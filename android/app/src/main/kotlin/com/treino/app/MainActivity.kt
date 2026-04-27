@@ -1,4 +1,4 @@
-package com.treino.treino
+package com.treino.app
 
 import io.flutter.embedding.android.FlutterActivity
 

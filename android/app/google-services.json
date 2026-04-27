@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "1079774251763",
+    "project_id": "treino-dev",
+    "storage_bucket": "treino-dev.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1079774251763:android:6810a95a4b3dce9b3f8586",
+        "android_client_info": {
+          "package_name": "com.treino.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDGa1H1FzTHhbDFEmjsrs20DuIUhiD8FDQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1079774251763:android:1752d1c0035d379e3f8586",
+        "android_client_info": {
+          "package_name": "com.treino.app.dev"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDGa1H1FzTHhbDFEmjsrs20DuIUhiD8FDQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
