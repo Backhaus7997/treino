@@ -4,12 +4,13 @@ App fitness multiplataforma (Flutter). Personal Trainers + comunidad + workout t
 
 > **Nuevo en el equipo?** Empezá por [CONTRIBUTING.md](./CONTRIBUTING.md) — guía de onboarding paso a paso.
 
-## Documentación clave
+## Documentación
 
 | Archivo | Para qué sirve |
 |---|---|
-| [AGENTS.md](./AGENTS.md) | **Constitución** del proyecto: reglas de naming, theming, performance, branching, scope. Cargado automáticamente por Claude Code, Cursor, Codex, etc. al abrir el repo. |
-| [CONTRIBUTING.md](./CONTRIBUTING.md) | Guía operativa para devs: setup, workflow diario, commits, PRs, troubleshooting. |
+| [AGENTS.md](./AGENTS.md) | **Constitución** del proyecto: índice + reglas críticas mínimas. Cargado automáticamente por Claude Code, Cursor, Codex, etc. |
+| [CONTRIBUTING.md](./CONTRIBUTING.md) | Onboarding técnico paso a paso para devs nuevos. |
+| [docs/](./docs/) | Documentación detallada por dominio: producto, design system, arquitectura, performance, workflow, roadmap. |
 | [.atl/skill-registry.md](./.atl/skill-registry.md) | Catálogo de las 24 skills de IA disponibles (11 Flutter + 13 SDD/ops). |
 
 ## Setup rápido
@@ -98,12 +99,8 @@ Detalles en [AGENTS.md → Branching](./AGENTS.md#branching) y [CONTRIBUTING.md 
 ## Roadmap
 
 - [x] **Fase 0** — Bootstrap, tema, navegación 5 tabs.
-- [ ] **Fase 1** — Auth (email + Google + Apple), Firebase, Profile setup.
-- [ ] **Fase 2** — Home + Rutinas (paridad con iOS).
-- [ ] **Fase 3** — Feed social.
-- [ ] **Fase 4** — Workout++ (bloques, super series, IA buscador, videos).
-- [ ] **Fase 5** — Coach / Personal Trainer (geohash, chat, agenda, planes).
-- [ ] **Fase 6** — Polish + lanzamiento beta.
+- [ ] **Fase 1** — Auth + Firebase + ProfileSetup (en curso). Etapa 1 ✅. Detalle de las 7 etapas en [docs/roadmap.md](./docs/roadmap.md).
+- [ ] **Fase 2-6** — ver [docs/roadmap.md](./docs/roadmap.md) para detalle completo.
 
 ## Equipo
 
