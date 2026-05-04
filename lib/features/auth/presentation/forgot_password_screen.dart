@@ -86,7 +86,8 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
         elevation: 0,
         leading: IconButton(
           icon: Icon(TreinoIcon.back, color: palette.textPrimary),
-          onPressed: () => context.pop(),
+          onPressed: () =>
+              context.canPop() ? context.pop() : context.go('/login'),
         ),
       ),
       body: SafeArea(

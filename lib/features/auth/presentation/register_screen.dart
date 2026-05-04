@@ -91,7 +91,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         elevation: 0,
         leading: IconButton(
           icon: Icon(TreinoIcon.back, color: palette.textPrimary),
-          onPressed: () => context.pop(),
+          onPressed: () =>
+              context.canPop() ? context.pop() : context.go('/welcome'),
         ),
         title: Text(
           AuthStrings.registerAppbar,

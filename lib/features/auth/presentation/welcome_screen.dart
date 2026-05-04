@@ -103,7 +103,7 @@ class WelcomeScreen extends ConsumerWidget {
                   // CTA
                   AuthPillButton(
                     label: AuthStrings.welcomeCta,
-                    onPressed: () => context.go('/register'),
+                    onPressed: () => context.push('/register'),
                   ),
                   const SizedBox(height: 14),
                   // Social buttons row
@@ -140,7 +140,7 @@ class WelcomeScreen extends ConsumerWidget {
                           ),
                         ),
                         GestureDetector(
-                          onTap: () => context.go('/login'),
+                          onTap: () => context.push('/login'),
                           child: Text(
                             AuthStrings.welcomeSignIn,
                             style: GoogleFonts.barlow(
