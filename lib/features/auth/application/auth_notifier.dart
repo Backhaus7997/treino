@@ -36,11 +36,13 @@ class AuthNotifier extends AsyncNotifier<User?> {
     final service = ref.read(authServiceProvider);
     final currentUser = state.valueOrNull;
     state = const AsyncLoading();
-    await AsyncValue.guard(
+    final result = await AsyncValue.guard(
       () => service.sendPasswordResetEmail(email: email),
     );
     // Restore user value — password reset does not change auth state.
     state = AsyncData(currentUser);
+    // Rethrow so screens can handle failure cases (e.g. mask userNotFound).
+    if (result is AsyncError) throw result.error;
   }
 
   Future<void> sendEmailVerification() async {
