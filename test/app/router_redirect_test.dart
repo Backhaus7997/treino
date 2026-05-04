@@ -66,28 +66,35 @@ void main() {
       );
 
   // ---------------------------------------------------------------------------
-  // Anonymous user
+  // Anonymous user — shell routes redirect to /welcome
   // ---------------------------------------------------------------------------
   group('redirect — anonymous user', () {
-    test('scenario 15.1 — anon + /home → /login', () async {
+    test('anon + /home → /welcome', () async {
       final c = anonContainer();
       addTearDown(c.dispose);
       await c.read(authNotifierProvider.future);
-      expect(callRedirect(c, '/home'), '/login');
+      expect(callRedirect(c, '/home'), '/welcome');
     });
 
-    test('scenario 15.2 — anon + /workout → /login', () async {
+    test('anon + /workout → /welcome', () async {
       final c = anonContainer();
       addTearDown(c.dispose);
       await c.read(authNotifierProvider.future);
-      expect(callRedirect(c, '/workout'), '/login');
+      expect(callRedirect(c, '/workout'), '/welcome');
     });
 
-    test('scenario 15.3 — anon + /login → null (stay)', () async {
+    test('anon + /login → null (stay)', () async {
       final c = anonContainer();
       addTearDown(c.dispose);
       await c.read(authNotifierProvider.future);
       expect(callRedirect(c, '/login'), isNull);
+    });
+
+    test('anon + /welcome → null (stay)', () async {
+      final c = anonContainer();
+      addTearDown(c.dispose);
+      await c.read(authNotifierProvider.future);
+      expect(callRedirect(c, '/welcome'), isNull);
     });
 
     test('anon + /register → null (stay)', () async {
@@ -104,6 +111,13 @@ void main() {
       expect(callRedirect(c, '/forgot-password'), isNull);
     });
 
+    test('anon + /splash → null (no redirect on splash)', () async {
+      final c = anonContainer();
+      addTearDown(c.dispose);
+      await c.read(authNotifierProvider.future);
+      expect(callRedirect(c, '/splash'), isNull);
+    });
+
     test('anon + /login/deep → null (startsWith semantics)', () async {
       final c = anonContainer();
       addTearDown(c.dispose);
@@ -113,7 +127,7 @@ void main() {
   });
 
   // ---------------------------------------------------------------------------
-  // Authenticated user
+  // Authenticated user — auth routes redirect to /home
   // ---------------------------------------------------------------------------
   group('redirect — authenticated user', () {
     test('scenario 16.1 — user + /login → /home', () async {
@@ -143,17 +157,30 @@ void main() {
       await c.read(authNotifierProvider.future);
       expect(callRedirect(c, '/workout'), isNull);
     });
+
+    test('user + /welcome → /home', () async {
+      final c = loggedInContainer();
+      addTearDown(c.dispose);
+      await c.read(authNotifierProvider.future);
+      expect(callRedirect(c, '/welcome'), '/home');
+    });
+
+    test('user + /splash → null (splash handles its own navigation)', () async {
+      final c = loggedInContainer();
+      addTearDown(c.dispose);
+      await c.read(authNotifierProvider.future);
+      expect(callRedirect(c, '/splash'), isNull);
+    });
   });
 
   // ---------------------------------------------------------------------------
-  // AsyncLoading state
+  // AsyncLoading state — never redirects
   // ---------------------------------------------------------------------------
   group('redirect — AsyncLoading state', () {
     test('scenario 17.1 — loading + /home → null (no redirect while resolving)',
         () {
       final c = loadingContainer();
       addTearDown(c.dispose);
-      // Do NOT await future — we want the loading state
       expect(callRedirect(c, '/home'), isNull);
     });
 

@@ -32,7 +32,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 
     final user = ref.read(authNotifierProvider).valueOrNull;
     if (user != null) {
-      context.go('/');
+      context.go('/home');
     } else {
       context.go('/welcome');
     }

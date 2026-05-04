@@ -28,8 +28,8 @@ GoRouter _makeRouter(Widget splash) => GoRouter(
           builder: (_, __) => const Scaffold(body: Text('WELCOME')),
         ),
         GoRoute(
-          path: '/',
-          builder: (_, __) => const Scaffold(body: Text('HOME_ROOT')),
+          path: '/home',
+          builder: (_, __) => const Scaffold(body: Text('HOME')),
         ),
       ],
     );
@@ -91,6 +91,6 @@ void main() {
     await tester.pump(const Duration(milliseconds: 1600));
     await tester.pumpAndSettle();
 
-    expect(find.text('HOME_ROOT'), findsOneWidget);
+    expect(find.text('HOME'), findsOneWidget);
   });
 }

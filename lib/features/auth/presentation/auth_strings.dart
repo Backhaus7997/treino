@@ -74,25 +74,4 @@ abstract final class AuthStrings {
 
   // --- Profile ---
   static const profileSignOut = 'Cerrar sesión';
-
-  // ---------------------------------------------------------------------------
-  // Legacy aliases — used by old screens still in place; will be removed when
-  // each screen is rewritten in Groups 6-8.
-  // ---------------------------------------------------------------------------
-  static const loginSubmit = loginCta;
-  static const registerSubmit = registerCta;
-  static const registerConfirmLabel = 'CONFIRMAR CONTRASEÑA';
-  static const registerHasAccount = '¿Ya tenés cuenta?';
-  static const registerLoginLink = 'Iniciá sesión';
-  static const forgotSubtitle = forgotBody;
-  static const forgotSubmit = forgotCta;
-  static String forgotSuccessEmail(String email) => forgotSuccess;
-
-  // Verification banner (EmailVerificationBanner is being removed in T20,
-  // but still compiles until then)
-  static const verifyBannerTitle = 'Verificá tu email';
-  static const verifyBannerSubtitle =
-      'Te enviamos un enlace de verificación. Tocá Reenviar si no lo recibiste.';
-  static const verifyResend = 'Reenviar';
-  static const verifyDismiss = 'Ahora no';
 }

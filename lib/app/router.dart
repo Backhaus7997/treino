@@ -7,6 +7,8 @@ import '../features/auth/application/auth_providers.dart';
 import '../features/auth/presentation/forgot_password_screen.dart';
 import '../features/auth/presentation/login_screen.dart';
 import '../features/auth/presentation/register_screen.dart';
+import '../features/auth/presentation/splash_screen.dart';
+import '../features/auth/presentation/welcome_screen.dart';
 import '../features/coach/coach_screen.dart';
 import '../features/feed/feed_screen.dart';
 import '../features/home/home_screen.dart';
@@ -15,7 +17,15 @@ import '../features/workout/workout_screen.dart';
 import 'theme/app_background.dart';
 
 const _kTabs = ['/workout', '/feed', '/home', '/coach', '/profile'];
-const _authRoutes = {'/login', '/register', '/forgot-password'};
+
+/// Routes that are public (no redirect when anonymous).
+const _publicRoutes = {
+  '/splash',
+  '/welcome',
+  '/login',
+  '/register',
+  '/forgot-password',
+};
 
 /// Pure redirect logic — extracted as a top-level function so it is unit-testable
 /// without a widget tree (REQ-AUTH-022, REQ-AUTH-023, REQ-AUTH-024).
@@ -32,11 +42,12 @@ String? authRedirect(
 
   final user = auth.valueOrNull;
   final loggedIn = user != null;
-  final isAuthRoute = _authRoutes.any(location.startsWith);
+  final isPublic = _publicRoutes.any(location.startsWith);
 
-  // REQ-AUTH-023:
-  if (!loggedIn && !isAuthRoute) return '/login';
-  if (loggedIn && isAuthRoute) return '/home';
+  // Anonymous on a protected route → /welcome.
+  if (!loggedIn && !isPublic) return '/welcome';
+  // Authenticated on a public route (except /splash) → /home.
+  if (loggedIn && isPublic && !location.startsWith('/splash')) return '/home';
   return null;
 }
 
@@ -45,10 +56,19 @@ GoRouter buildRouter({
   required T Function<T>(ProviderListenable<T>) read,
 }) {
   return GoRouter(
-    initialLocation: '/home',
+    initialLocation: '/splash',
     refreshListenable: refreshListenable,
     redirect: (ctx, state) => authRedirect(read, state.matchedLocation),
     routes: [
+      // Entry routes — full screen, NO bottom bar
+      GoRoute(
+        path: '/splash',
+        pageBuilder: (_, __) => _noAnim(const SplashScreen()),
+      ),
+      GoRoute(
+        path: '/welcome',
+        pageBuilder: (_, __) => _noAnim(const WelcomeScreen()),
+      ),
       // Auth routes — full screen, NO bottom bar
       GoRoute(
         path: '/login',
