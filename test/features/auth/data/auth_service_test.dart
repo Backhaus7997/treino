@@ -55,6 +55,39 @@ void main() {
       verify(() => user.sendEmailVerification()).called(1);
     });
 
+    test('D03 — displayName provided: calls updateDisplayName', () async {
+      when(
+        () => fbAuth.createUserWithEmailAndPassword(
+          email: any(named: 'email'),
+          password: any(named: 'password'),
+        ),
+      ).thenAnswer((_) async => cred);
+      when(() => user.updateDisplayName(any())).thenAnswer((_) async {});
+      when(() => user.sendEmailVerification()).thenAnswer((_) async {});
+
+      await sut.signUpWithEmail(
+        email: 'a@b.c',
+        password: 'Pass1234',
+        displayName: 'Ana Núñez',
+      );
+
+      verify(() => user.updateDisplayName('Ana Núñez')).called(1);
+    });
+
+    test('D03 — displayName null: updateDisplayName NOT called', () async {
+      when(
+        () => fbAuth.createUserWithEmailAndPassword(
+          email: any(named: 'email'),
+          password: any(named: 'password'),
+        ),
+      ).thenAnswer((_) async => cred);
+      when(() => user.sendEmailVerification()).thenAnswer((_) async {});
+
+      await sut.signUpWithEmail(email: 'a@b.c', password: 'Pass1234');
+
+      verifyNever(() => user.updateDisplayName(any()));
+    });
+
     test('scenario 5.2 — maps email-already-in-use to emailAlreadyInUse',
         () async {
       when(

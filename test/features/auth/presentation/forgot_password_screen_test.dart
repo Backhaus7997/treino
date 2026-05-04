@@ -10,7 +10,7 @@ import 'package:treino/features/auth/application/auth_notifier.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/auth/domain/auth_failure.dart';
 import 'package:treino/features/auth/presentation/forgot_password_screen.dart';
-import 'package:treino/features/auth/presentation/widgets/auth_primary_button.dart';
+import 'package:treino/features/auth/presentation/widgets/auth_pill_button.dart';
 
 class MockUser extends Mock implements User {}
 
@@ -64,11 +64,11 @@ void main() {
     );
     await tester.pump();
 
-    await tester.tap(find.byType(AuthPrimaryButton));
+    await tester.tap(find.byType(AuthPillButton));
     await tester.pumpAndSettle();
 
     expect(
-      find.textContaining('Te enviamos un email a user@example.com'),
+      find.textContaining('Si tu email está registrado'),
       findsOneWidget,
     );
   });
@@ -82,7 +82,7 @@ void main() {
 
     await tester.enterText(find.byType(TextFormField), 'user@example.com');
     await tester.pump();
-    await tester.tap(find.byType(AuthPrimaryButton));
+    await tester.tap(find.byType(AuthPillButton));
     await tester.pumpAndSettle();
 
     // Field should be non-editable (enabled: false)
@@ -111,12 +111,12 @@ void main() {
     );
     await tester.pump();
 
-    await tester.tap(find.byType(AuthPrimaryButton));
+    await tester.tap(find.byType(AuthPillButton));
     await tester.pumpAndSettle();
 
     // Should show success message, NOT an error banner
     expect(
-      find.textContaining('Te enviamos un email a ghost@example.com'),
+      find.textContaining('Si tu email está registrado'),
       findsOneWidget,
     );
     expect(
@@ -141,7 +141,7 @@ void main() {
     await tester.enterText(find.byType(TextFormField), 'user@example.com');
     await tester.pump();
 
-    await tester.tap(find.byType(AuthPrimaryButton));
+    await tester.tap(find.byType(AuthPillButton));
     await tester.pumpAndSettle();
 
     expect(
@@ -167,10 +167,10 @@ void main() {
 
     // Tap submit and pump once — _submit sets _isLoading=true synchronously
     // before awaiting the completer, so the spinner is visible after one pump.
-    await tester.tap(find.byType(AuthPrimaryButton));
+    await tester.tap(find.byType(AuthPillButton));
     await tester.pump(); // allow setState(_isLoading=true) to render
 
-    // The button should show the spinner (isLoading:true on AuthPrimaryButton)
+    // The button should show the spinner (isLoading:true on AuthPillButton)
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
   });
 }

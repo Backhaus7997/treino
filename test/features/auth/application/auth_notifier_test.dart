@@ -172,6 +172,7 @@ void main() {
         () => mockService.signUpWithEmail(
           email: any(named: 'email'),
           password: any(named: 'password'),
+          displayName: any(named: 'displayName'),
         ),
       ).thenAnswer((_) async {
         streamController.add(mockUser);
@@ -184,6 +185,44 @@ void main() {
 
       final state = container.read(authNotifierProvider);
       expect(state.hasValue, isTrue);
+    });
+
+    test('D05 — displayName is passed through to service', () async {
+      final streamController = StreamController<User?>();
+      final container = buildContainer(
+        mockService: mockService,
+        authStream: streamController.stream,
+      );
+      addTearDown(() {
+        container.dispose();
+        streamController.close();
+      });
+
+      streamController.add(null);
+      await container.read(authNotifierProvider.future);
+
+      when(
+        () => mockService.signUpWithEmail(
+          email: any(named: 'email'),
+          password: any(named: 'password'),
+          displayName: any(named: 'displayName'),
+        ),
+      ).thenAnswer((_) async {
+        streamController.add(mockUser);
+        return mockUser;
+      });
+
+      await container
+          .read(authNotifierProvider.notifier)
+          .signUp(email: 'a@b.c', password: 'Pass1234', displayName: 'Ana');
+
+      verify(
+        () => mockService.signUpWithEmail(
+          email: 'a@b.c',
+          password: 'Pass1234',
+          displayName: 'Ana',
+        ),
+      ).called(1);
     });
   });
 

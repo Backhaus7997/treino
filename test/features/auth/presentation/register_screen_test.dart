@@ -8,7 +8,10 @@ import 'package:treino/features/auth/application/auth_notifier.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/auth/domain/auth_failure.dart';
 import 'package:treino/features/auth/presentation/register_screen.dart';
-import 'package:treino/features/auth/presentation/widgets/auth_primary_button.dart';
+import 'package:treino/features/auth/presentation/widgets/auth_pill_button.dart';
+import 'package:treino/features/auth/presentation/widgets/auth_secondary_button.dart';
+import 'package:treino/features/auth/presentation/widgets/password_strength_bar.dart';
+import 'package:treino/features/auth/presentation/widgets/terms_checkbox.dart';
 
 class MockUser extends Mock implements User {}
 
@@ -16,14 +19,21 @@ class _TestAuthNotifier extends AuthNotifier {
   _TestAuthNotifier({User? initialUser}) : _initialUser = initialUser;
 
   final User? _initialUser;
-  Future<void> Function(String email, String password)? onSignUp;
+  Future<void> Function(String email, String password, {String? displayName})?
+      onSignUp;
 
   @override
   Future<User?> build() async => _initialUser;
 
   @override
-  Future<void> signUp({required String email, required String password}) async {
-    if (onSignUp != null) await onSignUp!(email, password);
+  Future<void> signUp({
+    required String email,
+    required String password,
+    String? displayName,
+  }) async {
+    if (onSignUp != null) {
+      await onSignUp!(email, password, displayName: displayName);
+    }
   }
 }
 
@@ -60,12 +70,45 @@ void main() {
   });
 
   // ---------------------------------------------------------------------------
-  // REQ-AUTH-001: exactly 3 fields
+  // REQ-AUTH-001 (rework): exactly 3 fields — name, email, password
   // ---------------------------------------------------------------------------
-  testWidgets('REQ-AUTH-001 — exactly 3 fields rendered', (tester) async {
+  testWidgets('REQ-AUTH-001 — exactly 3 fields rendered (name/email/password)',
+      (tester) async {
     await tester.pumpWidget(_buildApp(notifier: _TestAuthNotifier()));
     await tester.pumpAndSettle();
     expect(find.byType(TextFormField), findsNWidgets(3));
+  });
+
+  // ---------------------------------------------------------------------------
+  // PasswordStrengthBar is visible
+  // ---------------------------------------------------------------------------
+  testWidgets('PasswordStrengthBar is rendered', (tester) async {
+    await tester.pumpWidget(_buildApp(notifier: _TestAuthNotifier()));
+    await tester.pumpAndSettle();
+    expect(find.byType(PasswordStrengthBar), findsOneWidget);
+  });
+
+  // ---------------------------------------------------------------------------
+  // TermsCheckbox is visible
+  // ---------------------------------------------------------------------------
+  testWidgets('TermsCheckbox is rendered', (tester) async {
+    await tester.pumpWidget(_buildApp(notifier: _TestAuthNotifier()));
+    await tester.pumpAndSettle();
+    expect(find.byType(TermsCheckbox), findsOneWidget);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Google and Apple buttons are disabled
+  // ---------------------------------------------------------------------------
+  testWidgets('Google and Apple social buttons are present and disabled',
+      (tester) async {
+    await tester.pumpWidget(_buildApp(notifier: _TestAuthNotifier()));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AuthSecondaryButton), findsNWidgets(2));
+    final buttons =
+        tester.widgetList<OutlinedButton>(find.byType(OutlinedButton)).toList();
+    expect(buttons.every((b) => b.onPressed == null), isTrue);
   });
 
   // ---------------------------------------------------------------------------
@@ -76,7 +119,7 @@ void main() {
     await tester.pumpAndSettle();
     final btn = tester.widget<ElevatedButton>(
       find.descendant(
-        of: find.byType(AuthPrimaryButton),
+        of: find.byType(AuthPillButton),
         matching: find.byType(ElevatedButton),
       ),
     );
@@ -84,11 +127,47 @@ void main() {
   });
 
   // ---------------------------------------------------------------------------
+  // CTA disabled until terms accepted
+  // ---------------------------------------------------------------------------
+  testWidgets('CTA disabled until terms checkbox is checked', (tester) async {
+    await tester.pumpWidget(_buildApp(notifier: _TestAuthNotifier()));
+    await tester.pumpAndSettle();
+
+    final fields = find.byType(TextFormField);
+    await tester.enterText(fields.at(0), 'Ana Núñez');
+    await tester.enterText(fields.at(1), 'test@example.com');
+    await tester.enterText(fields.at(2), 'Pass1234');
+    await tester.pump();
+
+    // Terms not checked → CTA still disabled
+    final btnBefore = tester.widget<ElevatedButton>(
+      find.descendant(
+        of: find.byType(AuthPillButton),
+        matching: find.byType(ElevatedButton),
+      ),
+    );
+    expect(btnBefore.onPressed, isNull);
+
+    // Tap the checkbox
+    await tester.tap(find.byType(Checkbox));
+    await tester.pump();
+
+    // Now CTA should be enabled
+    final btnAfter = tester.widget<ElevatedButton>(
+      find.descendant(
+        of: find.byType(AuthPillButton),
+        matching: find.byType(ElevatedButton),
+      ),
+    );
+    expect(btnAfter.onPressed, isNotNull);
+  });
+
+  // ---------------------------------------------------------------------------
   // Scenario 1.1: happy path → /home
   // ---------------------------------------------------------------------------
   testWidgets('scenario 1.1 — happy path navigates to /home', (tester) async {
     final notifier = _TestAuthNotifier();
-    notifier.onSignUp = (email, password) async {
+    notifier.onSignUp = (email, password, {String? displayName}) async {
       notifier.state = AsyncData(mockUser);
     };
 
@@ -96,12 +175,18 @@ void main() {
     await tester.pumpAndSettle();
 
     final fields = find.byType(TextFormField);
-    await tester.enterText(fields.at(0), 'test@example.com');
-    await tester.enterText(fields.at(1), 'Pass1234');
+    await tester.enterText(fields.at(0), 'Ana Núñez');
+    await tester.enterText(fields.at(1), 'test@example.com');
     await tester.enterText(fields.at(2), 'Pass1234');
     await tester.pump();
 
-    await tester.tap(find.byType(AuthPrimaryButton));
+    // Accept terms
+    await tester.ensureVisible(find.byType(Checkbox));
+    await tester.tap(find.byType(Checkbox));
+    await tester.pump();
+
+    await tester.ensureVisible(find.byType(AuthPillButton));
+    await tester.tap(find.byType(AuthPillButton));
     await tester.pumpAndSettle();
 
     expect(find.text('HOME'), findsOneWidget);
@@ -116,13 +201,17 @@ void main() {
     await tester.pumpAndSettle();
 
     final fields = find.byType(TextFormField);
-    await tester.enterText(fields.at(0), 'not-an-email');
-    await tester.enterText(fields.at(1), 'Pass1234');
+    await tester.enterText(fields.at(0), 'Ana Núñez');
+    await tester.enterText(fields.at(1), 'not-an-email');
     await tester.enterText(fields.at(2), 'Pass1234');
     await tester.pump();
 
-    // Try to submit to trigger validation
-    await tester.tap(find.byType(AuthPrimaryButton));
+    // Accept terms then submit to trigger validation
+    await tester.ensureVisible(find.byType(Checkbox));
+    await tester.tap(find.byType(Checkbox));
+    await tester.pump();
+    await tester.ensureVisible(find.byType(AuthPillButton));
+    await tester.tap(find.byType(AuthPillButton));
     await tester.pump();
 
     expect(find.text('El email no es válido'), findsOneWidget);
@@ -137,12 +226,16 @@ void main() {
     await tester.pumpAndSettle();
 
     final fields = find.byType(TextFormField);
-    await tester.enterText(fields.at(0), 'test@example.com');
-    await tester.enterText(fields.at(1), 'abc123'); // < 8 chars
-    await tester.enterText(fields.at(2), 'abc123');
+    await tester.enterText(fields.at(0), 'Ana Núñez');
+    await tester.enterText(fields.at(1), 'test@example.com');
+    await tester.enterText(fields.at(2), 'abc123'); // < 8 chars
     await tester.pump();
 
-    await tester.tap(find.byType(AuthPrimaryButton));
+    await tester.ensureVisible(find.byType(Checkbox));
+    await tester.tap(find.byType(Checkbox));
+    await tester.pump();
+    await tester.ensureVisible(find.byType(AuthPillButton));
+    await tester.tap(find.byType(AuthPillButton));
     await tester.pump();
 
     expect(
@@ -162,12 +255,16 @@ void main() {
     await tester.pumpAndSettle();
 
     final fields = find.byType(TextFormField);
-    await tester.enterText(fields.at(0), 'test@example.com');
-    await tester.enterText(fields.at(1), 'abcdefgh'); // no numbers
-    await tester.enterText(fields.at(2), 'abcdefgh');
+    await tester.enterText(fields.at(0), 'Ana Núñez');
+    await tester.enterText(fields.at(1), 'test@example.com');
+    await tester.enterText(fields.at(2), 'abcdefgh'); // no numbers
     await tester.pump();
 
-    await tester.tap(find.byType(AuthPrimaryButton));
+    await tester.ensureVisible(find.byType(Checkbox));
+    await tester.tap(find.byType(Checkbox));
+    await tester.pump();
+    await tester.ensureVisible(find.byType(AuthPillButton));
+    await tester.tap(find.byType(AuthPillButton));
     await tester.pump();
 
     expect(
@@ -187,12 +284,16 @@ void main() {
     await tester.pumpAndSettle();
 
     final fields = find.byType(TextFormField);
-    await tester.enterText(fields.at(0), 'test@example.com');
-    await tester.enterText(fields.at(1), '12345678'); // no letters
-    await tester.enterText(fields.at(2), '12345678');
+    await tester.enterText(fields.at(0), 'Ana Núñez');
+    await tester.enterText(fields.at(1), 'test@example.com');
+    await tester.enterText(fields.at(2), '12345678'); // no letters
     await tester.pump();
 
-    await tester.tap(find.byType(AuthPrimaryButton));
+    await tester.ensureVisible(find.byType(Checkbox));
+    await tester.tap(find.byType(Checkbox));
+    await tester.pump();
+    await tester.ensureVisible(find.byType(AuthPillButton));
+    await tester.tap(find.byType(AuthPillButton));
     await tester.pump();
 
     expect(
@@ -204,32 +305,12 @@ void main() {
   });
 
   // ---------------------------------------------------------------------------
-  // Scenario 4.1: passwords don't match
-  // ---------------------------------------------------------------------------
-  testWidgets('scenario 4.1 — passwords mismatch shows validation message',
-      (tester) async {
-    await tester.pumpWidget(_buildApp(notifier: _TestAuthNotifier()));
-    await tester.pumpAndSettle();
-
-    final fields = find.byType(TextFormField);
-    await tester.enterText(fields.at(0), 'test@example.com');
-    await tester.enterText(fields.at(1), 'Pass1234');
-    await tester.enterText(fields.at(2), 'Pass5678'); // mismatch
-    await tester.pump();
-
-    await tester.tap(find.byType(AuthPrimaryButton));
-    await tester.pump();
-
-    expect(find.text('Las contraseñas no coinciden'), findsOneWidget);
-  });
-
-  // ---------------------------------------------------------------------------
   // Scenario 5.1: email already in use → banner
   // ---------------------------------------------------------------------------
   testWidgets('scenario 5.1 — email-already-in-use shows error banner',
       (tester) async {
     final notifier = _TestAuthNotifier();
-    notifier.onSignUp = (email, password) async {
+    notifier.onSignUp = (email, password, {String? displayName}) async {
       notifier.state = const AsyncError(
         AuthFailure.emailAlreadyInUse(),
         StackTrace.empty,
@@ -240,12 +321,16 @@ void main() {
     await tester.pumpAndSettle();
 
     final fields = find.byType(TextFormField);
-    await tester.enterText(fields.at(0), 'existing@example.com');
-    await tester.enterText(fields.at(1), 'Pass1234');
+    await tester.enterText(fields.at(0), 'Ana Núñez');
+    await tester.enterText(fields.at(1), 'existing@example.com');
     await tester.enterText(fields.at(2), 'Pass1234');
     await tester.pump();
 
-    await tester.tap(find.byType(AuthPrimaryButton));
+    await tester.ensureVisible(find.byType(Checkbox));
+    await tester.tap(find.byType(Checkbox));
+    await tester.pump();
+    await tester.ensureVisible(find.byType(AuthPillButton));
+    await tester.tap(find.byType(AuthPillButton));
     await tester.pumpAndSettle();
 
     expect(find.text('Ya existe una cuenta con ese email'), findsOneWidget);

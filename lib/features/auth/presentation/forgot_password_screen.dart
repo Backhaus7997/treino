@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
+import '../../../core/widgets/treino_icon.dart';
 import '../application/auth_providers.dart';
 import '../domain/auth_failure.dart';
 import 'auth_strings.dart';
 import 'widgets/auth_failure_banner.dart';
-import 'widgets/auth_primary_button.dart';
-import 'widgets/auth_text_field.dart';
+import 'widgets/auth_input.dart';
+import 'widgets/auth_pill_button.dart';
 
 class ForgotPasswordScreen extends ConsumerStatefulWidget {
   const ForgotPasswordScreen({super.key});
@@ -21,7 +23,6 @@ class ForgotPasswordScreen extends ConsumerStatefulWidget {
 class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
   final _emailCtrl = TextEditingController();
   bool _sent = false;
-  String _sentEmail = '';
   AuthFailure? _failure;
   bool _isLoading = false;
 
@@ -52,7 +53,6 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
       // Success or userNotFound both treated as success (REQ-AUTH-011).
       setState(() {
         _sent = true;
-        _sentEmail = email;
         _isLoading = false;
       });
     } on AuthFailure catch (f) {
@@ -61,7 +61,6 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
       if (f == const AuthFailure.userNotFound()) {
         setState(() {
           _sent = true;
-          _sentEmail = email;
           _isLoading = false;
         });
       } else {
@@ -72,51 +71,70 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
       }
     } catch (_) {
       if (!mounted) return;
-      setState(() {
-        _isLoading = false;
-      });
+      setState(() => _isLoading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    final theme = Theme.of(context);
 
     return Scaffold(
+      backgroundColor: palette.bg,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: Icon(TreinoIcon.back, color: palette.textPrimary),
+          onPressed: () => context.pop(),
+        ),
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+          padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(height: 20),
+              const SizedBox(height: 12),
+              // Headline
               Text(
                 AuthStrings.forgotTitle,
-                style: theme.textTheme.headlineMedium?.copyWith(
+                style: GoogleFonts.barlowCondensed(
+                  fontSize: 46,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.5,
                   color: palette.textPrimary,
+                  height: 1.0,
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 12),
+              // Body
               Text(
-                AuthStrings.forgotSubtitle,
-                style: theme.textTheme.bodyMedium?.copyWith(
+                AuthStrings.forgotBody,
+                style: GoogleFonts.barlow(
+                  fontSize: 15,
                   color: palette.textMuted,
+                  height: 1.5,
                 ),
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 28),
               if (_sent) ...[
+                // Success state
                 Text(
-                  AuthStrings.forgotSuccess(_sentEmail),
-                  style: theme.textTheme.bodyMedium?.copyWith(
+                  AuthStrings.forgotSuccess,
+                  style: GoogleFonts.barlow(
+                    fontSize: 15,
                     color: palette.accent,
+                    height: 1.5,
                   ),
                 ),
                 const SizedBox(height: 20),
                 // Field shown as read-only after success
-                AuthTextField(
+                AuthInput(
                   controller: _emailCtrl,
                   label: AuthStrings.forgotEmailLabel,
+                  hint: AuthStrings.forgotEmailHint,
+                  leadingIcon: TreinoIcon.mail,
                   keyboardType: TextInputType.emailAddress,
                   enabled: false,
                 ),
@@ -125,13 +143,20 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                   onPressed: () => context.go('/login'),
                   child: Text(
                     AuthStrings.forgotBackToLogin,
-                    style: TextStyle(color: palette.accent),
+                    style: GoogleFonts.barlow(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: palette.accent,
+                    ),
                   ),
                 ),
               ] else ...[
-                AuthTextField(
+                // Form state
+                AuthInput(
                   controller: _emailCtrl,
                   label: AuthStrings.forgotEmailLabel,
+                  hint: AuthStrings.forgotEmailHint,
+                  leadingIcon: TreinoIcon.mail,
                   keyboardType: TextInputType.emailAddress,
                   textInputAction: TextInputAction.done,
                   autofillHints: const [AutofillHints.email],
@@ -143,18 +168,10 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                   AuthFailureBanner(failure: _failure!),
                   const SizedBox(height: 12),
                 ],
-                AuthPrimaryButton(
-                  label: AuthStrings.forgotSubmit,
+                AuthPillButton(
+                  label: AuthStrings.forgotCta,
                   onPressed: _emailCtrl.text.trim().isEmpty ? null : _submit,
                   isLoading: _isLoading,
-                ),
-                const SizedBox(height: 20),
-                TextButton(
-                  onPressed: () => context.go('/login'),
-                  child: Text(
-                    AuthStrings.forgotBackToLogin,
-                    style: TextStyle(color: palette.accent),
-                  ),
                 ),
               ],
             ],

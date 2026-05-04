@@ -7,11 +7,12 @@ class AuthService {
 
   final FirebaseAuth _auth;
 
-  /// Creates the user, sends verification email automatically (REQ-AUTH-003).
-  /// Throws [AuthFailure].
+  /// Creates the user, optionally sets [displayName], and sends verification
+  /// email automatically (REQ-AUTH-003). Throws [AuthFailure].
   Future<User> signUpWithEmail({
     required String email,
     required String password,
+    String? displayName,
   }) async {
     try {
       final cred = await _auth.createUserWithEmailAndPassword(
@@ -19,6 +20,9 @@ class AuthService {
         password: password,
       );
       final user = cred.user!;
+      if (displayName != null) {
+        await user.updateDisplayName(displayName);
+      }
       await user.sendEmailVerification();
       return user;
     } on FirebaseAuthException catch (e) {

@@ -1,14 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
+import '../../../core/widgets/treino_icon.dart';
 import '../application/auth_providers.dart';
 import '../domain/auth_failure.dart';
 import 'auth_strings.dart';
 import 'widgets/auth_failure_banner.dart';
-import 'widgets/auth_primary_button.dart';
-import 'widgets/auth_text_field.dart';
+import 'widgets/auth_input.dart';
+import 'widgets/auth_pill_button.dart';
+import 'widgets/auth_secondary_button.dart';
+import 'widgets/trainer_inquiry_card.dart';
+import 'widgets/treino_logo.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -23,6 +28,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _passwordCtrl = TextEditingController();
   final _emailFocus = FocusNode();
   final _passwordFocus = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    _emailCtrl.addListener(() => setState(() {}));
+    _passwordCtrl.addListener(() => setState(() {}));
+  }
 
   @override
   void dispose() {
@@ -42,8 +54,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           password: _passwordCtrl.text,
         );
     if (!mounted) return;
-    final state = ref.read(authNotifierProvider);
-    if (state.hasValue && state.valueOrNull != null) {
+    final s = ref.read(authNotifierProvider);
+    if (s.hasValue && s.valueOrNull != null) {
       context.go('/home');
     }
   }
@@ -57,29 +69,48 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         : null;
 
     final palette = AppPalette.of(context);
-    final theme = Theme.of(context);
 
     return Scaffold(
+      backgroundColor: palette.bg,
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+          padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Form(
             key: _formKey,
-            onChanged: () => setState(() {}),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SizedBox(height: 20),
+                const SizedBox(height: 32),
+                // Logo centered
+                const Center(child: TreinoLogo(size: 56)),
+                const SizedBox(height: 32),
+                // Headline
                 Text(
                   AuthStrings.loginTitle,
-                  style: theme.textTheme.headlineMedium?.copyWith(
+                  style: GoogleFonts.barlowCondensed(
+                    fontSize: 46,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.5,
                     color: palette.textPrimary,
+                    height: 1.0,
                   ),
                 ),
-                const SizedBox(height: 32),
-                AuthTextField(
+                const SizedBox(height: 8),
+                // Subtitle
+                Text(
+                  AuthStrings.loginSubtitle,
+                  style: GoogleFonts.barlow(
+                    fontSize: 15,
+                    color: palette.textMuted,
+                  ),
+                ),
+                const SizedBox(height: 28),
+                // Email field
+                AuthInput(
                   controller: _emailCtrl,
                   label: AuthStrings.loginEmailLabel,
+                  hint: AuthStrings.loginEmailHint,
+                  leadingIcon: TreinoIcon.mail,
                   keyboardType: TextInputType.emailAddress,
                   textInputAction: TextInputAction.next,
                   focusNode: _emailFocus,
@@ -87,53 +118,115 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   autofillHints: const [AutofillHints.email],
                 ),
                 const SizedBox(height: 14),
-                AuthTextField(
+                // Password field
+                AuthInput(
                   controller: _passwordCtrl,
                   label: AuthStrings.loginPasswordLabel,
-                  isPassword: true,
+                  leadingIcon: TreinoIcon.lock,
+                  obscureText: true,
+                  suffixToggle: true,
                   textInputAction: TextInputAction.done,
                   focusNode: _passwordFocus,
                   onFieldSubmitted: (_) => _fieldsEmpty ? null : _submit(),
                   autofillHints: const [AutofillHints.password],
                 ),
-                const SizedBox(height: 8),
+                // Forgot password — right aligned
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton(
                     onPressed: () => context.push('/forgot-password'),
                     child: Text(
                       AuthStrings.loginForgot,
-                      style: TextStyle(color: palette.accent),
+                      style: GoogleFonts.barlow(
+                        fontSize: 14,
+                        color: palette.accent,
+                      ),
                     ),
                   ),
                 ),
-                const SizedBox(height: 8),
+                // Error banner
                 if (failure != null) ...[
                   AuthFailureBanner(failure: failure),
                   const SizedBox(height: 12),
                 ],
-                AuthPrimaryButton(
-                  label: AuthStrings.loginSubmit,
+                // CTA
+                AuthPillButton(
+                  label: AuthStrings.loginCta,
                   onPressed: _fieldsEmpty ? null : _submit,
                   isLoading: isLoading,
                 ),
                 const SizedBox(height: 20),
+                // Divider "O CONTINUÁ CON"
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text(
-                      AuthStrings.loginNoAccount,
-                      style: TextStyle(color: palette.textMuted),
-                    ),
-                    TextButton(
-                      onPressed: () => context.push('/register'),
+                    const Expanded(child: Divider()),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
                       child: Text(
-                        AuthStrings.loginRegisterLink,
-                        style: TextStyle(color: palette.accent),
+                        AuthStrings.loginContinueWith,
+                        style: GoogleFonts.barlowCondensed(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 1.5,
+                          color: palette.textMuted,
+                        ),
+                      ),
+                    ),
+                    const Expanded(child: Divider()),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                // Social buttons
+                const Row(
+                  children: [
+                    Expanded(
+                      child: AuthSecondaryButton(
+                        icon: TreinoIcon.googleLogo,
+                        label: AuthStrings.googleLabel,
+                        onPressed: null,
+                      ),
+                    ),
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: AuthSecondaryButton(
+                        icon: TreinoIcon.appleLogo,
+                        label: AuthStrings.appleLabel,
+                        onPressed: null,
                       ),
                     ),
                   ],
                 ),
+                const SizedBox(height: 20),
+                // No account row
+                Center(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '${AuthStrings.loginNoAccount} ',
+                        style: GoogleFonts.barlow(
+                          fontSize: 14,
+                          color: palette.textMuted,
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: () => context.push('/register'),
+                        child: Text(
+                          AuthStrings.loginRegisterLink,
+                          style: GoogleFonts.barlow(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: palette.accent,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+                // Trainer inquiry card
+                const TrainerInquiryCard(),
+                const SizedBox(height: 20),
               ],
             ),
           ),

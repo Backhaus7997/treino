@@ -8,7 +8,7 @@ import 'package:treino/features/auth/application/auth_notifier.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/auth/domain/auth_failure.dart';
 import 'package:treino/features/auth/presentation/login_screen.dart';
-import 'package:treino/features/auth/presentation/widgets/auth_primary_button.dart';
+import 'package:treino/features/auth/presentation/widgets/auth_pill_button.dart';
 
 class MockUser extends Mock implements User {}
 
@@ -86,7 +86,7 @@ void main() {
     // Button should be disabled (onPressed is null)
     final btn = tester.widget<ElevatedButton>(
       find.descendant(
-        of: find.byType(AuthPrimaryButton),
+        of: find.byType(AuthPillButton),
         matching: find.byType(ElevatedButton),
       ),
     );
@@ -120,7 +120,7 @@ void main() {
     await tester.pump();
 
     // Tap submit
-    await tester.tap(find.byType(AuthPrimaryButton));
+    await tester.tap(find.byType(AuthPillButton));
     await tester.pumpAndSettle();
 
     // Should have navigated to /home
@@ -146,7 +146,7 @@ void main() {
     await tester.enterText(fields.at(1), 'wrong');
     await tester.pump();
 
-    await tester.tap(find.byType(AuthPrimaryButton));
+    await tester.tap(find.byType(AuthPillButton));
     await tester.pumpAndSettle();
 
     expect(find.text('La contraseña es incorrecta'), findsOneWidget);
@@ -171,7 +171,7 @@ void main() {
     await tester.enterText(fields.at(1), 'Pass1234');
     await tester.pump();
 
-    await tester.tap(find.byType(AuthPrimaryButton));
+    await tester.tap(find.byType(AuthPillButton));
     await tester.pumpAndSettle();
 
     expect(
@@ -196,7 +196,7 @@ void main() {
     await tester.enterText(fields.at(1), 'Pass1234');
     await tester.pump();
 
-    await tester.tap(find.byType(AuthPrimaryButton));
+    await tester.tap(find.byType(AuthPillButton));
     await tester.pump(); // Don't settle — keep in loading state
 
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
@@ -209,6 +209,8 @@ void main() {
     await tester.pumpWidget(_buildApp(notifier: _TestAuthNotifier()));
     await tester.pumpAndSettle();
 
+    // Scroll down to reveal the "Registrate" link (it may be below the fold).
+    await tester.ensureVisible(find.text('Registrate'));
     await tester.tap(find.text('Registrate'));
     await tester.pumpAndSettle();
 
@@ -220,7 +222,7 @@ void main() {
     await tester.pumpWidget(_buildApp(notifier: _TestAuthNotifier()));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('¿Olvidaste tu contraseña?'));
+    await tester.tap(find.text('Olvidé la contraseña'));
     await tester.pumpAndSettle();
 
     expect(find.text('FORGOT'), findsOneWidget);
