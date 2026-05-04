@@ -88,13 +88,16 @@ Documento de referencia sobre qué proyecto de Claude Design ganó en cada módu
 - **Referencia:** [`screens/full-projects/proyecto-app-alumno-mateo.html`](./app-alumno/screens/full-projects/proyecto-app-alumno-mateo.html)
 - **Modificaciones:** Ninguna
 
-![Profile Setup](./app-alumno/screens/profile-setup/profile-setup.png)
+![Profile Setup 1](./app-alumno/screens/profile-setup/profile-setup-1.png)
+![Profile Setup 2](./app-alumno/screens/profile-setup/profile-setup-2.png)
+![Profile Setup 3](./app-alumno/screens/profile-setup/profile-setup-3.png)
+![Profile Setup 4](./app-alumno/screens/profile-setup/profile-setup-4.png)
 
 ---
 
 ### Home
 
-> ⚠️ Este módulo es una **composición** de cards tomadas de los 3 proyectos. No existe un único screen de referencia.
+> Este módulo es una **composición** de cards tomadas de los 3 proyectos. No existe un único screen de referencia.
 
 #### Card "Empezar entrenamiento"
 - **Origen:** Proyecto Joaco
@@ -109,13 +112,6 @@ Documento de referencia sobre qué proyecto de Claude Design ganó en cada módu
 - **Modificaciones:** Ninguna
 
 ![Esta semana](./app-alumno/screens/home/esta-semana.png)
-
-#### Card "Semana y mes"
-- **Origen:** Proyecto Mateo
-- **Referencia:** [`screens/full-projects/proyecto-app-alumno-mateo.html`](./app-alumno/screens/full-projects/proyecto-app-alumno-mateo.html)
-- **Modificaciones:** Sacar el volumen de la card
-
-![Semana y mes](./app-alumno/screens/home/semana-mes.png)
 
 ---
 
