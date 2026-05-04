@@ -43,6 +43,9 @@ class AppTheme {
       ),
     );
 
+    const colorScheme = ColorScheme.dark();
+    final errorColor = colorScheme.error;
+
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
@@ -54,6 +57,38 @@ class AppTheme {
         onSecondary: palette.textPrimary,
         surface: palette.bgCard,
         onSurface: palette.textPrimary,
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: false,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 14,
+        ),
+        labelStyle: GoogleFonts.barlow(
+          color: palette.textMuted,
+          fontWeight: FontWeight.w400,
+        ),
+        hintStyle: GoogleFonts.barlow(color: palette.textMuted),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: palette.border),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: palette.accent, width: 1.5),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: errorColor),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: errorColor, width: 1.5),
+        ),
+        errorStyle: GoogleFonts.barlow(
+          color: errorColor,
+          fontWeight: FontWeight.w500,
+        ),
       ),
       textTheme: textTheme,
       extensions: [palette],
