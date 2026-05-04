@@ -2,6 +2,14 @@
 
 Tokens de diseño, tipografía, spacing y reglas de código de UI. Si vas a tocar widgets, tema o pantallas, leé esto antes.
 
+## Workflow de diseño
+
+1. Para saber qué screen implementar y de qué proyecto sale, consultar `docs/design-decisions.md`.
+2. Para saber qué colores, tipografías, spacing y componentes usar, consultar este documento.
+3. Los HTML en `docs/*/screens/full-projects/` son referencia visual de layout y composición — **NO copiar tokens de ahí**.
+
+> En caso de discrepancia entre los HTML de referencia y este documento, **este documento manda**. Los HTML son referencia visual, no fuente de tokens.
+
 ## Paletas
 
 La app soporta **dos paletas intercambiables**. La default es Mint Magenta. La alterna se selecciona en Perfil → Apariencia.
