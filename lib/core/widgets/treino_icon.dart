@@ -52,4 +52,17 @@ class TreinoIcon {
   static const IconData mail = PhosphorIconsRegular.envelope;
   static const IconData eye = PhosphorIconsRegular.eye;
   static const IconData eyeOff = PhosphorIconsRegular.eyeSlash;
+
+  // Social / third-party
+  static const IconData googleLogo = PhosphorIconsRegular.googleLogo;
+  static const IconData appleLogo = PhosphorIconsRegular.appleLogo;
+
+  // Directional
+  static const IconData arrowRight = PhosphorIconsRegular.arrowRight;
+
+  // Security / trust
+  static const IconData shieldCheck = PhosphorIconsRegular.shieldCheck;
+
+  // Info
+  static const IconData infoCircle = PhosphorIconsRegular.info;
 }

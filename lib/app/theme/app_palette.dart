@@ -28,6 +28,8 @@ class AppPalette extends ThemeExtension<AppPalette> {
     required this.border,
     required this.textPrimary,
     required this.textMuted,
+    required this.sage,
+    required this.espresso,
   });
 
   final Color accent;
@@ -38,6 +40,12 @@ class AppPalette extends ThemeExtension<AppPalette> {
   final Color textPrimary;
   final Color textMuted;
 
+  /// Sage green — secondary cards, subtle outlines.
+  final Color sage;
+
+  /// Espresso — elevated surfaces, sheets.
+  final Color espresso;
+
   static const mintMagenta = AppPalette(
     accent: AppColors.mint,
     highlight: AppColors.magenta,
@@ -46,6 +54,8 @@ class AppPalette extends ThemeExtension<AppPalette> {
     border: Color(0x1AFFFFFF),
     textPrimary: AppColors.bone,
     textMuted: Color(0x8CFFFFFF),
+    sage: AppColors.sage,
+    espresso: AppColors.espresso,
   );
 
   static const electricViolet = AppPalette(
@@ -56,6 +66,8 @@ class AppPalette extends ThemeExtension<AppPalette> {
     border: Color(0x1AFFFFFF),
     textPrimary: AppColors.bone,
     textMuted: Color(0x8CFFFFFF),
+    sage: AppColors.sage,
+    espresso: AppColors.espresso,
   );
 
   static AppPalette of(BuildContext context) =>
@@ -70,6 +82,8 @@ class AppPalette extends ThemeExtension<AppPalette> {
     Color? border,
     Color? textPrimary,
     Color? textMuted,
+    Color? sage,
+    Color? espresso,
   }) =>
       AppPalette(
         accent: accent ?? this.accent,
@@ -79,6 +93,8 @@ class AppPalette extends ThemeExtension<AppPalette> {
         border: border ?? this.border,
         textPrimary: textPrimary ?? this.textPrimary,
         textMuted: textMuted ?? this.textMuted,
+        sage: sage ?? this.sage,
+        espresso: espresso ?? this.espresso,
       );
 
   @override
@@ -92,6 +108,8 @@ class AppPalette extends ThemeExtension<AppPalette> {
       border: Color.lerp(border, other.border, t)!,
       textPrimary: Color.lerp(textPrimary, other.textPrimary, t)!,
       textMuted: Color.lerp(textMuted, other.textMuted, t)!,
+      sage: Color.lerp(sage, other.sage, t)!,
+      espresso: Color.lerp(espresso, other.espresso, t)!,
     );
   }
 }

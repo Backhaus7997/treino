@@ -59,10 +59,11 @@ class AppTheme {
         onSurface: palette.textPrimary,
       ),
       inputDecorationTheme: InputDecorationTheme(
-        filled: false,
+        filled: true,
+        fillColor: palette.bgCard,
         contentPadding: const EdgeInsets.symmetric(
-          horizontal: 14,
-          vertical: 14,
+          horizontal: 18,
+          vertical: 18,
         ),
         labelStyle: GoogleFonts.barlow(
           color: palette.textMuted,
