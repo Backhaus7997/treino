@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../features/auth/application/auth_providers.dart';
 import 'router.dart';
 import 'theme/app_theme.dart';
 
@@ -12,7 +14,14 @@ class TreinoApp extends ConsumerStatefulWidget {
 }
 
 class _TreinoAppState extends ConsumerState<TreinoApp> {
-  late final _router = buildRouter();
+  late final GoRouter _router;
+
+  @override
+  void initState() {
+    super.initState();
+    final refresh = ref.read(routerRefreshNotifierProvider);
+    _router = buildRouter(refreshListenable: refresh, read: ref.read);
+  }
 
   @override
   Widget build(BuildContext context) {
