@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>TREINO — App Atleta</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #0A0A0A; }
+  body { font-family: 'Barlow', -apple-system, system-ui, sans-serif; color: #fff; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="ios-frame.jsx"></script>
+<script type="text/babel" src="tokens.jsx"></script>
+<script type="text/babel" src="screens-1.jsx"></script>
+<script type="text/babel" src="screens-2.jsx"></script>
+<script type="text/babel" src="screens-3.jsx"></script>
+<script type="text/babel" src="screens-ds.jsx"></script>
+
+<script type="text/babel" data-presets="react">
+  const W = 390, H = 844;
+  const Frame = ({ children, dark = true }) => (
+    <IOSDevice width={W} height={H} dark={dark}>{children}</IOSDevice>
+  );
+
+  function App() {
+    return (
+      <DesignCanvas>
+        <DCSection id="overview" title="TREINO · App Atleta" subtitle="Dirección visual — Mint Magenta · iPhone · Mar 2026">
+          <DCArtboard id="ds" label="Mini Design System" width={1100} height={2260}>
+            <DesignSystemBoard/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="entry" title="Entrada" subtitle="Splash y onboarding">
+          <DCArtboard id="splash" label="01 · Splash / Login" width={W} height={H}>
+            <Frame><ScreenSplash/></Frame>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="core" title="Core" subtitle="Inicio, Entrenar, Workout Player">
+          <DCArtboard id="home" label="02 · Home / Inicio" width={W} height={H}>
+            <Frame><ScreenHome/></Frame>
+          </DCArtboard>
+          <DCArtboard id="entrenar" label="03 · Entrenar" width={W} height={H}>
+            <Frame><ScreenEntrenar/></Frame>
+          </DCArtboard>
+          <DCArtboard id="player" label="04 · Workout Player" width={W} height={H}>
+            <Frame><ScreenPlayer/></Frame>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="social" title="Social y Coach" subtitle="Feed, descubrimiento de coaches, perfil">
+          <DCArtboard id="feed" label="05 · Feed" width={W} height={H}>
+            <Frame><ScreenFeed/></Frame>
+          </DCArtboard>
+          <DCArtboard id="coach" label="06 · Coach Discovery" width={W} height={H}>
+            <Frame><ScreenCoach/></Frame>
+          </DCArtboard>
+          <DCArtboard id="perfil" label="07 · Perfil + Apariencia" width={W} height={H}>
+            <Frame><ScreenPerfil/></Frame>
+          </DCArtboard>
+        </DCSection>
+      </DesignCanvas>
+    );
+  }
+
+  ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

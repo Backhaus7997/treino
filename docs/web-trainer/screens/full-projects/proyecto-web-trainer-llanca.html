@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>TREINO — Entrenador Web</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #0A0A0A; }
+  body { font-family: 'Barlow', -apple-system, system-ui, sans-serif; color: #fff; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="browser-window.jsx"></script>
+<script type="text/babel" src="tokens.jsx"></script>
+<script type="text/babel" src="pf-tokens.jsx"></script>
+<script type="text/babel" src="pf-dashboard.jsx"></script>
+<script type="text/babel" src="pf-alumnos.jsx"></script>
+<script type="text/babel" src="pf-alumno-detail.jsx"></script>
+<script type="text/babel" src="pf-routine-editor.jsx"></script>
+<script type="text/babel" src="pf-metricas.jsx"></script>
+<script type="text/babel" src="pf-agenda-chat.jsx"></script>
+
+<script type="text/babel" data-presets="react">
+  const W = 1440, H = 900;
+  const Frame = ({ children, url }) => (
+    <ChromeWindow width={W} height={H} url={url || 'app.treino.com'} tabs={[{ title: 'TREINO · Panel' }]}>
+      <div style={{ display: 'flex', height: '100%', width: '100%', background: T.ink, fontFamily: T.body, color: T.bone }}>
+        <PFSidebar/>
+        <div style={{ flex: 1, display: 'flex', minWidth: 0 }}>{children}</div>
+      </div>
+    </ChromeWindow>
+  );
+
+  function App() {
+    return (
+      <DesignCanvas>
+        <DCSection id="overview" title="TREINO · Entrenador Web" subtitle="Panel del entrenador — Desktop · Mar 2026">
+          <DCArtboard id="dashboard" label="01 · Dashboard" width={W} height={H}>
+            <Frame url="app.treino.com/dashboard"><PFDashboard/></Frame>
+          </DCArtboard>
+          <DCArtboard id="alumnos" label="02 · Alumnos" width={W} height={H}>
+            <Frame url="app.treino.com/alumnos"><PFAlumnos/></Frame>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="alumno" title="Perfil de alumno" subtitle="Detalle individual + métricas + chat">
+          <DCArtboard id="alumno-detail" label="03 · Perfil de alumno" width={W} height={H}>
+            <Frame url="app.treino.com/alumnos/mateo-rivero"><PFAlumnoDetail/></Frame>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="rutinas" title="Rutinas y plantillas" subtitle="Editor semanal con biblioteca + inspector">
+          <DCArtboard id="routine" label="04 · Editor de rutinas" width={W} height={H}>
+            <Frame url="app.treino.com/rutinas/push-pull-lower"><PFRoutineEditor/></Frame>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="agenda" title="Agenda y comunicación" subtitle="Semana + chat con alumnos">
+          <DCArtboard id="agenda" label="05 · Agenda" width={W} height={H}>
+            <Frame url="app.treino.com/agenda"><PFAgenda/></Frame>
+          </DCArtboard>
+          <DCArtboard id="chat" label="06 · Chat" width={W} height={H}>
+            <Frame url="app.treino.com/chat"><PFChat/></Frame>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="metricas" title="Métricas del negocio" subtitle="KPIs, adherencia, mix de planes">
+          <DCArtboard id="metricas" label="07 · Métricas" width={W} height={H}>
+            <Frame url="app.treino.com/metricas"><PFMetricas/></Frame>
+          </DCArtboard>
+        </DCSection>
+      </DesignCanvas>
+    );
+  }
+
+  ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
