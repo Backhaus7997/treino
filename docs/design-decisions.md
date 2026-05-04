@@ -254,7 +254,7 @@ Documento de referencia sobre qué proyecto de Claude Design ganó en cada módu
 
 ---
 
-## Trainer Web (CORE)
+## Trainer Web
 
 ### Resumen por módulo
 
@@ -295,7 +295,7 @@ Documento de referencia sobre qué proyecto de Claude Design ganó en cada módu
 
 #### Dashboard
 
-> ⚠️ Composición de cards de 2 proyectos.
+> Composición de cards de 2 proyectos.
 
 ##### Welcome card
 - **Origen:** Proyecto Joaco
@@ -346,7 +346,7 @@ Documento de referencia sobre qué proyecto de Claude Design ganó en cada módu
 ##### Progreso
 - **Origen:** Proyecto Joaco
 - **Referencia:** [`screens/full-projects/proyecto-web-trainer-joaco.html`](./web-trainer/screens/full-projects/proyecto-web-trainer-joaco.html)
-- **Modificaciones:** ⚠️ Revisar qué incluir en este módulo (definir antes de implementar)
+- **Modificaciones:** Revisar qué incluir en este módulo (definir antes de implementar)
 
 ![Progreso](./web-trainer/screens/alumnos/progreso.png)
 
@@ -525,7 +525,7 @@ Documento de referencia sobre qué proyecto de Claude Design ganó en cada módu
 
 ---
 
-## Trainer App (CORE)
+## Trainer App
 
 ### Resumen por módulo
 
@@ -543,19 +543,20 @@ Documento de referencia sobre qué proyecto de Claude Design ganó en cada módu
 ### Detalle por módulo
 
 #### Hoy (Dashboard)
-- **Origen:** Proyecto Llanca
-- **Referencia:** [`screens/full-projects/proyecto-app-trainer-llanca.html`](./app-trainer/screens/full-projects/proyecto-app-trainer-llanca.html)
+- **Origen:** Proyecto Mateo
+- **Referencia:** [`screens/full-projects/proyecto-app-trainer-mateo.html`](./app-trainer/screens/full-projects/proyecto-app-trainer-mateo.html)
 - **Modificaciones:** Ninguna
 
-![Hoy](./app-trainer/screens/hoy/hoy.png)
+![Dashboard 1](./app-trainer/screens/dashboard/dashboard-1.png)
+![Dashboard 2](./app-trainer/screens/dashboard/dashboard-2.png)
 
 ---
 
 #### Chat
 
 ##### Vista general
-- **Origen:** Proyecto Llanca
-- **Referencia:** [`screens/full-projects/proyecto-app-trainer-llanca.html`](./app-trainer/screens/full-projects/proyecto-app-trainer-llanca.html)
+- **Origen:** Proyecto Mateo
+- **Referencia:** [`screens/full-projects/proyecto-app-trainer-mateo.html`](./app-trainer/screens/full-projects/proyecto-app-trainer-mateo.html)
 - **Modificaciones:** Ninguna
 
 ![Chat — Vista general](./app-trainer/screens/chat/view-general.png)
@@ -570,11 +571,13 @@ Documento de referencia sobre qué proyecto de Claude Design ganó en cada módu
 ---
 
 #### Alumnos
-- **Origen:** Proyecto Llanca
-- **Referencia:** [`screens/full-projects/proyecto-app-trainer-llanca.html`](./app-trainer/screens/full-projects/proyecto-app-trainer-llanca.html)
+- **Origen:** Proyecto Mateo
+- **Referencia:** [`screens/full-projects/proyecto-app-trainer-mateo.html`](./app-trainer/screens/full-projects/proyecto-app-trainer-mateo.html)
 - **Modificaciones:** Ninguna
 
-![Alumnos](./app-trainer/screens/alumnos/alumnos.png)
+![Alumnos 1](./app-trainer/screens/alumnos/alumnos-1.png)
+![Alumnos 2](./app-trainer/screens/alumnos/alumnos-2.png)
+![Alumnos 3](./app-trainer/screens/alumnos/alumnos-3.png)
 
 ---
 
@@ -588,8 +591,8 @@ Documento de referencia sobre qué proyecto de Claude Design ganó en cada módu
 ---
 
 #### Mi Perfil
-- **Origen:** Proyecto Llanca
-- **Referencia:** [`screens/full-projects/proyecto-app-trainer-llanca.html`](./app-trainer/screens/full-projects/proyecto-app-trainer-llanca.html)
+- **Origen:** Proyecto Mateo
+- **Referencia:** [`screens/full-projects/proyecto-app-trainer-mateo.html`](./app-trainer/screens/full-projects/proyecto-app-trainer-mateo.html)
 - **Modificaciones:** Ninguna
 
-![Mi Perfil](./app-trainer/screens/mi-perfil/mi-perfil.png)
+![Mi Perfil](./app-trainer/screens/perfil/perfil.png)
