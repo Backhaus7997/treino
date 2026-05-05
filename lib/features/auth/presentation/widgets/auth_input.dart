@@ -4,13 +4,14 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/treino_icon.dart';
 
-/// Mockup-aligned input field: small condensed UC label above, filled field
+/// Mockup-aligned input field: optional condensed UC label above, filled field
 /// with leading icon inside, optional eye toggle for passwords.
+/// When [label] is null the label row is omitted entirely.
 class AuthInput extends StatefulWidget {
   const AuthInput({
     super.key,
     required this.controller,
-    required this.label,
+    this.label,
     this.hint,
     required this.leadingIcon,
     this.obscureText = false,
@@ -26,7 +27,7 @@ class AuthInput extends StatefulWidget {
   });
 
   final TextEditingController controller;
-  final String label;
+  final String? label;
   final String? hint;
   final IconData leadingIcon;
   final bool obscureText;
@@ -76,17 +77,19 @@ class _AuthInputState extends State<AuthInput> {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        // Label above field — condensed UC, small
-        Text(
-          widget.label,
-          style: GoogleFonts.barlowCondensed(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 1.0,
-            color: palette.textMuted,
+        // Label above field — condensed UC, small. Omitted when null.
+        if (widget.label != null) ...[
+          Text(
+            widget.label!,
+            style: GoogleFonts.barlowCondensed(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 1.0,
+              color: palette.textMuted,
+            ),
           ),
-        ),
-        const SizedBox(height: 8),
+          const SizedBox(height: 8),
+        ],
         TextFormField(
           controller: widget.controller,
           focusNode: widget.focusNode,

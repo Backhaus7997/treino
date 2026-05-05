@@ -28,6 +28,24 @@ void main() {
       expect(find.byIcon(TreinoIcon.mail), findsOneWidget);
     });
 
+    testWidgets('renders without label when label is null', (tester) async {
+      final ctrl = TextEditingController();
+      await tester.pumpWidget(_wrap(
+        AuthInput(
+          controller: ctrl,
+          hint: 'tu@email.com',
+          leadingIcon: TreinoIcon.mail,
+        ),
+      ));
+      await tester.pump();
+
+      // No label text rendered
+      expect(find.text('EMAIL'), findsNothing);
+      // But the field and icon are still present
+      expect(find.byIcon(TreinoIcon.mail), findsOneWidget);
+      expect(find.byType(TextFormField), findsOneWidget);
+    });
+
     testWidgets('renders suffix eye toggle when suffixToggle is true',
         (tester) async {
       final ctrl = TextEditingController();

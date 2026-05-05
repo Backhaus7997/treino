@@ -105,10 +105,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                 ),
                 const SizedBox(height: 28),
-                // Email field
+                // Email field — no label per mockup (icon-only)
                 AuthInput(
                   controller: _emailCtrl,
-                  label: AuthStrings.loginEmailLabel,
                   hint: AuthStrings.loginEmailHint,
                   leadingIcon: TreinoIcon.mail,
                   keyboardType: TextInputType.emailAddress,
@@ -118,10 +117,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   autofillHints: const [AutofillHints.email],
                 ),
                 const SizedBox(height: 14),
-                // Password field
+                // Password field — no label per mockup (icon-only)
                 AuthInput(
                   controller: _passwordCtrl,
-                  label: AuthStrings.loginPasswordLabel,
                   leadingIcon: TreinoIcon.lock,
                   obscureText: true,
                   suffixToggle: true,
