@@ -8,7 +8,7 @@ import '../../../core/widgets/treino_icon.dart';
 import 'auth_strings.dart';
 import 'widgets/auth_pill_button.dart';
 import 'widgets/auth_secondary_button.dart';
-import 'widgets/welcome_glitch_logo.dart';
+import 'widgets/treino_logo.dart';
 
 class WelcomeScreen extends ConsumerWidget {
   const WelcomeScreen({super.key});
@@ -63,8 +63,8 @@ class WelcomeScreen extends ConsumerWidget {
                     ],
                   ),
                   const SizedBox(height: 18),
-                  // Glitch logo (Welcome-screen exclusive)
-                  const WelcomeGlitchLogo(fontSize: 52),
+                  // Brand logo
+                  const TreinoLogo(size: 56),
                   const SizedBox(height: 18),
                   // Headline block: vertical accent line + mixed-weight text
                   IntrinsicHeight(

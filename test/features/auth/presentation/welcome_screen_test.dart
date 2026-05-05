@@ -6,7 +6,7 @@ import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/features/auth/presentation/welcome_screen.dart';
 import 'package:treino/features/auth/presentation/widgets/auth_pill_button.dart';
 import 'package:treino/features/auth/presentation/widgets/auth_secondary_button.dart';
-import 'package:treino/features/auth/presentation/widgets/welcome_glitch_logo.dart';
+import 'package:treino/features/auth/presentation/widgets/treino_logo.dart';
 
 GoRouter _makeRouter(Widget home) => GoRouter(
       initialLocation: '/welcome',
@@ -40,11 +40,11 @@ void main() {
     expect(find.textContaining('ENTRENAMIENTO'), findsOneWidget);
   });
 
-  testWidgets('renders WelcomeGlitchLogo', (tester) async {
+  testWidgets('renders TreinoLogo', (tester) async {
     await tester.pumpWidget(_buildApp());
     await tester.pumpAndSettle();
 
-    expect(find.byType(WelcomeGlitchLogo), findsOneWidget);
+    expect(find.byType(TreinoLogo), findsOneWidget);
   });
 
   testWidgets('renders headline parts in textPrimary (not accent)',
