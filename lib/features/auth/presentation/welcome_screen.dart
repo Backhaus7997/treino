@@ -8,7 +8,7 @@ import '../../../core/widgets/treino_icon.dart';
 import 'auth_strings.dart';
 import 'widgets/auth_pill_button.dart';
 import 'widgets/auth_secondary_button.dart';
-import 'widgets/treino_logo.dart';
+import 'widgets/welcome_glitch_logo.dart';
 
 class WelcomeScreen extends ConsumerWidget {
   const WelcomeScreen({super.key});
@@ -62,30 +62,84 @@ class WelcomeScreen extends ConsumerWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 20),
-                  // Logo
-                  const TreinoLogo(size: 80),
-                  const SizedBox(height: 20),
-                  // Headline part 1
-                  Text(
-                    AuthStrings.welcomeHeadlinePart1,
-                    style: GoogleFonts.barlowCondensed(
-                      fontSize: 36,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.5,
-                      color: palette.textPrimary,
-                      height: 1.1,
-                    ),
-                  ),
-                  // Headline part 2
-                  Text(
-                    AuthStrings.welcomeHeadlinePart2,
-                    style: GoogleFonts.barlowCondensed(
-                      fontSize: 36,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.5,
-                      color: palette.accent,
-                      height: 1.1,
+                  const SizedBox(height: 18),
+                  // Glitch logo (Welcome-screen exclusive)
+                  const WelcomeGlitchLogo(fontSize: 52),
+                  const SizedBox(height: 18),
+                  // Headline block: vertical accent line + mixed-weight text
+                  IntrinsicHeight(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // Vertical accent line
+                        Container(
+                          width: 3,
+                          color: palette.accent,
+                        ),
+                        const SizedBox(width: 14),
+                        // Headline column
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Line 1: "MOVÉS " lighter + "EL HIERRO." bolder
+                              RichText(
+                                text: TextSpan(
+                                  children: [
+                                    TextSpan(
+                                      text: 'MOVÉS ',
+                                      style: GoogleFonts.barlowCondensed(
+                                        fontSize: 34,
+                                        fontWeight: FontWeight.w400,
+                                        letterSpacing: 0.5,
+                                        color: palette.textPrimary,
+                                        height: 1.1,
+                                      ),
+                                    ),
+                                    TextSpan(
+                                      text: 'EL HIERRO.',
+                                      style: GoogleFonts.barlowCondensed(
+                                        fontSize: 34,
+                                        fontWeight: FontWeight.w800,
+                                        letterSpacing: 0.5,
+                                        color: palette.textPrimary,
+                                        height: 1.1,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              // Line 2: "NOSOTROS " lighter + "EL RESTO." bolder
+                              RichText(
+                                text: TextSpan(
+                                  children: [
+                                    TextSpan(
+                                      text: 'NOSOTROS ',
+                                      style: GoogleFonts.barlowCondensed(
+                                        fontSize: 34,
+                                        fontWeight: FontWeight.w400,
+                                        letterSpacing: 0.5,
+                                        color: palette.textPrimary,
+                                        height: 1.1,
+                                      ),
+                                    ),
+                                    TextSpan(
+                                      text: 'EL RESTO.',
+                                      style: GoogleFonts.barlowCondensed(
+                                        fontSize: 34,
+                                        fontWeight: FontWeight.w800,
+                                        letterSpacing: 0.5,
+                                        color: palette.textPrimary,
+                                        height: 1.1,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   const SizedBox(height: 14),
@@ -93,19 +147,19 @@ class WelcomeScreen extends ConsumerWidget {
                   Text(
                     AuthStrings.welcomeBody,
                     style: GoogleFonts.barlow(
-                      fontSize: 15,
+                      fontSize: 14,
                       fontWeight: FontWeight.w400,
                       color: palette.textMuted,
                       height: 1.5,
                     ),
                   ),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 20),
                   // CTA
                   AuthPillButton(
                     label: AuthStrings.welcomeCta,
                     onPressed: () => context.push('/register'),
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 12),
                   // Social buttons row
                   const Row(
                     children: [
@@ -126,7 +180,7 @@ class WelcomeScreen extends ConsumerWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 18),
                   // Sign in row
                   Center(
                     child: Row(

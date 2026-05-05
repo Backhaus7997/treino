@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/features/auth/presentation/welcome_screen.dart';
 import 'package:treino/features/auth/presentation/widgets/auth_pill_button.dart';
 import 'package:treino/features/auth/presentation/widgets/auth_secondary_button.dart';
-import 'package:treino/features/auth/presentation/widgets/treino_logo.dart';
+import 'package:treino/features/auth/presentation/widgets/welcome_glitch_logo.dart';
 
 GoRouter _makeRouter(Widget home) => GoRouter(
       initialLocation: '/welcome',
@@ -39,19 +40,53 @@ void main() {
     expect(find.textContaining('ENTRENAMIENTO'), findsOneWidget);
   });
 
-  testWidgets('renders TreinoLogo', (tester) async {
+  testWidgets('renders WelcomeGlitchLogo', (tester) async {
     await tester.pumpWidget(_buildApp());
     await tester.pumpAndSettle();
 
-    expect(find.byType(TreinoLogo), findsOneWidget);
+    expect(find.byType(WelcomeGlitchLogo), findsOneWidget);
   });
 
-  testWidgets('renders headline parts', (tester) async {
+  testWidgets('renders headline parts in textPrimary (not accent)',
+      (tester) async {
     await tester.pumpWidget(_buildApp());
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('MOVÉS'), findsOneWidget);
-    expect(find.textContaining('NOSOTROS'), findsOneWidget);
+    const palette = AppPalette.mintMagenta;
+
+    // Headline uses RichText spans — check that MOVÉS and NOSOTROS appear
+    // in textPrimary color (not accent).
+    bool foundMoves = false;
+    bool foundNosotros = false;
+    for (final rt in tester.allWidgets.whereType<RichText>()) {
+      final span = rt.text;
+      if (span is TextSpan && span.children != null) {
+        for (final child in span.children!) {
+          if (child is TextSpan) {
+            final text = child.text ?? '';
+            final color = child.style?.color;
+            if (text.contains('MOVÉS') && color == palette.textPrimary) {
+              foundMoves = true;
+            }
+            if (text.contains('NOSOTROS') && color == palette.textPrimary) {
+              foundNosotros = true;
+            }
+          }
+        }
+      }
+    }
+    expect(foundMoves, isTrue,
+        reason: 'MOVÉS must be textPrimary (white), not accent');
+    expect(foundNosotros, isTrue,
+        reason: 'NOSOTROS must be textPrimary (white), not accent');
+  });
+
+  testWidgets('vertical accent line decorator is present', (tester) async {
+    await tester.pumpWidget(_buildApp());
+    await tester.pumpAndSettle();
+
+    // IntrinsicHeight wraps the line+headline row
+    expect(find.byType(IntrinsicHeight), findsOneWidget);
   });
 
   testWidgets('renders body text', (tester) async {
