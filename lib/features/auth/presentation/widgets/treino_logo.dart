@@ -1,3 +1,5 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
@@ -43,27 +45,27 @@ class TreinoLogo extends StatelessWidget {
 
     if (!glow) return logo;
 
-    // Accent halo — radial gradient sized to ~2.4x the logo width, behind
-    // the SVG so it reads as ambient light spilling from the brand.
+    // Outer glow — render the SVG twice in accent with progressive blur
+    // sigmas, then the sharp white logo on top. Each blurred copy follows
+    // the letterforms so the halo wraps around every glyph (neon effect).
+    Widget blurred(double sigma, double alpha) => ImageFiltered(
+          imageFilter: ui.ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
+          child: Opacity(
+            opacity: alpha,
+            child: SvgPicture.asset(
+              'assets/logo/treino_logo.svg',
+              height: size,
+              colorFilter: ColorFilter.mode(palette.accent, BlendMode.srcIn),
+            ),
+          ),
+        );
+
     return Stack(
       alignment: Alignment.center,
       children: [
-        IgnorePointer(
-          child: Container(
-            width: size * 4.5,
-            height: size * 2.4,
-            decoration: BoxDecoration(
-              gradient: RadialGradient(
-                colors: [
-                  palette.accent.withValues(alpha: 0.35),
-                  palette.accent.withValues(alpha: 0.0),
-                ],
-                stops: const [0.0, 0.7],
-              ),
-            ),
-          ),
-        ),
-        logo,
+        blurred(18.0, 0.7), // wide soft halo
+        blurred(8.0, 0.6), // tighter punch around glyphs
+        logo, // sharp logo
       ],
     );
   }

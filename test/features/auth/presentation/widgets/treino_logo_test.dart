@@ -10,14 +10,18 @@ Widget _wrap(Widget child) => MaterialApp(
       home: Scaffold(body: Center(child: child)),
     );
 
+/// The sharp foreground SVG is the LAST SvgPicture in the Stack (the
+/// blurred copies behind it are accent-tinted glow layers).
+SvgPicture _sharpSvg(WidgetTester tester) =>
+    tester.widgetList<SvgPicture>(find.byType(SvgPicture)).last;
+
 void main() {
   group('TreinoLogo', () {
-    testWidgets('renders an SvgPicture pointing at the brand asset',
-        (tester) async {
+    testWidgets('renders the brand SVG', (tester) async {
       await tester.pumpWidget(_wrap(const TreinoLogo()));
       await tester.pump();
 
-      expect(find.byType(SvgPicture), findsOneWidget);
+      expect(find.byType(SvgPicture), findsWidgets);
     });
 
     testWidgets('default size is 56 logical pixels', (tester) async {
@@ -36,28 +40,45 @@ void main() {
       expect(logo.size, 80.0);
     });
 
-    testWidgets('default tint is palette.textPrimary', (tester) async {
+    testWidgets('default tint of the sharp logo is palette.textPrimary',
+        (tester) async {
       await tester.pumpWidget(_wrap(const TreinoLogo()));
       await tester.pump();
 
       const palette = AppPalette.mintMagenta;
-      final svg = tester.widget<SvgPicture>(find.byType(SvgPicture));
       expect(
-        svg.colorFilter,
+        _sharpSvg(tester).colorFilter,
         ColorFilter.mode(palette.textPrimary, BlendMode.srcIn),
       );
     });
 
-    testWidgets('custom color overrides the default tint', (tester) async {
+    testWidgets('custom color overrides the default tint of the sharp logo',
+        (tester) async {
       const custom = Color(0xFF00FF00);
       await tester.pumpWidget(_wrap(const TreinoLogo(color: custom)));
       await tester.pump();
 
-      final svg = tester.widget<SvgPicture>(find.byType(SvgPicture));
       expect(
-        svg.colorFilter,
+        _sharpSvg(tester).colorFilter,
         const ColorFilter.mode(custom, BlendMode.srcIn),
       );
+    });
+
+    testWidgets('glow:true paints accent halo layers behind the logo',
+        (tester) async {
+      await tester.pumpWidget(_wrap(const TreinoLogo()));
+      await tester.pump();
+
+      // 2 blurred accent layers + 1 sharp foreground = 3 SvgPictures total.
+      expect(find.byType(SvgPicture), findsNWidgets(3));
+    });
+
+    testWidgets('glow:false renders only the sharp logo (no halo)',
+        (tester) async {
+      await tester.pumpWidget(_wrap(const TreinoLogo(glow: false)));
+      await tester.pump();
+
+      expect(find.byType(SvgPicture), findsOneWidget);
     });
   });
 }
