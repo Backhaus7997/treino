@@ -171,22 +171,22 @@ class WelcomeScreen extends ConsumerWidget {
         children: [
           TextSpan(
             text: light,
-            style: GoogleFonts.barlowCondensed(
-              fontSize: 34,
-              fontWeight: FontWeight.w400,
-              letterSpacing: 0.5,
+            style: GoogleFonts.spaceGrotesk(
+              fontSize: 28,
+              fontWeight: FontWeight.w500,
+              letterSpacing: -0.3,
               color: palette.textPrimary,
-              height: 1.1,
+              height: 1.15,
             ),
           ),
           TextSpan(
             text: bold,
-            style: GoogleFonts.barlowCondensed(
-              fontSize: 34,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0.5,
+            style: GoogleFonts.spaceGrotesk(
+              fontSize: 28,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -0.3,
               color: palette.textPrimary,
-              height: 1.1,
+              height: 1.15,
             ),
           ),
         ],

@@ -17,7 +17,6 @@ import 'widgets/auth_pill_button.dart';
 import 'widgets/auth_secondary_button.dart';
 import 'widgets/password_strength_bar.dart';
 import 'widgets/terms_checkbox.dart';
-import 'widgets/treino_logo.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
@@ -117,22 +116,19 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const SizedBox(height: 14),
-                  // Headline — first line as text, "TREINO" rendered as the
-                  // brand logo SVG (no halo here so it sits flush with the
-                  // text baseline above).
+                  // Headline — Space Grotesk Black for display contrast
+                  // against the condensed brand logo (typographic pairing).
                   Text(
-                    'SUMATE A',
-                    style: GoogleFonts.barlowCondensed(
-                      fontSize: 46,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.5,
+                    AuthStrings.registerTitle,
+                    style: GoogleFonts.spaceGrotesk(
+                      fontSize: 40,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -0.5,
                       color: palette.textPrimary,
-                      height: 1.0,
+                      height: 1.05,
                     ),
                   ),
-                  const SizedBox(height: 6),
-                  const TreinoLogo(size: 46, glow: false),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 8),
                   Text(
                     AuthStrings.registerSubtitle,
                     style: GoogleFonts.barlow(

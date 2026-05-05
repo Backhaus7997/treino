@@ -101,12 +101,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   // Headline
                   Text(
                     AuthStrings.loginTitle,
-                    style: GoogleFonts.barlowCondensed(
-                      fontSize: 46,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.5,
+                    style: GoogleFonts.spaceGrotesk(
+                      fontSize: 40,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -0.5,
                       color: palette.textPrimary,
-                      height: 1.0,
+                      height: 1.05,
                     ),
                   ),
                   const SizedBox(height: 8),
