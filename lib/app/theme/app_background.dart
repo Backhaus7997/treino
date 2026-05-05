@@ -33,12 +33,12 @@ class AppBackground extends StatelessWidget {
           decoration: BoxDecoration(
             gradient: RadialGradient(
               center: const Alignment(-0.7, -0.7),
-              radius: 0.6,
+              radius: 0.7,
               colors: [
-                palette.accent.withValues(alpha: 0.07),
+                palette.accent.withValues(alpha: 0.18),
                 Colors.transparent,
               ],
-              stops: const [0.0, 0.8],
+              stops: const [0.0, 0.85],
             ),
           ),
         ),
@@ -47,12 +47,12 @@ class AppBackground extends StatelessWidget {
           decoration: BoxDecoration(
             gradient: RadialGradient(
               center: const Alignment(0.8, 0.85),
-              radius: 0.6,
+              radius: 0.7,
               colors: [
-                palette.highlight.withValues(alpha: 0.07),
+                palette.highlight.withValues(alpha: 0.16),
                 Colors.transparent,
               ],
-              stops: const [0.0, 0.8],
+              stops: const [0.0, 0.85],
             ),
           ),
         ),
