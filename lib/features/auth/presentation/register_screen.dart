@@ -112,7 +112,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SizedBox(height: 20),
+                const SizedBox(height: 14),
                 // Headline
                 Text(
                   AuthStrings.registerTitle,
@@ -132,7 +132,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     color: palette.textMuted,
                   ),
                 ),
-                const SizedBox(height: 28),
+                const SizedBox(height: 20),
                 // Name field
                 AuthInput(
                   controller: _nameCtrl,

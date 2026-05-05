@@ -80,10 +80,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SizedBox(height: 32),
+                const SizedBox(height: 20),
                 // Logo centered
                 const Center(child: TreinoLogo(size: 56)),
-                const SizedBox(height: 32),
+                const SizedBox(height: 20),
                 // Headline
                 Text(
                   AuthStrings.loginTitle,
@@ -104,7 +104,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     color: palette.textMuted,
                   ),
                 ),
-                const SizedBox(height: 28),
+                const SizedBox(height: 20),
                 // Email field — no label per mockup (icon-only)
                 AuthInput(
                   controller: _emailCtrl,
@@ -153,7 +153,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   onPressed: _fieldsEmpty ? null : _submit,
                   isLoading: isLoading,
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 18),
                 // Divider "O CONTINUÁ CON"
                 Row(
                   children: [

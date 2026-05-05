@@ -18,8 +18,7 @@ void main() {
       final richTexts = tester.allWidgets.whereType<RichText>().toList();
       expect(richTexts, isNotEmpty);
 
-      final combined =
-          richTexts.map((rt) => rt.text.toPlainText()).join();
+      final combined = richTexts.map((rt) => rt.text.toPlainText()).join();
       expect(combined, contains('TREIN'));
       expect(combined, contains('O'));
     });
@@ -45,7 +44,8 @@ void main() {
       expect(foundAccentO, isTrue, reason: 'O must be in accent color');
     });
 
-    testWidgets('strike line Container is present in the Stack', (tester) async {
+    testWidgets('strike line Container is present in the Stack',
+        (tester) async {
       await tester.pumpWidget(_wrap(const WelcomeGlitchLogo()));
       await tester.pump();
 
