@@ -80,7 +80,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SizedBox(height: 20),
+                // Back button — top left
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: IconButton(
+                    padding: EdgeInsets.zero,
+                    icon: Icon(TreinoIcon.back, color: palette.textPrimary),
+                    onPressed: () => context.canPop()
+                        ? context.pop()
+                        : context.go('/welcome'),
+                  ),
+                ),
+                const SizedBox(height: 8),
                 // Logo centered
                 const Center(child: TreinoLogo(size: 56)),
                 const SizedBox(height: 20),
