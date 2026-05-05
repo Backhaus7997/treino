@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
 
 /// Outlined pill button for social sign-in (Google, Apple).
 /// When onPressed is null: opacity 0.5, wrapped in Tooltip("Próximamente").
+///
+/// Pass either a Material [icon] (IconData) or a FontAwesome brand glyph
+/// via [iconData] — internally it renders as [FaIcon] when the family is
+/// FontAwesome, otherwise as a regular [Icon].
 class AuthSecondaryButton extends StatelessWidget {
   const AuthSecondaryButton({
     super.key,
@@ -36,7 +41,13 @@ class AuthSecondaryButton extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: palette.textPrimary, size: 18),
+            // Use FaIcon for FontAwesome glyphs so the brand fonts render
+            // correctly, fall back to Icon for everything else.
+            icon.fontFamily == 'FontAwesomeBrands' ||
+                    icon.fontFamily == 'FontAwesomeSolid' ||
+                    icon.fontFamily == 'FontAwesomeRegular'
+                ? FaIcon(icon, color: palette.textPrimary, size: 18)
+                : Icon(icon, color: palette.textPrimary, size: 18),
             const SizedBox(width: 8),
             Text(
               label,

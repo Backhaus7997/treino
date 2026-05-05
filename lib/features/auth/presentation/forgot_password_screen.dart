@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../app/theme/app_background.dart';
 import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../application/auth_providers.dart';
@@ -90,92 +91,94 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
               context.canPop() ? context.pop() : context.go('/login'),
         ),
       ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 12),
-              // Headline
-              Text(
-                AuthStrings.forgotTitle,
-                style: GoogleFonts.barlowCondensed(
-                  fontSize: 46,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.5,
-                  color: palette.textPrimary,
-                  height: 1.0,
-                ),
-              ),
-              const SizedBox(height: 12),
-              // Body
-              Text(
-                AuthStrings.forgotBody,
-                style: GoogleFonts.barlow(
-                  fontSize: 15,
-                  color: palette.textMuted,
-                  height: 1.5,
-                ),
-              ),
-              const SizedBox(height: 28),
-              if (_sent) ...[
-                // Success state
+      body: AppBackground(
+        child: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 12),
+                // Headline
                 Text(
-                  AuthStrings.forgotSuccess,
+                  AuthStrings.forgotTitle,
+                  style: GoogleFonts.barlowCondensed(
+                    fontSize: 46,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.5,
+                    color: palette.textPrimary,
+                    height: 1.0,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                // Body
+                Text(
+                  AuthStrings.forgotBody,
                   style: GoogleFonts.barlow(
                     fontSize: 15,
-                    color: palette.accent,
+                    color: palette.textMuted,
                     height: 1.5,
                   ),
                 ),
-                const SizedBox(height: 20),
-                // Field shown as read-only after success
-                AuthInput(
-                  controller: _emailCtrl,
-                  label: AuthStrings.forgotEmailLabel,
-                  hint: AuthStrings.forgotEmailHint,
-                  leadingIcon: TreinoIcon.mail,
-                  keyboardType: TextInputType.emailAddress,
-                  enabled: false,
-                ),
-                const SizedBox(height: 20),
-                TextButton(
-                  onPressed: () => context.go('/login'),
-                  child: Text(
-                    AuthStrings.forgotBackToLogin,
+                const SizedBox(height: 28),
+                if (_sent) ...[
+                  // Success state
+                  Text(
+                    AuthStrings.forgotSuccess,
                     style: GoogleFonts.barlow(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
+                      fontSize: 15,
                       color: palette.accent,
+                      height: 1.5,
                     ),
                   ),
-                ),
-              ] else ...[
-                // Form state
-                AuthInput(
-                  controller: _emailCtrl,
-                  label: AuthStrings.forgotEmailLabel,
-                  hint: AuthStrings.forgotEmailHint,
-                  leadingIcon: TreinoIcon.mail,
-                  keyboardType: TextInputType.emailAddress,
-                  textInputAction: TextInputAction.done,
-                  autofillHints: const [AutofillHints.email],
-                  onFieldSubmitted: (_) =>
-                      _emailCtrl.text.trim().isEmpty ? null : _submit(),
-                ),
-                const SizedBox(height: 20),
-                if (_failure != null) ...[
-                  AuthFailureBanner(failure: _failure!),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 20),
+                  // Field shown as read-only after success
+                  AuthInput(
+                    controller: _emailCtrl,
+                    label: AuthStrings.forgotEmailLabel,
+                    hint: AuthStrings.forgotEmailHint,
+                    leadingIcon: TreinoIcon.mail,
+                    keyboardType: TextInputType.emailAddress,
+                    enabled: false,
+                  ),
+                  const SizedBox(height: 20),
+                  TextButton(
+                    onPressed: () => context.go('/login'),
+                    child: Text(
+                      AuthStrings.forgotBackToLogin,
+                      style: GoogleFonts.barlow(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: palette.accent,
+                      ),
+                    ),
+                  ),
+                ] else ...[
+                  // Form state
+                  AuthInput(
+                    controller: _emailCtrl,
+                    label: AuthStrings.forgotEmailLabel,
+                    hint: AuthStrings.forgotEmailHint,
+                    leadingIcon: TreinoIcon.mail,
+                    keyboardType: TextInputType.emailAddress,
+                    textInputAction: TextInputAction.done,
+                    autofillHints: const [AutofillHints.email],
+                    onFieldSubmitted: (_) =>
+                        _emailCtrl.text.trim().isEmpty ? null : _submit(),
+                  ),
+                  const SizedBox(height: 20),
+                  if (_failure != null) ...[
+                    AuthFailureBanner(failure: _failure!),
+                    const SizedBox(height: 12),
+                  ],
+                  AuthPillButton(
+                    label: AuthStrings.forgotCta,
+                    onPressed: _emailCtrl.text.trim().isEmpty ? null : _submit,
+                    isLoading: _isLoading,
+                  ),
                 ],
-                AuthPillButton(
-                  label: AuthStrings.forgotCta,
-                  onPressed: _emailCtrl.text.trim().isEmpty ? null : _submit,
-                  isLoading: _isLoading,
-                ),
               ],
-            ],
+            ),
           ),
         ),
       ),

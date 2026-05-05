@@ -85,8 +85,9 @@ void main() {
     await tester.pumpWidget(_buildApp());
     await tester.pumpAndSettle();
 
-    // IntrinsicHeight wraps the line+headline row
-    expect(find.byType(IntrinsicHeight), findsOneWidget);
+    // At least one IntrinsicHeight wraps the line+headline row.
+    // The screen also uses an outer IntrinsicHeight for spacing distribution.
+    expect(find.byType(IntrinsicHeight), findsWidgets);
   });
 
   testWidgets('renders body text', (tester) async {
