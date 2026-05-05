@@ -17,6 +17,7 @@ import 'widgets/auth_pill_button.dart';
 import 'widgets/auth_secondary_button.dart';
 import 'widgets/password_strength_bar.dart';
 import 'widgets/terms_checkbox.dart';
+import 'widgets/treino_logo.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
@@ -116,9 +117,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const SizedBox(height: 14),
-                  // Headline
+                  // Headline — first line as text, "TREINO" rendered as the
+                  // brand logo SVG (no halo here so it sits flush with the
+                  // text baseline above).
                   Text(
-                    AuthStrings.registerTitle,
+                    'SUMATE A',
                     style: GoogleFonts.barlowCondensed(
                       fontSize: 46,
                       fontWeight: FontWeight.w700,
@@ -127,7 +130,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       height: 1.0,
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
+                  const TreinoLogo(size: 46, glow: false),
+                  const SizedBox(height: 10),
                   Text(
                     AuthStrings.registerSubtitle,
                     style: GoogleFonts.barlow(
@@ -172,8 +177,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     autofillHints: const [AutofillHints.newPassword],
                     validator: EmailPasswordValidator.validatePassword,
                   ),
-                  const SizedBox(height: 8),
-                  // Strength bar — listens to password controller value
+                  const SizedBox(height: 4),
+                  // Strength bar — pegada al input por diseño (single block)
                   ValueListenableBuilder<TextEditingValue>(
                     valueListenable: _passwordCtrl,
                     builder: (_, value, __) =>
