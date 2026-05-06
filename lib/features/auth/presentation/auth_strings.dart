@@ -15,7 +15,7 @@ abstract final class AuthStrings {
   static const welcomeSignIn = 'Iniciar sesión';
 
   // --- Login ---
-  static const loginTitle = 'BIENVENIDO\nDE VUELTA';
+  static const loginTitle = 'BIENVENIDO';
   static const loginSubtitle = 'Entrá para seguir tu rutina';
   static const loginEmailLabel = 'EMAIL';
   static const loginEmailHint = 'tu@email.com';
