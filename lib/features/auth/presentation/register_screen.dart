@@ -121,9 +121,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   Text(
                     AuthStrings.registerTitle,
                     style: GoogleFonts.spaceGrotesk(
-                      fontSize: 40,
+                      fontSize: 28,
                       fontWeight: FontWeight.w900,
-                      letterSpacing: -0.5,
+                      letterSpacing: -0.4,
                       color: palette.textPrimary,
                       height: 1.05,
                     ),

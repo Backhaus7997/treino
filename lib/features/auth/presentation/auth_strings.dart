@@ -31,7 +31,7 @@ abstract final class AuthStrings {
 
   // --- Register ---
   static const registerAppbar = 'CREAR CUENTA';
-  static const registerTitle = 'SUMATE A\nTREINO';
+  static const registerTitle = 'SUMATE A TREINO';
   static const registerSubtitle = 'Es gratis. En 30 segundos estás adentro.';
   static const registerNameLabel = 'NOMBRE';
   static const registerNameHint = 'Tu nombre';
