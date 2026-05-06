@@ -47,14 +47,20 @@ void main() {
   // ---------------------------------------------------------------------------
   // B01: Renders TreinoLogo and tagline
   // ---------------------------------------------------------------------------
-  testWidgets('renders TreinoLogo and tagline', (tester) async {
+  testWidgets('renders TreinoLogo and brand headline', (tester) async {
     final notifier = _TestAuthNotifier();
 
     await tester.pumpWidget(_buildApp(notifier: notifier));
     await tester.pump(); // first frame — splash renders before timer fires
 
     expect(find.byType(TreinoLogo), findsOneWidget);
-    expect(find.textContaining('ENTRENÁ'), findsOneWidget);
+    // Brand headline lives in a RichText with TextSpans — extract plain text.
+    final headlineText = tester
+        .widgetList<RichText>(find.byType(RichText))
+        .map((rt) => rt.text.toPlainText())
+        .join(' ');
+    expect(headlineText, contains('MOVÉS'));
+    expect(headlineText, contains('EL RESTO.'));
 
     // Drain the pending 1500ms timer so the test can close cleanly.
     await tester.pump(const Duration(milliseconds: 1600));

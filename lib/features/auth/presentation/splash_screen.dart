@@ -5,7 +5,6 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
 import '../application/auth_providers.dart';
-import 'auth_strings.dart';
 import 'widgets/treino_logo.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
@@ -61,21 +60,63 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
             ),
           ),
           Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const TreinoLogo(size: 64),
-                const SizedBox(height: 12),
-                Text(
-                  AuthStrings.splashTagline,
-                  style: GoogleFonts.barlowCondensed(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 2.0,
-                    color: palette.textMuted,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const TreinoLogo(size: 64),
+                  const SizedBox(height: 20),
+                  // Brand headline — Space Grotesk, mixed weights, centered.
+                  RichText(
+                    textAlign: TextAlign.center,
+                    text: TextSpan(
+                      children: [
+                        TextSpan(
+                          text: 'MOVÉS ',
+                          style: GoogleFonts.spaceGrotesk(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w500,
+                            letterSpacing: -0.3,
+                            color: palette.textPrimary,
+                            height: 1.2,
+                          ),
+                        ),
+                        TextSpan(
+                          text: 'EL HIERRO.\n',
+                          style: GoogleFonts.spaceGrotesk(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: -0.3,
+                            color: palette.textPrimary,
+                            height: 1.2,
+                          ),
+                        ),
+                        TextSpan(
+                          text: 'NOSOTROS ',
+                          style: GoogleFonts.spaceGrotesk(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w500,
+                            letterSpacing: -0.3,
+                            color: palette.textPrimary,
+                            height: 1.2,
+                          ),
+                        ),
+                        TextSpan(
+                          text: 'EL RESTO.',
+                          style: GoogleFonts.spaceGrotesk(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: -0.3,
+                            color: palette.textPrimary,
+                            height: 1.2,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ],
