@@ -95,8 +95,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  // Logo centered
-                  const Center(child: TreinoLogo(size: 56)),
+                  // Logo — left-aligned to match headline column
+                  const TreinoLogo(size: 56),
                   const SizedBox(height: 20),
                   // Headline
                   Text(
