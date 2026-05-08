@@ -65,5 +65,4 @@ class DefaultFirebaseOptions {
     storageBucket: 'treino-dev.firebasestorage.app',
     iosBundleId: 'com.treino.app',
   );
-
 }

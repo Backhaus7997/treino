@@ -2,17 +2,14 @@ import 'package:flutter/material.dart';
 
 /// Tokens de color del sistema de diseño TREINO.
 ///
-/// El producto soporta dos paletas (mintMagenta default, electricViolet alterna).
-/// Los neutros (ink, sage, espresso, bone) se comparten entre ambas.
+/// El producto usa una única paleta oficial: **Mint Magenta** (definida en
+/// `docs/design-system.md` y en el PDF de marca de mayo 2026).
 /// Ningún widget debe usar HEX literales — siempre vía `AppPalette.of(context)`.
 class AppColors {
   static const ink = Color(0xFF0A0A0A);
   static const espresso = Color(0xFF3C3534);
   static const sage = Color(0xFF4F6358);
   static const bone = Color(0xFFFFFFFF);
-
-  static const violet = Color(0xFF7C3AED);
-  static const green = Color(0xFF34E062);
 
   static const magenta = Color(0xFFC123E0);
   static const mint = Color(0xFF2CE5A2);
@@ -28,6 +25,8 @@ class AppPalette extends ThemeExtension<AppPalette> {
     required this.border,
     required this.textPrimary,
     required this.textMuted,
+    required this.sage,
+    required this.espresso,
   });
 
   final Color accent;
@@ -38,6 +37,12 @@ class AppPalette extends ThemeExtension<AppPalette> {
   final Color textPrimary;
   final Color textMuted;
 
+  /// Sage green — secondary cards, subtle outlines.
+  final Color sage;
+
+  /// Espresso — elevated surfaces, sheets.
+  final Color espresso;
+
   static const mintMagenta = AppPalette(
     accent: AppColors.mint,
     highlight: AppColors.magenta,
@@ -46,16 +51,8 @@ class AppPalette extends ThemeExtension<AppPalette> {
     border: Color(0x1AFFFFFF),
     textPrimary: AppColors.bone,
     textMuted: Color(0x8CFFFFFF),
-  );
-
-  static const electricViolet = AppPalette(
-    accent: AppColors.green,
-    highlight: AppColors.violet,
-    bg: AppColors.ink,
-    bgCard: Color(0xFF111413),
-    border: Color(0x1AFFFFFF),
-    textPrimary: AppColors.bone,
-    textMuted: Color(0x8CFFFFFF),
+    sage: AppColors.sage,
+    espresso: AppColors.espresso,
   );
 
   static AppPalette of(BuildContext context) =>
@@ -70,6 +67,8 @@ class AppPalette extends ThemeExtension<AppPalette> {
     Color? border,
     Color? textPrimary,
     Color? textMuted,
+    Color? sage,
+    Color? espresso,
   }) =>
       AppPalette(
         accent: accent ?? this.accent,
@@ -79,6 +78,8 @@ class AppPalette extends ThemeExtension<AppPalette> {
         border: border ?? this.border,
         textPrimary: textPrimary ?? this.textPrimary,
         textMuted: textMuted ?? this.textMuted,
+        sage: sage ?? this.sage,
+        espresso: espresso ?? this.espresso,
       );
 
   @override
@@ -92,6 +93,8 @@ class AppPalette extends ThemeExtension<AppPalette> {
       border: Color.lerp(border, other.border, t)!,
       textPrimary: Color.lerp(textPrimary, other.textPrimary, t)!,
       textMuted: Color.lerp(textMuted, other.textMuted, t)!,
+      sage: Color.lerp(sage, other.sage, t)!,
+      espresso: Color.lerp(espresso, other.espresso, t)!,
     );
   }
 }

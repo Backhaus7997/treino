@@ -62,7 +62,7 @@ class TreinoBottomBar extends StatelessWidget {
             child: Container(
               height: 72,
               decoration: BoxDecoration(
-                color: palette.bgCard.withOpacity(0.72),
+                color: palette.bgCard.withValues(alpha: 0.72),
                 borderRadius: BorderRadius.circular(36),
                 border: Border.all(color: palette.border),
               ),
@@ -141,7 +141,7 @@ class _PillHighlight extends StatelessWidget {
         borderRadius: BorderRadius.circular(28),
         boxShadow: [
           BoxShadow(
-            color: palette.accent.withOpacity(0.35),
+            color: palette.accent.withValues(alpha: 0.35),
             blurRadius: 18,
             spreadRadius: 0,
             offset: const Offset(0, 4),
