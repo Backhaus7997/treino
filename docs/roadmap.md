@@ -6,7 +6,7 @@ Estado de las fases y desglose detallado de Fase 1 (en curso).
 
 - [x] **Fase 0** — Bootstrap + tema + 5 tabs vacías + Phosphor (commits `cf09068` a `c6d5fea`).
 - [ ] **Fase 1** — Auth (email/Google/Apple) + Firebase + Firestore + ProfileSetup + Roles & guards. Etapa 1 ✅ mergeada (`44c40fc`). Detalle de etapas más abajo.
-- [ ] **Fase 2** — Home (paridad con mockup Mobile Home) + Rutinas básicas.
+- [ ] **Fase 2** — Home (paridad con mockup Mobile Home, ver `docs/app-alumno/design-decisions.md` → Home: composición de cards Joaco + Llanca + Mateo) + Rutinas básicas.
 - [ ] **Fase 3** — Feed social (amigos · comunidad · público).
 - [ ] **Fase 4** — Workout++ (bloques, super series, IA buscador de ejercicios, videos).
 - [ ] **Fase 5** — Coach / Personal Trainer (discovery con geohash, chat, agenda, planes asignados, importación de planes Excel).
@@ -23,7 +23,7 @@ Cada etapa es un PR separado. La filosofía: rollback granular si algo se rompe,
 | 3 | Firestore + UserProfile + reglas + emulator | `feat/firestore-user-profile` | Firestore Database ✅ ya creada (`southamerica-east1`, Production mode) | `cloud_firestore` package, modelo `UserProfile` con freezed, `UserRepository`, reglas para `users/{uid}` (read/write sólo el dueño, role inmutable post-create), `firebase.json` con config emulator + script `scripts/emulator.sh` para development local. | A |
 | 4 | Auth Google | `feat/auth-google-signin` | Auth → habilitar Google + agregar SHA-1 fingerprint Android + OAuth consent screen | `google_sign_in` package, flujo en Login (botón "Continuar con Google"), credential exchange con Firebase Auth, manejo de "nuevo usuario" (redirect a ProfileSetup) vs "existente" (redirect a Home). | A o B |
 | 5 | Auth Apple | `feat/auth-apple-signin` | Auth → habilitar Apple provider + Service ID + Team ID + Key ID + .p8 desde Apple Developer | `sign_in_with_apple` package, flujo en Login. Sólo iOS por ahora. Validar email aún cuando Apple lo oculte (`@privaterelay.appleid.com`). | A |
-| 6 | ProfileSetup flow + Storage avatars | `feat/profile-setup-flow` | Storage → crear bucket default + reglas básicas | Multi-step flow (username, gym selector, experiencia, género, peso, altura, avatar). `firebase_storage`, `image_picker` para foto, upload con progress. Redirect post-signup automático cuando `UserProfile` está incompleto. | B |
+| 6 | ProfileSetup flow + Storage avatars | `feat/profile-setup-flow` | Storage → crear bucket default + reglas básicas | Multi-step flow de 4 pantallas (ver `docs/app-alumno/design-decisions.md` → Profile Setup): username, gym selector, experiencia, género, peso, altura, avatar. `firebase_storage`, `image_picker` para foto, upload con progress. Redirect post-signup automático cuando `UserProfile` está incompleto. | B |
 | 7 | Roles & guards | `feat/roles-guards` | Nada | Enum `UserRole` en `UserProfile`, route guards en `go_router` que redirigen según `role`. Tab Coach renderiza vista atleta vs vista trainer (sin toggle interno — el rol es inmutable). Si rol es `null` (post-signup, pre-ProfileSetup), redirigir a `/profile-setup`. | A |
 
 **App Check** (token verification para prevenir abuse) se mueve a **Fase 6 (Polish)** — es seguridad de prod, no MVP.
