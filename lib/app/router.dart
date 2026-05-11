@@ -12,7 +12,9 @@ import '../features/auth/presentation/welcome_screen.dart';
 import '../features/coach/coach_screen.dart';
 import '../features/feed/feed_screen.dart';
 import '../features/home/home_screen.dart';
+import '../features/profile/application/user_providers.dart';
 import '../features/profile/profile_screen.dart';
+import '../features/profile_setup/presentation/profile_setup_flow.dart';
 import '../features/workout/workout_screen.dart';
 import 'theme/app_background.dart';
 
@@ -43,9 +45,34 @@ String? authRedirect(
   final user = auth.valueOrNull;
   final loggedIn = user != null;
   final isPublic = _publicRoutes.any(location.startsWith);
+  final isProfileSetup = location.startsWith('/profile-setup');
 
   // Anonymous on a protected route → /welcome.
   if (!loggedIn && !isPublic) return '/welcome';
+
+  // Post-signup redirect a /profile-setup. Lee el UserProfile real de
+  // Firestore via userProfileProvider — si todavía no tiene displayName,
+  // el flow de setup no se completó y mandamos al atleta ahí.
+  //
+  // El UserProfile lo crea AuthService.signUpWithEmail con displayName=null;
+  // el submit de ProfileSetup lo updatea con el username elegido.
+  //
+  // Mientras el profile está cargando bloqueamos cualquier redirect — el
+  // user se queda donde está hasta que sepamos si su profile está completo
+  // o no. Esto evita el flicker `/home → /profile-setup` para usuarios
+  // recién registrados, y `/profile-setup → /home` para usuarios existentes.
+  //
+  // TODO(etapa7): cuando Roles & guards mergee, agregar también route guards
+  // por role (athlete vs trainer) acá mismo.
+  if (loggedIn && !isProfileSetup) {
+    final profileAsync = read(userProfileProvider);
+    if (profileAsync.isLoading) return null;
+    final profile = profileAsync.valueOrNull;
+    if (profile == null || profile.displayName == null) {
+      return '/profile-setup';
+    }
+  }
+
   // Authenticated on a public route (except /splash) → /home.
   if (loggedIn && isPublic && !location.startsWith('/splash')) return '/home';
   return null;
@@ -81,6 +108,12 @@ GoRouter buildRouter({
       GoRoute(
         path: '/forgot-password',
         pageBuilder: (_, __) => _noAnim(const ForgotPasswordScreen()),
+      ),
+
+      // ProfileSetup — fullscreen post-signup flow. No bottom bar.
+      GoRoute(
+        path: '/profile-setup',
+        pageBuilder: (_, __) => _noAnim(const ProfileSetupFlow()),
       ),
 
       // ShellRoute with the existing 5 tabs
