@@ -27,7 +27,6 @@ class AuthNotifier extends AsyncNotifier<User?> {
   Future<void> signUp({
     required String email,
     required String password,
-    String? displayName,
   }) async {
     final service = ref.read(authServiceProvider);
     state = const AsyncLoading();
@@ -35,7 +34,6 @@ class AuthNotifier extends AsyncNotifier<User?> {
       () => service.signUpWithEmail(
         email: email,
         password: password,
-        displayName: displayName,
       ),
     );
   }

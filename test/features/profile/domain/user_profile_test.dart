@@ -13,7 +13,7 @@ void main() {
       final profile = UserProfile(
         uid: 'uid-1',
         email: 'a@b.com',
-        displayName: 'Alice',
+        displayName: null,
         role: UserRole.athlete,
         createdAt: fixedDt,
         updatedAt: fixedDt,
@@ -24,7 +24,7 @@ void main() {
 
       expect(decoded.uid, equals('uid-1'));
       expect(decoded.email, equals('a@b.com'));
-      expect(decoded.displayName, equals('Alice'));
+      expect(decoded.displayName, isNull);
       expect(decoded.role, equals(UserRole.athlete));
       expect(decoded.createdAt, equals(fixedDt));
       expect(decoded.updatedAt, equals(fixedDt));
@@ -35,6 +35,20 @@ void main() {
       expect(decoded.experienceLevel, isNull);
       expect(decoded.avatarUrl, isNull);
       expect(decoded.bornAt, isNull);
+    });
+
+    test('SCENARIO-001b: displayName can be non-null and round-trips', () {
+      final profile = UserProfile(
+        uid: 'uid-1b',
+        email: 'a@b.com',
+        displayName: 'Alice',
+        role: UserRole.athlete,
+        createdAt: fixedDt,
+        updatedAt: fixedDt,
+      );
+
+      final decoded = UserProfile.fromJson(profile.toJson());
+      expect(decoded.displayName, equals('Alice'));
     });
 
     test('SCENARIO-002: all 13 fields populated roundtrip', () {
@@ -72,13 +86,14 @@ void main() {
       expect(decoded.bornAt, equals(bornAt));
     });
 
-    test('SCENARIO-004: raw map with Timestamp for createdAt decodes to DateTime',
+    test(
+        'SCENARIO-004: raw map with Timestamp for createdAt decodes to DateTime',
         () {
       final ts = Timestamp.fromDate(fixedDt);
       final raw = <String, Object?>{
         'uid': 'uid-3',
         'email': 'c@d.com',
-        'displayName': 'Carol',
+        'displayName': null,
         'role': 'athlete',
         'createdAt': ts,
         'updatedAt': ts,
@@ -89,6 +104,7 @@ void main() {
       expect(profile.createdAt, equals(fixedDt));
       expect(profile.updatedAt, equals(fixedDt));
       expect(profile.createdAt, isA<DateTime>());
+      expect(profile.displayName, isNull);
     });
   });
 }

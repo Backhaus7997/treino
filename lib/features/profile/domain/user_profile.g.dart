@@ -10,7 +10,7 @@ _$UserProfileImpl _$$UserProfileImplFromJson(Map<String, dynamic> json) =>
     _$UserProfileImpl(
       uid: json['uid'] as String,
       email: json['email'] as String,
-      displayName: json['displayName'] as String,
+      displayName: json['displayName'] as String?,
       role: $enumDecode(_$UserRoleEnumMap, json['role']),
       createdAt:
           const TimestampConverter().fromJson(json['createdAt'] as Timestamp),

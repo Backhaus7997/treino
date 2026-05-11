@@ -18,11 +18,12 @@ class MockUserRepository extends Mock implements UserRepository {}
 
 class FakeAuthCredential extends Fake implements AuthCredential {}
 
-// Fake UserProfile used as stub return value
+// Fake UserProfile used as stub return value — displayName remains null until
+// ProfileSetup (Etapa 6) populates it.
 final _fakeProfile = UserProfile(
   uid: 'uid-fake',
   email: 'a@b.c',
-  displayName: 'Ana',
+  displayName: null,
   role: UserRole.athlete,
   createdAt: DateTime.utc(2026, 5, 11),
   updatedAt: DateTime.utc(2026, 5, 11),
@@ -55,14 +56,12 @@ void main() {
       () => mockRepo.getOrCreate(
         uid: any(named: 'uid'),
         email: any(named: 'email'),
-        displayName: any(named: 'displayName'),
       ),
     ).thenAnswer((_) async => _fakeProfile);
     when(
       () => mockRepo.createIfAbsent(
         uid: any(named: 'uid'),
         email: any(named: 'email'),
-        displayName: any(named: 'displayName'),
       ),
     ).thenAnswer((_) async {});
 
@@ -94,26 +93,8 @@ void main() {
       verify(() => user.sendEmailVerification()).called(1);
     });
 
-    test('D03 — displayName provided: calls updateDisplayName', () async {
-      when(
-        () => fbAuth.createUserWithEmailAndPassword(
-          email: any(named: 'email'),
-          password: any(named: 'password'),
-        ),
-      ).thenAnswer((_) async => cred);
-      when(() => user.updateDisplayName(any())).thenAnswer((_) async {});
-      when(() => user.sendEmailVerification()).thenAnswer((_) async {});
-
-      await sut.signUpWithEmail(
-        email: 'a@b.c',
-        password: 'Pass1234',
-        displayName: 'Ana Núñez',
-      );
-
-      verify(() => user.updateDisplayName('Ana Núñez')).called(1);
-    });
-
-    test('D03 — displayName null: updateDisplayName NOT called', () async {
+    test('D03 — signUp never calls updateDisplayName (deferred to Etapa 6)',
+        () async {
       when(
         () => fbAuth.createUserWithEmailAndPassword(
           email: any(named: 'email'),
@@ -142,9 +123,9 @@ void main() {
       );
     });
 
-    // T29: SCENARIO-020 — happy path call order
+    // T29: SCENARIO-020 — happy path call order (no displayName work)
     test(
-        'SCENARIO-020: signup happy path calls updateDisplayName, sendEmailVerification, getOrCreate in order',
+        'SCENARIO-020: signup happy path calls sendEmailVerification and getOrCreate; never updateDisplayName',
         () async {
       when(
         () => fbAuth.createUserWithEmailAndPassword(
@@ -152,22 +133,16 @@ void main() {
           password: any(named: 'password'),
         ),
       ).thenAnswer((_) async => cred);
-      when(() => user.updateDisplayName(any())).thenAnswer((_) async {});
       when(() => user.sendEmailVerification()).thenAnswer((_) async {});
 
-      await sut.signUpWithEmail(
-        email: 'a@b.c',
-        password: 'Pass1234',
-        displayName: 'Ana',
-      );
+      await sut.signUpWithEmail(email: 'a@b.c', password: 'Pass1234');
 
-      verify(() => user.updateDisplayName('Ana')).called(1);
+      verifyNever(() => user.updateDisplayName(any()));
       verify(() => user.sendEmailVerification()).called(1);
       verify(
         () => mockRepo.getOrCreate(
           uid: any(named: 'uid'),
           email: any(named: 'email'),
-          displayName: any(named: 'displayName'),
         ),
       ).called(1);
     });
@@ -182,23 +157,17 @@ void main() {
           password: any(named: 'password'),
         ),
       ).thenAnswer((_) async => cred);
-      when(() => user.updateDisplayName(any())).thenAnswer((_) async {});
       when(() => user.sendEmailVerification()).thenAnswer((_) async {});
       when(() => user.delete()).thenAnswer((_) async {});
       when(
         () => mockRepo.getOrCreate(
           uid: any(named: 'uid'),
           email: any(named: 'email'),
-          displayName: any(named: 'displayName'),
         ),
       ).thenThrow(Exception('firestore down'));
 
       await expectLater(
-        () => sut.signUpWithEmail(
-          email: 'a@b.c',
-          password: 'Pass1234',
-          displayName: 'Ana',
-        ),
+        () => sut.signUpWithEmail(email: 'a@b.c', password: 'Pass1234'),
         throwsA(
           isA<AuthFailure>().having(
             (f) => f.map(
@@ -232,24 +201,18 @@ void main() {
           password: any(named: 'password'),
         ),
       ).thenAnswer((_) async => cred);
-      when(() => user.updateDisplayName(any())).thenAnswer((_) async {});
       when(() => user.sendEmailVerification()).thenAnswer((_) async {});
       when(() => user.delete()).thenThrow(Exception('delete failed'));
       when(
         () => mockRepo.getOrCreate(
           uid: any(named: 'uid'),
           email: any(named: 'email'),
-          displayName: any(named: 'displayName'),
         ),
       ).thenThrow(Exception('firestore down'));
 
       // Must throw profileCreateFailed, NOT the delete exception
       await expectLater(
-        () => sut.signUpWithEmail(
-          email: 'a@b.c',
-          password: 'Pass1234',
-          displayName: 'Ana',
-        ),
+        () => sut.signUpWithEmail(email: 'a@b.c', password: 'Pass1234'),
         throwsA(
           isA<AuthFailure>().having(
             (f) => f.map(
@@ -364,7 +327,6 @@ void main() {
         () => mockRepo.createIfAbsent(
           uid: any(named: 'uid'),
           email: any(named: 'email'),
-          displayName: any(named: 'displayName'),
         ),
       ).called(1);
     });
@@ -386,7 +348,6 @@ void main() {
         () => mockRepo.createIfAbsent(
           uid: any(named: 'uid'),
           email: any(named: 'email'),
-          displayName: any(named: 'displayName'),
         ),
       ).called(2);
     });
@@ -404,7 +365,6 @@ void main() {
         () => mockRepo.createIfAbsent(
           uid: any(named: 'uid'),
           email: any(named: 'email'),
-          displayName: any(named: 'displayName'),
         ),
       ).thenThrow(Exception('Firestore down'));
 
@@ -415,9 +375,9 @@ void main() {
       expect(result, user);
     });
 
-    // T31: REQ-PROF-038 — displayName null fallback uses email.split('@').first
+    // signIn backfill no longer synthesizes a displayName from the email
     test(
-        'REQ-PROF-038: displayName null → createIfAbsent called with email local part',
+        'sign-in backfill never derives displayName from email or Firebase user',
         () async {
       when(() => user.displayName).thenReturn(null);
       when(
@@ -429,11 +389,11 @@ void main() {
 
       await sut.signInWithEmail(email: 'alice@example.com', password: 'P1234');
 
+      // createIfAbsent must be called with only uid + email — no displayName at all.
       verify(
         () => mockRepo.createIfAbsent(
-          uid: any(named: 'uid'),
-          email: any(named: 'email'),
-          displayName: 'alice',
+          uid: 'uid-test',
+          email: 'alice@example.com',
         ),
       ).called(1);
     });

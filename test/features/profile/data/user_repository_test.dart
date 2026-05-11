@@ -20,7 +20,7 @@ void main() {
     final profile = UserProfile(
       uid: uid,
       email: 'seed@test.com',
-      displayName: 'Seeded',
+      displayName: null,
       role: UserRole.athlete,
       createdAt: now,
       updatedAt: now,
@@ -32,22 +32,24 @@ void main() {
   // T17: getOrCreate — new uid
   // ---------------------------------------------------------------------------
   group('UserRepository.getOrCreate', () {
-    test('SCENARIO-010: new uid creates doc and returns populated profile',
+    test(
+        'SCENARIO-010: new uid creates doc with displayName null and returns populated profile',
         () async {
       final result = await repo.getOrCreate(
         uid: 'uid-1',
         email: 'a@b.com',
-        displayName: 'Alice',
       );
 
       // Doc exists in fake Firestore
       final snap = await firestore.collection('users').doc('uid-1').get();
       expect(snap.exists, isTrue);
+      // Persisted displayName is null — populated by ProfileSetup in Etapa 6
+      expect(snap.data()!['displayName'], isNull);
 
       // Returned profile has correct values
       expect(result.uid, equals('uid-1'));
       expect(result.email, equals('a@b.com'));
-      expect(result.displayName, equals('Alice'));
+      expect(result.displayName, isNull);
       expect(result.role, equals(UserRole.athlete));
       expect(result.gymId, isNull);
       expect(result.bodyWeightKg, isNull);
@@ -69,15 +71,13 @@ void main() {
     test('SCENARIO-011: existing uid returns existing profile without writing',
         () async {
       await seedDoc('uid-1');
-      final snapBefore =
-          await firestore.collection('users').doc('uid-1').get();
+      final snapBefore = await firestore.collection('users').doc('uid-1').get();
       final originalCreatedAt =
           (snapBefore.data()!['createdAt'] as Timestamp).toDate();
 
       final result = await repo.getOrCreate(
         uid: 'uid-1',
         email: 'new@b.com',
-        displayName: 'NewName',
       );
 
       // createdAt unchanged
@@ -85,7 +85,8 @@ void main() {
           equals(originalCreatedAt.millisecondsSinceEpoch));
       // Returns existing data, not the new args
       expect(result.email, equals('seed@test.com'));
-      expect(result.displayName, equals('Seeded'));
+      // Seeded doc has displayName null
+      expect(result.displayName, isNull);
     });
   });
 
@@ -115,8 +116,7 @@ void main() {
         'SCENARIO-014: partial update preserves role/email/uid/createdAt, bumps updatedAt',
         () async {
       await seedDoc('uid-4');
-      final snapBefore =
-          await firestore.collection('users').doc('uid-4').get();
+      final snapBefore = await firestore.collection('users').doc('uid-4').get();
       final originalCreatedAt = snapBefore.data()!['createdAt'];
       final originalUpdatedAt =
           (snapBefore.data()!['updatedAt'] as Timestamp).toDate();
@@ -193,7 +193,8 @@ void main() {
       // This runs concurrently with the expectLater listener
     }, skip: 'requires concurrent write — see alternative test below');
 
-    test('SCENARIO-018b: watch emits profile after createIfAbsent (stream test)',
+    test(
+        'SCENARIO-018b: watch emits profile after createIfAbsent (stream test)',
         () async {
       final events = <UserProfile?>[];
       final sub = repo.watch('uid-7b').listen(events.add);
@@ -205,13 +206,14 @@ void main() {
       await repo.createIfAbsent(
         uid: 'uid-7b',
         email: 'd@e.com',
-        displayName: 'Dave',
       );
 
       await Future.delayed(const Duration(milliseconds: 50));
       expect(events.length, greaterThan(1));
       expect(events.last, isA<UserProfile>());
       expect((events.last as UserProfile).uid, equals('uid-7b'));
+      // createIfAbsent must persist displayName null
+      expect((events.last as UserProfile).displayName, isNull);
 
       await sub.cancel();
     });
@@ -223,9 +225,10 @@ void main() {
 
       await Future.delayed(const Duration(milliseconds: 50));
       expect(events.isNotEmpty, isTrue);
-      expect(events.first!.displayName, equals('Seeded'));
+      // Seeded doc has displayName null (REQ-PROF — populated later by ProfileSetup)
+      expect(events.first!.displayName, isNull);
 
-      // Direct mutation via fake firestore
+      // Direct mutation via fake firestore — simulates ProfileSetup writing
       await firestore
           .collection('users')
           .doc('uid-8')
@@ -241,22 +244,23 @@ void main() {
       await repo.createIfAbsent(
         uid: 'uid-9',
         email: 'e@f.com',
-        displayName: 'Eve',
       );
       await repo.createIfAbsent(
         uid: 'uid-9',
         email: 'e@f.com',
-        displayName: 'Eve',
       );
 
       final snap = await firestore.collection('users').doc('uid-9').get();
       expect(snap.exists, isTrue);
+      // displayName persisted as null
+      expect(snap.data()!['displayName'], isNull);
 
       // createdAt not changed by second call — get snapshot count proxy:
       // just verify we can still read exactly one profile
       final profile = await repo.get('uid-9');
       expect(profile, isNotNull);
       expect(profile!.uid, equals('uid-9'));
+      expect(profile.displayName, isNull);
     });
   });
 }

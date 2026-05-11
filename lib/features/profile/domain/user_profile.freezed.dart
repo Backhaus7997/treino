@@ -22,7 +22,7 @@ UserProfile _$UserProfileFromJson(Map<String, dynamic> json) {
 mixin _$UserProfile {
   String get uid => throw _privateConstructorUsedError;
   String get email => throw _privateConstructorUsedError;
-  String get displayName => throw _privateConstructorUsedError;
+  String? get displayName => throw _privateConstructorUsedError;
   UserRole get role => throw _privateConstructorUsedError;
   @TimestampConverter()
   DateTime get createdAt => throw _privateConstructorUsedError;
@@ -56,7 +56,7 @@ abstract class $UserProfileCopyWith<$Res> {
   $Res call(
       {String uid,
       String email,
-      String displayName,
+      String? displayName,
       UserRole role,
       @TimestampConverter() DateTime createdAt,
       @TimestampConverter() DateTime updatedAt,
@@ -86,7 +86,7 @@ class _$UserProfileCopyWithImpl<$Res, $Val extends UserProfile>
   $Res call({
     Object? uid = null,
     Object? email = null,
-    Object? displayName = null,
+    Object? displayName = freezed,
     Object? role = null,
     Object? createdAt = null,
     Object? updatedAt = null,
@@ -107,10 +107,10 @@ class _$UserProfileCopyWithImpl<$Res, $Val extends UserProfile>
           ? _value.email
           : email // ignore: cast_nullable_to_non_nullable
               as String,
-      displayName: null == displayName
+      displayName: freezed == displayName
           ? _value.displayName
           : displayName // ignore: cast_nullable_to_non_nullable
-              as String,
+              as String?,
       role: null == role
           ? _value.role
           : role // ignore: cast_nullable_to_non_nullable
@@ -166,7 +166,7 @@ abstract class _$$UserProfileImplCopyWith<$Res>
   $Res call(
       {String uid,
       String email,
-      String displayName,
+      String? displayName,
       UserRole role,
       @TimestampConverter() DateTime createdAt,
       @TimestampConverter() DateTime updatedAt,
@@ -194,7 +194,7 @@ class __$$UserProfileImplCopyWithImpl<$Res>
   $Res call({
     Object? uid = null,
     Object? email = null,
-    Object? displayName = null,
+    Object? displayName = freezed,
     Object? role = null,
     Object? createdAt = null,
     Object? updatedAt = null,
@@ -215,10 +215,10 @@ class __$$UserProfileImplCopyWithImpl<$Res>
           ? _value.email
           : email // ignore: cast_nullable_to_non_nullable
               as String,
-      displayName: null == displayName
+      displayName: freezed == displayName
           ? _value.displayName
           : displayName // ignore: cast_nullable_to_non_nullable
-              as String,
+              as String?,
       role: null == role
           ? _value.role
           : role // ignore: cast_nullable_to_non_nullable
@@ -289,7 +289,7 @@ class _$UserProfileImpl implements _UserProfile {
   @override
   final String email;
   @override
-  final String displayName;
+  final String? displayName;
   @override
   final UserRole role;
   @override
@@ -384,7 +384,7 @@ abstract class _UserProfile implements UserProfile {
   const factory _UserProfile(
       {required final String uid,
       required final String email,
-      required final String displayName,
+      required final String? displayName,
       required final UserRole role,
       @TimestampConverter() required final DateTime createdAt,
       @TimestampConverter() required final DateTime updatedAt,
@@ -404,7 +404,7 @@ abstract class _UserProfile implements UserProfile {
   @override
   String get email;
   @override
-  String get displayName;
+  String? get displayName;
   @override
   UserRole get role;
   @override

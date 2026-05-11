@@ -13,14 +13,15 @@ class AuthService {
   final FirebaseAuth _auth;
   final UserRepository _userRepository;
 
-  /// Creates the user, optionally sets [displayName], sends verification email,
-  /// then atomically creates the Firestore profile doc (REQ-PROF-033).
+  /// Creates the user, sends verification email, then atomically creates the
+  /// Firestore profile doc with `displayName: null` (REQ-PROF-033, REQ-AUTH-002).
+  /// `displayName` is intentionally NOT collected at signup — ProfileSetup
+  /// (Etapa 6) is the single owner of that field.
   /// On Firestore failure: best-effort deletes the orphan Auth user and throws
   /// [AuthFailure.profileCreateFailed] (REQ-PROF-034 / REQ-PROF-035).
   Future<User> signUpWithEmail({
     required String email,
     required String password,
-    String? displayName,
   }) async {
     late final UserCredential cred;
     try {
@@ -33,19 +34,14 @@ class AuthService {
     }
 
     final user = cred.user!;
-    final effectiveDisplayName = displayName ?? email.split('@').first;
 
     try {
-      if (displayName != null) {
-        await user.updateDisplayName(displayName);
-      }
       await user.sendEmailVerification();
 
       try {
         await _userRepository.getOrCreate(
           uid: user.uid,
           email: email,
-          displayName: effectiveDisplayName,
         );
       } catch (firestoreError) {
         // Rollback: best-effort delete the orphan Auth user.
@@ -84,11 +80,11 @@ class AuthService {
     }
 
     // Etapa 2 backfill — opportunistic, never blocks sign-in (REQ-PROF-037).
+    // Always writes `displayName: null` — ProfileSetup (Etapa 6) populates it.
     try {
       await _userRepository.createIfAbsent(
         uid: user.uid,
         email: email,
-        displayName: user.displayName ?? email.split('@').first,
       );
     } catch (_) {
       // Swallow — auth already succeeded; createIfAbsent is best-effort.

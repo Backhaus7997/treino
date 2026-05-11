@@ -12,10 +12,13 @@ part 'user_profile.g.dart';
 
 @freezed
 class UserProfile with _$UserProfile {
+  /// `displayName` is intentionally nullable: signup/signin create the doc
+  /// with `null`, and ProfileSetup (Etapa 6) is responsible for populating it.
+  /// Etapa 2 signup MUST NOT carry a name — that violates REQ-AUTH-002.
   const factory UserProfile({
     required String uid,
     required String email,
-    required String displayName,
+    required String? displayName,
     required UserRole role,
     @TimestampConverter() required DateTime createdAt,
     @TimestampConverter() required DateTime updatedAt,

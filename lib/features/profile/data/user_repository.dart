@@ -16,10 +16,11 @@ class UserRepository {
   CollectionReference<Map<String, Object?>> get _users =>
       _firestore.collection('users');
 
+  /// Creates the `users/{uid}` doc if missing, with `displayName: null`.
+  /// ProfileSetup (Etapa 6) is the only flow that populates `displayName`.
   Future<UserProfile> getOrCreate({
     required String uid,
     required String email,
-    required String displayName,
   }) async {
     final existing = await get(uid);
     if (existing != null) return existing;
@@ -27,7 +28,7 @@ class UserRepository {
     final profile = UserProfile(
       uid: uid,
       email: email,
-      displayName: displayName,
+      displayName: null,
       role: UserRole.athlete,
       createdAt: now,
       updatedAt: now,
@@ -36,10 +37,12 @@ class UserRepository {
     return profile;
   }
 
+  /// Best-effort backfill on sign-in (REQ-PROF-036/037). Creates the doc with
+  /// `displayName: null` so ProfileSetup (Etapa 6) is the single source of
+  /// truth for that field.
   Future<void> createIfAbsent({
     required String uid,
     required String email,
-    required String displayName,
   }) async {
     final snap = await _users.doc(uid).get();
     if (snap.exists) return;
@@ -47,7 +50,7 @@ class UserRepository {
     final profile = UserProfile(
       uid: uid,
       email: email,
-      displayName: displayName,
+      displayName: null,
       role: UserRole.athlete,
       createdAt: now,
       updatedAt: now,

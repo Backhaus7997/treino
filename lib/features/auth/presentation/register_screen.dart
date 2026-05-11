@@ -28,10 +28,8 @@ class RegisterScreen extends ConsumerStatefulWidget {
 
 class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _nameCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
-  final _nameFocus = FocusNode();
   final _emailFocus = FocusNode();
   final _passwordFocus = FocusNode();
 
@@ -40,35 +38,30 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   @override
   void initState() {
     super.initState();
-    _nameCtrl.addListener(() => setState(() {}));
     _emailCtrl.addListener(() => setState(() {}));
     _passwordCtrl.addListener(() => setState(() {}));
   }
 
   @override
   void dispose() {
-    _nameCtrl.dispose();
     _emailCtrl.dispose();
     _passwordCtrl.dispose();
-    _nameFocus.dispose();
     _emailFocus.dispose();
     _passwordFocus.dispose();
     super.dispose();
   }
 
   bool get _fieldsEmpty =>
-      _nameCtrl.text.trim().isEmpty ||
-      _emailCtrl.text.trim().isEmpty ||
-      _passwordCtrl.text.isEmpty;
+      _emailCtrl.text.trim().isEmpty || _passwordCtrl.text.isEmpty;
 
   bool get _canSubmit => !_fieldsEmpty && _termsAccepted;
 
   Future<void> _submit() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
+    // No displayName at signup — populated by ProfileSetup in Etapa 6 (REQ-AUTH-002).
     await ref.read(authNotifierProvider.notifier).signUp(
           email: _emailCtrl.text.trim(),
           password: _passwordCtrl.text,
-          displayName: _nameCtrl.text.trim(),
         );
     if (!mounted) return;
     final s = ref.read(authNotifierProvider);
@@ -140,18 +133,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     ),
                   ),
                   const SizedBox(height: 20),
-                  // Name field
-                  AuthInput(
-                    controller: _nameCtrl,
-                    label: AuthStrings.registerNameLabel,
-                    hint: AuthStrings.registerNameHint,
-                    leadingIcon: TreinoIcon.tabProfile,
-                    textInputAction: TextInputAction.next,
-                    focusNode: _nameFocus,
-                    nextFocusNode: _emailFocus,
-                  ),
-                  const SizedBox(height: 14),
-                  // Email field
+                  // Email field (no display name field — ProfileSetup owns it).
                   AuthInput(
                     controller: _emailCtrl,
                     label: AuthStrings.registerEmailLabel,
