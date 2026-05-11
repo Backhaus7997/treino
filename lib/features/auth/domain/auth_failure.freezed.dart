@@ -27,6 +27,7 @@ mixin _$AuthFailure {
     required TResult Function() tooManyRequests,
     required TResult Function() networkError,
     required TResult Function(String code) unknown,
+    required TResult Function(Object? cause) profileCreateFailed,
   }) =>
       throw _privateConstructorUsedError;
   @optionalTypeArgs
@@ -40,6 +41,7 @@ mixin _$AuthFailure {
     TResult? Function()? tooManyRequests,
     TResult? Function()? networkError,
     TResult? Function(String code)? unknown,
+    TResult? Function(Object? cause)? profileCreateFailed,
   }) =>
       throw _privateConstructorUsedError;
   @optionalTypeArgs
@@ -53,6 +55,7 @@ mixin _$AuthFailure {
     TResult Function()? tooManyRequests,
     TResult Function()? networkError,
     TResult Function(String code)? unknown,
+    TResult Function(Object? cause)? profileCreateFailed,
     required TResult orElse(),
   }) =>
       throw _privateConstructorUsedError;
@@ -67,6 +70,7 @@ mixin _$AuthFailure {
     required TResult Function(_TooManyRequests value) tooManyRequests,
     required TResult Function(_NetworkError value) networkError,
     required TResult Function(_Unknown value) unknown,
+    required TResult Function(_ProfileCreateFailed value) profileCreateFailed,
   }) =>
       throw _privateConstructorUsedError;
   @optionalTypeArgs
@@ -80,6 +84,7 @@ mixin _$AuthFailure {
     TResult? Function(_TooManyRequests value)? tooManyRequests,
     TResult? Function(_NetworkError value)? networkError,
     TResult? Function(_Unknown value)? unknown,
+    TResult? Function(_ProfileCreateFailed value)? profileCreateFailed,
   }) =>
       throw _privateConstructorUsedError;
   @optionalTypeArgs
@@ -93,6 +98,7 @@ mixin _$AuthFailure {
     TResult Function(_TooManyRequests value)? tooManyRequests,
     TResult Function(_NetworkError value)? networkError,
     TResult Function(_Unknown value)? unknown,
+    TResult Function(_ProfileCreateFailed value)? profileCreateFailed,
     required TResult orElse(),
   }) =>
       throw _privateConstructorUsedError;
@@ -169,6 +175,7 @@ class _$InvalidEmailImpl extends _InvalidEmail {
     required TResult Function() tooManyRequests,
     required TResult Function() networkError,
     required TResult Function(String code) unknown,
+    required TResult Function(Object? cause) profileCreateFailed,
   }) {
     return invalidEmail();
   }
@@ -185,6 +192,7 @@ class _$InvalidEmailImpl extends _InvalidEmail {
     TResult? Function()? tooManyRequests,
     TResult? Function()? networkError,
     TResult? Function(String code)? unknown,
+    TResult? Function(Object? cause)? profileCreateFailed,
   }) {
     return invalidEmail?.call();
   }
@@ -201,6 +209,7 @@ class _$InvalidEmailImpl extends _InvalidEmail {
     TResult Function()? tooManyRequests,
     TResult Function()? networkError,
     TResult Function(String code)? unknown,
+    TResult Function(Object? cause)? profileCreateFailed,
     required TResult orElse(),
   }) {
     if (invalidEmail != null) {
@@ -221,6 +230,7 @@ class _$InvalidEmailImpl extends _InvalidEmail {
     required TResult Function(_TooManyRequests value) tooManyRequests,
     required TResult Function(_NetworkError value) networkError,
     required TResult Function(_Unknown value) unknown,
+    required TResult Function(_ProfileCreateFailed value) profileCreateFailed,
   }) {
     return invalidEmail(this);
   }
@@ -237,6 +247,7 @@ class _$InvalidEmailImpl extends _InvalidEmail {
     TResult? Function(_TooManyRequests value)? tooManyRequests,
     TResult? Function(_NetworkError value)? networkError,
     TResult? Function(_Unknown value)? unknown,
+    TResult? Function(_ProfileCreateFailed value)? profileCreateFailed,
   }) {
     return invalidEmail?.call(this);
   }
@@ -253,6 +264,7 @@ class _$InvalidEmailImpl extends _InvalidEmail {
     TResult Function(_TooManyRequests value)? tooManyRequests,
     TResult Function(_NetworkError value)? networkError,
     TResult Function(_Unknown value)? unknown,
+    TResult Function(_ProfileCreateFailed value)? profileCreateFailed,
     required TResult orElse(),
   }) {
     if (invalidEmail != null) {
@@ -317,6 +329,7 @@ class _$UserDisabledImpl extends _UserDisabled {
     required TResult Function() tooManyRequests,
     required TResult Function() networkError,
     required TResult Function(String code) unknown,
+    required TResult Function(Object? cause) profileCreateFailed,
   }) {
     return userDisabled();
   }
@@ -333,6 +346,7 @@ class _$UserDisabledImpl extends _UserDisabled {
     TResult? Function()? tooManyRequests,
     TResult? Function()? networkError,
     TResult? Function(String code)? unknown,
+    TResult? Function(Object? cause)? profileCreateFailed,
   }) {
     return userDisabled?.call();
   }
@@ -349,6 +363,7 @@ class _$UserDisabledImpl extends _UserDisabled {
     TResult Function()? tooManyRequests,
     TResult Function()? networkError,
     TResult Function(String code)? unknown,
+    TResult Function(Object? cause)? profileCreateFailed,
     required TResult orElse(),
   }) {
     if (userDisabled != null) {
@@ -369,6 +384,7 @@ class _$UserDisabledImpl extends _UserDisabled {
     required TResult Function(_TooManyRequests value) tooManyRequests,
     required TResult Function(_NetworkError value) networkError,
     required TResult Function(_Unknown value) unknown,
+    required TResult Function(_ProfileCreateFailed value) profileCreateFailed,
   }) {
     return userDisabled(this);
   }
@@ -385,6 +401,7 @@ class _$UserDisabledImpl extends _UserDisabled {
     TResult? Function(_TooManyRequests value)? tooManyRequests,
     TResult? Function(_NetworkError value)? networkError,
     TResult? Function(_Unknown value)? unknown,
+    TResult? Function(_ProfileCreateFailed value)? profileCreateFailed,
   }) {
     return userDisabled?.call(this);
   }
@@ -401,6 +418,7 @@ class _$UserDisabledImpl extends _UserDisabled {
     TResult Function(_TooManyRequests value)? tooManyRequests,
     TResult Function(_NetworkError value)? networkError,
     TResult Function(_Unknown value)? unknown,
+    TResult Function(_ProfileCreateFailed value)? profileCreateFailed,
     required TResult orElse(),
   }) {
     if (userDisabled != null) {
@@ -465,6 +483,7 @@ class _$UserNotFoundImpl extends _UserNotFound {
     required TResult Function() tooManyRequests,
     required TResult Function() networkError,
     required TResult Function(String code) unknown,
+    required TResult Function(Object? cause) profileCreateFailed,
   }) {
     return userNotFound();
   }
@@ -481,6 +500,7 @@ class _$UserNotFoundImpl extends _UserNotFound {
     TResult? Function()? tooManyRequests,
     TResult? Function()? networkError,
     TResult? Function(String code)? unknown,
+    TResult? Function(Object? cause)? profileCreateFailed,
   }) {
     return userNotFound?.call();
   }
@@ -497,6 +517,7 @@ class _$UserNotFoundImpl extends _UserNotFound {
     TResult Function()? tooManyRequests,
     TResult Function()? networkError,
     TResult Function(String code)? unknown,
+    TResult Function(Object? cause)? profileCreateFailed,
     required TResult orElse(),
   }) {
     if (userNotFound != null) {
@@ -517,6 +538,7 @@ class _$UserNotFoundImpl extends _UserNotFound {
     required TResult Function(_TooManyRequests value) tooManyRequests,
     required TResult Function(_NetworkError value) networkError,
     required TResult Function(_Unknown value) unknown,
+    required TResult Function(_ProfileCreateFailed value) profileCreateFailed,
   }) {
     return userNotFound(this);
   }
@@ -533,6 +555,7 @@ class _$UserNotFoundImpl extends _UserNotFound {
     TResult? Function(_TooManyRequests value)? tooManyRequests,
     TResult? Function(_NetworkError value)? networkError,
     TResult? Function(_Unknown value)? unknown,
+    TResult? Function(_ProfileCreateFailed value)? profileCreateFailed,
   }) {
     return userNotFound?.call(this);
   }
@@ -549,6 +572,7 @@ class _$UserNotFoundImpl extends _UserNotFound {
     TResult Function(_TooManyRequests value)? tooManyRequests,
     TResult Function(_NetworkError value)? networkError,
     TResult Function(_Unknown value)? unknown,
+    TResult Function(_ProfileCreateFailed value)? profileCreateFailed,
     required TResult orElse(),
   }) {
     if (userNotFound != null) {
@@ -613,6 +637,7 @@ class _$WrongPasswordImpl extends _WrongPassword {
     required TResult Function() tooManyRequests,
     required TResult Function() networkError,
     required TResult Function(String code) unknown,
+    required TResult Function(Object? cause) profileCreateFailed,
   }) {
     return wrongPassword();
   }
@@ -629,6 +654,7 @@ class _$WrongPasswordImpl extends _WrongPassword {
     TResult? Function()? tooManyRequests,
     TResult? Function()? networkError,
     TResult? Function(String code)? unknown,
+    TResult? Function(Object? cause)? profileCreateFailed,
   }) {
     return wrongPassword?.call();
   }
@@ -645,6 +671,7 @@ class _$WrongPasswordImpl extends _WrongPassword {
     TResult Function()? tooManyRequests,
     TResult Function()? networkError,
     TResult Function(String code)? unknown,
+    TResult Function(Object? cause)? profileCreateFailed,
     required TResult orElse(),
   }) {
     if (wrongPassword != null) {
@@ -665,6 +692,7 @@ class _$WrongPasswordImpl extends _WrongPassword {
     required TResult Function(_TooManyRequests value) tooManyRequests,
     required TResult Function(_NetworkError value) networkError,
     required TResult Function(_Unknown value) unknown,
+    required TResult Function(_ProfileCreateFailed value) profileCreateFailed,
   }) {
     return wrongPassword(this);
   }
@@ -681,6 +709,7 @@ class _$WrongPasswordImpl extends _WrongPassword {
     TResult? Function(_TooManyRequests value)? tooManyRequests,
     TResult? Function(_NetworkError value)? networkError,
     TResult? Function(_Unknown value)? unknown,
+    TResult? Function(_ProfileCreateFailed value)? profileCreateFailed,
   }) {
     return wrongPassword?.call(this);
   }
@@ -697,6 +726,7 @@ class _$WrongPasswordImpl extends _WrongPassword {
     TResult Function(_TooManyRequests value)? tooManyRequests,
     TResult Function(_NetworkError value)? networkError,
     TResult Function(_Unknown value)? unknown,
+    TResult Function(_ProfileCreateFailed value)? profileCreateFailed,
     required TResult orElse(),
   }) {
     if (wrongPassword != null) {
@@ -761,6 +791,7 @@ class _$EmailAlreadyInUseImpl extends _EmailAlreadyInUse {
     required TResult Function() tooManyRequests,
     required TResult Function() networkError,
     required TResult Function(String code) unknown,
+    required TResult Function(Object? cause) profileCreateFailed,
   }) {
     return emailAlreadyInUse();
   }
@@ -777,6 +808,7 @@ class _$EmailAlreadyInUseImpl extends _EmailAlreadyInUse {
     TResult? Function()? tooManyRequests,
     TResult? Function()? networkError,
     TResult? Function(String code)? unknown,
+    TResult? Function(Object? cause)? profileCreateFailed,
   }) {
     return emailAlreadyInUse?.call();
   }
@@ -793,6 +825,7 @@ class _$EmailAlreadyInUseImpl extends _EmailAlreadyInUse {
     TResult Function()? tooManyRequests,
     TResult Function()? networkError,
     TResult Function(String code)? unknown,
+    TResult Function(Object? cause)? profileCreateFailed,
     required TResult orElse(),
   }) {
     if (emailAlreadyInUse != null) {
@@ -813,6 +846,7 @@ class _$EmailAlreadyInUseImpl extends _EmailAlreadyInUse {
     required TResult Function(_TooManyRequests value) tooManyRequests,
     required TResult Function(_NetworkError value) networkError,
     required TResult Function(_Unknown value) unknown,
+    required TResult Function(_ProfileCreateFailed value) profileCreateFailed,
   }) {
     return emailAlreadyInUse(this);
   }
@@ -829,6 +863,7 @@ class _$EmailAlreadyInUseImpl extends _EmailAlreadyInUse {
     TResult? Function(_TooManyRequests value)? tooManyRequests,
     TResult? Function(_NetworkError value)? networkError,
     TResult? Function(_Unknown value)? unknown,
+    TResult? Function(_ProfileCreateFailed value)? profileCreateFailed,
   }) {
     return emailAlreadyInUse?.call(this);
   }
@@ -845,6 +880,7 @@ class _$EmailAlreadyInUseImpl extends _EmailAlreadyInUse {
     TResult Function(_TooManyRequests value)? tooManyRequests,
     TResult Function(_NetworkError value)? networkError,
     TResult Function(_Unknown value)? unknown,
+    TResult Function(_ProfileCreateFailed value)? profileCreateFailed,
     required TResult orElse(),
   }) {
     if (emailAlreadyInUse != null) {
@@ -909,6 +945,7 @@ class _$WeakPasswordImpl extends _WeakPassword {
     required TResult Function() tooManyRequests,
     required TResult Function() networkError,
     required TResult Function(String code) unknown,
+    required TResult Function(Object? cause) profileCreateFailed,
   }) {
     return weakPassword();
   }
@@ -925,6 +962,7 @@ class _$WeakPasswordImpl extends _WeakPassword {
     TResult? Function()? tooManyRequests,
     TResult? Function()? networkError,
     TResult? Function(String code)? unknown,
+    TResult? Function(Object? cause)? profileCreateFailed,
   }) {
     return weakPassword?.call();
   }
@@ -941,6 +979,7 @@ class _$WeakPasswordImpl extends _WeakPassword {
     TResult Function()? tooManyRequests,
     TResult Function()? networkError,
     TResult Function(String code)? unknown,
+    TResult Function(Object? cause)? profileCreateFailed,
     required TResult orElse(),
   }) {
     if (weakPassword != null) {
@@ -961,6 +1000,7 @@ class _$WeakPasswordImpl extends _WeakPassword {
     required TResult Function(_TooManyRequests value) tooManyRequests,
     required TResult Function(_NetworkError value) networkError,
     required TResult Function(_Unknown value) unknown,
+    required TResult Function(_ProfileCreateFailed value) profileCreateFailed,
   }) {
     return weakPassword(this);
   }
@@ -977,6 +1017,7 @@ class _$WeakPasswordImpl extends _WeakPassword {
     TResult? Function(_TooManyRequests value)? tooManyRequests,
     TResult? Function(_NetworkError value)? networkError,
     TResult? Function(_Unknown value)? unknown,
+    TResult? Function(_ProfileCreateFailed value)? profileCreateFailed,
   }) {
     return weakPassword?.call(this);
   }
@@ -993,6 +1034,7 @@ class _$WeakPasswordImpl extends _WeakPassword {
     TResult Function(_TooManyRequests value)? tooManyRequests,
     TResult Function(_NetworkError value)? networkError,
     TResult Function(_Unknown value)? unknown,
+    TResult Function(_ProfileCreateFailed value)? profileCreateFailed,
     required TResult orElse(),
   }) {
     if (weakPassword != null) {
@@ -1057,6 +1099,7 @@ class _$TooManyRequestsImpl extends _TooManyRequests {
     required TResult Function() tooManyRequests,
     required TResult Function() networkError,
     required TResult Function(String code) unknown,
+    required TResult Function(Object? cause) profileCreateFailed,
   }) {
     return tooManyRequests();
   }
@@ -1073,6 +1116,7 @@ class _$TooManyRequestsImpl extends _TooManyRequests {
     TResult? Function()? tooManyRequests,
     TResult? Function()? networkError,
     TResult? Function(String code)? unknown,
+    TResult? Function(Object? cause)? profileCreateFailed,
   }) {
     return tooManyRequests?.call();
   }
@@ -1089,6 +1133,7 @@ class _$TooManyRequestsImpl extends _TooManyRequests {
     TResult Function()? tooManyRequests,
     TResult Function()? networkError,
     TResult Function(String code)? unknown,
+    TResult Function(Object? cause)? profileCreateFailed,
     required TResult orElse(),
   }) {
     if (tooManyRequests != null) {
@@ -1109,6 +1154,7 @@ class _$TooManyRequestsImpl extends _TooManyRequests {
     required TResult Function(_TooManyRequests value) tooManyRequests,
     required TResult Function(_NetworkError value) networkError,
     required TResult Function(_Unknown value) unknown,
+    required TResult Function(_ProfileCreateFailed value) profileCreateFailed,
   }) {
     return tooManyRequests(this);
   }
@@ -1125,6 +1171,7 @@ class _$TooManyRequestsImpl extends _TooManyRequests {
     TResult? Function(_TooManyRequests value)? tooManyRequests,
     TResult? Function(_NetworkError value)? networkError,
     TResult? Function(_Unknown value)? unknown,
+    TResult? Function(_ProfileCreateFailed value)? profileCreateFailed,
   }) {
     return tooManyRequests?.call(this);
   }
@@ -1141,6 +1188,7 @@ class _$TooManyRequestsImpl extends _TooManyRequests {
     TResult Function(_TooManyRequests value)? tooManyRequests,
     TResult Function(_NetworkError value)? networkError,
     TResult Function(_Unknown value)? unknown,
+    TResult Function(_ProfileCreateFailed value)? profileCreateFailed,
     required TResult orElse(),
   }) {
     if (tooManyRequests != null) {
@@ -1205,6 +1253,7 @@ class _$NetworkErrorImpl extends _NetworkError {
     required TResult Function() tooManyRequests,
     required TResult Function() networkError,
     required TResult Function(String code) unknown,
+    required TResult Function(Object? cause) profileCreateFailed,
   }) {
     return networkError();
   }
@@ -1221,6 +1270,7 @@ class _$NetworkErrorImpl extends _NetworkError {
     TResult? Function()? tooManyRequests,
     TResult? Function()? networkError,
     TResult? Function(String code)? unknown,
+    TResult? Function(Object? cause)? profileCreateFailed,
   }) {
     return networkError?.call();
   }
@@ -1237,6 +1287,7 @@ class _$NetworkErrorImpl extends _NetworkError {
     TResult Function()? tooManyRequests,
     TResult Function()? networkError,
     TResult Function(String code)? unknown,
+    TResult Function(Object? cause)? profileCreateFailed,
     required TResult orElse(),
   }) {
     if (networkError != null) {
@@ -1257,6 +1308,7 @@ class _$NetworkErrorImpl extends _NetworkError {
     required TResult Function(_TooManyRequests value) tooManyRequests,
     required TResult Function(_NetworkError value) networkError,
     required TResult Function(_Unknown value) unknown,
+    required TResult Function(_ProfileCreateFailed value) profileCreateFailed,
   }) {
     return networkError(this);
   }
@@ -1273,6 +1325,7 @@ class _$NetworkErrorImpl extends _NetworkError {
     TResult? Function(_TooManyRequests value)? tooManyRequests,
     TResult? Function(_NetworkError value)? networkError,
     TResult? Function(_Unknown value)? unknown,
+    TResult? Function(_ProfileCreateFailed value)? profileCreateFailed,
   }) {
     return networkError?.call(this);
   }
@@ -1289,6 +1342,7 @@ class _$NetworkErrorImpl extends _NetworkError {
     TResult Function(_TooManyRequests value)? tooManyRequests,
     TResult Function(_NetworkError value)? networkError,
     TResult Function(_Unknown value)? unknown,
+    TResult Function(_ProfileCreateFailed value)? profileCreateFailed,
     required TResult orElse(),
   }) {
     if (networkError != null) {
@@ -1380,6 +1434,7 @@ class _$UnknownImpl extends _Unknown {
     required TResult Function() tooManyRequests,
     required TResult Function() networkError,
     required TResult Function(String code) unknown,
+    required TResult Function(Object? cause) profileCreateFailed,
   }) {
     return unknown(code);
   }
@@ -1396,6 +1451,7 @@ class _$UnknownImpl extends _Unknown {
     TResult? Function()? tooManyRequests,
     TResult? Function()? networkError,
     TResult? Function(String code)? unknown,
+    TResult? Function(Object? cause)? profileCreateFailed,
   }) {
     return unknown?.call(code);
   }
@@ -1412,6 +1468,7 @@ class _$UnknownImpl extends _Unknown {
     TResult Function()? tooManyRequests,
     TResult Function()? networkError,
     TResult Function(String code)? unknown,
+    TResult Function(Object? cause)? profileCreateFailed,
     required TResult orElse(),
   }) {
     if (unknown != null) {
@@ -1432,6 +1489,7 @@ class _$UnknownImpl extends _Unknown {
     required TResult Function(_TooManyRequests value) tooManyRequests,
     required TResult Function(_NetworkError value) networkError,
     required TResult Function(_Unknown value) unknown,
+    required TResult Function(_ProfileCreateFailed value) profileCreateFailed,
   }) {
     return unknown(this);
   }
@@ -1448,6 +1506,7 @@ class _$UnknownImpl extends _Unknown {
     TResult? Function(_TooManyRequests value)? tooManyRequests,
     TResult? Function(_NetworkError value)? networkError,
     TResult? Function(_Unknown value)? unknown,
+    TResult? Function(_ProfileCreateFailed value)? profileCreateFailed,
   }) {
     return unknown?.call(this);
   }
@@ -1464,6 +1523,7 @@ class _$UnknownImpl extends _Unknown {
     TResult Function(_TooManyRequests value)? tooManyRequests,
     TResult Function(_NetworkError value)? networkError,
     TResult Function(_Unknown value)? unknown,
+    TResult Function(_ProfileCreateFailed value)? profileCreateFailed,
     required TResult orElse(),
   }) {
     if (unknown != null) {
@@ -1483,5 +1543,194 @@ abstract class _Unknown extends AuthFailure {
   /// with the given fields replaced by the non-null parameter values.
   @JsonKey(includeFromJson: false, includeToJson: false)
   _$$UnknownImplCopyWith<_$UnknownImpl> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+
+/// @nodoc
+abstract class _$$ProfileCreateFailedImplCopyWith<$Res> {
+  factory _$$ProfileCreateFailedImplCopyWith(_$ProfileCreateFailedImpl value,
+          $Res Function(_$ProfileCreateFailedImpl) then) =
+      __$$ProfileCreateFailedImplCopyWithImpl<$Res>;
+  @useResult
+  $Res call({Object? cause});
+}
+
+/// @nodoc
+class __$$ProfileCreateFailedImplCopyWithImpl<$Res>
+    extends _$AuthFailureCopyWithImpl<$Res, _$ProfileCreateFailedImpl>
+    implements _$$ProfileCreateFailedImplCopyWith<$Res> {
+  __$$ProfileCreateFailedImplCopyWithImpl(_$ProfileCreateFailedImpl _value,
+      $Res Function(_$ProfileCreateFailedImpl) _then)
+      : super(_value, _then);
+
+  /// Create a copy of AuthFailure
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? cause = freezed,
+  }) {
+    return _then(_$ProfileCreateFailedImpl(
+      cause: freezed == cause ? _value.cause : cause,
+    ));
+  }
+}
+
+/// @nodoc
+
+class _$ProfileCreateFailedImpl extends _ProfileCreateFailed {
+  const _$ProfileCreateFailedImpl({this.cause}) : super._();
+
+  @override
+  final Object? cause;
+
+  @override
+  String toString() {
+    return 'AuthFailure.profileCreateFailed(cause: $cause)';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$ProfileCreateFailedImpl &&
+            const DeepCollectionEquality().equals(other.cause, cause));
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(runtimeType, const DeepCollectionEquality().hash(cause));
+
+  /// Create a copy of AuthFailure
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$ProfileCreateFailedImplCopyWith<_$ProfileCreateFailedImpl> get copyWith =>
+      __$$ProfileCreateFailedImplCopyWithImpl<_$ProfileCreateFailedImpl>(
+          this, _$identity);
+
+  @override
+  @optionalTypeArgs
+  TResult when<TResult extends Object?>({
+    required TResult Function() invalidEmail,
+    required TResult Function() userDisabled,
+    required TResult Function() userNotFound,
+    required TResult Function() wrongPassword,
+    required TResult Function() emailAlreadyInUse,
+    required TResult Function() weakPassword,
+    required TResult Function() tooManyRequests,
+    required TResult Function() networkError,
+    required TResult Function(String code) unknown,
+    required TResult Function(Object? cause) profileCreateFailed,
+  }) {
+    return profileCreateFailed(cause);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? whenOrNull<TResult extends Object?>({
+    TResult? Function()? invalidEmail,
+    TResult? Function()? userDisabled,
+    TResult? Function()? userNotFound,
+    TResult? Function()? wrongPassword,
+    TResult? Function()? emailAlreadyInUse,
+    TResult? Function()? weakPassword,
+    TResult? Function()? tooManyRequests,
+    TResult? Function()? networkError,
+    TResult? Function(String code)? unknown,
+    TResult? Function(Object? cause)? profileCreateFailed,
+  }) {
+    return profileCreateFailed?.call(cause);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeWhen<TResult extends Object?>({
+    TResult Function()? invalidEmail,
+    TResult Function()? userDisabled,
+    TResult Function()? userNotFound,
+    TResult Function()? wrongPassword,
+    TResult Function()? emailAlreadyInUse,
+    TResult Function()? weakPassword,
+    TResult Function()? tooManyRequests,
+    TResult Function()? networkError,
+    TResult Function(String code)? unknown,
+    TResult Function(Object? cause)? profileCreateFailed,
+    required TResult orElse(),
+  }) {
+    if (profileCreateFailed != null) {
+      return profileCreateFailed(cause);
+    }
+    return orElse();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult map<TResult extends Object?>({
+    required TResult Function(_InvalidEmail value) invalidEmail,
+    required TResult Function(_UserDisabled value) userDisabled,
+    required TResult Function(_UserNotFound value) userNotFound,
+    required TResult Function(_WrongPassword value) wrongPassword,
+    required TResult Function(_EmailAlreadyInUse value) emailAlreadyInUse,
+    required TResult Function(_WeakPassword value) weakPassword,
+    required TResult Function(_TooManyRequests value) tooManyRequests,
+    required TResult Function(_NetworkError value) networkError,
+    required TResult Function(_Unknown value) unknown,
+    required TResult Function(_ProfileCreateFailed value) profileCreateFailed,
+  }) {
+    return profileCreateFailed(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? mapOrNull<TResult extends Object?>({
+    TResult? Function(_InvalidEmail value)? invalidEmail,
+    TResult? Function(_UserDisabled value)? userDisabled,
+    TResult? Function(_UserNotFound value)? userNotFound,
+    TResult? Function(_WrongPassword value)? wrongPassword,
+    TResult? Function(_EmailAlreadyInUse value)? emailAlreadyInUse,
+    TResult? Function(_WeakPassword value)? weakPassword,
+    TResult? Function(_TooManyRequests value)? tooManyRequests,
+    TResult? Function(_NetworkError value)? networkError,
+    TResult? Function(_Unknown value)? unknown,
+    TResult? Function(_ProfileCreateFailed value)? profileCreateFailed,
+  }) {
+    return profileCreateFailed?.call(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeMap<TResult extends Object?>({
+    TResult Function(_InvalidEmail value)? invalidEmail,
+    TResult Function(_UserDisabled value)? userDisabled,
+    TResult Function(_UserNotFound value)? userNotFound,
+    TResult Function(_WrongPassword value)? wrongPassword,
+    TResult Function(_EmailAlreadyInUse value)? emailAlreadyInUse,
+    TResult Function(_WeakPassword value)? weakPassword,
+    TResult Function(_TooManyRequests value)? tooManyRequests,
+    TResult Function(_NetworkError value)? networkError,
+    TResult Function(_Unknown value)? unknown,
+    TResult Function(_ProfileCreateFailed value)? profileCreateFailed,
+    required TResult orElse(),
+  }) {
+    if (profileCreateFailed != null) {
+      return profileCreateFailed(this);
+    }
+    return orElse();
+  }
+}
+
+abstract class _ProfileCreateFailed extends AuthFailure {
+  const factory _ProfileCreateFailed({final Object? cause}) =
+      _$ProfileCreateFailedImpl;
+  const _ProfileCreateFailed._() : super._();
+
+  Object? get cause;
+
+  /// Create a copy of AuthFailure
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$ProfileCreateFailedImplCopyWith<_$ProfileCreateFailedImpl> get copyWith =>
       throw _privateConstructorUsedError;
 }

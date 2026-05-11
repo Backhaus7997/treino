@@ -16,6 +16,8 @@ sealed class AuthFailure with _$AuthFailure implements Exception {
   const factory AuthFailure.tooManyRequests() = _TooManyRequests;
   const factory AuthFailure.networkError() = _NetworkError;
   const factory AuthFailure.unknown(String code) = _Unknown;
+  const factory AuthFailure.profileCreateFailed({Object? cause}) =
+      _ProfileCreateFailed;
 
   factory AuthFailure.fromFirebase(FirebaseAuthException e) => switch (e.code) {
         'invalid-email' => const AuthFailure.invalidEmail(),
@@ -44,5 +46,7 @@ sealed class AuthFailure with _$AuthFailure implements Exception {
         _NetworkError() =>
           'Sin conexión. Revisá tu internet e intentá de nuevo',
         _Unknown() => 'Algo salió mal. Intentá de nuevo',
+        _ProfileCreateFailed() =>
+          'Hubo un problema creando tu perfil. Probá de nuevo',
       };
 }
