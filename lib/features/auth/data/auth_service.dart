@@ -173,12 +173,27 @@ class AuthService {
       accessToken: authorization.accessToken,
     );
 
+    final UserCredential cred;
     try {
-      final cred = await _auth.signInWithCredential(credential);
-      return cred.user!;
+      cred = await _auth.signInWithCredential(credential);
     } on FirebaseAuthException catch (e) {
       throw AuthFailure.fromFirebase(e);
     }
+
+    // Etapa 2 backfill — opportunistic, never blocks sign-in (REQ-PROF-036 / REQ-PROF-037).
+    // Always writes `displayName: null` — ProfileSetup (Etapa 6) populates it.
+    // Defensive `?? ''` on email: Firebase Auth's User.email is nullable even
+    // though Google always provides one.
+    try {
+      await _userRepository.createIfAbsent(
+        uid: cred.user!.uid,
+        email: cred.user!.email ?? '',
+      );
+    } catch (_) {
+      // Swallow — auth already succeeded; createIfAbsent is best-effort.
+    }
+
+    return cred.user!;
   }
 
   Future<void> signOut() async {

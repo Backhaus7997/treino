@@ -556,6 +556,43 @@ void main() {
         throwsA(const AuthFailure.accountExistsWithDifferentCredential()),
       );
     });
+
+    // SCENARIO-025 — Google sign-in backfills users/{uid} via createIfAbsent
+    test(
+        'SCENARIO-025: signInWithGoogle backfills users/{uid} via createIfAbsent (REQ-PROF-036/037)',
+        () async {
+      when(() => googleSignIn.authenticate())
+          .thenAnswer((_) async => googleAccount);
+      when(() => fbAuth.signInWithCredential(any()))
+          .thenAnswer((_) async => cred);
+
+      await sut.signInWithGoogle();
+
+      verify(
+        () => mockRepo.createIfAbsent(
+          uid: 'uid-test',
+          email: 'a@b.c',
+        ),
+      ).called(1);
+    });
+
+    test('signInWithGoogle: createIfAbsent throwing does NOT fail the sign-in',
+        () async {
+      when(() => googleSignIn.authenticate())
+          .thenAnswer((_) async => googleAccount);
+      when(() => fbAuth.signInWithCredential(any()))
+          .thenAnswer((_) async => cred);
+      when(
+        () => mockRepo.createIfAbsent(
+          uid: any(named: 'uid'),
+          email: any(named: 'email'),
+        ),
+      ).thenThrow(Exception('Firestore down'));
+
+      final result = await sut.signInWithGoogle();
+
+      expect(result, user);
+    });
   });
 
   // ---------------------------------------------------------------------------
