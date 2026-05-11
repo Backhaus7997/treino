@@ -65,4 +65,9 @@ class TreinoIcon {
 
   // Info
   static const IconData infoCircle = PhosphorIconsRegular.info;
+
+  // ProfileSetup
+  static const IconData plus = PhosphorIconsRegular.plus;
+  static const IconData ruler = PhosphorIconsRegular.ruler;
+  static const IconData scales = PhosphorIconsRegular.scales;
 }

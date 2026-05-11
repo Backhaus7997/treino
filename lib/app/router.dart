@@ -10,6 +10,7 @@ import '../features/auth/presentation/register_screen.dart';
 import '../features/auth/presentation/splash_screen.dart';
 import '../features/auth/presentation/welcome_screen.dart';
 import '../features/coach/coach_screen.dart';
+import '../features/profile_setup/presentation/profile_setup_flow.dart';
 import '../features/feed/feed_screen.dart';
 import '../features/home/home_screen.dart';
 import '../features/profile/profile_screen.dart';
@@ -43,9 +44,25 @@ String? authRedirect(
   final user = auth.valueOrNull;
   final loggedIn = user != null;
   final isPublic = _publicRoutes.any(location.startsWith);
+  final isProfileSetup = location.startsWith('/profile-setup');
 
   // Anonymous on a protected route → /welcome.
   if (!loggedIn && !isPublic) return '/welcome';
+
+  // Post-signup redirect a /profile-setup.
+  // TODO(etapa3): reemplazar este check por
+  //   `userRepository.getProfile(uid).isComplete`. Hoy usamos la creationTime
+  //   de FirebaseAuth como proxy: usuarios creados en los últimos 5 min van
+  //   directo al flow de setup. Cuando Etapa 3 mergee y UserProfile exista,
+  //   este branch se vuelve "if UserProfile incomplete → /profile-setup".
+  if (loggedIn && !isProfileSetup) {
+    final created = user.metadata.creationTime;
+    if (created != null &&
+        DateTime.now().difference(created) < const Duration(minutes: 5)) {
+      return '/profile-setup';
+    }
+  }
+
   // Authenticated on a public route (except /splash) → /home.
   if (loggedIn && isPublic && !location.startsWith('/splash')) return '/home';
   return null;
@@ -81,6 +98,12 @@ GoRouter buildRouter({
       GoRoute(
         path: '/forgot-password',
         pageBuilder: (_, __) => _noAnim(const ForgotPasswordScreen()),
+      ),
+
+      // ProfileSetup — fullscreen post-signup flow. No bottom bar.
+      GoRoute(
+        path: '/profile-setup',
+        pageBuilder: (_, __) => _noAnim(const ProfileSetupFlow()),
       ),
 
       // ShellRoute with the existing 5 tabs
