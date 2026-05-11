@@ -172,7 +172,6 @@ void main() {
         () => mockService.signUpWithEmail(
           email: any(named: 'email'),
           password: any(named: 'password'),
-          displayName: any(named: 'displayName'),
         ),
       ).thenAnswer((_) async {
         streamController.add(mockUser);
@@ -187,7 +186,9 @@ void main() {
       expect(state.hasValue, isTrue);
     });
 
-    test('D05 — displayName is passed through to service', () async {
+    test(
+        'signUp forwards only email + password to service (no displayName param)',
+        () async {
       final streamController = StreamController<User?>();
       final container = buildContainer(
         mockService: mockService,
@@ -205,7 +206,6 @@ void main() {
         () => mockService.signUpWithEmail(
           email: any(named: 'email'),
           password: any(named: 'password'),
-          displayName: any(named: 'displayName'),
         ),
       ).thenAnswer((_) async {
         streamController.add(mockUser);
@@ -214,13 +214,12 @@ void main() {
 
       await container
           .read(authNotifierProvider.notifier)
-          .signUp(email: 'a@b.c', password: 'Pass1234', displayName: 'Ana');
+          .signUp(email: 'a@b.c', password: 'Pass1234');
 
       verify(
         () => mockService.signUpWithEmail(
           email: 'a@b.c',
           password: 'Pass1234',
-          displayName: 'Ana',
         ),
       ).called(1);
     });

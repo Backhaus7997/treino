@@ -19,8 +19,7 @@ class _TestAuthNotifier extends AuthNotifier {
   _TestAuthNotifier({User? initialUser}) : _initialUser = initialUser;
 
   final User? _initialUser;
-  Future<void> Function(String email, String password, {String? displayName})?
-      onSignUp;
+  Future<void> Function(String email, String password)? onSignUp;
 
   @override
   Future<User?> build() async => _initialUser;
@@ -29,10 +28,9 @@ class _TestAuthNotifier extends AuthNotifier {
   Future<void> signUp({
     required String email,
     required String password,
-    String? displayName,
   }) async {
     if (onSignUp != null) {
-      await onSignUp!(email, password, displayName: displayName);
+      await onSignUp!(email, password);
     }
   }
 }
@@ -70,13 +68,14 @@ void main() {
   });
 
   // ---------------------------------------------------------------------------
-  // REQ-AUTH-001 (rework): exactly 3 fields — name, email, password
+  // REQ-AUTH-002: exactly 2 fields — email + password (no display name).
+  // displayName is populated by ProfileSetup in Etapa 6.
   // ---------------------------------------------------------------------------
-  testWidgets('REQ-AUTH-001 — exactly 3 fields rendered (name/email/password)',
+  testWidgets('REQ-AUTH-002 — exactly 2 fields rendered (email/password)',
       (tester) async {
     await tester.pumpWidget(_buildApp(notifier: _TestAuthNotifier()));
     await tester.pumpAndSettle();
-    expect(find.byType(TextFormField), findsNWidgets(3));
+    expect(find.byType(TextFormField), findsNWidgets(2));
   });
 
   // ---------------------------------------------------------------------------
@@ -134,9 +133,8 @@ void main() {
     await tester.pumpAndSettle();
 
     final fields = find.byType(TextFormField);
-    await tester.enterText(fields.at(0), 'Ana Núñez');
-    await tester.enterText(fields.at(1), 'test@example.com');
-    await tester.enterText(fields.at(2), 'Pass1234');
+    await tester.enterText(fields.at(0), 'test@example.com');
+    await tester.enterText(fields.at(1), 'Pass1234');
     await tester.pump();
 
     // Terms not checked → CTA still disabled
@@ -167,7 +165,7 @@ void main() {
   // ---------------------------------------------------------------------------
   testWidgets('scenario 1.1 — happy path navigates to /home', (tester) async {
     final notifier = _TestAuthNotifier();
-    notifier.onSignUp = (email, password, {String? displayName}) async {
+    notifier.onSignUp = (email, password) async {
       notifier.state = AsyncData(mockUser);
     };
 
@@ -175,9 +173,8 @@ void main() {
     await tester.pumpAndSettle();
 
     final fields = find.byType(TextFormField);
-    await tester.enterText(fields.at(0), 'Ana Núñez');
-    await tester.enterText(fields.at(1), 'test@example.com');
-    await tester.enterText(fields.at(2), 'Pass1234');
+    await tester.enterText(fields.at(0), 'test@example.com');
+    await tester.enterText(fields.at(1), 'Pass1234');
     await tester.pump();
 
     // Accept terms
@@ -201,9 +198,8 @@ void main() {
     await tester.pumpAndSettle();
 
     final fields = find.byType(TextFormField);
-    await tester.enterText(fields.at(0), 'Ana Núñez');
-    await tester.enterText(fields.at(1), 'not-an-email');
-    await tester.enterText(fields.at(2), 'Pass1234');
+    await tester.enterText(fields.at(0), 'not-an-email');
+    await tester.enterText(fields.at(1), 'Pass1234');
     await tester.pump();
 
     // Accept terms then submit to trigger validation
@@ -226,9 +222,8 @@ void main() {
     await tester.pumpAndSettle();
 
     final fields = find.byType(TextFormField);
-    await tester.enterText(fields.at(0), 'Ana Núñez');
-    await tester.enterText(fields.at(1), 'test@example.com');
-    await tester.enterText(fields.at(2), 'abc123'); // < 8 chars
+    await tester.enterText(fields.at(0), 'test@example.com');
+    await tester.enterText(fields.at(1), 'abc123'); // < 8 chars
     await tester.pump();
 
     await tester.ensureVisible(find.byType(Checkbox));
@@ -255,9 +250,8 @@ void main() {
     await tester.pumpAndSettle();
 
     final fields = find.byType(TextFormField);
-    await tester.enterText(fields.at(0), 'Ana Núñez');
-    await tester.enterText(fields.at(1), 'test@example.com');
-    await tester.enterText(fields.at(2), 'abcdefgh'); // no numbers
+    await tester.enterText(fields.at(0), 'test@example.com');
+    await tester.enterText(fields.at(1), 'abcdefgh'); // no numbers
     await tester.pump();
 
     await tester.ensureVisible(find.byType(Checkbox));
@@ -284,9 +278,8 @@ void main() {
     await tester.pumpAndSettle();
 
     final fields = find.byType(TextFormField);
-    await tester.enterText(fields.at(0), 'Ana Núñez');
-    await tester.enterText(fields.at(1), 'test@example.com');
-    await tester.enterText(fields.at(2), '12345678'); // no letters
+    await tester.enterText(fields.at(0), 'test@example.com');
+    await tester.enterText(fields.at(1), '12345678'); // no letters
     await tester.pump();
 
     await tester.ensureVisible(find.byType(Checkbox));
@@ -310,7 +303,7 @@ void main() {
   testWidgets('scenario 5.1 — email-already-in-use shows error banner',
       (tester) async {
     final notifier = _TestAuthNotifier();
-    notifier.onSignUp = (email, password, {String? displayName}) async {
+    notifier.onSignUp = (email, password) async {
       notifier.state = const AsyncError(
         AuthFailure.emailAlreadyInUse(),
         StackTrace.empty,
@@ -321,9 +314,8 @@ void main() {
     await tester.pumpAndSettle();
 
     final fields = find.byType(TextFormField);
-    await tester.enterText(fields.at(0), 'Ana Núñez');
-    await tester.enterText(fields.at(1), 'existing@example.com');
-    await tester.enterText(fields.at(2), 'Pass1234');
+    await tester.enterText(fields.at(0), 'existing@example.com');
+    await tester.enterText(fields.at(1), 'Pass1234');
     await tester.pump();
 
     await tester.ensureVisible(find.byType(Checkbox));

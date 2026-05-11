@@ -1,49 +1,96 @@
 import 'package:firebase_auth/firebase_auth.dart';
 
 import '../domain/auth_failure.dart';
+import '../../profile/data/user_repository.dart';
 
 class AuthService {
-  AuthService({required FirebaseAuth firebaseAuth}) : _auth = firebaseAuth;
+  AuthService({
+    required FirebaseAuth firebaseAuth,
+    required UserRepository userRepository,
+  })  : _auth = firebaseAuth,
+        _userRepository = userRepository;
 
   final FirebaseAuth _auth;
+  final UserRepository _userRepository;
 
-  /// Creates the user, optionally sets [displayName], and sends verification
-  /// email automatically (REQ-AUTH-003). Throws [AuthFailure].
+  /// Creates the user, sends verification email, then atomically creates the
+  /// Firestore profile doc with `displayName: null` (REQ-PROF-033, REQ-AUTH-002).
+  /// `displayName` is intentionally NOT collected at signup — ProfileSetup
+  /// (Etapa 6) is the single owner of that field.
+  /// On Firestore failure: best-effort deletes the orphan Auth user and throws
+  /// [AuthFailure.profileCreateFailed] (REQ-PROF-034 / REQ-PROF-035).
   Future<User> signUpWithEmail({
     required String email,
     required String password,
-    String? displayName,
   }) async {
+    late final UserCredential cred;
     try {
-      final cred = await _auth.createUserWithEmailAndPassword(
+      cred = await _auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
-      final user = cred.user!;
-      if (displayName != null) {
-        await user.updateDisplayName(displayName);
-      }
+    } on FirebaseAuthException catch (e) {
+      throw AuthFailure.fromFirebase(e);
+    }
+
+    final user = cred.user!;
+
+    try {
       await user.sendEmailVerification();
+
+      try {
+        await _userRepository.getOrCreate(
+          uid: user.uid,
+          email: email,
+        );
+      } catch (firestoreError) {
+        // Rollback: best-effort delete the orphan Auth user.
+        try {
+          await user.delete();
+        } catch (_) {
+          // Swallow — profileCreateFailed is thrown regardless.
+        }
+        throw AuthFailure.profileCreateFailed(cause: firestoreError);
+      }
+
       return user;
+    } on AuthFailure {
+      rethrow;
     } on FirebaseAuthException catch (e) {
       throw AuthFailure.fromFirebase(e);
     }
   }
 
   /// Throws [AuthFailure] on bad credentials, missing user, etc.
+  /// After successful sign-in, best-effort backfills the Firestore doc for
+  /// Etapa 2 users who do not yet have one (REQ-PROF-036 / REQ-PROF-037).
   Future<User> signInWithEmail({
     required String email,
     required String password,
   }) async {
+    final User user;
     try {
       final cred = await _auth.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
-      return cred.user!;
+      user = cred.user!;
     } on FirebaseAuthException catch (e) {
       throw AuthFailure.fromFirebase(e);
     }
+
+    // Etapa 2 backfill — opportunistic, never blocks sign-in (REQ-PROF-037).
+    // Always writes `displayName: null` — ProfileSetup (Etapa 6) populates it.
+    try {
+      await _userRepository.createIfAbsent(
+        uid: user.uid,
+        email: email,
+      );
+    } catch (_) {
+      // Swallow — auth already succeeded; createIfAbsent is best-effort.
+    }
+
+    return user;
   }
 
   /// Throws [AuthFailure]; the screen treats userNotFound as success (REQ-AUTH-011).

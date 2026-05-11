@@ -5,7 +5,7 @@ Estado de las fases y desglose detallado de Fase 1 (en curso).
 ## Estado por fase
 
 - [x] **Fase 0** — Bootstrap + tema + 5 tabs vacías + Phosphor (commits `cf09068` a `c6d5fea`).
-- [ ] **Fase 1** — Auth (email/Google/Apple) + Firebase + Firestore + ProfileSetup + Roles & guards. Etapa 1 ✅ mergeada (`44c40fc`). Detalle de etapas más abajo.
+- [ ] **Fase 1** — Auth (email/Google/Apple) + Firebase + Firestore + ProfileSetup + Roles & guards. Etapa 1 ✅ (`44c40fc`), Etapa 2 ✅ (`2648b32`). Detalle de etapas más abajo.
 - [ ] **Fase 2** — Home (paridad con mockup Mobile Home, ver `docs/app-alumno/design-decisions.md` → Home: composición de cards Joaco + Llanca + Mateo) + Rutinas básicas.
 - [ ] **Fase 3** — Feed social (amigos · comunidad · público).
 - [ ] **Fase 4** — Workout++ (bloques, super series, IA buscador de ejercicios, videos).
@@ -19,7 +19,7 @@ Cada etapa es un PR separado. La filosofía: rollback granular si algo se rompe,
 | # | Etapa | Branch | Console (manual) | Código clave | Owner sugerido |
 |---|---|---|---|---|---|
 | 1 | Firebase init ✅ | `feat/firebase-init` (mergeada en `44c40fc`) | Nada | `firebase_core` + `Firebase.initializeApp()` con `DefaultFirebaseOptions.currentPlatform`. iOS y Android registrados con bundle `com.treino.app`. | A |
-| 2 | Auth Email/Password | `feat/auth-email-password` | Authentication → Sign-in method → habilitar Email/Password | `firebase_auth` package, `AuthService`, `AuthNotifier` (Riverpod), pantallas Login + Register + Forgot password. Validación de email + password. Loading states + error handling. | A |
+| 2 | Auth Email/Password ✅ | `feat/auth-email-password` (mergeada en `2648b32`) | Authentication → Sign-in method → Email/Password habilitado | `firebase_auth` + `flutter_svg` + `font_awesome_flutter` + `mocktail`. `AuthService`, `AuthNotifier` (Riverpod), `AuthFailure` sealed. Splash + Welcome + Login + Register + ForgotPassword. Logo SVG oficial. Paleta Mint Magenta única. Tipografía Space Grotesk para headlines. | A |
 | 3 | Firestore + UserProfile + reglas + emulator | `feat/firestore-user-profile` | Firestore Database ✅ ya creada (`southamerica-east1`, Production mode) | `cloud_firestore` package, modelo `UserProfile` con freezed, `UserRepository`, reglas para `users/{uid}` (read/write sólo el dueño, role inmutable post-create), `firebase.json` con config emulator + script `scripts/emulator.sh` para development local. | A |
 | 4 | Auth Google | `feat/auth-google-signin` | Auth → habilitar Google + agregar SHA-1 fingerprint Android + OAuth consent screen | `google_sign_in` package, flujo en Login (botón "Continuar con Google"), credential exchange con Firebase Auth, manejo de "nuevo usuario" (redirect a ProfileSetup) vs "existente" (redirect a Home). | A o B |
 | 5 | Auth Apple | `feat/auth-apple-signin` | Auth → habilitar Apple provider + Service ID + Team ID + Key ID + .p8 desde Apple Developer | `sign_in_with_apple` package, flujo en Login. Sólo iOS por ahora. Validar email aún cuando Apple lo oculte (`@privaterelay.appleid.com`). | A |

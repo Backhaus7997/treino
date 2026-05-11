@@ -1,0 +1,438 @@
+// coverage:ignore-file
+// GENERATED CODE - DO NOT MODIFY BY HAND
+// ignore_for_file: type=lint
+// ignore_for_file: unused_element, deprecated_member_use, deprecated_member_use_from_same_package, use_function_type_syntax_for_parameters, unnecessary_const, avoid_init_to_null, invalid_override_different_default_values_named, prefer_expression_function_bodies, annotate_overrides, invalid_annotation_target, unnecessary_question_mark
+
+part of 'user_profile.dart';
+
+// **************************************************************************
+// FreezedGenerator
+// **************************************************************************
+
+T _$identity<T>(T value) => value;
+
+final _privateConstructorUsedError = UnsupportedError(
+    'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models');
+
+UserProfile _$UserProfileFromJson(Map<String, dynamic> json) {
+  return _UserProfile.fromJson(json);
+}
+
+/// @nodoc
+mixin _$UserProfile {
+  String get uid => throw _privateConstructorUsedError;
+  String get email => throw _privateConstructorUsedError;
+  String? get displayName => throw _privateConstructorUsedError;
+  UserRole get role => throw _privateConstructorUsedError;
+  @TimestampConverter()
+  DateTime get createdAt => throw _privateConstructorUsedError;
+  @TimestampConverter()
+  DateTime get updatedAt => throw _privateConstructorUsedError;
+  String? get gymId => throw _privateConstructorUsedError;
+  double? get bodyWeightKg => throw _privateConstructorUsedError;
+  int? get heightCm => throw _privateConstructorUsedError;
+  Gender? get gender => throw _privateConstructorUsedError;
+  ExperienceLevel? get experienceLevel => throw _privateConstructorUsedError;
+  String? get avatarUrl => throw _privateConstructorUsedError;
+  @TimestampConverter()
+  DateTime? get bornAt => throw _privateConstructorUsedError;
+
+  /// Serializes this UserProfile to a JSON map.
+  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
+
+  /// Create a copy of UserProfile
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  $UserProfileCopyWith<UserProfile> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+
+/// @nodoc
+abstract class $UserProfileCopyWith<$Res> {
+  factory $UserProfileCopyWith(
+          UserProfile value, $Res Function(UserProfile) then) =
+      _$UserProfileCopyWithImpl<$Res, UserProfile>;
+  @useResult
+  $Res call(
+      {String uid,
+      String email,
+      String? displayName,
+      UserRole role,
+      @TimestampConverter() DateTime createdAt,
+      @TimestampConverter() DateTime updatedAt,
+      String? gymId,
+      double? bodyWeightKg,
+      int? heightCm,
+      Gender? gender,
+      ExperienceLevel? experienceLevel,
+      String? avatarUrl,
+      @TimestampConverter() DateTime? bornAt});
+}
+
+/// @nodoc
+class _$UserProfileCopyWithImpl<$Res, $Val extends UserProfile>
+    implements $UserProfileCopyWith<$Res> {
+  _$UserProfileCopyWithImpl(this._value, this._then);
+
+  // ignore: unused_field
+  final $Val _value;
+  // ignore: unused_field
+  final $Res Function($Val) _then;
+
+  /// Create a copy of UserProfile
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? uid = null,
+    Object? email = null,
+    Object? displayName = freezed,
+    Object? role = null,
+    Object? createdAt = null,
+    Object? updatedAt = null,
+    Object? gymId = freezed,
+    Object? bodyWeightKg = freezed,
+    Object? heightCm = freezed,
+    Object? gender = freezed,
+    Object? experienceLevel = freezed,
+    Object? avatarUrl = freezed,
+    Object? bornAt = freezed,
+  }) {
+    return _then(_value.copyWith(
+      uid: null == uid
+          ? _value.uid
+          : uid // ignore: cast_nullable_to_non_nullable
+              as String,
+      email: null == email
+          ? _value.email
+          : email // ignore: cast_nullable_to_non_nullable
+              as String,
+      displayName: freezed == displayName
+          ? _value.displayName
+          : displayName // ignore: cast_nullable_to_non_nullable
+              as String?,
+      role: null == role
+          ? _value.role
+          : role // ignore: cast_nullable_to_non_nullable
+              as UserRole,
+      createdAt: null == createdAt
+          ? _value.createdAt
+          : createdAt // ignore: cast_nullable_to_non_nullable
+              as DateTime,
+      updatedAt: null == updatedAt
+          ? _value.updatedAt
+          : updatedAt // ignore: cast_nullable_to_non_nullable
+              as DateTime,
+      gymId: freezed == gymId
+          ? _value.gymId
+          : gymId // ignore: cast_nullable_to_non_nullable
+              as String?,
+      bodyWeightKg: freezed == bodyWeightKg
+          ? _value.bodyWeightKg
+          : bodyWeightKg // ignore: cast_nullable_to_non_nullable
+              as double?,
+      heightCm: freezed == heightCm
+          ? _value.heightCm
+          : heightCm // ignore: cast_nullable_to_non_nullable
+              as int?,
+      gender: freezed == gender
+          ? _value.gender
+          : gender // ignore: cast_nullable_to_non_nullable
+              as Gender?,
+      experienceLevel: freezed == experienceLevel
+          ? _value.experienceLevel
+          : experienceLevel // ignore: cast_nullable_to_non_nullable
+              as ExperienceLevel?,
+      avatarUrl: freezed == avatarUrl
+          ? _value.avatarUrl
+          : avatarUrl // ignore: cast_nullable_to_non_nullable
+              as String?,
+      bornAt: freezed == bornAt
+          ? _value.bornAt
+          : bornAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+    ) as $Val);
+  }
+}
+
+/// @nodoc
+abstract class _$$UserProfileImplCopyWith<$Res>
+    implements $UserProfileCopyWith<$Res> {
+  factory _$$UserProfileImplCopyWith(
+          _$UserProfileImpl value, $Res Function(_$UserProfileImpl) then) =
+      __$$UserProfileImplCopyWithImpl<$Res>;
+  @override
+  @useResult
+  $Res call(
+      {String uid,
+      String email,
+      String? displayName,
+      UserRole role,
+      @TimestampConverter() DateTime createdAt,
+      @TimestampConverter() DateTime updatedAt,
+      String? gymId,
+      double? bodyWeightKg,
+      int? heightCm,
+      Gender? gender,
+      ExperienceLevel? experienceLevel,
+      String? avatarUrl,
+      @TimestampConverter() DateTime? bornAt});
+}
+
+/// @nodoc
+class __$$UserProfileImplCopyWithImpl<$Res>
+    extends _$UserProfileCopyWithImpl<$Res, _$UserProfileImpl>
+    implements _$$UserProfileImplCopyWith<$Res> {
+  __$$UserProfileImplCopyWithImpl(
+      _$UserProfileImpl _value, $Res Function(_$UserProfileImpl) _then)
+      : super(_value, _then);
+
+  /// Create a copy of UserProfile
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? uid = null,
+    Object? email = null,
+    Object? displayName = freezed,
+    Object? role = null,
+    Object? createdAt = null,
+    Object? updatedAt = null,
+    Object? gymId = freezed,
+    Object? bodyWeightKg = freezed,
+    Object? heightCm = freezed,
+    Object? gender = freezed,
+    Object? experienceLevel = freezed,
+    Object? avatarUrl = freezed,
+    Object? bornAt = freezed,
+  }) {
+    return _then(_$UserProfileImpl(
+      uid: null == uid
+          ? _value.uid
+          : uid // ignore: cast_nullable_to_non_nullable
+              as String,
+      email: null == email
+          ? _value.email
+          : email // ignore: cast_nullable_to_non_nullable
+              as String,
+      displayName: freezed == displayName
+          ? _value.displayName
+          : displayName // ignore: cast_nullable_to_non_nullable
+              as String?,
+      role: null == role
+          ? _value.role
+          : role // ignore: cast_nullable_to_non_nullable
+              as UserRole,
+      createdAt: null == createdAt
+          ? _value.createdAt
+          : createdAt // ignore: cast_nullable_to_non_nullable
+              as DateTime,
+      updatedAt: null == updatedAt
+          ? _value.updatedAt
+          : updatedAt // ignore: cast_nullable_to_non_nullable
+              as DateTime,
+      gymId: freezed == gymId
+          ? _value.gymId
+          : gymId // ignore: cast_nullable_to_non_nullable
+              as String?,
+      bodyWeightKg: freezed == bodyWeightKg
+          ? _value.bodyWeightKg
+          : bodyWeightKg // ignore: cast_nullable_to_non_nullable
+              as double?,
+      heightCm: freezed == heightCm
+          ? _value.heightCm
+          : heightCm // ignore: cast_nullable_to_non_nullable
+              as int?,
+      gender: freezed == gender
+          ? _value.gender
+          : gender // ignore: cast_nullable_to_non_nullable
+              as Gender?,
+      experienceLevel: freezed == experienceLevel
+          ? _value.experienceLevel
+          : experienceLevel // ignore: cast_nullable_to_non_nullable
+              as ExperienceLevel?,
+      avatarUrl: freezed == avatarUrl
+          ? _value.avatarUrl
+          : avatarUrl // ignore: cast_nullable_to_non_nullable
+              as String?,
+      bornAt: freezed == bornAt
+          ? _value.bornAt
+          : bornAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+    ));
+  }
+}
+
+/// @nodoc
+@JsonSerializable()
+class _$UserProfileImpl implements _UserProfile {
+  const _$UserProfileImpl(
+      {required this.uid,
+      required this.email,
+      required this.displayName,
+      required this.role,
+      @TimestampConverter() required this.createdAt,
+      @TimestampConverter() required this.updatedAt,
+      this.gymId,
+      this.bodyWeightKg,
+      this.heightCm,
+      this.gender,
+      this.experienceLevel,
+      this.avatarUrl,
+      @TimestampConverter() this.bornAt});
+
+  factory _$UserProfileImpl.fromJson(Map<String, dynamic> json) =>
+      _$$UserProfileImplFromJson(json);
+
+  @override
+  final String uid;
+  @override
+  final String email;
+  @override
+  final String? displayName;
+  @override
+  final UserRole role;
+  @override
+  @TimestampConverter()
+  final DateTime createdAt;
+  @override
+  @TimestampConverter()
+  final DateTime updatedAt;
+  @override
+  final String? gymId;
+  @override
+  final double? bodyWeightKg;
+  @override
+  final int? heightCm;
+  @override
+  final Gender? gender;
+  @override
+  final ExperienceLevel? experienceLevel;
+  @override
+  final String? avatarUrl;
+  @override
+  @TimestampConverter()
+  final DateTime? bornAt;
+
+  @override
+  String toString() {
+    return 'UserProfile(uid: $uid, email: $email, displayName: $displayName, role: $role, createdAt: $createdAt, updatedAt: $updatedAt, gymId: $gymId, bodyWeightKg: $bodyWeightKg, heightCm: $heightCm, gender: $gender, experienceLevel: $experienceLevel, avatarUrl: $avatarUrl, bornAt: $bornAt)';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$UserProfileImpl &&
+            (identical(other.uid, uid) || other.uid == uid) &&
+            (identical(other.email, email) || other.email == email) &&
+            (identical(other.displayName, displayName) ||
+                other.displayName == displayName) &&
+            (identical(other.role, role) || other.role == role) &&
+            (identical(other.createdAt, createdAt) ||
+                other.createdAt == createdAt) &&
+            (identical(other.updatedAt, updatedAt) ||
+                other.updatedAt == updatedAt) &&
+            (identical(other.gymId, gymId) || other.gymId == gymId) &&
+            (identical(other.bodyWeightKg, bodyWeightKg) ||
+                other.bodyWeightKg == bodyWeightKg) &&
+            (identical(other.heightCm, heightCm) ||
+                other.heightCm == heightCm) &&
+            (identical(other.gender, gender) || other.gender == gender) &&
+            (identical(other.experienceLevel, experienceLevel) ||
+                other.experienceLevel == experienceLevel) &&
+            (identical(other.avatarUrl, avatarUrl) ||
+                other.avatarUrl == avatarUrl) &&
+            (identical(other.bornAt, bornAt) || other.bornAt == bornAt));
+  }
+
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  int get hashCode => Object.hash(
+      runtimeType,
+      uid,
+      email,
+      displayName,
+      role,
+      createdAt,
+      updatedAt,
+      gymId,
+      bodyWeightKg,
+      heightCm,
+      gender,
+      experienceLevel,
+      avatarUrl,
+      bornAt);
+
+  /// Create a copy of UserProfile
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$UserProfileImplCopyWith<_$UserProfileImpl> get copyWith =>
+      __$$UserProfileImplCopyWithImpl<_$UserProfileImpl>(this, _$identity);
+
+  @override
+  Map<String, dynamic> toJson() {
+    return _$$UserProfileImplToJson(
+      this,
+    );
+  }
+}
+
+abstract class _UserProfile implements UserProfile {
+  const factory _UserProfile(
+      {required final String uid,
+      required final String email,
+      required final String? displayName,
+      required final UserRole role,
+      @TimestampConverter() required final DateTime createdAt,
+      @TimestampConverter() required final DateTime updatedAt,
+      final String? gymId,
+      final double? bodyWeightKg,
+      final int? heightCm,
+      final Gender? gender,
+      final ExperienceLevel? experienceLevel,
+      final String? avatarUrl,
+      @TimestampConverter() final DateTime? bornAt}) = _$UserProfileImpl;
+
+  factory _UserProfile.fromJson(Map<String, dynamic> json) =
+      _$UserProfileImpl.fromJson;
+
+  @override
+  String get uid;
+  @override
+  String get email;
+  @override
+  String? get displayName;
+  @override
+  UserRole get role;
+  @override
+  @TimestampConverter()
+  DateTime get createdAt;
+  @override
+  @TimestampConverter()
+  DateTime get updatedAt;
+  @override
+  String? get gymId;
+  @override
+  double? get bodyWeightKg;
+  @override
+  int? get heightCm;
+  @override
+  Gender? get gender;
+  @override
+  ExperienceLevel? get experienceLevel;
+  @override
+  String? get avatarUrl;
+  @override
+  @TimestampConverter()
+  DateTime? get bornAt;
+
+  /// Create a copy of UserProfile
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$UserProfileImplCopyWith<_$UserProfileImpl> get copyWith =>
+      throw _privateConstructorUsedError;
+}

@@ -124,6 +124,19 @@ void main() {
       );
     });
 
+    test('SCENARIO-021: profileCreateFailed returns Spanish voseo message', () {
+      expect(
+        const AuthFailure.profileCreateFailed().userMessage,
+        equals('Hubo un problema creando tu perfil. Probá de nuevo'),
+      );
+    });
+
+    test('profileCreateFailed with cause preserves the cause', () {
+      const cause = 'firestore-error';
+      const failure = AuthFailure.profileCreateFailed(cause: cause);
+      expect(failure, isA<AuthFailure>());
+    });
+
     test('every variant userMessage is non-empty and Spanish', () {
       final failures = [
         const AuthFailure.invalidEmail(),
@@ -135,6 +148,7 @@ void main() {
         const AuthFailure.tooManyRequests(),
         const AuthFailure.networkError(),
         const AuthFailure.unknown('x'),
+        const AuthFailure.profileCreateFailed(),
       ];
       for (final f in failures) {
         expect(f.userMessage, isNotEmpty, reason: '$f.userMessage was empty');

@@ -1,0 +1,36 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /users/{uid} {
+      // Owner-only read.
+      allow read: if request.auth != null
+                  && request.auth.uid == uid;
+
+      // Create: only the authenticated user can create their own doc,
+      // role MUST be one of the two valid values, and uid MUST match doc id.
+      allow create: if request.auth != null
+                    && request.auth.uid == uid
+                    && request.resource.data.uid == uid
+                    && request.resource.data.role in ['athlete', 'trainer'];
+
+      // Update: only the owner can update, and the four immutable fields
+      // MUST equal their previous values. Trainers via Admin SDK only;
+      // email changes via FirebaseAuth re-verification flow.
+      allow update: if request.auth != null
+                    && request.auth.uid == uid
+                    // uid: identity — must equal doc id forever.
+                    && request.resource.data.uid == resource.data.uid
+                    // role: AGENTS.md rule 3 — intrinsic, never client-mutable.
+                    && request.resource.data.role == resource.data.role
+                    // email: must use FirebaseAuth.updateEmail re-verification.
+                    && request.resource.data.email == resource.data.email
+                    // createdAt: audit field — preserves analytics integrity.
+                    && request.resource.data.createdAt == resource.data.createdAt;
+
+      // Delete denied — account deletion goes through privileged Cloud Function.
+      allow delete: if false;
+    }
+  }
+}

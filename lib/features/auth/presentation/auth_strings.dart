@@ -33,8 +33,6 @@ abstract final class AuthStrings {
   static const registerAppbar = 'CREAR CUENTA';
   static const registerTitle = 'SUMATE A';
   static const registerSubtitle = 'Es gratis. En 30 segundos estás adentro.';
-  static const registerNameLabel = 'NOMBRE';
-  static const registerNameHint = 'Tu nombre';
   static const registerEmailLabel = 'EMAIL';
   static const registerPasswordLabel = 'CONTRASEÑA';
   static const registerCta = 'CREAR CUENTA';
@@ -70,7 +68,6 @@ abstract final class AuthStrings {
   static const validationPasswordRules =
       'La contraseña debe tener al menos 8 caracteres, una letra y un número';
   static const validationPasswordMismatch = 'Las contraseñas no coinciden';
-  static const validationNameRequired = 'Ingresá tu nombre';
 
   // --- Profile ---
   static const profileSignOut = 'Cerrar sesión';
