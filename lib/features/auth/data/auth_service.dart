@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/services.dart' show PlatformException;
 import 'package:google_sign_in/google_sign_in.dart';
 
 import '../domain/auth_failure.dart';
@@ -11,7 +12,7 @@ class AuthService {
     GoogleSignIn? googleSignIn,
   })  : _auth = firebaseAuth,
         _userRepository = userRepository,
-        _googleSignIn = googleSignIn ?? GoogleSignIn();
+        _googleSignIn = googleSignIn ?? GoogleSignIn.instance;
 
   final FirebaseAuth _auth;
   final UserRepository _userRepository;
@@ -136,24 +137,40 @@ class AuthService {
   /// issues, and [AuthFailure.fromFirebase] for any FirebaseAuthException
   /// (e.g. account-exists-with-different-credential when the same email is
   /// already registered with a different provider).
+  ///
+  /// google_sign_in 7.x splits authentication and authorization:
+  /// `authenticate()` returns an idToken-only account; the accessToken needed
+  /// by [GoogleAuthProvider.credential] comes from a separate authorization
+  /// flow via [GoogleSignInAccount.authorizationClient.authorizeScopes].
   Future<User> signInWithGoogle() async {
-    GoogleSignInAccount? googleUser;
+    final GoogleSignInAccount googleUser;
     try {
-      googleUser = await _googleSignIn.signIn();
-    } catch (_) {
-      // google_sign_in surfaces platform errors as PlatformException; we
-      // surface them as a generic network failure to keep the domain clean.
+      googleUser = await _googleSignIn.authenticate();
+    } on GoogleSignInException catch (e) {
+      if (e.code == GoogleSignInExceptionCode.canceled) {
+        throw const AuthFailure.signInCancelled();
+      }
+      throw const AuthFailure.networkError();
+    } on PlatformException {
       throw const AuthFailure.networkError();
     }
-    if (googleUser == null) {
-      // User dismissed the account picker.
-      throw const AuthFailure.signInCancelled();
+
+    final GoogleSignInClientAuthorization authorization;
+    try {
+      authorization = await googleUser.authorizationClient
+          .authorizeScopes(const <String>['email']);
+    } on GoogleSignInException catch (e) {
+      if (e.code == GoogleSignInExceptionCode.canceled) {
+        throw const AuthFailure.signInCancelled();
+      }
+      throw const AuthFailure.networkError();
+    } on PlatformException {
+      throw const AuthFailure.networkError();
     }
 
-    final googleAuth = await googleUser.authentication;
     final credential = GoogleAuthProvider.credential(
-      idToken: googleAuth.idToken,
-      accessToken: googleAuth.accessToken,
+      idToken: googleUser.authentication.idToken,
+      accessToken: authorization.accessToken,
     );
 
     try {

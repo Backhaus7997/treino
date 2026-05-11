@@ -24,8 +24,8 @@ class MockGoogleSignIn extends Mock implements GoogleSignIn {}
 
 class MockGoogleSignInAccount extends Mock implements GoogleSignInAccount {}
 
-class MockGoogleSignInAuthentication extends Mock
-    implements GoogleSignInAuthentication {}
+class MockGoogleSignInAuthorizationClient extends Mock
+    implements GoogleSignInAuthorizationClient {}
 
 // Fake UserProfile used as stub return value — displayName remains null until
 // ProfileSetup (Etapa 6) populates it.
@@ -193,6 +193,8 @@ void main() {
               weakPassword: (_) => false,
               tooManyRequests: (_) => false,
               networkError: (_) => false,
+              signInCancelled: (_) => false,
+              accountExistsWithDifferentCredential: (_) => false,
               unknown: (_) => false,
               profileCreateFailed: (_) => true,
             ),
@@ -238,6 +240,8 @@ void main() {
               weakPassword: (_) => false,
               tooManyRequests: (_) => false,
               networkError: (_) => false,
+              signInCancelled: (_) => false,
+              accountExistsWithDifferentCredential: (_) => false,
               unknown: (_) => false,
               profileCreateFailed: (_) => true,
             ),
@@ -445,33 +449,47 @@ void main() {
   // ---------------------------------------------------------------------------
   group('AuthService.signInWithGoogle', () {
     late MockGoogleSignInAccount googleAccount;
-    late MockGoogleSignInAuthentication googleAuth;
+    late MockGoogleSignInAuthorizationClient authzClient;
 
     setUp(() {
       googleAccount = MockGoogleSignInAccount();
-      googleAuth = MockGoogleSignInAuthentication();
-      when(() => googleAccount.authentication)
-          .thenAnswer((_) async => googleAuth);
-      when(() => googleAuth.idToken).thenReturn('id-token-stub');
-      when(() => googleAuth.accessToken).thenReturn('access-token-stub');
+      authzClient = MockGoogleSignInAuthorizationClient();
+      // 7.x: account.authentication is a sync getter returning idToken only.
+      when(() => googleAccount.authentication).thenReturn(
+        const GoogleSignInAuthentication(idToken: 'id-token-stub'),
+      );
+      when(() => googleAccount.authorizationClient).thenReturn(authzClient);
+      when(() => authzClient.authorizeScopes(any())).thenAnswer(
+        (_) async => const GoogleSignInClientAuthorization(
+          accessToken: 'access-token-stub',
+        ),
+      );
     });
 
     test('happy path — returns User after Firebase credential exchange',
         () async {
-      when(() => googleSignIn.signIn()).thenAnswer((_) async => googleAccount);
+      when(() => googleSignIn.authenticate())
+          .thenAnswer((_) async => googleAccount);
       when(() => fbAuth.signInWithCredential(any()))
           .thenAnswer((_) async => cred);
 
       final result = await sut.signInWithGoogle();
 
       expect(result, user);
-      verify(() => googleSignIn.signIn()).called(1);
+      verify(() => googleSignIn.authenticate()).called(1);
+      verify(() => authzClient.authorizeScopes(const <String>['email']))
+          .called(1);
       verify(() => fbAuth.signInWithCredential(any())).called(1);
     });
 
     test('user dismisses picker → throws AuthFailure.signInCancelled',
         () async {
-      when(() => googleSignIn.signIn()).thenAnswer((_) async => null);
+      when(() => googleSignIn.authenticate()).thenThrow(
+        const GoogleSignInException(
+          code: GoogleSignInExceptionCode.canceled,
+          description: 'user cancelled',
+        ),
+      );
 
       expect(
         () => sut.signInWithGoogle(),
@@ -481,7 +499,7 @@ void main() {
 
     test('PlatformException from google_sign_in → AuthFailure.networkError',
         () async {
-      when(() => googleSignIn.signIn()).thenThrow(
+      when(() => googleSignIn.authenticate()).thenThrow(
         PlatformException(code: 'network_error'),
       );
 
@@ -492,9 +510,43 @@ void main() {
     });
 
     test(
+        'non-cancel GoogleSignInException from authenticate → AuthFailure.networkError',
+        () async {
+      when(() => googleSignIn.authenticate()).thenThrow(
+        const GoogleSignInException(
+          code: GoogleSignInExceptionCode.interrupted,
+          description: 'lost connection',
+        ),
+      );
+
+      expect(
+        () => sut.signInWithGoogle(),
+        throwsA(const AuthFailure.networkError()),
+      );
+    });
+
+    test('user cancels scope authorization → AuthFailure.signInCancelled',
+        () async {
+      when(() => googleSignIn.authenticate())
+          .thenAnswer((_) async => googleAccount);
+      when(() => authzClient.authorizeScopes(any())).thenThrow(
+        const GoogleSignInException(
+          code: GoogleSignInExceptionCode.canceled,
+          description: 'user dismissed consent',
+        ),
+      );
+
+      expect(
+        () => sut.signInWithGoogle(),
+        throwsA(const AuthFailure.signInCancelled()),
+      );
+    });
+
+    test(
         'FirebaseAuthException during credential exchange is mapped via fromFirebase',
         () async {
-      when(() => googleSignIn.signIn()).thenAnswer((_) async => googleAccount);
+      when(() => googleSignIn.authenticate())
+          .thenAnswer((_) async => googleAccount);
       when(() => fbAuth.signInWithCredential(any())).thenThrow(
         FirebaseAuthException(code: 'account-exists-with-different-credential'),
       );
@@ -511,7 +563,7 @@ void main() {
   // ---------------------------------------------------------------------------
   group('AuthService.signOut', () {
     test('scenario 12.1 — completes without error', () async {
-      when(() => googleSignIn.signOut()).thenAnswer((_) async => null);
+      when(() => googleSignIn.signOut()).thenAnswer((_) async {});
       when(() => fbAuth.signOut()).thenAnswer((_) async {});
 
       await expectLater(sut.signOut(), completes);
@@ -520,7 +572,7 @@ void main() {
 
     test('also signs out from Google to force account picker on next signIn',
         () async {
-      when(() => googleSignIn.signOut()).thenAnswer((_) async => null);
+      when(() => googleSignIn.signOut()).thenAnswer((_) async {});
       when(() => fbAuth.signOut()).thenAnswer((_) async {});
 
       await sut.signOut();
