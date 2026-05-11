@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/router/router_refresh_notifier.dart';
+import '../../profile/application/user_providers.dart';
 import '../data/auth_service.dart';
 import 'auth_notifier.dart';
 
@@ -10,7 +11,10 @@ final firebaseAuthProvider = Provider<FirebaseAuth>(
 );
 
 final authServiceProvider = Provider<AuthService>(
-  (ref) => AuthService(firebaseAuth: ref.watch(firebaseAuthProvider)),
+  (ref) => AuthService(
+    firebaseAuth: ref.watch(firebaseAuthProvider),
+    userRepository: ref.watch(userRepositoryProvider),
+  ),
 );
 
 final authStateChangesProvider = StreamProvider<User?>(

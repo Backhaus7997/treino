@@ -3,6 +3,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/features/auth/data/auth_service.dart';
 import 'package:treino/features/auth/domain/auth_failure.dart';
+import 'package:treino/features/profile/data/user_repository.dart';
+import 'package:treino/features/profile/domain/user_profile.dart';
+import 'package:treino/features/profile/domain/user_role.dart';
 
 // --- Mocks ---
 class MockFirebaseAuth extends Mock implements FirebaseAuth {}
@@ -11,7 +14,19 @@ class MockUserCredential extends Mock implements UserCredential {}
 
 class MockUser extends Mock implements User {}
 
+class MockUserRepository extends Mock implements UserRepository {}
+
 class FakeAuthCredential extends Fake implements AuthCredential {}
+
+// Fake UserProfile used as stub return value
+final _fakeProfile = UserProfile(
+  uid: 'uid-fake',
+  email: 'a@b.c',
+  displayName: 'Ana',
+  role: UserRole.athlete,
+  createdAt: DateTime.utc(2026, 5, 11),
+  updatedAt: DateTime.utc(2026, 5, 11),
+);
 
 void main() {
   setUpAll(() {
@@ -21,14 +36,38 @@ void main() {
   late MockFirebaseAuth fbAuth;
   late MockUserCredential cred;
   late MockUser user;
+  late MockUserRepository mockRepo;
   late AuthService sut;
 
   setUp(() {
     fbAuth = MockFirebaseAuth();
     cred = MockUserCredential();
     user = MockUser();
+    mockRepo = MockUserRepository();
+
     when(() => cred.user).thenReturn(user);
-    sut = AuthService(firebaseAuth: fbAuth);
+    when(() => user.uid).thenReturn('uid-test');
+    when(() => user.email).thenReturn('a@b.c');
+    when(() => user.displayName).thenReturn('Ana');
+
+    // Default stubs so existing tests that don't care about repo still work
+    when(
+      () => mockRepo.getOrCreate(
+        uid: any(named: 'uid'),
+        email: any(named: 'email'),
+        displayName: any(named: 'displayName'),
+      ),
+    ).thenAnswer((_) async => _fakeProfile);
+    when(
+      () => mockRepo.createIfAbsent(
+        uid: any(named: 'uid'),
+        email: any(named: 'email'),
+        displayName: any(named: 'displayName'),
+      ),
+    ).thenAnswer((_) async {});
+
+    // T28: constructor now requires userRepository
+    sut = AuthService(firebaseAuth: fbAuth, userRepository: mockRepo);
   });
 
   // ---------------------------------------------------------------------------
@@ -100,6 +139,135 @@ void main() {
       expect(
         () => sut.signUpWithEmail(email: 'a@b.c', password: 'Pass1234'),
         throwsA(const AuthFailure.emailAlreadyInUse()),
+      );
+    });
+
+    // T29: SCENARIO-020 — happy path call order
+    test(
+        'SCENARIO-020: signup happy path calls updateDisplayName, sendEmailVerification, getOrCreate in order',
+        () async {
+      when(
+        () => fbAuth.createUserWithEmailAndPassword(
+          email: any(named: 'email'),
+          password: any(named: 'password'),
+        ),
+      ).thenAnswer((_) async => cred);
+      when(() => user.updateDisplayName(any())).thenAnswer((_) async {});
+      when(() => user.sendEmailVerification()).thenAnswer((_) async {});
+
+      await sut.signUpWithEmail(
+        email: 'a@b.c',
+        password: 'Pass1234',
+        displayName: 'Ana',
+      );
+
+      verify(() => user.updateDisplayName('Ana')).called(1);
+      verify(() => user.sendEmailVerification()).called(1);
+      verify(
+        () => mockRepo.getOrCreate(
+          uid: any(named: 'uid'),
+          email: any(named: 'email'),
+          displayName: any(named: 'displayName'),
+        ),
+      ).called(1);
+    });
+
+    // T30: SCENARIO-021 — rollback: getOrCreate throws → user.delete() called
+    test(
+        'SCENARIO-021: getOrCreate throws → user.delete() called → profileCreateFailed thrown',
+        () async {
+      when(
+        () => fbAuth.createUserWithEmailAndPassword(
+          email: any(named: 'email'),
+          password: any(named: 'password'),
+        ),
+      ).thenAnswer((_) async => cred);
+      when(() => user.updateDisplayName(any())).thenAnswer((_) async {});
+      when(() => user.sendEmailVerification()).thenAnswer((_) async {});
+      when(() => user.delete()).thenAnswer((_) async {});
+      when(
+        () => mockRepo.getOrCreate(
+          uid: any(named: 'uid'),
+          email: any(named: 'email'),
+          displayName: any(named: 'displayName'),
+        ),
+      ).thenThrow(Exception('firestore down'));
+
+      await expectLater(
+        () => sut.signUpWithEmail(
+          email: 'a@b.c',
+          password: 'Pass1234',
+          displayName: 'Ana',
+        ),
+        throwsA(
+          isA<AuthFailure>().having(
+            (f) => f.map(
+              invalidEmail: (_) => false,
+              userDisabled: (_) => false,
+              userNotFound: (_) => false,
+              wrongPassword: (_) => false,
+              emailAlreadyInUse: (_) => false,
+              weakPassword: (_) => false,
+              tooManyRequests: (_) => false,
+              networkError: (_) => false,
+              unknown: (_) => false,
+              profileCreateFailed: (_) => true,
+            ),
+            'is profileCreateFailed',
+            isTrue,
+          ),
+        ),
+      );
+
+      verify(() => user.delete()).called(1);
+    });
+
+    // T30: SCENARIO-022 — rollback: getOrCreate throws AND user.delete throws
+    test(
+        'SCENARIO-022: getOrCreate throws AND user.delete throws → profileCreateFailed still thrown',
+        () async {
+      when(
+        () => fbAuth.createUserWithEmailAndPassword(
+          email: any(named: 'email'),
+          password: any(named: 'password'),
+        ),
+      ).thenAnswer((_) async => cred);
+      when(() => user.updateDisplayName(any())).thenAnswer((_) async {});
+      when(() => user.sendEmailVerification()).thenAnswer((_) async {});
+      when(() => user.delete()).thenThrow(Exception('delete failed'));
+      when(
+        () => mockRepo.getOrCreate(
+          uid: any(named: 'uid'),
+          email: any(named: 'email'),
+          displayName: any(named: 'displayName'),
+        ),
+      ).thenThrow(Exception('firestore down'));
+
+      // Must throw profileCreateFailed, NOT the delete exception
+      await expectLater(
+        () => sut.signUpWithEmail(
+          email: 'a@b.c',
+          password: 'Pass1234',
+          displayName: 'Ana',
+        ),
+        throwsA(
+          isA<AuthFailure>().having(
+            (f) => f.map(
+              invalidEmail: (_) => false,
+              userDisabled: (_) => false,
+              userNotFound: (_) => false,
+              wrongPassword: (_) => false,
+              emailAlreadyInUse: (_) => false,
+              weakPassword: (_) => false,
+              tooManyRequests: (_) => false,
+              networkError: (_) => false,
+              unknown: (_) => false,
+              profileCreateFailed: (_) => true,
+            ),
+            'is profileCreateFailed',
+            isTrue,
+          ),
+        ),
       );
     });
   });
@@ -178,6 +346,96 @@ void main() {
         () => sut.signInWithEmail(email: 'a@b.c', password: 'Pass1234'),
         throwsA(const AuthFailure.tooManyRequests()),
       );
+    });
+
+    // T31: SCENARIO-023 — createIfAbsent called once on sign-in
+    test('SCENARIO-023: signInWithEmail calls createIfAbsent exactly once',
+        () async {
+      when(
+        () => fbAuth.signInWithEmailAndPassword(
+          email: any(named: 'email'),
+          password: any(named: 'password'),
+        ),
+      ).thenAnswer((_) async => cred);
+
+      await sut.signInWithEmail(email: 'a@b.c', password: 'Pass1234');
+
+      verify(
+        () => mockRepo.createIfAbsent(
+          uid: any(named: 'uid'),
+          email: any(named: 'email'),
+          displayName: any(named: 'displayName'),
+        ),
+      ).called(1);
+    });
+
+    // T31: SCENARIO-024 — sign-in twice → createIfAbsent called twice
+    test('SCENARIO-024: signInWithEmail twice → createIfAbsent called twice',
+        () async {
+      when(
+        () => fbAuth.signInWithEmailAndPassword(
+          email: any(named: 'email'),
+          password: any(named: 'password'),
+        ),
+      ).thenAnswer((_) async => cred);
+
+      await sut.signInWithEmail(email: 'a@b.c', password: 'Pass1234');
+      await sut.signInWithEmail(email: 'a@b.c', password: 'Pass1234');
+
+      verify(
+        () => mockRepo.createIfAbsent(
+          uid: any(named: 'uid'),
+          email: any(named: 'email'),
+          displayName: any(named: 'displayName'),
+        ),
+      ).called(2);
+    });
+
+    // T31: REQ-PROF-037 — createIfAbsent throws → sign-in still succeeds
+    test('REQ-PROF-037: createIfAbsent throws → sign-in still returns user',
+        () async {
+      when(
+        () => fbAuth.signInWithEmailAndPassword(
+          email: any(named: 'email'),
+          password: any(named: 'password'),
+        ),
+      ).thenAnswer((_) async => cred);
+      when(
+        () => mockRepo.createIfAbsent(
+          uid: any(named: 'uid'),
+          email: any(named: 'email'),
+          displayName: any(named: 'displayName'),
+        ),
+      ).thenThrow(Exception('Firestore down'));
+
+      final result = await sut.signInWithEmail(
+        email: 'a@b.c',
+        password: 'Pass1234',
+      );
+      expect(result, user);
+    });
+
+    // T31: REQ-PROF-038 — displayName null fallback uses email.split('@').first
+    test(
+        'REQ-PROF-038: displayName null → createIfAbsent called with email local part',
+        () async {
+      when(() => user.displayName).thenReturn(null);
+      when(
+        () => fbAuth.signInWithEmailAndPassword(
+          email: any(named: 'email'),
+          password: any(named: 'password'),
+        ),
+      ).thenAnswer((_) async => cred);
+
+      await sut.signInWithEmail(email: 'alice@example.com', password: 'P1234');
+
+      verify(
+        () => mockRepo.createIfAbsent(
+          uid: any(named: 'uid'),
+          email: any(named: 'email'),
+          displayName: 'alice',
+        ),
+      ).called(1);
     });
   });
 
