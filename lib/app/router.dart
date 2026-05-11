@@ -10,10 +10,11 @@ import '../features/auth/presentation/register_screen.dart';
 import '../features/auth/presentation/splash_screen.dart';
 import '../features/auth/presentation/welcome_screen.dart';
 import '../features/coach/coach_screen.dart';
-import '../features/profile_setup/presentation/profile_setup_flow.dart';
 import '../features/feed/feed_screen.dart';
 import '../features/home/home_screen.dart';
+import '../features/profile/application/user_providers.dart';
 import '../features/profile/profile_screen.dart';
+import '../features/profile_setup/presentation/profile_setup_flow.dart';
 import '../features/workout/workout_screen.dart';
 import 'theme/app_background.dart';
 
@@ -49,16 +50,25 @@ String? authRedirect(
   // Anonymous on a protected route → /welcome.
   if (!loggedIn && !isPublic) return '/welcome';
 
-  // Post-signup redirect a /profile-setup.
-  // TODO(etapa3): reemplazar este check por
-  //   `userRepository.getProfile(uid).isComplete`. Hoy usamos la creationTime
-  //   de FirebaseAuth como proxy: usuarios creados en los últimos 5 min van
-  //   directo al flow de setup. Cuando Etapa 3 mergee y UserProfile exista,
-  //   este branch se vuelve "if UserProfile incomplete → /profile-setup".
+  // Post-signup redirect a /profile-setup. Lee el UserProfile real de
+  // Firestore via userProfileProvider — si todavía no tiene displayName,
+  // el flow de setup no se completó y mandamos al atleta ahí.
+  //
+  // El UserProfile lo crea AuthService.signUpWithEmail con displayName=null;
+  // el submit de ProfileSetup lo updatea con el username elegido.
+  //
+  // Mientras el profile está cargando bloqueamos cualquier redirect — el
+  // user se queda donde está hasta que sepamos si su profile está completo
+  // o no. Esto evita el flicker `/home → /profile-setup` para usuarios
+  // recién registrados, y `/profile-setup → /home` para usuarios existentes.
+  //
+  // TODO(etapa7): cuando Roles & guards mergee, agregar también route guards
+  // por role (athlete vs trainer) acá mismo.
   if (loggedIn && !isProfileSetup) {
-    final created = user.metadata.creationTime;
-    if (created != null &&
-        DateTime.now().difference(created) < const Duration(minutes: 5)) {
+    final profileAsync = read(userProfileProvider);
+    if (profileAsync.isLoading) return null;
+    final profile = profileAsync.valueOrNull;
+    if (profile == null || profile.displayName == null) {
       return '/profile-setup';
     }
   }

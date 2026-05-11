@@ -22,7 +22,7 @@ class ProfileSetupValidators {
   }
 
   /// Peso corporal en kg. Acepta coma o punto decimal.
-  static String? validateWeightKg(String? value) {
+  static String? validateBodyWeightKg(String? value) {
     if (value == null || value.trim().isEmpty) return 'Ingresá tu peso';
     final n = double.tryParse(value.replaceAll(',', '.'));
     if (n == null) return 'Número inválido';
@@ -31,11 +31,11 @@ class ProfileSetupValidators {
     return null;
   }
 
-  /// Altura en cm.
+  /// Altura en cm — entero. `UserProfile.heightCm` es `int?`.
   static String? validateHeightCm(String? value) {
     if (value == null || value.trim().isEmpty) return 'Ingresá tu altura';
-    final n = double.tryParse(value);
-    if (n == null) return 'Número inválido';
+    final n = int.tryParse(value.trim());
+    if (n == null) return 'Número entero inválido';
     if (n <= 100) return 'Mínimo 100 cm';
     if (n >= 250) return 'Máximo 250 cm';
     return null;

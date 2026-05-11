@@ -16,33 +16,29 @@ final _privateConstructorUsedError = UnsupportedError(
 
 /// @nodoc
 mixin _$ProfileSetupDraft {
-  /// Step 1
+  /// Step 1 — mapea a `UserProfile.displayName`.
   String? get username => throw _privateConstructorUsedError;
 
-  /// Step 1 — path local del avatar elegido del image_picker. Se uploadea
-  /// a Firebase Storage en el submit final, y la URL resultante se persiste
-  /// como `avatarRemoteUrl`.
+  /// Step 1 — path local del avatar elegido. Se uploadea a Firebase Storage
+  /// en el submit final, y la URL resultante se persiste como
+  /// `UserProfile.avatarUrl`.
   String? get avatarLocalPath => throw _privateConstructorUsedError;
 
-  /// Step 1 — URL HTTPS del avatar después del upload a Storage. `null`
-  /// mientras el usuario no haya elegido foto o el upload no haya completado.
-  String? get avatarRemoteUrl => throw _privateConstructorUsedError;
-
   /// Step 2 — `null` si el usuario aún no eligió, o [kNoGymId] si optó por
-  /// "OTRO GYM / SIN GYM".
+  /// "OTRO GYM / SIN GYM". Mapea a `UserProfile.gymId` (null en ambos casos).
   String? get gymId => throw _privateConstructorUsedError;
 
-  /// Step 3
-  ExperienceLevel? get experience => throw _privateConstructorUsedError;
+  /// Step 3 — mapea a `UserProfile.experienceLevel`.
+  ExperienceLevel? get experienceLevel => throw _privateConstructorUsedError;
 
-  /// Step 3
+  /// Step 3 — mapea a `UserProfile.gender`.
   Gender? get gender => throw _privateConstructorUsedError;
 
-  /// Step 4 — peso corporal en kilogramos.
-  double? get weightKg => throw _privateConstructorUsedError;
+  /// Step 4 — peso corporal en kilogramos. Mapea a `UserProfile.bodyWeightKg`.
+  double? get bodyWeightKg => throw _privateConstructorUsedError;
 
-  /// Step 4 — altura en centímetros.
-  double? get heightCm => throw _privateConstructorUsedError;
+  /// Step 4 — altura en centímetros (entera). Mapea a `UserProfile.heightCm`.
+  int? get heightCm => throw _privateConstructorUsedError;
 
   /// Create a copy of ProfileSetupDraft
   /// with the given fields replaced by the non-null parameter values.
@@ -60,12 +56,11 @@ abstract class $ProfileSetupDraftCopyWith<$Res> {
   $Res call(
       {String? username,
       String? avatarLocalPath,
-      String? avatarRemoteUrl,
       String? gymId,
-      ExperienceLevel? experience,
+      ExperienceLevel? experienceLevel,
       Gender? gender,
-      double? weightKg,
-      double? heightCm});
+      double? bodyWeightKg,
+      int? heightCm});
 }
 
 /// @nodoc
@@ -85,11 +80,10 @@ class _$ProfileSetupDraftCopyWithImpl<$Res, $Val extends ProfileSetupDraft>
   $Res call({
     Object? username = freezed,
     Object? avatarLocalPath = freezed,
-    Object? avatarRemoteUrl = freezed,
     Object? gymId = freezed,
-    Object? experience = freezed,
+    Object? experienceLevel = freezed,
     Object? gender = freezed,
-    Object? weightKg = freezed,
+    Object? bodyWeightKg = freezed,
     Object? heightCm = freezed,
   }) {
     return _then(_value.copyWith(
@@ -101,30 +95,26 @@ class _$ProfileSetupDraftCopyWithImpl<$Res, $Val extends ProfileSetupDraft>
           ? _value.avatarLocalPath
           : avatarLocalPath // ignore: cast_nullable_to_non_nullable
               as String?,
-      avatarRemoteUrl: freezed == avatarRemoteUrl
-          ? _value.avatarRemoteUrl
-          : avatarRemoteUrl // ignore: cast_nullable_to_non_nullable
-              as String?,
       gymId: freezed == gymId
           ? _value.gymId
           : gymId // ignore: cast_nullable_to_non_nullable
               as String?,
-      experience: freezed == experience
-          ? _value.experience
-          : experience // ignore: cast_nullable_to_non_nullable
+      experienceLevel: freezed == experienceLevel
+          ? _value.experienceLevel
+          : experienceLevel // ignore: cast_nullable_to_non_nullable
               as ExperienceLevel?,
       gender: freezed == gender
           ? _value.gender
           : gender // ignore: cast_nullable_to_non_nullable
               as Gender?,
-      weightKg: freezed == weightKg
-          ? _value.weightKg
-          : weightKg // ignore: cast_nullable_to_non_nullable
+      bodyWeightKg: freezed == bodyWeightKg
+          ? _value.bodyWeightKg
+          : bodyWeightKg // ignore: cast_nullable_to_non_nullable
               as double?,
       heightCm: freezed == heightCm
           ? _value.heightCm
           : heightCm // ignore: cast_nullable_to_non_nullable
-              as double?,
+              as int?,
     ) as $Val);
   }
 }
@@ -140,12 +130,11 @@ abstract class _$$ProfileSetupDraftImplCopyWith<$Res>
   $Res call(
       {String? username,
       String? avatarLocalPath,
-      String? avatarRemoteUrl,
       String? gymId,
-      ExperienceLevel? experience,
+      ExperienceLevel? experienceLevel,
       Gender? gender,
-      double? weightKg,
-      double? heightCm});
+      double? bodyWeightKg,
+      int? heightCm});
 }
 
 /// @nodoc
@@ -163,11 +152,10 @@ class __$$ProfileSetupDraftImplCopyWithImpl<$Res>
   $Res call({
     Object? username = freezed,
     Object? avatarLocalPath = freezed,
-    Object? avatarRemoteUrl = freezed,
     Object? gymId = freezed,
-    Object? experience = freezed,
+    Object? experienceLevel = freezed,
     Object? gender = freezed,
-    Object? weightKg = freezed,
+    Object? bodyWeightKg = freezed,
     Object? heightCm = freezed,
   }) {
     return _then(_$ProfileSetupDraftImpl(
@@ -179,30 +167,26 @@ class __$$ProfileSetupDraftImplCopyWithImpl<$Res>
           ? _value.avatarLocalPath
           : avatarLocalPath // ignore: cast_nullable_to_non_nullable
               as String?,
-      avatarRemoteUrl: freezed == avatarRemoteUrl
-          ? _value.avatarRemoteUrl
-          : avatarRemoteUrl // ignore: cast_nullable_to_non_nullable
-              as String?,
       gymId: freezed == gymId
           ? _value.gymId
           : gymId // ignore: cast_nullable_to_non_nullable
               as String?,
-      experience: freezed == experience
-          ? _value.experience
-          : experience // ignore: cast_nullable_to_non_nullable
+      experienceLevel: freezed == experienceLevel
+          ? _value.experienceLevel
+          : experienceLevel // ignore: cast_nullable_to_non_nullable
               as ExperienceLevel?,
       gender: freezed == gender
           ? _value.gender
           : gender // ignore: cast_nullable_to_non_nullable
               as Gender?,
-      weightKg: freezed == weightKg
-          ? _value.weightKg
-          : weightKg // ignore: cast_nullable_to_non_nullable
+      bodyWeightKg: freezed == bodyWeightKg
+          ? _value.bodyWeightKg
+          : bodyWeightKg // ignore: cast_nullable_to_non_nullable
               as double?,
       heightCm: freezed == heightCm
           ? _value.heightCm
           : heightCm // ignore: cast_nullable_to_non_nullable
-              as double?,
+              as int?,
     ));
   }
 }
@@ -213,53 +197,47 @@ class _$ProfileSetupDraftImpl extends _ProfileSetupDraft {
   const _$ProfileSetupDraftImpl(
       {this.username,
       this.avatarLocalPath,
-      this.avatarRemoteUrl,
       this.gymId,
-      this.experience,
+      this.experienceLevel,
       this.gender,
-      this.weightKg,
+      this.bodyWeightKg,
       this.heightCm})
       : super._();
 
-  /// Step 1
+  /// Step 1 — mapea a `UserProfile.displayName`.
   @override
   final String? username;
 
-  /// Step 1 — path local del avatar elegido del image_picker. Se uploadea
-  /// a Firebase Storage en el submit final, y la URL resultante se persiste
-  /// como `avatarRemoteUrl`.
+  /// Step 1 — path local del avatar elegido. Se uploadea a Firebase Storage
+  /// en el submit final, y la URL resultante se persiste como
+  /// `UserProfile.avatarUrl`.
   @override
   final String? avatarLocalPath;
 
-  /// Step 1 — URL HTTPS del avatar después del upload a Storage. `null`
-  /// mientras el usuario no haya elegido foto o el upload no haya completado.
-  @override
-  final String? avatarRemoteUrl;
-
   /// Step 2 — `null` si el usuario aún no eligió, o [kNoGymId] si optó por
-  /// "OTRO GYM / SIN GYM".
+  /// "OTRO GYM / SIN GYM". Mapea a `UserProfile.gymId` (null en ambos casos).
   @override
   final String? gymId;
 
-  /// Step 3
+  /// Step 3 — mapea a `UserProfile.experienceLevel`.
   @override
-  final ExperienceLevel? experience;
+  final ExperienceLevel? experienceLevel;
 
-  /// Step 3
+  /// Step 3 — mapea a `UserProfile.gender`.
   @override
   final Gender? gender;
 
-  /// Step 4 — peso corporal en kilogramos.
+  /// Step 4 — peso corporal en kilogramos. Mapea a `UserProfile.bodyWeightKg`.
   @override
-  final double? weightKg;
+  final double? bodyWeightKg;
 
-  /// Step 4 — altura en centímetros.
+  /// Step 4 — altura en centímetros (entera). Mapea a `UserProfile.heightCm`.
   @override
-  final double? heightCm;
+  final int? heightCm;
 
   @override
   String toString() {
-    return 'ProfileSetupDraft(username: $username, avatarLocalPath: $avatarLocalPath, avatarRemoteUrl: $avatarRemoteUrl, gymId: $gymId, experience: $experience, gender: $gender, weightKg: $weightKg, heightCm: $heightCm)';
+    return 'ProfileSetupDraft(username: $username, avatarLocalPath: $avatarLocalPath, gymId: $gymId, experienceLevel: $experienceLevel, gender: $gender, bodyWeightKg: $bodyWeightKg, heightCm: $heightCm)';
   }
 
   @override
@@ -271,21 +249,19 @@ class _$ProfileSetupDraftImpl extends _ProfileSetupDraft {
                 other.username == username) &&
             (identical(other.avatarLocalPath, avatarLocalPath) ||
                 other.avatarLocalPath == avatarLocalPath) &&
-            (identical(other.avatarRemoteUrl, avatarRemoteUrl) ||
-                other.avatarRemoteUrl == avatarRemoteUrl) &&
             (identical(other.gymId, gymId) || other.gymId == gymId) &&
-            (identical(other.experience, experience) ||
-                other.experience == experience) &&
+            (identical(other.experienceLevel, experienceLevel) ||
+                other.experienceLevel == experienceLevel) &&
             (identical(other.gender, gender) || other.gender == gender) &&
-            (identical(other.weightKg, weightKg) ||
-                other.weightKg == weightKg) &&
+            (identical(other.bodyWeightKg, bodyWeightKg) ||
+                other.bodyWeightKg == bodyWeightKg) &&
             (identical(other.heightCm, heightCm) ||
                 other.heightCm == heightCm));
   }
 
   @override
-  int get hashCode => Object.hash(runtimeType, username, avatarLocalPath,
-      avatarRemoteUrl, gymId, experience, gender, weightKg, heightCm);
+  int get hashCode => Object.hash(runtimeType, username, avatarLocalPath, gymId,
+      experienceLevel, gender, bodyWeightKg, heightCm);
 
   /// Create a copy of ProfileSetupDraft
   /// with the given fields replaced by the non-null parameter values.
@@ -301,49 +277,43 @@ abstract class _ProfileSetupDraft extends ProfileSetupDraft {
   const factory _ProfileSetupDraft(
       {final String? username,
       final String? avatarLocalPath,
-      final String? avatarRemoteUrl,
       final String? gymId,
-      final ExperienceLevel? experience,
+      final ExperienceLevel? experienceLevel,
       final Gender? gender,
-      final double? weightKg,
-      final double? heightCm}) = _$ProfileSetupDraftImpl;
+      final double? bodyWeightKg,
+      final int? heightCm}) = _$ProfileSetupDraftImpl;
   const _ProfileSetupDraft._() : super._();
 
-  /// Step 1
+  /// Step 1 — mapea a `UserProfile.displayName`.
   @override
   String? get username;
 
-  /// Step 1 — path local del avatar elegido del image_picker. Se uploadea
-  /// a Firebase Storage en el submit final, y la URL resultante se persiste
-  /// como `avatarRemoteUrl`.
+  /// Step 1 — path local del avatar elegido. Se uploadea a Firebase Storage
+  /// en el submit final, y la URL resultante se persiste como
+  /// `UserProfile.avatarUrl`.
   @override
   String? get avatarLocalPath;
 
-  /// Step 1 — URL HTTPS del avatar después del upload a Storage. `null`
-  /// mientras el usuario no haya elegido foto o el upload no haya completado.
-  @override
-  String? get avatarRemoteUrl;
-
   /// Step 2 — `null` si el usuario aún no eligió, o [kNoGymId] si optó por
-  /// "OTRO GYM / SIN GYM".
+  /// "OTRO GYM / SIN GYM". Mapea a `UserProfile.gymId` (null en ambos casos).
   @override
   String? get gymId;
 
-  /// Step 3
+  /// Step 3 — mapea a `UserProfile.experienceLevel`.
   @override
-  ExperienceLevel? get experience;
+  ExperienceLevel? get experienceLevel;
 
-  /// Step 3
+  /// Step 3 — mapea a `UserProfile.gender`.
   @override
   Gender? get gender;
 
-  /// Step 4 — peso corporal en kilogramos.
+  /// Step 4 — peso corporal en kilogramos. Mapea a `UserProfile.bodyWeightKg`.
   @override
-  double? get weightKg;
+  double? get bodyWeightKg;
 
-  /// Step 4 — altura en centímetros.
+  /// Step 4 — altura en centímetros (entera). Mapea a `UserProfile.heightCm`.
   @override
-  double? get heightCm;
+  int? get heightCm;
 
   /// Create a copy of ProfileSetupDraft
   /// with the given fields replaced by the non-null parameter values.

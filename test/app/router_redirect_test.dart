@@ -7,6 +7,9 @@ import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/router.dart';
 import 'package:treino/features/auth/application/auth_notifier.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
+import 'package:treino/features/profile/application/user_providers.dart';
+import 'package:treino/features/profile/domain/user_profile.dart';
+import 'package:treino/features/profile/domain/user_role.dart';
 
 class MockUser extends Mock implements User {}
 
@@ -36,6 +39,29 @@ class _LoadingAuthNotifier extends AuthNotifier {
   Future<User?> build() => Completer<User?>().future;
 }
 
+/// Fixture: UserProfile con displayName seteado → profile completo.
+/// El redirect tiene que tratar este perfil como "ya pasó ProfileSetup".
+UserProfile _completeProfile() => UserProfile(
+      uid: 'test-uid',
+      email: 'test@example.com',
+      displayName: 'tincho',
+      role: UserRole.athlete,
+      createdAt: DateTime.utc(2026, 1, 1),
+      updatedAt: DateTime.utc(2026, 1, 1),
+    );
+
+/// Fixture: UserProfile con displayName=null → profile incompleto.
+/// AuthService.signUpWithEmail crea el doc inicial así; ProfileSetup lo
+/// completa.
+UserProfile _incompleteProfile() => UserProfile(
+      uid: 'test-uid',
+      email: 'test@example.com',
+      displayName: null,
+      role: UserRole.athlete,
+      createdAt: DateTime.utc(2026, 1, 1),
+      updatedAt: DateTime.utc(2026, 1, 1),
+    );
+
 void main() {
   late MockUser mockUser;
 
@@ -48,13 +74,21 @@ void main() {
           authNotifierProvider.overrideWith(
             () => _StubAuthNotifier(const AsyncData(null)),
           ),
+          userProfileProvider
+              .overrideWith((ref) => Stream<UserProfile?>.value(null)),
         ],
       );
 
-  ProviderContainer loggedInContainer() => ProviderContainer(
+  ProviderContainer loggedInContainer({
+    UserProfile? profile,
+  }) =>
+      ProviderContainer(
         overrides: [
           authNotifierProvider.overrideWith(
             () => _StubAuthNotifier(AsyncData(mockUser)),
+          ),
+          userProfileProvider.overrideWith(
+            (ref) => Stream<UserProfile?>.value(profile ?? _completeProfile()),
           ),
         ],
       );
@@ -62,6 +96,8 @@ void main() {
   ProviderContainer loadingContainer() => ProviderContainer(
         overrides: [
           authNotifierProvider.overrideWith(() => _LoadingAuthNotifier()),
+          userProfileProvider
+              .overrideWith((ref) => Stream<UserProfile?>.value(null)),
         ],
       );
 
@@ -127,13 +163,15 @@ void main() {
   });
 
   // ---------------------------------------------------------------------------
-  // Authenticated user — auth routes redirect to /home
+  // Authenticated user with COMPLETE profile — auth routes redirect to /home.
+  // El loggedInContainer por default usa _completeProfile().
   // ---------------------------------------------------------------------------
-  group('redirect — authenticated user', () {
+  group('redirect — authenticated user (complete profile)', () {
     test('scenario 16.1 — user + /login → /home', () async {
       final c = loggedInContainer();
       addTearDown(c.dispose);
       await c.read(authNotifierProvider.future);
+      await c.read(userProfileProvider.future);
       expect(callRedirect(c, '/login'), '/home');
     });
 
@@ -141,6 +179,7 @@ void main() {
       final c = loggedInContainer();
       addTearDown(c.dispose);
       await c.read(authNotifierProvider.future);
+      await c.read(userProfileProvider.future);
       expect(callRedirect(c, '/register'), '/home');
     });
 
@@ -148,6 +187,7 @@ void main() {
       final c = loggedInContainer();
       addTearDown(c.dispose);
       await c.read(authNotifierProvider.future);
+      await c.read(userProfileProvider.future);
       expect(callRedirect(c, '/home'), isNull);
     });
 
@@ -155,6 +195,7 @@ void main() {
       final c = loggedInContainer();
       addTearDown(c.dispose);
       await c.read(authNotifierProvider.future);
+      await c.read(userProfileProvider.future);
       expect(callRedirect(c, '/workout'), isNull);
     });
 
@@ -162,14 +203,75 @@ void main() {
       final c = loggedInContainer();
       addTearDown(c.dispose);
       await c.read(authNotifierProvider.future);
+      await c.read(userProfileProvider.future);
       expect(callRedirect(c, '/welcome'), '/home');
     });
 
-    test('user + /splash → null (splash handles its own navigation)', () async {
+    test('user + /splash → null (splash handles its own navigation)',
+        () async {
       final c = loggedInContainer();
       addTearDown(c.dispose);
       await c.read(authNotifierProvider.future);
+      await c.read(userProfileProvider.future);
       expect(callRedirect(c, '/splash'), isNull);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Authenticated user with INCOMPLETE profile — todo cae a /profile-setup
+  // (excepto /profile-setup mismo y /splash que no se bouncea).
+  // ---------------------------------------------------------------------------
+  group('redirect — authenticated user (incomplete profile)', () {
+    test('incomplete + /home → /profile-setup', () async {
+      final c = loggedInContainer(profile: _incompleteProfile());
+      addTearDown(c.dispose);
+      await c.read(authNotifierProvider.future);
+      await c.read(userProfileProvider.future);
+      expect(callRedirect(c, '/home'), '/profile-setup');
+    });
+
+    test('incomplete + /workout → /profile-setup', () async {
+      final c = loggedInContainer(profile: _incompleteProfile());
+      addTearDown(c.dispose);
+      await c.read(authNotifierProvider.future);
+      await c.read(userProfileProvider.future);
+      expect(callRedirect(c, '/workout'), '/profile-setup');
+    });
+
+    test('incomplete + /login → /profile-setup', () async {
+      final c = loggedInContainer(profile: _incompleteProfile());
+      addTearDown(c.dispose);
+      await c.read(authNotifierProvider.future);
+      await c.read(userProfileProvider.future);
+      expect(callRedirect(c, '/login'), '/profile-setup');
+    });
+
+    test('incomplete + /profile-setup → null (stay)', () async {
+      final c = loggedInContainer(profile: _incompleteProfile());
+      addTearDown(c.dispose);
+      await c.read(authNotifierProvider.future);
+      await c.read(userProfileProvider.future);
+      expect(callRedirect(c, '/profile-setup'), isNull);
+    });
+
+    test('no profile doc yet → /profile-setup (treat as incomplete)',
+        () async {
+      // Inline en vez de loggedInContainer() porque el helper tiene un
+      // default a _completeProfile() para el caso común; acá queremos
+      // explícitamente que la collection no tenga el doc todavía.
+      final c = ProviderContainer(
+        overrides: [
+          authNotifierProvider.overrideWith(
+            () => _StubAuthNotifier(AsyncData(mockUser)),
+          ),
+          userProfileProvider
+              .overrideWith((ref) => Stream<UserProfile?>.value(null)),
+        ],
+      );
+      addTearDown(c.dispose);
+      await c.read(authNotifierProvider.future);
+      await c.read(userProfileProvider.future);
+      expect(callRedirect(c, '/home'), '/profile-setup');
     });
   });
 

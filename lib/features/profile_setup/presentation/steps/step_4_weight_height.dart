@@ -25,7 +25,7 @@ class _Step4WeightHeightState extends ConsumerState<Step4WeightHeight> {
     super.initState();
     final draft = ref.read(profileSetupNotifierProvider).draft;
     _weightCtrl = TextEditingController(
-      text: draft.weightKg?.toString() ?? '',
+      text: draft.bodyWeightKg?.toString() ?? '',
     );
     _heightCtrl = TextEditingController(
       text: draft.heightCm?.toString() ?? '',
@@ -36,11 +36,11 @@ class _Step4WeightHeightState extends ConsumerState<Step4WeightHeight> {
 
   void _syncWeight() {
     final n = double.tryParse(_weightCtrl.text.replaceAll(',', '.'));
-    ref.read(profileSetupNotifierProvider.notifier).updateWeightKg(n);
+    ref.read(profileSetupNotifierProvider.notifier).updateBodyWeightKg(n);
   }
 
   void _syncHeight() {
-    final n = double.tryParse(_heightCtrl.text);
+    final n = int.tryParse(_heightCtrl.text.trim());
     ref.read(profileSetupNotifierProvider.notifier).updateHeightCm(n);
   }
 
@@ -56,7 +56,6 @@ class _Step4WeightHeightState extends ConsumerState<Step4WeightHeight> {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    final notifier = ref.read(profileSetupNotifierProvider.notifier);
 
     return SingleChildScrollView(
       child: Column(
@@ -80,10 +79,7 @@ class _Step4WeightHeightState extends ConsumerState<Step4WeightHeight> {
             keyboardType:
                 const TextInputType.numberWithOptions(decimal: true),
             textInputAction: TextInputAction.next,
-            validator: ProfileSetupValidators.validateWeightKg,
-            onFieldSubmitted: (v) => notifier.updateWeightKg(
-              double.tryParse(v.replaceAll(',', '.')),
-            ),
+            validator: ProfileSetupValidators.validateBodyWeightKg,
           ),
           const SizedBox(height: 14),
           AuthInput(
@@ -94,8 +90,6 @@ class _Step4WeightHeightState extends ConsumerState<Step4WeightHeight> {
             keyboardType: TextInputType.number,
             textInputAction: TextInputAction.done,
             validator: ProfileSetupValidators.validateHeightCm,
-            onFieldSubmitted: (v) =>
-                notifier.updateHeightCm(double.tryParse(v)),
           ),
           const SizedBox(height: 20),
           Text(

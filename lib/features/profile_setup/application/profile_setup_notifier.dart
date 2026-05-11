@@ -1,26 +1,42 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../domain/experience_level.dart';
-import '../domain/gender.dart';
+import '../../auth/application/auth_providers.dart' show firebaseAuthProvider;
+import '../../profile/application/user_providers.dart';
+import '../../profile/domain/experience_level.dart';
+import '../../profile/domain/gender.dart';
+import '../domain/gym.dart';
 import '../domain/profile_setup_draft.dart';
+import 'profile_setup_providers.dart' show avatarUploadServiceProvider;
 
-/// Estado in-memory del flow: el draft del usuario + el step actual (0..3).
+/// Estado in-memory del flow: el draft del usuario + el step actual (0..3) +
+/// flags de submit (loading / error).
 class ProfileSetupState {
   const ProfileSetupState({
     required this.draft,
     required this.currentStep,
+    this.isSubmitting = false,
+    this.submitError,
   });
 
   final ProfileSetupDraft draft;
   final int currentStep;
+  final bool isSubmitting;
+  final Object? submitError;
 
   ProfileSetupState copyWith({
     ProfileSetupDraft? draft,
     int? currentStep,
+    bool? isSubmitting,
+    Object? submitError,
+    bool clearSubmitError = false,
   }) =>
       ProfileSetupState(
         draft: draft ?? this.draft,
         currentStep: currentStep ?? this.currentStep,
+        isSubmitting: isSubmitting ?? this.isSubmitting,
+        submitError:
+            clearSubmitError ? null : (submitError ?? this.submitError),
       );
 
   static const total = 4;
@@ -64,35 +80,72 @@ class ProfileSetupNotifier extends Notifier<ProfileSetupState> {
         draft: state.draft.copyWith(avatarLocalPath: value),
       );
 
-  void updateAvatarRemoteUrl(String? value) => state = state.copyWith(
-        draft: state.draft.copyWith(avatarRemoteUrl: value),
-      );
-
   void updateGymId(String? value) =>
       state = state.copyWith(draft: state.draft.copyWith(gymId: value));
 
-  void updateExperience(ExperienceLevel value) => state = state.copyWith(
-        draft: state.draft.copyWith(experience: value),
+  void updateExperienceLevel(ExperienceLevel value) => state = state.copyWith(
+        draft: state.draft.copyWith(experienceLevel: value),
       );
 
   void updateGender(Gender value) =>
       state = state.copyWith(draft: state.draft.copyWith(gender: value));
 
-  void updateWeightKg(double? value) =>
-      state = state.copyWith(draft: state.draft.copyWith(weightKg: value));
+  void updateBodyWeightKg(double? value) =>
+      state = state.copyWith(draft: state.draft.copyWith(bodyWeightKg: value));
 
-  void updateHeightCm(double? value) =>
+  void updateHeightCm(int? value) =>
       state = state.copyWith(draft: state.draft.copyWith(heightCm: value));
 
   // ---------- Submit ----------
 
-  /// TODO(etapa3): cuando UserRepository exista, mapear el draft a UserProfile
-  /// y persistirlo en Firestore en `users/{uid}`. También uploadear avatar a
-  /// Firebase Storage primero y guardar la URL en avatarRemoteUrl.
+  /// Persiste el draft a Firestore via `UserRepository.update`. El doc ya
+  /// existe (creado por `AuthService.signUpWithEmail` al hacer signup via
+  /// `getOrCreate`), así que sólo seteamos los campos completados acá.
   ///
-  /// Por ahora es no-op: el caller decide qué hacer (típicamente navegar a
-  /// /home).
+  /// Si hay avatar local, lo subimos primero a Firebase Storage y guardamos
+  /// la URL resultante. Si el upload falla (ej. bucket no creado en Console
+  /// todavía), persistimos el resto del perfil y dejamos avatarUrl null — el
+  /// atleta puede reintentar desde Perfil → Ajustes más adelante.
   Future<void> submit() async {
-    // No-op stub until Etapa 3 lands.
+    final uid = ref.read(firebaseAuthProvider).currentUser?.uid;
+    if (uid == null) {
+      state = state.copyWith(
+        submitError: StateError('No authenticated user'),
+      );
+      return;
+    }
+    state = state.copyWith(isSubmitting: true, clearSubmitError: true);
+
+    String? avatarUrl;
+    final localPath = state.draft.avatarLocalPath;
+    if (localPath != null) {
+      try {
+        avatarUrl = await ref
+            .read(avatarUploadServiceProvider)
+            .upload(localPath);
+      } on FirebaseException {
+        avatarUrl = null;
+      } catch (_) {
+        avatarUrl = null;
+      }
+    }
+
+    try {
+      final draft = state.draft;
+      final partial = <String, Object?>{
+        'displayName': draft.username?.trim(),
+        'gymId': draft.gymId == kNoGymId ? null : draft.gymId,
+        'experienceLevel': draft.experienceLevel?.toJson(),
+        'gender': draft.gender?.toJson(),
+        'bodyWeightKg': draft.bodyWeightKg,
+        'heightCm': draft.heightCm,
+        if (avatarUrl != null) 'avatarUrl': avatarUrl,
+      };
+      await ref.read(userRepositoryProvider).update(uid, partial);
+      state = state.copyWith(isSubmitting: false);
+    } catch (e) {
+      state = state.copyWith(isSubmitting: false, submitError: e);
+      rethrow;
+    }
   }
 }

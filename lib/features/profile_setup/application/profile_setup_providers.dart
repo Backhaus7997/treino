@@ -1,11 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../data/avatar_upload_service.dart';
 import '../domain/gym.dart';
 import 'profile_setup_notifier.dart';
 
-/// Catálogo hardcodeado de gyms mientras Etapa 3 (Firestore) no esté lista.
-/// Cuando llegue Firestore, este provider se reemplaza por un `StreamProvider`
-/// que escucha la colección `gyms/`. Los ids son estables.
+/// Catálogo hardcodeado de gyms mientras no exista una colección `gyms/` en
+/// Firestore. Cuando se cree, reemplazar este provider por un StreamProvider.
 const List<Gym> _kHardcodedGyms = [
   Gym(
     id: 'smart-fit-palermo',
@@ -39,7 +39,12 @@ final filteredGymsProvider = Provider<List<Gym>>((ref) {
       .toList(growable: false);
 });
 
-/// Estado del flow: holds draft + current step.
+/// Singleton del service que uploadea avatares a Firebase Storage.
+final avatarUploadServiceProvider = Provider<AvatarUploadService>(
+  (_) => AvatarUploadService(),
+);
+
+/// Estado del flow: holds draft + current step + submit state.
 final profileSetupNotifierProvider =
     NotifierProvider<ProfileSetupNotifier, ProfileSetupState>(
   ProfileSetupNotifier.new,
