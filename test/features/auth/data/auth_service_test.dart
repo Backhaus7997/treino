@@ -1,5 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/features/auth/data/auth_service.dart';
 import 'package:treino/features/auth/domain/auth_failure.dart';
@@ -17,6 +19,13 @@ class MockUser extends Mock implements User {}
 class MockUserRepository extends Mock implements UserRepository {}
 
 class FakeAuthCredential extends Fake implements AuthCredential {}
+
+class MockGoogleSignIn extends Mock implements GoogleSignIn {}
+
+class MockGoogleSignInAccount extends Mock implements GoogleSignInAccount {}
+
+class MockGoogleSignInAuthentication extends Mock
+    implements GoogleSignInAuthentication {}
 
 // Fake UserProfile used as stub return value — displayName remains null until
 // ProfileSetup (Etapa 6) populates it.
@@ -38,6 +47,7 @@ void main() {
   late MockUserCredential cred;
   late MockUser user;
   late MockUserRepository mockRepo;
+  late MockGoogleSignIn googleSignIn;
   late AuthService sut;
 
   setUp(() {
@@ -45,6 +55,7 @@ void main() {
     cred = MockUserCredential();
     user = MockUser();
     mockRepo = MockUserRepository();
+    googleSignIn = MockGoogleSignIn();
 
     when(() => cred.user).thenReturn(user);
     when(() => user.uid).thenReturn('uid-test');
@@ -65,8 +76,11 @@ void main() {
       ),
     ).thenAnswer((_) async {});
 
-    // T28: constructor now requires userRepository
-    sut = AuthService(firebaseAuth: fbAuth, userRepository: mockRepo);
+    sut = AuthService(
+      firebaseAuth: fbAuth,
+      userRepository: mockRepo,
+      googleSignIn: googleSignIn,
+    );
   });
 
   // ---------------------------------------------------------------------------
@@ -427,14 +441,91 @@ void main() {
   });
 
   // ---------------------------------------------------------------------------
+  // signInWithGoogle
+  // ---------------------------------------------------------------------------
+  group('AuthService.signInWithGoogle', () {
+    late MockGoogleSignInAccount googleAccount;
+    late MockGoogleSignInAuthentication googleAuth;
+
+    setUp(() {
+      googleAccount = MockGoogleSignInAccount();
+      googleAuth = MockGoogleSignInAuthentication();
+      when(() => googleAccount.authentication)
+          .thenAnswer((_) async => googleAuth);
+      when(() => googleAuth.idToken).thenReturn('id-token-stub');
+      when(() => googleAuth.accessToken).thenReturn('access-token-stub');
+    });
+
+    test('happy path — returns User after Firebase credential exchange',
+        () async {
+      when(() => googleSignIn.signIn()).thenAnswer((_) async => googleAccount);
+      when(() => fbAuth.signInWithCredential(any()))
+          .thenAnswer((_) async => cred);
+
+      final result = await sut.signInWithGoogle();
+
+      expect(result, user);
+      verify(() => googleSignIn.signIn()).called(1);
+      verify(() => fbAuth.signInWithCredential(any())).called(1);
+    });
+
+    test('user dismisses picker → throws AuthFailure.signInCancelled',
+        () async {
+      when(() => googleSignIn.signIn()).thenAnswer((_) async => null);
+
+      expect(
+        () => sut.signInWithGoogle(),
+        throwsA(const AuthFailure.signInCancelled()),
+      );
+    });
+
+    test('PlatformException from google_sign_in → AuthFailure.networkError',
+        () async {
+      when(() => googleSignIn.signIn()).thenThrow(
+        PlatformException(code: 'network_error'),
+      );
+
+      expect(
+        () => sut.signInWithGoogle(),
+        throwsA(const AuthFailure.networkError()),
+      );
+    });
+
+    test(
+        'FirebaseAuthException during credential exchange is mapped via fromFirebase',
+        () async {
+      when(() => googleSignIn.signIn()).thenAnswer((_) async => googleAccount);
+      when(() => fbAuth.signInWithCredential(any())).thenThrow(
+        FirebaseAuthException(code: 'account-exists-with-different-credential'),
+      );
+
+      expect(
+        () => sut.signInWithGoogle(),
+        throwsA(const AuthFailure.accountExistsWithDifferentCredential()),
+      );
+    });
+  });
+
+  // ---------------------------------------------------------------------------
   // signOut
   // ---------------------------------------------------------------------------
   group('AuthService.signOut', () {
     test('scenario 12.1 — completes without error', () async {
+      when(() => googleSignIn.signOut()).thenAnswer((_) async => null);
       when(() => fbAuth.signOut()).thenAnswer((_) async {});
 
       await expectLater(sut.signOut(), completes);
       verify(() => fbAuth.signOut()).called(1);
+    });
+
+    test('also signs out from Google to force account picker on next signIn',
+        () async {
+      when(() => googleSignIn.signOut()).thenAnswer((_) async => null);
+      when(() => fbAuth.signOut()).thenAnswer((_) async {});
+
+      await sut.signOut();
+
+      verify(() => googleSignIn.signOut()).called(1);
     });
   });
 

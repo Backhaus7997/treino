@@ -52,7 +52,14 @@ void main() {
       );
     });
 
-    test('19.10 unknown code → unknown with code preserved', () {
+    test('19.10 account-exists-with-different-credential maps', () {
+      expect(
+        fromCode('account-exists-with-different-credential'),
+        const AuthFailure.accountExistsWithDifferentCredential(),
+      );
+    });
+
+    test('19.11 unknown code → unknown with code preserved', () {
       final result = fromCode('some-unknown-code');
       expect(result, const AuthFailure.unknown('some-unknown-code'));
     });
@@ -117,6 +124,21 @@ void main() {
       );
     });
 
+    test('signInCancelled returns Spanish message', () {
+      expect(
+        const AuthFailure.signInCancelled().userMessage,
+        equals('Cancelaste el inicio de sesión'),
+      );
+    });
+
+    test('accountExistsWithDifferentCredential returns Spanish message', () {
+      expect(
+        const AuthFailure.accountExistsWithDifferentCredential().userMessage,
+        equals(
+            'Ya existe una cuenta con ese email usando otro método de inicio'),
+      );
+    });
+
     test('unknown returns Spanish message', () {
       expect(
         const AuthFailure.unknown('any-code').userMessage,
@@ -147,6 +169,8 @@ void main() {
         const AuthFailure.weakPassword(),
         const AuthFailure.tooManyRequests(),
         const AuthFailure.networkError(),
+        const AuthFailure.signInCancelled(),
+        const AuthFailure.accountExistsWithDifferentCredential(),
         const AuthFailure.unknown('x'),
         const AuthFailure.profileCreateFailed(),
       ];

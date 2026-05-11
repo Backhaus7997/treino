@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 import '../domain/auth_failure.dart';
 import '../../profile/data/user_repository.dart';
@@ -7,11 +8,14 @@ class AuthService {
   AuthService({
     required FirebaseAuth firebaseAuth,
     required UserRepository userRepository,
+    GoogleSignIn? googleSignIn,
   })  : _auth = firebaseAuth,
-        _userRepository = userRepository;
+        _userRepository = userRepository,
+        _googleSignIn = googleSignIn ?? GoogleSignIn();
 
   final FirebaseAuth _auth;
   final UserRepository _userRepository;
+  final GoogleSignIn _googleSignIn;
 
   /// Creates the user, sends verification email, then atomically creates the
   /// Firestore profile doc with `displayName: null` (REQ-PROF-033, REQ-AUTH-002).
@@ -122,8 +126,49 @@ class AuthService {
     return user;
   }
 
+  /// Launches the native Google account picker and exchanges the OAuth
+  /// credential with Firebase Auth. Firebase resolves new vs existing users
+  /// transparently — this matches the standard one-button-fits-all UX of
+  /// modern apps (Spotify, Notion, etc.).
+  ///
+  /// Throws [AuthFailure.signInCancelled] when the user dismisses the picker
+  /// without selecting an account, [AuthFailure.networkError] on connectivity
+  /// issues, and [AuthFailure.fromFirebase] for any FirebaseAuthException
+  /// (e.g. account-exists-with-different-credential when the same email is
+  /// already registered with a different provider).
+  Future<User> signInWithGoogle() async {
+    GoogleSignInAccount? googleUser;
+    try {
+      googleUser = await _googleSignIn.signIn();
+    } catch (_) {
+      // google_sign_in surfaces platform errors as PlatformException; we
+      // surface them as a generic network failure to keep the domain clean.
+      throw const AuthFailure.networkError();
+    }
+    if (googleUser == null) {
+      // User dismissed the account picker.
+      throw const AuthFailure.signInCancelled();
+    }
+
+    final googleAuth = await googleUser.authentication;
+    final credential = GoogleAuthProvider.credential(
+      idToken: googleAuth.idToken,
+      accessToken: googleAuth.accessToken,
+    );
+
+    try {
+      final cred = await _auth.signInWithCredential(credential);
+      return cred.user!;
+    } on FirebaseAuthException catch (e) {
+      throw AuthFailure.fromFirebase(e);
+    }
+  }
+
   Future<void> signOut() async {
     try {
+      // Disconnect Google session too — otherwise a subsequent signIn() would
+      // silently re-use the cached account without showing the picker.
+      await _googleSignIn.signOut();
       await _auth.signOut();
     } on FirebaseAuthException catch (e) {
       throw AuthFailure.fromFirebase(e);

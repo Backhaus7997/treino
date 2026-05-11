@@ -7,6 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../app/theme/app_background.dart';
 import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/treino_icon.dart';
+import '../application/auth_providers.dart';
 import 'auth_strings.dart';
 import 'widgets/auth_pill_button.dart';
 import 'widgets/auth_secondary_button.dart';
@@ -18,6 +19,7 @@ class WelcomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
+    final isLoading = ref.watch(authNotifierProvider).isLoading;
 
     return Scaffold(
       backgroundColor: palette.bg,
@@ -105,17 +107,19 @@ class WelcomeScreen extends ConsumerWidget {
                             onPressed: () => context.push('/register'),
                           ),
                           const SizedBox(height: 12),
-                          const Row(
+                          Row(
                             children: [
                               Expanded(
                                 child: AuthSecondaryButton(
                                   icon: FontAwesomeIcons.google,
                                   label: AuthStrings.googleLabel,
-                                  onPressed: null,
+                                  onPressed: isLoading
+                                      ? null
+                                      : () => _signInWithGoogle(context, ref),
                                 ),
                               ),
-                              SizedBox(width: 12),
-                              Expanded(
+                              const SizedBox(width: 12),
+                              const Expanded(
                                 child: AuthSecondaryButton(
                                   icon: FontAwesomeIcons.apple,
                                   label: AuthStrings.appleLabel,
@@ -162,6 +166,16 @@ class WelcomeScreen extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _signInWithGoogle(BuildContext context, WidgetRef ref) async {
+    // No intent gating on Welcome — both new and existing users land in /home.
+    await ref.read(authNotifierProvider.notifier).signInWithGoogle();
+    if (!context.mounted) return;
+    final s = ref.read(authNotifierProvider);
+    if (s.hasValue && s.valueOrNull != null) {
+      context.go('/home');
+    }
   }
 
   Widget _headlineLine(AppPalette palette,

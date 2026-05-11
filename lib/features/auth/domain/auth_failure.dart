@@ -15,6 +15,9 @@ sealed class AuthFailure with _$AuthFailure implements Exception {
   const factory AuthFailure.weakPassword() = _WeakPassword;
   const factory AuthFailure.tooManyRequests() = _TooManyRequests;
   const factory AuthFailure.networkError() = _NetworkError;
+  const factory AuthFailure.signInCancelled() = _SignInCancelled;
+  const factory AuthFailure.accountExistsWithDifferentCredential() =
+      _AccountExistsWithDifferentCredential;
   const factory AuthFailure.unknown(String code) = _Unknown;
   const factory AuthFailure.profileCreateFailed({Object? cause}) =
       _ProfileCreateFailed;
@@ -30,6 +33,8 @@ sealed class AuthFailure with _$AuthFailure implements Exception {
         'weak-password' => const AuthFailure.weakPassword(),
         'too-many-requests' => const AuthFailure.tooManyRequests(),
         'network-request-failed' => const AuthFailure.networkError(),
+        'account-exists-with-different-credential' =>
+          const AuthFailure.accountExistsWithDifferentCredential(),
         final code => AuthFailure.unknown(code),
       };
 
@@ -45,6 +50,9 @@ sealed class AuthFailure with _$AuthFailure implements Exception {
           'Demasiados intentos. Esperá unos minutos e intentá de nuevo',
         _NetworkError() =>
           'Sin conexión. Revisá tu internet e intentá de nuevo',
+        _SignInCancelled() => 'Cancelaste el inicio de sesión',
+        _AccountExistsWithDifferentCredential() =>
+          'Ya existe una cuenta con ese email usando otro método de inicio',
         _Unknown() => 'Algo salió mal. Intentá de nuevo',
         _ProfileCreateFailed() =>
           'Hubo un problema creando tu perfil. Probá de nuevo',

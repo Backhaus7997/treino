@@ -226,6 +226,90 @@ void main() {
   });
 
   // ---------------------------------------------------------------------------
+  // signInWithGoogle
+  // ---------------------------------------------------------------------------
+  group('AuthNotifier.signInWithGoogle', () {
+    test('happy path — resolves to AsyncData(user)', () async {
+      final streamController = StreamController<User?>();
+      final container = buildContainer(
+        mockService: mockService,
+        authStream: streamController.stream,
+      );
+      addTearDown(() {
+        container.dispose();
+        streamController.close();
+      });
+
+      streamController.add(null);
+      await container.read(authNotifierProvider.future);
+
+      when(() => mockService.signInWithGoogle()).thenAnswer((_) async {
+        streamController.add(mockUser);
+        return mockUser;
+      });
+
+      await container.read(authNotifierProvider.notifier).signInWithGoogle();
+
+      final state = container.read(authNotifierProvider);
+      expect(state.hasValue, isTrue);
+      expect(state.valueOrNull, mockUser);
+    });
+
+    test('user cancels picker → no AsyncError, state restored to previous user',
+        () async {
+      final streamController = StreamController<User?>();
+      final container = buildContainer(
+        mockService: mockService,
+        authStream: streamController.stream,
+      );
+      addTearDown(() {
+        container.dispose();
+        streamController.close();
+      });
+
+      // Start logged out
+      streamController.add(null);
+      await container.read(authNotifierProvider.future);
+
+      when(() => mockService.signInWithGoogle())
+          .thenThrow(const AuthFailure.signInCancelled());
+
+      await container.read(authNotifierProvider.notifier).signInWithGoogle();
+
+      final state = container.read(authNotifierProvider);
+      expect(state.hasError, isFalse,
+          reason: 'cancel must not surface as an error');
+      expect(state.valueOrNull, isNull,
+          reason: 'previous user (null) is restored');
+    });
+
+    test('non-cancel failure → state goes to AsyncError with the failure',
+        () async {
+      final streamController = StreamController<User?>();
+      final container = buildContainer(
+        mockService: mockService,
+        authStream: streamController.stream,
+      );
+      addTearDown(() {
+        container.dispose();
+        streamController.close();
+      });
+
+      streamController.add(null);
+      await container.read(authNotifierProvider.future);
+
+      when(() => mockService.signInWithGoogle())
+          .thenThrow(const AuthFailure.networkError());
+
+      await container.read(authNotifierProvider.notifier).signInWithGoogle();
+
+      final state = container.read(authNotifierProvider);
+      expect(state.hasError, isTrue);
+      expect(state.error, const AuthFailure.networkError());
+    });
+  });
+
+  // ---------------------------------------------------------------------------
   // signOut
   // ---------------------------------------------------------------------------
   group('AuthNotifier.signOut', () {

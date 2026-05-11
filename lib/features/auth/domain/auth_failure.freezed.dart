@@ -26,6 +26,8 @@ mixin _$AuthFailure {
     required TResult Function() weakPassword,
     required TResult Function() tooManyRequests,
     required TResult Function() networkError,
+    required TResult Function() signInCancelled,
+    required TResult Function() accountExistsWithDifferentCredential,
     required TResult Function(String code) unknown,
     required TResult Function(Object? cause) profileCreateFailed,
   }) =>
@@ -40,6 +42,8 @@ mixin _$AuthFailure {
     TResult? Function()? weakPassword,
     TResult? Function()? tooManyRequests,
     TResult? Function()? networkError,
+    TResult? Function()? signInCancelled,
+    TResult? Function()? accountExistsWithDifferentCredential,
     TResult? Function(String code)? unknown,
     TResult? Function(Object? cause)? profileCreateFailed,
   }) =>
@@ -54,6 +58,8 @@ mixin _$AuthFailure {
     TResult Function()? weakPassword,
     TResult Function()? tooManyRequests,
     TResult Function()? networkError,
+    TResult Function()? signInCancelled,
+    TResult Function()? accountExistsWithDifferentCredential,
     TResult Function(String code)? unknown,
     TResult Function(Object? cause)? profileCreateFailed,
     required TResult orElse(),
@@ -69,6 +75,9 @@ mixin _$AuthFailure {
     required TResult Function(_WeakPassword value) weakPassword,
     required TResult Function(_TooManyRequests value) tooManyRequests,
     required TResult Function(_NetworkError value) networkError,
+    required TResult Function(_SignInCancelled value) signInCancelled,
+    required TResult Function(_AccountExistsWithDifferentCredential value)
+        accountExistsWithDifferentCredential,
     required TResult Function(_Unknown value) unknown,
     required TResult Function(_ProfileCreateFailed value) profileCreateFailed,
   }) =>
@@ -83,6 +92,9 @@ mixin _$AuthFailure {
     TResult? Function(_WeakPassword value)? weakPassword,
     TResult? Function(_TooManyRequests value)? tooManyRequests,
     TResult? Function(_NetworkError value)? networkError,
+    TResult? Function(_SignInCancelled value)? signInCancelled,
+    TResult? Function(_AccountExistsWithDifferentCredential value)?
+        accountExistsWithDifferentCredential,
     TResult? Function(_Unknown value)? unknown,
     TResult? Function(_ProfileCreateFailed value)? profileCreateFailed,
   }) =>
@@ -97,6 +109,9 @@ mixin _$AuthFailure {
     TResult Function(_WeakPassword value)? weakPassword,
     TResult Function(_TooManyRequests value)? tooManyRequests,
     TResult Function(_NetworkError value)? networkError,
+    TResult Function(_SignInCancelled value)? signInCancelled,
+    TResult Function(_AccountExistsWithDifferentCredential value)?
+        accountExistsWithDifferentCredential,
     TResult Function(_Unknown value)? unknown,
     TResult Function(_ProfileCreateFailed value)? profileCreateFailed,
     required TResult orElse(),
@@ -174,6 +189,8 @@ class _$InvalidEmailImpl extends _InvalidEmail {
     required TResult Function() weakPassword,
     required TResult Function() tooManyRequests,
     required TResult Function() networkError,
+    required TResult Function() signInCancelled,
+    required TResult Function() accountExistsWithDifferentCredential,
     required TResult Function(String code) unknown,
     required TResult Function(Object? cause) profileCreateFailed,
   }) {
@@ -191,6 +208,8 @@ class _$InvalidEmailImpl extends _InvalidEmail {
     TResult? Function()? weakPassword,
     TResult? Function()? tooManyRequests,
     TResult? Function()? networkError,
+    TResult? Function()? signInCancelled,
+    TResult? Function()? accountExistsWithDifferentCredential,
     TResult? Function(String code)? unknown,
     TResult? Function(Object? cause)? profileCreateFailed,
   }) {
@@ -208,6 +227,8 @@ class _$InvalidEmailImpl extends _InvalidEmail {
     TResult Function()? weakPassword,
     TResult Function()? tooManyRequests,
     TResult Function()? networkError,
+    TResult Function()? signInCancelled,
+    TResult Function()? accountExistsWithDifferentCredential,
     TResult Function(String code)? unknown,
     TResult Function(Object? cause)? profileCreateFailed,
     required TResult orElse(),
@@ -229,6 +250,9 @@ class _$InvalidEmailImpl extends _InvalidEmail {
     required TResult Function(_WeakPassword value) weakPassword,
     required TResult Function(_TooManyRequests value) tooManyRequests,
     required TResult Function(_NetworkError value) networkError,
+    required TResult Function(_SignInCancelled value) signInCancelled,
+    required TResult Function(_AccountExistsWithDifferentCredential value)
+        accountExistsWithDifferentCredential,
     required TResult Function(_Unknown value) unknown,
     required TResult Function(_ProfileCreateFailed value) profileCreateFailed,
   }) {
@@ -246,6 +270,9 @@ class _$InvalidEmailImpl extends _InvalidEmail {
     TResult? Function(_WeakPassword value)? weakPassword,
     TResult? Function(_TooManyRequests value)? tooManyRequests,
     TResult? Function(_NetworkError value)? networkError,
+    TResult? Function(_SignInCancelled value)? signInCancelled,
+    TResult? Function(_AccountExistsWithDifferentCredential value)?
+        accountExistsWithDifferentCredential,
     TResult? Function(_Unknown value)? unknown,
     TResult? Function(_ProfileCreateFailed value)? profileCreateFailed,
   }) {
@@ -263,6 +290,9 @@ class _$InvalidEmailImpl extends _InvalidEmail {
     TResult Function(_WeakPassword value)? weakPassword,
     TResult Function(_TooManyRequests value)? tooManyRequests,
     TResult Function(_NetworkError value)? networkError,
+    TResult Function(_SignInCancelled value)? signInCancelled,
+    TResult Function(_AccountExistsWithDifferentCredential value)?
+        accountExistsWithDifferentCredential,
     TResult Function(_Unknown value)? unknown,
     TResult Function(_ProfileCreateFailed value)? profileCreateFailed,
     required TResult orElse(),
@@ -328,6 +358,8 @@ class _$UserDisabledImpl extends _UserDisabled {
     required TResult Function() weakPassword,
     required TResult Function() tooManyRequests,
     required TResult Function() networkError,
+    required TResult Function() signInCancelled,
+    required TResult Function() accountExistsWithDifferentCredential,
     required TResult Function(String code) unknown,
     required TResult Function(Object? cause) profileCreateFailed,
   }) {
@@ -345,6 +377,8 @@ class _$UserDisabledImpl extends _UserDisabled {
     TResult? Function()? weakPassword,
     TResult? Function()? tooManyRequests,
     TResult? Function()? networkError,
+    TResult? Function()? signInCancelled,
+    TResult? Function()? accountExistsWithDifferentCredential,
     TResult? Function(String code)? unknown,
     TResult? Function(Object? cause)? profileCreateFailed,
   }) {
@@ -362,6 +396,8 @@ class _$UserDisabledImpl extends _UserDisabled {
     TResult Function()? weakPassword,
     TResult Function()? tooManyRequests,
     TResult Function()? networkError,
+    TResult Function()? signInCancelled,
+    TResult Function()? accountExistsWithDifferentCredential,
     TResult Function(String code)? unknown,
     TResult Function(Object? cause)? profileCreateFailed,
     required TResult orElse(),
@@ -383,6 +419,9 @@ class _$UserDisabledImpl extends _UserDisabled {
     required TResult Function(_WeakPassword value) weakPassword,
     required TResult Function(_TooManyRequests value) tooManyRequests,
     required TResult Function(_NetworkError value) networkError,
+    required TResult Function(_SignInCancelled value) signInCancelled,
+    required TResult Function(_AccountExistsWithDifferentCredential value)
+        accountExistsWithDifferentCredential,
     required TResult Function(_Unknown value) unknown,
     required TResult Function(_ProfileCreateFailed value) profileCreateFailed,
   }) {
@@ -400,6 +439,9 @@ class _$UserDisabledImpl extends _UserDisabled {
     TResult? Function(_WeakPassword value)? weakPassword,
     TResult? Function(_TooManyRequests value)? tooManyRequests,
     TResult? Function(_NetworkError value)? networkError,
+    TResult? Function(_SignInCancelled value)? signInCancelled,
+    TResult? Function(_AccountExistsWithDifferentCredential value)?
+        accountExistsWithDifferentCredential,
     TResult? Function(_Unknown value)? unknown,
     TResult? Function(_ProfileCreateFailed value)? profileCreateFailed,
   }) {
@@ -417,6 +459,9 @@ class _$UserDisabledImpl extends _UserDisabled {
     TResult Function(_WeakPassword value)? weakPassword,
     TResult Function(_TooManyRequests value)? tooManyRequests,
     TResult Function(_NetworkError value)? networkError,
+    TResult Function(_SignInCancelled value)? signInCancelled,
+    TResult Function(_AccountExistsWithDifferentCredential value)?
+        accountExistsWithDifferentCredential,
     TResult Function(_Unknown value)? unknown,
     TResult Function(_ProfileCreateFailed value)? profileCreateFailed,
     required TResult orElse(),
@@ -482,6 +527,8 @@ class _$UserNotFoundImpl extends _UserNotFound {
     required TResult Function() weakPassword,
     required TResult Function() tooManyRequests,
     required TResult Function() networkError,
+    required TResult Function() signInCancelled,
+    required TResult Function() accountExistsWithDifferentCredential,
     required TResult Function(String code) unknown,
     required TResult Function(Object? cause) profileCreateFailed,
   }) {
@@ -499,6 +546,8 @@ class _$UserNotFoundImpl extends _UserNotFound {
     TResult? Function()? weakPassword,
     TResult? Function()? tooManyRequests,
     TResult? Function()? networkError,
+    TResult? Function()? signInCancelled,
+    TResult? Function()? accountExistsWithDifferentCredential,
     TResult? Function(String code)? unknown,
     TResult? Function(Object? cause)? profileCreateFailed,
   }) {
@@ -516,6 +565,8 @@ class _$UserNotFoundImpl extends _UserNotFound {
     TResult Function()? weakPassword,
     TResult Function()? tooManyRequests,
     TResult Function()? networkError,
+    TResult Function()? signInCancelled,
+    TResult Function()? accountExistsWithDifferentCredential,
     TResult Function(String code)? unknown,
     TResult Function(Object? cause)? profileCreateFailed,
     required TResult orElse(),
@@ -537,6 +588,9 @@ class _$UserNotFoundImpl extends _UserNotFound {
     required TResult Function(_WeakPassword value) weakPassword,
     required TResult Function(_TooManyRequests value) tooManyRequests,
     required TResult Function(_NetworkError value) networkError,
+    required TResult Function(_SignInCancelled value) signInCancelled,
+    required TResult Function(_AccountExistsWithDifferentCredential value)
+        accountExistsWithDifferentCredential,
     required TResult Function(_Unknown value) unknown,
     required TResult Function(_ProfileCreateFailed value) profileCreateFailed,
   }) {
@@ -554,6 +608,9 @@ class _$UserNotFoundImpl extends _UserNotFound {
     TResult? Function(_WeakPassword value)? weakPassword,
     TResult? Function(_TooManyRequests value)? tooManyRequests,
     TResult? Function(_NetworkError value)? networkError,
+    TResult? Function(_SignInCancelled value)? signInCancelled,
+    TResult? Function(_AccountExistsWithDifferentCredential value)?
+        accountExistsWithDifferentCredential,
     TResult? Function(_Unknown value)? unknown,
     TResult? Function(_ProfileCreateFailed value)? profileCreateFailed,
   }) {
@@ -571,6 +628,9 @@ class _$UserNotFoundImpl extends _UserNotFound {
     TResult Function(_WeakPassword value)? weakPassword,
     TResult Function(_TooManyRequests value)? tooManyRequests,
     TResult Function(_NetworkError value)? networkError,
+    TResult Function(_SignInCancelled value)? signInCancelled,
+    TResult Function(_AccountExistsWithDifferentCredential value)?
+        accountExistsWithDifferentCredential,
     TResult Function(_Unknown value)? unknown,
     TResult Function(_ProfileCreateFailed value)? profileCreateFailed,
     required TResult orElse(),
@@ -636,6 +696,8 @@ class _$WrongPasswordImpl extends _WrongPassword {
     required TResult Function() weakPassword,
     required TResult Function() tooManyRequests,
     required TResult Function() networkError,
+    required TResult Function() signInCancelled,
+    required TResult Function() accountExistsWithDifferentCredential,
     required TResult Function(String code) unknown,
     required TResult Function(Object? cause) profileCreateFailed,
   }) {
@@ -653,6 +715,8 @@ class _$WrongPasswordImpl extends _WrongPassword {
     TResult? Function()? weakPassword,
     TResult? Function()? tooManyRequests,
     TResult? Function()? networkError,
+    TResult? Function()? signInCancelled,
+    TResult? Function()? accountExistsWithDifferentCredential,
     TResult? Function(String code)? unknown,
     TResult? Function(Object? cause)? profileCreateFailed,
   }) {
@@ -670,6 +734,8 @@ class _$WrongPasswordImpl extends _WrongPassword {
     TResult Function()? weakPassword,
     TResult Function()? tooManyRequests,
     TResult Function()? networkError,
+    TResult Function()? signInCancelled,
+    TResult Function()? accountExistsWithDifferentCredential,
     TResult Function(String code)? unknown,
     TResult Function(Object? cause)? profileCreateFailed,
     required TResult orElse(),
@@ -691,6 +757,9 @@ class _$WrongPasswordImpl extends _WrongPassword {
     required TResult Function(_WeakPassword value) weakPassword,
     required TResult Function(_TooManyRequests value) tooManyRequests,
     required TResult Function(_NetworkError value) networkError,
+    required TResult Function(_SignInCancelled value) signInCancelled,
+    required TResult Function(_AccountExistsWithDifferentCredential value)
+        accountExistsWithDifferentCredential,
     required TResult Function(_Unknown value) unknown,
     required TResult Function(_ProfileCreateFailed value) profileCreateFailed,
   }) {
@@ -708,6 +777,9 @@ class _$WrongPasswordImpl extends _WrongPassword {
     TResult? Function(_WeakPassword value)? weakPassword,
     TResult? Function(_TooManyRequests value)? tooManyRequests,
     TResult? Function(_NetworkError value)? networkError,
+    TResult? Function(_SignInCancelled value)? signInCancelled,
+    TResult? Function(_AccountExistsWithDifferentCredential value)?
+        accountExistsWithDifferentCredential,
     TResult? Function(_Unknown value)? unknown,
     TResult? Function(_ProfileCreateFailed value)? profileCreateFailed,
   }) {
@@ -725,6 +797,9 @@ class _$WrongPasswordImpl extends _WrongPassword {
     TResult Function(_WeakPassword value)? weakPassword,
     TResult Function(_TooManyRequests value)? tooManyRequests,
     TResult Function(_NetworkError value)? networkError,
+    TResult Function(_SignInCancelled value)? signInCancelled,
+    TResult Function(_AccountExistsWithDifferentCredential value)?
+        accountExistsWithDifferentCredential,
     TResult Function(_Unknown value)? unknown,
     TResult Function(_ProfileCreateFailed value)? profileCreateFailed,
     required TResult orElse(),
@@ -790,6 +865,8 @@ class _$EmailAlreadyInUseImpl extends _EmailAlreadyInUse {
     required TResult Function() weakPassword,
     required TResult Function() tooManyRequests,
     required TResult Function() networkError,
+    required TResult Function() signInCancelled,
+    required TResult Function() accountExistsWithDifferentCredential,
     required TResult Function(String code) unknown,
     required TResult Function(Object? cause) profileCreateFailed,
   }) {
@@ -807,6 +884,8 @@ class _$EmailAlreadyInUseImpl extends _EmailAlreadyInUse {
     TResult? Function()? weakPassword,
     TResult? Function()? tooManyRequests,
     TResult? Function()? networkError,
+    TResult? Function()? signInCancelled,
+    TResult? Function()? accountExistsWithDifferentCredential,
     TResult? Function(String code)? unknown,
     TResult? Function(Object? cause)? profileCreateFailed,
   }) {
@@ -824,6 +903,8 @@ class _$EmailAlreadyInUseImpl extends _EmailAlreadyInUse {
     TResult Function()? weakPassword,
     TResult Function()? tooManyRequests,
     TResult Function()? networkError,
+    TResult Function()? signInCancelled,
+    TResult Function()? accountExistsWithDifferentCredential,
     TResult Function(String code)? unknown,
     TResult Function(Object? cause)? profileCreateFailed,
     required TResult orElse(),
@@ -845,6 +926,9 @@ class _$EmailAlreadyInUseImpl extends _EmailAlreadyInUse {
     required TResult Function(_WeakPassword value) weakPassword,
     required TResult Function(_TooManyRequests value) tooManyRequests,
     required TResult Function(_NetworkError value) networkError,
+    required TResult Function(_SignInCancelled value) signInCancelled,
+    required TResult Function(_AccountExistsWithDifferentCredential value)
+        accountExistsWithDifferentCredential,
     required TResult Function(_Unknown value) unknown,
     required TResult Function(_ProfileCreateFailed value) profileCreateFailed,
   }) {
@@ -862,6 +946,9 @@ class _$EmailAlreadyInUseImpl extends _EmailAlreadyInUse {
     TResult? Function(_WeakPassword value)? weakPassword,
     TResult? Function(_TooManyRequests value)? tooManyRequests,
     TResult? Function(_NetworkError value)? networkError,
+    TResult? Function(_SignInCancelled value)? signInCancelled,
+    TResult? Function(_AccountExistsWithDifferentCredential value)?
+        accountExistsWithDifferentCredential,
     TResult? Function(_Unknown value)? unknown,
     TResult? Function(_ProfileCreateFailed value)? profileCreateFailed,
   }) {
@@ -879,6 +966,9 @@ class _$EmailAlreadyInUseImpl extends _EmailAlreadyInUse {
     TResult Function(_WeakPassword value)? weakPassword,
     TResult Function(_TooManyRequests value)? tooManyRequests,
     TResult Function(_NetworkError value)? networkError,
+    TResult Function(_SignInCancelled value)? signInCancelled,
+    TResult Function(_AccountExistsWithDifferentCredential value)?
+        accountExistsWithDifferentCredential,
     TResult Function(_Unknown value)? unknown,
     TResult Function(_ProfileCreateFailed value)? profileCreateFailed,
     required TResult orElse(),
@@ -944,6 +1034,8 @@ class _$WeakPasswordImpl extends _WeakPassword {
     required TResult Function() weakPassword,
     required TResult Function() tooManyRequests,
     required TResult Function() networkError,
+    required TResult Function() signInCancelled,
+    required TResult Function() accountExistsWithDifferentCredential,
     required TResult Function(String code) unknown,
     required TResult Function(Object? cause) profileCreateFailed,
   }) {
@@ -961,6 +1053,8 @@ class _$WeakPasswordImpl extends _WeakPassword {
     TResult? Function()? weakPassword,
     TResult? Function()? tooManyRequests,
     TResult? Function()? networkError,
+    TResult? Function()? signInCancelled,
+    TResult? Function()? accountExistsWithDifferentCredential,
     TResult? Function(String code)? unknown,
     TResult? Function(Object? cause)? profileCreateFailed,
   }) {
@@ -978,6 +1072,8 @@ class _$WeakPasswordImpl extends _WeakPassword {
     TResult Function()? weakPassword,
     TResult Function()? tooManyRequests,
     TResult Function()? networkError,
+    TResult Function()? signInCancelled,
+    TResult Function()? accountExistsWithDifferentCredential,
     TResult Function(String code)? unknown,
     TResult Function(Object? cause)? profileCreateFailed,
     required TResult orElse(),
@@ -999,6 +1095,9 @@ class _$WeakPasswordImpl extends _WeakPassword {
     required TResult Function(_WeakPassword value) weakPassword,
     required TResult Function(_TooManyRequests value) tooManyRequests,
     required TResult Function(_NetworkError value) networkError,
+    required TResult Function(_SignInCancelled value) signInCancelled,
+    required TResult Function(_AccountExistsWithDifferentCredential value)
+        accountExistsWithDifferentCredential,
     required TResult Function(_Unknown value) unknown,
     required TResult Function(_ProfileCreateFailed value) profileCreateFailed,
   }) {
@@ -1016,6 +1115,9 @@ class _$WeakPasswordImpl extends _WeakPassword {
     TResult? Function(_WeakPassword value)? weakPassword,
     TResult? Function(_TooManyRequests value)? tooManyRequests,
     TResult? Function(_NetworkError value)? networkError,
+    TResult? Function(_SignInCancelled value)? signInCancelled,
+    TResult? Function(_AccountExistsWithDifferentCredential value)?
+        accountExistsWithDifferentCredential,
     TResult? Function(_Unknown value)? unknown,
     TResult? Function(_ProfileCreateFailed value)? profileCreateFailed,
   }) {
@@ -1033,6 +1135,9 @@ class _$WeakPasswordImpl extends _WeakPassword {
     TResult Function(_WeakPassword value)? weakPassword,
     TResult Function(_TooManyRequests value)? tooManyRequests,
     TResult Function(_NetworkError value)? networkError,
+    TResult Function(_SignInCancelled value)? signInCancelled,
+    TResult Function(_AccountExistsWithDifferentCredential value)?
+        accountExistsWithDifferentCredential,
     TResult Function(_Unknown value)? unknown,
     TResult Function(_ProfileCreateFailed value)? profileCreateFailed,
     required TResult orElse(),
@@ -1098,6 +1203,8 @@ class _$TooManyRequestsImpl extends _TooManyRequests {
     required TResult Function() weakPassword,
     required TResult Function() tooManyRequests,
     required TResult Function() networkError,
+    required TResult Function() signInCancelled,
+    required TResult Function() accountExistsWithDifferentCredential,
     required TResult Function(String code) unknown,
     required TResult Function(Object? cause) profileCreateFailed,
   }) {
@@ -1115,6 +1222,8 @@ class _$TooManyRequestsImpl extends _TooManyRequests {
     TResult? Function()? weakPassword,
     TResult? Function()? tooManyRequests,
     TResult? Function()? networkError,
+    TResult? Function()? signInCancelled,
+    TResult? Function()? accountExistsWithDifferentCredential,
     TResult? Function(String code)? unknown,
     TResult? Function(Object? cause)? profileCreateFailed,
   }) {
@@ -1132,6 +1241,8 @@ class _$TooManyRequestsImpl extends _TooManyRequests {
     TResult Function()? weakPassword,
     TResult Function()? tooManyRequests,
     TResult Function()? networkError,
+    TResult Function()? signInCancelled,
+    TResult Function()? accountExistsWithDifferentCredential,
     TResult Function(String code)? unknown,
     TResult Function(Object? cause)? profileCreateFailed,
     required TResult orElse(),
@@ -1153,6 +1264,9 @@ class _$TooManyRequestsImpl extends _TooManyRequests {
     required TResult Function(_WeakPassword value) weakPassword,
     required TResult Function(_TooManyRequests value) tooManyRequests,
     required TResult Function(_NetworkError value) networkError,
+    required TResult Function(_SignInCancelled value) signInCancelled,
+    required TResult Function(_AccountExistsWithDifferentCredential value)
+        accountExistsWithDifferentCredential,
     required TResult Function(_Unknown value) unknown,
     required TResult Function(_ProfileCreateFailed value) profileCreateFailed,
   }) {
@@ -1170,6 +1284,9 @@ class _$TooManyRequestsImpl extends _TooManyRequests {
     TResult? Function(_WeakPassword value)? weakPassword,
     TResult? Function(_TooManyRequests value)? tooManyRequests,
     TResult? Function(_NetworkError value)? networkError,
+    TResult? Function(_SignInCancelled value)? signInCancelled,
+    TResult? Function(_AccountExistsWithDifferentCredential value)?
+        accountExistsWithDifferentCredential,
     TResult? Function(_Unknown value)? unknown,
     TResult? Function(_ProfileCreateFailed value)? profileCreateFailed,
   }) {
@@ -1187,6 +1304,9 @@ class _$TooManyRequestsImpl extends _TooManyRequests {
     TResult Function(_WeakPassword value)? weakPassword,
     TResult Function(_TooManyRequests value)? tooManyRequests,
     TResult Function(_NetworkError value)? networkError,
+    TResult Function(_SignInCancelled value)? signInCancelled,
+    TResult Function(_AccountExistsWithDifferentCredential value)?
+        accountExistsWithDifferentCredential,
     TResult Function(_Unknown value)? unknown,
     TResult Function(_ProfileCreateFailed value)? profileCreateFailed,
     required TResult orElse(),
@@ -1252,6 +1372,8 @@ class _$NetworkErrorImpl extends _NetworkError {
     required TResult Function() weakPassword,
     required TResult Function() tooManyRequests,
     required TResult Function() networkError,
+    required TResult Function() signInCancelled,
+    required TResult Function() accountExistsWithDifferentCredential,
     required TResult Function(String code) unknown,
     required TResult Function(Object? cause) profileCreateFailed,
   }) {
@@ -1269,6 +1391,8 @@ class _$NetworkErrorImpl extends _NetworkError {
     TResult? Function()? weakPassword,
     TResult? Function()? tooManyRequests,
     TResult? Function()? networkError,
+    TResult? Function()? signInCancelled,
+    TResult? Function()? accountExistsWithDifferentCredential,
     TResult? Function(String code)? unknown,
     TResult? Function(Object? cause)? profileCreateFailed,
   }) {
@@ -1286,6 +1410,8 @@ class _$NetworkErrorImpl extends _NetworkError {
     TResult Function()? weakPassword,
     TResult Function()? tooManyRequests,
     TResult Function()? networkError,
+    TResult Function()? signInCancelled,
+    TResult Function()? accountExistsWithDifferentCredential,
     TResult Function(String code)? unknown,
     TResult Function(Object? cause)? profileCreateFailed,
     required TResult orElse(),
@@ -1307,6 +1433,9 @@ class _$NetworkErrorImpl extends _NetworkError {
     required TResult Function(_WeakPassword value) weakPassword,
     required TResult Function(_TooManyRequests value) tooManyRequests,
     required TResult Function(_NetworkError value) networkError,
+    required TResult Function(_SignInCancelled value) signInCancelled,
+    required TResult Function(_AccountExistsWithDifferentCredential value)
+        accountExistsWithDifferentCredential,
     required TResult Function(_Unknown value) unknown,
     required TResult Function(_ProfileCreateFailed value) profileCreateFailed,
   }) {
@@ -1324,6 +1453,9 @@ class _$NetworkErrorImpl extends _NetworkError {
     TResult? Function(_WeakPassword value)? weakPassword,
     TResult? Function(_TooManyRequests value)? tooManyRequests,
     TResult? Function(_NetworkError value)? networkError,
+    TResult? Function(_SignInCancelled value)? signInCancelled,
+    TResult? Function(_AccountExistsWithDifferentCredential value)?
+        accountExistsWithDifferentCredential,
     TResult? Function(_Unknown value)? unknown,
     TResult? Function(_ProfileCreateFailed value)? profileCreateFailed,
   }) {
@@ -1341,6 +1473,9 @@ class _$NetworkErrorImpl extends _NetworkError {
     TResult Function(_WeakPassword value)? weakPassword,
     TResult Function(_TooManyRequests value)? tooManyRequests,
     TResult Function(_NetworkError value)? networkError,
+    TResult Function(_SignInCancelled value)? signInCancelled,
+    TResult Function(_AccountExistsWithDifferentCredential value)?
+        accountExistsWithDifferentCredential,
     TResult Function(_Unknown value)? unknown,
     TResult Function(_ProfileCreateFailed value)? profileCreateFailed,
     required TResult orElse(),
@@ -1355,6 +1490,338 @@ class _$NetworkErrorImpl extends _NetworkError {
 abstract class _NetworkError extends AuthFailure {
   const factory _NetworkError() = _$NetworkErrorImpl;
   const _NetworkError._() : super._();
+}
+
+/// @nodoc
+abstract class _$$SignInCancelledImplCopyWith<$Res> {
+  factory _$$SignInCancelledImplCopyWith(_$SignInCancelledImpl value,
+          $Res Function(_$SignInCancelledImpl) then) =
+      __$$SignInCancelledImplCopyWithImpl<$Res>;
+}
+
+/// @nodoc
+class __$$SignInCancelledImplCopyWithImpl<$Res>
+    extends _$AuthFailureCopyWithImpl<$Res, _$SignInCancelledImpl>
+    implements _$$SignInCancelledImplCopyWith<$Res> {
+  __$$SignInCancelledImplCopyWithImpl(
+      _$SignInCancelledImpl _value, $Res Function(_$SignInCancelledImpl) _then)
+      : super(_value, _then);
+
+  /// Create a copy of AuthFailure
+  /// with the given fields replaced by the non-null parameter values.
+}
+
+/// @nodoc
+
+class _$SignInCancelledImpl extends _SignInCancelled {
+  const _$SignInCancelledImpl() : super._();
+
+  @override
+  String toString() {
+    return 'AuthFailure.signInCancelled()';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType && other is _$SignInCancelledImpl);
+  }
+
+  @override
+  int get hashCode => runtimeType.hashCode;
+
+  @override
+  @optionalTypeArgs
+  TResult when<TResult extends Object?>({
+    required TResult Function() invalidEmail,
+    required TResult Function() userDisabled,
+    required TResult Function() userNotFound,
+    required TResult Function() wrongPassword,
+    required TResult Function() emailAlreadyInUse,
+    required TResult Function() weakPassword,
+    required TResult Function() tooManyRequests,
+    required TResult Function() networkError,
+    required TResult Function() signInCancelled,
+    required TResult Function() accountExistsWithDifferentCredential,
+    required TResult Function(String code) unknown,
+  }) {
+    return signInCancelled();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? whenOrNull<TResult extends Object?>({
+    TResult? Function()? invalidEmail,
+    TResult? Function()? userDisabled,
+    TResult? Function()? userNotFound,
+    TResult? Function()? wrongPassword,
+    TResult? Function()? emailAlreadyInUse,
+    TResult? Function()? weakPassword,
+    TResult? Function()? tooManyRequests,
+    TResult? Function()? networkError,
+    TResult? Function()? signInCancelled,
+    TResult? Function()? accountExistsWithDifferentCredential,
+    TResult? Function(String code)? unknown,
+  }) {
+    return signInCancelled?.call();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeWhen<TResult extends Object?>({
+    TResult Function()? invalidEmail,
+    TResult Function()? userDisabled,
+    TResult Function()? userNotFound,
+    TResult Function()? wrongPassword,
+    TResult Function()? emailAlreadyInUse,
+    TResult Function()? weakPassword,
+    TResult Function()? tooManyRequests,
+    TResult Function()? networkError,
+    TResult Function()? signInCancelled,
+    TResult Function()? accountExistsWithDifferentCredential,
+    TResult Function(String code)? unknown,
+    required TResult orElse(),
+  }) {
+    if (signInCancelled != null) {
+      return signInCancelled();
+    }
+    return orElse();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult map<TResult extends Object?>({
+    required TResult Function(_InvalidEmail value) invalidEmail,
+    required TResult Function(_UserDisabled value) userDisabled,
+    required TResult Function(_UserNotFound value) userNotFound,
+    required TResult Function(_WrongPassword value) wrongPassword,
+    required TResult Function(_EmailAlreadyInUse value) emailAlreadyInUse,
+    required TResult Function(_WeakPassword value) weakPassword,
+    required TResult Function(_TooManyRequests value) tooManyRequests,
+    required TResult Function(_NetworkError value) networkError,
+    required TResult Function(_SignInCancelled value) signInCancelled,
+    required TResult Function(_AccountExistsWithDifferentCredential value)
+        accountExistsWithDifferentCredential,
+    required TResult Function(_Unknown value) unknown,
+  }) {
+    return signInCancelled(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? mapOrNull<TResult extends Object?>({
+    TResult? Function(_InvalidEmail value)? invalidEmail,
+    TResult? Function(_UserDisabled value)? userDisabled,
+    TResult? Function(_UserNotFound value)? userNotFound,
+    TResult? Function(_WrongPassword value)? wrongPassword,
+    TResult? Function(_EmailAlreadyInUse value)? emailAlreadyInUse,
+    TResult? Function(_WeakPassword value)? weakPassword,
+    TResult? Function(_TooManyRequests value)? tooManyRequests,
+    TResult? Function(_NetworkError value)? networkError,
+    TResult? Function(_SignInCancelled value)? signInCancelled,
+    TResult? Function(_AccountExistsWithDifferentCredential value)?
+        accountExistsWithDifferentCredential,
+    TResult? Function(_Unknown value)? unknown,
+  }) {
+    return signInCancelled?.call(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeMap<TResult extends Object?>({
+    TResult Function(_InvalidEmail value)? invalidEmail,
+    TResult Function(_UserDisabled value)? userDisabled,
+    TResult Function(_UserNotFound value)? userNotFound,
+    TResult Function(_WrongPassword value)? wrongPassword,
+    TResult Function(_EmailAlreadyInUse value)? emailAlreadyInUse,
+    TResult Function(_WeakPassword value)? weakPassword,
+    TResult Function(_TooManyRequests value)? tooManyRequests,
+    TResult Function(_NetworkError value)? networkError,
+    TResult Function(_SignInCancelled value)? signInCancelled,
+    TResult Function(_AccountExistsWithDifferentCredential value)?
+        accountExistsWithDifferentCredential,
+    TResult Function(_Unknown value)? unknown,
+    required TResult orElse(),
+  }) {
+    if (signInCancelled != null) {
+      return signInCancelled(this);
+    }
+    return orElse();
+  }
+}
+
+abstract class _SignInCancelled extends AuthFailure {
+  const factory _SignInCancelled() = _$SignInCancelledImpl;
+  const _SignInCancelled._() : super._();
+}
+
+/// @nodoc
+abstract class _$$AccountExistsWithDifferentCredentialImplCopyWith<$Res> {
+  factory _$$AccountExistsWithDifferentCredentialImplCopyWith(
+          _$AccountExistsWithDifferentCredentialImpl value,
+          $Res Function(_$AccountExistsWithDifferentCredentialImpl) then) =
+      __$$AccountExistsWithDifferentCredentialImplCopyWithImpl<$Res>;
+}
+
+/// @nodoc
+class __$$AccountExistsWithDifferentCredentialImplCopyWithImpl<$Res>
+    extends _$AuthFailureCopyWithImpl<$Res,
+        _$AccountExistsWithDifferentCredentialImpl>
+    implements _$$AccountExistsWithDifferentCredentialImplCopyWith<$Res> {
+  __$$AccountExistsWithDifferentCredentialImplCopyWithImpl(
+      _$AccountExistsWithDifferentCredentialImpl _value,
+      $Res Function(_$AccountExistsWithDifferentCredentialImpl) _then)
+      : super(_value, _then);
+
+  /// Create a copy of AuthFailure
+  /// with the given fields replaced by the non-null parameter values.
+}
+
+/// @nodoc
+
+class _$AccountExistsWithDifferentCredentialImpl
+    extends _AccountExistsWithDifferentCredential {
+  const _$AccountExistsWithDifferentCredentialImpl() : super._();
+
+  @override
+  String toString() {
+    return 'AuthFailure.accountExistsWithDifferentCredential()';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$AccountExistsWithDifferentCredentialImpl);
+  }
+
+  @override
+  int get hashCode => runtimeType.hashCode;
+
+  @override
+  @optionalTypeArgs
+  TResult when<TResult extends Object?>({
+    required TResult Function() invalidEmail,
+    required TResult Function() userDisabled,
+    required TResult Function() userNotFound,
+    required TResult Function() wrongPassword,
+    required TResult Function() emailAlreadyInUse,
+    required TResult Function() weakPassword,
+    required TResult Function() tooManyRequests,
+    required TResult Function() networkError,
+    required TResult Function() signInCancelled,
+    required TResult Function() accountExistsWithDifferentCredential,
+    required TResult Function(String code) unknown,
+  }) {
+    return accountExistsWithDifferentCredential();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? whenOrNull<TResult extends Object?>({
+    TResult? Function()? invalidEmail,
+    TResult? Function()? userDisabled,
+    TResult? Function()? userNotFound,
+    TResult? Function()? wrongPassword,
+    TResult? Function()? emailAlreadyInUse,
+    TResult? Function()? weakPassword,
+    TResult? Function()? tooManyRequests,
+    TResult? Function()? networkError,
+    TResult? Function()? signInCancelled,
+    TResult? Function()? accountExistsWithDifferentCredential,
+    TResult? Function(String code)? unknown,
+  }) {
+    return accountExistsWithDifferentCredential?.call();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeWhen<TResult extends Object?>({
+    TResult Function()? invalidEmail,
+    TResult Function()? userDisabled,
+    TResult Function()? userNotFound,
+    TResult Function()? wrongPassword,
+    TResult Function()? emailAlreadyInUse,
+    TResult Function()? weakPassword,
+    TResult Function()? tooManyRequests,
+    TResult Function()? networkError,
+    TResult Function()? signInCancelled,
+    TResult Function()? accountExistsWithDifferentCredential,
+    TResult Function(String code)? unknown,
+    required TResult orElse(),
+  }) {
+    if (accountExistsWithDifferentCredential != null) {
+      return accountExistsWithDifferentCredential();
+    }
+    return orElse();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult map<TResult extends Object?>({
+    required TResult Function(_InvalidEmail value) invalidEmail,
+    required TResult Function(_UserDisabled value) userDisabled,
+    required TResult Function(_UserNotFound value) userNotFound,
+    required TResult Function(_WrongPassword value) wrongPassword,
+    required TResult Function(_EmailAlreadyInUse value) emailAlreadyInUse,
+    required TResult Function(_WeakPassword value) weakPassword,
+    required TResult Function(_TooManyRequests value) tooManyRequests,
+    required TResult Function(_NetworkError value) networkError,
+    required TResult Function(_SignInCancelled value) signInCancelled,
+    required TResult Function(_AccountExistsWithDifferentCredential value)
+        accountExistsWithDifferentCredential,
+    required TResult Function(_Unknown value) unknown,
+  }) {
+    return accountExistsWithDifferentCredential(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? mapOrNull<TResult extends Object?>({
+    TResult? Function(_InvalidEmail value)? invalidEmail,
+    TResult? Function(_UserDisabled value)? userDisabled,
+    TResult? Function(_UserNotFound value)? userNotFound,
+    TResult? Function(_WrongPassword value)? wrongPassword,
+    TResult? Function(_EmailAlreadyInUse value)? emailAlreadyInUse,
+    TResult? Function(_WeakPassword value)? weakPassword,
+    TResult? Function(_TooManyRequests value)? tooManyRequests,
+    TResult? Function(_NetworkError value)? networkError,
+    TResult? Function(_SignInCancelled value)? signInCancelled,
+    TResult? Function(_AccountExistsWithDifferentCredential value)?
+        accountExistsWithDifferentCredential,
+    TResult? Function(_Unknown value)? unknown,
+  }) {
+    return accountExistsWithDifferentCredential?.call(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeMap<TResult extends Object?>({
+    TResult Function(_InvalidEmail value)? invalidEmail,
+    TResult Function(_UserDisabled value)? userDisabled,
+    TResult Function(_UserNotFound value)? userNotFound,
+    TResult Function(_WrongPassword value)? wrongPassword,
+    TResult Function(_EmailAlreadyInUse value)? emailAlreadyInUse,
+    TResult Function(_WeakPassword value)? weakPassword,
+    TResult Function(_TooManyRequests value)? tooManyRequests,
+    TResult Function(_NetworkError value)? networkError,
+    TResult Function(_SignInCancelled value)? signInCancelled,
+    TResult Function(_AccountExistsWithDifferentCredential value)?
+        accountExistsWithDifferentCredential,
+    TResult Function(_Unknown value)? unknown,
+    required TResult orElse(),
+  }) {
+    if (accountExistsWithDifferentCredential != null) {
+      return accountExistsWithDifferentCredential(this);
+    }
+    return orElse();
+  }
+}
+
+abstract class _AccountExistsWithDifferentCredential extends AuthFailure {
+  const factory _AccountExistsWithDifferentCredential() =
+      _$AccountExistsWithDifferentCredentialImpl;
+  const _AccountExistsWithDifferentCredential._() : super._();
 }
 
 /// @nodoc
@@ -1433,6 +1900,8 @@ class _$UnknownImpl extends _Unknown {
     required TResult Function() weakPassword,
     required TResult Function() tooManyRequests,
     required TResult Function() networkError,
+    required TResult Function() signInCancelled,
+    required TResult Function() accountExistsWithDifferentCredential,
     required TResult Function(String code) unknown,
     required TResult Function(Object? cause) profileCreateFailed,
   }) {
@@ -1450,6 +1919,8 @@ class _$UnknownImpl extends _Unknown {
     TResult? Function()? weakPassword,
     TResult? Function()? tooManyRequests,
     TResult? Function()? networkError,
+    TResult? Function()? signInCancelled,
+    TResult? Function()? accountExistsWithDifferentCredential,
     TResult? Function(String code)? unknown,
     TResult? Function(Object? cause)? profileCreateFailed,
   }) {
@@ -1467,6 +1938,8 @@ class _$UnknownImpl extends _Unknown {
     TResult Function()? weakPassword,
     TResult Function()? tooManyRequests,
     TResult Function()? networkError,
+    TResult Function()? signInCancelled,
+    TResult Function()? accountExistsWithDifferentCredential,
     TResult Function(String code)? unknown,
     TResult Function(Object? cause)? profileCreateFailed,
     required TResult orElse(),
@@ -1488,6 +1961,9 @@ class _$UnknownImpl extends _Unknown {
     required TResult Function(_WeakPassword value) weakPassword,
     required TResult Function(_TooManyRequests value) tooManyRequests,
     required TResult Function(_NetworkError value) networkError,
+    required TResult Function(_SignInCancelled value) signInCancelled,
+    required TResult Function(_AccountExistsWithDifferentCredential value)
+        accountExistsWithDifferentCredential,
     required TResult Function(_Unknown value) unknown,
     required TResult Function(_ProfileCreateFailed value) profileCreateFailed,
   }) {
@@ -1505,6 +1981,9 @@ class _$UnknownImpl extends _Unknown {
     TResult? Function(_WeakPassword value)? weakPassword,
     TResult? Function(_TooManyRequests value)? tooManyRequests,
     TResult? Function(_NetworkError value)? networkError,
+    TResult? Function(_SignInCancelled value)? signInCancelled,
+    TResult? Function(_AccountExistsWithDifferentCredential value)?
+        accountExistsWithDifferentCredential,
     TResult? Function(_Unknown value)? unknown,
     TResult? Function(_ProfileCreateFailed value)? profileCreateFailed,
   }) {
@@ -1522,6 +2001,9 @@ class _$UnknownImpl extends _Unknown {
     TResult Function(_WeakPassword value)? weakPassword,
     TResult Function(_TooManyRequests value)? tooManyRequests,
     TResult Function(_NetworkError value)? networkError,
+    TResult Function(_SignInCancelled value)? signInCancelled,
+    TResult Function(_AccountExistsWithDifferentCredential value)?
+        accountExistsWithDifferentCredential,
     TResult Function(_Unknown value)? unknown,
     TResult Function(_ProfileCreateFailed value)? profileCreateFailed,
     required TResult orElse(),

@@ -62,6 +62,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
+  Future<void> _signInWithGoogle() async {
+    await ref.read(authNotifierProvider.notifier).signInWithGoogle();
+    if (!mounted) return;
+    final s = ref.read(authNotifierProvider);
+    if (s.hasValue && s.valueOrNull != null) {
+      context.go('/home');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authNotifierProvider);
@@ -189,17 +198,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                   const SizedBox(height: 14),
                   // Social buttons
-                  const Row(
+                  Row(
                     children: [
                       Expanded(
                         child: AuthSecondaryButton(
                           icon: FontAwesomeIcons.google,
                           label: AuthStrings.googleLabel,
-                          onPressed: null,
+                          onPressed: isLoading ? null : _signInWithGoogle,
                         ),
                       ),
-                      SizedBox(width: 12),
-                      Expanded(
+                      const SizedBox(width: 12),
+                      const Expanded(
                         child: AuthSecondaryButton(
                           icon: FontAwesomeIcons.apple,
                           label: AuthStrings.appleLabel,
