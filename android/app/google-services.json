@@ -12,7 +12,20 @@
           "package_name": "com.treino.app"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "1079774251763-vutof18t4ieuda4l744utk143gl1n48v.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.treino.app",
+            "certificate_hash": "9b282ba2ff34d22c9ff3110b91eeb1f22bec09de"
+          }
+        },
+        {
+          "client_id": "1079774251763-st3fqiiii35p8v8kcpc924utongkq2v1.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyDGa1H1FzTHhbDFEmjsrs20DuIUhiD8FDQ"
@@ -20,7 +33,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1079774251763-st3fqiiii35p8v8kcpc924utongkq2v1.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "1079774251763-f0mi2qv9sbsi7ai7ptv0b64b4hd1hskf.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.treino.app.dev"
+              }
+            }
+          ]
         }
       }
     },
@@ -31,7 +56,20 @@
           "package_name": "com.treino.app.dev"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "1079774251763-kf6ct53t2olntalhafgtj5bvufpa6rfd.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.treino.app.dev",
+            "certificate_hash": "9b282ba2ff34d22c9ff3110b91eeb1f22bec09de"
+          }
+        },
+        {
+          "client_id": "1079774251763-st3fqiiii35p8v8kcpc924utongkq2v1.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyDGa1H1FzTHhbDFEmjsrs20DuIUhiD8FDQ"
@@ -39,7 +77,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1079774251763-st3fqiiii35p8v8kcpc924utongkq2v1.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "1079774251763-f0mi2qv9sbsi7ai7ptv0b64b4hd1hskf.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.treino.app.dev"
+              }
+            }
+          ]
         }
       }
     }

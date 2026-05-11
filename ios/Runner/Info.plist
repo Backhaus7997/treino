@@ -24,6 +24,22 @@
 	<string>????</string>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<!--
+		Google Sign-In URL scheme. Must equal REVERSED_CLIENT_ID from
+		ios/Runner/GoogleService-Info.plist. If you re-download that plist,
+		copy the new REVERSED_CLIENT_ID value here.
+	-->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.1079774251763-kf3c7agu2f9b64rqrj9barlm1sd1oohi</string>
+			</array>
+		</dict>
+	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>

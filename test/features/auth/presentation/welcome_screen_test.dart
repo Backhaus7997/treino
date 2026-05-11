@@ -121,15 +121,25 @@ void main() {
     expect(find.byType(AuthSecondaryButton), findsNWidgets(2));
   });
 
-  testWidgets('Google and Apple buttons are disabled (onPressed null)',
+  testWidgets(
+      'Google button is enabled (wired to AuthNotifier), Apple is disabled',
       (tester) async {
     await tester.pumpWidget(_buildApp());
     await tester.pumpAndSettle();
 
-    final buttons =
-        tester.widgetList<OutlinedButton>(find.byType(OutlinedButton)).toList();
-    // Both social buttons should be disabled
-    expect(buttons.every((b) => b.onPressed == null), isTrue);
+    // Find each AuthSecondaryButton and inspect its onPressed.
+    final secondary = tester
+        .widgetList<AuthSecondaryButton>(find.byType(AuthSecondaryButton))
+        .toList();
+    expect(secondary, hasLength(2));
+
+    // First in the Row is Google, second is Apple.
+    expect(secondary[0].label, 'GOOGLE');
+    expect(secondary[0].onPressed, isNotNull,
+        reason: 'Google must be wired to AuthNotifier.signInWithGoogle');
+    expect(secondary[1].label, 'APPLE');
+    expect(secondary[1].onPressed, isNull,
+        reason: 'Apple stays disabled until Etapa 5 lands');
   });
 
   // ---------------------------------------------------------------------------

@@ -70,6 +70,29 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     }
   }
 
+  Future<void> _signInWithGoogle() async {
+    // Terms must be accepted even when registering with Google — the OAuth
+    // flow still creates a TREINO account. Surface a snackbar instead of
+    // silently doing nothing so the user knows what is missing.
+    if (!_termsAccepted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Aceptá los Términos y la Política de Privacidad para continuar',
+          ),
+          duration: Duration(seconds: 3),
+        ),
+      );
+      return;
+    }
+    await ref.read(authNotifierProvider.notifier).signInWithGoogle();
+    if (!mounted) return;
+    final s = ref.read(authNotifierProvider);
+    if (s.hasValue && s.valueOrNull != null) {
+      context.go('/home');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authNotifierProvider);
@@ -204,18 +227,22 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     ],
                   ),
                   const SizedBox(height: 14),
-                  // Social buttons
-                  const Row(
+                  // Social buttons. Google stays enabled regardless of the
+                  // Terms checkbox so that tapping yields explicit feedback
+                  // (snackbar) instead of looking like a "Próximamente"
+                  // disabled control. The Terms requirement is enforced
+                  // inside _signInWithGoogle.
+                  Row(
                     children: [
                       Expanded(
                         child: AuthSecondaryButton(
                           icon: FontAwesomeIcons.google,
                           label: AuthStrings.googleLabel,
-                          onPressed: null,
+                          onPressed: isLoading ? null : _signInWithGoogle,
                         ),
                       ),
-                      SizedBox(width: 12),
-                      Expanded(
+                      const SizedBox(width: 12),
+                      const Expanded(
                         child: AuthSecondaryButton(
                           icon: FontAwesomeIcons.apple,
                           label: AuthStrings.appleLabel,
