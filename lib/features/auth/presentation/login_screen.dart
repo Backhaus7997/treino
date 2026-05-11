@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart'
+    show defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
@@ -50,6 +52,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool get _fieldsEmpty =>
       _emailCtrl.text.trim().isEmpty || _passwordCtrl.text.isEmpty;
 
+  bool get _isApplePlatform => defaultTargetPlatform == TargetPlatform.iOS;
+
   Future<void> _submit() async {
     await ref.read(authNotifierProvider.notifier).signIn(
           email: _emailCtrl.text.trim(),
@@ -58,6 +62,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     if (!mounted) return;
     final s = ref.read(authNotifierProvider);
     if (s.hasValue && s.valueOrNull != null) {
+      context.go('/home');
+    }
+  }
+
+  Future<void> _signInWithApple() async {
+    await ref.read(authNotifierProvider.notifier).signInWithApple();
+    if (!mounted) return;
+    final s = ref.read(authNotifierProvider);
+    if (s.hasValue && s.valueOrNull != null) {
+      // TODO Etapa 6: branch on lastSignInIsNewUserProvider → /profile-setup
       context.go('/home');
     }
   }
@@ -189,21 +203,23 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                   const SizedBox(height: 14),
                   // Social buttons
-                  const Row(
+                  Row(
                     children: [
-                      Expanded(
+                      const Expanded(
                         child: AuthSecondaryButton(
                           icon: FontAwesomeIcons.google,
                           label: AuthStrings.googleLabel,
                           onPressed: null,
                         ),
                       ),
-                      SizedBox(width: 12),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: AuthSecondaryButton(
                           icon: FontAwesomeIcons.apple,
                           label: AuthStrings.appleLabel,
-                          onPressed: null,
+                          onPressed: (_isApplePlatform && !isLoading)
+                              ? _signInWithApple
+                              : null,
                         ),
                       ),
                     ],

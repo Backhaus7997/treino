@@ -19,9 +19,17 @@ class AuthNotifier extends AsyncNotifier<User?> {
   Future<void> signIn({required String email, required String password}) async {
     final service = ref.read(authServiceProvider);
     state = const AsyncLoading();
-    state = await AsyncValue.guard(
-      () => service.signInWithEmail(email: email, password: password),
-    );
+    state = await AsyncValue.guard(() async {
+      final outcome = await service.signInWithEmail(
+        email: email,
+        password: password,
+      );
+      if (outcome != null) {
+        ref.read(lastSignInIsNewUserProvider.notifier).state =
+            outcome.isNewUser;
+      }
+      return outcome?.user;
+    });
   }
 
   Future<void> signUp({
@@ -31,13 +39,35 @@ class AuthNotifier extends AsyncNotifier<User?> {
   }) async {
     final service = ref.read(authServiceProvider);
     state = const AsyncLoading();
-    state = await AsyncValue.guard(
-      () => service.signUpWithEmail(
+    state = await AsyncValue.guard(() async {
+      final outcome = await service.signUpWithEmail(
         email: email,
         password: password,
         displayName: displayName,
-      ),
-    );
+      );
+      if (outcome != null) {
+        ref.read(lastSignInIsNewUserProvider.notifier).state =
+            outcome.isNewUser;
+      }
+      return outcome?.user;
+    });
+  }
+
+  /// Signs in with Apple native sheet (iOS only).
+  ///
+  /// When the user cancels, state is restored to the previous value
+  /// (typically AsyncData(null) on the login screen) — no error emitted.
+  Future<void> signInWithApple() async {
+    final service = ref.read(authServiceProvider);
+    final previousUser = state.valueOrNull;
+
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(() async {
+      final outcome = await service.signInWithApple();
+      if (outcome == null) return previousUser; // cancel: restore prior state
+      ref.read(lastSignInIsNewUserProvider.notifier).state = outcome.isNewUser;
+      return outcome.user;
+    });
   }
 
   Future<void> sendPasswordResetEmail({required String email}) async {

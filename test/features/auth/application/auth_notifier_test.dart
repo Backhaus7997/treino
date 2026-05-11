@@ -7,6 +7,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/auth/data/auth_service.dart';
 import 'package:treino/features/auth/domain/auth_failure.dart';
+import 'package:treino/features/auth/domain/auth_outcome.dart';
 
 // --- Mocks ---
 class MockAuthService extends Mock implements AuthService {}
@@ -81,10 +82,11 @@ void main() {
   });
 
   // ---------------------------------------------------------------------------
-  // signIn
+  // signIn — T-5.3: adapted for AuthOutcome?
   // ---------------------------------------------------------------------------
   group('AuthNotifier.signIn', () {
-    test('signIn happy path — AsyncData(null) → AsyncLoading → AsyncData(user)',
+    test(
+        'T-5.3 / signIn happy path — AsyncData(null) → AsyncLoading → AsyncData(user)',
         () async {
       final streamController = StreamController<User?>();
       final container = buildContainer(
@@ -108,7 +110,7 @@ void main() {
       ).thenAnswer((_) async {
         // Simulate Firebase emitting the user mid-sign-in
         streamController.add(mockUser);
-        return mockUser;
+        return AuthOutcome(user: mockUser, isNewUser: false);
       });
 
       await container
@@ -151,10 +153,10 @@ void main() {
   });
 
   // ---------------------------------------------------------------------------
-  // signUp
+  // signUp — T-5.3: adapted for AuthOutcome?
   // ---------------------------------------------------------------------------
   group('AuthNotifier.signUp', () {
-    test('signUp happy path — resolves to AsyncData(user)', () async {
+    test('T-5.3 / signUp happy path — resolves to AsyncData(user)', () async {
       final streamController = StreamController<User?>();
       final container = buildContainer(
         mockService: mockService,
@@ -176,7 +178,7 @@ void main() {
         ),
       ).thenAnswer((_) async {
         streamController.add(mockUser);
-        return mockUser;
+        return AuthOutcome(user: mockUser, isNewUser: true);
       });
 
       await container
@@ -209,7 +211,7 @@ void main() {
         ),
       ).thenAnswer((_) async {
         streamController.add(mockUser);
-        return mockUser;
+        return AuthOutcome(user: mockUser, isNewUser: true);
       });
 
       await container
@@ -328,7 +330,7 @@ void main() {
         // Signal that signIn has started, then wait for stream emission
         signInStarted.complete();
         await streamEmitted.future;
-        return mockUser;
+        return AuthOutcome(user: mockUser, isNewUser: false);
       });
 
       // Start signIn (don't await yet)
@@ -351,6 +353,71 @@ void main() {
       // Final state must be data (stream emission was absorbed, action completed)
       expect(state.hasValue, isTrue);
       expect(state.error, isNull);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // T-5.1 — signInWithApple happy path
+  // ---------------------------------------------------------------------------
+  group('AuthNotifier.signInWithApple', () {
+    test('T-5.1 — happy path: state transitions AsyncLoading → AsyncData(user)',
+        () async {
+      final streamController = StreamController<User?>();
+      final container = buildContainer(
+        mockService: mockService,
+        authStream: streamController.stream,
+      );
+      addTearDown(() {
+        container.dispose();
+        streamController.close();
+      });
+
+      streamController.add(null);
+      await container.read(authNotifierProvider.future);
+
+      when(
+        () => mockService.signInWithApple(),
+      ).thenAnswer((_) async {
+        streamController.add(mockUser);
+        return AuthOutcome(user: mockUser, isNewUser: true);
+      });
+
+      await container.read(authNotifierProvider.notifier).signInWithApple();
+
+      final state = container.read(authNotifierProvider);
+      expect(state.hasValue, isTrue);
+      expect(state.valueOrNull, mockUser);
+    });
+
+    // T-5.2 — cancel: no AsyncError, state restored
+    test(
+        'T-5.2 — cancel: service returns null, state does NOT become AsyncError',
+        () async {
+      final streamController = StreamController<User?>();
+      final container = buildContainer(
+        mockService: mockService,
+        authStream: streamController.stream,
+      );
+      addTearDown(() {
+        container.dispose();
+        streamController.close();
+      });
+
+      streamController.add(null);
+      await container.read(authNotifierProvider.future);
+
+      when(
+        () => mockService.signInWithApple(),
+      ).thenAnswer((_) async => null);
+
+      await container.read(authNotifierProvider.notifier).signInWithApple();
+
+      final state = container.read(authNotifierProvider);
+      // Must NOT be an error
+      expect(state.hasError, isFalse);
+      // Value should be null (previousUser was null — logged out screen)
+      expect(state.hasValue, isTrue);
+      expect(state.valueOrNull, isNull);
     });
   });
 }

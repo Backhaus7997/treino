@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart'
+    show defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
@@ -7,16 +9,42 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../app/theme/app_background.dart';
 import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/treino_icon.dart';
+import '../application/auth_providers.dart';
+import '../domain/auth_failure.dart';
 import 'auth_strings.dart';
+import 'widgets/auth_failure_banner.dart';
 import 'widgets/auth_pill_button.dart';
 import 'widgets/auth_secondary_button.dart';
 import 'widgets/treino_logo.dart';
 
-class WelcomeScreen extends ConsumerWidget {
+class WelcomeScreen extends ConsumerStatefulWidget {
   const WelcomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<WelcomeScreen> createState() => _WelcomeScreenState();
+}
+
+class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
+  bool get _isApplePlatform => defaultTargetPlatform == TargetPlatform.iOS;
+
+  Future<void> _signInWithApple() async {
+    await ref.read(authNotifierProvider.notifier).signInWithApple();
+    if (!mounted) return;
+    final s = ref.read(authNotifierProvider);
+    if (s.hasValue && s.valueOrNull != null) {
+      // TODO Etapa 6: branch on lastSignInIsNewUserProvider → /profile-setup
+      context.go('/home');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final authState = ref.watch(authNotifierProvider);
+    final isLoading = authState.isLoading;
+    final failure = authState.hasError && authState.error is AuthFailure
+        ? authState.error as AuthFailure
+        : null;
+
     final palette = AppPalette.of(context);
 
     return Scaffold(
@@ -105,21 +133,28 @@ class WelcomeScreen extends ConsumerWidget {
                             onPressed: () => context.push('/register'),
                           ),
                           const SizedBox(height: 12),
-                          const Row(
+                          // Error banner — shown when Apple sign-in fails
+                          if (failure != null) ...[
+                            AuthFailureBanner(failure: failure),
+                            const SizedBox(height: 12),
+                          ],
+                          Row(
                             children: [
-                              Expanded(
+                              const Expanded(
                                 child: AuthSecondaryButton(
                                   icon: FontAwesomeIcons.google,
                                   label: AuthStrings.googleLabel,
                                   onPressed: null,
                                 ),
                               ),
-                              SizedBox(width: 12),
+                              const SizedBox(width: 12),
                               Expanded(
                                 child: AuthSecondaryButton(
                                   icon: FontAwesomeIcons.apple,
                                   label: AuthStrings.appleLabel,
-                                  onPressed: null,
+                                  onPressed: (_isApplePlatform && !isLoading)
+                                      ? _signInWithApple
+                                      : null,
                                 ),
                               ),
                             ],

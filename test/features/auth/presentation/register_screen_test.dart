@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -8,6 +9,7 @@ import 'package:treino/features/auth/application/auth_notifier.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/auth/domain/auth_failure.dart';
 import 'package:treino/features/auth/presentation/register_screen.dart';
+import 'package:treino/features/auth/presentation/widgets/auth_failure_banner.dart';
 import 'package:treino/features/auth/presentation/widgets/auth_pill_button.dart';
 import 'package:treino/features/auth/presentation/widgets/auth_secondary_button.dart';
 import 'package:treino/features/auth/presentation/widgets/password_strength_bar.dart';
@@ -16,11 +18,15 @@ import 'package:treino/features/auth/presentation/widgets/terms_checkbox.dart';
 class MockUser extends Mock implements User {}
 
 class _TestAuthNotifier extends AuthNotifier {
-  _TestAuthNotifier({User? initialUser}) : _initialUser = initialUser;
+  _TestAuthNotifier({
+    this.onSignInWithApple,
+    User? initialUser,
+  }) : _initialUser = initialUser;
 
   final User? _initialUser;
   Future<void> Function(String email, String password, {String? displayName})?
       onSignUp;
+  Future<void> Function()? onSignInWithApple;
 
   @override
   Future<User?> build() async => _initialUser;
@@ -33,6 +39,13 @@ class _TestAuthNotifier extends AuthNotifier {
   }) async {
     if (onSignUp != null) {
       await onSignUp!(email, password, displayName: displayName);
+    }
+  }
+
+  @override
+  Future<void> signInWithApple() async {
+    if (onSignInWithApple != null) {
+      await onSignInWithApple!();
     }
   }
 }
@@ -98,17 +111,51 @@ void main() {
   });
 
   // ---------------------------------------------------------------------------
-  // Google and Apple buttons are disabled
+  // Google and Apple buttons are present; Google always disabled
   // ---------------------------------------------------------------------------
-  testWidgets('Google and Apple social buttons are present and disabled',
-      (tester) async {
+  testWidgets('Google and Apple social buttons are present', (tester) async {
     await tester.pumpWidget(_buildApp(notifier: _TestAuthNotifier()));
     await tester.pumpAndSettle();
 
     expect(find.byType(AuthSecondaryButton), findsNWidgets(2));
-    final buttons =
-        tester.widgetList<OutlinedButton>(find.byType(OutlinedButton)).toList();
-    expect(buttons.every((b) => b.onPressed == null), isTrue);
+  });
+
+  testWidgets('Google button is always disabled (onPressed null)',
+      (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    try {
+      await tester.pumpWidget(_buildApp(notifier: _TestAuthNotifier()));
+      await tester.pumpAndSettle();
+
+      final googleButton = tester.widget<OutlinedButton>(
+        find.descendant(
+          of: find.widgetWithText(AuthSecondaryButton, 'GOOGLE'),
+          matching: find.byType(OutlinedButton),
+        ),
+      );
+      expect(googleButton.onPressed, isNull);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
+
+  testWidgets('Apple button is disabled on Android (onPressed null)',
+      (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    try {
+      await tester.pumpWidget(_buildApp(notifier: _TestAuthNotifier()));
+      await tester.pumpAndSettle();
+
+      final appleButton = tester.widget<OutlinedButton>(
+        find.descendant(
+          of: find.widgetWithText(AuthSecondaryButton, 'APPLE'),
+          matching: find.byType(OutlinedButton),
+        ),
+      );
+      expect(appleButton.onPressed, isNull);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
   });
 
   // ---------------------------------------------------------------------------
@@ -334,5 +381,148 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Ya existe una cuenta con ese email'), findsOneWidget);
+  });
+
+  // ---------------------------------------------------------------------------
+  // T-R1 — Apple button enabled on iOS
+  // ---------------------------------------------------------------------------
+  testWidgets('T-R1 — Apple button has non-null onPressed on iOS',
+      (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+
+    try {
+      await tester.pumpWidget(_buildApp(notifier: _TestAuthNotifier()));
+      await tester.pumpAndSettle();
+
+      final appleButton = tester.widget<OutlinedButton>(
+        find.descendant(
+          of: find.widgetWithText(AuthSecondaryButton, 'APPLE'),
+          matching: find.byType(OutlinedButton),
+        ),
+      );
+      expect(appleButton.onPressed, isNotNull);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
+
+  // ---------------------------------------------------------------------------
+  // T-R2 — Apple button disabled on Android
+  // ---------------------------------------------------------------------------
+  testWidgets('T-R2 — Apple button has null onPressed on Android',
+      (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+
+    try {
+      await tester.pumpWidget(_buildApp(notifier: _TestAuthNotifier()));
+      await tester.pumpAndSettle();
+
+      final appleButton = tester.widget<OutlinedButton>(
+        find.descendant(
+          of: find.widgetWithText(AuthSecondaryButton, 'APPLE'),
+          matching: find.byType(OutlinedButton),
+        ),
+      );
+      expect(appleButton.onPressed, isNull);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
+
+  // ---------------------------------------------------------------------------
+  // T-R3 — Tapping Apple button calls notifier.signInWithApple
+  // Note: user tapping Apple on the register screen is abandoning the form —
+  // the Apple flow takes over and creates/signs in the account. No special
+  // form-clearing logic needed; Apple's result navigates away.
+  // ---------------------------------------------------------------------------
+  testWidgets('T-R3 — tapping Apple button on iOS calls signInWithApple',
+      (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+
+    try {
+      var called = false;
+      final notifier = _TestAuthNotifier(
+        onSignInWithApple: () async {
+          called = true;
+        },
+      );
+
+      await tester.pumpWidget(_buildApp(notifier: notifier));
+      await tester.pumpAndSettle();
+
+      final appleButtonFinder = find.descendant(
+        of: find.widgetWithText(AuthSecondaryButton, 'APPLE'),
+        matching: find.byType(OutlinedButton),
+      );
+      await tester.ensureVisible(appleButtonFinder);
+      await tester.tap(appleButtonFinder);
+      await tester.pumpAndSettle();
+
+      expect(called, isTrue);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
+
+  // ---------------------------------------------------------------------------
+  // T-R4 — accountExistsWithDifferentCredential shows error banner
+  // ---------------------------------------------------------------------------
+  testWidgets(
+      'T-R4 — Apple sign-in accountExistsWithDifferentCredential shows banner',
+      (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+
+    try {
+      late _TestAuthNotifier notifier;
+      notifier = _TestAuthNotifier(
+        onSignInWithApple: () async {
+          notifier.state = const AsyncError(
+            AuthFailure.accountExistsWithDifferentCredential(),
+            StackTrace.empty,
+          );
+        },
+      );
+
+      await tester.pumpWidget(_buildApp(notifier: notifier));
+      await tester.pumpAndSettle();
+
+      // Register screen has form fields above the social buttons — scroll to them.
+      final appleButtonFinder = find.descendant(
+        of: find.widgetWithText(AuthSecondaryButton, 'APPLE'),
+        matching: find.byType(OutlinedButton),
+      );
+      await tester.ensureVisible(appleButtonFinder);
+      await tester.tap(appleButtonFinder);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text(
+          'Esta cuenta ya existe. Iniciá sesión con tu método original y vinculá Apple desde tu perfil.',
+        ),
+        findsOneWidget,
+      );
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
+
+  // ---------------------------------------------------------------------------
+  // T-R5 — cancel (AsyncData(null)) does NOT show error banner
+  // ---------------------------------------------------------------------------
+  testWidgets(
+      'T-R5 — does not show error banner after cancel (AsyncData(null))',
+      (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+
+    try {
+      final notifier = _TestAuthNotifier(initialUser: null);
+
+      await tester.pumpWidget(_buildApp(notifier: notifier));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AuthFailureBanner), findsNothing);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
   });
 }

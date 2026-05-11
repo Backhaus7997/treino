@@ -143,4 +143,45 @@ void main() {
       }
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // T-1.7 — New Apple Sign-In failure cases
+  // ---------------------------------------------------------------------------
+  group('AuthFailure — Apple Sign-In cases', () {
+    test('appleSignInFailed.userMessage is non-empty Spanish string', () {
+      expect(
+        const AuthFailure.appleSignInFailed().userMessage,
+        isNotEmpty,
+      );
+      expect(
+        const AuthFailure.appleSignInFailed().userMessage.length,
+        greaterThan(5),
+      );
+    });
+
+    test(
+        'accountExistsWithDifferentCredential.userMessage equals locked Spanish copy',
+        () {
+      expect(
+        const AuthFailure.accountExistsWithDifferentCredential().userMessage,
+        equals(
+          'Esta cuenta ya existe. Iniciá sesión con tu método original y vinculá Apple desde tu perfil.',
+        ),
+      );
+    });
+
+    test(
+        'fromFirebase maps account-exists-with-different-credential to accountExistsWithDifferentCredential',
+        () {
+      final result = AuthFailure.fromFirebase(
+        FirebaseAuthException(
+          code: 'account-exists-with-different-credential',
+        ),
+      );
+      expect(
+        result,
+        const AuthFailure.accountExistsWithDifferentCredential(),
+      );
+    });
+  });
 }

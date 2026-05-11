@@ -27,6 +27,8 @@ mixin _$AuthFailure {
     required TResult Function() tooManyRequests,
     required TResult Function() networkError,
     required TResult Function(String code) unknown,
+    required TResult Function() appleSignInFailed,
+    required TResult Function() accountExistsWithDifferentCredential,
   }) =>
       throw _privateConstructorUsedError;
   @optionalTypeArgs
@@ -40,6 +42,8 @@ mixin _$AuthFailure {
     TResult? Function()? tooManyRequests,
     TResult? Function()? networkError,
     TResult? Function(String code)? unknown,
+    TResult? Function()? appleSignInFailed,
+    TResult? Function()? accountExistsWithDifferentCredential,
   }) =>
       throw _privateConstructorUsedError;
   @optionalTypeArgs
@@ -53,6 +57,8 @@ mixin _$AuthFailure {
     TResult Function()? tooManyRequests,
     TResult Function()? networkError,
     TResult Function(String code)? unknown,
+    TResult Function()? appleSignInFailed,
+    TResult Function()? accountExistsWithDifferentCredential,
     required TResult orElse(),
   }) =>
       throw _privateConstructorUsedError;
@@ -67,6 +73,9 @@ mixin _$AuthFailure {
     required TResult Function(_TooManyRequests value) tooManyRequests,
     required TResult Function(_NetworkError value) networkError,
     required TResult Function(_Unknown value) unknown,
+    required TResult Function(_AppleSignInFailed value) appleSignInFailed,
+    required TResult Function(_AccountExistsWithDifferentCredential value)
+        accountExistsWithDifferentCredential,
   }) =>
       throw _privateConstructorUsedError;
   @optionalTypeArgs
@@ -80,6 +89,9 @@ mixin _$AuthFailure {
     TResult? Function(_TooManyRequests value)? tooManyRequests,
     TResult? Function(_NetworkError value)? networkError,
     TResult? Function(_Unknown value)? unknown,
+    TResult? Function(_AppleSignInFailed value)? appleSignInFailed,
+    TResult? Function(_AccountExistsWithDifferentCredential value)?
+        accountExistsWithDifferentCredential,
   }) =>
       throw _privateConstructorUsedError;
   @optionalTypeArgs
@@ -93,6 +105,9 @@ mixin _$AuthFailure {
     TResult Function(_TooManyRequests value)? tooManyRequests,
     TResult Function(_NetworkError value)? networkError,
     TResult Function(_Unknown value)? unknown,
+    TResult Function(_AppleSignInFailed value)? appleSignInFailed,
+    TResult Function(_AccountExistsWithDifferentCredential value)?
+        accountExistsWithDifferentCredential,
     required TResult orElse(),
   }) =>
       throw _privateConstructorUsedError;
@@ -169,6 +184,8 @@ class _$InvalidEmailImpl extends _InvalidEmail {
     required TResult Function() tooManyRequests,
     required TResult Function() networkError,
     required TResult Function(String code) unknown,
+    required TResult Function() appleSignInFailed,
+    required TResult Function() accountExistsWithDifferentCredential,
   }) {
     return invalidEmail();
   }
@@ -185,6 +202,8 @@ class _$InvalidEmailImpl extends _InvalidEmail {
     TResult? Function()? tooManyRequests,
     TResult? Function()? networkError,
     TResult? Function(String code)? unknown,
+    TResult? Function()? appleSignInFailed,
+    TResult? Function()? accountExistsWithDifferentCredential,
   }) {
     return invalidEmail?.call();
   }
@@ -201,6 +220,8 @@ class _$InvalidEmailImpl extends _InvalidEmail {
     TResult Function()? tooManyRequests,
     TResult Function()? networkError,
     TResult Function(String code)? unknown,
+    TResult Function()? appleSignInFailed,
+    TResult Function()? accountExistsWithDifferentCredential,
     required TResult orElse(),
   }) {
     if (invalidEmail != null) {
@@ -221,6 +242,9 @@ class _$InvalidEmailImpl extends _InvalidEmail {
     required TResult Function(_TooManyRequests value) tooManyRequests,
     required TResult Function(_NetworkError value) networkError,
     required TResult Function(_Unknown value) unknown,
+    required TResult Function(_AppleSignInFailed value) appleSignInFailed,
+    required TResult Function(_AccountExistsWithDifferentCredential value)
+        accountExistsWithDifferentCredential,
   }) {
     return invalidEmail(this);
   }
@@ -237,6 +261,9 @@ class _$InvalidEmailImpl extends _InvalidEmail {
     TResult? Function(_TooManyRequests value)? tooManyRequests,
     TResult? Function(_NetworkError value)? networkError,
     TResult? Function(_Unknown value)? unknown,
+    TResult? Function(_AppleSignInFailed value)? appleSignInFailed,
+    TResult? Function(_AccountExistsWithDifferentCredential value)?
+        accountExistsWithDifferentCredential,
   }) {
     return invalidEmail?.call(this);
   }
@@ -253,6 +280,9 @@ class _$InvalidEmailImpl extends _InvalidEmail {
     TResult Function(_TooManyRequests value)? tooManyRequests,
     TResult Function(_NetworkError value)? networkError,
     TResult Function(_Unknown value)? unknown,
+    TResult Function(_AppleSignInFailed value)? appleSignInFailed,
+    TResult Function(_AccountExistsWithDifferentCredential value)?
+        accountExistsWithDifferentCredential,
     required TResult orElse(),
   }) {
     if (invalidEmail != null) {
@@ -317,6 +347,8 @@ class _$UserDisabledImpl extends _UserDisabled {
     required TResult Function() tooManyRequests,
     required TResult Function() networkError,
     required TResult Function(String code) unknown,
+    required TResult Function() appleSignInFailed,
+    required TResult Function() accountExistsWithDifferentCredential,
   }) {
     return userDisabled();
   }
@@ -333,6 +365,8 @@ class _$UserDisabledImpl extends _UserDisabled {
     TResult? Function()? tooManyRequests,
     TResult? Function()? networkError,
     TResult? Function(String code)? unknown,
+    TResult? Function()? appleSignInFailed,
+    TResult? Function()? accountExistsWithDifferentCredential,
   }) {
     return userDisabled?.call();
   }
@@ -349,6 +383,8 @@ class _$UserDisabledImpl extends _UserDisabled {
     TResult Function()? tooManyRequests,
     TResult Function()? networkError,
     TResult Function(String code)? unknown,
+    TResult Function()? appleSignInFailed,
+    TResult Function()? accountExistsWithDifferentCredential,
     required TResult orElse(),
   }) {
     if (userDisabled != null) {
@@ -369,6 +405,9 @@ class _$UserDisabledImpl extends _UserDisabled {
     required TResult Function(_TooManyRequests value) tooManyRequests,
     required TResult Function(_NetworkError value) networkError,
     required TResult Function(_Unknown value) unknown,
+    required TResult Function(_AppleSignInFailed value) appleSignInFailed,
+    required TResult Function(_AccountExistsWithDifferentCredential value)
+        accountExistsWithDifferentCredential,
   }) {
     return userDisabled(this);
   }
@@ -385,6 +424,9 @@ class _$UserDisabledImpl extends _UserDisabled {
     TResult? Function(_TooManyRequests value)? tooManyRequests,
     TResult? Function(_NetworkError value)? networkError,
     TResult? Function(_Unknown value)? unknown,
+    TResult? Function(_AppleSignInFailed value)? appleSignInFailed,
+    TResult? Function(_AccountExistsWithDifferentCredential value)?
+        accountExistsWithDifferentCredential,
   }) {
     return userDisabled?.call(this);
   }
@@ -401,6 +443,9 @@ class _$UserDisabledImpl extends _UserDisabled {
     TResult Function(_TooManyRequests value)? tooManyRequests,
     TResult Function(_NetworkError value)? networkError,
     TResult Function(_Unknown value)? unknown,
+    TResult Function(_AppleSignInFailed value)? appleSignInFailed,
+    TResult Function(_AccountExistsWithDifferentCredential value)?
+        accountExistsWithDifferentCredential,
     required TResult orElse(),
   }) {
     if (userDisabled != null) {
@@ -465,6 +510,8 @@ class _$UserNotFoundImpl extends _UserNotFound {
     required TResult Function() tooManyRequests,
     required TResult Function() networkError,
     required TResult Function(String code) unknown,
+    required TResult Function() appleSignInFailed,
+    required TResult Function() accountExistsWithDifferentCredential,
   }) {
     return userNotFound();
   }
@@ -481,6 +528,8 @@ class _$UserNotFoundImpl extends _UserNotFound {
     TResult? Function()? tooManyRequests,
     TResult? Function()? networkError,
     TResult? Function(String code)? unknown,
+    TResult? Function()? appleSignInFailed,
+    TResult? Function()? accountExistsWithDifferentCredential,
   }) {
     return userNotFound?.call();
   }
@@ -497,6 +546,8 @@ class _$UserNotFoundImpl extends _UserNotFound {
     TResult Function()? tooManyRequests,
     TResult Function()? networkError,
     TResult Function(String code)? unknown,
+    TResult Function()? appleSignInFailed,
+    TResult Function()? accountExistsWithDifferentCredential,
     required TResult orElse(),
   }) {
     if (userNotFound != null) {
@@ -517,6 +568,9 @@ class _$UserNotFoundImpl extends _UserNotFound {
     required TResult Function(_TooManyRequests value) tooManyRequests,
     required TResult Function(_NetworkError value) networkError,
     required TResult Function(_Unknown value) unknown,
+    required TResult Function(_AppleSignInFailed value) appleSignInFailed,
+    required TResult Function(_AccountExistsWithDifferentCredential value)
+        accountExistsWithDifferentCredential,
   }) {
     return userNotFound(this);
   }
@@ -533,6 +587,9 @@ class _$UserNotFoundImpl extends _UserNotFound {
     TResult? Function(_TooManyRequests value)? tooManyRequests,
     TResult? Function(_NetworkError value)? networkError,
     TResult? Function(_Unknown value)? unknown,
+    TResult? Function(_AppleSignInFailed value)? appleSignInFailed,
+    TResult? Function(_AccountExistsWithDifferentCredential value)?
+        accountExistsWithDifferentCredential,
   }) {
     return userNotFound?.call(this);
   }
@@ -549,6 +606,9 @@ class _$UserNotFoundImpl extends _UserNotFound {
     TResult Function(_TooManyRequests value)? tooManyRequests,
     TResult Function(_NetworkError value)? networkError,
     TResult Function(_Unknown value)? unknown,
+    TResult Function(_AppleSignInFailed value)? appleSignInFailed,
+    TResult Function(_AccountExistsWithDifferentCredential value)?
+        accountExistsWithDifferentCredential,
     required TResult orElse(),
   }) {
     if (userNotFound != null) {
@@ -613,6 +673,8 @@ class _$WrongPasswordImpl extends _WrongPassword {
     required TResult Function() tooManyRequests,
     required TResult Function() networkError,
     required TResult Function(String code) unknown,
+    required TResult Function() appleSignInFailed,
+    required TResult Function() accountExistsWithDifferentCredential,
   }) {
     return wrongPassword();
   }
@@ -629,6 +691,8 @@ class _$WrongPasswordImpl extends _WrongPassword {
     TResult? Function()? tooManyRequests,
     TResult? Function()? networkError,
     TResult? Function(String code)? unknown,
+    TResult? Function()? appleSignInFailed,
+    TResult? Function()? accountExistsWithDifferentCredential,
   }) {
     return wrongPassword?.call();
   }
@@ -645,6 +709,8 @@ class _$WrongPasswordImpl extends _WrongPassword {
     TResult Function()? tooManyRequests,
     TResult Function()? networkError,
     TResult Function(String code)? unknown,
+    TResult Function()? appleSignInFailed,
+    TResult Function()? accountExistsWithDifferentCredential,
     required TResult orElse(),
   }) {
     if (wrongPassword != null) {
@@ -665,6 +731,9 @@ class _$WrongPasswordImpl extends _WrongPassword {
     required TResult Function(_TooManyRequests value) tooManyRequests,
     required TResult Function(_NetworkError value) networkError,
     required TResult Function(_Unknown value) unknown,
+    required TResult Function(_AppleSignInFailed value) appleSignInFailed,
+    required TResult Function(_AccountExistsWithDifferentCredential value)
+        accountExistsWithDifferentCredential,
   }) {
     return wrongPassword(this);
   }
@@ -681,6 +750,9 @@ class _$WrongPasswordImpl extends _WrongPassword {
     TResult? Function(_TooManyRequests value)? tooManyRequests,
     TResult? Function(_NetworkError value)? networkError,
     TResult? Function(_Unknown value)? unknown,
+    TResult? Function(_AppleSignInFailed value)? appleSignInFailed,
+    TResult? Function(_AccountExistsWithDifferentCredential value)?
+        accountExistsWithDifferentCredential,
   }) {
     return wrongPassword?.call(this);
   }
@@ -697,6 +769,9 @@ class _$WrongPasswordImpl extends _WrongPassword {
     TResult Function(_TooManyRequests value)? tooManyRequests,
     TResult Function(_NetworkError value)? networkError,
     TResult Function(_Unknown value)? unknown,
+    TResult Function(_AppleSignInFailed value)? appleSignInFailed,
+    TResult Function(_AccountExistsWithDifferentCredential value)?
+        accountExistsWithDifferentCredential,
     required TResult orElse(),
   }) {
     if (wrongPassword != null) {
@@ -761,6 +836,8 @@ class _$EmailAlreadyInUseImpl extends _EmailAlreadyInUse {
     required TResult Function() tooManyRequests,
     required TResult Function() networkError,
     required TResult Function(String code) unknown,
+    required TResult Function() appleSignInFailed,
+    required TResult Function() accountExistsWithDifferentCredential,
   }) {
     return emailAlreadyInUse();
   }
@@ -777,6 +854,8 @@ class _$EmailAlreadyInUseImpl extends _EmailAlreadyInUse {
     TResult? Function()? tooManyRequests,
     TResult? Function()? networkError,
     TResult? Function(String code)? unknown,
+    TResult? Function()? appleSignInFailed,
+    TResult? Function()? accountExistsWithDifferentCredential,
   }) {
     return emailAlreadyInUse?.call();
   }
@@ -793,6 +872,8 @@ class _$EmailAlreadyInUseImpl extends _EmailAlreadyInUse {
     TResult Function()? tooManyRequests,
     TResult Function()? networkError,
     TResult Function(String code)? unknown,
+    TResult Function()? appleSignInFailed,
+    TResult Function()? accountExistsWithDifferentCredential,
     required TResult orElse(),
   }) {
     if (emailAlreadyInUse != null) {
@@ -813,6 +894,9 @@ class _$EmailAlreadyInUseImpl extends _EmailAlreadyInUse {
     required TResult Function(_TooManyRequests value) tooManyRequests,
     required TResult Function(_NetworkError value) networkError,
     required TResult Function(_Unknown value) unknown,
+    required TResult Function(_AppleSignInFailed value) appleSignInFailed,
+    required TResult Function(_AccountExistsWithDifferentCredential value)
+        accountExistsWithDifferentCredential,
   }) {
     return emailAlreadyInUse(this);
   }
@@ -829,6 +913,9 @@ class _$EmailAlreadyInUseImpl extends _EmailAlreadyInUse {
     TResult? Function(_TooManyRequests value)? tooManyRequests,
     TResult? Function(_NetworkError value)? networkError,
     TResult? Function(_Unknown value)? unknown,
+    TResult? Function(_AppleSignInFailed value)? appleSignInFailed,
+    TResult? Function(_AccountExistsWithDifferentCredential value)?
+        accountExistsWithDifferentCredential,
   }) {
     return emailAlreadyInUse?.call(this);
   }
@@ -845,6 +932,9 @@ class _$EmailAlreadyInUseImpl extends _EmailAlreadyInUse {
     TResult Function(_TooManyRequests value)? tooManyRequests,
     TResult Function(_NetworkError value)? networkError,
     TResult Function(_Unknown value)? unknown,
+    TResult Function(_AppleSignInFailed value)? appleSignInFailed,
+    TResult Function(_AccountExistsWithDifferentCredential value)?
+        accountExistsWithDifferentCredential,
     required TResult orElse(),
   }) {
     if (emailAlreadyInUse != null) {
@@ -909,6 +999,8 @@ class _$WeakPasswordImpl extends _WeakPassword {
     required TResult Function() tooManyRequests,
     required TResult Function() networkError,
     required TResult Function(String code) unknown,
+    required TResult Function() appleSignInFailed,
+    required TResult Function() accountExistsWithDifferentCredential,
   }) {
     return weakPassword();
   }
@@ -925,6 +1017,8 @@ class _$WeakPasswordImpl extends _WeakPassword {
     TResult? Function()? tooManyRequests,
     TResult? Function()? networkError,
     TResult? Function(String code)? unknown,
+    TResult? Function()? appleSignInFailed,
+    TResult? Function()? accountExistsWithDifferentCredential,
   }) {
     return weakPassword?.call();
   }
@@ -941,6 +1035,8 @@ class _$WeakPasswordImpl extends _WeakPassword {
     TResult Function()? tooManyRequests,
     TResult Function()? networkError,
     TResult Function(String code)? unknown,
+    TResult Function()? appleSignInFailed,
+    TResult Function()? accountExistsWithDifferentCredential,
     required TResult orElse(),
   }) {
     if (weakPassword != null) {
@@ -961,6 +1057,9 @@ class _$WeakPasswordImpl extends _WeakPassword {
     required TResult Function(_TooManyRequests value) tooManyRequests,
     required TResult Function(_NetworkError value) networkError,
     required TResult Function(_Unknown value) unknown,
+    required TResult Function(_AppleSignInFailed value) appleSignInFailed,
+    required TResult Function(_AccountExistsWithDifferentCredential value)
+        accountExistsWithDifferentCredential,
   }) {
     return weakPassword(this);
   }
@@ -977,6 +1076,9 @@ class _$WeakPasswordImpl extends _WeakPassword {
     TResult? Function(_TooManyRequests value)? tooManyRequests,
     TResult? Function(_NetworkError value)? networkError,
     TResult? Function(_Unknown value)? unknown,
+    TResult? Function(_AppleSignInFailed value)? appleSignInFailed,
+    TResult? Function(_AccountExistsWithDifferentCredential value)?
+        accountExistsWithDifferentCredential,
   }) {
     return weakPassword?.call(this);
   }
@@ -993,6 +1095,9 @@ class _$WeakPasswordImpl extends _WeakPassword {
     TResult Function(_TooManyRequests value)? tooManyRequests,
     TResult Function(_NetworkError value)? networkError,
     TResult Function(_Unknown value)? unknown,
+    TResult Function(_AppleSignInFailed value)? appleSignInFailed,
+    TResult Function(_AccountExistsWithDifferentCredential value)?
+        accountExistsWithDifferentCredential,
     required TResult orElse(),
   }) {
     if (weakPassword != null) {
@@ -1057,6 +1162,8 @@ class _$TooManyRequestsImpl extends _TooManyRequests {
     required TResult Function() tooManyRequests,
     required TResult Function() networkError,
     required TResult Function(String code) unknown,
+    required TResult Function() appleSignInFailed,
+    required TResult Function() accountExistsWithDifferentCredential,
   }) {
     return tooManyRequests();
   }
@@ -1073,6 +1180,8 @@ class _$TooManyRequestsImpl extends _TooManyRequests {
     TResult? Function()? tooManyRequests,
     TResult? Function()? networkError,
     TResult? Function(String code)? unknown,
+    TResult? Function()? appleSignInFailed,
+    TResult? Function()? accountExistsWithDifferentCredential,
   }) {
     return tooManyRequests?.call();
   }
@@ -1089,6 +1198,8 @@ class _$TooManyRequestsImpl extends _TooManyRequests {
     TResult Function()? tooManyRequests,
     TResult Function()? networkError,
     TResult Function(String code)? unknown,
+    TResult Function()? appleSignInFailed,
+    TResult Function()? accountExistsWithDifferentCredential,
     required TResult orElse(),
   }) {
     if (tooManyRequests != null) {
@@ -1109,6 +1220,9 @@ class _$TooManyRequestsImpl extends _TooManyRequests {
     required TResult Function(_TooManyRequests value) tooManyRequests,
     required TResult Function(_NetworkError value) networkError,
     required TResult Function(_Unknown value) unknown,
+    required TResult Function(_AppleSignInFailed value) appleSignInFailed,
+    required TResult Function(_AccountExistsWithDifferentCredential value)
+        accountExistsWithDifferentCredential,
   }) {
     return tooManyRequests(this);
   }
@@ -1125,6 +1239,9 @@ class _$TooManyRequestsImpl extends _TooManyRequests {
     TResult? Function(_TooManyRequests value)? tooManyRequests,
     TResult? Function(_NetworkError value)? networkError,
     TResult? Function(_Unknown value)? unknown,
+    TResult? Function(_AppleSignInFailed value)? appleSignInFailed,
+    TResult? Function(_AccountExistsWithDifferentCredential value)?
+        accountExistsWithDifferentCredential,
   }) {
     return tooManyRequests?.call(this);
   }
@@ -1141,6 +1258,9 @@ class _$TooManyRequestsImpl extends _TooManyRequests {
     TResult Function(_TooManyRequests value)? tooManyRequests,
     TResult Function(_NetworkError value)? networkError,
     TResult Function(_Unknown value)? unknown,
+    TResult Function(_AppleSignInFailed value)? appleSignInFailed,
+    TResult Function(_AccountExistsWithDifferentCredential value)?
+        accountExistsWithDifferentCredential,
     required TResult orElse(),
   }) {
     if (tooManyRequests != null) {
@@ -1205,6 +1325,8 @@ class _$NetworkErrorImpl extends _NetworkError {
     required TResult Function() tooManyRequests,
     required TResult Function() networkError,
     required TResult Function(String code) unknown,
+    required TResult Function() appleSignInFailed,
+    required TResult Function() accountExistsWithDifferentCredential,
   }) {
     return networkError();
   }
@@ -1221,6 +1343,8 @@ class _$NetworkErrorImpl extends _NetworkError {
     TResult? Function()? tooManyRequests,
     TResult? Function()? networkError,
     TResult? Function(String code)? unknown,
+    TResult? Function()? appleSignInFailed,
+    TResult? Function()? accountExistsWithDifferentCredential,
   }) {
     return networkError?.call();
   }
@@ -1237,6 +1361,8 @@ class _$NetworkErrorImpl extends _NetworkError {
     TResult Function()? tooManyRequests,
     TResult Function()? networkError,
     TResult Function(String code)? unknown,
+    TResult Function()? appleSignInFailed,
+    TResult Function()? accountExistsWithDifferentCredential,
     required TResult orElse(),
   }) {
     if (networkError != null) {
@@ -1257,6 +1383,9 @@ class _$NetworkErrorImpl extends _NetworkError {
     required TResult Function(_TooManyRequests value) tooManyRequests,
     required TResult Function(_NetworkError value) networkError,
     required TResult Function(_Unknown value) unknown,
+    required TResult Function(_AppleSignInFailed value) appleSignInFailed,
+    required TResult Function(_AccountExistsWithDifferentCredential value)
+        accountExistsWithDifferentCredential,
   }) {
     return networkError(this);
   }
@@ -1273,6 +1402,9 @@ class _$NetworkErrorImpl extends _NetworkError {
     TResult? Function(_TooManyRequests value)? tooManyRequests,
     TResult? Function(_NetworkError value)? networkError,
     TResult? Function(_Unknown value)? unknown,
+    TResult? Function(_AppleSignInFailed value)? appleSignInFailed,
+    TResult? Function(_AccountExistsWithDifferentCredential value)?
+        accountExistsWithDifferentCredential,
   }) {
     return networkError?.call(this);
   }
@@ -1289,6 +1421,9 @@ class _$NetworkErrorImpl extends _NetworkError {
     TResult Function(_TooManyRequests value)? tooManyRequests,
     TResult Function(_NetworkError value)? networkError,
     TResult Function(_Unknown value)? unknown,
+    TResult Function(_AppleSignInFailed value)? appleSignInFailed,
+    TResult Function(_AccountExistsWithDifferentCredential value)?
+        accountExistsWithDifferentCredential,
     required TResult orElse(),
   }) {
     if (networkError != null) {
@@ -1380,6 +1515,8 @@ class _$UnknownImpl extends _Unknown {
     required TResult Function() tooManyRequests,
     required TResult Function() networkError,
     required TResult Function(String code) unknown,
+    required TResult Function() appleSignInFailed,
+    required TResult Function() accountExistsWithDifferentCredential,
   }) {
     return unknown(code);
   }
@@ -1396,6 +1533,8 @@ class _$UnknownImpl extends _Unknown {
     TResult? Function()? tooManyRequests,
     TResult? Function()? networkError,
     TResult? Function(String code)? unknown,
+    TResult? Function()? appleSignInFailed,
+    TResult? Function()? accountExistsWithDifferentCredential,
   }) {
     return unknown?.call(code);
   }
@@ -1412,6 +1551,8 @@ class _$UnknownImpl extends _Unknown {
     TResult Function()? tooManyRequests,
     TResult Function()? networkError,
     TResult Function(String code)? unknown,
+    TResult Function()? appleSignInFailed,
+    TResult Function()? accountExistsWithDifferentCredential,
     required TResult orElse(),
   }) {
     if (unknown != null) {
@@ -1432,6 +1573,9 @@ class _$UnknownImpl extends _Unknown {
     required TResult Function(_TooManyRequests value) tooManyRequests,
     required TResult Function(_NetworkError value) networkError,
     required TResult Function(_Unknown value) unknown,
+    required TResult Function(_AppleSignInFailed value) appleSignInFailed,
+    required TResult Function(_AccountExistsWithDifferentCredential value)
+        accountExistsWithDifferentCredential,
   }) {
     return unknown(this);
   }
@@ -1448,6 +1592,9 @@ class _$UnknownImpl extends _Unknown {
     TResult? Function(_TooManyRequests value)? tooManyRequests,
     TResult? Function(_NetworkError value)? networkError,
     TResult? Function(_Unknown value)? unknown,
+    TResult? Function(_AppleSignInFailed value)? appleSignInFailed,
+    TResult? Function(_AccountExistsWithDifferentCredential value)?
+        accountExistsWithDifferentCredential,
   }) {
     return unknown?.call(this);
   }
@@ -1464,6 +1611,9 @@ class _$UnknownImpl extends _Unknown {
     TResult Function(_TooManyRequests value)? tooManyRequests,
     TResult Function(_NetworkError value)? networkError,
     TResult Function(_Unknown value)? unknown,
+    TResult Function(_AppleSignInFailed value)? appleSignInFailed,
+    TResult Function(_AccountExistsWithDifferentCredential value)?
+        accountExistsWithDifferentCredential,
     required TResult orElse(),
   }) {
     if (unknown != null) {
@@ -1484,4 +1634,336 @@ abstract class _Unknown extends AuthFailure {
   @JsonKey(includeFromJson: false, includeToJson: false)
   _$$UnknownImplCopyWith<_$UnknownImpl> get copyWith =>
       throw _privateConstructorUsedError;
+}
+
+/// @nodoc
+abstract class _$$AppleSignInFailedImplCopyWith<$Res> {
+  factory _$$AppleSignInFailedImplCopyWith(_$AppleSignInFailedImpl value,
+          $Res Function(_$AppleSignInFailedImpl) then) =
+      __$$AppleSignInFailedImplCopyWithImpl<$Res>;
+}
+
+/// @nodoc
+class __$$AppleSignInFailedImplCopyWithImpl<$Res>
+    extends _$AuthFailureCopyWithImpl<$Res, _$AppleSignInFailedImpl>
+    implements _$$AppleSignInFailedImplCopyWith<$Res> {
+  __$$AppleSignInFailedImplCopyWithImpl(_$AppleSignInFailedImpl _value,
+      $Res Function(_$AppleSignInFailedImpl) _then)
+      : super(_value, _then);
+
+  /// Create a copy of AuthFailure
+  /// with the given fields replaced by the non-null parameter values.
+}
+
+/// @nodoc
+
+class _$AppleSignInFailedImpl extends _AppleSignInFailed {
+  const _$AppleSignInFailedImpl() : super._();
+
+  @override
+  String toString() {
+    return 'AuthFailure.appleSignInFailed()';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType && other is _$AppleSignInFailedImpl);
+  }
+
+  @override
+  int get hashCode => runtimeType.hashCode;
+
+  @override
+  @optionalTypeArgs
+  TResult when<TResult extends Object?>({
+    required TResult Function() invalidEmail,
+    required TResult Function() userDisabled,
+    required TResult Function() userNotFound,
+    required TResult Function() wrongPassword,
+    required TResult Function() emailAlreadyInUse,
+    required TResult Function() weakPassword,
+    required TResult Function() tooManyRequests,
+    required TResult Function() networkError,
+    required TResult Function(String code) unknown,
+    required TResult Function() appleSignInFailed,
+    required TResult Function() accountExistsWithDifferentCredential,
+  }) {
+    return appleSignInFailed();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? whenOrNull<TResult extends Object?>({
+    TResult? Function()? invalidEmail,
+    TResult? Function()? userDisabled,
+    TResult? Function()? userNotFound,
+    TResult? Function()? wrongPassword,
+    TResult? Function()? emailAlreadyInUse,
+    TResult? Function()? weakPassword,
+    TResult? Function()? tooManyRequests,
+    TResult? Function()? networkError,
+    TResult? Function(String code)? unknown,
+    TResult? Function()? appleSignInFailed,
+    TResult? Function()? accountExistsWithDifferentCredential,
+  }) {
+    return appleSignInFailed?.call();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeWhen<TResult extends Object?>({
+    TResult Function()? invalidEmail,
+    TResult Function()? userDisabled,
+    TResult Function()? userNotFound,
+    TResult Function()? wrongPassword,
+    TResult Function()? emailAlreadyInUse,
+    TResult Function()? weakPassword,
+    TResult Function()? tooManyRequests,
+    TResult Function()? networkError,
+    TResult Function(String code)? unknown,
+    TResult Function()? appleSignInFailed,
+    TResult Function()? accountExistsWithDifferentCredential,
+    required TResult orElse(),
+  }) {
+    if (appleSignInFailed != null) {
+      return appleSignInFailed();
+    }
+    return orElse();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult map<TResult extends Object?>({
+    required TResult Function(_InvalidEmail value) invalidEmail,
+    required TResult Function(_UserDisabled value) userDisabled,
+    required TResult Function(_UserNotFound value) userNotFound,
+    required TResult Function(_WrongPassword value) wrongPassword,
+    required TResult Function(_EmailAlreadyInUse value) emailAlreadyInUse,
+    required TResult Function(_WeakPassword value) weakPassword,
+    required TResult Function(_TooManyRequests value) tooManyRequests,
+    required TResult Function(_NetworkError value) networkError,
+    required TResult Function(_Unknown value) unknown,
+    required TResult Function(_AppleSignInFailed value) appleSignInFailed,
+    required TResult Function(_AccountExistsWithDifferentCredential value)
+        accountExistsWithDifferentCredential,
+  }) {
+    return appleSignInFailed(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? mapOrNull<TResult extends Object?>({
+    TResult? Function(_InvalidEmail value)? invalidEmail,
+    TResult? Function(_UserDisabled value)? userDisabled,
+    TResult? Function(_UserNotFound value)? userNotFound,
+    TResult? Function(_WrongPassword value)? wrongPassword,
+    TResult? Function(_EmailAlreadyInUse value)? emailAlreadyInUse,
+    TResult? Function(_WeakPassword value)? weakPassword,
+    TResult? Function(_TooManyRequests value)? tooManyRequests,
+    TResult? Function(_NetworkError value)? networkError,
+    TResult? Function(_Unknown value)? unknown,
+    TResult? Function(_AppleSignInFailed value)? appleSignInFailed,
+    TResult? Function(_AccountExistsWithDifferentCredential value)?
+        accountExistsWithDifferentCredential,
+  }) {
+    return appleSignInFailed?.call(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeMap<TResult extends Object?>({
+    TResult Function(_InvalidEmail value)? invalidEmail,
+    TResult Function(_UserDisabled value)? userDisabled,
+    TResult Function(_UserNotFound value)? userNotFound,
+    TResult Function(_WrongPassword value)? wrongPassword,
+    TResult Function(_EmailAlreadyInUse value)? emailAlreadyInUse,
+    TResult Function(_WeakPassword value)? weakPassword,
+    TResult Function(_TooManyRequests value)? tooManyRequests,
+    TResult Function(_NetworkError value)? networkError,
+    TResult Function(_Unknown value)? unknown,
+    TResult Function(_AppleSignInFailed value)? appleSignInFailed,
+    TResult Function(_AccountExistsWithDifferentCredential value)?
+        accountExistsWithDifferentCredential,
+    required TResult orElse(),
+  }) {
+    if (appleSignInFailed != null) {
+      return appleSignInFailed(this);
+    }
+    return orElse();
+  }
+}
+
+abstract class _AppleSignInFailed extends AuthFailure {
+  const factory _AppleSignInFailed() = _$AppleSignInFailedImpl;
+  const _AppleSignInFailed._() : super._();
+}
+
+/// @nodoc
+abstract class _$$AccountExistsWithDifferentCredentialImplCopyWith<$Res> {
+  factory _$$AccountExistsWithDifferentCredentialImplCopyWith(
+          _$AccountExistsWithDifferentCredentialImpl value,
+          $Res Function(_$AccountExistsWithDifferentCredentialImpl) then) =
+      __$$AccountExistsWithDifferentCredentialImplCopyWithImpl<$Res>;
+}
+
+/// @nodoc
+class __$$AccountExistsWithDifferentCredentialImplCopyWithImpl<$Res>
+    extends _$AuthFailureCopyWithImpl<$Res,
+        _$AccountExistsWithDifferentCredentialImpl>
+    implements _$$AccountExistsWithDifferentCredentialImplCopyWith<$Res> {
+  __$$AccountExistsWithDifferentCredentialImplCopyWithImpl(
+      _$AccountExistsWithDifferentCredentialImpl _value,
+      $Res Function(_$AccountExistsWithDifferentCredentialImpl) _then)
+      : super(_value, _then);
+
+  /// Create a copy of AuthFailure
+  /// with the given fields replaced by the non-null parameter values.
+}
+
+/// @nodoc
+
+class _$AccountExistsWithDifferentCredentialImpl
+    extends _AccountExistsWithDifferentCredential {
+  const _$AccountExistsWithDifferentCredentialImpl() : super._();
+
+  @override
+  String toString() {
+    return 'AuthFailure.accountExistsWithDifferentCredential()';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$AccountExistsWithDifferentCredentialImpl);
+  }
+
+  @override
+  int get hashCode => runtimeType.hashCode;
+
+  @override
+  @optionalTypeArgs
+  TResult when<TResult extends Object?>({
+    required TResult Function() invalidEmail,
+    required TResult Function() userDisabled,
+    required TResult Function() userNotFound,
+    required TResult Function() wrongPassword,
+    required TResult Function() emailAlreadyInUse,
+    required TResult Function() weakPassword,
+    required TResult Function() tooManyRequests,
+    required TResult Function() networkError,
+    required TResult Function(String code) unknown,
+    required TResult Function() appleSignInFailed,
+    required TResult Function() accountExistsWithDifferentCredential,
+  }) {
+    return accountExistsWithDifferentCredential();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? whenOrNull<TResult extends Object?>({
+    TResult? Function()? invalidEmail,
+    TResult? Function()? userDisabled,
+    TResult? Function()? userNotFound,
+    TResult? Function()? wrongPassword,
+    TResult? Function()? emailAlreadyInUse,
+    TResult? Function()? weakPassword,
+    TResult? Function()? tooManyRequests,
+    TResult? Function()? networkError,
+    TResult? Function(String code)? unknown,
+    TResult? Function()? appleSignInFailed,
+    TResult? Function()? accountExistsWithDifferentCredential,
+  }) {
+    return accountExistsWithDifferentCredential?.call();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeWhen<TResult extends Object?>({
+    TResult Function()? invalidEmail,
+    TResult Function()? userDisabled,
+    TResult Function()? userNotFound,
+    TResult Function()? wrongPassword,
+    TResult Function()? emailAlreadyInUse,
+    TResult Function()? weakPassword,
+    TResult Function()? tooManyRequests,
+    TResult Function()? networkError,
+    TResult Function(String code)? unknown,
+    TResult Function()? appleSignInFailed,
+    TResult Function()? accountExistsWithDifferentCredential,
+    required TResult orElse(),
+  }) {
+    if (accountExistsWithDifferentCredential != null) {
+      return accountExistsWithDifferentCredential();
+    }
+    return orElse();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult map<TResult extends Object?>({
+    required TResult Function(_InvalidEmail value) invalidEmail,
+    required TResult Function(_UserDisabled value) userDisabled,
+    required TResult Function(_UserNotFound value) userNotFound,
+    required TResult Function(_WrongPassword value) wrongPassword,
+    required TResult Function(_EmailAlreadyInUse value) emailAlreadyInUse,
+    required TResult Function(_WeakPassword value) weakPassword,
+    required TResult Function(_TooManyRequests value) tooManyRequests,
+    required TResult Function(_NetworkError value) networkError,
+    required TResult Function(_Unknown value) unknown,
+    required TResult Function(_AppleSignInFailed value) appleSignInFailed,
+    required TResult Function(_AccountExistsWithDifferentCredential value)
+        accountExistsWithDifferentCredential,
+  }) {
+    return accountExistsWithDifferentCredential(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? mapOrNull<TResult extends Object?>({
+    TResult? Function(_InvalidEmail value)? invalidEmail,
+    TResult? Function(_UserDisabled value)? userDisabled,
+    TResult? Function(_UserNotFound value)? userNotFound,
+    TResult? Function(_WrongPassword value)? wrongPassword,
+    TResult? Function(_EmailAlreadyInUse value)? emailAlreadyInUse,
+    TResult? Function(_WeakPassword value)? weakPassword,
+    TResult? Function(_TooManyRequests value)? tooManyRequests,
+    TResult? Function(_NetworkError value)? networkError,
+    TResult? Function(_Unknown value)? unknown,
+    TResult? Function(_AppleSignInFailed value)? appleSignInFailed,
+    TResult? Function(_AccountExistsWithDifferentCredential value)?
+        accountExistsWithDifferentCredential,
+  }) {
+    return accountExistsWithDifferentCredential?.call(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeMap<TResult extends Object?>({
+    TResult Function(_InvalidEmail value)? invalidEmail,
+    TResult Function(_UserDisabled value)? userDisabled,
+    TResult Function(_UserNotFound value)? userNotFound,
+    TResult Function(_WrongPassword value)? wrongPassword,
+    TResult Function(_EmailAlreadyInUse value)? emailAlreadyInUse,
+    TResult Function(_WeakPassword value)? weakPassword,
+    TResult Function(_TooManyRequests value)? tooManyRequests,
+    TResult Function(_NetworkError value)? networkError,
+    TResult Function(_Unknown value)? unknown,
+    TResult Function(_AppleSignInFailed value)? appleSignInFailed,
+    TResult Function(_AccountExistsWithDifferentCredential value)?
+        accountExistsWithDifferentCredential,
+    required TResult orElse(),
+  }) {
+    if (accountExistsWithDifferentCredential != null) {
+      return accountExistsWithDifferentCredential(this);
+    }
+    return orElse();
+  }
+}
+
+abstract class _AccountExistsWithDifferentCredential extends AuthFailure {
+  const factory _AccountExistsWithDifferentCredential() =
+      _$AccountExistsWithDifferentCredentialImpl;
+  const _AccountExistsWithDifferentCredential._() : super._();
 }

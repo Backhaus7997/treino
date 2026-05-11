@@ -16,6 +16,9 @@ sealed class AuthFailure with _$AuthFailure implements Exception {
   const factory AuthFailure.tooManyRequests() = _TooManyRequests;
   const factory AuthFailure.networkError() = _NetworkError;
   const factory AuthFailure.unknown(String code) = _Unknown;
+  const factory AuthFailure.appleSignInFailed() = _AppleSignInFailed;
+  const factory AuthFailure.accountExistsWithDifferentCredential() =
+      _AccountExistsWithDifferentCredential;
 
   factory AuthFailure.fromFirebase(FirebaseAuthException e) => switch (e.code) {
         'invalid-email' => const AuthFailure.invalidEmail(),
@@ -28,6 +31,8 @@ sealed class AuthFailure with _$AuthFailure implements Exception {
         'weak-password' => const AuthFailure.weakPassword(),
         'too-many-requests' => const AuthFailure.tooManyRequests(),
         'network-request-failed' => const AuthFailure.networkError(),
+        'account-exists-with-different-credential' =>
+          const AuthFailure.accountExistsWithDifferentCredential(),
         final code => AuthFailure.unknown(code),
       };
 
@@ -44,5 +49,9 @@ sealed class AuthFailure with _$AuthFailure implements Exception {
         _NetworkError() =>
           'Sin conexión. Revisá tu internet e intentá de nuevo',
         _Unknown() => 'Algo salió mal. Intentá de nuevo',
+        _AppleSignInFailed() =>
+          'No pudimos completar el inicio con Apple. Intentá de nuevo',
+        _AccountExistsWithDifferentCredential() =>
+          'Esta cuenta ya existe. Iniciá sesión con tu método original y vinculá Apple desde tu perfil.',
       };
 }

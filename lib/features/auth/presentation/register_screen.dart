@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart'
+    show defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
@@ -62,6 +64,21 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       _passwordCtrl.text.isEmpty;
 
   bool get _canSubmit => !_fieldsEmpty && _termsAccepted;
+
+  bool get _isApplePlatform => defaultTargetPlatform == TargetPlatform.iOS;
+
+  /// Triggers Apple Sign-In. If the user taps Apple, they are abandoning the
+  /// form — the Apple flow takes over and either creates a new account or
+  /// signs in an existing one. No form-clearing needed; navigation handles it.
+  Future<void> _signInWithApple() async {
+    await ref.read(authNotifierProvider.notifier).signInWithApple();
+    if (!mounted) return;
+    final s = ref.read(authNotifierProvider);
+    if (s.hasValue && s.valueOrNull != null) {
+      // TODO Etapa 6: branch on lastSignInIsNewUserProvider → /profile-setup
+      context.go('/home');
+    }
+  }
 
   Future<void> _submit() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
@@ -223,21 +240,23 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   ),
                   const SizedBox(height: 14),
                   // Social buttons
-                  const Row(
+                  Row(
                     children: [
-                      Expanded(
+                      const Expanded(
                         child: AuthSecondaryButton(
                           icon: FontAwesomeIcons.google,
                           label: AuthStrings.googleLabel,
                           onPressed: null,
                         ),
                       ),
-                      SizedBox(width: 12),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: AuthSecondaryButton(
                           icon: FontAwesomeIcons.apple,
                           label: AuthStrings.appleLabel,
-                          onPressed: null,
+                          onPressed: (_isApplePlatform && !isLoading)
+                              ? _signInWithApple
+                              : null,
                         ),
                       ),
                     ],
