@@ -72,6 +72,53 @@ Para cada etapa, lo que tenés que dejar listo en [console.firebase.google.com/u
 - Crashlytics.
 - Deep links (Firebase Dynamic Links o nativos iOS/Android).
 
+## Fase 2 — desglose en 5 etapas
+
+Home (paridad con mockup Mobile Home) + Rutinas básicas read-only (Plantillas pre-cargadas en Firestore que el atleta puede consultar y usar como fallback cuando no tiene una rutina asignada). Misma filosofía que Fase 1: cada etapa es un PR separado, paralelizable donde no hay dependencia.
+
+**Scope explícito de Fase 2**: solo lectura. Crear rutinas (PF) va en Fase 5. Tracking de sesiones, "Esta semana" con datos reales, Historial e Insights van en Fase 4 (Workout++). En Fase 2 esas zonas quedan con estado vacío/placeholder.
+
+| # | Etapa | Branch | Console (manual) | Código clave | Owner sugerido |
+|---|---|---|---|---|---|
+| 1 | Home shell + cards (datos placeholder) | `feat/home-shell` | Nada | Pantalla Home con cards "Empezar entrenamiento" + "Esta semana" según mockup (`docs/app-alumno/screens/home/`). Datos hardcodeados/placeholders — el wire real va en Etapa 5. | B |
+| 2 | Modelo `Routine` + seed Plantillas + reglas Firestore | `feat/routine-model-seed` | Crear colección `routines` poblada por script Admin SDK con plantillas oficiales | Modelos `Routine`, `Exercise`, `RoutineSet` con freezed + `json_serializable`. `RoutineRepository`. Reglas `routines/{id}`: `read: request.auth != null`, `write: false` (solo Admin SDK escribe). Script `scripts/seed_routines.dart` con plantillas iniciales. | A |
+| 3 | Lista de Plantillas (tab Entrenamiento) | `feat/routines-list` | Nada | Tab Entrenamiento → sección Plantillas según mockup (`docs/app-alumno/screens/entrenamiento/plantillas.png`). Scroll de cards de plantilla. Filtros básicos (split, duración, nivel) si caben en scope. | C |
+| 4 | Detalle Rutina + Detalle Ejercicio (read-only) | `feat/routine-detail` | Nada | Pantalla "Expandir Plantilla" (`docs/app-alumno/screens/entrenamiento/expandir-plantilla.png`) → lista de ejercicios con series/repes. Pantalla "Detalle Ejercicio" (`docs/app-alumno/screens/detalle-rutina/detalle-ejercicio.png`) con instrucciones de ejecución. Sin "iniciar entrenamiento" — eso es Fase 4. | C |
+| 5 | Wire Home → Plantillas + estados vacíos | `feat/home-wire-routines` | Nada | Card "Empezar entrenamiento" navega a Plantillas (en Fase 2 el usuario nunca tiene rutina asignada). Card "Esta semana" muestra estado vacío correcto. Cleanup de placeholders de Etapa 1. | B |
+
+### Dependencias entre etapas
+
+```
+1 ─────────────► 5
+                  ▲
+2 ──► 3 ──────────┤
+  └─► 4 ──────────┘
+```
+
+- **1 y 2 arrancan en paralelo**: Home shell no depende del modelo Routine.
+- **2 antes de 3 y 4**: sin `RoutineRepository` no hay lista ni detalle.
+- **3 y 4 en paralelo**: lista y detalle son pantallas independientes.
+- **5 al final**: necesita Home (Etapa 1) + Plantillas (Etapa 3) funcionando.
+
+### División entre los 3 devs (con paralelización)
+
+| Dev | Etapas |
+|---|---|
+| **A** | Etapa 2 (modelo + seed + reglas) cuando termine Etapa 7 de Fase 1 |
+| **B** | Etapa 1 (Home shell) + Etapa 5 (wire final) |
+| **C** | Etapa 3 (lista) + Etapa 4 (detalle) cuando termine QA Etapa 5 de Fase 1 |
+
+**Tiempo estimado**: ~2.5-3 semanas con 3 devs en paralelo.
+
+### Paralelización con Fase 1 pendiente
+
+Mientras Etapa 7 de Fase 1 (roles/guards, Dev A) y QA de Etapa 5 (Apple, Dev C) están en curso, **Dev B puede arrancar Etapa 1 de Fase 2 ya**. Home es vista de atleta pura — no toca Coach tab ni necesita guards (esos se agregan retroactivamente sobre las rutas nuevas cuando Etapa 7 mergee).
+
+### Pre-flight checklist (manual por owner)
+
+- ⏳ Etapa 2: poblar colección `routines` en Firestore Console o con script Admin SDK. Plantillas iniciales sugeridas: Push/Pull/Legs (3 días), Full Body principiante (3 días), Upper/Lower (4 días). Cantidad mínima para que la UI no se vea pelada: ~6 plantillas.
+- (Etapas 1, 3, 4, 5 no requieren acción en console.)
+
 ## Fase 5 — extensión: Importación de planes desde Excel
 
 Feature crítica para adopción de PFs reales (la mayoría trabaja con plantillas Excel históricas). Detalle de arquitectura completa pendiente de documentar como sub-fase 5.5 cuando lleguemos.
