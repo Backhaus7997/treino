@@ -62,8 +62,13 @@ String? authRedirect(
   // o no. Esto evita el flicker `/home → /profile-setup` para usuarios
   // recién registrados, y `/profile-setup → /home` para usuarios existentes.
   //
-  // TODO(etapa7): cuando Roles & guards mergee, agregar también route guards
-  // por role (athlete vs trainer) acá mismo.
+  // Role-awareness (Etapa 7, Option A): el outer 5-tab shell se comparte
+  // entre athlete y trainer. No hay rutas trainer-specific en Fase 1, así
+  // que tampoco hay redirects por role acá. La diferenciación visual vive
+  // en CoachScreen, que despacha a AthleteCoachView o TrainerCoachView
+  // según UserProfile.role. Cuando Fase 5 introduzca rutas /trainer/...,
+  // el branch va EXACTAMENTE acá — después del gate de profile completo y
+  // antes del redirect "/public → /home".
   if (loggedIn && !isProfileSetup) {
     final profileAsync = read(userProfileProvider);
     if (profileAsync.isLoading) return null;

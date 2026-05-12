@@ -207,8 +207,7 @@ void main() {
       expect(callRedirect(c, '/welcome'), '/home');
     });
 
-    test('user + /splash → null (splash handles its own navigation)',
-        () async {
+    test('user + /splash → null (splash handles its own navigation)', () async {
       final c = loggedInContainer();
       addTearDown(c.dispose);
       await c.read(authNotifierProvider.future);
@@ -254,8 +253,7 @@ void main() {
       expect(callRedirect(c, '/profile-setup'), isNull);
     });
 
-    test('no profile doc yet → /profile-setup (treat as incomplete)',
-        () async {
+    test('no profile doc yet → /profile-setup (treat as incomplete)', () async {
       // Inline en vez de loggedInContainer() porque el helper tiene un
       // default a _completeProfile() para el caso común; acá queremos
       // explícitamente que la collection no tenga el doc todavía.
@@ -296,6 +294,100 @@ void main() {
       final c = loadingContainer();
       addTearDown(c.dispose);
       expect(callRedirect(c, '/workout'), isNull);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Fixtures for trainer role tests
+  // ---------------------------------------------------------------------------
+
+  /// Fixture: trainer with complete profile.
+  UserProfile trainerProfile() => UserProfile(
+        uid: 'test-trainer-uid',
+        email: 'trainer@example.com',
+        displayName: 'pf-mauro',
+        role: UserRole.trainer,
+        createdAt: DateTime.utc(2026, 1, 1),
+        updatedAt: DateTime.utc(2026, 1, 1),
+      );
+
+  /// Fixture: trainer with incomplete profile (displayName=null).
+  UserProfile trainerIncompleteProfile() => UserProfile(
+        uid: 'test-trainer-uid',
+        email: 'trainer@example.com',
+        displayName: null,
+        role: UserRole.trainer,
+        createdAt: DateTime.utc(2026, 1, 1),
+        updatedAt: DateTime.utc(2026, 1, 1),
+      );
+
+  // ---------------------------------------------------------------------------
+  // Authenticated user with TRAINER role (complete profile) — Option A:
+  // no role-specific redirects at the router layer. All routes stay.
+  // ---------------------------------------------------------------------------
+  group('redirect — authenticated user (trainer role)', () {
+    test('trainer + /home → null (stay)', () async {
+      final c = loggedInContainer(profile: trainerProfile());
+      addTearDown(c.dispose);
+      await c.read(authNotifierProvider.future);
+      await c.read(userProfileProvider.future);
+      expect(callRedirect(c, '/home'), isNull);
+    });
+
+    test('trainer + /coach → null (stay; widget-level dispatch decides)',
+        () async {
+      final c = loggedInContainer(profile: trainerProfile());
+      addTearDown(c.dispose);
+      await c.read(authNotifierProvider.future);
+      await c.read(userProfileProvider.future);
+      expect(callRedirect(c, '/coach'), isNull);
+    });
+
+    test('trainer + /welcome → /home (same gate as athlete)', () async {
+      final c = loggedInContainer(profile: trainerProfile());
+      addTearDown(c.dispose);
+      await c.read(authNotifierProvider.future);
+      await c.read(userProfileProvider.future);
+      expect(callRedirect(c, '/welcome'), '/home');
+    });
+
+    test('trainer + /workout → null (Option A: NOT redirected away)', () async {
+      final c = loggedInContainer(profile: trainerProfile());
+      addTearDown(c.dispose);
+      await c.read(authNotifierProvider.future);
+      await c.read(userProfileProvider.future);
+      expect(callRedirect(c, '/workout'), isNull);
+    });
+
+    test('trainer + /feed → null (Option A: NOT redirected away)', () async {
+      final c = loggedInContainer(profile: trainerProfile());
+      addTearDown(c.dispose);
+      await c.read(authNotifierProvider.future);
+      await c.read(userProfileProvider.future);
+      expect(callRedirect(c, '/feed'), isNull);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Trainer with INCOMPLETE profile — role does NOT bypass the completeness gate
+  // ---------------------------------------------------------------------------
+  group('redirect — trainer with incomplete profile', () {
+    test(
+        'trainer + displayName=null + /home → /profile-setup (completeness gate)',
+        () async {
+      final c = loggedInContainer(profile: trainerIncompleteProfile());
+      addTearDown(c.dispose);
+      await c.read(authNotifierProvider.future);
+      await c.read(userProfileProvider.future);
+      expect(callRedirect(c, '/home'), '/profile-setup');
+    });
+
+    test('trainer + displayName=null + /profile-setup → null (stay)', () async {
+      final c = loggedInContainer(profile: trainerIncompleteProfile());
+      addTearDown(c.dispose);
+      await c.read(authNotifierProvider.future);
+      await c.read(userProfileProvider.future);
+      expect(callRedirect(c, '/profile-setup'), isNull);
     });
   });
 }
