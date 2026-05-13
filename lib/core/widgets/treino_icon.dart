@@ -37,6 +37,7 @@ class TreinoIcon {
   static const IconData chartBar = PhosphorIconsRegular.chartBar;
   static const IconData calendar = PhosphorIconsRegular.calendarCheck;
   static const IconData clock = PhosphorIconsRegular.clock;
+  static const IconData timer = PhosphorIconsRegular.timer;
 
   // Acciones de usuario
   static const IconData chat = PhosphorIconsRegular.chatCircle;

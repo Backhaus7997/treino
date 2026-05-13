@@ -9,7 +9,7 @@ import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
 import 'package:treino/features/workout/application/routine_providers.dart';
 import 'package:treino/features/workout/domain/routine.dart';
-import 'package:treino/features/workout/presentation/routine_detail_placeholder_screen.dart';
+import 'package:treino/features/workout/presentation/routine_detail_screen.dart';
 import 'package:treino/features/workout/presentation/widgets/plantillas_section.dart';
 import 'package:treino/features/workout/workout_screen.dart';
 
@@ -58,7 +58,7 @@ void main() {
 
   group('Router — /workout/routine/:id', () {
     testWidgets(
-        'navigating to /workout/routine/test-id renders RoutineDetailPlaceholderScreen',
+        'navigating to /workout/routine/test-id renders RoutineDetailScreen',
         (tester) async {
       final routine = makeRoutine(id: 'test-id');
 
@@ -74,7 +74,7 @@ void main() {
         routes: [
           GoRoute(
             path: '/workout/routine/:id',
-            builder: (context, state) => RoutineDetailPlaceholderScreen(
+            builder: (context, state) => RoutineDetailScreen(
               routineId: state.pathParameters['id']!,
             ),
           ),
@@ -93,7 +93,7 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 50));
 
-      expect(find.byType(RoutineDetailPlaceholderScreen), findsOneWidget);
+      expect(find.byType(RoutineDetailScreen), findsOneWidget);
     });
 
     testWidgets(
@@ -121,7 +121,7 @@ void main() {
               ),
               GoRoute(
                 path: '/workout/routine/:id',
-                builder: (context, state) => RoutineDetailPlaceholderScreen(
+                builder: (context, state) => RoutineDetailScreen(
                   routineId: state.pathParameters['id']!,
                 ),
               ),
