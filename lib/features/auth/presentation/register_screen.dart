@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -105,24 +106,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
     return Scaffold(
       backgroundColor: palette.bg,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: Icon(TreinoIcon.back, color: palette.textPrimary),
-          onPressed: () =>
-              context.canPop() ? context.pop() : context.go('/welcome'),
-        ),
-        title: Text(
-          AuthStrings.registerAppbar,
-          style: GoogleFonts.barlowCondensed(
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 1.5,
-            color: palette.textPrimary,
-          ),
-        ),
-      ),
       body: AppBackground(
         child: SafeArea(
           child: SingleChildScrollView(
@@ -132,7 +115,18 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const SizedBox(height: 14),
+                  // Back button — top left (same pattern as Login)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: IconButton(
+                      padding: EdgeInsets.zero,
+                      icon: Icon(TreinoIcon.back, color: palette.textPrimary),
+                      onPressed: () => context.canPop()
+                          ? context.pop()
+                          : context.go('/welcome'),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
                   // Headline: "SUMATE A" + TREINO brand logo below.
                   // Space Grotesk for the prose, brand SVG for the wordmark.
                   Text(
@@ -237,6 +231,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       Expanded(
                         child: AuthSecondaryButton(
                           icon: FontAwesomeIcons.google,
+                          iconWidget: SvgPicture.asset(
+                            'assets/logo/google_g.svg',
+                            width: 18,
+                            height: 18,
+                          ),
                           label: AuthStrings.googleLabel,
                           onPressed: isLoading ? null : _signInWithGoogle,
                         ),

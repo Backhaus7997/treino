@@ -12,11 +12,13 @@ class AuthPillButton extends StatelessWidget {
     required this.label,
     required this.onPressed,
     this.isLoading = false,
+    this.showArrow = true,
   });
 
   final String label;
   final VoidCallback? onPressed;
   final bool isLoading;
+  final bool showArrow;
 
   @override
   Widget build(BuildContext context) {
@@ -67,12 +69,14 @@ class AuthPillButton extends StatelessWidget {
                       color: palette.bg,
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  Icon(
-                    TreinoIcon.arrowRight,
-                    size: 18,
-                    color: palette.bg,
-                  ),
+                  if (showArrow) ...[
+                    const SizedBox(width: 8),
+                    Icon(
+                      TreinoIcon.arrowRight,
+                      size: 18,
+                      color: palette.bg,
+                    ),
+                  ],
                 ],
               ),
       ),

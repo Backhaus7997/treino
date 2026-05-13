@@ -9,6 +9,7 @@ import '../../../core/widgets/treino_icon.dart';
 import '../application/auth_providers.dart';
 import '../domain/auth_failure.dart';
 import 'auth_strings.dart';
+import 'widgets/auth_circle_back_button.dart';
 import 'widgets/auth_failure_banner.dart';
 import 'widgets/auth_input.dart';
 import 'widgets/auth_pill_button.dart';
@@ -82,15 +83,6 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
 
     return Scaffold(
       backgroundColor: palette.bg,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: Icon(TreinoIcon.back, color: palette.textPrimary),
-          onPressed: () =>
-              context.canPop() ? context.pop() : context.go('/login'),
-        ),
-      ),
       body: AppBackground(
         child: SafeArea(
           child: SingleChildScrollView(
@@ -99,6 +91,11 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: 12),
+                AuthCircleBackButton(
+                  onPressed: () =>
+                      context.canPop() ? context.pop() : context.go('/login'),
+                ),
+                const SizedBox(height: 24),
                 // Headline
                 Text(
                   AuthStrings.forgotTitle,
@@ -175,6 +172,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                     label: AuthStrings.forgotCta,
                     onPressed: _emailCtrl.text.trim().isEmpty ? null : _submit,
                     isLoading: _isLoading,
+                    showArrow: false,
                   ),
                 ],
               ],

@@ -58,6 +58,7 @@ class ProfileSetupFooter extends StatelessWidget {
           child: AuthPillButton(
             label: primaryLabel ?? 'SIGUIENTE',
             onPressed: onPrimary,
+            showArrow: false,
           ),
         ),
       ],

@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_background.dart';
 import '../../../app/theme/app_palette.dart';
-import '../../../core/widgets/treino_icon.dart';
 import '../application/auth_providers.dart';
 import 'auth_strings.dart';
 import 'widgets/auth_pill_button.dart';
@@ -36,14 +36,17 @@ class WelcomeScreen extends ConsumerWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const SizedBox(height: 20),
+                          const Spacer(flex: 3),
                           // ── Top block: eyebrow + logo ────────────────────
                           Row(
                             children: [
-                              Icon(
-                                TreinoIcon.sparkle,
-                                color: palette.accent,
-                                size: 12,
+                              Container(
+                                width: 8,
+                                height: 8,
+                                decoration: BoxDecoration(
+                                  color: palette.accent,
+                                  shape: BoxShape.circle,
+                                ),
                               ),
                               const SizedBox(width: 8),
                               Text(
@@ -58,9 +61,8 @@ class WelcomeScreen extends ConsumerWidget {
                             ],
                           ),
                           const SizedBox(height: 18),
-                          const TreinoLogo(size: 56),
-                          // ── Spacer pushes the headline toward the middle ─
-                          const Spacer(flex: 2),
+                          const TreinoLogo(size: 120),
+                          const SizedBox(height: 24),
                           // ── Middle block: headline + body ────────────────
                           IntrinsicHeight(
                             child: Row(
@@ -105,6 +107,7 @@ class WelcomeScreen extends ConsumerWidget {
                           AuthPillButton(
                             label: AuthStrings.welcomeCta,
                             onPressed: () => context.push('/register'),
+                            showArrow: false,
                           ),
                           const SizedBox(height: 12),
                           Row(
@@ -112,6 +115,11 @@ class WelcomeScreen extends ConsumerWidget {
                               Expanded(
                                 child: AuthSecondaryButton(
                                   icon: FontAwesomeIcons.google,
+                                  iconWidget: SvgPicture.asset(
+                                    'assets/logo/google_g.svg',
+                                    width: 18,
+                                    height: 18,
+                                  ),
                                   label: AuthStrings.googleLabel,
                                   onPressed: isLoading
                                       ? null
