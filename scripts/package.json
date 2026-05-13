@@ -1,0 +1,13 @@
+{
+  "name": "treino-seed",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Treino workout catalog seed scripts.",
+  "scripts": {
+    "seed:exercises": "node seed_workout_catalog.js --exercises",
+    "seed:all": "node seed_workout_catalog.js --all"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.0.0"
+  }
+}
