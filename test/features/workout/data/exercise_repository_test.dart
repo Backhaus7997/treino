@@ -44,8 +44,7 @@ void main() {
       expect(result.every((e) => e.id.isNotEmpty), isTrue);
     });
 
-    test(
-        'SCENARIO-027: getById returns non-null exercise with correct id',
+    test('SCENARIO-027: getById returns non-null exercise with correct id',
         () async {
       await seedExercise(id: 'bench-press', name: 'Bench Press');
 
@@ -56,14 +55,12 @@ void main() {
       expect(result.name, equals('Bench Press'));
     });
 
-    test(
-        'SCENARIO-028: getById returns null for nonexistent id', () async {
+    test('SCENARIO-028: getById returns null for nonexistent id', () async {
       final result = await repo.getById('nonexistent');
       expect(result, isNull);
     });
 
-    test(
-        'SCENARIO-029: getByIds returns only the requested exercises',
+    test('SCENARIO-029: getByIds returns only the requested exercises',
         () async {
       await seedExercise(id: 'squat');
       await seedExercise(id: 'deadlift');
@@ -77,7 +74,8 @@ void main() {
       expect(ids, isNot(contains('bench-press')));
     });
 
-    test('SCENARIO-030: getByIds with empty list returns empty list without querying Firestore',
+    test(
+        'SCENARIO-030: getByIds with empty list returns empty list without querying Firestore',
         () async {
       // Seed something to prove no data is read
       await seedExercise(id: 'some-exercise');

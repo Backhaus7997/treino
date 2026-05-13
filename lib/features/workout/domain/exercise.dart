@@ -9,8 +9,10 @@ class Exercise with _$Exercise {
     required String id,
     required String name,
     required String muscleGroup,
-    required String category, // 'compound' | 'isolation' (free-form String, validated in seed)
-    List<String>? techniqueInstructions, // null means "not yet authored" (ADR-1)
+    required String
+        category, // 'compound' | 'isolation' (free-form String, validated in seed)
+    List<String>?
+        techniqueInstructions, // null means "not yet authored" (ADR-1)
     String? videoUrl,
     int? defaultRestSeconds,
   }) = _Exercise;

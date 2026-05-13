@@ -34,9 +34,8 @@ class ExerciseRepository {
         i,
         i + chunkSize > ids.length ? ids.length : i + chunkSize,
       );
-      final snap = await _collection
-          .where(FieldPath.documentId, whereIn: chunk)
-          .get();
+      final snap =
+          await _collection.where(FieldPath.documentId, whereIn: chunk).get();
       out.addAll(snap.docs.map(_fromDoc).whereType<Exercise>());
     }
     return out;

@@ -90,8 +90,7 @@ void main() {
       expect(result!.id, equals('deadlift'));
     });
 
-    test(
-        'SCENARIO-038: exerciseByIdProvider returns null for unknown id',
+    test('SCENARIO-038: exerciseByIdProvider returns null for unknown id',
         () async {
       final firestore = FakeFirebaseFirestore();
       await firestore.collection('exercises').doc('squat').set({
@@ -108,8 +107,7 @@ void main() {
       );
       addTearDown(container.dispose);
 
-      final result =
-          await container.read(exerciseByIdProvider('ghost').future);
+      final result = await container.read(exerciseByIdProvider('ghost').future);
       expect(result, isNull);
     });
   });
