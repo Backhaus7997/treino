@@ -324,7 +324,357 @@ const exercises = [
   },
 ];
 
-// PR 2 will add: const routines = [ ... ];
+// -- ROUTINES DATA ---------------------------------------------------------
+
+const routines = [
+  // ── 1. PUSH / PULL / LEGS — PRINCIPIANTE (3 days) ─────────────────────
+  {
+    id: 'ppl-beginner',
+    name: 'Push Pull Legs — Principiante',
+    split: 'PPL',
+    level: 'beginner',
+    estimatedMinutesPerDay: 60,
+    imageUrl: null,
+    days: [
+      {
+        dayNumber: 1,
+        name: 'Push',
+        estimatedMinutes: 60,
+        slots: [
+          { exerciseId: 'bench-press',          exerciseName: 'Bench Press',          muscleGroup: 'chest',     targetSets: 4, targetRepsMin: 8,  targetRepsMax: 12, restSeconds: 90,  targetWeightKg: null, notes: null },
+          { exerciseId: 'incline-dumbbell-press', exerciseName: 'Incline Dumbbell Press', muscleGroup: 'chest',  targetSets: 3, targetRepsMin: 10, targetRepsMax: 15, restSeconds: 75,  targetWeightKg: null, notes: null },
+          { exerciseId: 'overhead-press',        exerciseName: 'Overhead Press',        muscleGroup: 'shoulders', targetSets: 3, targetRepsMin: 8,  targetRepsMax: 12, restSeconds: 90,  targetWeightKg: null, notes: null },
+          { exerciseId: 'lateral-raise',         exerciseName: 'Lateral Raise',         muscleGroup: 'shoulders', targetSets: 3, targetRepsMin: 12, targetRepsMax: 15, restSeconds: 60,  targetWeightKg: null, notes: null },
+          { exerciseId: 'tricep-pushdown',       exerciseName: 'Tricep Pushdown',       muscleGroup: 'triceps',  targetSets: 3, targetRepsMin: 12, targetRepsMax: 15, restSeconds: 60,  targetWeightKg: null, notes: null },
+          { exerciseId: 'skull-crusher',         exerciseName: 'Skull Crusher',         muscleGroup: 'triceps',  targetSets: 3, targetRepsMin: 10, targetRepsMax: 12, restSeconds: 60,  targetWeightKg: null, notes: null },
+        ],
+      },
+      {
+        dayNumber: 2,
+        name: 'Pull',
+        estimatedMinutes: 60,
+        slots: [
+          { exerciseId: 'deadlift',      exerciseName: 'Deadlift',      muscleGroup: 'back',    targetSets: 4, targetRepsMin: 5,  targetRepsMax: 6,  restSeconds: 120, targetWeightKg: null, notes: null },
+          { exerciseId: 'barbell-row',   exerciseName: 'Barbell Row',   muscleGroup: 'back',    targetSets: 3, targetRepsMin: 8,  targetRepsMax: 12, restSeconds: 90,  targetWeightKg: null, notes: null },
+          { exerciseId: 'lat-pulldown',  exerciseName: 'Lat Pulldown',  muscleGroup: 'back',    targetSets: 3, targetRepsMin: 10, targetRepsMax: 12, restSeconds: 75,  targetWeightKg: null, notes: null },
+          { exerciseId: 'barbell-curl',  exerciseName: 'Barbell Curl',  muscleGroup: 'biceps',  targetSets: 3, targetRepsMin: 10, targetRepsMax: 12, restSeconds: 60,  targetWeightKg: null, notes: null },
+          { exerciseId: 'hammer-curl',   exerciseName: 'Hammer Curl',   muscleGroup: 'biceps',  targetSets: 3, targetRepsMin: 12, targetRepsMax: 15, restSeconds: 60,  targetWeightKg: null, notes: null },
+          { exerciseId: 'face-pull',     exerciseName: 'Face Pull',     muscleGroup: 'shoulders', targetSets: 3, targetRepsMin: 15, targetRepsMax: 20, restSeconds: 60, targetWeightKg: null, notes: null },
+        ],
+      },
+      {
+        dayNumber: 3,
+        name: 'Legs',
+        estimatedMinutes: 65,
+        slots: [
+          { exerciseId: 'back-squat',        exerciseName: 'Back Squat',        muscleGroup: 'quads',      targetSets: 4, targetRepsMin: 8,  targetRepsMax: 12, restSeconds: 120, targetWeightKg: null, notes: null },
+          { exerciseId: 'romanian-deadlift', exerciseName: 'Romanian Deadlift', muscleGroup: 'hamstrings', targetSets: 3, targetRepsMin: 10, targetRepsMax: 12, restSeconds: 90,  targetWeightKg: null, notes: null },
+          { exerciseId: 'leg-press',         exerciseName: 'Leg Press',         muscleGroup: 'quads',      targetSets: 3, targetRepsMin: 12, targetRepsMax: 15, restSeconds: 90,  targetWeightKg: null, notes: null },
+          { exerciseId: 'leg-curl',          exerciseName: 'Leg Curl',          muscleGroup: 'hamstrings', targetSets: 3, targetRepsMin: 12, targetRepsMax: 15, restSeconds: 60,  targetWeightKg: null, notes: null },
+          { exerciseId: 'hip-thrust',        exerciseName: 'Hip Thrust',        muscleGroup: 'glutes',     targetSets: 3, targetRepsMin: 12, targetRepsMax: 15, restSeconds: 90,  targetWeightKg: null, notes: null },
+          { exerciseId: 'calf-raise',        exerciseName: 'Calf Raise',        muscleGroup: 'calves',     targetSets: 4, targetRepsMin: 15, targetRepsMax: 20, restSeconds: 45,  targetWeightKg: null, notes: null },
+        ],
+      },
+    ],
+  },
+
+  // ── 2. FULL BODY PRINCIPIANTE (3 days) ────────────────────────────────
+  {
+    id: 'full-body-3day',
+    name: 'Full Body Principiante',
+    split: 'Full Body',
+    level: 'beginner',
+    estimatedMinutesPerDay: 55,
+    imageUrl: null,
+    days: [
+      {
+        dayNumber: 1,
+        name: 'Día 1',
+        estimatedMinutes: 55,
+        slots: [
+          { exerciseId: 'back-squat',    exerciseName: 'Back Squat',    muscleGroup: 'quads',    targetSets: 3, targetRepsMin: 8,  targetRepsMax: 12, restSeconds: 120, targetWeightKg: null, notes: null },
+          { exerciseId: 'bench-press',   exerciseName: 'Bench Press',   muscleGroup: 'chest',    targetSets: 3, targetRepsMin: 8,  targetRepsMax: 12, restSeconds: 90,  targetWeightKg: null, notes: null },
+          { exerciseId: 'barbell-row',   exerciseName: 'Barbell Row',   muscleGroup: 'back',     targetSets: 3, targetRepsMin: 8,  targetRepsMax: 12, restSeconds: 90,  targetWeightKg: null, notes: null },
+          { exerciseId: 'overhead-press', exerciseName: 'Overhead Press', muscleGroup: 'shoulders', targetSets: 3, targetRepsMin: 8, targetRepsMax: 12, restSeconds: 90, targetWeightKg: null, notes: null },
+          { exerciseId: 'plank',         exerciseName: 'Plank',         muscleGroup: 'core',     targetSets: 3, targetRepsMin: 30, targetRepsMax: 45, restSeconds: 45,  targetWeightKg: null, notes: 'segundos' },
+        ],
+      },
+      {
+        dayNumber: 2,
+        name: 'Día 2',
+        estimatedMinutes: 55,
+        slots: [
+          { exerciseId: 'leg-press',         exerciseName: 'Leg Press',         muscleGroup: 'quads',      targetSets: 3, targetRepsMin: 10, targetRepsMax: 15, restSeconds: 90, targetWeightKg: null, notes: null },
+          { exerciseId: 'incline-dumbbell-press', exerciseName: 'Incline Dumbbell Press', muscleGroup: 'chest', targetSets: 3, targetRepsMin: 10, targetRepsMax: 15, restSeconds: 75, targetWeightKg: null, notes: null },
+          { exerciseId: 'lat-pulldown',      exerciseName: 'Lat Pulldown',      muscleGroup: 'back',       targetSets: 3, targetRepsMin: 10, targetRepsMax: 12, restSeconds: 75, targetWeightKg: null, notes: null },
+          { exerciseId: 'lateral-raise',     exerciseName: 'Lateral Raise',     muscleGroup: 'shoulders',  targetSets: 3, targetRepsMin: 12, targetRepsMax: 15, restSeconds: 60, targetWeightKg: null, notes: null },
+          { exerciseId: 'cable-crunch',      exerciseName: 'Cable Crunch',      muscleGroup: 'core',       targetSets: 3, targetRepsMin: 15, targetRepsMax: 20, restSeconds: 45, targetWeightKg: null, notes: null },
+        ],
+      },
+      {
+        dayNumber: 3,
+        name: 'Día 3',
+        estimatedMinutes: 55,
+        slots: [
+          { exerciseId: 'romanian-deadlift', exerciseName: 'Romanian Deadlift', muscleGroup: 'hamstrings', targetSets: 3, targetRepsMin: 10, targetRepsMax: 12, restSeconds: 90, targetWeightKg: null, notes: null },
+          { exerciseId: 'cable-fly',         exerciseName: 'Cable Fly',         muscleGroup: 'chest',      targetSets: 3, targetRepsMin: 12, targetRepsMax: 15, restSeconds: 60, targetWeightKg: null, notes: null },
+          { exerciseId: 'pull-up',           exerciseName: 'Pull-Up',           muscleGroup: 'back',       targetSets: 3, targetRepsMin: 6,  targetRepsMax: 10, restSeconds: 90, targetWeightKg: null, notes: null },
+          { exerciseId: 'hip-thrust',        exerciseName: 'Hip Thrust',        muscleGroup: 'glutes',     targetSets: 3, targetRepsMin: 12, targetRepsMax: 15, restSeconds: 90, targetWeightKg: null, notes: null },
+          { exerciseId: 'hanging-leg-raise', exerciseName: 'Hanging Leg Raise', muscleGroup: 'core',       targetSets: 3, targetRepsMin: 10, targetRepsMax: 15, restSeconds: 60, targetWeightKg: null, notes: null },
+        ],
+      },
+    ],
+  },
+
+  // ── 3. UPPER / LOWER — INTERMEDIO (4 days) ────────────────────────────
+  {
+    id: 'upper-lower-intermediate',
+    name: 'Upper/Lower — Intermedio',
+    split: 'Upper/Lower',
+    level: 'intermediate',
+    estimatedMinutesPerDay: 65,
+    imageUrl: null,
+    days: [
+      {
+        dayNumber: 1,
+        name: 'Upper A',
+        estimatedMinutes: 65,
+        slots: [
+          { exerciseId: 'bench-press',    exerciseName: 'Bench Press',    muscleGroup: 'chest',     targetSets: 4, targetRepsMin: 6,  targetRepsMax: 8,  restSeconds: 120, targetWeightKg: null, notes: null },
+          { exerciseId: 'barbell-row',    exerciseName: 'Barbell Row',    muscleGroup: 'back',      targetSets: 4, targetRepsMin: 6,  targetRepsMax: 8,  restSeconds: 90,  targetWeightKg: null, notes: null },
+          { exerciseId: 'overhead-press', exerciseName: 'Overhead Press', muscleGroup: 'shoulders', targetSets: 3, targetRepsMin: 8,  targetRepsMax: 10, restSeconds: 90,  targetWeightKg: null, notes: null },
+          { exerciseId: 'pull-up',        exerciseName: 'Pull-Up',        muscleGroup: 'back',      targetSets: 3, targetRepsMin: 8,  targetRepsMax: 12, restSeconds: 90,  targetWeightKg: null, notes: null },
+          { exerciseId: 'barbell-curl',   exerciseName: 'Barbell Curl',   muscleGroup: 'biceps',    targetSets: 3, targetRepsMin: 10, targetRepsMax: 12, restSeconds: 60,  targetWeightKg: null, notes: null },
+          { exerciseId: 'skull-crusher',  exerciseName: 'Skull Crusher',  muscleGroup: 'triceps',   targetSets: 3, targetRepsMin: 10, targetRepsMax: 12, restSeconds: 60,  targetWeightKg: null, notes: null },
+        ],
+      },
+      {
+        dayNumber: 2,
+        name: 'Lower A',
+        estimatedMinutes: 65,
+        slots: [
+          { exerciseId: 'back-squat',        exerciseName: 'Back Squat',        muscleGroup: 'quads',      targetSets: 4, targetRepsMin: 6,  targetRepsMax: 8,  restSeconds: 120, targetWeightKg: null, notes: null },
+          { exerciseId: 'romanian-deadlift', exerciseName: 'Romanian Deadlift', muscleGroup: 'hamstrings', targetSets: 3, targetRepsMin: 8,  targetRepsMax: 10, restSeconds: 90,  targetWeightKg: null, notes: null },
+          { exerciseId: 'leg-press',         exerciseName: 'Leg Press',         muscleGroup: 'quads',      targetSets: 3, targetRepsMin: 10, targetRepsMax: 12, restSeconds: 90,  targetWeightKg: null, notes: null },
+          { exerciseId: 'leg-curl',          exerciseName: 'Leg Curl',          muscleGroup: 'hamstrings', targetSets: 3, targetRepsMin: 12, targetRepsMax: 15, restSeconds: 60,  targetWeightKg: null, notes: null },
+          { exerciseId: 'calf-raise',        exerciseName: 'Calf Raise',        muscleGroup: 'calves',     targetSets: 4, targetRepsMin: 15, targetRepsMax: 20, restSeconds: 45,  targetWeightKg: null, notes: null },
+          { exerciseId: 'plank',             exerciseName: 'Plank',             muscleGroup: 'core',       targetSets: 3, targetRepsMin: 40, targetRepsMax: 60, restSeconds: 45,  targetWeightKg: null, notes: 'segundos' },
+        ],
+      },
+      {
+        dayNumber: 3,
+        name: 'Upper B',
+        estimatedMinutes: 65,
+        slots: [
+          { exerciseId: 'incline-dumbbell-press', exerciseName: 'Incline Dumbbell Press', muscleGroup: 'chest',     targetSets: 4, targetRepsMin: 8,  targetRepsMax: 10, restSeconds: 90, targetWeightKg: null, notes: null },
+          { exerciseId: 'lat-pulldown',           exerciseName: 'Lat Pulldown',           muscleGroup: 'back',      targetSets: 4, targetRepsMin: 8,  targetRepsMax: 10, restSeconds: 75, targetWeightKg: null, notes: null },
+          { exerciseId: 'lateral-raise',          exerciseName: 'Lateral Raise',          muscleGroup: 'shoulders', targetSets: 4, targetRepsMin: 12, targetRepsMax: 15, restSeconds: 60, targetWeightKg: null, notes: null },
+          { exerciseId: 'cable-fly',              exerciseName: 'Cable Fly',              muscleGroup: 'chest',     targetSets: 3, targetRepsMin: 12, targetRepsMax: 15, restSeconds: 60, targetWeightKg: null, notes: null },
+          { exerciseId: 'hammer-curl',            exerciseName: 'Hammer Curl',            muscleGroup: 'biceps',    targetSets: 3, targetRepsMin: 12, targetRepsMax: 15, restSeconds: 60, targetWeightKg: null, notes: null },
+          { exerciseId: 'tricep-pushdown',        exerciseName: 'Tricep Pushdown',        muscleGroup: 'triceps',   targetSets: 3, targetRepsMin: 12, targetRepsMax: 15, restSeconds: 60, targetWeightKg: null, notes: null },
+        ],
+      },
+      {
+        dayNumber: 4,
+        name: 'Lower B',
+        estimatedMinutes: 65,
+        slots: [
+          { exerciseId: 'deadlift',          exerciseName: 'Deadlift',          muscleGroup: 'back',       targetSets: 4, targetRepsMin: 4,  targetRepsMax: 6,  restSeconds: 180, targetWeightKg: null, notes: null },
+          { exerciseId: 'leg-extension',     exerciseName: 'Leg Extension',     muscleGroup: 'quads',      targetSets: 3, targetRepsMin: 12, targetRepsMax: 15, restSeconds: 60,  targetWeightKg: null, notes: null },
+          { exerciseId: 'hip-thrust',        exerciseName: 'Hip Thrust',        muscleGroup: 'glutes',     targetSets: 3, targetRepsMin: 12, targetRepsMax: 15, restSeconds: 90,  targetWeightKg: null, notes: null },
+          { exerciseId: 'romanian-deadlift', exerciseName: 'Romanian Deadlift', muscleGroup: 'hamstrings', targetSets: 3, targetRepsMin: 10, targetRepsMax: 12, restSeconds: 90,  targetWeightKg: null, notes: null },
+          { exerciseId: 'cable-crunch',      exerciseName: 'Cable Crunch',      muscleGroup: 'core',       targetSets: 3, targetRepsMin: 15, targetRepsMax: 20, restSeconds: 45,  targetWeightKg: null, notes: null },
+          { exerciseId: 'calf-raise',        exerciseName: 'Calf Raise',        muscleGroup: 'calves',     targetSets: 3, targetRepsMin: 15, targetRepsMax: 20, restSeconds: 45,  targetWeightKg: null, notes: null },
+        ],
+      },
+    ],
+  },
+
+  // ── 4. BRO SPLIT — INTERMEDIO (5 days) ───────────────────────────────
+  {
+    id: 'bro-split-intermediate',
+    name: 'Bro Split — Intermedio',
+    split: 'Bro Split',
+    level: 'intermediate',
+    estimatedMinutesPerDay: 55,
+    imageUrl: null,
+    days: [
+      {
+        dayNumber: 1,
+        name: 'Pecho',
+        estimatedMinutes: 55,
+        slots: [
+          { exerciseId: 'bench-press',           exerciseName: 'Bench Press',           muscleGroup: 'chest', targetSets: 4, targetRepsMin: 8,  targetRepsMax: 10, restSeconds: 90, targetWeightKg: null, notes: null },
+          { exerciseId: 'incline-dumbbell-press', exerciseName: 'Incline Dumbbell Press', muscleGroup: 'chest', targetSets: 4, targetRepsMin: 10, targetRepsMax: 12, restSeconds: 75, targetWeightKg: null, notes: null },
+          { exerciseId: 'cable-fly',             exerciseName: 'Cable Fly',             muscleGroup: 'chest', targetSets: 3, targetRepsMin: 12, targetRepsMax: 15, restSeconds: 60, targetWeightKg: null, notes: null },
+          { exerciseId: 'close-grip-bench-press', exerciseName: 'Close Grip Bench Press', muscleGroup: 'triceps', targetSets: 3, targetRepsMin: 10, targetRepsMax: 12, restSeconds: 75, targetWeightKg: null, notes: null },
+          { exerciseId: 'tricep-pushdown',       exerciseName: 'Tricep Pushdown',       muscleGroup: 'triceps', targetSets: 3, targetRepsMin: 12, targetRepsMax: 15, restSeconds: 60, targetWeightKg: null, notes: null },
+        ],
+      },
+      {
+        dayNumber: 2,
+        name: 'Espalda',
+        estimatedMinutes: 60,
+        slots: [
+          { exerciseId: 'deadlift',     exerciseName: 'Deadlift',     muscleGroup: 'back',   targetSets: 4, targetRepsMin: 5,  targetRepsMax: 6,  restSeconds: 180, targetWeightKg: null, notes: null },
+          { exerciseId: 'barbell-row',  exerciseName: 'Barbell Row',  muscleGroup: 'back',   targetSets: 4, targetRepsMin: 8,  targetRepsMax: 10, restSeconds: 90,  targetWeightKg: null, notes: null },
+          { exerciseId: 'pull-up',      exerciseName: 'Pull-Up',      muscleGroup: 'back',   targetSets: 3, targetRepsMin: 8,  targetRepsMax: 12, restSeconds: 90,  targetWeightKg: null, notes: null },
+          { exerciseId: 'lat-pulldown', exerciseName: 'Lat Pulldown', muscleGroup: 'back',   targetSets: 3, targetRepsMin: 10, targetRepsMax: 12, restSeconds: 75,  targetWeightKg: null, notes: null },
+          { exerciseId: 'barbell-curl', exerciseName: 'Barbell Curl', muscleGroup: 'biceps', targetSets: 3, targetRepsMin: 10, targetRepsMax: 12, restSeconds: 60,  targetWeightKg: null, notes: null },
+          { exerciseId: 'hammer-curl',  exerciseName: 'Hammer Curl',  muscleGroup: 'biceps', targetSets: 3, targetRepsMin: 12, targetRepsMax: 15, restSeconds: 60,  targetWeightKg: null, notes: null },
+        ],
+      },
+      {
+        dayNumber: 3,
+        name: 'Hombros',
+        estimatedMinutes: 50,
+        slots: [
+          { exerciseId: 'overhead-press', exerciseName: 'Overhead Press', muscleGroup: 'shoulders', targetSets: 4, targetRepsMin: 8,  targetRepsMax: 10, restSeconds: 90, targetWeightKg: null, notes: null },
+          { exerciseId: 'lateral-raise',  exerciseName: 'Lateral Raise',  muscleGroup: 'shoulders', targetSets: 4, targetRepsMin: 12, targetRepsMax: 15, restSeconds: 60, targetWeightKg: null, notes: null },
+          { exerciseId: 'face-pull',      exerciseName: 'Face Pull',      muscleGroup: 'shoulders', targetSets: 3, targetRepsMin: 15, targetRepsMax: 20, restSeconds: 60, targetWeightKg: null, notes: null },
+          { exerciseId: 'skull-crusher',  exerciseName: 'Skull Crusher',  muscleGroup: 'triceps',   targetSets: 3, targetRepsMin: 10, targetRepsMax: 12, restSeconds: 60, targetWeightKg: null, notes: null },
+          { exerciseId: 'cable-crunch',   exerciseName: 'Cable Crunch',   muscleGroup: 'core',      targetSets: 3, targetRepsMin: 15, targetRepsMax: 20, restSeconds: 45, targetWeightKg: null, notes: null },
+        ],
+      },
+      {
+        dayNumber: 4,
+        name: 'Piernas',
+        estimatedMinutes: 65,
+        slots: [
+          { exerciseId: 'back-squat',        exerciseName: 'Back Squat',        muscleGroup: 'quads',      targetSets: 4, targetRepsMin: 8,  targetRepsMax: 10, restSeconds: 120, targetWeightKg: null, notes: null },
+          { exerciseId: 'romanian-deadlift', exerciseName: 'Romanian Deadlift', muscleGroup: 'hamstrings', targetSets: 3, targetRepsMin: 10, targetRepsMax: 12, restSeconds: 90,  targetWeightKg: null, notes: null },
+          { exerciseId: 'leg-press',         exerciseName: 'Leg Press',         muscleGroup: 'quads',      targetSets: 3, targetRepsMin: 12, targetRepsMax: 15, restSeconds: 90,  targetWeightKg: null, notes: null },
+          { exerciseId: 'leg-extension',     exerciseName: 'Leg Extension',     muscleGroup: 'quads',      targetSets: 3, targetRepsMin: 12, targetRepsMax: 15, restSeconds: 60,  targetWeightKg: null, notes: null },
+          { exerciseId: 'leg-curl',          exerciseName: 'Leg Curl',          muscleGroup: 'hamstrings', targetSets: 3, targetRepsMin: 12, targetRepsMax: 15, restSeconds: 60,  targetWeightKg: null, notes: null },
+          { exerciseId: 'calf-raise',        exerciseName: 'Calf Raise',        muscleGroup: 'calves',     targetSets: 4, targetRepsMin: 15, targetRepsMax: 20, restSeconds: 45,  targetWeightKg: null, notes: null },
+          { exerciseId: 'hip-thrust',        exerciseName: 'Hip Thrust',        muscleGroup: 'glutes',     targetSets: 3, targetRepsMin: 12, targetRepsMax: 15, restSeconds: 90,  targetWeightKg: null, notes: null },
+        ],
+      },
+      {
+        dayNumber: 5,
+        name: 'Full',
+        estimatedMinutes: 50,
+        slots: [
+          { exerciseId: 'bench-press',   exerciseName: 'Bench Press',   muscleGroup: 'chest',    targetSets: 3, targetRepsMin: 10, targetRepsMax: 12, restSeconds: 90, targetWeightKg: null, notes: null },
+          { exerciseId: 'lat-pulldown',  exerciseName: 'Lat Pulldown',  muscleGroup: 'back',     targetSets: 3, targetRepsMin: 10, targetRepsMax: 12, restSeconds: 75, targetWeightKg: null, notes: null },
+          { exerciseId: 'back-squat',    exerciseName: 'Back Squat',    muscleGroup: 'quads',    targetSets: 3, targetRepsMin: 10, targetRepsMax: 12, restSeconds: 90, targetWeightKg: null, notes: null },
+          { exerciseId: 'plank',         exerciseName: 'Plank',         muscleGroup: 'core',     targetSets: 3, targetRepsMin: 40, targetRepsMax: 60, restSeconds: 45, targetWeightKg: null, notes: 'segundos' },
+          { exerciseId: 'hanging-leg-raise', exerciseName: 'Hanging Leg Raise', muscleGroup: 'core', targetSets: 3, targetRepsMin: 12, targetRepsMax: 15, restSeconds: 60, targetWeightKg: null, notes: null },
+        ],
+      },
+    ],
+  },
+
+  // ── 5. POWERLIFTING BASE — AVANZADO (4 days) ──────────────────────────
+  {
+    id: 'powerlifting-base',
+    name: 'Powerlifting Base',
+    split: 'Powerlifting',
+    level: 'advanced',
+    estimatedMinutesPerDay: 75,
+    imageUrl: null,
+    days: [
+      {
+        dayNumber: 1,
+        name: 'Sentadilla',
+        estimatedMinutes: 75,
+        slots: [
+          { exerciseId: 'back-squat',    exerciseName: 'Back Squat',    muscleGroup: 'quads',      targetSets: 5, targetRepsMin: 3,  targetRepsMax: 5,  restSeconds: 180, targetWeightKg: 100.0, notes: '80% 1RM' },
+          { exerciseId: 'leg-press',     exerciseName: 'Leg Press',     muscleGroup: 'quads',      targetSets: 3, targetRepsMin: 8,  targetRepsMax: 10, restSeconds: 120, targetWeightKg: null,  notes: null },
+          { exerciseId: 'leg-curl',      exerciseName: 'Leg Curl',      muscleGroup: 'hamstrings', targetSets: 3, targetRepsMin: 10, targetRepsMax: 12, restSeconds: 60,  targetWeightKg: null,  notes: null },
+          { exerciseId: 'calf-raise',    exerciseName: 'Calf Raise',    muscleGroup: 'calves',     targetSets: 4, targetRepsMin: 12, targetRepsMax: 15, restSeconds: 45,  targetWeightKg: null,  notes: null },
+          { exerciseId: 'cable-crunch',  exerciseName: 'Cable Crunch',  muscleGroup: 'core',       targetSets: 3, targetRepsMin: 15, targetRepsMax: 20, restSeconds: 45,  targetWeightKg: null,  notes: null },
+        ],
+      },
+      {
+        dayNumber: 2,
+        name: 'Press',
+        estimatedMinutes: 70,
+        slots: [
+          { exerciseId: 'bench-press',           exerciseName: 'Bench Press',           muscleGroup: 'chest',     targetSets: 5, targetRepsMin: 3,  targetRepsMax: 5,  restSeconds: 180, targetWeightKg: 80.0,  notes: '80% 1RM' },
+          { exerciseId: 'close-grip-bench-press', exerciseName: 'Close Grip Bench Press', muscleGroup: 'triceps',  targetSets: 3, targetRepsMin: 6,  targetRepsMax: 8,  restSeconds: 90,  targetWeightKg: null,  notes: null },
+          { exerciseId: 'overhead-press',        exerciseName: 'Overhead Press',        muscleGroup: 'shoulders', targetSets: 3, targetRepsMin: 6,  targetRepsMax: 8,  restSeconds: 90,  targetWeightKg: null,  notes: null },
+          { exerciseId: 'tricep-pushdown',       exerciseName: 'Tricep Pushdown',       muscleGroup: 'triceps',   targetSets: 3, targetRepsMin: 10, targetRepsMax: 12, restSeconds: 60,  targetWeightKg: null,  notes: null },
+          { exerciseId: 'face-pull',             exerciseName: 'Face Pull',             muscleGroup: 'shoulders', targetSets: 3, targetRepsMin: 15, targetRepsMax: 20, restSeconds: 60,  targetWeightKg: null,  notes: null },
+        ],
+      },
+      {
+        dayNumber: 3,
+        name: 'Peso Muerto',
+        estimatedMinutes: 75,
+        slots: [
+          { exerciseId: 'deadlift',          exerciseName: 'Deadlift',          muscleGroup: 'back',       targetSets: 5, targetRepsMin: 2,  targetRepsMax: 4,  restSeconds: 240, targetWeightKg: 120.0, notes: '80% 1RM' },
+          { exerciseId: 'romanian-deadlift', exerciseName: 'Romanian Deadlift', muscleGroup: 'hamstrings', targetSets: 3, targetRepsMin: 6,  targetRepsMax: 8,  restSeconds: 120, targetWeightKg: null,  notes: null },
+          { exerciseId: 'barbell-row',       exerciseName: 'Barbell Row',       muscleGroup: 'back',       targetSets: 3, targetRepsMin: 6,  targetRepsMax: 8,  restSeconds: 90,  targetWeightKg: null,  notes: null },
+          { exerciseId: 'pull-up',           exerciseName: 'Pull-Up',           muscleGroup: 'back',       targetSets: 3, targetRepsMin: 6,  targetRepsMax: 10, restSeconds: 90,  targetWeightKg: null,  notes: null },
+          { exerciseId: 'hanging-leg-raise', exerciseName: 'Hanging Leg Raise', muscleGroup: 'core',       targetSets: 3, targetRepsMin: 10, targetRepsMax: 15, restSeconds: 60,  targetWeightKg: null,  notes: null },
+        ],
+      },
+      {
+        dayNumber: 4,
+        name: 'Accesorios',
+        estimatedMinutes: 60,
+        slots: [
+          { exerciseId: 'incline-dumbbell-press', exerciseName: 'Incline Dumbbell Press', muscleGroup: 'chest',     targetSets: 3, targetRepsMin: 8,  targetRepsMax: 10, restSeconds: 75, targetWeightKg: null, notes: null },
+          { exerciseId: 'lat-pulldown',           exerciseName: 'Lat Pulldown',           muscleGroup: 'back',      targetSets: 3, targetRepsMin: 8,  targetRepsMax: 10, restSeconds: 75, targetWeightKg: null, notes: null },
+          { exerciseId: 'lateral-raise',          exerciseName: 'Lateral Raise',          muscleGroup: 'shoulders', targetSets: 3, targetRepsMin: 12, targetRepsMax: 15, restSeconds: 60, targetWeightKg: null, notes: null },
+          { exerciseId: 'barbell-curl',           exerciseName: 'Barbell Curl',           muscleGroup: 'biceps',    targetSets: 3, targetRepsMin: 10, targetRepsMax: 12, restSeconds: 60, targetWeightKg: null, notes: null },
+          { exerciseId: 'skull-crusher',          exerciseName: 'Skull Crusher',          muscleGroup: 'triceps',   targetSets: 3, targetRepsMin: 10, targetRepsMax: 12, restSeconds: 60, targetWeightKg: null, notes: null },
+          { exerciseId: 'plank',                  exerciseName: 'Plank',                  muscleGroup: 'core',      targetSets: 3, targetRepsMin: 45, targetRepsMax: 60, restSeconds: 45, targetWeightKg: null, notes: 'segundos' },
+        ],
+      },
+    ],
+  },
+
+  // ── 6. CALISTENIA PRINCIPIANTE (3 days) ───────────────────────────────
+  {
+    id: 'calistenia-beginner',
+    name: 'Calistenia Principiante',
+    split: 'Full Body',
+    level: 'beginner',
+    estimatedMinutesPerDay: 45,
+    imageUrl: null,
+    days: [
+      {
+        dayNumber: 1,
+        name: 'Empuje + Core',
+        estimatedMinutes: 45,
+        slots: [
+          { exerciseId: 'bench-press',    exerciseName: 'Bench Press',    muscleGroup: 'chest',    targetSets: 3, targetRepsMin: 8,  targetRepsMax: 12, restSeconds: 90, targetWeightKg: null, notes: null },
+          { exerciseId: 'overhead-press', exerciseName: 'Overhead Press', muscleGroup: 'shoulders', targetSets: 3, targetRepsMin: 8,  targetRepsMax: 12, restSeconds: 90, targetWeightKg: null, notes: null },
+          { exerciseId: 'tricep-pushdown', exerciseName: 'Tricep Pushdown', muscleGroup: 'triceps', targetSets: 3, targetRepsMin: 12, targetRepsMax: 15, restSeconds: 60, targetWeightKg: null, notes: null },
+          { exerciseId: 'plank',          exerciseName: 'Plank',          muscleGroup: 'core',     targetSets: 3, targetRepsMin: 20, targetRepsMax: 40, restSeconds: 45, targetWeightKg: null, notes: 'segundos' },
+          { exerciseId: 'cable-crunch',   exerciseName: 'Cable Crunch',   muscleGroup: 'core',     targetSets: 3, targetRepsMin: 15, targetRepsMax: 20, restSeconds: 45, targetWeightKg: null, notes: null },
+        ],
+      },
+      {
+        dayNumber: 2,
+        name: 'Jalón + Piernas',
+        estimatedMinutes: 50,
+        slots: [
+          { exerciseId: 'pull-up',           exerciseName: 'Pull-Up',           muscleGroup: 'back',       targetSets: 3, targetRepsMin: 5,  targetRepsMax: 8,  restSeconds: 90,  targetWeightKg: null, notes: null },
+          { exerciseId: 'lat-pulldown',      exerciseName: 'Lat Pulldown',      muscleGroup: 'back',       targetSets: 3, targetRepsMin: 10, targetRepsMax: 12, restSeconds: 75,  targetWeightKg: null, notes: null },
+          { exerciseId: 'barbell-curl',      exerciseName: 'Barbell Curl',      muscleGroup: 'biceps',     targetSets: 3, targetRepsMin: 10, targetRepsMax: 15, restSeconds: 60,  targetWeightKg: null, notes: null },
+          { exerciseId: 'back-squat',        exerciseName: 'Back Squat',        muscleGroup: 'quads',      targetSets: 3, targetRepsMin: 10, targetRepsMax: 15, restSeconds: 90,  targetWeightKg: null, notes: null },
+          { exerciseId: 'hip-thrust',        exerciseName: 'Hip Thrust',        muscleGroup: 'glutes',     targetSets: 3, targetRepsMin: 12, targetRepsMax: 15, restSeconds: 75,  targetWeightKg: null, notes: null },
+          { exerciseId: 'hanging-leg-raise', exerciseName: 'Hanging Leg Raise', muscleGroup: 'core',       targetSets: 3, targetRepsMin: 8,  targetRepsMax: 12, restSeconds: 60,  targetWeightKg: null, notes: null },
+        ],
+      },
+      {
+        dayNumber: 3,
+        name: 'Full + Isométricos',
+        estimatedMinutes: 45,
+        slots: [
+          { exerciseId: 'deadlift',      exerciseName: 'Deadlift',      muscleGroup: 'back',      targetSets: 3, targetRepsMin: 6,  targetRepsMax: 8,  restSeconds: 120, targetWeightKg: null, notes: null },
+          { exerciseId: 'leg-press',     exerciseName: 'Leg Press',     muscleGroup: 'quads',     targetSets: 3, targetRepsMin: 12, targetRepsMax: 15, restSeconds: 90,  targetWeightKg: null, notes: null },
+          { exerciseId: 'lateral-raise', exerciseName: 'Lateral Raise', muscleGroup: 'shoulders', targetSets: 3, targetRepsMin: 12, targetRepsMax: 15, restSeconds: 60,  targetWeightKg: null, notes: null },
+          { exerciseId: 'cable-fly',     exerciseName: 'Cable Fly',     muscleGroup: 'chest',     targetSets: 3, targetRepsMin: 12, targetRepsMax: 15, restSeconds: 60,  targetWeightKg: null, notes: null },
+          { exerciseId: 'plank',         exerciseName: 'Plank',         muscleGroup: 'core',      targetSets: 4, targetRepsMin: 30, targetRepsMax: 45, restSeconds: 45,  targetWeightKg: null, notes: 'segundos' },
+        ],
+      },
+    ],
+  },
+];
 
 // -- SEEDERS ---------------------------------------------------------------
 
@@ -336,23 +686,59 @@ async function seedExercises() {
   console.log('Exercises seeded.');
 }
 
-// PR 2 will add: async function validateRoutineRefs() { ... }
-// PR 2 will add: async function seedRoutines() { ... }
+// -- VALIDATION ------------------------------------------------------------
+
+function validateRoutineRefs() {
+  const exerciseIds = new Set(exercises.map((e) => e.id));
+  const errors = [];
+  for (const routine of routines) {
+    for (const day of routine.days) {
+      for (const slot of day.slots) {
+        if (!exerciseIds.has(slot.exerciseId)) {
+          errors.push(
+            `Routine '${routine.id}' day ${day.dayNumber} references ` +
+            `unknown exerciseId '${slot.exerciseId}'.`
+          );
+        }
+      }
+    }
+  }
+  if (errors.length > 0) {
+    console.error('Orphan reference validation FAILED:');
+    for (const e of errors) console.error('  - ' + e);
+    throw new Error(
+      `${errors.length} orphan reference(s) found. Aborting before any Firestore writes.`
+    );
+  }
+  console.log('Orphan reference validation passed.');
+}
+
+// -- SEEDERS (continued) ---------------------------------------------------
+
+async function seedRoutines() {
+  validateRoutineRefs();
+  console.log(`Seeding ${routines.length} routines...`);
+  for (const r of routines) {
+    await db.collection('routines').doc(r.id).set(r);
+    console.log(`  Seeded routine: ${r.id}`);
+  }
+  console.log('Routines seeded.');
+}
 
 // -- ENTRYPOINT ------------------------------------------------------------
 
 async function main() {
   const args = process.argv.slice(2);
   const doExercises = args.includes('--exercises') || args.includes('--all');
-  // PR 2 will add: const doRoutines = args.includes('--routines') || args.includes('--all');
+  const doRoutines = args.includes('--routines') || args.includes('--all');
 
-  if (!doExercises /* && !doRoutines */) {
+  if (!doExercises && !doRoutines) {
     console.error('Usage: node seed_workout_catalog.js [--exercises|--routines|--all]');
     process.exit(1);
   }
 
   if (doExercises) await seedExercises();
-  // PR 2: if (doRoutines) await seedRoutines();
+  if (doRoutines) await seedRoutines();
 }
 
 main().catch((err) => {
