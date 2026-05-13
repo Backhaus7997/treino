@@ -22,7 +22,7 @@ final exercisesProvider = FutureProvider<List<Exercise>>((ref) async {
   // future only settles after auth is known — not during AsyncLoading.
   final user = await ref.watch(authStateChangesProvider.future);
   if (user == null) return const [];
-  return ref.read(exerciseRepositoryProvider).listAll();
+  return ref.watch(exerciseRepositoryProvider).listAll();
 });
 
 /// O(1) in-memory lookup. Derives from [exercisesProvider] — never re-fetches

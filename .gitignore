@@ -49,7 +49,7 @@ app.*.map.json
 .claude/worktrees/
 
 # Firebase Admin SDK service account credentials — NEVER commit
-scripts/treino-dev-service-account.json
+scripts/treino-dev-service-account*.json
 scripts/*.serviceAccount.json
 scripts/node_modules/
 scripts/.env
