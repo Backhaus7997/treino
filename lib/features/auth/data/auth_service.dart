@@ -1,22 +1,28 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/services.dart' show PlatformException;
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart' hide generateNonce;
 
 import '../domain/auth_failure.dart';
 import '../../profile/data/user_repository.dart';
+import 'apple_sign_in_gateway.dart';
+import 'nonce_helpers.dart';
 
 class AuthService {
   AuthService({
     required FirebaseAuth firebaseAuth,
     required UserRepository userRepository,
     GoogleSignIn? googleSignIn,
+    AppleSignInGateway appleGateway = const RealAppleSignInGateway(),
   })  : _auth = firebaseAuth,
         _userRepository = userRepository,
-        _googleSignIn = googleSignIn ?? GoogleSignIn.instance;
+        _googleSignIn = googleSignIn ?? GoogleSignIn.instance,
+        _appleGateway = appleGateway;
 
   final FirebaseAuth _auth;
   final UserRepository _userRepository;
   final GoogleSignIn _googleSignIn;
+  final AppleSignInGateway _appleGateway;
 
   /// Creates the user, sends verification email, then atomically creates the
   /// Firestore profile doc with `displayName: null` (REQ-PROF-033, REQ-AUTH-002).
@@ -184,6 +190,67 @@ class AuthService {
     // Always writes `displayName: null` — ProfileSetup (Etapa 6) populates it.
     // Defensive `?? ''` on email: Firebase Auth's User.email is nullable even
     // though Google always provides one.
+    try {
+      await _userRepository.createIfAbsent(
+        uid: cred.user!.uid,
+        email: cred.user!.email ?? '',
+      );
+    } catch (_) {
+      // Swallow — auth already succeeded; createIfAbsent is best-effort.
+    }
+
+    return cred.user!;
+  }
+
+  /// Launches the native Apple Sign-In sheet and exchanges the OAuth
+  /// credential with Firebase Auth. Mirrors [signInWithGoogle] — Firebase
+  /// resolves new vs existing users transparently; ProfileSetup (Etapa 6)
+  /// owns the displayName, so we never call [User.updateDisplayName] here.
+  ///
+  /// Throws [AuthFailure.signInCancelled] when the user dismisses the native
+  /// sheet, [AuthFailure.networkError] on any other Apple-side failure, and
+  /// [AuthFailure.fromFirebase] for any FirebaseAuthException.
+  ///
+  /// Crucial: passes the Apple `authorizationCode` as `accessToken` to
+  /// [OAuthProvider.credential] — without it, Firebase fails to validate the
+  /// identity token server-side and returns `invalid-credential`.
+  Future<User> signInWithApple() async {
+    final rawNonce = generateNonce();
+    final hashedNonce = sha256OfString(rawNonce);
+
+    final AuthorizationCredentialAppleID appleCred;
+    try {
+      appleCred = await _appleGateway.getAppleIDCredential(
+        scopes: const [
+          AppleIDAuthorizationScopes.email,
+          AppleIDAuthorizationScopes.fullName,
+        ],
+        nonce: hashedNonce, // HASH to Apple
+      );
+    } on SignInWithAppleAuthorizationException catch (e) {
+      if (e.code == AuthorizationErrorCode.canceled) {
+        throw const AuthFailure.signInCancelled();
+      }
+      throw const AuthFailure.networkError();
+    } catch (_) {
+      throw const AuthFailure.networkError();
+    }
+
+    final oauthCredential = OAuthProvider('apple.com').credential(
+      idToken: appleCred.identityToken,
+      rawNonce: rawNonce, // RAW to Firebase
+      accessToken: appleCred.authorizationCode,
+    );
+
+    final UserCredential cred;
+    try {
+      cred = await _auth.signInWithCredential(oauthCredential);
+    } on FirebaseAuthException catch (e) {
+      throw AuthFailure.fromFirebase(e);
+    }
+
+    // Etapa 2 backfill — mirrors Google flow (REQ-PROF-036 / REQ-PROF-037).
+    // Apple may not return an email after the first sign-in; defensive `?? ''`.
     try {
       await _userRepository.createIfAbsent(
         uid: cred.user!.uid,

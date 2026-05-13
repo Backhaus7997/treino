@@ -46,6 +46,22 @@ class AuthNotifier extends AsyncNotifier<User?> {
     state = result;
   }
 
+  /// Triggers the native Apple Sign-In sheet. Same cancel-restore semantics
+  /// as [signInWithGoogle].
+  Future<void> signInWithApple() async {
+    final service = ref.read(authServiceProvider);
+    final previousUser = state.valueOrNull;
+    state = const AsyncLoading();
+    final result = await AsyncValue.guard(() => service.signInWithApple());
+    if (result is AsyncError &&
+        result.error == const AuthFailure.signInCancelled()) {
+      // Silent restore — no banner for intentional dismissal.
+      state = AsyncData(previousUser);
+      return;
+    }
+    state = result;
+  }
+
   Future<void> signUp({
     required String email,
     required String password,
