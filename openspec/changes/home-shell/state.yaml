@@ -1,0 +1,22 @@
+change: home-shell
+fase: "Fase 2 · Etapa 1"
+branch: feat/home-shell
+artifact_store: openspec
+execution_mode: interactive
+delivery_strategy: ask-on-risk
+tdd: strict
+
+phases:
+  explore: done
+  propose: done
+  spec: done
+  design: pending
+  tasks: pending
+  apply: pending
+  verify: pending
+  archive: pending
+
+artifacts:
+  explore: openspec/changes/home-shell/explore.md
+  propose: openspec/changes/home-shell/propose.md
+  spec: openspec/changes/home-shell/spec.md
