@@ -45,8 +45,7 @@ void main() {
       expect(result, isEmpty);
     });
 
-    test(
-        'SCENARIO-068: authenticated with 2 seeded routines returns list of 2',
+    test('SCENARIO-068: authenticated with 2 seeded routines returns list of 2',
         () async {
       final firestore = FakeFirebaseFirestore();
       for (var i = 1; i <= 2; i++) {
@@ -93,8 +92,8 @@ void main() {
       );
       addTearDown(container.dispose);
 
-      final result =
-          await container.read(routineByIdProvider('full-body-beginner').future);
+      final result = await container
+          .read(routineByIdProvider('full-body-beginner').future);
       expect(result, isNotNull);
       expect(result!.id, equals('full-body-beginner'));
     });
@@ -119,7 +118,8 @@ void main() {
       );
       addTearDown(container.dispose);
 
-      final result = await container.read(routineByIdProvider('missing').future);
+      final result =
+          await container.read(routineByIdProvider('missing').future);
       expect(result, isNull);
     });
   });

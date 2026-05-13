@@ -11,7 +11,8 @@ class Routine with _$Routine {
   const factory Routine({
     required String id,
     required String name,
-    required String split, // 'PPL' | 'Full Body' | 'Upper/Lower' | ... (free-form)
+    required String
+        split, // 'PPL' | 'Full Body' | 'Upper/Lower' | ... (free-form)
     required ExperienceLevel level,
     required List<RoutineDay> days, // empty list valid (spec SCENARIO-052)
     int? estimatedMinutesPerDay,

@@ -1,8 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/features/profile/domain/experience_level.dart';
 import 'package:treino/features/workout/domain/routine.dart';
-import 'package:treino/features/workout/domain/routine_day.dart';
-import 'package:treino/features/workout/domain/routine_slot.dart';
 
 void main() {
   group('Routine', () {

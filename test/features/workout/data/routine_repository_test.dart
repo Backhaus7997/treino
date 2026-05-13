@@ -118,7 +118,8 @@ void main() {
       expect(result.days[0].slots[1].exerciseId, equals('romanian-deadlift'));
     });
 
-    test('SCENARIO-063: routine with days: [] deserializes to empty List<RoutineDay>',
+    test(
+        'SCENARIO-063: routine with days: [] deserializes to empty List<RoutineDay>',
         () async {
       await seedRoutine(id: 'empty-routine', days: []);
 
