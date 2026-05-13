@@ -71,6 +71,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
+  Future<void> _signInWithApple() async {
+    await ref.read(authNotifierProvider.notifier).signInWithApple();
+    if (!mounted) return;
+    final s = ref.read(authNotifierProvider);
+    if (s.hasValue && s.valueOrNull != null) {
+      context.go('/home');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authNotifierProvider);
@@ -208,11 +217,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         ),
                       ),
                       const SizedBox(width: 12),
-                      const Expanded(
+                      Expanded(
                         child: AuthSecondaryButton(
                           icon: FontAwesomeIcons.apple,
                           label: AuthStrings.appleLabel,
-                          onPressed: null,
+                          onPressed: isLoading ? null : _signInWithApple,
                         ),
                       ),
                     ],

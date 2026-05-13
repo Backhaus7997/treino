@@ -121,8 +121,7 @@ void main() {
     expect(find.byType(AuthSecondaryButton), findsNWidgets(2));
   });
 
-  testWidgets(
-      'Google button is enabled (wired to AuthNotifier), Apple is disabled',
+  testWidgets('Google and Apple buttons are both wired to AuthNotifier',
       (tester) async {
     await tester.pumpWidget(_buildApp());
     await tester.pumpAndSettle();
@@ -138,8 +137,8 @@ void main() {
     expect(secondary[0].onPressed, isNotNull,
         reason: 'Google must be wired to AuthNotifier.signInWithGoogle');
     expect(secondary[1].label, 'APPLE');
-    expect(secondary[1].onPressed, isNull,
-        reason: 'Apple stays disabled until Etapa 5 lands');
+    expect(secondary[1].onPressed, isNotNull,
+        reason: 'Apple must be wired to AuthNotifier.signInWithApple');
   });
 
   // ---------------------------------------------------------------------------

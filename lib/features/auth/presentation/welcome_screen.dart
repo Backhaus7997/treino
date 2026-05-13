@@ -119,11 +119,13 @@ class WelcomeScreen extends ConsumerWidget {
                                 ),
                               ),
                               const SizedBox(width: 12),
-                              const Expanded(
+                              Expanded(
                                 child: AuthSecondaryButton(
                                   icon: FontAwesomeIcons.apple,
                                   label: AuthStrings.appleLabel,
-                                  onPressed: null,
+                                  onPressed: isLoading
+                                      ? null
+                                      : () => _signInWithApple(context, ref),
                                 ),
                               ),
                             ],
@@ -171,6 +173,15 @@ class WelcomeScreen extends ConsumerWidget {
   Future<void> _signInWithGoogle(BuildContext context, WidgetRef ref) async {
     // No intent gating on Welcome — both new and existing users land in /home.
     await ref.read(authNotifierProvider.notifier).signInWithGoogle();
+    if (!context.mounted) return;
+    final s = ref.read(authNotifierProvider);
+    if (s.hasValue && s.valueOrNull != null) {
+      context.go('/home');
+    }
+  }
+
+  Future<void> _signInWithApple(BuildContext context, WidgetRef ref) async {
+    await ref.read(authNotifierProvider.notifier).signInWithApple();
     if (!context.mounted) return;
     final s = ref.read(authNotifierProvider);
     if (s.hasValue && s.valueOrNull != null) {
