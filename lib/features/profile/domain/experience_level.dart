@@ -34,3 +34,13 @@ extension ExperienceLevelX on ExperienceLevel {
         ExperienceLevel.advanced => 'advanced',
       };
 }
+
+extension ExperienceLevelEs on ExperienceLevel {
+  /// Spanish display label. Used by [RoutineCard] subtitle and
+  /// [LevelFilterPills] chip labels.
+  String get displayNameEs => switch (this) {
+        ExperienceLevel.beginner => 'Principiante',
+        ExperienceLevel.intermediate => 'Intermedio',
+        ExperienceLevel.advanced => 'Avanzado',
+      };
+}

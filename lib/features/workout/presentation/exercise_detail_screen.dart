@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
@@ -21,14 +22,45 @@ class ExerciseDetailScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final exerciseAsync = ref.watch(exerciseByIdProvider(exerciseId));
 
-    return exerciseAsync.when(
-      data: (exercise) => exercise == null
-          ? const _NotFoundState(label: 'Ejercicio no encontrado')
-          : _ExerciseDetailContent(exercise: exercise),
-      loading: () => const _ExerciseLoadingSkeleton(),
-      error: (_, __) => _ErrorState(
-        message: 'No pudimos cargar el ejercicio.',
-        onRetry: () => ref.invalidate(exerciseByIdProvider(exerciseId)),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const _BackBar(),
+        Expanded(
+          child: exerciseAsync.when(
+            data: (exercise) => exercise == null
+                ? const _NotFoundState(label: 'Ejercicio no encontrado')
+                : _ExerciseDetailContent(exercise: exercise),
+            loading: () => const _ExerciseLoadingSkeleton(),
+            error: (_, __) => _ErrorState(
+              message: 'No pudimos cargar el ejercicio.',
+              onRetry: () => ref.invalidate(exerciseByIdProvider(exerciseId)),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Persistent top-left back button. Always visible across loading / error /
+/// not-found / data states so the user can never dead-end on a deep-linked
+/// screen (REQ-RDT-020 strengthened).
+class _BackBar extends StatelessWidget {
+  const _BackBar();
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(left: 4, top: 4),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: IconButton(
+          icon: Icon(TreinoIcon.back, color: palette.textPrimary),
+          onPressed: () =>
+              context.canPop() ? context.pop() : context.go('/workout'),
+        ),
       ),
     );
   }

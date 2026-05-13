@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_background.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/workout/application/exercise_providers.dart';
 import 'package:treino/features/workout/domain/exercise.dart';
 import 'package:treino/features/workout/presentation/exercise_detail_screen.dart';
@@ -83,7 +84,8 @@ void main() {
       expect(find.textContaining('cargar'), findsAtLeastNWidgets(1));
     });
 
-    testWidgets('SCENARIO-100: AsyncData(null) shows "Ejercicio no encontrado"',
+    testWidgets(
+        'SCENARIO-100: AsyncData(null) shows "Ejercicio no encontrado" + back button',
         (tester) async {
       await tester.pumpWidget(_wrapWithOverrides(
         const ExerciseDetailScreen(exerciseId: 'bench-press'),
@@ -93,6 +95,8 @@ void main() {
       ));
       await tester.pump(const Duration(milliseconds: 50));
       expect(find.textContaining('no encontrado'), findsOneWidget);
+      // Back button MUST be present so the user can never dead-end.
+      expect(find.byIcon(TreinoIcon.back), findsOneWidget);
     });
 
     testWidgets('SCENARIO-101: breadcrumb and title render in uppercase',
@@ -193,6 +197,14 @@ void main() {
         ],
       ));
       await tester.pump(const Duration(milliseconds: 50));
+      // HISTORIAL is the last section in a CustomScrollView — outside the
+      // default test viewport once the persistent back-bar takes ~48px off the
+      // top. Scroll it into view before asserting.
+      await tester.scrollUntilVisible(
+        find.text('Aún no entrenaste este ejercicio'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
       expect(find.text('HISTORIAL'), findsOneWidget);
       expect(
         find.text('Aún no entrenaste este ejercicio'),

@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_background.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/workout/application/routine_providers.dart';
 import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/domain/routine_day.dart';
@@ -121,7 +122,8 @@ void main() {
       expect(find.textContaining('cargar'), findsAtLeastNWidgets(1));
     });
 
-    testWidgets('SCENARIO-078: AsyncData(null) shows "Rutina no encontrada"',
+    testWidgets(
+        'SCENARIO-078: AsyncData(null) shows "Rutina no encontrada" + back button',
         (tester) async {
       await tester.pumpWidget(_wrapWithOverrides(
         const RoutineDetailScreen(routineId: 'test-id'),
@@ -132,6 +134,8 @@ void main() {
       await tester.pump(const Duration(milliseconds: 50));
       expect(find.textContaining('no encontrada'), findsOneWidget);
       expect(find.byType(ExerciseSlotRow), findsNothing);
+      // Back button MUST be present so the user can never dead-end.
+      expect(find.byIcon(TreinoIcon.back), findsOneWidget);
     });
 
     testWidgets(

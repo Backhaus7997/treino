@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
+import '../../../core/widgets/treino_icon.dart';
 import '../application/routine_providers.dart';
 import '../domain/routine.dart';
 import '../domain/routine_day.dart';
@@ -31,30 +32,65 @@ class _RoutineDetailScreenState extends ConsumerState<RoutineDetailScreen> {
   Widget build(BuildContext context) {
     final routineAsync = ref.watch(routineByIdProvider(widget.routineId));
 
-    return routineAsync.when(
-      data: (routine) {
-        if (routine == null) {
-          return const _NotFoundState(label: 'Rutina no encontrada');
-        }
-        final dayIndex = selectedDayIndex.clamp(0, routine.days.length - 1);
-        final day = routine.days.isEmpty ? null : routine.days[dayIndex];
-        if (day == null) {
-          return const _EmptyState(
-              message: 'Esta rutina no tiene días configurados.');
-        }
-        return _RoutineDetailContent(
-          routine: routine,
-          day: day,
-          selectedDayIndex: dayIndex,
-          onSelectDay: (i) => setState(() => selectedDayIndex = i),
-          onSlotTap: (slot) =>
-              context.push('/workout/exercise/${slot.exerciseId}'),
-        );
-      },
-      loading: () => const _RoutineLoadingSkeleton(),
-      error: (_, __) => _ErrorState(
-        message: 'No pudimos cargar la rutina.',
-        onRetry: () => ref.invalidate(routineByIdProvider(widget.routineId)),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const _BackBar(),
+        Expanded(
+          child: routineAsync.when(
+            data: (routine) {
+              if (routine == null) {
+                return const _NotFoundState(label: 'Rutina no encontrada');
+              }
+              // `clamp(0, length - 1)` throws when length == 0 — empty-check
+              // BEFORE clamping.
+              if (routine.days.isEmpty) {
+                return const _EmptyState(
+                    message: 'Esta rutina no tiene días configurados.');
+              }
+              final dayIndex =
+                  selectedDayIndex.clamp(0, routine.days.length - 1);
+              final day = routine.days[dayIndex];
+              return _RoutineDetailContent(
+                routine: routine,
+                day: day,
+                selectedDayIndex: dayIndex,
+                onSelectDay: (i) => setState(() => selectedDayIndex = i),
+                onSlotTap: (slot) =>
+                    context.push('/workout/exercise/${slot.exerciseId}'),
+              );
+            },
+            loading: () => const _RoutineLoadingSkeleton(),
+            error: (_, __) => _ErrorState(
+              message: 'No pudimos cargar la rutina.',
+              onRetry: () =>
+                  ref.invalidate(routineByIdProvider(widget.routineId)),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Persistent top-left back button. Always visible so the user can never
+/// dead-end on a deep-linked screen — even in loading, error, or not-found
+/// states (REQ-RDT-016 strengthened).
+class _BackBar extends StatelessWidget {
+  const _BackBar();
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(left: 4, top: 4),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: IconButton(
+          icon: Icon(TreinoIcon.back, color: palette.textPrimary),
+          onPressed: () =>
+              context.canPop() ? context.pop() : context.go('/workout'),
+        ),
       ),
     );
   }
