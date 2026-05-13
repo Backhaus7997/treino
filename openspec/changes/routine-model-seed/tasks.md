@@ -118,7 +118,7 @@ Branch: `feat/routine-model-seed-routines` (created after PR 1 merges to main)
 
 ---
 
-- [ ] **TASK-010a — Write `routine_slot_test.dart` (RED)**
+- [x] **TASK-010a — Write `routine_slot_test.dart` (RED)**
   - **REQ refs**: REQ-RT-MODEL-001
   - **Files**: `test/features/workout/domain/routine_slot_test.dart`
   - **Done when**: File exists with three named tests covering SCENARIO-043, SCENARIO-044, SCENARIO-045. Running `flutter test test/features/workout/domain/routine_slot_test.dart` fails with compile errors (model not yet created).
@@ -126,7 +126,7 @@ Branch: `feat/routine-model-seed-routines` (created after PR 1 merges to main)
 
 ---
 
-- [ ] **TASK-010b — Implement `routine_slot.dart` and run `build_runner` (GREEN)**
+- [x] **TASK-010b — Implement `routine_slot.dart` and run `build_runner` (GREEN)**
   - **REQ refs**: REQ-RT-MODEL-001, REQ-RT-MODEL-005
   - **Files**: `lib/features/workout/domain/routine_slot.dart`, `lib/features/workout/domain/routine_slot.freezed.dart` (generated), `lib/features/workout/domain/routine_slot.g.dart` (generated)
   - **Done when**: `dart run build_runner build --delete-conflicting-outputs` exits 0. `flutter test test/features/workout/domain/routine_slot_test.dart` passes all 3 tests (SCENARIO-043..045 green).
@@ -134,7 +134,7 @@ Branch: `feat/routine-model-seed-routines` (created after PR 1 merges to main)
 
 ---
 
-- [ ] **TASK-011a — Write `routine_day_test.dart` (RED)**
+- [x] **TASK-011a — Write `routine_day_test.dart` (RED)**
   - **REQ refs**: REQ-RT-MODEL-002
   - **Files**: `test/features/workout/domain/routine_day_test.dart`
   - **Done when**: File exists with three named tests covering SCENARIO-046, SCENARIO-047, SCENARIO-048. Running `flutter test test/features/workout/domain/routine_day_test.dart` fails (model not yet created).
@@ -142,7 +142,7 @@ Branch: `feat/routine-model-seed-routines` (created after PR 1 merges to main)
 
 ---
 
-- [ ] **TASK-011b — Implement `routine_day.dart` and run `build_runner` (GREEN)**
+- [x] **TASK-011b — Implement `routine_day.dart` and run `build_runner` (GREEN)**
   - **REQ refs**: REQ-RT-MODEL-002, REQ-RT-MODEL-005
   - **Files**: `lib/features/workout/domain/routine_day.dart`, `lib/features/workout/domain/routine_day.freezed.dart` (generated), `lib/features/workout/domain/routine_day.g.dart` (generated)
   - **Done when**: `dart run build_runner build --delete-conflicting-outputs` exits 0. `flutter test test/features/workout/domain/routine_day_test.dart` passes all 3 tests (SCENARIO-046..048 green).
@@ -150,7 +150,7 @@ Branch: `feat/routine-model-seed-routines` (created after PR 1 merges to main)
 
 ---
 
-- [ ] **TASK-012a — Write `routine_test.dart` (RED)**
+- [x] **TASK-012a — Write `routine_test.dart` (RED)**
   - **REQ refs**: REQ-RT-MODEL-003, REQ-RT-MODEL-004, REQ-RT-MODEL-005
   - **Files**: `test/features/workout/domain/routine_test.dart`
   - **Done when**: File exists with nine named tests covering SCENARIO-049 through SCENARIO-057. Running `flutter test test/features/workout/domain/routine_test.dart` fails (model not yet created). SCENARIO-056 tests unknown `level` value throws. SCENARIO-057 is documented as a checklist note (not a `test()` call — verified by build_runner exit code).
@@ -158,7 +158,7 @@ Branch: `feat/routine-model-seed-routines` (created after PR 1 merges to main)
 
 ---
 
-- [ ] **TASK-012b — Implement `routine.dart` and run `build_runner` (GREEN)**
+- [x] **TASK-012b — Implement `routine.dart` and run `build_runner` (GREEN)**
   - **REQ refs**: REQ-RT-MODEL-003, REQ-RT-MODEL-004, REQ-RT-MODEL-005
   - **Files**: `lib/features/workout/domain/routine.dart`, `lib/features/workout/domain/routine.freezed.dart` (generated), `lib/features/workout/domain/routine.g.dart` (generated)
   - **Done when**: `dart run build_runner build --delete-conflicting-outputs` exits 0 and produces all 8 generated files (`exercise.freezed.dart`, `exercise.g.dart`, `routine_slot.freezed.dart`, `routine_slot.g.dart`, `routine_day.freezed.dart`, `routine_day.g.dart`, `routine.freezed.dart`, `routine.g.dart`). `flutter test test/features/workout/domain/routine_test.dart` passes all 9 tests. SCENARIO-057 is confirmed (8 generated files present). Record in apply-progress.
@@ -166,7 +166,7 @@ Branch: `feat/routine-model-seed-routines` (created after PR 1 merges to main)
 
 ---
 
-- [ ] **TASK-013a — Write `routine_repository_test.dart` (RED)**
+- [x] **TASK-013a — Write `routine_repository_test.dart` (RED)**
   - **REQ refs**: REQ-RT-REPO-001, REQ-RT-REPO-002
   - **Files**: `test/features/workout/data/routine_repository_test.dart`
   - **Done when**: File exists with six named tests covering SCENARIO-058, SCENARIO-059, SCENARIO-060, SCENARIO-061, SCENARIO-062, SCENARIO-063. Uses `FakeFirebaseFirestore` and the `seedRoutine` helper from design.md §7 (PR 2). Running `flutter test test/features/workout/data/routine_repository_test.dart` fails (repository not yet created).
@@ -174,7 +174,7 @@ Branch: `feat/routine-model-seed-routines` (created after PR 1 merges to main)
 
 ---
 
-- [ ] **TASK-013b — Implement `routine_repository.dart` (GREEN)**
+- [x] **TASK-013b — Implement `routine_repository.dart` (GREEN)**
   - **REQ refs**: REQ-RT-REPO-001, REQ-RT-REPO-002
   - **Files**: `lib/features/workout/data/routine_repository.dart`
   - **Done when**: `flutter test test/features/workout/data/routine_repository_test.dart` passes all 6 tests (SCENARIO-058..063 green). `flutter analyze lib/features/workout/data/routine_repository.dart` reports 0 issues.
@@ -182,7 +182,7 @@ Branch: `feat/routine-model-seed-routines` (created after PR 1 merges to main)
 
 ---
 
-- [ ] **TASK-014a — Write `routine_providers_test.dart` (RED)**
+- [x] **TASK-014a — Write `routine_providers_test.dart` (RED)**
   - **REQ refs**: REQ-RT-PROVIDERS-001
   - **Files**: `test/features/workout/application/routine_providers_test.dart`
   - **Done when**: File exists with four named tests covering SCENARIO-067, SCENARIO-068, SCENARIO-069, SCENARIO-070. Uses `ProviderContainer` with auth and repository overrides. Running `flutter test test/features/workout/application/routine_providers_test.dart` fails (providers not yet created).
@@ -190,7 +190,7 @@ Branch: `feat/routine-model-seed-routines` (created after PR 1 merges to main)
 
 ---
 
-- [ ] **TASK-014b — Implement `routine_providers.dart` (GREEN)**
+- [x] **TASK-014b — Implement `routine_providers.dart` (GREEN)**
   - **REQ refs**: REQ-RT-PROVIDERS-001
   - **Files**: `lib/features/workout/application/routine_providers.dart`
   - **Done when**: `flutter test test/features/workout/application/routine_providers_test.dart` passes all 4 tests (SCENARIO-067..070 green). `flutter analyze lib/features/workout/application/routine_providers.dart` reports 0 issues.
@@ -198,7 +198,7 @@ Branch: `feat/routine-model-seed-routines` (created after PR 1 merges to main)
 
 ---
 
-- [ ] **TASK-015 — Add `routines` block to `firestore.rules`**
+- [x] **TASK-015 — Add `routines` block to `firestore.rules`**
   - **REQ refs**: REQ-RT-RULES-001
   - **Files**: `firestore.rules`
   - **Done when**: `firestore.rules` contains `match /routines/{routineId}` with `allow read: if request.auth != null;` and `allow write: if false;` AFTER the `exercises` block (which PR 1 already added). The existing `users` and `exercises` blocks are unchanged. Manual emulator or dry-run validation confirms SCENARIO-064, SCENARIO-065, SCENARIO-066 pass. Result recorded in apply-progress.
@@ -206,7 +206,7 @@ Branch: `feat/routine-model-seed-routines` (created after PR 1 merges to main)
 
 ---
 
-- [ ] **TASK-016 — Extend `seed_workout_catalog.js` with `seedRoutines()`, orphan validation, and `--routines` flag**
+- [x] **TASK-016 — Extend `seed_workout_catalog.js` with `seedRoutines()`, orphan validation, and `--routines` flag**
   - **REQ refs**: REQ-RT-SEED-001, REQ-RT-SEED-002
   - **Files**: `scripts/seed_workout_catalog.js`, `scripts/package.json`
   - **Done when**: `scripts/seed_workout_catalog.js` contains `const routines = [...]` with ≥6 routine objects (PPL beginner, Full Body 3-day, Upper/Lower 4-day, plus ≥1 extra variety). Each routine has ≥1 `RoutineDay`, each day has ≥1 `RoutineSlot`. `validateRoutineRefs()` function iterates all slots and verifies each `exerciseId` against `const exercises`. `seedRoutines()` calls `validateRoutineRefs()` first. `main()` handles `--routines` and `--all` flags. `scripts/package.json` includes `"seed:routines"` script. SCENARIO-071, SCENARIO-072, SCENARIO-073, SCENARIO-074 are manually verifiable.
@@ -214,7 +214,7 @@ Branch: `feat/routine-model-seed-routines` (created after PR 1 merges to main)
 
 ---
 
-- [ ] **TASK-017 — Manual seed run against dev Firebase project (full catalog)**
+- [x] **TASK-017 — Manual seed run against dev Firebase project (full catalog)**
   - **REQ refs**: REQ-RT-SEED-001, REQ-RT-SEED-002
   - **Files**: none (manual verification step)
   - **Done when**: `node seed_workout_catalog.js --all` completes successfully. Firebase Console shows ≥25 docs in `exercises/` and ≥6 docs in `routines/`. Re-running produces same counts (idempotency — SCENARIO-072). Orphan validation test: temporarily set a slot's `exerciseId` to `'does-not-exist'`, re-run, confirm non-zero exit + error message naming the orphan + zero Firestore writes for routines (SCENARIO-074). Revert the change. Results recorded in apply-progress.
@@ -222,7 +222,7 @@ Branch: `feat/routine-model-seed-routines` (created after PR 1 merges to main)
 
 ---
 
-- [ ] **TASK-018 — PR 2 quality gates**
+- [x] **TASK-018 — PR 2 quality gates**
   - **REQ refs**: Cross-cutting constraints §5 and §6
   - **Files**: none (verification step; may patch formatting drift)
   - **Done when**: `flutter analyze` exits 0 with no issues across all new and modified Dart files (PR 2 additions: `routine_slot.dart`, `routine_day.dart`, `routine.dart`, `routine_repository.dart`, `routine_providers.dart`, `firestore.rules`). `dart format . --output=none --set-exit-if-changed` exits 0. `flutter test` runs the full suite and all new tests are green. Total new passing tests across both PRs: ≥35 (SCENARIO-020..031, SCENARIO-035..038 from PR 1, plus SCENARIO-043..063, SCENARIO-067..070 from PR 2). Results recorded in apply-progress.
