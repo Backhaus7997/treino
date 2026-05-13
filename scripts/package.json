@@ -5,6 +5,7 @@
   "description": "Treino workout catalog seed scripts.",
   "scripts": {
     "seed:exercises": "node seed_workout_catalog.js --exercises",
+    "seed:routines": "node seed_workout_catalog.js --routines",
     "seed:all": "node seed_workout_catalog.js --all"
   },
   "dependencies": {

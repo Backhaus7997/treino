@@ -39,5 +39,12 @@ service cloud.firestore {
       // Catálogo writeable solo via Admin SDK (seed script).
       allow write: if false;
     }
+
+    match /routines/{routineId} {
+      // Catálogo público para usuarios autenticados.
+      allow read: if request.auth != null;
+      // Rutinas writeables solo via Admin SDK (seed script).
+      allow write: if false;
+    }
   }
 }
