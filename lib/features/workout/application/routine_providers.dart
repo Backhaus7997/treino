@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../auth/application/auth_providers.dart';
 import '../../profile/application/user_providers.dart' show firestoreProvider;
+import '../../profile/domain/experience_level.dart';
 import '../data/routine_repository.dart';
 import '../domain/routine.dart';
 
@@ -28,3 +29,23 @@ final routineByIdProvider = FutureProvider.family<Routine?, String>(
     return null;
   },
 );
+
+/// Currently selected level filter for the Plantillas section.
+/// `null` means "Todas" (no filter applied).
+final routinesLevelFilterProvider =
+    StateProvider<ExperienceLevel?>((ref) => null);
+
+/// Derived view of [routinesProvider] filtered by [routinesLevelFilterProvider].
+/// Returns an [AsyncValue] so the UI keeps a unified loading/error contract.
+/// When the filter is `null`, the full list is returned unchanged.
+///
+/// [AsyncValue.whenData] preserves loading and error states automatically
+/// — only the data branch runs the transform.
+final filteredRoutinesProvider = Provider<AsyncValue<List<Routine>>>((ref) {
+  final routines = ref.watch(routinesProvider);
+  final filter = ref.watch(routinesLevelFilterProvider);
+  return routines.whenData((list) {
+    if (filter == null) return list;
+    return list.where((r) => r.level == filter).toList();
+  });
+});
