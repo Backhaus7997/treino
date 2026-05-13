@@ -32,5 +32,12 @@ service cloud.firestore {
       // Delete denied — account deletion goes through privileged Cloud Function.
       allow delete: if false;
     }
+
+    match /exercises/{exerciseId} {
+      // Catálogo público para usuarios autenticados.
+      allow read: if request.auth != null;
+      // Catálogo writeable solo via Admin SDK (seed script).
+      allow write: if false;
+    }
   }
 }
