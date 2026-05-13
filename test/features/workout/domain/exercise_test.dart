@@ -4,7 +4,7 @@ import 'package:treino/features/workout/domain/exercise.dart';
 void main() {
   group('Exercise', () {
     test('SCENARIO-020: required-only roundtrip, all nullable fields null', () {
-      final exercise = Exercise(
+      const exercise = Exercise(
         id: 'bench-press',
         name: 'Bench Press',
         muscleGroup: 'chest',
@@ -25,7 +25,7 @@ void main() {
     });
 
     test('SCENARIO-021: all 7 fields populated roundtrip', () {
-      final exercise = Exercise(
+      const exercise = Exercise(
         id: 'squat',
         name: 'Back Squat',
         muscleGroup: 'quads',
@@ -53,14 +53,18 @@ void main() {
         'name': 'Deadlift',
         'muscleGroup': 'back',
         'category': 'compound',
-        'techniqueInstructions': <dynamic>['Pies al ancho de caderas.', 'Espalda neutra.'],
+        'techniqueInstructions': <dynamic>[
+          'Pies al ancho de caderas.',
+          'Espalda neutra.'
+        ],
       };
 
       final exercise = Exercise.fromJson(rawMap);
 
       expect(exercise.techniqueInstructions, isA<List<String>>());
       expect(exercise.techniqueInstructions, hasLength(2));
-      expect(exercise.techniqueInstructions![0], equals('Pies al ancho de caderas.'));
+      expect(exercise.techniqueInstructions![0],
+          equals('Pies al ancho de caderas.'));
       expect(exercise.techniqueInstructions![1], equals('Espalda neutra.'));
     });
 
