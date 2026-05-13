@@ -92,6 +92,7 @@ class AuthService {
     final oauthCredential = OAuthProvider('apple.com').credential(
       idToken: appleCred.identityToken,
       rawNonce: rawNonce, // RAW to Firebase
+      accessToken: appleCred.authorizationCode, // authorization code → Firebase server-side validation
     );
 
     try {
