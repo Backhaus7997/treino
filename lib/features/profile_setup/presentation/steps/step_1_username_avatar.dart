@@ -23,8 +23,7 @@ class _Step1UsernameAvatarState extends ConsumerState<Step1UsernameAvatar> {
   @override
   void initState() {
     super.initState();
-    final initial =
-        ref.read(profileSetupNotifierProvider).draft.username ?? '';
+    final initial = ref.read(profileSetupNotifierProvider).draft.username ?? '';
     _usernameCtrl = TextEditingController(text: initial);
     _usernameCtrl.addListener(_syncUsername);
   }

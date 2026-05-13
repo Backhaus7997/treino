@@ -76,8 +76,7 @@ class _Step4WeightHeightState extends ConsumerState<Step4WeightHeight> {
             label: 'PESO (KG)',
             hint: '82',
             leadingIcon: TreinoIcon.scales,
-            keyboardType:
-                const TextInputType.numberWithOptions(decimal: true),
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
             textInputAction: TextInputAction.next,
             validator: ProfileSetupValidators.validateBodyWeightKg,
           ),
