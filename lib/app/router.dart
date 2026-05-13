@@ -10,6 +10,8 @@ import '../features/auth/presentation/register_screen.dart';
 import '../features/auth/presentation/splash_screen.dart';
 import '../features/auth/presentation/welcome_screen.dart';
 import '../features/coach/coach_screen.dart';
+import '../features/workout/presentation/exercise_detail_screen.dart';
+import '../features/workout/presentation/routine_detail_screen.dart';
 import '../features/feed/feed_screen.dart';
 import '../features/home/home_screen.dart';
 import '../features/profile/application/user_providers.dart';
@@ -131,6 +133,22 @@ GoRouter buildRouter({
           GoRoute(
             path: '/workout',
             pageBuilder: (_, __) => _noAnim(const WorkoutScreen()),
+            routes: [
+              GoRoute(
+                path: 'routine/:routineId',
+                pageBuilder: (context, state) {
+                  final routineId = state.pathParameters['routineId']!;
+                  return _noAnim(RoutineDetailScreen(routineId: routineId));
+                },
+              ),
+              GoRoute(
+                path: 'exercise/:exerciseId',
+                pageBuilder: (context, state) {
+                  final exerciseId = state.pathParameters['exerciseId']!;
+                  return _noAnim(ExerciseDetailScreen(exerciseId: exerciseId));
+                },
+              ),
+            ],
           ),
           GoRoute(
             path: '/feed',
