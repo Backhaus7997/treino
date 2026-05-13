@@ -10,11 +10,11 @@ phases:
   explore: done
   propose: done
   spec: done
-  design: pending
-  tasks: pending
-  apply: pending
-  verify: pending
-  archive: pending
+  design: done
+  tasks: done
+  apply: done
+  verify: done
+  archive: done
 
 artifacts:
   explore: openspec/changes/home-shell/explore.md
