@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -203,6 +204,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       Expanded(
                         child: AuthSecondaryButton(
                           icon: FontAwesomeIcons.google,
+                          iconWidget: SvgPicture.asset(
+                            'assets/logo/google_g.svg',
+                            width: 18,
+                            height: 18,
+                          ),
                           label: AuthStrings.googleLabel,
                           onPressed: isLoading ? null : _signInWithGoogle,
                         ),

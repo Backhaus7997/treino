@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../app/theme/app_background.dart';
 import '../../../app/theme/app_palette.dart';
 import '../application/profile_setup_notifier.dart';
 import '../application/profile_setup_providers.dart';
@@ -80,35 +81,37 @@ class _ProfileSetupFlowState extends ConsumerState<ProfileSetupFlow> {
 
     return Scaffold(
       backgroundColor: palette.bg,
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-          child: Column(
-            children: [
-              ProfileSetupHeader(
-                currentStep: state.currentStep,
-                title: _titles[state.currentStep],
-              ),
-              const SizedBox(height: 20),
-              Expanded(
-                child: PageView(
-                  controller: _pageController,
-                  physics: const NeverScrollableScrollPhysics(),
-                  children: const [
-                    Step1UsernameAvatar(),
-                    Step2Gym(),
-                    Step3ExperienceGender(),
-                    Step4WeightHeight(),
-                  ],
+      body: AppBackground(
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            child: Column(
+              children: [
+                ProfileSetupHeader(
+                  currentStep: state.currentStep,
+                  title: _titles[state.currentStep],
                 ),
-              ),
-              const SizedBox(height: 12),
-              ProfileSetupFooter(
-                onBack: state.currentStep == 0 ? null : _onBack,
-                onPrimary: state.canGoNext ? _onPrimary : null,
-                primaryLabel: state.isLastStep ? 'EMPEZAR' : null,
-              ),
-            ],
+                const SizedBox(height: 20),
+                Expanded(
+                  child: PageView(
+                    controller: _pageController,
+                    physics: const NeverScrollableScrollPhysics(),
+                    children: const [
+                      Step1UsernameAvatar(),
+                      Step2Gym(),
+                      Step3ExperienceGender(),
+                      Step4WeightHeight(),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                ProfileSetupFooter(
+                  onBack: state.currentStep == 0 ? null : _onBack,
+                  onPrimary: state.canGoNext ? _onPrimary : null,
+                  primaryLabel: state.isLastStep ? 'EMPEZAR' : null,
+                ),
+              ],
+            ),
           ),
         ),
       ),

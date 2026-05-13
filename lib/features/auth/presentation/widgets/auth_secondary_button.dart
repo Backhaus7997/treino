@@ -7,25 +7,42 @@ import '../../../../app/theme/app_palette.dart';
 /// Outlined pill button for social sign-in (Google, Apple).
 /// When onPressed is null: opacity 0.5, wrapped in Tooltip("Próximamente").
 ///
-/// Pass either a Material [icon] (IconData) or a FontAwesome brand glyph
-/// via [iconData] — internally it renders as [FaIcon] when the family is
-/// FontAwesome, otherwise as a regular [Icon].
+/// Pass either a Material [icon] (IconData) or a FontAwesome brand glyph —
+/// renders as [FaIcon] when family is FontAwesome, otherwise as a regular
+/// [Icon]. For multi-color brand assets (e.g. the official Google G logo),
+/// pass [iconWidget] instead — it overrides the [icon] rendering.
 class AuthSecondaryButton extends StatelessWidget {
   const AuthSecondaryButton({
     super.key,
     required this.icon,
     required this.label,
     required this.onPressed,
+    this.iconWidget,
   });
 
   final IconData icon;
   final String label;
   final VoidCallback? onPressed;
 
+  /// Optional custom widget that replaces the icon — useful for multi-color
+  /// brand assets (e.g. the official Google G logo SVG).
+  final Widget? iconWidget;
+
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final disabled = onPressed == null;
+
+    Widget iconChild;
+    if (iconWidget != null) {
+      iconChild = iconWidget!;
+    } else if (icon.fontFamily == 'FontAwesomeBrands' ||
+        icon.fontFamily == 'FontAwesomeSolid' ||
+        icon.fontFamily == 'FontAwesomeRegular') {
+      iconChild = FaIcon(icon, color: palette.textPrimary, size: 18);
+    } else {
+      iconChild = Icon(icon, color: palette.textPrimary, size: 18);
+    }
 
     Widget button = Opacity(
       opacity: disabled ? 0.5 : 1.0,
@@ -41,13 +58,7 @@ class AuthSecondaryButton extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Use FaIcon for FontAwesome glyphs so the brand fonts render
-            // correctly, fall back to Icon for everything else.
-            icon.fontFamily == 'FontAwesomeBrands' ||
-                    icon.fontFamily == 'FontAwesomeSolid' ||
-                    icon.fontFamily == 'FontAwesomeRegular'
-                ? FaIcon(icon, color: palette.textPrimary, size: 18)
-                : Icon(icon, color: palette.textPrimary, size: 18),
+            iconChild,
             const SizedBox(width: 8),
             Text(
               label,
