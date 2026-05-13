@@ -120,9 +120,8 @@ class ProfileSetupNotifier extends Notifier<ProfileSetupState> {
     final localPath = state.draft.avatarLocalPath;
     if (localPath != null) {
       try {
-        avatarUrl = await ref
-            .read(avatarUploadServiceProvider)
-            .upload(localPath);
+        avatarUrl =
+            await ref.read(avatarUploadServiceProvider).upload(localPath);
       } on FirebaseException {
         avatarUrl = null;
       } catch (_) {

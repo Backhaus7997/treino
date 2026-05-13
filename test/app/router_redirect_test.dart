@@ -207,8 +207,7 @@ void main() {
       expect(callRedirect(c, '/welcome'), '/home');
     });
 
-    test('user + /splash → null (splash handles its own navigation)',
-        () async {
+    test('user + /splash → null (splash handles its own navigation)', () async {
       final c = loggedInContainer();
       addTearDown(c.dispose);
       await c.read(authNotifierProvider.future);
@@ -254,8 +253,7 @@ void main() {
       expect(callRedirect(c, '/profile-setup'), isNull);
     });
 
-    test('no profile doc yet → /profile-setup (treat as incomplete)',
-        () async {
+    test('no profile doc yet → /profile-setup (treat as incomplete)', () async {
       // Inline en vez de loggedInContainer() porque el helper tiene un
       // default a _completeProfile() para el caso común; acá queremos
       // explícitamente que la collection no tenga el doc todavía.
