@@ -3,9 +3,9 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
 
-/// Placeholder "Esta semana" card (Etapa 1).
+/// Placeholder "Esta semana" card.
 /// Shows a static message — streak, week dots, and muscle-map SVG are
-/// deferred to Etapa 5. Zero constructor params; all content is inline.
+/// deferred to a future phase. Zero constructor params; all content is inline.
 class EstaSemanaCard extends StatelessWidget {
   const EstaSemanaCard({super.key});
 

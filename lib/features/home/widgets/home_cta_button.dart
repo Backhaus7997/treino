@@ -5,7 +5,7 @@ import '../../../app/theme/app_palette.dart';
 
 /// Full-width pill CTA used on the Home screen.
 /// Mirrors the visual style of [AuthPillButton] without the loading state —
-/// no network call at Etapa 1 (YAGNI; add isLoading in Etapa 5 wire).
+/// no network call needed (navigation is synchronous, YAGNI for isLoading).
 class HomeCTAButton extends StatelessWidget {
   const HomeCTAButton({
     super.key,
