@@ -63,11 +63,13 @@ void main() {
         routes: [
           GoRoute(
             path: '/home',
-            builder: (_, __) => const Scaffold(body: EmpezarEntrenamientoCard()),
+            builder: (_, __) =>
+                const Scaffold(body: EmpezarEntrenamientoCard()),
           ),
           GoRoute(
             path: '/workout',
-            builder: (_, __) => const Scaffold(body: Text('WORKOUT_DESTINATION')),
+            builder: (_, __) =>
+                const Scaffold(body: Text('WORKOUT_DESTINATION')),
           ),
         ],
       );
