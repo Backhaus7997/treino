@@ -1,0 +1,13 @@
+change: home-wire-routines
+branch: feat/home-wire-routines
+artifact_store: openspec
+phases_completed:
+  - explore
+  - propose
+  - spec
+phases_pending:
+  - tasks
+  - apply
+  - verify
+  - archive
+last_updated: "2026-05-14"
