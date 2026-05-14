@@ -123,11 +123,17 @@ GoRouter buildRouter({
         pageBuilder: (_, __) => _noAnim(const ProfileSetupFlow()),
       ),
 
-      // ShellRoute with the existing 5 tabs
+      // ShellRoute with the existing 5 tabs.
+      // Use `pageBuilder` (not `builder`) so the shell itself uses an
+      // instant transition when entered from a top-level route like /splash —
+      // otherwise the default iOS slide animation runs and the previous
+      // screen (splash) is briefly visible behind the home content.
       ShellRoute(
-        builder: (context, state, child) => _ShellScaffold(
-          location: state.uri.toString(),
-          child: child,
+        pageBuilder: (context, state, child) => _noAnim(
+          _ShellScaffold(
+            location: state.uri.toString(),
+            child: child,
+          ),
         ),
         routes: [
           GoRoute(
