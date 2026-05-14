@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/treino_icon.dart';
 import 'home_cta_button.dart';
 
-/// Hardcoded "Empezar Entrenamiento" card (Etapa 1).
-/// All strings are private static const so Etapa 5 can swap them for
-/// provider-driven data without renaming the widget.
-/// Zero constructor params; no ref.watch / ref.read.
+/// Hardcoded "Empezar Entrenamiento" card.
+/// All strings are private static const — ready for provider-driven swap
+/// without renaming the widget. Zero constructor params; no ref.watch / ref.read.
 class EmpezarEntrenamientoCard extends StatelessWidget {
   const EmpezarEntrenamientoCard({super.key});
 
@@ -93,11 +93,10 @@ class EmpezarEntrenamientoCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 18),
-            // CTA — onPressed is null until Etapa 5 wires navigation
-            const HomeCTAButton(
+            HomeCTAButton(
               label: _ctaLabel,
               leadingIcon: TreinoIcon.play,
-              onPressed: null,
+              onPressed: () => context.go('/workout'),
             ),
           ],
         ),
