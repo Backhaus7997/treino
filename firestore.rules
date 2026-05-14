@@ -46,5 +46,46 @@ service cloud.firestore {
       // Rutinas writeables solo via Admin SDK (seed script).
       allow write: if false;
     }
+
+    match /posts/{postId} {
+      // Any authenticated user can read posts (friends-privacy is soft / client-side).
+      // REQ-PFM-009
+      allow read: if request.auth != null;
+
+      // Create: only the owner of the post — authorUid must equal caller uid.
+      // SCENARIO-130: non-owner create is blocked.
+      allow create: if request.auth != null
+                    && request.auth.uid == request.resource.data.authorUid;
+
+      // Update and delete: only the original author.
+      allow update, delete: if request.auth != null
+                            && request.auth.uid == resource.data.authorUid;
+    }
+
+    match /friendships/{friendshipId} {
+      // Read: only members of the friendship. SCENARIO-131: non-member blocked.
+      // REQ-PFM-010
+      allow read: if request.auth != null
+                  && request.auth.uid in resource.data.members;
+
+      // Create: only by the requester, with status='pending', requester in members.
+      allow create: if request.auth != null
+                    && request.auth.uid == request.resource.data.requesterId
+                    && request.resource.data.status == 'pending'
+                    && request.auth.uid in request.resource.data.members;
+
+      // Update: only the non-requester member may update (accept transition only).
+      // SCENARIO-132: requester self-accept blocked.
+      allow update: if request.auth != null
+                    && request.auth.uid in resource.data.members
+                    && request.auth.uid != resource.data.requesterId
+                    && request.resource.data.status == 'accepted'
+                    && request.resource.data.requesterId == resource.data.requesterId
+                    && request.resource.data.members == resource.data.members;
+
+      // Delete: either member may remove the friendship.
+      allow delete: if request.auth != null
+                    && request.auth.uid in resource.data.members;
+    }
   }
 }
