@@ -99,11 +99,13 @@ void main() {
       expect(find.byIcon(TreinoIcon.back), findsOneWidget);
     });
 
-    testWidgets('SCENARIO-101: breadcrumb and title render in uppercase',
+    testWidgets(
+        'SCENARIO-101: badge translates muscleGroup + category; title uppercase',
         (tester) async {
+      // Data is stored in English (chest/compound) and translated at render.
       final exercise = _makeExercise(
         name: 'Press de Banca',
-        muscleGroup: 'Pecho',
+        muscleGroup: 'chest',
         category: 'compound',
       );
       await tester.pumpWidget(_wrapWithOverrides(
@@ -114,7 +116,7 @@ void main() {
         ],
       ));
       await tester.pump(const Duration(milliseconds: 50));
-      expect(find.text('PECHO · COMPOUND'), findsOneWidget);
+      expect(find.text('PECHO · COMPUESTO'), findsOneWidget);
       expect(find.text('PRESS DE BANCA'), findsOneWidget);
     });
 

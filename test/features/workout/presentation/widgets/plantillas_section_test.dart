@@ -184,12 +184,25 @@ void main() {
         makeRoutine(id: 'r2', name: 'Routine 2'),
       ];
 
+      // Wrap in SingleChildScrollView — grid now renders N cards + a
+      // VerMasCell, so the section can exceed 800px and needs a scrollable
+      // parent (mirrors WorkoutScreen's outer ListView).
       await tester.pumpWidget(
-        _wrap(
-          const PlantillasSection(),
+        ProviderScope(
           overrides: [
             routinesProvider.overrideWith((ref) async => routines),
           ],
+          child: MaterialApp(
+            theme: AppTheme.dark(),
+            home: const Scaffold(
+              body: SizedBox(
+                height: 800,
+                child: SingleChildScrollView(
+                  child: PlantillasSection(),
+                ),
+              ),
+            ),
+          ),
         ),
       );
       await tester.pump();

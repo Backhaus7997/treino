@@ -6,10 +6,19 @@ import '../../../../core/widgets/treino_icon.dart';
 import '../../../profile/domain/experience_level.dart';
 import '../../domain/routine.dart';
 
+/// Visual variant of [RoutineCard]. Used to alternate between mint (accent)
+/// and magenta (highlight) glow per the design mockup.
+enum RoutineCardVariant { accent, highlight }
+
 class RoutineCard extends StatelessWidget {
-  const RoutineCard({required this.routine, super.key});
+  const RoutineCard({
+    required this.routine,
+    this.variant = RoutineCardVariant.accent,
+    super.key,
+  });
 
   final Routine routine;
+  final RoutineCardVariant variant;
 
   /// Total exercises across all days. Computed inline (no [Routine.totalExercises]
   /// getter — domain model is unchanged per ADR-D5).
@@ -21,6 +30,10 @@ class RoutineCard extends StatelessWidget {
     final palette = AppPalette.of(context);
     final theme = Theme.of(context);
 
+    final tint = variant == RoutineCardVariant.highlight
+        ? palette.highlight
+        : palette.accent;
+
     return GestureDetector(
       onTap: () => context.push('/workout/routine/${routine.id}'),
       behavior: HitTestBehavior.opaque,
@@ -29,22 +42,34 @@ class RoutineCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: palette.bgCard,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: palette.border, width: 1),
+          border: Border.all(color: tint.withValues(alpha: 0.35), width: 1),
+          boxShadow: [
+            BoxShadow(
+              color: tint.withValues(alpha: 0.18),
+              blurRadius: 18,
+              spreadRadius: 0,
+              offset: Offset.zero,
+            ),
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Icon square (40×40, radius 12, accent icon on espresso fill).
+            // Icon square — tinted background matching the variant.
             Container(
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: palette.espresso,
+                color: tint.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: tint.withValues(alpha: 0.3),
+                  width: 1,
+                ),
               ),
               child: Icon(
                 TreinoIcon.tabWorkout,
-                color: palette.accent,
+                color: tint,
                 size: 20,
               ),
             ),

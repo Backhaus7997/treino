@@ -26,10 +26,11 @@ class TechniqueInstructionItem extends StatelessWidget {
           width: 28,
           height: 28,
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [palette.accent, palette.highlight],
-            ),
+            color: palette.accent.withValues(alpha: 0.18),
             shape: BoxShape.circle,
+            border: Border.all(
+              color: palette.accent.withValues(alpha: 0.6),
+            ),
           ),
           alignment: Alignment.center,
           child: Text(
@@ -37,7 +38,7 @@ class TechniqueInstructionItem extends StatelessWidget {
             style: GoogleFonts.barlowCondensed(
               fontWeight: FontWeight.w700,
               fontSize: 14,
-              color: palette.bg,
+              color: palette.accent,
             ),
           ),
         ),

@@ -43,3 +43,5 @@ flutter:
   uses-material-design: true
   assets:
     - assets/logo/
+    - assets/routines/
+    - assets/muscles/
