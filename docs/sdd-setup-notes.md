@@ -65,9 +65,19 @@ Mismo motivo: verify-report no se mirroriza a openspec.
 
 Apply consume ~50 tool uses en un change chico (12 tasks). Con 40 raspa contra el techo justo cuando va a flushear el apply-progress final.
 
+## ⚠️ Reiniciá Claude Code después de aplicar los parches
+
+**Importante**: Claude Code cachea el frontmatter de los sub-agents al startup de la sesión. Los cambios en `tools:`, `maxTurns:`, etc. **NO toman efecto en sesiones ya abiertas** — solo en sesiones nuevas. Después de editar los 3 archivos:
+
+1. Cerrá la sesión actual de Claude Code (o reiniciá el proceso).
+2. Abrí una sesión nueva en el proyecto.
+3. Recién ahí los parches están activos.
+
+Verificable: si después de parchar, un sub-agent sigue diciendo "no tengo Write disponible" → estás en una sesión vieja, reiniciá.
+
 ## Verificación rápida
 
-Después de aplicar los 3 parches, corré un change trivial para confirmar que todo cierra. Idea: agregar un campo opcional a un model que ya exista.
+Después de aplicar los 3 parches **y reiniciar Claude Code**, corré un change trivial para confirmar que todo cierra. Idea: agregar un campo opcional a un model que ya exista.
 
 ```bash
 cd /Users/<tu-user>/treino
