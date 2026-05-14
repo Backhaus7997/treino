@@ -1,141 +1,90 @@
-# SDD Setup — notas para devs (temporal)
+# SDD Setup — onboarding para devs (temporal)
 
-> **Estado**: temporal. Este doc deprecará cuando el setup SDD migre upstream (a `gentle-ai` o a un install script). Última verificación: 2026-05-14.
+> **Estado**: temporal. Deprecará cuando el flow esté completamente cubierto en `docs/workflow.md` o en docs oficiales de gentle-ai. Última verificación: gentle-ai **1.29.0** (2026-05-14).
 
-## Qué es el setup SDD
+## Qué es
 
-Un orchestrator + 8 sub-agents que viven en tu `~/.claude/` (no en este repo) y que ejecutan el ciclo de Spec-Driven Development cuando arrancás `/sdd-new <change-name>`:
+`gentle-ai` (Gentleman Programming) es un CLI que provee el ecosistema de agents, skills y workflows para AI coding agents (Claude Code, Cursor, OpenCode, etc.). En este proyecto lo usamos para el **ciclo SDD** (Spec-Driven Development) — el workflow que ya está documentado en [`docs/workflow.md` §Workflow SDD](./workflow.md).
+
+El binario `gentle-ai` no toca el repo. Solo instala/mantiene archivos en tu `~/.claude/` (agents, skills, orchestrator file). Por eso es **per-máquina**, no per-repo.
+
+## Instalación en una máquina nueva
+
+```bash
+# 1. Agregar el tap del homebrew
+brew tap gentleman-programming/tap
+
+# 2. Instalar el CLI
+brew install gentle-ai
+
+# 3. Configurar los agents/skills en ~/.claude/
+gentle-ai install
+
+# 4. (opcional) Verificar
+gentle-ai version
+# → gentle-ai 1.29.0 (o superior)
+```
+
+Después de `gentle-ai install`, vas a tener:
+- `~/.claude/agents/sdd-*.md` — 8 sub-agents (explore, propose, spec, design, tasks, apply, verify, archive)
+- `~/.claude/skills/sdd-*/SKILL.md` — skills correspondientes
+- `~/.claude/sdd-orchestrator.md` — orchestrator reference
+- Actualizaciones a tu `~/.claude/CLAUDE.md` (persona block + engram protocol)
+
+## Actualizar a la última versión
+
+```bash
+brew upgrade gentle-ai     # actualiza el CLI
+gentle-ai sync             # sincroniza agents/skills en ~/.claude/ con la versión nueva
+```
+
+**Importante**: `brew upgrade` solo actualiza el binario CLI. Si no corrés `gentle-ai sync` después, los archivos en `~/.claude/agents/` quedan en la versión vieja.
+
+> ⚠️ **Reiniciá Claude Code después de `gentle-ai sync`**. Claude Code cachea el frontmatter de los sub-agents al startup de cada sesión. Si sincronizás mientras tenés una sesión abierta, los cambios no toman efecto hasta que cerrás y abrís de nuevo.
+
+## Workflow básico
+
+El ciclo completo + criterios para saltarlo en cambios chicos están en [`docs/workflow.md` §Workflow SDD](./workflow.md). Resumen rápido:
 
 ```
-/sdd-new
+/sdd-new <change-name>
   → sdd-explore   (investigar)
-  → sdd-propose   (formalizar intent + scope)
+  → sdd-propose   (intent + scope)
   → sdd-spec      (requirements + scenarios)
   → sdd-design    (decisiones técnicas)
   → sdd-tasks     (checklist accionable, strict TDD)
-  → sdd-apply     (escribe código en un worktree aislado)
-  → sdd-verify    (valida contra spec)
-  → sdd-archive   (cierra)
+  → sdd-apply     (escribir código)
+  → sdd-verify    (validar contra spec)
+  → sdd-archive   (cerrar)
 ```
 
-Cada sub-agent corre en su propio contexto, leyendo skills preloaded por frontmatter. `sdd-apply` corre en un git worktree separado (`.claude/worktrees/agent-<id>`) así nunca toca tu checkout principal hasta que vos lo mergees.
+Cuando arrancás `/sdd-new` por primera vez en una sesión, te va a preguntar:
+- **Modo**: `Interactive` (pausa entre fases) vs `Auto` (corre todo).
+- **Artifact store**: `engram` (solo memoria) vs `openspec` (archivos en `openspec/changes/<name>/`) vs `hybrid` (ambos).
 
-El ciclo completo + criterios para saltarlo en cambios chicos ya están en [`docs/workflow.md` §Workflow SDD](./workflow.md). Este doc solo cubre la parte de **setup local**.
+Para tasks del roadmap, usá **Interactive + hybrid**.
 
-## Pre-requisitos
+## Gaps abiertos en 1.29.0
 
-- Claude Code instalado.
-- Tu `~/.claude/agents/sdd-*.md` deben existir (los provee gentle-ai u otra fuente de dotfiles del equipo).
-- Engram MCP server corriendo (memoria persistente entre sesiones).
+Hay 2 limitaciones conocidas en gentle-ai 1.29.0 que tocan a TODOS los devs:
 
-## 3 parches obligatorios
+1. **`sdd-explore` no puede escribir archivos** — el agent `~/.claude/agents/sdd-explore.md` no incluye `Write` en sus `tools:`. En modo `hybrid`, guarda en engram pero no escribe `openspec/changes/<change>/explore.md`. **Workaround**: Claude Code (orchestrator) mirroriza el archivo después de la delegación.
+2. **`sdd-verify` no puede escribir archivos** — misma situación con `~/.claude/agents/sdd-verify.md`. Workaround idéntico.
 
-Cuando se portó el orchestrator a la nueva API de Claude Code (skills preload, worktree isolation, scoped memory), quedaron 3 gaps de frontmatter. Aplicalos en tu home **antes de correr cualquier `/sdd-new`** o el ciclo se rompe a mitad de camino.
-
-### 1. `sdd-explore.md` — falta `Write` en tools
-
-`~/.claude/agents/sdd-explore.md`, línea ~8:
-
-```diff
-- tools: Read, Grep, Glob, WebFetch, WebSearch, mcp__plugin_engram_engram__mem_save
-+ tools: Read, Write, Grep, Glob, WebFetch, WebSearch, mcp__plugin_engram_engram__mem_save
-```
-
-Sin esto: explore guarda en engram pero no escribe `openspec/changes/<change>/explore.md`. Resultado: artifact incompleto en modo `hybrid`.
-
-### 2. `sdd-verify.md` — falta `Write` en tools
-
-`~/.claude/agents/sdd-verify.md`, línea ~7:
-
-```diff
-- tools: Read, Grep, Glob, Bash, mcp__plugin_engram_engram__mem_search, mcp__plugin_engram_engram__mem_get_observation, mcp__plugin_engram_engram__mem_save
-+ tools: Read, Write, Grep, Glob, Bash, mcp__plugin_engram_engram__mem_search, mcp__plugin_engram_engram__mem_get_observation, mcp__plugin_engram_engram__mem_save
-```
-
-Mismo motivo: verify-report no se mirroriza a openspec.
-
-### 3. `sdd-apply.md` — `maxTurns` muy ajustado
-
-`~/.claude/agents/sdd-apply.md`, línea ~14:
-
-```diff
-- maxTurns: 40
-+ maxTurns: 60
-```
-
-Apply consume ~50 tool uses en un change chico (12 tasks). Con 40 raspa contra el techo justo cuando va a flushear el apply-progress final.
-
-## ⚠️ Reiniciá Claude Code después de aplicar los parches
-
-**Importante**: Claude Code cachea el frontmatter de los sub-agents al startup de la sesión. Los cambios en `tools:`, `maxTurns:`, etc. **NO toman efecto en sesiones ya abiertas** — solo en sesiones nuevas. Después de editar los 3 archivos:
-
-1. Cerrá la sesión actual de Claude Code (o reiniciá el proceso).
-2. Abrí una sesión nueva en el proyecto.
-3. Recién ahí los parches están activos.
-
-Verificable: si después de parchar, un sub-agent sigue diciendo "no tengo Write disponible" → estás en una sesión vieja, reiniciá.
-
-## Verificación rápida
-
-Después de aplicar los 3 parches **y reiniciar Claude Code**, corré un change trivial para confirmar que todo cierra. Idea: agregar un campo opcional a un model que ya exista.
-
-```bash
-cd /Users/<tu-user>/treino
-# en Claude Code:
-/sdd-new test-mi-setup "agregar un String? notes opcional a algún model"
-```
-
-Decile **Auto + hybrid** cuando te pregunte. Mientras corre, en otra terminal:
-
-```bash
-# durante apply, debería haber un worktree
-eza .claude/worktrees/
-
-# explore + verify deben crear sus archivos
-eza openspec/changes/test-mi-setup/
-# esperás ver: explore.md, proposal.md, spec.md, design.md, tasks.md, apply-progress.md, verify-report.md
-```
-
-Si los 7 archivos aparecen y `flutter test` queda verde dentro del worktree → setup OK.
-
-**No mergees** la rama del test. Borrá el worktree y la carpeta de openspec cuando termines:
-
-```bash
-git worktree remove .claude/worktrees/agent-<id>
-git branch -D feat/test-mi-setup
-rm -rf openspec/changes/test-mi-setup/
-```
-
-## Tu primer SDD real
-
-Cuando corras `/sdd-new <change-name>` en una task real:
-
-1. **Modo**: la primera vez te pregunta `Interactive vs Auto` y `engram vs openspec vs hybrid`. Para tasks no triviales del roadmap, usá **Interactive + hybrid** — pausa entre fases para revisar, y deja artifacts tanto en engram (recovery cross-session) como en `openspec/changes/<change>/` (committeable, reviewable).
-2. **TDD**: el orchestrator detecta automáticamente que el proyecto usa `flutter test` y forwardeá Strict TDD a apply. **No hagas override**.
-3. **Worktree**: apply escribe en `.claude/worktrees/agent-<id>`. Cuando esté verde y verify pasa, tu commit/PR vive en esa rama. Llevala al main como cualquier otra branch.
-4. **Archive**: después de mergear, corré `/sdd-archive <change-name>` para cerrar el ciclo en engram. Esto NO toca código — solo sincroniza specs.
+**Ambos gaps están reportados upstream**. No los parchees manualmente — `gentle-ai sync` te los va a pisar.
 
 ## Troubleshooting
 
-- **"agent hit maxTurns mid-write"** → revisá que aplicaste el parche #3.
-- **"openspec/changes/<x>/explore.md no aparece"** → parche #1.
-- **"verify-report no escribe"** → parche #2.
-- **Estado roto, ciclo a la mitad** → recovery: `mem_search "sdd/<change-name>"` en engram trae todos los artifacts guardados. Cada fase chequea si la anterior ya corrió.
-- **Apply se rompe y quedó worktree huérfano** → `git worktree list` te muestra los activos, `git worktree remove <path>` limpia.
+| Síntoma | Causa | Fix |
+|---|---|---|
+| `command not found: gentle-ai` | brew install no corrió | `brew tap gentleman-programming/tap && brew install gentle-ai` |
+| Agents no aparecen en autocomplete | falta correr `gentle-ai install` | `gentle-ai install` |
+| Cambio reciente en gentle-ai no aplica | sync no corrió post-upgrade | `gentle-ai sync` |
+| Después de sync, sub-agent sigue con comportamiento viejo | Claude Code cacheó frontmatter de sesión vieja | Cerrar y abrir sesión |
+| Worktree huérfano de SDD apply | apply se cortó a la mitad | `git worktree list` → `git worktree remove <path>` |
 
-## Referencia rápida de comandos
+## Referencias
 
-| Comando | Uso |
-|---|---|
-| `/sdd-new <name>` | Arranca el ciclo desde cero |
-| `/sdd-continue [name]` | Avanza a la próxima fase pendiente |
-| `/sdd-ff <name>` | Fast-forward: corre todas las fases de planificación de tirón |
-| `/sdd-apply [name]` | Solo apply (cuando ya tenés tasks) |
-| `/sdd-verify [name]` | Solo verify (post-apply) |
-| `/sdd-archive [name]` | Cierra el change |
-
-Para sub-agents individuales (debugging): invocables vía el panel de agents de Claude Code.
-
----
-
-**Origen de los hallazgos**: el test `test-frontmatter` corrido el 2026-05-14 ejercitó las 7 fases y descubrió los 3 gaps. Detalle del audit en engram bajo topic `sdd-agent-frontmatter-gaps` (#40) y `sdd-agent-frontmatter-patches` (#47).
+- Repo upstream: <https://github.com/Gentleman-Programming/gentle-ai>
+- Workflow SDD del proyecto: [`docs/workflow.md` §Workflow SDD](./workflow.md)
+- Documentación de producto: [`AGENTS.md`](../AGENTS.md)
