@@ -11,11 +11,16 @@ class ExerciseSlotRow extends StatelessWidget {
   const ExerciseSlotRow({
     super.key,
     required this.slot,
+    required this.index,
     required this.onTap,
     this.lastWeightDisplay,
   });
 
   final RoutineSlot slot;
+
+  /// 1-based ordinal of this slot inside the day. Shown in the leading box.
+  final int index;
+
   final VoidCallback onTap;
 
   /// null → renders dash inside the ÚLTIMO badge (Fase 2 state).
@@ -43,7 +48,9 @@ class ExerciseSlotRow extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // Thumb
+                // Ordinal — replaces the placeholder dumbbell icon. Same
+                // 48x48 box; the number tells the athlete the exercise order
+                // within the day.
                 Container(
                   width: 48,
                   height: 48,
@@ -53,10 +60,13 @@ class ExerciseSlotRow extends StatelessWidget {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   alignment: Alignment.center,
-                  child: Icon(
-                    TreinoIcon.tabWorkout,
-                    size: 24,
-                    color: palette.textMuted,
+                  child: Text(
+                    '$index',
+                    style: GoogleFonts.barlowCondensed(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 22,
+                      color: palette.textPrimary,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 14),

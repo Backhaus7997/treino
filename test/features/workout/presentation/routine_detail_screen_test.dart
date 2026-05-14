@@ -138,26 +138,26 @@ void main() {
       expect(find.byIcon(TreinoIcon.back), findsOneWidget);
     });
 
-    testWidgets(
-        'SCENARIO-079: imageUrl null — no CachedNetworkImage, gradient present',
+    testWidgets('SCENARIO-079: hero strip attempts Image.asset by routine id',
         (tester) async {
       await tester.pumpWidget(_wrapWithOverrides(
         const RoutineDetailScreen(routineId: 'test-id'),
         [
           routineByIdProvider('test-id')
-              .overrideWith((ref) async => _makeRoutine(imageUrl: null)),
+              .overrideWith((ref) async => _makeRoutine(id: 'test-id')),
         ],
       ));
       await tester.pump(const Duration(milliseconds: 50));
-      expect(
+      final image = tester.widget<Image>(
         find.byWidgetPredicate(
           (w) =>
-              w is Container &&
-              w.decoration is BoxDecoration &&
-              (w.decoration as BoxDecoration).gradient != null,
+              w is Image &&
+              w.image is AssetImage &&
+              (w.image as AssetImage).assetName ==
+                  'assets/routines/test-id.png',
         ),
-        findsAtLeastNWidgets(1),
       );
+      expect(image.errorBuilder, isNotNull);
     });
 
     testWidgets('SCENARIO-080: badge shows "PPL · DÍA 1"', (tester) async {

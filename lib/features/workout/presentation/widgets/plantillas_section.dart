@@ -5,12 +5,25 @@ import '../../../../app/theme/app_palette.dart';
 import '../../application/routine_providers.dart';
 import 'level_filter_pills.dart';
 import 'routine_card.dart';
+import 'ver_mas_cell.dart';
 
-class PlantillasSection extends ConsumerWidget {
+/// Number of routine cards shown before the "Ver más" cell. When the user
+/// taps Ver más, the section expands to show all routines and the Ver más
+/// cell disappears.
+const int _kCollapsedLimit = 3;
+
+class PlantillasSection extends ConsumerStatefulWidget {
   const PlantillasSection({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<PlantillasSection> createState() => _PlantillasSectionState();
+}
+
+class _PlantillasSectionState extends ConsumerState<PlantillasSection> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final theme = Theme.of(context);
     final filteredAsync = ref.watch(filteredRoutinesProvider);
@@ -44,6 +57,15 @@ class PlantillasSection extends ConsumerWidget {
                 ),
               );
             }
+            // Show 3 cards + Ver más cell when collapsed AND there are more
+            // than 3 routines. Otherwise show all routines and no Ver más
+            // cell (nothing more to expand to).
+            final hasMore = routines.length > _kCollapsedLimit;
+            final showVerMas = hasMore && !_expanded;
+            final visibleCount =
+                showVerMas ? _kCollapsedLimit : routines.length;
+            final itemCount = showVerMas ? visibleCount + 1 : visibleCount;
+
             return GridView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
@@ -53,8 +75,19 @@ class PlantillasSection extends ConsumerWidget {
                 mainAxisSpacing: 12,
                 childAspectRatio: 0.95,
               ),
-              itemCount: routines.length,
-              itemBuilder: (context, i) => RoutineCard(routine: routines[i]),
+              itemCount: itemCount,
+              itemBuilder: (context, i) {
+                if (showVerMas && i == visibleCount) {
+                  return VerMasCell(
+                    onTap: () => setState(() => _expanded = true),
+                  );
+                }
+                final routine = routines[i];
+                final variant = routine.id.hashCode % 3 == 0
+                    ? RoutineCardVariant.highlight
+                    : RoutineCardVariant.accent;
+                return RoutineCard(routine: routine, variant: variant);
+              },
             );
           },
           loading: () => Padding(

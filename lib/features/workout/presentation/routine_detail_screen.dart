@@ -32,11 +32,12 @@ class _RoutineDetailScreenState extends ConsumerState<RoutineDetailScreen> {
   Widget build(BuildContext context) {
     final routineAsync = ref.watch(routineByIdProvider(widget.routineId));
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    // Stack so the hero image can extend edge-to-edge from the top of the
+    // safe area while the back button floats over it. Non-data states still
+    // render the back button on top so the user can always escape.
+    return Stack(
       children: [
-        const _BackBar(),
-        Expanded(
+        Positioned.fill(
           child: routineAsync.when(
             data: (routine) {
               if (routine == null) {
@@ -68,6 +69,7 @@ class _RoutineDetailScreenState extends ConsumerState<RoutineDetailScreen> {
             ),
           ),
         ),
+        const Positioned(top: 0, left: 0, child: _BackBar()),
       ],
     );
   }
@@ -75,7 +77,8 @@ class _RoutineDetailScreenState extends ConsumerState<RoutineDetailScreen> {
 
 /// Persistent top-left back button. Always visible so the user can never
 /// dead-end on a deep-linked screen — even in loading, error, or not-found
-/// states (REQ-RDT-016 strengthened).
+/// states (REQ-RDT-016 strengthened). Now floats over the hero image with a
+/// translucent chip so it stays legible on bright photos.
 class _BackBar extends StatelessWidget {
   const _BackBar();
 
@@ -83,9 +86,11 @@ class _BackBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     return Padding(
-      padding: const EdgeInsets.only(left: 4, top: 4),
-      child: Align(
-        alignment: Alignment.centerLeft,
+      padding: const EdgeInsets.only(left: 12, top: 8),
+      child: Material(
+        color: Colors.black.withValues(alpha: 0.35),
+        shape: const CircleBorder(),
+        clipBehavior: Clip.antiAlias,
         child: IconButton(
           icon: Icon(TreinoIcon.back, color: palette.textPrimary),
           onPressed: () =>
@@ -126,19 +131,17 @@ class _RoutineDetailContent extends StatelessWidget {
     return CustomScrollView(
       slivers: [
         SliverToBoxAdapter(
-          child: _HeroStrip(imageUrl: routine.imageUrl),
+          child: _HeroStrip(
+            routineId: routine.id,
+            badgeText: '${routine.split.toUpperCase()} · DÍA ${day.dayNumber}',
+            titleText: day.name.toUpperCase(),
+          ),
         ),
         SliverPadding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
           sliver: SliverList(
             delegate: SliverChildListDelegate([
-              const SizedBox(height: 18),
-              _DayChipBadge(
-                text: '${routine.split.toUpperCase()} · DÍA ${day.dayNumber}',
-              ),
-              const SizedBox(height: 8),
-              _DayTitle(text: day.name.toUpperCase()),
-              const SizedBox(height: 14),
+              const SizedBox(height: 20),
               _StatRow(
                 tiles: [
                   StatTile(
@@ -169,15 +172,16 @@ class _RoutineDetailContent extends StatelessWidget {
               if (day.slots.isEmpty)
                 const _EmptyState(message: 'No hay ejercicios en este día')
               else
-                ...day.slots.expand(
-                  (slot) => [
-                    ExerciseSlotRow(
-                      slot: slot,
-                      onTap: () => onSlotTap(slot),
+                ...day.slots.asMap().entries.expand(
+                      (entry) => [
+                        ExerciseSlotRow(
+                          slot: entry.value,
+                          index: entry.key + 1,
+                          onTap: () => onSlotTap(entry.value),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
                     ),
-                    const SizedBox(height: 12),
-                  ],
-                ),
               const SizedBox(height: 20),
               const _DisabledCTABar(),
               const SizedBox(height: 18),
@@ -194,16 +198,20 @@ class _RoutineDetailContent extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class _HeroStrip extends StatelessWidget {
-  const _HeroStrip({this.imageUrl});
+  const _HeroStrip({
+    required this.routineId,
+    required this.badgeText,
+    required this.titleText,
+  });
 
-  final String? imageUrl;
+  final String routineId;
+  final String badgeText;
+  final String titleText;
 
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    // imageUrl always null in Fase 2 — gradient placeholder only.
-    return Container(
-      height: 180,
+    final gradient = Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
@@ -213,6 +221,76 @@ class _HeroStrip extends StatelessWidget {
             palette.bg,
           ],
         ),
+      ),
+    );
+
+    return SizedBox(
+      height: 320,
+      width: double.infinity,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          // Convention: assets/routines/{routine.id}.png. Missing asset →
+          // errorBuilder paints the gradient so the screen never breaks.
+          Image.asset(
+            'assets/routines/$routineId.png',
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => gradient,
+          ),
+          // Top scrim — keeps the floating back button legible on bright photos.
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: 96,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.black.withValues(alpha: 0.45),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+            ),
+          ),
+          // Bottom scrim — makes the badge + title overlay readable and
+          // softens the seam between the photo and the body content.
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: 200,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.transparent,
+                    palette.bg.withValues(alpha: 0.95),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          // Badge + day title overlaid at the bottom-left of the hero.
+          Positioned(
+            left: 20,
+            right: 20,
+            bottom: 16,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _DayChipBadge(text: badgeText),
+                const SizedBox(height: 8),
+                _DayTitle(text: titleText),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -496,7 +574,7 @@ class _RoutineLoadingSkeleton extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            height: 180,
+            height: 320,
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topLeft,

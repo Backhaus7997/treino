@@ -34,7 +34,7 @@ void main() {
         'SCENARIO-088: renders exercise name, sets·reps, and muscle group',
         (tester) async {
       await tester.pumpWidget(_wrap(
-        ExerciseSlotRow(slot: _makeSlot(), onTap: () {}),
+        ExerciseSlotRow(slot: _makeSlot(), index: 1, onTap: () {}),
       ));
       expect(find.textContaining('PRESS'), findsOneWidget);
       expect(find.text('4 · 8–12'), findsOneWidget);
@@ -44,7 +44,7 @@ void main() {
     testWidgets('SCENARIO-089: renders ÚLTIMO badge and dash placeholder',
         (tester) async {
       await tester.pumpWidget(_wrap(
-        ExerciseSlotRow(slot: _makeSlot(), onTap: () {}),
+        ExerciseSlotRow(slot: _makeSlot(), index: 1, onTap: () {}),
       ));
       expect(find.textContaining('ÚLTIMO'), findsOneWidget);
       expect(find.text('—'), findsAtLeastNWidgets(1));
@@ -55,11 +55,20 @@ void main() {
       await tester.pumpWidget(_wrap(
         ExerciseSlotRow(
           slot: _makeSlot(),
+          index: 1,
           onTap: () => tapped = true,
         ),
       ));
       await tester.tap(find.byType(ExerciseSlotRow));
       expect(tapped, isTrue);
+    });
+
+    testWidgets('index renders as 1-based ordinal in leading box',
+        (tester) async {
+      await tester.pumpWidget(_wrap(
+        ExerciseSlotRow(slot: _makeSlot(), index: 3, onTap: () {}),
+      ));
+      expect(find.text('3'), findsOneWidget);
     });
   });
 }
