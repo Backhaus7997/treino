@@ -94,6 +94,28 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     }
   }
 
+  Future<void> _signInWithApple() async {
+    // Same Terms gate as Google: Apple Sign-In also creates a TREINO account
+    // on first sign-in, so the user must accept Terms first.
+    if (!_termsAccepted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Aceptá los Términos y la Política de Privacidad para continuar',
+          ),
+          duration: Duration(seconds: 3),
+        ),
+      );
+      return;
+    }
+    await ref.read(authNotifierProvider.notifier).signInWithApple();
+    if (!mounted) return;
+    final s = ref.read(authNotifierProvider);
+    if (s.hasValue && s.valueOrNull != null) {
+      context.go('/home');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authNotifierProvider);
@@ -241,11 +263,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         ),
                       ),
                       const SizedBox(width: 12),
-                      const Expanded(
+                      Expanded(
                         child: AuthSecondaryButton(
                           icon: FontAwesomeIcons.apple,
                           label: AuthStrings.appleLabel,
-                          onPressed: null,
+                          onPressed: isLoading ? null : _signInWithApple,
                         ),
                       ),
                     ],
