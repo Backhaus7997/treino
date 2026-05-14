@@ -5,9 +5,12 @@ phases_completed:
   - explore
   - propose
   - spec
-phases_pending:
   - tasks
   - apply
   - verify
   - archive
+phases_pending: []
 last_updated: "2026-05-14"
+status: archived
+merge_commit: 175dcf5
+merge_date: "2026-05-14"
