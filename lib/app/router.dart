@@ -174,6 +174,8 @@ GoRouter buildRouter({
 
 CustomTransitionPage<void> _noAnim(Widget child) => CustomTransitionPage(
       child: child,
+      transitionDuration: Duration.zero,
+      reverseTransitionDuration: Duration.zero,
       transitionsBuilder: (_, __, ___, child) => child,
     );
 
