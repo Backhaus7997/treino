@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
@@ -55,14 +56,31 @@ void main() {
       expect(decoration.border, isNotNull);
     });
 
-    testWidgets('REQ-HOME-EMPEZAR-004: tap no-op — no exception, no navigation',
+    testWidgets('REQ-HOME-WIRE-001: tap CTA navigates to /workout',
         (tester) async {
-      await tester.pumpWidget(_wrap(const EmpezarEntrenamientoCard()));
+      final router = GoRouter(
+        initialLocation: '/home',
+        routes: [
+          GoRoute(
+            path: '/home',
+            builder: (_, __) => const Scaffold(body: EmpezarEntrenamientoCard()),
+          ),
+          GoRoute(
+            path: '/workout',
+            builder: (_, __) => const Scaffold(body: Text('WORKOUT_DESTINATION')),
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        MaterialApp.router(theme: AppTheme.dark(), routerConfig: router),
+      );
       await tester.pump();
 
       await tester.tap(find.byType(HomeCTAButton));
       await tester.pumpAndSettle();
-      // No exception = pass
+
+      expect(find.text('WORKOUT_DESTINATION'), findsOneWidget);
     });
 
     testWidgets(
