@@ -154,6 +154,29 @@ Strict TDD Mode está **habilitado**: en `sdd-apply`, el agente escribe el test 
 
 Cada fase queda persistida en Engram bajo `--project treino`.
 
+## Ownership visual de pantallas
+
+Para mantener **consistencia visual** sin caer en feudos de feature, asignamos un **owner visual por pantalla principal**. El owner decide micro-detalles de UX (paleta exacta, spacing, tipografía, micro-interacciones, hierarchy visual) y revisa cualquier PR que toque la UI de esa pantalla.
+
+| Pantalla | Owner visual |
+|---|---|
+| Coach (athlete view + trainer view) | Dev A |
+| Feed (incluye crear post, search, perfil público) | Dev B |
+| Profile (perfil propio) | Dev C |
+
+**Lo que NO cambia**: el trabajo funcional se sigue paralelizando por etapa/fase del roadmap. Si la Etapa X de la Fase Y le toca a Dev B, Dev B la implementa — aunque toque archivos de varias pantallas. La división por fases del roadmap es la fuente de verdad para asignación de trabajo.
+
+**Lo que SÍ cambia**: si tu etapa funcional requiere tocar la UI de una pantalla cuyo owner es otro dev, **consultá con el owner antes de tocar**. Esto puede ser un mensaje, un comentario en el issue, o una llamada — el formato no importa, sí la conversación.
+
+Casos típicos donde aplica:
+- Fase 4 (Workout++) escribe stats que el Profile muestra → el owner de Profile (Dev C) decide cómo se renderizan esos stats.
+- Fase 5 (Coach) agrega chat → el owner de Coach (Dev A) decide la UX del chat.
+- Fase 3 (Feed) define `PostCard` → el owner de Feed (Dev B) decide su shape final.
+
+**Pantallas sin owner formal** (Home, Workout, Auth, Routine Detail, Exercise Detail): se tocan como históricamente — quien necesite modificarlas pide review a quien la implementó originalmente (ver `CONTRIBUTING.md` §División de tareas).
+
+**Regla anti-conflict**: para evitar merge hell, NO modifiques archivos compartidos críticos (`router.dart`, `firestore.rules`, `theme/`, widgets compartidos) sin avisar a los otros 2 devs. Estos archivos los toca todo el equipo — coordinar el orden de los PRs evita el 90% de los conflictos.
+
 ## Reglas de oro
 
 1. **No bloquearte esperando review**. Si nadie te ve en 48h, mergeás con review de cualquiera.
