@@ -97,11 +97,11 @@ void main() {
   });
 
   // ---------------------------------------------------------------------------
-  // Google is wired to AuthNotifier; Apple stays disabled until Etapa 5.
+  // Google and Apple are both wired to AuthNotifier.
   // The Terms requirement is enforced inside the handler (snackbar), not by
-  // disabling the button — so the Google button reads as enabled here.
+  // disabling the button — so both buttons read as enabled here.
   // ---------------------------------------------------------------------------
-  testWidgets('Google enabled, Apple disabled', (tester) async {
+  testWidgets('Google and Apple are enabled', (tester) async {
     await tester.pumpWidget(_buildApp(notifier: _TestAuthNotifier()));
     await tester.pumpAndSettle();
 
@@ -112,7 +112,7 @@ void main() {
     expect(secondary[0].label, 'GOOGLE');
     expect(secondary[0].onPressed, isNotNull);
     expect(secondary[1].label, 'APPLE');
-    expect(secondary[1].onPressed, isNull);
+    expect(secondary[1].onPressed, isNotNull);
   });
 
   // ---------------------------------------------------------------------------
