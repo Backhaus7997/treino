@@ -3,9 +3,9 @@
 <plist version="1.0">
 <dict>
 	<key>CLIENT_ID</key>
-	<string>1079774251763-kf3c7agu2f9b64rqrj9barlm1sd1oohi.apps.googleusercontent.com</string>
+	<string>1079774251763-rbcocukjq4mc8onmohitp65jualmvmo5.apps.googleusercontent.com</string>
 	<key>REVERSED_CLIENT_ID</key>
-	<string>com.googleusercontent.apps.1079774251763-kf3c7agu2f9b64rqrj9barlm1sd1oohi</string>
+	<string>com.googleusercontent.apps.1079774251763-rbcocukjq4mc8onmohitp65jualmvmo5</string>
 	<key>ANDROID_CLIENT_ID</key>
 	<string>1079774251763-kf6ct53t2olntalhafgtj5bvufpa6rfd.apps.googleusercontent.com</string>
 	<key>API_KEY</key>
@@ -15,7 +15,7 @@
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>com.treino.app</string>
+	<string>com.backhaus.treino</string>
 	<key>PROJECT_ID</key>
 	<string>treino-dev</string>
 	<key>STORAGE_BUCKET</key>
@@ -31,6 +31,6 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:1079774251763:ios:c292394709b082553f8586</string>
+	<string>1:1079774251763:ios:006f7766b93ce5dc3f8586</string>
 </dict>
 </plist>
