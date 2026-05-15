@@ -7,6 +7,7 @@ import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/feed/domain/post.dart';
 import 'package:treino/features/feed/domain/post_privacy.dart';
 import 'package:treino/features/feed/domain/routine_tag.dart';
+import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/feed/presentation/widgets/post_card.dart';
 
 Post makePost({
@@ -200,7 +201,7 @@ void main() {
       await tester.pumpWidget(_wrap(PostCard(post: post)));
       await tester.pump();
 
-      final palette = AppPalette.mintMagenta;
+      const palette = AppPalette.mintMagenta;
 
       final containers = tester.widgetList<Container>(find.byType(Container));
       bool foundCard = false;
@@ -226,15 +227,7 @@ void main() {
       await tester.pumpWidget(_wrap(PostCard(post: post)));
       await tester.pump();
 
-      expect(find.byIcon(const IconData(0xe3b3, fontFamily: 'Phosphor')),
-          findsNothing); // sanity — not the wrong icon
-      // Use the actual TreinoIcon.dotsThree constant (indirectly via Icon finder)
-      expect(
-        find.byWidgetPredicate(
-          (w) => w is Icon && w.icon?.fontFamily == 'Phosphor',
-        ),
-        findsAtLeastNWidgets(1),
-      );
+      expect(find.byIcon(TreinoIcon.dotsThree), findsOneWidget);
     });
 
     // SCENARIO-177: tapping dotsThree does nothing (no crash, no navigation)
