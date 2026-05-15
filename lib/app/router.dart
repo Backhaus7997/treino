@@ -13,6 +13,7 @@ import '../features/coach/coach_screen.dart';
 import '../features/workout/presentation/exercise_detail_screen.dart';
 import '../features/workout/presentation/routine_detail_screen.dart';
 import '../features/feed/feed_screen.dart';
+import '../features/feed/presentation/public_profile_screen.dart';
 import '../features/home/home_screen.dart';
 import '../features/profile/application/user_providers.dart';
 import '../features/profile/profile_screen.dart';
@@ -159,6 +160,15 @@ GoRouter buildRouter({
           GoRoute(
             path: '/feed',
             pageBuilder: (_, __) => _noAnim(const FeedScreen()),
+            routes: [
+              GoRoute(
+                path: 'profile/:uid',
+                pageBuilder: (context, state) {
+                  final uid = state.pathParameters['uid']!;
+                  return _noAnim(PublicProfileScreen(targetUid: uid));
+                },
+              ),
+            ],
           ),
           GoRoute(
             path: '/home',
