@@ -15,6 +15,7 @@ class FeedSegmentPills extends ConsumerWidget {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       physics: const ClampingScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -25,23 +26,17 @@ class FeedSegmentPills extends ConsumerWidget {
                 ref.read(feedSegmentProvider.notifier).state =
                     FeedSegment.amigos,
           ),
-          const SizedBox(width: 8),
-          const Opacity(
-            opacity: 0.4,
-            child: _Pill(
-              label: 'MI GYM',
-              isActive: false,
-              onTap: null,
-            ),
+          const SizedBox(width: 12),
+          const _Pill(
+            label: 'MI GYM',
+            isActive: false,
+            onTap: null,
           ),
-          const SizedBox(width: 8),
-          const Opacity(
-            opacity: 0.4,
-            child: _Pill(
-              label: 'PÚBLICO',
-              isActive: false,
-              onTap: null,
-            ),
+          const SizedBox(width: 12),
+          const _Pill(
+            label: 'PÚBLICO',
+            isActive: false,
+            onTap: null,
           ),
         ],
       ),
@@ -69,7 +64,7 @@ class _Pill extends StatelessWidget {
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
         decoration: BoxDecoration(
           color: isActive ? palette.accent : palette.bgCard,
           borderRadius: BorderRadius.circular(20),

@@ -55,34 +55,28 @@ void main() {
       );
       await tester.pump();
 
-      // Find the Container backing AMIGOS pill — it should be accent colored
-      final amigosContainerFinder = find.ancestor(
-        of: find.text('AMIGOS'),
-        matching: find.byType(Container),
+      // Both AMIGOS and MI GYM pills are structurally present; the visual
+      // distinction lives in BoxDecoration.color (accent vs bgCard).
+      final amigosContainers = tester.widgetList<Container>(
+        find.ancestor(
+          of: find.text('AMIGOS'),
+          matching: find.byType(Container),
+        ),
       );
-      final amigosContainers =
-          tester.widgetList<Container>(amigosContainerFinder);
-      final hasAccent = amigosContainers.any((c) {
-        final dec = c.decoration;
-        return dec is BoxDecoration &&
-            dec.color == Theme.of(tester.element(find.byType(MaterialApp)))
-                .extension<dynamic>()
-                ?.accent;
-      });
-      // Lighter assertion: just check that MI GYM pill container uses bgCard
-      final gymContainerFinder = find.ancestor(
-        of: find.text('MI GYM'),
-        matching: find.byType(Container),
+      final gymContainers = tester.widgetList<Container>(
+        find.ancestor(
+          of: find.text('MI GYM'),
+          matching: find.byType(Container),
+        ),
       );
-      final gymContainers = tester.widgetList<Container>(gymContainerFinder);
-      // The gym pill must exist and have at least one Container
-      expect(gymContainers, isNotEmpty);
-      // AMIGOS pill Container tree must also be present
       expect(amigosContainers, isNotEmpty);
+      expect(gymContainers, isNotEmpty);
     });
 
-    // SCENARIO-161: MI GYM pill wrapped in Opacity(0.4)
-    testWidgets('SCENARIO-161: MI GYM pill has Opacity(0.4)', (tester) async {
+    // SCENARIO-161: MI GYM pill renders at full opacity (mockup parity).
+    // Disabled visual cue is the lack of accent fill, NOT reduced opacity.
+    testWidgets('SCENARIO-161: MI GYM pill renders at full opacity',
+        (tester) async {
       await tester.pumpWidget(
         _wrapProvider(
           const FeedSegmentPills(),
@@ -97,13 +91,13 @@ void main() {
         of: find.text('MI GYM'),
         matching: find.byType(Opacity),
       );
-      expect(opacityFinder, findsOneWidget);
-      final opacityWidget = tester.widget<Opacity>(opacityFinder);
-      expect(opacityWidget.opacity, equals(0.4));
+      // No Opacity ancestor wrapping the pill — full opacity by default.
+      expect(opacityFinder, findsNothing);
     });
 
-    // SCENARIO-162: PÚBLICO pill wrapped in Opacity(0.4)
-    testWidgets('SCENARIO-162: PÚBLICO pill has Opacity(0.4)', (tester) async {
+    // SCENARIO-162: PÚBLICO pill renders at full opacity (mockup parity).
+    testWidgets('SCENARIO-162: PÚBLICO pill renders at full opacity',
+        (tester) async {
       await tester.pumpWidget(
         _wrapProvider(
           const FeedSegmentPills(),
@@ -118,9 +112,7 @@ void main() {
         of: find.text('PÚBLICO'),
         matching: find.byType(Opacity),
       );
-      expect(opacityFinder, findsOneWidget);
-      final opacityWidget = tester.widget<Opacity>(opacityFinder);
-      expect(opacityWidget.opacity, equals(0.4));
+      expect(opacityFinder, findsNothing);
     });
 
     // SCENARIO-163: tapping AMIGOS when active — state unchanged, no error
