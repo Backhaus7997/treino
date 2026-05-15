@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/feed/presentation/widgets/feed_empty_state.dart';
 
 Widget _wrap(Widget w) => MaterialApp(
@@ -10,9 +11,11 @@ Widget _wrap(Widget w) => MaterialApp(
 
 void main() {
   group('FeedEmptyState', () {
-    // SCENARIO-185: correct copy is rendered
+    // SCENARIO-185: correct copy is rendered (updated to use message param)
     testWidgets('SCENARIO-185: renders correct copy', (tester) async {
-      await tester.pumpWidget(_wrap(const FeedEmptyState()));
+      await tester.pumpWidget(
+        _wrap(const FeedEmptyState(message: 'Aún no hay posts de tus amigos')),
+      );
       await tester.pump();
 
       expect(
@@ -23,7 +26,9 @@ void main() {
 
     // SCENARIO-186: an icon is rendered
     testWidgets('SCENARIO-186: renders an icon', (tester) async {
-      await tester.pumpWidget(_wrap(const FeedEmptyState()));
+      await tester.pumpWidget(
+        _wrap(const FeedEmptyState(message: 'Test')),
+      );
       await tester.pump();
 
       expect(find.byType(Icon), findsAtLeastNWidgets(1));
@@ -33,13 +38,44 @@ void main() {
     testWidgets(
         'SCENARIO-187: no PostCard or CircularProgressIndicator rendered',
         (tester) async {
-      await tester.pumpWidget(_wrap(const FeedEmptyState()));
+      await tester.pumpWidget(
+        _wrap(const FeedEmptyState(message: 'Test')),
+      );
       await tester.pump();
 
       expect(find.byType(CircularProgressIndicator), findsNothing);
-      // PostCard doesn't exist yet; we simply verify no spinner — the type
-      // check for PostCard is added once TASK-007b lands (it compiles as a
-      // forward reference and the test still satisfies the spec contract).
+    });
+
+    // SCENARIO-195: renders provided message string
+    testWidgets('SCENARIO-195: renders provided message string', (tester) async {
+      await tester.pumpWidget(
+        _wrap(const FeedEmptyState(message: 'Test message')),
+      );
+      await tester.pump();
+
+      expect(find.text('Test message'), findsOneWidget);
+    });
+
+    // SCENARIO-196: omitting icon defaults to TreinoIcon.users
+    testWidgets('SCENARIO-196: omitting icon defaults to TreinoIcon.users',
+        (tester) async {
+      await tester.pumpWidget(
+        _wrap(const FeedEmptyState(message: 'Test')),
+      );
+      await tester.pump();
+
+      expect(find.byIcon(TreinoIcon.users), findsOneWidget);
+    });
+
+    // SCENARIO-197: custom icon overrides default
+    testWidgets('SCENARIO-197: custom icon overrides default', (tester) async {
+      await tester.pumpWidget(
+        _wrap(const FeedEmptyState(message: 'Test', icon: TreinoIcon.gym)),
+      );
+      await tester.pump();
+
+      expect(find.byIcon(TreinoIcon.gym), findsOneWidget);
+      expect(find.byIcon(TreinoIcon.users), findsNothing);
     });
   });
 }
