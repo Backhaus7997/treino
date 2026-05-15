@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../app/theme/app_palette.dart';
 import '../../core/widgets/treino_icon.dart';
 import 'application/feed_screen_providers.dart';
+import 'application/post_providers.dart';
 import 'domain/feed_segment.dart';
+import 'domain/post.dart';
 import 'presentation/widgets/feed_empty_state.dart';
 import 'presentation/widgets/feed_segment_pills.dart';
 import 'presentation/widgets/post_card.dart';
@@ -27,7 +30,8 @@ class FeedScreen extends ConsumerWidget {
         Expanded(
           child: switch (segment) {
             FeedSegment.amigos => const _AmigosBody(),
-            FeedSegment.gym || FeedSegment.public => const SizedBox.shrink(),
+            FeedSegment.gym => const _MiGymBody(),
+            FeedSegment.public => const _PublicoBody(),
           },
         ),
       ],
@@ -93,6 +97,107 @@ class _AmigosBody extends ConsumerWidget {
           itemCount: posts.length,
           separatorBuilder: (_, __) => const SizedBox(height: 14),
           itemBuilder: (_, i) => PostCard(post: posts[i]),
+        );
+      },
+      loading: () => Center(
+        child: CircularProgressIndicator(color: palette.accent),
+      ),
+      error: (_, __) => Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Text(
+            'No pudimos cargar tu feed. Intentá de nuevo.',
+            style: GoogleFonts.barlow(
+              fontSize: 14,
+              color: palette.textMuted,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MiGymBody extends ConsumerWidget {
+  const _MiGymBody();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final palette = AppPalette.of(context);
+    final asyncPosts = ref.watch(myGymFeedProvider);
+
+    return asyncPosts.when(
+      data: (posts) {
+        if (posts == null) {
+          return const FeedEmptyState(
+            message: 'Todavía no estás en un gym',
+          );
+        }
+        if (posts.isEmpty) {
+          return const FeedEmptyState(
+            message: 'Tu gym todavía no tiene posts',
+          );
+        }
+        // TODO(pagination): cursor-based pagination deferred (see explore §9)
+        return ListView.separated(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          itemCount: posts.length,
+          separatorBuilder: (_, __) => const SizedBox(height: 14),
+          itemBuilder: (_, i) => PostCard(
+            post: posts[i],
+            // TODO: route added in feat/public-profile (Etapa 4)
+            onAuthorTap: () =>
+                context.go('/feed/profile/${posts[i].authorUid}'),
+          ),
+        );
+      },
+      loading: () => Center(
+        child: CircularProgressIndicator(color: palette.accent),
+      ),
+      error: (_, __) => Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Text(
+            'No pudimos cargar tu feed. Intentá de nuevo.',
+            style: GoogleFonts.barlow(
+              fontSize: 14,
+              color: palette.textMuted,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PublicoBody extends ConsumerWidget {
+  const _PublicoBody();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final palette = AppPalette.of(context);
+    final asyncPosts = ref.watch(feedPublicProvider);
+
+    return asyncPosts.when(
+      data: (posts) {
+        if (posts.isEmpty) {
+          return const FeedEmptyState(
+            message: 'Aún no hay posts públicos',
+          );
+        }
+        // TODO(pagination): cursor-based pagination deferred (see explore §9)
+        return ListView.separated(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          itemCount: posts.length,
+          separatorBuilder: (_, __) => const SizedBox(height: 14),
+          itemBuilder: (_, i) => PostCard(
+            post: posts[i],
+            // TODO: route added in feat/public-profile (Etapa 4)
+            onAuthorTap: () =>
+                context.go('/feed/profile/${posts[i].authorUid}'),
+          ),
         );
       },
       loading: () => Center(

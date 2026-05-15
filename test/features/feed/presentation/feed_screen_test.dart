@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_background.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
@@ -64,6 +65,30 @@ Widget _wrapProvider(Widget w, List<Override> overrides) => ProviderScope(
         home: Scaffold(body: w),
       ),
     );
+
+Widget _wrapProviderRouter(Widget w, List<Override> overrides) {
+  final router = GoRouter(
+    initialLocation: '/',
+    routes: [
+      GoRoute(
+        path: '/',
+        builder: (_, __) => Scaffold(body: w),
+      ),
+      GoRoute(
+        path: '/feed/profile/:uid',
+        builder: (_, state) =>
+            Scaffold(body: Text('profile-${state.pathParameters['uid']}')),
+      ),
+    ],
+  );
+  return ProviderScope(
+    overrides: overrides,
+    child: MaterialApp.router(
+      theme: AppTheme.dark(),
+      routerConfig: router,
+    ),
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -425,13 +450,13 @@ void main() {
       expect(find.byType(FeedEmptyState), findsNothing);
     });
 
-    // SCENARIO-213/214: PostCard onAuthorTap invoked (no crash)
+    // SCENARIO-213/214: PostCard onAuthorTap invoked — navigates to profile
     testWidgets(
-        'SCENARIO-213: onAuthorTap callback fires without crash on gym post',
+        'SCENARIO-213: onAuthorTap callback navigates to /feed/profile/:uid',
         (tester) async {
       final post = _makePost(id: 'g1', text: 'Gym post', authorUid: 'u-xyz');
       await tester.pumpWidget(
-        _wrapProvider(
+        _wrapProviderRouter(
           const FeedScreen(),
           gymOverrides(gymFuture: () async => [post]),
         ),
@@ -442,7 +467,8 @@ void main() {
       // Tap the author area — PostCard uses GestureDetector internally
       await tester.tap(find.text('Tincho').first);
       await tester.pumpAndSettle();
-      // No exception thrown — navigation stub with TODO comment handles the tap
+      // Navigated to profile screen stub
+      expect(find.text('profile-u-xyz'), findsOneWidget);
     });
   });
 
