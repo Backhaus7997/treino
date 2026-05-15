@@ -157,7 +157,8 @@ void main() {
     });
 
     // SCENARIO-148: FeedScreen in gym segment renders _MiGymBody (REQ-FSG-008)
-    testWidgets('SCENARIO-148: gym segment renders _MiGymBody (FeedEmptyState shown)',
+    testWidgets(
+        'SCENARIO-148: gym segment renders _MiGymBody (FeedEmptyState shown)',
         (tester) async {
       await tester.pumpWidget(
         _wrapProvider(const FeedScreen(), [
@@ -175,7 +176,8 @@ void main() {
     });
 
     // SCENARIO-149: FeedScreen in public segment renders _PublicoBody (REQ-FSG-009)
-    testWidgets('SCENARIO-149: public segment renders _PublicoBody (FeedEmptyState shown)',
+    testWidgets(
+        'SCENARIO-149: public segment renders _PublicoBody (FeedEmptyState shown)',
         (tester) async {
       await tester.pumpWidget(
         _wrapProvider(const FeedScreen(), [
@@ -388,7 +390,8 @@ void main() {
           feedSegmentProvider.overrideWith((ref) => FeedSegment.gym),
           myFriendsFeedProvider.overrideWith((ref) async => const <Post>[]),
           myGymFeedProvider.overrideWith(
-            (ref) => Future<List<Post>?>.error(Exception('err'), StackTrace.empty),
+            (ref) =>
+                Future<List<Post>?>.error(Exception('err'), StackTrace.empty),
           ),
           feedPublicProvider.overrideWith((ref) async => const <Post>[]),
         ]),

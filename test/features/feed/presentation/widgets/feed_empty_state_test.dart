@@ -47,7 +47,8 @@ void main() {
     });
 
     // SCENARIO-195: renders provided message string
-    testWidgets('SCENARIO-195: renders provided message string', (tester) async {
+    testWidgets('SCENARIO-195: renders provided message string',
+        (tester) async {
       await tester.pumpWidget(
         _wrap(const FeedEmptyState(message: 'Test message')),
       );

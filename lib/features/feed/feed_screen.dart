@@ -8,7 +8,6 @@ import '../../core/widgets/treino_icon.dart';
 import 'application/feed_screen_providers.dart';
 import 'application/post_providers.dart';
 import 'domain/feed_segment.dart';
-import 'domain/post.dart';
 import 'presentation/widgets/feed_empty_state.dart';
 import 'presentation/widgets/feed_segment_pills.dart';
 import 'presentation/widgets/post_card.dart';

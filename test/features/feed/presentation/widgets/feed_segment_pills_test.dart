@@ -143,7 +143,8 @@ void main() {
     });
 
     // SCENARIO-164 (updated): tapping MI GYM sets feedSegmentProvider to gym
-    testWidgets('SCENARIO-164/SCENARIO-198: tapping MI GYM sets provider to gym',
+    testWidgets(
+        'SCENARIO-164/SCENARIO-198: tapping MI GYM sets provider to gym',
         (tester) async {
       final container = ProviderContainer(
         overrides: [
@@ -198,8 +199,7 @@ void main() {
     });
 
     // SCENARIO-200: isActive reflects current feedSegmentProvider value
-    testWidgets(
-        'SCENARIO-200: MI GYM isActive when feedSegmentProvider is gym',
+    testWidgets('SCENARIO-200: MI GYM isActive when feedSegmentProvider is gym',
         (tester) async {
       await tester.pumpWidget(
         _wrapProvider(

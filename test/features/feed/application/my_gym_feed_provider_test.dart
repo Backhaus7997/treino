@@ -4,7 +4,6 @@ import 'package:treino/features/feed/application/feed_screen_providers.dart';
 import 'package:treino/features/feed/application/post_providers.dart';
 import 'package:treino/features/feed/domain/post.dart';
 import 'package:treino/features/feed/domain/post_privacy.dart';
-import 'package:treino/features/feed/domain/routine_tag.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
@@ -40,8 +39,7 @@ UserProfile _makeProfile({String? gymId}) => UserProfile(
 void main() {
   group('myGymFeedProvider', () {
     // SCENARIO-190: profile with gymId null returns null
-    test(
-        'SCENARIO-190: profile with gymId null returns null (no-gym branch)',
+    test('SCENARIO-190: profile with gymId null returns null (no-gym branch)',
         () async {
       final container = ProviderContainer(
         overrides: [
@@ -98,8 +96,7 @@ void main() {
     });
 
     // SCENARIO-193: auth null treated as no-data (no error surfaced)
-    test(
-        'SCENARIO-193: auth null (signed-out) resolves null without error',
+    test('SCENARIO-193: auth null (signed-out) resolves null without error',
         () async {
       final container = ProviderContainer(
         overrides: [
@@ -116,8 +113,7 @@ void main() {
     });
 
     // SCENARIO-194: upstream error from feedForGymProvider is propagated
-    test(
-        'SCENARIO-194: error from feedForGymProvider propagated as AsyncError',
+    test('SCENARIO-194: error from feedForGymProvider propagated as AsyncError',
         () async {
       final container = ProviderContainer(
         overrides: [
