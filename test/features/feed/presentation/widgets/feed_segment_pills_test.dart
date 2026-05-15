@@ -142,8 +142,8 @@ void main() {
       expect(container.read(feedSegmentProvider), equals(FeedSegment.amigos));
     });
 
-    // SCENARIO-164: tapping MI GYM — feedSegmentProvider state unchanged
-    testWidgets('SCENARIO-164: tapping MI GYM does not change provider state',
+    // SCENARIO-164 (updated): tapping MI GYM sets feedSegmentProvider to gym
+    testWidgets('SCENARIO-164/SCENARIO-198: tapping MI GYM sets provider to gym',
         (tester) async {
       final container = ProviderContainer(
         overrides: [
@@ -166,11 +166,12 @@ void main() {
       await tester.tap(find.text('MI GYM'));
       await tester.pumpAndSettle();
 
-      expect(container.read(feedSegmentProvider), equals(FeedSegment.amigos));
+      expect(container.read(feedSegmentProvider), equals(FeedSegment.gym));
     });
 
-    // SCENARIO-165: tapping PÚBLICO — feedSegmentProvider state unchanged
-    testWidgets('SCENARIO-165: tapping PÚBLICO does not change provider state',
+    // SCENARIO-165 (updated): tapping PÚBLICO sets feedSegmentProvider to public
+    testWidgets(
+        'SCENARIO-165/SCENARIO-199: tapping PÚBLICO sets provider to public',
         (tester) async {
       final container = ProviderContainer(
         overrides: [
@@ -193,7 +194,65 @@ void main() {
       await tester.tap(find.text('PÚBLICO'));
       await tester.pumpAndSettle();
 
-      expect(container.read(feedSegmentProvider), equals(FeedSegment.amigos));
+      expect(container.read(feedSegmentProvider), equals(FeedSegment.public));
+    });
+
+    // SCENARIO-200: isActive reflects current feedSegmentProvider value
+    testWidgets(
+        'SCENARIO-200: MI GYM isActive when feedSegmentProvider is gym',
+        (tester) async {
+      await tester.pumpWidget(
+        _wrapProvider(
+          const FeedSegmentPills(),
+          [
+            feedSegmentProvider.overrideWith((ref) => FeedSegment.gym),
+          ],
+        ),
+      );
+      await tester.pump();
+
+      // MI GYM pill container should have accent color (active)
+      final gymContainers = tester.widgetList<Container>(
+        find.ancestor(
+          of: find.text('MI GYM'),
+          matching: find.byType(Container),
+        ),
+      );
+      // AMIGOS should be inactive (not accent)
+      final amigosContainers = tester.widgetList<Container>(
+        find.ancestor(
+          of: find.text('AMIGOS'),
+          matching: find.byType(Container),
+        ),
+      );
+      expect(gymContainers, isNotEmpty);
+      expect(amigosContainers, isNotEmpty);
+    });
+
+    // SCENARIO-201: no Opacity wrapper on any pill
+    testWidgets('SCENARIO-201: no Opacity wrapper on MI GYM or PÚBLICO',
+        (tester) async {
+      await tester.pumpWidget(
+        _wrapProvider(
+          const FeedSegmentPills(),
+          [
+            feedSegmentProvider.overrideWith((ref) => FeedSegment.amigos),
+          ],
+        ),
+      );
+      await tester.pump();
+
+      // Neither pill should be wrapped in Opacity (was the disabled treatment)
+      final gymOpacity = find.ancestor(
+        of: find.text('MI GYM'),
+        matching: find.byType(Opacity),
+      );
+      final publicoOpacity = find.ancestor(
+        of: find.text('PÚBLICO'),
+        matching: find.byType(Opacity),
+      );
+      expect(gymOpacity, findsNothing);
+      expect(publicoOpacity, findsNothing);
     });
   });
 }
