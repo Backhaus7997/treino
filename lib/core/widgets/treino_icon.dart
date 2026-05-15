@@ -75,4 +75,7 @@ class TreinoIcon {
   // Feed / social
   static const IconData dotsThree = PhosphorIconsRegular.dotsThreeVertical;
   static const IconData verified = PhosphorIconsFill.sealCheck;
+
+  // Gym / spaces
+  static const IconData gym = PhosphorIconsRegular.buildings;
 }

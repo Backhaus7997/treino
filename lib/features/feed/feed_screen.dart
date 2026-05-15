@@ -84,7 +84,9 @@ class _AmigosBody extends ConsumerWidget {
     return asyncPosts.when(
       data: (posts) {
         if (posts.isEmpty) {
-          return const FeedEmptyState();
+          return const FeedEmptyState(
+            message: 'Aún no hay posts de tus amigos',
+          );
         }
         return ListView.separated(
           padding: const EdgeInsets.symmetric(horizontal: 20),
