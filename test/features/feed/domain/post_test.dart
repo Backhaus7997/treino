@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/features/feed/domain/post.dart';
 import 'package:treino/features/feed/domain/post_privacy.dart';
@@ -104,7 +105,7 @@ void main() {
         'text': 'Old doc',
         'routineTag': null,
         'privacy': 'public',
-        'createdAt': DateTime.utc(2026, 1, 1, 12, 0, 0),
+        'createdAt': Timestamp.fromDate(DateTime.utc(2026, 1, 1, 12, 0, 0)),
         // 'authorDisplayName' intentionally missing
         // 'authorAvatarUrl' intentionally missing
       };
@@ -125,7 +126,7 @@ void main() {
         'text': 'Null avatar',
         'routineTag': null,
         'privacy': 'public',
-        'createdAt': DateTime.utc(2026, 1, 1, 12, 0, 0),
+        'createdAt': Timestamp.fromDate(DateTime.utc(2026, 1, 1, 12, 0, 0)),
       };
 
       final result = Post.fromJson(json);
@@ -144,7 +145,7 @@ void main() {
         'text': 'Missing avatar key',
         'routineTag': null,
         'privacy': 'public',
-        'createdAt': DateTime.utc(2026, 1, 1, 12, 0, 0),
+        'createdAt': Timestamp.fromDate(DateTime.utc(2026, 1, 1, 12, 0, 0)),
       };
 
       final result = Post.fromJson(json);

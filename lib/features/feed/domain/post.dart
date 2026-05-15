@@ -14,6 +14,12 @@ class Post with _$Post {
   const factory Post({
     required String id,
     required String authorUid,
+    // Author display fields denormalized at write time (same ADR as authorGymId).
+    // Stale-on-update is accepted — standard social-media pattern.
+    // `@Default('Anónimo')` handles legacy Firestore docs that predate this field —
+    // json_serializable applies the default when the JSON key is missing.
+    @Default('Anónimo') String authorDisplayName,
+    required String? authorAvatarUrl,
     required String? authorGymId,
     required String text,
     required RoutineTag? routineTag,

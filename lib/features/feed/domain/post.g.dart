@@ -9,6 +9,8 @@ part of 'post.dart';
 _$PostImpl _$$PostImplFromJson(Map<String, dynamic> json) => _$PostImpl(
       id: json['id'] as String,
       authorUid: json['authorUid'] as String,
+      authorDisplayName: json['authorDisplayName'] as String? ?? 'Anónimo',
+      authorAvatarUrl: json['authorAvatarUrl'] as String?,
       authorGymId: json['authorGymId'] as String?,
       text: json['text'] as String,
       routineTag: json['routineTag'] == null
@@ -23,6 +25,8 @@ Map<String, dynamic> _$$PostImplToJson(_$PostImpl instance) =>
     <String, dynamic>{
       'id': instance.id,
       'authorUid': instance.authorUid,
+      'authorDisplayName': instance.authorDisplayName,
+      'authorAvatarUrl': instance.authorAvatarUrl,
       'authorGymId': instance.authorGymId,
       'text': instance.text,
       'routineTag': instance.routineTag?.toJson(),
