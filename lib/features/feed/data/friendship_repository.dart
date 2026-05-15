@@ -90,6 +90,15 @@ class FriendshipRepository {
     await _friendships.doc(friendshipId).delete();
   }
 
+  /// Returns the friendship document between [uidA] and [uidB], or null if none
+  /// exists. Single `get()` on `sortedDocId(uidA, uidB)` — pair order doesn't
+  /// matter (commutative).
+  Future<Friendship?> getByPair(String uidA, String uidB) async {
+    final id = Friendship.sortedDocId(uidA, uidB);
+    final snap = await _friendships.doc(id).get();
+    return _fromDoc(snap);
+  }
+
   Friendship? _fromDoc(DocumentSnapshot<Map<String, Object?>> snap) {
     final data = snap.data();
     if (!snap.exists || data == null) return null;
