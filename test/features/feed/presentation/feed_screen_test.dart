@@ -223,7 +223,7 @@ void main() {
   // ── REQ-FEED-SCREEN-004 — Loading state ───────────────────────────────────
 
   group('REQ-FEED-SCREEN-004: amigos loading state', () {
-    List<Override> _loadingOverrides() => [
+    List<Override> loadingOverrides() => [
           feedSegmentProvider.overrideWith((ref) => FeedSegment.amigos),
           myFriendsFeedProvider
               .overrideWith((ref) async {
@@ -237,7 +237,7 @@ void main() {
     testWidgets('SCENARIO-155: CircularProgressIndicator during loading',
         (tester) async {
       await tester.pumpWidget(
-          _wrapProvider(const FeedScreen(), _loadingOverrides()));
+          _wrapProvider(const FeedScreen(), loadingOverrides()));
       // Single pump — don't settle, stay in loading state
       await tester.pump();
 
@@ -248,7 +248,7 @@ void main() {
     testWidgets('SCENARIO-156: no PostCard or FeedEmptyState during loading',
         (tester) async {
       await tester.pumpWidget(
-          _wrapProvider(const FeedScreen(), _loadingOverrides()));
+          _wrapProvider(const FeedScreen(), loadingOverrides()));
       await tester.pump();
 
       expect(find.byType(PostCard), findsNothing);
