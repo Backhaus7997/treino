@@ -28,7 +28,16 @@ void main() {
       await tester.pump();
 
       expect(find.byType(CachedNetworkImage), findsAtLeastNWidgets(1));
-      expect(find.byType(Image), findsNothing);
+      // Spec: must NOT use Image.network directly (CachedNetworkImage is fine —
+      // it internally uses Image but wraps it; we check there's no raw
+      // Image.network constructor at the avatar subtree root by verifying there
+      // is no widget whose image provider is a NetworkImage directly exposed).
+      expect(
+        find.byWidgetPredicate(
+          (w) => w is Image && w.image is NetworkImage,
+        ),
+        findsNothing,
+      );
     });
 
     // SCENARIO-181: null URL + valid name → first letter
@@ -101,7 +110,7 @@ void main() {
       );
       await tester.pump();
 
-      final palette = AppPalette.mintMagenta;
+      const palette = AppPalette.mintMagenta;
 
       // Find a Container with a BoxDecoration that has a LinearGradient
       // containing accent and highlight colors.
