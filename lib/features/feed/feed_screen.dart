@@ -95,7 +95,11 @@ class _AmigosBody extends ConsumerWidget {
           padding: const EdgeInsets.symmetric(horizontal: 20),
           itemCount: posts.length,
           separatorBuilder: (_, __) => const SizedBox(height: 14),
-          itemBuilder: (_, i) => PostCard(post: posts[i]),
+          itemBuilder: (_, i) => PostCard(
+            post: posts[i],
+            onAuthorTap: () =>
+                context.go('/feed/profile/${posts[i].authorUid}'),
+          ),
         );
       },
       loading: () => Center(
@@ -145,7 +149,6 @@ class _MiGymBody extends ConsumerWidget {
           separatorBuilder: (_, __) => const SizedBox(height: 14),
           itemBuilder: (_, i) => PostCard(
             post: posts[i],
-            // TODO: route added in feat/public-profile (Etapa 4)
             onAuthorTap: () =>
                 context.go('/feed/profile/${posts[i].authorUid}'),
           ),
@@ -193,7 +196,6 @@ class _PublicoBody extends ConsumerWidget {
           separatorBuilder: (_, __) => const SizedBox(height: 14),
           itemBuilder: (_, i) => PostCard(
             post: posts[i],
-            // TODO: route added in feat/public-profile (Etapa 4)
             onAuthorTap: () =>
                 context.go('/feed/profile/${posts[i].authorUid}'),
           ),
