@@ -74,14 +74,16 @@ void main() {
         makePost(id: 'p5'),
       ];
 
+      // Override feedForFriendsProvider for any argument (using overrideWith on
+      // the family itself) so list identity doesn't matter.
       final container = ProviderContainer(
         overrides: [
           authStateChangesProvider
               .overrideWith((ref) => Stream.value(user)),
           acceptedFriendsProvider('u1')
               .overrideWith((ref) => Future.value(['u2', 'u3'])),
-          feedForFriendsProvider(['u2', 'u3'])
-              .overrideWith((ref) => Future.value(posts)),
+          feedForFriendsProvider
+              .overrideWith((ref, _) => Future.value(posts)),
         ],
       );
       addTearDown(container.dispose);
