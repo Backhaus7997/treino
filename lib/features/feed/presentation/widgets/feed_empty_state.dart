@@ -5,9 +5,14 @@ import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/treino_icon.dart';
 
 class FeedEmptyState extends StatelessWidget {
-  const FeedEmptyState({super.key});
+  const FeedEmptyState({
+    super.key,
+    required this.message,
+    this.icon = TreinoIcon.users,
+  });
 
-  static const _kCopy = 'Aún no hay posts de tus amigos';
+  final String message;
+  final IconData icon;
 
   @override
   Widget build(BuildContext context) {
@@ -17,10 +22,10 @@ class FeedEmptyState extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(TreinoIcon.users, size: 48, color: palette.textMuted),
+          Icon(icon, size: 48, color: palette.textMuted),
           const SizedBox(height: 12),
           Text(
-            _kCopy,
+            message,
             style: GoogleFonts.barlow(
               fontWeight: FontWeight.w400,
               fontSize: 14,
