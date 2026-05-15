@@ -7,6 +7,7 @@ import 'package:treino/app/theme/app_background.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/feed/application/feed_screen_providers.dart';
+import 'package:treino/features/feed/application/post_providers.dart';
 import 'package:treino/features/feed/domain/feed_segment.dart';
 import 'package:treino/features/feed/domain/post.dart';
 import 'package:treino/features/feed/domain/post_privacy.dart';
@@ -15,6 +16,9 @@ import 'package:treino/features/feed/feed_screen.dart';
 import 'package:treino/features/feed/presentation/widgets/feed_empty_state.dart';
 import 'package:treino/features/feed/presentation/widgets/feed_segment_pills.dart';
 import 'package:treino/features/feed/presentation/widgets/post_card.dart';
+import 'package:treino/features/profile/application/user_providers.dart';
+import 'package:treino/features/profile/domain/user_profile.dart';
+import 'package:treino/features/profile/domain/user_role.dart';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -22,6 +26,7 @@ import 'package:treino/features/feed/presentation/widgets/post_card.dart';
 
 Post _makePost({
   String id = 'p1',
+  String authorUid = 'u1',
   String authorDisplayName = 'Tincho',
   String? authorAvatarUrl,
   String? authorGymId,
@@ -32,7 +37,7 @@ Post _makePost({
 }) =>
     Post(
       id: id,
-      authorUid: 'u1',
+      authorUid: authorUid,
       authorDisplayName: authorDisplayName,
       authorAvatarUrl: authorAvatarUrl,
       authorGymId: authorGymId,
@@ -40,6 +45,16 @@ Post _makePost({
       routineTag: routineTag,
       privacy: privacy,
       createdAt: createdAt ?? DateTime.now().subtract(const Duration(hours: 1)),
+    );
+
+UserProfile _makeProfile({String? gymId}) => UserProfile(
+      uid: 'u1',
+      email: 'tincho@test.com',
+      displayName: 'Tincho',
+      role: UserRole.athlete,
+      createdAt: DateTime.utc(2026, 1, 1),
+      updatedAt: DateTime.utc(2026, 1, 1),
+      gymId: gymId,
     );
 
 Widget _wrapProvider(Widget w, List<Override> overrides) => ProviderScope(
@@ -61,6 +76,8 @@ void main() {
     final baseOverrides = <Override>[
       feedSegmentProvider.overrideWith((ref) => FeedSegment.amigos),
       myFriendsFeedProvider.overrideWith((ref) async => const <Post>[]),
+      myGymFeedProvider.overrideWith((ref) async => null),
+      feedPublicProvider.overrideWith((ref) async => const <Post>[]),
     ];
 
     // SCENARIO-144: FeedScreen renders header title "FEED"
@@ -114,34 +131,40 @@ void main() {
       expect(find.byType(SafeArea), findsNothing);
     });
 
-    // SCENARIO-148: FeedScreen in gym segment renders SizedBox.shrink
-    testWidgets('SCENARIO-148: gym segment renders no posts or empty state',
+    // SCENARIO-148: FeedScreen in gym segment renders _MiGymBody (REQ-FSG-008)
+    testWidgets('SCENARIO-148: gym segment renders _MiGymBody (FeedEmptyState shown)',
         (tester) async {
       await tester.pumpWidget(
         _wrapProvider(const FeedScreen(), [
           feedSegmentProvider.overrideWith((ref) => FeedSegment.gym),
           myFriendsFeedProvider.overrideWith((ref) async => const <Post>[]),
+          myGymFeedProvider.overrideWith((ref) async => null),
+          feedPublicProvider.overrideWith((ref) async => const <Post>[]),
         ]),
       );
-      await tester.pump();
+      await tester.pumpAndSettle();
 
-      expect(find.byType(PostCard), findsNothing);
-      expect(find.byType(FeedEmptyState), findsNothing);
+      // null result → "Todavía no estás en un gym"
+      expect(find.byType(FeedEmptyState), findsOneWidget);
+      expect(find.text('Todavía no estás en un gym'), findsOneWidget);
     });
 
-    // SCENARIO-149: FeedScreen in public segment renders SizedBox.shrink
-    testWidgets('SCENARIO-149: public segment renders no posts or empty state',
+    // SCENARIO-149: FeedScreen in public segment renders _PublicoBody (REQ-FSG-009)
+    testWidgets('SCENARIO-149: public segment renders _PublicoBody (FeedEmptyState shown)',
         (tester) async {
       await tester.pumpWidget(
         _wrapProvider(const FeedScreen(), [
           feedSegmentProvider.overrideWith((ref) => FeedSegment.public),
           myFriendsFeedProvider.overrideWith((ref) async => const <Post>[]),
+          myGymFeedProvider.overrideWith((ref) async => null),
+          feedPublicProvider.overrideWith((ref) async => const <Post>[]),
         ]),
       );
-      await tester.pump();
+      await tester.pumpAndSettle();
 
-      expect(find.byType(PostCard), findsNothing);
-      expect(find.byType(FeedEmptyState), findsNothing);
+      // empty list → "Aún no hay posts públicos"
+      expect(find.byType(FeedEmptyState), findsOneWidget);
+      expect(find.text('Aún no hay posts públicos'), findsOneWidget);
     });
   });
 
@@ -155,6 +178,8 @@ void main() {
     List<Override> makeOverrides(List<Post> posts) => [
           feedSegmentProvider.overrideWith((ref) => FeedSegment.amigos),
           myFriendsFeedProvider.overrideWith((ref) async => posts),
+          myGymFeedProvider.overrideWith((ref) async => null),
+          feedPublicProvider.overrideWith((ref) async => const <Post>[]),
         ];
 
     // SCENARIO-150: list of PostCards rendered in order
@@ -197,6 +222,8 @@ void main() {
     final emptyOverrides = <Override>[
       feedSegmentProvider.overrideWith((ref) => FeedSegment.amigos),
       myFriendsFeedProvider.overrideWith((ref) async => const <Post>[]),
+      myGymFeedProvider.overrideWith((ref) async => null),
+      feedPublicProvider.overrideWith((ref) async => const <Post>[]),
     ];
 
     // SCENARIO-153: FeedEmptyState rendered when list empty
@@ -229,6 +256,8 @@ void main() {
             await Completer<void>().future;
             return const <Post>[];
           }),
+          myGymFeedProvider.overrideWith((ref) async => null),
+          feedPublicProvider.overrideWith((ref) async => const <Post>[]),
         ];
 
     // SCENARIO-155: spinner rendered during loading
@@ -263,6 +292,8 @@ void main() {
             Exception('net'),
             StackTrace.empty,
           )),
+      myGymFeedProvider.overrideWith((ref) async => null),
+      feedPublicProvider.overrideWith((ref) async => const <Post>[]),
     ];
 
     // SCENARIO-157: graceful fallback rendered, no FlutterError
@@ -286,6 +317,217 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(PostCard), findsNothing);
+      expect(find.byType(FeedEmptyState), findsNothing);
+    });
+  });
+
+  // ── REQ-FSG-010..013, REQ-FSG-016 — _MiGymBody ───────────────────────────
+
+  group('_MiGymBody', () {
+    List<Override> gymOverrides({
+      required Future<List<Post>?> Function() gymFuture,
+    }) =>
+        [
+          feedSegmentProvider.overrideWith((ref) => FeedSegment.gym),
+          myFriendsFeedProvider.overrideWith((ref) async => const <Post>[]),
+          myGymFeedProvider.overrideWith((ref) => gymFuture()),
+          feedPublicProvider.overrideWith((ref) async => const <Post>[]),
+          userProfileProvider.overrideWith(
+            (ref) => Stream.value(_makeProfile(gymId: null)),
+          ),
+        ];
+
+    // SCENARIO-206: loading state shows spinner
+    testWidgets('SCENARIO-206: loading state shows spinner', (tester) async {
+      await tester.pumpWidget(
+        _wrapProvider(const FeedScreen(), [
+          feedSegmentProvider.overrideWith((ref) => FeedSegment.gym),
+          myFriendsFeedProvider.overrideWith((ref) async => const <Post>[]),
+          myGymFeedProvider.overrideWith((ref) async {
+            await Completer<void>().future;
+            return null;
+          }),
+          feedPublicProvider.overrideWith((ref) async => const <Post>[]),
+        ]),
+      );
+      await tester.pump();
+
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    });
+
+    // SCENARIO-205: error state shows generic error copy
+    testWidgets('SCENARIO-205: error state shows generic error copy',
+        (tester) async {
+      await tester.pumpWidget(
+        _wrapProvider(const FeedScreen(), [
+          feedSegmentProvider.overrideWith((ref) => FeedSegment.gym),
+          myFriendsFeedProvider.overrideWith((ref) async => const <Post>[]),
+          myGymFeedProvider.overrideWith(
+            (ref) => Future<List<Post>?>.error(Exception('err'), StackTrace.empty),
+          ),
+          feedPublicProvider.overrideWith((ref) async => const <Post>[]),
+        ]),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('No pudimos cargar tu feed. Intentá de nuevo.'),
+        findsOneWidget,
+      );
+    });
+
+    // SCENARIO-202: null result shows no-gym empty state
+    testWidgets('SCENARIO-202: null result shows no-gym FeedEmptyState',
+        (tester) async {
+      await tester.pumpWidget(
+        _wrapProvider(
+          const FeedScreen(),
+          gymOverrides(gymFuture: () async => null),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(FeedEmptyState), findsOneWidget);
+      expect(find.text('Todavía no estás en un gym'), findsOneWidget);
+    });
+
+    // SCENARIO-203: empty list shows gym-no-posts empty state
+    testWidgets('SCENARIO-203: empty list shows gym-no-posts FeedEmptyState',
+        (tester) async {
+      await tester.pumpWidget(
+        _wrapProvider(
+          const FeedScreen(),
+          gymOverrides(gymFuture: () async => const <Post>[]),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(FeedEmptyState), findsOneWidget);
+      expect(find.text('Tu gym todavía no tiene posts'), findsOneWidget);
+    });
+
+    // SCENARIO-204: non-empty list shows ListView with PostCards
+    testWidgets('SCENARIO-204: non-empty list shows PostCard ListView',
+        (tester) async {
+      final posts = [
+        _makePost(id: 'g1', text: 'Post gym 1', authorUid: 'u-gym-1'),
+        _makePost(id: 'g2', text: 'Post gym 2', authorUid: 'u-gym-2'),
+      ];
+      await tester.pumpWidget(
+        _wrapProvider(
+          const FeedScreen(),
+          gymOverrides(gymFuture: () async => posts),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(PostCard), findsNWidgets(2));
+      expect(find.byType(FeedEmptyState), findsNothing);
+    });
+
+    // SCENARIO-213/214: PostCard onAuthorTap invoked (no crash)
+    testWidgets(
+        'SCENARIO-213: onAuthorTap callback fires without crash on gym post',
+        (tester) async {
+      final post = _makePost(id: 'g1', text: 'Gym post', authorUid: 'u-xyz');
+      await tester.pumpWidget(
+        _wrapProvider(
+          const FeedScreen(),
+          gymOverrides(gymFuture: () async => [post]),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(PostCard), findsOneWidget);
+      // Tap the author area — PostCard uses GestureDetector internally
+      await tester.tap(find.text('Tincho').first);
+      await tester.pumpAndSettle();
+      // No exception thrown — navigation stub with TODO comment handles the tap
+    });
+  });
+
+  // ── REQ-FSG-014..016 — _PublicoBody ──────────────────────────────────────
+
+  group('_PublicoBody', () {
+    // SCENARIO-211: loading state shows spinner
+    testWidgets('SCENARIO-211: loading state shows spinner', (tester) async {
+      await tester.pumpWidget(
+        _wrapProvider(const FeedScreen(), [
+          feedSegmentProvider.overrideWith((ref) => FeedSegment.public),
+          myFriendsFeedProvider.overrideWith((ref) async => const <Post>[]),
+          myGymFeedProvider.overrideWith((ref) async => null),
+          feedPublicProvider.overrideWith((ref) async {
+            await Completer<void>().future;
+            return const <Post>[];
+          }),
+        ]),
+      );
+      await tester.pump();
+
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    });
+
+    // SCENARIO-210: error state shows generic error copy
+    testWidgets('SCENARIO-210: error state shows generic error copy',
+        (tester) async {
+      await tester.pumpWidget(
+        _wrapProvider(const FeedScreen(), [
+          feedSegmentProvider.overrideWith((ref) => FeedSegment.public),
+          myFriendsFeedProvider.overrideWith((ref) async => const <Post>[]),
+          myGymFeedProvider.overrideWith((ref) async => null),
+          feedPublicProvider.overrideWith(
+            (ref) =>
+                Future<List<Post>>.error(Exception('err'), StackTrace.empty),
+          ),
+        ]),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('No pudimos cargar tu feed. Intentá de nuevo.'),
+        findsOneWidget,
+      );
+    });
+
+    // SCENARIO-208: empty list shows empty-state copy
+    testWidgets('SCENARIO-208: empty list shows FeedEmptyState for público',
+        (tester) async {
+      await tester.pumpWidget(
+        _wrapProvider(const FeedScreen(), [
+          feedSegmentProvider.overrideWith((ref) => FeedSegment.public),
+          myFriendsFeedProvider.overrideWith((ref) async => const <Post>[]),
+          myGymFeedProvider.overrideWith((ref) async => null),
+          feedPublicProvider.overrideWith((ref) async => const <Post>[]),
+        ]),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(FeedEmptyState), findsOneWidget);
+      expect(find.text('Aún no hay posts públicos'), findsOneWidget);
+    });
+
+    // SCENARIO-209: non-empty list shows ListView with PostCards
+    testWidgets('SCENARIO-209: non-empty list shows PostCard ListView',
+        (tester) async {
+      final posts = [
+        _makePost(
+          id: 'pub1',
+          text: 'Post público',
+          authorUid: 'u-pub-1',
+          privacy: PostPrivacy.public,
+        ),
+      ];
+      await tester.pumpWidget(
+        _wrapProvider(const FeedScreen(), [
+          feedSegmentProvider.overrideWith((ref) => FeedSegment.public),
+          myFriendsFeedProvider.overrideWith((ref) async => const <Post>[]),
+          myGymFeedProvider.overrideWith((ref) async => null),
+          feedPublicProvider.overrideWith((ref) async => posts),
+        ]),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(PostCard), findsOneWidget);
       expect(find.byType(FeedEmptyState), findsNothing);
     });
   });
