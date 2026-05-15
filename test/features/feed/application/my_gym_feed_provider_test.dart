@@ -134,11 +134,11 @@ void main() {
       );
       addTearDown(container.dispose);
 
-      final state = await container
-          .read(myGymFeedProvider.future)
-          .then((_) => null)
-          .catchError((e) => e);
-      expect(state, isA<Exception>());
+      // Expect the future to throw, confirming an error was propagated
+      await expectLater(
+        container.read(myGymFeedProvider.future),
+        throwsA(isA<Exception>()),
+      );
     });
   });
 }
