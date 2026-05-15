@@ -102,6 +102,9 @@ class FriendshipRepository {
   Friendship? _fromDoc(DocumentSnapshot<Map<String, Object?>> snap) {
     final data = snap.data();
     if (!snap.exists || data == null) return null;
-    return Friendship.fromJson(data);
+    // Inject snap.id so manually-created docs (e.g. Firestore Console)
+    // deserialize correctly even if they omit the `id` field from the body.
+    // App-created friendships already carry `id` via `request()` toJson().
+    return Friendship.fromJson({...data, 'id': snap.id});
   }
 }

@@ -82,6 +82,10 @@ class PostRepository {
   Post? _fromDoc(DocumentSnapshot<Map<String, Object?>> snap) {
     final data = snap.data();
     if (!snap.exists || data == null) return null;
-    return Post.fromJson(data);
+    // Inject snap.id so seed-written docs (which strip `id` from the body
+    // and store it only as the doc ID) deserialize correctly. App-created
+    // posts already carry `id` in the body via `create()` — this is a no-op
+    // override for those.
+    return Post.fromJson({...data, 'id': snap.id});
   }
 }
