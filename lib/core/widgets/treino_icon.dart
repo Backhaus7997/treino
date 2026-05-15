@@ -71,4 +71,8 @@ class TreinoIcon {
   static const IconData plus = PhosphorIconsRegular.plus;
   static const IconData ruler = PhosphorIconsRegular.ruler;
   static const IconData scales = PhosphorIconsRegular.scales;
+
+  // Feed / social
+  static const IconData dotsThree = PhosphorIconsRegular.dotsThreeVertical;
+  static const IconData verified = PhosphorIconsFill.sealCheck;
 }

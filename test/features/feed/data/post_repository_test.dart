@@ -8,6 +8,8 @@ import 'package:treino/features/feed/domain/routine_tag.dart';
 Post _makePost({
   String id = 'p1',
   String authorUid = 'u1',
+  String authorDisplayName = 'Test User',
+  String? authorAvatarUrl,
   String? authorGymId,
   String text = 'Test post',
   RoutineTag? routineTag,
@@ -17,6 +19,8 @@ Post _makePost({
   return Post(
     id: id,
     authorUid: authorUid,
+    authorDisplayName: authorDisplayName,
+    authorAvatarUrl: authorAvatarUrl,
     authorGymId: authorGymId,
     text: text,
     routineTag: routineTag,

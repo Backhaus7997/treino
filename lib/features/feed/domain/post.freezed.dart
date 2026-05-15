@@ -21,7 +21,13 @@ Post _$PostFromJson(Map<String, dynamic> json) {
 /// @nodoc
 mixin _$Post {
   String get id => throw _privateConstructorUsedError;
-  String get authorUid => throw _privateConstructorUsedError;
+  String get authorUid =>
+      throw _privateConstructorUsedError; // Author display fields denormalized at write time (same ADR as authorGymId).
+// Stale-on-update is accepted — standard social-media pattern.
+// `@Default('Anónimo')` handles legacy Firestore docs that predate this field —
+// json_serializable applies the default when the JSON key is missing.
+  String get authorDisplayName => throw _privateConstructorUsedError;
+  String? get authorAvatarUrl => throw _privateConstructorUsedError;
   String? get authorGymId => throw _privateConstructorUsedError;
   String get text => throw _privateConstructorUsedError;
   RoutineTag? get routineTag => throw _privateConstructorUsedError;
@@ -46,6 +52,8 @@ abstract class $PostCopyWith<$Res> {
   $Res call(
       {String id,
       String authorUid,
+      String authorDisplayName,
+      String? authorAvatarUrl,
       String? authorGymId,
       String text,
       RoutineTag? routineTag,
@@ -72,6 +80,8 @@ class _$PostCopyWithImpl<$Res, $Val extends Post>
   $Res call({
     Object? id = null,
     Object? authorUid = null,
+    Object? authorDisplayName = null,
+    Object? authorAvatarUrl = freezed,
     Object? authorGymId = freezed,
     Object? text = null,
     Object? routineTag = freezed,
@@ -87,6 +97,14 @@ class _$PostCopyWithImpl<$Res, $Val extends Post>
           ? _value.authorUid
           : authorUid // ignore: cast_nullable_to_non_nullable
               as String,
+      authorDisplayName: null == authorDisplayName
+          ? _value.authorDisplayName
+          : authorDisplayName // ignore: cast_nullable_to_non_nullable
+              as String,
+      authorAvatarUrl: freezed == authorAvatarUrl
+          ? _value.authorAvatarUrl
+          : authorAvatarUrl // ignore: cast_nullable_to_non_nullable
+              as String?,
       authorGymId: freezed == authorGymId
           ? _value.authorGymId
           : authorGymId // ignore: cast_nullable_to_non_nullable
@@ -135,6 +153,8 @@ abstract class _$$PostImplCopyWith<$Res> implements $PostCopyWith<$Res> {
   $Res call(
       {String id,
       String authorUid,
+      String authorDisplayName,
+      String? authorAvatarUrl,
       String? authorGymId,
       String text,
       RoutineTag? routineTag,
@@ -159,6 +179,8 @@ class __$$PostImplCopyWithImpl<$Res>
   $Res call({
     Object? id = null,
     Object? authorUid = null,
+    Object? authorDisplayName = null,
+    Object? authorAvatarUrl = freezed,
     Object? authorGymId = freezed,
     Object? text = null,
     Object? routineTag = freezed,
@@ -174,6 +196,14 @@ class __$$PostImplCopyWithImpl<$Res>
           ? _value.authorUid
           : authorUid // ignore: cast_nullable_to_non_nullable
               as String,
+      authorDisplayName: null == authorDisplayName
+          ? _value.authorDisplayName
+          : authorDisplayName // ignore: cast_nullable_to_non_nullable
+              as String,
+      authorAvatarUrl: freezed == authorAvatarUrl
+          ? _value.authorAvatarUrl
+          : authorAvatarUrl // ignore: cast_nullable_to_non_nullable
+              as String?,
       authorGymId: freezed == authorGymId
           ? _value.authorGymId
           : authorGymId // ignore: cast_nullable_to_non_nullable
@@ -204,6 +234,8 @@ class _$PostImpl implements _Post {
   const _$PostImpl(
       {required this.id,
       required this.authorUid,
+      this.authorDisplayName = 'Anónimo',
+      required this.authorAvatarUrl,
       required this.authorGymId,
       required this.text,
       required this.routineTag,
@@ -217,6 +249,15 @@ class _$PostImpl implements _Post {
   final String id;
   @override
   final String authorUid;
+// Author display fields denormalized at write time (same ADR as authorGymId).
+// Stale-on-update is accepted — standard social-media pattern.
+// `@Default('Anónimo')` handles legacy Firestore docs that predate this field —
+// json_serializable applies the default when the JSON key is missing.
+  @override
+  @JsonKey()
+  final String authorDisplayName;
+  @override
+  final String? authorAvatarUrl;
   @override
   final String? authorGymId;
   @override
@@ -231,7 +272,7 @@ class _$PostImpl implements _Post {
 
   @override
   String toString() {
-    return 'Post(id: $id, authorUid: $authorUid, authorGymId: $authorGymId, text: $text, routineTag: $routineTag, privacy: $privacy, createdAt: $createdAt)';
+    return 'Post(id: $id, authorUid: $authorUid, authorDisplayName: $authorDisplayName, authorAvatarUrl: $authorAvatarUrl, authorGymId: $authorGymId, text: $text, routineTag: $routineTag, privacy: $privacy, createdAt: $createdAt)';
   }
 
   @override
@@ -242,6 +283,10 @@ class _$PostImpl implements _Post {
             (identical(other.id, id) || other.id == id) &&
             (identical(other.authorUid, authorUid) ||
                 other.authorUid == authorUid) &&
+            (identical(other.authorDisplayName, authorDisplayName) ||
+                other.authorDisplayName == authorDisplayName) &&
+            (identical(other.authorAvatarUrl, authorAvatarUrl) ||
+                other.authorAvatarUrl == authorAvatarUrl) &&
             (identical(other.authorGymId, authorGymId) ||
                 other.authorGymId == authorGymId) &&
             (identical(other.text, text) || other.text == text) &&
@@ -254,8 +299,8 @@ class _$PostImpl implements _Post {
 
   @JsonKey(includeFromJson: false, includeToJson: false)
   @override
-  int get hashCode => Object.hash(runtimeType, id, authorUid, authorGymId, text,
-      routineTag, privacy, createdAt);
+  int get hashCode => Object.hash(runtimeType, id, authorUid, authorDisplayName,
+      authorAvatarUrl, authorGymId, text, routineTag, privacy, createdAt);
 
   /// Create a copy of Post
   /// with the given fields replaced by the non-null parameter values.
@@ -277,6 +322,8 @@ abstract class _Post implements Post {
   const factory _Post(
       {required final String id,
       required final String authorUid,
+      final String authorDisplayName,
+      required final String? authorAvatarUrl,
       required final String? authorGymId,
       required final String text,
       required final RoutineTag? routineTag,
@@ -288,7 +335,15 @@ abstract class _Post implements Post {
   @override
   String get id;
   @override
-  String get authorUid;
+  String
+      get authorUid; // Author display fields denormalized at write time (same ADR as authorGymId).
+// Stale-on-update is accepted — standard social-media pattern.
+// `@Default('Anónimo')` handles legacy Firestore docs that predate this field —
+// json_serializable applies the default when the JSON key is missing.
+  @override
+  String get authorDisplayName;
+  @override
+  String? get authorAvatarUrl;
   @override
   String? get authorGymId;
   @override
