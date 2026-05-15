@@ -57,8 +57,7 @@ final firstPostByAuthorProvider =
 ///   - `friendship` (null on self-visit or if no friendship doc exists)
 ///   - `isSelf` flag for the view layer to hide SEGUIR/MENSAJE buttons.
 final publicProfileViewProvider =
-    FutureProvider.family<PublicProfileView, String>(
-        (ref, targetUid) async {
+    FutureProvider.family<PublicProfileView, String>((ref, targetUid) async {
   final auth = await ref.watch(authStateChangesProvider.future);
   if (auth == null) {
     return const PublicProfileView(

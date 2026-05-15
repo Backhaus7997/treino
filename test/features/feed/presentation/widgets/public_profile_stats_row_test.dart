@@ -29,7 +29,8 @@ void main() {
       expect(find.text('0'), findsNWidgets(4));
     });
 
-    testWidgets('SCENARIO-218: stats row renders without overflow on narrow widths',
+    testWidgets(
+        'SCENARIO-218: stats row renders without overflow on narrow widths',
         (tester) async {
       await tester.pumpWidget(_wrap(
         const SizedBox(

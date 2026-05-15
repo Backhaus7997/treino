@@ -35,17 +35,17 @@ void main() {
       expect(avatar.authorDisplayName, equals('Tincho'));
     });
 
-    testWidgets(
-        'SCENARIO-212: display name is rendered UPPERCASE',
+    testWidgets('SCENARIO-212: display name is rendered UPPERCASE',
         (tester) async {
-      await tester
-          .pumpWidget(_wrap(PublicProfileHero(view: _view(authorDisplayName: 'Tincho'))));
+      await tester.pumpWidget(
+          _wrap(PublicProfileHero(view: _view(authorDisplayName: 'Tincho'))));
       await tester.pump();
       expect(find.text('TINCHO'), findsOneWidget);
       expect(find.text('Tincho'), findsNothing);
     });
 
-    testWidgets('SCENARIO-213: known gymId resolves to gym name', (tester) async {
+    testWidgets('SCENARIO-213: known gymId resolves to gym name',
+        (tester) async {
       await tester.pumpWidget(_wrap(PublicProfileHero(
         view: _view(authorGymId: 'smart-fit-palermo'),
       )));

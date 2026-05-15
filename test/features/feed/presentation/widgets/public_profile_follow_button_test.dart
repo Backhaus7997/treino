@@ -43,8 +43,7 @@ Friendship _pending({required String requesterId}) => Friendship(
 
 void main() {
   group('PublicProfileFollowButton', () {
-    testWidgets(
-        'SCENARIO-219: friendship null → SEGUIR pill mint active',
+    testWidgets('SCENARIO-219: friendship null → SEGUIR pill mint active',
         (tester) async {
       final firestore = FakeFirebaseFirestore();
       await tester.pumpWidget(_wrap(
@@ -117,8 +116,7 @@ void main() {
       expect(find.text('ACEPTAR'), findsOneWidget);
     });
 
-    testWidgets(
-        'SCENARIO-223: accepted → SIGUIENDO with check icon',
+    testWidgets('SCENARIO-223: accepted → SIGUIENDO with check icon',
         (tester) async {
       final firestore = FakeFirebaseFirestore();
       await tester.pumpWidget(_wrap(
@@ -135,8 +133,7 @@ void main() {
       expect(find.byIcon(TreinoIcon.check), findsOneWidget);
     });
 
-    testWidgets(
-        'SCENARIO-224: tap SEGUIR fires request and writes Firestore',
+    testWidgets('SCENARIO-224: tap SEGUIR fires request and writes Firestore',
         (tester) async {
       final firestore = FakeFirebaseFirestore();
 
@@ -159,8 +156,7 @@ void main() {
       expect(snap.data()!['status'], equals('pending'));
     });
 
-    testWidgets(
-        'SCENARIO-225: tap ACEPTAR transitions friendship to accepted',
+    testWidgets('SCENARIO-225: tap ACEPTAR transitions friendship to accepted',
         (tester) async {
       final firestore = FakeFirebaseFirestore();
       final pending = _pending(requesterId: 'target');
@@ -186,8 +182,7 @@ void main() {
       expect(snap.data()!['status'], equals('accepted'));
     });
 
-    testWidgets(
-        'SCENARIO-226: tap SIGUIENDO is a no-op (no Firestore change)',
+    testWidgets('SCENARIO-226: tap SIGUIENDO is a no-op (no Firestore change)',
         (tester) async {
       final firestore = FakeFirebaseFirestore();
       final accepted = _accepted();

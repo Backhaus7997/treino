@@ -151,8 +151,8 @@ void main() {
       ]);
       addTearDown(container.dispose);
 
-      final result = await container
-          .read(firstPostByAuthorProvider('no-posts').future);
+      final result =
+          await container.read(firstPostByAuthorProvider('no-posts').future);
 
       expect(result, isNull);
     });
@@ -229,8 +229,7 @@ void main() {
       expect(view.isSelf, isFalse);
     });
 
-    test(
-        'SCENARIO-204: no posts → authorDisplayName falls back to "Anónimo"',
+    test('SCENARIO-204: no posts → authorDisplayName falls back to "Anónimo"',
         () async {
       final firestore = FakeFirebaseFirestore();
 

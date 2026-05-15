@@ -98,8 +98,7 @@ void main() {
       expect(find.text('TINCHO'), findsOneWidget);
     });
 
-    testWidgets(
-        'SCENARIO-209: non-self renders SEGUIR and MENSAJE buttons',
+    testWidgets('SCENARIO-209: non-self renders SEGUIR and MENSAJE buttons',
         (tester) async {
       await tester.pumpWidget(_wrap(
         child: const PublicProfileScreen(targetUid: 'target'),
@@ -111,8 +110,7 @@ void main() {
       expect(find.text('MENSAJE'), findsOneWidget);
     });
 
-    testWidgets(
-        'SCENARIO-227: loading state renders CircularProgressIndicator',
+    testWidgets('SCENARIO-227: loading state renders CircularProgressIndicator',
         (tester) async {
       await tester.pumpWidget(_wrap(
         child: const PublicProfileScreen(targetUid: 'target'),
@@ -125,8 +123,7 @@ void main() {
       expect(find.text('TINCHO'), findsNothing);
     });
 
-    testWidgets(
-        'SCENARIO-228: error state renders graceful fallback text',
+    testWidgets('SCENARIO-228: error state renders graceful fallback text',
         (tester) async {
       await tester.pumpWidget(_wrap(
         child: const PublicProfileScreen(targetUid: 'target'),
@@ -137,8 +134,7 @@ void main() {
       expect(find.text('No pudimos cargar este perfil.'), findsOneWidget);
     });
 
-    testWidgets(
-        'SCENARIO-230: RUTINAS PÚBLICAS tab is active by default',
+    testWidgets('SCENARIO-230: RUTINAS PÚBLICAS tab is active by default',
         (tester) async {
       await tester.pumpWidget(_wrap(
         child: const PublicProfileScreen(targetUid: 'target'),
@@ -152,8 +148,7 @@ void main() {
       expect(find.text('Aún no hay rutinas públicas.'), findsOneWidget);
     });
 
-    testWidgets(
-        'SCENARIO-231/232/233: tapping ACTIVIDAD switches body copy',
+    testWidgets('SCENARIO-231/232/233: tapping ACTIVIDAD switches body copy',
         (tester) async {
       await tester.pumpWidget(_wrap(
         child: const PublicProfileScreen(targetUid: 'target'),

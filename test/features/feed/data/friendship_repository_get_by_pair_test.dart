@@ -34,8 +34,7 @@ void main() {
 
   group('FriendshipRepository.getByPair', () {
     // SCENARIO-190: returns Friendship when doc exists
-    test(
-        'SCENARIO-190: returns a non-null Friendship when doc exists',
+    test('SCENARIO-190: returns a non-null Friendship when doc exists',
         () async {
       await seedFriendship(
         uidA: 'alice',
@@ -52,8 +51,7 @@ void main() {
     });
 
     // SCENARIO-191: returns null when no doc exists
-    test(
-        'SCENARIO-191: returns null and no exception when no doc exists',
+    test('SCENARIO-191: returns null and no exception when no doc exists',
         () async {
       final result = await repo.getByPair('alice', 'bob');
 
@@ -61,8 +59,7 @@ void main() {
     });
 
     // SCENARIO-192: respects sorted doc ID regardless of argument order
-    test(
-        'SCENARIO-192: returns same Friendship when arguments are reversed',
+    test('SCENARIO-192: returns same Friendship when arguments are reversed',
         () async {
       await seedFriendship(
         uidA: 'alice',

@@ -31,7 +31,8 @@ void main() {
       expect(view.isSelf, isFalse);
     });
 
-    test('SCENARIO-194: handles nullable fields (no avatar, no gym, no friendship)',
+    test(
+        'SCENARIO-194: handles nullable fields (no avatar, no gym, no friendship)',
         () {
       const view = PublicProfileView(
         authorDisplayName: 'Anónimo',
