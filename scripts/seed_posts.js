@@ -26,11 +26,41 @@ const db = admin.firestore();
 
 const NOW = new Date('2026-01-15T10:00:00Z');
 
+// Author display name / avatar mapping (design §7.3)
+// seed_user_001 → Martín L.   (has avatar)
+// seed_user_002 → Sofía R.    (has avatar)
+// seed_user_003 → Mateo Q.    (null — initials fallback)
+// seed_user_004 → Camila P.   (has avatar)
+// seed_user_005 → Diego F.    (null — initials fallback)
+const AUTHOR_META = {
+  seed_user_001: {
+    authorDisplayName: 'Martín L.',
+    authorAvatarUrl: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=80&h=80&fit=crop',
+  },
+  seed_user_002: {
+    authorDisplayName: 'Sofía R.',
+    authorAvatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=80&h=80&fit=crop',
+  },
+  seed_user_003: {
+    authorDisplayName: 'Mateo Q.',
+    authorAvatarUrl: null,
+  },
+  seed_user_004: {
+    authorDisplayName: 'Camila P.',
+    authorAvatarUrl: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=80&h=80&fit=crop',
+  },
+  seed_user_005: {
+    authorDisplayName: 'Diego F.',
+    authorAvatarUrl: null,
+  },
+};
+
 const posts = [
   // --- public (4 posts) ---------------------------------------------------
   {
     id: 'seed_post_001',
     authorUid: 'seed_user_001',
+    ...AUTHOR_META['seed_user_001'],
     authorGymId: 'seed_gym_001',
     text: 'Acabo de terminar mi primer entrenamiento del año. ¡Vamos!',
     routineTag: null,
@@ -40,6 +70,7 @@ const posts = [
   {
     id: 'seed_post_002',
     authorUid: 'seed_user_002',
+    ...AUTHOR_META['seed_user_002'],
     authorGymId: 'seed_gym_001',
     text: 'PR en sentadilla: 120 kg. La constancia da resultados.',
     routineTag: {
@@ -52,6 +83,7 @@ const posts = [
   {
     id: 'seed_post_003',
     authorUid: 'seed_user_003',
+    ...AUTHOR_META['seed_user_003'],
     authorGymId: 'seed_gym_002',
     text: 'Rutina de cardio completada. 5 km en 22 minutos.',
     routineTag: null,
@@ -61,6 +93,7 @@ const posts = [
   {
     id: 'seed_post_004',
     authorUid: 'seed_user_001',
+    ...AUTHOR_META['seed_user_001'],
     authorGymId: 'seed_gym_001',
     text: 'Bench press 100 kg × 5 reps. Progreso sostenido.',
     routineTag: {
@@ -75,6 +108,7 @@ const posts = [
   {
     id: 'seed_post_005',
     authorUid: 'seed_user_002',
+    ...AUTHOR_META['seed_user_002'],
     authorGymId: 'seed_gym_001',
     text: 'Entrené con resaca, no me pregunten cómo salió.',
     routineTag: null,
@@ -84,6 +118,7 @@ const posts = [
   {
     id: 'seed_post_006',
     authorUid: 'seed_user_004',
+    ...AUTHOR_META['seed_user_004'],
     authorGymId: 'seed_gym_003',
     text: 'Lesión leve en el hombro. Tomando la semana tranquilo.',
     routineTag: null,
@@ -93,6 +128,7 @@ const posts = [
   {
     id: 'seed_post_007',
     authorUid: 'seed_user_003',
+    ...AUTHOR_META['seed_user_003'],
     authorGymId: 'seed_gym_002',
     text: 'Probé una rutina nueva de hipertrofia. Muy buena.',
     routineTag: {
@@ -107,6 +143,7 @@ const posts = [
   {
     id: 'seed_post_008',
     authorUid: 'seed_user_001',
+    ...AUTHOR_META['seed_user_001'],
     authorGymId: 'seed_gym_001',
     text: 'Los viernes a las 7am somos cuatro gatos. Mejor horario.',
     routineTag: null,
@@ -116,6 +153,7 @@ const posts = [
   {
     id: 'seed_post_009',
     authorUid: 'seed_user_005',
+    ...AUTHOR_META['seed_user_005'],
     authorGymId: 'seed_gym_001',
     text: 'Clase de spinning con el profe Martín. Brutal como siempre.',
     routineTag: null,
@@ -125,6 +163,7 @@ const posts = [
   {
     id: 'seed_post_010',
     authorUid: 'seed_user_002',
+    ...AUTHOR_META['seed_user_002'],
     authorGymId: 'seed_gym_001',
     text: '¿Alguien más probó el nuevo rack de mancuernas? Una joya.',
     routineTag: null,
