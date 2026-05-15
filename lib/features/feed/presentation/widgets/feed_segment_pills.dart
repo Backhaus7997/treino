@@ -26,16 +26,18 @@ class FeedSegmentPills extends ConsumerWidget {
                 FeedSegment.amigos,
           ),
           const SizedBox(width: 12),
-          const _Pill(
+          _Pill(
             label: 'MI GYM',
-            isActive: false,
-            onTap: null,
+            isActive: segment == FeedSegment.gym,
+            onTap: () =>
+                ref.read(feedSegmentProvider.notifier).state = FeedSegment.gym,
           ),
           const SizedBox(width: 12),
-          const _Pill(
+          _Pill(
             label: 'PÚBLICO',
-            isActive: false,
-            onTap: null,
+            isActive: segment == FeedSegment.public,
+            onTap: () => ref.read(feedSegmentProvider.notifier).state =
+                FeedSegment.public,
           ),
         ],
       ),
