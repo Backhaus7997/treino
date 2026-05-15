@@ -60,8 +60,7 @@ void main() {
     });
 
     // SCENARIO-182: null URL + 'Anónimo' → '?'
-    testWidgets(
-        'SCENARIO-182: shows ? for displayName Anónimo',
+    testWidgets('SCENARIO-182: shows ? for displayName Anónimo',
         (tester) async {
       await tester.pumpWidget(
         _wrap(
@@ -78,9 +77,7 @@ void main() {
     });
 
     // SCENARIO-183: null URL + empty displayName → '?'
-    testWidgets(
-        'SCENARIO-183: shows ? for empty displayName',
-        (tester) async {
+    testWidgets('SCENARIO-183: shows ? for empty displayName', (tester) async {
       await tester.pumpWidget(
         _wrap(
           const PostAvatar(

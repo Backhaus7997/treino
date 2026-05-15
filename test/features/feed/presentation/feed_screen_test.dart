@@ -120,8 +120,7 @@ void main() {
       await tester.pumpWidget(
         _wrapProvider(const FeedScreen(), [
           feedSegmentProvider.overrideWith((ref) => FeedSegment.gym),
-          myFriendsFeedProvider
-              .overrideWith((ref) async => const <Post>[]),
+          myFriendsFeedProvider.overrideWith((ref) async => const <Post>[]),
         ]),
       );
       await tester.pump();
@@ -136,8 +135,7 @@ void main() {
       await tester.pumpWidget(
         _wrapProvider(const FeedScreen(), [
           feedSegmentProvider.overrideWith((ref) => FeedSegment.public),
-          myFriendsFeedProvider
-              .overrideWith((ref) async => const <Post>[]),
+          myFriendsFeedProvider.overrideWith((ref) async => const <Post>[]),
         ]),
       );
       await tester.pump();
@@ -162,8 +160,8 @@ void main() {
     // SCENARIO-150: list of PostCards rendered in order
     testWidgets('SCENARIO-150: 3 PostCards rendered in correct order',
         (tester) async {
-      await tester.pumpWidget(
-          _wrapProvider(const FeedScreen(), makeOverrides([post1, post2, post3])));
+      await tester.pumpWidget(_wrapProvider(
+          const FeedScreen(), makeOverrides([post1, post2, post3])));
       await tester.pumpAndSettle();
 
       expect(find.byType(PostCard), findsNWidgets(3));
@@ -176,8 +174,8 @@ void main() {
     // SCENARIO-151: no FeedEmptyState when posts present
     testWidgets('SCENARIO-151: no FeedEmptyState when posts present',
         (tester) async {
-      await tester.pumpWidget(
-          _wrapProvider(const FeedScreen(), makeOverrides([post1, post2, post3])));
+      await tester.pumpWidget(_wrapProvider(
+          const FeedScreen(), makeOverrides([post1, post2, post3])));
       await tester.pumpAndSettle();
 
       expect(find.byType(FeedEmptyState), findsNothing);
@@ -185,8 +183,8 @@ void main() {
 
     // SCENARIO-152: no CircularProgressIndicator when data resolved
     testWidgets('SCENARIO-152: no spinner when data resolved', (tester) async {
-      await tester.pumpWidget(
-          _wrapProvider(const FeedScreen(), makeOverrides([post1, post2, post3])));
+      await tester.pumpWidget(_wrapProvider(
+          const FeedScreen(), makeOverrides([post1, post2, post3])));
       await tester.pumpAndSettle();
 
       expect(find.byType(CircularProgressIndicator), findsNothing);
@@ -198,14 +196,14 @@ void main() {
   group('REQ-FEED-SCREEN-003: amigos empty state', () {
     final emptyOverrides = <Override>[
       feedSegmentProvider.overrideWith((ref) => FeedSegment.amigos),
-      myFriendsFeedProvider
-          .overrideWith((ref) async => const <Post>[]),
+      myFriendsFeedProvider.overrideWith((ref) async => const <Post>[]),
     ];
 
     // SCENARIO-153: FeedEmptyState rendered when list empty
     testWidgets('SCENARIO-153: FeedEmptyState rendered for empty list',
         (tester) async {
-      await tester.pumpWidget(_wrapProvider(const FeedScreen(), emptyOverrides));
+      await tester
+          .pumpWidget(_wrapProvider(const FeedScreen(), emptyOverrides));
       await tester.pumpAndSettle();
 
       expect(find.byType(FeedEmptyState), findsOneWidget);
@@ -213,7 +211,8 @@ void main() {
 
     // SCENARIO-154: no PostCard rendered when list empty
     testWidgets('SCENARIO-154: no PostCard when empty', (tester) async {
-      await tester.pumpWidget(_wrapProvider(const FeedScreen(), emptyOverrides));
+      await tester
+          .pumpWidget(_wrapProvider(const FeedScreen(), emptyOverrides));
       await tester.pumpAndSettle();
 
       expect(find.byType(PostCard), findsNothing);
@@ -225,8 +224,7 @@ void main() {
   group('REQ-FEED-SCREEN-004: amigos loading state', () {
     List<Override> loadingOverrides() => [
           feedSegmentProvider.overrideWith((ref) => FeedSegment.amigos),
-          myFriendsFeedProvider
-              .overrideWith((ref) async {
+          myFriendsFeedProvider.overrideWith((ref) async {
             // Never resolves → AsyncLoading
             await Completer<void>().future;
             return const <Post>[];
@@ -236,8 +234,8 @@ void main() {
     // SCENARIO-155: spinner rendered during loading
     testWidgets('SCENARIO-155: CircularProgressIndicator during loading',
         (tester) async {
-      await tester.pumpWidget(
-          _wrapProvider(const FeedScreen(), loadingOverrides()));
+      await tester
+          .pumpWidget(_wrapProvider(const FeedScreen(), loadingOverrides()));
       // Single pump — don't settle, stay in loading state
       await tester.pump();
 
@@ -247,8 +245,8 @@ void main() {
     // SCENARIO-156: no PostCard or FeedEmptyState during loading
     testWidgets('SCENARIO-156: no PostCard or FeedEmptyState during loading',
         (tester) async {
-      await tester.pumpWidget(
-          _wrapProvider(const FeedScreen(), loadingOverrides()));
+      await tester
+          .pumpWidget(_wrapProvider(const FeedScreen(), loadingOverrides()));
       await tester.pump();
 
       expect(find.byType(PostCard), findsNothing);
@@ -261,17 +259,17 @@ void main() {
   group('REQ-FEED-SCREEN-005: amigos error state', () {
     final errorOverrides = <Override>[
       feedSegmentProvider.overrideWith((ref) => FeedSegment.amigos),
-      myFriendsFeedProvider
-          .overrideWith((ref) => Future<List<Post>>.error(
-                Exception('net'),
-                StackTrace.empty,
-              )),
+      myFriendsFeedProvider.overrideWith((ref) => Future<List<Post>>.error(
+            Exception('net'),
+            StackTrace.empty,
+          )),
     ];
 
     // SCENARIO-157: graceful fallback rendered, no FlutterError
-    testWidgets('SCENARIO-157: graceful error message rendered', (tester) async {
-      await tester.pumpWidget(
-          _wrapProvider(const FeedScreen(), errorOverrides));
+    testWidgets('SCENARIO-157: graceful error message rendered',
+        (tester) async {
+      await tester
+          .pumpWidget(_wrapProvider(const FeedScreen(), errorOverrides));
       await tester.pumpAndSettle();
 
       expect(
@@ -283,8 +281,8 @@ void main() {
     // SCENARIO-158: no PostCard or FeedEmptyState in error state
     testWidgets('SCENARIO-158: no PostCard or FeedEmptyState on error',
         (tester) async {
-      await tester.pumpWidget(
-          _wrapProvider(const FeedScreen(), errorOverrides));
+      await tester
+          .pumpWidget(_wrapProvider(const FeedScreen(), errorOverrides));
       await tester.pumpAndSettle();
 
       expect(find.byType(PostCard), findsNothing);

@@ -29,10 +29,10 @@ class PostAvatar extends StatelessWidget {
             ? CachedNetworkImage(
                 imageUrl: authorAvatarUrl!,
                 fit: BoxFit.cover,
-                placeholder: (_, __) =>
-                    _InitialFallback(initial: initial, palette: palette, size: size),
-                errorWidget: (_, __, ___) =>
-                    _InitialFallback(initial: initial, palette: palette, size: size),
+                placeholder: (_, __) => _InitialFallback(
+                    initial: initial, palette: palette, size: size),
+                errorWidget: (_, __, ___) => _InitialFallback(
+                    initial: initial, palette: palette, size: size),
               )
             : _InitialFallback(initial: initial, palette: palette, size: size),
       ),

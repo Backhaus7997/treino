@@ -169,8 +169,7 @@ String _relativeTime(DateTime createdAt) {
 }
 
 String _formatMeta(String? gymId, DateTime createdAt) {
-  final gym =
-      (gymId == null || gymId.isEmpty) ? null : gymId.toUpperCase();
+  final gym = (gymId == null || gymId.isEmpty) ? null : gymId.toUpperCase();
   final time = _relativeTime(createdAt);
   return gym == null ? time : '$gym · $time';
 }

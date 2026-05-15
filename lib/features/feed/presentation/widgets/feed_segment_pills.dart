@@ -22,9 +22,8 @@ class FeedSegmentPills extends ConsumerWidget {
           _Pill(
             label: 'AMIGOS',
             isActive: segment == FeedSegment.amigos,
-            onTap: () =>
-                ref.read(feedSegmentProvider.notifier).state =
-                    FeedSegment.amigos,
+            onTap: () => ref.read(feedSegmentProvider.notifier).state =
+                FeedSegment.amigos,
           ),
           const SizedBox(width: 12),
           const _Pill(

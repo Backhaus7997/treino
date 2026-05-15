@@ -76,7 +76,8 @@ void main() {
     // -------------------------------------------------------------------------
 
     // SCENARIO-133: Roundtrip serialization preserves all 9 fields
-    test('SCENARIO-133: roundtrip preserves all 9 fields including author fields',
+    test(
+        'SCENARIO-133: roundtrip preserves all 9 fields including author fields',
         () {
       final post = Post(
         id: 'p4',
@@ -155,7 +156,8 @@ void main() {
     // SCENARIO-137: All existing Post fixture calls updated (compile-time gate)
     // Verified by: flutter analyze exits 0 with no missing-required-param errors.
     // The test below is a compile-time smoke pump — if this file compiles, gate passes.
-    test('SCENARIO-137: Post constructor requires authorDisplayName at compile time',
+    test(
+        'SCENARIO-137: Post constructor requires authorDisplayName at compile time',
         () {
       // This test asserts the constructor works with the required field present.
       // The RED state before TASK-002b is a compile error — this file intentionally

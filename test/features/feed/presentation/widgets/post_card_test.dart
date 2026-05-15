@@ -168,7 +168,8 @@ void main() {
     });
 
     // SCENARIO-173: stats row present with em-dashes
-    testWidgets('SCENARIO-173: stats row contains em-dash text', (tester) async {
+    testWidgets('SCENARIO-173: stats row contains em-dash text',
+        (tester) async {
       final post = makePost();
       await tester.pumpWidget(_wrap(PostCard(post: post)));
       await tester.pump();
