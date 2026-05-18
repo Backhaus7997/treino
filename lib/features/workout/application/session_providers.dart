@@ -41,9 +41,8 @@ final currentUidProvider = Provider<String?>((ref) {
 
 /// Notifier de sesión activa. autoDispose cancela el timer al salir del player.
 /// Orden: `.autoDispose.family` (no `.family.autoDispose`). Diseño §4.
-final sessionNotifierProvider =
-    AsyncNotifierProvider.autoDispose.family<SessionNotifier, SessionState,
-        SessionInit>(
+final sessionNotifierProvider = AsyncNotifierProvider.autoDispose
+    .family<SessionNotifier, SessionState, SessionInit>(
   SessionNotifier.new,
 );
 

@@ -100,7 +100,8 @@ RoutineDay makeDay({
       slots: slots ??
           [
             makeSlot(exerciseId: 'e1', targetSets: 3),
-            makeSlot(exerciseId: 'e2', exerciseName: 'Sentadilla', targetSets: 4),
+            makeSlot(
+                exerciseId: 'e2', exerciseName: 'Sentadilla', targetSets: 4),
           ],
       estimatedMinutes: estimatedMinutes,
     );

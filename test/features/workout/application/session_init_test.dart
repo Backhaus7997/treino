@@ -29,7 +29,8 @@ void main() {
     });
 
     // ── Distintos subtipos no son == ─────────────────────────────────────────
-    test('FreshSession y ResumeSession no son == aunque tengan ids similares', () {
+    test('FreshSession y ResumeSession no son == aunque tengan ids similares',
+        () {
       const fresh = FreshSession(routineId: 's1', dayNumber: 1);
       const resume = ResumeSession(sessionId: 's1');
       expect(fresh, isNot(equals(resume)));

@@ -47,7 +47,9 @@ void main() {
     });
 
     // ── SCENARIO-252: isFullyCompleted = true cuando todos completos ─────────
-    test('SCENARIO-252: isFullyCompleted = true cuando todos los sets están logueados', () {
+    test(
+        'SCENARIO-252: isFullyCompleted = true cuando todos los sets están logueados',
+        () {
       final day = makeDay(slots: [
         makeSlot(exerciseId: 'e1', targetSets: 3),
         makeSlot(exerciseId: 'e2', targetSets: 2),
@@ -70,7 +72,9 @@ void main() {
     });
 
     // ── SCENARIO-253: isFullyCompleted = true con overshoot ──────────────────
-    test('SCENARIO-253: isFullyCompleted = true aunque sets superen el target (overshoot)', () {
+    test(
+        'SCENARIO-253: isFullyCompleted = true aunque sets superen el target (overshoot)',
+        () {
       final day = makeDay(slots: [
         makeSlot(exerciseId: 'e1', targetSets: 2),
       ]);
@@ -96,8 +100,10 @@ void main() {
         makeSlot(exerciseId: 'e1', targetSets: 2),
       ]);
       final logs = [
-        makeSetLog(exerciseId: 'e1', setNumber: 1, reps: 10, weightKg: 60.0, id: 'l1'),
-        makeSetLog(exerciseId: 'e1', setNumber: 2, reps: 8, weightKg: 65.0, id: 'l2'),
+        makeSetLog(
+            exerciseId: 'e1', setNumber: 1, reps: 10, weightKg: 60.0, id: 'l1'),
+        makeSetLog(
+            exerciseId: 'e1', setNumber: 2, reps: 8, weightKg: 65.0, id: 'l2'),
       ];
       // 10*60 + 8*65 = 600 + 520 = 1120
       final state = SessionState(
@@ -124,7 +130,9 @@ void main() {
     });
 
     // ── copyWith smoke ────────────────────────────────────────────────────────
-    test('copyWith devuelve nueva instancia con el campo modificado y el resto igual', () {
+    test(
+        'copyWith devuelve nueva instancia con el campo modificado y el resto igual',
+        () {
       final day = makeDay();
       final original = SessionState(
         session: makeSession(),

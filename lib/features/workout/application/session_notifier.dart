@@ -112,8 +112,10 @@ class SessionNotifier
     );
 
     final currentIndex = _nextIncompleteIndex(day, recoveredLogs);
-    final elapsed =
-        DateTime.now().difference(session.startedAt).inSeconds.clamp(0, 1 << 31);
+    final elapsed = DateTime.now()
+        .difference(session.startedAt)
+        .inSeconds
+        .clamp(0, 1 << 31);
 
     return SessionState(
       session: session,
@@ -177,7 +179,8 @@ class SessionNotifier
     final current = state.value;
     if (current == null) return;
     if (!current.isFullyCompleted) {
-      throw StateError('finishSession llamado antes de que isFullyCompleted sea true');
+      throw StateError(
+          'finishSession llamado antes de que isFullyCompleted sea true');
     }
 
     _finalize();

@@ -63,7 +63,8 @@ void main() {
   // ── sessionNotifierProvider — family key uniqueness (SCENARIO-269) ────────
 
   group('sessionNotifierProvider family key uniqueness (SCENARIO-269)', () {
-    test('FreshSession con distintos routineId produce instancias distintas', () {
+    test('FreshSession con distintos routineId produce instancias distintas',
+        () {
       final repo = MockSessionRepository();
       final container = _makeContainer(uid: 'u1', repo: repo);
       addTearDown(container.dispose);
@@ -75,13 +76,17 @@ void main() {
       expect(key1, isNot(equals(key2)));
     });
 
-    test('FreshSession y ResumeSession son claves distintas aunque compartan valor', () {
+    test(
+        'FreshSession y ResumeSession son claves distintas aunque compartan valor',
+        () {
       const fresh = FreshSession(routineId: 's1', dayNumber: 1);
       const resume = ResumeSession(sessionId: 's1');
       expect(fresh, isNot(equals(resume)));
     });
 
-    test('dos FreshSession con mismos params son la misma clave (mismo provider)', () {
+    test(
+        'dos FreshSession con mismos params son la misma clave (mismo provider)',
+        () {
       const a = FreshSession(routineId: 'r1', dayNumber: 1);
       const b = FreshSession(routineId: 'r1', dayNumber: 1);
       expect(a, equals(b));
@@ -122,11 +127,11 @@ void main() {
       final result = await container.read(activeSessionForUidProvider.future);
       expect(result, isNull);
       // listSetLogs no debe ser llamado
-      verifyNever(() => repo.listSetLogs(uid: any(named: 'uid'), sessionId: any(named: 'sessionId')));
+      verifyNever(() => repo.listSetLogs(
+          uid: any(named: 'uid'), sessionId: any(named: 'sessionId')));
     });
 
-    test(
-        'SCENARIO-324: retorna null y NO llama al repo cuando uid es null',
+    test('SCENARIO-324: retorna null y NO llama al repo cuando uid es null',
         () async {
       final repo = MockSessionRepository();
       final container = _makeContainer(uid: null, repo: repo);

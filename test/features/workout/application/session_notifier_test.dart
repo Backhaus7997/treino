@@ -105,8 +105,7 @@ void main() {
       addTearDown(container.dispose);
 
       final init = FreshSession(routineId: routine.id, dayNumber: 1);
-      final state =
-          await container.read(sessionNotifierProvider(init).future);
+      final state = await container.read(sessionNotifierProvider(init).future);
 
       expect(state.setLogs, isEmpty);
       expect(state.currentExerciseIndex, equals(0));
@@ -195,8 +194,7 @@ void main() {
       addTearDown(container.dispose);
 
       const init = ResumeSession(sessionId: 's42');
-      final state =
-          await container.read(sessionNotifierProvider(init).future);
+      final state = await container.read(sessionNotifierProvider(init).future);
 
       expect(state.setLogs.length, equals(2));
       expect(state.setLogs[0].id, equals('l1'));
@@ -235,8 +233,7 @@ void main() {
       addTearDown(container.dispose);
 
       const init = ResumeSession(sessionId: 's42');
-      final state =
-          await container.read(sessionNotifierProvider(init).future);
+      final state = await container.read(sessionNotifierProvider(init).future);
 
       expect(state.currentExerciseIndex, equals(1));
     });
@@ -260,8 +257,7 @@ void main() {
       addTearDown(container.dispose);
 
       const init = ResumeSession(sessionId: 's42');
-      final state =
-          await container.read(sessionNotifierProvider(init).future);
+      final state = await container.read(sessionNotifierProvider(init).future);
 
       // 5 minutos = 300 segundos, tolerancia ±2s
       expect(state.elapsedSeconds, closeTo(300, 2));
@@ -337,7 +333,8 @@ void main() {
           )).called(1);
     });
 
-    test('SCENARIO-261: logSet avanza currentExerciseIndex cuando el ejercicio se completa',
+    test(
+        'SCENARIO-261: logSet avanza currentExerciseIndex cuando el ejercicio se completa',
         () async {
       final repo = MockSessionRepository();
       final routine = makeRoutine(
@@ -354,7 +351,8 @@ void main() {
             setLog: any(named: 'setLog'),
           )).thenAnswer((_) async => makeSetLog());
 
-      final (:container, :init) = await setupFresh(repo: repo, routine: routine);
+      final (:container, :init) =
+          await setupFresh(repo: repo, routine: routine);
       addTearDown(container.dispose);
 
       // Loguear el único set de e1 → avanza a e2 (índice 1)
@@ -424,8 +422,7 @@ void main() {
           )).thenAnswer((_) async {});
 
       final routine = makeRoutine();
-      final container =
-          _makeContainer(repo: repo, uid: 'u1', routine: routine);
+      final container = _makeContainer(repo: repo, uid: 'u1', routine: routine);
       addTearDown(container.dispose);
 
       final init = FreshSession(routineId: routine.id, dayNumber: 1);
@@ -446,7 +443,8 @@ void main() {
       expect(captured.first, isFalse);
     });
 
-    test('SCENARIO-266: abandonSession no llama a finish dos veces (guard _finalized)',
+    test(
+        'SCENARIO-266: abandonSession no llama a finish dos veces (guard _finalized)',
         () async {
       final repo = MockSessionRepository();
       when(() => repo.create(
@@ -466,8 +464,7 @@ void main() {
           )).thenAnswer((_) async {});
 
       final routine = makeRoutine();
-      final container =
-          _makeContainer(repo: repo, uid: 'u1', routine: routine);
+      final container = _makeContainer(repo: repo, uid: 'u1', routine: routine);
       addTearDown(container.dispose);
 
       final init = FreshSession(routineId: routine.id, dayNumber: 1);
@@ -524,8 +521,7 @@ void main() {
             wasFullyCompleted: any(named: 'wasFullyCompleted'),
           )).thenAnswer((_) async {});
 
-      final container =
-          _makeContainer(repo: repo, uid: 'u1', routine: routine);
+      final container = _makeContainer(repo: repo, uid: 'u1', routine: routine);
       addTearDown(container.dispose);
 
       final init = FreshSession(routineId: routine.id, dayNumber: 1);
@@ -560,8 +556,7 @@ void main() {
           )).thenAnswer((_) async => makeSession());
 
       final routine = makeRoutine();
-      final container =
-          _makeContainer(repo: repo, uid: 'u1', routine: routine);
+      final container = _makeContainer(repo: repo, uid: 'u1', routine: routine);
       addTearDown(container.dispose);
 
       final init = FreshSession(routineId: routine.id, dayNumber: 1);

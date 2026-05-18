@@ -47,7 +47,8 @@ void main() {
     });
 
     // ── SCENARIO-331: onContinue callback ────────────────────────────────
-    testWidgets('SCENARIO-331: botón Continuar invoca onContinue', (tester) async {
+    testWidgets('SCENARIO-331: botón Continuar invoca onContinue',
+        (tester) async {
       var called = false;
       await tester.pumpWidget(_wrap(ResumeSessionModal(
         session: makeSession(),
@@ -60,7 +61,8 @@ void main() {
     });
 
     // ── SCENARIO-332: onDiscard callback ─────────────────────────────────
-    testWidgets('SCENARIO-332: botón Descartar invoca onDiscard', (tester) async {
+    testWidgets('SCENARIO-332: botón Descartar invoca onDiscard',
+        (tester) async {
       var called = false;
       await tester.pumpWidget(_wrap(ResumeSessionModal(
         session: makeSession(),
@@ -73,7 +75,8 @@ void main() {
     });
 
     // ── SCENARIO-333: ambos botones presentes ────────────────────────────
-    testWidgets('SCENARIO-333: ambos botones Continuar y Descartar están presentes',
+    testWidgets(
+        'SCENARIO-333: ambos botones Continuar y Descartar están presentes',
         (tester) async {
       await tester.pumpWidget(_wrap(ResumeSessionModal(
         session: makeSession(),
