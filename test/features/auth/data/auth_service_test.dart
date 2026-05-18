@@ -620,6 +620,71 @@ void main() {
   });
 
   // ---------------------------------------------------------------------------
+  // cancelOnboarding — hard-cancel an in-progress signup from ProfileSetup
+  // ---------------------------------------------------------------------------
+  group('AuthService.cancelOnboarding', () {
+    test('deletes Firestore profile + Firebase Auth user on happy path',
+        () async {
+      when(() => fbAuth.currentUser).thenReturn(user);
+      when(() => mockRepo.delete(any())).thenAnswer((_) async {});
+      when(() => user.delete()).thenAnswer((_) async {});
+      when(() => googleSignIn.signOut()).thenAnswer((_) async {});
+
+      await sut.cancelOnboarding();
+
+      verify(() => mockRepo.delete('uid-test')).called(1);
+      verify(() => user.delete()).called(1);
+      verify(() => googleSignIn.signOut()).called(1);
+    });
+
+    test('continues to delete Auth user even if Firestore delete throws',
+        () async {
+      when(() => fbAuth.currentUser).thenReturn(user);
+      when(() => mockRepo.delete(any())).thenThrow(Exception('firestore down'));
+      when(() => user.delete()).thenAnswer((_) async {});
+      when(() => googleSignIn.signOut()).thenAnswer((_) async {});
+
+      await sut.cancelOnboarding();
+
+      verify(() => mockRepo.delete('uid-test')).called(1);
+      verify(() => user.delete()).called(1);
+    });
+
+    test('throws AuthFailure when Firebase Auth delete fails', () async {
+      when(() => fbAuth.currentUser).thenReturn(user);
+      when(() => mockRepo.delete(any())).thenAnswer((_) async {});
+      when(() => user.delete()).thenThrow(
+        FirebaseAuthException(code: 'requires-recent-login'),
+      );
+
+      await expectLater(
+        sut.cancelOnboarding(),
+        throwsA(isA<AuthFailure>()),
+      );
+      verify(() => user.delete()).called(1);
+    });
+
+    test('is a no-op when there is no current user', () async {
+      when(() => fbAuth.currentUser).thenReturn(null);
+
+      await expectLater(sut.cancelOnboarding(), completes);
+
+      verifyNever(() => mockRepo.delete(any()));
+      verifyNever(() => user.delete());
+    });
+
+    test('swallows Google signOut failures (best-effort cleanup)', () async {
+      when(() => fbAuth.currentUser).thenReturn(user);
+      when(() => mockRepo.delete(any())).thenAnswer((_) async {});
+      when(() => user.delete()).thenAnswer((_) async {});
+      when(() => googleSignIn.signOut()).thenThrow(Exception('google down'));
+
+      // Should NOT propagate the Google signOut error.
+      await expectLater(sut.cancelOnboarding(), completes);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
   // sendEmailVerification
   // ---------------------------------------------------------------------------
   group('AuthService.sendEmailVerification', () {

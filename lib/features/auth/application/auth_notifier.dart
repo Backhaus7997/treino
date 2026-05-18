@@ -108,4 +108,23 @@ class AuthNotifier extends AsyncNotifier<User?> {
       return null;
     });
   }
+
+  /// Triggers hard-cancel of an in-progress onboarding (ProfileSetup step 0).
+  /// Deletes the Firestore profile + Firebase Auth user + clears Google
+  /// session. State ends as `AsyncData(null)` on success.
+  ///
+  /// On failure, restores the previous state (so the user is not lost) and
+  /// rethrows the AuthFailure so the screen can show an error SnackBar.
+  Future<void> cancelOnboarding() async {
+    final service = ref.read(authServiceProvider);
+    final previousState = state;
+    state = const AsyncLoading();
+    try {
+      await service.cancelOnboarding();
+      state = const AsyncData(null);
+    } catch (e) {
+      state = previousState;
+      rethrow;
+    }
+  }
 }
