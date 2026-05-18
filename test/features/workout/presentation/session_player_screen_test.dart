@@ -57,6 +57,19 @@ class _StubNotifier extends SessionNotifier {
   Future<SessionState> build(SessionInit arg) async => _state;
 }
 
+/// Stub que registra la llamada a finishSession sin ejecutar lógica real.
+class _FinishTrackingNotifier extends SessionNotifier {
+  _FinishTrackingNotifier(this._state, {required this.onFinish});
+  final SessionState _state;
+  final void Function() onFinish;
+
+  @override
+  Future<SessionState> build(SessionInit arg) async => _state;
+
+  @override
+  Future<void> finishSession() async => onFinish();
+}
+
 // ── Factories de estado ───────────────────────────────────────────────────────
 
 SessionState _defaultState() => SessionState(
@@ -320,6 +333,107 @@ void main() {
       await tester.pumpAndSettle();
       // El SetEntrySheet NO debe aparecer
       expect(find.text('SQUAT'), findsNothing);
+    });
+  });
+
+  // ── _TerminarSessionButton (TASK-206a) ────────────────────────────────────
+
+  group('_TerminarSessionButton', () {
+    SessionState completedState() {
+      final slots = [
+        makeSlot(exerciseId: 'e1', exerciseName: 'Press', targetSets: 1),
+      ];
+      final day = makeDay(dayNumber: 1, slots: slots);
+      final logs = [makeSetLog(exerciseId: 'e1', setNumber: 1)];
+      return SessionState(
+        session: makeSession(),
+        day: day,
+        setLogs: logs,
+        currentExerciseIndex: 0,
+        elapsedSeconds: 0,
+      );
+    }
+
+    // SCENARIO-287: botón habilitado — sin Opacity < 1
+    testWidgets('SCENARIO-287: botón habilitado no tiene Opacity < 1',
+        (tester) async {
+      await tester.pumpWidget(
+        _wrapProvider(
+          const SessionPlayerScreen(init: _kInit),
+          _stateOverride(completedState()),
+        ),
+      );
+      await tester.pump();
+      expect(find.text('TERMINAR SESIÓN'), findsOneWidget);
+      // No debe haber Opacity con opacity < 1 envolviendo el botón
+      final opacities = tester.widgetList<Opacity>(find.byType(Opacity));
+      final lowOpacity = opacities.where((o) => o.opacity < 1.0);
+      expect(lowOpacity, isEmpty);
+    });
+
+    // SCENARIO-288: botón deshabilitado — Opacity(0.4)
+    testWidgets('SCENARIO-288: botón deshabilitado tiene Opacity(0.4)',
+        (tester) async {
+      await tester.pumpWidget(
+        _wrapProvider(
+          const SessionPlayerScreen(init: _kInit),
+          _stateOverride(_defaultState()), // no completado
+        ),
+      );
+      await tester.pump();
+      expect(find.text('TERMINAR SESIÓN'), findsOneWidget);
+      expect(
+        find.byWidgetPredicate((w) => w is Opacity && w.opacity == 0.4),
+        findsOneWidget,
+      );
+    });
+
+    // SCENARIO-289: tap en botón deshabilitado → no-op (sin excepción)
+    testWidgets('SCENARIO-289: tap en botón deshabilitado es no-op',
+        (tester) async {
+      await tester.pumpWidget(
+        _wrapProvider(
+          const SessionPlayerScreen(init: _kInit),
+          _stateOverride(_defaultState()),
+        ),
+      );
+      await tester.pump();
+      // No debe lanzar excepción
+      await tester.tap(find.text('TERMINAR SESIÓN'));
+      await tester.pumpAndSettle();
+    });
+
+    // SCENARIO-290: tap en botón habilitado llama al callback
+    testWidgets('SCENARIO-290: tap en botón habilitado llama finishSession',
+        (tester) async {
+      var finishCalled = false;
+      final stub = _FinishTrackingNotifier(
+        completedState(),
+        onFinish: () => finishCalled = true,
+      );
+      // Necesita GoRouter porque _finishSession navega a /workout/session-summary/...
+      final router = GoRouter(routes: [
+        GoRoute(
+          path: '/',
+          builder: (_, __) => const SessionPlayerScreen(init: _kInit),
+        ),
+        GoRoute(
+          path: '/workout/session-summary/:sessionId',
+          builder: (_, __) =>
+              const Scaffold(body: Center(child: Text('summary-stub'))),
+        ),
+      ]);
+      await tester.pumpWidget(ProviderScope(
+        overrides: [sessionNotifierProvider.overrideWith(() => stub)],
+        child: MaterialApp.router(
+          theme: AppTheme.dark(),
+          routerConfig: router,
+        ),
+      ));
+      await tester.pump();
+      await tester.tap(find.text('TERMINAR SESIÓN'));
+      await tester.pumpAndSettle();
+      expect(finishCalled, isTrue);
     });
   });
 

@@ -184,7 +184,7 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
                     const SizedBox(height: 14),
                     _SessionStatsCard(state: state),
                     const SizedBox(height: 20),
-                    _SectionLabel('EJERCICIOS'),
+                    const _SectionLabel('EJERCICIOS'),
                     const SizedBox(height: 12),
                     ...state.day.slots.asMap().entries.expand((entry) {
                       final idx = entry.key;
