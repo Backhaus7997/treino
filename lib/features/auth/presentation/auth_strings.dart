@@ -35,6 +35,7 @@ abstract final class AuthStrings {
   static const registerSubtitle = 'Es gratis. En 30 segundos estás adentro.';
   static const registerEmailLabel = 'EMAIL';
   static const registerPasswordLabel = 'CONTRASEÑA';
+  static const registerConfirmPasswordLabel = 'CONFIRMAR CONTRASEÑA';
   static const registerCta = 'CREAR CUENTA';
   static const registerDividerOr = 'O';
 

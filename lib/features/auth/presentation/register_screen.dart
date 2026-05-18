@@ -31,8 +31,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
+  final _confirmPasswordCtrl = TextEditingController();
   final _emailFocus = FocusNode();
   final _passwordFocus = FocusNode();
+  final _confirmPasswordFocus = FocusNode();
 
   bool _termsAccepted = false;
 
@@ -41,19 +43,24 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     super.initState();
     _emailCtrl.addListener(() => setState(() {}));
     _passwordCtrl.addListener(() => setState(() {}));
+    _confirmPasswordCtrl.addListener(() => setState(() {}));
   }
 
   @override
   void dispose() {
     _emailCtrl.dispose();
     _passwordCtrl.dispose();
+    _confirmPasswordCtrl.dispose();
     _emailFocus.dispose();
     _passwordFocus.dispose();
+    _confirmPasswordFocus.dispose();
     super.dispose();
   }
 
   bool get _fieldsEmpty =>
-      _emailCtrl.text.trim().isEmpty || _passwordCtrl.text.isEmpty;
+      _emailCtrl.text.trim().isEmpty ||
+      _passwordCtrl.text.isEmpty ||
+      _confirmPasswordCtrl.text.isEmpty;
 
   bool get _canSubmit => !_fieldsEmpty && _termsAccepted;
 
@@ -192,8 +199,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     leadingIcon: TreinoIcon.lock,
                     obscureText: true,
                     suffixToggle: true,
-                    textInputAction: TextInputAction.done,
+                    textInputAction: TextInputAction.next,
                     focusNode: _passwordFocus,
+                    nextFocusNode: _confirmPasswordFocus,
                     autofillHints: const [AutofillHints.newPassword],
                     validator: EmailPasswordValidator.validatePassword,
                   ),
@@ -203,6 +211,23 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     valueListenable: _passwordCtrl,
                     builder: (_, value, __) =>
                         PasswordStrengthBar(password: value.text),
+                  ),
+                  const SizedBox(height: 14),
+                  // Confirm password field
+                  AuthInput(
+                    controller: _confirmPasswordCtrl,
+                    label: AuthStrings.registerConfirmPasswordLabel,
+                    leadingIcon: TreinoIcon.lock,
+                    obscureText: true,
+                    suffixToggle: true,
+                    textInputAction: TextInputAction.done,
+                    focusNode: _confirmPasswordFocus,
+                    autofillHints: const [AutofillHints.newPassword],
+                    validator: (value) =>
+                        EmailPasswordValidator.validatePasswordMatch(
+                      _passwordCtrl.text,
+                      value,
+                    ),
                   ),
                   const SizedBox(height: 14),
                   // Terms checkbox
