@@ -10,8 +10,10 @@ import '../features/auth/presentation/register_screen.dart';
 import '../features/auth/presentation/splash_screen.dart';
 import '../features/auth/presentation/welcome_screen.dart';
 import '../features/coach/coach_screen.dart';
+import '../features/workout/application/session_init.dart';
 import '../features/workout/presentation/exercise_detail_screen.dart';
 import '../features/workout/presentation/routine_detail_screen.dart';
+import '../features/workout/presentation/session_player_screen.dart';
 import '../features/feed/feed_screen.dart';
 import '../features/feed/presentation/create_post_screen.dart';
 import '../features/feed/presentation/public_profile_screen.dart';
@@ -123,6 +125,36 @@ GoRouter buildRouter({
       GoRoute(
         path: '/profile-setup',
         pageBuilder: (_, __) => _noAnim(const ProfileSetupFlow()),
+      ),
+
+      // ─── Session player — TOP-LEVEL ROUTES (outside ShellRoute) ───────────
+      // El player es immersive: oculta la bottom bar durante el entrenamiento.
+      // Diseño §9.1. Las 3 rutas son auth-gated via authRedirect.
+      GoRoute(
+        path: '/workout/session/resume/:sessionId',
+        pageBuilder: (context, state) {
+          final sessionId = state.pathParameters['sessionId']!;
+          return _noAnim(SessionPlayerScreen(
+            init: ResumeSession(sessionId: sessionId),
+          ));
+        },
+      ),
+      GoRoute(
+        path: '/workout/session/:routineId/:dayNumber',
+        pageBuilder: (context, state) {
+          final routineId = state.pathParameters['routineId']!;
+          final dayNumber =
+              int.tryParse(state.pathParameters['dayNumber'] ?? '') ?? 1;
+          return _noAnim(SessionPlayerScreen(
+            init: FreshSession(routineId: routineId, dayNumber: dayNumber),
+          ));
+        },
+      ),
+      GoRoute(
+        path: '/workout/session-summary/:sessionId',
+        pageBuilder: (_, __) => _noAnim(const Scaffold(
+          body: Center(child: Text('Resumen — próximamente')),
+        )),
       ),
 
       // ShellRoute with the existing 5 tabs.
