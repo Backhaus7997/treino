@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/features/workout/data/session_repository.dart';
@@ -115,7 +116,18 @@ void main() {
 
     final data = snap.data()!;
     expect(data['status'], equals('finished'));
-    expect(data['finishedAt'], isNotNull);
+    // SCENARIO-242b: finishedAt MUST be a Firestore Timestamp, NOT a raw
+    // DateTime. Otherwise real Firestore stores an ISO string and the
+    // @TimestampConverter fails to deserialize on subsequent reads in Etapa 2.
+    expect(
+      data['finishedAt'],
+      isA<Timestamp>(),
+      reason: 'finish() must write Timestamp.fromDate, not raw DateTime',
+    );
+    expect(
+      (data['finishedAt'] as Timestamp).toDate().toUtc(),
+      equals(finishedAt),
+    );
     expect(data['totalVolumeKg'], equals(95.5));
     expect(data['durationMin'], equals(45));
   });

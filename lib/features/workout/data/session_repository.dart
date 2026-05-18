@@ -1,5 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart'
-    show CollectionReference, DocumentSnapshot, FirebaseFirestore;
+    show CollectionReference, DocumentSnapshot, FirebaseFirestore, Timestamp;
 
 import '../domain/session.dart';
 import '../domain/session_status.dart';
@@ -53,9 +53,14 @@ class SessionRepository {
     required double totalVolumeKg,
     required int durationMin,
   }) async {
+    // finishedAt MUST be Timestamp.fromDate, not a raw DateTime — real Firestore
+    // serializes a raw DateTime as an ISO string, but the @TimestampConverter
+    // on Session.finishedAt expects a Firestore Timestamp on read. Without
+    // this conversion, listByUid()/getActive() would fail to deserialize
+    // sessions finished against production Firestore.
     await _sessions(uid).doc(sessionId).update({
       'status': SessionStatusX(SessionStatus.finished).toJson(),
-      'finishedAt': finishedAt.toUtc(),
+      'finishedAt': Timestamp.fromDate(finishedAt.toUtc()),
       'totalVolumeKg': totalVolumeKg,
       'durationMin': durationMin,
     });
