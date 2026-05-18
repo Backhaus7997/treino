@@ -19,6 +19,8 @@ _$SessionImpl _$$SessionImplFromJson(Map<String, dynamic> json) =>
       totalVolumeKg: (json['totalVolumeKg'] as num?)?.toDouble() ?? 0.0,
       durationMin: (json['durationMin'] as num?)?.toInt() ?? 0,
       status: $enumDecode(_$SessionStatusEnumMap, json['status']),
+      dayNumber: (json['dayNumber'] as num?)?.toInt() ?? 1,
+      wasFullyCompleted: json['wasFullyCompleted'] as bool? ?? false,
     );
 
 Map<String, dynamic> _$$SessionImplToJson(_$SessionImpl instance) =>
@@ -33,6 +35,8 @@ Map<String, dynamic> _$$SessionImplToJson(_$SessionImpl instance) =>
       'totalVolumeKg': instance.totalVolumeKg,
       'durationMin': instance.durationMin,
       'status': _$SessionStatusEnumMap[instance.status]!,
+      'dayNumber': instance.dayNumber,
+      'wasFullyCompleted': instance.wasFullyCompleted,
     };
 
 Value? _$JsonConverterFromJson<Json, Value>(

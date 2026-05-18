@@ -113,5 +113,43 @@ void main() {
       expect(decoded.startedAt, equals(startedAt));
       expect(decoded.finishedAt, isNull);
     });
+
+    test('SCENARIO-234e: dayNumber defaults to 1 when absent in JSON', () {
+      final rawMap = <String, dynamic>{
+        'id': 'session-006',
+        'uid': 'user-abc',
+        'routineId': 'routine-ppl',
+        'routineName': 'Push Pull Legs',
+        'startedAt': Timestamp.fromDate(DateTime.utc(2026, 5, 18, 10, 0, 0)),
+        'finishedAt': null,
+        'totalVolumeKg': 0.0,
+        'durationMin': 0,
+        'status': 'active',
+      };
+
+      final decoded = Session.fromJson(rawMap);
+
+      expect(decoded.dayNumber, equals(1));
+    });
+
+    test(
+        'SCENARIO-234f: wasFullyCompleted defaults to false when absent in JSON',
+        () {
+      final rawMap = <String, dynamic>{
+        'id': 'session-007',
+        'uid': 'user-abc',
+        'routineId': 'routine-ppl',
+        'routineName': 'Push Pull Legs',
+        'startedAt': Timestamp.fromDate(DateTime.utc(2026, 5, 18, 10, 0, 0)),
+        'finishedAt': null,
+        'totalVolumeKg': 0.0,
+        'durationMin': 0,
+        'status': 'active',
+      };
+
+      final decoded = Session.fromJson(rawMap);
+
+      expect(decoded.wasFullyCompleted, isFalse);
+    });
   });
 }
