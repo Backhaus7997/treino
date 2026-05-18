@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_theme.dart';
-import 'package:treino/features/workout/domain/session.dart';
 import 'package:treino/features/workout/presentation/widgets/resume_session_modal.dart';
 
 import '../../../workout/application/stub_factories.dart';

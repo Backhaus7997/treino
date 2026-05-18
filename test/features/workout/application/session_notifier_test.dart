@@ -162,7 +162,7 @@ void main() {
       );
       addTearDown(container.dispose);
 
-      final init = const ResumeSession(sessionId: 's42');
+      const init = ResumeSession(sessionId: 's42');
       await container.read(sessionNotifierProvider(init).future);
 
       verifyNever(() => repo.create(
@@ -194,7 +194,7 @@ void main() {
       );
       addTearDown(container.dispose);
 
-      final init = const ResumeSession(sessionId: 's42');
+      const init = ResumeSession(sessionId: 's42');
       final state =
           await container.read(sessionNotifierProvider(init).future);
 
@@ -234,7 +234,7 @@ void main() {
       );
       addTearDown(container.dispose);
 
-      final init = const ResumeSession(sessionId: 's42');
+      const init = ResumeSession(sessionId: 's42');
       final state =
           await container.read(sessionNotifierProvider(init).future);
 
@@ -259,7 +259,7 @@ void main() {
       );
       addTearDown(container.dispose);
 
-      final init = const ResumeSession(sessionId: 's42');
+      const init = ResumeSession(sessionId: 's42');
       final state =
           await container.read(sessionNotifierProvider(init).future);
 
@@ -276,7 +276,7 @@ void main() {
         ({
           ProviderContainer container,
           FreshSession init,
-        })> _setupFresh({
+        })> setupFresh({
       required MockSessionRepository repo,
       Routine? routine,
     }) async {
@@ -305,7 +305,7 @@ void main() {
             setLog: any(named: 'setLog'),
           )).thenAnswer((_) async => makeSetLog());
 
-      final (:container, :init) = await _setupFresh(repo: repo);
+      final (:container, :init) = await setupFresh(repo: repo);
       addTearDown(container.dispose);
 
       final notifier = container.read(sessionNotifierProvider(init).notifier);
@@ -323,7 +323,7 @@ void main() {
             setLog: any(named: 'setLog'),
           )).thenAnswer((_) async => makeSetLog());
 
-      final (:container, :init) = await _setupFresh(repo: repo);
+      final (:container, :init) = await setupFresh(repo: repo);
       addTearDown(container.dispose);
 
       await container
@@ -354,7 +354,7 @@ void main() {
             setLog: any(named: 'setLog'),
           )).thenAnswer((_) async => makeSetLog());
 
-      final (:container, :init) = await _setupFresh(repo: repo, routine: routine);
+      final (:container, :init) = await setupFresh(repo: repo, routine: routine);
       addTearDown(container.dispose);
 
       // Loguear el único set de e1 → avanza a e2 (índice 1)
@@ -383,7 +383,7 @@ void main() {
             wasFullyCompleted: any(named: 'wasFullyCompleted'),
           )).thenAnswer((_) async {});
 
-      final (:container, :init) = await _setupFresh(repo: repo);
+      final (:container, :init) = await setupFresh(repo: repo);
       addTearDown(container.dispose);
 
       final notifier = container.read(sessionNotifierProvider(init).notifier);

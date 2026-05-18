@@ -38,15 +38,17 @@ void main() {
     // ── Pattern matching exhaustivo (compile-time check) ─────────────────────
     test('switch sobre SessionInit cubre todos los casos sin default', () {
       // Si se agrega una subclase sin actualizar este switch, falla la compilación.
-      SessionInit init = const FreshSession(routineId: 'r1', dayNumber: 1);
-      final result = switch (init) {
+      // Declaramos los SessionInit por separado (no reasignamos) para evitar
+      // que el análisis de flujo de Dart promocione el tipo del segundo init.
+      const SessionInit init1 = FreshSession(routineId: 'r1', dayNumber: 1);
+      final result = switch (init1) {
         FreshSession(routineId: final rid) => 'fresh:$rid',
         ResumeSession(sessionId: final sid) => 'resume:$sid',
       };
       expect(result, equals('fresh:r1'));
 
-      init = const ResumeSession(sessionId: 's42');
-      final result2 = switch (init) {
+      const SessionInit init2 = ResumeSession(sessionId: 's42');
+      final result2 = switch (init2) {
         FreshSession() => 'fresh',
         ResumeSession(sessionId: final sid) => 'resume:$sid',
       };

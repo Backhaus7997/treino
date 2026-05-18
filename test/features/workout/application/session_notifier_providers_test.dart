@@ -8,8 +8,6 @@ import 'package:mocktail/mocktail.dart';
 import 'package:treino/features/workout/application/session_init.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
 import 'package:treino/features/workout/data/session_repository.dart';
-import 'package:treino/features/workout/domain/session.dart';
-import 'package:treino/features/workout/domain/set_log.dart';
 
 import 'stub_factories.dart';
 
@@ -70,8 +68,8 @@ void main() {
       final container = _makeContainer(uid: 'u1', repo: repo);
       addTearDown(container.dispose);
 
-      final key1 = const FreshSession(routineId: 'r1', dayNumber: 1);
-      final key2 = const FreshSession(routineId: 'r2', dayNumber: 1);
+      const key1 = FreshSession(routineId: 'r1', dayNumber: 1);
+      const key2 = FreshSession(routineId: 'r2', dayNumber: 1);
 
       // Distintas claves → no son iguales
       expect(key1, isNot(equals(key2)));
