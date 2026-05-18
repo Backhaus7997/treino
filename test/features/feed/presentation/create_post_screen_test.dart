@@ -8,7 +8,6 @@ import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
-import 'package:treino/features/feed/application/create_post_notifier.dart';
 import 'package:treino/features/feed/application/feed_screen_providers.dart';
 import 'package:treino/features/feed/application/post_providers.dart';
 import 'package:treino/features/feed/data/post_repository.dart';
@@ -25,8 +24,8 @@ import 'package:treino/features/profile/domain/user_role.dart';
 
 class MockPostRepository extends Mock implements PostRepository {}
 
-class MockUser extends Mock implements User {
-  MockUser({required String uid}) : _uid = uid;
+class _MockUser extends Mock implements User {
+  _MockUser({required String uid}) : _uid = uid;
   final String _uid;
   @override
   String get uid => _uid;
@@ -53,25 +52,55 @@ UserProfile _makeProfile({
       avatarUrl: avatarUrl,
     );
 
-/// Wraps [CreatePostScreen] with all required providers.
+/// Wraps [CreatePostScreen] in a GoRouter + ProviderScope.
 ///
-/// [gymId] — if null, gym pill should be disabled.
-/// [mockRepo] — repository for submit assertions; defaults to success.
-Widget _wrap({
+/// The initial route is '/' which shows a button that pushes '/create'.
+/// Call [_openCreatePost] after pumpWidget to navigate to the screen.
+/// This ensures [context.pop()] has a valid previous route (mirrors real app).
+Widget _wrapWithRouter({
   String? gymId,
   MockPostRepository? mockRepo,
-  GoRouter? router,
 }) {
-  final repo = mockRepo ?? MockPostRepository();
-  when(() => repo.create(any())).thenAnswer((inv) async {
-    final post = inv.positionalArguments[0] as Post;
-    return post.copyWith(id: 'generated-id');
-  });
+  final MockPostRepository repo;
+  if (mockRepo != null) {
+    // Caller already configured all stubs — don't override them.
+    repo = mockRepo;
+  } else {
+    repo = MockPostRepository();
+    // Default stub: success.
+    when(() => repo.create(any())).thenAnswer((inv) async {
+      final post = inv.positionalArguments[0] as Post;
+      return post.copyWith(id: 'generated-id');
+    });
+  }
 
-  final user = MockUser(uid: 'u1');
+  final user = _MockUser(uid: 'u1');
   final profile = _makeProfile(gymId: gymId);
 
-  final screen = ProviderScope(
+  final router = GoRouter(
+    initialLocation: '/',
+    routes: [
+      GoRoute(
+        path: '/',
+        builder: (_, __) => Scaffold(
+          body: Builder(
+            builder: (ctx) => Center(
+              child: TextButton(
+                onPressed: () => ctx.push('/create'),
+                child: const Text('open'),
+              ),
+            ),
+          ),
+        ),
+      ),
+      GoRoute(
+        path: '/create',
+        builder: (_, __) => const Scaffold(body: CreatePostScreen()),
+      ),
+    ],
+  );
+
+  return ProviderScope(
     overrides: [
       authStateChangesProvider.overrideWith((ref) => Stream.value(user)),
       userProfileProvider.overrideWith((ref) => Stream.value(profile)),
@@ -80,70 +109,17 @@ Widget _wrap({
       feedPublicProvider.overrideWith((ref) async => const []),
       myGymFeedProvider.overrideWith((ref) async => null),
     ],
-    child: MaterialApp(
+    child: MaterialApp.router(
       theme: AppTheme.dark(),
-      home: const Scaffold(body: CreatePostScreen()),
+      routerConfig: router,
     ),
   );
-
-  if (router != null) {
-    return ProviderScope(
-      overrides: [
-        authStateChangesProvider.overrideWith((ref) => Stream.value(user)),
-        userProfileProvider.overrideWith((ref) => Stream.value(profile)),
-        postRepositoryProvider.overrideWithValue(repo),
-        myFriendsFeedProvider.overrideWith((ref) async => const []),
-        feedPublicProvider.overrideWith((ref) async => const []),
-        myGymFeedProvider.overrideWith((ref) async => null),
-      ],
-      child: MaterialApp.router(
-        theme: AppTheme.dark(),
-        routerConfig: router,
-      ),
-    );
-  }
-
-  return screen;
 }
 
-GoRouter _makeRouter({
-  String? gymId,
-  MockPostRepository? mockRepo,
-}) {
-  final repo = mockRepo ?? MockPostRepository();
-  when(() => repo.create(any())).thenAnswer((inv) async {
-    final post = inv.positionalArguments[0] as Post;
-    return post.copyWith(id: 'generated-id');
-  });
-
-  final user = MockUser(uid: 'u1');
-  final profile = _makeProfile(gymId: gymId);
-
-  return GoRouter(
-    initialLocation: '/create',
-    routes: [
-      GoRoute(
-        path: '/',
-        builder: (_, __) => const Scaffold(body: Text('home')),
-      ),
-      GoRoute(
-        path: '/create',
-        builder: (_, __) => ProviderScope(
-          overrides: [
-            authStateChangesProvider
-                .overrideWith((ref) => Stream.value(user)),
-            userProfileProvider
-                .overrideWith((ref) => Stream.value(profile)),
-            postRepositoryProvider.overrideWithValue(repo),
-            myFriendsFeedProvider.overrideWith((ref) async => const []),
-            feedPublicProvider.overrideWith((ref) async => const []),
-            myGymFeedProvider.overrideWith((ref) async => null),
-          ],
-          child: const Scaffold(body: CreatePostScreen()),
-        ),
-      ),
-    ],
-  );
+/// Navigates to the CreatePostScreen (taps the 'open' button).
+Future<void> _openCreatePost(WidgetTester tester) async {
+  await tester.tap(find.text('open'));
+  await tester.pumpAndSettle();
 }
 
 // ---------------------------------------------------------------------------
@@ -169,109 +145,95 @@ void main() {
   // ── SCENARIO-220 — Form structure ─────────────────────────────────────────
 
   group('SCENARIO-220: form structure', () {
-    // SCENARIO-220: CANCELAR + title + PUBLICAR + TextField + privacy pills + routine chip
     testWidgets('SCENARIO-220: renders required form components', (tester) async {
-      await tester.pumpWidget(_wrap());
-      await tester.pumpAndSettle();
+      await tester.pumpWidget(_wrapWithRouter());
+      await _openCreatePost(tester);
 
-      // Header row
       expect(find.text('CANCELAR'), findsOneWidget);
       expect(find.text('NUEVO POST'), findsOneWidget);
       expect(find.text('PUBLICAR'), findsOneWidget);
-
-      // Text input
       expect(find.byType(TextField), findsOneWidget);
-
-      // Privacy selector pills (3 options)
       expect(find.text('AMIGOS'), findsOneWidget);
       expect(find.text('MI GYM'), findsOneWidget);
       expect(find.text('PÚBLICO'), findsOneWidget);
-
-      // Routine tag chip
       expect(find.text('ETIQUETAR RUTINA'), findsOneWidget);
     });
   });
 
-  // ── SCENARIO-222/223 — PUBLICAR enabled state ─────────────────────────────
+  // ── SCENARIO-222 — PUBLICAR disabled ─────────────────────────────────────
 
-  group('SCENARIO-222/223: PUBLICAR enabled state', () {
-    // SCENARIO-222: PUBLICAR is disabled when text is empty
+  group('SCENARIO-222: PUBLICAR disabled state', () {
     testWidgets('SCENARIO-222: PUBLICAR disabled when text empty',
         (tester) async {
-      await tester.pumpWidget(_wrap());
-      await tester.pumpAndSettle();
-
-      // The PUBLICAR button should not be tappable (onTap null / disabled)
-      // We verify by checking there's no active InkWell/GestureDetector on it
-      // or by checking the notifier state. We check the visual: opacity should
-      // be 0.4 for disabled state.
-      final publishFinder = find.text('PUBLICAR');
-      expect(publishFinder, findsOneWidget);
-
-      // Tap PUBLICAR while empty — should NOT call repo.create
       final repo = MockPostRepository();
-      await tester.tap(publishFinder, warnIfMissed: false);
+      await tester.pumpWidget(_wrapWithRouter(mockRepo: repo));
+      await _openCreatePost(tester);
+
+      await tester.tap(find.text('PUBLICAR'), warnIfMissed: false);
       await tester.pumpAndSettle();
-      // No submit occurred (empty text → canSubmit false)
+
+      verifyNever(() => repo.create(any()));
     });
 
-    // SCENARIO-222: PUBLICAR is disabled for whitespace-only text
     testWidgets('SCENARIO-222: PUBLICAR disabled for whitespace text',
         (tester) async {
-      await tester.pumpWidget(_wrap());
-      await tester.pumpAndSettle();
+      final repo = MockPostRepository();
+      await tester.pumpWidget(_wrapWithRouter(mockRepo: repo));
+      await _openCreatePost(tester);
 
       await tester.enterText(find.byType(TextField), '   ');
       await tester.pump();
 
-      // Widget should still show PUBLICAR as disabled (opacity 0.4)
-      final publishFinder = find.text('PUBLICAR');
-      expect(publishFinder, findsOneWidget);
-    });
+      await tester.tap(find.text('PUBLICAR'), warnIfMissed: false);
+      await tester.pumpAndSettle();
 
-    // SCENARIO-223: PUBLICAR is enabled when text has non-whitespace content
-    testWidgets('SCENARIO-223: PUBLICAR enabled when text has content',
+      verifyNever(() => repo.create(any()));
+    });
+  });
+
+  // ── SCENARIO-223 — PUBLICAR enabled ──────────────────────────────────────
+
+  group('SCENARIO-223: PUBLICAR enabled state', () {
+    testWidgets('SCENARIO-223: PUBLICAR triggers submit when text has content',
         (tester) async {
       final repo = MockPostRepository();
       when(() => repo.create(any())).thenAnswer((inv) async {
         final post = inv.positionalArguments[0] as Post;
         return post.copyWith(id: 'gen');
       });
-      await tester.pumpWidget(_wrap(mockRepo: repo));
-      await tester.pumpAndSettle();
+
+      await tester.pumpWidget(_wrapWithRouter(mockRepo: repo));
+      await _openCreatePost(tester);
 
       await tester.enterText(find.byType(TextField), 'Buena sesión!');
       await tester.pump();
 
-      // Tap PUBLICAR — should trigger submit
       await tester.tap(find.text('PUBLICAR'));
       await tester.pumpAndSettle();
 
-      // After success the screen should pop (repo was called)
       verify(() => repo.create(any())).called(1);
     });
   });
 
-  // ── SCENARIO-221 — Char counter visible ──────────────────────────────────
+  // ── SCENARIO-221 — Char counter ──────────────────────────────────────────
 
   group('SCENARIO-221: char counter', () {
-    testWidgets('SCENARIO-221: char counter is visible', (tester) async {
-      await tester.pumpWidget(_wrap());
-      await tester.pumpAndSettle();
+    testWidgets('SCENARIO-221: char counter is visible showing /280',
+        (tester) async {
+      await tester.pumpWidget(_wrapWithRouter());
+      await _openCreatePost(tester);
 
-      // Counter shows "0 / 280" initially
       expect(find.textContaining('280'), findsWidgets);
     });
 
     testWidgets('SCENARIO-221: char counter updates as user types',
         (tester) async {
-      await tester.pumpWidget(_wrap());
-      await tester.pumpAndSettle();
+      await tester.pumpWidget(_wrapWithRouter());
+      await _openCreatePost(tester);
 
       await tester.enterText(find.byType(TextField), 'Hola');
       await tester.pump();
 
-      // Counter shows "4 / 280"
       expect(find.text('4 / 280'), findsOneWidget);
     });
   });
@@ -279,63 +241,77 @@ void main() {
   // ── SCENARIO-224 — Privacy default ───────────────────────────────────────
 
   group('SCENARIO-224: privacy default', () {
-    testWidgets('SCENARIO-224: AMIGOS pill is selected by default',
+    testWidgets('SCENARIO-224: AMIGOS pill is rendered (default selection)',
         (tester) async {
-      await tester.pumpWidget(_wrap());
-      await tester.pumpAndSettle();
+      await tester.pumpWidget(_wrapWithRouter());
+      await _openCreatePost(tester);
 
-      // The AMIGOS pill should be selected (active, mint fill).
-      // We can verify by testing that tapping MI GYM changes state,
-      // and that the initial state shows AMIGOS as selected.
-      // We use a semantic approach: the notifier defaults to PostPrivacy.friends
-      // and the screen reflects that.
       expect(find.text('AMIGOS'), findsOneWidget);
+      expect(find.text('MI GYM'), findsOneWidget);
+      expect(find.text('PÚBLICO'), findsOneWidget);
     });
   });
 
   // ── SCENARIO-225 — Gym pill disabled when no gym ─────────────────────────
 
   group('SCENARIO-225: gym pill disabled', () {
-    testWidgets('SCENARIO-225: gym pill disabled when gymId is null',
+    testWidgets('SCENARIO-225: helper text shown when gymId is null',
         (tester) async {
-      // No gymId → gym pill should be disabled (Opacity 0.4 + helper text)
-      await tester.pumpWidget(_wrap(gymId: null));
-      await tester.pumpAndSettle();
+      await tester.pumpWidget(_wrapWithRouter(gymId: null));
+      await _openCreatePost(tester);
 
-      // Helper text is shown
       expect(
         find.text('Asociate a un gym para postear acá'),
         findsOneWidget,
       );
     });
 
-    testWidgets('SCENARIO-225: gym pill enabled when gymId is set',
+    testWidgets('SCENARIO-225: helper text absent when gymId is set',
         (tester) async {
-      // With gymId → helper text NOT shown
-      await tester.pumpWidget(_wrap(gymId: 'gym-123'));
-      await tester.pumpAndSettle();
+      await tester.pumpWidget(_wrapWithRouter(gymId: 'gym-123'));
+      await _openCreatePost(tester);
 
       expect(
         find.text('Asociate a un gym para postear acá'),
         findsNothing,
       );
     });
+
+    testWidgets(
+        'SCENARIO-225: tapping gym pill when disabled does not call repo.create',
+        (tester) async {
+      final repo = MockPostRepository();
+      await tester.pumpWidget(_wrapWithRouter(gymId: null, mockRepo: repo));
+      await _openCreatePost(tester);
+
+      await tester.tap(find.text('MI GYM'), warnIfMissed: false);
+      await tester.pump();
+
+      expect(find.text('MI GYM'), findsOneWidget);
+      verifyNever(() => repo.create(any()));
+    });
   });
 
   // ── SCENARIO-226 — Routine tag stub ──────────────────────────────────────
 
   group('SCENARIO-226: routine tag stub chip', () {
-    testWidgets('SCENARIO-226: routine chip shows ETIQUETAR RUTINA at opacity 0.4',
+    testWidgets('SCENARIO-226: routine chip shows ETIQUETAR RUTINA',
         (tester) async {
-      await tester.pumpWidget(_wrap());
+      await tester.pumpWidget(_wrapWithRouter());
+      await _openCreatePost(tester);
+
+      expect(find.text('ETIQUETAR RUTINA'), findsOneWidget);
+    });
+
+    testWidgets('SCENARIO-226: tapping routine chip has no side effect',
+        (tester) async {
+      await tester.pumpWidget(_wrapWithRouter());
+      await _openCreatePost(tester);
+
+      await tester.tap(find.text('ETIQUETAR RUTINA'), warnIfMissed: false);
       await tester.pumpAndSettle();
 
       expect(find.text('ETIQUETAR RUTINA'), findsOneWidget);
-
-      // Tapping the chip should have no effect (onTap null)
-      await tester.tap(find.text('ETIQUETAR RUTINA'), warnIfMissed: false);
-      await tester.pumpAndSettle();
-      // No navigation or side effect expected
     });
   });
 
@@ -345,53 +321,18 @@ void main() {
     testWidgets('SCENARIO-230: CANCELAR pops without calling repo.create',
         (tester) async {
       final repo = MockPostRepository();
-      final router = GoRouter(
-        initialLocation: '/create',
-        routes: [
-          GoRoute(
-            path: '/',
-            builder: (_, __) => const Scaffold(body: Text('home')),
-          ),
-          GoRoute(
-            path: '/create',
-            builder: (_, __) => ProviderScope(
-              overrides: [
-                authStateChangesProvider.overrideWith(
-                  (ref) => Stream.value(MockUser(uid: 'u1')),
-                ),
-                userProfileProvider.overrideWith(
-                  (ref) => Stream.value(_makeProfile()),
-                ),
-                postRepositoryProvider.overrideWithValue(repo),
-                myFriendsFeedProvider.overrideWith((ref) async => const []),
-                feedPublicProvider.overrideWith((ref) async => const []),
-                myGymFeedProvider.overrideWith((ref) async => null),
-              ],
-              child: const Scaffold(body: CreatePostScreen()),
-            ),
-          ),
-        ],
-      );
-
-      await tester.pumpWidget(
-        ProviderScope(
-          child: MaterialApp.router(
-            theme: AppTheme.dark(),
-            routerConfig: router,
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
+      await tester.pumpWidget(_wrapWithRouter(mockRepo: repo));
+      await _openCreatePost(tester);
 
       await tester.enterText(find.byType(TextField), 'Texto de prueba');
       await tester.pump();
 
-      // Tap CANCELAR
       await tester.tap(find.text('CANCELAR'));
       await tester.pumpAndSettle();
 
-      // repo.create should never have been called
       verifyNever(() => repo.create(any()));
+      // Screen has popped — we're back at '/'
+      expect(find.text('open'), findsOneWidget);
     });
   });
 
@@ -405,19 +346,23 @@ void main() {
       final completer = Completer<Post>();
       when(() => repo.create(any())).thenAnswer((_) => completer.future);
 
-      await tester.pumpWidget(_wrap(mockRepo: repo));
-      await tester.pumpAndSettle();
+      await tester.pumpWidget(_wrapWithRouter(mockRepo: repo));
+      await _openCreatePost(tester);
 
       await tester.enterText(find.byType(TextField), 'Buena sesión!');
       await tester.pump();
 
-      // Tap PUBLICAR — triggers slow submit
+      // Tap PUBLICAR — triggers submit which hangs at repo.create
       await tester.tap(find.text('PUBLICAR'));
-      await tester.pump(); // let submit start
+      // Pump several frames to let notifier set isSubmitting=true and widget rebuild
+      await tester.pump();
+      await tester.pump();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
 
-      // While submitting: spinner visible
+      // While submitting: spinner visible in the header (replaces PUBLICAR text)
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
-      // CANCELAR still present and enabled
+      // CANCELAR still present
       expect(find.text('CANCELAR'), findsOneWidget);
     });
   });
@@ -430,8 +375,8 @@ void main() {
       final repo = MockPostRepository();
       when(() => repo.create(any())).thenThrow(Exception('Network fail'));
 
-      await tester.pumpWidget(_wrap(mockRepo: repo));
-      await tester.pumpAndSettle();
+      await tester.pumpWidget(_wrapWithRouter(mockRepo: repo));
+      await _openCreatePost(tester);
 
       await tester.enterText(find.byType(TextField), 'Buena sesión!');
       await tester.pump();
