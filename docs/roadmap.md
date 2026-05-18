@@ -8,7 +8,7 @@ Estado de las fases y desglose detallado de Fase 2 (en curso) y Fase 3 (próxima
 - [x] **Fase 1** — Auth (email/Google/Apple) + Firebase + Firestore + ProfileSetup + Roles & guards. ✅ **COMPLETA** — 7/7 etapas mergeadas. Cerró 2026-05-13 con Apple Sign-In (PR #10).
 - [ ] **Fase 2** — Home (paridad con mockup Mobile Home) + Rutinas básicas read-only. **4/5 etapas hechas** (Etapas 1, 2, 3, 4 ✅; Etapa 5 pending Dev B).
 - [ ] **Fase 3** — Feed social (amigos · mi gym · público) + perfiles públicos.
-- [ ] **Fase 4** — Workout++ (bloques, super series, IA buscador de ejercicios, videos, session tracking, post-entreno).
+- [ ] **Fase 4** — Workout++ (session tracking, sesión activa, post-entreno, historial, insights, wire de stats). Desglose en 6 etapas más abajo. IA buscador y videos quedan deferrables a Fase 4.5.
 - [ ] **Fase 5** — Coach / Personal Trainer (discovery con geohash, chat, agenda, planes asignados, importación de planes Excel).
 - [ ] **Fase 6** — Polish + lanzamiento beta (TestFlight + Play Internal). Incluye App Check, Analytics, Crashlytics, deep links, localización, app icon final.
 
@@ -160,6 +160,65 @@ Mientras Dev B termina Etapa 5 de Fase 2 (wire Home → Plantillas) el día 2026
 
 - ⏳ Etapa 1: poblar colecciones `posts` (~6-10 posts manuales con autores distintos para probar feed) y `friendships` (~3-5 conexiones aceptadas + 1-2 pending para probar el flow). Script Admin SDK.
 - (Etapas 2, 3, 4, 5 no requieren acción en console.)
+
+## Fase 4 — desglose en 6 etapas
+
+Workout++ es donde la app deja de ser exploración read-only y se vuelve **ejecutable**: el alumno arranca un workout, marca sets en tiempo real, ve su progreso a lo largo del tiempo. Cierra los carry-overs visibles de Fases 1-3 (Home "Esta semana", Profile stats, PostCard stats stub, "Compartir post-entreno").
+
+**Scope explícito de Fase 4**:
+- Modelo `Session` + `SetLog` + reglas Firestore + repo.
+- Sesión activa (player): timer, marcado de sets en vivo, persiste sesión en Firestore.
+- Resumen post-entreno + opción "Compartir" que genera un Post automáticamente.
+- Historial: tab Entrenamiento sección Historial + expandir-historial.
+- Insights: pantalla completa con volumen semanal, racha, PRs por ejercicio, frecuencia.
+- Wire de data atrasada: Home "Esta semana" con streak/muscle map/stats reales, Profile stats reales, check-in básico.
+
+**Out of scope** (deferrables a Fase 4.5):
+- IA buscador de ejercicios (Gemini).
+- Videos en ejercicios (asset pipeline + Firebase Storage para video).
+- Bloques y super series complejos en la rutina (extensión del modelo `Routine`).
+
+| # | Etapa | Branch | Console (manual) | Código clave | Owner sugerido |
+|---|---|---|---|---|---|
+| 1 | Modelo `Session` + `SetLog` + reglas Firestore + repo | `feat/session-model-seed` | Colección `users/{uid}/sessions` poblada por seed (opcional para testing) | Modelos `Session` (uid, routineId, startedAt, finishedAt, totalVolumeKg, durationMin, status: active/finished) y `SetLog` (exerciseId, setNumber, reps, weightKg, rpe?, completedAt) con freezed + json_serializable. `SessionRepository` con create/finish/listByUid. Reglas owner-only R/W bajo `users/{uid}/sessions/{sessionId}`. Sub-colección dentro del user para que los rules ya cubran. | A |
+| 2 | Sesión activa (player) | `feat/session-player` | Nada | Pantalla nueva accesible desde "EMPEZAR ENTRENAMIENTO" en RoutineDetailScreen. Timer running, marcado de sets en vivo (reps + peso + check), persiste cada `SetLog` en Firestore on-completion. Botón "TERMINAR SESIÓN" → finaliza Session + navega a resumen post-entreno. | B |
+| 3 | Resumen post-entreno + compartir | `feat/post-workout-summary` | Nada | Pantalla `post-entreno.png` con stats finales (volumen total, duración, PRs alcanzados). Opción "Compartir" → genera Post automáticamente con `routineTag` set + texto autocompletado + privacy default friends. Navega de vuelta a Home o Entrenamiento. | B |
+| 4 | Historial + expandir | `feat/historial` | Nada | Tab Entrenamiento sección Historial según `historial.png`. Lista de sesiones pasadas con día, volumen, duración. Tap expande a `expandir-historial.png` mostrando sets/reps reales de la sesión. | C |
+| 5 | Insights screen | `feat/insights` | Nada | Pantalla Insights (`insights.png`) con volumen semanal, racha de días, PRs por grupo muscular, frecuencia. Lee de la colección `sessions` y agrega client-side (server aggregation queda para Fase 6 cuando aparezca App Check / Cloud Functions). | C |
+| 6 | Wire data atrasada (Home + Profile + check-in) | `feat/wire-real-stats` | Nada | Home "Esta semana" con streak real, muscle map basado en último 7d, dots de días entrenados, stats SEMANA/MES. Profile public + own: stats `workouts` y `racha` reales (seguidores/siguiendo siguen siendo de `friendships`, que ya existe). Check-in básico (`check-in.png`) — daily prompt para registrar estado. | B |
+
+### Dependencias entre etapas
+
+```
+1 ──► 2 ──► 3
+  ├──► 4 ──► 5
+  └──────────► 6
+```
+
+- **1 bloqueante absoluto**: sin `Session` model + repo no hay nada que ejecutar, persistir, ni leer.
+- **2 antes de 3**: el resumen post-entreno lee la Session que el player acaba de cerrar.
+- **4 paralelo a 2 y 3**: historial solo lee `sessions` (sin escritura).
+- **5 después de 4**: insights agrega data que el historial ya estructura.
+- **6 al final**: wire de stats reales necesita data real en `sessions` para calcular streak/volumen.
+
+### División entre los 3 devs (con paralelización)
+
+| Dev | Etapas |
+|---|---|
+| **A** | Etapa 1 (modelo + seed + reglas) |
+| **B** | Etapa 2 (player) + Etapa 3 (resumen + compartir) + Etapa 6 (wire stats) |
+| **C** | Etapa 4 (historial) + Etapa 5 (insights) |
+
+**Tiempo estimado**: ~3-4 semanas con 3 devs en paralelo.
+
+### Paralelización con Fase 3 pendiente
+
+Mientras Dev C cierra Etapa 5 de Fase 3 (crear post + search), **Dev A puede arrancar Etapa 1 de Fase 4 (data layer) sin conflicto** — son features distintas (`lib/features/workout/` y `lib/features/session/` vs `lib/features/feed/`).
+
+### Pre-flight checklist
+
+- ⏳ Etapa 1: opcional poblar ~5-10 sesiones de prueba en `users/{uid}/sessions` para testing visual de historial e insights. Si no se siembran, los screens muestran empty states correctamente — no es bloqueante.
+- (Etapas 2-6 no requieren acción en console.)
 
 ## Fase 5 — extensión: Importación de planes desde Excel
 
