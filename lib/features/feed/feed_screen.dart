@@ -61,14 +61,18 @@ class _FeedHeader extends StatelessWidget {
           const Spacer(),
           Icon(TreinoIcon.search, size: 20, color: palette.textMuted),
           const SizedBox(width: 18),
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: palette.accent,
-              shape: BoxShape.circle,
+          GestureDetector(
+            onTap: () => context.push('/feed/create'),
+            behavior: HitTestBehavior.opaque,
+            child: Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: palette.accent,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(TreinoIcon.plus, size: 20, color: palette.bg),
             ),
-            child: Icon(TreinoIcon.plus, size: 20, color: palette.bg),
           ),
         ],
       ),

@@ -27,6 +27,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
     required this.textMuted,
     required this.sage,
     required this.espresso,
+    required this.danger,
   });
 
   final Color accent;
@@ -43,6 +44,9 @@ class AppPalette extends ThemeExtension<AppPalette> {
   /// Espresso — elevated surfaces, sheets.
   final Color espresso;
 
+  /// Danger red — inline error states, char-limit exceeded indicator.
+  final Color danger;
+
   static const mintMagenta = AppPalette(
     accent: AppColors.mint,
     highlight: AppColors.magenta,
@@ -53,6 +57,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
     textMuted: Color(0x8CFFFFFF),
     sage: AppColors.sage,
     espresso: AppColors.espresso,
+    danger: Color(0xFFE53935),
   );
 
   static AppPalette of(BuildContext context) =>
@@ -69,6 +74,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
     Color? textMuted,
     Color? sage,
     Color? espresso,
+    Color? danger,
   }) =>
       AppPalette(
         accent: accent ?? this.accent,
@@ -80,6 +86,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
         textMuted: textMuted ?? this.textMuted,
         sage: sage ?? this.sage,
         espresso: espresso ?? this.espresso,
+        danger: danger ?? this.danger,
       );
 
   @override
@@ -95,6 +102,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
       textMuted: Color.lerp(textMuted, other.textMuted, t)!,
       sage: Color.lerp(sage, other.sage, t)!,
       espresso: Color.lerp(espresso, other.espresso, t)!,
+      danger: Color.lerp(danger, other.danger, t)!,
     );
   }
 }
