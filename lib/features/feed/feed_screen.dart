@@ -92,6 +92,7 @@ class _AmigosBody extends ConsumerWidget {
           );
         }
         return ListView.separated(
+          physics: const ClampingScrollPhysics(),
           padding: const EdgeInsets.symmetric(horizontal: 20),
           itemCount: posts.length,
           separatorBuilder: (_, __) => const SizedBox(height: 14),
@@ -144,6 +145,7 @@ class _MiGymBody extends ConsumerWidget {
         }
         // TODO(pagination): cursor-based pagination deferred (see explore §9)
         return ListView.separated(
+          physics: const ClampingScrollPhysics(),
           padding: const EdgeInsets.symmetric(horizontal: 20),
           itemCount: posts.length,
           separatorBuilder: (_, __) => const SizedBox(height: 14),
@@ -191,6 +193,7 @@ class _PublicoBody extends ConsumerWidget {
         }
         // TODO(pagination): cursor-based pagination deferred (see explore §9)
         return ListView.separated(
+          physics: const ClampingScrollPhysics(),
           padding: const EdgeInsets.symmetric(horizontal: 20),
           itemCount: posts.length,
           separatorBuilder: (_, __) => const SizedBox(height: 14),
