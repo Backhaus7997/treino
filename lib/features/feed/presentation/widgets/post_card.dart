@@ -26,7 +26,18 @@ class PostCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: palette.bgCard,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: palette.border, width: 1),
+        border: Border.all(
+          color: palette.accent.withValues(alpha: 0.25),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: palette.accent.withValues(alpha: 0.10),
+            blurRadius: 10,
+            spreadRadius: 0,
+            offset: Offset.zero,
+          ),
+        ],
       ),
       padding: const EdgeInsets.all(18),
       child: Column(

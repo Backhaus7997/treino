@@ -90,9 +90,21 @@ class FriendshipRepository {
     await _friendships.doc(friendshipId).delete();
   }
 
+  /// Returns the friendship document between [uidA] and [uidB], or null if none
+  /// exists. Single `get()` on `sortedDocId(uidA, uidB)` — pair order doesn't
+  /// matter (commutative).
+  Future<Friendship?> getByPair(String uidA, String uidB) async {
+    final id = Friendship.sortedDocId(uidA, uidB);
+    final snap = await _friendships.doc(id).get();
+    return _fromDoc(snap);
+  }
+
   Friendship? _fromDoc(DocumentSnapshot<Map<String, Object?>> snap) {
     final data = snap.data();
     if (!snap.exists || data == null) return null;
-    return Friendship.fromJson(data);
+    // Inject snap.id so manually-created docs (e.g. Firestore Console)
+    // deserialize correctly even if they omit the `id` field from the body.
+    // App-created friendships already carry `id` via `request()` toJson().
+    return Friendship.fromJson({...data, 'id': snap.id});
   }
 }

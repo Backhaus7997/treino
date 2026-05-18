@@ -1,0 +1,161 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
+
+import '../../../../app/theme/app_palette.dart';
+import '../../../../core/widgets/treino_icon.dart';
+import '../../application/friendship_providers.dart'
+    show friendshipRepositoryProvider;
+import '../../application/public_profile_providers.dart'
+    show friendshipByPairProvider;
+import '../../domain/friendship.dart';
+import '../../domain/friendship_status.dart';
+
+/// 4-state SEGUIR pill for the public profile screen.
+///
+/// State resolution (per design §7):
+/// - `friendship == null`                                → SEGUIR (mint active)
+/// - status accepted                                     → SIGUIENDO (outlined + check, no-op)
+/// - status pending && requesterId == viewerUid          → SOLICITUD ENVIADA (muted, opacity 0.6, no-op)
+/// - status pending && requesterId == targetUid          → ACEPTAR (mint active)
+///
+/// Tapping SEGUIR or ACEPTAR fires the repo mutation and then invalidates
+/// [friendshipByPairProvider] to refetch the state.
+class PublicProfileFollowButton extends ConsumerWidget {
+  const PublicProfileFollowButton({
+    super.key,
+    required this.friendship,
+    required this.viewerUid,
+    required this.targetUid,
+  });
+
+  final Friendship? friendship;
+  final String viewerUid;
+  final String targetUid;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final repo = ref.watch(friendshipRepositoryProvider);
+
+    Future<void> invalidate() async => ref.invalidate(
+          friendshipByPairProvider(
+            (viewerUid: viewerUid, targetUid: targetUid),
+          ),
+        );
+
+    if (friendship == null) {
+      return _FollowPill(
+        label: 'SEGUIR',
+        style: _FollowPillStyle.mintFilled,
+        onTap: () async {
+          await repo.request(viewerUid, targetUid);
+          await invalidate();
+        },
+      );
+    }
+    final f = friendship!;
+    if (f.status == FriendshipStatus.accepted) {
+      return const _FollowPill(
+        label: 'SIGUIENDO',
+        style: _FollowPillStyle.outlined,
+        leadingIcon: TreinoIcon.check,
+        onTap: null,
+      );
+    }
+    if (f.requesterId == viewerUid) {
+      return const _FollowPill(
+        label: 'SOLICITUD ENVIADA',
+        style: _FollowPillStyle.outlinedMuted,
+        onTap: null,
+      );
+    }
+    // pending && requesterId == targetUid → received → ACEPTAR
+    return _FollowPill(
+      label: 'ACEPTAR',
+      style: _FollowPillStyle.mintFilled,
+      onTap: () async {
+        await repo.accept(f.id, viewerUid);
+        await invalidate();
+      },
+    );
+  }
+}
+
+enum _FollowPillStyle { mintFilled, outlined, outlinedMuted }
+
+class _FollowPill extends StatelessWidget {
+  const _FollowPill({
+    required this.label,
+    required this.style,
+    required this.onTap,
+    this.leadingIcon,
+  });
+
+  final String label;
+  final _FollowPillStyle style;
+  final VoidCallback? onTap;
+  final IconData? leadingIcon;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+
+    final Color bg;
+    final Color textColor;
+    final Color borderColor;
+    switch (style) {
+      case _FollowPillStyle.mintFilled:
+        bg = palette.accent;
+        textColor = palette.bg;
+        borderColor = palette.accent;
+        break;
+      case _FollowPillStyle.outlined:
+        bg = Colors.transparent;
+        textColor = palette.textPrimary;
+        borderColor = palette.border;
+        break;
+      case _FollowPillStyle.outlinedMuted:
+        bg = Colors.transparent;
+        textColor = palette.textMuted;
+        borderColor = palette.border;
+        break;
+    }
+
+    final pill = GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: borderColor, width: 1),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (leadingIcon != null) ...[
+              Icon(leadingIcon, size: 14, color: textColor),
+              const SizedBox(width: 8),
+            ],
+            Text(
+              label,
+              style: GoogleFonts.barlowCondensed(
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+                letterSpacing: 1.0,
+                color: textColor,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (style == _FollowPillStyle.outlinedMuted) {
+      return Opacity(opacity: 0.6, child: pill);
+    }
+    return pill;
+  }
+}
