@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,6 +13,10 @@ import 'package:treino/features/home/widgets/home_header.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
+import 'package:treino/features/workout/application/session_providers.dart';
+import 'package:treino/features/workout/domain/session.dart';
+import 'package:treino/features/workout/domain/session_status.dart';
+import 'package:treino/features/workout/domain/set_log.dart';
 
 UserProfile makeProfile({
   String? displayName = 'Martín',
@@ -26,6 +32,16 @@ UserProfile makeProfile({
       createdAt: DateTime.utc(2026, 5, 12),
       updatedAt: DateTime.utc(2026, 5, 12),
       avatarUrl: avatarUrl,
+    );
+
+Session makeStubSession({DateTime? startedAt}) => Session(
+      id: 'stub-session-001',
+      uid: 'u1',
+      routineId: 'r1',
+      routineName: 'Push',
+      startedAt: startedAt ?? DateTime.utc(2026, 5, 18, 18, 42),
+      status: SessionStatus.active,
+      dayNumber: 1,
     );
 
 Widget _wrapWithOverrides(Widget w, List<Override> overrides) => ProviderScope(
@@ -181,6 +197,87 @@ void main() {
 
       expect(find.text('HOLA, MARTÍN!'), findsOneWidget);
       expect(find.byType(CachedNetworkImage), findsAtLeastNWidgets(1));
+    });
+
+    // ── Resume listener (REQ-SESSION-RESUME-002) ─────────────────────────────
+
+    testWidgets(
+        'SCENARIO-325: activeSessionForUidProvider returns non-null → ResumeSessionModal aparece',
+        (tester) async {
+      final profile = makeProfile();
+      await tester.pumpWidget(_wrapWithOverrides(
+        const HomeScreen(),
+        [
+          userProfileProvider.overrideWith((ref) => Stream.value(profile)),
+          activeSessionForUidProvider.overrideWith(
+            (ref) async => (session: makeStubSession(), setLogs: <SetLog>[]),
+          ),
+        ],
+      ));
+      // Initial pump + extra pumps to let the FutureProvider resolve and
+      // the post-frame callback fire.
+      await tester.pumpAndSettle();
+
+      expect(find.text('Entrenamiento en curso'), findsOneWidget);
+    });
+
+    testWidgets(
+        'SCENARIO-326: activeSessionForUidProvider returns null → sin modal, Home normal',
+        (tester) async {
+      final profile = makeProfile();
+      await tester.pumpWidget(_wrapWithOverrides(
+        const HomeScreen(),
+        [
+          userProfileProvider.overrideWith((ref) => Stream.value(profile)),
+          activeSessionForUidProvider.overrideWith((ref) async => null),
+        ],
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Entrenamiento en curso'), findsNothing);
+      expect(find.byType(EmpezarEntrenamientoCard), findsOneWidget);
+      expect(find.byType(EstaSemanaCard), findsOneWidget);
+    });
+
+    testWidgets(
+        'SCENARIO-327: activeSessionForUidProvider AsyncLoading → Home renderiza sin modal',
+        (tester) async {
+      final profile = makeProfile();
+      // Override with a Future that never completes during this pump.
+      final completer = Completer<({Session session, List<SetLog> setLogs})?>();
+      addTearDown(() {
+        if (!completer.isCompleted) completer.complete(null);
+      });
+      await tester.pumpWidget(_wrapWithOverrides(
+        const HomeScreen(),
+        [
+          userProfileProvider.overrideWith((ref) => Stream.value(profile)),
+          activeSessionForUidProvider.overrideWith((ref) => completer.future),
+        ],
+      ));
+      await tester.pump(const Duration(milliseconds: 50));
+
+      expect(find.text('Entrenamiento en curso'), findsNothing);
+      expect(find.byType(HomeHeader), findsOneWidget);
+    });
+
+    testWidgets(
+        'SCENARIO-328: activeSessionForUidProvider AsyncError → Home renderiza sin modal',
+        (tester) async {
+      final profile = makeProfile();
+      await tester.pumpWidget(_wrapWithOverrides(
+        const HomeScreen(),
+        [
+          userProfileProvider.overrideWith((ref) => Stream.value(profile)),
+          activeSessionForUidProvider.overrideWith(
+            (ref) => Future.error(Exception('network')),
+          ),
+        ],
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Entrenamiento en curso'), findsNothing);
+      expect(find.byType(HomeHeader), findsOneWidget);
     });
   });
 }
