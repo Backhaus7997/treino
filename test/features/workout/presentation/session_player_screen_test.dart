@@ -85,6 +85,30 @@ List<Override> _stateOverride(SessionState state) => [
       sessionNotifierProvider.overrideWith(() => _StubNotifier(state)),
     ];
 
+// ── Helpers adicionales de SessionState ──────────────────────────────────────
+
+/// Estado con 3 slots, 1 completamente terminado.
+SessionState _stateWith1Of3Done() {
+  final slots = [
+    makeSlot(exerciseId: 'e1', targetSets: 2),
+    makeSlot(exerciseId: 'e2', exerciseName: 'Sentadilla', targetSets: 3),
+    makeSlot(exerciseId: 'e3', exerciseName: 'Peso muerto', targetSets: 3),
+  ];
+  final day = makeDay(dayNumber: 1, slots: slots);
+  // 2 logs para e1 → completo; 0 para e2, e3
+  final logs = [
+    makeSetLog(exerciseId: 'e1', setNumber: 1, reps: 10, weightKg: 60.0),
+    makeSetLog(exerciseId: 'e1', setNumber: 2, reps: 10, weightKg: 60.0),
+  ];
+  return SessionState(
+    session: makeSession(),
+    day: day,
+    setLogs: logs,
+    currentExerciseIndex: 1,
+    elapsedSeconds: 0,
+  );
+}
+
 // ── Helpers de UserProfile ────────────────────────────────────────────────────
 
 UserProfile _makeProfile({String? gymId}) => UserProfile(
@@ -181,6 +205,70 @@ void main() {
       );
       await tester.pump();
       expect(find.text('Sin gimnasio asignado'), findsOneWidget);
+    });
+  });
+
+  // ── _SessionStatsCard (TASK-204a) ─────────────────────────────────────────
+
+  group('_SessionStatsCard', () {
+    // SCENARIO-279: etiqueta 'SESIÓN ACTIVA'
+    testWidgets('SCENARIO-279: renderiza etiqueta "SESIÓN ACTIVA"',
+        (tester) async {
+      await tester.pumpWidget(
+        _wrapProvider(
+          const SessionPlayerScreen(init: _kInit),
+          _stateOverride(_defaultState()),
+        ),
+      );
+      await tester.pump();
+      expect(find.text('SESIÓN ACTIVA'), findsOneWidget);
+    });
+
+    // SCENARIO-280: timer '00:00' cuando elapsedSeconds == 0
+    testWidgets('SCENARIO-280: timer muestra "00:00" cuando elapsedSeconds=0',
+        (tester) async {
+      await tester.pumpWidget(
+        _wrapProvider(
+          const SessionPlayerScreen(init: _kInit),
+          _stateOverride(_defaultState()),
+        ),
+      );
+      await tester.pump();
+      expect(find.text('00:00'), findsOneWidget);
+    });
+
+    // SCENARIO-281: timer '01:03' cuando elapsedSeconds == 63
+    testWidgets('SCENARIO-281: timer muestra "01:03" cuando elapsedSeconds=63',
+        (tester) async {
+      final state = SessionState(
+        session: makeSession(),
+        day: _defaultState().day,
+        setLogs: const [],
+        currentExerciseIndex: 0,
+        elapsedSeconds: 63,
+      );
+      await tester.pumpWidget(
+        _wrapProvider(
+          const SessionPlayerScreen(init: _kInit),
+          _stateOverride(state),
+        ),
+      );
+      await tester.pump();
+      expect(find.text('01:03'), findsOneWidget);
+    });
+
+    // SCENARIO-282: progreso con conteo correcto de ejercicios
+    testWidgets(
+        'SCENARIO-282: texto de progreso refleja conteos correctos de ejercicios',
+        (tester) async {
+      await tester.pumpWidget(
+        _wrapProvider(
+          const SessionPlayerScreen(init: _kInit),
+          _stateOverride(_stateWith1Of3Done()),
+        ),
+      );
+      await tester.pump();
+      expect(find.textContaining('1 / 3 ejercicios'), findsOneWidget);
     });
   });
 }
