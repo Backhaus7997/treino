@@ -65,8 +65,7 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
   }
 
   Future<void> _onAbandonConfirmed() async {
-    final notifier =
-        ref.read(sessionNotifierProvider(widget.init).notifier);
+    final notifier = ref.read(sessionNotifierProvider(widget.init).notifier);
     final sessionId =
         ref.read(sessionNotifierProvider(widget.init)).value?.session.id;
     await notifier.abandonSession();
@@ -76,8 +75,7 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
   }
 
   Future<void> _finishSession() async {
-    final notifier =
-        ref.read(sessionNotifierProvider(widget.init).notifier);
+    final notifier = ref.read(sessionNotifierProvider(widget.init).notifier);
     final sessionId =
         ref.read(sessionNotifierProvider(widget.init)).value?.session.id;
     await notifier.finishSession();
@@ -88,9 +86,8 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
 
   void _openSetEntry(RoutineSlot slot, SessionState state) {
     // Aplica defaults del último log del ejercicio (diseño §9.7).
-    final lastLog = state.setLogs
-        .where((l) => l.exerciseId == slot.exerciseId)
-        .lastOrNull;
+    final lastLog =
+        state.setLogs.where((l) => l.exerciseId == slot.exerciseId).lastOrNull;
     final effectiveSlot = lastLog != null
         ? RoutineSlot(
             exerciseId: slot.exerciseId,
@@ -210,8 +207,7 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
                 padding: const EdgeInsets.fromLTRB(20, 12, 20, 18),
                 child: _TerminarSessionButton(
                   enabled: state.isFullyCompleted,
-                  onPressed:
-                      state.isFullyCompleted ? _finishSession : null,
+                  onPressed: state.isFullyCompleted ? _finishSession : null,
                 ),
               ),
             ],
@@ -254,7 +250,8 @@ class _SessionHeader extends StatelessWidget {
                 shape: BoxShape.circle,
                 color: palette.bgCard,
               ),
-              child: Icon(TreinoIcon.back, color: palette.textPrimary, size: 18),
+              child:
+                  Icon(TreinoIcon.back, color: palette.textPrimary, size: 18),
             ),
           ),
           const SizedBox(width: 12),
@@ -275,8 +272,7 @@ class _SessionHeader extends StatelessWidget {
             style: OutlinedButton.styleFrom(
               side: BorderSide(color: palette.highlight),
               foregroundColor: palette.highlight,
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               minimumSize: Size.zero,
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               shape: RoundedRectangleBorder(

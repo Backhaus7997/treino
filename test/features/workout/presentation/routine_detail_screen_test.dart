@@ -305,8 +305,7 @@ void main() {
       );
     });
 
-    testWidgets(
-        'SCENARIO-313: EMPEZAR habilitado, EDITAR sigue deshabilitado',
+    testWidgets('SCENARIO-313: EMPEZAR habilitado, EDITAR sigue deshabilitado',
         (tester) async {
       await tester.pumpWidget(_wrapWithOverrides(
         const RoutineDetailScreen(routineId: 'test-id'),
@@ -326,8 +325,7 @@ void main() {
       expect(empezarBtn.onPressed, isNotNull);
     });
 
-    testWidgets(
-        'SCENARIO-315: tap en EDITAR es no-op (stub, no excepción)',
+    testWidgets('SCENARIO-315: tap en EDITAR es no-op (stub, no excepción)',
         (tester) async {
       await tester.pumpWidget(_wrapWithOverrides(
         const RoutineDetailScreen(routineId: 'test-id'),
@@ -367,8 +365,7 @@ void main() {
       final router = GoRouter(routes: [
         GoRoute(
           path: '/',
-          builder: (_, __) =>
-              const RoutineDetailScreen(routineId: 'test-id'),
+          builder: (_, __) => const RoutineDetailScreen(routineId: 'test-id'),
         ),
         GoRoute(
           path: '/workout/session/:routineId/:dayNumber',

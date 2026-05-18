@@ -78,11 +78,8 @@ SessionState _defaultState() => SessionState(
         dayNumber: 4,
         slots: [
           makeSlot(
-              exerciseId: 'e1',
-              exerciseName: 'Press de banca',
-              targetSets: 3),
-          makeSlot(
-              exerciseId: 'e2', exerciseName: 'Sentadilla', targetSets: 3),
+              exerciseId: 'e1', exerciseName: 'Press de banca', targetSets: 3),
+          makeSlot(exerciseId: 'e2', exerciseName: 'Sentadilla', targetSets: 3),
         ],
       ),
       setLogs: const [],
@@ -275,12 +272,12 @@ void main() {
     });
 
     // SCENARIO-285: fila pending — tap llama al callback (abre el sheet)
-    testWidgets(
-        'SCENARIO-285: estado pending es tappable y abre SetEntrySheet',
+    testWidgets('SCENARIO-285: estado pending es tappable y abre SetEntrySheet',
         (tester) async {
       // Estado donde e1 está completo, e2 es pending
       final slots = [
-        makeSlot(exerciseId: 'e1', exerciseName: 'Press de banca', targetSets: 1),
+        makeSlot(
+            exerciseId: 'e1', exerciseName: 'Press de banca', targetSets: 1),
         makeSlot(exerciseId: 'e2', exerciseName: 'Sentadilla', targetSets: 3),
       ];
       final day = makeDay(dayNumber: 1, slots: slots);
