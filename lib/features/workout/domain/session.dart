@@ -20,6 +20,8 @@ class Session with _$Session {
     @Default(0.0) double totalVolumeKg,
     @Default(0) int durationMin,
     required SessionStatus status,
+    @Default(1) int dayNumber,
+    @Default(false) bool wasFullyCompleted,
   }) = _Session;
 
   factory Session.fromJson(Map<String, Object?> json) =>

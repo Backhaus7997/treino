@@ -1,10 +1,10 @@
 # Session Data Layer — Specification
 
 **Domain**: Workout Session Management
-**Change**: `session-model-seed` (Fase 4 · Etapa 1)
+**Change**: `session-model-seed` (Fase 4 · Etapa 1) + `session-player` amendment (Etapa 2)
 **Status**: ACTIVE (source of truth)
 **Last updated**: 2026-05-18
-**Merged**: PR #34 (commit 83cd63b)
+**Merged**: PR #34 (commit 83cd63b); contract amendment landed via `feat/session-player`
 
 ---
 
@@ -19,6 +19,8 @@ Define the workout session data layer: models, repositories, Riverpod providers,
 | ID | Name | Strength | Status |
 |----|------|----------|--------|
 | REQ-SMS-001 | Session model fields | MUST | ✅ IMPLEMENTED |
+| REQ-SMS-001b | Session.dayNumber (added in Etapa 2 amendment) | MUST | ✅ IMPLEMENTED |
+| REQ-SMS-001c | Session.wasFullyCompleted (added in Etapa 2 amendment) | MUST | ✅ IMPLEMENTED |
 | REQ-SMS-002 | SessionStatus enum wire format | MUST | ✅ IMPLEMENTED |
 | REQ-SMS-003 | SetLog model fields | MUST | ✅ IMPLEMENTED |
 | REQ-SMS-004 | Denormalized names at write time | MUST | ✅ IMPLEMENTED |
@@ -39,13 +41,37 @@ Define the workout session data layer: models, repositories, Riverpod providers,
 
 ### REQ-SMS-001 — Session model fields
 
-The `Session` model MUST have fields: `id`, `uid`, `routineId`, `routineName`, `startedAt`, `finishedAt?`, `totalVolumeKg`, `durationMin`, `status`. All fields MUST round-trip through JSON without data loss.
+The `Session` model MUST have fields: `id`, `uid`, `routineId`, `routineName`, `startedAt`, `finishedAt?`, `totalVolumeKg`, `durationMin`, `status`, plus `dayNumber` (REQ-SMS-001b) and `wasFullyCompleted` (REQ-SMS-001c) added by the Etapa 2 amendment. All fields MUST round-trip through JSON without data loss.
 
 #### SCENARIO-234: Session default values and JSON round-trip
 
 - GIVEN a `Session` with all required fields set and `finishedAt` null
 - WHEN serialized to JSON and deserialized back
 - THEN all fields are equal to the originals and `finishedAt` is null
+
+---
+
+### REQ-SMS-001b — Session.dayNumber
+
+`Session.dayNumber: int` MUST identify which day of a multi-day routine the session targets (1-based). Defaults to `1` to allow Etapa 1 seed docs and legacy Firestore documents to deserialize without backfill. New sessions created during the player flow MUST pass the real day number selected by the user.
+
+#### SCENARIO-234e: dayNumber defaults to 1 when absent in JSON
+
+- GIVEN a Firestore document without `dayNumber`
+- WHEN decoded via `Session.fromJson`
+- THEN `dayNumber` equals `1`
+
+---
+
+### REQ-SMS-001c — Session.wasFullyCompleted
+
+`Session.wasFullyCompleted: bool` MUST signal whether the user completed every target set and explicitly tapped TERMINAR SESIÓN. Defaults to `false`. Abandon paths and back-out paths MUST leave this field `false`. This is the canonical analytics signal that distinguishes completed sessions from abandoned ones — `status: finished` alone does not differentiate.
+
+#### SCENARIO-234f: wasFullyCompleted defaults to false when absent in JSON
+
+- GIVEN a Firestore document without `wasFullyCompleted`
+- WHEN decoded via `Session.fromJson`
+- THEN `wasFullyCompleted` equals `false`
 
 ---
 

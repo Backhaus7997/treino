@@ -27,6 +27,7 @@ class SessionRepository {
     required String routineId,
     required String routineName,
     required DateTime startedAt,
+    int dayNumber = 1,
   }) async {
     final ref = _sessions(uid).doc();
     final session = Session(
@@ -39,6 +40,7 @@ class SessionRepository {
       totalVolumeKg: 0.0,
       durationMin: 0,
       status: SessionStatus.active,
+      dayNumber: dayNumber,
     );
     await ref.set(session.toJson());
     return session;
@@ -52,6 +54,7 @@ class SessionRepository {
     required DateTime finishedAt,
     required double totalVolumeKg,
     required int durationMin,
+    bool wasFullyCompleted = false,
   }) async {
     // finishedAt MUST be Timestamp.fromDate, not a raw DateTime — real Firestore
     // serializes a raw DateTime as an ISO string, but the @TimestampConverter
@@ -63,6 +66,7 @@ class SessionRepository {
       'finishedAt': Timestamp.fromDate(finishedAt.toUtc()),
       'totalVolumeKg': totalVolumeKg,
       'durationMin': durationMin,
+      'wasFullyCompleted': wasFullyCompleted,
     });
   }
 

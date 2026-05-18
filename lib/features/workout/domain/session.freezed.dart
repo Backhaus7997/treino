@@ -31,6 +31,8 @@ mixin _$Session {
   double get totalVolumeKg => throw _privateConstructorUsedError;
   int get durationMin => throw _privateConstructorUsedError;
   SessionStatus get status => throw _privateConstructorUsedError;
+  int get dayNumber => throw _privateConstructorUsedError;
+  bool get wasFullyCompleted => throw _privateConstructorUsedError;
 
   /// Serializes this Session to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -55,7 +57,9 @@ abstract class $SessionCopyWith<$Res> {
       @TimestampConverter() DateTime? finishedAt,
       double totalVolumeKg,
       int durationMin,
-      SessionStatus status});
+      SessionStatus status,
+      int dayNumber,
+      bool wasFullyCompleted});
 }
 
 /// @nodoc
@@ -82,6 +86,8 @@ class _$SessionCopyWithImpl<$Res, $Val extends Session>
     Object? totalVolumeKg = null,
     Object? durationMin = null,
     Object? status = null,
+    Object? dayNumber = null,
+    Object? wasFullyCompleted = null,
   }) {
     return _then(_value.copyWith(
       id: null == id
@@ -120,6 +126,14 @@ class _$SessionCopyWithImpl<$Res, $Val extends Session>
           ? _value.status
           : status // ignore: cast_nullable_to_non_nullable
               as SessionStatus,
+      dayNumber: null == dayNumber
+          ? _value.dayNumber
+          : dayNumber // ignore: cast_nullable_to_non_nullable
+              as int,
+      wasFullyCompleted: null == wasFullyCompleted
+          ? _value.wasFullyCompleted
+          : wasFullyCompleted // ignore: cast_nullable_to_non_nullable
+              as bool,
     ) as $Val);
   }
 }
@@ -140,7 +154,9 @@ abstract class _$$SessionImplCopyWith<$Res> implements $SessionCopyWith<$Res> {
       @TimestampConverter() DateTime? finishedAt,
       double totalVolumeKg,
       int durationMin,
-      SessionStatus status});
+      SessionStatus status,
+      int dayNumber,
+      bool wasFullyCompleted});
 }
 
 /// @nodoc
@@ -165,6 +181,8 @@ class __$$SessionImplCopyWithImpl<$Res>
     Object? totalVolumeKg = null,
     Object? durationMin = null,
     Object? status = null,
+    Object? dayNumber = null,
+    Object? wasFullyCompleted = null,
   }) {
     return _then(_$SessionImpl(
       id: null == id
@@ -203,6 +221,14 @@ class __$$SessionImplCopyWithImpl<$Res>
           ? _value.status
           : status // ignore: cast_nullable_to_non_nullable
               as SessionStatus,
+      dayNumber: null == dayNumber
+          ? _value.dayNumber
+          : dayNumber // ignore: cast_nullable_to_non_nullable
+              as int,
+      wasFullyCompleted: null == wasFullyCompleted
+          ? _value.wasFullyCompleted
+          : wasFullyCompleted // ignore: cast_nullable_to_non_nullable
+              as bool,
     ));
   }
 }
@@ -219,7 +245,9 @@ class _$SessionImpl implements _Session {
       @TimestampConverter() this.finishedAt,
       this.totalVolumeKg = 0.0,
       this.durationMin = 0,
-      required this.status});
+      required this.status,
+      this.dayNumber = 1,
+      this.wasFullyCompleted = false});
 
   factory _$SessionImpl.fromJson(Map<String, dynamic> json) =>
       _$$SessionImplFromJson(json);
@@ -246,10 +274,16 @@ class _$SessionImpl implements _Session {
   final int durationMin;
   @override
   final SessionStatus status;
+  @override
+  @JsonKey()
+  final int dayNumber;
+  @override
+  @JsonKey()
+  final bool wasFullyCompleted;
 
   @override
   String toString() {
-    return 'Session(id: $id, uid: $uid, routineId: $routineId, routineName: $routineName, startedAt: $startedAt, finishedAt: $finishedAt, totalVolumeKg: $totalVolumeKg, durationMin: $durationMin, status: $status)';
+    return 'Session(id: $id, uid: $uid, routineId: $routineId, routineName: $routineName, startedAt: $startedAt, finishedAt: $finishedAt, totalVolumeKg: $totalVolumeKg, durationMin: $durationMin, status: $status, dayNumber: $dayNumber, wasFullyCompleted: $wasFullyCompleted)';
   }
 
   @override
@@ -271,13 +305,28 @@ class _$SessionImpl implements _Session {
                 other.totalVolumeKg == totalVolumeKg) &&
             (identical(other.durationMin, durationMin) ||
                 other.durationMin == durationMin) &&
-            (identical(other.status, status) || other.status == status));
+            (identical(other.status, status) || other.status == status) &&
+            (identical(other.dayNumber, dayNumber) ||
+                other.dayNumber == dayNumber) &&
+            (identical(other.wasFullyCompleted, wasFullyCompleted) ||
+                other.wasFullyCompleted == wasFullyCompleted));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
   @override
-  int get hashCode => Object.hash(runtimeType, id, uid, routineId, routineName,
-      startedAt, finishedAt, totalVolumeKg, durationMin, status);
+  int get hashCode => Object.hash(
+      runtimeType,
+      id,
+      uid,
+      routineId,
+      routineName,
+      startedAt,
+      finishedAt,
+      totalVolumeKg,
+      durationMin,
+      status,
+      dayNumber,
+      wasFullyCompleted);
 
   /// Create a copy of Session
   /// with the given fields replaced by the non-null parameter values.
@@ -305,7 +354,9 @@ abstract class _Session implements Session {
       @TimestampConverter() final DateTime? finishedAt,
       final double totalVolumeKg,
       final int durationMin,
-      required final SessionStatus status}) = _$SessionImpl;
+      required final SessionStatus status,
+      final int dayNumber,
+      final bool wasFullyCompleted}) = _$SessionImpl;
 
   factory _Session.fromJson(Map<String, dynamic> json) = _$SessionImpl.fromJson;
 
@@ -329,6 +380,10 @@ abstract class _Session implements Session {
   int get durationMin;
   @override
   SessionStatus get status;
+  @override
+  int get dayNumber;
+  @override
+  bool get wasFullyCompleted;
 
   /// Create a copy of Session
   /// with the given fields replaced by the non-null parameter values.
