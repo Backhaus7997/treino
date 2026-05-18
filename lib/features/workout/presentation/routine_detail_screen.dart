@@ -183,7 +183,7 @@ class _RoutineDetailContent extends StatelessWidget {
                       ],
                     ),
               const SizedBox(height: 20),
-              const _DisabledCTABar(),
+              _StartSessionCTABar(routine: routine, day: day),
               const SizedBox(height: 18),
             ]),
           ),
@@ -439,19 +439,23 @@ class _EmptyState extends StatelessWidget {
   }
 }
 
-class _DisabledCTABar extends StatelessWidget {
-  const _DisabledCTABar();
+class _StartSessionCTABar extends StatelessWidget {
+  const _StartSessionCTABar({required this.routine, required this.day});
+
+  final Routine routine;
+  final RoutineDay day;
 
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    return Opacity(
-      opacity: 0.4,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 18),
-        child: Row(
-          children: [
-            Expanded(
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 18),
+      child: Row(
+        children: [
+          Expanded(
+            // EDITAR sigue stub — habilitar en una etapa futura.
+            child: Opacity(
+              opacity: 0.4,
               child: OutlinedButton(
                 onPressed: null,
                 style: OutlinedButton.styleFrom(
@@ -472,32 +476,32 @@ class _DisabledCTABar extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: ElevatedButton(
-                onPressed: null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: palette.accent,
-                  disabledBackgroundColor:
-                      palette.accent.withValues(alpha: 1.0),
-                  minimumSize: const Size.fromHeight(56),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(9999),
-                  ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: ElevatedButton(
+              onPressed: () => context.push(
+                '/workout/session/${routine.id}/${day.dayNumber}',
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: palette.accent,
+                minimumSize: const Size.fromHeight(56),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(9999),
                 ),
-                child: Text(
-                  'EMPEZAR',
-                  style: GoogleFonts.barlowCondensed(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 16,
-                    letterSpacing: 1.0,
-                    color: palette.bg,
-                  ),
+              ),
+              child: Text(
+                'EMPEZAR',
+                style: GoogleFonts.barlowCondensed(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 16,
+                  letterSpacing: 1.0,
+                  color: palette.bg,
                 ),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
