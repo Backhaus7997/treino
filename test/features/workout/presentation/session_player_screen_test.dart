@@ -1,5 +1,8 @@
-// Tests para SessionPlayerScreen — SCENARIO-274..276 (_SessionHeader, TASK-202a).
-// El archivo de producción no existe — RED.
+// Tests para SessionPlayerScreen — SCENARIO-274..276 (_SessionHeader, TASK-202a)
+// + SCENARIO-277..278 (_AttendanceCard, TASK-203a).
+// TASK-203a: _AttendanceCard fue incluida en el commit 202b junto con el esqueleto
+// de la pantalla — los tests 277-278 son GREEN desde el primer run (desviación
+// documentada en apply-progress.md).
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,6 +14,9 @@ import 'package:treino/features/workout/application/session_notifier.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
 import 'package:treino/features/workout/application/session_state.dart';
 import 'package:treino/features/workout/presentation/session_player_screen.dart';
+import 'package:treino/features/profile/application/user_providers.dart';
+import 'package:treino/features/profile/domain/user_profile.dart';
+import 'package:treino/features/profile/domain/user_role.dart';
 
 import '../../../features/workout/application/stub_factories.dart';
 
@@ -79,7 +85,19 @@ List<Override> _stateOverride(SessionState state) => [
       sessionNotifierProvider.overrideWith(() => _StubNotifier(state)),
     ];
 
-// ── _SessionHeader (TASK-202a) ────────────────────────────────────────────────
+// ── Helpers de UserProfile ────────────────────────────────────────────────────
+
+UserProfile _makeProfile({String? gymId}) => UserProfile(
+      uid: 'u1',
+      email: 'u1@test.com',
+      displayName: 'Test',
+      role: UserRole.athlete,
+      createdAt: DateTime.utc(2026, 1, 1),
+      updatedAt: DateTime.utc(2026, 1, 1),
+      gymId: gymId,
+    );
+
+// ── _SessionHeader + _AttendanceCard tests ───────────────────────────────────
 
 void main() {
   group('_SessionHeader', () {
@@ -126,6 +144,43 @@ void main() {
         find.textContaining('¿Seguro que querés abandonar?'),
         findsOneWidget,
       );
+    });
+  });
+
+  // ── _AttendanceCard (TASK-203a) ───────────────────────────────────────────
+
+  group('_AttendanceCard', () {
+    List<Override> attendanceOverrides(UserProfile profile) => [
+          ...(_stateOverride(_defaultState())),
+          userProfileProvider.overrideWith(
+            (ref) => Stream.value(profile),
+          ),
+        ];
+
+    // SCENARIO-277: 'Asistencia marcada' aparece
+    testWidgets('SCENARIO-277: renderiza "Asistencia marcada"', (tester) async {
+      await tester.pumpWidget(
+        _wrapProvider(
+          const SessionPlayerScreen(init: _kInit),
+          attendanceOverrides(_makeProfile()),
+        ),
+      );
+      await tester.pump();
+      expect(find.text('Asistencia marcada'), findsOneWidget);
+    });
+
+    // SCENARIO-278: 'Sin gimnasio asignado' cuando gymId es null
+    testWidgets(
+        'SCENARIO-278: renderiza "Sin gimnasio asignado" cuando gymId es null',
+        (tester) async {
+      await tester.pumpWidget(
+        _wrapProvider(
+          const SessionPlayerScreen(init: _kInit),
+          attendanceOverrides(_makeProfile(gymId: null)),
+        ),
+      );
+      await tester.pump();
+      expect(find.text('Sin gimnasio asignado'), findsOneWidget);
     });
   });
 }
