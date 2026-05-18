@@ -68,14 +68,17 @@ void main() {
   });
 
   // ---------------------------------------------------------------------------
-  // REQ-AUTH-002: exactly 2 fields — email + password (no display name).
-  // displayName is populated by ProfileSetup in Etapa 6.
+  // REQ-AUTH-002 (relaxed): 3 fields — email + password + confirm password.
+  // displayName is still NOT collected here — populated by ProfileSetup in
+  // Etapa 6. Confirm password is a UX safety net against typos, not a
+  // displayName regression.
   // ---------------------------------------------------------------------------
-  testWidgets('REQ-AUTH-002 — exactly 2 fields rendered (email/password)',
+  testWidgets(
+      'REQ-AUTH-002 — exactly 3 fields rendered (email/password/confirm)',
       (tester) async {
     await tester.pumpWidget(_buildApp(notifier: _TestAuthNotifier()));
     await tester.pumpAndSettle();
-    expect(find.byType(TextFormField), findsNWidgets(2));
+    expect(find.byType(TextFormField), findsNWidgets(3));
   });
 
   // ---------------------------------------------------------------------------
@@ -140,6 +143,7 @@ void main() {
     final fields = find.byType(TextFormField);
     await tester.enterText(fields.at(0), 'test@example.com');
     await tester.enterText(fields.at(1), 'Pass1234');
+    await tester.enterText(fields.at(2), 'Pass1234');
     await tester.pump();
 
     // Terms not checked → CTA still disabled
@@ -180,6 +184,7 @@ void main() {
     final fields = find.byType(TextFormField);
     await tester.enterText(fields.at(0), 'test@example.com');
     await tester.enterText(fields.at(1), 'Pass1234');
+    await tester.enterText(fields.at(2), 'Pass1234');
     await tester.pump();
 
     // Accept terms
@@ -205,6 +210,7 @@ void main() {
     final fields = find.byType(TextFormField);
     await tester.enterText(fields.at(0), 'not-an-email');
     await tester.enterText(fields.at(1), 'Pass1234');
+    await tester.enterText(fields.at(2), 'Pass1234');
     await tester.pump();
 
     // Accept terms then submit to trigger validation
@@ -229,6 +235,7 @@ void main() {
     final fields = find.byType(TextFormField);
     await tester.enterText(fields.at(0), 'test@example.com');
     await tester.enterText(fields.at(1), 'abc123'); // < 8 chars
+    await tester.enterText(fields.at(2), 'abc123');
     await tester.pump();
 
     await tester.ensureVisible(find.byType(Checkbox));
@@ -257,6 +264,7 @@ void main() {
     final fields = find.byType(TextFormField);
     await tester.enterText(fields.at(0), 'test@example.com');
     await tester.enterText(fields.at(1), 'abcdefgh'); // no numbers
+    await tester.enterText(fields.at(2), 'abcdefgh');
     await tester.pump();
 
     await tester.ensureVisible(find.byType(Checkbox));
@@ -285,6 +293,7 @@ void main() {
     final fields = find.byType(TextFormField);
     await tester.enterText(fields.at(0), 'test@example.com');
     await tester.enterText(fields.at(1), '12345678'); // no letters
+    await tester.enterText(fields.at(2), '12345678');
     await tester.pump();
 
     await tester.ensureVisible(find.byType(Checkbox));
@@ -321,6 +330,7 @@ void main() {
     final fields = find.byType(TextFormField);
     await tester.enterText(fields.at(0), 'existing@example.com');
     await tester.enterText(fields.at(1), 'Pass1234');
+    await tester.enterText(fields.at(2), 'Pass1234');
     await tester.pump();
 
     await tester.ensureVisible(find.byType(Checkbox));
@@ -331,5 +341,59 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Ya existe una cuenta con ese email'), findsOneWidget);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Confirm password — mismatched passwords show "Las contraseñas no coinciden"
+  // ---------------------------------------------------------------------------
+  testWidgets(
+      'confirm password — mismatched values show "Las contraseñas no coinciden"',
+      (tester) async {
+    await tester.pumpWidget(_buildApp(notifier: _TestAuthNotifier()));
+    await tester.pumpAndSettle();
+
+    final fields = find.byType(TextFormField);
+    await tester.enterText(fields.at(0), 'test@example.com');
+    await tester.enterText(fields.at(1), 'Pass1234');
+    await tester.enterText(fields.at(2), 'OtherPass1234');
+    await tester.pump();
+
+    // Accept terms then submit to trigger validation
+    await tester.ensureVisible(find.byType(Checkbox));
+    await tester.tap(find.byType(Checkbox));
+    await tester.pump();
+    await tester.ensureVisible(find.byType(AuthPillButton));
+    await tester.tap(find.byType(AuthPillButton));
+    await tester.pump();
+
+    expect(find.text('Las contraseñas no coinciden'), findsOneWidget);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Confirm password — empty confirm field blocks submit (CTA stays disabled)
+  // ---------------------------------------------------------------------------
+  testWidgets('confirm password — empty confirm keeps CTA disabled',
+      (tester) async {
+    await tester.pumpWidget(_buildApp(notifier: _TestAuthNotifier()));
+    await tester.pumpAndSettle();
+
+    final fields = find.byType(TextFormField);
+    await tester.enterText(fields.at(0), 'test@example.com');
+    await tester.enterText(fields.at(1), 'Pass1234');
+    // Intentionally leave confirm empty
+    await tester.pump();
+
+    // Even with terms accepted, CTA stays disabled because confirm is empty
+    await tester.ensureVisible(find.byType(Checkbox));
+    await tester.tap(find.byType(Checkbox));
+    await tester.pump();
+
+    final btn = tester.widget<ElevatedButton>(
+      find.descendant(
+        of: find.byType(AuthPillButton),
+        matching: find.byType(ElevatedButton),
+      ),
+    );
+    expect(btn.onPressed, isNull);
   });
 }
