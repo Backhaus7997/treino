@@ -139,10 +139,11 @@ class AuthService {
   /// modern apps (Spotify, Notion, etc.).
   ///
   /// Throws [AuthFailure.signInCancelled] when the user dismisses the picker
-  /// without selecting an account, [AuthFailure.networkError] on connectivity
-  /// issues, and [AuthFailure.fromFirebase] for any FirebaseAuthException
-  /// (e.g. account-exists-with-different-credential when the same email is
-  /// already registered with a different provider).
+  /// without selecting an account, [AuthFailure.unknown] with the underlying
+  /// provider/platform code for any other non-cancel failure (interrupted,
+  /// config errors, platform exceptions, etc.), and [AuthFailure.fromFirebase]
+  /// for any FirebaseAuthException (e.g. account-exists-with-different-credential
+  /// when the same email is already registered with a different provider).
   ///
   /// google_sign_in 7.x splits authentication and authorization:
   /// `authenticate()` returns an idToken-only account; the accessToken needed
@@ -156,9 +157,9 @@ class AuthService {
       if (e.code == GoogleSignInExceptionCode.canceled) {
         throw const AuthFailure.signInCancelled();
       }
-      throw const AuthFailure.networkError();
-    } on PlatformException {
-      throw const AuthFailure.networkError();
+      throw AuthFailure.unknown(e.code.name);
+    } on PlatformException catch (e) {
+      throw AuthFailure.unknown(e.code);
     }
 
     final GoogleSignInClientAuthorization authorization;
@@ -169,9 +170,9 @@ class AuthService {
       if (e.code == GoogleSignInExceptionCode.canceled) {
         throw const AuthFailure.signInCancelled();
       }
-      throw const AuthFailure.networkError();
-    } on PlatformException {
-      throw const AuthFailure.networkError();
+      throw AuthFailure.unknown(e.code.name);
+    } on PlatformException catch (e) {
+      throw AuthFailure.unknown(e.code);
     }
 
     final credential = GoogleAuthProvider.credential(
@@ -208,8 +209,9 @@ class AuthService {
   /// owns the displayName, so we never call [User.updateDisplayName] here.
   ///
   /// Throws [AuthFailure.signInCancelled] when the user dismisses the native
-  /// sheet, [AuthFailure.networkError] on any other Apple-side failure, and
-  /// [AuthFailure.fromFirebase] for any FirebaseAuthException.
+  /// sheet, [AuthFailure.unknown] with the Apple authorization code for any
+  /// other Apple-side failure, and [AuthFailure.fromFirebase] for any
+  /// FirebaseAuthException.
   ///
   /// Crucial: passes the Apple `authorizationCode` as `accessToken` to
   /// [OAuthProvider.credential] — without it, Firebase fails to validate the
@@ -231,9 +233,9 @@ class AuthService {
       if (e.code == AuthorizationErrorCode.canceled) {
         throw const AuthFailure.signInCancelled();
       }
-      throw const AuthFailure.networkError();
+      throw AuthFailure.unknown(e.code.name);
     } catch (_) {
-      throw const AuthFailure.networkError();
+      throw const AuthFailure.unknown('apple-unknown');
     }
 
     final oauthCredential = OAuthProvider('apple.com').credential(

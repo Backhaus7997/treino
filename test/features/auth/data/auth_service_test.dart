@@ -497,7 +497,8 @@ void main() {
       );
     });
 
-    test('PlatformException from google_sign_in → AuthFailure.networkError',
+    test(
+        'PlatformException from google_sign_in → AuthFailure.unknown with code',
         () async {
       when(() => googleSignIn.authenticate()).thenThrow(
         PlatformException(code: 'network_error'),
@@ -505,12 +506,12 @@ void main() {
 
       expect(
         () => sut.signInWithGoogle(),
-        throwsA(const AuthFailure.networkError()),
+        throwsA(const AuthFailure.unknown('network_error')),
       );
     });
 
     test(
-        'non-cancel GoogleSignInException from authenticate → AuthFailure.networkError',
+        'non-cancel GoogleSignInException from authenticate → AuthFailure.unknown with code',
         () async {
       when(() => googleSignIn.authenticate()).thenThrow(
         const GoogleSignInException(
@@ -521,7 +522,7 @@ void main() {
 
       expect(
         () => sut.signInWithGoogle(),
-        throwsA(const AuthFailure.networkError()),
+        throwsA(const AuthFailure.unknown('interrupted')),
       );
     });
 
