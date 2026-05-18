@@ -276,6 +276,43 @@ class AuthService {
     }
   }
 
+  /// Hard-cancel onboarding for a user who just signed up and wants to bail
+  /// from ProfileSetup step 0. Deletes the Firestore profile doc (best-effort)
+  /// and then the Firebase Auth user (mandatory). The Auth delete auto-signs
+  /// the user out; we still clean the Google session cache so the next picker
+  /// shows fresh.
+  ///
+  /// Throws [AuthFailure] on Firebase Auth delete failure (e.g.
+  /// `requires-recent-login` on stale tokens). On Firestore delete failure
+  /// we swallow and proceed — the Auth delete is the source of truth for
+  /// account existence.
+  Future<void> cancelOnboarding() async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+
+    // Best-effort delete of the Firestore profile doc.
+    try {
+      await _userRepository.delete(user.uid);
+    } catch (_) {
+      // Continue — Auth delete is what removes the account from Firebase.
+    }
+
+    // Mandatory delete of the Firebase Auth user.
+    try {
+      await user.delete();
+    } on FirebaseAuthException catch (e) {
+      throw AuthFailure.fromFirebase(e);
+    }
+
+    // Cleanup Google session cache. Firebase Auth is already cleared by
+    // user.delete(); this only matters if the user used Google to sign up.
+    try {
+      await _googleSignIn.signOut();
+    } catch (_) {
+      // Ignore — best-effort cleanup.
+    }
+  }
+
   /// Stream piped from [FirebaseAuth.authStateChanges].
   Stream<User?> authStateChanges() => _auth.authStateChanges();
 }

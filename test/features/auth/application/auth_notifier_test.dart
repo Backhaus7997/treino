@@ -341,6 +341,66 @@ void main() {
   });
 
   // ---------------------------------------------------------------------------
+  // cancelOnboarding — hard-cancel an in-progress signup
+  // ---------------------------------------------------------------------------
+  group('AuthNotifier.cancelOnboarding', () {
+    test('happy path — state transitions to AsyncData(null) after service call',
+        () async {
+      final streamController = StreamController<User?>();
+      final container = buildContainer(
+        mockService: mockService,
+        authStream: streamController.stream,
+      );
+      addTearDown(() {
+        container.dispose();
+        streamController.close();
+      });
+
+      // Start logged in
+      streamController.add(mockUser);
+      await container.read(authNotifierProvider.future);
+
+      when(() => mockService.cancelOnboarding()).thenAnswer((_) async {});
+
+      await container.read(authNotifierProvider.notifier).cancelOnboarding();
+
+      final state = container.read(authNotifierProvider);
+      expect(state.valueOrNull, isNull);
+      verify(() => mockService.cancelOnboarding()).called(1);
+    });
+
+    test('on failure — restores previous state and rethrows AuthFailure',
+        () async {
+      final streamController = StreamController<User?>();
+      final container = buildContainer(
+        mockService: mockService,
+        authStream: streamController.stream,
+      );
+      addTearDown(() {
+        container.dispose();
+        streamController.close();
+      });
+
+      // Start logged in
+      streamController.add(mockUser);
+      await container.read(authNotifierProvider.future);
+
+      when(() => mockService.cancelOnboarding()).thenThrow(
+        const AuthFailure.unknown('requires-recent-login'),
+      );
+
+      await expectLater(
+        () => container.read(authNotifierProvider.notifier).cancelOnboarding(),
+        throwsA(isA<AuthFailure>()),
+      );
+
+      // Previous state restored — user still there
+      final state = container.read(authNotifierProvider);
+      expect(state.valueOrNull, equals(mockUser));
+    });
+  });
+
+  // ---------------------------------------------------------------------------
   // sendPasswordResetEmail
   // ---------------------------------------------------------------------------
   group('AuthNotifier.sendPasswordResetEmail', () {
