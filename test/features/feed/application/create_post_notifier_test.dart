@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -48,19 +50,28 @@ UserProfile _makeProfile({
     );
 
 /// Builds a [ProviderContainer] with the notifier wired up.
+///
+/// If [mockRepo] is provided, its stubs are assumed to be already configured by
+/// the caller — this function does NOT add a default success stub on top of it.
+/// If [mockRepo] is null, a fresh mock with a default success stub is created.
 ProviderContainer _makeContainer({
   String? uid = 'u1',
   UserProfile? Function()? profileFactory,
   MockPostRepository? mockRepo,
 }) {
   final profile = profileFactory != null ? profileFactory() : _makeProfile();
-  final repo = mockRepo ?? MockPostRepository();
 
-  // Default stub: create succeeds
-  when(() => repo.create(any())).thenAnswer((invocation) async {
-    final post = invocation.positionalArguments[0] as Post;
-    return post.copyWith(id: 'generated-id');
-  });
+  final MockPostRepository repo;
+  if (mockRepo != null) {
+    repo = mockRepo;
+  } else {
+    repo = MockPostRepository();
+    // Default stub: create succeeds
+    when(() => repo.create(any())).thenAnswer((invocation) async {
+      final post = invocation.positionalArguments[0] as Post;
+      return post.copyWith(id: 'generated-id');
+    });
+  }
 
   final user = uid != null ? MockUser(uid: uid) : null;
 
@@ -215,6 +226,7 @@ void main() {
 
     setUp(() {
       mockRepo = MockPostRepository();
+      // Stub before passing to _makeContainer so the container uses it as-is.
       when(() => mockRepo.create(any())).thenAnswer((inv) async {
         final post = inv.positionalArguments[0] as Post;
         return post.copyWith(id: 'generated-id');
@@ -324,34 +336,49 @@ void main() {
   });
 
   // ── SCENARIO-228 — isSubmitting blocks double-tap ─────────────────────────
+  //
+  // Strategy: we build a container where auth resolution is slow (Completer).
+  // This means submit() will set isSubmitting=true, then stall on auth.future.
+  // We can then synchronously read state and confirm isSubmitting=true.
 
   group('CreatePostNotifier — isSubmitting guard (SCENARIO-228)', () {
-    late ProviderContainer container;
-    late MockPostRepository mockRepo;
-
-    setUp(() {
-      mockRepo = MockPostRepository();
-      // Slow repo: never resolves during the test pump
-      when(() => mockRepo.create(any()))
-          .thenAnswer((_) => Future.delayed(const Duration(seconds: 10)));
-      container = _makeContainer(mockRepo: mockRepo);
-    });
-
-    tearDown(() => container.dispose());
-
     // SCENARIO-228: while submitting, canSubmit is false (isSubmitting=true)
     test('SCENARIO-228: canSubmit false while isSubmitting', () async {
+      final mockRepo = MockPostRepository();
+      when(() => mockRepo.create(any()))
+          .thenAnswer((_) => Future.delayed(const Duration(seconds: 10)));
+
+      // Use a Completer-backed stream so auth.future NEVER resolves →
+      // submit() hangs at the auth gate, giving us time to read isSubmitting.
+      final authCompleter = Completer<void>();
+      final container = ProviderContainer(
+        overrides: [
+          authStateChangesProvider.overrideWith(
+            (ref) => Stream.fromFuture(authCompleter.future)
+                .map((_) => MockUser(uid: 'u1') as dynamic),
+          ),
+          userProfileProvider.overrideWith(
+            (ref) => Stream.value(_makeProfile()),
+          ),
+          postRepositoryProvider.overrideWithValue(mockRepo),
+          myFriendsFeedProvider.overrideWith((ref) async => const []),
+          feedPublicProvider.overrideWith((ref) async => const []),
+          myGymFeedProvider.overrideWith((ref) async => null),
+        ],
+      );
+      addTearDown(container.dispose);
+
       final notifier = container.read(createPostNotifierProvider.notifier);
       await container.read(createPostNotifierProvider.future);
 
       notifier.setText('Buena sesión!');
 
-      // Start submit without awaiting — it is slow
+      // Start submit — it will set isSubmitting=true then block on auth.future
       // ignore: unawaited_futures
       notifier.submit();
 
-      // Yield to allow state to update
-      await Future<void>.delayed(Duration.zero);
+      // One microtask tick lets submit() run synchronously up to its first await
+      await Future<void>.microtask(() {});
 
       final state = container.read(createPostNotifierProvider).valueOrNull;
       expect(state?.isSubmitting, isTrue);
