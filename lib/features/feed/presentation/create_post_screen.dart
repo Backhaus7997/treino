@@ -26,8 +26,7 @@ class CreatePostScreen extends ConsumerWidget {
 
     return stateAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) =>
-          Center(child: Text('Error: $e')),
+      error: (e, _) => Center(child: Text('Error: $e')),
       data: (state) => _CreatePostBody(state: state, notifier: notifier),
     );
   }

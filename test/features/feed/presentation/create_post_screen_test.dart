@@ -145,7 +145,8 @@ void main() {
   // ── SCENARIO-220 — Form structure ─────────────────────────────────────────
 
   group('SCENARIO-220: form structure', () {
-    testWidgets('SCENARIO-220: renders required form components', (tester) async {
+    testWidgets('SCENARIO-220: renders required form components',
+        (tester) async {
       await tester.pumpWidget(_wrapWithRouter());
       await _openCreatePost(tester);
 
