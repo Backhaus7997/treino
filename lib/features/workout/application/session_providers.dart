@@ -17,8 +17,10 @@ final sessionRepositoryProvider = Provider<SessionRepository>(
 
 /// Fetches all sessions for [uid], ordered by startedAt descending.
 /// Returns an empty list when [uid] is empty/invalid.
+/// autoDispose: refresca al re-mountear (volver al tab Workout tras un
+/// nuevo entreno) sin necesidad de invalidate manual desde el player.
 final sessionsByUidProvider =
-    FutureProvider.family<List<Session>, String>((ref, uid) async {
+    FutureProvider.autoDispose.family<List<Session>, String>((ref, uid) async {
   if (uid.isEmpty) return const [];
   return ref.watch(sessionRepositoryProvider).listByUid(uid);
 });

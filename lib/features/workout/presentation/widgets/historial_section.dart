@@ -39,16 +39,19 @@ class HistorialSection extends ConsumerWidget {
             onRetry: () => ref.invalidate(sessionsByUidProvider(uid)),
           ),
           data: (all) {
-            final finished =
-                all.where((s) => s.status == SessionStatus.finished).toList();
-            if (finished.isEmpty) {
+            final completed = all
+                .where((s) =>
+                    s.status == SessionStatus.finished && s.wasFullyCompleted)
+                .toList();
+            if (completed.isEmpty) {
               return const _ListEmptyState();
             }
             return ListView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
-              itemCount: finished.length,
-              itemBuilder: (context, i) => _HistorialCard(session: finished[i]),
+              itemCount: completed.length,
+              itemBuilder: (context, i) =>
+                  _HistorialCard(session: completed[i]),
             );
           },
         ),
@@ -157,7 +160,7 @@ class _HistorialCard extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 8),
         child: Row(
           children: [
-            _CompletedIcon(wasFullyCompleted: session.wasFullyCompleted),
+            const _CompletedIcon(),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -204,20 +207,11 @@ class _HistorialCard extends StatelessWidget {
 // ── Completed indicator icon ──────────────────────────────────────────────────
 
 class _CompletedIcon extends StatelessWidget {
-  const _CompletedIcon({required this.wasFullyCompleted});
-
-  final bool wasFullyCompleted;
+  const _CompletedIcon();
 
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    if (wasFullyCompleted) {
-      return Icon(TreinoIcon.checkCircleFill, color: palette.accent, size: 20);
-    }
-    return Icon(
-      TreinoIcon.checkCircleEmpty,
-      color: palette.textMuted,
-      size: 20,
-    );
+    return Icon(TreinoIcon.checkCircleFill, color: palette.accent, size: 20);
   }
 }

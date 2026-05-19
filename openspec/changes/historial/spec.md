@@ -80,11 +80,17 @@ client-side filtering.
 
 ---
 
-## REQ-HIST-003 — Client-side filter: status == finished
+## REQ-HIST-003 — Client-side filter: finished AND wasFullyCompleted
 
 `HistorialSection` MUST filter the list returned by `sessionsByUidProvider` and render ONLY sessions
-where `session.status == SessionStatus.finished`.
-Sessions with any other status (e.g. `inProgress`, `abandoned`) MUST NOT appear in the list.
+where `session.status == SessionStatus.finished` AND `session.wasFullyCompleted == true`.
+
+Sessions with any other status (e.g. `inProgress`) MUST NOT appear in the list, AND sessions that
+were finalized by the user without completing all sets (`wasFullyCompleted: false`) MUST NOT appear
+in the list either. They remain in Firestore (not deleted) but are not surfaced to the user as
+historial entries. This is an explicit product decision (2026-05-19): users want a clean record of
+completed sessions, not partial/interrupted ones.
+
 No new repository method is added; filtering is entirely client-side.
 
 #### SCENARIO-357: non-finished sessions are excluded from the list
@@ -92,7 +98,7 @@ No new repository method is added; filtering is entirely client-side.
 - GIVEN `sessionsByUidProvider` returns three sessions:
   one with `status: SessionStatus.finished` and `routineName: 'Push'`,
   one with `status: SessionStatus.inProgress` and `routineName: 'Pull'`,
-  one with `status: SessionStatus.abandoned` and `routineName: 'Legs'`
+  one with `status: SessionStatus.active` and `routineName: 'Legs'`
 - WHEN `HistorialSection` renders
 - THEN only 'Push' is visible
 - AND 'Pull' and 'Legs' are not present in the widget tree
@@ -110,8 +116,9 @@ No new repository method is added; filtering is entirely client-side.
 
 Each session card MUST display all of the following fields:
 
-1. `wasFullyCompleted` visual indicator: a distinct icon/checkmark when `true`, a different
-   icon/style when `false`. Both states MUST be visually distinguishable.
+1. A completed visual indicator (e.g. filled checkmark icon). Since the list only shows
+   `wasFullyCompleted == true` sessions (per REQ-HIST-003), the indicator is constant — no
+   distinct "abandoned" variant is rendered in this etapa.
 2. `routineName` as card title text.
 3. Relative date in the format produced by `formatSessionDate` (e.g. `"Mié 27 nov"`).
 4. `totalVolumeKg` numeric value with unit label.
@@ -128,14 +135,14 @@ The card MUST NOT display set count (avoids N+1 load on the list).
 - THEN the text 'Push A' is visible in the widget tree
 - AND the text '4.5' (or equivalent formatted string) is visible
 - AND the text '48' (or equivalent formatted string) is visible
-- AND a widget representing `wasFullyCompleted == true` is present
+- AND a completed indicator widget is present
 
-#### SCENARIO-360: card shows different indicator for wasFullyCompleted == false
+#### SCENARIO-360: abandoned sessions are filtered out
 
-- GIVEN a finished session with `wasFullyCompleted: false`
-- WHEN `HistorialSection` renders the card
-- THEN the widget tree contains a completion indicator that differs from the `wasFullyCompleted: true` case
-- AND no green checkmark (or equivalent "complete" icon) is shown
+- GIVEN a finished session with `wasFullyCompleted: true` AND a finished session with `wasFullyCompleted: false`
+- WHEN `HistorialSection` renders
+- THEN only the `wasFullyCompleted: true` card appears
+- AND the `wasFullyCompleted: false` card is absent from the widget tree
 
 ---
 

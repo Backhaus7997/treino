@@ -181,9 +181,9 @@ void main() {
       expect(find.textContaining('45'), findsOneWidget);
     });
 
-    // SCENARIO-360: wasFullyCompleted indicators differ
+    // SCENARIO-360: abandoned sessions (wasFullyCompleted=false) are filtered out
     testWidgets(
-        'SCENARIO-360: wasFullyCompleted=false shows different indicator than true',
+        'SCENARIO-360: abandoned sessions (wasFullyCompleted=false) are filtered out',
         (tester) async {
       final completed = _makeSession(
         id: 's-comp',
@@ -198,15 +198,9 @@ void main() {
       await _pumpHistorialSection(tester, sessions: [completed, abandoned]);
       await tester.pumpAndSettle();
 
-      // Both cards appear
+      // Only the completed session appears
       expect(find.text('Push A'), findsOneWidget);
-      expect(find.text('Pull B'), findsOneWidget);
-
-      // The icon data for completed vs abandoned must differ
-      final icons = tester.widgetList<Icon>(find.byType(Icon)).toList();
-      final iconDatas = icons.map((i) => i.icon).toSet();
-      // At least 2 distinct icon variants (completed vs abandoned)
-      expect(iconDatas.length, greaterThanOrEqualTo(2));
+      expect(find.text('Pull B'), findsNothing);
     });
 
     // SCENARIO-361: empty list renders empty message + CTA button
