@@ -113,6 +113,19 @@ class SessionRepository {
     return withId;
   }
 
+  // ─── updateSetLog ───────────────────────────────────────────────────────
+
+  /// Overwrites an existing SetLog doc with new values. Used by the inline
+  /// edit flow when the user changes reps/weight of a set that was already
+  /// logged. The doc id MUST be the existing one (no new doc is created).
+  Future<void> updateSetLog({
+    required String uid,
+    required String sessionId,
+    required SetLog setLog,
+  }) async {
+    await _setLogs(uid, sessionId).doc(setLog.id).set(setLog.toJson());
+  }
+
   // ─── listSetLogs ────────────────────────────────────────────────────────
 
   Future<List<SetLog>> listSetLogs({
