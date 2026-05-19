@@ -305,7 +305,7 @@ void main() {
       );
     });
 
-    testWidgets('SCENARIO-090: two CTAs EDITAR and EMPEZAR with onPressed null',
+    testWidgets('SCENARIO-313: EMPEZAR habilitado, EDITAR sigue deshabilitado',
         (tester) async {
       await tester.pumpWidget(_wrapWithOverrides(
         const RoutineDetailScreen(routineId: 'test-id'),
@@ -322,11 +322,10 @@ void main() {
       final empezarBtn = tester.widget<ElevatedButton>(
           find.widgetWithText(ElevatedButton, 'EMPEZAR'));
       expect(editarBtn.onPressed, isNull);
-      expect(empezarBtn.onPressed, isNull);
+      expect(empezarBtn.onPressed, isNotNull);
     });
 
-    testWidgets(
-        'SCENARIO-091: tapping disabled CTAs causes no exception and no navigation',
+    testWidgets('SCENARIO-315: tap en EDITAR es no-op (stub, no excepción)',
         (tester) async {
       await tester.pumpWidget(_wrapWithOverrides(
         const RoutineDetailScreen(routineId: 'test-id'),
@@ -337,12 +336,13 @@ void main() {
       ));
       await tester.pump(const Duration(milliseconds: 50));
       await tester.tap(find.text('EDITAR'), warnIfMissed: false);
-      await tester.tap(find.text('EMPEZAR'), warnIfMissed: false);
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('SCENARIO-092: CTAs wrapped in Opacity(0.4)', (tester) async {
+    testWidgets(
+        'SCENARIO-092: EDITAR sigue envuelto en Opacity(0.4); EMPEZAR no',
+        (tester) async {
       await tester.pumpWidget(_wrapWithOverrides(
         const RoutineDetailScreen(routineId: 'test-id'),
         [
@@ -356,6 +356,44 @@ void main() {
           .where((o) => (o.opacity - 0.4).abs() < 0.01)
           .toList();
       expect(opacityWidgets, isNotEmpty);
+    });
+
+    testWidgets(
+        'SCENARIO-314: tap en EMPEZAR pushea /workout/session/{id}/{day}',
+        (tester) async {
+      String? pushedLocation;
+      final router = GoRouter(routes: [
+        GoRoute(
+          path: '/',
+          builder: (_, __) => const RoutineDetailScreen(routineId: 'test-id'),
+        ),
+        GoRoute(
+          path: '/workout/session/:routineId/:dayNumber',
+          builder: (_, state) {
+            pushedLocation = state.matchedLocation;
+            return const Scaffold(body: Center(child: Text('session-stub')));
+          },
+        ),
+      ]);
+      await tester.pumpWidget(ProviderScope(
+        overrides: [
+          routineByIdProvider('test-id').overrideWith(
+            (ref) async => _makeRoutine(
+              days: [_makeDay(dayNumber: 4)],
+            ),
+          ),
+        ],
+        child: MaterialApp.router(
+          theme: AppTheme.dark(),
+          routerConfig: router,
+        ),
+      ));
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.ensureVisible(find.text('EMPEZAR'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('EMPEZAR'));
+      await tester.pumpAndSettle();
+      expect(pushedLocation, equals('/workout/session/test-id/4'));
     });
 
     testWidgets(

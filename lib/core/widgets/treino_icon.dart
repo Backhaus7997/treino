@@ -81,4 +81,8 @@ class TreinoIcon {
 
   // Gym / spaces
   static const IconData gym = PhosphorIconsRegular.buildings;
+
+  // Session player
+  static const IconData checkCircleFill = PhosphorIconsFill.checkCircle;
+  static const IconData checkCircleEmpty = PhosphorIconsRegular.circle;
 }
