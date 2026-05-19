@@ -1,0 +1,253 @@
+// coverage:ignore-file
+// GENERATED CODE - DO NOT MODIFY BY HAND
+// ignore_for_file: type=lint
+// ignore_for_file: unused_element, deprecated_member_use, deprecated_member_use_from_same_package, use_function_type_syntax_for_parameters, unnecessary_const, avoid_init_to_null, invalid_override_different_default_values_named, prefer_expression_function_bodies, annotate_overrides, invalid_annotation_target, unnecessary_question_mark
+
+part of 'user_public_profile.dart';
+
+// **************************************************************************
+// FreezedGenerator
+// **************************************************************************
+
+T _$identity<T>(T value) => value;
+
+final _privateConstructorUsedError = UnsupportedError(
+    'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models');
+
+UserPublicProfile _$UserPublicProfileFromJson(Map<String, dynamic> json) {
+  return _UserPublicProfile.fromJson(json);
+}
+
+/// @nodoc
+mixin _$UserPublicProfile {
+  String get uid => throw _privateConstructorUsedError;
+  String? get displayName => throw _privateConstructorUsedError;
+  String? get displayNameLowercase => throw _privateConstructorUsedError;
+  String? get avatarUrl => throw _privateConstructorUsedError;
+  String? get gymId => throw _privateConstructorUsedError;
+
+  /// Serializes this UserPublicProfile to a JSON map.
+  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
+
+  /// Create a copy of UserPublicProfile
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  $UserPublicProfileCopyWith<UserPublicProfile> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+
+/// @nodoc
+abstract class $UserPublicProfileCopyWith<$Res> {
+  factory $UserPublicProfileCopyWith(
+          UserPublicProfile value, $Res Function(UserPublicProfile) then) =
+      _$UserPublicProfileCopyWithImpl<$Res, UserPublicProfile>;
+  @useResult
+  $Res call(
+      {String uid,
+      String? displayName,
+      String? displayNameLowercase,
+      String? avatarUrl,
+      String? gymId});
+}
+
+/// @nodoc
+class _$UserPublicProfileCopyWithImpl<$Res, $Val extends UserPublicProfile>
+    implements $UserPublicProfileCopyWith<$Res> {
+  _$UserPublicProfileCopyWithImpl(this._value, this._then);
+
+  // ignore: unused_field
+  final $Val _value;
+  // ignore: unused_field
+  final $Res Function($Val) _then;
+
+  /// Create a copy of UserPublicProfile
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? uid = null,
+    Object? displayName = freezed,
+    Object? displayNameLowercase = freezed,
+    Object? avatarUrl = freezed,
+    Object? gymId = freezed,
+  }) {
+    return _then(_value.copyWith(
+      uid: null == uid
+          ? _value.uid
+          : uid // ignore: cast_nullable_to_non_nullable
+              as String,
+      displayName: freezed == displayName
+          ? _value.displayName
+          : displayName // ignore: cast_nullable_to_non_nullable
+              as String?,
+      displayNameLowercase: freezed == displayNameLowercase
+          ? _value.displayNameLowercase
+          : displayNameLowercase // ignore: cast_nullable_to_non_nullable
+              as String?,
+      avatarUrl: freezed == avatarUrl
+          ? _value.avatarUrl
+          : avatarUrl // ignore: cast_nullable_to_non_nullable
+              as String?,
+      gymId: freezed == gymId
+          ? _value.gymId
+          : gymId // ignore: cast_nullable_to_non_nullable
+              as String?,
+    ) as $Val);
+  }
+}
+
+/// @nodoc
+abstract class _$$UserPublicProfileImplCopyWith<$Res>
+    implements $UserPublicProfileCopyWith<$Res> {
+  factory _$$UserPublicProfileImplCopyWith(_$UserPublicProfileImpl value,
+          $Res Function(_$UserPublicProfileImpl) then) =
+      __$$UserPublicProfileImplCopyWithImpl<$Res>;
+  @override
+  @useResult
+  $Res call(
+      {String uid,
+      String? displayName,
+      String? displayNameLowercase,
+      String? avatarUrl,
+      String? gymId});
+}
+
+/// @nodoc
+class __$$UserPublicProfileImplCopyWithImpl<$Res>
+    extends _$UserPublicProfileCopyWithImpl<$Res, _$UserPublicProfileImpl>
+    implements _$$UserPublicProfileImplCopyWith<$Res> {
+  __$$UserPublicProfileImplCopyWithImpl(_$UserPublicProfileImpl _value,
+      $Res Function(_$UserPublicProfileImpl) _then)
+      : super(_value, _then);
+
+  /// Create a copy of UserPublicProfile
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? uid = null,
+    Object? displayName = freezed,
+    Object? displayNameLowercase = freezed,
+    Object? avatarUrl = freezed,
+    Object? gymId = freezed,
+  }) {
+    return _then(_$UserPublicProfileImpl(
+      uid: null == uid
+          ? _value.uid
+          : uid // ignore: cast_nullable_to_non_nullable
+              as String,
+      displayName: freezed == displayName
+          ? _value.displayName
+          : displayName // ignore: cast_nullable_to_non_nullable
+              as String?,
+      displayNameLowercase: freezed == displayNameLowercase
+          ? _value.displayNameLowercase
+          : displayNameLowercase // ignore: cast_nullable_to_non_nullable
+              as String?,
+      avatarUrl: freezed == avatarUrl
+          ? _value.avatarUrl
+          : avatarUrl // ignore: cast_nullable_to_non_nullable
+              as String?,
+      gymId: freezed == gymId
+          ? _value.gymId
+          : gymId // ignore: cast_nullable_to_non_nullable
+              as String?,
+    ));
+  }
+}
+
+/// @nodoc
+@JsonSerializable()
+class _$UserPublicProfileImpl implements _UserPublicProfile {
+  const _$UserPublicProfileImpl(
+      {required this.uid,
+      this.displayName,
+      this.displayNameLowercase,
+      this.avatarUrl,
+      this.gymId});
+
+  factory _$UserPublicProfileImpl.fromJson(Map<String, dynamic> json) =>
+      _$$UserPublicProfileImplFromJson(json);
+
+  @override
+  final String uid;
+  @override
+  final String? displayName;
+  @override
+  final String? displayNameLowercase;
+  @override
+  final String? avatarUrl;
+  @override
+  final String? gymId;
+
+  @override
+  String toString() {
+    return 'UserPublicProfile(uid: $uid, displayName: $displayName, displayNameLowercase: $displayNameLowercase, avatarUrl: $avatarUrl, gymId: $gymId)';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$UserPublicProfileImpl &&
+            (identical(other.uid, uid) || other.uid == uid) &&
+            (identical(other.displayName, displayName) ||
+                other.displayName == displayName) &&
+            (identical(other.displayNameLowercase, displayNameLowercase) ||
+                other.displayNameLowercase == displayNameLowercase) &&
+            (identical(other.avatarUrl, avatarUrl) ||
+                other.avatarUrl == avatarUrl) &&
+            (identical(other.gymId, gymId) || other.gymId == gymId));
+  }
+
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  int get hashCode => Object.hash(
+      runtimeType, uid, displayName, displayNameLowercase, avatarUrl, gymId);
+
+  /// Create a copy of UserPublicProfile
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$UserPublicProfileImplCopyWith<_$UserPublicProfileImpl> get copyWith =>
+      __$$UserPublicProfileImplCopyWithImpl<_$UserPublicProfileImpl>(
+          this, _$identity);
+
+  @override
+  Map<String, dynamic> toJson() {
+    return _$$UserPublicProfileImplToJson(
+      this,
+    );
+  }
+}
+
+abstract class _UserPublicProfile implements UserPublicProfile {
+  const factory _UserPublicProfile(
+      {required final String uid,
+      final String? displayName,
+      final String? displayNameLowercase,
+      final String? avatarUrl,
+      final String? gymId}) = _$UserPublicProfileImpl;
+
+  factory _UserPublicProfile.fromJson(Map<String, dynamic> json) =
+      _$UserPublicProfileImpl.fromJson;
+
+  @override
+  String get uid;
+  @override
+  String? get displayName;
+  @override
+  String? get displayNameLowercase;
+  @override
+  String? get avatarUrl;
+  @override
+  String? get gymId;
+
+  /// Create a copy of UserPublicProfile
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$UserPublicProfileImplCopyWith<_$UserPublicProfileImpl> get copyWith =>
+      throw _privateConstructorUsedError;
+}
