@@ -136,19 +136,48 @@ class SessionNotifier
     final uid = ref.read(currentUidProvider);
     if (uid == null) return;
 
-    await repo.addSetLog(
+    // El repo asigna el id de Firestore al doc y devuelve el SetLog
+    // persisted — usamos ese para que `updateSet` futuro pueda referirse
+    // por id (sino el log local quedaría con id=''').
+    final persisted = await repo.addSetLog(
       uid: uid,
       sessionId: current.session.id,
       setLog: setLog,
     );
 
-    final newLogs = [...current.setLogs, setLog];
+    final newLogs = [...current.setLogs, persisted];
     final newIndex = _nextIncompleteIndex(current.day, newLogs);
 
     state = AsyncData(current.copyWith(
       setLogs: newLogs,
       currentExerciseIndex: newIndex,
     ));
+  }
+
+  /// Actualiza un set ya logueado con nuevos reps/peso. Llamado por el
+  /// flow de edición inline cuando el usuario corrige una fila done.
+  /// [updated] debe traer el id existente en Firestore.
+  Future<void> updateSet(SetLog updated) async {
+    final current = state.value;
+    if (current == null || _finalized) return;
+    if (updated.id.isEmpty) {
+      throw StateError('updateSet requires an existing SetLog id');
+    }
+
+    final repo = ref.read(sessionRepositoryProvider);
+    final uid = ref.read(currentUidProvider);
+    if (uid == null) return;
+
+    await repo.updateSetLog(
+      uid: uid,
+      sessionId: current.session.id,
+      setLog: updated,
+    );
+
+    final newLogs = current.setLogs
+        .map((l) => l.id == updated.id ? updated : l)
+        .toList(growable: false);
+    state = AsyncData(current.copyWith(setLogs: newLogs));
   }
 
   Future<void> abandonSession() async {

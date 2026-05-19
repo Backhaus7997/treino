@@ -35,14 +35,12 @@ class SetEntrySheet extends StatefulWidget {
 class _SetEntrySheetState extends State<SetEntrySheet> {
   late int _reps;
   late double _weight;
-  late int _currentSetNumber;
 
   @override
   void initState() {
     super.initState();
     _reps = widget.slot.targetRepsMin;
     _weight = widget.slot.targetWeightKg ?? 0.0;
-    _currentSetNumber = widget.setNumber;
   }
 
   void _incReps() => setState(() => _reps = (_reps + 1).clamp(0, 50));
@@ -53,15 +51,11 @@ class _SetEntrySheetState extends State<SetEntrySheet> {
       setState(() => _weight = (_weight - 2.5).clamp(0.0, 500.0));
 
   void _onCheckTap() {
+    // Editor de un único set: aplicar los valores actuales al callback y
+    // cerrar. La lista del player tiene filas inline por set, así que el
+    // sheet nunca auto-avanza — cada set se loguea desde su propia fila.
     widget.onCheck(_reps, _weight);
-    // Si era la última serie del ejercicio, cerramos la hoja.
-    // Si quedan series por hacer, avanzamos el contador y dejamos los
-    // valores actuales como defaults del próximo set (carry-over).
-    if (_currentSetNumber >= widget.slot.targetSets) {
-      Navigator.of(context).pop();
-    } else {
-      setState(() => _currentSetNumber++);
-    }
+    Navigator.of(context).pop();
   }
 
   void _showTechniqueModal() {
@@ -71,7 +65,7 @@ class _SetEntrySheetState extends State<SetEntrySheet> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _TechniqueSheet(
+      builder: (_) => TechniqueSheet(
         exerciseName: widget.slot.exerciseName,
         instructions: instructions,
         videoUrl: widget.videoUrl,
@@ -144,7 +138,7 @@ class _SetEntrySheetState extends State<SetEntrySheet> {
           const SizedBox(height: 8),
           // Subtítulo set progress
           Text(
-            'SET $_currentSetNumber DE ${widget.slot.targetSets}',
+            'SET ${widget.setNumber} DE ${widget.slot.targetSets}',
             style: GoogleFonts.barlowCondensed(
               fontWeight: FontWeight.w600,
               fontSize: 12,
@@ -292,12 +286,14 @@ class _StepperButton extends StatelessWidget {
   }
 }
 
-// ── _TechniqueSheet ──────────────────────────────────────────────────────────
+// ── TechniqueSheet ──────────────────────────────────────────────────────────
 
 /// Hoja anidada con la técnica del ejercicio + placeholder de video.
-/// Se abre desde el botón ⓘ de la SetEntrySheet y la deja activa debajo.
-class _TechniqueSheet extends StatelessWidget {
-  const _TechniqueSheet({
+/// Se abre desde el botón ⓘ del header de la sección de ejercicio
+/// (anteriormente vivía sobre la SetEntrySheet).
+class TechniqueSheet extends StatelessWidget {
+  const TechniqueSheet({
+    super.key,
     required this.exerciseName,
     required this.instructions,
     this.videoUrl,
