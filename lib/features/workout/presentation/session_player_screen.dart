@@ -173,37 +173,38 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: 20),
                       physics: const ClampingScrollPhysics(),
                       children: [
-                      const SizedBox(height: 12),
-                      const _AttendanceCard(),
-                      const SizedBox(height: 14),
-                      _SessionStatsCard(state: state),
-                      const SizedBox(height: 20),
-                      const _SectionLabel('EJERCICIOS'),
-                      const SizedBox(height: 12),
-                      ...state.day.slots.expand((slot) {
-                        final logsForExercise = state.setLogs
-                            .where((l) => l.exerciseId == slot.exerciseId)
-                            .toList()
-                          ..sort((a, b) => a.setNumber.compareTo(b.setNumber));
-                        final exerciseAsync =
-                            ref.watch(exerciseByIdProvider(slot.exerciseId));
-                        return [
-                          _ExerciseSection(
-                            slot: slot,
-                            logsForExercise: logsForExercise,
-                            techniqueInstructions: exerciseAsync
-                                .valueOrNull?.techniqueInstructions,
-                            videoUrl: exerciseAsync.valueOrNull?.videoUrl,
-                            onSetCheck: (setNumber, reps, weightKg) =>
-                                _logSet(slot, setNumber, reps, weightKg),
-                            onSetUpdate: (existing, reps, weightKg) =>
-                                _updateSet(existing, reps, weightKg),
-                          ),
-                          const SizedBox(height: 14),
-                        ];
-                      }),
-                      const SizedBox(height: 20),
-                    ],
+                        const SizedBox(height: 12),
+                        const _AttendanceCard(),
+                        const SizedBox(height: 14),
+                        _SessionStatsCard(state: state),
+                        const SizedBox(height: 20),
+                        const _SectionLabel('EJERCICIOS'),
+                        const SizedBox(height: 12),
+                        ...state.day.slots.expand((slot) {
+                          final logsForExercise = state.setLogs
+                              .where((l) => l.exerciseId == slot.exerciseId)
+                              .toList()
+                            ..sort(
+                                (a, b) => a.setNumber.compareTo(b.setNumber));
+                          final exerciseAsync =
+                              ref.watch(exerciseByIdProvider(slot.exerciseId));
+                          return [
+                            _ExerciseSection(
+                              slot: slot,
+                              logsForExercise: logsForExercise,
+                              techniqueInstructions: exerciseAsync
+                                  .valueOrNull?.techniqueInstructions,
+                              videoUrl: exerciseAsync.valueOrNull?.videoUrl,
+                              onSetCheck: (setNumber, reps, weightKg) =>
+                                  _logSet(slot, setNumber, reps, weightKg),
+                              onSetUpdate: (existing, reps, weightKg) =>
+                                  _updateSet(existing, reps, weightKg),
+                            ),
+                            const SizedBox(height: 14),
+                          ];
+                        }),
+                        const SizedBox(height: 20),
+                      ],
                     ),
                   ),
                 ),
