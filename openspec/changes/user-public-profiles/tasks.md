@@ -145,50 +145,50 @@ Resolved: Query normalization (toLowercase) happens INSIDE `searchUsersProvider`
 
 ### Phase B1: Setup + Branch Cut
 
-- [ ] B1.1 Confirm PR#A is merged to `main`. Pull latest main: `git checkout main && git pull`.
-- [ ] B1.2 Cut new branch: `git checkout -b feat/user-public-profiles-search`.
-- [ ] B1.3 Run `flutter test` to confirm clean baseline (expect ~699 from PR#A).
+- [x] B1.1 Confirm PR#A is merged to `main`. Pull latest main: `git checkout main && git pull`.
+- [x] B1.2 Cut new branch: `git checkout -b feat/user-public-profiles-search`.
+- [x] B1.3 Run `flutter test` to confirm clean baseline (expect ~699 from PR#A).
 
 ### Phase B2: Cherry-Pick Adaptation Checklist
 
-- [ ] B2.1 Read deprecated branch files: `git show wip/feed-search-users-deprecated:lib/features/feed/presentation/search_users_screen.dart`, same for tile and provider. Do NOT checkout — read only.
-- [ ] B2.2 Plan adaptations: `UserProfile` → `UserPublicProfile`, `userRepositoryProvider` → `userPublicProfileRepositoryProvider`, fixtures from `users/...` → `userPublicProfiles/...`.
-- [ ] B2.3 **ENFORCEMENT GATE**: After creating all new PR#B files (B3–B5), run: `rg "UserProfile\b|userRepositoryProvider|bodyWeightKg|heightCm|\bgender\b|\bemail\b|\brole\b|\bbornAt\b" lib/features/feed/presentation/search_users_screen.dart lib/features/feed/presentation/widgets/user_search_result_tile.dart lib/features/feed/application/search_users_provider.dart` → MUST return 0 matches. Block PR#B merge if any match found.
+- [x] B2.1 Read deprecated branch files: `git show wip/feed-search-users-deprecated:lib/features/feed/presentation/search_users_screen.dart`, same for tile and provider. Do NOT checkout — read only.
+- [x] B2.2 Plan adaptations: `UserProfile` → `UserPublicProfile`, `userRepositoryProvider` → `userPublicProfileRepositoryProvider`, fixtures from `users/...` → `userPublicProfiles/...`.
+- [x] B2.3 **ENFORCEMENT GATE**: After creating all new PR#B files (B3–B5), run: `rg "UserProfile\b|userRepositoryProvider|bodyWeightKg|heightCm|\bgender\b|\bemail\b|\brole\b|\bbornAt\b" lib/features/feed/presentation/search_users_screen.dart lib/features/feed/presentation/widgets/user_search_result_tile.dart lib/features/feed/application/search_users_provider.dart` → MUST return 0 matches. Block PR#B merge if any match found.
 
 ### Phase B3: searchUsersProvider (RED → GREEN)
 
-- [ ] B3.1 **RED**: Create `test/features/feed/application/search_users_provider_test.dart`. Tests: SCENARIO-275 (delegates to repo), SCENARIO-276 (blank query → []), SCENARIO-277 (1 char → []), SCENARIO-278 (normalization in provider — 'MAR' and 'mar' normalize to same key), SCENARIO-279 (no matches → []), SCENARIO-280 (repo error → AsyncError). Commit tests. Tests MUST fail.
-- [ ] B3.2 **GREEN**: Create `lib/features/feed/application/search_users_provider.dart`. `FutureProvider.autoDispose.family<List<UserPublicProfile>, String>`. Normalize key to lowercase INSIDE provider. 2-char minimum gate. Delegate to `userPublicProfileRepositoryProvider.searchByDisplayName`. Commit. Tests MUST pass.
-- [ ] B3.3 Covers: REQ-UPS-006, REQ-UPS-007, SCENARIO-275..280. Risk 3 resolved: normalization in provider, not screen.
+- [x] B3.1 **RED**: Create `test/features/feed/application/search_users_provider_test.dart`. Tests: SCENARIO-275 (delegates to repo), SCENARIO-276 (blank query → []), SCENARIO-277 (1 char → []), SCENARIO-278 (normalization in provider — 'MAR' and 'mar' normalize to same key), SCENARIO-279 (no matches → []), SCENARIO-280 (repo error → AsyncError). Commit tests. Tests MUST fail.
+- [x] B3.2 **GREEN**: Create `lib/features/feed/application/search_users_provider.dart`. `FutureProvider.autoDispose.family<List<UserPublicProfile>, String>`. Normalize key to lowercase INSIDE provider. 2-char minimum gate. Delegate to `userPublicProfileRepositoryProvider.searchByDisplayName`. Commit. Tests MUST pass.
+- [x] B3.3 Covers: REQ-UPS-006, REQ-UPS-007, SCENARIO-275..280. Risk 3 resolved: normalization in provider, not screen.
 
 ### Phase B4: UserSearchResultTile (RED → GREEN)
 
-- [ ] B4.1 **RED**: Create `test/features/feed/presentation/user_search_result_tile_test.dart`. Tests: SCENARIO-281 (renders avatar + displayName + gymName), SCENARIO-282 (null displayName no crash), SCENARIO-283 (tap → context.push('/feed/profile/u1')), SCENARIO-284 (no follow button), SCENARIO-285 (null gymId → blank, no crash). Commit tests. Tests MUST fail.
-- [ ] B4.2 **GREEN**: Create `lib/features/feed/presentation/widgets/user_search_result_tile.dart`. StatelessWidget. Avatar 32px via `PostAvatar`. Display `displayName` and gym name via `gymNameFromId`. Tap calls `context.push('/feed/profile/$uid')`. `AppPalette.of(context)` for colors. `TreinoIcon.*` for icons. No follow button. Commit. Tests MUST pass.
-- [ ] B4.3 Covers: REQ-UPS-008, REQ-UPS-009, REQ-UPS-010, SCENARIO-281..285.
+- [x] B4.1 **RED**: Create `test/features/feed/presentation/user_search_result_tile_test.dart`. Tests: SCENARIO-281 (renders avatar + displayName + gymName), SCENARIO-282 (null displayName no crash), SCENARIO-283 (tap → context.push('/feed/profile/u1')), SCENARIO-284 (no follow button), SCENARIO-285 (null gymId → blank, no crash). Commit tests. Tests MUST fail.
+- [x] B4.2 **GREEN**: Create `lib/features/feed/presentation/widgets/user_search_result_tile.dart`. StatelessWidget. Avatar 32px via `PostAvatar`. Display `displayName` and gym name via `gymNameFromId`. Tap calls `context.push('/feed/profile/$uid')`. `AppPalette.of(context)` for colors. `TreinoIcon.*` for icons. No follow button. Commit. Tests MUST pass.
+- [x] B4.3 Covers: REQ-UPS-008, REQ-UPS-009, REQ-UPS-010, SCENARIO-281..285.
 
 ### Phase B5: SearchUsersScreen (RED → GREEN)
 
-- [ ] B5.1 **RED**: Create `test/features/feed/presentation/search_users_screen_test.dart`. Tests: SCENARIO-286 (initial empty prompt), SCENARIO-287 (1-char still shows empty prompt), SCENARIO-288 (loading → CircularProgressIndicator with palette.accent color), SCENARIO-289 (data → ListView with 3 tiles), SCENARIO-290 (empty results message contains query), SCENARIO-291 (error text visible), SCENARIO-292 (clear button appears when non-empty), SCENARIO-293 (clear resets field), SCENARIO-294 (back arrow pops navigator), SCENARIO-295 (header shows 'BUSCAR USUARIOS'). Commit tests. Tests MUST fail.
-- [ ] B5.2 **GREEN**: Create `lib/features/feed/presentation/search_users_screen.dart`. `ConsumerStatefulWidget`. Local state: `TextEditingController`, debounce `Timer` (300 ms), `query` string. State machine: INITIAL → TYPING_BELOW_MIN → LOADING → {DATA, EMPTY_RESULTS, ERROR}. Header with back arrow + 'BUSCAR USUARIOS'. `FeedEmptyState` for initial and below-min states. `CircularProgressIndicator` (palette.accent) for loading. `ListView.separated` with 8 px separators for data. `FeedEmptyState` for empty results. Error text for error state. Does NOT add its own `Scaffold` (uses `_ShellScaffold`). Commit. Tests MUST pass.
-- [ ] B5.3 Covers: REQ-UPS-001, REQ-UPS-002, REQ-UPS-003, REQ-UPS-004, REQ-UPS-005, REQ-UPS-011, REQ-UPS-012, REQ-UPS-013, REQ-UPS-014, SCENARIO-286..295.
+- [x] B5.1 **RED**: Create `test/features/feed/presentation/search_users_screen_test.dart`. Tests: SCENARIO-286 (initial empty prompt), SCENARIO-287 (1-char still shows empty prompt), SCENARIO-288 (loading → CircularProgressIndicator with palette.accent color), SCENARIO-289 (data → ListView with 3 tiles), SCENARIO-290 (empty results message contains query), SCENARIO-291 (error text visible), SCENARIO-292 (clear button appears when non-empty), SCENARIO-293 (clear resets field), SCENARIO-294 (back arrow pops navigator), SCENARIO-295 (header shows 'BUSCAR USUARIOS'). Commit tests. Tests MUST fail.
+- [x] B5.2 **GREEN**: Create `lib/features/feed/presentation/search_users_screen.dart`. `ConsumerStatefulWidget`. Local state: `TextEditingController`, debounce `Timer` (300 ms), `query` string. State machine: INITIAL → TYPING_BELOW_MIN → LOADING → {DATA, EMPTY_RESULTS, ERROR}. Header with back arrow + 'BUSCAR USUARIOS'. `FeedEmptyState` for initial and below-min states. `CircularProgressIndicator` (palette.accent) for loading. `ListView.separated` with 8 px separators for data. `FeedEmptyState` for empty results. Error text for error state. Does NOT add its own `Scaffold` (uses `_ShellScaffold`). Commit. Tests MUST pass.
+- [x] B5.3 Covers: REQ-UPS-001, REQ-UPS-002, REQ-UPS-003, REQ-UPS-004, REQ-UPS-005, REQ-UPS-011, REQ-UPS-012, REQ-UPS-013, REQ-UPS-014, SCENARIO-286..295.
 
 ### Phase B6: Integration — Feed Header + Router
 
-- [ ] B6.1 Wrap search icon in `_FeedHeader` inside a `GestureDetector` that calls `context.push('/feed/search')` in `lib/features/feed/feed_screen.dart`. Commit.
-- [ ] B6.2 Add `GoRoute(path: 'search', builder: (_, __) => const SearchUsersScreen())` nested under the `/feed` `ShellRoute` in `lib/app/router.dart`. Commit.
-- [ ] B6.3 Covers: REQ-UPS-015, REQ-UPS-016, SCENARIO-296, SCENARIO-297.
+- [x] B6.1 Wrap search icon in `_FeedHeader` inside a `GestureDetector` that calls `context.push('/feed/search')` in `lib/features/feed/feed_screen.dart`. Commit.
+- [x] B6.2 Add `GoRoute(path: 'search', builder: (_, __) => const SearchUsersScreen())` nested under the `/feed` `ShellRoute` in `lib/app/router.dart`. Commit.
+- [x] B6.3 Covers: REQ-UPS-015, REQ-UPS-016, SCENARIO-296, SCENARIO-297.
 
 ### Phase B7: Privacy Enforcement Gate
 
-- [ ] B7.1 Run the `rg` enforcement command from B2.3 against all three new PR#B production files. MUST return 0 matches. Document result. Block merge if any match found.
+- [x] B7.1 Run the `rg` enforcement command from B2.3 against all three new PR#B production files. MUST return 0 matches. Document result. Block merge if any match found.
 
 ### Phase B8: Quality Gates
 
-- [ ] B8.1 Run `flutter analyze` → 0 issues.
-- [ ] B8.2 Run `dart format --output=none --set-exit-if-changed .` → 0 changed files.
-- [ ] B8.3 Run `flutter test` → all passing. Expected: ~699 (PR#A) + ~24 new PR#B tests = ~723 total.
-- [ ] B8.4 Cross-cutting constraints: `rg "PhosphorIcons\." lib/features/feed/presentation/search_users_screen.dart lib/features/feed/presentation/widgets/user_search_result_tile.dart lib/features/feed/application/search_users_provider.dart` → 0 matches.
+- [x] B8.1 Run `flutter analyze` → 0 issues.
+- [x] B8.2 Run `dart format --output=none --set-exit-if-changed .` → 0 changed files.
+- [x] B8.3 Run `flutter test` → all passing. 733 total (711 baseline + 22 new PR#B tests).
+- [x] B8.4 Cross-cutting constraints: `rg "PhosphorIcons\." lib/features/feed/presentation/search_users_screen.dart lib/features/feed/presentation/widgets/user_search_result_tile.dart lib/features/feed/application/search_users_provider.dart` → 0 matches.
 
 ### Phase B9: Manual Smoke Test (MANDATORY pre-merge)
 
