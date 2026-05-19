@@ -59,7 +59,11 @@ class _FeedHeader extends StatelessWidget {
             ),
           ),
           const Spacer(),
-          Icon(TreinoIcon.search, size: 20, color: palette.textMuted),
+          GestureDetector(
+            onTap: () => context.push('/feed/search'),
+            behavior: HitTestBehavior.opaque,
+            child: Icon(TreinoIcon.search, size: 20, color: palette.textMuted),
+          ),
           const SizedBox(width: 18),
           GestureDetector(
             onTap: () => context.push('/feed/create'),

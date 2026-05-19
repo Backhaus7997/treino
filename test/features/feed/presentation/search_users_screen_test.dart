@@ -6,7 +6,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
-import 'package:treino/features/feed/application/search_users_provider.dart';
 import 'package:treino/features/feed/presentation/search_users_screen.dart';
 import 'package:treino/features/feed/presentation/widgets/feed_empty_state.dart';
 import 'package:treino/features/feed/presentation/widgets/user_search_result_tile.dart';

@@ -22,10 +22,7 @@ UserPublicProfile _fakeProfile({
     );
 
 /// Wraps the tile inside a GoRouter so context.push works.
-Widget _wrapWithRouter(
-  Widget tile, {
-  List<String> navigatedRoutes = const [],
-}) {
+Widget _wrapWithRouter(Widget tile) {
   final routes = <GoRoute>[
     GoRoute(
       path: '/',
