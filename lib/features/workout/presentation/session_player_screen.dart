@@ -7,6 +7,7 @@ import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../profile/application/user_providers.dart';
 import '../../feed/domain/gym_name.dart';
+import '../application/exercise_providers.dart';
 import '../application/routine_providers.dart';
 import '../application/session_init.dart';
 import '../application/session_providers.dart';
@@ -45,6 +46,12 @@ class SessionPlayerScreen extends ConsumerStatefulWidget {
 }
 
 class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
+  // Marca que evita que el PopScope dispare el dialog de abandono cuando la
+  // salida es intencional (TERMINAR o ABANDONAR confirmado). Sin esta marca,
+  // context.go() pide al Navigator un pop que PopScope intercepta y dispara
+  // showDialog en paralelo a la navegación — produce `!_debugLocked` assertion.
+  bool _isFinalizing = false;
+
   // ── Helpers ───────────────────────────────────────────────────────────────
 
   ExerciseRowStatus _statusFor(int index, SessionState state) {
@@ -56,6 +63,7 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
   }
 
   void _showAbandonConfirm() {
+    if (_isFinalizing) return;
     showDialog<void>(
       context: context,
       builder: (_) => _AbandonConfirmDialog(
@@ -66,11 +74,15 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
 
   Future<void> _onAbandonConfirmed() async {
     final notifier = ref.read(sessionNotifierProvider(widget.init).notifier);
-    final sessionId =
-        ref.read(sessionNotifierProvider(widget.init)).value?.session.id;
+    _isFinalizing = true;
     await notifier.abandonSession();
-    if (mounted && sessionId != null) {
-      context.go('/workout/session-summary/$sessionId');
+    // Abandonar = salir, no celebrar. Navegación explícita al tab Workout
+    // (evita revelar rutas residuales como /workout/session-summary del
+    // stack — context.pop() depende del historial y puede caer ahí). La
+    // sesión queda persistida como finished + wasFullyCompleted=false:
+    // sets guardados, no aparece como activa para el resume.
+    if (mounted) {
+      context.go('/workout');
     }
   }
 
@@ -78,6 +90,7 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
     final notifier = ref.read(sessionNotifierProvider(widget.init).notifier);
     final sessionId =
         ref.read(sessionNotifierProvider(widget.init)).value?.session.id;
+    _isFinalizing = true;
     await notifier.finishSession();
     if (mounted && sessionId != null) {
       context.go('/workout/session-summary/$sessionId');
@@ -102,7 +115,15 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
           )
         : slot;
 
-    final setNumber = state.setsLoggedFor(slot.exerciseId) + 1;
+    final initialSetNumber = state.setsLoggedFor(slot.exerciseId) + 1;
+
+    // Si el ejercicio ya está cargado en caché lo aprovechamos para mostrar
+    // técnica/video dentro de la sheet. Si todavía no está, no rompemos
+    // nada — la sheet simplemente no muestra el botón ⓘ.
+    final exerciseAsync = ref.read(exerciseByIdProvider(slot.exerciseId));
+    final techniqueInstructions =
+        exerciseAsync.valueOrNull?.techniqueInstructions;
+    final videoUrl = exerciseAsync.valueOrNull?.videoUrl;
 
     showModalBottomSheet<void>(
       context: context,
@@ -110,14 +131,23 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
       backgroundColor: Colors.transparent,
       builder: (_) => SetEntrySheet(
         slot: effectiveSlot,
-        setNumber: setNumber,
+        setNumber: initialSetNumber,
+        techniqueInstructions: techniqueInstructions,
+        videoUrl: videoUrl,
         onCheck: (reps, weightKg) {
+          // setNumber dinámico — recalculado en cada CHECK porque la sheet
+          // queda abierta entre sets. Sin esto, todos los sets logueados
+          // dentro de la misma apertura compartirían el mismo número.
+          final currentState =
+              ref.read(sessionNotifierProvider(widget.init)).value;
+          final nextSetNumber =
+              (currentState?.setsLoggedFor(slot.exerciseId) ?? 0) + 1;
           ref.read(sessionNotifierProvider(widget.init).notifier).logSet(
                 SetLog(
                   id: '',
                   exerciseId: slot.exerciseId,
                   exerciseName: slot.exerciseName,
-                  setNumber: setNumber,
+                  setNumber: nextSetNumber,
                   reps: reps,
                   weightKg: weightKg,
                   completedAt: DateTime.now(),
@@ -145,23 +175,29 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
         : const AsyncLoading<Routine?>();
     final routineSplit = routineAsync.valueOrNull?.split ?? '';
 
-    return sessionAsync.when(
-      loading: () => Center(
-        child: CircularProgressIndicator(color: palette.accent),
-      ),
-      error: (_, __) => Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Text(
-            'No pudimos iniciar la sesión.',
-            style: GoogleFonts.barlow(fontSize: 14, color: palette.textMuted),
-            textAlign: TextAlign.center,
+    return Scaffold(
+      backgroundColor: palette.bg,
+      body: sessionAsync.when(
+        loading: () => Center(
+          child: CircularProgressIndicator(color: palette.accent),
+        ),
+        error: (_, __) => Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Text(
+              'No pudimos iniciar la sesión.',
+              style:
+                  GoogleFonts.barlow(fontSize: 14, color: palette.textMuted),
+              textAlign: TextAlign.center,
+            ),
           ),
         ),
-      ),
       data: (state) => PopScope(
-        canPop: false,
-        onPopInvokedWithResult: (_, __) => _showAbandonConfirm(),
+        canPop: _isFinalizing,
+        onPopInvokedWithResult: (didPop, _) {
+          if (didPop || _isFinalizing) return;
+          _showAbandonConfirm();
+        },
         child: SafeArea(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -213,6 +249,7 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
             ],
           ),
         ),
+      ),
       ),
     );
   }
