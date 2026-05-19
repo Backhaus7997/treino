@@ -158,12 +158,21 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
                   onBack: _showAbandonConfirm,
                 ),
                 Expanded(
-                  child: ListView(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    // ClampingScrollPhysics evita el efecto bouncing/stretch
-                    // de iOS que estira y deforma las cards en overscroll.
-                    physics: const ClampingScrollPhysics(),
-                    children: [
+                  // ScrollConfiguration con overscroll: false desactiva el
+                  // StretchingOverscrollIndicator de Android 12+ — el que
+                  // escala visualmente las cards y deforma los steppers
+                  // cuando se llega al borde de la lista. ClampingScrollPhysics
+                  // solo controla el comportamiento del scroll, no el
+                  // indicator visual; los dos son necesarios.
+                  child: ScrollConfiguration(
+                    behavior: ScrollConfiguration.of(context).copyWith(
+                      physics: const ClampingScrollPhysics(),
+                      overscroll: false,
+                    ),
+                    child: ListView(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      physics: const ClampingScrollPhysics(),
+                      children: [
                       const SizedBox(height: 12),
                       const _AttendanceCard(),
                       const SizedBox(height: 14),
@@ -195,6 +204,7 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
                       }),
                       const SizedBox(height: 20),
                     ],
+                    ),
                   ),
                 ),
                 Padding(
