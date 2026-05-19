@@ -46,6 +46,24 @@ final sessionNotifierProvider = AsyncNotifierProvider.autoDispose
   SessionNotifier.new,
 );
 
+/// Summary provider: fetches Session + SetLogs in parallel for a given
+/// (uid, sessionId) pair. Returns null session when doc doesn't exist.
+/// autoDispose so the load is re-triggered if the user navigates back and
+/// returns. family key is a Dart record for explicit named fields (Design §2).
+final sessionSummaryProvider = FutureProvider.autoDispose.family<
+    ({Session? session, List<SetLog> setLogs}),
+    ({String uid, String sessionId})>((ref, key) async {
+  final repo = ref.read(sessionRepositoryProvider);
+  final results = await Future.wait([
+    repo.getById(uid: key.uid, sessionId: key.sessionId),
+    repo.listSetLogs(uid: key.uid, sessionId: key.sessionId),
+  ]);
+  return (
+    session: results[0] as Session?,
+    setLogs: results[1] as List<SetLog>,
+  );
+});
+
 /// Chequeo de sesión activa al abrir /home (Decision 12).
 /// Retorna el record (session + setLogs) si hay una sesión activa, o null.
 /// autoDispose: se re-evalúa en cada mount de HomeScreen.

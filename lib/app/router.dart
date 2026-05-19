@@ -12,6 +12,7 @@ import '../features/auth/presentation/welcome_screen.dart';
 import '../features/coach/coach_screen.dart';
 import '../features/workout/application/session_init.dart';
 import '../features/workout/presentation/exercise_detail_screen.dart';
+import '../features/workout/presentation/post_workout_summary_screen.dart';
 import '../features/workout/presentation/routine_detail_screen.dart';
 import '../features/workout/presentation/session_player_screen.dart';
 import '../features/feed/feed_screen.dart';
@@ -152,9 +153,10 @@ GoRouter buildRouter({
       ),
       GoRoute(
         path: '/workout/session-summary/:sessionId',
-        pageBuilder: (_, __) => _noAnim(const Scaffold(
-          body: Center(child: Text('Resumen — próximamente')),
-        )),
+        pageBuilder: (context, state) {
+          final sessionId = state.pathParameters['sessionId']!;
+          return _noAnim(PostWorkoutSummaryScreen(sessionId: sessionId));
+        },
       ),
 
       // ShellRoute with the existing 5 tabs.
