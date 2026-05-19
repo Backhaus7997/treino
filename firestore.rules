@@ -87,10 +87,15 @@ service cloud.firestore {
     }
 
     match /friendships/{friendshipId} {
-      // Read: only members of the friendship. SCENARIO-131: non-member blocked.
-      // REQ-PFM-010
+      // Read: only members of the friendship — OR doc does not exist (returns
+      // empty snapshot without leaking data). The `resource == null` branch is
+      // required for `getByPair()` to gracefully resolve "no friendship yet"
+      // between two users who have never interacted (e.g. fresh public profile
+      // visits). Discovered during user-public-profiles smoke test;
+      // pre-existing from PR #28 friendships introduction (REQ-PFM-010).
       allow read: if request.auth != null
-                  && request.auth.uid in resource.data.members;
+                  && (resource == null
+                      || request.auth.uid in resource.data.members);
 
       // Create: only by the requester, with status='pending', requester in members.
       allow create: if request.auth != null
