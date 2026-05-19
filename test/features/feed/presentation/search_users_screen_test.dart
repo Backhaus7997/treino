@@ -71,8 +71,7 @@ void main() {
   setUp(() {
     mockRepo = MockUserPublicProfileRepository();
     // Default: return empty list
-    when(() => mockRepo.searchByDisplayName(any()))
-        .thenAnswer((_) async => []);
+    when(() => mockRepo.searchByDisplayName(any())).thenAnswer((_) async => []);
   });
 
   // ---------------------------------------------------------------------------
@@ -81,8 +80,7 @@ void main() {
   group('SearchUsersScreen — initial state', () {
     testWidgets(
         'SCENARIO-286: shows FeedEmptyState with "Buscá usuarios por nombre" '
-        'on initial render',
-        (tester) async {
+        'on initial render', (tester) async {
       await tester.pumpWidget(_wrapWithRouter(
         overrides: [
           userPublicProfileRepositoryProvider.overrideWithValue(mockRepo),
@@ -117,8 +115,7 @@ void main() {
   group('SearchUsersScreen — below minimum chars', () {
     testWidgets(
         'SCENARIO-287: typing 1 character still shows "Buscá usuarios" '
-        'empty-state prompt (2-char minimum not met)',
-        (tester) async {
+        'empty-state prompt (2-char minimum not met)', (tester) async {
       await tester.pumpWidget(_wrapWithRouter(
         overrides: [
           userPublicProfileRepositoryProvider.overrideWithValue(mockRepo),
@@ -173,8 +170,7 @@ void main() {
   group('SearchUsersScreen — data state', () {
     testWidgets(
         'SCENARIO-289: provider returns 3 profiles → ListView with 3 '
-        'UserSearchResultTile items',
-        (tester) async {
+        'UserSearchResultTile items', (tester) async {
       final profiles = [
         _fakeProfile(uid: 'u1', displayName: 'Martin'),
         _fakeProfile(uid: 'u2', displayName: 'Maria'),
@@ -204,8 +200,7 @@ void main() {
   group('SearchUsersScreen — empty results state', () {
     testWidgets(
         'SCENARIO-290: provider returns empty list → FeedEmptyState with '
-        'message containing the active query',
-        (tester) async {
+        'message containing the active query', (tester) async {
       when(() => mockRepo.searchByDisplayName(any()))
           .thenAnswer((_) async => []);
 
@@ -231,8 +226,7 @@ void main() {
   group('SearchUsersScreen — error state', () {
     testWidgets(
         'SCENARIO-291: provider errors → shows error text '
-        '"No pudimos buscar usuarios. Intentá de nuevo."',
-        (tester) async {
+        '"No pudimos buscar usuarios. Intentá de nuevo."', (tester) async {
       when(() => mockRepo.searchByDisplayName(any()))
           .thenThrow(Exception('network error'));
 
@@ -282,8 +276,7 @@ void main() {
     // -------------------------------------------------------------------------
     testWidgets(
         'SCENARIO-293: tapping clear resets the field and shows empty-state '
-        '"Buscá usuarios por nombre"',
-        (tester) async {
+        '"Buscá usuarios por nombre"', (tester) async {
       await tester.pumpWidget(_wrapWithRouter(
         overrides: [
           userPublicProfileRepositoryProvider.overrideWithValue(mockRepo),
@@ -312,8 +305,7 @@ void main() {
   group('SearchUsersScreen — navigation', () {
     testWidgets(
         'SCENARIO-294: tapping back arrow calls context.pop() — navigator has '
-        'only one entry so pop goes to initial empty state',
-        (tester) async {
+        'only one entry so pop goes to initial empty state', (tester) async {
       // Set up router with a parent route so we can push to /search
       final router = GoRouter(
         initialLocation: '/feed',
@@ -328,8 +320,8 @@ void main() {
           ),
           GoRoute(
             path: '/feed/profile/:uid',
-            builder: (_, state) => Scaffold(
-                body: Text('Profile ${state.pathParameters['uid']}')),
+            builder: (_, state) =>
+                Scaffold(body: Text('Profile ${state.pathParameters['uid']}')),
           ),
         ],
       );

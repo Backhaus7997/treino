@@ -50,10 +50,10 @@ void main() {
   group('UserSearchResultTile — rendering', () {
     testWidgets(
         'SCENARIO-281: renders PostAvatar, displayName, and gym name when '
-        'gymId is "smart-fit-palermo"',
-        (tester) async {
+        'gymId is "smart-fit-palermo"', (tester) async {
       final tile = UserSearchResultTile(
-        profile: _fakeProfile(uid: 'u1', displayName: 'Ana', gymId: 'smart-fit-palermo'),
+        profile: _fakeProfile(
+            uid: 'u1', displayName: 'Ana', gymId: 'smart-fit-palermo'),
         onTap: () {},
       );
 
@@ -89,8 +89,7 @@ void main() {
     // -------------------------------------------------------------------------
     testWidgets(
         'SCENARIO-285: tile renders without exception when gymId is null; '
-        'gym name area is blank',
-        (tester) async {
+        'gym name area is blank', (tester) async {
       final tile = UserSearchResultTile(
         profile: _fakeProfile(uid: 'u1', displayName: 'Ana', gymId: null),
         onTap: () {},
@@ -109,8 +108,7 @@ void main() {
   group('UserSearchResultTile — navigation', () {
     testWidgets(
         'SCENARIO-283: tapping the tile calls onTap callback which navigates '
-        'to /feed/profile/u1',
-        (tester) async {
+        'to /feed/profile/u1', (tester) async {
       var tapped = false;
 
       final tile = UserSearchResultTile(

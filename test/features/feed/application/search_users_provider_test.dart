@@ -29,8 +29,7 @@ UserPublicProfile _fakeProfile({
       gymId: gymId,
     );
 
-ProviderContainer _makeContainer(
-    MockUserPublicProfileRepository mockRepo) {
+ProviderContainer _makeContainer(MockUserPublicProfileRepository mockRepo) {
   return ProviderContainer(
     overrides: [
       userPublicProfileRepositoryProvider.overrideWithValue(mockRepo),
@@ -62,8 +61,7 @@ void main() {
       final container = _makeContainer(mockRepo);
       addTearDown(container.dispose);
 
-      final result =
-          await container.read(searchUsersProvider('ma').future);
+      final result = await container.read(searchUsersProvider('ma').future);
 
       expect(result, equals(profiles));
       verify(() => mockRepo.searchByDisplayName('ma')).called(1);
@@ -76,13 +74,11 @@ void main() {
   group('searchUsersProvider — blank query guard', () {
     test(
         'SCENARIO-276: whitespace-only query returns empty list without '
-        'calling repository',
-        () async {
+        'calling repository', () async {
       final container = _makeContainer(mockRepo);
       addTearDown(container.dispose);
 
-      final result =
-          await container.read(searchUsersProvider('  ').future);
+      final result = await container.read(searchUsersProvider('  ').future);
 
       expect(result, isEmpty);
       verifyNever(() => mockRepo.searchByDisplayName(any()));
@@ -92,8 +88,7 @@ void main() {
       final container = _makeContainer(mockRepo);
       addTearDown(container.dispose);
 
-      final result =
-          await container.read(searchUsersProvider('').future);
+      final result = await container.read(searchUsersProvider('').future);
 
       expect(result, isEmpty);
       verifyNever(() => mockRepo.searchByDisplayName(any()));
@@ -106,13 +101,11 @@ void main() {
   group('searchUsersProvider — 2-char minimum gate', () {
     test(
         'SCENARIO-277: single-character query returns empty list without '
-        'issuing a Firestore call',
-        () async {
+        'issuing a Firestore call', () async {
       final container = _makeContainer(mockRepo);
       addTearDown(container.dispose);
 
-      final result =
-          await container.read(searchUsersProvider('m').future);
+      final result = await container.read(searchUsersProvider('m').future);
 
       expect(result, isEmpty);
       verifyNever(() => mockRepo.searchByDisplayName(any()));
@@ -125,8 +118,7 @@ void main() {
   group('searchUsersProvider — normalization / family key', () {
     test(
         'SCENARIO-278: uppercase query is lowercased before repository call; '
-        '"MAR" and "mar" produce the same lowercased call',
-        () async {
+        '"MAR" and "mar" produce the same lowercased call', () async {
       when(() => mockRepo.searchByDisplayName('mar'))
           .thenAnswer((_) async => []);
 
@@ -146,16 +138,14 @@ void main() {
   group('searchUsersProvider — empty results', () {
     test(
         'SCENARIO-279: repository returns empty list when no profiles match '
-        'and provider returns it as-is',
-        () async {
+        'and provider returns it as-is', () async {
       when(() => mockRepo.searchByDisplayName('xyz123'))
           .thenAnswer((_) async => []);
 
       final container = _makeContainer(mockRepo);
       addTearDown(container.dispose);
 
-      final result =
-          await container.read(searchUsersProvider('xyz123').future);
+      final result = await container.read(searchUsersProvider('xyz123').future);
 
       expect(result, isEmpty);
     });
