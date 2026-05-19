@@ -186,70 +186,69 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Text(
               'No pudimos iniciar la sesión.',
-              style:
-                  GoogleFonts.barlow(fontSize: 14, color: palette.textMuted),
+              style: GoogleFonts.barlow(fontSize: 14, color: palette.textMuted),
               textAlign: TextAlign.center,
             ),
           ),
         ),
-      data: (state) => PopScope(
-        canPop: _isFinalizing,
-        onPopInvokedWithResult: (didPop, _) {
-          if (didPop || _isFinalizing) return;
-          _showAbandonConfirm();
-        },
-        child: SafeArea(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _SessionHeader(
-                routineSplit: routineSplit,
-                dayNumber: state.day.dayNumber,
-                onAbandon: _showAbandonConfirm,
-                onBack: _showAbandonConfirm,
-              ),
-              Expanded(
-                child: ListView(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  children: [
-                    const SizedBox(height: 12),
-                    const _AttendanceCard(),
-                    const SizedBox(height: 14),
-                    _SessionStatsCard(state: state),
-                    const SizedBox(height: 20),
-                    const _SectionLabel('EJERCICIOS'),
-                    const SizedBox(height: 12),
-                    ...state.day.slots.asMap().entries.expand((entry) {
-                      final idx = entry.key;
-                      final slot = entry.value;
-                      final status = _statusFor(idx, state);
-                      return [
-                        _ExerciseListRow(
-                          slot: slot,
-                          status: status,
-                          completedSets: state.setsLoggedFor(slot.exerciseId),
-                          onTap: status != ExerciseRowStatus.done
-                              ? () => _openSetEntry(slot, state)
-                              : null,
-                        ),
-                        const SizedBox(height: 12),
-                      ];
-                    }),
-                    const SizedBox(height: 20),
-                  ],
+        data: (state) => PopScope(
+          canPop: _isFinalizing,
+          onPopInvokedWithResult: (didPop, _) {
+            if (didPop || _isFinalizing) return;
+            _showAbandonConfirm();
+          },
+          child: SafeArea(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _SessionHeader(
+                  routineSplit: routineSplit,
+                  dayNumber: state.day.dayNumber,
+                  onAbandon: _showAbandonConfirm,
+                  onBack: _showAbandonConfirm,
                 ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 18),
-                child: _TerminarSessionButton(
-                  enabled: state.isFullyCompleted,
-                  onPressed: state.isFullyCompleted ? _finishSession : null,
+                Expanded(
+                  child: ListView(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    children: [
+                      const SizedBox(height: 12),
+                      const _AttendanceCard(),
+                      const SizedBox(height: 14),
+                      _SessionStatsCard(state: state),
+                      const SizedBox(height: 20),
+                      const _SectionLabel('EJERCICIOS'),
+                      const SizedBox(height: 12),
+                      ...state.day.slots.asMap().entries.expand((entry) {
+                        final idx = entry.key;
+                        final slot = entry.value;
+                        final status = _statusFor(idx, state);
+                        return [
+                          _ExerciseListRow(
+                            slot: slot,
+                            status: status,
+                            completedSets: state.setsLoggedFor(slot.exerciseId),
+                            onTap: status != ExerciseRowStatus.done
+                                ? () => _openSetEntry(slot, state)
+                                : null,
+                          ),
+                          const SizedBox(height: 12),
+                        ];
+                      }),
+                      const SizedBox(height: 20),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 18),
+                  child: _TerminarSessionButton(
+                    enabled: state.isFullyCompleted,
+                    onPressed: state.isFullyCompleted ? _finishSession : null,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
-      ),
       ),
     );
   }
