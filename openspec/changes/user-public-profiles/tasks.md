@@ -46,63 +46,63 @@ Resolved: Query normalization (toLowercase) happens INSIDE `searchUsersProvider`
 
 ### Phase A1: Setup + Precondition
 
-- [ ] A1.1 Verify clean working tree (`git status` — no uncommitted changes) before any code generation.
-- [ ] A1.2 Confirm existing test suite baseline: run `flutter test` and record count (~677 passing). Commit baseline note.
+- [x] A1.1 Verify clean working tree (`git status` — no uncommitted changes) before any code generation.
+- [x] A1.2 Confirm existing test suite baseline: run `flutter test` and record count (~677 passing). Commit baseline note.
 
 ### Phase A2: Domain — UserPublicProfile Model (RED → GREEN)
 
-- [ ] A2.1 **RED**: Create `test/features/profile/domain/user_public_profile_test.dart`. Tests: SCENARIO-252 (JSON roundtrip), SCENARIO-253 (displayNameLowercase auto-derivation at write-path layer — assert repo helper, not model constructor). Commit test file. `flutter test` MUST fail at this point.
-- [ ] A2.2 **GREEN**: Create `lib/features/profile/domain/user_public_profile.dart` (Freezed, 5 fields: `uid` required, `displayName?`, `displayNameLowercase?`, `avatarUrl?`, `gymId?`, all String). Run `dart run build_runner build --delete-conflicting-outputs`. Commit generated files. `flutter test` target tests MUST pass.
-- [ ] A2.3 Covers: REQ-UPP-001, SCENARIO-252, SCENARIO-253.
+- [x] A2.1 **RED**: Create `test/features/profile/domain/user_public_profile_test.dart`. Tests: SCENARIO-252 (JSON roundtrip), SCENARIO-253 (displayNameLowercase auto-derivation at write-path layer — assert repo helper, not model constructor). Commit test file. `flutter test` MUST fail at this point.
+- [x] A2.2 **GREEN**: Create `lib/features/profile/domain/user_public_profile.dart` (Freezed, 5 fields: `uid` required, `displayName?`, `displayNameLowercase?`, `avatarUrl?`, `gymId?`, all String). Run `dart run build_runner build --delete-conflicting-outputs`. Commit generated files. `flutter test` target tests MUST pass.
+- [x] A2.3 Covers: REQ-UPP-001, SCENARIO-252, SCENARIO-253.
 
 ### Phase A3: Repository — UserPublicProfileRepository (RED → GREEN)
 
-- [ ] A3.1 **RED**: Create `test/features/profile/data/user_public_profile_repository_test.dart`. Tests: SCENARIO-254 (get null for missing), SCENARIO-255 (set + get roundtrip), SCENARIO-256 (prefix match), SCENARIO-257 (20-result limit), SCENARIO-258 (empty/blank query returns []). Commit test file. Tests MUST fail.
-- [ ] A3.2 **GREEN**: Create `lib/features/profile/data/user_public_profile_repository.dart`. Implement `get(uid)`, `set(profile)` with `SetOptions(merge: true)`, `searchByDisplayName(query, {int limit = 20})` using prefix range on `displayNameLowercase`. Commit. Tests MUST pass.
-- [ ] A3.3 Covers: REQ-UPP-003, REQ-UPP-004, REQ-UPP-005, REQ-UPP-006, SCENARIO-254..258.
+- [x] A3.1 **RED**: Create `test/features/profile/data/user_public_profile_repository_test.dart`. Tests: SCENARIO-254 (get null for missing), SCENARIO-255 (set + get roundtrip), SCENARIO-256 (prefix match), SCENARIO-257 (20-result limit), SCENARIO-258 (empty/blank query returns []). Commit test file. Tests MUST fail.
+- [x] A3.2 **GREEN**: Create `lib/features/profile/data/user_public_profile_repository.dart`. Implement `get(uid)`, `set(profile)` with `SetOptions(merge: true)`, `searchByDisplayName(query, {int limit = 20})` using prefix range on `displayNameLowercase`. Commit. Tests MUST pass.
+- [x] A3.3 Covers: REQ-UPP-003, REQ-UPP-004, REQ-UPP-005, REQ-UPP-006, SCENARIO-254..258.
 
 ### Phase A4: Providers — userPublicProfileRepositoryProvider + userPublicProfileProvider (RED → GREEN)
 
-- [ ] A4.1 **RED**: Create `test/features/profile/application/user_public_profile_providers_test.dart`. Tests: `userPublicProfileProvider` resolves to null when no doc (SCENARIO-254 via provider), returns profile when doc exists (SCENARIO-255 via provider). Commit test file. Tests MUST fail.
-- [ ] A4.2 **GREEN**: Create `lib/features/profile/application/user_public_profile_providers.dart`. Implement `userPublicProfileRepositoryProvider` (singleton `Provider`) and `userPublicProfileProvider` (`FutureProvider.family<UserPublicProfile?, String>` — auth-gated, returns null when unauthenticated). Commit. Tests MUST pass.
-- [ ] A4.3 Covers: REQ-UPP-007, REQ-UPP-008.
+- [x] A4.1 **RED**: Create `test/features/profile/application/user_public_profile_providers_test.dart`. Tests: `userPublicProfileProvider` resolves to null when no doc (SCENARIO-254 via provider), returns profile when doc exists (SCENARIO-255 via provider). Commit test file. Tests MUST fail.
+- [x] A4.2 **GREEN**: Create `lib/features/profile/application/user_public_profile_providers.dart`. Implement `userPublicProfileRepositoryProvider` (singleton `Provider`) and `userPublicProfileProvider` (`FutureProvider.family<UserPublicProfile?, String>` — auth-gated, returns null when unauthenticated). Commit. Tests MUST pass.
+- [x] A4.3 Covers: REQ-UPP-007, REQ-UPP-008.
 
 ### Phase A5: Etapa 4 Fixture Rewrite — CRITICAL, must precede A5.2 (RED → GREEN → REFACTOR)
 
-- [ ] A5.1 **RED**: In `test/features/feed/application/public_profile_providers_test.dart`, rewrite SCENARIO-203..205 fixtures to seed `userPublicProfiles` collection instead of `posts`. Assertions remain behaviorally equivalent. Commit. Tests SCENARIO-203..205 MUST fail (provider still reads from old source). SCENARIO-200..202 MUST remain green.
-- [ ] A5.2 **GREEN**: Modify `lib/features/feed/application/public_profile_providers.dart` — `publicProfileViewProvider` now reads `userPublicProfileProvider(targetUid)` instead of `firstPostByAuthorProvider`. Implement fallback to `'Anónimo'` when provider returns null. `firstPostByAuthorProvider` STAYS in the file untouched. Commit. SCENARIO-203..205 MUST pass. SCENARIO-200..202 MUST remain green.
-- [ ] A5.3 **REFACTOR**: Run `flutter test test/features/feed/application/` — all 6 scenarios (200..205) must be green simultaneously.
-- [ ] A5.4 Covers: REQ-UPP-017, REQ-UPP-018, REQ-UPP-019, REQ-UPP-020, SCENARIO-271..274.
+- [x] A5.1 **RED**: In `test/features/feed/application/public_profile_providers_test.dart`, rewrite SCENARIO-203..205 fixtures to seed `userPublicProfiles` collection instead of `posts`. Assertions remain behaviorally equivalent. Commit. Tests SCENARIO-203..205 MUST fail (provider still reads from old source). SCENARIO-200..202 MUST remain green.
+- [x] A5.2 **GREEN**: Modify `lib/features/feed/application/public_profile_providers.dart` — `publicProfileViewProvider` now reads `userPublicProfileProvider(targetUid)` instead of `firstPostByAuthorProvider`. Implement fallback to `'Anónimo'` when provider returns null. `firstPostByAuthorProvider` STAYS in the file untouched. Commit. SCENARIO-203..205 MUST pass. SCENARIO-200..202 MUST remain green.
+- [x] A5.3 **REFACTOR**: Run `flutter test test/features/feed/application/` — all 6 scenarios (200..205) must be green simultaneously.
+- [x] A5.4 Covers: REQ-UPP-017, REQ-UPP-018, REQ-UPP-019, REQ-UPP-020, SCENARIO-271..274.
 
 ### Phase A6: UserRepository Dual-Write (RED → GREEN)
 
-- [ ] A6.1 **RED**: In `test/features/profile/data/user_repository_test.dart`, add tests for SCENARIO-259 (getOrCreate writes both), SCENARIO-260 (createIfAbsent writes both), SCENARIO-261 (update with displayName propagates), SCENARIO-262 (update without name/avatar/gym leaves public profile untouched), SCENARIO-263 (displayNameLowercase auto-derived, caller override ignored). Add TODO comment for SCENARIO-264 (atomicity — deferred, manual emulator only). Commit tests. Tests MUST fail.
-- [ ] A6.2 **GREEN**: Modify `lib/features/profile/data/user_repository.dart`. Add private helpers `_publicSubsetFromProfile(...)` and `_publicSubsetFromPartial(...)` that derive `displayNameLowercase = displayName?.trim().toLowerCase()`. Replace sequential writes in `getOrCreate`, `createIfAbsent`, and `update` with `WriteBatch` dual-write pattern per design Section A.3. Commit. Tests MUST pass.
-- [ ] A6.3 Covers: REQ-UPP-009, REQ-UPP-010, REQ-UPP-011, REQ-UPP-012, SCENARIO-259..263. SCENARIO-264 marked deferred.
+- [x] A6.1 **RED**: In `test/features/profile/data/user_repository_test.dart`, add tests for SCENARIO-259 (getOrCreate writes both), SCENARIO-260 (createIfAbsent writes both), SCENARIO-261 (update with displayName propagates), SCENARIO-262 (update without name/avatar/gym leaves public profile untouched), SCENARIO-263 (displayNameLowercase auto-derived, caller override ignored). Add TODO comment for SCENARIO-264 (atomicity — deferred, manual emulator only). Commit tests. Tests MUST fail.
+- [x] A6.2 **GREEN**: Modify `lib/features/profile/data/user_repository.dart`. Add private helpers `_publicSubsetFromProfile(...)` and `_publicSubsetFromPartial(...)` that derive `displayNameLowercase = displayName?.trim().toLowerCase()`. Replace sequential writes in `getOrCreate`, `createIfAbsent`, and `update` with `WriteBatch` dual-write pattern per design Section A.3. Commit. Tests MUST pass.
+- [x] A6.3 Covers: REQ-UPP-009, REQ-UPP-010, REQ-UPP-011, REQ-UPP-012, SCENARIO-259..263. SCENARIO-264 marked deferred.
 
 ### Phase A7: ProfileSetupNotifier Dual-Write Verification (RED → GREEN)
 
-- [ ] A7.1 **RED**: In `test/features/profile_setup/application/profile_setup_notifier_test.dart` (or appropriate existing test file), add test for SCENARIO-265 (submit writes both docs), SCENARIO-266 (displayNameLowercase derived). Add TODO for SCENARIO-267 (commit failure — deferred, manual). Commit tests. Tests MUST fail.
-- [ ] A7.2 **GREEN**: Verify `lib/features/profile_setup/application/profile_setup_notifier.dart` calls `userRepository.update(uid, partial)` without signature change. Since A6.2 already made UserRepository batch-aware, no change to notifier may be needed. If `submit()` calls `UserRepository.update`, the dual-write is inherited. Confirm and commit (no-op or minimal fix). Tests MUST pass.
-- [ ] A7.3 Covers: REQ-UPP-013, SCENARIO-265, SCENARIO-266. SCENARIO-267 marked deferred.
+- [x] A7.1 **RED**: In `test/features/profile_setup/application/profile_setup_notifier_test.dart` (or appropriate existing test file), add test for SCENARIO-265 (submit writes both docs), SCENARIO-266 (displayNameLowercase derived). Add TODO for SCENARIO-267 (commit failure — deferred, manual). Commit tests. Tests MUST fail.
+- [x] A7.2 **GREEN**: Verify `lib/features/profile_setup/application/profile_setup_notifier.dart` calls `userRepository.update(uid, partial)` without signature change. Since A6.2 already made UserRepository batch-aware, no change to notifier may be needed. If `submit()` calls `UserRepository.update`, the dual-write is inherited. Confirm and commit (no-op or minimal fix). Tests MUST pass.
+- [x] A7.3 Covers: REQ-UPP-013, SCENARIO-265, SCENARIO-266. SCENARIO-267 marked deferred.
 
 ### Phase A8: Firestore Rules
 
-- [ ] A8.1 Add the `userPublicProfiles/{uid}` block to `firestore.rules` per design Section A.4 (read for auth != null; create with uid check; update with uid immutability; delete: false). Commit.
-- [ ] A8.2 Covers: REQ-UPP-014, REQ-UPP-015, REQ-UPP-016. AUTOMATED TESTS NOT APPLICABLE — `fake_cloud_firestore` does not enforce rules.
+- [x] A8.1 Add the `userPublicProfiles/{uid}` block to `firestore.rules` per design Section A.4 (read for auth != null; create with uid check; update with uid immutability; delete: false). Commit.
+- [x] A8.2 Covers: REQ-UPP-014, REQ-UPP-015, REQ-UPP-016. AUTOMATED TESTS NOT APPLICABLE — `fake_cloud_firestore` does not enforce rules.
 - [ ] A8.3 **MANDATORY MANUAL GATE (pre-merge)**: Run T35-style emulator test. Start `firebase emulators:start`, deploy updated rules, seed via Admin SDK, attempt: (a) user B reads `userPublicProfiles/A` — MUST succeed (SCENARIO-268); (b) user B lists prefix query — MUST succeed (SCENARIO-269 semantics); (c) user B writes `userPublicProfiles/A` where B != A — MUST be denied (SCENARIO-269/270). Document results in PR description before requesting review.
 
 ### Phase A9: Backfill Script
 
-- [ ] A9.1 Create `scripts/backfill_user_public_profiles.js`. Node.js + firebase-admin skeleton. Comment block explains: lazy migration is primary strategy (dual-write catches new profiles); script is ops escape hatch for existing users. Script logs every 100 docs, halts on error, uses `{merge: true}` for idempotency. NOT executed in PR#A. Commit.
-- [ ] A9.2 Covers: REQ-UPP-021.
+- [x] A9.1 Create `scripts/backfill_user_public_profiles.js`. Node.js + firebase-admin skeleton. Comment block explains: lazy migration is primary strategy (dual-write catches new profiles); script is ops escape hatch for existing users. Script logs every 100 docs, halts on error, uses `{merge: true}` for idempotency. NOT executed in PR#A. Commit.
+- [x] A9.2 Covers: REQ-UPP-021.
 
 ### Phase A10: Quality Gates
 
-- [ ] A10.1 Run `flutter analyze` → 0 issues. Fix any lint violations before this step.
-- [ ] A10.2 Run `dart format --output=none --set-exit-if-changed .` → 0 changed files.
-- [ ] A10.3 Run `flutter test` → all passing. Expected: ~677 baseline + ~22 new PR#A tests = ~699 total.
-- [ ] A10.4 Verify cross-cutting constraints: `rg "PhosphorIcons\." lib/features/profile/ lib/features/feed/application/public_profile_providers.dart` → 0 matches. `rg "#[0-9a-fA-F]{6}" lib/features/profile/ lib/features/feed/application/public_profile_providers.dart` → 0 matches.
+- [x] A10.1 Run `flutter analyze` → 0 issues. Fix any lint violations before this step.
+- [x] A10.2 Run `dart format --output=none --set-exit-if-changed .` → 0 changed files.
+- [x] A10.3 Run `flutter test` → all passing. Expected: ~677 baseline + ~22 new PR#A tests = ~699 total.
+- [x] A10.4 Verify cross-cutting constraints: `rg "PhosphorIcons\." lib/features/profile/ lib/features/feed/application/public_profile_providers.dart` → 0 matches. `rg "#[0-9a-fA-F]{6}" lib/features/profile/ lib/features/feed/application/public_profile_providers.dart` → 0 matches.
 
 ### PR#A Coverage Matrix
 
