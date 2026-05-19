@@ -163,13 +163,11 @@ void main() {
   // Dual-write scenarios (SCENARIO-259..263)
   // ---------------------------------------------------------------------------
   group('UserRepository dual-write (userPublicProfiles)', () {
-    test(
-        'SCENARIO-259: getOrCreate writes both users and userPublicProfiles',
+    test('SCENARIO-259: getOrCreate writes both users and userPublicProfiles',
         () async {
       await repo.getOrCreate(uid: 'u1', email: 'a@b.com');
 
-      final usersSnap =
-          await firestore.collection('users').doc('u1').get();
+      final usersSnap = await firestore.collection('users').doc('u1').get();
       final pubSnap =
           await firestore.collection('userPublicProfiles').doc('u1').get();
 
@@ -183,8 +181,7 @@ void main() {
         () async {
       await repo.createIfAbsent(uid: 'u2', email: 'b@c.com');
 
-      final usersSnap =
-          await firestore.collection('users').doc('u2').get();
+      final usersSnap = await firestore.collection('users').doc('u2').get();
       final pubSnap =
           await firestore.collection('userPublicProfiles').doc('u2').get();
 

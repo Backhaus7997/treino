@@ -47,8 +47,7 @@ class UserRepository {
   Map<String, Object?>? _publicSubsetFromPartial(
     Map<String, Object?> partial,
   ) {
-    final hasPublicField =
-        partial.keys.any((k) => _publicFields.contains(k));
+    final hasPublicField = partial.keys.any((k) => _publicFields.contains(k));
     if (!hasPublicField) return null;
 
     final result = <String, Object?>{};

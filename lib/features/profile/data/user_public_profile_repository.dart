@@ -58,8 +58,6 @@ class UserPublicProfileRepository {
         .limit(limit)
         .get();
 
-    return snap.docs
-        .map((d) => UserPublicProfile.fromJson(d.data()))
-        .toList();
+    return snap.docs.map((d) => UserPublicProfile.fromJson(d.data())).toList();
   }
 }

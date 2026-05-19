@@ -22,7 +22,8 @@ void main() {
   // userPublicProfileProvider
   // ──────────────────────────────────────────────────────────────────────────
   group('userPublicProfileProvider', () {
-    test('SCENARIO-254 (via provider): returns null when doc missing', () async {
+    test('SCENARIO-254 (via provider): returns null when doc missing',
+        () async {
       final firestore = FakeFirebaseFirestore();
 
       final container = ProviderContainer(overrides: [
@@ -76,8 +77,7 @@ void main() {
 
       final container = ProviderContainer(overrides: [
         firestoreProvider.overrideWithValue(firestore),
-        authStateChangesProvider
-            .overrideWith((_) => Stream.value(null)),
+        authStateChangesProvider.overrideWith((_) => Stream.value(null)),
       ]);
       addTearDown(container.dispose);
 

@@ -84,10 +84,7 @@ void main() {
       () async {
     // Seed 25 docs whose displayNameLowercase starts with 'test'
     for (var i = 0; i < 25; i++) {
-      await firestore
-          .collection('userPublicProfiles')
-          .doc('test$i')
-          .set({
+      await firestore.collection('userPublicProfiles').doc('test$i').set({
         'uid': 'test$i',
         'displayName': 'Test$i',
         'displayNameLowercase': 'test$i',
@@ -103,7 +100,8 @@ void main() {
   // ──────────────────────────────────────────────────────────────────────────
   // SCENARIO-258: searchByDisplayName returns empty list for blank query
   // ──────────────────────────────────────────────────────────────────────────
-  test('SCENARIO-258: searchByDisplayName returns [] for blank/whitespace query',
+  test(
+      'SCENARIO-258: searchByDisplayName returns [] for blank/whitespace query',
       () async {
     // Seed a doc to ensure the repo doesn't hit Firestore
     await firestore.collection('userPublicProfiles').doc('u1').set({

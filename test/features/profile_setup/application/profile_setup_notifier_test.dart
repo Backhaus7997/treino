@@ -8,7 +8,6 @@ import 'package:treino/features/auth/application/auth_providers.dart'
 import 'package:treino/features/profile/application/user_providers.dart'
     show firestoreProvider, userRepositoryProvider;
 import 'package:treino/features/profile/data/user_repository.dart';
-import 'package:treino/features/profile_setup/application/profile_setup_notifier.dart';
 import 'package:treino/features/profile_setup/application/profile_setup_providers.dart';
 import 'package:treino/features/profile_setup/data/avatar_upload_service.dart';
 
@@ -56,8 +55,7 @@ void main() {
         UserRepository(firestore: firestore),
       ),
       firebaseAuthProvider.overrideWithValue(mockAuth),
-      avatarUploadServiceProvider
-          .overrideWithValue(_FakeAvatarUploadService()),
+      avatarUploadServiceProvider.overrideWithValue(_FakeAvatarUploadService()),
     ]);
   }
 
@@ -70,14 +68,12 @@ void main() {
     final container = makeContainer();
     addTearDown(container.dispose);
 
-    final notifier =
-        container.read(profileSetupNotifierProvider.notifier);
+    final notifier = container.read(profileSetupNotifierProvider.notifier);
     notifier.updateUsername('Carlos');
 
     await notifier.submit();
 
-    final usersSnap =
-        await firestore.collection('users').doc('u1').get();
+    final usersSnap = await firestore.collection('users').doc('u1').get();
     final pubSnap =
         await firestore.collection('userPublicProfiles').doc('u1').get();
 
@@ -95,8 +91,7 @@ void main() {
     final container = makeContainer();
     addTearDown(container.dispose);
 
-    final notifier =
-        container.read(profileSetupNotifierProvider.notifier);
+    final notifier = container.read(profileSetupNotifierProvider.notifier);
     notifier.updateUsername('Carlos');
 
     await notifier.submit();
