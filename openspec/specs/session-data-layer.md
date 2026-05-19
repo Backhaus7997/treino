@@ -1,10 +1,10 @@
 # Session Data Layer — Specification
 
 **Domain**: Workout Session Management
-**Change**: `session-model-seed` (Fase 4 · Etapa 1) + `session-player` amendment (Etapa 2)
+**Changes**: `session-model-seed` (Fase 4 · Etapa 1) + `session-player` amendment (Etapa 2) + `post-workout-summary` amendment (Etapa 3)
 **Status**: ACTIVE (source of truth)
-**Last updated**: 2026-05-18
-**Merged**: PR #34 (commit 83cd63b); contract amendment landed via `feat/session-player`
+**Last updated**: 2026-05-19
+**Merged**: PR #34 (commit 83cd63b); PR #39 (squash commit c23c80c)
 
 ---
 
@@ -34,6 +34,7 @@ Define the workout session data layer: models, repositories, Riverpod providers,
 | REQ-SMS-012 | SessionRepository.addSetLog appends to sub-collection | MUST | ✅ IMPLEMENTED |
 | REQ-SMS-013 | SessionRepository.listSetLogs ordered setNumber ASC | MUST | ✅ IMPLEMENTED |
 | REQ-SMS-014 | Firestore rules enforce owner-only access | MUST | ✅ IMPLEMENTED |
+| REQ-PWS-013 | SessionRepository.getById returns Session or null | MUST | ✅ IMPLEMENTED |
 
 ---
 
@@ -281,6 +282,30 @@ Firestore security rules MUST block read and write to `users/{uid}/sessions/**` 
 
 ---
 
+### REQ-PWS-013 — SessionRepository.getById returns Session or null
+
+`SessionRepository.getById(uid, sessionId)` MUST return `Future<Session?>`. If a document exists at `users/{uid}/sessions/{sessionId}`, it MUST be returned as a `Session`. If the document does not exist, it MUST return `null`.
+
+#### SCENARIO-334: getById returns Session when document exists
+
+- GIVEN a session document exists at `users/{uid}/sessions/{sessionId}`
+- WHEN `getById(uid, sessionId)` is called
+- THEN a `Session` is returned with `id == sessionId`
+
+#### SCENARIO-335: getById returns null when document does not exist
+
+- GIVEN no session document exists at `users/{uid}/sessions/{unknownId}`
+- WHEN `getById(uid, unknownId)` is called
+- THEN `null` is returned
+
+#### SCENARIO-336: getById reads from correct Firestore sub-path
+
+- GIVEN a Firestore instance with a session at `users/u1/sessions/s1`
+- WHEN `getById('u1', 's1')` is called
+- THEN the read targets the path `users/u1/sessions/s1`
+
+---
+
 ## Implementation Summary
 
 **File locations**:
@@ -299,7 +324,7 @@ Firestore security rules MUST block read and write to `users/{uid}/sessions/**` 
 ## Notes for Future Etapas
 
 - **Etapa 2** (Session Player): Calls `SessionRepository.create()` + `addSetLog()` during workout
-- **Etapa 3** (Post-Workout Summary): Calls `SessionRepository.finish()` before `PostRepository.create()`
+- **Etapa 3** (Post-Workout Summary): Calls `SessionRepository.getById()` (REQ-PWS-013) for summary screen; calls `SessionRepository.finish()` before `PostRepository.create()`
 - **Etapa 4** (Historial): Calls `listByUid()` + lazy-loads `listSetLogs()`
 - **Etapa 5** (Insights): Calls `listByUid()` for aggregates
 - **Etapa 6** (Wire Stats): Calls `listByUid()` for Home/Profile widgets
