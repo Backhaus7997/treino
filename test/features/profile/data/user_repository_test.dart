@@ -5,6 +5,8 @@ import 'package:treino/features/profile/data/user_repository.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
 
+// ignore_for_file: avoid_dynamic_calls
+
 void main() {
   late FakeFirebaseFirestore firestore;
   late UserRepository repo;
@@ -155,6 +157,99 @@ void main() {
       expect(data['displayName'], equals('Carol'));
       expect(data['role'], equals('athlete')); // role NOT changed
     });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Dual-write scenarios (SCENARIO-259..263)
+  // ---------------------------------------------------------------------------
+  group('UserRepository dual-write (userPublicProfiles)', () {
+    test(
+        'SCENARIO-259: getOrCreate writes both users and userPublicProfiles',
+        () async {
+      await repo.getOrCreate(uid: 'u1', email: 'a@b.com');
+
+      final usersSnap =
+          await firestore.collection('users').doc('u1').get();
+      final pubSnap =
+          await firestore.collection('userPublicProfiles').doc('u1').get();
+
+      expect(usersSnap.exists, isTrue);
+      expect(pubSnap.exists, isTrue);
+      expect(pubSnap.data()!['uid'], equals('u1'));
+    });
+
+    test(
+        'SCENARIO-260: createIfAbsent writes both users and userPublicProfiles',
+        () async {
+      await repo.createIfAbsent(uid: 'u2', email: 'b@c.com');
+
+      final usersSnap =
+          await firestore.collection('users').doc('u2').get();
+      final pubSnap =
+          await firestore.collection('userPublicProfiles').doc('u2').get();
+
+      expect(usersSnap.exists, isTrue);
+      expect(pubSnap.exists, isTrue);
+      expect(pubSnap.data()!['uid'], equals('u2'));
+    });
+
+    test(
+        'SCENARIO-261: update with displayName propagates to userPublicProfiles '
+        'with lowercase derivation', () async {
+      await seedDoc('u3');
+      // Also seed public profile so the doc exists
+      await firestore.collection('userPublicProfiles').doc('u3').set({
+        'uid': 'u3',
+        'displayName': null,
+        'displayNameLowercase': null,
+        'avatarUrl': null,
+        'gymId': null,
+      });
+
+      await repo.update('u3', {'displayName': 'Nueva'});
+
+      final pubSnap =
+          await firestore.collection('userPublicProfiles').doc('u3').get();
+      expect(pubSnap.data()!['displayName'], equals('Nueva'));
+      expect(pubSnap.data()!['displayNameLowercase'], equals('nueva'));
+    });
+
+    test(
+        'SCENARIO-262: update without displayName/avatarUrl/gymId does NOT '
+        'touch userPublicProfiles', () async {
+      await seedDoc('u4');
+      await firestore.collection('userPublicProfiles').doc('u4').set({
+        'uid': 'u4',
+        'displayName': 'Original',
+        'displayNameLowercase': 'original',
+        'avatarUrl': null,
+        'gymId': null,
+      });
+
+      // Update only experienceLevel — none of the public fields
+      await repo.update('u4', {'experienceLevel': 'beginner'});
+
+      final pubSnap =
+          await firestore.collection('userPublicProfiles').doc('u4').get();
+      // Public profile must remain untouched
+      expect(pubSnap.data()!['displayName'], equals('Original'));
+      expect(pubSnap.data()!['displayNameLowercase'], equals('original'));
+    });
+
+    test(
+        'SCENARIO-263: displayNameLowercase is always auto-derived; '
+        'caller cannot override', () async {
+      await repo.getOrCreate(uid: 'u5', email: 'c@d.com');
+      await repo.update('u5', {'displayName': 'Alice'});
+
+      final pubSnap =
+          await firestore.collection('userPublicProfiles').doc('u5').get();
+      expect(pubSnap.data()!['displayNameLowercase'], equals('alice'));
+    });
+
+    // TODO: SCENARIO-264 — partial batch failure leaves neither doc written.
+    // Deferred: faking a mid-commit batch failure is not reliably reproducible
+    // with fake_cloud_firestore. Covered by manual T35-style emulator session.
   });
 
   // ---------------------------------------------------------------------------
