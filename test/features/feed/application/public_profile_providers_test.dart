@@ -10,6 +10,9 @@ import 'package:treino/features/feed/domain/friendship_status.dart';
 import 'package:treino/features/feed/domain/post_privacy.dart';
 import 'package:treino/features/profile/application/user_providers.dart'
     show firestoreProvider;
+import 'package:treino/features/profile/application/user_public_profile_providers.dart'
+    show userPublicProfileRepositoryProvider;
+import 'package:treino/features/profile/data/user_public_profile_repository.dart';
 
 class _MockUser extends Mock implements User {}
 
@@ -187,19 +190,23 @@ void main() {
   // publicProfileViewProvider
   // ────────────────────────────────────────────────────────────────────
 
+  // ──────────────────────────────────────────────────────────────────────────
+  // publicProfileViewProvider
+  //
+  // SCENARIO-203..205 fixtures now seed `userPublicProfiles` (NOT `posts`).
+  // Assertions remain behaviorally equivalent per REQ-UPP-020 / SCENARIO-273.
+  // ──────────────────────────────────────────────────────────────────────────
   group('publicProfileViewProvider', () {
-    test('SCENARIO-203: composes post + friendship; isSelf=false', () async {
+    test('SCENARIO-203: composes userPublicProfile + friendship; isSelf=false',
+        () async {
       final firestore = FakeFirebaseFirestore();
-      await firestore.collection('posts').doc('p1').set({
-        'id': 'p1',
-        'authorUid': 'target',
-        'authorDisplayName': 'Tincho',
-        'authorAvatarUrl': 'https://x.com/y.jpg',
-        'authorGymId': 'la-fuerza',
-        'text': 'hola',
-        'routineTag': null,
-        'privacy': PostPrivacy.public.toJson(),
-        'createdAt': Timestamp.now(),
+      // Seed userPublicProfiles (NOT posts) — REQ-UPP-020
+      await firestore.collection('userPublicProfiles').doc('target').set({
+        'uid': 'target',
+        'displayName': 'Tincho',
+        'displayNameLowercase': 'tincho',
+        'avatarUrl': 'https://x.com/y.jpg',
+        'gymId': 'la-fuerza',
       });
       await firestore.collection('friendships').doc('target_viewer').set({
         'id': 'target_viewer',
@@ -213,6 +220,9 @@ void main() {
 
       final container = ProviderContainer(overrides: [
         firestoreProvider.overrideWithValue(firestore),
+        userPublicProfileRepositoryProvider.overrideWithValue(
+          UserPublicProfileRepository(firestore: firestore),
+        ),
         authStateChangesProvider
             .overrideWith((_) => Stream.value(_userWithUid('viewer'))),
       ]);
@@ -229,12 +239,17 @@ void main() {
       expect(view.isSelf, isFalse);
     });
 
-    test('SCENARIO-204: no posts → authorDisplayName falls back to "Anónimo"',
+    test(
+        'SCENARIO-204: no userPublicProfile doc → authorDisplayName falls back to "Anónimo"',
         () async {
       final firestore = FakeFirebaseFirestore();
+      // No doc seeded in userPublicProfiles for 'target'
 
       final container = ProviderContainer(overrides: [
         firestoreProvider.overrideWithValue(firestore),
+        userPublicProfileRepositoryProvider.overrideWithValue(
+          UserPublicProfileRepository(firestore: firestore),
+        ),
         authStateChangesProvider
             .overrideWith((_) => Stream.value(_userWithUid('viewer'))),
       ]);
@@ -253,20 +268,20 @@ void main() {
     test('SCENARIO-205: self-visit → isSelf=true and friendship is null',
         () async {
       final firestore = FakeFirebaseFirestore();
-      await firestore.collection('posts').doc('p1').set({
-        'id': 'p1',
-        'authorUid': 'me',
-        'authorDisplayName': 'Yo',
-        'authorAvatarUrl': null,
-        'authorGymId': null,
-        'text': 'mio',
-        'routineTag': null,
-        'privacy': PostPrivacy.public.toJson(),
-        'createdAt': Timestamp.now(),
+      // Seed userPublicProfiles for self (NOT posts) — REQ-UPP-020
+      await firestore.collection('userPublicProfiles').doc('me').set({
+        'uid': 'me',
+        'displayName': 'Yo',
+        'displayNameLowercase': 'yo',
+        'avatarUrl': null,
+        'gymId': null,
       });
 
       final container = ProviderContainer(overrides: [
         firestoreProvider.overrideWithValue(firestore),
+        userPublicProfileRepositoryProvider.overrideWithValue(
+          UserPublicProfileRepository(firestore: firestore),
+        ),
         authStateChangesProvider
             .overrideWith((_) => Stream.value(_userWithUid('me'))),
       ]);

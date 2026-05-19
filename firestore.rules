@@ -62,11 +62,40 @@ service cloud.firestore {
                             && request.auth.uid == resource.data.authorUid;
     }
 
+    // Public identity documents — one per user, public-readable by any
+    // authenticated user, writable only by the owner. Contains ONLY the 5
+    // public fields (uid, displayName, displayNameLowercase, avatarUrl, gymId).
+    // REQ-UPP-014, REQ-UPP-015. GAP-1, GAP-2, GAP-3 from design Section C.
+    match /userPublicProfiles/{uid} {
+      // Any authenticated user can read (get or list). Enables prefix-range
+      // search queries from searchByDisplayName. REQ-UPP-014.
+      allow read: if request.auth != null;
+
+      // Only the owner can create their own doc; uid in body must match doc id.
+      allow create: if request.auth != null
+                    && request.auth.uid == uid
+                    && request.resource.data.uid == uid;
+
+      // Only the owner can update; uid in body must not change (immutable).
+      allow update: if request.auth != null
+                    && request.auth.uid == uid
+                    && request.resource.data.uid == resource.data.uid;
+
+      // Deletion denied — managed exclusively through WriteBatch from
+      // server-side operations (backfill, account deletion Cloud Function).
+      allow delete: if false;
+    }
+
     match /friendships/{friendshipId} {
-      // Read: only members of the friendship. SCENARIO-131: non-member blocked.
-      // REQ-PFM-010
+      // Read: only members of the friendship — OR doc does not exist (returns
+      // empty snapshot without leaking data). The `resource == null` branch is
+      // required for `getByPair()` to gracefully resolve "no friendship yet"
+      // between two users who have never interacted (e.g. fresh public profile
+      // visits). Discovered during user-public-profiles smoke test;
+      // pre-existing from PR #28 friendships introduction (REQ-PFM-010).
       allow read: if request.auth != null
-                  && request.auth.uid in resource.data.members;
+                  && (resource == null
+                      || request.auth.uid in resource.data.members);
 
       // Create: only by the requester, with status='pending', requester in members.
       allow create: if request.auth != null
