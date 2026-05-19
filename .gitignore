@@ -52,4 +52,5 @@ app.*.map.json
 scripts/treino-dev-service-account*.json
 scripts/*.serviceAccount.json
 scripts/node_modules/
+scripts/rules_test/node_modules/
 scripts/.env
