@@ -262,5 +262,110 @@ void main() {
 
       expect(find.text('Detalle'), findsOneWidget);
     });
+
+    // ── Expand / collapse toggle ────────────────────────────────────────────
+
+    /// Builds N completed sessions with unique routineNames so we can count
+    /// rendered cards via find.text per name.
+    List<Session> manySessions(int n) => List.generate(
+          n,
+          (i) => _makeSession(
+            id: 's$i',
+            routineName: 'Rutina $i',
+            startedAt: DateTime(2025, 11, 30 - i),
+          ),
+        );
+
+    // SCENARIO-367: collapsed by default — shows max 5 cards + "Ver más (N)"
+    testWidgets(
+        'SCENARIO-367: with 8 sessions, collapsed view shows 5 cards + "Ver más (3)"',
+        (tester) async {
+      await _pumpHistorialSection(tester, sessions: manySessions(8));
+      await tester.pumpAndSettle();
+
+      // The first 5 cards are visible
+      for (var i = 0; i < 5; i++) {
+        expect(find.text('Rutina $i'), findsOneWidget);
+      }
+      // The last 3 are hidden
+      for (var i = 5; i < 8; i++) {
+        expect(find.text('Rutina $i'), findsNothing);
+      }
+      // "Ver más (3)" toggle button is visible
+      expect(
+        find.text(WorkoutStrings.historialShowMore(3)),
+        findsOneWidget,
+      );
+    });
+
+    // SCENARIO-368: tap "Ver más" expands to show all sessions
+    testWidgets(
+        'SCENARIO-368: tapping "Ver más" expands to show all 8 sessions',
+        (tester) async {
+      await _pumpHistorialSection(tester, sessions: manySessions(8));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text(WorkoutStrings.historialShowMore(3)));
+      await tester.pumpAndSettle();
+
+      // All 8 cards visible
+      for (var i = 0; i < 8; i++) {
+        expect(find.text('Rutina $i'), findsOneWidget);
+      }
+      // Button now says "Ver menos"
+      expect(find.text(WorkoutStrings.historialShowLess), findsOneWidget);
+    });
+
+    // SCENARIO-369: tap "Ver menos" collapses back to 5
+    testWidgets('SCENARIO-369: tapping "Ver menos" collapses back to 5 cards',
+        (tester) async {
+      await _pumpHistorialSection(tester, sessions: manySessions(8));
+      await tester.pumpAndSettle();
+
+      // Expand
+      await tester.tap(find.text(WorkoutStrings.historialShowMore(3)));
+      await tester.pumpAndSettle();
+
+      // Collapse
+      await tester.tap(find.text(WorkoutStrings.historialShowLess));
+      await tester.pumpAndSettle();
+
+      // Back to first 5 visible
+      for (var i = 0; i < 5; i++) {
+        expect(find.text('Rutina $i'), findsOneWidget);
+      }
+      for (var i = 5; i < 8; i++) {
+        expect(find.text('Rutina $i'), findsNothing);
+      }
+    });
+
+    // SCENARIO-370: when sessions <= 5, no toggle button is rendered
+    testWidgets(
+        'SCENARIO-370: with 5 sessions (exactly limit), no toggle is rendered',
+        (tester) async {
+      await _pumpHistorialSection(tester, sessions: manySessions(5));
+      await tester.pumpAndSettle();
+
+      // All 5 visible
+      for (var i = 0; i < 5; i++) {
+        expect(find.text('Rutina $i'), findsOneWidget);
+      }
+      // No "Ver más" / "Ver menos" anywhere
+      expect(find.textContaining('Ver más'), findsNothing);
+      expect(find.text(WorkoutStrings.historialShowLess), findsNothing);
+    });
+
+    // SCENARIO-371: with 3 sessions (under limit), no toggle is rendered
+    testWidgets(
+        'SCENARIO-371: with 3 sessions (under limit), no toggle is rendered',
+        (tester) async {
+      await _pumpHistorialSection(tester, sessions: manySessions(3));
+      await tester.pumpAndSettle();
+
+      for (var i = 0; i < 3; i++) {
+        expect(find.text('Rutina $i'), findsOneWidget);
+      }
+      expect(find.textContaining('Ver más'), findsNothing);
+    });
   });
 }

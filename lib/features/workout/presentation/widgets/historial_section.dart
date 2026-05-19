@@ -15,11 +15,18 @@ import '../../../../core/widgets/treino_icon.dart';
 ///
 /// No constructor parameters — consumes [currentUidProvider] and
 /// [sessionsByUidProvider] from Riverpod.
-class HistorialSection extends ConsumerWidget {
+class HistorialSection extends ConsumerStatefulWidget {
   const HistorialSection({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HistorialSection> createState() => _HistorialSectionState();
+}
+
+class _HistorialSectionState extends ConsumerState<HistorialSection> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final uid = ref.watch(currentUidProvider) ?? '';
 
@@ -46,12 +53,31 @@ class HistorialSection extends ConsumerWidget {
             if (completed.isEmpty) {
               return const _ListEmptyState();
             }
-            return ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: completed.length,
-              itemBuilder: (context, i) =>
-                  _HistorialCard(session: completed[i]),
+
+            const limit = WorkoutStrings.historialCollapsedLimit;
+            final overflow = completed.length > limit;
+            final visible = (overflow && !_expanded)
+                ? completed.take(limit).toList()
+                : completed;
+            final hidden = completed.length - limit;
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: visible.length,
+                  itemBuilder: (context, i) =>
+                      _HistorialCard(session: visible[i]),
+                ),
+                if (overflow)
+                  _ExpandToggle(
+                    expanded: _expanded,
+                    hiddenCount: hidden,
+                    onTap: () => setState(() => _expanded = !_expanded),
+                  ),
+              ],
             );
           },
         ),
@@ -213,5 +239,36 @@ class _CompletedIcon extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     return Icon(TreinoIcon.checkCircleFill, color: palette.accent, size: 20);
+  }
+}
+
+// ── Expand / collapse toggle ──────────────────────────────────────────────────
+
+class _ExpandToggle extends StatelessWidget {
+  const _ExpandToggle({
+    required this.expanded,
+    required this.hiddenCount,
+    required this.onTap,
+  });
+
+  final bool expanded;
+  final int hiddenCount;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final label = expanded
+        ? WorkoutStrings.historialShowLess
+        : WorkoutStrings.historialShowMore(hiddenCount);
+    final icon = expanded ? TreinoIcon.chevronUp : TreinoIcon.chevronDown;
+
+    return Center(
+      child: TextButton.icon(
+        onPressed: onTap,
+        icon: Icon(icon, color: palette.accent, size: 18),
+        label: Text(label, style: TextStyle(color: palette.accent)),
+      ),
+    );
   }
 }

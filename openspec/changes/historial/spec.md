@@ -461,6 +461,54 @@ No changes to `pubspec.yaml` are permitted.
 
 ---
 
+## REQ-HIST-022 — Collapsed-by-default list with expand toggle
+
+`HistorialSection` MUST limit the number of visible cards to
+`WorkoutStrings.historialCollapsedLimit` (5) by default. When the filtered list
+exceeds this limit, a toggle button MUST appear under the cards:
+
+- **Collapsed state**: label `"Ver más (N)"` where `N = total - limit` (count
+  of hidden sessions), with a `TreinoIcon.chevronDown` leading icon.
+- **Expanded state**: label `"Ver menos"` with a `TreinoIcon.chevronUp` leading
+  icon. All filtered sessions are visible.
+
+Tapping the toggle MUST flip the expanded state in-place (no navigation,
+no modal). The state is local to the widget instance (re-enters collapsed on
+navigation away and back, by design — `autoDispose` on the provider makes that
+desirable).
+
+When the filtered list has 5 or fewer sessions, the toggle button MUST NOT be
+rendered.
+
+#### SCENARIO-381: with 8 sessions, collapsed shows 5 cards + "Ver más (3)"
+
+- GIVEN `sessionsByUidProvider` returns 8 completed sessions
+- WHEN `HistorialSection` renders the initial (collapsed) state
+- THEN exactly 5 cards are visible
+- AND a button with text `"Ver más (3)"` is visible
+
+#### SCENARIO-382: tapping "Ver más" expands to show all sessions
+
+- GIVEN the collapsed view with `"Ver más (3)"` visible
+- WHEN the user taps the button
+- THEN all 8 cards are visible
+- AND the button label is now `"Ver menos"`
+
+#### SCENARIO-383: tapping "Ver menos" collapses back to 5
+
+- GIVEN the expanded view with `"Ver menos"` visible
+- WHEN the user taps the button
+- THEN only the first 5 cards are visible
+- AND the button label is back to `"Ver más (3)"`
+
+#### SCENARIO-384: with 5 or fewer sessions, no toggle is rendered
+
+- GIVEN `sessionsByUidProvider` returns 5 completed sessions
+- WHEN `HistorialSection` renders
+- THEN no `"Ver más"` or `"Ver menos"` button appears anywhere in the tree
+
+---
+
 ## Annotated Capability: `workout-data`
 
 **No code changes.** This etapa is a read-only consumer of the existing data layer.

@@ -43,4 +43,11 @@ abstract final class WorkoutStrings {
   static const historialErrorRetry = 'Reintentar';
   static const historialCardKgSuffix = ' kg';
   static const historialCardMinSuffix = ' min';
+
+  // --- Historial section (expand toggle) ---
+  /// Default cap for the collapsed historial. Cards beyond this are hidden
+  /// until the user taps "Ver más".
+  static const historialCollapsedLimit = 5;
+  static const historialShowLess = 'Ver menos';
+  static String historialShowMore(int hidden) => 'Ver más ($hidden)';
 }
