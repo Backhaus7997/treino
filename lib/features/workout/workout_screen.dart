@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/theme/app_palette.dart';
+import 'presentation/widgets/historial_section.dart';
 import 'presentation/widgets/plantillas_section.dart';
 
 class WorkoutScreen extends ConsumerWidget {
@@ -20,7 +21,7 @@ class WorkoutScreen extends ConsumerWidget {
           SizedBox(height: 20),
           _TuRutinaSection(),
           SizedBox(height: 20),
-          _HistorialSection(),
+          HistorialSection(),
         ],
       ),
     );
@@ -45,30 +46,6 @@ class _TuRutinaSection extends StatelessWidget {
         const SizedBox(height: 12),
         Text(
           'No tenés rutina asignada todavía.',
-          style: theme.textTheme.bodyMedium?.copyWith(color: palette.textMuted),
-        ),
-      ],
-    );
-  }
-}
-
-class _HistorialSection extends StatelessWidget {
-  const _HistorialSection();
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-    final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'HISTORIAL',
-          style: theme.textTheme.titleMedium,
-        ),
-        const SizedBox(height: 12),
-        Text(
-          'Tus entrenamientos completados aparecerán acá.',
           style: theme.textTheme.bodyMedium?.copyWith(color: palette.textMuted),
         ),
       ],

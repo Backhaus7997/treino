@@ -34,4 +34,13 @@ abstract final class WorkoutStrings {
 
   // --- Post autocomplete text ---
   static const postAutoCompleteText = '¡Terminé mi entreno! 💪';
+
+  // --- Historial section (lista) ---
+  static const historialHeading = 'HISTORIAL';
+  static const historialEmptyMessage = 'Todavía no entrenaste.';
+  static const historialEmptyCta = 'Empezar entrenamiento';
+  static const historialErrorMessage = 'No pudimos cargar tu historial.';
+  static const historialErrorRetry = 'Reintentar';
+  static const historialCardKgSuffix = ' kg';
+  static const historialCardMinSuffix = ' min';
 }

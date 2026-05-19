@@ -160,6 +160,16 @@ GoRouter buildRouter({
         },
       ),
 
+      // ─── Historial detail — TOP-LEVEL ROUTE (outside ShellRoute) ──────────
+      // Immersive: oculta la bottom bar. PR-A stub; PR-B reemplaza con
+      // SessionDetailScreen. Design §11-12.
+      GoRoute(
+        path: '/workout/historial/:sessionId',
+        pageBuilder: (context, state) => _noAnim(
+          const Center(child: Text('Detalle — próximamente')),
+        ),
+      ),
+
       // ShellRoute with the existing 5 tabs.
       // Use `pageBuilder` (not `builder`) so the shell itself uses an
       // instant transition when entered from a top-level route like /splash —
