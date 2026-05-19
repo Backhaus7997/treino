@@ -1,10 +1,10 @@
 # Session Data Layer — Specification
 
 **Domain**: Workout Session Management
-**Changes**: `session-model-seed` (Fase 4 · Etapa 1) + `session-player` amendment (Etapa 2) + `post-workout-summary` amendment (Etapa 3)
+**Changes**: `session-model-seed` (Fase 4 · Etapa 1) + `session-player` amendment (Etapa 2) + `post-workout-summary` amendment (Etapa 3) + `historial` consumer annotation (Etapa 4)
 **Status**: ACTIVE (source of truth)
 **Last updated**: 2026-05-19
-**Merged**: PR #34 (commit 83cd63b); PR #39 (squash commit c23c80c)
+**Merged**: PR #34 (commit 83cd63b); PR #39 (squash commit c23c80c); PR #46 + #48 (consumer annotation only)
 
 ---
 
@@ -321,10 +321,31 @@ Firestore security rules MUST block read and write to `users/{uid}/sessions/**` 
 
 ---
 
+## Consumer Documentation
+
+### Etapa 4 (Historial) — Consumer Annotation
+
+The `historial` capability (Fase 4 · Etapa 4) consumes the following symbols from this data layer as **read-only**. No modifications are made to this spec or implementation.
+
+**Consumed symbols**:
+- `sessionsByUidProvider`: Fetches all user sessions (read-only query)
+- `sessionSummaryProvider`: Fetches a single session + its set logs (read-only query)
+- `currentUidProvider`: Identifies the current user
+- `Session` model fields: `routineName`, `startedAt`, `totalVolumeKg`, `durationMin`, `wasFullyCompleted`, `status`
+- `SetLog` model fields: `exerciseName`, `setNumber`, `reps`, `weightKg`
+- `SessionStatus.finished`: Status check during client-side filtering
+
+**Filter applied by consumer**:
+`HistorialSection` applies a client-side filter `status == SessionStatus.finished && wasFullyCompleted == true` when rendering the session list. This filter is a UI concern and does not affect the data layer.
+
+**No changes to session-data-layer required**. All existing providers and repositories remain as documented above.
+
+---
+
 ## Notes for Future Etapas
 
 - **Etapa 2** (Session Player): Calls `SessionRepository.create()` + `addSetLog()` during workout
 - **Etapa 3** (Post-Workout Summary): Calls `SessionRepository.getById()` (REQ-PWS-013) for summary screen; calls `SessionRepository.finish()` before `PostRepository.create()`
-- **Etapa 4** (Historial): Calls `listByUid()` + lazy-loads `listSetLogs()`
-- **Etapa 5** (Insights): Calls `listByUid()` for aggregates
+- **Etapa 4** (Historial): Calls `listByUid()` + `listSetLogs()` via providers (read-only consumer, no changes to data layer)
+- **Etapa 5** (Insights): Calls `listByUid()` for aggregates + PR detection
 - **Etapa 6** (Wire Stats): Calls `listByUid()` for Home/Profile widgets
