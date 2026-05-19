@@ -6,11 +6,14 @@ import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/widgets/treino_bottom_bar.dart';
 import 'package:treino/features/workout/application/exercise_providers.dart';
 import 'package:treino/features/workout/application/routine_providers.dart';
+import 'package:treino/features/workout/application/session_providers.dart';
 import 'package:treino/features/workout/domain/exercise.dart';
 import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/domain/routine_day.dart';
 import 'package:treino/features/workout/domain/routine_slot.dart';
+import 'package:treino/features/workout/domain/set_log.dart';
 import 'package:treino/features/workout/presentation/exercise_detail_screen.dart';
+import 'package:treino/features/workout/presentation/post_workout_summary_screen.dart';
 import 'package:treino/features/workout/presentation/routine_detail_screen.dart';
 import 'package:treino/features/profile/domain/experience_level.dart';
 
@@ -158,6 +161,53 @@ void main() {
 
       expect(find.byType(ExerciseDetailScreen), findsOneWidget);
       expect(find.byType(TreinoBottomBar), findsOneWidget);
+    });
+
+    testWidgets(
+        'SCENARIO-354: /workout/session-summary/:sessionId resolves to PostWorkoutSummaryScreen WITHOUT TreinoBottomBar (immersive)',
+        (tester) async {
+      final router = GoRouter(
+        initialLocation: '/start',
+        routes: [
+          GoRoute(path: '/start', builder: (_, __) => const Text('START')),
+          GoRoute(
+            path: '/workout/session-summary/:sessionId',
+            builder: (context, state) => PostWorkoutSummaryScreen(
+              sessionId: state.pathParameters['sessionId']!,
+            ),
+          ),
+          ShellRoute(
+            builder: (context, state, child) => _TestShell(child: child),
+            routes: [
+              GoRoute(
+                path: '/workout',
+                builder: (_, __) => const Text('WORKOUT'),
+              ),
+            ],
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            currentUidProvider.overrideWithValue('u1'),
+            sessionSummaryProvider.overrideWith(
+              (ref, key) async => (session: null, setLogs: <SetLog>[]),
+            ),
+          ],
+          child: MaterialApp.router(
+            theme: AppTheme.dark(),
+            routerConfig: router,
+          ),
+        ),
+      );
+
+      router.go('/workout/session-summary/s1');
+      await tester.pumpAndSettle();
+
+      expect(find.byType(PostWorkoutSummaryScreen), findsOneWidget);
+      expect(find.byType(TreinoBottomBar), findsNothing);
     });
   });
 }

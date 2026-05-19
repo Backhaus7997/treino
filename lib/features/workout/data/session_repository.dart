@@ -70,6 +70,16 @@ class SessionRepository {
     });
   }
 
+  // ─── getById ────────────────────────────────────────────────────────────
+
+  Future<Session?> getById({
+    required String uid,
+    required String sessionId,
+  }) async {
+    final snap = await _sessions(uid).doc(sessionId).get();
+    return _sessionFromDoc(snap);
+  }
+
   // ─── listByUid ──────────────────────────────────────────────────────────
 
   Future<List<Session>> listByUid(String uid) async {
