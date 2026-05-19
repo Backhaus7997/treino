@@ -118,6 +118,7 @@ class _ExerciseDetailContent extends StatelessWidget {
       slivers: [
         SliverToBoxAdapter(
           child: _HeroStrip(
+            exerciseId: exercise.id,
             muscleGroup: exercise.muscleGroup,
             badgeText: badgeText,
             titleText: exercise.name.toUpperCase(),
@@ -167,11 +168,13 @@ class _ExerciseDetailContent extends StatelessWidget {
 
 class _HeroStrip extends StatelessWidget {
   const _HeroStrip({
+    required this.exerciseId,
     required this.muscleGroup,
     required this.badgeText,
     required this.titleText,
   });
 
+  final String exerciseId;
   final String muscleGroup;
   final String badgeText;
   final String titleText;
@@ -198,10 +201,10 @@ class _HeroStrip extends StatelessWidget {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          // Convention: assets/muscles/{muscleGroup}.png. Missing asset →
+          // Convention: assets/exercises/{exerciseId}.png. Missing asset →
           // errorBuilder paints the gradient so the screen never breaks.
           Image.asset(
-            'assets/muscles/${muscleGroup.toLowerCase()}.png',
+            'assets/exercises/$exerciseId.png',
             fit: BoxFit.cover,
             errorBuilder: (_, __, ___) => gradient,
           ),
