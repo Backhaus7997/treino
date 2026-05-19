@@ -257,10 +257,12 @@ void main() {
       );
     });
 
-    // SCENARIO-284: fila current — badge 'Ahora'
-    testWidgets('SCENARIO-284: estado current renderiza badge "Ahora"',
+    // SCENARIO-284: header de ejercicio muestra progreso "X/N"
+    // (reemplaza el badge "Ahora" del diseño viejo — en el redesign de
+    // inline-set-rows el progreso se muestra explícito por ejercicio).
+    testWidgets('SCENARIO-284: header del ejercicio muestra progreso "0/N"',
         (tester) async {
-      // Estado default: e1 sin logs → current en index 0
+      // Estado default: e1 (targetSets=3) sin logs → progreso "0/3"
       await tester.pumpWidget(
         _wrapProvider(
           const SessionPlayerScreen(init: _kInit),
@@ -268,25 +270,26 @@ void main() {
         ),
       );
       await tester.pump();
-      expect(find.text('Ahora'), findsOneWidget);
+      expect(find.text('0/3'), findsAtLeastNWidgets(1));
     });
 
-    // SCENARIO-285: fila pending — tap llama al callback (abre el sheet)
-    testWidgets('SCENARIO-285: estado pending es tappable y abre SetEntrySheet',
+    // SCENARIO-285: stepper '+' de reps actualiza el valor mostrado inline.
+    // En el redesign solo se muestra la serie actual expandida (no las
+    // futuras pendientes), así que esperamos exactamente 1 fila con
+    // "8 reps" antes del tap y 1 con "9 reps" después.
+    testWidgets(
+        'SCENARIO-285: tap en stepper "+" de reps incrementa el valor inline',
         (tester) async {
-      // Estado donde e1 está completo, e2 es pending
+      // Sentadilla pending, sin logs → solo se renderiza la serie 1.
       final slots = [
-        makeSlot(
-            exerciseId: 'e1', exerciseName: 'Press de banca', targetSets: 1),
         makeSlot(exerciseId: 'e2', exerciseName: 'Sentadilla', targetSets: 3),
       ];
       final day = makeDay(dayNumber: 1, slots: slots);
-      final logs = [makeSetLog(exerciseId: 'e1', setNumber: 1)];
       final state = SessionState(
         session: makeSession(),
         day: day,
-        setLogs: logs,
-        currentExerciseIndex: 1,
+        setLogs: const [],
+        currentExerciseIndex: 0,
         elapsedSeconds: 0,
       );
       await tester.pumpWidget(
@@ -296,11 +299,16 @@ void main() {
         ),
       );
       await tester.pump();
-      // Sentadilla es pending — tap debe abrir el sheet
-      await tester.tap(find.text('Sentadilla'));
+      // Antes: la única fila expandida muestra "8 reps" (targetRepsMin
+      // default de makeSlot) en el stepper de reps.
+      expect(find.text('8 reps'), findsOneWidget);
+      // Tap en el primer '+' (el '+' del stepper de reps).
+      await tester.ensureVisible(find.text('+').first);
       await tester.pumpAndSettle();
-      // El sheet abierto muestra el nombre en mayúsculas
-      expect(find.text('SENTADILLA'), findsOneWidget);
+      await tester.tap(find.text('+').first);
+      await tester.pump();
+      // Después: el stepper de reps muestra "9 reps".
+      expect(find.text('9 reps'), findsOneWidget);
     });
 
     // SCENARIO-286: fila done NO es tappable
