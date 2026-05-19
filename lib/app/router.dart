@@ -21,6 +21,7 @@ import '../features/feed/presentation/create_post_screen.dart';
 import '../features/feed/presentation/public_profile_screen.dart';
 import '../features/feed/presentation/search_users_screen.dart';
 import '../features/home/home_screen.dart';
+import '../features/insights/presentation/insights_screen.dart';
 import '../features/profile/application/user_providers.dart';
 import '../features/profile/profile_screen.dart';
 import '../features/profile_setup/presentation/profile_setup_flow.dart';
@@ -229,6 +230,12 @@ GoRouter buildRouter({
           GoRoute(
             path: '/home',
             pageBuilder: (_, __) => _noAnim(const HomeScreen()),
+            routes: [
+              GoRoute(
+                path: 'insights',
+                pageBuilder: (_, __) => _noAnim(const InsightsScreen()),
+              ),
+            ],
           ),
           GoRoute(
             path: '/coach',
