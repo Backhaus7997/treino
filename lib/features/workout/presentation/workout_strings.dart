@@ -34,4 +34,20 @@ abstract final class WorkoutStrings {
 
   // --- Post autocomplete text ---
   static const postAutoCompleteText = '¡Terminé mi entreno! 💪';
+
+  // --- Historial section (lista) ---
+  static const historialHeading = 'HISTORIAL';
+  static const historialEmptyMessage = 'Todavía no entrenaste.';
+  static const historialEmptyCta = 'Empezar entrenamiento';
+  static const historialErrorMessage = 'No pudimos cargar tu historial.';
+  static const historialErrorRetry = 'Reintentar';
+  static const historialCardKgSuffix = ' kg';
+  static const historialCardMinSuffix = ' min';
+
+  // --- Historial section (expand toggle) ---
+  /// Default cap for the collapsed historial. Cards beyond this are hidden
+  /// until the user taps "Ver más".
+  static const historialCollapsedLimit = 5;
+  static const historialShowLess = 'Ver menos';
+  static String historialShowMore(int hidden) => 'Ver más ($hidden)';
 }

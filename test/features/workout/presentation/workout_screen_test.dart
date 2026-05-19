@@ -8,9 +8,12 @@ import 'package:treino/features/profile/domain/experience_level.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
 import 'package:treino/features/workout/application/routine_providers.dart';
+import 'package:treino/features/workout/application/session_providers.dart';
 import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/presentation/routine_detail_screen.dart';
+import 'package:treino/features/workout/presentation/widgets/historial_section.dart';
 import 'package:treino/features/workout/presentation/widgets/plantillas_section.dart';
+import 'package:treino/features/workout/presentation/workout_strings.dart';
 import 'package:treino/features/workout/workout_screen.dart';
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
@@ -41,7 +44,11 @@ UserProfile makeProfile() => UserProfile(
 
 Widget _wrapWorkout(Widget w, {List<Override> overrides = const []}) =>
     ProviderScope(
-      overrides: overrides,
+      overrides: [
+        currentUidProvider.overrideWithValue('test-uid'),
+        sessionsByUidProvider.overrideWith((ref, uid) async => []),
+        ...overrides,
+      ],
       child: MaterialApp(
         theme: AppTheme.dark(),
         home: Scaffold(
@@ -202,8 +209,11 @@ void main() {
       );
     });
 
+    // REQ-HIST-020: WorkoutScreen uses real HistorialSection (not placeholder).
+    // Asserts that HistorialSection widget is rendered and shows empty state
+    // when sessionsByUidProvider returns an empty list.
     testWidgets(
-        '"Tus entrenamientos completados aparecerán acá." in Historial section',
+        'REQ-HIST-020: WorkoutScreen renders HistorialSection with empty state message',
         (tester) async {
       await tester.pumpWidget(
         _wrapWorkout(
@@ -216,8 +226,11 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 50));
 
+      // Real HistorialSection must be in the tree (not the private placeholder)
+      expect(find.byType(HistorialSection), findsOneWidget);
+      // Empty state message from WorkoutStrings
       expect(
-        find.text('Tus entrenamientos completados aparecerán acá.'),
+        find.text(WorkoutStrings.historialEmptyMessage),
         findsOneWidget,
       );
     });

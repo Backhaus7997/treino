@@ -78,6 +78,8 @@ class TreinoIcon {
   static const IconData dumbbell = PhosphorIconsRegular.barbell;
   static const IconData chevronLeft = PhosphorIconsRegular.caretLeft;
   static const IconData chevronRight = PhosphorIconsRegular.caretRight;
+  static const IconData chevronDown = PhosphorIconsRegular.caretDown;
+  static const IconData chevronUp = PhosphorIconsRegular.caretUp;
 
   // Gym / spaces
   static const IconData gym = PhosphorIconsRegular.buildings;

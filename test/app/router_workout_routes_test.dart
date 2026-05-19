@@ -209,5 +209,57 @@ void main() {
       expect(find.byType(PostWorkoutSummaryScreen), findsOneWidget);
       expect(find.byType(TreinoBottomBar), findsNothing);
     });
+
+    // SCENARIO-378 (PR-A stub): /workout/historial/:sessionId resolves to
+    // stub screen WITHOUT TreinoBottomBar (immersive, top-level route outside
+    // ShellRoute). PR-B replaces the stub with SessionDetailScreen.
+    testWidgets(
+        'SCENARIO-378: /workout/historial/:sessionId shows stub text WITHOUT TreinoBottomBar',
+        (tester) async {
+      // Router mirrors production structure: top-level GoRoute (no shell) for
+      // /workout/historial/:sessionId plus a ShellRoute for /workout.
+      // The stub body matches design §12: Center(Text('Detalle — próximamente')).
+      final router = GoRouter(
+        initialLocation: '/start',
+        routes: [
+          GoRoute(path: '/start', builder: (_, __) => const Text('START')),
+          // Top-level immersive route — outside ShellRoute (no bottom bar).
+          GoRoute(
+            path: '/workout/historial/:sessionId',
+            pageBuilder: (context, state) => CustomTransitionPage(
+              child: const Center(child: Text('Detalle — próximamente')),
+              transitionDuration: Duration.zero,
+              reverseTransitionDuration: Duration.zero,
+              transitionsBuilder: (_, __, ___, child) => child,
+            ),
+          ),
+          ShellRoute(
+            builder: (context, state, child) => _TestShell(child: child),
+            routes: [
+              GoRoute(
+                path: '/workout',
+                builder: (_, __) => const Text('WORKOUT'),
+              ),
+            ],
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: const [],
+          child: MaterialApp.router(
+            theme: AppTheme.dark(),
+            routerConfig: router,
+          ),
+        ),
+      );
+
+      router.go('/workout/historial/abc123');
+      await tester.pumpAndSettle();
+
+      expect(find.text('Detalle — próximamente'), findsOneWidget);
+      expect(find.byType(TreinoBottomBar), findsNothing);
+    });
   });
 }
