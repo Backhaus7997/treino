@@ -13,6 +13,7 @@ import '../features/coach/coach_screen.dart';
 import '../features/workout/application/session_init.dart';
 import '../features/workout/presentation/exercise_detail_screen.dart';
 import '../features/workout/presentation/post_workout_summary_screen.dart';
+import '../features/workout/presentation/session_detail_screen.dart';
 import '../features/workout/presentation/routine_detail_screen.dart';
 import '../features/workout/presentation/session_player_screen.dart';
 import '../features/feed/feed_screen.dart';
@@ -161,12 +162,13 @@ GoRouter buildRouter({
       ),
 
       // ─── Historial detail — TOP-LEVEL ROUTE (outside ShellRoute) ──────────
-      // Immersive: oculta la bottom bar. PR-A stub; PR-B reemplaza con
-      // SessionDetailScreen. Design §11-12.
+      // Immersive: oculta la bottom bar. Design §11-12.
       GoRoute(
         path: '/workout/historial/:sessionId',
         pageBuilder: (context, state) => _noAnim(
-          const Center(child: Text('Detalle — próximamente')),
+          SessionDetailScreen(
+            sessionId: state.pathParameters['sessionId']!,
+          ),
         ),
       ),
 

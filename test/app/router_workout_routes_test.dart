@@ -15,6 +15,7 @@ import 'package:treino/features/workout/domain/set_log.dart';
 import 'package:treino/features/workout/presentation/exercise_detail_screen.dart';
 import 'package:treino/features/workout/presentation/post_workout_summary_screen.dart';
 import 'package:treino/features/workout/presentation/routine_detail_screen.dart';
+import 'package:treino/features/workout/presentation/session_detail_screen.dart';
 import 'package:treino/features/profile/domain/experience_level.dart';
 
 // Minimal shell that mirrors _ShellScaffold from router.dart: provides a
@@ -210,15 +211,14 @@ void main() {
       expect(find.byType(TreinoBottomBar), findsNothing);
     });
 
-    // SCENARIO-378 (PR-A stub): /workout/historial/:sessionId resolves to
-    // stub screen WITHOUT TreinoBottomBar (immersive, top-level route outside
-    // ShellRoute). PR-B replaces the stub with SessionDetailScreen.
+    // SCENARIO-378 (PR-B): /workout/historial/:sessionId resolves to
+    // SessionDetailScreen WITHOUT TreinoBottomBar (immersive, top-level route
+    // outside ShellRoute). PR-B replaces the PR-A stub with SessionDetailScreen.
     testWidgets(
-        'SCENARIO-378: /workout/historial/:sessionId shows stub text WITHOUT TreinoBottomBar',
+        'SCENARIO-378: /workout/historial/:sessionId resolves to SessionDetailScreen WITHOUT TreinoBottomBar',
         (tester) async {
       // Router mirrors production structure: top-level GoRoute (no shell) for
       // /workout/historial/:sessionId plus a ShellRoute for /workout.
-      // The stub body matches design §12: Center(Text('Detalle — próximamente')).
       final router = GoRouter(
         initialLocation: '/start',
         routes: [
@@ -227,7 +227,9 @@ void main() {
           GoRoute(
             path: '/workout/historial/:sessionId',
             pageBuilder: (context, state) => CustomTransitionPage(
-              child: const Center(child: Text('Detalle — próximamente')),
+              child: SessionDetailScreen(
+                sessionId: state.pathParameters['sessionId']!,
+              ),
               transitionDuration: Duration.zero,
               reverseTransitionDuration: Duration.zero,
               transitionsBuilder: (_, __, ___, child) => child,
@@ -247,7 +249,12 @@ void main() {
 
       await tester.pumpWidget(
         ProviderScope(
-          overrides: const [],
+          overrides: [
+            currentUidProvider.overrideWithValue('u1'),
+            sessionSummaryProvider.overrideWith(
+              (ref, key) async => (session: null, setLogs: <SetLog>[]),
+            ),
+          ],
           child: MaterialApp.router(
             theme: AppTheme.dark(),
             routerConfig: router,
@@ -258,7 +265,7 @@ void main() {
       router.go('/workout/historial/abc123');
       await tester.pumpAndSettle();
 
-      expect(find.text('Detalle — próximamente'), findsOneWidget);
+      expect(find.byType(SessionDetailScreen), findsOneWidget);
       expect(find.byType(TreinoBottomBar), findsNothing);
     });
   });

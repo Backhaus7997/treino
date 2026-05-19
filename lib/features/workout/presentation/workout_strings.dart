@@ -50,4 +50,13 @@ abstract final class WorkoutStrings {
   static const historialCollapsedLimit = 5;
   static const historialShowLess = 'Ver menos';
   static String historialShowMore(int hidden) => 'Ver más ($hidden)';
+
+  // --- Historial detail screen (SessionDetailScreen) ---
+  // Note: StatTile renders label.toUpperCase() — constants are pre-uppercase
+  // so find.text() matches what's rendered on screen.
+  static const detailStatDuration = 'DURACIÓN';
+  static const detailStatSets = 'SETS';
+  static const detailStatVolume = 'VOLUMEN';
+  static const detailStatPrsToday = 'PRS HOY';
+  static const detailPrBadge = 'PR';
 }
