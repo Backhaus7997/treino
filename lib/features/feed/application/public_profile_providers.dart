@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../auth/application/auth_providers.dart';
 import '../../profile/application/user_providers.dart' show firestoreProvider;
+import '../../profile/application/user_public_profile_providers.dart';
 import '../data/friendship_repository.dart';
 import '../domain/friendship.dart';
 import '../domain/post.dart';
@@ -50,12 +51,15 @@ final firstPostByAuthorProvider =
   return Post.fromJson(snap.docs.first.data());
 });
 
-/// Composes [firstPostByAuthorProvider] + [friendshipByPairProvider] into a
+/// Composes [userPublicProfileProvider] + [friendshipByPairProvider] into a
 /// single view-model the `PublicProfileScreen` watches. Resolves:
-///   - `authorDisplayName` ('Anónimo' fallback when target has no posts)
-///   - `authorAvatarUrl` / `authorGymId` (denormalized from the post; null if none)
+///   - `authorDisplayName` (`'Anónimo'` fallback when no public profile doc)
+///   - `authorAvatarUrl` / `authorGymId` (from userPublicProfiles; null if none)
 ///   - `friendship` (null on self-visit or if no friendship doc exists)
 ///   - `isSelf` flag for the view layer to hide SEGUIR/MENSAJE buttons.
+///
+/// Sources author identity from `userPublicProfileProvider(targetUid)` — NOT
+/// from `firstPostByAuthorProvider`. REQ-UPP-017, REQ-UPP-018.
 final publicProfileViewProvider =
     FutureProvider.family<PublicProfileView, String>((ref, targetUid) async {
   final auth = await ref.watch(authStateChangesProvider.future);
@@ -73,20 +77,21 @@ final publicProfileViewProvider =
   final isSelf = viewerUid == targetUid;
 
   // Parallel reads. Skip the friendship lookup entirely on self-visit.
-  final postFuture = ref.watch(firstPostByAuthorProvider(targetUid).future);
+  final publicProfileFuture =
+      ref.watch(userPublicProfileProvider(targetUid).future);
   final friendshipFuture = isSelf
       ? Future<Friendship?>.value(null)
       : ref.watch(friendshipByPairProvider(
           (viewerUid: viewerUid, targetUid: targetUid),
         ).future);
 
-  final post = await postFuture;
+  final publicProfile = await publicProfileFuture;
   final friendship = await friendshipFuture;
 
   return PublicProfileView(
-    authorDisplayName: post?.authorDisplayName ?? 'Anónimo',
-    authorAvatarUrl: post?.authorAvatarUrl,
-    authorGymId: post?.authorGymId,
+    authorDisplayName: publicProfile?.displayName ?? 'Anónimo',
+    authorAvatarUrl: publicProfile?.avatarUrl,
+    authorGymId: publicProfile?.gymId,
     friendship: friendship,
     isSelf: isSelf,
   );
