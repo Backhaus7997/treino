@@ -70,18 +70,18 @@ void main() {
     });
 
     test(
-        'SCENARIO-423c: update with trainerHourlyRate writes to '
+        'SCENARIO-423c: update with trainerMonthlyRate writes to '
         'trainerPublicProfiles/{uid}', () async {
       await seedDoc('trainer-3');
 
-      await repo.update('trainer-3', {'trainerHourlyRate': 50});
+      await repo.update('trainer-3', {'trainerMonthlyRate': 50});
 
       final snap = await firestore
           .collection('trainerPublicProfiles')
           .doc('trainer-3')
           .get();
       expect(snap.exists, isTrue);
-      expect(snap.data()!['trainerHourlyRate'], equals(50));
+      expect(snap.data()!['trainerMonthlyRate'], equals(50));
     });
 
     test(

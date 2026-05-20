@@ -29,7 +29,7 @@ class UserRepository {
     'trainerGeohash',
     'trainerLatitude',
     'trainerLongitude',
-    'trainerHourlyRate',
+    'trainerMonthlyRate',
   };
 
   CollectionReference<Map<String, Object?>> get _users =>
@@ -91,7 +91,7 @@ class UserRepository {
   /// Per design D2: key-presence trigger (NOT value diff).
   /// Per design D1: field set includes displayName, avatarUrl, trainerBio,
   ///   trainerSpecialty, trainerGeohash, trainerLatitude, trainerLongitude,
-  ///   trainerHourlyRate. `displayNameLowercase` is always derived when
+  ///   trainerMonthlyRate. `displayNameLowercase` is always derived when
   ///   `displayName` is present.
   ///
   /// REQ-COACH-DISC-DUAL-001.
@@ -126,8 +126,8 @@ class UserRepository {
     if (partial.containsKey('trainerLongitude')) {
       result['trainerLongitude'] = partial['trainerLongitude'];
     }
-    if (partial.containsKey('trainerHourlyRate')) {
-      result['trainerHourlyRate'] = partial['trainerHourlyRate'];
+    if (partial.containsKey('trainerMonthlyRate')) {
+      result['trainerMonthlyRate'] = partial['trainerMonthlyRate'];
     }
     return result;
   }

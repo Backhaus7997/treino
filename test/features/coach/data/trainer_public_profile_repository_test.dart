@@ -24,7 +24,7 @@ void main() {
       displayNameLowercase: displayName.trim().toLowerCase(),
       trainerGeohash: trainerGeohash,
       trainerSpecialty: specialty,
-      trainerHourlyRate: hourlyRate,
+      trainerMonthlyRate: hourlyRate,
     );
     await firestore
         .collection('trainerPublicProfiles')

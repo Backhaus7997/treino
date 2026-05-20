@@ -17,7 +17,7 @@ void main() {
         trainerGeohash: '69y7p',
         trainerLatitude: -34.6037,
         trainerLongitude: -58.3816,
-        trainerHourlyRate: 2500,
+        trainerMonthlyRate: 2500,
       );
 
       final json = profile.toJson();
@@ -34,7 +34,7 @@ void main() {
       expect(restored.trainerGeohash, equals('69y7p'));
       expect(restored.trainerLatitude, equals(-34.6037));
       expect(restored.trainerLongitude, equals(-58.3816));
-      expect(restored.trainerHourlyRate, equals(2500));
+      expect(restored.trainerMonthlyRate, equals(2500));
     });
 
     test('SCENARIO-408: roundtrip with all nullable fields null', () {
@@ -48,7 +48,7 @@ void main() {
         trainerGeohash: null,
         trainerLatitude: null,
         trainerLongitude: null,
-        trainerHourlyRate: null,
+        trainerMonthlyRate: null,
       );
 
       final json = profile.toJson();
@@ -64,7 +64,7 @@ void main() {
       expect(restored.trainerGeohash, isNull);
       expect(restored.trainerLatitude, isNull);
       expect(restored.trainerLongitude, isNull);
-      expect(restored.trainerHourlyRate, isNull);
+      expect(restored.trainerMonthlyRate, isNull);
     });
 
     test('trainerSpecialty serializes as wire string in JSON', () {
@@ -88,12 +88,12 @@ void main() {
 
     test('copyWith works correctly', () {
       const original = TrainerPublicProfile(
-          uid: 'u1', displayName: 'Alice', trainerHourlyRate: 1000);
+          uid: 'u1', displayName: 'Alice', trainerMonthlyRate: 1000);
       final updated = original.copyWith(displayName: 'Alicia');
 
       expect(updated.uid, equals('u1'));
       expect(updated.displayName, equals('Alicia'));
-      expect(updated.trainerHourlyRate, equals(1000));
+      expect(updated.trainerMonthlyRate, equals(1000));
     });
   });
 }

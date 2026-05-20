@@ -87,4 +87,10 @@ class TreinoIcon {
   // Session player
   static const IconData checkCircleFill = PhosphorIconsFill.checkCircle;
   static const IconData checkCircleEmpty = PhosphorIconsRegular.circle;
+
+  // Coach discovery
+  static const IconData specialty = PhosphorIconsRegular.lightning;
+  static const IconData money = PhosphorIconsRegular.currencyDollar;
+  static const IconData star = PhosphorIconsRegular.star;
+  static const IconData mapToggle = PhosphorIconsRegular.mapTrifold;
 }

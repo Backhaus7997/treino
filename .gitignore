@@ -51,6 +51,8 @@ app.*.map.json
 # Firebase Admin SDK service account credentials — NEVER commit
 scripts/treino-dev-service-account*.json
 scripts/*.serviceAccount.json
+scripts/sa-key.json
+*-firebase-adminsdk-*.json
 scripts/node_modules/
 scripts/rules_test/node_modules/
 scripts/.env
