@@ -25,8 +25,7 @@ void main() {
         expect(profile.followingCount, isNull);
       });
 
-      test(
-          'SCENARIO-320b: fromJson with all counter fields → values preserved',
+      test('SCENARIO-320b: fromJson with all counter fields → values preserved',
           () {
         final json = {
           'uid': 'u1',

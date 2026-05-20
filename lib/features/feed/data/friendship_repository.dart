@@ -133,7 +133,8 @@ class FriendshipRepository {
       final profile = await pubRepo.get(myUid);
       final currentFollowing = profile?.followingCount ?? 0;
       await pubRepo.updateCounters(myUid, {
-        'followingCount': (currentFollowing - 1).clamp(0, double.maxFinite).toInt(),
+        'followingCount':
+            (currentFollowing - 1).clamp(0, double.maxFinite).toInt(),
       });
     } catch (e, st) {
       developer.log(

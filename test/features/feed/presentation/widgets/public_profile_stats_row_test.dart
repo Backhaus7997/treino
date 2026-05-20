@@ -92,7 +92,8 @@ void main() {
     });
 
     // SCENARIO-325: null values render as '0'
-    testWidgets('SCENARIO-325: null workoutsCount/followersCount/followingCount → "0"',
+    testWidgets(
+        'SCENARIO-325: null workoutsCount/followersCount/followingCount → "0"',
         (tester) async {
       await tester.pumpWidget(_wrap(
         const PublicProfileStatsRow(

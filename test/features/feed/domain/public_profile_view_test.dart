@@ -23,7 +23,8 @@ void main() {
         expect(view.followingCount, isNull);
       });
 
-      test('SCENARIO-326b: construction with all counter fields → values preserved',
+      test(
+          'SCENARIO-326b: construction with all counter fields → values preserved',
           () {
         const view = PublicProfileView(
           authorDisplayName: 'Tincho',

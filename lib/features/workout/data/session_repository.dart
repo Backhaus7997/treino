@@ -90,9 +90,8 @@ class SessionRepository {
       final allSnap = await colRef.get();
       final allSessions =
           allSnap.docs.map(_sessionFromDoc).whereType<Session>().toList();
-      final finishedList = allSessions
-          .where((s) => s.status == SessionStatus.finished)
-          .toList();
+      final finishedList =
+          allSessions.where((s) => s.status == SessionStatus.finished).toList();
       final racha = computeStreak(finishedList);
       await pubRepo.updateCounters(uid, {
         'workoutsCount': finishedList.length,

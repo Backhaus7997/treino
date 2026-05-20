@@ -120,7 +120,10 @@ void main() {
         members: [uidA, uidB],
         createdAt: now,
       );
-      await firestore.collection('friendships').doc(id).set(friendship.toJson());
+      await firestore
+          .collection('friendships')
+          .doc(id)
+          .set(friendship.toJson());
     }
 
     // SCENARIO-322 success: accept() increments followingCount for myUid
