@@ -98,6 +98,43 @@ void main() {
   });
 
   // ──────────────────────────────────────────────────────────────────────────
+  // SCENARIO-320e: updateCounters() merges only the provided counter fields
+  // without clobbering displayName / avatarUrl / gymId written by the
+  // identity write-path. Verifies ADR-WRS-12 partial-merge contract.
+  // ──────────────────────────────────────────────────────────────────────────
+  test(
+      'SCENARIO-320e: updateCounters merges without clobbering existing identity fields',
+      () async {
+    // Seed the identity doc first (as UserRepository would do it)
+    await firestore.collection('userPublicProfiles').doc('u10').set({
+      'uid': 'u10',
+      'displayName': 'Ana Kraft',
+      'displayNameLowercase': 'ana kraft',
+      'avatarUrl': 'https://cdn.example.com/ana.jpg',
+      'gymId': 'gym-elite',
+    });
+
+    // Partial counter write (as SessionRepository.finish() uses it)
+    await repo.updateCounters('u10', {'workoutsCount': 5, 'racha': 3});
+
+    final result = await repo.get('u10');
+    expect(result, isNotNull);
+
+    // Identity fields must NOT be clobbered
+    expect(result!.displayName, equals('Ana Kraft'));
+    expect(result.displayNameLowercase, equals('ana kraft'));
+    expect(result.avatarUrl, equals('https://cdn.example.com/ana.jpg'));
+    expect(result.gymId, equals('gym-elite'));
+
+    // Counter fields are written
+    expect(result.workoutsCount, equals(5));
+    expect(result.racha, equals(3));
+    // Unset counters remain null (not overwritten with null)
+    expect(result.followersCount, isNull);
+    expect(result.followingCount, isNull);
+  });
+
+  // ──────────────────────────────────────────────────────────────────────────
   // SCENARIO-258: searchByDisplayName returns empty list for blank query
   // ──────────────────────────────────────────────────────────────────────────
   test(
