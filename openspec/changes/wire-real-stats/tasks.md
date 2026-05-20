@@ -127,42 +127,42 @@ Chain strategy: stacked-to-main
 
 ### Phase 1: Foundation — Model & Repository
 
-- [ ] T27 — SETUP: create branch from post-PR#2 main; confirm `kFormat` and `computeStreak` are available from core/utils
-- [ ] T28 — RED: add SCENARIO-320 to `test/features/profile/domain/user_public_profile_test.dart` (or create); test `UserPublicProfile.fromJson()` with no counter fields → all 4 new fields are null; test with all fields present → values correct; test existing non-counter fields are preserved
-- [ ] T29 — GREEN: add 4 nullable int fields to `lib/features/profile/domain/user_public_profile.dart` (Freezed): `workoutsCount: int?`, `racha: int?`, `followersCount: int?`, `followingCount: int?`; run `dart run build_runner build --delete-conflicting-outputs`; regenerate `.freezed.dart` and `.g.dart`; SCENARIO-320 must pass
-- [ ] T30 — RED: add partial-update tests to `test/features/profile/data/user_public_profile_repository_test.dart` (or create); verify `set()` with `SetOptions(merge: true)` writes only provided counter fields without clobbering others; verify null fields serialize as absent (not null) to avoid overwriting previous values
+- [x] T27 — SETUP: create branch from post-PR#2 main; confirm `kFormat` and `computeStreak` are available from core/utils
+- [x] T28 — RED: add SCENARIO-320 to `test/features/profile/domain/user_public_profile_test.dart` (or create); test `UserPublicProfile.fromJson()` with no counter fields → all 4 new fields are null; test with all fields present → values correct; test existing non-counter fields are preserved
+- [x] T29 — GREEN: add 4 nullable int fields to `lib/features/profile/domain/user_public_profile.dart` (Freezed): `workoutsCount: int?`, `racha: int?`, `followersCount: int?`, `followingCount: int?`; run `dart run build_runner build --delete-conflicting-outputs`; regenerate `.freezed.dart` and `.g.dart`; SCENARIO-320 must pass
+- [x] T30 — RED+GREEN: add `updateCounters()` to `UserPublicProfileRepository` and test SCENARIO-320e (partial merge without clobbering identity fields)
 
 ### Phase 2: Breaking Change — FriendshipRepository.delete()
 
-- [ ] T31 — ENUM CALLERS: confirm all callers of `FriendshipRepository.delete()` before modifying signature; KNOWN callers: (1) `test/features/feed/data/friendship_repository_test.dart:203` — `await repo.delete('aaa_bbb')`; no UI production callers found (SIGUIENDO pill is non-tappable stub); document any additional callers found during apply
-- [ ] T32 — RED: update `test/features/feed/data/friendship_repository_test.dart` SCENARIO-128 to use new signature `repo.delete('aaa_bbb', 'aaa')`; test must FAIL (signature not yet changed)
-- [ ] T33 — RED: add SCENARIO-323 test to `test/features/feed/data/friendship_repository_test.dart`: `delete(friendshipId, myUid)` triggers self-refresh write to `userPublicProfiles/{myUid}` (decrement followersCount/followingCount); injected `UserPublicProfileRepository` receives the write; test must FAIL
-- [ ] T34 — RED: add failure-swallowed test for SCENARIO-323: when `UserPublicProfileRepository` throws, `delete()` still resolves without rethrowing; error is logged via `developer.log`
-- [ ] T35 — GREEN: update `FriendshipRepository.delete(String friendshipId, String myUid)` signature in `lib/features/feed/data/friendship_repository.dart`; inject optional `UserPublicProfileRepository? publicProfileRepository`; after Firestore delete, perform self-refresh counter write (self-only per ADR-WRS-12) wrapped in try/catch + `developer.log`; import `dart:developer`; SCENARIO-128 (updated), SCENARIO-323 (success + failure) must pass
+- [x] T31 — ENUM CALLERS: confirmed 1 caller at `test/features/feed/data/friendship_repository_test.dart:203`; no production UI callers (SIGUIENDO pill is non-tappable)
+- [x] T32 — RED: updated SCENARIO-128 to use new signature `repo.delete('aaa_bbb', 'aaa')`
+- [x] T33 — RED: added SCENARIO-323 success test for cross-feature counter decrement
+- [x] T34 — RED: added SCENARIO-323 failure test (throws swallowed, primary op succeeds)
+- [x] T35 — GREEN: `FriendshipRepository.delete(String friendshipId, String myUid)` + optional `publicProfileRepository` + try/catch + developer.log
 
 ### Phase 3: Cross-Feature Writes — SessionRepository & FriendshipRepository.accept()
 
-- [ ] T36 — RED: add cross-feature write tests to `test/features/workout/data/session_repository_test.dart` (or create): SCENARIO-321 success path — `finish()` executes successfully AND `userPublicProfiles/{uid}` receives a merged write with `workoutsCount` and `racha`; inject `UserPublicProfileRepository` via closure
-- [ ] T37 — RED: add SCENARIO-321 failure path: when public profile write throws, session is still marked finished (primary op succeeds); exception is swallowed; `developer.log` receives the error message
-- [ ] T38 — GREEN: modify `lib/features/workout/data/session_repository.dart`; after session doc finalized, compute `workoutsCount` (count all finished for uid) and `racha` (via `computeStreak`); write to `userPublicProfiles/{uid}` via injected optional `UserPublicProfileRepository`; wrap in try/catch + `developer.log`; import `dart:developer`; `followerCountResolver` closure injected for follow counts (ADR-WRS-13 avoids cross-feature import); SCENARIO-321 success+failure must pass
-- [ ] T39 — RED: add cross-feature write tests for `FriendshipRepository.accept()`: SCENARIO-322 success — after accept, `userPublicProfiles/{myUid}` receives self-refresh write; SCENARIO-322 failure — when write throws, `accept()` resolves without rethrowing; `developer.log` receives error
-- [ ] T40 — GREEN: modify `lib/features/feed/data/friendship_repository.dart` `accept()` method; inject optional `UserPublicProfileRepository?`; after status update, perform self-refresh counter write for myUid only (ADR-WRS-12); try/catch + `developer.log`; SCENARIO-322 success+failure must pass
+- [x] T36 — RED: SCENARIO-321 success path for `finish()` cross-feature write
+- [x] T37 — RED: SCENARIO-321 failure path (throws swallowed, session marked finished)
+- [x] T38 — GREEN: `SessionRepository.finish()` computes workoutsCount + racha, writes to `userPublicProfiles/{uid}` via optional `publicProfileRepository`; try/catch + developer.log
+- [x] T39 — RED: SCENARIO-322 success + failure for `FriendshipRepository.accept()` cross-feature write
+- [x] T40 — GREEN: `FriendshipRepository.accept()` increments followingCount for myUid (best-effort)
 
 ### Phase 4: DTO & Widget Pass-Through
 
-- [ ] T41 — RED: create or extend `test/features/feed/domain/public_profile_view_test.dart`; verify `PublicProfileView` carries `workoutsCount?`, `racha?`, `followersCount?`, `followingCount?`; legacy construction without these fields still works (nullable defaults)
-- [ ] T42 — GREEN: add 4 nullable int fields to `lib/features/feed/domain/public_profile_view.dart`; extend `copyWith`, `==`, `hashCode` (or regenerate if Freezed)
-- [ ] T43 — RED: update `test/features/feed/application/public_profile_providers_test.dart`; add test: `publicProfileViewProvider` sources 4 counter fields from `userPublicProfileProvider(uid)` and passes them through to `PublicProfileView`
-- [ ] T44 — GREEN: update `lib/features/feed/application/public_profile_providers.dart` `publicProfileViewProvider` to pass `workoutsCount`, `racha`, `followersCount`, `followingCount` from `publicProfile` into `PublicProfileView`; no new Firestore reads
-- [ ] T45 — RED: create `test/features/feed/presentation/widgets/public_profile_stats_row_test.dart`; write SCENARIO-324 (real values 89/23/412/284 display in correct columns), SCENARIO-325 (null → "0"), verify `kFormat` applied to WORKOUTS/SEGUIDORES/SIGUIENDO, RACHA is raw integer
-- [ ] T46 — GREEN: modify `lib/features/feed/presentation/widgets/public_profile_stats_row.dart`; add 4 `int?` constructor parameters; render null as '0'; apply `kFormat` to workoutsCount, followersCount, followingCount; RACHA displays raw value; accent color preserved; SCENARIO-324..325 must pass
-- [ ] T47 — WIRE: update `lib/features/feed/presentation/public_profile_screen.dart` to pass `workoutsCount`, `racha`, `followersCount`, `followingCount` from `view` to `PublicProfileStatsRow(...)`; no new logic
+- [x] T41 — RED: SCENARIO-326a/b/c for `PublicProfileView` counter fields
+- [x] T42 — GREEN: added 4 nullable int fields to `PublicProfileView` (Freezed regen)
+- [x] T43 — RED: SCENARIO-326d/e for `publicProfileViewProvider` counter field pass-through
+- [x] T44 — GREEN: `publicProfileViewProvider` passes workoutsCount/racha/followersCount/followingCount from userPublicProfile
+- [x] T45 — RED: SCENARIO-324/325 for `PublicProfileStatsRow` parameterized widget tests
+- [x] T46 — GREEN: `PublicProfileStatsRow` accepts 4 optional `int?` params; null→'0'; kFormat on WORKOUTS/SEGUIDORES/SIGUIENDO; RACHA raw
+- [x] T47 — WIRE: `public_profile_screen.dart` passes counter fields from `view` to `PublicProfileStatsRow`
 
 ### Phase 5: Gates
 
-- [ ] T48 — GATE: `flutter analyze` — 0 issues
-- [ ] T49 — GATE: `dart format --output=none --set-exit-if-changed .` — 0 changed
-- [ ] T50 — GATE: `flutter test` — all passing; verify SCENARIO-320..325 pass; verify cross-feature failure tests pass (success + failure paths for SCENARIO-321..323)
+- [x] T48 — GATE: `flutter analyze` — 0 issues
+- [x] T49 — GATE: `dart format --output=none --set-exit-if-changed .` — 0 changed
+- [x] T50 — GATE: `flutter test` — 931/931 passing (baseline 912 + 19 new)
 
 **PR#3 task count**: 24 tasks | **Estimated LOC**: ~385 | **Budget risk**: Medium (no size:exception needed)
 
