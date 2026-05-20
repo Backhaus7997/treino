@@ -166,6 +166,12 @@ final trainerDiscoveryProvider =
   if (pos != null) {
     final prefix = geohash5(pos.latitude, pos.longitude);
     trainers = await repo.listByGeohashPrefix(prefix);
+    // Fallback UX: si el geohash cell del atleta no tiene trainers,
+    // mostrar todos (haversine reorder igual aplica). Mejor que dejar el
+    // empty state cuando hay PFs disponibles en otras ciudades.
+    if (trainers.isEmpty) {
+      trainers = await repo.listAll();
+    }
   } else {
     trainers = await repo.listAll();
   }
