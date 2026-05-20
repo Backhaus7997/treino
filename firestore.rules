@@ -41,10 +41,56 @@ service cloud.firestore {
     }
 
     match /routines/{routineId} {
-      // Catálogo público para usuarios autenticados.
-      allow read: if request.auth != null;
+      // Read: público para autenticados si la rutina es `visibility: 'public'`
+      // (default histórico — todas las plantillas seedeadas sin el campo
+      // explícito caen en este branch). Si la rutina es privada
+      // (`visibility: 'private'`), solo `assignedBy` (PF) o `assignedTo`
+      // (atleta) pueden leerla. REQ-COACH-FOUNDATIONS-006.
+      allow read: if request.auth != null
+                  && (!('visibility' in resource.data)
+                      || resource.data.visibility == 'public'
+                      || resource.data.visibility == 'shared'
+                      || request.auth.uid == resource.data.assignedTo
+                      || request.auth.uid == resource.data.assignedBy);
       // Rutinas writeables solo via Admin SDK (seed script).
+      // Fase 5 Etapa 4 abrirá `create` para PFs autenticados.
       allow write: if false;
+    }
+
+    // Vínculo PF ↔ atleta (Fase 5 Etapa 1, REQ-COACH-FOUNDATIONS-004).
+    // Doc id auto-generado. Permite múltiples vínculos históricos por par.
+    match /trainer_links/{linkId} {
+      // Read: solo members (trainer o athlete del vínculo) o doc inexistente.
+      // El branch `resource == null` permite getByPair queries que no
+      // matchean leak-free.
+      allow read: if request.auth != null
+                  && (resource == null
+                      || request.auth.uid == resource.data.trainerId
+                      || request.auth.uid == resource.data.athleteId);
+
+      // Create: solo el atleta inicia un request (convención producto).
+      // Status inicial debe ser `pending`. trainerId != athleteId.
+      allow create: if request.auth != null
+                    && request.auth.uid == request.resource.data.athleteId
+                    && request.auth.uid != request.resource.data.trainerId
+                    && request.resource.data.status == 'pending'
+                    && request.resource.data.trainerId is string
+                    && request.resource.data.trainerId.size() > 0;
+
+      // Update: members del vínculo pueden actualizar (accept / decline /
+      // terminate). Fields `trainerId`, `athleteId`, `requestedAt` son
+      // inmutables. Business rules (transiciones de status válidas, who
+      // can accept vs terminate) se enforce client-side en el repository;
+      // las rules dan defensa estructural.
+      allow update: if request.auth != null
+                    && (request.auth.uid == resource.data.trainerId
+                        || request.auth.uid == resource.data.athleteId)
+                    && request.resource.data.trainerId == resource.data.trainerId
+                    && request.resource.data.athleteId == resource.data.athleteId
+                    && request.resource.data.requestedAt == resource.data.requestedAt;
+
+      // Delete denegado — terminate vía update status='terminated'.
+      allow delete: if false;
     }
 
     match /posts/{postId} {

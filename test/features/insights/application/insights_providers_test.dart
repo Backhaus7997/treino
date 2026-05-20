@@ -73,8 +73,7 @@ void main() {
       expect(result.plannedSessionsCount, 5);
     });
 
-    test('SCENARIO-403: filtra sesiones por status=finished',
-        () async {
+    test('SCENARIO-403: filtra sesiones por status=finished', () async {
       final repo = MockSessionRepository();
       // 1 active (excluida) + 1 finished
       final now = DateTime.now();
@@ -104,12 +103,10 @@ void main() {
 
       final result = await container.read(weeklyInsightsProvider.future);
       expect(result!.sessionsCount, 1);
-      verifyNever(
-          () => repo.listSetLogs(uid: 'u1', sessionId: 's-active'));
+      verifyNever(() => repo.listSetLogs(uid: 'u1', sessionId: 's-active'));
     });
 
-    test(
-        'SCENARIO-404: agrupa SetLogs por muscleGroup → MuscleGroupDisplay',
+    test('SCENARIO-404: agrupa SetLogs por muscleGroup → MuscleGroupDisplay',
         () async {
       final repo = MockSessionRepository();
       final now = DateTime.now();
@@ -151,12 +148,11 @@ void main() {
       expect(result.setsByGroup[MuscleGroupDisplay.piernas], 2);
       expect(result.setsByGroup[MuscleGroupDisplay.brazos], 1);
       // El log de 'unknownGroup' fue descartado defensivamente.
-      expect(result.setsByGroup.containsKey(MuscleGroupDisplay.espalda),
-          isFalse);
+      expect(
+          result.setsByGroup.containsKey(MuscleGroupDisplay.espalda), isFalse);
     });
 
-    test(
-        'SCENARIO-405: daysTrained refleja qué días de la semana hubo sesión',
+    test('SCENARIO-405: daysTrained refleja qué días de la semana hubo sesión',
         () async {
       final repo = MockSessionRepository();
       // 2 sesiones: una lunes (weekday=1) y una miércoles (weekday=3) de
@@ -183,9 +179,9 @@ void main() {
               routineId: 'r1',
             ),
           ]);
-      when(() => repo.listSetLogs(
-          uid: 'u1',
-          sessionId: any(named: 'sessionId'))).thenAnswer(
+      when(() =>
+              repo.listSetLogs(uid: 'u1', sessionId: any(named: 'sessionId')))
+          .thenAnswer(
         (_) async => const <SetLog>[],
       );
 

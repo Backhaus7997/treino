@@ -106,5 +106,66 @@ void main() {
       expect(profile.createdAt, isA<DateTime>());
       expect(profile.displayName, isNull);
     });
+
+    // ── Trainer-specific fields (Fase 5 Etapa 1 — REQ-COACH-FOUNDATIONS-001) ──
+
+    test('REQ-COACH-FOUNDATIONS-001: trainer fields default to null', () {
+      final profile = UserProfile(
+        uid: 'uid-1',
+        email: 'a@b.com',
+        displayName: null,
+        role: UserRole.athlete,
+        createdAt: fixedDt,
+        updatedAt: fixedDt,
+      );
+      expect(profile.trainerBio, isNull);
+      expect(profile.trainerSpecialty, isNull);
+      expect(profile.trainerLatitude, isNull);
+      expect(profile.trainerLongitude, isNull);
+      expect(profile.trainerGeohash, isNull);
+      expect(profile.trainerHourlyRate, isNull);
+    });
+
+    test('REQ-COACH-FOUNDATIONS-001: trainer fields round-trip when populated',
+        () {
+      final profile = UserProfile(
+        uid: 'trainer-1',
+        email: 't@coach.com',
+        displayName: 'Coach Joe',
+        role: UserRole.trainer,
+        createdAt: fixedDt,
+        updatedAt: fixedDt,
+        trainerBio: 'Especialista en hipertrofia con 10 años de experiencia',
+        trainerSpecialty: 'hipertrofia',
+        trainerLatitude: -34.6037,
+        trainerLongitude: -58.3816,
+        trainerGeohash: '6gycff',
+        trainerHourlyRate: 15000,
+      );
+      final decoded = UserProfile.fromJson(profile.toJson());
+      expect(decoded.trainerBio, equals(profile.trainerBio));
+      expect(decoded.trainerSpecialty, equals('hipertrofia'));
+      expect(decoded.trainerLatitude, closeTo(-34.6037, 1e-6));
+      expect(decoded.trainerLongitude, closeTo(-58.3816, 1e-6));
+      expect(decoded.trainerGeohash, equals('6gycff'));
+      expect(decoded.trainerHourlyRate, equals(15000));
+    });
+
+    test(
+        'REQ-COACH-FOUNDATIONS-001: docs Firestore antiguos sin trainer fields deserializan con nulls',
+        () {
+      final raw = <String, dynamic>{
+        'uid': 'uid-old',
+        'email': 'a@b.com',
+        'displayName': null,
+        'role': 'athlete',
+        'createdAt': Timestamp.fromDate(fixedDt),
+        'updatedAt': Timestamp.fromDate(fixedDt),
+      };
+      final profile = UserProfile.fromJson(raw);
+      expect(profile.trainerBio, isNull);
+      expect(profile.trainerGeohash, isNull);
+      expect(profile.trainerHourlyRate, isNull);
+    });
   });
 }

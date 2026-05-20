@@ -25,6 +25,12 @@ _$UserProfileImpl _$$UserProfileImplFromJson(Map<String, dynamic> json) =>
       avatarUrl: json['avatarUrl'] as String?,
       bornAt: _$JsonConverterFromJson<Timestamp, DateTime>(
           json['bornAt'], const TimestampConverter().fromJson),
+      trainerBio: json['trainerBio'] as String?,
+      trainerSpecialty: json['trainerSpecialty'] as String?,
+      trainerLatitude: (json['trainerLatitude'] as num?)?.toDouble(),
+      trainerLongitude: (json['trainerLongitude'] as num?)?.toDouble(),
+      trainerGeohash: json['trainerGeohash'] as String?,
+      trainerHourlyRate: (json['trainerHourlyRate'] as num?)?.toInt(),
     );
 
 Map<String, dynamic> _$$UserProfileImplToJson(_$UserProfileImpl instance) =>
@@ -43,6 +49,12 @@ Map<String, dynamic> _$$UserProfileImplToJson(_$UserProfileImpl instance) =>
       'avatarUrl': instance.avatarUrl,
       'bornAt': _$JsonConverterToJson<Timestamp, DateTime>(
           instance.bornAt, const TimestampConverter().toJson),
+      'trainerBio': instance.trainerBio,
+      'trainerSpecialty': instance.trainerSpecialty,
+      'trainerLatitude': instance.trainerLatitude,
+      'trainerLongitude': instance.trainerLongitude,
+      'trainerGeohash': instance.trainerGeohash,
+      'trainerHourlyRate': instance.trainerHourlyRate,
     };
 
 const _$UserRoleEnumMap = {

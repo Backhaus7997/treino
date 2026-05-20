@@ -35,7 +35,14 @@ mixin _$UserProfile {
   ExperienceLevel? get experienceLevel => throw _privateConstructorUsedError;
   String? get avatarUrl => throw _privateConstructorUsedError;
   @TimestampConverter()
-  DateTime? get bornAt => throw _privateConstructorUsedError;
+  DateTime? get bornAt =>
+      throw _privateConstructorUsedError; // ── Trainer-specific (Fase 5 Etapa 1 foundations) ───────────────────
+  String? get trainerBio => throw _privateConstructorUsedError;
+  String? get trainerSpecialty => throw _privateConstructorUsedError;
+  double? get trainerLatitude => throw _privateConstructorUsedError;
+  double? get trainerLongitude => throw _privateConstructorUsedError;
+  String? get trainerGeohash => throw _privateConstructorUsedError;
+  int? get trainerHourlyRate => throw _privateConstructorUsedError;
 
   /// Serializes this UserProfile to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -66,7 +73,13 @@ abstract class $UserProfileCopyWith<$Res> {
       Gender? gender,
       ExperienceLevel? experienceLevel,
       String? avatarUrl,
-      @TimestampConverter() DateTime? bornAt});
+      @TimestampConverter() DateTime? bornAt,
+      String? trainerBio,
+      String? trainerSpecialty,
+      double? trainerLatitude,
+      double? trainerLongitude,
+      String? trainerGeohash,
+      int? trainerHourlyRate});
 }
 
 /// @nodoc
@@ -97,6 +110,12 @@ class _$UserProfileCopyWithImpl<$Res, $Val extends UserProfile>
     Object? experienceLevel = freezed,
     Object? avatarUrl = freezed,
     Object? bornAt = freezed,
+    Object? trainerBio = freezed,
+    Object? trainerSpecialty = freezed,
+    Object? trainerLatitude = freezed,
+    Object? trainerLongitude = freezed,
+    Object? trainerGeohash = freezed,
+    Object? trainerHourlyRate = freezed,
   }) {
     return _then(_value.copyWith(
       uid: null == uid
@@ -151,6 +170,30 @@ class _$UserProfileCopyWithImpl<$Res, $Val extends UserProfile>
           ? _value.bornAt
           : bornAt // ignore: cast_nullable_to_non_nullable
               as DateTime?,
+      trainerBio: freezed == trainerBio
+          ? _value.trainerBio
+          : trainerBio // ignore: cast_nullable_to_non_nullable
+              as String?,
+      trainerSpecialty: freezed == trainerSpecialty
+          ? _value.trainerSpecialty
+          : trainerSpecialty // ignore: cast_nullable_to_non_nullable
+              as String?,
+      trainerLatitude: freezed == trainerLatitude
+          ? _value.trainerLatitude
+          : trainerLatitude // ignore: cast_nullable_to_non_nullable
+              as double?,
+      trainerLongitude: freezed == trainerLongitude
+          ? _value.trainerLongitude
+          : trainerLongitude // ignore: cast_nullable_to_non_nullable
+              as double?,
+      trainerGeohash: freezed == trainerGeohash
+          ? _value.trainerGeohash
+          : trainerGeohash // ignore: cast_nullable_to_non_nullable
+              as String?,
+      trainerHourlyRate: freezed == trainerHourlyRate
+          ? _value.trainerHourlyRate
+          : trainerHourlyRate // ignore: cast_nullable_to_non_nullable
+              as int?,
     ) as $Val);
   }
 }
@@ -176,7 +219,13 @@ abstract class _$$UserProfileImplCopyWith<$Res>
       Gender? gender,
       ExperienceLevel? experienceLevel,
       String? avatarUrl,
-      @TimestampConverter() DateTime? bornAt});
+      @TimestampConverter() DateTime? bornAt,
+      String? trainerBio,
+      String? trainerSpecialty,
+      double? trainerLatitude,
+      double? trainerLongitude,
+      String? trainerGeohash,
+      int? trainerHourlyRate});
 }
 
 /// @nodoc
@@ -205,6 +254,12 @@ class __$$UserProfileImplCopyWithImpl<$Res>
     Object? experienceLevel = freezed,
     Object? avatarUrl = freezed,
     Object? bornAt = freezed,
+    Object? trainerBio = freezed,
+    Object? trainerSpecialty = freezed,
+    Object? trainerLatitude = freezed,
+    Object? trainerLongitude = freezed,
+    Object? trainerGeohash = freezed,
+    Object? trainerHourlyRate = freezed,
   }) {
     return _then(_$UserProfileImpl(
       uid: null == uid
@@ -259,6 +314,30 @@ class __$$UserProfileImplCopyWithImpl<$Res>
           ? _value.bornAt
           : bornAt // ignore: cast_nullable_to_non_nullable
               as DateTime?,
+      trainerBio: freezed == trainerBio
+          ? _value.trainerBio
+          : trainerBio // ignore: cast_nullable_to_non_nullable
+              as String?,
+      trainerSpecialty: freezed == trainerSpecialty
+          ? _value.trainerSpecialty
+          : trainerSpecialty // ignore: cast_nullable_to_non_nullable
+              as String?,
+      trainerLatitude: freezed == trainerLatitude
+          ? _value.trainerLatitude
+          : trainerLatitude // ignore: cast_nullable_to_non_nullable
+              as double?,
+      trainerLongitude: freezed == trainerLongitude
+          ? _value.trainerLongitude
+          : trainerLongitude // ignore: cast_nullable_to_non_nullable
+              as double?,
+      trainerGeohash: freezed == trainerGeohash
+          ? _value.trainerGeohash
+          : trainerGeohash // ignore: cast_nullable_to_non_nullable
+              as String?,
+      trainerHourlyRate: freezed == trainerHourlyRate
+          ? _value.trainerHourlyRate
+          : trainerHourlyRate // ignore: cast_nullable_to_non_nullable
+              as int?,
     ));
   }
 }
@@ -279,7 +358,13 @@ class _$UserProfileImpl implements _UserProfile {
       this.gender,
       this.experienceLevel,
       this.avatarUrl,
-      @TimestampConverter() this.bornAt});
+      @TimestampConverter() this.bornAt,
+      this.trainerBio,
+      this.trainerSpecialty,
+      this.trainerLatitude,
+      this.trainerLongitude,
+      this.trainerGeohash,
+      this.trainerHourlyRate});
 
   factory _$UserProfileImpl.fromJson(Map<String, dynamic> json) =>
       _$$UserProfileImplFromJson(json);
@@ -313,10 +398,23 @@ class _$UserProfileImpl implements _UserProfile {
   @override
   @TimestampConverter()
   final DateTime? bornAt;
+// ── Trainer-specific (Fase 5 Etapa 1 foundations) ───────────────────
+  @override
+  final String? trainerBio;
+  @override
+  final String? trainerSpecialty;
+  @override
+  final double? trainerLatitude;
+  @override
+  final double? trainerLongitude;
+  @override
+  final String? trainerGeohash;
+  @override
+  final int? trainerHourlyRate;
 
   @override
   String toString() {
-    return 'UserProfile(uid: $uid, email: $email, displayName: $displayName, role: $role, createdAt: $createdAt, updatedAt: $updatedAt, gymId: $gymId, bodyWeightKg: $bodyWeightKg, heightCm: $heightCm, gender: $gender, experienceLevel: $experienceLevel, avatarUrl: $avatarUrl, bornAt: $bornAt)';
+    return 'UserProfile(uid: $uid, email: $email, displayName: $displayName, role: $role, createdAt: $createdAt, updatedAt: $updatedAt, gymId: $gymId, bodyWeightKg: $bodyWeightKg, heightCm: $heightCm, gender: $gender, experienceLevel: $experienceLevel, avatarUrl: $avatarUrl, bornAt: $bornAt, trainerBio: $trainerBio, trainerSpecialty: $trainerSpecialty, trainerLatitude: $trainerLatitude, trainerLongitude: $trainerLongitude, trainerGeohash: $trainerGeohash, trainerHourlyRate: $trainerHourlyRate)';
   }
 
   @override
@@ -343,26 +441,45 @@ class _$UserProfileImpl implements _UserProfile {
                 other.experienceLevel == experienceLevel) &&
             (identical(other.avatarUrl, avatarUrl) ||
                 other.avatarUrl == avatarUrl) &&
-            (identical(other.bornAt, bornAt) || other.bornAt == bornAt));
+            (identical(other.bornAt, bornAt) || other.bornAt == bornAt) &&
+            (identical(other.trainerBio, trainerBio) ||
+                other.trainerBio == trainerBio) &&
+            (identical(other.trainerSpecialty, trainerSpecialty) ||
+                other.trainerSpecialty == trainerSpecialty) &&
+            (identical(other.trainerLatitude, trainerLatitude) ||
+                other.trainerLatitude == trainerLatitude) &&
+            (identical(other.trainerLongitude, trainerLongitude) ||
+                other.trainerLongitude == trainerLongitude) &&
+            (identical(other.trainerGeohash, trainerGeohash) ||
+                other.trainerGeohash == trainerGeohash) &&
+            (identical(other.trainerHourlyRate, trainerHourlyRate) ||
+                other.trainerHourlyRate == trainerHourlyRate));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
   @override
-  int get hashCode => Object.hash(
-      runtimeType,
-      uid,
-      email,
-      displayName,
-      role,
-      createdAt,
-      updatedAt,
-      gymId,
-      bodyWeightKg,
-      heightCm,
-      gender,
-      experienceLevel,
-      avatarUrl,
-      bornAt);
+  int get hashCode => Object.hashAll([
+        runtimeType,
+        uid,
+        email,
+        displayName,
+        role,
+        createdAt,
+        updatedAt,
+        gymId,
+        bodyWeightKg,
+        heightCm,
+        gender,
+        experienceLevel,
+        avatarUrl,
+        bornAt,
+        trainerBio,
+        trainerSpecialty,
+        trainerLatitude,
+        trainerLongitude,
+        trainerGeohash,
+        trainerHourlyRate
+      ]);
 
   /// Create a copy of UserProfile
   /// with the given fields replaced by the non-null parameter values.
@@ -394,7 +511,13 @@ abstract class _UserProfile implements UserProfile {
       final Gender? gender,
       final ExperienceLevel? experienceLevel,
       final String? avatarUrl,
-      @TimestampConverter() final DateTime? bornAt}) = _$UserProfileImpl;
+      @TimestampConverter() final DateTime? bornAt,
+      final String? trainerBio,
+      final String? trainerSpecialty,
+      final double? trainerLatitude,
+      final double? trainerLongitude,
+      final String? trainerGeohash,
+      final int? trainerHourlyRate}) = _$UserProfileImpl;
 
   factory _UserProfile.fromJson(Map<String, dynamic> json) =
       _$UserProfileImpl.fromJson;
@@ -427,7 +550,20 @@ abstract class _UserProfile implements UserProfile {
   String? get avatarUrl;
   @override
   @TimestampConverter()
-  DateTime? get bornAt;
+  DateTime?
+      get bornAt; // ── Trainer-specific (Fase 5 Etapa 1 foundations) ───────────────────
+  @override
+  String? get trainerBio;
+  @override
+  String? get trainerSpecialty;
+  @override
+  double? get trainerLatitude;
+  @override
+  double? get trainerLongitude;
+  @override
+  String? get trainerGeohash;
+  @override
+  int? get trainerHourlyRate;
 
   /// Create a copy of UserProfile
   /// with the given fields replaced by the non-null parameter values.

@@ -17,6 +17,13 @@ _$RoutineImpl _$$RoutineImplFromJson(Map<String, dynamic> json) =>
           .toList(),
       estimatedMinutesPerDay: (json['estimatedMinutesPerDay'] as num?)?.toInt(),
       imageUrl: json['imageUrl'] as String?,
+      source: $enumDecodeNullable(_$RoutineSourceEnumMap, json['source']) ??
+          RoutineSource.system,
+      assignedBy: json['assignedBy'] as String?,
+      assignedTo: json['assignedTo'] as String?,
+      visibility:
+          $enumDecodeNullable(_$RoutineVisibilityEnumMap, json['visibility']) ??
+              RoutineVisibility.public,
     );
 
 Map<String, dynamic> _$$RoutineImplToJson(_$RoutineImpl instance) =>
@@ -28,10 +35,26 @@ Map<String, dynamic> _$$RoutineImplToJson(_$RoutineImpl instance) =>
       'days': instance.days.map((e) => e.toJson()).toList(),
       'estimatedMinutesPerDay': instance.estimatedMinutesPerDay,
       'imageUrl': instance.imageUrl,
+      'source': _$RoutineSourceEnumMap[instance.source]!,
+      'assignedBy': instance.assignedBy,
+      'assignedTo': instance.assignedTo,
+      'visibility': _$RoutineVisibilityEnumMap[instance.visibility]!,
     };
 
 const _$ExperienceLevelEnumMap = {
   ExperienceLevel.beginner: 'beginner',
   ExperienceLevel.intermediate: 'intermediate',
   ExperienceLevel.advanced: 'advanced',
+};
+
+const _$RoutineSourceEnumMap = {
+  RoutineSource.system: 'system',
+  RoutineSource.trainerAssigned: 'trainer-assigned',
+  RoutineSource.userCreated: 'user-created',
+};
+
+const _$RoutineVisibilityEnumMap = {
+  RoutineVisibility.public: 'public',
+  RoutineVisibility.private: 'private',
+  RoutineVisibility.shared: 'shared',
 };
