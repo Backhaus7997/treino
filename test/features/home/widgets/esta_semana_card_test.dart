@@ -63,7 +63,8 @@ void main() {
   group('EstaSemanaCard', () {
     // ── Legacy tests (updated for ConsumerWidget) ─────────────────────────────
 
-    testWidgets('REQ-HOME-SEMANA-001: renders title "ESTA SEMANA"',
+    testWidgets(
+        'REQ-HOME-SEMANA-001: renders RACHA ACTUAL pill (mockup parity)',
         (tester) async {
       final insights = _makeInsights();
       await tester.pumpWidget(_wrapCard(overrides: [
@@ -71,7 +72,10 @@ void main() {
       ]));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 50));
-      expect(find.text('ESTA SEMANA'), findsOneWidget);
+      // Loaded state replaces "ESTA SEMANA" header with RACHA ACTUAL pill +
+      // SEM N · MMM label per esta-semana.png mockup.
+      expect(find.text('RACHA ACTUAL'), findsOneWidget);
+      expect(find.textContaining('SEM '), findsOneWidget);
     });
 
     testWidgets('REQ-HOME-SEMANA-002: card decoration — bgCard, r=20, border',
@@ -176,7 +180,8 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 50));
 
-      expect(find.textContaining('seguidos'), findsOneWidget);
+      // Mockup copy: "No rompas la racha — entrenaste hoy."
+      expect(find.textContaining('entrenaste hoy'), findsOneWidget);
     });
 
     // SCENARIO-308: not trained today → shows not-yet-today copy
@@ -192,7 +197,8 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 50));
 
-      expect(find.textContaining('Seguí la racha'), findsOneWidget);
+      // Mockup copy: "No rompas la racha — entrená hoy."
+      expect(find.textContaining('entrená hoy'), findsOneWidget);
     });
 
     // SCENARIO-309: error state shows fallback text
@@ -251,7 +257,8 @@ void main() {
     });
 
     // Null insights (user has no sessions) — renders gracefully with header
-    testWidgets('null insights (no sessions) → ESTA SEMANA header visible',
+    testWidgets(
+        'null insights (no sessions) → RACHA ACTUAL header + placeholder',
         (tester) async {
       await tester.pumpWidget(_wrapCard(overrides: [
         weeklyInsightsProvider.overrideWith((_) async => null),
@@ -259,7 +266,10 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 50));
 
-      expect(find.text('ESTA SEMANA'), findsOneWidget);
+      // Empty state renders the same header (RACHA ACTUAL pill + SEM N · MMM)
+      // above the silhouette placeholder.
+      expect(find.text('RACHA ACTUAL'), findsOneWidget);
+      expect(find.text('Tocá para ver tus insights'), findsOneWidget);
     });
   });
 }
