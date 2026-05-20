@@ -92,27 +92,27 @@ Chain strategy: stacked-to-main
 
 ### Phase 1: Foundation
 
-- [ ] T15 — SETUP: create branch from post-PR#1 main; confirm `_computeStreak` exists inline in insights_providers.dart
-- [ ] T16 — RED: create `test/core/utils/k_formatter_test.dart`; write failing tests for `kFormat(num v)`: SCENARIO-313 (92000 → "92k"), SCENARIO-314 (750 → "750"), SCENARIO-315 (1000 → "1k"), boundary 999 → "999", 0 → "0", 1499 → "1k", negative → "-1" (or "0" per design decision)
-- [ ] T17 — GREEN: create `lib/core/utils/number_format.dart`; implement `kFormat(num v) → String`; SCENARIO-313..315 must pass
-- [ ] T18 — GREEN: LIFT streak algorithm — create `lib/core/utils/streak_calculator.dart` with exported `computeStreak(Iterable<Session> sessions, {required DateTime now}) → int`; update `insights_providers.dart` to call `computeStreak(...)` instead of inline `_computeStreak`; re-run `flutter test` (no regressions)
+- [x] T15 — SETUP: create branch from post-PR#1 main; confirm `_computeStreak` exists inline in insights_providers.dart
+- [x] T16 — RED: create `test/core/utils/k_formatter_test.dart`; write failing tests for `kFormat(num v)`: SCENARIO-313 (92000 → "92k"), SCENARIO-314 (750 → "750"), SCENARIO-315 (1000 → "1k"), boundary 999 → "999", 0 → "0", 1499 → "1k", negative → "-1" (or "0" per design decision)
+- [x] T17 — GREEN: create `lib/core/utils/number_format.dart`; implement `kFormat(num v) → String`; SCENARIO-313..315 must pass
+- [x] T18 — GREEN: LIFT streak algorithm — create `lib/core/utils/streak_calculator.dart` with exported `computeStreak(Iterable<Session> sessions, {required DateTime now}) → int`; update `insights_providers.dart` to call `computeStreak(...)` instead of inline `_computeStreak`; re-run `flutter test` (no regressions)
 
 ### Phase 2: Core Implementation
 
-- [ ] T19 — RED: create `lib/features/profile/domain/user_session_stats.dart` (named hand-written @immutable DTO per ADR-WRS-07: `{int totalSessions, double totalVolumeKg, int streak}`)
-- [ ] T20 — RED: create `test/features/profile/application/profile_stats_providers_test.dart`; write failing tests for `userSessionStatsProvider`: SCENARIO-311 (143 sessions, 92000 kg total), SCENARIO-312 (new user → all zeros), streak reuses `computeStreak`; inject fake `SessionRepository` via ProviderContainer override; test null uid returns null provider result
-- [ ] T21 — GREEN: create `lib/features/profile/application/profile_stats_providers.dart`; implement `userSessionStatsProvider` as `FutureProvider.autoDispose<UserSessionStats?>`; reads `currentUidProvider` + `sessionRepositoryProvider`; computes `totalSessions`, `totalVolumeKg` (fold over `session.totalVolumeKg` for finished), `streak` via `computeStreak`; returns null when uid is null; SCENARIO-311..312 must pass
+- [x] T19 — RED: create `lib/features/profile/domain/user_session_stats.dart` (named hand-written @immutable DTO per ADR-WRS-07: `{int totalSessions, double totalVolumeKg, int streak}`)
+- [x] T20 — RED: create `test/features/profile/application/profile_stats_providers_test.dart`; write failing tests for `userSessionStatsProvider`: SCENARIO-311 (143 sessions, 92000 kg total), SCENARIO-312 (new user → all zeros), streak reuses `computeStreak`; inject fake `SessionRepository` via ProviderContainer override; test null uid returns null provider result
+- [x] T21 — GREEN: create `lib/features/profile/application/profile_stats_providers.dart`; implement `userSessionStatsProvider` as `FutureProvider.autoDispose<UserSessionStats?>`; reads `currentUidProvider` + `sessionRepositoryProvider`; computes `totalSessions`, `totalVolumeKg` (fold over `session.totalVolumeKg` for finished), `streak` via `computeStreak`; returns null when uid is null; SCENARIO-311..312 must pass
 
 ### Phase 3: Integration & Widget
 
-- [ ] T22 — RED: create or extend `test/features/profile/presentation/profile_screen_test.dart`; write 4 failing tests: SCENARIO-316 (data state renders SESIONES/VOLUMEN KG in accent, RACHA in highlight), SCENARIO-317 (loading → '--'), SCENARIO-318 (error → '--', no exception thrown), SCENARIO-319 (sign-out button always visible regardless of stats state)
-- [ ] T23 — GREEN: modify `lib/features/profile/profile_screen.dart`; prepend `_OwnProfileStatsRow` ConsumerWidget above existing PERFIL content; `_OwnProfileStatsRow` reads `userSessionStatsProvider` and renders 3-stat row with `AsyncValue.when`; loading=shimmer/"--"; error="--"; data=real values; SESIONES+VOLUMEN KG use `palette.accent`, RACHA uses `palette.highlight`; sign-out ALWAYS visible; NO Scaffold/AppBackground/SafeArea added; spacing 8/12/14/18/20 only; SCENARIO-316..319 must pass
+- [x] T22 — RED: create or extend `test/features/profile/presentation/profile_screen_test.dart`; write 4 failing tests: SCENARIO-316 (data state renders SESIONES/VOLUMEN KG in accent, RACHA in highlight), SCENARIO-317 (loading → '--'), SCENARIO-318 (error → '--', no exception thrown), SCENARIO-319 (sign-out button always visible regardless of stats state)
+- [x] T23 — GREEN: modify `lib/features/profile/profile_screen.dart`; prepend `_OwnProfileStatsRow` ConsumerWidget above existing PERFIL content; `_OwnProfileStatsRow` reads `userSessionStatsProvider` and renders 3-stat row with `AsyncValue.when`; loading=shimmer/"--"; error="--"; data=real values; SESIONES+VOLUMEN KG use `palette.accent`, RACHA uses `palette.highlight`; sign-out ALWAYS visible; NO Scaffold/AppBackground/SafeArea added; spacing 8/12/14/18/20 only; SCENARIO-316..319 must pass
 
 ### Phase 4: Gates
 
-- [ ] T24 — GATE: `flutter analyze` — 0 issues
-- [ ] T25 — GATE: `dart format --output=none --set-exit-if-changed .` — 0 changed
-- [ ] T26 — GATE: `flutter test` — all passing (includes SCENARIO-311..319)
+- [x] T24 — GATE: `flutter analyze` — 0 issues
+- [x] T25 — GATE: `dart format --output=none --set-exit-if-changed .` — 0 changed
+- [x] T26 — GATE: `flutter test` — all passing (includes SCENARIO-311..319)
 
 **PR#2 task count**: 12 tasks | **Estimated LOC**: ~255 | **Budget risk**: Low
 
