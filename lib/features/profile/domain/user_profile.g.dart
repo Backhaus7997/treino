@@ -30,7 +30,7 @@ _$UserProfileImpl _$$UserProfileImplFromJson(Map<String, dynamic> json) =>
       trainerLatitude: (json['trainerLatitude'] as num?)?.toDouble(),
       trainerLongitude: (json['trainerLongitude'] as num?)?.toDouble(),
       trainerGeohash: json['trainerGeohash'] as String?,
-      trainerHourlyRate: (json['trainerHourlyRate'] as num?)?.toInt(),
+      trainerMonthlyRate: (json['trainerMonthlyRate'] as num?)?.toInt(),
     );
 
 Map<String, dynamic> _$$UserProfileImplToJson(_$UserProfileImpl instance) =>
@@ -54,7 +54,7 @@ Map<String, dynamic> _$$UserProfileImplToJson(_$UserProfileImpl instance) =>
       'trainerLatitude': instance.trainerLatitude,
       'trainerLongitude': instance.trainerLongitude,
       'trainerGeohash': instance.trainerGeohash,
-      'trainerHourlyRate': instance.trainerHourlyRate,
+      'trainerMonthlyRate': instance.trainerMonthlyRate,
     };
 
 const _$UserRoleEnumMap = {

@@ -30,7 +30,7 @@ mixin _$TrainerPublicProfile {
   String? get trainerGeohash => throw _privateConstructorUsedError;
   double? get trainerLatitude => throw _privateConstructorUsedError;
   double? get trainerLongitude => throw _privateConstructorUsedError;
-  int? get trainerHourlyRate => throw _privateConstructorUsedError;
+  int? get trainerMonthlyRate => throw _privateConstructorUsedError;
 
   /// Serializes this TrainerPublicProfile to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -59,7 +59,7 @@ abstract class $TrainerPublicProfileCopyWith<$Res> {
       String? trainerGeohash,
       double? trainerLatitude,
       double? trainerLongitude,
-      int? trainerHourlyRate});
+      int? trainerMonthlyRate});
 }
 
 /// @nodoc
@@ -87,7 +87,7 @@ class _$TrainerPublicProfileCopyWithImpl<$Res,
     Object? trainerGeohash = freezed,
     Object? trainerLatitude = freezed,
     Object? trainerLongitude = freezed,
-    Object? trainerHourlyRate = freezed,
+    Object? trainerMonthlyRate = freezed,
   }) {
     return _then(_value.copyWith(
       uid: null == uid
@@ -126,9 +126,9 @@ class _$TrainerPublicProfileCopyWithImpl<$Res,
           ? _value.trainerLongitude
           : trainerLongitude // ignore: cast_nullable_to_non_nullable
               as double?,
-      trainerHourlyRate: freezed == trainerHourlyRate
-          ? _value.trainerHourlyRate
-          : trainerHourlyRate // ignore: cast_nullable_to_non_nullable
+      trainerMonthlyRate: freezed == trainerMonthlyRate
+          ? _value.trainerMonthlyRate
+          : trainerMonthlyRate // ignore: cast_nullable_to_non_nullable
               as int?,
     ) as $Val);
   }
@@ -153,7 +153,7 @@ abstract class _$$TrainerPublicProfileImplCopyWith<$Res>
       String? trainerGeohash,
       double? trainerLatitude,
       double? trainerLongitude,
-      int? trainerHourlyRate});
+      int? trainerMonthlyRate});
 }
 
 /// @nodoc
@@ -178,7 +178,7 @@ class __$$TrainerPublicProfileImplCopyWithImpl<$Res>
     Object? trainerGeohash = freezed,
     Object? trainerLatitude = freezed,
     Object? trainerLongitude = freezed,
-    Object? trainerHourlyRate = freezed,
+    Object? trainerMonthlyRate = freezed,
   }) {
     return _then(_$TrainerPublicProfileImpl(
       uid: null == uid
@@ -217,9 +217,9 @@ class __$$TrainerPublicProfileImplCopyWithImpl<$Res>
           ? _value.trainerLongitude
           : trainerLongitude // ignore: cast_nullable_to_non_nullable
               as double?,
-      trainerHourlyRate: freezed == trainerHourlyRate
-          ? _value.trainerHourlyRate
-          : trainerHourlyRate // ignore: cast_nullable_to_non_nullable
+      trainerMonthlyRate: freezed == trainerMonthlyRate
+          ? _value.trainerMonthlyRate
+          : trainerMonthlyRate // ignore: cast_nullable_to_non_nullable
               as int?,
     ));
   }
@@ -239,7 +239,7 @@ class _$TrainerPublicProfileImpl implements _TrainerPublicProfile {
       this.trainerGeohash,
       this.trainerLatitude,
       this.trainerLongitude,
-      this.trainerHourlyRate});
+      this.trainerMonthlyRate});
 
   factory _$TrainerPublicProfileImpl.fromJson(Map<String, dynamic> json) =>
       _$$TrainerPublicProfileImplFromJson(json);
@@ -264,11 +264,11 @@ class _$TrainerPublicProfileImpl implements _TrainerPublicProfile {
   @override
   final double? trainerLongitude;
   @override
-  final int? trainerHourlyRate;
+  final int? trainerMonthlyRate;
 
   @override
   String toString() {
-    return 'TrainerPublicProfile(uid: $uid, displayName: $displayName, displayNameLowercase: $displayNameLowercase, avatarUrl: $avatarUrl, trainerBio: $trainerBio, trainerSpecialty: $trainerSpecialty, trainerGeohash: $trainerGeohash, trainerLatitude: $trainerLatitude, trainerLongitude: $trainerLongitude, trainerHourlyRate: $trainerHourlyRate)';
+    return 'TrainerPublicProfile(uid: $uid, displayName: $displayName, displayNameLowercase: $displayNameLowercase, avatarUrl: $avatarUrl, trainerBio: $trainerBio, trainerSpecialty: $trainerSpecialty, trainerGeohash: $trainerGeohash, trainerLatitude: $trainerLatitude, trainerLongitude: $trainerLongitude, trainerMonthlyRate: $trainerMonthlyRate)';
   }
 
   @override
@@ -293,8 +293,8 @@ class _$TrainerPublicProfileImpl implements _TrainerPublicProfile {
                 other.trainerLatitude == trainerLatitude) &&
             (identical(other.trainerLongitude, trainerLongitude) ||
                 other.trainerLongitude == trainerLongitude) &&
-            (identical(other.trainerHourlyRate, trainerHourlyRate) ||
-                other.trainerHourlyRate == trainerHourlyRate));
+            (identical(other.trainerMonthlyRate, trainerMonthlyRate) ||
+                other.trainerMonthlyRate == trainerMonthlyRate));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -310,7 +310,7 @@ class _$TrainerPublicProfileImpl implements _TrainerPublicProfile {
       trainerGeohash,
       trainerLatitude,
       trainerLongitude,
-      trainerHourlyRate);
+      trainerMonthlyRate);
 
   /// Create a copy of TrainerPublicProfile
   /// with the given fields replaced by the non-null parameter values.
@@ -342,7 +342,7 @@ abstract class _TrainerPublicProfile implements TrainerPublicProfile {
       final String? trainerGeohash,
       final double? trainerLatitude,
       final double? trainerLongitude,
-      final int? trainerHourlyRate}) = _$TrainerPublicProfileImpl;
+      final int? trainerMonthlyRate}) = _$TrainerPublicProfileImpl;
 
   factory _TrainerPublicProfile.fromJson(Map<String, dynamic> json) =
       _$TrainerPublicProfileImpl.fromJson;
@@ -367,7 +367,7 @@ abstract class _TrainerPublicProfile implements TrainerPublicProfile {
   @override
   double? get trainerLongitude;
   @override
-  int? get trainerHourlyRate;
+  int? get trainerMonthlyRate;
 
   /// Create a copy of TrainerPublicProfile
   /// with the given fields replaced by the non-null parameter values.

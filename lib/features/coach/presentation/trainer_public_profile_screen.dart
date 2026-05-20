@@ -60,7 +60,7 @@ class TrainerPublicProfileScreen extends ConsumerWidget {
                 style: TextStyle(color: palette.textPrimary, fontSize: 14),
               ),
               const SizedBox(height: 16),
-              if (profile.trainerHourlyRate != null)
+              if (profile.trainerMonthlyRate != null)
                 Row(
                   children: [
                     Text(
@@ -72,7 +72,7 @@ class TrainerPublicProfileScreen extends ConsumerWidget {
                     ),
                     const Spacer(),
                     Text(
-                      '\$${profile.trainerHourlyRate}${CoachStrings.hourlyRateUnit}',
+                      '\$${profile.trainerMonthlyRate}${CoachStrings.monthlyRateUnit}',
                       style: TextStyle(
                         color: palette.textPrimary,
                         fontWeight: FontWeight.w700,

@@ -93,8 +93,8 @@ function geohash5(lat, lon) {
 // Seed data — 5 trainers in Buenos Aires neighborhoods
 // ──────────────────────────────────────────────────────────────────────────
 
-// All 5 trainers clustered in Palermo (within ~1.5km radius) so they share
-// the same geohash5 cell `69y7q`. This makes the seed useful BOTH with
+// All 5 trainers clustered in Córdoba Capital (zona Centro-Norte) within
+// the same geohash5 cell `6d6m7`. This makes the seed useful BOTH with
 // location permission granted AND with "Ahora no" (listAll fallback).
 const TRAINERS = [
   {
@@ -104,9 +104,9 @@ const TRAINERS = [
     avatarUrl: null,
     trainerBio: 'Powerlifter competitivo desde 2018. Especializado en sentadilla, banco y peso muerto. Atletas all-level.',
     trainerSpecialty: 'powerlifting',
-    trainerLatitude: -34.5755,
-    trainerLongitude: -58.4338,
-    trainerHourlyRate: 8000,
+    trainerLatitude: -31.4135,
+    trainerLongitude: -64.1810,
+    trainerMonthlyRate: 8000,
   },
   {
     uid: 'seed-trainer-2',
@@ -115,9 +115,9 @@ const TRAINERS = [
     avatarUrl: null,
     trainerBio: 'Crossfit Level 2. Programas de fuerza + condicionamiento metabólico. Atención personalizada por whatsapp.',
     trainerSpecialty: 'crossfit',
-    trainerLatitude: -34.5808,
-    trainerLongitude: -58.4290,
-    trainerHourlyRate: 7500,
+    trainerLatitude: -31.3960,
+    trainerLongitude: -64.1900,
+    trainerMonthlyRate: 7500,
   },
   {
     uid: 'seed-trainer-3',
@@ -126,9 +126,9 @@ const TRAINERS = [
     avatarUrl: null,
     trainerBio: 'Hipertrofia y composición corporal. 6 años de experiencia en gimnasios de zona norte. Plan + seguimiento semanal.',
     trainerSpecialty: 'hipertrofia',
-    trainerLatitude: -34.5720,
-    trainerLongitude: -58.4395,
-    trainerHourlyRate: 6500,
+    trainerLatitude: -31.4050,
+    trainerLongitude: -64.1750,
+    trainerMonthlyRate: 6500,
   },
   {
     uid: 'seed-trainer-4',
@@ -137,9 +137,9 @@ const TRAINERS = [
     avatarUrl: null,
     trainerBio: 'Yoga vinyasa + entrenamiento funcional. Mujeres 30+, posparto, rehabilitación articular. Clases online disponibles.',
     trainerSpecialty: 'yoga',
-    trainerLatitude: -34.5790,
-    trainerLongitude: -58.4310,
-    trainerHourlyRate: 5500,
+    trainerLatitude: -31.4000,
+    trainerLongitude: -64.1850,
+    trainerMonthlyRate: 5500,
   },
   {
     uid: 'seed-trainer-5',
@@ -148,9 +148,9 @@ const TRAINERS = [
     avatarUrl: null,
     trainerBio: 'Kinesiología + entrenamiento. Recupero post-lesión, runners con sobrecargas, fortalecimiento de core.',
     trainerSpecialty: 'kinesiologia',
-    trainerLatitude: -34.5765,
-    trainerLongitude: -58.4360,
-    trainerHourlyRate: 9000,
+    trainerLatitude: -31.3920,
+    trainerLongitude: -64.1750,
+    trainerMonthlyRate: 9000,
   },
 ];
 
@@ -172,7 +172,7 @@ function userDoc(t) {
     trainerLatitude: t.trainerLatitude,
     trainerLongitude: t.trainerLongitude,
     trainerGeohash: geohash,
-    trainerHourlyRate: t.trainerHourlyRate,
+    trainerMonthlyRate: t.trainerMonthlyRate,
   };
 }
 
@@ -188,7 +188,7 @@ function publicDoc(t) {
     trainerLatitude: t.trainerLatitude,
     trainerLongitude: t.trainerLongitude,
     trainerGeohash: geohash,
-    trainerHourlyRate: t.trainerHourlyRate,
+    trainerMonthlyRate: t.trainerMonthlyRate,
   };
 }
 

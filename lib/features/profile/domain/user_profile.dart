@@ -18,7 +18,7 @@ class UserProfile with _$UserProfile {
   ///
   /// Trainer-specific fields (`trainerBio`, `trainerSpecialty`,
   /// `trainerLatitude`, `trainerLongitude`, `trainerGeohash`,
-  /// `trainerHourlyRate`) son nullable y solo se setean cuando
+  /// `trainerMonthlyRate`) son nullable y solo se setean cuando
   /// `role == UserRole.trainer`. La extensión propia del onboarding del
   /// PF llega en Fase 5 Etapa 2 (Discovery). Esta etapa solo agrega los
   /// campos al schema — sin escribirlos.
@@ -42,7 +42,7 @@ class UserProfile with _$UserProfile {
     double? trainerLatitude,
     double? trainerLongitude,
     String? trainerGeohash,
-    int? trainerHourlyRate,
+    int? trainerMonthlyRate,
   }) = _UserProfile;
 
   factory UserProfile.fromJson(Map<String, Object?> json) =>

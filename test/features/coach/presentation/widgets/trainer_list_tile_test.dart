@@ -20,7 +20,7 @@ TrainerPublicProfile _profile({
       uid: uid,
       displayName: displayName ?? 'Carlos Trainer',
       trainerSpecialty: specialty,
-      trainerHourlyRate: rate,
+      trainerMonthlyRate: rate,
     );
 
 void main() {

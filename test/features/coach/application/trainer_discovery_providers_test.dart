@@ -37,7 +37,7 @@ TrainerPublicProfile _trainer({
       trainerLatitude: lat,
       trainerLongitude: lon,
       trainerGeohash: geohash,
-      trainerHourlyRate: rate,
+      trainerMonthlyRate: rate,
     );
 
 // ── Fake GeolocatorPlatform stub ──────────────────────────────────────────

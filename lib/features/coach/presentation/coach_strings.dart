@@ -14,7 +14,7 @@ abstract final class CoachStrings {
 
   // ── TrainerListTile ───────────────────────────────────────────────────────
   static const distanceUnknown = '—';
-  static const hourlyRateUnit = '/h';
+  static const monthlyRateUnit = '/mes';
 
   // ── TrainerSpecialtyChips ─────────────────────────────────────────────────
   static const specialtyAll = 'Todos';
@@ -33,7 +33,7 @@ abstract final class CoachStrings {
   static const profileErrorLabel = 'No pudimos cargar este perfil.';
   static const profileNotFoundLabel = 'Entrenador no encontrado.';
   static const profileBioEmpty = 'Sin descripción.';
-  static const profileRateLabel = 'Tarifa por hora';
+  static const profileRateLabel = 'Tarifa mensual';
 
   // ── TrainerContactCtaStub ─────────────────────────────────────────────────
   static const ctaLabel = 'PEDIR VÍNCULO';

@@ -30,7 +30,7 @@ class TrainerPublicProfile with _$TrainerPublicProfile {
     String? trainerGeohash,
     double? trainerLatitude,
     double? trainerLongitude,
-    int? trainerHourlyRate,
+    int? trainerMonthlyRate,
   }) = _TrainerPublicProfile;
 
   factory TrainerPublicProfile.fromJson(Map<String, Object?> json) =>

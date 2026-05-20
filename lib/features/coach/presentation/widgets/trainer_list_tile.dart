@@ -36,7 +36,7 @@ class TrainerListTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final specialty = profile.trainerSpecialty;
-    final rate = profile.trainerHourlyRate;
+    final rate = profile.trainerMonthlyRate;
 
     return InkWell(
       onTap: onTap,
@@ -76,7 +76,7 @@ class TrainerListTile extends StatelessWidget {
               children: [
                 if (rate != null)
                   Text(
-                    '\$$rate${CoachStrings.hourlyRateUnit}',
+                    '\$$rate${CoachStrings.monthlyRateUnit}',
                     style: GoogleFonts.barlowCondensed(
                       fontWeight: FontWeight.w600,
                       fontSize: 13,

@@ -123,7 +123,7 @@ void main() {
       expect(profile.trainerLatitude, isNull);
       expect(profile.trainerLongitude, isNull);
       expect(profile.trainerGeohash, isNull);
-      expect(profile.trainerHourlyRate, isNull);
+      expect(profile.trainerMonthlyRate, isNull);
     });
 
     test('REQ-COACH-FOUNDATIONS-001: trainer fields round-trip when populated',
@@ -140,7 +140,7 @@ void main() {
         trainerLatitude: -34.6037,
         trainerLongitude: -58.3816,
         trainerGeohash: '6gycff',
-        trainerHourlyRate: 15000,
+        trainerMonthlyRate: 15000,
       );
       final decoded = UserProfile.fromJson(profile.toJson());
       expect(decoded.trainerBio, equals(profile.trainerBio));
@@ -148,7 +148,7 @@ void main() {
       expect(decoded.trainerLatitude, closeTo(-34.6037, 1e-6));
       expect(decoded.trainerLongitude, closeTo(-58.3816, 1e-6));
       expect(decoded.trainerGeohash, equals('6gycff'));
-      expect(decoded.trainerHourlyRate, equals(15000));
+      expect(decoded.trainerMonthlyRate, equals(15000));
     });
 
     test(
@@ -165,7 +165,7 @@ void main() {
       final profile = UserProfile.fromJson(raw);
       expect(profile.trainerBio, isNull);
       expect(profile.trainerGeohash, isNull);
-      expect(profile.trainerHourlyRate, isNull);
+      expect(profile.trainerMonthlyRate, isNull);
     });
   });
 }

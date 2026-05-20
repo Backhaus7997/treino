@@ -18,7 +18,7 @@ _$TrainerPublicProfileImpl _$$TrainerPublicProfileImplFromJson(
       trainerGeohash: json['trainerGeohash'] as String?,
       trainerLatitude: (json['trainerLatitude'] as num?)?.toDouble(),
       trainerLongitude: (json['trainerLongitude'] as num?)?.toDouble(),
-      trainerHourlyRate: (json['trainerHourlyRate'] as num?)?.toInt(),
+      trainerMonthlyRate: (json['trainerMonthlyRate'] as num?)?.toInt(),
     );
 
 Map<String, dynamic> _$$TrainerPublicProfileImplToJson(
@@ -33,5 +33,5 @@ Map<String, dynamic> _$$TrainerPublicProfileImplToJson(
       'trainerGeohash': instance.trainerGeohash,
       'trainerLatitude': instance.trainerLatitude,
       'trainerLongitude': instance.trainerLongitude,
-      'trainerHourlyRate': instance.trainerHourlyRate,
+      'trainerMonthlyRate': instance.trainerMonthlyRate,
     };
