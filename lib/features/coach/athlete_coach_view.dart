@@ -1,33 +1,15 @@
 import 'package:flutter/material.dart';
 
-import '../../app/theme/app_palette.dart';
+import 'presentation/trainers_list_screen.dart';
 
+/// Vista de la tab Coach cuando el usuario es athlete.
+///
+/// A partir de Fase 5 Etapa 2, monta [TrainersListScreen] (discovery de
+/// entrenadores). El stub "COACH / Personal Trainers cerca tuyo" anterior
+/// quedó deprecado.
 class AthleteCoachView extends StatelessWidget {
   const AthleteCoachView({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-    final theme = Theme.of(context);
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            'COACH',
-            style: theme.textTheme.displayMedium?.copyWith(
-              color: palette.highlight,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Personal Trainers cerca tuyo',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: palette.textMuted,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) => const TrainersListScreen();
 }

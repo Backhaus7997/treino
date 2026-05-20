@@ -10,6 +10,7 @@ import '../features/auth/presentation/register_screen.dart';
 import '../features/auth/presentation/splash_screen.dart';
 import '../features/auth/presentation/welcome_screen.dart';
 import '../features/coach/coach_screen.dart';
+import '../features/coach/presentation/trainer_public_profile_screen.dart';
 import '../features/workout/application/session_init.dart';
 import '../features/workout/presentation/exercise_detail_screen.dart';
 import '../features/workout/presentation/post_workout_summary_screen.dart';
@@ -240,6 +241,15 @@ GoRouter buildRouter({
           GoRoute(
             path: '/coach',
             pageBuilder: (_, __) => _noAnim(const CoachScreen()),
+            routes: [
+              GoRoute(
+                path: 'trainer/:uid',
+                pageBuilder: (context, state) {
+                  final uid = state.pathParameters['uid']!;
+                  return _noAnim(TrainerPublicProfileScreen(uid: uid));
+                },
+              ),
+            ],
           ),
           GoRoute(
             path: '/profile',
