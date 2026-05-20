@@ -101,6 +101,90 @@ void main() {
   });
 
   // ---------------------------------------------------------------------------
+  // T39-T40: accept cross-feature write (SCENARIO-322)
+  // ---------------------------------------------------------------------------
+  group('FriendshipRepository.accept cross-feature write', () {
+    Future<void> seedFriendshipForAccept({
+      required String id,
+      required String requesterId,
+      required String uidA,
+      required String uidB,
+    }) async {
+      final now = DateTime.utc(2026, 1, 1);
+      final friendship = Friendship(
+        id: id,
+        uidA: uidA,
+        uidB: uidB,
+        status: FriendshipStatus.pending,
+        requesterId: requesterId,
+        members: [uidA, uidB],
+        createdAt: now,
+      );
+      await firestore.collection('friendships').doc(id).set(friendship.toJson());
+    }
+
+    // SCENARIO-322 success: accept() increments followingCount for myUid
+    test(
+        'SCENARIO-322: accept() triggers self-refresh write to userPublicProfiles/myUid',
+        () async {
+      await seedFriendshipForAccept(
+        id: 'aaa_bbb',
+        requesterId: 'bbb',
+        uidA: 'aaa',
+        uidB: 'bbb',
+      );
+      // myUid 'aaa' currently has followingCount: 2
+      await firestore.collection('userPublicProfiles').doc('aaa').set({
+        'uid': 'aaa',
+        'followersCount': 1,
+        'followingCount': 2,
+      });
+
+      final repoWithProfile = FriendshipRepository(
+        firestore: firestore,
+        publicProfileRepository: publicProfileRepo,
+      );
+      await repoWithProfile.accept('aaa_bbb', 'aaa');
+
+      final profileSnap =
+          await firestore.collection('userPublicProfiles').doc('aaa').get();
+      expect(profileSnap.exists, isTrue);
+      final data = profileSnap.data()!;
+      // followingCount incremented by 1 (was 2, now 3)
+      expect(data['followingCount'], equals(3));
+    });
+
+    // SCENARIO-322 failure: when public profile write throws, accept() resolves
+    test(
+        'SCENARIO-322 failure: when public profile write throws, accept() resolves without rethrowing',
+        () async {
+      await seedFriendshipForAccept(
+        id: 'aaa_bbb',
+        requesterId: 'bbb',
+        uidA: 'aaa',
+        uidB: 'bbb',
+      );
+
+      final throwingRepo = _ThrowingPublicProfileRepository();
+      final repoWithThrowingProfile = FriendshipRepository(
+        firestore: firestore,
+        publicProfileRepository: throwingRepo,
+      );
+
+      // Must not throw — primary accept() succeeds
+      await expectLater(
+        repoWithThrowingProfile.accept('aaa_bbb', 'aaa'),
+        completes,
+      );
+
+      // Friendship doc was accepted
+      final snap =
+          await firestore.collection('friendships').doc('aaa_bbb').get();
+      expect(snap.data()?['status'], equals('accepted'));
+    });
+  });
+
+  // ---------------------------------------------------------------------------
   // T26: acceptedFriendsOf and pendingRequestsFor
   // ---------------------------------------------------------------------------
   group('FriendshipRepository.acceptedFriendsOf', () {
