@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/athlete_coach_view.dart';
 import 'package:treino/features/coach/coach_screen.dart';
+import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/trainer_coach_view.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
@@ -32,6 +34,11 @@ ProviderContainer _container({UserProfile? profile}) => ProviderContainer(
         userProfileProvider.overrideWith(
           (ref) => Stream<UserProfile?>.value(profile),
         ),
+        // Stubs para los providers de coach que las views nuevas observan.
+        // Sin esto los streams quedan abiertos y pumpAndSettle nunca termina.
+        currentAthleteLinkProvider.overrideWith((ref) async => null),
+        trainerLinksStreamProvider
+            .overrideWith((ref) => Stream.value(const <TrainerLink>[])),
       ],
     );
 
@@ -40,6 +47,9 @@ ProviderContainer _loadingContainer() => ProviderContainer(
         userProfileProvider.overrideWith(
           (ref) => const Stream<UserProfile?>.empty(),
         ),
+        currentAthleteLinkProvider.overrideWith((ref) async => null),
+        trainerLinksStreamProvider
+            .overrideWith((ref) => Stream.value(const <TrainerLink>[])),
       ],
     );
 

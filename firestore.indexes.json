@@ -15,6 +15,22 @@
         { "fieldPath": "trainerGeohash", "order": "ASCENDING" },
         { "fieldPath": "displayNameLowercase", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "trainer_links",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "athleteId", "order": "ASCENDING" },
+        { "fieldPath": "requestedAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "trainer_links",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "trainerId", "order": "ASCENDING" },
+        { "fieldPath": "requestedAt", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

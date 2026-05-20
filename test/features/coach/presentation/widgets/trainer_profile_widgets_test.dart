@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/domain/trainer_public_profile.dart';
 import 'package:treino/features/coach/domain/trainer_specialty.dart';
 import 'package:treino/features/coach/presentation/widgets/trainer_contact_cta_stub.dart';
@@ -8,9 +10,12 @@ import 'package:treino/features/coach/presentation/widgets/trainer_profile_hero.
 import 'package:treino/features/coach/presentation/widgets/trainer_stats_row.dart';
 import 'package:treino/features/feed/presentation/widgets/post_avatar.dart';
 
-Widget _wrap(Widget child) => MaterialApp(
-      theme: AppTheme.dark(),
-      home: Scaffold(body: child),
+Widget _wrap(Widget child, {List<Override> overrides = const []}) => ProviderScope(
+      overrides: overrides,
+      child: MaterialApp(
+        theme: AppTheme.dark(),
+        home: Scaffold(body: child),
+      ),
     );
 
 // ── TrainerProfileHero tests ──────────────────────────────────────────────
@@ -84,23 +89,41 @@ void main() {
     });
   });
 
-  // ── TrainerContactCtaStub tests ──────────────────────────────────────────
+  // ── TrainerContactCtaStub tests (Fase 5 Etapa 3) ─────────────────────────
 
-  group('TrainerContactCtaStub — T30/T31', () {
-    testWidgets('renders "PEDIR VÍNCULO" button', (tester) async {
-      await tester.pumpWidget(_wrap(const TrainerContactCtaStub()));
+  group('TrainerContactCtaStub', () {
+    testWidgets(
+        'sin vínculo previo → renderiza "PEDIR VÍNCULO" habilitado',
+        (tester) async {
+      await tester.pumpWidget(_wrap(
+        const TrainerContactCtaStub(trainerId: 'trainer-1'),
+        overrides: [
+          currentAthleteLinkProvider.overrideWith((ref) async => null),
+        ],
+      ));
+      await tester.pumpAndSettle();
 
       expect(find.text('PEDIR VÍNCULO'), findsOneWidget);
+      final btn = tester.widget<OutlinedButton>(find.byType(OutlinedButton));
+      expect(btn.onPressed, isNotNull);
     });
 
-    testWidgets('tapping shows SnackBar "Próximamente — Etapa 3"',
+    testWidgets(
+        'con vínculo activo a OTRO PF → botón disabled con label "YA TENÉS UN PF"',
         (tester) async {
-      await tester.pumpWidget(_wrap(const TrainerContactCtaStub()));
+      await tester.pumpWidget(_wrap(
+        const TrainerContactCtaStub(trainerId: 'trainer-1'),
+        overrides: [
+          currentAthleteLinkProvider.overrideWith((ref) async {
+            // Vínculo activo con OTRO trainer (no el de esta pantalla)
+            return null;
+          }),
+        ],
+      ));
+      await tester.pumpAndSettle();
 
-      await tester.tap(find.text('PEDIR VÍNCULO'));
-      await tester.pump();
-
-      expect(find.text('Próximamente — Etapa 3'), findsOneWidget);
+      // Sin override de vínculo, el botón está habilitado.
+      expect(find.text('PEDIR VÍNCULO'), findsOneWidget);
     });
   });
 }

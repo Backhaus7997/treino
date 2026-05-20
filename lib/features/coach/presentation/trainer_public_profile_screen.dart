@@ -81,7 +81,7 @@ class TrainerPublicProfileScreen extends ConsumerWidget {
                   ],
                 ),
               const SizedBox(height: 24),
-              const TrainerContactCtaStub(),
+              TrainerContactCtaStub(trainerId: uid),
             ],
           );
         },
