@@ -17,11 +17,29 @@ class UserRepository {
   // userPublicProfiles document.
   static const _publicFields = {'displayName', 'avatarUrl', 'gymId'};
 
+  // Fields that, when present in an update partial, must be propagated to the
+  // trainerPublicProfiles document. Per design D3.
+  // `displayName` and `avatarUrl` are shared with _publicFields — they trigger
+  // both userPublicProfiles AND trainerPublicProfiles dual-write.
+  static const _trainerPublicFields = {
+    'displayName',
+    'avatarUrl',
+    'trainerBio',
+    'trainerSpecialty',
+    'trainerGeohash',
+    'trainerLatitude',
+    'trainerLongitude',
+    'trainerHourlyRate',
+  };
+
   CollectionReference<Map<String, Object?>> get _users =>
       _firestore.collection('users');
 
   CollectionReference<Map<String, Object?>> get _userPublicProfiles =>
       _firestore.collection('userPublicProfiles');
+
+  CollectionReference<Map<String, Object?>> get _trainerPublicProfiles =>
+      _firestore.collection('trainerPublicProfiles');
 
   // ---------------------------------------------------------------------------
   // Private helpers — REQ-UPP-002 / ADR-UPP-11
@@ -61,6 +79,55 @@ class UserRepository {
     }
     if (partial.containsKey('gymId')) {
       result['gymId'] = partial['gymId'];
+    }
+    return result;
+  }
+
+  /// Builds a partial trainer-public update map from a raw update [partial].
+  ///
+  /// Returns `null` when no trainer-public-relevant fields are in [partial] —
+  /// callers must skip the trainerPublicProfiles write in that case.
+  ///
+  /// Per design D2: key-presence trigger (NOT value diff).
+  /// Per design D1: field set includes displayName, avatarUrl, trainerBio,
+  ///   trainerSpecialty, trainerGeohash, trainerLatitude, trainerLongitude,
+  ///   trainerHourlyRate. `displayNameLowercase` is always derived when
+  ///   `displayName` is present.
+  ///
+  /// REQ-COACH-DISC-DUAL-001.
+  Map<String, Object?>? _trainerPublicSubsetFromPartial(
+    Map<String, Object?> partial,
+  ) {
+    final hasTrainerField =
+        partial.keys.any((k) => _trainerPublicFields.contains(k));
+    if (!hasTrainerField) return null;
+
+    final result = <String, Object?>{};
+    if (partial.containsKey('displayName')) {
+      final name = partial['displayName'] as String?;
+      result['displayName'] = name;
+      result['displayNameLowercase'] = name?.trim().toLowerCase();
+    }
+    if (partial.containsKey('avatarUrl')) {
+      result['avatarUrl'] = partial['avatarUrl'];
+    }
+    if (partial.containsKey('trainerBio')) {
+      result['trainerBio'] = partial['trainerBio'];
+    }
+    if (partial.containsKey('trainerSpecialty')) {
+      result['trainerSpecialty'] = partial['trainerSpecialty'];
+    }
+    if (partial.containsKey('trainerGeohash')) {
+      result['trainerGeohash'] = partial['trainerGeohash'];
+    }
+    if (partial.containsKey('trainerLatitude')) {
+      result['trainerLatitude'] = partial['trainerLatitude'];
+    }
+    if (partial.containsKey('trainerLongitude')) {
+      result['trainerLongitude'] = partial['trainerLongitude'];
+    }
+    if (partial.containsKey('trainerHourlyRate')) {
+      result['trainerHourlyRate'] = partial['trainerHourlyRate'];
     }
     return result;
   }
@@ -138,17 +205,24 @@ class UserRepository {
 
   /// Partial update. Immutable fields are filtered out defensively.
   /// `updatedAt` is always overwritten — callers do not set it.
-  /// When `displayName`, `avatarUrl`, or `gymId` are present in [partial],
-  /// `userPublicProfiles/{uid}` is also updated in the same batch.
-  /// REQ-UPP-011, REQ-UPP-012.
+  ///
+  /// Dual-write strategy (atomic WriteBatch):
+  ///   - `users/{uid}` — always written.
+  ///   - `userPublicProfiles/{uid}` — written when partial contains any of
+  ///     `displayName`, `avatarUrl`, `gymId`. REQ-UPP-011, REQ-UPP-012.
+  ///   - `trainerPublicProfiles/{uid}` — written when partial contains any of
+  ///     the D3 trainer public fields. REQ-COACH-DISC-DUAL-001.
+  ///
+  /// All three writes are in a single batch.commit() — no partial state.
   Future<void> update(String uid, Map<String, Object?> partial) async {
     final sanitized = Map<String, Object?>.fromEntries(
       partial.entries.where((e) => !_immutableFields.contains(e.key)),
     )..['updatedAt'] = Timestamp.fromDate(DateTime.now().toUtc());
 
     final publicSubset = _publicSubsetFromPartial(partial);
+    final trainerPublicSubset = _trainerPublicSubsetFromPartial(partial);
 
-    if (publicSubset == null) {
+    if (publicSubset == null && trainerPublicSubset == null) {
       // No public-relevant fields — single write to users only.
       await _users.doc(uid).set(sanitized, SetOptions(merge: true));
       return;
@@ -156,11 +230,23 @@ class UserRepository {
 
     final batch = _firestore.batch();
     batch.set(_users.doc(uid), sanitized, SetOptions(merge: true));
-    batch.set(
-      _userPublicProfiles.doc(uid),
-      publicSubset,
-      SetOptions(merge: true),
-    );
+
+    if (publicSubset != null) {
+      batch.set(
+        _userPublicProfiles.doc(uid),
+        publicSubset,
+        SetOptions(merge: true),
+      );
+    }
+
+    if (trainerPublicSubset != null) {
+      batch.set(
+        _trainerPublicProfiles.doc(uid),
+        trainerPublicSubset,
+        SetOptions(merge: true),
+      );
+    }
+
     await batch.commit();
   }
 
