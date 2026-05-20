@@ -16,6 +16,8 @@ class WeeklyInsights {
     required this.plannedSessionsCount,
     required this.setsByGroup,
     required this.targetByGroup,
+    this.streak = 0,
+    this.monthSessionsCount = 0,
   });
 
   /// Lunes 00:00 hora local de la semana actual.
@@ -45,6 +47,15 @@ class WeeklyInsights {
   /// rutina asignada.
   final Map<MuscleGroupDisplay, int> targetByGroup;
 
+  /// Racha de días consecutivos entrenados (incluye hoy si entrenó,
+  /// o cuenta desde ayer si todavía no entrenó hoy). Calculado en
+  /// `weeklyInsightsProvider`.
+  final int streak;
+
+  /// Cantidad de sesiones finished en el mes calendario actual.
+  /// Se basa en el mes de `startedAt.toLocal()`, no en ventana de 30 días.
+  final int monthSessionsCount;
+
   WeeklyInsights copyWith({
     DateTime? weekStart,
     DateTime? weekEnd,
@@ -53,6 +64,8 @@ class WeeklyInsights {
     int? plannedSessionsCount,
     Map<MuscleGroupDisplay, int>? setsByGroup,
     Map<MuscleGroupDisplay, int>? targetByGroup,
+    int? streak,
+    int? monthSessionsCount,
   }) =>
       WeeklyInsights(
         weekStart: weekStart ?? this.weekStart,
@@ -62,6 +75,8 @@ class WeeklyInsights {
         plannedSessionsCount: plannedSessionsCount ?? this.plannedSessionsCount,
         setsByGroup: setsByGroup ?? this.setsByGroup,
         targetByGroup: targetByGroup ?? this.targetByGroup,
+        streak: streak ?? this.streak,
+        monthSessionsCount: monthSessionsCount ?? this.monthSessionsCount,
       );
 
   @override
@@ -74,7 +89,9 @@ class WeeklyInsights {
           other.sessionsCount == sessionsCount &&
           other.plannedSessionsCount == plannedSessionsCount &&
           mapEquals(other.setsByGroup, setsByGroup) &&
-          mapEquals(other.targetByGroup, targetByGroup);
+          mapEquals(other.targetByGroup, targetByGroup) &&
+          other.streak == streak &&
+          other.monthSessionsCount == monthSessionsCount;
 
   @override
   int get hashCode => Object.hash(
@@ -85,6 +102,8 @@ class WeeklyInsights {
         plannedSessionsCount,
         _stableMapHash(setsByGroup),
         _stableMapHash(targetByGroup),
+        streak,
+        monthSessionsCount,
       );
 
   /// MapEntry tiene identity-based hash, así que iteramos ordenado por

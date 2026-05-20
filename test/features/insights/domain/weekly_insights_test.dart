@@ -9,6 +9,8 @@ void main() {
     int sessionsCount = 0,
     Map<MuscleGroupDisplay, int>? setsByGroup,
     Map<MuscleGroupDisplay, int>? targetByGroup,
+    int streak = 0,
+    int monthSessionsCount = 0,
   }) {
     final start = weekStart ?? DateTime(2026, 5, 18); // monday
     return WeeklyInsights(
@@ -20,6 +22,8 @@ void main() {
       plannedSessionsCount: 5,
       setsByGroup: setsByGroup ?? const {},
       targetByGroup: targetByGroup ?? const {},
+      streak: streak,
+      monthSessionsCount: monthSessionsCount,
     );
   }
 
@@ -73,6 +77,56 @@ void main() {
       );
       final b = a.copyWith();
       expect(b, equals(a));
+    });
+  });
+
+  group('WeeklyInsights new fields (SCENARIO-298..299)', () {
+    // SCENARIO-298: DTO with new fields omitted defaults to 0
+    test('SCENARIO-298: streak and monthSessionsCount default to 0', () {
+      final a = makeStub(); // streak=0, monthSessionsCount=0 by default
+      expect(a.streak, 0);
+      expect(a.monthSessionsCount, 0);
+    });
+
+    // SCENARIO-299: DTO serializes new fields when present
+    test('SCENARIO-299: streak and monthSessionsCount round-trip via copyWith',
+        () {
+      final a = makeStub(streak: 5, monthSessionsCount: 12);
+      expect(a.streak, 5);
+      expect(a.monthSessionsCount, 12);
+
+      // copyWith preserves them
+      final b = a.copyWith();
+      expect(b.streak, 5);
+      expect(b.monthSessionsCount, 12);
+      expect(a, equals(b));
+      expect(a.hashCode, equals(b.hashCode));
+    });
+
+    test('different streak values → not equal', () {
+      final a = makeStub(streak: 3);
+      final b = makeStub(streak: 4);
+      expect(a, isNot(equals(b)));
+    });
+
+    test('different monthSessionsCount values → not equal', () {
+      final a = makeStub(monthSessionsCount: 10);
+      final b = makeStub(monthSessionsCount: 11);
+      expect(a, isNot(equals(b)));
+    });
+
+    test('copyWith overrides streak', () {
+      final a = makeStub(streak: 3);
+      final b = a.copyWith(streak: 7);
+      expect(b.streak, 7);
+      expect(b.monthSessionsCount, a.monthSessionsCount);
+    });
+
+    test('copyWith overrides monthSessionsCount', () {
+      final a = makeStub(monthSessionsCount: 10);
+      final b = a.copyWith(monthSessionsCount: 15);
+      expect(b.monthSessionsCount, 15);
+      expect(b.streak, a.streak);
     });
   });
 }
