@@ -3,14 +3,17 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/features/feed/data/friendship_repository.dart';
 import 'package:treino/features/feed/domain/friendship.dart';
 import 'package:treino/features/feed/domain/friendship_status.dart';
+import 'package:treino/features/profile/data/user_public_profile_repository.dart';
 
 void main() {
   late FakeFirebaseFirestore firestore;
   late FriendshipRepository repo;
+  late UserPublicProfileRepository publicProfileRepo;
 
   setUp(() {
     firestore = FakeFirebaseFirestore();
     repo = FriendshipRepository(firestore: firestore);
+    publicProfileRepo = UserPublicProfileRepository(firestore: firestore);
   });
 
   // ---------------------------------------------------------------------------
@@ -182,26 +185,111 @@ void main() {
   });
 
   // ---------------------------------------------------------------------------
-  // T28: delete and idempotency
+  // T32-T35: delete (BREAKING: gains myUid param) + cross-feature write
   // ---------------------------------------------------------------------------
   group('FriendshipRepository.delete', () {
-    // SCENARIO-128: delete removes the friendship doc
-    test('SCENARIO-128: delete("aaa_bbb") removes the doc', () async {
+    // SCENARIO-128 (updated): delete with new signature removes the doc
+    test('SCENARIO-128: delete("aaa_bbb", "aaa") removes the friendship doc',
+        () async {
       final now = DateTime.utc(2026, 1, 1);
       await firestore.collection('friendships').doc('aaa_bbb').set(
             Friendship(
               id: 'aaa_bbb',
               uidA: 'aaa',
               uidB: 'bbb',
-              status: FriendshipStatus.pending,
+              status: FriendshipStatus.accepted,
+              requesterId: 'aaa',
+              members: ['aaa', 'bbb'],
+              createdAt: now,
+            ).toJson(),
+          );
+      // Seed public profile for myUid so decrement can read current count
+      await firestore.collection('userPublicProfiles').doc('aaa').set({
+        'uid': 'aaa',
+        'followersCount': 2,
+        'followingCount': 3,
+      });
+
+      final repoWithProfile = FriendshipRepository(
+        firestore: firestore,
+        publicProfileRepository: publicProfileRepo,
+      );
+      await repoWithProfile.delete('aaa_bbb', 'aaa');
+
+      final snap =
+          await firestore.collection('friendships').doc('aaa_bbb').get();
+      expect(snap.exists, isFalse);
+    });
+
+    // SCENARIO-323 success: delete decrements self-refresh counter for myUid
+    test(
+        'SCENARIO-323: delete triggers self-refresh write to userPublicProfiles/myUid with decremented count',
+        () async {
+      final now = DateTime.utc(2026, 1, 1);
+      await firestore.collection('friendships').doc('aaa_bbb').set(
+            Friendship(
+              id: 'aaa_bbb',
+              uidA: 'aaa',
+              uidB: 'bbb',
+              status: FriendshipStatus.accepted,
+              requesterId: 'aaa',
+              members: ['aaa', 'bbb'],
+              createdAt: now,
+            ).toJson(),
+          );
+      // myUid 'aaa' currently has followingCount: 5
+      await firestore.collection('userPublicProfiles').doc('aaa').set({
+        'uid': 'aaa',
+        'followersCount': 3,
+        'followingCount': 5,
+      });
+
+      final repoWithProfile = FriendshipRepository(
+        firestore: firestore,
+        publicProfileRepository: publicProfileRepo,
+      );
+      await repoWithProfile.delete('aaa_bbb', 'aaa');
+
+      final profileSnap =
+          await firestore.collection('userPublicProfiles').doc('aaa').get();
+      expect(profileSnap.exists, isTrue);
+      final data = profileSnap.data()!;
+      // followingCount decremented by 1 (was 5, now 4)
+      expect(data['followingCount'], equals(4));
+    });
+
+    // SCENARIO-323 failure: when public profile write throws, delete still
+    // resolves successfully (primary op is not affected)
+    test(
+        'SCENARIO-323 failure: when public profile write throws, delete resolves without rethrowing',
+        () async {
+      final now = DateTime.utc(2026, 1, 1);
+      await firestore.collection('friendships').doc('aaa_bbb').set(
+            Friendship(
+              id: 'aaa_bbb',
+              uidA: 'aaa',
+              uidB: 'bbb',
+              status: FriendshipStatus.accepted,
               requesterId: 'aaa',
               members: ['aaa', 'bbb'],
               createdAt: now,
             ).toJson(),
           );
 
-      await repo.delete('aaa_bbb');
+      // Use a throwing repo to simulate failure
+      final throwingRepo = _ThrowingPublicProfileRepository();
+      final repoWithThrowingProfile = FriendshipRepository(
+        firestore: firestore,
+        publicProfileRepository: throwingRepo,
+      );
 
+      // Must not throw — primary delete succeeds
+      await expectLater(
+        repoWithThrowingProfile.delete('aaa_bbb', 'aaa'),
+        completes,
+      );
+
+      // The friendship doc was still deleted
       final snap =
           await firestore.collection('friendships').doc('aaa_bbb').get();
       expect(snap.exists, isFalse);
@@ -226,4 +314,16 @@ void main() {
       expect(second.status, equals(FriendshipStatus.pending));
     });
   });
+}
+
+// ─── Test helper: throws on any write ─────────────────────────────────────────
+
+class _ThrowingPublicProfileRepository extends UserPublicProfileRepository {
+  _ThrowingPublicProfileRepository()
+      : super(firestore: FakeFirebaseFirestore());
+
+  @override
+  Future<void> updateCounters(String uid, Map<String, Object?> fields) {
+    throw Exception('Simulated public profile write failure');
+  }
 }
