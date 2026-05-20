@@ -1,14 +1,21 @@
+import 'dart:developer' as developer;
+
 import 'package:cloud_firestore/cloud_firestore.dart'
     show CollectionReference, DocumentSnapshot, FirebaseFirestore;
 
+import '../../../features/profile/data/user_public_profile_repository.dart';
 import '../domain/friendship.dart';
 import '../domain/friendship_status.dart';
 
 class FriendshipRepository {
-  FriendshipRepository({required FirebaseFirestore firestore})
-      : _firestore = firestore;
+  FriendshipRepository({
+    required FirebaseFirestore firestore,
+    UserPublicProfileRepository? publicProfileRepository,
+  })  : _firestore = firestore,
+        _publicProfileRepository = publicProfileRepository;
 
   final FirebaseFirestore _firestore;
+  final UserPublicProfileRepository? _publicProfileRepository;
 
   CollectionReference<Map<String, Object?>> get _friendships =>
       _firestore.collection('friendships');
@@ -86,8 +93,32 @@ class FriendshipRepository {
   }
 
   /// Permanently removes a friendship document.
-  Future<void> delete(String friendshipId) async {
+  ///
+  /// [myUid] identifies the caller for the self-refresh counter decrement
+  /// written to `userPublicProfiles/{myUid}`. The decrement is best-effort:
+  /// if the public profile write fails, the friendship is still deleted and
+  /// the error is captured via `developer.log` (REQ-WRX-010 / ADR-WRS-12).
+  Future<void> delete(String friendshipId, String myUid) async {
     await _friendships.doc(friendshipId).delete();
+
+    // Cross-feature: decrement self-refresh counter for myUid (best-effort)
+    final pubRepo = _publicProfileRepository;
+    if (pubRepo == null) return;
+
+    try {
+      final profile = await pubRepo.get(myUid);
+      final currentFollowing = profile?.followingCount ?? 0;
+      await pubRepo.updateCounters(myUid, {
+        'followingCount': (currentFollowing - 1).clamp(0, double.maxFinite).toInt(),
+      });
+    } catch (e, st) {
+      developer.log(
+        'FriendshipRepository.delete: failed to decrement public profile '
+        'counters for $myUid',
+        error: e,
+        stackTrace: st,
+      );
+    }
   }
 
   /// Returns the friendship document between [uidA] and [uidB], or null if none
