@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:treino/features/insights/application/insights_providers.dart';
+import 'package:treino/core/utils/streak_calculator.dart';
 import 'package:treino/features/workout/domain/session.dart';
 import 'package:treino/features/workout/domain/session_status.dart';
 
@@ -14,7 +14,7 @@ Session _finishedOn(DateTime localDate, {String id = 's'}) => Session(
     );
 
 void main() {
-  group('_computeStreak (SCENARIO-300..303)', () {
+  group('computeStreak (SCENARIO-300..303)', () {
     // SCENARIO-300: Streak when trained today (includes today)
     test('SCENARIO-300: trained today → streak starts from today', () {
       final today = DateTime(2026, 5, 14); // Wednesday
@@ -23,7 +23,7 @@ void main() {
         _finishedOn(DateTime(2026, 5, 13), id: 's2'),
         _finishedOn(DateTime(2026, 5, 12), id: 's3'),
       ];
-      final result = computeStreakForTest(sessions, now: today);
+      final result = computeStreak(sessions, now: today);
       expect(result, 3);
     });
 
@@ -34,7 +34,7 @@ void main() {
         _finishedOn(DateTime(2026, 5, 13), id: 's1'),
         _finishedOn(DateTime(2026, 5, 12), id: 's2'),
       ];
-      final result = computeStreakForTest(sessions, now: today);
+      final result = computeStreak(sessions, now: today);
       expect(result, 2);
     });
 
@@ -49,14 +49,14 @@ void main() {
         _finishedOn(DateTime(2026, 5, 12), id: 's2'),
         _finishedOn(DateTime(2026, 5, 11), id: 's3'),
       ];
-      final result = computeStreakForTest(sessions, now: today);
+      final result = computeStreak(sessions, now: today);
       expect(result, 1); // only today counts; gap breaks the chain
     });
 
     // SCENARIO-303: Streak is zero for user with no finished sessions
     test('SCENARIO-303: no finished sessions → streak is 0', () {
       final today = DateTime(2026, 5, 14);
-      final result = computeStreakForTest([], now: today);
+      final result = computeStreak([], now: today);
       expect(result, 0);
     });
 
@@ -68,7 +68,7 @@ void main() {
         _finishedOn(DateTime(2026, 5, 14, 18, 0), id: 's2'), // same day
         _finishedOn(DateTime(2026, 5, 13), id: 's3'),
       ];
-      final result = computeStreakForTest(sessions, now: today);
+      final result = computeStreak(sessions, now: today);
       expect(result, 2); // today + yesterday = 2, not 3
     });
 
@@ -82,7 +82,7 @@ void main() {
           id: 's$i',
         ),
       );
-      final result = computeStreakForTest(sessions, now: today);
+      final result = computeStreak(sessions, now: today);
       expect(result, 7);
     });
 
@@ -92,7 +92,7 @@ void main() {
       final sessions = [
         _finishedOn(DateTime(2026, 5, 14), id: 's1'),
       ];
-      final result = computeStreakForTest(sessions, now: today);
+      final result = computeStreak(sessions, now: today);
       expect(result, 1);
     });
   });
