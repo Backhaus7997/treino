@@ -50,6 +50,11 @@ class FriendshipRepository {
 
   /// Accepts a pending friendship. Throws [StateError] if [myUid] is the
   /// original requester (cannot self-accept per SCENARIO-125).
+  ///
+  /// After accepting, performs a best-effort self-refresh write to
+  /// `userPublicProfiles/{myUid}` to increment [followingCount].
+  /// If the public profile write fails, it is logged and swallowed —
+  /// the primary accept is not affected. (REQ-WRX-004 / ADR-WRS-12)
   Future<void> accept(String friendshipId, String myUid) async {
     final snap = await _friendships.doc(friendshipId).get();
     if (!snap.exists) {
@@ -63,6 +68,25 @@ class FriendshipRepository {
     await _friendships
         .doc(friendshipId)
         .update({'status': FriendshipStatus.accepted.toJson()});
+
+    // Cross-feature: increment followingCount for myUid (best-effort)
+    final pubRepo = _publicProfileRepository;
+    if (pubRepo == null) return;
+
+    try {
+      final profile = await pubRepo.get(myUid);
+      final currentFollowing = profile?.followingCount ?? 0;
+      await pubRepo.updateCounters(myUid, {
+        'followingCount': currentFollowing + 1,
+      });
+    } catch (e, st) {
+      developer.log(
+        'FriendshipRepository.accept: failed to increment public profile '
+        'counters for $myUid',
+        error: e,
+        stackTrace: st,
+      );
+    }
   }
 
   /// Returns the list of UIDs that [uid] is friends with (status = accepted).
