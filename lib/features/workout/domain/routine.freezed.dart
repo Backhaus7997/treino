@@ -28,7 +28,14 @@ mixin _$Routine {
   List<RoutineDay> get days =>
       throw _privateConstructorUsedError; // empty list valid (spec SCENARIO-052)
   int? get estimatedMinutesPerDay => throw _privateConstructorUsedError;
-  String? get imageUrl => throw _privateConstructorUsedError;
+  String? get imageUrl =>
+      throw _privateConstructorUsedError; // null for seed PR 2 (ADR-3); future Storage URL
+  RoutineSource get source => throw _privateConstructorUsedError;
+  String? get assignedBy =>
+      throw _privateConstructorUsedError; // trainerId — solo cuando source == trainerAssigned
+  String? get assignedTo =>
+      throw _privateConstructorUsedError; // athleteId — solo en planes privados asignados
+  RoutineVisibility get visibility => throw _privateConstructorUsedError;
 
   /// Serializes this Routine to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -51,7 +58,11 @@ abstract class $RoutineCopyWith<$Res> {
       ExperienceLevel level,
       List<RoutineDay> days,
       int? estimatedMinutesPerDay,
-      String? imageUrl});
+      String? imageUrl,
+      RoutineSource source,
+      String? assignedBy,
+      String? assignedTo,
+      RoutineVisibility visibility});
 }
 
 /// @nodoc
@@ -76,6 +87,10 @@ class _$RoutineCopyWithImpl<$Res, $Val extends Routine>
     Object? days = null,
     Object? estimatedMinutesPerDay = freezed,
     Object? imageUrl = freezed,
+    Object? source = null,
+    Object? assignedBy = freezed,
+    Object? assignedTo = freezed,
+    Object? visibility = null,
   }) {
     return _then(_value.copyWith(
       id: null == id
@@ -106,6 +121,22 @@ class _$RoutineCopyWithImpl<$Res, $Val extends Routine>
           ? _value.imageUrl
           : imageUrl // ignore: cast_nullable_to_non_nullable
               as String?,
+      source: null == source
+          ? _value.source
+          : source // ignore: cast_nullable_to_non_nullable
+              as RoutineSource,
+      assignedBy: freezed == assignedBy
+          ? _value.assignedBy
+          : assignedBy // ignore: cast_nullable_to_non_nullable
+              as String?,
+      assignedTo: freezed == assignedTo
+          ? _value.assignedTo
+          : assignedTo // ignore: cast_nullable_to_non_nullable
+              as String?,
+      visibility: null == visibility
+          ? _value.visibility
+          : visibility // ignore: cast_nullable_to_non_nullable
+              as RoutineVisibility,
     ) as $Val);
   }
 }
@@ -124,7 +155,11 @@ abstract class _$$RoutineImplCopyWith<$Res> implements $RoutineCopyWith<$Res> {
       ExperienceLevel level,
       List<RoutineDay> days,
       int? estimatedMinutesPerDay,
-      String? imageUrl});
+      String? imageUrl,
+      RoutineSource source,
+      String? assignedBy,
+      String? assignedTo,
+      RoutineVisibility visibility});
 }
 
 /// @nodoc
@@ -147,6 +182,10 @@ class __$$RoutineImplCopyWithImpl<$Res>
     Object? days = null,
     Object? estimatedMinutesPerDay = freezed,
     Object? imageUrl = freezed,
+    Object? source = null,
+    Object? assignedBy = freezed,
+    Object? assignedTo = freezed,
+    Object? visibility = null,
   }) {
     return _then(_$RoutineImpl(
       id: null == id
@@ -177,6 +216,22 @@ class __$$RoutineImplCopyWithImpl<$Res>
           ? _value.imageUrl
           : imageUrl // ignore: cast_nullable_to_non_nullable
               as String?,
+      source: null == source
+          ? _value.source
+          : source // ignore: cast_nullable_to_non_nullable
+              as RoutineSource,
+      assignedBy: freezed == assignedBy
+          ? _value.assignedBy
+          : assignedBy // ignore: cast_nullable_to_non_nullable
+              as String?,
+      assignedTo: freezed == assignedTo
+          ? _value.assignedTo
+          : assignedTo // ignore: cast_nullable_to_non_nullable
+              as String?,
+      visibility: null == visibility
+          ? _value.visibility
+          : visibility // ignore: cast_nullable_to_non_nullable
+              as RoutineVisibility,
     ));
   }
 }
@@ -191,7 +246,11 @@ class _$RoutineImpl implements _Routine {
       required this.level,
       required final List<RoutineDay> days,
       this.estimatedMinutesPerDay,
-      this.imageUrl})
+      this.imageUrl,
+      this.source = RoutineSource.system,
+      this.assignedBy,
+      this.assignedTo,
+      this.visibility = RoutineVisibility.public})
       : _days = days;
 
   factory _$RoutineImpl.fromJson(Map<String, dynamic> json) =>
@@ -219,10 +278,23 @@ class _$RoutineImpl implements _Routine {
   final int? estimatedMinutesPerDay;
   @override
   final String? imageUrl;
+// null for seed PR 2 (ADR-3); future Storage URL
+  @override
+  @JsonKey()
+  final RoutineSource source;
+  @override
+  final String? assignedBy;
+// trainerId — solo cuando source == trainerAssigned
+  @override
+  final String? assignedTo;
+// athleteId — solo en planes privados asignados
+  @override
+  @JsonKey()
+  final RoutineVisibility visibility;
 
   @override
   String toString() {
-    return 'Routine(id: $id, name: $name, split: $split, level: $level, days: $days, estimatedMinutesPerDay: $estimatedMinutesPerDay, imageUrl: $imageUrl)';
+    return 'Routine(id: $id, name: $name, split: $split, level: $level, days: $days, estimatedMinutesPerDay: $estimatedMinutesPerDay, imageUrl: $imageUrl, source: $source, assignedBy: $assignedBy, assignedTo: $assignedTo, visibility: $visibility)';
   }
 
   @override
@@ -238,7 +310,14 @@ class _$RoutineImpl implements _Routine {
             (identical(other.estimatedMinutesPerDay, estimatedMinutesPerDay) ||
                 other.estimatedMinutesPerDay == estimatedMinutesPerDay) &&
             (identical(other.imageUrl, imageUrl) ||
-                other.imageUrl == imageUrl));
+                other.imageUrl == imageUrl) &&
+            (identical(other.source, source) || other.source == source) &&
+            (identical(other.assignedBy, assignedBy) ||
+                other.assignedBy == assignedBy) &&
+            (identical(other.assignedTo, assignedTo) ||
+                other.assignedTo == assignedTo) &&
+            (identical(other.visibility, visibility) ||
+                other.visibility == visibility));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -251,7 +330,11 @@ class _$RoutineImpl implements _Routine {
       level,
       const DeepCollectionEquality().hash(_days),
       estimatedMinutesPerDay,
-      imageUrl);
+      imageUrl,
+      source,
+      assignedBy,
+      assignedTo,
+      visibility);
 
   /// Create a copy of Routine
   /// with the given fields replaced by the non-null parameter values.
@@ -277,7 +360,11 @@ abstract class _Routine implements Routine {
       required final ExperienceLevel level,
       required final List<RoutineDay> days,
       final int? estimatedMinutesPerDay,
-      final String? imageUrl}) = _$RoutineImpl;
+      final String? imageUrl,
+      final RoutineSource source,
+      final String? assignedBy,
+      final String? assignedTo,
+      final RoutineVisibility visibility}) = _$RoutineImpl;
 
   factory _Routine.fromJson(Map<String, dynamic> json) = _$RoutineImpl.fromJson;
 
@@ -294,7 +381,15 @@ abstract class _Routine implements Routine {
   @override
   int? get estimatedMinutesPerDay;
   @override
-  String? get imageUrl;
+  String? get imageUrl; // null for seed PR 2 (ADR-3); future Storage URL
+  @override
+  RoutineSource get source;
+  @override
+  String? get assignedBy; // trainerId — solo cuando source == trainerAssigned
+  @override
+  String? get assignedTo; // athleteId — solo en planes privados asignados
+  @override
+  RoutineVisibility get visibility;
 
   /// Create a copy of Routine
   /// with the given fields replaced by the non-null parameter values.

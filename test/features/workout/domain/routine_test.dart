@@ -1,6 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/features/profile/domain/experience_level.dart';
 import 'package:treino/features/workout/domain/routine.dart';
+import 'package:treino/features/workout/domain/routine_source.dart';
+import 'package:treino/features/workout/domain/routine_visibility.dart';
 
 void main() {
   group('Routine', () {
@@ -223,5 +225,59 @@ void main() {
     // routine_slot.freezed.dart, routine_slot.g.dart,
     // routine_day.freezed.dart, routine_day.g.dart,
     // routine.freezed.dart, routine.g.dart
+
+    // ── Coach extension (Fase 5 Etapa 1 — REQ-COACH-FOUNDATIONS-002) ──────
+
+    test('REQ-COACH-FOUNDATIONS-002: defaults source=system, visibility=public',
+        () {
+      const routine = Routine(
+        id: 'ppl-beginner',
+        name: 'PPL',
+        split: 'PPL',
+        level: ExperienceLevel.beginner,
+        days: [],
+      );
+      expect(routine.source, RoutineSource.system);
+      expect(routine.visibility, RoutineVisibility.public);
+      expect(routine.assignedBy, isNull);
+      expect(routine.assignedTo, isNull);
+    });
+
+    test(
+        'REQ-COACH-FOUNDATIONS-002: trainer-assigned private routine round-trip',
+        () {
+      const routine = Routine(
+        id: 'plan-001',
+        name: 'Plan personalizado de Juan',
+        split: 'Custom',
+        level: ExperienceLevel.intermediate,
+        days: [],
+        source: RoutineSource.trainerAssigned,
+        assignedBy: 'trainer-1',
+        assignedTo: 'athlete-1',
+        visibility: RoutineVisibility.private,
+      );
+      final decoded = Routine.fromJson(routine.toJson());
+      expect(decoded.source, RoutineSource.trainerAssigned);
+      expect(decoded.assignedBy, 'trainer-1');
+      expect(decoded.assignedTo, 'athlete-1');
+      expect(decoded.visibility, RoutineVisibility.private);
+    });
+
+    test(
+        'REQ-COACH-FOUNDATIONS-002: docs Firestore sin source/visibility caen a defaults',
+        () {
+      // Simula un doc plantilla seedeado pre-Fase-5 sin los campos nuevos.
+      final rawMap = <String, dynamic>{
+        'id': 'old-template',
+        'name': 'Old Template',
+        'split': 'Full Body',
+        'level': 'beginner',
+        'days': <Map<String, dynamic>>[],
+      };
+      final routine = Routine.fromJson(rawMap);
+      expect(routine.source, RoutineSource.system);
+      expect(routine.visibility, RoutineVisibility.public);
+    });
   });
 }
