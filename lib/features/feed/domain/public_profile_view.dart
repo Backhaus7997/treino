@@ -17,5 +17,9 @@ class PublicProfileView with _$PublicProfileView {
     required String? authorGymId,
     required Friendship? friendship,
     required bool isSelf,
+    int? workoutsCount,
+    int? racha,
+    int? followersCount,
+    int? followingCount,
   }) = _PublicProfileView;
 }
