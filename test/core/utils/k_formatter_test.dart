@@ -6,7 +6,8 @@ void main() {
     // SCENARIO-313: kFormat for value >= 1000
     test('SCENARIO-313: value >= 1000 → formatted as Xk', () {
       expect(kFormat(1000), '1k');
-      expect(kFormat(1500), '2k'); // 1500/1000 = 1.5 → rounded to 2? NO — toStringAsFixed(0) rounds
+      expect(kFormat(1500),
+          '2k'); // 1500/1000 = 1.5 → rounded to 2? NO — toStringAsFixed(0) rounds
       expect(kFormat(92000), '92k');
     });
 

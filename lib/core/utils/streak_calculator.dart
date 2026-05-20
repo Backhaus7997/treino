@@ -15,8 +15,7 @@ import '../../features/workout/domain/session_status.dart';
 /// [now] defaults to [DateTime.now()] when not provided (injectable for testing).
 int computeStreak(List<Session> sessions, {DateTime? now}) {
   final todayLocal = (now ?? DateTime.now()).toLocal();
-  final todayDate =
-      DateTime(todayLocal.year, todayLocal.month, todayLocal.day);
+  final todayDate = DateTime(todayLocal.year, todayLocal.month, todayLocal.day);
 
   // Build a set of unique local dates with at least one finished session.
   final trainedDates =

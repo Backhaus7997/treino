@@ -4,7 +4,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/auth/application/auth_notifier.dart';
@@ -12,8 +11,6 @@ import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/profile/application/profile_stats_providers.dart';
 import 'package:treino/features/profile/domain/user_session_stats.dart';
 import 'package:treino/features/profile/profile_screen.dart';
-
-class MockUser extends Mock implements User {}
 
 /// Minimal [AuthNotifier] stub that does not call Firebase.
 class _StubAuthNotifier extends AuthNotifier {
@@ -36,18 +33,6 @@ Widget _buildScreen({required List<Override> overrides}) {
     ),
   );
 }
-
-const _loadingStats = AsyncLoading<UserSessionStats>();
-
-const _dataStats = AsyncData(
-  UserSessionStats(
-    totalSessions: 42,
-    totalVolumeKg: 15000.0,
-    streak: 7,
-  ),
-);
-
-const _errorStats = AsyncError<UserSessionStats>('oops', StackTrace.empty);
 
 void main() {
   group('ProfileScreen — stats row (SCENARIO-316..319)', () {
@@ -160,14 +145,10 @@ void main() {
       // The palette is minted via AppPalette.mintMagenta = the dark theme.
       // SESIONES + VOLUMEN KG value → mint accent (#2CE5A2)
       // RACHA value → magenta highlight (#C123E0)
-      final sesionesValue = tester
-          .widgetList<Text>(find.text('10'))
-          .first;
+      final sesionesValue = tester.widgetList<Text>(find.text('10')).first;
       expect(sesionesValue.style?.color, AppPalette.mintMagenta.accent);
 
-      final rachaValue = tester
-          .widgetList<Text>(find.text('5'))
-          .first;
+      final rachaValue = tester.widgetList<Text>(find.text('5')).first;
       expect(rachaValue.style?.color, AppPalette.mintMagenta.highlight);
     });
 
