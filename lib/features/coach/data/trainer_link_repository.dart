@@ -90,6 +90,35 @@ class TrainerLinkRepository {
     });
   }
 
+  // ─── cancel ─────────────────────────────────────────────────────────────
+  //
+  // Transición pending → terminated cuando el atleta cancela su propia
+  // solicitud antes de que el PF responda. Diferenciado de `decline`
+  // (que es la rechazo desde el PF) — termina con razón distinta para
+  // analytics.
+
+  Future<void> cancel(String linkId) async {
+    final docRef = _links.doc(linkId);
+    final snap = await docRef.get();
+    if (!snap.exists) {
+      throw StateError('Vínculo $linkId no existe');
+    }
+    final current = _fromDoc(snap);
+    if (current == null) {
+      throw StateError('Vínculo $linkId no se pudo deserializar');
+    }
+    if (current.status != TrainerLinkStatus.pending) {
+      throw StateError(
+        'cancel solo se permite sobre status=pending (actual: ${current.status.toJson()})',
+      );
+    }
+    await docRef.update({
+      'status': TrainerLinkStatusX(TrainerLinkStatus.terminated).toJson(),
+      'terminatedAt': Timestamp.fromDate(DateTime.now().toUtc()),
+      'terminationReason': 'cancelled-by-athlete',
+    });
+  }
+
   // ─── terminate ──────────────────────────────────────────────────────────
   //
   // Transición active/paused → terminated. Cualquier member puede terminar.
