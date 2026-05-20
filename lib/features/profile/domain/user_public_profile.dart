@@ -22,6 +22,10 @@ class UserPublicProfile with _$UserPublicProfile {
     String? displayNameLowercase,
     String? avatarUrl,
     String? gymId,
+    int? workoutsCount,
+    int? racha,
+    int? followersCount,
+    int? followingCount,
   }) = _UserPublicProfile;
 
   factory UserPublicProfile.fromJson(Map<String, Object?> json) =>

@@ -25,6 +25,10 @@ mixin _$UserPublicProfile {
   String? get displayNameLowercase => throw _privateConstructorUsedError;
   String? get avatarUrl => throw _privateConstructorUsedError;
   String? get gymId => throw _privateConstructorUsedError;
+  int? get workoutsCount => throw _privateConstructorUsedError;
+  int? get racha => throw _privateConstructorUsedError;
+  int? get followersCount => throw _privateConstructorUsedError;
+  int? get followingCount => throw _privateConstructorUsedError;
 
   /// Serializes this UserPublicProfile to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -47,7 +51,11 @@ abstract class $UserPublicProfileCopyWith<$Res> {
       String? displayName,
       String? displayNameLowercase,
       String? avatarUrl,
-      String? gymId});
+      String? gymId,
+      int? workoutsCount,
+      int? racha,
+      int? followersCount,
+      int? followingCount});
 }
 
 /// @nodoc
@@ -70,6 +78,10 @@ class _$UserPublicProfileCopyWithImpl<$Res, $Val extends UserPublicProfile>
     Object? displayNameLowercase = freezed,
     Object? avatarUrl = freezed,
     Object? gymId = freezed,
+    Object? workoutsCount = freezed,
+    Object? racha = freezed,
+    Object? followersCount = freezed,
+    Object? followingCount = freezed,
   }) {
     return _then(_value.copyWith(
       uid: null == uid
@@ -92,6 +104,22 @@ class _$UserPublicProfileCopyWithImpl<$Res, $Val extends UserPublicProfile>
           ? _value.gymId
           : gymId // ignore: cast_nullable_to_non_nullable
               as String?,
+      workoutsCount: freezed == workoutsCount
+          ? _value.workoutsCount
+          : workoutsCount // ignore: cast_nullable_to_non_nullable
+              as int?,
+      racha: freezed == racha
+          ? _value.racha
+          : racha // ignore: cast_nullable_to_non_nullable
+              as int?,
+      followersCount: freezed == followersCount
+          ? _value.followersCount
+          : followersCount // ignore: cast_nullable_to_non_nullable
+              as int?,
+      followingCount: freezed == followingCount
+          ? _value.followingCount
+          : followingCount // ignore: cast_nullable_to_non_nullable
+              as int?,
     ) as $Val);
   }
 }
@@ -109,7 +137,11 @@ abstract class _$$UserPublicProfileImplCopyWith<$Res>
       String? displayName,
       String? displayNameLowercase,
       String? avatarUrl,
-      String? gymId});
+      String? gymId,
+      int? workoutsCount,
+      int? racha,
+      int? followersCount,
+      int? followingCount});
 }
 
 /// @nodoc
@@ -130,6 +162,10 @@ class __$$UserPublicProfileImplCopyWithImpl<$Res>
     Object? displayNameLowercase = freezed,
     Object? avatarUrl = freezed,
     Object? gymId = freezed,
+    Object? workoutsCount = freezed,
+    Object? racha = freezed,
+    Object? followersCount = freezed,
+    Object? followingCount = freezed,
   }) {
     return _then(_$UserPublicProfileImpl(
       uid: null == uid
@@ -152,6 +188,22 @@ class __$$UserPublicProfileImplCopyWithImpl<$Res>
           ? _value.gymId
           : gymId // ignore: cast_nullable_to_non_nullable
               as String?,
+      workoutsCount: freezed == workoutsCount
+          ? _value.workoutsCount
+          : workoutsCount // ignore: cast_nullable_to_non_nullable
+              as int?,
+      racha: freezed == racha
+          ? _value.racha
+          : racha // ignore: cast_nullable_to_non_nullable
+              as int?,
+      followersCount: freezed == followersCount
+          ? _value.followersCount
+          : followersCount // ignore: cast_nullable_to_non_nullable
+              as int?,
+      followingCount: freezed == followingCount
+          ? _value.followingCount
+          : followingCount // ignore: cast_nullable_to_non_nullable
+              as int?,
     ));
   }
 }
@@ -164,7 +216,11 @@ class _$UserPublicProfileImpl implements _UserPublicProfile {
       this.displayName,
       this.displayNameLowercase,
       this.avatarUrl,
-      this.gymId});
+      this.gymId,
+      this.workoutsCount,
+      this.racha,
+      this.followersCount,
+      this.followingCount});
 
   factory _$UserPublicProfileImpl.fromJson(Map<String, dynamic> json) =>
       _$$UserPublicProfileImplFromJson(json);
@@ -179,10 +235,18 @@ class _$UserPublicProfileImpl implements _UserPublicProfile {
   final String? avatarUrl;
   @override
   final String? gymId;
+  @override
+  final int? workoutsCount;
+  @override
+  final int? racha;
+  @override
+  final int? followersCount;
+  @override
+  final int? followingCount;
 
   @override
   String toString() {
-    return 'UserPublicProfile(uid: $uid, displayName: $displayName, displayNameLowercase: $displayNameLowercase, avatarUrl: $avatarUrl, gymId: $gymId)';
+    return 'UserPublicProfile(uid: $uid, displayName: $displayName, displayNameLowercase: $displayNameLowercase, avatarUrl: $avatarUrl, gymId: $gymId, workoutsCount: $workoutsCount, racha: $racha, followersCount: $followersCount, followingCount: $followingCount)';
   }
 
   @override
@@ -197,13 +261,29 @@ class _$UserPublicProfileImpl implements _UserPublicProfile {
                 other.displayNameLowercase == displayNameLowercase) &&
             (identical(other.avatarUrl, avatarUrl) ||
                 other.avatarUrl == avatarUrl) &&
-            (identical(other.gymId, gymId) || other.gymId == gymId));
+            (identical(other.gymId, gymId) || other.gymId == gymId) &&
+            (identical(other.workoutsCount, workoutsCount) ||
+                other.workoutsCount == workoutsCount) &&
+            (identical(other.racha, racha) || other.racha == racha) &&
+            (identical(other.followersCount, followersCount) ||
+                other.followersCount == followersCount) &&
+            (identical(other.followingCount, followingCount) ||
+                other.followingCount == followingCount));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
   @override
   int get hashCode => Object.hash(
-      runtimeType, uid, displayName, displayNameLowercase, avatarUrl, gymId);
+      runtimeType,
+      uid,
+      displayName,
+      displayNameLowercase,
+      avatarUrl,
+      gymId,
+      workoutsCount,
+      racha,
+      followersCount,
+      followingCount);
 
   /// Create a copy of UserPublicProfile
   /// with the given fields replaced by the non-null parameter values.
@@ -228,7 +308,11 @@ abstract class _UserPublicProfile implements UserPublicProfile {
       final String? displayName,
       final String? displayNameLowercase,
       final String? avatarUrl,
-      final String? gymId}) = _$UserPublicProfileImpl;
+      final String? gymId,
+      final int? workoutsCount,
+      final int? racha,
+      final int? followersCount,
+      final int? followingCount}) = _$UserPublicProfileImpl;
 
   factory _UserPublicProfile.fromJson(Map<String, dynamic> json) =
       _$UserPublicProfileImpl.fromJson;
@@ -243,6 +327,14 @@ abstract class _UserPublicProfile implements UserPublicProfile {
   String? get avatarUrl;
   @override
   String? get gymId;
+  @override
+  int? get workoutsCount;
+  @override
+  int? get racha;
+  @override
+  int? get followersCount;
+  @override
+  int? get followingCount;
 
   /// Create a copy of UserPublicProfile
   /// with the given fields replaced by the non-null parameter values.
