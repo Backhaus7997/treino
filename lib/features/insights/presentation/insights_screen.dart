@@ -337,7 +337,7 @@ class _MusclesCard extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              const BodySilhouettePlaceholder(width: 120, height: 180),
+              const BodySilhouettePlaceholder(width: 160, height: 240),
               const SizedBox(width: 18),
               Expanded(
                 child: Column(

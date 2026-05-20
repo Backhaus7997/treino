@@ -146,7 +146,7 @@ class _Loaded extends StatelessWidget {
           const _CardHeader(),
           const SizedBox(height: 18),
 
-          // ── Streak number (big) ───────────────────────────────────────
+          // ── Streak number (big) + DÍAS ────────────────────────────────
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
@@ -184,11 +184,11 @@ class _Loaded extends StatelessWidget {
           _DayStrip(insights: wi),
           const SizedBox(height: 14),
 
-          // ── Body silhouette placeholder (anatomical SVG deferred) ─────
+          // ── Body silhouettes (front + back, full-width, prominent) ────
           const BodySilhouettePlaceholder(
             width: double.infinity,
-            height: 120,
-            label: '',
+            height: 280,
+            showBack: true,
           ),
           const SizedBox(height: 14),
 

@@ -35,12 +35,19 @@ WeeklyInsights _makeInsights({
 }
 
 /// Wraps EstaSemanaCard with ProviderScope + GoRouter.
+///
+/// Body wraps the card in `SingleChildScrollView` because the card height
+/// (full streak + day strip + 280px body silhouette + period cards) can
+/// exceed the default 800x600 test viewport. In production the card lives
+/// inside a scrollable Home — the same wrapping pattern.
 Widget _wrapCard({required List<Override> overrides, GoRouter? router}) {
   final goRouter = router ??
       GoRouter(routes: [
         GoRoute(
           path: '/',
-          builder: (_, __) => const Scaffold(body: EstaSemanaCard()),
+          builder: (_, __) => const Scaffold(
+            body: SingleChildScrollView(child: EstaSemanaCard()),
+          ),
         ),
         GoRoute(
           path: '/home/insights',
@@ -106,7 +113,9 @@ void main() {
       final router = GoRouter(routes: [
         GoRoute(
           path: '/',
-          builder: (_, __) => const Scaffold(body: EstaSemanaCard()),
+          builder: (_, __) => const Scaffold(
+            body: SingleChildScrollView(child: EstaSemanaCard()),
+          ),
         ),
         GoRoute(
           path: '/home/insights',
@@ -230,7 +239,9 @@ void main() {
       final router = GoRouter(routes: [
         GoRoute(
           path: '/',
-          builder: (_, __) => const Scaffold(body: EstaSemanaCard()),
+          builder: (_, __) => const Scaffold(
+            body: SingleChildScrollView(child: EstaSemanaCard()),
+          ),
         ),
         GoRoute(
           path: '/home/insights',
