@@ -6,7 +6,9 @@
   "scripts": {
     "seed:exercises": "node seed_workout_catalog.js --exercises",
     "seed:routines": "node seed_workout_catalog.js --routines",
-    "seed:all": "node seed_workout_catalog.js --all"
+    "seed:all": "node seed_workout_catalog.js --all",
+    "seed:trainers": "node seed_trainer_profiles.js",
+    "seed:trainers:clear": "node seed_trainer_profiles.js --clear"
   },
   "dependencies": {
     "firebase-admin": "^12.0.0"
