@@ -132,6 +132,28 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // Trainer public identity documents — readable by any authenticated user,
+    // writable only by the owner (always written via UserRepository dual-write).
+    // REQ-COACH-DISC-DATA-008, REQ-COACH-DISC-DATA-009.
+    match /trainerPublicProfiles/{uid} {
+      // Any authenticated user can read (SCENARIO-416).
+      allow read: if request.auth != null;
+
+      // Only the owner can create their own doc; uid in body must match doc id.
+      // (SCENARIO-418)
+      allow create: if request.auth != null
+                    && request.auth.uid == uid
+                    && request.resource.data.uid == uid;
+
+      // Only the owner can update; uid in body must not change (SCENARIO-418).
+      allow update: if request.auth != null
+                    && request.auth.uid == uid
+                    && request.resource.data.uid == resource.data.uid;
+
+      // Delete denied — managed exclusively via privileged server-side operations.
+      allow delete: if false;
+    }
+
     match /friendships/{friendshipId} {
       // Read: only members of the friendship — OR doc does not exist (returns
       // empty snapshot without leaking data). The `resource == null` branch is

@@ -7,6 +7,14 @@
         { "fieldPath": "status", "order": "ASCENDING" },
         { "fieldPath": "startedAt", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "trainerPublicProfiles",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "trainerGeohash", "order": "ASCENDING" },
+        { "fieldPath": "displayNameLowercase", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []
