@@ -140,7 +140,7 @@ class _StatTile extends StatelessWidget {
               letterSpacing: 1.2,
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 8),
           Text(
             value,
             style: theme.textTheme.headlineSmall?.copyWith(
