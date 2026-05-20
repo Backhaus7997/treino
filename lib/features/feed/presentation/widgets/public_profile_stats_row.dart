@@ -2,23 +2,58 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
+import '../../../../core/utils/k_formatter.dart';
 
-/// 4-column stats row for the public profile. All values are hardcoded `'0'`
-/// in Etapa 4 (real workouts/racha/seguidores/siguiendo numbers arrive in
-/// Fase 4 with the Session model). RACHA is rendered in accent color to
-/// match the mockup; the others use `textPrimary`.
+/// 4-column stats row for the public profile. Accepts nullable counter values;
+/// null renders as '0'. kFormat is applied to WORKOUTS, SEGUIDORES, SIGUIENDO
+/// (compact Xk display). RACHA is rendered as raw integer (design spec).
+///
+/// RACHA is rendered in accent color to match the mockup; the others use
+/// `textPrimary`. Backward-compatible: all params default to null → '0'.
 class PublicProfileStatsRow extends StatelessWidget {
-  const PublicProfileStatsRow({super.key});
+  const PublicProfileStatsRow({
+    super.key,
+    this.workoutsCount,
+    this.racha,
+    this.followersCount,
+    this.followingCount,
+  });
+
+  final int? workoutsCount;
+  final int? racha;
+  final int? followersCount;
+  final int? followingCount;
 
   @override
   Widget build(BuildContext context) {
-    return const Row(
+    return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Expanded(child: _StatTile(label: 'WORKOUTS', value: '0')),
-        Expanded(child: _StatTile(label: 'RACHA', value: '0', isAccent: true)),
-        Expanded(child: _StatTile(label: 'SEGUIDORES', value: '0')),
-        Expanded(child: _StatTile(label: 'SIGUIENDO', value: '0')),
+        Expanded(
+          child: _StatTile(
+            label: 'WORKOUTS',
+            value: kFormat(workoutsCount ?? 0),
+          ),
+        ),
+        Expanded(
+          child: _StatTile(
+            label: 'RACHA',
+            value: '${racha ?? 0}',
+            isAccent: true,
+          ),
+        ),
+        Expanded(
+          child: _StatTile(
+            label: 'SEGUIDORES',
+            value: kFormat(followersCount ?? 0),
+          ),
+        ),
+        Expanded(
+          child: _StatTile(
+            label: 'SIGUIENDO',
+            value: kFormat(followingCount ?? 0),
+          ),
+        ),
       ],
     );
   }
