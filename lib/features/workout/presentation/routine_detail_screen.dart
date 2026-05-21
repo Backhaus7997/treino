@@ -214,6 +214,27 @@ class _HeroStrip extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
+
+    // Trainer-assigned plans don't carry a photo asset — render a compact
+    // header with just badges + title, no image / gradient / scrims.
+    if (routine.source == RoutineSource.trainerAssigned) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(20, 64, 20, 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _DayChipBadge(text: badgeText),
+            if (routine.assignedBy != null) ...[
+              const SizedBox(height: 6),
+              _AssignedByChip(assignedBy: routine.assignedBy!),
+            ],
+            const SizedBox(height: 8),
+            _DayTitle(text: titleText),
+          ],
+        ),
+      );
+    }
+
     final gradient = Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(
