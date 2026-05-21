@@ -5,6 +5,11 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../app/theme/app_palette.dart';
 import '../../core/widgets/treino_icon.dart';
+import '../check_in/application/check_in_providers.dart';
+import '../check_in/presentation/check_in_dialog.dart';
+import 'domain/gym_name.dart';
+import '../profile/application/user_providers.dart';
+import '../workout/application/session_providers.dart' show currentUidProvider;
 import 'application/feed_screen_providers.dart';
 import 'application/post_providers.dart';
 import 'domain/feed_segment.dart';
@@ -12,11 +17,66 @@ import 'presentation/widgets/feed_empty_state.dart';
 import 'presentation/widgets/feed_segment_pills.dart';
 import 'presentation/widgets/post_card.dart';
 
-class FeedScreen extends ConsumerWidget {
+/// Session-scoped flag — once the dialog fires during this process lifetime,
+/// it should not reappear even on tab switches (ADR-WRS-16).
+///
+/// Defined at top level (process-lifetime provider) so it persists across
+/// multiple `FeedScreen` instances in the same session.
+final _checkInDialogShownThisSessionProvider =
+    StateProvider<bool>((_) => false);
+
+class FeedScreen extends ConsumerStatefulWidget {
   const FeedScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<FeedScreen> createState() => _FeedScreenState();
+}
+
+class _FeedScreenState extends ConsumerState<FeedScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Defer to after first frame so we have a valid BuildContext for showDialog.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _maybeShowCheckIn());
+  }
+
+  Future<void> _maybeShowCheckIn() async {
+    if (!mounted) return;
+
+    // Session guard: do not show more than once per process lifetime.
+    if (ref.read(_checkInDialogShownThisSessionProvider)) return;
+
+    // Auth guard: no uid → skip (unauthenticated users do not get the dialog).
+    final uid = ref.read(currentUidProvider);
+    if (uid == null) return;
+
+    // Fetch today's check-in; provider is already auth-gated.
+    final today = await ref.read(todayCheckInProvider.future);
+
+    if (!mounted) return;
+
+    // Check-in guard: already checked in today → do not show.
+    if (today != null) return;
+
+    // Mark shown BEFORE awaiting showDialog to prevent race on rapid remounts.
+    ref.read(_checkInDialogShownThisSessionProvider.notifier).state = true;
+
+    // Resolve gym info from the user's profile for the dialog copy.
+    final profile = ref.read(userProfileProvider).valueOrNull;
+    final gymId = profile?.gymId;
+    final gymName = gymId != null ? gymNameFromId(gymId) : null;
+
+    await showDialog<void>(
+      context: context,
+      builder: (_) => CheckInDialog(
+        gymId: gymId,
+        gymName: gymName?.isNotEmpty == true ? gymName : null,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final segment = ref.watch(feedSegmentProvider);
 
     return Column(

@@ -1,0 +1,152 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
+
+import '../../../app/theme/app_palette.dart';
+import '../../../core/widgets/treino_icon.dart';
+import '../application/check_in_providers.dart';
+import 'check_in_strings.dart';
+
+/// Full-screen dialog shown on FeedScreen mount once per session when the user
+/// has not yet checked in today. REQ-WRC-005.
+///
+/// Accepts [gymId] and [gymName] pre-resolved by FeedScreen from the user's
+/// profile — NO GPS lookup inside this widget (ADR-WRS-17).
+class CheckInDialog extends ConsumerWidget {
+  const CheckInDialog({
+    super.key,
+    required this.gymId,
+    required this.gymName,
+  });
+
+  /// The user's configured gym id, or null if not set. REQ-WRC-009.
+  final String? gymId;
+
+  /// The gym display name resolved from [gymId] via `gymNameFromId`, or null.
+  final String? gymName;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final palette = AppPalette.of(context);
+
+    final subtext = (gymId != null && gymName != null && gymName!.isNotEmpty)
+        ? CheckInStrings.gymSubtext(gymName!)
+        : CheckInStrings.neutralSubtext;
+
+    return Dialog(
+      backgroundColor: palette.bgCard,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(TreinoIcon.mapPin, color: palette.accent, size: 48),
+            const SizedBox(height: 18),
+            Text(
+              CheckInStrings.header,
+              style: GoogleFonts.barlowCondensed(
+                fontWeight: FontWeight.w700,
+                fontSize: 18,
+                color: palette.textPrimary,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              subtext,
+              style: GoogleFonts.barlow(
+                fontSize: 14,
+                color: palette.textMuted,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: _NoButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    palette: palette,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _SiButton(
+                    gymId: gymId,
+                    gymName: gymName,
+                    palette: palette,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _NoButton extends StatelessWidget {
+  const _NoButton({required this.onPressed, required this.palette});
+
+  final VoidCallback onPressed;
+  final AppPalette palette;
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton(
+      onPressed: onPressed,
+      style: OutlinedButton.styleFrom(
+        side: BorderSide(color: palette.border),
+        foregroundColor: palette.textPrimary,
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+      child: Text(
+        CheckInStrings.noButton,
+        style: GoogleFonts.barlowCondensed(
+          fontWeight: FontWeight.w700,
+          fontSize: 16,
+        ),
+      ),
+    );
+  }
+}
+
+class _SiButton extends ConsumerWidget {
+  const _SiButton({
+    required this.gymId,
+    required this.gymName,
+    required this.palette,
+  });
+
+  final String? gymId;
+  final String? gymName;
+  final AppPalette palette;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return ElevatedButton(
+      onPressed: () async {
+        await ref
+            .read(checkInNotifierProvider.notifier)
+            .confirm(gymId: gymId, gymName: gymName);
+        if (context.mounted) Navigator.of(context).pop();
+      },
+      style: ElevatedButton.styleFrom(
+        backgroundColor: palette.accent,
+        foregroundColor: palette.bg,
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+      child: Text(
+        CheckInStrings.siButton,
+        style: GoogleFonts.barlowCondensed(
+          fontWeight: FontWeight.w700,
+          fontSize: 16,
+        ),
+      ),
+    );
+  }
+}
