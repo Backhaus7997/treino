@@ -5,10 +5,13 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/treino_icon.dart';
+import '../../coach/presentation/coach_strings.dart';
+import '../../profile/application/user_public_profile_providers.dart';
 import '../application/routine_providers.dart';
 import '../domain/routine.dart';
 import '../domain/routine_day.dart';
 import '../domain/routine_slot.dart';
+import '../domain/routine_source.dart';
 import 'widgets/exercise_slot_row.dart';
 import 'widgets/stat_tile.dart';
 
@@ -132,7 +135,7 @@ class _RoutineDetailContent extends StatelessWidget {
       slivers: [
         SliverToBoxAdapter(
           child: _HeroStrip(
-            routineId: routine.id,
+            routine: routine,
             badgeText: '${routine.split.toUpperCase()} · DÍA ${day.dayNumber}',
             titleText: day.name.toUpperCase(),
           ),
@@ -197,19 +200,19 @@ class _RoutineDetailContent extends StatelessWidget {
 // Private widgets
 // ---------------------------------------------------------------------------
 
-class _HeroStrip extends StatelessWidget {
+class _HeroStrip extends ConsumerWidget {
   const _HeroStrip({
-    required this.routineId,
+    required this.routine,
     required this.badgeText,
     required this.titleText,
   });
 
-  final String routineId;
+  final Routine routine;
   final String badgeText;
   final String titleText;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
     final gradient = Container(
       decoration: BoxDecoration(
@@ -233,7 +236,7 @@ class _HeroStrip extends StatelessWidget {
           // Convention: assets/routines/{routine.id}.png. Missing asset →
           // errorBuilder paints the gradient so the screen never breaks.
           Image.asset(
-            'assets/routines/$routineId.png',
+            'assets/routines/${routine.id}.png',
             fit: BoxFit.cover,
             errorBuilder: (_, __, ___) => gradient,
           ),
@@ -285,12 +288,56 @@ class _HeroStrip extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _DayChipBadge(text: badgeText),
+                if (routine.source == RoutineSource.trainerAssigned &&
+                    routine.assignedBy != null) ...[
+                  const SizedBox(height: 6),
+                  _AssignedByChip(assignedBy: routine.assignedBy!),
+                ],
                 const SizedBox(height: 8),
                 _DayTitle(text: titleText),
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Chip "Asignado por <PF>" — visible solo cuando source == trainerAssigned.
+/// Reads userPublicProfileProvider to resolve the trainer's display name.
+/// REQ-COACH-PLANS-019, SCENARIO-452, SCENARIO-453.
+class _AssignedByChip extends ConsumerWidget {
+  const _AssignedByChip({required this.assignedBy});
+
+  final String assignedBy;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final palette = AppPalette.of(context);
+    final profileAsync = ref.watch(userPublicProfileProvider(assignedBy));
+
+    final label = profileAsync.when(
+      data: (profile) =>
+          '${CoachStrings.assignedByPrefix}${profile?.displayName ?? '?'}',
+      loading: () => CoachStrings.assignedByLoading,
+      error: (_, __) => CoachStrings.assignedByError,
+    );
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      decoration: BoxDecoration(
+        color: palette.accent.withValues(alpha: 0.20),
+        borderRadius: BorderRadius.circular(9999),
+      ),
+      child: Text(
+        label,
+        style: GoogleFonts.barlowCondensed(
+          fontWeight: FontWeight.w600,
+          fontSize: 11,
+          letterSpacing: 1.2,
+          color: palette.accent,
+        ),
       ),
     );
   }

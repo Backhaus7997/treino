@@ -10,7 +10,8 @@ import 'package:treino/features/coach/presentation/widgets/trainer_profile_hero.
 import 'package:treino/features/coach/presentation/widgets/trainer_stats_row.dart';
 import 'package:treino/features/feed/presentation/widgets/post_avatar.dart';
 
-Widget _wrap(Widget child, {List<Override> overrides = const []}) => ProviderScope(
+Widget _wrap(Widget child, {List<Override> overrides = const []}) =>
+    ProviderScope(
       overrides: overrides,
       child: MaterialApp(
         theme: AppTheme.dark(),
@@ -92,8 +93,7 @@ void main() {
   // ── TrainerContactCtaStub tests (Fase 5 Etapa 3) ─────────────────────────
 
   group('TrainerContactCtaStub', () {
-    testWidgets(
-        'sin vínculo previo → renderiza "PEDIR VÍNCULO" habilitado',
+    testWidgets('sin vínculo previo → renderiza "PEDIR VÍNCULO" habilitado',
         (tester) async {
       await tester.pumpWidget(_wrap(
         const TrainerContactCtaStub(trainerId: 'trainer-1'),
