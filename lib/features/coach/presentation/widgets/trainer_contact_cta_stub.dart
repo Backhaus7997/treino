@@ -48,8 +48,8 @@ class _TrainerContactCtaStubState extends ConsumerState<TrainerContactCtaStub> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text(
-                'Solicitud enviada. Te avisamos cuando el PF responda.'),
+            content:
+                Text('Solicitud enviada. Te avisamos cuando el PF responda.'),
           ),
         );
       }
@@ -71,13 +71,10 @@ class _TrainerContactCtaStubState extends ConsumerState<TrainerContactCtaStub> {
 
     // Disabled si: ya hay vínculo en pending/active, está submitting, o
     // el provider todavía no resolvió.
-    final hasActiveOrPending =
-        linkAsync.valueOrNull != null &&
-            (linkAsync.valueOrNull!.status == TrainerLinkStatus.pending ||
-                linkAsync.valueOrNull!.status == TrainerLinkStatus.active);
-    final disabled = _submitting ||
-        !linkAsync.hasValue ||
-        hasActiveOrPending;
+    final hasActiveOrPending = linkAsync.valueOrNull != null &&
+        (linkAsync.valueOrNull!.status == TrainerLinkStatus.pending ||
+            linkAsync.valueOrNull!.status == TrainerLinkStatus.active);
+    final disabled = _submitting || !linkAsync.hasValue || hasActiveOrPending;
 
     final label = hasActiveOrPending
         ? _existingLinkLabel(linkAsync.valueOrNull!)
@@ -88,9 +85,7 @@ class _TrainerContactCtaStubState extends ConsumerState<TrainerContactCtaStub> {
       style: OutlinedButton.styleFrom(
         foregroundColor: palette.accent,
         side: BorderSide(
-          color: disabled
-              ? palette.border
-              : palette.accent,
+          color: disabled ? palette.border : palette.accent,
         ),
         disabledForegroundColor: palette.textMuted,
         padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
