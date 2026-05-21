@@ -12,8 +12,23 @@ class RoutineRepository {
   CollectionReference<Map<String, Object?>> get _collection =>
       _firestore.collection('routines');
 
+  /// Lists every public routine in the catalogue. Used by the Plantillas
+  /// screen to render seed plans + any explicitly-public routine.
+  ///
+  /// The `where('visibility', isEqualTo: 'public')` filter is REQUIRED by
+  /// the firestore.rules contract introduced in coach-plans-mobile (PR #64):
+  /// the read rule on `routines` checks `resource.data.visibility` per doc,
+  /// so Firestore rejects list queries that don't constrain that field
+  /// (the rule cannot be proven for arbitrary unfiltered results).
+  ///
+  /// Legacy seed routines that pre-date the visibility field are reconciled
+  /// by `scripts/backfill_routines_source_visibility.js`, which sets
+  /// `visibility: 'public'` on any doc missing it. Without that backfill
+  /// run, old plantillas would silently disappear from this query.
   Future<List<Routine>> listAll() async {
-    final snap = await _collection.get();
+    final snap = await _collection
+        .where('visibility', isEqualTo: 'public')
+        .get();
     return snap.docs.map(_fromDoc).whereType<Routine>().toList();
   }
 

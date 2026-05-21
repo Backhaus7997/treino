@@ -33,6 +33,8 @@ void main() {
         'days': <dynamic>[],
         'estimatedMinutesPerDay': null,
         'imageUrl': null,
+        'visibility': 'public',
+        'source': 'system',
       });
 
       final container = makeContainer(
@@ -57,6 +59,8 @@ void main() {
           'days': <dynamic>[],
           'estimatedMinutesPerDay': null,
           'imageUrl': null,
+          'visibility': 'public',
+          'source': 'system',
         });
       }
 
@@ -83,6 +87,8 @@ void main() {
         'days': <dynamic>[],
         'estimatedMinutesPerDay': null,
         'imageUrl': null,
+        'visibility': 'public',
+        'source': 'system',
       });
 
       final mockUser = MockUser();
@@ -109,6 +115,8 @@ void main() {
         'days': <dynamic>[],
         'estimatedMinutesPerDay': null,
         'imageUrl': null,
+        'visibility': 'public',
+        'source': 'system',
       });
 
       final mockUser = MockUser();
