@@ -100,11 +100,18 @@ void main() {
     });
 
     test(
-        'SCENARIO-423e: update with displayName writes to BOTH '
-        'userPublicProfiles AND trainerPublicProfiles', () async {
+        'SCENARIO-423e: update with displayName + a trainer field writes to '
+        'BOTH userPublicProfiles AND trainerPublicProfiles', () async {
+      // Hotfix 2026-05-21: displayName alone no longer triggers a trainer
+      // dual-write (would break athlete signup — firestore.rules deny). The
+      // sync still works when the trainer save bundles displayName with a
+      // trainer-specific field, which is the realistic trainer-side flow.
       await seedDoc('trainer-5');
 
-      await repo.update('trainer-5', {'displayName': 'Coach María'});
+      await repo.update('trainer-5', {
+        'displayName': 'Coach María',
+        'trainerSpecialty': 'pilates',
+      });
 
       final pubSnap = await firestore
           .collection('userPublicProfiles')
@@ -119,6 +126,7 @@ void main() {
           .get();
       expect(trainerSnap.exists, isTrue);
       expect(trainerSnap.data()!['displayName'], equals('Coach María'));
+      expect(trainerSnap.data()!['trainerSpecialty'], equals('pilates'));
     });
 
     test(
@@ -220,6 +228,97 @@ void main() {
     });
 
     // ---------------------------------------------------------------------------
+    // SCENARIO-424d/e/f — athlete signup regressions (hotfix 2026-05-21)
+    //
+    // Repro of the production bug: athletes completing ProfileSetup submit a
+    // partial containing displayName (and optionally avatarUrl, gymId, etc.)
+    // but no trainer-specific field. Pre-hotfix this triggered a batch write
+    // to trainerPublicProfiles → firestore.rules denied → atomic rollback →
+    // users/{uid} never received the form values → infinite redirect to
+    // /profile-setup. These tests guard against re-introduction.
+    // ---------------------------------------------------------------------------
+
+    test(
+        'SCENARIO-424d: athlete update with ONLY displayName does NOT write '
+        'to trainerPublicProfiles (signup regression)', () async {
+      await seedDoc('athlete-signup-1');
+
+      await repo.update('athlete-signup-1', {'displayName': 'Franco'});
+
+      final trainerSnap = await firestore
+          .collection('trainerPublicProfiles')
+          .doc('athlete-signup-1')
+          .get();
+      expect(trainerSnap.exists, isFalse);
+
+      // users/{uid} MUST have received the displayName — the bug was that
+      // the failed batch rolled back this write.
+      final userSnap = await firestore
+          .collection('users')
+          .doc('athlete-signup-1')
+          .get();
+      expect(userSnap.data()!['displayName'], equals('Franco'));
+    });
+
+    test(
+        'SCENARIO-424e: athlete update with ONLY avatarUrl does NOT write '
+        'to trainerPublicProfiles', () async {
+      await seedDoc('athlete-signup-2');
+
+      await repo.update(
+          'athlete-signup-2', {'avatarUrl': 'https://example.com/a.jpg'});
+
+      final trainerSnap = await firestore
+          .collection('trainerPublicProfiles')
+          .doc('athlete-signup-2')
+          .get();
+      expect(trainerSnap.exists, isFalse);
+    });
+
+    test(
+        'SCENARIO-424f: athlete full ProfileSetup partial (displayName + '
+        'gender + bodyWeightKg + heightCm + gymId) does NOT touch '
+        'trainerPublicProfiles', () async {
+      await seedDoc('athlete-signup-3');
+
+      await repo.update('athlete-signup-3', {
+        'displayName': 'Lucía',
+        'gender': 'female',
+        'bodyWeightKg': 62.0,
+        'heightCm': 168.0,
+        'gymId': 'gym-abc',
+        'experienceLevel': 'intermediate',
+      });
+
+      final trainerSnap = await firestore
+          .collection('trainerPublicProfiles')
+          .doc('athlete-signup-3')
+          .get();
+      expect(trainerSnap.exists, isFalse);
+
+      // All form fields must land in users/{uid}.
+      final userSnap = await firestore
+          .collection('users')
+          .doc('athlete-signup-3')
+          .get();
+      final data = userSnap.data()!;
+      expect(data['displayName'], equals('Lucía'));
+      expect(data['gender'], equals('female'));
+      expect(data['bodyWeightKg'], equals(62.0));
+      expect(data['heightCm'], equals(168.0));
+      expect(data['gymId'], equals('gym-abc'));
+      expect(data['experienceLevel'], equals('intermediate'));
+
+      // userPublicProfiles still receives the public subset.
+      final pubSnap = await firestore
+          .collection('userPublicProfiles')
+          .doc('athlete-signup-3')
+          .get();
+      expect(pubSnap.data()!['displayName'], equals('Lucía'));
+      expect(pubSnap.data()!['gymId'], equals('gym-abc'));
+    });
+
+    // ---------------------------------------------------------------------------
     // Existing userPublicProfiles behavior MUST remain unchanged
     // ---------------------------------------------------------------------------
 
@@ -261,11 +360,16 @@ void main() {
     });
 
     test(
-        'trainer update with displayName also derives displayNameLowercase '
-        'in trainerPublicProfiles', () async {
+        'trainer update with displayName + trainer field also derives '
+        'displayNameLowercase in trainerPublicProfiles', () async {
+      // Bundled with a trainer field per hotfix 2026-05-21 — displayName alone
+      // no longer triggers the trainer dual-write.
       await seedDoc('trainer-lc');
 
-      await repo.update('trainer-lc', {'displayName': 'CARLOS'});
+      await repo.update('trainer-lc', {
+        'displayName': 'CARLOS',
+        'trainerSpecialty': 'crossfit',
+      });
 
       final trainerSnap = await firestore
           .collection('trainerPublicProfiles')
@@ -275,12 +379,16 @@ void main() {
     });
 
     test(
-        'avatarUrl update writes to BOTH userPublicProfiles AND '
+        'avatarUrl + a trainer field writes to BOTH userPublicProfiles AND '
         'trainerPublicProfiles', () async {
+      // Hotfix 2026-05-21: avatarUrl alone no longer triggers trainer
+      // dual-write (mirrors displayName behavior, same root cause).
       await seedDoc('trainer-av');
 
-      await repo
-          .update('trainer-av', {'avatarUrl': 'https://example.com/img.jpg'});
+      await repo.update('trainer-av', {
+        'avatarUrl': 'https://example.com/img.jpg',
+        'trainerBio': 'Updated bio',
+      });
 
       final pubSnap = await firestore
           .collection('userPublicProfiles')
