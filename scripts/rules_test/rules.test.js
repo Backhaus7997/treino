@@ -263,3 +263,55 @@ test('SCENARIO-271: non-member can get a non-existent friendship doc (returns em
   );
   expect(snap.exists).toBe(false);
 });
+
+// ---------------------------------------------------------------------------
+// SCENARIO-272: owner can write their own check-in doc. REQ-WRC-004.
+// ---------------------------------------------------------------------------
+test('SCENARIO-272: owner can create their own check-in for today', async () => {
+  const u1 = testEnv.authenticatedContext('u1');
+  await assertSucceeds(
+    u1.firestore()
+      .collection('users').doc('u1')
+      .collection('checkIns').doc('2026-05-15')
+      .set({
+        uid: 'u1',
+        date: '2026-05-15',
+        checkedInAt: new Date(),
+        gymId: 'smart-fit-palermo',
+        gymName: 'Smart Fit · Palermo',
+      }),
+  );
+});
+
+// ---------------------------------------------------------------------------
+// SCENARIO-273: non-owner is blocked from reading another user's check-in.
+// REQ-WRC-004.
+// ---------------------------------------------------------------------------
+test('SCENARIO-273: non-owner cannot read another user check-in', async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await ctx.firestore()
+      .collection('users').doc('u1')
+      .collection('checkIns').doc('2026-05-15')
+      .set({ uid: 'u1', date: '2026-05-15', checkedInAt: new Date() });
+  });
+  const u2 = testEnv.authenticatedContext('u2');
+  await assertFails(
+    u2.firestore()
+      .collection('users').doc('u1')
+      .collection('checkIns').doc('2026-05-15').get(),
+  );
+});
+
+// ---------------------------------------------------------------------------
+// SCENARIO-274: non-owner is blocked from writing to another user's check-in.
+// REQ-WRC-004.
+// ---------------------------------------------------------------------------
+test('SCENARIO-274: non-owner cannot write another user check-in', async () => {
+  const u2 = testEnv.authenticatedContext('u2');
+  await assertFails(
+    u2.firestore()
+      .collection('users').doc('u1')
+      .collection('checkIns').doc('2026-05-15')
+      .set({ uid: 'u1', date: '2026-05-15', checkedInAt: new Date() }),
+  );
+});
