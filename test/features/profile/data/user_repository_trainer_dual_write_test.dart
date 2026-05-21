@@ -253,10 +253,8 @@ void main() {
 
       // users/{uid} MUST have received the displayName — the bug was that
       // the failed batch rolled back this write.
-      final userSnap = await firestore
-          .collection('users')
-          .doc('athlete-signup-1')
-          .get();
+      final userSnap =
+          await firestore.collection('users').doc('athlete-signup-1').get();
       expect(userSnap.data()!['displayName'], equals('Franco'));
     });
 
@@ -297,10 +295,8 @@ void main() {
       expect(trainerSnap.exists, isFalse);
 
       // All form fields must land in users/{uid}.
-      final userSnap = await firestore
-          .collection('users')
-          .doc('athlete-signup-3')
-          .get();
+      final userSnap =
+          await firestore.collection('users').doc('athlete-signup-3').get();
       final data = userSnap.data()!;
       expect(data['displayName'], equals('Lucía'));
       expect(data['gender'], equals('female'));

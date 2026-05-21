@@ -26,9 +26,8 @@ class RoutineRepository {
   /// `visibility: 'public'` on any doc missing it. Without that backfill
   /// run, old plantillas would silently disappear from this query.
   Future<List<Routine>> listAll() async {
-    final snap = await _collection
-        .where('visibility', isEqualTo: 'public')
-        .get();
+    final snap =
+        await _collection.where('visibility', isEqualTo: 'public').get();
     return snap.docs.map(_fromDoc).whereType<Routine>().toList();
   }
 
