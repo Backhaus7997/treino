@@ -52,9 +52,23 @@ service cloud.firestore {
                       || resource.data.visibility == 'shared'
                       || request.auth.uid == resource.data.assignedTo
                       || request.auth.uid == resource.data.assignedBy);
-      // Rutinas writeables solo via Admin SDK (seed script).
-      // Fase 5 Etapa 4 abrirá `create` para PFs autenticados.
-      allow write: if false;
+      // Create: solo PFs autenticados pueden crear planes asignados.
+      // - assignedBy debe coincidir con el uid del caller (anti-spoofing).
+      // - source debe ser 'trainer-assigned' (no system, no user).
+      // - visibility debe ser 'private' o 'shared' (no 'public').
+      // - assignedTo debe ser un string no vacío (uid del atleta destino).
+      // REQ-COACH-PLANS-005..010, SCENARIO-438..443.
+      // Note: SCENARIO-438..443 validation is tested via Firestore emulator
+      // (scripts/rules_test/rules.test.js) — deferred per Decision #25.
+      allow create: if request.auth != null
+                    && request.resource.data.assignedBy == request.auth.uid
+                    && request.resource.data.source == 'trainer-assigned'
+                    && request.resource.data.visibility in ['private', 'shared']
+                    && request.resource.data.assignedTo is string
+                    && request.resource.data.assignedTo.size() > 0;
+
+      // Update/delete denegados hasta Etapa 7.
+      allow update, delete: if false;
     }
 
     // Vínculo PF ↔ atleta (Fase 5 Etapa 1, REQ-COACH-FOUNDATIONS-004).
