@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
@@ -16,6 +17,29 @@ Widget _wrap(Widget child, {List<Override> overrides = const []}) =>
         theme: AppTheme.dark(),
         home: Scaffold(body: child),
       ),
+    );
+
+/// Builds a GoRouter test harness with a ShellRoute so TreinoBottomBar is
+/// visible AND so context.push() works for sub-routes.
+GoRouter _wrapRouter({
+  required List<Override> overrides,
+  required List<GoRoute> subRoutes,
+}) =>
+    GoRouter(
+      initialLocation: '/coach',
+      routes: [
+        ShellRoute(
+          builder: (context, state, child) =>
+              Scaffold(body: child, bottomNavigationBar: const SizedBox()),
+          routes: [
+            GoRoute(
+              path: '/coach',
+              builder: (_, __) => const TrainerCoachView(),
+              routes: subRoutes,
+            ),
+          ],
+        ),
+      ],
     );
 
 TrainerLink _link({
@@ -153,6 +177,67 @@ void main() {
 
       expect(find.text('Atleta l1'), findsOneWidget);
       expect(find.text('TERMINAR VÍNCULO'), findsOneWidget);
+    });
+
+    testWidgets(
+        'SCENARIO-454: tapping _ActiveAlumnoCard navigates to /coach/athlete/:athleteId',
+        (tester) async {
+      final router = _wrapRouter(
+        overrides: [],
+        subRoutes: [
+          GoRoute(
+            path: 'athlete/:athleteId',
+            builder: (_, state) => Scaffold(
+              body: Text('Athlete:${state.pathParameters['athleteId']}'),
+            ),
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: _stubLinks([
+            _link(id: 'l1', status: TrainerLinkStatus.active, athleteId: 'a1'),
+          ]),
+          child: MaterialApp.router(
+            theme: AppTheme.dark(),
+            routerConfig: router,
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+      // Navigate to ALUMNOS tab
+      await tester.tap(find.text('ALUMNOS'));
+      await tester.pumpAndSettle();
+
+      // Tap on the card area (not the TERMINAR VÍNCULO button)
+      // The card has an InkWell wrapping the athlete name area
+      await tester.tap(find.text('Atleta l1'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Athlete:a1'), findsOneWidget);
+    });
+
+    testWidgets(
+        'SCENARIO-454 (triangulate): TERMINAR VÍNCULO button still works after InkWell wrap',
+        (tester) async {
+      await tester.pumpWidget(_wrap(
+        const TrainerCoachView(),
+        overrides: _stubLinks([
+          _link(id: 'l1', status: TrainerLinkStatus.active, athleteId: 'a1'),
+        ]),
+      ));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('ALUMNOS'));
+      await tester.pumpAndSettle();
+
+      // The TERMINAR VÍNCULO button must still be findable and tappable
+      expect(find.text('TERMINAR VÍNCULO'), findsOneWidget);
+      // Tapping it should show the confirmation dialog
+      await tester.tap(find.text('TERMINAR VÍNCULO'));
+      await tester.pumpAndSettle();
+      expect(find.text('Terminar vínculo'), findsOneWidget);
     });
   });
 }

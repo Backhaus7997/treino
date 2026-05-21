@@ -10,7 +10,9 @@ import '../features/auth/presentation/register_screen.dart';
 import '../features/auth/presentation/splash_screen.dart';
 import '../features/auth/presentation/welcome_screen.dart';
 import '../features/coach/coach_screen.dart';
+import '../features/coach/presentation/athlete_detail_screen.dart';
 import '../features/coach/presentation/trainer_public_profile_screen.dart';
+import '../features/workout/presentation/routine_editor_screen.dart';
 import '../features/workout/application/session_init.dart';
 import '../features/workout/presentation/exercise_detail_screen.dart';
 import '../features/workout/presentation/post_workout_summary_screen.dart';
@@ -205,6 +207,13 @@ GoRouter buildRouter({
                   return _noAnim(ExerciseDetailScreen(exerciseId: exerciseId));
                 },
               ),
+              GoRoute(
+                path: 'routine-editor/:athleteId',
+                pageBuilder: (context, state) {
+                  final athleteId = state.pathParameters['athleteId']!;
+                  return _noAnim(RoutineEditorScreen(athleteId: athleteId));
+                },
+              ),
             ],
           ),
           GoRoute(
@@ -247,6 +256,13 @@ GoRouter buildRouter({
                 pageBuilder: (context, state) {
                   final uid = state.pathParameters['uid']!;
                   return _noAnim(TrainerPublicProfileScreen(uid: uid));
+                },
+              ),
+              GoRoute(
+                path: 'athlete/:athleteId',
+                pageBuilder: (context, state) {
+                  final athleteId = state.pathParameters['athleteId']!;
+                  return _noAnim(AthleteDetailScreen(athleteId: athleteId));
                 },
               ),
             ],

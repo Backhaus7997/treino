@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../app/theme/app_palette.dart';
@@ -340,43 +341,47 @@ class _ActiveAlumnoCard extends ConsumerWidget {
     final palette = AppPalette.of(context);
     final pubAsync = ref.watch(userPublicProfileProvider(link.athleteId));
 
-    return Container(
-      decoration: BoxDecoration(
-        color: palette.bgCard,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: palette.border, width: 1),
-      ),
-      padding: const EdgeInsets.all(14),
-      child: Column(
-        children: [
-          _UserHeader(
-            pubAsync: pubAsync,
-            subtitle: 'Vinculado desde ${_formatAcceptedAt(link)}',
-          ),
-          const SizedBox(height: 14),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton(
-              onPressed: () => _terminate(context, ref),
-              style: OutlinedButton.styleFrom(
-                side: BorderSide(color: palette.border, width: 1),
-                foregroundColor: palette.textMuted,
-                minimumSize: const Size.fromHeight(40),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(9999),
+    return InkWell(
+      onTap: () => context.push('/coach/athlete/${link.athleteId}'),
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        decoration: BoxDecoration(
+          color: palette.bgCard,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: palette.border, width: 1),
+        ),
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          children: [
+            _UserHeader(
+              pubAsync: pubAsync,
+              subtitle: 'Vinculado desde ${_formatAcceptedAt(link)}',
+            ),
+            const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: () => _terminate(context, ref),
+                style: OutlinedButton.styleFrom(
+                  side: BorderSide(color: palette.border, width: 1),
+                  foregroundColor: palette.textMuted,
+                  minimumSize: const Size.fromHeight(40),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(9999),
+                  ),
                 ),
-              ),
-              child: Text(
-                'TERMINAR VÍNCULO',
-                style: GoogleFonts.barlowCondensed(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 12,
-                  letterSpacing: 0.8,
+                child: Text(
+                  'TERMINAR VÍNCULO',
+                  style: GoogleFonts.barlowCondensed(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                    letterSpacing: 0.8,
+                  ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

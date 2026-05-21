@@ -8,7 +8,8 @@
     "seed:routines": "node seed_workout_catalog.js --routines",
     "seed:all": "node seed_workout_catalog.js --all",
     "seed:trainers": "node seed_trainer_profiles.js",
-    "seed:trainers:clear": "node seed_trainer_profiles.js --clear"
+    "seed:trainers:clear": "node seed_trainer_profiles.js --clear",
+    "promote:trainer": "node promote_user_to_trainer.js"
   },
   "dependencies": {
     "firebase-admin": "^12.0.0"
