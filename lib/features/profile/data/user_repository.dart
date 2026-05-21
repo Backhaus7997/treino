@@ -17,13 +17,27 @@ class UserRepository {
   // userPublicProfiles document.
   static const _publicFields = {'displayName', 'avatarUrl', 'gymId'};
 
-  // Fields that, when present in an update partial, must be propagated to the
-  // trainerPublicProfiles document. Per design D3.
-  // `displayName` and `avatarUrl` are shared with _publicFields — they trigger
-  // both userPublicProfiles AND trainerPublicProfiles dual-write.
+  // Fields that, when present in an update partial, trigger a dual-write to
+  // the trainerPublicProfiles document. TRAINER-SPECIFIC ONLY.
+  //
+  // Originally (PR #58, coach-discovery-infra) this set included `displayName`
+  // and `avatarUrl` so trainer profile changes would propagate to the
+  // discovery card. The unintended consequence: ANY athlete completing
+  // ProfileSetup (which sends `displayName`) triggered a batch write to
+  // trainerPublicProfiles — denied by firestore.rules → atomic rollback →
+  // users/{uid} never received the form values → auth_redirect looped back to
+  // /profile-setup forever. Discovered 2026-05-21 during wire-real-stats PR#3
+  // smoke when creating a second test account.
+  //
+  // Trade-off (approach D — minimal hotfix): when a trainer self-edits ONLY
+  // displayName/avatarUrl without touching a trainer-specific field, their
+  // trainerPublicProfiles doc goes stale. Acceptable for now because trainers
+  // are seeded server-side (scripts/seed_trainer_profiles.js) and no trainer
+  // self-edit UI exists yet. When that UI lands, promote to approach E:
+  // pre-fetch role inside update() and gate the trainer write on
+  // role == trainer, plus include `uid` in the trainer subset so the create
+  // rule passes for the first ever trainer-side write.
   static const _trainerPublicFields = {
-    'displayName',
-    'avatarUrl',
     'trainerBio',
     'trainerSpecialty',
     'trainerGeohash',
@@ -85,14 +99,16 @@ class UserRepository {
 
   /// Builds a partial trainer-public update map from a raw update [partial].
   ///
-  /// Returns `null` when no trainer-public-relevant fields are in [partial] —
-  /// callers must skip the trainerPublicProfiles write in that case.
+  /// Returns `null` when no trainer-specific field is in [partial] — callers
+  /// must skip the trainerPublicProfiles write in that case. See the comment
+  /// on [_trainerPublicFields] for the rationale (athlete signup regression
+  /// from PR #58).
   ///
-  /// Per design D2: key-presence trigger (NOT value diff).
-  /// Per design D1: field set includes displayName, avatarUrl, trainerBio,
-  ///   trainerSpecialty, trainerGeohash, trainerLatitude, trainerLongitude,
-  ///   trainerMonthlyRate. `displayNameLowercase` is always derived when
-  ///   `displayName` is present.
+  /// When a trainer-specific field IS present, `displayName` and `avatarUrl`
+  /// are still folded into the subset body if also present in [partial], so a
+  /// trainer save that bundles identity + trainer fields keeps the discovery
+  /// card in sync. `displayNameLowercase` is always derived when `displayName`
+  /// is present.
   ///
   /// REQ-COACH-DISC-DUAL-001.
   Map<String, Object?>? _trainerPublicSubsetFromPartial(
@@ -210,8 +226,9 @@ class UserRepository {
   ///   - `users/{uid}` — always written.
   ///   - `userPublicProfiles/{uid}` — written when partial contains any of
   ///     `displayName`, `avatarUrl`, `gymId`. REQ-UPP-011, REQ-UPP-012.
-  ///   - `trainerPublicProfiles/{uid}` — written when partial contains any of
-  ///     the D3 trainer public fields. REQ-COACH-DISC-DUAL-001.
+  ///   - `trainerPublicProfiles/{uid}` — written when partial contains any
+  ///     trainer-specific field (see [_trainerPublicFields]).
+  ///     REQ-COACH-DISC-DUAL-001.
   ///
   /// All three writes are in a single batch.commit() — no partial state.
   Future<void> update(String uid, Map<String, Object?> partial) async {
