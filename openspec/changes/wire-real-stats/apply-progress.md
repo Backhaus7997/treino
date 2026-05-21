@@ -269,6 +269,99 @@
 
 ---
 
-## PR#4 — PENDING
+## PR#4 — IN PROGRESS (T64 + T68 blocked)
 
-Tasks T51-T68 not yet implemented.
+**Branch**: feat/wire-real-stats-pr4
+**Tasks T51-T67 complete; T64 (emulator) + T68 (deploy) blocked**
+**Baseline**: 931 tests → **Final**: 1011 tests (+80 new)
+**Quality gates**: PASS (analyze 0 issues, format 0 changed, 1011/1011 tests pass)
+
+### TDD Cycle Evidence
+
+| Task | RED | GREEN | REFACTOR |
+|---|---|---|---|
+| T51 SETUP | — | ✅ branch created, TreinoIcon.mapPin confirmed at line 27 | — |
+| T52 RED | ✅ compile error (CheckIn missing) | — | — |
+| T53 GREEN | — | ✅ SCENARIO-326 all 6 tests pass | ✅ build_runner regen |
+| T54 RED | ✅ compile error (CheckInRepository missing) | — | — |
+| T55 GREEN | — | ✅ SCENARIO-327..329 + idempotency pass | — |
+| T56 RED | ✅ compile error (providers missing) | — | — |
+| T57 GREEN | — | ✅ auth gate + confirm() tests pass | — |
+| T58 RED | ✅ compile error (CheckInDialog missing) | — | — |
+| T59 GREEN | — | ✅ SCENARIO-333..334 + NO/SÍ buttons pass | — |
+| T60 RED | ✅ 2/3 tests fail (trigger not wired) | — | — |
+| T61 GREEN | — | ✅ SCENARIO-335..336 + session guard pass | ✅ auth guard fix (uid check before provider) |
+| T62 SETUP | — | ✅ firestore.rules checkIns block added | — |
+| T63 SETUP | — | ✅ SCENARIO-272..274 added to rules.test.js | — |
+| T64 | BLOCKED | — | Needs orchestrator-coordinated emulator run |
+| T65 GATE analyze | — | ✅ 0 issues | — |
+| T66 GATE format | — | ✅ 0 changed | — |
+| T67 GATE flutter test | — | ✅ 1011/1011 pass | — |
+| T68 | BLOCKED | — | Needs user-authorized firebase deploy |
+
+### Completed Tasks
+
+- [x] T51 — SETUP: branch feat/wire-real-stats-pr4 from post-PR#3 main; TreinoIcon.mapPin confirmed; gymNameFromId confirmed importable
+- [x] T52 — RED: `test/features/check_in/domain/check_in_test.dart` — 6 failing tests (SCENARIO-326: dateKey zero-padding for year/month/day + fromJson roundtrip with all fields + null gymId/gymName)
+- [x] T53 — GREEN: `lib/features/check_in/domain/check_in.dart` (Freezed) — fields uid/date/checkedInAt/gymId?/gymName?; static `dateKey()` with padLeft(4)/padLeft(2)/padLeft(2); Timestamp import comment; build_runner regen
+- [x] T54 — RED: `test/features/check_in/data/check_in_repository_test.dart` — 5 failing tests (SCENARIO-327..329 + null gym fields + idempotency)
+- [x] T55 — GREEN: `lib/features/check_in/data/check_in_repository.dart` — `getTodayForUser(uid)` reads `/users/{uid}/checkIns/{today}`; `createTodayCheckIn(uid, {inGym, gymId?, gymName?})` read-then-set pattern; gymId/gymName null when inGym: false
+- [x] T56 — RED: `test/features/check_in/application/check_in_providers_test.dart` — 4 failing tests (null uid auth gate + null check-in + existing check-in + confirm() call verification)
+- [x] T57 — GREEN: `lib/features/check_in/application/check_in_providers.dart` — `checkInRepositoryProvider` + `todayCheckInProvider` (FutureProvider.autoDispose, auth-gated) + `checkInNotifierProvider` (AsyncNotifier with confirm() that calls repo + invalidates todayCheckInProvider)
+- [x] T58 — RED: `test/features/check_in/presentation/check_in_dialog_test.dart` — 4 failing tests (SCENARIO-333 gym subtext + SCENARIO-334 neutral subtext + NO dismisses + SÍ visible)
+- [x] T59 — GREEN: `lib/features/check_in/presentation/check_in_dialog.dart` (ConsumerWidget) — Dialog > Padding(20) > Column[Icon(TreinoIcon.mapPin) + header + subtext + Row[NO|SÍ ENTRÉ]]; `lib/features/check_in/presentation/check_in_strings.dart` — all UI copy; AppPalette colors; spacing 8/12/14/18/20 only
+- [x] T60 — RED: `test/features/feed/presentation/feed_screen_check_in_test.dart` — 3 tests (SCENARIO-335 dialog shown + SCENARIO-336 not shown when existing + session guard)
+- [x] T61 — GREEN: `lib/features/feed/feed_screen.dart` — ConsumerStatefulWidget; `_checkInDialogShownThisSessionProvider` (StateProvider<bool>, process-lifetime); `_maybeShowCheckIn`: uid guard → session flag → provider read → check → set flag → showDialog(CheckInDialog); gymId/gymName resolved from userProfileProvider via gymNameFromId
+- [x] T62 — SETUP: `firestore.rules` — added `match /users/{uid}/checkIns/{date}` block with owner-only read/write (REQ-WRC-004)
+- [x] T63 — SETUP: `scripts/rules_test/rules.test.js` — added SCENARIO-272 (owner write own check-in), SCENARIO-273 (non-owner read blocked), SCENARIO-274 (non-owner write blocked) after SCENARIO-271
+- [ ] T64 — BLOCKED on orchestrator-coordinated emulator run (Java 21 + interactive Firestore emulator required)
+- [x] T65 — GATE: `flutter analyze` 0 issues
+- [x] T66 — GATE: `dart format --output=none --set-exit-if-changed .` 0 changed
+- [x] T67 — GATE: `flutter test` 1011/1011 passing
+- [ ] T68 — BLOCKED on user-authorized firebase deploy (`firebase deploy --only firestore:rules --project treino-dev`)
+
+### Files Modified/Created (PR#4)
+
+| File | Action | Description |
+|---|---|---|
+| `lib/features/check_in/domain/check_in.dart` | CREATED | Freezed model + dateKey() static helper |
+| `lib/features/check_in/domain/check_in.freezed.dart` | CREATED | Freezed generated |
+| `lib/features/check_in/domain/check_in.g.dart` | CREATED | json_serializable generated |
+| `lib/features/check_in/data/check_in_repository.dart` | CREATED | getTodayForUser + createTodayCheckIn |
+| `lib/features/check_in/application/check_in_providers.dart` | CREATED | checkInRepositoryProvider + todayCheckInProvider + checkInNotifierProvider |
+| `lib/features/check_in/presentation/check_in_dialog.dart` | CREATED | ConsumerWidget dialog with NO/SÍ ENTRÉ buttons |
+| `lib/features/check_in/presentation/check_in_strings.dart` | CREATED | UI copy constants (es-AR) |
+| `lib/features/feed/feed_screen.dart` | MODIFIED | ConsumerWidget → ConsumerStatefulWidget; check-in trigger in initState |
+| `firestore.rules` | MODIFIED | Added /users/{uid}/checkIns/{date} owner-only R/W block |
+| `scripts/rules_test/rules.test.js` | MODIFIED | SCENARIO-272..274 for checkIn rules |
+| `test/features/check_in/domain/check_in_test.dart` | CREATED | 6 tests SCENARIO-326 + dateKey variants |
+| `test/features/check_in/data/check_in_repository_test.dart` | CREATED | 5 tests SCENARIO-327..329 + idempotency |
+| `test/features/check_in/application/check_in_providers_test.dart` | CREATED | 4 tests auth gate + check-in state + confirm() |
+| `test/features/check_in/presentation/check_in_dialog_test.dart` | CREATED | 4 tests SCENARIO-333..334 + NO/SÍ |
+| `test/features/feed/presentation/feed_screen_check_in_test.dart` | CREATED | 3 tests SCENARIO-335..336 + session guard |
+
+### Commits (branch: feat/wire-real-stats-pr4)
+
+| Hash | Message |
+|---|---|
+| 4307c5e | test(check_in): SCENARIO-326 for CheckIn domain model dateKey and roundtrip (RED) |
+| 7139510 | feat(check_in): add CheckIn Freezed model with dateKey helper (SCENARIO-326) |
+| 3d671db | test(check_in): SCENARIO-327..329 for CheckInRepository CRUD (RED) |
+| 0b74692 | feat(check_in): add CheckInRepository with getTodayForUser and createTodayCheckIn |
+| 7742d8f | test(check_in): SCENARIO-327..329 provider layer auth gating and confirm() (RED) |
+| 7b5fbec | feat(check_in): add checkInRepositoryProvider, todayCheckInProvider, checkInNotifierProvider |
+| 1ab957e | test(check_in): SCENARIO-333..334 for CheckInDialog gym/neutral subtext (RED) |
+| bfceb16 | feat(check_in): add CheckInDialog with NO/SÍ ENTRÉ buttons and contextual gym subtext |
+| bae276d | test(feed): SCENARIO-335..336 for FeedScreen check-in dialog trigger (RED) |
+| 500939d | feat(feed): convert FeedScreen to ConsumerStatefulWidget with check-in dialog trigger |
+| 1f8b2d9 | feat(rules): add owner-only checkIns sub-collection rule (REQ-WRC-004) |
+| 810961d | test(rules): SCENARIO-272..274 for checkIn owner-write/non-owner-blocked (T63) |
+| f1e5174 | chore: apply dart format (T66) |
+| c77ff42 | docs(sdd): mark T51-T67 complete in tasks.md (PR#4 done) |
+
+### Deviations from Design
+
+1. **D.3 API naming**: Design shows `getForDate(uid, localDate)` in the repository API. Tasks.md says `getTodayForUser(uid)`. Used `getTodayForUser(uid)` per tasks.md (same behavior — always today's date). No functional deviation.
+2. **D.5 gymId/gymName in dialog**: Design injects these from `userProfileProvider` inside the dialog. Implementation: resolved in `_maybeShowCheckIn()` in FeedScreen and passed as constructor parameters to `CheckInDialog`. This avoids `userProfileProvider` being watched inside the Dialog widget, keeping the dialog stateless and easily testable without auth mocks.
+3. **checkInNotifierProvider.confirm() inGym detection**: Design shows `inGym` as explicit boolean param. Implementation derives it from `gymId != null` inside the notifier for simplicity (both NO path with null gymId and SÍ path with gymId are handled). Identical behavior.
+4. **Auth guard in _maybeShowCheckIn**: Added explicit `uid == null → return` before awaiting `todayCheckInProvider.future` to prevent dialog from showing in unauthenticated test contexts (when `currentUidProvider` is not overridden). This fixed regressions in existing FeedScreen tests.
