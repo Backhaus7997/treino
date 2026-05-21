@@ -12,9 +12,19 @@ void main() {
   });
 
   /// Seeds a routine document using raw wire-format maps (mimicking Firestore).
+  ///
+  /// `visibility` defaults to `'public'` so the doc is returned by
+  /// `listAll()`, which filters by `visibility == 'public'` after the
+  /// coach-plans-mobile rule change (see `routine_repository.dart` for the
+  /// rationale). Pass `visibility: 'private'` to seed a trainer-assigned
+  /// plan that must NOT appear in the Plantillas screen.
   Future<void> seedRoutine({
     required String id,
     required List<Map<String, dynamic>> days,
+    String visibility = 'public',
+    String source = 'system',
+    String? assignedBy,
+    String? assignedTo,
   }) async {
     await firestore.collection('routines').doc(id).set({
       'id': id,
@@ -24,6 +34,10 @@ void main() {
       'days': days,
       'estimatedMinutesPerDay': null,
       'imageUrl': null,
+      'visibility': visibility,
+      'source': source,
+      if (assignedBy != null) 'assignedBy': assignedBy,
+      if (assignedTo != null) 'assignedTo': assignedTo,
     });
   }
 
@@ -127,6 +141,36 @@ void main() {
 
       expect(result, isNotNull);
       expect(result!.days, isEmpty);
+    });
+
+    test(
+        'SCENARIO-450: listAll() excludes private trainer-assigned routines '
+        '(matches firestore.rules visibility constraint)', () async {
+      // Public plantilla → must be included
+      await seedRoutine(id: 'public-routine', days: []);
+      // Private trainer-assigned plan → must be excluded from Plantillas screen
+      await seedRoutine(
+        id: 'private-trainer-plan',
+        days: [],
+        visibility: 'private',
+        source: 'trainer-assigned',
+        assignedBy: 'trainer-uid',
+        assignedTo: 'athlete-uid',
+      );
+      // Shared trainer plan → also excluded (Plantillas shows only public)
+      await seedRoutine(
+        id: 'shared-trainer-plan',
+        days: [],
+        visibility: 'shared',
+        source: 'trainer-assigned',
+        assignedBy: 'trainer-uid',
+        assignedTo: 'athlete-uid',
+      );
+
+      final result = await repo.listAll();
+
+      expect(result, hasLength(1));
+      expect(result.single.id, equals('public-routine'));
     });
   });
 }
