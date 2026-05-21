@@ -5,6 +5,73 @@ import 'package:treino/features/feed/domain/public_profile_view.dart';
 
 void main() {
   group('PublicProfileView', () {
+    // ── SCENARIO-326: New counter fields on PublicProfileView ───────────────
+    group('SCENARIO-326 — counter fields', () {
+      test(
+          'SCENARIO-326a: construction without counter fields → all 4 null (backward compat)',
+          () {
+        const view = PublicProfileView(
+          authorDisplayName: 'Tincho',
+          authorAvatarUrl: null,
+          authorGymId: null,
+          friendship: null,
+          isSelf: false,
+        );
+        expect(view.workoutsCount, isNull);
+        expect(view.racha, isNull);
+        expect(view.followersCount, isNull);
+        expect(view.followingCount, isNull);
+      });
+
+      test(
+          'SCENARIO-326b: construction with all counter fields → values preserved',
+          () {
+        const view = PublicProfileView(
+          authorDisplayName: 'Tincho',
+          authorAvatarUrl: null,
+          authorGymId: null,
+          friendship: null,
+          isSelf: false,
+          workoutsCount: 89,
+          racha: 23,
+          followersCount: 412,
+          followingCount: 284,
+        );
+        expect(view.workoutsCount, equals(89));
+        expect(view.racha, equals(23));
+        expect(view.followersCount, equals(412));
+        expect(view.followingCount, equals(284));
+      });
+
+      test('SCENARIO-326c: equality via freezed — same counter values → equal',
+          () {
+        const a = PublicProfileView(
+          authorDisplayName: 'X',
+          authorAvatarUrl: null,
+          authorGymId: null,
+          friendship: null,
+          isSelf: false,
+          workoutsCount: 10,
+          racha: 5,
+          followersCount: 20,
+          followingCount: 15,
+        );
+        const b = PublicProfileView(
+          authorDisplayName: 'X',
+          authorAvatarUrl: null,
+          authorGymId: null,
+          friendship: null,
+          isSelf: false,
+          workoutsCount: 10,
+          racha: 5,
+          followersCount: 20,
+          followingCount: 15,
+        );
+        expect(a, equals(b));
+        expect(a.hashCode, equals(b.hashCode));
+      });
+    });
+
     test('SCENARIO-193: holds all 5 fields when fully populated', () {
       final friendship = Friendship(
         id: 'a_b',

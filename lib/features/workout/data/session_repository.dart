@@ -1,15 +1,23 @@
+import 'dart:developer' as developer;
+
 import 'package:cloud_firestore/cloud_firestore.dart'
     show CollectionReference, DocumentSnapshot, FirebaseFirestore, Timestamp;
 
+import '../../../core/utils/streak_calculator.dart';
+import '../../profile/data/user_public_profile_repository.dart';
 import '../domain/session.dart';
 import '../domain/session_status.dart';
 import '../domain/set_log.dart';
 
 class SessionRepository {
-  SessionRepository({required FirebaseFirestore firestore})
-      : _firestore = firestore;
+  SessionRepository({
+    required FirebaseFirestore firestore,
+    UserPublicProfileRepository? publicProfileRepository,
+  })  : _firestore = firestore,
+        _publicProfileRepository = publicProfileRepository;
 
   final FirebaseFirestore _firestore;
+  final UserPublicProfileRepository? _publicProfileRepository;
 
   // ─── Private collection getters ─────────────────────────────────────────
 
@@ -68,6 +76,36 @@ class SessionRepository {
       'durationMin': durationMin,
       'wasFullyCompleted': wasFullyCompleted,
     });
+
+    // Cross-feature: update public stats counters (best-effort, REQ-WRX-003).
+    // Executes after the primary session update. Uses a fresh collection
+    // reference to read all sessions for uid, then filters in Dart to avoid
+    // fake_cloud_firestore's indexed-query stale-read issue. (ADR-WRS-13)
+    final pubRepo = _publicProfileRepository;
+    if (pubRepo == null) return;
+
+    try {
+      final colRef =
+          _firestore.collection('users').doc(uid).collection('sessions');
+      final allSnap = await colRef.get();
+      final allSessions =
+          allSnap.docs.map(_sessionFromDoc).whereType<Session>().toList();
+      final finishedList =
+          allSessions.where((s) => s.status == SessionStatus.finished).toList();
+      final racha = computeStreak(finishedList);
+      await pubRepo.updateCounters(uid, {
+        'workoutsCount': finishedList.length,
+        'racha': racha,
+      });
+    } catch (e, st) {
+      developer.log(
+        'SessionRepository.finish: failed to update public profile counters '
+        'for $uid',
+        error: e,
+        stackTrace: st,
+      );
+      // DO NOT rethrow — public stats are best-effort
+    }
   }
 
   // ─── getById ────────────────────────────────────────────────────────────

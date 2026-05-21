@@ -21,6 +21,10 @@ mixin _$PublicProfileView {
   String? get authorGymId => throw _privateConstructorUsedError;
   Friendship? get friendship => throw _privateConstructorUsedError;
   bool get isSelf => throw _privateConstructorUsedError;
+  int? get workoutsCount => throw _privateConstructorUsedError;
+  int? get racha => throw _privateConstructorUsedError;
+  int? get followersCount => throw _privateConstructorUsedError;
+  int? get followingCount => throw _privateConstructorUsedError;
 
   /// Create a copy of PublicProfileView
   /// with the given fields replaced by the non-null parameter values.
@@ -40,7 +44,11 @@ abstract class $PublicProfileViewCopyWith<$Res> {
       String? authorAvatarUrl,
       String? authorGymId,
       Friendship? friendship,
-      bool isSelf});
+      bool isSelf,
+      int? workoutsCount,
+      int? racha,
+      int? followersCount,
+      int? followingCount});
 
   $FriendshipCopyWith<$Res>? get friendship;
 }
@@ -65,6 +73,10 @@ class _$PublicProfileViewCopyWithImpl<$Res, $Val extends PublicProfileView>
     Object? authorGymId = freezed,
     Object? friendship = freezed,
     Object? isSelf = null,
+    Object? workoutsCount = freezed,
+    Object? racha = freezed,
+    Object? followersCount = freezed,
+    Object? followingCount = freezed,
   }) {
     return _then(_value.copyWith(
       authorDisplayName: null == authorDisplayName
@@ -87,6 +99,22 @@ class _$PublicProfileViewCopyWithImpl<$Res, $Val extends PublicProfileView>
           ? _value.isSelf
           : isSelf // ignore: cast_nullable_to_non_nullable
               as bool,
+      workoutsCount: freezed == workoutsCount
+          ? _value.workoutsCount
+          : workoutsCount // ignore: cast_nullable_to_non_nullable
+              as int?,
+      racha: freezed == racha
+          ? _value.racha
+          : racha // ignore: cast_nullable_to_non_nullable
+              as int?,
+      followersCount: freezed == followersCount
+          ? _value.followersCount
+          : followersCount // ignore: cast_nullable_to_non_nullable
+              as int?,
+      followingCount: freezed == followingCount
+          ? _value.followingCount
+          : followingCount // ignore: cast_nullable_to_non_nullable
+              as int?,
     ) as $Val);
   }
 
@@ -118,7 +146,11 @@ abstract class _$$PublicProfileViewImplCopyWith<$Res>
       String? authorAvatarUrl,
       String? authorGymId,
       Friendship? friendship,
-      bool isSelf});
+      bool isSelf,
+      int? workoutsCount,
+      int? racha,
+      int? followersCount,
+      int? followingCount});
 
   @override
   $FriendshipCopyWith<$Res>? get friendship;
@@ -142,6 +174,10 @@ class __$$PublicProfileViewImplCopyWithImpl<$Res>
     Object? authorGymId = freezed,
     Object? friendship = freezed,
     Object? isSelf = null,
+    Object? workoutsCount = freezed,
+    Object? racha = freezed,
+    Object? followersCount = freezed,
+    Object? followingCount = freezed,
   }) {
     return _then(_$PublicProfileViewImpl(
       authorDisplayName: null == authorDisplayName
@@ -164,6 +200,22 @@ class __$$PublicProfileViewImplCopyWithImpl<$Res>
           ? _value.isSelf
           : isSelf // ignore: cast_nullable_to_non_nullable
               as bool,
+      workoutsCount: freezed == workoutsCount
+          ? _value.workoutsCount
+          : workoutsCount // ignore: cast_nullable_to_non_nullable
+              as int?,
+      racha: freezed == racha
+          ? _value.racha
+          : racha // ignore: cast_nullable_to_non_nullable
+              as int?,
+      followersCount: freezed == followersCount
+          ? _value.followersCount
+          : followersCount // ignore: cast_nullable_to_non_nullable
+              as int?,
+      followingCount: freezed == followingCount
+          ? _value.followingCount
+          : followingCount // ignore: cast_nullable_to_non_nullable
+              as int?,
     ));
   }
 }
@@ -176,7 +228,11 @@ class _$PublicProfileViewImpl implements _PublicProfileView {
       required this.authorAvatarUrl,
       required this.authorGymId,
       required this.friendship,
-      required this.isSelf});
+      required this.isSelf,
+      this.workoutsCount,
+      this.racha,
+      this.followersCount,
+      this.followingCount});
 
   @override
   final String authorDisplayName;
@@ -188,10 +244,18 @@ class _$PublicProfileViewImpl implements _PublicProfileView {
   final Friendship? friendship;
   @override
   final bool isSelf;
+  @override
+  final int? workoutsCount;
+  @override
+  final int? racha;
+  @override
+  final int? followersCount;
+  @override
+  final int? followingCount;
 
   @override
   String toString() {
-    return 'PublicProfileView(authorDisplayName: $authorDisplayName, authorAvatarUrl: $authorAvatarUrl, authorGymId: $authorGymId, friendship: $friendship, isSelf: $isSelf)';
+    return 'PublicProfileView(authorDisplayName: $authorDisplayName, authorAvatarUrl: $authorAvatarUrl, authorGymId: $authorGymId, friendship: $friendship, isSelf: $isSelf, workoutsCount: $workoutsCount, racha: $racha, followersCount: $followersCount, followingCount: $followingCount)';
   }
 
   @override
@@ -207,12 +271,28 @@ class _$PublicProfileViewImpl implements _PublicProfileView {
                 other.authorGymId == authorGymId) &&
             (identical(other.friendship, friendship) ||
                 other.friendship == friendship) &&
-            (identical(other.isSelf, isSelf) || other.isSelf == isSelf));
+            (identical(other.isSelf, isSelf) || other.isSelf == isSelf) &&
+            (identical(other.workoutsCount, workoutsCount) ||
+                other.workoutsCount == workoutsCount) &&
+            (identical(other.racha, racha) || other.racha == racha) &&
+            (identical(other.followersCount, followersCount) ||
+                other.followersCount == followersCount) &&
+            (identical(other.followingCount, followingCount) ||
+                other.followingCount == followingCount));
   }
 
   @override
-  int get hashCode => Object.hash(runtimeType, authorDisplayName,
-      authorAvatarUrl, authorGymId, friendship, isSelf);
+  int get hashCode => Object.hash(
+      runtimeType,
+      authorDisplayName,
+      authorAvatarUrl,
+      authorGymId,
+      friendship,
+      isSelf,
+      workoutsCount,
+      racha,
+      followersCount,
+      followingCount);
 
   /// Create a copy of PublicProfileView
   /// with the given fields replaced by the non-null parameter values.
@@ -230,7 +310,11 @@ abstract class _PublicProfileView implements PublicProfileView {
       required final String? authorAvatarUrl,
       required final String? authorGymId,
       required final Friendship? friendship,
-      required final bool isSelf}) = _$PublicProfileViewImpl;
+      required final bool isSelf,
+      final int? workoutsCount,
+      final int? racha,
+      final int? followersCount,
+      final int? followingCount}) = _$PublicProfileViewImpl;
 
   @override
   String get authorDisplayName;
@@ -242,6 +326,14 @@ abstract class _PublicProfileView implements PublicProfileView {
   Friendship? get friendship;
   @override
   bool get isSelf;
+  @override
+  int? get workoutsCount;
+  @override
+  int? get racha;
+  @override
+  int? get followersCount;
+  @override
+  int? get followingCount;
 
   /// Create a copy of PublicProfileView
   /// with the given fields replaced by the non-null parameter values.

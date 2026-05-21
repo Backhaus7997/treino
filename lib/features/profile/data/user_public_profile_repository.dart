@@ -36,6 +36,17 @@ class UserPublicProfileRepository {
     await _col.doc(profile.uid).set(profile.toJson(), SetOptions(merge: true));
   }
 
+  /// Performs a partial merge write on `userPublicProfiles/{uid}` using only
+  /// the provided [fields]. Existing fields NOT in [fields] are preserved.
+  ///
+  /// Used by cross-feature write paths (SessionRepository.finish,
+  /// FriendshipRepository.accept/delete) to update counters without
+  /// clobbering identity fields (displayName, avatarUrl, gymId) set by
+  /// UserRepository. See ADR-WRS-12.
+  Future<void> updateCounters(String uid, Map<String, Object?> fields) async {
+    await _col.doc(uid).set(fields, SetOptions(merge: true));
+  }
+
   /// Returns up to [limit] profiles whose `displayNameLowercase` starts with
   /// the trimmed lowercase [query]. Returns an empty list when [query] is
   /// blank after trimming. No Firestore call is issued in that case.

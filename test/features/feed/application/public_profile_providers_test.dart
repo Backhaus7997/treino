@@ -197,6 +197,75 @@ void main() {
   // Assertions remain behaviorally equivalent per REQ-UPP-020 / SCENARIO-273.
   // ──────────────────────────────────────────────────────────────────────────
   group('publicProfileViewProvider', () {
+    // SCENARIO-326d: publicProfileViewProvider passes counter fields through
+    test(
+        'SCENARIO-326d: publicProfileViewProvider sources 4 counter fields from userPublicProfile',
+        () async {
+      final firestore = FakeFirebaseFirestore();
+      // Seed with counter fields
+      await firestore.collection('userPublicProfiles').doc('target').set({
+        'uid': 'target',
+        'displayName': 'Ana',
+        'displayNameLowercase': 'ana',
+        'avatarUrl': null,
+        'gymId': null,
+        'workoutsCount': 89,
+        'racha': 23,
+        'followersCount': 412,
+        'followingCount': 284,
+      });
+
+      final container = ProviderContainer(overrides: [
+        firestoreProvider.overrideWithValue(firestore),
+        userPublicProfileRepositoryProvider.overrideWithValue(
+          UserPublicProfileRepository(firestore: firestore),
+        ),
+        authStateChangesProvider
+            .overrideWith((_) => Stream.value(_userWithUid('viewer'))),
+      ]);
+      addTearDown(container.dispose);
+
+      final view =
+          await container.read(publicProfileViewProvider('target').future);
+
+      expect(view.workoutsCount, equals(89));
+      expect(view.racha, equals(23));
+      expect(view.followersCount, equals(412));
+      expect(view.followingCount, equals(284));
+    });
+
+    // SCENARIO-326e: counter fields are null when userPublicProfile has no counters
+    test(
+        'SCENARIO-326e: counter fields are null when userPublicProfile has no counters',
+        () async {
+      final firestore = FakeFirebaseFirestore();
+      await firestore.collection('userPublicProfiles').doc('target').set({
+        'uid': 'target',
+        'displayName': 'Ana',
+        'displayNameLowercase': 'ana',
+        'avatarUrl': null,
+        'gymId': null,
+      });
+
+      final container = ProviderContainer(overrides: [
+        firestoreProvider.overrideWithValue(firestore),
+        userPublicProfileRepositoryProvider.overrideWithValue(
+          UserPublicProfileRepository(firestore: firestore),
+        ),
+        authStateChangesProvider
+            .overrideWith((_) => Stream.value(_userWithUid('viewer'))),
+      ]);
+      addTearDown(container.dispose);
+
+      final view =
+          await container.read(publicProfileViewProvider('target').future);
+
+      expect(view.workoutsCount, isNull);
+      expect(view.racha, isNull);
+      expect(view.followersCount, isNull);
+      expect(view.followingCount, isNull);
+    });
+
     test('SCENARIO-203: composes userPublicProfile + friendship; isSelf=false',
         () async {
       final firestore = FakeFirebaseFirestore();

@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:treino/features/profile/data/user_public_profile_repository.dart';
 import 'package:treino/features/workout/data/session_repository.dart';
 import 'package:treino/features/workout/domain/set_log.dart';
 import 'package:treino/features/workout/domain/session_status.dart';
@@ -8,6 +9,7 @@ import 'package:treino/features/workout/domain/session_status.dart';
 void main() {
   late FakeFirebaseFirestore firestore;
   late SessionRepository repo;
+  late UserPublicProfileRepository publicProfileRepo;
 
   const uid = 'user-test-001';
   const routineId = 'routine-ppl';
@@ -16,6 +18,7 @@ void main() {
   setUp(() {
     firestore = FakeFirebaseFirestore();
     repo = SessionRepository(firestore: firestore);
+    publicProfileRepo = UserPublicProfileRepository(firestore: firestore);
   });
 
   // ─── Helpers ──────────────────────────────────────────────────────────────
@@ -314,4 +317,94 @@ void main() {
     expect(results[0].setNumber, equals(1));
     expect(results[1].setNumber, equals(2));
   });
+
+  // ─── finish() cross-feature write ─────────────────────────────────────────
+
+  // SCENARIO-321 success: finish() updates userPublicProfiles with counters.
+  // Uses repoWithProfile for BOTH create() and finish() to ensure
+  // fake_cloud_firestore's sub-collection index is consistent.
+  test(
+      'SCENARIO-321: finish() updates userPublicProfiles/{uid} with workoutsCount and racha',
+      () async {
+    final repoWithProfile = SessionRepository(
+      firestore: firestore,
+      publicProfileRepository: publicProfileRepo,
+    );
+
+    // Use the same repo instance for create AND finish so fake_cloud_firestore
+    // uses the same internal collection reference throughout.
+    // Session date: 2026-05-15 = today (matches testNow() for streak calc)
+    final session = await repoWithProfile.create(
+      uid: uid,
+      routineId: routineId,
+      routineName: routineName,
+      startedAt: DateTime.utc(2026, 5, 15, 8, 0, 0),
+    );
+
+    await repoWithProfile.finish(
+      uid: uid,
+      sessionId: session.id,
+      finishedAt: DateTime.utc(2026, 5, 15, 10, 45, 0),
+      totalVolumeKg: 100.0,
+      durationMin: 45,
+    );
+
+    final profileSnap =
+        await firestore.collection('userPublicProfiles').doc(uid).get();
+    expect(profileSnap.exists, isTrue);
+    final data = profileSnap.data()!;
+    // 1 finished session
+    expect(data['workoutsCount'], equals(1));
+    // racha is computed by computeStreak using DateTime.now() — the value
+    // is correct (0 if not trained today in local TZ, 1 if trained today).
+    // We only verify it's a non-negative integer.
+    expect(data['racha'], isA<int>());
+  });
+
+  // SCENARIO-321 failure: when public profile write fails, finish() still
+  // completes and the primary session update is not affected
+  test(
+      'SCENARIO-321 failure: when public profile write throws, finish() resolves and session is finished',
+      () async {
+    final throwingRepo = _ThrowingPublicProfileRepository();
+    final repoWithThrowingProfile = SessionRepository(
+      firestore: firestore,
+      publicProfileRepository: throwingRepo,
+    );
+
+    final sessionId = await createActiveSession();
+
+    // Must not throw
+    await expectLater(
+      repoWithThrowingProfile.finish(
+        uid: uid,
+        sessionId: sessionId,
+        finishedAt: DateTime.utc(2026, 5, 18, 10, 45, 0),
+        totalVolumeKg: 75.0,
+        durationMin: 40,
+      ),
+      completes,
+    );
+
+    // Primary op succeeded
+    final snap = await firestore
+        .collection('users')
+        .doc(uid)
+        .collection('sessions')
+        .doc(sessionId)
+        .get();
+    expect(snap.data()?['status'], equals('finished'));
+  });
+}
+
+// ─── Test helpers ─────────────────────────────────────────────────────────────
+
+class _ThrowingPublicProfileRepository extends UserPublicProfileRepository {
+  _ThrowingPublicProfileRepository()
+      : super(firestore: FakeFirebaseFirestore());
+
+  @override
+  Future<void> updateCounters(String uid, Map<String, Object?> fields) {
+    throw Exception('Simulated public profile write failure');
+  }
 }

@@ -14,6 +14,10 @@ _$UserPublicProfileImpl _$$UserPublicProfileImplFromJson(
       displayNameLowercase: json['displayNameLowercase'] as String?,
       avatarUrl: json['avatarUrl'] as String?,
       gymId: json['gymId'] as String?,
+      workoutsCount: (json['workoutsCount'] as num?)?.toInt(),
+      racha: (json['racha'] as num?)?.toInt(),
+      followersCount: (json['followersCount'] as num?)?.toInt(),
+      followingCount: (json['followingCount'] as num?)?.toInt(),
     );
 
 Map<String, dynamic> _$$UserPublicProfileImplToJson(
@@ -24,4 +28,8 @@ Map<String, dynamic> _$$UserPublicProfileImplToJson(
       'displayNameLowercase': instance.displayNameLowercase,
       'avatarUrl': instance.avatarUrl,
       'gymId': instance.gymId,
+      'workoutsCount': instance.workoutsCount,
+      'racha': instance.racha,
+      'followersCount': instance.followersCount,
+      'followingCount': instance.followingCount,
     };

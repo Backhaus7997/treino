@@ -94,5 +94,9 @@ final publicProfileViewProvider =
     authorGymId: publicProfile?.gymId,
     friendship: friendship,
     isSelf: isSelf,
+    workoutsCount: publicProfile?.workoutsCount,
+    racha: publicProfile?.racha,
+    followersCount: publicProfile?.followersCount,
+    followingCount: publicProfile?.followingCount,
   );
 });

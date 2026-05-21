@@ -62,9 +62,14 @@ class PublicProfileScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 20),
               ],
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 20),
-                child: PublicProfileStatsRow(),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: PublicProfileStatsRow(
+                  workoutsCount: view.workoutsCount,
+                  racha: view.racha,
+                  followersCount: view.followersCount,
+                  followingCount: view.followingCount,
+                ),
               ),
               const SizedBox(height: 20),
               Padding(
