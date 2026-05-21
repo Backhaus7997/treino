@@ -206,7 +206,7 @@ Chain strategy: stacked-to-main
 - [x] T65 — GATE: `flutter analyze` — 0 issues
 - [x] T66 — GATE: `dart format --output=none --set-exit-if-changed .` — 0 changed
 - [x] T67 — GATE: `flutter test` — all 1011 passing (includes SCENARIO-326..338)
-- [ ] T68 — MANDATORY pre-PR: deploy updated rules to treino-dev: `npx firebase-tools deploy --only firestore:rules --project treino-dev` — BLOCKED on user-authorized deploy
+- [x] T68 — DONE 2026-05-21: deployed `firestore.rules` (with checkIns block) to `treino-dev` via `firebase-tools deploy --only firestore:rules`. Output: "released rules firestore.rules to cloud.firestore". Compiled successfully.
 
 **PR#4 task count**: 18 tasks | **Estimated LOC**: ~370 | **Budget risk**: Medium (no size:exception needed)
 

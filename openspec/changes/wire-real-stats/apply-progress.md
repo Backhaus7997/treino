@@ -269,10 +269,10 @@
 
 ---
 
-## PR#4 — IN PROGRESS (T68 blocked)
+## PR#4 — DONE (all 18 tasks complete)
 
 **Branch**: feat/wire-real-stats-pr4
-**Tasks T51-T67 + T64 complete; T68 (deploy) blocked**
+**Tasks T51-T68 complete**
 **Baseline**: 931 tests → **Final**: 1011 tests (+80 new)
 **Quality gates**: PASS (analyze 0 issues, format 0 changed, 1011/1011 tests pass)
 
@@ -297,7 +297,7 @@
 | T65 GATE analyze | — | ✅ 0 issues | — |
 | T66 GATE format | — | ✅ 0 changed | — |
 | T67 GATE flutter test | — | ✅ 1011/1011 pass | — |
-| T68 | BLOCKED | — | Needs user-authorized firebase deploy |
+| T68 | — | ✅ deployed firestore.rules to treino-dev (2026-05-21) | — |
 
 ### Completed Tasks
 
@@ -318,7 +318,7 @@
 - [x] T65 — GATE: `flutter analyze` 0 issues
 - [x] T66 — GATE: `dart format --output=none --set-exit-if-changed .` 0 changed
 - [x] T67 — GATE: `flutter test` 1011/1011 passing
-- [ ] T68 — BLOCKED on user-authorized firebase deploy (`firebase deploy --only firestore:rules --project treino-dev`)
+- [x] T68 — DONE 2026-05-21: deployed firestore.rules to `treino-dev` via `firebase deploy --only firestore:rules`. Compiled OK, rules released to cloud.firestore.
 
 ### Files Modified/Created (PR#4)
 
