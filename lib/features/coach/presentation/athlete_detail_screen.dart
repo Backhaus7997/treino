@@ -114,6 +114,31 @@ class _AthleteDetailBody extends ConsumerWidget {
       );
     }
 
+    if (plansAsync.hasError) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Error cargando planes:',
+                style:
+                    GoogleFonts.barlow(color: palette.textMuted, fontSize: 14),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                plansAsync.error.toString(),
+                style:
+                    GoogleFonts.barlow(color: palette.textMuted, fontSize: 12),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     // Client-side filter: only show plans assigned by current trainer
     final allPlans = plansAsync.valueOrNull ?? const [];
     final myPlans = allPlans.where((r) => r.assignedBy == trainerUid).toList();
@@ -150,7 +175,10 @@ class _AthleteDetailBody extends ConsumerWidget {
                 )
               else
                 for (final plan in myPlans) ...[
-                  _PlanCard(plan: plan),
+                  _PlanCard(
+                    plan: plan,
+                    onTap: () => context.push('/workout/routine/${plan.id}'),
+                  ),
                   const SizedBox(height: 12),
                 ],
             ],
@@ -235,40 +263,45 @@ class _AthleteHeader extends StatelessWidget {
 // ── Plan card ─────────────────────────────────────────────────────────────────
 
 class _PlanCard extends StatelessWidget {
-  const _PlanCard({required this.plan});
+  const _PlanCard({required this.plan, this.onTap});
   final Routine plan;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    return Container(
-      decoration: BoxDecoration(
-        color: palette.bgCard,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: palette.border, width: 1),
-      ),
-      padding: const EdgeInsets.all(14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            plan.name,
-            style: GoogleFonts.barlow(
-              fontWeight: FontWeight.w600,
-              fontSize: 14,
-              color: palette.textPrimary,
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        decoration: BoxDecoration(
+          color: palette.bgCard,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: palette.border, width: 1),
+        ),
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              plan.name,
+              style: GoogleFonts.barlow(
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+                color: palette.textPrimary,
+              ),
             ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            '${plan.days.length} ${plan.days.length == 1 ? "día" : "días"} · ${plan.split}',
-            style: GoogleFonts.barlow(
-              fontWeight: FontWeight.w400,
-              fontSize: 12,
-              color: palette.textMuted,
+            const SizedBox(height: 4),
+            Text(
+              '${plan.days.length} ${plan.days.length == 1 ? "día" : "días"} · ${plan.split}',
+              style: GoogleFonts.barlow(
+                fontWeight: FontWeight.w400,
+                fontSize: 12,
+                color: palette.textMuted,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

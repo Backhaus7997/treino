@@ -13,18 +13,17 @@ class RoutineRepository {
       _firestore.collection('routines');
 
   /// Lists every public routine in the catalogue. Used by the Plantillas
-  /// screen to render seed plans + any explicitly-public routine.
+  /// screen to render seed plans.
   ///
   /// The `where('visibility', isEqualTo: 'public')` filter is REQUIRED by
-  /// the firestore.rules contract introduced in coach-plans-mobile (PR #64):
-  /// the read rule on `routines` checks `resource.data.visibility` per doc,
-  /// so Firestore rejects list queries that don't constrain that field
-  /// (the rule cannot be proven for arbitrary unfiltered results).
+  /// firestore.rules: the read rule on `routines` checks
+  /// `resource.data.visibility` per doc, so Firestore rejects list queries
+  /// that don't constrain that field. Trainer-assigned (`private`) plans
+  /// are fetched per-athlete via [listAssignedTo]; `shared` plans are
+  /// explicitly excluded from Plantillas by design.
   ///
   /// Legacy seed routines that pre-date the visibility field are reconciled
-  /// by `scripts/backfill_routines_source_visibility.js`, which sets
-  /// `visibility: 'public'` on any doc missing it. Without that backfill
-  /// run, old plantillas would silently disappear from this query.
+  /// by `scripts/backfill_routines_source_visibility.js`.
   Future<List<Routine>> listAll() async {
     final snap =
         await _collection.where('visibility', isEqualTo: 'public').get();
@@ -50,7 +49,7 @@ class RoutineRepository {
         .orderBy('createdAt', descending: true)
         .limit(20)
         .get();
-    return snap.docs.map((d) => Routine.fromJson(d.data())).toList();
+    return snap.docs.map(_fromDoc).whereType<Routine>().toList();
   }
 
   /// Persists a trainer-assigned plan.
@@ -88,9 +87,16 @@ class RoutineRepository {
     return routine.copyWith(id: ref.id);
   }
 
+  /// Deserializes a Firestore doc into a [Routine], injecting the doc id.
+  ///
+  /// Trainer-assigned routines are written via `.add()` and do NOT carry an
+  /// `id` field inside their data. Seeded plantillas DO have an `id` field
+  /// (set explicitly by the seed script). Injecting `snap.id` unconditionally
+  /// handles both cases: it overrides the existing value for seeds (same id)
+  /// and supplies the missing field for trainer-assigned docs.
   Routine? _fromDoc(DocumentSnapshot<Map<String, Object?>> snap) {
     final data = snap.data();
     if (!snap.exists || data == null) return null;
-    return Routine.fromJson(data);
+    return Routine.fromJson({...data, 'id': snap.id});
   }
 }

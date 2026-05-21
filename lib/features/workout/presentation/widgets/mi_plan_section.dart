@@ -40,7 +40,8 @@ class MiPlanSection extends ConsumerWidget {
         const SizedBox(height: 12),
         plansAsync.when(
           loading: () => const _SectionLoadingState(),
-          error: (_, __) => _SectionErrorState(
+          error: (err, _) => _SectionErrorState(
+            errorMessage: err.toString(),
             onRetry: () => ref.invalidate(assignedRoutinesProvider(uid)),
           ),
           data: (plans) {
@@ -83,8 +84,9 @@ class _SectionLoadingState extends StatelessWidget {
 // ── Error state ───────────────────────────────────────────────────────────────
 
 class _SectionErrorState extends StatelessWidget {
-  const _SectionErrorState({required this.onRetry});
+  const _SectionErrorState({required this.onRetry, this.errorMessage});
   final VoidCallback onRetry;
+  final String? errorMessage;
 
   @override
   Widget build(BuildContext context) {
@@ -101,6 +103,16 @@ class _SectionErrorState extends StatelessWidget {
               color: palette.textMuted,
             ),
           ),
+          if (errorMessage != null) ...[
+            const SizedBox(height: 6),
+            Text(
+              errorMessage!,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: palette.textMuted,
+                fontSize: 11,
+              ),
+            ),
+          ],
           const SizedBox(height: 8),
           TextButton(
             onPressed: onRetry,

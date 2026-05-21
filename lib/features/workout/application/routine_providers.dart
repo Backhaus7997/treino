@@ -18,15 +18,13 @@ final routinesProvider = FutureProvider<List<Routine>>((ref) async {
   return ref.watch(routineRepositoryProvider).listAll();
 });
 
-/// O(1) in-memory lookup. Derives from [routinesProvider] — never re-fetches
-/// from Firestore. All family instances share one Firestore round-trip.
+/// Single-doc fetch. Hits Firestore directly via `getById` so it works for
+/// BOTH public catalog plantillas AND private trainer-assigned plans
+/// (which are not in [routinesProvider] because [listAll] now filters
+/// `whereIn ['public', 'shared']`).
 final routineByIdProvider = FutureProvider.family<Routine?, String>(
   (ref, id) async {
-    final routines = await ref.watch(routinesProvider.future);
-    for (final r in routines) {
-      if (r.id == id) return r;
-    }
-    return null;
+    return ref.watch(routineRepositoryProvider).getById(id);
   },
 );
 
