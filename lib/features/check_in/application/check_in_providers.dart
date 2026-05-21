@@ -1,7 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../profile/application/user_providers.dart' show firestoreProvider;
-import '../../workout/application/session_providers.dart' show currentUidProvider;
+import '../../workout/application/session_providers.dart'
+    show currentUidProvider;
 import '../data/check_in_repository.dart';
 import '../domain/check_in.dart';
 
@@ -14,8 +15,7 @@ final checkInRepositoryProvider = Provider<CheckInRepository>(
 /// today. Auth-gated: returns null when unauthenticated.
 ///
 /// autoDispose: re-fetched on FeedScreen remount (tab switch, app resume).
-final todayCheckInProvider =
-    FutureProvider.autoDispose<CheckIn?>((ref) async {
+final todayCheckInProvider = FutureProvider.autoDispose<CheckIn?>((ref) async {
   final uid = ref.watch(currentUidProvider);
   if (uid == null) return null;
   return ref.watch(checkInRepositoryProvider).getTodayForUser(uid);

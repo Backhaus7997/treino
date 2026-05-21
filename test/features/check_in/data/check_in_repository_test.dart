@@ -50,8 +50,7 @@ void main() {
   });
 
   group('createTodayCheckIn', () {
-    test(
-        'SCENARIO-329: upserts doc with correct fields when inGym: true',
+    test('SCENARIO-329: upserts doc with correct fields when inGym: true',
         () async {
       await repo.createTodayCheckIn(
         uid,

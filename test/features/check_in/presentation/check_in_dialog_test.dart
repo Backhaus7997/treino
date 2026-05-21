@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/check_in/application/check_in_providers.dart';
 import 'package:treino/features/check_in/domain/check_in.dart';
@@ -35,7 +34,8 @@ void main() {
         'SCENARIO-333: renders gym name in subtext when gymId is non-null',
         (tester) async {
       await tester.pumpWidget(_wrap(
-        child: const CheckInDialog(gymId: 'smart-fit-palermo', gymName: 'Smart Fit'),
+        child: const CheckInDialog(
+            gymId: 'smart-fit-palermo', gymName: 'Smart Fit'),
       ));
       await tester.pump();
 
@@ -43,8 +43,7 @@ void main() {
       expect(find.textContaining('Smart Fit'), findsOneWidget);
     });
 
-    testWidgets(
-        'SCENARIO-334: renders neutral subtext when gymId is null',
+    testWidgets('SCENARIO-334: renders neutral subtext when gymId is null',
         (tester) async {
       await tester.pumpWidget(_wrap(
         child: const CheckInDialog(gymId: null, gymName: null),
@@ -55,8 +54,7 @@ void main() {
       expect(find.text('Confirma tu entrenamiento de hoy'), findsOneWidget);
     });
 
-    testWidgets(
-        'SCENARIO-338 partial: NO button dismisses dialog',
+    testWidgets('SCENARIO-338 partial: NO button dismisses dialog',
         (tester) async {
       bool dialogOpen = true;
       await tester.pumpWidget(_wrap(
@@ -85,13 +83,11 @@ void main() {
       expect(dialogOpen, isFalse);
     });
 
-    testWidgets(
-        'SCENARIO-337 partial: SÍ, ENTRÉ button is visible',
+    testWidgets('SCENARIO-337 partial: SÍ, ENTRÉ button is visible',
         (tester) async {
       await tester.pumpWidget(_wrap(
         overrides: [
-          checkInNotifierProvider
-              .overrideWith(() => MockCheckInNotifier()),
+          checkInNotifierProvider.overrideWith(() => MockCheckInNotifier()),
         ],
         child: const CheckInDialog(gymId: 'gym1', gymName: 'Smart Fit'),
       ));
