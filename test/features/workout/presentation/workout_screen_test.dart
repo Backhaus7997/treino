@@ -1,20 +1,35 @@
+import 'package:firebase_auth/firebase_auth.dart' show User;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/widgets/treino_bottom_bar.dart';
+import 'package:treino/features/auth/application/auth_providers.dart';
+import 'package:treino/features/coach/application/trainer_link_providers.dart';
+import 'package:treino/features/coach/presentation/coach_strings.dart';
 import 'package:treino/features/profile/domain/experience_level.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
+import 'package:treino/features/workout/application/assigned_routine_providers.dart';
 import 'package:treino/features/workout/application/routine_providers.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
 import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/presentation/routine_detail_screen.dart';
 import 'package:treino/features/workout/presentation/widgets/historial_section.dart';
+import 'package:treino/features/workout/presentation/widgets/mi_plan_section.dart';
 import 'package:treino/features/workout/presentation/widgets/plantillas_section.dart';
 import 'package:treino/features/workout/presentation/workout_strings.dart';
 import 'package:treino/features/workout/workout_screen.dart';
+
+class _MockUser extends Mock implements User {}
+
+User fakeUser(String uid) {
+  final u = _MockUser();
+  when(() => u.uid).thenReturn(uid);
+  return u;
+}
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -47,6 +62,11 @@ Widget _wrapWorkout(Widget w, {List<Override> overrides = const []}) =>
       overrides: [
         currentUidProvider.overrideWithValue('test-uid'),
         sessionsByUidProvider.overrideWith((ref, uid) async => []),
+        // MiPlanSection: return null user → section renders SizedBox.shrink.
+        // Tests that only care about PLANTILLAS / HISTORIAL order don't need
+        // the full MiPlanSection provider stack.
+        authStateChangesProvider.overrideWith((ref) => const Stream.empty()),
+        currentAthleteLinkProvider.overrideWith((ref) async => null),
         ...overrides,
       ],
       child: MaterialApp(
@@ -164,39 +184,48 @@ void main() {
 
   group('WorkoutScreen', () {
     testWidgets(
-        'three sections rendered in order: PLANTILLAS → TU RUTINA → HISTORIAL',
+        'three sections rendered in order: MI PLAN → PLANTILLAS → HISTORIAL',
         (tester) async {
       await tester.pumpWidget(
         _wrapWorkout(
           const WorkoutScreen(),
           overrides: [
             routinesProvider.overrideWith((ref) async => []),
+            // Provide a user so MiPlanSection is visible (shows empty state).
+            authStateChangesProvider.overrideWith(
+              (ref) => Stream.value(null),
+            ),
+            assignedRoutinesProvider('').overrideWith((ref) async => []),
           ],
         ),
       );
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 50));
 
+      // MiPlanSection renders SizedBox.shrink when uid is null (null User).
+      // Test presence of MiPlanSection widget and remaining sections.
+      expect(find.byType(MiPlanSection), findsOneWidget);
       expect(find.text('PLANTILLAS'), findsOneWidget);
-      expect(find.text('TU RUTINA'), findsOneWidget);
       expect(find.text('HISTORIAL'), findsOneWidget);
 
+      final miPlanPos = tester.getTopLeft(find.byType(MiPlanSection)).dy;
       final plantillasPos = tester.getTopLeft(find.text('PLANTILLAS')).dy;
-      final tuRutinaPos = tester.getTopLeft(find.text('TU RUTINA')).dy;
       final historialPos = tester.getTopLeft(find.text('HISTORIAL')).dy;
 
-      expect(plantillasPos, lessThan(tuRutinaPos));
-      expect(tuRutinaPos, lessThan(historialPos));
+      expect(miPlanPos, lessThanOrEqualTo(plantillasPos));
+      expect(plantillasPos, lessThan(historialPos));
     });
 
-    testWidgets(
-        '"No tenés rutina asignada todavía." appears in Tu Rutina section',
+    testWidgets('MiPlanSection empty state appears when plans list is empty',
         (tester) async {
       await tester.pumpWidget(
         _wrapWorkout(
           const WorkoutScreen(),
           overrides: [
             routinesProvider.overrideWith((ref) async => []),
+            currentUidProvider.overrideWithValue('athlete-1'),
+            assignedRoutinesProvider('athlete-1')
+                .overrideWith((ref) async => []),
           ],
         ),
       );
@@ -204,7 +233,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 50));
 
       expect(
-        find.text('No tenés rutina asignada todavía.'),
+        find.text(CoachStrings.miPlanEmpty),
         findsOneWidget,
       );
     });

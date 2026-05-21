@@ -46,4 +46,24 @@ abstract final class CoachStrings {
       'Tu ubicación no es visible para otros usuarios.';
   static const locationSheetAccept = 'ACEPTAR';
   static const locationSheetDeny = 'Ahora no';
+
+  // ── Coach Plans Mobile (Fase 5 · Etapa 4) ────────────────────────────────
+  static const miPlanTitle = 'MI PLAN';
+  static const miPlanEmpty = 'No tenés rutina asignada todavía.';
+  static const miPlanError = 'Error al cargar tu plan.';
+  static const miPlanFinalizado = 'Plan finalizado';
+  static const assignedByPrefix = 'Asignado por ';
+  static const assignedByLoading = 'Asignado por …';
+  static const assignedByError = 'Asignado por un PF';
+  static const createPlanCta = 'CREAR PLAN';
+  static const createPlanSuccess = 'Plan creado y asignado.';
+  static const createPlanError = 'No pudimos crear el plan. Intentá de nuevo.';
+  static const athleteDetailNoPlans = 'Todavía no le asignaste planes.';
+  static const editorTitle = 'Crear plan';
+  static const editorNameLabel = 'NOMBRE';
+  static const editorSplitLabel = 'SPLIT (e.g. PPL)';
+  static const editorAddDay = 'Agregar día';
+  static const editorAddSlot = 'Agregar ejercicio';
+  static const editorSubmit = 'ASIGNAR PLAN';
+  static const exercisePicker = 'Buscar ejercicio';
 }
