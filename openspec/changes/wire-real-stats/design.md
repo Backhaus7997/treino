@@ -875,9 +875,24 @@ class CheckInNotifier extends AsyncNotifier<CheckIn?> {
 
 ### D.5 CheckInDialog widget structure
 
+**Implementation note (post-archive, per ADR-WRS-19)**: the dialog accepts
+`gymId` and `gymName` as constructor props instead of reading
+`userProfileProvider` inside the widget. The parent `FeedScreen` resolves
+both via `userProfileProvider` + `gymNameFromId` before calling `showDialog`.
+This keeps the dialog a pure presentation widget (no ambient provider
+reads, no auth mocks needed in tests) and preserves Q7 (profile-based, NO
+GPS — ADR-WRS-17): the lookup just moves up one level.
+
 ```
 CheckInDialog extends ConsumerWidget
+  const CheckInDialog({required this.gymId, required this.gymName, super.key})
+  final String? gymId
+  final String? gymName
+
   build(context, ref)
+    final subtext = (gymId != null && gymName != null && gymName.isNotEmpty)
+        ? CheckInStrings.gymSubtext(gymName)        // 'SMART FIT · ¡Detectamos que podés estar entrenando!'
+        : CheckInStrings.neutralSubtext             // 'Sin gym configurado'
     return Dialog(
       backgroundColor: palette.bgCard,
       shape: RoundedRectangleBorder(borderRadius: 20),
@@ -885,17 +900,17 @@ CheckInDialog extends ConsumerWidget
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           Icon(TreinoIcon.mapPin, color: palette.accent, size: 48),
           SizedBox(height: 18),
-          Text('¿ESTÁS EN EL GYM HOY?', style: barlowCondensed bold 18),
+          Text(CheckInStrings.header, style: barlowCondensed bold 18),
           SizedBox(height: 8),
-          Text(gymCopy, style: bodyMuted),    // 'Smart Fit · Palermo. Detectamos que estás cerca.' OR 'Sin gym configurado'
+          Text(subtext, style: bodyMuted),
           SizedBox(height: 20),
           Row(children: [
             Expanded(child: _NoButton(onPressed: () => Navigator.pop(context))),
             SizedBox(width: 12),
-            Expanded(child: _SiButton(onPressed: () async {
+            Expanded(child: _SiButton(gymId: gymId, gymName: gymName, onPressed: () async {
               await ref.read(checkInNotifierProvider.notifier).confirm(
-                gymId: gymProfile.gymId,
-                gymName: gymProfile.gymName,
+                gymId: gymId,
+                gymName: gymName,
               );
               if (context.mounted) Navigator.pop(context);
             })),
@@ -905,7 +920,23 @@ CheckInDialog extends ConsumerWidget
     )
 ```
 
-Q7 lock: `gymId` is read from the current user's profile via a `userProfileProvider`. NO GPS. If profile.gymId is null, the dialog still shows but the copy degrades to a neutral prompt; check-in records `gymId: null, gymName: null` (allowed by schema).
+**Parent resolver** (FeedScreen, per D.6):
+
+```
+final profile = ref.read(userProfileProvider).valueOrNull;
+final gymId = profile?.gymId;
+final gymName = gymId != null ? gymNameFromId(gymId) : null;
+showDialog(context: context, builder: (_) => CheckInDialog(
+  gymId: gymId,
+  gymName: gymName?.isNotEmpty == true ? gymName : null,
+));
+```
+
+Q7 lock: `gymId` is read from the current user's profile via
+`userProfileProvider` — **at the parent layer**, not inside the dialog
+(ADR-WRS-19). NO GPS. If `profile.gymId` is null, the dialog still shows but
+the copy degrades to a neutral prompt; check-in records `gymId: null,
+gymName: null` (allowed by schema).
 
 ### D.6 FeedScreen mount trigger
 
@@ -1061,6 +1092,7 @@ test('SCENARIO-274: non-owner cannot write another user check-in', async () => {
 | ADR-WRS-16 | Session-scoped flag (`StateProvider<bool>`) for trigger guard, in addition to `todayCheckInProvider` | Prevents dialog re-show on tab switch within the same app session; flag resets at process restart so the dialog reappears the next day if user hasn't acted | Persisting dismissal to Firestore — rejected: dismissal is not data, just UX; persisting creates spurious "I said no" doc + Firestore cost |
 | ADR-WRS-17 | NO GPS, NO mood/energy sliders (Q7, Q8 lock) | Roadmap "básico" scope; GPS adds permission flow + dependency (geolocator); mood/energy is a separate Etapa | Add geolocator + mood sliders — rejected: scope creep; explicit out of scope in proposal |
 | ADR-WRS-18 | FeedScreen converted to ConsumerStatefulWidget (not abusing ref.listen in build) | Mount-once trigger requires StatefulWidget lifecycle; addPostFrameCallback gives a safe context for showDialog | Use ref.listen in build of ConsumerWidget — rejected: fires on every rebuild; needs manual dedup; harder to reason about |
+| ADR-WRS-19 | `CheckInDialog` receives `gymId`/`gymName` as constructor props (resolved by parent `FeedScreen._maybeShowCheckIn`) instead of reading `userProfileProvider` inside the widget — supersedes D.5 sketch | Container-presentational pattern declared in CLAUDE.md user prefs; dialog tests stay free of auth/provider mocking; zero coupling to the `profile` feature; Q7 lock (profile-based, NO GPS — ADR-WRS-17) preserved (lookup just moves to the parent). Deviation discovered + approved during PR#4 apply; promoted to ADR here per archive. | Read `userProfileProvider` inline in the dialog (the original D.5 sketch) — rejected: couples the dialog to ambient providers, complicates tests with overrides, and gives no meaningful reactivity (the dialog lives ~3 s; profile.gymId does not change mid-session) |
 
 ---
 
@@ -1176,6 +1208,7 @@ Strict TDD: every step writes the test BEFORE the implementation. Mandatory red 
 | ADR-WRS-16 | Session-scoped StateProvider for trigger guard | PR#4 |
 | ADR-WRS-17 | No GPS / no mood-energy (Q7, Q8 lock) | PR#4 |
 | ADR-WRS-18 | ConsumerStatefulWidget for FeedScreen lifecycle | PR#4 |
+| ADR-WRS-19 | CheckInDialog props-down (supersedes D.5 inline provider read) | PR#4 (apply); promoted in archive |
 
 ---
 
