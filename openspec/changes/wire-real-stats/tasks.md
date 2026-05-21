@@ -199,7 +199,7 @@ Chain strategy: stacked-to-main
 
 - [x] T62 — SETUP: add rules block to `firestore.rules` (insert after sessions block): `match /users/{uid}/checkIns/{date} { allow read, write: if request.auth != null && request.auth.uid == uid; }` (REQ-WRC-004)
 - [x] T63 — SETUP: add 3 SCENARIO tests to `scripts/rules_test/rules.test.js` (after SCENARIO-271): SCENARIO-272 (owner can create own check-in), SCENARIO-273 (non-owner cannot read another user's checkIn), SCENARIO-274 (non-owner cannot write another user's checkIn)
-- [ ] T64 — MANDATORY: run rules tests against local Firestore Emulator: `npx firebase-tools emulators:start --only firestore` + `npm test` in `scripts/rules_test/`; all 14+ scenarios (SCENARIO-268..274) MUST PASS; document results in PR description — BLOCKED on orchestrator-coordinated emulator run
+- [x] T64 — MANDATORY: rules tests run against local Firestore Emulator (Java 21 + FIRESTORE_EMULATOR_HOST=127.0.0.1:8080) on 2026-05-21. All 14 scenarios PASS (SCENARIO-130, 131, 132, 268, 269, 270, 271, 272, 273, 274 — incl. owner/non-owner inverse pairs). Console warnings for PERMISSION_DENIED on the inverse tests are expected (rules are denying what they should deny).
 
 ### Phase 5: Gates & Deploy
 

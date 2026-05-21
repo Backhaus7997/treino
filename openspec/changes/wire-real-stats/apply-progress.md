@@ -269,10 +269,10 @@
 
 ---
 
-## PR#4 — IN PROGRESS (T64 + T68 blocked)
+## PR#4 — IN PROGRESS (T68 blocked)
 
 **Branch**: feat/wire-real-stats-pr4
-**Tasks T51-T67 complete; T64 (emulator) + T68 (deploy) blocked**
+**Tasks T51-T67 + T64 complete; T68 (deploy) blocked**
 **Baseline**: 931 tests → **Final**: 1011 tests (+80 new)
 **Quality gates**: PASS (analyze 0 issues, format 0 changed, 1011/1011 tests pass)
 
@@ -293,7 +293,7 @@
 | T61 GREEN | — | ✅ SCENARIO-335..336 + session guard pass | ✅ auth guard fix (uid check before provider) |
 | T62 SETUP | — | ✅ firestore.rules checkIns block added | — |
 | T63 SETUP | — | ✅ SCENARIO-272..274 added to rules.test.js | — |
-| T64 | BLOCKED | — | Needs orchestrator-coordinated emulator run |
+| T64 | — | ✅ 14/14 scenarios pass on local emulator (2026-05-21) | — |
 | T65 GATE analyze | — | ✅ 0 issues | — |
 | T66 GATE format | — | ✅ 0 changed | — |
 | T67 GATE flutter test | — | ✅ 1011/1011 pass | — |
@@ -314,7 +314,7 @@
 - [x] T61 — GREEN: `lib/features/feed/feed_screen.dart` — ConsumerStatefulWidget; `_checkInDialogShownThisSessionProvider` (StateProvider<bool>, process-lifetime); `_maybeShowCheckIn`: uid guard → session flag → provider read → check → set flag → showDialog(CheckInDialog); gymId/gymName resolved from userProfileProvider via gymNameFromId
 - [x] T62 — SETUP: `firestore.rules` — added `match /users/{uid}/checkIns/{date}` block with owner-only read/write (REQ-WRC-004)
 - [x] T63 — SETUP: `scripts/rules_test/rules.test.js` — added SCENARIO-272 (owner write own check-in), SCENARIO-273 (non-owner read blocked), SCENARIO-274 (non-owner write blocked) after SCENARIO-271
-- [ ] T64 — BLOCKED on orchestrator-coordinated emulator run (Java 21 + interactive Firestore emulator required)
+- [x] T64 — DONE 2026-05-21: rules tests run against local Firestore Emulator (JAVA_HOME=openjdk@21, FIRESTORE_EMULATOR_HOST=127.0.0.1:8080). All 14 scenarios PASS (SCENARIO-130/131/132/268/269/270/271/272/273/274 incl. owner/non-owner inverse pairs). PERMISSION_DENIED warnings on inverse tests are expected behavior (rules denying what they should).
 - [x] T65 — GATE: `flutter analyze` 0 issues
 - [x] T66 — GATE: `dart format --output=none --set-exit-if-changed .` 0 changed
 - [x] T67 — GATE: `flutter test` 1011/1011 passing
