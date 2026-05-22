@@ -5,6 +5,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/treino_icon.dart';
 import '../../../profile/application/user_public_profile_providers.dart';
+import '../../application/feed_screen_providers.dart'
+    show myFriendsFeedProvider;
 import '../../application/friendship_providers.dart'
     show acceptedFriendsProvider, friendshipRepositoryProvider;
 import '../../application/public_profile_providers.dart'
@@ -79,11 +81,15 @@ class PublicProfileFollowButton extends ConsumerWidget {
       style: _FollowPillStyle.mintFilled,
       onTap: () async {
         await repo.accept(f.id, viewerUid);
-        // Per ADR-FRI-013: refresh both the pair (button transitions to
-        // SIGUIENDO) AND the AMIGOS feed source (the new friend's posts
-        // start appearing without an app restart).
+        // Per ADR-FRI-013: refresh the pair (button transitions to SIGUIENDO),
+        // the AMIGOS-feed source (`acceptedFriendsProvider`), AND the
+        // composed feed provider itself (`myFriendsFeedProvider`). Riverpod
+        // does NOT auto-cascade invalidation when the downstream has no
+        // active listener — and the viewer is on the public-profile screen
+        // here, not on Feed AMIGOS.
         await invalidatePair();
         ref.invalidate(acceptedFriendsProvider(viewerUid));
+        ref.invalidate(myFriendsFeedProvider);
       },
     );
   }
@@ -120,15 +126,19 @@ class PublicProfileFollowButton extends ConsumerWidget {
           } catch (_) {
             // Swallow — same fire-and-forget pattern as inbox pills (ADR-FRI-009).
           }
-          // Per ADR-FRI-013: refresh both the pair (so the button transitions
-          // back to SEGUIR) AND the AMIGOS feed source (so the ex-friend's
-          // posts are pruned from the viewer's feed without an app restart).
+          // Per ADR-FRI-013: refresh the pair (button → SEGUIR), the
+          // AMIGOS-feed source (`acceptedFriendsProvider`), AND the composed
+          // `myFriendsFeedProvider` directly — Riverpod does not auto-cascade
+          // invalidation to downstream providers that have no active listener
+          // at the moment, and the viewer is on the public-profile screen
+          // here, not on Feed AMIGOS.
           ref.invalidate(
             friendshipByPairProvider(
               (viewerUid: viewerUid, targetUid: targetUid),
             ),
           );
           ref.invalidate(acceptedFriendsProvider(viewerUid));
+          ref.invalidate(myFriendsFeedProvider);
         },
       ),
     );

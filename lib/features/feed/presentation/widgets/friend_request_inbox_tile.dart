@@ -5,6 +5,8 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../profile/application/user_public_profile_providers.dart';
+import '../../application/feed_screen_providers.dart'
+    show myFriendsFeedProvider;
 import '../../application/friendship_providers.dart';
 import '../../application/public_profile_providers.dart'
     show friendshipByPairProvider;
@@ -148,10 +150,18 @@ class _FriendRequestInboxTileState
           .read(friendshipRepositoryProvider)
           .accept(widget.friendship.id, widget.viewerUid);
       // Refresh sibling consumers (ADR-FRI-013). The inbox itself updates
-      // via stream re-emit, but the Feed AMIGOS list and the public-profile
-      // follow button hold FutureProvider snapshots that need explicit
-      // invalidation to reflect the new accepted state.
+      // via stream re-emit. For the rest:
+      //   - `acceptedFriendsProvider` is the source list of friend uids
+      //   - `myFriendsFeedProvider` MUST be invalidated explicitly (Riverpod
+      //     does NOT auto-cascade invalidation to downstream providers when
+      //     they have no active listener at the moment of invalidate — and
+      //     here the user is on the inbox screen, NOT on Feed AMIGOS). This
+      //     mirrors the pattern in `create_post_notifier` and
+      //     `post_workout_notifier`.
+      //   - `friendshipByPairProvider` keeps the public-profile follow
+      //     button in sync if the viewer visits the requester's profile.
       ref.invalidate(acceptedFriendsProvider(widget.viewerUid));
+      ref.invalidate(myFriendsFeedProvider);
       ref.invalidate(
         friendshipByPairProvider(
           (viewerUid: widget.viewerUid, targetUid: widget.friendship.requesterId),
