@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/feed/application/friendship_providers.dart';
 import 'package:treino/features/feed/data/friendship_repository.dart';
@@ -299,6 +300,155 @@ void main() {
       // delete was called immediately
       expect(stub.deleteCallCount, equals(1));
       expect(stub.lastDeletedId, equals('alice_bob'));
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // SCENARIO-472: Tappable requester zone navigates; action pills do NOT
+  // ---------------------------------------------------------------------------
+
+  group('FriendRequestInboxTile tappable requester zone (SCENARIO-472)', () {
+    // Builds the tile inside a GoRouter so we can detect navigation
+    Widget _buildTileWithRouter({
+      required Friendship friendship,
+      required String viewerUid,
+      required List<Override> overrides,
+      required List<String> navigatedRoutes,
+    }) {
+      final router = GoRouter(
+        initialLocation: '/',
+        routes: [
+          GoRoute(
+            path: '/',
+            builder: (context, state) => Scaffold(
+              body: FriendRequestInboxTile(
+                friendship: friendship,
+                viewerUid: viewerUid,
+              ),
+            ),
+          ),
+          GoRoute(
+            path: '/feed/profile/:uid',
+            builder: (context, state) {
+              final uid = state.pathParameters['uid']!;
+              navigatedRoutes.add('/feed/profile/$uid');
+              return Scaffold(body: Text('Profile $uid'));
+            },
+          ),
+        ],
+      );
+
+      return ProviderScope(
+        overrides: overrides,
+        child: MaterialApp.router(
+          theme: AppTheme.dark(),
+          routerConfig: router,
+        ),
+      );
+    }
+
+    // SCENARIO-472: tap requester zone → navigates to /feed/profile/{requesterUid}
+    testWidgets(
+        'SCENARIO-472: tapping avatar/name zone navigates to /feed/profile/requesterUid',
+        (tester) async {
+      final navigatedRoutes = <String>[];
+      final friendship = _makeFriendship(requesterId: 'vicente-uid');
+
+      await tester.pumpWidget(
+        _buildTileWithRouter(
+          friendship: friendship,
+          viewerUid: 'alice',
+          overrides: [
+            userPublicProfileProvider('vicente-uid').overrideWith(
+              (_) async => const UserPublicProfile(
+                uid: 'vicente-uid',
+                displayName: 'Vicente',
+              ),
+            ),
+          ],
+          navigatedRoutes: navigatedRoutes,
+        ),
+      );
+
+      await tester.pump();
+
+      // Tap on the PostAvatar (part of the tappable zone)
+      await tester.tap(find.byType(PostAvatar));
+      await tester.pumpAndSettle();
+
+      expect(navigatedRoutes, contains('/feed/profile/vicente-uid'));
+    });
+
+    // SCENARIO-472: tapping ACEPTAR does NOT navigate
+    testWidgets(
+        'SCENARIO-472: tapping ACEPTAR does NOT navigate to the public profile route',
+        (tester) async {
+      final navigatedRoutes = <String>[];
+      final stub = _StubFriendshipRepository();
+      final friendship = _makeFriendship(requesterId: 'vicente-uid');
+
+      await tester.pumpWidget(
+        _buildTileWithRouter(
+          friendship: friendship,
+          viewerUid: 'alice',
+          overrides: [
+            friendshipRepositoryProvider.overrideWithValue(stub),
+            userPublicProfileProvider('vicente-uid').overrideWith(
+              (_) async => const UserPublicProfile(
+                uid: 'vicente-uid',
+                displayName: 'Vicente',
+              ),
+            ),
+          ],
+          navigatedRoutes: navigatedRoutes,
+        ),
+      );
+
+      await tester.pump();
+
+      await tester.tap(find.text('ACEPTAR'));
+      await tester.pumpAndSettle();
+
+      // No navigation to profile
+      expect(navigatedRoutes, isEmpty);
+      // But the repo call was made
+      expect(stub.acceptCallCount, equals(1));
+    });
+
+    // SCENARIO-472: tapping RECHAZAR does NOT navigate
+    testWidgets(
+        'SCENARIO-472: tapping RECHAZAR does NOT navigate to the public profile route',
+        (tester) async {
+      final navigatedRoutes = <String>[];
+      final stub = _StubFriendshipRepository();
+      final friendship = _makeFriendship(requesterId: 'vicente-uid');
+
+      await tester.pumpWidget(
+        _buildTileWithRouter(
+          friendship: friendship,
+          viewerUid: 'alice',
+          overrides: [
+            friendshipRepositoryProvider.overrideWithValue(stub),
+            userPublicProfileProvider('vicente-uid').overrideWith(
+              (_) async => const UserPublicProfile(
+                uid: 'vicente-uid',
+                displayName: 'Vicente',
+              ),
+            ),
+          ],
+          navigatedRoutes: navigatedRoutes,
+        ),
+      );
+
+      await tester.pump();
+
+      await tester.tap(find.text('RECHAZAR'));
+      await tester.pumpAndSettle();
+
+      // No navigation to profile
+      expect(navigatedRoutes, isEmpty);
+      // But the repo call was made
+      expect(stub.deleteCallCount, equals(1));
     });
   });
 }
