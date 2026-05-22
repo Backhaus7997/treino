@@ -96,12 +96,20 @@ service cloud.firestore {
       // inmutables. Business rules (transiciones de status válidas, who
       // can accept vs terminate) se enforce client-side en el repository;
       // las rules dan defensa estructural.
+      //
+      // Privacy gate (REQ-COACH-LINK-012..014): el último OR clause restringe
+      // la mutación de `sharedWithTrainer` exclusivamente al atleta. Si el
+      // request cambia el campo (`request.resource.data.sharedWithTrainer !=
+      // resource.data.sharedWithTrainer`), el auth.uid debe ser el atleta.
+      // El PF nunca puede flippear el flag.
       allow update: if request.auth != null
                     && (request.auth.uid == resource.data.trainerId
                         || request.auth.uid == resource.data.athleteId)
                     && request.resource.data.trainerId == resource.data.trainerId
                     && request.resource.data.athleteId == resource.data.athleteId
-                    && request.resource.data.requestedAt == resource.data.requestedAt;
+                    && request.resource.data.requestedAt == resource.data.requestedAt
+                    && (request.resource.data.sharedWithTrainer == resource.data.sharedWithTrainer
+                        || request.auth.uid == resource.data.athleteId);
 
       // Delete denegado — terminate vía update status='terminated'.
       allow delete: if false;
