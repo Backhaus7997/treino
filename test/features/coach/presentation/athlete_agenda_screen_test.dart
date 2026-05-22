@@ -104,7 +104,7 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(find.text(AgendaStrings.emptyAvailability), findsOneWidget);
-        expect(find.byType(TableCalendar), findsNothing);
+        expect(find.byType(TableCalendar<void>), findsNothing);
       },
     );
   });
@@ -140,7 +140,7 @@ void main() {
         await tester.pumpAndSettle();
 
         // Calendar is shown (rules exist)
-        expect(find.byType(TableCalendar), findsOneWidget);
+        expect(find.byType(TableCalendar<void>), findsOneWidget);
         // Empty state NOT shown
         expect(find.text(AgendaStrings.emptyAvailability), findsNothing);
       },
@@ -153,6 +153,12 @@ void main() {
     testWidgets(
       'SCENARIO-506: past appointments list renders below calendar',
       (tester) async {
+        // Use a tall viewport so the lazy ListView builds all appointment tiles.
+        tester.view.physicalSize = const Size(800, 4000);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
         final now = DateTime.now().toUtc();
         final past1 = now.subtract(const Duration(days: 3));
         final past2 = now.subtract(const Duration(days: 5));
@@ -204,6 +210,12 @@ void main() {
     testWidgets(
       'SCENARIO-507: past appointments list capped at 10',
       (tester) async {
+        // Use a tall viewport so the lazy ListView builds all appointment tiles.
+        tester.view.physicalSize = const Size(800, 8000);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
         final now = DateTime.now().toUtc();
         DateTime rnd(DateTime d) =>
             DateTime.utc(d.year, d.month, d.day, d.hour, d.minute);
@@ -272,7 +284,10 @@ void main() {
               home: Scaffold(
                 body: AppointmentTile(
                   appointment: appt,
-                  onCancel: null,
+                  // onCancel must be non-null: the tile only shows the icon
+                  // when the callback is provided (the screen passes it in when
+                  // >24h ahead; null means "not cancellable").
+                  onCancel: () {},
                   now: DateTime.now().toUtc(),
                 ),
               ),
@@ -290,7 +305,8 @@ void main() {
     testWidgets(
       'SCENARIO-509: cancel button absent when <=24h ahead',
       (tester) async {
-        final nearFuture = DateTime.now().toUtc().add(const Duration(hours: 10));
+        final nearFuture =
+            DateTime.now().toUtc().add(const Duration(hours: 10));
         final dt = DateTime.utc(
           nearFuture.year,
           nearFuture.month,
@@ -329,13 +345,13 @@ void main() {
     testWidgets(
       'SCENARIO-501: sheet lists free slot chips',
       (tester) async {
-        final now = DateTime.now().toUtc();
-        // Slots at 09:00 and 10:00 today (in future)
-        final tomorrow = now.add(const Duration(days: 1));
+        // Use local time so AgendaStrings.formatTime (which calls toLocal())
+        // displays the expected "09:00" / "10:00" regardless of machine timezone.
+        final tomorrow = DateTime.now().add(const Duration(days: 1));
         final slot1 =
-            DateTime.utc(tomorrow.year, tomorrow.month, tomorrow.day, 9, 0);
+            DateTime(tomorrow.year, tomorrow.month, tomorrow.day, 9, 0);
         final slot2 =
-            DateTime.utc(tomorrow.year, tomorrow.month, tomorrow.day, 10, 0);
+            DateTime(tomorrow.year, tomorrow.month, tomorrow.day, 10, 0);
 
         await tester.pumpWidget(
           ProviderScope(
@@ -394,9 +410,10 @@ void main() {
     testWidgets(
       'SCENARIO-503: tapping slot chip shows confirmation dialog',
       (tester) async {
-        final tomorrow = DateTime.now().toUtc().add(const Duration(days: 1));
-        final slot = DateTime.utc(
-            tomorrow.year, tomorrow.month, tomorrow.day, 9, 0);
+        // Use local time so AgendaStrings.formatTime displays "09:00".
+        final tomorrow = DateTime.now().add(const Duration(days: 1));
+        final slot =
+            DateTime(tomorrow.year, tomorrow.month, tomorrow.day, 9, 0);
 
         var bookCalled = false;
         await tester.pumpWidget(
@@ -434,9 +451,10 @@ void main() {
     testWidgets(
       'SCENARIO-504: confirming dialog calls onBookSlot',
       (tester) async {
-        final tomorrow = DateTime.now().toUtc().add(const Duration(days: 1));
+        // Use local time so AgendaStrings.formatTime displays "09:00".
+        final tomorrow = DateTime.now().add(const Duration(days: 1));
         final slot =
-            DateTime.utc(tomorrow.year, tomorrow.month, tomorrow.day, 9, 0);
+            DateTime(tomorrow.year, tomorrow.month, tomorrow.day, 9, 0);
 
         DateTime? bookedSlot;
         await tester.pumpWidget(
@@ -464,8 +482,8 @@ void main() {
         await tester.pumpAndSettle();
 
         // Confirm in dialog
-        await tester
-            .tap(find.widgetWithText(ElevatedButton, AgendaStrings.bookingConfirmCta));
+        await tester.tap(find.widgetWithText(
+            ElevatedButton, AgendaStrings.bookingConfirmCta));
         await tester.pumpAndSettle();
 
         expect(bookedSlot, equals(slot));
@@ -524,9 +542,10 @@ void main() {
     testWidgets(
       'SCENARIO-508: athlete own bookings shown with distinct style',
       (tester) async {
-        final tomorrow = DateTime.now().toUtc().add(const Duration(days: 1));
+        // Use local time so AgendaStrings.formatTime displays "09:00".
+        final tomorrow = DateTime.now().add(const Duration(days: 1));
         final slot =
-            DateTime.utc(tomorrow.year, tomorrow.month, tomorrow.day, 9, 0);
+            DateTime(tomorrow.year, tomorrow.month, tomorrow.day, 9, 0);
 
         final ownBooking = _makeAppointment(
           startsAt: slot,

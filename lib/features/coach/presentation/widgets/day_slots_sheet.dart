@@ -91,8 +91,7 @@ class DaySlotsSheet extends StatelessWidget {
                 children: existingBookings
                     .map((appt) => _BookedChip(
                           appointment: appt,
-                          onCancel: () =>
-                              _onCancelTap(context, appt),
+                          onCancel: () => _onCancelTap(context, appt),
                           now: now,
                         ))
                     .toList(),
@@ -211,7 +210,8 @@ class _BookedChip extends StatelessWidget {
             const SizedBox(width: 8),
             GestureDetector(
               onTap: onCancel,
-              child: Icon(Icons.cancel_outlined, size: 16, color: palette.accent),
+              child:
+                  Icon(Icons.cancel_outlined, size: 16, color: palette.accent),
             ),
           ],
         ],

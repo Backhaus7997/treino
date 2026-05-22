@@ -403,9 +403,8 @@ class AppointmentTile extends StatelessWidget {
                   style: GoogleFonts.barlowCondensed(
                     fontWeight: FontWeight.w700,
                     fontSize: 15,
-                    color: isCancelled
-                        ? palette.textMuted
-                        : palette.textPrimary,
+                    color:
+                        isCancelled ? palette.textMuted : palette.textPrimary,
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -429,8 +428,8 @@ class AppointmentTile extends StatelessWidget {
             )
           else if (_canCancel && onCancel != null)
             IconButton(
-              icon:
-                  Icon(Icons.cancel_outlined, color: palette.highlight, size: 20),
+              icon: Icon(Icons.cancel_outlined,
+                  color: palette.highlight, size: 20),
               onPressed: onCancel,
               tooltip: AgendaStrings.cancellationConfirmCta,
             ),
