@@ -109,6 +109,7 @@ class TrainerSpecialtyChips extends StatelessWidget {
         side: BorderSide(
           color: isSelected ? palette.accent : palette.border,
         ),
+        shape: const StadiumBorder(),
         // Pass both true/false cases — fires regardless of current selection
         onSelected: (bool newValue) {
           // Always fire callback; parent is responsible for state management.
