@@ -162,6 +162,17 @@ class TrainerLinkRepository {
     return links.where((l) => statuses.contains(l.status)).toList();
   }
 
+  // ─── setSharedWithTrainer ───────────────────────────────────────────────
+  //
+  // Privacy gate. Solo el atleta puede flippear este flag (validado por
+  // Firestore rules — Shape 1). Single-field update sin `updatedAt` para
+  // mantener la convención del resto de los update methods de este repo.
+  // REQ-COACH-LINK-003..006.
+
+  Future<void> setSharedWithTrainer(String linkId, bool value) {
+    return _links.doc(linkId).update({'sharedWithTrainer': value});
+  }
+
   // ─── listForAthlete ─────────────────────────────────────────────────────
 
   Future<List<TrainerLink>> listForAthlete(
