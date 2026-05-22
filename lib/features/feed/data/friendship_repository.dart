@@ -105,6 +105,25 @@ class FriendshipRepository {
         .toList();
   }
 
+  /// Live stream of pending friendships where [uid] is the recipient
+  /// (not the requester). This is the inbox feed for the friend-requests
+  /// inbox screen. Emits an empty list when none exist.
+  ///
+  /// Same shape as [pendingRequestsFor], but uses `.snapshots()` so the
+  /// inbox auto-prunes rows when `accept` or `delete` commits without
+  /// requiring manual provider invalidation.
+  Stream<List<Friendship>> watchPendingRequestsFor(String uid) {
+    return _friendships
+        .where('members', arrayContains: uid)
+        .where('status', isEqualTo: FriendshipStatus.pending.toJson())
+        .snapshots()
+        .map((snap) => snap.docs
+            .map(_fromDoc)
+            .whereType<Friendship>()
+            .where((f) => f.requesterId != uid)
+            .toList());
+  }
+
   /// Returns pending friendships where [uid] is the recipient (not the requester).
   /// This is the inbox: requests received by [uid] that haven't been acted on.
   Future<List<Friendship>> pendingRequestsFor(String uid) async {

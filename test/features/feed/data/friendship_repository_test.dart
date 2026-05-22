@@ -485,27 +485,24 @@ void main() {
       );
 
       final stream = repo.watchPendingRequestsFor('alice');
+      final emissions = <List<Friendship>>[];
+      final sub = stream.listen(emissions.add);
 
-      await expectLater(
-        stream,
-        emitsInOrder([
-          // First emission: 1 item (bob's pending request to alice)
-          predicate<List<Friendship>>(
-            (list) => list.length == 1 && list.first.id == 'alice_bob',
-            'initial list contains alice_bob',
-          ),
-          // Second emission: empty (after accept flips status to accepted)
-          predicate<List<Friendship>>(
-            (list) => list.isEmpty,
-            'list is empty after accept commits',
-          ),
-        ]),
-        skip: false,
-        reason: 'stream must re-emit after accept changes status',
-      );
+      // Wait for initial emission (list with alice_bob)
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(emissions.length, equals(1));
+      expect(emissions.first.length, equals(1));
+      expect(emissions.first.first.id, equals('alice_bob'));
 
-      // Trigger the accept (alice is the recipient, bob is the requester)
+      // Accept the friendship — status flips to accepted, Firestore re-emits
       await repo.accept('alice_bob', 'alice');
+
+      // Wait for stream to re-emit
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(emissions.length, equals(2));
+      expect(emissions[1], isEmpty);
+
+      await sub.cancel();
     });
   });
 }
