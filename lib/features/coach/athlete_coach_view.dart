@@ -93,6 +93,10 @@ class _LinkStateCard extends ConsumerWidget {
               ),
               const SizedBox(height: 14),
               _TrainerHeader(pubAsync: pubAsync, link: link),
+              if (link.status == TrainerLinkStatus.active) ...[
+                const SizedBox(height: 14),
+                _ShareToggle(link: link),
+              ],
               const SizedBox(height: 18),
               _ActionRow(link: link),
             ],
@@ -170,6 +174,55 @@ class _TrainerHeader extends StatelessWidget {
     final dd = d.day.toString().padLeft(2, '0');
     final mm = d.month.toString().padLeft(2, '0');
     return '$dd/$mm/${d.year}';
+  }
+}
+
+// ── Share toggle — privacy gate (REQ-COACH-LINK-007..011) ─────────────────────
+
+class _ShareToggle extends ConsumerWidget {
+  const _ShareToggle({required this.link});
+  final TrainerLink link;
+
+  Future<void> _onChanged(
+    BuildContext context,
+    WidgetRef ref,
+    bool newValue,
+  ) async {
+    // Enabling sharing → confirmar antes (asymmetric UX: dar acceso es más
+    // delicado que revocarlo). Restaurar privacidad es low-stakes y va directo.
+    if (newValue == true) {
+      final confirmed = await _confirm(
+        context,
+        '¿Seguro?',
+        'Tu PF va a poder ver todas tus sesiones, volumen y racha. '
+            'Podés desactivarlo cuando quieras.',
+        confirmLabel: 'Compartir',
+      );
+      if (!confirmed) return;
+    }
+    await ref
+        .read(trainerLinkRepositoryProvider)
+        .setSharedWithTrainer(link.id, newValue);
+    ref.invalidate(currentAthleteLinkProvider);
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final palette = AppPalette.of(context);
+    return SwitchListTile(
+      contentPadding: EdgeInsets.zero,
+      title: Text(
+        'Compartir historial con mi PF',
+        style: GoogleFonts.barlow(
+          fontWeight: FontWeight.w600,
+          fontSize: 14,
+          color: palette.textPrimary,
+        ),
+      ),
+      value: link.sharedWithTrainer,
+      activeThumbColor: palette.accent,
+      onChanged: (v) => _onChanged(context, ref, v),
+    );
   }
 }
 
@@ -256,7 +309,12 @@ class _ActionRow extends ConsumerWidget {
   }
 }
 
-Future<bool> _confirm(BuildContext context, String title, String body) async {
+Future<bool> _confirm(
+  BuildContext context,
+  String title,
+  String body, {
+  String confirmLabel = 'Confirmar',
+}) async {
   final palette = AppPalette.of(context);
   final result = await showDialog<bool>(
     context: context,
@@ -294,7 +352,7 @@ Future<bool> _confirm(BuildContext context, String title, String body) async {
             foregroundColor: palette.bg,
           ),
           child: Text(
-            'Confirmar',
+            confirmLabel,
             style: GoogleFonts.barlowCondensed(
               fontWeight: FontWeight.w700,
               fontSize: 13,

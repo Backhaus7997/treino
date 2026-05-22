@@ -87,4 +87,48 @@ void main() {
       expect(decoded.requestedAt, DateTime.utc(2026, 5, 20, 10, 0));
     });
   });
+
+  // ── sharedWithTrainer field ────────────────────────────────────────────────
+  //
+  // Privacy gate retrofit. The field MUST round-trip through fromJson/toJson
+  // (SCENARIO-464) and MUST default to false when the key is absent from a
+  // legacy document (SCENARIO-465).
+  //
+  // REQ-COACH-LINK-001 (field contract) and REQ-COACH-LINK-002 (default).
+
+  group('sharedWithTrainer field', () {
+    test(
+      'SCENARIO-464: round-trip preserves sharedWithTrainer: true and other fields',
+      () {
+        final link = TrainerLink(
+          id: 'link-shared-001',
+          trainerId: 'trainer-1',
+          athleteId: 'athlete-1',
+          status: TrainerLinkStatus.active,
+          requestedAt: DateTime.utc(2026, 5, 20, 10, 0),
+          acceptedAt: DateTime.utc(2026, 5, 20, 12, 0),
+          sharedWithTrainer: true,
+        );
+        final decoded = TrainerLink.fromJson(link.toJson());
+        expect(decoded.sharedWithTrainer, isTrue);
+        expect(decoded, equals(link));
+      },
+    );
+
+    test(
+      'SCENARIO-465: fromJson defaults sharedWithTrainer to false when key absent',
+      () {
+        final legacyMap = <String, dynamic>{
+          'id': 'link-legacy-001',
+          'trainerId': 'trainer-1',
+          'athleteId': 'athlete-1',
+          'status': 'active',
+          'requestedAt': Timestamp.fromDate(DateTime.utc(2026, 5, 20, 10, 0)),
+          'acceptedAt': Timestamp.fromDate(DateTime.utc(2026, 5, 20, 12, 0)),
+        };
+        final decoded = TrainerLink.fromJson(legacyMap);
+        expect(decoded.sharedWithTrainer, isFalse);
+      },
+    );
+  });
 }

@@ -22,6 +22,12 @@ class TrainerLink with _$TrainerLink {
     @TimestampConverter() DateTime? acceptedAt,
     @TimestampConverter() DateTime? terminatedAt,
     String? terminationReason,
+    // Privacy gate. When `true`, the athlete shares their history
+    // (sessions, volume, streak) with their PF. Defaults to `false`
+    // so legacy docs without the key decode safely; Etapa 6 will
+    // consume this flag to gate PF reads on `sessions/{athleteId}/*`.
+    // REQ-COACH-LINK-001 + REQ-COACH-LINK-002.
+    @Default(false) bool sharedWithTrainer,
   }) = _TrainerLink;
 
   factory TrainerLink.fromJson(Map<String, Object?> json) =>
