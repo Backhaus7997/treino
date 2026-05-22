@@ -21,6 +21,7 @@ import '../features/workout/presentation/routine_detail_screen.dart';
 import '../features/workout/presentation/session_player_screen.dart';
 import '../features/feed/feed_screen.dart';
 import '../features/feed/presentation/create_post_screen.dart';
+import '../features/feed/presentation/friend_requests_inbox_screen.dart';
 import '../features/feed/presentation/public_profile_screen.dart';
 import '../features/feed/presentation/search_users_screen.dart';
 import '../features/home/home_screen.dart';
@@ -270,6 +271,13 @@ GoRouter buildRouter({
           GoRoute(
             path: '/profile',
             pageBuilder: (_, __) => _noAnim(const ProfileScreen()),
+            routes: [
+              GoRoute(
+                path: 'friend-requests',
+                pageBuilder: (_, __) =>
+                    _noAnim(const FriendRequestsInboxScreen()),
+              ),
+            ],
           ),
         ],
       ),
