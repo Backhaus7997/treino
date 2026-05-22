@@ -7,7 +7,6 @@ import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../auth/application/auth_providers.dart';
 import '../application/friendship_providers.dart';
-import '../domain/friendship.dart';
 import 'widgets/friend_request_inbox_tile.dart';
 
 /// Inbox screen listing pending friend requests received by the current user.
@@ -24,11 +23,9 @@ class FriendRequestsInboxScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
-    final myUid =
-        ref.watch(authStateChangesProvider).valueOrNull?.uid;
+    final myUid = ref.watch(authStateChangesProvider).valueOrNull?.uid;
 
-    final requestsAsync =
-        ref.watch(pendingRequestsStreamProvider(myUid ?? ''));
+    final requestsAsync = ref.watch(pendingRequestsStreamProvider(myUid ?? ''));
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,

@@ -125,7 +125,8 @@ void main() {
               (_) => Stream.value(null),
             ),
             pendingRequestsStreamProvider('').overrideWith(
-              (_) => Stream<List<Friendship>>.error(Exception('Firestore error')),
+              (_) =>
+                  Stream<List<Friendship>>.error(Exception('Firestore error')),
             ),
           ],
         ),
@@ -134,8 +135,7 @@ void main() {
       await tester.pump();
 
       expect(
-        find.text(
-            'No pudimos cargar las solicitudes. Intentá de nuevo.'),
+        find.text('No pudimos cargar las solicitudes. Intentá de nuevo.'),
         findsOneWidget,
       );
       expect(find.byType(CircularProgressIndicator), findsNothing);

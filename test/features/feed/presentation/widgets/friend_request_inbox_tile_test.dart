@@ -115,7 +115,8 @@ void main() {
           overrides: [
             friendshipRepositoryProvider.overrideWithValue(stub),
             userPublicProfileProvider('bob').overrideWith(
-              (_) async => const UserPublicProfile(uid: 'bob', displayName: 'Bob'),
+              (_) async =>
+                  const UserPublicProfile(uid: 'bob', displayName: 'Bob'),
             ),
           ],
         ),
@@ -148,7 +149,8 @@ void main() {
           overrides: [
             friendshipRepositoryProvider.overrideWithValue(slowStub),
             userPublicProfileProvider('bob').overrideWith(
-              (_) async => const UserPublicProfile(uid: 'bob', displayName: 'Bob'),
+              (_) async =>
+                  const UserPublicProfile(uid: 'bob', displayName: 'Bob'),
             ),
           ],
         ),
@@ -173,8 +175,7 @@ void main() {
 
   group('FriendRequestInboxTile render', () {
     // SCENARIO-461: profile resolved → "Ana García" + gym text visible + avatar rendered
-    testWidgets(
-        'SCENARIO-461: resolved profile shows displayName and gym text',
+    testWidgets('SCENARIO-461: resolved profile shows displayName and gym text',
         (tester) async {
       const profile = UserPublicProfile(
         uid: 'bob',

@@ -19,8 +19,7 @@ class ProfileFriendRequestsTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
-    final myUid =
-        ref.watch(authStateChangesProvider).valueOrNull?.uid;
+    final myUid = ref.watch(authStateChangesProvider).valueOrNull?.uid;
     final count = ref.watch(pendingRequestCountProvider(myUid ?? ''));
 
     return Padding(

@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
-import '../../../../core/widgets/treino_icon.dart';
 import '../../../profile/application/user_public_profile_providers.dart';
 import '../../application/friendship_providers.dart';
 import '../../domain/friendship.dart';
