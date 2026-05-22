@@ -220,7 +220,7 @@ class _ShareToggle extends ConsumerWidget {
         ),
       ),
       value: link.sharedWithTrainer,
-      activeColor: palette.accent,
+      activeThumbColor: palette.accent,
       onChanged: (v) => _onChanged(context, ref, v),
     );
   }

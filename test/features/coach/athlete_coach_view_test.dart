@@ -191,8 +191,7 @@ void main() {
         ));
         await tester.pumpAndSettle();
 
-        final tile =
-            tester.widget<SwitchListTile>(find.byType(SwitchListTile));
+        final tile = tester.widget<SwitchListTile>(find.byType(SwitchListTile));
         expect(tile.value, isTrue);
       },
     );
