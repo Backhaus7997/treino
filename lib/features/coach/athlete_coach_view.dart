@@ -11,6 +11,7 @@ import '../profile/domain/user_public_profile.dart';
 import 'application/trainer_link_providers.dart';
 import 'domain/trainer_link.dart';
 import 'domain/trainer_link_status.dart';
+import 'presentation/agenda_strings.dart';
 import 'presentation/trainers_list_screen.dart';
 
 /// Tab Coach del atleta. Combina la discovery (Dev A, Etapa 2) con el
@@ -98,6 +99,8 @@ class _LinkStateCard extends ConsumerWidget {
               if (link.status == TrainerLinkStatus.active) ...[
                 const SizedBox(height: 14),
                 _ShareToggle(link: link),
+                const SizedBox(height: 12),
+                _AgendaButton(trainerId: link.trainerId),
               ],
               const SizedBox(height: 18),
               _ActionRow(link: link),
@@ -351,6 +354,62 @@ class _ActionRow extends ConsumerWidget {
         ),
       );
     }
+  }
+}
+
+// ── Agenda button — only shown when link is active ────────────────────────────
+
+class _AgendaButton extends StatelessWidget {
+  const _AgendaButton({required this.trainerId});
+  final String trainerId;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        onPressed: () => context.push('/coach/agenda'),
+        style: OutlinedButton.styleFrom(
+          side: BorderSide(color: palette.accent, width: 1),
+          foregroundColor: palette.accent,
+          minimumSize: const Size.fromHeight(48),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(9999),
+          ),
+        ),
+        icon: Icon(TreinoIcon.tabWorkout, size: 18, color: palette.accent),
+        label: Text(
+          AgendaStrings.agendaButtonLabel,
+          style: GoogleFonts.barlowCondensed(
+            fontWeight: FontWeight.w700,
+            fontSize: 13,
+            letterSpacing: 0.8,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Test-only harness that renders `_LinkStateCard` directly, bypassing the
+/// router dependency. Exported for widget tests only.
+///
+/// @visibleForTesting
+class AthleteCoachViewTestHarness extends ConsumerWidget {
+  const AthleteCoachViewTestHarness({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final linkAsync = ref.watch(currentAthleteLinkProvider);
+    return linkAsync.when(
+      loading: () => const CircularProgressIndicator(),
+      error: (_, __) => const SizedBox.shrink(),
+      data: (link) {
+        if (link == null) return const SizedBox.shrink();
+        return _LinkStateCard(link: link);
+      },
+    );
   }
 }
 
