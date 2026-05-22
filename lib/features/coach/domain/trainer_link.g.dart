@@ -19,6 +19,7 @@ _$TrainerLinkImpl _$$TrainerLinkImplFromJson(Map<String, dynamic> json) =>
       terminatedAt: _$JsonConverterFromJson<Timestamp, DateTime>(
           json['terminatedAt'], const TimestampConverter().fromJson),
       terminationReason: json['terminationReason'] as String?,
+      sharedWithTrainer: json['sharedWithTrainer'] as bool? ?? false,
     );
 
 Map<String, dynamic> _$$TrainerLinkImplToJson(_$TrainerLinkImpl instance) =>
@@ -33,6 +34,7 @@ Map<String, dynamic> _$$TrainerLinkImplToJson(_$TrainerLinkImpl instance) =>
       'terminatedAt': _$JsonConverterToJson<Timestamp, DateTime>(
           instance.terminatedAt, const TimestampConverter().toJson),
       'terminationReason': instance.terminationReason,
+      'sharedWithTrainer': instance.sharedWithTrainer,
     };
 
 const _$TrainerLinkStatusEnumMap = {

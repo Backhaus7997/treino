@@ -30,7 +30,13 @@ mixin _$TrainerLink {
   DateTime? get acceptedAt => throw _privateConstructorUsedError;
   @TimestampConverter()
   DateTime? get terminatedAt => throw _privateConstructorUsedError;
-  String? get terminationReason => throw _privateConstructorUsedError;
+  String? get terminationReason =>
+      throw _privateConstructorUsedError; // Privacy gate. When `true`, the athlete shares their history
+// (sessions, volume, streak) with their PF. Defaults to `false`
+// so legacy docs without the key decode safely; Etapa 6 will
+// consume this flag to gate PF reads on `sessions/{athleteId}/*`.
+// REQ-COACH-LINK-001 + REQ-COACH-LINK-002.
+  bool get sharedWithTrainer => throw _privateConstructorUsedError;
 
   /// Serializes this TrainerLink to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -56,7 +62,8 @@ abstract class $TrainerLinkCopyWith<$Res> {
       @TimestampConverter() DateTime requestedAt,
       @TimestampConverter() DateTime? acceptedAt,
       @TimestampConverter() DateTime? terminatedAt,
-      String? terminationReason});
+      String? terminationReason,
+      bool sharedWithTrainer});
 }
 
 /// @nodoc
@@ -82,6 +89,7 @@ class _$TrainerLinkCopyWithImpl<$Res, $Val extends TrainerLink>
     Object? acceptedAt = freezed,
     Object? terminatedAt = freezed,
     Object? terminationReason = freezed,
+    Object? sharedWithTrainer = null,
   }) {
     return _then(_value.copyWith(
       id: null == id
@@ -116,6 +124,10 @@ class _$TrainerLinkCopyWithImpl<$Res, $Val extends TrainerLink>
           ? _value.terminationReason
           : terminationReason // ignore: cast_nullable_to_non_nullable
               as String?,
+      sharedWithTrainer: null == sharedWithTrainer
+          ? _value.sharedWithTrainer
+          : sharedWithTrainer // ignore: cast_nullable_to_non_nullable
+              as bool,
     ) as $Val);
   }
 }
@@ -136,7 +148,8 @@ abstract class _$$TrainerLinkImplCopyWith<$Res>
       @TimestampConverter() DateTime requestedAt,
       @TimestampConverter() DateTime? acceptedAt,
       @TimestampConverter() DateTime? terminatedAt,
-      String? terminationReason});
+      String? terminationReason,
+      bool sharedWithTrainer});
 }
 
 /// @nodoc
@@ -160,6 +173,7 @@ class __$$TrainerLinkImplCopyWithImpl<$Res>
     Object? acceptedAt = freezed,
     Object? terminatedAt = freezed,
     Object? terminationReason = freezed,
+    Object? sharedWithTrainer = null,
   }) {
     return _then(_$TrainerLinkImpl(
       id: null == id
@@ -194,6 +208,10 @@ class __$$TrainerLinkImplCopyWithImpl<$Res>
           ? _value.terminationReason
           : terminationReason // ignore: cast_nullable_to_non_nullable
               as String?,
+      sharedWithTrainer: null == sharedWithTrainer
+          ? _value.sharedWithTrainer
+          : sharedWithTrainer // ignore: cast_nullable_to_non_nullable
+              as bool,
     ));
   }
 }
@@ -209,7 +227,8 @@ class _$TrainerLinkImpl implements _TrainerLink {
       @TimestampConverter() required this.requestedAt,
       @TimestampConverter() this.acceptedAt,
       @TimestampConverter() this.terminatedAt,
-      this.terminationReason});
+      this.terminationReason,
+      this.sharedWithTrainer = false});
 
   factory _$TrainerLinkImpl.fromJson(Map<String, dynamic> json) =>
       _$$TrainerLinkImplFromJson(json);
@@ -233,10 +252,18 @@ class _$TrainerLinkImpl implements _TrainerLink {
   final DateTime? terminatedAt;
   @override
   final String? terminationReason;
+// Privacy gate. When `true`, the athlete shares their history
+// (sessions, volume, streak) with their PF. Defaults to `false`
+// so legacy docs without the key decode safely; Etapa 6 will
+// consume this flag to gate PF reads on `sessions/{athleteId}/*`.
+// REQ-COACH-LINK-001 + REQ-COACH-LINK-002.
+  @override
+  @JsonKey()
+  final bool sharedWithTrainer;
 
   @override
   String toString() {
-    return 'TrainerLink(id: $id, trainerId: $trainerId, athleteId: $athleteId, status: $status, requestedAt: $requestedAt, acceptedAt: $acceptedAt, terminatedAt: $terminatedAt, terminationReason: $terminationReason)';
+    return 'TrainerLink(id: $id, trainerId: $trainerId, athleteId: $athleteId, status: $status, requestedAt: $requestedAt, acceptedAt: $acceptedAt, terminatedAt: $terminatedAt, terminationReason: $terminationReason, sharedWithTrainer: $sharedWithTrainer)';
   }
 
   @override
@@ -257,13 +284,24 @@ class _$TrainerLinkImpl implements _TrainerLink {
             (identical(other.terminatedAt, terminatedAt) ||
                 other.terminatedAt == terminatedAt) &&
             (identical(other.terminationReason, terminationReason) ||
-                other.terminationReason == terminationReason));
+                other.terminationReason == terminationReason) &&
+            (identical(other.sharedWithTrainer, sharedWithTrainer) ||
+                other.sharedWithTrainer == sharedWithTrainer));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
   @override
-  int get hashCode => Object.hash(runtimeType, id, trainerId, athleteId, status,
-      requestedAt, acceptedAt, terminatedAt, terminationReason);
+  int get hashCode => Object.hash(
+      runtimeType,
+      id,
+      trainerId,
+      athleteId,
+      status,
+      requestedAt,
+      acceptedAt,
+      terminatedAt,
+      terminationReason,
+      sharedWithTrainer);
 
   /// Create a copy of TrainerLink
   /// with the given fields replaced by the non-null parameter values.
@@ -290,7 +328,8 @@ abstract class _TrainerLink implements TrainerLink {
       @TimestampConverter() required final DateTime requestedAt,
       @TimestampConverter() final DateTime? acceptedAt,
       @TimestampConverter() final DateTime? terminatedAt,
-      final String? terminationReason}) = _$TrainerLinkImpl;
+      final String? terminationReason,
+      final bool sharedWithTrainer}) = _$TrainerLinkImpl;
 
   factory _TrainerLink.fromJson(Map<String, dynamic> json) =
       _$TrainerLinkImpl.fromJson;
@@ -313,7 +352,14 @@ abstract class _TrainerLink implements TrainerLink {
   @TimestampConverter()
   DateTime? get terminatedAt;
   @override
-  String? get terminationReason;
+  String?
+      get terminationReason; // Privacy gate. When `true`, the athlete shares their history
+// (sessions, volume, streak) with their PF. Defaults to `false`
+// so legacy docs without the key decode safely; Etapa 6 will
+// consume this flag to gate PF reads on `sessions/{athleteId}/*`.
+// REQ-COACH-LINK-001 + REQ-COACH-LINK-002.
+  @override
+  bool get sharedWithTrainer;
 
   /// Create a copy of TrainerLink
   /// with the given fields replaced by the non-null parameter values.
