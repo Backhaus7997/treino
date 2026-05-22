@@ -11,6 +11,7 @@ import 'package:latlong2/latlong.dart';
 import '../../../../app/theme/app_palette.dart';
 import '../../application/trainer_discovery_providers.dart';
 import '../../domain/trainer_public_profile.dart';
+import 'trainers_map_bottom_sheet.dart';
 
 /// Map view de Discovery — embeddable dentro de `TrainersListScreen`
 /// como uno de los dos contenidos del IndexedStack (el otro es la lista).
@@ -61,31 +62,43 @@ class TrainersMapView extends ConsumerWidget {
             _buildAthleteMarker(athletePosition, palette),
         ];
 
-        return FlutterMap(
-          options: const MapOptions(
-            initialCenter: _initialCenter,
-            initialZoom: _initialZoom,
-            minZoom: 3,
-            maxZoom: 18,
-            interactionOptions: InteractionOptions(
-              flags: InteractiveFlag.all,
-            ),
-          ),
+        return Stack(
           children: [
-            TileLayer(
-              urlTemplate: _tileUrl,
-              subdomains: _tileSubdomains,
-              userAgentPackageName: 'com.treino.app',
-              retinaMode: MediaQuery.of(context).devicePixelRatio > 1.5,
-              maxZoom: 19,
-            ),
-            MarkerLayer(markers: markers),
-            const RichAttributionWidget(
-              alignment: AttributionAlignment.bottomRight,
-              attributions: [
-                TextSourceAttribution('OpenStreetMap contributors'),
-                TextSourceAttribution('CARTO'),
+            // Mapa de fondo
+            FlutterMap(
+              options: const MapOptions(
+                initialCenter: _initialCenter,
+                initialZoom: _initialZoom,
+                minZoom: 3,
+                maxZoom: 18,
+                interactionOptions: InteractionOptions(
+                  flags: InteractiveFlag.all,
+                ),
+              ),
+              children: [
+                TileLayer(
+                  urlTemplate: _tileUrl,
+                  subdomains: _tileSubdomains,
+                  userAgentPackageName: 'com.treino.app',
+                  retinaMode: MediaQuery.of(context).devicePixelRatio > 1.5,
+                  maxZoom: 19,
+                ),
+                MarkerLayer(markers: markers),
               ],
+            ),
+            // Atribución OSM + CARTO (legal compliance) — top-right del map,
+            // arriba del bottom sheet para no quedar tapada.
+            Positioned(
+              top: 8,
+              right: 8,
+              child: _AttributionChip(palette: palette),
+            ),
+            // Bottom sheet con carousel de cards.
+            const Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: TrainersMapBottomSheet(),
             ),
           ],
         );
@@ -214,6 +227,31 @@ class _AthleteLocationDot extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ── Attribution chip — OSM + CARTO legal compliance ──────────────────────────
+
+class _AttributionChip extends StatelessWidget {
+  const _AttributionChip({required this.palette});
+  final AppPalette palette;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: palette.bg.withValues(alpha: 0.7),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        '© OpenStreetMap · CARTO',
+        style: GoogleFonts.barlow(
+          fontSize: 9,
+          color: palette.textPrimary.withValues(alpha: 0.7),
+        ),
       ),
     );
   }
