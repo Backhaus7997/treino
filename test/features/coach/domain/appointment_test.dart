@@ -61,14 +61,15 @@ void main() {
   group('AppointmentStatus wire encoding', () {
     test('SCENARIO-483: AppointmentStatus.cancelled serialises to "cancelled"',
         () {
-      final raw = const Appointment(
+      final raw = Appointment(
         id: 'tA_1',
         trainerId: 'tA',
         athleteId: 'aB',
         athleteDisplayName: 'Juan',
+        startsAt: DateTime.utc(2026, 6, 1, 9),
         durationMin: 60,
         status: AppointmentStatus.cancelled,
-      ).copyWith(startsAt: DateTime.utc(2026, 6, 1, 9));
+      );
       final encoded = raw.toJson();
       expect(encoded['status'], 'cancelled');
     });
@@ -88,9 +89,12 @@ void main() {
   });
 
   group('Appointment deterministic id', () {
+    // 1747999980000 ms = 2025-05-23 07:53:00 UTC — minute-precise (ADR-7).
+    const kTestStartsAtMs = 1747999980000;
+
     test('SCENARIO-484: id matches pattern "{trainerId}_{startsAtMs}"', () {
       final startsAt = DateTime.fromMillisecondsSinceEpoch(
-        1748000000000,
+        kTestStartsAtMs,
         isUtc: true,
       );
       final appt = Appointment.create(
@@ -100,9 +104,9 @@ void main() {
         startsAt: startsAt,
         durationMin: 60,
       );
-      expect(appt.id, 'tA_1748000000000');
+      expect(appt.id, 'tA_$kTestStartsAtMs');
       expect(appt.trainerId, 'tA');
-      expect(appt.startsAt.millisecondsSinceEpoch, 1748000000000);
+      expect(appt.startsAt.millisecondsSinceEpoch, kTestStartsAtMs);
     });
 
     test('Appointment.create asserts minute precision on startsAt (ADR-7)', () {
