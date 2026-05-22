@@ -26,6 +26,13 @@ class TrainersMapBottomSheet extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
     final discoveryAsync = ref.watch(trainerDiscoveryProvider);
+    // Sin ubicación del athlete, la palabra "CERCA" pierde sentido — no
+    // podemos saber qué tan cerca está cada PF. Cambiamos el label.
+    // Scoped: solo rebuild en cambios reales del Position.
+    final hasLocation = ref.watch(
+          athleteLocationProvider.select((s) => s.valueOrNull),
+        ) !=
+        null;
 
     return discoveryAsync.when(
       // Mientras carga el provider no renderizamos sheet — el mapa solo.
@@ -73,7 +80,10 @@ class TrainersMapBottomSheet extends ConsumerWidget {
               // ── Header: count ─────────────────────────────────────────────
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: _Header(count: visible.length),
+                child: _Header(
+                  count: visible.length,
+                  hasLocation: hasLocation,
+                ),
               ),
               const SizedBox(height: 12),
               // ── Carousel ──────────────────────────────────────────────────
@@ -101,13 +111,24 @@ class TrainersMapBottomSheet extends ConsumerWidget {
 // ── Header ───────────────────────────────────────────────────────────────────
 
 class _Header extends StatelessWidget {
-  const _Header({required this.count});
+  const _Header({required this.count, required this.hasLocation});
   final int count;
+
+  /// Si el athlete tiene ubicación, el label incluye "CERCA" (proximidad
+  /// tiene sentido). Sin ubicación, solo "ENTRENADORES" (no podemos saber
+  /// qué tan cerca está cada PF).
+  final bool hasLocation;
 
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    final label = count == 1 ? 'ENTRENADOR CERCA' : 'ENTRENADORES CERCA';
+    final singular = count == 1;
+    final String label;
+    if (hasLocation) {
+      label = singular ? 'ENTRENADOR CERCA' : 'ENTRENADORES CERCA';
+    } else {
+      label = singular ? 'ENTRENADOR' : 'ENTRENADORES';
+    }
     return Text(
       '$count $label',
       style: GoogleFonts.barlowCondensed(

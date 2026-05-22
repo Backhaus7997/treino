@@ -37,7 +37,10 @@ class TrainersMapView extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
     final discoveryAsync = ref.watch(trainerDiscoveryProvider);
-    final athletePosition = ref.watch(athleteLocationProvider).valueOrNull;
+    // Scoped: solo rebuild cuando el Position cambia, no en cada
+    // transición de AsyncValue (loading → data).
+    final athletePosition =
+        ref.watch(athleteLocationProvider.select((s) => s.valueOrNull));
 
     return discoveryAsync.when(
       loading: () => Center(
