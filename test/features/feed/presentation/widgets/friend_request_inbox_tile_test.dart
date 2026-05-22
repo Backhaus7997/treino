@@ -309,7 +309,7 @@ void main() {
 
   group('FriendRequestInboxTile tappable requester zone (SCENARIO-472)', () {
     // Builds the tile inside a GoRouter so we can detect navigation
-    Widget _buildTileWithRouter({
+    Widget buildTileWithRouter({
       required Friendship friendship,
       required String viewerUid,
       required List<Override> overrides,
@@ -355,7 +355,7 @@ void main() {
       final friendship = _makeFriendship(requesterId: 'vicente-uid');
 
       await tester.pumpWidget(
-        _buildTileWithRouter(
+        buildTileWithRouter(
           friendship: friendship,
           viewerUid: 'alice',
           overrides: [
@@ -388,7 +388,7 @@ void main() {
       final friendship = _makeFriendship(requesterId: 'vicente-uid');
 
       await tester.pumpWidget(
-        _buildTileWithRouter(
+        buildTileWithRouter(
           friendship: friendship,
           viewerUid: 'alice',
           overrides: [
@@ -424,7 +424,7 @@ void main() {
       final friendship = _makeFriendship(requesterId: 'vicente-uid');
 
       await tester.pumpWidget(
-        _buildTileWithRouter(
+        buildTileWithRouter(
           friendship: friendship,
           viewerUid: 'alice',
           overrides: [
