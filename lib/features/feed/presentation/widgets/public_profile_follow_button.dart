@@ -4,12 +4,14 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/treino_icon.dart';
+import '../../../profile/application/user_public_profile_providers.dart';
 import '../../application/friendship_providers.dart'
     show friendshipRepositoryProvider;
 import '../../application/public_profile_providers.dart'
     show friendshipByPairProvider;
 import '../../domain/friendship.dart';
 import '../../domain/friendship_status.dart';
+import 'unfriend_confirmation_sheet.dart';
 
 /// 4-state SEGUIR pill for the public profile screen.
 ///
@@ -55,11 +57,11 @@ class PublicProfileFollowButton extends ConsumerWidget {
     }
     final f = friendship!;
     if (f.status == FriendshipStatus.accepted) {
-      return const _FollowPill(
+      return _FollowPill(
         label: 'SIGUIENDO',
         style: _FollowPillStyle.outlined,
         leadingIcon: TreinoIcon.check,
-        onTap: null,
+        onTap: () => _showUnfriendSheet(context, ref, f),
       );
     }
     if (f.requesterId == viewerUid) {
@@ -77,6 +79,48 @@ class PublicProfileFollowButton extends ConsumerWidget {
         await repo.accept(f.id, viewerUid);
         await invalidate();
       },
+    );
+  }
+
+  /// Opens the unfriend confirmation bottom sheet.
+  ///
+  /// Resolves the friend's display name from [userPublicProfileProvider] with
+  /// a fallback of "Usuario anónimo". On ELIMINAR, calls
+  /// [FriendshipRepository.delete] and invalidates [friendshipByPairProvider]
+  /// so the pill transitions back to SEGUIR.
+  Future<void> _showUnfriendSheet(
+    BuildContext context,
+    WidgetRef ref,
+    Friendship f,
+  ) async {
+    final palette = AppPalette.of(context);
+    final profileAsync = ref.read(userPublicProfileProvider(targetUid));
+    final friendDisplayName =
+        profileAsync.valueOrNull?.displayName ?? 'Usuario anónimo';
+
+    final repo = ref.read(friendshipRepositoryProvider);
+
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: palette.bgCard,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => UnfriendConfirmationSheet(
+        friendDisplayName: friendDisplayName,
+        onConfirm: () async {
+          try {
+            await repo.delete(f.id, viewerUid);
+          } catch (_) {
+            // Swallow — same fire-and-forget pattern as inbox pills (ADR-FRI-009).
+          }
+          ref.invalidate(
+            friendshipByPairProvider(
+              (viewerUid: viewerUid, targetUid: targetUid),
+            ),
+          );
+        },
+      ),
     );
   }
 }
