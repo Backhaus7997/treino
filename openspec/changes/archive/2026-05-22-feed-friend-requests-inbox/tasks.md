@@ -157,13 +157,13 @@ Chain strategy: stacked-to-main
 ## Pre-PR Checklist
 
 - [x] All 30 tasks marked [x] (T01..T17 done; T22..T30 added in scope amendment 2026-05-22)
-- [ ] Quality gates passed (T18..T21 first pass + T28..T30 after Phase 9-11)
-- [ ] No `firestore.rules` changes (rules audit CONFIRMED — no changes needed)
-- [ ] No new Firestore collections; no new Freezed models
-- [ ] Orphaned `pendingRequestsProvider` (Future variant) left untouched per locked decision
-- [ ] `TreinoBottomBar`, `_FeedHeader` untouched
-- [ ] `PublicProfileFollowButton` SEGUIR / SOLICITUD ENVIADA / ACEPTAR branches untouched (only SIGUIENDO upgraded)
-- [ ] Smoke test plan documented in PR body covering all 11 steps (8 inbox + 3 unfriend/tap)
+- [x] Quality gates passed (T18..T21 first pass + T28..T30 after Phase 9-11)
+- [x] No `firestore.rules` changes (rules audit CONFIRMED — no changes needed)
+- [x] No new Firestore collections; no new Freezed models
+- [x] Orphaned `pendingRequestsProvider` (Future variant) left untouched per locked decision
+- [x] `TreinoBottomBar`, `_FeedHeader` untouched
+- [x] `PublicProfileFollowButton` SEGUIR / SOLICITUD ENVIADA branches untouched. ACEPTAR was extended with `invalidate(acceptedFriendsProvider + myFriendsFeedProvider)` per ADR-FRI-013 (intended, documented). SIGUIENDO upgraded to open `UnfriendConfirmationSheet`.
+- [x] Smoke test plan documented in PR body covering all 14 steps (11 inbox + unfriend/tap original + 3 invalidation cases discovered in smoke 2026-05-22)
 
 ---
 
