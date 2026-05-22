@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/treino_icon.dart';
+import '../../chat/application/chat_providers.dart';
 import '../../profile/application/user_public_profile_providers.dart';
 import '../../workout/application/assigned_routine_providers.dart';
 import '../../workout/application/session_providers.dart'
@@ -185,35 +186,82 @@ class _AthleteDetailBody extends ConsumerWidget {
           ),
         ),
 
-        // ── CREAR PLAN button ─────────────────────────────────────────
+        // ── MENSAJE + CREAR PLAN buttons ──────────────────────────────
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-          child: SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: () =>
-                  context.push('/workout/routine-editor/$athleteId'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: palette.accent,
-                foregroundColor: palette.bg,
-                minimumSize: const Size.fromHeight(48),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(9999),
+          child: Column(
+            children: [
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => _onMessage(context, ref),
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: palette.accent, width: 1),
+                    foregroundColor: palette.accent,
+                    minimumSize: const Size.fromHeight(48),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(9999),
+                    ),
+                  ),
+                  icon: Icon(TreinoIcon.chat, size: 18, color: palette.accent),
+                  label: Text(
+                    'MENSAJE',
+                    style: GoogleFonts.barlowCondensed(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                      letterSpacing: 0.8,
+                    ),
+                  ),
                 ),
               ),
-              child: Text(
-                CoachStrings.createPlanCta,
-                style: GoogleFonts.barlowCondensed(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 14,
-                  letterSpacing: 0.8,
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () =>
+                      context.push('/workout/routine-editor/$athleteId'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: palette.accent,
+                    foregroundColor: palette.bg,
+                    minimumSize: const Size.fromHeight(48),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(9999),
+                    ),
+                  ),
+                  child: Text(
+                    CoachStrings.createPlanCta,
+                    style: GoogleFonts.barlowCondensed(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                      letterSpacing: 0.8,
+                    ),
+                  ),
                 ),
               ),
-            ),
+            ],
           ),
         ),
       ],
     );
+  }
+
+  Future<void> _onMessage(BuildContext context, WidgetRef ref) async {
+    if (trainerUid.isEmpty) return;
+    try {
+      final chat = await ref.read(chatRepositoryProvider).getOrCreate(
+            selfId: trainerUid,
+            otherId: athleteId,
+          );
+      if (!context.mounted) return;
+      context.push('/coach/chat/${chat.chatId}?other=$athleteId');
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No pudimos abrir el chat. Probá de nuevo.'),
+        ),
+      );
+    }
   }
 }
 

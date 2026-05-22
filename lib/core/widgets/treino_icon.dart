@@ -93,4 +93,8 @@ class TreinoIcon {
   static const IconData money = PhosphorIconsRegular.currencyDollar;
   static const IconData star = PhosphorIconsRegular.star;
   static const IconData mapToggle = PhosphorIconsRegular.mapTrifold;
+
+  // Chat
+  static const IconData send = PhosphorIconsFill.paperPlaneTilt;
+  static const IconData chatEmpty = PhosphorIconsRegular.chatsCircle;
 }
