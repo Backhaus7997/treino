@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -55,6 +57,24 @@ class _StubFriendshipRepository extends FriendshipRepository {
   }
 }
 
+/// Stub whose accept() completes only when completer fires (simulates in-flight).
+class _SlowFriendshipRepository extends FriendshipRepository {
+  _SlowFriendshipRepository({required this.completer})
+      : super(firestore: FakeFirebaseFirestore());
+
+  final Completer<void> completer;
+  int acceptCallCount = 0;
+
+  @override
+  Future<void> accept(String friendshipId, String myUid) async {
+    acceptCallCount++;
+    await completer.future;
+  }
+
+  @override
+  Future<void> delete(String friendshipId, String myUid) async {}
+}
+
 Widget _buildTile({
   required Friendship friendship,
   required String viewerUid,
@@ -79,6 +99,78 @@ Widget _buildTile({
 // ---------------------------------------------------------------------------
 
 void main() {
+  // T10 RED: SCENARIO-465 (clamp regression) and SCENARIO-467 (double-tap guard)
+  group('FriendRequestInboxTile double-tap and clamp', () {
+    // SCENARIO-465: RECHAZAR on never-accepted friendship → followingCount does not go below 0
+    testWidgets(
+        'SCENARIO-465: RECHAZAR does not push followingCount below 0 on never-accepted friendship',
+        (tester) async {
+      final stub = _StubFriendshipRepository();
+      final friendship = _makeFriendship(requesterId: 'bob');
+
+      await tester.pumpWidget(
+        _buildTile(
+          friendship: friendship,
+          viewerUid: 'alice',
+          overrides: [
+            friendshipRepositoryProvider.overrideWithValue(stub),
+            userPublicProfileProvider('bob').overrideWith(
+              (_) async => const UserPublicProfile(uid: 'bob', displayName: 'Bob'),
+            ),
+          ],
+        ),
+      );
+
+      await tester.pump();
+
+      // Tap RECHAZAR — stub delete does not throw, no exception bubbles
+      await tester.tap(find.text('RECHAZAR'));
+      await tester.pump();
+
+      expect(stub.deleteCallCount, equals(1));
+      // No exception should have propagated (no expect-throws means it didn't)
+    });
+
+    // SCENARIO-467 (tile): double-tap ACEPTAR → second tap is swallowed:
+    // repo.accept called exactly once during in-flight, no exception bubbles.
+    testWidgets(
+        'SCENARIO-467: double-tap ACEPTAR swallowed — repo.accept called exactly once',
+        (tester) async {
+      // Slow stub: accept takes 200ms to resolve
+      final completer = Completer<void>();
+      final slowStub = _SlowFriendshipRepository(completer: completer);
+      final friendship = _makeFriendship(requesterId: 'bob');
+
+      await tester.pumpWidget(
+        _buildTile(
+          friendship: friendship,
+          viewerUid: 'alice',
+          overrides: [
+            friendshipRepositoryProvider.overrideWithValue(slowStub),
+            userPublicProfileProvider('bob').overrideWith(
+              (_) async => const UserPublicProfile(uid: 'bob', displayName: 'Bob'),
+            ),
+          ],
+        ),
+      );
+
+      await tester.pump();
+
+      // Tap ACEPTAR twice in rapid succession
+      await tester.tap(find.text('ACEPTAR'));
+      await tester.pump();
+      await tester.tap(find.text('ACEPTAR'));
+      await tester.pump();
+
+      // Repo.accept should have been called exactly once (second tap guarded)
+      expect(slowStub.acceptCallCount, equals(1));
+
+      // Complete the pending operation to avoid timer leaks
+      completer.complete();
+      await tester.pumpAndSettle();
+    });
+  });
+
   group('FriendRequestInboxTile render', () {
     // SCENARIO-461: profile resolved → "Ana García" + gym text visible + avatar rendered
     testWidgets(
