@@ -7,7 +7,7 @@ Estado de las fases y desglose detallado de Fase 4 (en curso).
 - [x] **Fase 0** — Bootstrap + tema + 5 tabs vacías + Phosphor (commits `cf09068` a `c6d5fea`).
 - [x] **Fase 1** — Auth (email/Google/Apple) + Firebase + Firestore + ProfileSetup + Roles & guards. ✅ **COMPLETA** — 7/7 etapas mergeadas. Cerró 2026-05-13 con Apple Sign-In (PR #10).
 - [x] **Fase 2** — Home (paridad con mockup Mobile Home) + Rutinas básicas read-only. ✅ **COMPLETA** — 5/5 etapas mergeadas. Cerró ~2026-05-15 con Wire Home → Plantillas (PR #18).
-- [x] **Fase 3** — Feed social (amigos · mi gym · público) + perfiles públicos. ✅ **COMPLETA** — 5/5 etapas + sub-fase 5.5 (`user-public-profiles`) mergeadas. Cerró 2026-05-19 con archive (PR #45).
+- [x] **Fase 3** — Feed social (amigos · mi gym · público) + perfiles públicos. ✅ **COMPLETA** — 6/6 etapas + sub-fase 5.5 (`user-public-profiles`) mergeadas. Cerró 2026-05-22 con Etapa 6 (feed-friend-requests-inbox, PR #78).
 - [ ] **Fase 4** — Workout++ (session tracking, sesión activa, post-entreno, historial, insights, wire de stats). 🔄 **4/6 etapas hechas** (Etapas 1, 2, 3, 4 ✅; Etapas 5 y 6 pending). IA buscador y videos quedan deferrables a Fase 4.5.
 - [ ] **Fase 5** — Coach / Personal Trainer (discovery con geohash, chat, agenda, planes asignados, importación de planes Excel).
 - [ ] **Fase 6** — Polish + lanzamiento beta (TestFlight + Play Internal). Incluye App Check, Analytics, Crashlytics, deep links, localización, app icon final.
@@ -110,7 +110,7 @@ Home (paridad con mockup Mobile Home) + Rutinas básicas read-only (Plantillas p
 - ✅ Etapa 2: colección `routines` + `exercises` pobladas via `scripts/seed_workout_catalog.js`.
 - (Etapas 1, 3, 4, 5 no requieren acción en console.)
 
-## Fase 3 — desglose en 5 etapas + sub-fase 5.5 ✅ COMPLETA
+## Fase 3 — desglose en 6 etapas + sub-fase 5.5 ✅ COMPLETA
 
 Feed social con 3 segmentos (Amigos · Mi Gym · Público) + perfiles públicos de otros usuarios + creación manual de posts. Misma filosofía: PR por etapa, paralelizable.
 
@@ -130,11 +130,12 @@ Feed social con 3 segmentos (Amigos · Mi Gym · Público) + perfiles públicos 
 | 4 | Perfil público de otro usuario ✅ | `a4780d4` (#28) | Nada | Ruta `/feed/profile/:uid`. UI según `feed-publico.png`: hero + avatar + handle + stats (workouts, racha, seguidores, siguiendo — todos placeholder hasta Fase 4) + tabs RUTINAS PÚBLICAS / ACTIVIDAD + botón SEGUIR (toggleable, escribe en `friendships`). Botón MENSAJE disabled stub → Fase 5. Workaround inicial: `publicProfileViewProvider` leía del primer post del user (refactorizado en 5.5). | C |
 | 5 | Crear post manual ✅ | `739bcc3` (#35) | Nada | Plus button (`/feed/create`) → form para crear post (texto max 280 + privacy selector + routine tag stub). `CreatePostNotifier` AsyncNotifier + `PostRepository.create` + invalidate feed providers post-submit. Search usuarios se movió a sub-fase 5.5 por bug de Firestore rules descubierto en smoke. | C |
 | **5.5** | **`UserPublicProfile` collection + search + Etapa 4 refactor** ✅ | **`1db1644` (#40) + `9eb7399` (#44) + `275df81` (#45)** | Nueva collection `userPublicProfiles` con rule `read: auth != null` | **Chained PRs.** Reemplaza el approach fallido de search directo en `users` (owner-only rule rompía permission). Crea collection separada con 5 fields públicos (uid, displayName, displayNameLowercase, avatarUrl, gymId), `WriteBatch` atomic dual-write en `UserRepository`. Etapa 4 refactor: `publicProfileViewProvider` ahora source de `userPublicProfileProvider`. Sidecar fix: rule de `friendships` permite `resource == null` (bug pre-existente de PR #28). | C |
+| 6 | Inbox de solicitudes de amistad + unfriend desde profile ✅ | `b716ee8` (#78) | Nada | Pantalla in-app `/profile/friend-requests` con `StreamProvider` para live updates; tile siempre visible en Profile con count `(N)`; `UnfriendConfirmationSheet` modal cierra la gap del SIGUIENDO no-op en `PublicProfileFollowButton`; tappable requester zone en cada inbox row → `/feed/profile/:uid`. Scope amendment mid-cycle incluyó unfriend + tap-row + invalidaciones explícitas (ADR-FRI-013) para cerrar on-device staleness sin convertir providers a Stream (cross-device queda en follow-up SDD). | C |
 
 ### Dependencias entre etapas
 
 ```
-1 ✅ ──► 2 ✅ ──► 3 ✅ ─► 5 ✅ ──► 5.5 ✅
+1 ✅ ──► 2 ✅ ──► 3 ✅ ─► 5 ✅ ──► 5.5 ✅ ──► 6 ✅
             └─► 4 ✅ ───┘
 ```
 
@@ -143,6 +144,7 @@ Feed social con 3 segmentos (Amigos · Mi Gym · Público) + perfiles públicos 
 - **Etapa 4 paralelo a 3**: perfil público no toca segments.
 - **Etapa 5 al final**: necesita PostCard + Friendship.
 - **Etapa 5.5 después de 5**: descubierto que search directo en `users` rompía por Firestore rules owner-only. Solución architectural: `UserPublicProfile` collection separada con privacy boundary explícito. Incluyó refactor de Etapa 4 para usar el mismo provider (eliminando el workaround "first post").
+- **Etapa 6 después de 5.5 + Fase 4 Etapa 6 (wire-real-stats)**: gap UX descubierta durante el smoke de `wire-real-stats` PR#3 — un athlete que recibe friend request no tenía cómo enterarse ni aceptarla salvo navegando al profile del requester. Re-abre Fase 3 con la pantalla in-app de inbox, entry tile en Profile, y unfriend desde public profile.
 
 ### División final entre los 3 devs
 
