@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
+import '../../../core/widgets/treino_icon.dart';
 import '../../insights/application/insights_providers.dart';
 import '../../insights/domain/weekly_insights.dart';
 import '../../insights/presentation/widgets/body_silhouette_placeholder.dart';
@@ -120,21 +121,7 @@ class _Loaded extends StatelessWidget {
     final wi = insights;
 
     if (wi == null || wi.sessionsCount == 0) {
-      return const Padding(
-        padding: EdgeInsets.all(18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _CardHeader(),
-            SizedBox(height: 18),
-            BodySilhouettePlaceholder(
-              width: double.infinity,
-              height: 120,
-              label: 'Tocá para ver tus insights',
-            ),
-          ],
-        ),
-      );
+      return const _EmptyState();
     }
 
     return Padding(
@@ -216,10 +203,93 @@ class _Loaded extends StatelessWidget {
   }
 }
 
-// ── Card header: RACHA ACTUAL pill (left) + SEM N · MMM (right) ──────────────
+// ── Empty state — para users con 0 sesiones (cuenta nueva) ───────────────────
+//
+// Replace al placeholder "Tocá para ver tus insights" con un layout más
+// motivador: titular grande + ícono de llama (TreinoIcon.streak) + copy
+// invitante + CTA explícito que lleva a la tab Entrenar. Diseño 2026-05-22:
+// no mostramos "0 días / 0 entrenos" porque desmotiva al primer login.
+
+class _EmptyState extends StatelessWidget {
+  const _EmptyState();
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    return Padding(
+      padding: const EdgeInsets.all(18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const _CardHeader(emptyState: true),
+          const SizedBox(height: 18),
+          Center(
+            child: Text(
+              'TU RACHA\nEMPIEZA ACÁ',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.barlowCondensed(
+                fontWeight: FontWeight.w700,
+                fontSize: 32,
+                height: 1.05,
+                color: palette.textPrimary,
+              ),
+            ),
+          ),
+          const SizedBox(height: 18),
+          Center(
+            child: Icon(
+              TreinoIcon.streak,
+              size: 64,
+              color: palette.accent,
+            ),
+          ),
+          const SizedBox(height: 18),
+          Text(
+            'Cada entrenamiento alimenta tu racha. Hacé el primero y empezá a construir tu progreso.',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.barlow(
+              fontSize: 13,
+              color: palette.textMuted,
+            ),
+          ),
+          const SizedBox(height: 18),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton(
+              onPressed: () => context.go('/workout'),
+              style: OutlinedButton.styleFrom(
+                side: BorderSide(color: palette.accent, width: 1),
+                foregroundColor: palette.accent,
+                minimumSize: const Size.fromHeight(48),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(9999),
+                ),
+              ),
+              child: Text(
+                'EXPLORAR RUTINAS  →',
+                style: GoogleFonts.barlowCondensed(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                  letterSpacing: 0.8,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Card header: pill (left) + SEM N · MMM (right) ───────────────────────────
+//
+// `emptyState=true` cambia el label a "PRIMER PASO" — versión empty state.
+// `emptyState=false` (default) muestra "RACHA ACTUAL" — versión con data.
 
 class _CardHeader extends StatelessWidget {
-  const _CardHeader();
+  const _CardHeader({this.emptyState = false});
+
+  final bool emptyState;
 
   static const _monthsEs = [
     'ENE',
@@ -280,7 +350,7 @@ class _CardHeader extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Text(
-                'RACHA ACTUAL',
+                emptyState ? 'PRIMER PASO' : 'RACHA ACTUAL',
                 style: GoogleFonts.barlowCondensed(
                   fontWeight: FontWeight.w700,
                   fontSize: 12,
