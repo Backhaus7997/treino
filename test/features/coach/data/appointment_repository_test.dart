@@ -154,4 +154,180 @@ void main() {
       },
     );
   });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // cancel(), watchForAthlete(), watchForTrainer()
+  // ─────────────────────────────────────────────────────────────────────────
+
+  group('cancel()', () {
+    Appointment makeConfirmedAppt({
+      required DateTime startsAt,
+      String id = '',
+    }) {
+      final appt = Appointment.create(
+        trainerId: trainerId,
+        athleteId: athleteId,
+        athleteDisplayName: athleteDisplayName,
+        startsAt: startsAt,
+        durationMin: durationMin,
+      );
+      return id.isEmpty ? appt : appt.copyWith(id: id);
+    }
+
+    // ─── SCENARIO-492: cancellation succeeds when >24h ahead ─────────────
+    test(
+      'SCENARIO-492: cancel succeeds when >24h ahead → status=cancelled, cancelledAt/By set, appends to log',
+      () async {
+        // startsAt is in the far future — always >24h away.
+        final future = DateTime.utc(2030, 1, 1, 10, 0);
+        final appt = makeConfirmedAppt(startsAt: future);
+        await firestore
+            .collection('appointments')
+            .doc(appt.id)
+            .set(appt.toJson());
+
+        await repo.cancel(
+          appointment: appt,
+          actorUid: athleteId,
+          reason: 'changed plans',
+        );
+
+        final snap = await firestore
+            .collection('appointments')
+            .doc(appt.id)
+            .get();
+        expect(snap.data()!['status'], equals('cancelled'));
+        expect(snap.data()!['cancelledBy'], equals(athleteId));
+        // cancellationLog should have one entry.
+        final log = snap.data()!['cancellationLog'] as List<dynamic>;
+        expect(log, hasLength(1));
+        expect((log.first as Map<String, dynamic>)['byUid'], equals(athleteId));
+        expect(
+          (log.first as Map<String, dynamic>)['reason'],
+          equals('changed plans'),
+        );
+      },
+    );
+
+    // ─── SCENARIO-493: CancellationTooLateException when <24h ahead ──────
+    test(
+      'SCENARIO-493: cancel throws CancellationTooLateException when <24h ahead',
+      () async {
+        // startsAt is 1 hour from now.
+        final soon = DateTime.now().toUtc().add(const Duration(hours: 1));
+        final soonMinutePrecision = DateTime.utc(
+          soon.year,
+          soon.month,
+          soon.day,
+          soon.hour,
+          soon.minute,
+        );
+        final appt = makeConfirmedAppt(startsAt: soonMinutePrecision);
+        await firestore
+            .collection('appointments')
+            .doc(appt.id)
+            .set(appt.toJson());
+
+        expect(
+          () => repo.cancel(appointment: appt, actorUid: athleteId),
+          throwsA(isA<CancellationTooLateException>()),
+        );
+      },
+    );
+  });
+
+  group('watchForAthlete()', () {
+    // ─── SCENARIO-494: streams confirmed appointments for athleteId ───────
+    test(
+      'SCENARIO-494: watchForAthlete streams confirmed appointments for athleteId',
+      () async {
+        final appt1 = Appointment.create(
+          trainerId: trainerId,
+          athleteId: athleteId,
+          athleteDisplayName: athleteDisplayName,
+          startsAt: DateTime.utc(2026, 7, 1, 10, 0),
+          durationMin: durationMin,
+        );
+        final appt2 = Appointment.create(
+          trainerId: trainerId,
+          athleteId: athleteId,
+          athleteDisplayName: athleteDisplayName,
+          startsAt: DateTime.utc(2026, 7, 2, 10, 0),
+          durationMin: durationMin,
+        );
+        // Different athlete — should NOT appear.
+        final apptOther = Appointment.create(
+          trainerId: trainerId,
+          athleteId: 'otherAthlete',
+          athleteDisplayName: 'Other',
+          startsAt: DateTime.utc(2026, 7, 3, 10, 0),
+          durationMin: durationMin,
+        );
+
+        await firestore
+            .collection('appointments')
+            .doc(appt1.id)
+            .set(appt1.toJson());
+        await firestore
+            .collection('appointments')
+            .doc(appt2.id)
+            .set(appt2.toJson());
+        await firestore
+            .collection('appointments')
+            .doc(apptOther.id)
+            .set(apptOther.toJson());
+
+        final results = await repo.watchForAthlete(athleteId).first;
+        expect(results, hasLength(2));
+        expect(results.map((a) => a.athleteId).toSet(), equals({athleteId}));
+        expect(results.every((a) => a.status == AppointmentStatus.confirmed),
+            isTrue);
+      },
+    );
+  });
+
+  group('watchForTrainer()', () {
+    // ─── SCENARIO-495: streams confirmed appointments for trainerId in date range ─
+    test(
+      'SCENARIO-495: watchForTrainer streams confirmed appointments for trainerId in date range',
+      () async {
+        final apptInRange = Appointment.create(
+          trainerId: trainerId,
+          athleteId: athleteId,
+          athleteDisplayName: athleteDisplayName,
+          startsAt: DateTime.utc(2026, 7, 5, 10, 0),
+          durationMin: durationMin,
+        );
+        // Outside range — should NOT appear.
+        final apptOutside = Appointment.create(
+          trainerId: trainerId,
+          athleteId: athleteId,
+          athleteDisplayName: athleteDisplayName,
+          startsAt: DateTime.utc(2026, 8, 1, 10, 0),
+          durationMin: durationMin,
+        );
+
+        await firestore
+            .collection('appointments')
+            .doc(apptInRange.id)
+            .set(apptInRange.toJson());
+        await firestore
+            .collection('appointments')
+            .doc(apptOutside.id)
+            .set(apptOutside.toJson());
+
+        final results = await repo
+            .watchForTrainer(
+              trainerId,
+              fromDate: DateTime.utc(2026, 7, 1),
+              toDate: DateTime.utc(2026, 7, 31),
+            )
+            .first;
+
+        expect(results, hasLength(1));
+        expect(results.single.id, equals(apptInRange.id));
+        expect(results.single.trainerId, equals(trainerId));
+      },
+    );
+  });
 }
