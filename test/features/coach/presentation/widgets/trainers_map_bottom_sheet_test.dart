@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/coach/application/trainer_discovery_providers.dart';
 import 'package:treino/features/coach/domain/trainer_public_profile.dart';
@@ -27,6 +28,25 @@ TrainerPublicProfile _trainer({
       trainerMonthlyRate: rate,
     );
 
+Position _fakePosition() => Position(
+      latitude: -31.40,
+      longitude: -64.18,
+      timestamp: DateTime(2026, 5, 22),
+      accuracy: 10,
+      altitude: 0,
+      altitudeAccuracy: 0,
+      heading: 0,
+      headingAccuracy: 0,
+      speed: 0,
+      speedAccuracy: 0,
+    );
+
+/// Override del `athleteLocationProvider` con una `Position` fake, usado
+/// en tests que validan la variante "CERCA" del label del header.
+Override _withFakeLocation() => athleteLocationProvider.overrideWith(
+      (ref) => AthleteLocationNotifier()..setForTest(_fakePosition()),
+    );
+
 Widget _wrap(Widget child, {List<Override> overrides = const []}) =>
     ProviderScope(
       overrides: overrides,
@@ -40,11 +60,13 @@ Widget _wrap(Widget child, {List<Override> overrides = const []}) =>
 
 void main() {
   group('TrainersMapBottomSheet', () {
-    testWidgets('renderiza header con count + carousel con cards',
+    testWidgets(
+        'con ubicación: header dice "N ENTRENADORES CERCA" (plural)',
         (tester) async {
       await tester.pumpWidget(_wrap(
         const TrainersMapBottomSheet(),
         overrides: [
+          _withFakeLocation(),
           trainerDiscoveryProvider.overrideWith((_) async => [
                 _trainer(uid: 't1', displayName: 'Camila Ruiz'),
                 _trainer(uid: 't2', displayName: 'Diego Aguirre'),
@@ -53,17 +75,17 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      // Header count plural
       expect(find.text('2 ENTRENADORES CERCA'), findsOneWidget);
-      // Both names rendered as cards
       expect(find.text('Camila Ruiz'), findsOneWidget);
       expect(find.text('Diego Aguirre'), findsOneWidget);
     });
 
-    testWidgets('header singular cuando count == 1', (tester) async {
+    testWidgets('con ubicación: header singular cuando count == 1',
+        (tester) async {
       await tester.pumpWidget(_wrap(
         const TrainersMapBottomSheet(),
         overrides: [
+          _withFakeLocation(),
           trainerDiscoveryProvider.overrideWith((_) async => [_trainer()]),
         ],
       ));
@@ -72,11 +94,29 @@ void main() {
       expect(find.text('1 ENTRENADOR CERCA'), findsOneWidget);
     });
 
+    testWidgets(
+        'SIN ubicación: header dice "N ENTRENADORES" (sin CERCA — Fase 2b polish)',
+        (tester) async {
+      await tester.pumpWidget(_wrap(
+        const TrainersMapBottomSheet(),
+        overrides: [
+          // NO override de location → default AsyncData(null) → hasLocation false
+          trainerDiscoveryProvider.overrideWith((_) async => [_trainer()]),
+        ],
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.text('1 ENTRENADOR'), findsOneWidget);
+      // Asegurar que NO dice CERCA cuando no hay location
+      expect(find.text('1 ENTRENADOR CERCA'), findsNothing);
+    });
+
     testWidgets('filtra trainers sin lat/lon — solo cuenta los que tienen',
         (tester) async {
       await tester.pumpWidget(_wrap(
         const TrainersMapBottomSheet(),
         overrides: [
+          _withFakeLocation(),
           trainerDiscoveryProvider.overrideWith((_) async => [
                 _trainer(uid: 't1', displayName: 'Con Loc'),
                 _trainer(
@@ -100,6 +140,7 @@ void main() {
       await tester.pumpWidget(_wrap(
         const TrainersMapBottomSheet(),
         overrides: [
+          _withFakeLocation(),
           trainerDiscoveryProvider.overrideWith((_) async => [
                 _trainer(lat: null, lon: null),
               ]),

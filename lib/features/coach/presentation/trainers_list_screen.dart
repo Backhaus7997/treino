@@ -11,6 +11,7 @@ import '../application/trainer_discovery_providers.dart';
 import '../domain/trainer_public_profile.dart';
 import 'coach_strings.dart';
 import 'widgets/location_permission_rationale_sheet.dart';
+import 'widgets/trainer_advanced_filter_chips.dart';
 import 'widgets/trainer_list_tile.dart';
 import 'widgets/trainer_specialty_chips.dart';
 import 'widgets/trainers_map_view.dart';
@@ -83,12 +84,16 @@ class _TrainersListScreenState extends ConsumerState<TrainersListScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
+            padding: const EdgeInsets.only(top: 8),
             child: TrainerSpecialtyChips(
               selected: selected,
               onChanged: (s) =>
                   ref.read(selectedSpecialtyProvider.notifier).state = s,
             ),
+          ),
+          const Padding(
+            padding: EdgeInsets.only(top: 4, bottom: 8),
+            child: TrainerAdvancedFilterChips(),
           ),
           Expanded(
             child: IndexedStack(

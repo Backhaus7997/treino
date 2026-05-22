@@ -3,6 +3,7 @@ import 'package:geolocator/geolocator.dart';
 
 import '../../profile/application/user_providers.dart' show firestoreProvider;
 import '../data/trainer_public_profile_repository.dart';
+import '../domain/discovery_filters.dart';
 import '../domain/trainer_public_profile.dart';
 import '../domain/trainer_specialty.dart';
 import '../../../core/utils/geohash.dart';
@@ -138,6 +139,31 @@ final selectedSpecialtyProvider = StateProvider<TrainerSpecialty?>(
 /// Per D24.
 final mapModeProvider = StateProvider<bool>((ref) => false);
 
+// ── selectedDistanceFilterProvider ────────────────────────────────────────
+
+/// Filtro de distancia máxima desde el athlete (Fase 2b del Discovery map).
+///
+/// Default: `DistanceFilter.any` (sin restricción). Solo aplica cuando
+/// `athleteLocationProvider` tiene una `Position` válida — sin location,
+/// el filtro es no-op (no se descartan trainers).
+///
+/// NOT autoDispose — persiste entre navegaciones list↔detail, mismo patrón
+/// que `selectedSpecialtyProvider`.
+final selectedDistanceFilterProvider = StateProvider<DistanceFilter>(
+  (ref) => DistanceFilter.any,
+);
+
+// ── selectedPriceFilterProvider ───────────────────────────────────────────
+
+/// Filtro de rango de precio mensual del PF (Fase 2b del Discovery map).
+///
+/// Default: `PriceFilter.any` (sin restricción). Trainers sin
+/// `trainerMonthlyRate` set se incluyen siempre (no se filtran out) — solo
+/// se filtran los que tienen rate fuera del rango.
+final selectedPriceFilterProvider = StateProvider<PriceFilter>(
+  (ref) => PriceFilter.any,
+);
+
 // ── trainerDiscoveryProvider ──────────────────────────────────────────────
 
 /// Fetches and orders trainers for the discovery list.
@@ -155,11 +181,16 @@ final mapModeProvider = StateProvider<bool>((ref) => false);
 /// REQ-COACH-DISC-UI-001..011.
 final trainerDiscoveryProvider =
     FutureProvider.autoDispose<List<TrainerPublicProfile>>((ref) async {
-  final locationState = ref.watch(athleteLocationProvider);
+  // Scoped watch: solo re-ejecutar cuando el Position cambia realmente, NO
+  // cuando el AsyncValue pasa por AsyncLoading. Sin el `.select`, ir de
+  // AsyncData(null) → AsyncLoading → AsyncData(pos) disparaba 2 refetches
+  // — el primero wasteful (mismo `pos == null`, mismos datos). El select
+  // colapsa eso a 1 sola transición real (null → pos).
+  final pos = ref.watch(athleteLocationProvider.select((s) => s.valueOrNull));
   final selectedSpecialty = ref.watch(selectedSpecialtyProvider);
+  final selectedDistance = ref.watch(selectedDistanceFilterProvider);
+  final selectedPrice = ref.watch(selectedPriceFilterProvider);
   final repo = ref.watch(trainerPublicProfileRepositoryProvider);
-
-  final pos = locationState.valueOrNull;
 
   List<TrainerPublicProfile> trainers;
 
@@ -180,6 +211,31 @@ final trainerDiscoveryProvider =
   if (selectedSpecialty != null) {
     trainers =
         trainers.where((t) => t.trainerSpecialty == selectedSpecialty).toList();
+  }
+
+  // Fase 2b: distance filter — solo aplica cuando hay location del athlete.
+  // Si pos == null, el filtro es no-op (no descarta nada).
+  final maxKm = selectedDistance.maxKm;
+  if (pos != null && maxKm != null) {
+    trainers = trainers.where((t) {
+      if (t.trainerLatitude == null || t.trainerLongitude == null) {
+        return false; // sin location no podemos saber la distancia
+      }
+      final km = haversineKm(
+        pos.latitude,
+        pos.longitude,
+        t.trainerLatitude!,
+        t.trainerLongitude!,
+      );
+      return km <= maxKm;
+    }).toList();
+  }
+
+  // Fase 2b: price filter — siempre aplica. Trainers sin rate set se
+  // incluyen (matches retorna true cuando rate es null).
+  if (selectedPrice != PriceFilter.any) {
+    trainers =
+        trainers.where((t) => selectedPrice.matches(t.trainerMonthlyRate)).toList();
   }
 
   // Reorder by haversine ASC when location is available (D9)
