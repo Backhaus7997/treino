@@ -206,11 +206,12 @@ final pendingRequestCountProvider =
 **Render**: `Container` styled like `UserSearchResultTile` (same `palette.bgCard`, radius 14, border, padding `horizontal: 14, vertical: 12`).
 
 Inside, `Row`:
-1. `PostAvatar(authorDisplayName: displayName, authorAvatarUrl: avatarUrl, size: 40)`
-2. `SizedBox(width: 14)`
-3. `Expanded(child: Column(crossAxisAlignment: start, mainAxisSize: min, children: [name text, if (gymName.isNotEmpty) gym text]))`
-4. `SizedBox(width: 8)`
-5. Action buttons `Row(mainAxisSize: min, children: [RECHAZAR pill, SizedBox(width: 8), ACEPTAR pill])`
+1. **Tappable requester zone** (per ADR-FRI-012) — wrap items 1-3 below in a single `InkWell` whose `onTap` does `context.push('/feed/profile/${friendship.requesterId}')`. This makes the avatar + name + gym a unified hit target while keeping the action pills as independent tap regions.
+   1.1. `PostAvatar(authorDisplayName: displayName, authorAvatarUrl: avatarUrl, size: 40)`
+   1.2. `SizedBox(width: 14)`
+   1.3. `Expanded(child: Column(crossAxisAlignment: start, mainAxisSize: min, children: [name text, if (gymName.isNotEmpty) gym text]))`
+2. `SizedBox(width: 8)`
+3. Action buttons `Row(mainAxisSize: min, children: [RECHAZAR pill, SizedBox(width: 8), ACEPTAR pill])` — outside the `InkWell` so taps on the pills don't bubble up to the row navigation.
 
 **Field resolution from `userPublicProfileProvider`**:
 - `displayName` = `profile?.displayName ?? "Usuario anónimo"` (note: "Usuario anónimo" not just "Anónimo" — see Copy table §8)
@@ -253,6 +254,86 @@ onTap: () async {
 ```
 
 **No optimistic UI**: rely on snapshot re-emission. If the mutation fails, the row stays visible — which is the correct UX, not a regression.
+
+---
+
+### 5.4 `UnfriendConfirmationSheet` (scope expansion 2026-05-22, REQ-FRI-012)
+
+**Path**: `lib/features/feed/presentation/widgets/unfriend_confirmation_sheet.dart`
+**Type**: `StatelessWidget`
+**Constructor**: `const UnfriendConfirmationSheet({super.key, required this.friendDisplayName, required this.onConfirm})`
+
+**Fields**:
+- `final String friendDisplayName` — the friend's display name to interpolate into the copy (fallback to `"Usuario anónimo"` upstream)
+- `final VoidCallback onConfirm` — callback fired when user taps ELIMINAR; parent is responsible for invoking the repo + invalidation
+
+**Render**: a `Padding` (`EdgeInsets.fromLTRB(20, 14, 20, 20)`) wrapping a `Column(mainAxisSize: min)` with:
+1. A small drag handle bar (`Container(width: 40, height: 4, color: palette.border)`) centered at top — visual affordance for the sheet, mirrors `PostPrivacySelectorSheet`
+2. `SizedBox(height: 18)`
+3. `Text("¿Eliminar amistad con $friendDisplayName?", style: barlowCondensed bold 18, textAlign: center, color: palette.textPrimary)`
+4. `SizedBox(height: 20)`
+5. `Row(children: [Expanded(child: _CancelButton), SizedBox(width: 12), Expanded(child: _DeleteButton)])`
+
+**Buttons**:
+
+| Variant | bg | border | text color | label | onPressed |
+|---|---|---|---|---|---|
+| Cancel | transparent | `palette.border` | `palette.textPrimary` | `"CANCELAR"` | `Navigator.pop(context)` |
+| Delete (destructive) | `palette.danger` | `palette.danger` | white | `"ELIMINAR"` | `() { Navigator.pop(context); onConfirm(); }` |
+
+Pill geometry matches `_InboxActionPill` style: `padding(horizontal: 18, vertical: 12)`, `BorderRadius.circular(20)`, label `barlowCondensed bold 13 letterSpacing 1.0`.
+
+**Invocation pattern** (from `PublicProfileFollowButton` SIGUIENDO `onTap`):
+
+```dart
+await showModalBottomSheet<void>(
+  context: context,
+  backgroundColor: palette.bgCard,
+  shape: const RoundedRectangleBorder(
+    borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+  ),
+  builder: (_) => UnfriendConfirmationSheet(
+    friendDisplayName: friendDisplayName,
+    onConfirm: () async {
+      try {
+        await repo.delete(friendship.id, viewerUid);
+      } catch (_) {
+        // Swallow — same pattern as the inbox pills (ADR-FRI-009).
+      }
+      ref.invalidate(
+        friendshipByPairProvider((viewerUid: viewerUid, targetUid: targetUid)),
+      );
+    },
+  ),
+);
+```
+
+---
+
+### 5.5 `PublicProfileFollowButton` — SIGUIENDO branch upgrade (scope expansion 2026-05-22, REQ-FRI-012)
+
+**Path**: `lib/features/feed/presentation/widgets/public_profile_follow_button.dart`
+**Change**: the existing `accepted` branch currently renders a `const _FollowPill(label: 'SIGUIENDO', onTap: null)`. Replace with a tappable variant that opens `UnfriendConfirmationSheet`.
+
+```dart
+if (f.status == FriendshipStatus.accepted) {
+  return _FollowPill(
+    label: 'SIGUIENDO',
+    style: _FollowPillStyle.outlined,
+    leadingIcon: TreinoIcon.check,
+    onTap: () => _showUnfriendSheet(context, ref, f),
+  );
+}
+```
+
+The `_showUnfriendSheet` helper resolves the friend's `displayName` from `userPublicProfileProvider(targetUid)` (falling back to `"Usuario anónimo"` to match the inbox-tile pattern), then calls `showModalBottomSheet` per §5.4. After confirm, invalidate `friendshipByPairProvider` so the next rebuild renders `SEGUIR`.
+
+**Imports added**:
+- `import 'package:flutter_riverpod/flutter_riverpod.dart';` (already present)
+- `import '../../../profile/application/user_public_profile_providers.dart';` (for the displayName lookup)
+- `import 'unfriend_confirmation_sheet.dart';`
+
+**No change** to the other three states (`null` → SEGUIR, `pending && requester == viewer` → SOLICITUD ENVIADA, `pending && requester == target` → ACEPTAR).
 
 ---
 
@@ -343,6 +424,8 @@ All strings are Rioplatense Spanish, UPPERCASE only where the design system uses
 | ADR-FRI-008 | Inbox screen is registered as a **sub-route of `/profile` inside the ShellRoute** (not a top-level immersive route) | The inbox is a relationship-management surface, semantically owned by `/profile`. Keeping the bottom bar visible matches the proposal's "Profile tile → /profile/friend-requests" intent and lets the user tab away mid-decision without losing context. | (a) Top-level immersive route (like `/workout/session/...`): hides the bottom bar, treats the inbox as a deep action — overkill for a list-with-buttons. Rejected. (b) Modal bottom sheet: hard to test, doesn't deep-link, doesn't paginate cleanly. Rejected. |
 | ADR-FRI-009 | No optimistic UI on ACEPTAR/RECHAZAR | The snapshot re-emission round-trip is fast enough (sub-second on warm connections) and avoids double-fire races between the optimistic local removal and the real stream emission. If the mutation fails (offline, rules failure), the row correctly stays visible — which is honest UX, not a regression. | Optimistic removal with rollback on error: state machine adds complexity for negligible perceived latency win. Rejected. |
 | ADR-FRI-010 | Inline a local `_InboxActionPill` widget rather than reusing `_FollowPill` from `public_profile_follow_button.dart` | `_FollowPill` is a private class — exporting it would force a public API extraction with no other consumer. The inbox pill needs a smaller geometry (12px font, 18px radius vs 13/20) anyway to fit two pills in a single row. Cheaper to inline 30 LOC than to refactor a shared pill abstraction with one and a half consumers. | (a) Extract `TreinoPill` to `core/widgets/`: premature abstraction, would need to absorb 4 style variants without proof of a third consumer. Rejected — revisit if a third pill surface appears. (b) Use Material `OutlinedButton` + `FilledButton`: doesn't match the project's hand-rolled pill aesthetic. Rejected. |
+| ADR-FRI-011 | Unfriend confirm uses `showModalBottomSheet` (not `AlertDialog`) with destructive "ELIMINAR" action and "CANCELAR" dismissive | iOS-native pattern for destructive actions on a row context. The sheet leaves room for friend name + future expansion (e.g. "Only block" toggle in a later SDD) without re-doing the surface. AlertDialog is platform-correct on Android but the rest of TREINO has standardized on bottom sheets for similar destructive flows (post privacy selector). Consistency with the project's existing destructive-confirmation idiom wins over per-platform purity. | (a) `AlertDialog`: smaller surface, less context room, jarring mid-flow. Rejected. (b) Inline confirmation row inside the pill: too unfamiliar, hard to dismiss without re-tapping a button. Rejected. (c) No confirmation (immediate fire like RECHAZAR): unfriend is irreversible from the actor's side and affects an existing relationship — friction is warranted here even though it isn't on RECHAZAR (which only cancels a transient request). |
+| ADR-FRI-012 | `FriendRequestInboxTile` makes the requester zone (avatar + name + gym) a single tap target via `InkWell` wrapping that subtree; action pills stay independent tap targets | One large hit target beats three small ones — mirrors `UserSearchResultTile` and `PostCard` author-area tapability. Splitting taps between profile-open and action-pills uses standard Flutter hit-test ordering: the `InkWell` on the left subtree never overlaps the right-side `GestureDetector` regions inside the pills. No need for explicit `HitTestBehavior.translucent` gymnastics. | (a) Whole row tappable including action pills: pills steal the tap and accidentally fire when user meant to open profile. Rejected. (b) Only avatar tappable (Instagram-pre-2018 pattern): too small a hit target, low discoverability. Rejected. (c) Long-press to open profile: hidden affordance, requires onboarding. Rejected. |
 
 ---
 

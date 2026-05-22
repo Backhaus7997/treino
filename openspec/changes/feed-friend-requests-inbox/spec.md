@@ -192,6 +192,60 @@
 
 ---
 
+## Section F — Unfriend Action: REQ-FRI-012
+
+### Requirement: Unfriend an accepted friendship from PublicProfileScreen (REQ-FRI-012)
+
+When a viewer opens the public profile of someone they're already friends with (`friendship.status == accepted`), the `PublicProfileFollowButton` MUST render the "SIGUIENDO" pill as a TAPPABLE control (today it is a `no-op`). Tapping it MUST open a confirmation bottom sheet listing the friend's display name. Confirming MUST call `FriendshipRepository.delete(friendship.id, viewerUid)`. After successful delete, `friendshipByPairProvider` MUST be invalidated so the pill transitions back to "SEGUIR".
+
+#### SCENARIO-469: SIGUIENDO pill is tappable when friendship is accepted
+
+- GIVEN viewer A and target B are friends (`status: accepted`)
+- WHEN A opens B's public profile
+- THEN the follow button displays "SIGUIENDO" with a tappable affordance (the `onTap` callback is NOT null)
+
+#### SCENARIO-470: Tapping SIGUIENDO opens an UnfriendConfirmationSheet showing the friend's display name
+
+- GIVEN A is friends with B (displayName "Vicente")
+- WHEN A taps the SIGUIENDO pill
+- THEN a modal bottom sheet opens
+- AND the sheet displays the copy "¿Eliminar amistad con Vicente?"
+- AND the sheet exposes two buttons: "ELIMINAR" (destructive style) and "CANCELAR"
+
+#### SCENARIO-471: Confirming the unfriend deletes the friendship and returns the pill to SEGUIR
+
+- GIVEN A is friends with B and the UnfriendConfirmationSheet is open
+- WHEN A taps "ELIMINAR"
+- THEN `FriendshipRepository.delete(friendship.id, viewerUid)` is called
+- AND the sheet closes
+- AND `friendshipByPairProvider((viewerUid, targetUid))` is invalidated
+- AND the next rebuild of the follow button renders "SEGUIR"
+
+#### SCENARIO-471b: Cancelling the unfriend closes the sheet without calling delete
+
+- GIVEN the UnfriendConfirmationSheet is open
+- WHEN A taps "CANCELAR" (or dismisses the sheet by drag-down)
+- THEN the sheet closes
+- AND `FriendshipRepository.delete` is NOT called
+- AND the follow button still renders "SIGUIENDO"
+
+---
+
+## Section G — Tappable Inbox Row: REQ-FRI-013
+
+### Requirement: Tapping the requester area of an inbox row opens their public profile (REQ-FRI-013)
+
+In `FriendRequestInboxTile`, the requester information zone (avatar + name + gym, NOT the action pills) MUST be a tappable region. Tapping it MUST navigate to `/feed/profile/{requesterUid}` — the same route used by the Feed search results. The ACEPTAR and RECHAZAR pills MUST remain independent tap targets and MUST NOT trigger navigation.
+
+#### SCENARIO-472: Tapping the requester area navigates to the public profile route
+
+- GIVEN an inbox row for a pending request from requester "Vicente" (uid `vicente-uid`)
+- WHEN the user taps the avatar / name / gym zone
+- THEN the router navigates to `/feed/profile/vicente-uid`
+- AND tapping the ACEPTAR or RECHAZAR pills does NOT trigger navigation (independent hit testing)
+
+---
+
 ## REQ → SCENARIO Traceability
 
 | REQ | SCENARIOs |
@@ -207,6 +261,8 @@
 | REQ-FRI-009 | 463 |
 | REQ-FRI-010 | 464 |
 | REQ-FRI-011 | 465, 466, 467, 468 |
+| REQ-FRI-012 | 469, 470, 471, 471b |
+| REQ-FRI-013 | 472 |
 
 ---
 
@@ -240,6 +296,7 @@ The following are explicitly NOT covered by this spec and MUST NOT be implemente
 - REQ-WRX-004 dual-side counter updates (`followersCount` / `followingCount`) on accept/delete — deferred to Fase 6 or a dedicated SDD.
 - Confirmation dialog on "RECHAZAR" — explicitly rejected (locked decision #4).
 - Hiding the profile tile when count is zero — explicitly rejected (locked decision #3).
-- Changes to `TreinoBottomBar`, `_FeedHeader`, `public_profile_follow_button.dart`, or `firestore.rules`.
-- The "ELIMINAR AMISTAD" copy or behavior on `PublicProfileScreen` — untouched.
+- Changes to `TreinoBottomBar`, `_FeedHeader`, or `firestore.rules`.
 - Removal of the orphaned `pendingRequestsProvider` (Future variant) — cleanup for a separate bookkeeping SDD.
+
+**Amendment 2026-05-22 (scope expansion)**: `public_profile_follow_button.dart` and the "SIGUIENDO" no-op are NOW in scope — see Section F (REQ-FRI-012). `FriendRequestInboxTile` requester-area tap-to-profile is NOW in scope — see Section G (REQ-FRI-013).

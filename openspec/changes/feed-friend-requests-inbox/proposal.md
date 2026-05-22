@@ -43,7 +43,18 @@ The data layer is fully in place — `FriendshipRepository.pendingRequestsFor(ui
 | 4 | RECHAZAR UX | **Immediate tap**, no confirmation dialog. Row disappears from inbox on tap. Consistent with iOS native patterns. |
 | 5 | Dismiss-without-action | **Accepted**. If user opens and closes the inbox without acting, requests stay pending indefinitely. No TTL, no auto-expire. |
 | 6 | Empty state copy | **"No hay solicitudes pendientes"** rendered inside the inbox screen when count is zero. The Profile tile stays visible regardless. |
-| 7 | RECHAZAR vs ELIMINAR copy semantics | Repo op is the same (`friendshipRepository.delete`), but UI copy MUST differentiate by context. **Inbox button reads "RECHAZAR"**. The existing **"ELIMINAR AMISTAD"** copy on `PublicProfileScreen` for accepted friendships stays unchanged and is **out of scope** for this SDD. |
+| 7 | RECHAZAR vs ELIMINAR copy semantics | Repo op is the same (`friendshipRepository.delete`), but UI copy MUST differentiate by context. **Inbox button reads "RECHAZAR"**. Unfriend an accepted friendship is **"ELIMINAR"** inside a confirmation bottom sheet (see #8 below). |
+
+### Scope amendment (2026-05-22)
+
+After the initial scope was locked, smoke discussion surfaced two related gaps that fit cleanly within the same PR. Added as locked decisions #8 and #9:
+
+| # | Decision | Locked answer |
+|---|---|---|
+| 8 | Unfriend from PublicProfileScreen | **In scope**. Today the SIGUIENDO pill in `PublicProfileFollowButton` is a no-op — there is NO way to remove a friend from the UI. Make SIGUIENDO tappable → opens `UnfriendConfirmationSheet` (modal bottom sheet, NOT AlertDialog) with copy "¿Eliminar amistad con {name}?" + destructive "ELIMINAR" button + "CANCELAR". On confirm: `friendshipRepository.delete(id, viewerUid)` + invalidate `friendshipByPairProvider`. See spec REQ-FRI-012 / SCENARIO-469..471b and design §5.4-5.5, ADR-FRI-011. |
+| 9 | Tappable inbox row | **In scope**. The requester area (avatar + name + gym) of `FriendRequestInboxTile` becomes a single tap target via `InkWell` → `context.push('/feed/profile/{requesterUid}')`. Action pills stay independent tap targets. Same UX as tapping a search result. See spec REQ-FRI-013 / SCENARIO-472 and design ADR-FRI-012. |
+
+Estimated incremental scope: ~130 LOC, brings PR total from ~250 to ~380 LOC (still under the 400-line budget; no `size:exception` needed).
 
 ### Out of scope (explicit)
 
@@ -51,7 +62,7 @@ The data layer is fully in place — `FriendshipRepository.pendingRequestsFor(ui
 - Push notifications (FCM) — Fase 6 polish.
 - Inbox surfaces for other social events (post likes, comments) — friend requests only here.
 - REQ-WRX-004 dual-side counter updates — still deferred to Fase 6 Cloud Function or a future SDD.
-- Modifying the `SEGUIR` / `ACEPTAR` button on `PublicProfileScreen` — stays as-is, the alternate accept path remains available.
+- Modifying the `SEGUIR` / `ACEPTAR` / `SOLICITUD ENVIADA` states of `PublicProfileFollowButton` — only the `SIGUIENDO` branch is upgraded (per amendment #8). The other three states are untouched.
 - Changes to `TreinoBottomBar`, `_FeedHeader`, or any other shared widget outside the explicit touch list below.
 - New Firestore collections or any change to `firestore.rules` — existing `friendships` rules already cover read + update + delete for members. (Verify in design phase.)
 
@@ -66,6 +77,9 @@ The data layer is fully in place — `FriendshipRepository.pendingRequestsFor(ui
 | `lib/features/feed/presentation/friend_requests_inbox_screen.dart` | Inbox screen (`ConsumerWidget`). Subscribes to `pendingRequestsStreamProvider(myUid)`, renders empty state or list of `FriendRequestInboxTile`. |
 | `lib/features/feed/presentation/widgets/friend_request_inbox_tile.dart` | Per-row widget: avatar + displayName + gym + ACEPTAR/RECHAZAR buttons. Reads `userPublicProfileProvider(requesterUid).family` for the visible fields. |
 | `lib/features/profile/presentation/widgets/profile_friend_requests_tile.dart` | Entry tile rendered inside `ProfileScreen`. Factored out into its own widget for testability and to avoid bloating `profile_screen.dart`. |
+| `lib/features/feed/presentation/widgets/unfriend_confirmation_sheet.dart` | **(amendment)** Modal bottom sheet for confirming unfriend action. Stateless, takes `friendDisplayName` + `onConfirm` callback. |
+| `test/features/feed/presentation/widgets/unfriend_confirmation_sheet_test.dart` | **(amendment)** Widget tests: sheet renders friend name, CANCELAR closes without firing callback, ELIMINAR fires callback then closes. |
+| `test/features/feed/presentation/widgets/public_profile_follow_button_unfriend_test.dart` | **(amendment)** Widget tests: SIGUIENDO state now tappable, opens sheet, ELIMINAR triggers delete + invalidation, button reverts to SEGUIR. |
 | `test/features/feed/data/friendship_repository_test.dart` | New tests for `watchPendingRequestsFor(uid)` stream contract (initial emit, pending-only filter, requester-not-self filter, accept/delete-driven re-emit). |
 | `test/features/feed/application/friendship_providers_test.dart` | Tests for `pendingRequestsStreamProvider` and `pendingRequestCountProvider`. |
 | `test/features/feed/presentation/friend_requests_inbox_screen_test.dart` | Widget tests: empty state, populated list, ACEPTAR removes row, RECHAZAR removes row. |
@@ -80,12 +94,14 @@ The data layer is fully in place — `FriendshipRepository.pendingRequestsFor(ui
 | `lib/features/feed/application/friendship_providers.dart` | Add `pendingRequestsStreamProvider` (`StreamProvider.family<List<Friendship>, String>`) wrapping the new repo method. Add `pendingRequestCountProvider` (`Provider.family<int, String>`) derived via `select()` for fine-grained count subscription. |
 | `lib/features/profile/profile_screen.dart` | Insert `ProfileFriendRequestsTile()` below the existing stats row. No structural change beyond the insert. |
 | `lib/app/router.dart` | Register `/profile/friend-requests` route pointing to `FriendRequestsInboxScreen`. |
+| `lib/features/feed/presentation/widgets/public_profile_follow_button.dart` | **(amendment)** Upgrade the `SIGUIENDO` branch from no-op `onTap: null` to an `onTap` that opens `UnfriendConfirmationSheet`. The other three states (`SEGUIR`, `SOLICITUD ENVIADA`, `ACEPTAR`) are untouched. |
+| `lib/features/feed/presentation/widgets/friend_request_inbox_tile.dart` | **(amendment)** Wrap the requester zone (avatar + name + gym) in an `InkWell` whose `onTap` does `context.push('/feed/profile/${friendship.requesterId}')`. Action pills stay outside the `InkWell` as independent tap targets. |
 
 ### NOT touched (sanity guards for reviewers)
 
 - `lib/features/feed/data/friendship_repository.dart` — `accept()`, `delete()`, `pendingRequestsFor()` left as-is; only the new `watch*()` method is added.
 - `lib/features/feed/application/friendship_providers.dart` — existing `pendingRequestsProvider` stays (zero consumers but harmless; removal is bookkeeping for a different SDD).
-- `lib/features/feed/presentation/widgets/public_profile_follow_button.dart` (or wherever ELIMINAR AMISTAD lives) — untouched.
+- `lib/features/feed/presentation/widgets/public_profile_follow_button.dart` — **only the `SIGUIENDO` branch is upgraded**; the other 3 states (`SEGUIR`, `SOLICITUD ENVIADA`, `ACEPTAR`) are untouched.
 - `lib/shared/widgets/treino_bottom_bar.dart`, `_FeedHeader` — untouched.
 - `firestore.rules`, `scripts/rules_test/rules.test.js` — untouched.
 - `lib/features/feed/domain/friendship.dart` — Freezed model not modified, no `build_runner` regen needed.
