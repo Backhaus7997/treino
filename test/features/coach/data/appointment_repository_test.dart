@@ -43,10 +43,8 @@ void main() {
         expect(appt.startsAt, equals(startsAt));
 
         // Verify persisted in Firestore.
-        final snap = await firestore
-            .collection('appointments')
-            .doc(expectedDocId)
-            .get();
+        final snap =
+            await firestore.collection('appointments').doc(expectedDocId).get();
         expect(snap.exists, isTrue);
         expect(snap.data()!['status'], equals('confirmed'));
         expect(snap.data()!['athleteId'], equals(athleteId));
@@ -121,10 +119,8 @@ void main() {
         expect(appt.cancelledBy, isNull);
 
         // cancellationLog MUST be preserved (ADR-1 audit trail).
-        final snap = await firestore
-            .collection('appointments')
-            .doc(expectedDocId)
-            .get();
+        final snap =
+            await firestore.collection('appointments').doc(expectedDocId).get();
         final log = snap.data()!['cancellationLog'] as List<dynamic>;
         expect(log, hasLength(1));
         expect((log.first as Map<String, dynamic>)['byUid'], 'oldAthlete');
@@ -143,13 +139,12 @@ void main() {
           durationMin: durationMin,
         );
 
-        expect(appt.id, equals('${trainerId}_${startsAt.millisecondsSinceEpoch}'));
+        expect(
+            appt.id, equals('${trainerId}_${startsAt.millisecondsSinceEpoch}'));
 
         // Verify the document exists at that exact ID.
-        final snap = await firestore
-            .collection('appointments')
-            .doc(appt.id)
-            .get();
+        final snap =
+            await firestore.collection('appointments').doc(appt.id).get();
         expect(snap.exists, isTrue);
       },
     );
@@ -192,10 +187,8 @@ void main() {
           reason: 'changed plans',
         );
 
-        final snap = await firestore
-            .collection('appointments')
-            .doc(appt.id)
-            .get();
+        final snap =
+            await firestore.collection('appointments').doc(appt.id).get();
         expect(snap.data()!['status'], equals('cancelled'));
         expect(snap.data()!['cancelledBy'], equals(athleteId));
         // cancellationLog should have one entry.

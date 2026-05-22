@@ -340,8 +340,7 @@ class _ActionRow extends ConsumerWidget {
 
   Future<void> _onMessage(BuildContext context, WidgetRef ref) async {
     try {
-      final chat =
-          await ref.read(chatForLinkProvider(link).future);
+      final chat = await ref.read(chatForLinkProvider(link).future);
       if (!context.mounted) return;
       context.push('/coach/chat/${chat.chatId}?other=${link.trainerId}');
     } catch (_) {

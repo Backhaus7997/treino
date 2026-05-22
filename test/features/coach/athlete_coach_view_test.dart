@@ -86,8 +86,7 @@ void main() {
       expect(find.text('TERMINAR VÍNCULO'), findsOneWidget);
     });
 
-    testWidgets(
-        'Fase B: status active → muestra botón MENSAJE',
+    testWidgets('Fase B: status active → muestra botón MENSAJE',
         (tester) async {
       await tester.pumpWidget(_wrap(
         const AthleteCoachView(),
@@ -102,8 +101,7 @@ void main() {
       expect(find.text('MENSAJE'), findsOneWidget);
     });
 
-    testWidgets(
-        'Fase B: status pending → NO muestra botón MENSAJE',
+    testWidgets('Fase B: status pending → NO muestra botón MENSAJE',
         (tester) async {
       await tester.pumpWidget(_wrap(
         const AthleteCoachView(),

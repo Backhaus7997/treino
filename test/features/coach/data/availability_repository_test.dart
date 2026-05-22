@@ -47,7 +47,8 @@ void main() {
   });
 
   group('deleteRule', () {
-    test('SCENARIO-486: removes doc at coach_availability_rules/{id}', () async {
+    test('SCENARIO-486: removes doc at coach_availability_rules/{id}',
+        () async {
       final rule = makeRule('r1');
       await repo.addRule(rule);
 
@@ -67,7 +68,7 @@ void main() {
       () async {
         final ruleA1 = makeRule('r-a1');
         final ruleA2 = makeRule('r-a2');
-        final ruleB = AvailabilityRule(
+        const ruleB = AvailabilityRule(
           id: 'r-b1',
           trainerId: 'tB',
           dayOfWeek: 2,

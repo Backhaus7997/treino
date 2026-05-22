@@ -40,10 +40,8 @@ class AvailabilityRepository {
 
   /// Real-time stream of all rules for [trainerId]. SCENARIO-487.
   Stream<List<AvailabilityRule>> watchRules(String trainerId) {
-    return _rules
-        .where('trainerId', isEqualTo: trainerId)
-        .snapshots()
-        .map((snap) => snap.docs
+    return _rules.where('trainerId', isEqualTo: trainerId).snapshots().map(
+        (snap) => snap.docs
             .map((d) => AvailabilityRule.fromJson({...d.data(), 'id': d.id}))
             .toList());
   }
@@ -72,12 +70,11 @@ class AvailabilityRepository {
         .where('trainerId', isEqualTo: trainerId)
         .where('date',
             isGreaterThanOrEqualTo: Timestamp.fromDate(fromDate.toUtc()))
-        .where('date',
-            isLessThanOrEqualTo: Timestamp.fromDate(toDate.toUtc()))
+        .where('date', isLessThanOrEqualTo: Timestamp.fromDate(toDate.toUtc()))
         .snapshots()
         .map((snap) => snap.docs
-            .map((d) =>
-                AvailabilityOverride.fromJson({...d.data(), 'id': d.id}))
+            .map(
+                (d) => AvailabilityOverride.fromJson({...d.data(), 'id': d.id}))
             .toList());
   }
 }

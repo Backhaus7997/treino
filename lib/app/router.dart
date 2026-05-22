@@ -276,6 +276,10 @@ GoRouter buildRouter({
                   );
                 },
               ),
+              GoRoute(
+                path: 'agenda',
+                pageBuilder: (_, __) => _noAnim(const _AgendaPlaceholder()),
+              ),
             ],
           ),
           GoRoute(
@@ -294,6 +298,19 @@ CustomTransitionPage<void> _noAnim(Widget child) => CustomTransitionPage(
       reverseTransitionDuration: Duration.zero,
       transitionsBuilder: (_, __, ___, child) => child,
     );
+
+class _AgendaPlaceholder extends StatelessWidget {
+  const _AgendaPlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      body: Center(
+        child: Text('PRÓXIMAMENTE — AgendaScreen (PR2)'),
+      ),
+    );
+  }
+}
 
 class _ShellScaffold extends StatelessWidget {
   const _ShellScaffold({required this.location, required this.child});

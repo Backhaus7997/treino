@@ -31,7 +31,7 @@ void main() {
         addTearDown(container.dispose);
 
         // Seed one rule directly into the fake Firestore.
-        final rule = AvailabilityRule(
+        const rule = AvailabilityRule(
           id: 'r1',
           trainerId: 'tA',
           dayOfWeek: 1,
@@ -46,13 +46,12 @@ void main() {
             .doc(rule.id)
             .set(rule.toJson());
 
-        final stream =
-            container.read(availabilityRulesStreamProvider('tA'));
+        final stream = container.read(availabilityRulesStreamProvider('tA'));
         expect(stream, isA<AsyncValue<List<AvailabilityRule>>>());
 
         // Wait for first emission.
-        final result = await container
-            .read(availabilityRulesStreamProvider('tA').future);
+        final result =
+            await container.read(availabilityRulesStreamProvider('tA').future);
         expect(result, hasLength(1));
         expect(result.first.id, equals('r1'));
       },

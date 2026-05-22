@@ -54,7 +54,9 @@ Chain strategy: feature-branch-chain
 
 ---
 
-### T01 [1] [DOCS] Amend SCENARIO-491 in spec — ADR-1 flip semantics
+### T01 [x] [DOCS] Amend SCENARIO-491 in spec — ADR-1 flip semantics
+
+> Status: ✅ Done — commit b0c18f9
 
 - **Files**: `openspec/changes/coach-agenda/spec.md` (MODIFY); Engram `sdd/coach-agenda/spec` (#117 via mem_save with topic_key)
 - **SCENARIOs**: SCENARIO-491
@@ -70,7 +72,10 @@ Chain strategy: feature-branch-chain
 
 ---
 
-### T02 [1] [CHORE] Branch creation + pubspec update
+### T02 [x] [CHORE] Branch creation + pubspec update
+
+> Status: ✅ Done — commit fe08a0b (pubspec) + branch feat/coach-agenda-data created
+
 
 - **Files**: `pubspec.yaml` (MODIFY)
 - **Description**: Checkout `feat/coach-agenda-data` from `main`. Add `table_calendar: ^3.2.0` to `pubspec.yaml` under `dependencies`. Run `flutter pub get` and verify it resolves cleanly (check `pubspec.lock` for exact resolved version). Confirm `flutter test` baseline green. Create test directories: `test/features/coach/domain/`, `test/features/coach/data/`, `test/features/coach/application/`.
@@ -78,7 +83,9 @@ Chain strategy: feature-branch-chain
 
 ---
 
-### T03 [1] [RED] Unit tests — domain models (AvailabilityRule + AvailabilityOverride)
+### T03 [x] [RED] Unit tests — domain models (AvailabilityRule + AvailabilityOverride)
+
+> Status: ✅ Done — commit 1a10d22
 
 - **Files**: `test/features/coach/domain/availability_rule_test.dart` (NEW); `test/features/coach/domain/availability_override_test.dart` (NEW)
 - **SCENARIOs**: 478, 479, 480, 481
@@ -93,7 +100,9 @@ Chain strategy: feature-branch-chain
 
 ---
 
-### T04 [1] [GREEN+CODEGEN] Implement AvailabilityRule + AvailabilityOverride models
+### T04 [x] [GREEN+CODEGEN] Implement AvailabilityRule + AvailabilityOverride models
+
+> Status: ✅ Done — commit 40fbd42 (freezed sealed union with `type` discriminator, slotDurationMin @Assert guard)
 
 - **Files**: `lib/features/coach/domain/availability_rule.dart` (NEW + `.g.dart`); `lib/features/coach/domain/availability_override.dart` (NEW + `.g.dart`)
 - **REQs**: REQ-COACH-AGENDA-001, REQ-COACH-AGENDA-002

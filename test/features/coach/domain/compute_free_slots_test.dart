@@ -19,7 +19,7 @@ void main() {
       'SCENARIO-517: single rule on matching weekday generates correct slots',
       () {
         // Rule: Monday 09:00–11:00, 60 min slots → 2 slots (09:00, 10:00).
-        final rule = AvailabilityRule(
+        const rule = AvailabilityRule(
           id: 'r1',
           trainerId: 'tA',
           dayOfWeek: 1, // Monday
@@ -46,7 +46,7 @@ void main() {
     // SCENARIO-518 (formerly SCENARIO-486):
     // A `block` override drops all slots for the date.
     test('SCENARIO-518: block override returns empty list', () {
-      final rule = AvailabilityRule(
+      const rule = AvailabilityRule(
         id: 'r1',
         trainerId: 'tA',
         dayOfWeek: 1,
@@ -103,7 +103,7 @@ void main() {
     test(
       'SCENARIO-500: confirmed appointment removes its slot from free list',
       () {
-        final rule = AvailabilityRule(
+        const rule = AvailabilityRule(
           id: 'r1',
           trainerId: 'tA',
           dayOfWeek: 1,
@@ -139,7 +139,7 @@ void main() {
     // Overlap deduplification — overlapping rules produce unique slots.
     test('overlapping rules deduplicate slots', () {
       // Two rules that overlap at 10:00.
-      final rule1 = AvailabilityRule(
+      const rule1 = AvailabilityRule(
         id: 'r1',
         trainerId: 'tA',
         dayOfWeek: 1,
@@ -149,7 +149,7 @@ void main() {
         endMinute: 0,
         slotDurationMin: 60,
       );
-      final rule2 = AvailabilityRule(
+      const rule2 = AvailabilityRule(
         id: 'r2',
         trainerId: 'tA',
         dayOfWeek: 1,
@@ -177,7 +177,7 @@ void main() {
     // ADR-7: all generated slots have second == 0, millisecond == 0,
     // microsecond == 0 (minute precision invariant).
     test('ADR-7: all generated slots are minute-precise', () {
-      final rule = AvailabilityRule(
+      const rule = AvailabilityRule(
         id: 'r1',
         trainerId: 'tA',
         dayOfWeek: 1,
@@ -204,7 +204,7 @@ void main() {
 
     // Cancelled appointments do NOT remove the slot from free list.
     test('cancelled appointment does not remove slot', () {
-      final rule = AvailabilityRule(
+      const rule = AvailabilityRule(
         id: 'r1',
         trainerId: 'tA',
         dayOfWeek: 1,

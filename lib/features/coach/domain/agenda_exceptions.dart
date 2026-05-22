@@ -2,6 +2,7 @@
 ///
 /// Each exception maps to a locked Rioplatense user message in
 /// `agenda_strings.dart` (PR2 — ADR-4).
+library;
 
 /// Thrown by `AppointmentRepository.book` when the slot is already taken by
 /// a confirmed appointment. SCENARIO-490.

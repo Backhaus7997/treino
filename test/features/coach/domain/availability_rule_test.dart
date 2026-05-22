@@ -27,7 +27,7 @@ void main() {
     );
 
     test('full record with all fields round-trips cleanly', () {
-      final rule = AvailabilityRule(
+      const rule = AvailabilityRule(
         id: 'r-mon-am',
         trainerId: 'trainer-1',
         dayOfWeek: 1,

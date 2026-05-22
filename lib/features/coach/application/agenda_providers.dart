@@ -59,9 +59,7 @@ final appointmentRepositoryProvider = Provider<AppointmentRepository>(
 /// Real-time stream of availability rules for a trainer. ADR-3.
 final availabilityRulesStreamProvider = StreamProvider.autoDispose
     .family<List<AvailabilityRule>, String>((ref, trainerId) {
-  return ref
-      .read(availabilityRepositoryProvider)
-      .watchRules(trainerId);
+  return ref.read(availabilityRepositoryProvider).watchRules(trainerId);
 });
 
 /// Real-time stream of overrides for a trainer within a date range. ADR-3.
@@ -75,17 +73,13 @@ final overridesStreamProvider = StreamProvider.autoDispose
 /// Real-time stream of confirmed appointments for an athlete. ADR-3.
 final appointmentsForAthleteStreamProvider = StreamProvider.autoDispose
     .family<List<Appointment>, String>((ref, athleteId) {
-  return ref
-      .read(appointmentRepositoryProvider)
-      .watchForAthlete(athleteId);
+  return ref.read(appointmentRepositoryProvider).watchForAthlete(athleteId);
 });
 
 /// Real-time stream of confirmed appointments for a trainer within a date range. ADR-3.
 final trainerAppointmentsStreamProvider = StreamProvider.autoDispose
     .family<List<Appointment>, TrainerAppointmentsKey>((ref, key) {
-  return ref
-      .read(appointmentRepositoryProvider)
-      .watchForTrainer(
+  return ref.read(appointmentRepositoryProvider).watchForTrainer(
         key.trainerId,
         fromDate: key.fromDate,
         toDate: key.toDate,
@@ -98,8 +92,8 @@ final trainerAppointmentsStreamProvider = StreamProvider.autoDispose
 ///
 /// Derived from [availabilityRulesStreamProvider], [overridesStreamProvider],
 /// and [trainerAppointmentsStreamProvider] via [computeFreeSlots]. ADR-2, ADR-3.
-final freeSlotsProvider = Provider.autoDispose
-    .family<List<DateTime>, FreeSlotsKey>((ref, key) {
+final freeSlotsProvider =
+    Provider.autoDispose.family<List<DateTime>, FreeSlotsKey>((ref, key) {
   final rulesAsync = ref.watch(availabilityRulesStreamProvider(key.trainerId));
   final overridesAsync = ref.watch(overridesStreamProvider(
     OverridesKey(
