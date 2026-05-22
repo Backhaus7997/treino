@@ -145,10 +145,18 @@ class _FriendRequestInboxTileState
   Future<void> _onAceptar() async {
     if (_busy) return;
     setState(() => _busy = true);
+    // Capture the ProviderContainer + repo BEFORE the await. After the
+    // accept commits, `pendingRequestsStreamProvider` re-emits without this
+    // row and the ListView disposes the tile — `ref` from a disposed
+    // ConsumerStatefulWidget can silently no-op on `invalidate`, leaving
+    // sibling consumers (Feed AMIGOS) stale. The container lives at the
+    // root and survives the tile's disposal, so its invalidates always run.
+    final container = ProviderScope.containerOf(context, listen: false);
+    final repo = container.read(friendshipRepositoryProvider);
+    final requesterUid = widget.friendship.requesterId;
+    final viewerUid = widget.viewerUid;
     try {
-      await ref
-          .read(friendshipRepositoryProvider)
-          .accept(widget.friendship.id, widget.viewerUid);
+      await repo.accept(widget.friendship.id, viewerUid);
       // Refresh sibling consumers (ADR-FRI-013). The inbox itself updates
       // via stream re-emit. For the rest:
       //   - `acceptedFriendsProvider` is the source list of friend uids
@@ -160,11 +168,11 @@ class _FriendRequestInboxTileState
       //     `post_workout_notifier`.
       //   - `friendshipByPairProvider` keeps the public-profile follow
       //     button in sync if the viewer visits the requester's profile.
-      ref.invalidate(acceptedFriendsProvider(widget.viewerUid));
-      ref.invalidate(myFriendsFeedProvider);
-      ref.invalidate(
+      container.invalidate(acceptedFriendsProvider(viewerUid));
+      container.invalidate(myFriendsFeedProvider);
+      container.invalidate(
         friendshipByPairProvider(
-          (viewerUid: widget.viewerUid, targetUid: widget.friendship.requesterId),
+          (viewerUid: viewerUid, targetUid: requesterUid),
         ),
       );
     } catch (_) {
@@ -177,17 +185,20 @@ class _FriendRequestInboxTileState
   Future<void> _onRechazar() async {
     if (_busy) return;
     setState(() => _busy = true);
+    // Same dispose-safe pattern as `_onAceptar` (see comments there).
+    final container = ProviderScope.containerOf(context, listen: false);
+    final repo = container.read(friendshipRepositoryProvider);
+    final requesterUid = widget.friendship.requesterId;
+    final viewerUid = widget.viewerUid;
     try {
-      await ref
-          .read(friendshipRepositoryProvider)
-          .delete(widget.friendship.id, widget.viewerUid);
+      await repo.delete(widget.friendship.id, viewerUid);
       // Refresh the public-profile follow button (ADR-FRI-013) so it shows
       // SEGUIR again if the viewer visits the (former) requester's profile.
       // No `acceptedFriendsProvider` invalidation — the friendship was never
       // accepted, so the AMIGOS feed list is unaffected.
-      ref.invalidate(
+      container.invalidate(
         friendshipByPairProvider(
-          (viewerUid: widget.viewerUid, targetUid: widget.friendship.requesterId),
+          (viewerUid: viewerUid, targetUid: requesterUid),
         ),
       );
     } catch (_) {
