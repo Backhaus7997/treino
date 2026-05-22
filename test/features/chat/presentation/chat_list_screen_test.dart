@@ -47,15 +47,14 @@ void main() {
         const ChatListScreen(),
         overrides: [
           currentUidProvider.overrideWith((_) => 'aaa'),
-          chatsForCurrentUserProvider.overrideWith(
-              (ref) => Stream.value(const <Chat>[])),
+          chatsForCurrentUserProvider
+              .overrideWith((ref) => Stream.value(const <Chat>[])),
         ],
       ));
       await tester.pumpAndSettle();
 
       expect(find.text('Sin mensajes todavía'), findsOneWidget);
-      expect(
-          find.textContaining('vínculo activo con un PF'), findsOneWidget);
+      expect(find.textContaining('vínculo activo con un PF'), findsOneWidget);
     });
 
     testWidgets('lista de chats — muestra nombre del otro miembro + preview',

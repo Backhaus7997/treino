@@ -39,7 +39,8 @@ class ChatRepository {
 
   static String chatIdFor(String uidA, String uidB) {
     if (uidA == uidB) {
-      throw ArgumentError.value(uidB, 'uidB', 'no se puede chatear con uno mismo');
+      throw ArgumentError.value(
+          uidB, 'uidB', 'no se puede chatear con uno mismo');
     }
     final sorted = [uidA, uidB]..sort();
     return sorted.join('_');
@@ -83,7 +84,8 @@ class ChatRepository {
   }) async {
     final trimmed = text.trim();
     if (trimmed.isEmpty) {
-      throw ArgumentError.value(text, 'text', 'el mensaje no puede estar vacío');
+      throw ArgumentError.value(
+          text, 'text', 'el mensaje no puede estar vacío');
     }
 
     final batch = _firestore.batch();
@@ -111,9 +113,8 @@ class ChatRepository {
     String chatId, {
     int limit = defaultMessagesLimit,
   }) {
-    final Query<Map<String, Object?>> query = _messagesOf(chatId)
-        .orderBy('createdAt', descending: true)
-        .limit(limit);
+    final Query<Map<String, Object?>> query =
+        _messagesOf(chatId).orderBy('createdAt', descending: true).limit(limit);
     return query.snapshots().map((snap) {
       return snap.docs.map(_messageFromDoc).whereType<Message>().toList();
     });

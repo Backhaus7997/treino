@@ -182,9 +182,7 @@ void main() {
       expect(find.text('RoutineEditor:athlete-1'), findsOneWidget);
     });
 
-    testWidgets(
-        'Fase B: renderiza botón MENSAJE en el footer',
-        (tester) async {
+    testWidgets('Fase B: renderiza botón MENSAJE en el footer', (tester) async {
       await _pumpScreen(
         tester,
         athleteId: 'athlete-1',

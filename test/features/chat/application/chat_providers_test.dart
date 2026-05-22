@@ -51,20 +51,17 @@ void main() {
     test('emite lista vacía cuando no hay current uid', () async {
       final container =
           makeContainer(firestore: FakeFirebaseFirestore(), currentUid: null);
-      final state =
-          await container.read(chatsForCurrentUserProvider.future);
+      final state = await container.read(chatsForCurrentUserProvider.future);
       expect(state, isEmpty);
     });
 
     test('emite los chats del current user', () async {
       final firestore = FakeFirebaseFirestore();
-      final container =
-          makeContainer(firestore: firestore, currentUid: 'aaa');
+      final container = makeContainer(firestore: firestore, currentUid: 'aaa');
       final repo = container.read(chatRepositoryProvider);
 
       // Crear chat + mandar mensaje para que aparezca en el orderBy
-      final chat =
-          await repo.getOrCreate(selfId: 'aaa', otherId: 'bbb');
+      final chat = await repo.getOrCreate(selfId: 'aaa', otherId: 'bbb');
       await repo.sendMessage(
           chatId: chat.chatId, senderId: 'aaa', text: 'hola');
 
@@ -77,11 +74,9 @@ void main() {
   group('messagesProvider', () {
     test('emite mensajes de un chatId', () async {
       final firestore = FakeFirebaseFirestore();
-      final container =
-          makeContainer(firestore: firestore, currentUid: 'aaa');
+      final container = makeContainer(firestore: firestore, currentUid: 'aaa');
       final repo = container.read(chatRepositoryProvider);
-      final chat =
-          await repo.getOrCreate(selfId: 'aaa', otherId: 'bbb');
+      final chat = await repo.getOrCreate(selfId: 'aaa', otherId: 'bbb');
       await repo.sendMessage(
           chatId: chat.chatId, senderId: 'aaa', text: 'hola');
 
@@ -100,8 +95,7 @@ void main() {
   });
 
   group('chatForLinkProvider', () {
-    test('crea o resuelve el chat para un link (desde lado athlete)',
-        () async {
+    test('crea o resuelve el chat para un link (desde lado athlete)', () async {
       final firestore = FakeFirebaseFirestore();
       final container =
           makeContainer(firestore: firestore, currentUid: 'athlete-1');
@@ -112,8 +106,7 @@ void main() {
       expect(chat.members.contains('trainer-1'), isTrue);
     });
 
-    test('crea o resuelve el chat para un link (desde lado trainer)',
-        () async {
+    test('crea o resuelve el chat para un link (desde lado trainer)', () async {
       final firestore = FakeFirebaseFirestore();
       final container =
           makeContainer(firestore: firestore, currentUid: 'trainer-1');
