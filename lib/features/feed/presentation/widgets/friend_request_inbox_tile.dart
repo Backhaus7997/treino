@@ -6,6 +6,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../app/theme/app_palette.dart';
 import '../../../profile/application/user_public_profile_providers.dart';
 import '../../application/friendship_providers.dart';
+import '../../application/public_profile_providers.dart'
+    show friendshipByPairProvider;
 import '../../domain/friendship.dart';
 import '../../domain/gym_name.dart';
 import 'post_avatar.dart';
@@ -15,8 +17,15 @@ import 'post_avatar.dart';
 /// Renders: [PostAvatar] + display name (UPPERCASE Barlow Condensed) +
 /// gym name subtitle + RECHAZAR / ACEPTAR action pills.
 ///
-/// Actions are fire-and-forget — the stream re-emission removes the row.
-/// No `ref.invalidate`, no optimistic UI (ADR-FRI-009).
+/// Actions are fire-and-forget — the inbox stream re-emission removes the
+/// row. After commit we ALSO invalidate sibling consumers that hold cached
+/// snapshots of friendship state but are not subscribed to this row's
+/// stream — `acceptedFriendsProvider` (Feed AMIGOS) and
+/// `friendshipByPairProvider` (PublicProfile follow button). Per
+/// ADR-FRI-013 (targeted invalidation in action handlers): on-device
+/// staleness is closed without converting those providers to streams.
+/// Cross-device staleness remains the scope of the deferred
+/// Stream-conversion follow-up SDD.
 class FriendRequestInboxTile extends ConsumerStatefulWidget {
   const FriendRequestInboxTile({
     super.key,
@@ -138,6 +147,16 @@ class _FriendRequestInboxTileState
       await ref
           .read(friendshipRepositoryProvider)
           .accept(widget.friendship.id, widget.viewerUid);
+      // Refresh sibling consumers (ADR-FRI-013). The inbox itself updates
+      // via stream re-emit, but the Feed AMIGOS list and the public-profile
+      // follow button hold FutureProvider snapshots that need explicit
+      // invalidation to reflect the new accepted state.
+      ref.invalidate(acceptedFriendsProvider(widget.viewerUid));
+      ref.invalidate(
+        friendshipByPairProvider(
+          (viewerUid: widget.viewerUid, targetUid: widget.friendship.requesterId),
+        ),
+      );
     } catch (_) {
       // Swallow — stream will not emit a removal, so row stays.
     } finally {
@@ -152,6 +171,15 @@ class _FriendRequestInboxTileState
       await ref
           .read(friendshipRepositoryProvider)
           .delete(widget.friendship.id, widget.viewerUid);
+      // Refresh the public-profile follow button (ADR-FRI-013) so it shows
+      // SEGUIR again if the viewer visits the (former) requester's profile.
+      // No `acceptedFriendsProvider` invalidation — the friendship was never
+      // accepted, so the AMIGOS feed list is unaffected.
+      ref.invalidate(
+        friendshipByPairProvider(
+          (viewerUid: widget.viewerUid, targetUid: widget.friendship.requesterId),
+        ),
+      );
     } catch (_) {
       // Swallow — stream will not emit a removal, so row stays.
     } finally {

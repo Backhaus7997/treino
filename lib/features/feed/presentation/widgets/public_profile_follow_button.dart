@@ -6,7 +6,7 @@ import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/treino_icon.dart';
 import '../../../profile/application/user_public_profile_providers.dart';
 import '../../application/friendship_providers.dart'
-    show friendshipRepositoryProvider;
+    show acceptedFriendsProvider, friendshipRepositoryProvider;
 import '../../application/public_profile_providers.dart'
     show friendshipByPairProvider;
 import '../../domain/friendship.dart';
@@ -39,7 +39,7 @@ class PublicProfileFollowButton extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final repo = ref.watch(friendshipRepositoryProvider);
 
-    Future<void> invalidate() async => ref.invalidate(
+    Future<void> invalidatePair() async => ref.invalidate(
           friendshipByPairProvider(
             (viewerUid: viewerUid, targetUid: targetUid),
           ),
@@ -51,7 +51,9 @@ class PublicProfileFollowButton extends ConsumerWidget {
         style: _FollowPillStyle.mintFilled,
         onTap: () async {
           await repo.request(viewerUid, targetUid);
-          await invalidate();
+          // Pending request — only the pair view changes; the accepted
+          // friends list is unaffected.
+          await invalidatePair();
         },
       );
     }
@@ -77,7 +79,11 @@ class PublicProfileFollowButton extends ConsumerWidget {
       style: _FollowPillStyle.mintFilled,
       onTap: () async {
         await repo.accept(f.id, viewerUid);
-        await invalidate();
+        // Per ADR-FRI-013: refresh both the pair (button transitions to
+        // SIGUIENDO) AND the AMIGOS feed source (the new friend's posts
+        // start appearing without an app restart).
+        await invalidatePair();
+        ref.invalidate(acceptedFriendsProvider(viewerUid));
       },
     );
   }
@@ -114,11 +120,15 @@ class PublicProfileFollowButton extends ConsumerWidget {
           } catch (_) {
             // Swallow — same fire-and-forget pattern as inbox pills (ADR-FRI-009).
           }
+          // Per ADR-FRI-013: refresh both the pair (so the button transitions
+          // back to SEGUIR) AND the AMIGOS feed source (so the ex-friend's
+          // posts are pruned from the viewer's feed without an app restart).
           ref.invalidate(
             friendshipByPairProvider(
               (viewerUid: viewerUid, targetUid: targetUid),
             ),
           );
+          ref.invalidate(acceptedFriendsProvider(viewerUid));
         },
       ),
     );
