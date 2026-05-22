@@ -113,14 +113,12 @@ void main() {
       expect(find.text('Coach Joe'), findsOneWidget);
     });
 
-    testWidgets(
-        'tap en send escribe el mensaje vía repo y limpia el textfield',
+    testWidgets('tap en send escribe el mensaje vía repo y limpia el textfield',
         (tester) async {
       // Usamos un repo real sobre FakeFirebaseFirestore para no mockear.
       final firestore = FakeFirebaseFirestore();
       final repo = ChatRepository(firestore: firestore);
-      final chat =
-          await repo.getOrCreate(selfId: 'aaa', otherId: 'bbb');
+      final chat = await repo.getOrCreate(selfId: 'aaa', otherId: 'bbb');
 
       await tester.pumpWidget(_wrap(
         ChatScreen(chatId: chat.chatId, otherUid: 'bbb'),
@@ -156,8 +154,7 @@ void main() {
         (tester) async {
       final firestore = FakeFirebaseFirestore();
       final repo = ChatRepository(firestore: firestore);
-      final chat =
-          await repo.getOrCreate(selfId: 'aaa', otherId: 'bbb');
+      final chat = await repo.getOrCreate(selfId: 'aaa', otherId: 'bbb');
 
       await tester.pumpWidget(_wrap(
         ChatScreen(chatId: chat.chatId, otherUid: 'bbb'),

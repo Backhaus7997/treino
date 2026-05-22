@@ -94,8 +94,7 @@ void main() {
 
     test('preview se trunca a 80 chars con elipsis', () async {
       final longText = 'x' * 100;
-      await repo.sendMessage(
-          chatId: chatId, senderId: uidA, text: longText);
+      await repo.sendMessage(chatId: chatId, senderId: uidA, text: longText);
       final parent = await firestore.collection('chats').doc(chatId).get();
       final preview = parent.data()!['lastMessageText'] as String;
       expect(preview.length, 81); // 80 chars + 1 elipsis
@@ -110,8 +109,7 @@ void main() {
     });
 
     test('trimea whitespace del texto antes de guardar', () async {
-      await repo.sendMessage(
-          chatId: chatId, senderId: uidA, text: '  hola  ');
+      await repo.sendMessage(chatId: chatId, senderId: uidA, text: '  hola  ');
       final snap = await firestore
           .collection('chats')
           .doc(chatId)
@@ -153,8 +151,7 @@ void main() {
 
     test('respeta el limit', () async {
       for (var i = 0; i < 5; i++) {
-        await repo.sendMessage(
-            chatId: chatId, senderId: uidA, text: 'msg $i');
+        await repo.sendMessage(chatId: chatId, senderId: uidA, text: 'msg $i');
         await Future.delayed(const Duration(milliseconds: 5));
       }
       final messages = await repo.watchMessages(chatId, limit: 3).first;
@@ -172,8 +169,7 @@ void main() {
       // Forzamos un mensaje en el primer chat para que tenga lastMessageAt
       // (el orderBy de Firestore filtra docs sin el campo).
       final chatAB = ChatRepository.chatIdFor(uidA, uidB);
-      await repo.sendMessage(
-          chatId: chatAB, senderId: uidA, text: 'hola b');
+      await repo.sendMessage(chatId: chatAB, senderId: uidA, text: 'hola b');
 
       final chats = await repo.watchChatsForUser(uidA).first;
       expect(chats.length, 1);
