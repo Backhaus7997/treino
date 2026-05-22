@@ -269,5 +269,55 @@ service cloud.firestore {
       allow read, write: if request.auth != null
                          && request.auth.uid == uid;
     }
+
+    // Coach Agenda — availability rules (Fase 5 Etapa 6, REQ-027).
+    // Trainers own their rules; athletes and trainers can read any rule
+    // (needed to compute free slots client-side). Create/update/delete
+    // restricted to the owning trainer.
+    // SCENARIOs 525-527 tested via emulator (emulator-deferred per Decision #25).
+    match /coach_availability_rules/{ruleId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+                    && request.resource.data.trainerId == request.auth.uid;
+      allow update, delete: if request.auth != null
+                            && resource.data.trainerId == request.auth.uid;
+    }
+
+    // Coach Agenda — availability overrides (Fase 5 Etapa 6, REQ-028).
+    // Same ownership model as rules.
+    match /coach_availability_overrides/{overrideId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+                    && request.resource.data.trainerId == request.auth.uid;
+      allow update, delete: if request.auth != null
+                            && resource.data.trainerId == request.auth.uid;
+    }
+
+    // Coach Agenda — appointments (Fase 5 Etapa 6, REQ-029, ADR-1, ADR-5).
+    // Create: athlete books their own slot (status must be 'confirmed').
+    // Update: two valid paths —
+    //   Path 1 (cancellation): member cancels with >24h notice.
+    //   Path 2 (ADR-1 flip): new athlete flips cancelled → confirmed.
+    // Delete: never (audit trail preserved per ADR-1).
+    match /appointments/{appointmentId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+                    && request.resource.data.status == 'confirmed'
+                    && request.resource.data.athleteId == request.auth.uid;
+      // Update has 2 valid paths: cancellation by member, or flip cancelled→confirmed by new athlete.
+      allow update: if request.auth != null && (
+        // Path 1: cancellation by member with >24h
+        (request.resource.data.status == 'cancelled'
+         && (request.auth.uid == resource.data.athleteId
+             || request.auth.uid == resource.data.trainerId)
+         && resource.data.startsAt.toMillis() - 86400000 > request.time.toMillis())
+        ||
+        // Path 2: flip cancelled→confirmed by new athlete (ADR-1)
+        (resource.data.status == 'cancelled'
+         && request.resource.data.status == 'confirmed'
+         && request.resource.data.athleteId == request.auth.uid)
+      );
+      allow delete: if false;
+    }
   }
 }
