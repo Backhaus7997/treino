@@ -7,6 +7,7 @@ import 'package:treino/features/feed/application/friendship_providers.dart';
 import 'package:treino/features/feed/domain/friendship.dart';
 import 'package:treino/features/feed/domain/friendship_status.dart';
 import 'package:treino/features/feed/presentation/friend_requests_inbox_screen.dart';
+import 'package:treino/features/feed/presentation/widgets/friend_request_inbox_tile.dart';
 
 // ---------------------------------------------------------------------------
 // Helpers
