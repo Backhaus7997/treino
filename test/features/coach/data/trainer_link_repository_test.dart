@@ -217,6 +217,85 @@ void main() {
     });
   });
 
+  // ─── setSharedWithTrainer ─────────────────────────────────────────────────
+
+  group('setSharedWithTrainer', () {
+    test(
+      'SCENARIO-466: actualiza solo sharedWithTrainer y preserva otros campos',
+      () async {
+        // GIVEN un trainer_links doc con sharedWithTrainer: false, status: active
+        final link = await repo.request(
+          trainerId: trainerId,
+          athleteId: athleteId,
+        );
+        await repo.accept(link.id);
+
+        final before =
+            await firestore.collection('trainer_links').doc(link.id).get();
+        final beforeData = before.data()!;
+
+        // WHEN llamamos setSharedWithTrainer(linkId, true)
+        await repo.setSharedWithTrainer(link.id, true);
+
+        // THEN el doc tiene sharedWithTrainer == true
+        final after =
+            await firestore.collection('trainer_links').doc(link.id).get();
+        final afterData = after.data()!;
+        expect(afterData['sharedWithTrainer'], true);
+
+        // AND status, trainerId, athleteId, requestedAt no cambiaron
+        expect(afterData['status'], beforeData['status']);
+        expect(afterData['trainerId'], beforeData['trainerId']);
+        expect(afterData['athleteId'], beforeData['athleteId']);
+        expect(afterData['requestedAt'], beforeData['requestedAt']);
+
+        // AND updatedAt NO existe (REQ-COACH-LINK-004 — sin updatedAt).
+        expect(afterData.containsKey('updatedAt'), isFalse);
+
+        // AND solo agregamos sharedWithTrainer relativo al doc previo —
+        // ningún otro campo nuevo aparece.
+        final addedKeys =
+            afterData.keys.toSet().difference(beforeData.keys.toSet());
+        expect(addedKeys, isEmpty,
+            reason: 'setSharedWithTrainer no debe agregar campos nuevos '
+                'más allá de sharedWithTrainer (que ya tendría que existir '
+                'al crear el doc por el @Default(false))');
+      },
+    );
+
+    test(
+      'SCENARIO-467: lanza excepción cuando el documento no existe',
+      () async {
+        // GIVEN no existe doc en trainer_links/non-existent-id
+        // WHEN llamamos setSharedWithTrainer('non-existent-id', true)
+        // THEN se lanza una excepción y no hay no-op silencioso
+        await expectLater(
+          () => repo.setSharedWithTrainer('non-existent-id', true),
+          throwsA(isA<Exception>()),
+        );
+      },
+    );
+
+    test(
+      'SCENARIO-468: idempotente cuando el valor no cambia',
+      () async {
+        // GIVEN un doc con sharedWithTrainer: false (default)
+        final link = await repo.request(
+          trainerId: trainerId,
+          athleteId: athleteId,
+        );
+
+        // WHEN llamamos setSharedWithTrainer(linkId, false)
+        await repo.setSharedWithTrainer(link.id, false);
+
+        // THEN no se lanza excepción AND el doc sigue con sharedWithTrainer == false
+        final snap =
+            await firestore.collection('trainer_links').doc(link.id).get();
+        expect(snap.data()!['sharedWithTrainer'], false);
+      },
+    );
+  });
+
   // ─── watchForTrainer ──────────────────────────────────────────────────────
 
   group('watchForTrainer', () {
