@@ -43,7 +43,7 @@ Chain strategy: size-exception
 
 ---
 
-## T02 — [RED] Domain tests — SCENARIO-464, 465
+## T02 — [x] [RED] Domain tests — SCENARIO-464, 465
 
 - **Files**: `test/features/coach/domain/trainer_link_test.dart` (MODIFIED — add group)
 - **SCENARIOs**: SCENARIO-464, SCENARIO-465
