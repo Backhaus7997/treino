@@ -30,7 +30,7 @@ unchanged. No existing requirements are removed.
 | REQ-COACH-LINK-003 | `TrainerLinkRepository.setSharedWithTrainer` — update contract | MUST |
 | REQ-COACH-LINK-004 | `setSharedWithTrainer` field isolation — no side effects | MUST |
 | REQ-COACH-LINK-005 | `setSharedWithTrainer` missing link throws | MUST |
-| REQ-COACH-LINK-006 | `setSharedWithTrainer` stamps only `sharedWithTrainer` | MUST |
+| REQ-COACH-LINK-006 | `setSharedWithTrainer` idempotent write | MUST |
 | REQ-COACH-LINK-007 | Toggle visible only when `link.status == active` | MUST |
 | REQ-COACH-LINK-008 | Toggle reflects `link.sharedWithTrainer` | MUST |
 | REQ-COACH-LINK-009 | Enabling toggle shows confirmation dialog | MUST |
@@ -222,12 +222,12 @@ immediately and `currentAthleteLinkProvider` MUST be invalidated.
 
 The `trainer_links/{linkId}` update rule MUST permit an authenticated user who is the
 document's `athleteId` to change the `sharedWithTrainer` field, provided that all of the
-following invariants are preserved (trainer-write-protected fields unchanged):
+following invariants are preserved:
 - `trainerId` unchanged
 - `athleteId` unchanged
 - `requestedAt` unchanged
 
-The exact rule shape from the proposal MUST be implemented verbatim:
+Rule shape (verbatim from proposal):
 
 ```
 allow update: if request.auth != null
@@ -287,21 +287,15 @@ MUST be denied.
 
 ## Domain Invariants
 
-1. **No `updatedAt`**: `setSharedWithTrainer` MUST NOT write `updatedAt`. This matches the
-   convention of all other `TrainerLinkRepository` update methods (`accept`, `decline`, `cancel`,
-   `terminate`).
+1. **No `updatedAt`**: `setSharedWithTrainer` MUST NOT write `updatedAt`. Matches convention of all other `TrainerLinkRepository` update methods.
 
-2. **Privacy-restore is low-stakes**: disable (true → false) intentionally skips the confirmation
-   dialog. Restoring privacy is less consequential than granting it; the asymmetry is deliberate.
+2. **Privacy-restore is low-stakes**: disable (true → false) intentionally skips the confirmation dialog. Restoring privacy is less consequential than granting it; the asymmetry is deliberate.
 
-3. **Trainer cannot see the toggle**: `_LinkStateCard` is private to `athlete_coach_view.dart`.
-   `trainer_coach_view.dart` does NOT render it. No trainer-facing visibility toggle is in scope.
+3. **Trainer cannot see the toggle**: `_LinkStateCard` is private to `athlete_coach_view.dart`. `trainer_coach_view.dart` does NOT render it.
 
-4. **Backfill script is idempotent**: `scripts/backfill_trainer_links_shared.js` MUST use batched
-   writes and check for key absence before writing, so re-runs are safe.
+4. **Backfill script is idempotent**: `scripts/backfill_trainer_links_shared.js` MUST use batched writes and check for key absence before writing, so re-runs are safe.
 
-5. **Etapa 6 gate**: `sharedWithTrainer` is a privacy gate only. Etapa 6 will add the query filter
-   on `sessions/{athleteId}/*`. This change MUST NOT add any Etapa 6 behavior.
+5. **Etapa 6 gate**: `sharedWithTrainer` is a privacy gate only. Etapa 6 will add the query filter on `sessions/{athleteId}/*`. This change MUST NOT add any Etapa 6 behavior.
 
 ---
 
@@ -312,7 +306,7 @@ MUST be denied.
 | Etapa 6 PF read gate on `sessions/{athleteId}/*` | Etapa 6 |
 | Trainer-side UI indicator that history is shared | Future UX iteration |
 | Granular sharing (date ranges, per-routine) | Out of MVP |
-| Optimistic UI on toggle (toggle flips instantly before reload) | Out of MVP |
+| Optimistic UI on toggle | Out of MVP |
 | Push / in-app notification on share change | Fase 6 notifications |
 
 ---
