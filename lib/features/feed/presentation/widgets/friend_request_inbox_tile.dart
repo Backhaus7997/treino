@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
@@ -55,40 +56,55 @@ class _FriendRequestInboxTileState
       ),
       child: Row(
         children: [
-          PostAvatar(
-            authorDisplayName: displayName,
-            authorAvatarUrl: avatarUrl,
-            size: 40,
-          ),
-          const SizedBox(width: 14),
+          // Tappable requester zone: avatar + name + gym (ADR-FRI-012).
+          // InkWell is kept inside an Expanded so it fills the available
+          // space and provides a large hit target while the action pills
+          // remain as independent tap regions to its right.
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  displayName.toUpperCase(),
-                  style: GoogleFonts.barlowCondensed(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 16,
-                    color: palette.textPrimary,
+            child: InkWell(
+              onTap: () => context
+                  .push('/feed/profile/${widget.friendship.requesterId}'),
+              borderRadius: BorderRadius.circular(8),
+              child: Row(
+                children: [
+                  PostAvatar(
+                    authorDisplayName: displayName,
+                    authorAvatarUrl: avatarUrl,
+                    size: 40,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                if (gymName.isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    gymName,
-                    style: GoogleFonts.barlow(
-                      fontSize: 12,
-                      color: palette.textMuted,
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          displayName.toUpperCase(),
+                          style: GoogleFonts.barlowCondensed(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 16,
+                            color: palette.textPrimary,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (gymName.isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            gymName,
+                            style: GoogleFonts.barlow(
+                              fontSize: 12,
+                              color: palette.textMuted,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ],
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
-              ],
+              ),
             ),
           ),
           const SizedBox(width: 8),
