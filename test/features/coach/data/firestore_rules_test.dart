@@ -51,4 +51,45 @@ void main() {
       skip: 'emulator required — run with firebase emulators:exec',
     );
   });
+
+  // ── trainer_links sharedWithTrainer privacy rule (Fase 5 · Tech Debt) ─────
+  //
+  // SCENARIOs covered (deferred to emulator):
+  //   SCENARIO-475: athlete can flip sharedWithTrainer → permitted.
+  //   SCENARIO-476: trainer attempt to flip sharedWithTrainer → denied.
+  //   SCENARIO-477: non-member update → denied.
+  //
+  // Validates `firestore.rules` Shape 1 update block on
+  // `match /trainer_links/{linkId}` — the OR clause restricts mutation of
+  // `sharedWithTrainer` to the athlete only.
+  //
+  // REQ-COACH-LINK-012, REQ-COACH-LINK-013, REQ-COACH-LINK-014.
+  group('trainer_links sharedWithTrainer rules (emulator required)', () {
+    test(
+      'SCENARIO-475: athlete can update sharedWithTrainer — permitted',
+      () {
+        // Requires emulator. Validates Shape 1 OR clause permits the athlete
+        // to flip the field when all other invariants are preserved.
+      },
+      skip: 'emulator required — run with firebase emulators:exec',
+    );
+
+    test(
+      'SCENARIO-476: trainer attempt to flip sharedWithTrainer — denied',
+      () {
+        // Requires emulator. Validates Shape 1 OR clause denies a trainer
+        // request that mutates sharedWithTrainer.
+      },
+      skip: 'emulator required — run with firebase emulators:exec',
+    );
+
+    test(
+      'SCENARIO-477: non-member update — denied',
+      () {
+        // Requires emulator. Validates the outer member predicate denies
+        // any auth uid that is neither trainerId nor athleteId.
+      },
+      skip: 'emulator required — run with firebase emulators:exec',
+    );
+  });
 }
