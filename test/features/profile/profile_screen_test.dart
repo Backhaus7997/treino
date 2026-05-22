@@ -8,8 +8,10 @@ import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/auth/application/auth_notifier.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
+import 'package:treino/features/feed/application/friendship_providers.dart';
 import 'package:treino/features/profile/application/profile_stats_providers.dart';
 import 'package:treino/features/profile/domain/user_session_stats.dart';
+import 'package:treino/features/profile/presentation/widgets/profile_friend_requests_tile.dart';
 import 'package:treino/features/profile/profile_screen.dart';
 
 /// Minimal [AuthNotifier] stub that does not call Firebase.
@@ -169,6 +171,30 @@ void main() {
       expect(find.text('Cerrar sesión'), findsOneWidget);
 
       completer.completeError(Exception('cleanup'));
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // T14 RED: SCENARIO-468a — ProfileFriendRequestsTile is in the ProfileScreen
+  // ---------------------------------------------------------------------------
+  group('ProfileScreen — friend requests tile (SCENARIO-468a)', () {
+    testWidgets(
+        'SCENARIO-468a: ProfileScreen widget tree contains ProfileFriendRequestsTile',
+        (tester) async {
+      await tester.pumpWidget(
+        _buildScreen(overrides: [
+          authNotifierProvider.overrideWith(_StubAuthNotifier.new),
+          authStateChangesProvider.overrideWith((_) => Stream.value(null)),
+          userSessionStatsProvider.overrideWith((_) async =>
+              const UserSessionStats(
+                  totalSessions: 0, totalVolumeKg: 0, streak: 0)),
+          pendingRequestCountProvider('').overrideWith((_) => 0),
+        ]),
+      );
+
+      await tester.pump();
+
+      expect(find.byType(ProfileFriendRequestsTile), findsOneWidget);
     });
   });
 }

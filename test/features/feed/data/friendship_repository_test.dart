@@ -401,6 +401,110 @@ void main() {
       expect(second.status, equals(FriendshipStatus.pending));
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // T02 RED: watchPendingRequestsFor (SCENARIO-451..453)
+  // ---------------------------------------------------------------------------
+  group('FriendshipRepository.watchPendingRequestsFor', () {
+    final now = DateTime.utc(2026, 1, 1);
+
+    Future<void> seedFriendship({
+      required String id,
+      required String requesterId,
+      required String uidA,
+      required String uidB,
+      FriendshipStatus status = FriendshipStatus.pending,
+    }) async {
+      final f = Friendship(
+        id: id,
+        uidA: uidA,
+        uidB: uidB,
+        status: status,
+        requesterId: requesterId,
+        members: [uidA, uidB],
+        createdAt: now,
+      );
+      await firestore.collection('friendships').doc(id).set(f.toJson());
+    }
+
+    // SCENARIO-451: emits empty list when no friendships exist
+    test(
+        'SCENARIO-451: watchPendingRequestsFor emits [] when no docs exist for uid',
+        () async {
+      final stream = repo.watchPendingRequestsFor('uid-alice');
+      final result = await stream.first;
+      expect(result, isEmpty);
+    });
+
+    // SCENARIO-452: emits only pending requests received by the user
+    test(
+        'SCENARIO-452: watchPendingRequestsFor emits only docs where uid is recipient',
+        () async {
+      // pending where uid=alice is recipient (bob sent to alice)
+      await seedFriendship(
+        id: 'alice_bob',
+        requesterId: 'bob',
+        uidA: 'alice',
+        uidB: 'bob',
+      );
+
+      // pending where uid=alice is requester — must be excluded
+      await seedFriendship(
+        id: 'alice_charlie',
+        requesterId: 'alice',
+        uidA: 'alice',
+        uidB: 'charlie',
+      );
+
+      // accepted where alice is a member — must be excluded (not pending)
+      await seedFriendship(
+        id: 'alice_dave',
+        requesterId: 'dave',
+        uidA: 'alice',
+        uidB: 'dave',
+        status: FriendshipStatus.accepted,
+      );
+
+      final stream = repo.watchPendingRequestsFor('alice');
+      final result = await stream.first;
+
+      expect(result.length, equals(1));
+      expect(result.first.id, equals('alice_bob'));
+      expect(result.first.requesterId, equals('bob'));
+    });
+
+    // SCENARIO-453: stream re-emits list without F after accept commits
+    test(
+        'SCENARIO-453: watchPendingRequestsFor re-emits without F after accept(F.id, myUid) commits',
+        () async {
+      await seedFriendship(
+        id: 'alice_bob',
+        requesterId: 'bob',
+        uidA: 'alice',
+        uidB: 'bob',
+      );
+
+      final stream = repo.watchPendingRequestsFor('alice');
+      final emissions = <List<Friendship>>[];
+      final sub = stream.listen(emissions.add);
+
+      // Wait for initial emission (list with alice_bob)
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(emissions.length, equals(1));
+      expect(emissions.first.length, equals(1));
+      expect(emissions.first.first.id, equals('alice_bob'));
+
+      // Accept the friendship — status flips to accepted, Firestore re-emits
+      await repo.accept('alice_bob', 'alice');
+
+      // Wait for stream to re-emit
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(emissions.length, equals(2));
+      expect(emissions[1], isEmpty);
+
+      await sub.cancel();
+    });
+  });
 }
 
 // ─── Test helper: throws on any write ─────────────────────────────────────────

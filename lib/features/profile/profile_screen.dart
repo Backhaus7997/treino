@@ -6,6 +6,7 @@ import '../../core/utils/k_formatter.dart';
 import '../auth/application/auth_providers.dart';
 import '../auth/presentation/auth_strings.dart';
 import 'application/profile_stats_providers.dart';
+import 'presentation/widgets/profile_friend_requests_tile.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -18,6 +19,7 @@ class ProfileScreen extends ConsumerWidget {
     return Column(
       children: [
         _OwnProfileStatsRow(palette: palette, theme: theme),
+        const ProfileFriendRequestsTile(),
         Expanded(
           child: Center(
             child: Column(

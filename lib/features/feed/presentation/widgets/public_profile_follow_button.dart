@@ -4,12 +4,16 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/treino_icon.dart';
+import '../../../profile/application/user_public_profile_providers.dart';
+import '../../application/feed_screen_providers.dart'
+    show myFriendsFeedProvider;
 import '../../application/friendship_providers.dart'
-    show friendshipRepositoryProvider;
+    show acceptedFriendsProvider, friendshipRepositoryProvider;
 import '../../application/public_profile_providers.dart'
     show friendshipByPairProvider;
 import '../../domain/friendship.dart';
 import '../../domain/friendship_status.dart';
+import 'unfriend_confirmation_sheet.dart';
 
 /// 4-state SEGUIR pill for the public profile screen.
 ///
@@ -37,7 +41,7 @@ class PublicProfileFollowButton extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final repo = ref.watch(friendshipRepositoryProvider);
 
-    Future<void> invalidate() async => ref.invalidate(
+    Future<void> invalidatePair() async => ref.invalidate(
           friendshipByPairProvider(
             (viewerUid: viewerUid, targetUid: targetUid),
           ),
@@ -49,17 +53,19 @@ class PublicProfileFollowButton extends ConsumerWidget {
         style: _FollowPillStyle.mintFilled,
         onTap: () async {
           await repo.request(viewerUid, targetUid);
-          await invalidate();
+          // Pending request — only the pair view changes; the accepted
+          // friends list is unaffected.
+          await invalidatePair();
         },
       );
     }
     final f = friendship!;
     if (f.status == FriendshipStatus.accepted) {
-      return const _FollowPill(
+      return _FollowPill(
         label: 'SIGUIENDO',
         style: _FollowPillStyle.outlined,
         leadingIcon: TreinoIcon.check,
-        onTap: null,
+        onTap: () => _showUnfriendSheet(context, ref, f),
       );
     }
     if (f.requesterId == viewerUid) {
@@ -75,8 +81,66 @@ class PublicProfileFollowButton extends ConsumerWidget {
       style: _FollowPillStyle.mintFilled,
       onTap: () async {
         await repo.accept(f.id, viewerUid);
-        await invalidate();
+        // Per ADR-FRI-013: refresh the pair (button transitions to SIGUIENDO),
+        // the AMIGOS-feed source (`acceptedFriendsProvider`), AND the
+        // composed feed provider itself (`myFriendsFeedProvider`). Riverpod
+        // does NOT auto-cascade invalidation when the downstream has no
+        // active listener — and the viewer is on the public-profile screen
+        // here, not on Feed AMIGOS.
+        await invalidatePair();
+        ref.invalidate(acceptedFriendsProvider(viewerUid));
+        ref.invalidate(myFriendsFeedProvider);
       },
+    );
+  }
+
+  /// Opens the unfriend confirmation bottom sheet.
+  ///
+  /// Resolves the friend's display name from [userPublicProfileProvider] with
+  /// a fallback of "Usuario anónimo". On ELIMINAR, calls
+  /// [FriendshipRepository.delete] and invalidates [friendshipByPairProvider]
+  /// so the pill transitions back to SEGUIR.
+  Future<void> _showUnfriendSheet(
+    BuildContext context,
+    WidgetRef ref,
+    Friendship f,
+  ) async {
+    final palette = AppPalette.of(context);
+    final profileAsync = ref.read(userPublicProfileProvider(targetUid));
+    final friendDisplayName =
+        profileAsync.valueOrNull?.displayName ?? 'Usuario anónimo';
+
+    final repo = ref.read(friendshipRepositoryProvider);
+
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: palette.bgCard,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => UnfriendConfirmationSheet(
+        friendDisplayName: friendDisplayName,
+        onConfirm: () async {
+          try {
+            await repo.delete(f.id, viewerUid);
+          } catch (_) {
+            // Swallow — same fire-and-forget pattern as inbox pills (ADR-FRI-009).
+          }
+          // Per ADR-FRI-013: refresh the pair (button → SEGUIR), the
+          // AMIGOS-feed source (`acceptedFriendsProvider`), AND the composed
+          // `myFriendsFeedProvider` directly — Riverpod does not auto-cascade
+          // invalidation to downstream providers that have no active listener
+          // at the moment, and the viewer is on the public-profile screen
+          // here, not on Feed AMIGOS.
+          ref.invalidate(
+            friendshipByPairProvider(
+              (viewerUid: viewerUid, targetUid: targetUid),
+            ),
+          );
+          ref.invalidate(acceptedFriendsProvider(viewerUid));
+          ref.invalidate(myFriendsFeedProvider);
+        },
+      ),
     );
   }
 }
