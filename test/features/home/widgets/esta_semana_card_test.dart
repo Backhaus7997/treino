@@ -267,9 +267,9 @@ void main() {
       expect(navigated, contains('/home/insights'));
     });
 
-    // Null insights (user has no sessions) — renders gracefully with header
+    // Null insights (user has no sessions) — renders motivational empty state
     testWidgets(
-        'null insights (no sessions) → RACHA ACTUAL header + placeholder',
+        'null insights (no sessions) → PRIMER PASO header + motivational copy + CTA',
         (tester) async {
       await tester.pumpWidget(_wrapCard(overrides: [
         weeklyInsightsProvider.overrideWith((_) async => null),
@@ -277,10 +277,73 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 50));
 
-      // Empty state renders the same header (RACHA ACTUAL pill + SEM N · MMM)
-      // above the silhouette placeholder.
-      expect(find.text('RACHA ACTUAL'), findsOneWidget);
-      expect(find.text('Tocá para ver tus insights'), findsOneWidget);
+      // Empty state: header pill cambia a "PRIMER PASO" (no "RACHA ACTUAL")
+      expect(find.text('PRIMER PASO'), findsOneWidget);
+      expect(find.text('RACHA ACTUAL'), findsNothing);
+      // Titular motivacional
+      expect(find.text('TU RACHA\nEMPIEZA ACÁ'), findsOneWidget);
+      // Copy invitante
+      expect(
+        find.textContaining('Cada entrenamiento alimenta'),
+        findsOneWidget,
+      );
+      // CTA outlined
+      expect(find.text('EXPLORAR RUTINAS  →'), findsOneWidget);
+    });
+
+    testWidgets(
+        'sessionsCount == 0 (cuenta nueva) → renderiza empty state',
+        (tester) async {
+      await tester.pumpWidget(_wrapCard(overrides: [
+        weeklyInsightsProvider.overrideWith(
+          (_) async => _makeInsights(
+            sessionsCount: 0,
+            streak: 0,
+            monthSessionsCount: 0,
+          ),
+        ),
+      ]));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+
+      // Mismo empty state cuando sessionsCount == 0 (no solo null)
+      expect(find.text('PRIMER PASO'), findsOneWidget);
+      expect(find.text('EXPLORAR RUTINAS  →'), findsOneWidget);
+    });
+
+    testWidgets(
+        'empty state → tap EXPLORAR RUTINAS navega a /workout',
+        (tester) async {
+      String? navigated;
+      final router = GoRouter(routes: [
+        GoRoute(
+          path: '/',
+          builder: (_, __) => const Scaffold(
+            body: SingleChildScrollView(child: EstaSemanaCard()),
+          ),
+        ),
+        GoRoute(
+          path: '/workout',
+          builder: (_, __) {
+            navigated = '/workout';
+            return const Scaffold(body: Text('Workout'));
+          },
+        ),
+      ]);
+
+      await tester.pumpWidget(_wrapCard(
+        overrides: [
+          weeklyInsightsProvider.overrideWith((_) async => null),
+        ],
+        router: router,
+      ));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+
+      await tester.tap(find.text('EXPLORAR RUTINAS  →'));
+      await tester.pumpAndSettle();
+
+      expect(navigated, '/workout');
     });
   });
 }
