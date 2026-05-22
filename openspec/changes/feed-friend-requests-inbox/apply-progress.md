@@ -118,7 +118,7 @@
 
 ---
 
-## Pre-PR Checklist Status
+## Pre-PR Checklist Status (PR#1 base)
 
 - [x] All 21 tasks marked [x]
 - [x] Quality gates passed (T18..T21)
@@ -127,3 +127,73 @@
 - [x] Orphaned `pendingRequestsProvider` left untouched
 - [x] `PublicProfileFollowButton`, `TreinoBottomBar`, `_FeedHeader` untouched
 - [ ] Smoke test plan to be verified in PR description (orchestrator responsibility)
+
+---
+
+## Scope Amendment 2026-05-22 (T22..T30)
+
+**Delta**: +8 tests; baseline 1055 → final 1063; all pass; 0 analyze issues; 0 format changes.
+
+### TDD Cycle Evidence
+
+| Task | Test File | Layer | RED | GREEN | REFACTOR |
+|------|-----------|-------|-----|-------|----------|
+| T22 | `test/features/feed/presentation/widgets/unfriend_confirmation_sheet_test.dart` | Widget | ✅ Written (compile fail — widget not found) | — | — |
+| T23 | same (new file) | Widget | — | ✅ All 3 SCENARIO-470,471,471b pass | ✅ Clean |
+| T24 | `test/features/feed/presentation/widgets/public_profile_follow_button_unfriend_test.dart` | Widget | ✅ Written (SIGUIENDO tap opened nothing) | — | — |
+| T25 | `lib/features/feed/presentation/widgets/public_profile_follow_button.dart` (modified) | Widget | — | ✅ SCENARIO-469,471 wiring pass; SCENARIO-226 (existing no-op) still passes | ✅ Clean |
+| T26 | `test/features/feed/presentation/widgets/friend_request_inbox_tile_test.dart` (extended) | Widget | ✅ Written (navigation assert fails — no InkWell) | — | — |
+| T27 | `lib/features/feed/presentation/widgets/friend_request_inbox_tile.dart` (modified) | Widget | — | ✅ All 3 SCENARIO-472 sub-cases pass (navigate, ACEPTAR no-nav, RECHAZAR no-nav) | ✅ Clean |
+| T28 | Gate | — | — | ✅ `flutter analyze` 0 issues (after lint fix: leading-underscore local var renamed) | — |
+| T29 | Gate | — | — | ✅ `dart format` 0 changed | — |
+| T30 | Gate | — | — | ✅ `flutter test` 1063/1063 pass | — |
+
+### Completed Tasks (Amendment)
+
+- [x] T22 — RED: `unfriend_confirmation_sheet_test.dart` — SCENARIO-470,471,471b (compile fail)
+- [x] T23 — GREEN: `UnfriendConfirmationSheet` widget created — drag handle, title, CANCELAR/ELIMINAR row, `palette.danger`
+- [x] T24 — RED: `public_profile_follow_button_unfriend_test.dart` — SCENARIO-469 (tappable), SCENARIO-471 wiring (delete fires)
+- [x] T25 — GREEN: `PublicProfileFollowButton` SIGUIENDO branch upgraded — adds `_showUnfriendSheet` helper, opens sheet, calls `repo.delete` on confirm, invalidates `friendshipByPairProvider`
+- [x] T26 — RED: extended `friend_request_inbox_tile_test.dart` — SCENARIO-472 (3 sub-cases: navigate, ACEPTAR no-nav, RECHAZAR no-nav)
+- [x] T27 — GREEN: `FriendRequestInboxTile` requester zone wrapped in `InkWell` with `context.push('/feed/profile/${friendship.requesterId}')`
+- [x] T28 — GATE: `flutter analyze` 0 issues ✅
+- [x] T29 — GATE: `dart format` 0 changed ✅
+- [x] T30 — GATE: `flutter test` 1063/1063 pass ✅
+
+### Files Modified/Created (Delta)
+
+| File | Action | Description |
+|------|--------|-------------|
+| `lib/features/feed/presentation/widgets/unfriend_confirmation_sheet.dart` | Created | StatelessWidget: drag handle + interpolated title + CANCELAR/ELIMINAR row |
+| `lib/features/feed/presentation/widgets/public_profile_follow_button.dart` | Modified | SIGUIENDO branch: removed `const` + `onTap: null`, added `_showUnfriendSheet` helper + 3 new imports |
+| `lib/features/feed/presentation/widgets/friend_request_inbox_tile.dart` | Modified | Added `go_router` import; wrapped avatar+name+gym subtree in `Expanded(InkWell(...))` |
+| `test/features/feed/presentation/widgets/unfriend_confirmation_sheet_test.dart` | Created | SCENARIO-470, 471b, 471 — 3 tests |
+| `test/features/feed/presentation/widgets/public_profile_follow_button_unfriend_test.dart` | Created | SCENARIO-469, 471 wiring — 2 tests |
+| `test/features/feed/presentation/widgets/friend_request_inbox_tile_test.dart` | Modified | Extended with SCENARIO-472 group — 3 sub-case tests |
+
+### Commits (Amendment)
+
+| Short SHA | Message |
+|-----------|---------|
+| 1ae9dfa | test(feed): SCENARIO-470,471,471b for UnfriendConfirmationSheet (T22 RED) |
+| ee582f9 | feat(feed): add UnfriendConfirmationSheet widget (T23 GREEN) |
+| 8057c0d | test(feed): SCENARIO-469,471 wiring for PublicProfileFollowButton SIGUIENDO upgrade (T24 RED) |
+| 508432e | feat(feed): upgrade SIGUIENDO branch to open UnfriendConfirmationSheet (T25 GREEN) |
+| d6fa42b | test(feed): SCENARIO-472 tappable requester zone for FriendRequestInboxTile (T26 RED) |
+| 46d473e | feat(feed): wrap requester zone in InkWell for profile navigation (T27 GREEN) |
+| f9ec00a | chore(quality): fix leading-underscore lint in tile test, gates T28-T30 pass |
+
+### Deviations from Design
+
+1. **InkWell inside `Expanded` (not `Material` wrapper)**: Design §5.3 note 4 suggested wrapping with `Material(color: Colors.transparent, child: InkWell(...))` or using `Material(borderRadius: ..., color: palette.bgCard, ...)`. The tile's outer `Container` already provides the `bgCard` background and radius, so adding a `Material` wrapper would double-wrap the background. Instead, the `InkWell` sits inside `Expanded` directly — the ink ripple is bounded by the expanded region and doesn't bleed over the pills because they are sibling widgets to the right. Visual behavior matches intent; no background layering artifact.
+
+2. **`_showUnfriendSheet` as instance method on `PublicProfileFollowButton`**: Design §5.5 describes it as a helper function. Implemented as a private instance method on the `ConsumerWidget` class since it needs access to `targetUid`, `viewerUid`, and `context`. Functionally identical; no deviation in behavior.
+
+### Pre-PR Checklist (Amendment)
+
+- [x] All 30 tasks marked [x] (T01..T17 + T22..T30)
+- [x] Quality gates passed — T28..T30
+- [x] Only `SIGUIENDO` branch of `PublicProfileFollowButton` modified — other 3 states untouched
+- [x] No `firestore.rules` changes
+- [x] `TreinoBottomBar`, `_FeedHeader` untouched
+- [x] No new Freezed models, no new Firestore collections

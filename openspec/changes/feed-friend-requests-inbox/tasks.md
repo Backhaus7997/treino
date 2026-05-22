@@ -106,6 +106,29 @@ Chain strategy: stacked-to-main
 
 ---
 
+## Phase 9: Unfriend confirmation sheet (scope amendment 2026-05-22, REQ-FRI-012)
+
+- [x] T22 — RED: create `test/features/feed/presentation/widgets/unfriend_confirmation_sheet_test.dart`. Failing tests for SCENARIO-470 (sheet renders "¿Eliminar amistad con Vicente?" with the interpolated friend name + CANCELAR + ELIMINAR buttons), SCENARIO-471b (CANCELAR taps `Navigator.pop` without firing `onConfirm`), SCENARIO-471 (ELIMINAR taps `Navigator.pop` then fires `onConfirm`).
+- [x] T23 — GREEN: create `lib/features/feed/presentation/widgets/unfriend_confirmation_sheet.dart` per design §5.4 (Stateless widget, drag-handle + title + Cancel/Delete row, `palette.danger` for the destructive button). Tests pass.
+
+## Phase 10: PublicProfileFollowButton SIGUIENDO upgrade (REQ-FRI-012)
+
+- [x] T24 — RED: create `test/features/feed/presentation/widgets/public_profile_follow_button_unfriend_test.dart`. Failing tests for SCENARIO-469 (SIGUIENDO pill's `onTap` is no longer null when status=accepted), SCENARIO-471 wiring (tapping SIGUIENDO opens the sheet and ELIMINAR triggers `repo.delete(friendship.id, viewerUid)` then invalidates `friendshipByPairProvider`).
+- [x] T25 — GREEN: modify `lib/features/feed/presentation/widgets/public_profile_follow_button.dart` per design §5.5 — replace the `const _FollowPill(... onTap: null)` in the `accepted` branch with the tappable variant that opens `UnfriendConfirmationSheet`. Resolve `friendDisplayName` from `userPublicProfileProvider(targetUid)`, fallback to `"Usuario anónimo"`. Tests pass.
+
+## Phase 11: Tappable inbox row (REQ-FRI-013)
+
+- [x] T26 — RED: extend `test/features/feed/presentation/widgets/friend_request_inbox_tile_test.dart` with SCENARIO-472 (tapping the requester zone — avatar/name/gym — navigates to `/feed/profile/{requesterUid}`; tapping ACEPTAR or RECHAZAR does NOT navigate).
+- [x] T27 — GREEN: modify `lib/features/feed/presentation/widgets/friend_request_inbox_tile.dart` per design §5.3 — wrap the avatar + name + gym subtree in an `InkWell` with `onTap: () => context.push('/feed/profile/${friendship.requesterId}')`. Action pills stay outside the InkWell. Tests pass.
+
+## Phase 12: Quality Gates (re-run after Phase 9-11)
+
+- [x] T28 — GATE: `flutter analyze` — still 0 issues after the new code
+- [x] T29 — GATE: `dart format --output=none --set-exit-if-changed .` — still 0 changed
+- [x] T30 — GATE: `flutter test` — full suite green; new SCENARIOs 469..472 pass; no regressions in any existing test
+
+---
+
 ## Coverage Matrix: REQ → Tasks → SCENARIOs
 
 | REQ | Tasks | SCENARIOs |
@@ -121,35 +144,38 @@ Chain strategy: stacked-to-main
 | REQ-FRI-009 | T08, T09, T10, T11 | 463, 467 |
 | REQ-FRI-010 | T08, T09, T10, T11 | 464, 465 |
 | REQ-FRI-011 | T12, T13, T14, T15, T16, T17 | 465a, 466, 467, 468a, 468b |
-| REQ-FRI-CX-001 | T21 | — (cross-cutting gate) |
-| REQ-FRI-CX-002 | T21 | — (cross-cutting gate) |
-| REQ-FRI-CX-003 | T21 | — (cross-cutting gate) |
-| REQ-FRI-CX-004 | T02..T17 | All (TDD order enforced) |
+| REQ-FRI-012 | T22, T23, T24, T25 | 469, 470, 471, 471b |
+| REQ-FRI-013 | T26, T27 | 472 |
+| REQ-FRI-CX-001 | T21, T28 | — (cross-cutting gate) |
+| REQ-FRI-CX-002 | T21, T28 | — (cross-cutting gate) |
+| REQ-FRI-CX-003 | T21, T28 | — (cross-cutting gate) |
+| REQ-FRI-CX-004 | T02..T27 | All (TDD order enforced) |
 | REQ-FRI-CX-005 | T07 | — (no Scaffold/AppBackground/SafeArea) |
 
 ---
 
 ## Pre-PR Checklist
 
-- [ ] All 21 tasks marked [x]
-- [ ] Quality gates passed (T18..T21)
+- [x] All 30 tasks marked [x] (T01..T17 done; T22..T30 added in scope amendment 2026-05-22)
+- [ ] Quality gates passed (T18..T21 first pass + T28..T30 after Phase 9-11)
 - [ ] No `firestore.rules` changes (rules audit CONFIRMED — no changes needed)
 - [ ] No new Firestore collections; no new Freezed models
 - [ ] Orphaned `pendingRequestsProvider` (Future variant) left untouched per locked decision
-- [ ] `PublicProfileFollowButton`, `TreinoBottomBar`, `_FeedHeader` untouched
-- [ ] Smoke test plan documented in PR body: (1) open Profile tab → tile visible with count; (2) open inbox → pending requests listed; (3) tap ACEPTAR → row disappears; (4) tap RECHAZAR → row disappears, no dialog; (5) empty inbox → empty state copy; (6) sign out race → no crash
+- [ ] `TreinoBottomBar`, `_FeedHeader` untouched
+- [ ] `PublicProfileFollowButton` SEGUIR / SOLICITUD ENVIADA / ACEPTAR branches untouched (only SIGUIENDO upgraded)
+- [ ] Smoke test plan documented in PR body covering all 11 steps (8 inbox + 3 unfriend/tap)
 
 ---
 
 ## Hard Constraints (from design + spec)
 
 1. NO modifications to `firestore.rules` (audit confirmed clean)
-2. NO touching `PublicProfileFollowButton` (alternate accept path stays as-is)
+2. **AMENDMENT 2026-05-22**: `PublicProfileFollowButton` IS now in scope BUT only the `SIGUIENDO` (accepted) branch — the other three states (`SEGUIR`, `SOLICITUD ENVIADA`, `ACEPTAR`) stay untouched
 3. NO touching `TreinoBottomBar` (Option A entry, no badge surgery)
-4. NO converting `friendshipByPairProvider` or `userPublicProfileProvider` to Stream (separate follow-up SDD)
+4. NO converting `friendshipByPairProvider` or `userPublicProfileProvider` to Stream (separate follow-up SDD) — though THIS SDD does invalidate `friendshipByPairProvider` after unfriend (single targeted call, not a conversion)
 5. NO removing orphaned `pendingRequestsProvider` (separate cleanup pass)
 6. NO copy review iteration in this PR — locked from proposal
-7. All colors via `AppPalette.of(context)` — no hex literals
+7. All colors via `AppPalette.of(context)` — no hex literals. `palette.danger` is the destructive button color in the unfriend sheet (already exists in `AppPalette`)
 8. All icons via `TreinoIcon.X` — no `PhosphorIcons.X` direct usage
 9. Spacing from scale only: 8 / 12 / 14 / 18 / 20 px
 10. Strict TDD: RED commit BEFORE GREEN commit per task pair
