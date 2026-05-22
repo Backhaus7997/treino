@@ -87,6 +87,39 @@ void main() {
     });
 
     testWidgets(
+        'Fase B: status active → muestra botón MENSAJE',
+        (tester) async {
+      await tester.pumpWidget(_wrap(
+        const AthleteCoachView(),
+        overrides: [
+          currentAthleteLinkProvider.overrideWith((ref) async => _makeLink()),
+          userPublicProfileProvider('trainer-1')
+              .overrideWith((ref) async => _makePub()),
+        ],
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.text('MENSAJE'), findsOneWidget);
+    });
+
+    testWidgets(
+        'Fase B: status pending → NO muestra botón MENSAJE',
+        (tester) async {
+      await tester.pumpWidget(_wrap(
+        const AthleteCoachView(),
+        overrides: [
+          currentAthleteLinkProvider.overrideWith(
+              (ref) async => _makeLink(status: TrainerLinkStatus.pending)),
+          userPublicProfileProvider('trainer-1')
+              .overrideWith((ref) async => _makePub()),
+        ],
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.text('MENSAJE'), findsNothing);
+    });
+
+    testWidgets(
         'REQ-COACH-LINK-003: status pending → muestra esperando + cancelar',
         (tester) async {
       await tester.pumpWidget(_wrap(

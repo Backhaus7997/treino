@@ -9,6 +9,7 @@ import '../features/auth/presentation/login_screen.dart';
 import '../features/auth/presentation/register_screen.dart';
 import '../features/auth/presentation/splash_screen.dart';
 import '../features/auth/presentation/welcome_screen.dart';
+import '../features/chat/presentation/chat_screen.dart';
 import '../features/coach/coach_screen.dart';
 import '../features/coach/presentation/athlete_detail_screen.dart';
 import '../features/coach/presentation/trainer_public_profile_screen.dart';
@@ -263,6 +264,16 @@ GoRouter buildRouter({
                 pageBuilder: (context, state) {
                   final athleteId = state.pathParameters['athleteId']!;
                   return _noAnim(AthleteDetailScreen(athleteId: athleteId));
+                },
+              ),
+              GoRoute(
+                path: 'chat/:chatId',
+                pageBuilder: (context, state) {
+                  final chatId = state.pathParameters['chatId']!;
+                  final otherUid = state.uri.queryParameters['other'] ?? '';
+                  return _noAnim(
+                    ChatScreen(chatId: chatId, otherUid: otherUid),
+                  );
                 },
               ),
             ],

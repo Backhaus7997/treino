@@ -1,0 +1,164 @@
+import 'package:cloud_firestore/cloud_firestore.dart'
+    show
+        CollectionReference,
+        DocumentSnapshot,
+        FieldValue,
+        FirebaseFirestore,
+        Query;
+
+import '../domain/chat.dart';
+import '../domain/message.dart';
+
+/// Repository de chats 1-1 entre PF y athlete. Doc id determinístico
+/// (`sortedUids.join('_')`) para que ambos miembros resuelvan al mismo doc
+/// sin coordinar.
+class ChatRepository {
+  ChatRepository({required FirebaseFirestore firestore})
+      : _firestore = firestore;
+
+  final FirebaseFirestore _firestore;
+
+  /// Preview máximo guardado en `chats.lastMessageText`. Si el mensaje es
+  /// más largo se trunca con elipsis Unicode (`…`).
+  static const int previewMaxChars = 80;
+
+  /// Default limit para `watchMessages`. Conversaciones MVP son cortas;
+  /// paginación real entra cuando crezca.
+  static const int defaultMessagesLimit = 50;
+
+  CollectionReference<Map<String, Object?>> get _chats =>
+      _firestore.collection('chats');
+
+  CollectionReference<Map<String, Object?>> _messagesOf(String chatId) =>
+      _chats.doc(chatId).collection('messages');
+
+  // ─── chatIdFor ──────────────────────────────────────────────────────────
+  //
+  // Pure helper. Devuelve el doc id determinístico para el par. Orden de
+  // los argumentos no importa.
+
+  static String chatIdFor(String uidA, String uidB) {
+    if (uidA == uidB) {
+      throw ArgumentError.value(uidB, 'uidB', 'no se puede chatear con uno mismo');
+    }
+    final sorted = [uidA, uidB]..sort();
+    return sorted.join('_');
+  }
+
+  // ─── getOrCreate ────────────────────────────────────────────────────────
+  //
+  // Idempotente. Si el doc ya existe lo devuelve tal cual; si no, lo crea
+  // con createdAt:serverTimestamp + members ordenados.
+
+  Future<Chat> getOrCreate({
+    required String selfId,
+    required String otherId,
+  }) async {
+    final id = chatIdFor(selfId, otherId);
+    final ref = _chats.doc(id);
+    final existing = await ref.get();
+    if (existing.exists) {
+      return _chatFromDoc(existing)!;
+    }
+    final members = [selfId, otherId]..sort();
+    await ref.set({
+      'chatId': id,
+      'members': members,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+    final created = await ref.get();
+    return _chatFromDoc(created)!;
+  }
+
+  // ─── sendMessage ────────────────────────────────────────────────────────
+  //
+  // Batch: doc nuevo en messages + update del parent con preview. Atómico
+  // para que la lista nunca muestre un preview desincronizado con el último
+  // mensaje real.
+
+  Future<void> sendMessage({
+    required String chatId,
+    required String senderId,
+    required String text,
+  }) async {
+    final trimmed = text.trim();
+    if (trimmed.isEmpty) {
+      throw ArgumentError.value(text, 'text', 'el mensaje no puede estar vacío');
+    }
+
+    final batch = _firestore.batch();
+    final msgRef = _messagesOf(chatId).doc();
+    batch.set(msgRef, {
+      'id': msgRef.id,
+      'senderId': senderId,
+      'text': trimmed,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+    batch.update(_chats.doc(chatId), {
+      'lastMessageAt': FieldValue.serverTimestamp(),
+      'lastMessageText': _previewOf(trimmed),
+      'lastMessageSenderId': senderId,
+    });
+    await batch.commit();
+  }
+
+  // ─── watchMessages ──────────────────────────────────────────────────────
+  //
+  // Stream ordenado desc por createdAt. El ChatScreen usa ListView.reverse
+  // para mostrar el más nuevo al final visualmente sin shifting.
+
+  Stream<List<Message>> watchMessages(
+    String chatId, {
+    int limit = defaultMessagesLimit,
+  }) {
+    final Query<Map<String, Object?>> query = _messagesOf(chatId)
+        .orderBy('createdAt', descending: true)
+        .limit(limit);
+    return query.snapshots().map((snap) {
+      return snap.docs.map(_messageFromDoc).whereType<Message>().toList();
+    });
+  }
+
+  // ─── watchChatsForUser ──────────────────────────────────────────────────
+  //
+  // Stream de chats donde el uid es miembro, ordenados por lastMessageAt
+  // desc. Nota: Firestore `orderBy('lastMessageAt')` excluye docs sin el
+  // campo, así que los chats recién creados (todavía sin mensajes) no
+  // aparecen en la lista hasta que tengan al menos un send. Es behavior
+  // intencional para MVP — un chat vacío en la lista se ve raro.
+
+  Stream<List<Chat>> watchChatsForUser(String uid) {
+    final ordered = _chats
+        .where('members', arrayContains: uid)
+        .orderBy('lastMessageAt', descending: true);
+    return ordered.snapshots().map((snap) {
+      return snap.docs.map(_chatFromDoc).whereType<Chat>().toList();
+    });
+  }
+
+  // ─── Private helpers ────────────────────────────────────────────────────
+
+  Chat? _chatFromDoc(DocumentSnapshot<Map<String, Object?>> snap) {
+    final data = snap.data();
+    if (!snap.exists || data == null) return null;
+    // createdAt puede llegar como null si justo se acaba de crear y el
+    // serverTimestamp todavía no resolvió localmente; en ese caso el get()
+    // posterior ya tiene el valor real.
+    if (data['createdAt'] == null) return null;
+    return Chat.fromJson({...data, 'chatId': snap.id});
+  }
+
+  Message? _messageFromDoc(DocumentSnapshot<Map<String, Object?>> snap) {
+    final data = snap.data();
+    if (!snap.exists || data == null) return null;
+    // Mismo motivo que en _chatFromDoc: el serverTimestamp puede llegar
+    // null en el primer snapshot local antes de que el server confirme.
+    if (data['createdAt'] == null) return null;
+    return Message.fromJson({...data, 'id': snap.id});
+  }
+
+  String _previewOf(String text) {
+    if (text.length <= previewMaxChars) return text;
+    return '${text.substring(0, previewMaxChars)}…';
+  }
+}

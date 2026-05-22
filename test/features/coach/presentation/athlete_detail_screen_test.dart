@@ -181,5 +181,27 @@ void main() {
 
       expect(find.text('RoutineEditor:athlete-1'), findsOneWidget);
     });
+
+    testWidgets(
+        'Fase B: renderiza botón MENSAJE en el footer',
+        (tester) async {
+      await _pumpScreen(
+        tester,
+        athleteId: 'athlete-1',
+        overrides: [
+          currentUidProvider.overrideWithValue('trainer-1'),
+          userPublicProfileProvider('athlete-1').overrideWith(
+            (ref) async => _makeProfile('athlete-1', 'Martín García'),
+          ),
+          assignedRoutinesProvider('athlete-1').overrideWith(
+            (ref) async => const [],
+          ),
+        ],
+      );
+
+      await tester.pumpAndSettle();
+
+      expect(find.text('MENSAJE'), findsOneWidget);
+    });
   });
 }

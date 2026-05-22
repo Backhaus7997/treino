@@ -15,9 +15,16 @@
  *      - `role: 'trainer'`
  *      - Defaults for trainer fields (bio/specialty/rate) so the account is
  *        also discoverable via Coach Discovery (Etapa 2).
- *   3. Upsert `trainerPublicProfiles/{uid}` with the dual-write subset.
+ *   3. Upsert `trainerPublicProfiles/{uid}` with the trainer-specific subset
+ *      (consumed by Coach Discovery / TrainerPublicProfileScreen).
+ *   4. Upsert `userPublicProfiles/{uid}` with the generic public identity
+ *      subset (consumed by ChatScreen, post avatars, search — anywhere that
+ *      needs a public displayName/avatar for any user regardless of role).
+ *      Without this step, accounts created directly with this script would
+ *      show as "Usuario" in chats (collection is null/missing).
  *
- * The script is idempotent — safe to re-run.
+ * The script is idempotent — safe to re-run. Re-running on an existing
+ * trainer will backfill the userPublicProfiles doc if it was missing.
  *
  * ────────────────────────────────────────────────────────────────────────────
  * USAGE
@@ -108,10 +115,27 @@ async function promote() {
     { merge: true },
   );
 
+  // Dual-write a userPublicProfiles — generic public identity, leída por
+  // ChatScreen y cualquier feature que muestra el nombre de "otro user"
+  // sin importar su rol. Sin esto, cuentas creadas directo via Admin SDK
+  // (sin pasar por signup) quedan invisibles ahí y caen al fallback
+  // "Usuario" en el chat. REQ-UPP-014/015 + bugfix coach-chat smoke 2026-05-22.
+  await db.collection('userPublicProfiles').doc(uid).set(
+    {
+      uid,
+      displayName: data.displayName,
+      displayNameLowercase: (data.displayName || '').trim().toLowerCase(),
+      avatarUrl: data.avatarUrl ?? null,
+      gymId: data.gymId ?? null,
+    },
+    { merge: true },
+  );
+
   console.log(`✓ Promoted ${email} to trainer.`);
   console.log(`  uid: ${uid}`);
   console.log(`  trainerSpecialty: ${trainerSpecialty}`);
   console.log(`  trainerMonthlyRate: \$${trainerMonthlyRate}/mes`);
+  console.log(`  userPublicProfiles backfilled (displayName: ${data.displayName ?? '(no name)'})`);
   console.log('');
   console.log('Logout + login again on the app to see the TrainerCoachView.');
 }

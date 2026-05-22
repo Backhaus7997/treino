@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../app/theme/app_palette.dart';
 import '../../core/widgets/treino_icon.dart';
+import '../chat/application/chat_providers.dart';
 import '../profile/application/user_public_profile_providers.dart';
 import '../profile/domain/user_public_profile.dart';
 import 'application/trainer_link_providers.dart';
@@ -282,30 +284,74 @@ class _ActionRow extends ConsumerWidget {
       );
     }
     if (link.status == TrainerLinkStatus.active) {
-      return SizedBox(
-        width: double.infinity,
-        child: OutlinedButton(
-          onPressed: () => _onTerminate(context, ref),
-          style: OutlinedButton.styleFrom(
-            side: BorderSide(color: palette.highlight, width: 1),
-            foregroundColor: palette.highlight,
-            minimumSize: const Size.fromHeight(48),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(9999),
+      return Column(
+        children: [
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () => _onMessage(context, ref),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: palette.accent,
+                foregroundColor: palette.bg,
+                minimumSize: const Size.fromHeight(48),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(9999),
+                ),
+              ),
+              icon: Icon(TreinoIcon.chat, size: 18, color: palette.bg),
+              label: Text(
+                'MENSAJE',
+                style: GoogleFonts.barlowCondensed(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                  letterSpacing: 0.8,
+                ),
+              ),
             ),
           ),
-          child: Text(
-            'TERMINAR VÍNCULO',
-            style: GoogleFonts.barlowCondensed(
-              fontWeight: FontWeight.w700,
-              fontSize: 13,
-              letterSpacing: 0.8,
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton(
+              onPressed: () => _onTerminate(context, ref),
+              style: OutlinedButton.styleFrom(
+                side: BorderSide(color: palette.highlight, width: 1),
+                foregroundColor: palette.highlight,
+                minimumSize: const Size.fromHeight(48),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(9999),
+                ),
+              ),
+              child: Text(
+                'TERMINAR VÍNCULO',
+                style: GoogleFonts.barlowCondensed(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                  letterSpacing: 0.8,
+                ),
+              ),
             ),
           ),
-        ),
+        ],
       );
     }
     return const SizedBox.shrink();
+  }
+
+  Future<void> _onMessage(BuildContext context, WidgetRef ref) async {
+    try {
+      final chat =
+          await ref.read(chatForLinkProvider(link).future);
+      if (!context.mounted) return;
+      context.push('/coach/chat/${chat.chatId}?other=${link.trainerId}');
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No pudimos abrir el chat. Probá de nuevo.'),
+        ),
+      );
+    }
   }
 }
 
