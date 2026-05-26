@@ -1,0 +1,14 @@
+{
+  "projects": {
+    "default": "treino-dev"
+  },
+  "targets": {
+    "treino-dev": {
+      "hosting": {
+        "coach-hub-dev": [
+          "coach-treino-dev"
+        ]
+      }
+    }
+  }
+}

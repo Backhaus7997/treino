@@ -17,10 +17,7 @@ import 'package:flutter/foundation.dart'
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
-      throw UnsupportedError(
-        'DefaultFirebaseOptions have not been configured for web - '
-        'you can reconfigure this by running the FlutterFire CLI again.',
-      );
+      return web;
     }
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
@@ -59,10 +56,23 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyADShDYyLfXvQSVgVUCoSsdXmB35uS8Z3k',
-    appId: '1:1079774251763:ios:c292394709b082553f8586',
+    appId: '1:1079774251763:ios:006f7766b93ce5dc3f8586',
     messagingSenderId: '1079774251763',
     projectId: 'treino-dev',
     storageBucket: 'treino-dev.firebasestorage.app',
-    iosBundleId: 'com.treino.app',
+    androidClientId: '1079774251763-kf6ct53t2olntalhafgtj5bvufpa6rfd.apps.googleusercontent.com',
+    iosClientId: '1079774251763-rbcocukjq4mc8onmohitp65jualmvmo5.apps.googleusercontent.com',
+    iosBundleId: 'com.backhaus.treino',
   );
+
+  static const FirebaseOptions web = FirebaseOptions(
+    apiKey: 'AIzaSyCs6DDwJxEZkfWQgrhGF2_uUzWRBVweAFs',
+    appId: '1:1079774251763:web:e78f5ea99effb1593f8586',
+    messagingSenderId: '1079774251763',
+    projectId: 'treino-dev',
+    authDomain: 'treino-dev.firebaseapp.com',
+    storageBucket: 'treino-dev.firebasestorage.app',
+    measurementId: 'G-KT3CZ3EL8S',
+  );
+
 }
