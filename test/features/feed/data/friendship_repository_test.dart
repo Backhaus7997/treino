@@ -505,6 +505,188 @@ void main() {
       await sub.cancel();
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // T02 RED: watchByPair (SCENARIO-473..475)
+  // ---------------------------------------------------------------------------
+  group('FriendshipRepository.watchByPair', () {
+    final now = DateTime.utc(2026, 1, 1);
+
+    // SCENARIO-473: watchByPair emits null when no friendship doc exists
+    test(
+        'SCENARIO-473: watchByPair emits null when no doc exists for the pair',
+        () async {
+      final stream = repo.watchByPair('alice', 'bob');
+      await expectLater(stream, emits(isNull));
+    });
+
+    // SCENARIO-474: watchByPair re-emits with the new friendship after Firestore write commits
+    test(
+        'SCENARIO-474: watchByPair re-emits non-null Friendship after doc written with status pending',
+        () async {
+      final stream = repo.watchByPair('alice', 'bob');
+      final emissions = <Friendship?>[];
+      final sub = stream.listen(emissions.add);
+
+      // Wait for initial null emission
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(emissions.length, equals(1));
+      expect(emissions.first, isNull);
+
+      // Write a friendship doc
+      final docId = Friendship.sortedDocId('alice', 'bob');
+      final friendship = Friendship(
+        id: docId,
+        uidA: 'alice',
+        uidB: 'bob',
+        status: FriendshipStatus.pending,
+        requesterId: 'alice',
+        members: ['alice', 'bob'],
+        createdAt: now,
+      );
+      await firestore
+          .collection('friendships')
+          .doc(docId)
+          .set(friendship.toJson());
+
+      // Wait for re-emission
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(emissions.length, equals(2));
+      expect(emissions[1], isNotNull);
+      expect(emissions[1]!.status, equals(FriendshipStatus.pending));
+
+      await sub.cancel();
+    });
+
+    // SCENARIO-475: watchByPair re-emits null after friendship deletion
+    test('SCENARIO-475: watchByPair re-emits null after doc is deleted',
+        () async {
+      // Seed an existing friendship
+      final docId = Friendship.sortedDocId('alice', 'bob');
+      final friendship = Friendship(
+        id: docId,
+        uidA: 'alice',
+        uidB: 'bob',
+        status: FriendshipStatus.accepted,
+        requesterId: 'alice',
+        members: ['alice', 'bob'],
+        createdAt: now,
+      );
+      await firestore
+          .collection('friendships')
+          .doc(docId)
+          .set(friendship.toJson());
+
+      final stream = repo.watchByPair('alice', 'bob');
+      final emissions = <Friendship?>[];
+      final sub = stream.listen(emissions.add);
+
+      // Wait for initial non-null emission
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(emissions.length, equals(1));
+      expect(emissions.first, isNotNull);
+
+      // Delete the doc
+      await firestore.collection('friendships').doc(docId).delete();
+
+      // Wait for re-emission
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(emissions.length, equals(2));
+      expect(emissions[1], isNull);
+
+      await sub.cancel();
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // T04 RED: watchAcceptedFriendsOf (SCENARIO-476..478)
+  // ---------------------------------------------------------------------------
+  group('FriendshipRepository.watchAcceptedFriendsOf', () {
+    final now = DateTime.utc(2026, 1, 1);
+
+    // SCENARIO-476: watchAcceptedFriendsOf emits empty list for user with no accepted friendships
+    test(
+        'SCENARIO-476: watchAcceptedFriendsOf emits [] when no accepted docs exist for uid',
+        () async {
+      final stream = repo.watchAcceptedFriendsOf('u1');
+      await expectLater(stream, emits(isEmpty));
+    });
+
+    // SCENARIO-477: watchAcceptedFriendsOf re-emits with new peer uid after accept commits
+    test(
+        'SCENARIO-477: watchAcceptedFriendsOf re-emits [peerUid] after accepted doc is written',
+        () async {
+      final stream = repo.watchAcceptedFriendsOf('u1');
+      final emissions = <List<String>>[];
+      final sub = stream.listen(emissions.add);
+
+      // Wait for initial empty emission
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(emissions.length, equals(1));
+      expect(emissions.first, isEmpty);
+
+      // Write an accepted friendship
+      final friendship = Friendship(
+        id: 'u1_u2',
+        uidA: 'u1',
+        uidB: 'u2',
+        status: FriendshipStatus.accepted,
+        requesterId: 'u2',
+        members: ['u1', 'u2'],
+        createdAt: now,
+      );
+      await firestore
+          .collection('friendships')
+          .doc('u1_u2')
+          .set(friendship.toJson());
+
+      // Wait for re-emission
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(emissions.length, greaterThanOrEqualTo(2));
+      expect(emissions.last, equals(['u2']));
+
+      await sub.cancel();
+    });
+
+    // SCENARIO-478: watchAcceptedFriendsOf re-emits [] after accepted friendship deleted
+    test(
+        'SCENARIO-478: watchAcceptedFriendsOf re-emits [] after accepted doc is deleted',
+        () async {
+      // Seed an accepted friendship
+      final friendship = Friendship(
+        id: 'u1_u2',
+        uidA: 'u1',
+        uidB: 'u2',
+        status: FriendshipStatus.accepted,
+        requesterId: 'u2',
+        members: ['u1', 'u2'],
+        createdAt: now,
+      );
+      await firestore
+          .collection('friendships')
+          .doc('u1_u2')
+          .set(friendship.toJson());
+
+      final stream = repo.watchAcceptedFriendsOf('u1');
+      final emissions = <List<String>>[];
+      final sub = stream.listen(emissions.add);
+
+      // Wait for initial non-empty emission
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(emissions.length, equals(1));
+      expect(emissions.first, equals(['u2']));
+
+      // Delete the doc
+      await firestore.collection('friendships').doc('u1_u2').delete();
+
+      // Wait for re-emission
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(emissions.length, greaterThanOrEqualTo(2));
+      expect(emissions.last, isEmpty);
+
+      await sub.cancel();
+    });
+  });
 }
 
 // ─── Test helper: throws on any write ─────────────────────────────────────────
