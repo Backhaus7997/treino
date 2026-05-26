@@ -28,6 +28,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
     required this.sage,
     required this.espresso,
     required this.danger,
+    required this.warning,
   });
 
   final Color accent;
@@ -47,6 +48,11 @@ class AppPalette extends ThemeExtension<AppPalette> {
   /// Danger red — inline error states, char-limit exceeded indicator.
   final Color danger;
 
+  /// Warning amber — non-blocking caution states (eg. import partial match,
+  /// rate limit close to cap). Distinct hue from `danger` so the user can
+  /// tell at a glance whether action is required or just attention.
+  final Color warning;
+
   static const mintMagenta = AppPalette(
     accent: AppColors.mint,
     highlight: AppColors.magenta,
@@ -58,6 +64,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
     sage: AppColors.sage,
     espresso: AppColors.espresso,
     danger: Color(0xFFE53935),
+    warning: Color(0xFFFFB300),
   );
 
   static AppPalette of(BuildContext context) =>
@@ -75,6 +82,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
     Color? sage,
     Color? espresso,
     Color? danger,
+    Color? warning,
   }) =>
       AppPalette(
         accent: accent ?? this.accent,
@@ -87,6 +95,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
         sage: sage ?? this.sage,
         espresso: espresso ?? this.espresso,
         danger: danger ?? this.danger,
+        warning: warning ?? this.warning,
       );
 
   @override
@@ -103,6 +112,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
       sage: Color.lerp(sage, other.sage, t)!,
       espresso: Color.lerp(espresso, other.espresso, t)!,
       danger: Color.lerp(danger, other.danger, t)!,
+      warning: Color.lerp(warning, other.warning, t)!,
     );
   }
 }

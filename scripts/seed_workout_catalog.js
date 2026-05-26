@@ -13,6 +13,7 @@ const exercises = [
     name: 'Bench Press',
     muscleGroup: 'chest',
     category: 'compound',
+    aliases: ['Press banca', 'Press de banca', 'Press plano', 'Press de banca plano', 'Press de pecho'],
     techniqueInstructions: [
       'Acostate en banco plano con los pies firmes en el piso.',
       'Tomá la barra con agarre poco más ancho que los hombros.',
@@ -25,6 +26,7 @@ const exercises = [
     name: 'Incline Dumbbell Press',
     muscleGroup: 'chest',
     category: 'compound',
+    aliases: ['Press inclinado con mancuernas', 'Press inclinado mancuernas', 'Press inclinado', 'Press inclinado DB', 'Press inclinado de mancuernas', 'Press en banco inclinado'],
     techniqueInstructions: [
       'Banco inclinado a 30–45°.',
       'Bajá las mancuernas a la altura del pecho con codos a 45°.',
@@ -37,6 +39,7 @@ const exercises = [
     name: 'Cable Fly',
     muscleGroup: 'chest',
     category: 'isolation',
+    aliases: ['Cruce de poleas', 'Cruces en polea', 'Aperturas en polea', 'Aperturas con poleas', 'Cruces de cable', 'Cruces poleas'],
     techniqueInstructions: [
       'Poleas altas, un paso adelante con una pierna.',
       'Llevá las manijas hacia el centro con codos ligeramente flexionados.',
@@ -51,6 +54,7 @@ const exercises = [
     name: 'Deadlift',
     muscleGroup: 'back',
     category: 'compound',
+    aliases: ['Peso muerto', 'Peso muerto convencional', 'Peso muerto con barra', 'Muerto'],
     techniqueInstructions: [
       'Pies al ancho de caderas, barra sobre el empeine.',
       'Espalda neutra, pecho hacia afuera, caderas atrás.',
@@ -63,6 +67,7 @@ const exercises = [
     name: 'Barbell Row',
     muscleGroup: 'back',
     category: 'compound',
+    aliases: ['Remo con barra', 'Remo barra', 'Remo inclinado con barra', 'Remo Pendlay', 'Remo con barra al pecho', 'Remo agarre pronado'],
     techniqueInstructions: [
       'Inclinación de torso a ~45°, espalda neutra.',
       'Jalá la barra hacia el ombligo apretando los codos.',
@@ -75,6 +80,7 @@ const exercises = [
     name: 'Pull-Up',
     muscleGroup: 'back',
     category: 'compound',
+    aliases: ['Dominadas', 'Dominada', 'Pull up', 'Pull ups', 'Dominada pronada', 'Dominadas pronadas'],
     techniqueInstructions: [
       'Agarre pronado, ancho de hombros.',
       'Iniciá el movimiento deprimiendo las escápulas.',
@@ -87,6 +93,7 @@ const exercises = [
     name: 'Lat Pulldown',
     muscleGroup: 'back',
     category: 'compound',
+    aliases: ['Jalón al pecho', 'Polea al pecho', 'Jalón frontal', 'Polea dorsal', 'Jalón dorsal', 'Polea al pecho con barra', 'Pulldown'],
     techniqueInstructions: [
       'Agarre ancho, sentate con los muslos bajo los rodillos.',
       'Jalá la barra hacia el pecho inclinando el torso ligeramente.',
@@ -101,6 +108,7 @@ const exercises = [
     name: 'Overhead Press',
     muscleGroup: 'shoulders',
     category: 'compound',
+    aliases: ['Press militar', 'Press de hombros', 'Press de pie', 'Press hombro con barra', 'Press militar de pie', 'OHP', 'Press de hombro'],
     techniqueInstructions: [
       'Barra a la altura del pecho, agarre levemente más ancho que los hombros.',
       'Empujá hacia arriba evitando arquear la espalda baja.',
@@ -113,6 +121,7 @@ const exercises = [
     name: 'Lateral Raise',
     muscleGroup: 'shoulders',
     category: 'isolation',
+    aliases: ['Elevaciones laterales', 'Vuelos laterales', 'Laterales con mancuernas', 'Elevaciones laterales con mancuernas', 'Aperturas laterales', 'Laterales'],
     techniqueInstructions: [
       'Mancuernas a los costados con codos ligeramente flexionados.',
       'Levantá los brazos hasta paralelo al piso como si derramaras agua.',
@@ -127,6 +136,7 @@ const exercises = [
     name: 'Back Squat',
     muscleGroup: 'quads',
     category: 'compound',
+    aliases: ['Sentadilla', 'Sentadilla con barra', 'Sentadilla trasera', 'Squat', 'Squat trasero', 'Sentadilla libre', 'Sentadilla profunda', 'Sentadilla con barra trasera'],
     techniqueInstructions: [
       'Barra sobre trapecios, pies al ancho de hombros o un poco más.',
       'Bajá como si fueras a sentarte, rodillas alineadas con los pies.',
@@ -139,6 +149,7 @@ const exercises = [
     name: 'Leg Press',
     muscleGroup: 'quads',
     category: 'compound',
+    aliases: ['Prensa de piernas', 'Prensa', 'Prensa 45', 'Prensa horizontal', 'Press de pierna', 'Prensa de pierna'],
     techniqueInstructions: [
       'Pies al ancho de hombros en la plataforma.',
       'Bajá el peso hasta que los muslos queden paralelos.',
@@ -151,6 +162,7 @@ const exercises = [
     name: 'Leg Extension',
     muscleGroup: 'quads',
     category: 'isolation',
+    aliases: ['Extensión de cuádriceps', 'Extensión de piernas', 'Cuádriceps en máquina', 'Camilla de cuádriceps', 'Silla de cuádriceps', 'Extensiones de cuadriceps'],
     techniqueInstructions: [
       'Sentate con la espalda contra el respaldo y el eje de la máquina alineado con la rodilla.',
       'Extendé las piernas hasta arriba apretando el cuádriceps.',
@@ -163,6 +175,7 @@ const exercises = [
     name: 'Romanian Deadlift',
     muscleGroup: 'hamstrings',
     category: 'compound',
+    aliases: ['Peso muerto rumano', 'Peso muerto a piernas rectas', 'Rumano', 'RDL', 'Peso muerto piernas semi-rígidas', 'Peso muerto rumano con barra'],
     techniqueInstructions: [
       'Pies al ancho de caderas, barra o mancuernas frente al cuerpo.',
       'Empujá las caderas hacia atrás bajando el peso pegado a las piernas.',
@@ -175,6 +188,7 @@ const exercises = [
     name: 'Leg Curl',
     muscleGroup: 'hamstrings',
     category: 'isolation',
+    aliases: ['Curl femoral', 'Camilla femoral', 'Femoral acostado', 'Femoral en máquina', 'Flexión de pierna en máquina', 'Curl de pierna acostado', 'Femoral'],
     techniqueInstructions: [
       'Boca abajo en la máquina, eje alineado con la rodilla.',
       'Flexioná las rodillas llevando los talones hacia los glúteos.',
@@ -187,6 +201,7 @@ const exercises = [
     name: 'Hip Thrust',
     muscleGroup: 'glutes',
     category: 'compound',
+    aliases: ['Empuje de cadera', 'Empuje de caderas', 'Empuje pélvico', 'Hip thrust con barra', 'Glute bridge con barra', 'Puente de glúteos con barra'],
     techniqueInstructions: [
       'Espalda alta sobre el banco, barra sobre las caderas con amortiguador.',
       'Empujá las caderas hacia arriba hasta que el torso quede paralelo al piso.',
@@ -199,6 +214,7 @@ const exercises = [
     name: 'Calf Raise',
     muscleGroup: 'calves',
     category: 'isolation',
+    aliases: ['Elevación de pantorrillas', 'Gemelos de pie', 'Pantorrilla en máquina', 'Elevaciones de gemelos', 'Gemelos', 'Pantorrillas'],
     techniqueInstructions: [
       'Pies al ancho de caderas en el borde de un escalón o plataforma.',
       'Subí en puntillas lo más alto posible apretando las pantorrillas.',
@@ -213,6 +229,7 @@ const exercises = [
     name: 'Barbell Curl',
     muscleGroup: 'biceps',
     category: 'isolation',
+    aliases: ['Curl con barra', 'Curl de bíceps con barra', 'Bíceps con barra', 'Curl barra recta', 'Curl barra'],
     techniqueInstructions: [
       'Agarre supino al ancho de hombros.',
       'Flexioná los codos llevando la barra hacia los hombros.',
@@ -225,6 +242,7 @@ const exercises = [
     name: 'Hammer Curl',
     muscleGroup: 'biceps',
     category: 'isolation',
+    aliases: ['Curl martillo', 'Curl tipo martillo', 'Martillo con mancuernas', 'Curl neutro', 'Curl de bíceps martillo'],
     techniqueInstructions: [
       'Agarre neutro (pulgar arriba) con mancuernas.',
       'Flexioná el codo manteniendo el agarre neutro.',
@@ -239,6 +257,7 @@ const exercises = [
     name: 'Tricep Pushdown',
     muscleGroup: 'triceps',
     category: 'isolation',
+    aliases: ['Jalón de tríceps', 'Extensión de tríceps en polea', 'Tríceps en polea', 'Polea de tríceps', 'Pushdown', 'Extensión polea alta', 'Tríceps polea'],
     techniqueInstructions: [
       'Polea alta, agarre con barra recta o en V.',
       'Codos fijos a los costados, extendé los brazos hacia abajo.',
@@ -251,6 +270,7 @@ const exercises = [
     name: 'Skull Crusher',
     muscleGroup: 'triceps',
     category: 'isolation',
+    aliases: ['Press francés', 'Rompecráneos', 'Frances', 'Press francés con barra EZ', 'Extensión de tríceps acostado', 'Press francés acostado'],
     techniqueInstructions: [
       'Acostado en banco plano, barra EZ sobre el pecho.',
       'Bajá la barra hacia la frente flexionando solo los codos.',
@@ -263,6 +283,7 @@ const exercises = [
     name: 'Close Grip Bench Press',
     muscleGroup: 'triceps',
     category: 'compound',
+    aliases: ['Press cerrado', 'Press banca cerrado', 'Press agarre cerrado', 'Press de banca agarre cerrado', 'Press banca tríceps'],
     techniqueInstructions: [
       'Agarre estrecho (ancho de hombros) en banco plano.',
       'Bajá la barra al pecho con los codos cerca del torso.',
@@ -277,6 +298,7 @@ const exercises = [
     name: 'Plank',
     muscleGroup: 'core',
     category: 'isolation',
+    aliases: ['Plancha', 'Plancha frontal', 'Plancha abdominal', 'Plancha isométrica'],
     techniqueInstructions: [
       'Apoyate en antebrazos y puntas de pies.',
       'Cuerpo en línea recta de la cabeza a los talones.',
@@ -289,6 +311,7 @@ const exercises = [
     name: 'Cable Crunch',
     muscleGroup: 'core',
     category: 'isolation',
+    aliases: ['Crunch en polea', 'Abdominales en polea', 'Crunch con cuerda', 'Abdominal polea alta', 'Abdominales con polea'],
     techniqueInstructions: [
       'De rodillas frente a la polea alta con la cuerda detrás de la cabeza.',
       'Flexioná el torso llevando los codos hacia las rodillas.',
@@ -301,6 +324,7 @@ const exercises = [
     name: 'Hanging Leg Raise',
     muscleGroup: 'core',
     category: 'isolation',
+    aliases: ['Elevación de piernas colgado', 'Elevaciones de piernas colgado', 'Piernas en barra', 'Elevación de piernas en barra', 'Elevación de rodillas colgado'],
     techniqueInstructions: [
       'Colgado de una barra con agarre pronado.',
       'Llevá las rodillas (o piernas rectas) hacia el pecho.',
@@ -315,6 +339,7 @@ const exercises = [
     name: 'Face Pull',
     muscleGroup: 'shoulders',
     category: 'isolation',
+    aliases: ['Jalón al rostro', 'Jalón a la cara', 'Face pull con cuerda', 'Polea cara con cuerda', 'Jalón facial'],
     techniqueInstructions: [
       'Polea alta con cuerda, jalá hacia la cara con codos a 90°.',
       'Rotá externamente los hombros al final del movimiento.',
