@@ -171,6 +171,7 @@ void main() {
     testWidgets(
       'SCENARIO-522: tapping booked chip opens action menu with cancel',
       (tester) async {
+        // ignore: unused_local_variable
         final rule = _makeRule(dayOfWeek: DateTime.tuesday);
         // Make appointment far in the future so cancel is available (>24h)
         final futureAppt = Appointment(

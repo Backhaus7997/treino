@@ -12,6 +12,7 @@ import '../features/auth/presentation/welcome_screen.dart';
 import '../features/chat/presentation/chat_screen.dart';
 import '../features/coach/coach_screen.dart';
 import '../features/coach/presentation/athlete_detail_screen.dart';
+import '../features/coach/presentation/availability_editor_screen.dart';
 import '../features/coach/presentation/trainer_public_profile_screen.dart';
 import '../features/workout/presentation/routine_editor_screen.dart';
 import '../features/workout/application/session_init.dart';
@@ -280,6 +281,13 @@ GoRouter buildRouter({
               GoRoute(
                 path: 'agenda',
                 pageBuilder: (_, __) => _noAnim(const _AgendaPlaceholder()),
+              ),
+              GoRoute(
+                path: 'availability-editor',
+                pageBuilder: (context, state) {
+                  final uid = state.uri.queryParameters['trainerId'] ?? '';
+                  return _noAnim(AvailabilityEditorScreen(trainerId: uid));
+                },
               ),
             ],
           ),

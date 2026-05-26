@@ -81,10 +81,10 @@ class _EditorBody extends ConsumerWidget {
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
       children: [
         // ── Rules section ───────────────────────────────────────────────────
-        _SectionHeader(label: 'MIS HORARIOS DE TRABAJO'),
+        const _SectionHeader(label: 'MIS HORARIOS DE TRABAJO'),
         const SizedBox(height: 12),
         if (rules.isEmpty)
-          _EmptyHint(
+          const _EmptyHint(
             message:
                 'Sin horarios configurados. Agregá uno para que tus alumnos puedan reservar.',
           )
@@ -105,10 +105,9 @@ class _EditorBody extends ConsumerWidget {
         const SizedBox(height: 32),
 
         // ── Overrides section ───────────────────────────────────────────────
-        _SectionHeader(label: 'EXCEPCIONES'),
+        const _SectionHeader(label: 'EXCEPCIONES'),
         const SizedBox(height: 12),
-        if (overrides.isEmpty)
-          _EmptyHint(message: 'Sin excepciones.'),
+        if (overrides.isEmpty) const _EmptyHint(message: 'Sin excepciones.'),
         for (final avOverride in overrides)
           _OverrideTile(
             availOverride: avOverride,
@@ -418,7 +417,9 @@ class _RuleFormSheetState extends ConsumerState<_RuleFormSheet> {
               ),
             ),
             Text(
-              widget.existing == null ? AgendaStrings.addRuleCta : 'Editar horario',
+              widget.existing == null
+                  ? AgendaStrings.addRuleCta
+                  : 'Editar horario',
               style: GoogleFonts.barlowCondensed(
                 fontWeight: FontWeight.w700,
                 fontSize: 18,
@@ -443,8 +444,10 @@ class _RuleFormSheetState extends ConsumerState<_RuleFormSheet> {
             _TimePicker(
               hour: _startHour,
               minute: _startMinute,
-              onChanged: (h, m) =>
-                  setState(() { _startHour = h; _startMinute = m; }),
+              onChanged: (h, m) => setState(() {
+                _startHour = h;
+                _startMinute = m;
+              }),
               palette: palette,
             ),
             const SizedBox(height: 16),
@@ -455,8 +458,10 @@ class _RuleFormSheetState extends ConsumerState<_RuleFormSheet> {
             _TimePicker(
               hour: _endHour,
               minute: _endMinute,
-              onChanged: (h, m) =>
-                  setState(() { _endHour = h; _endMinute = m; }),
+              onChanged: (h, m) => setState(() {
+                _endHour = h;
+                _endMinute = m;
+              }),
               palette: palette,
             ),
             const SizedBox(height: 16),
@@ -483,8 +488,7 @@ class _RuleFormSheetState extends ConsumerState<_RuleFormSheet> {
                   side: BorderSide(
                     color: selected ? palette.accent : palette.border,
                   ),
-                  onSelected: (_) =>
-                      setState(() => _slotDurationMin = d),
+                  onSelected: (_) => setState(() => _slotDurationMin = d),
                 );
               }).toList(),
             ),
@@ -604,13 +608,13 @@ class _BlockOverrideFormSheetState
               ),
             ),
             const SizedBox(height: 20),
-
             _FormLabel('Fecha a bloquear', palette),
             const SizedBox(height: 6),
             InkWell(
               onTap: () => _pickDate(context),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                 decoration: BoxDecoration(
                   border: Border.all(color: palette.border),
                   borderRadius: BorderRadius.circular(8),
@@ -632,7 +636,6 @@ class _BlockOverrideFormSheetState
               ),
             ),
             const SizedBox(height: 24),
-
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
@@ -859,7 +862,8 @@ class _TimePicker extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.access_time_outlined, size: 18, color: palette.textMuted),
+            Icon(Icons.access_time_outlined,
+                size: 18, color: palette.textMuted),
             const SizedBox(width: 8),
             Text(
               '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}',

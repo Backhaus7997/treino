@@ -60,8 +60,7 @@ Widget _wrap(Widget child, {List<Override> overrides = const []}) =>
 
 void main() {
   group('TrainersMapBottomSheet', () {
-    testWidgets(
-        'con ubicación: header dice "N ENTRENADORES CERCA" (plural)',
+    testWidgets('con ubicación: header dice "N ENTRENADORES CERCA" (plural)',
         (tester) async {
       await tester.pumpWidget(_wrap(
         const TrainersMapBottomSheet(),
@@ -120,10 +119,7 @@ void main() {
           trainerDiscoveryProvider.overrideWith((_) async => [
                 _trainer(uid: 't1', displayName: 'Con Loc'),
                 _trainer(
-                    uid: 't2',
-                    displayName: 'Sin Loc',
-                    lat: null,
-                    lon: null),
+                    uid: 't2', displayName: 'Sin Loc', lat: null, lon: null),
               ]),
         ],
       ));

@@ -87,13 +87,16 @@ void main() {
       expect(find.byType(TabBar), findsOneWidget);
     });
 
-    testWidgets('AGENDA y COMUNIDADES siguen como placeholder', (tester) async {
+    testWidgets(
+        'COMUNIDADES sigue como placeholder; AGENDA ahora trae TrainerAgendaTab (Etapa 6)',
+        (tester) async {
       await tester.pumpWidget(_wrap(
         const TrainerCoachView(),
         overrides: _stubLinks(const []),
       ));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('AGENDA'));
+      // COMUNIDADES sigue placeholder
+      await tester.tap(find.text('COMUNIDADES'));
       await tester.pumpAndSettle();
       expect(find.text('PRÓXIMAMENTE'), findsOneWidget);
     });

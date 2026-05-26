@@ -7,11 +7,9 @@ import 'package:treino/features/coach/application/agenda_providers.dart';
 import 'package:treino/features/coach/data/appointment_repository.dart';
 import 'package:treino/features/coach/data/availability_repository.dart';
 import 'package:treino/features/coach/domain/appointment.dart';
-import 'package:treino/features/coach/domain/availability_override.dart';
 import 'package:treino/features/coach/domain/availability_rule.dart';
 import 'package:treino/features/coach/presentation/agenda_strings.dart';
 import 'package:treino/features/coach/presentation/trainer_agenda_tab.dart';
-import 'package:treino/features/coach/trainer_coach_view.dart';
 
 // ── Fakes ─────────────────────────────────────────────────────────────────────
 
@@ -59,7 +57,8 @@ Widget _wrap(Widget child, {List<Override> overrides = const []}) {
 
 void main() {
   // ── SCENARIO-512: AGENDA sub-tab renders TrainerAgendaTab ─────────────────
-  group('SCENARIO-512 — TrainerCoachView renders TrainerAgendaTab at index 2', () {
+  group('SCENARIO-512 — TrainerCoachView renders TrainerAgendaTab at index 2',
+      () {
     testWidgets(
       'SCENARIO-512: TabBarView index 2 is TrainerAgendaTab, not _SubTabPlaceholder',
       (tester) async {
@@ -88,7 +87,8 @@ void main() {
             ],
             child: MaterialApp(
               theme: AppTheme.dark(),
-              home: const Scaffold(body: TrainerAgendaTab(trainerId: 'trainer-1')),
+              home: const Scaffold(
+                  body: TrainerAgendaTab(trainerId: 'trainer-1')),
             ),
           ),
         );

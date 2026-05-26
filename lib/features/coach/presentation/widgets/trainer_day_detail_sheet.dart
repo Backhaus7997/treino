@@ -147,7 +147,8 @@ class TrainerDayDetailSheet extends ConsumerWidget {
     );
   }
 
-  Widget _sheet(BuildContext context, AppPalette palette, {required Widget child}) {
+  Widget _sheet(BuildContext context, AppPalette palette,
+      {required Widget child}) {
     return SafeArea(
       child: Padding(
         padding: EdgeInsets.only(
@@ -343,9 +344,8 @@ class _BookedSlotChip extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final canCancel =
-        appointment.startsAt.difference(DateTime.now().toUtc()) >
-            const Duration(hours: 24);
+    final canCancel = appointment.startsAt.difference(DateTime.now().toUtc()) >
+        const Duration(hours: 24);
 
     return GestureDetector(
       onTap: () => _showActionMenu(context, ref, canCancel),
@@ -461,14 +461,12 @@ class _BookedSlotChip extends ConsumerWidget {
       if (!context.mounted) return;
       Navigator.of(context).pop(); // close detail sheet
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text(AgendaStrings.cancellationSuccess)),
+        const SnackBar(content: Text(AgendaStrings.cancellationSuccess)),
       );
     } on CancellationTooLateException {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text(AgendaStrings.cancellationTooLate)),
+        const SnackBar(content: Text(AgendaStrings.cancellationTooLate)),
       );
     } catch (_) {
       if (!context.mounted) return;

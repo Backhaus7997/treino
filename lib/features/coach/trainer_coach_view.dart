@@ -7,9 +7,11 @@ import '../../app/theme/app_palette.dart';
 import '../../core/widgets/treino_icon.dart';
 import '../profile/application/user_public_profile_providers.dart';
 import '../profile/domain/user_public_profile.dart';
+import '../workout/application/session_providers.dart' show currentUidProvider;
 import 'application/trainer_link_providers.dart';
 import 'domain/trainer_link.dart';
 import 'domain/trainer_link_status.dart';
+import 'presentation/trainer_agenda_tab.dart';
 
 class TrainerCoachView extends StatelessWidget {
   const TrainerCoachView({super.key});
@@ -43,14 +45,19 @@ class TrainerCoachView extends StatelessWidget {
             tabs: [for (final l in _labels) Tab(text: l)],
           ),
           const SizedBox(height: 8),
-          const Expanded(
+          Expanded(
             child: TabBarView(
-              physics: NeverScrollableScrollPhysics(),
+              physics: const NeverScrollableScrollPhysics(),
               children: [
-                _DashboardTab(),
-                _AlumnosTab(),
-                _SubTabPlaceholder(label: 'AGENDA'),
-                _SubTabPlaceholder(label: 'COMUNIDADES'),
+                const _DashboardTab(),
+                const _AlumnosTab(),
+                Consumer(
+                  builder: (context, ref, _) {
+                    final uid = ref.watch(currentUidProvider) ?? '';
+                    return TrainerAgendaTab(trainerId: uid);
+                  },
+                ),
+                const _SubTabPlaceholder(label: 'COMUNIDADES'),
               ],
             ),
           ),

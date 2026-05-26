@@ -92,6 +92,7 @@ AvailabilityOverride _makeBlockOverride({String id = 'override-1'}) =>
 
 // ── Widget helper ─────────────────────────────────────────────────────────────
 
+// ignore: unused_element
 Widget _wrap(
   Widget child, {
   List<Override> overrides = const [],

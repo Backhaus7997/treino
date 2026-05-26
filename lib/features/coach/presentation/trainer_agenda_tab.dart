@@ -45,7 +45,8 @@ class _TrainerAgendaTabState extends ConsumerState<TrainerAgendaTab> {
   void initState() {
     super.initState();
     final now = DateTime.now().toUtc();
-    _rangeFrom = DateTime.utc(now.year, now.month - 1 < 1 ? 1 : now.month - 1, 1);
+    _rangeFrom =
+        DateTime.utc(now.year, now.month - 1 < 1 ? 1 : now.month - 1, 1);
     _rangeTo = DateTime.utc(now.year + 1, now.month, 1);
   }
 
@@ -92,7 +93,8 @@ class _TrainerAgendaTabState extends ConsumerState<TrainerAgendaTab> {
             ),
             if (rules.isNotEmpty)
               TextButton(
-                onPressed: () => context.push('/coach/availability-editor'),
+                onPressed: () => context.push(
+                    '/coach/availability-editor?trainerId=${widget.trainerId}'),
                 child: Text(
                   'Editar',
                   style: GoogleFonts.barlowCondensed(
@@ -125,7 +127,8 @@ class _TrainerAgendaTabState extends ConsumerState<TrainerAgendaTab> {
           const SizedBox(height: 24),
           Center(
             child: ElevatedButton(
-              onPressed: () => context.push('/coach/availability-editor'),
+              onPressed: () => context.push(
+                  '/coach/availability-editor?trainerId=${widget.trainerId}'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: palette.accent,
                 foregroundColor: palette.bg,
@@ -160,8 +163,7 @@ class _TrainerAgendaTabState extends ConsumerState<TrainerAgendaTab> {
               });
               _openDaySheet(context, selected);
             },
-            onPageChanged: (focused) =>
-                setState(() => _focusedDay = focused),
+            onPageChanged: (focused) => setState(() => _focusedDay = focused),
           ),
         ],
       ],
@@ -236,8 +238,9 @@ class _TrainerCalendar extends ConsumerWidget {
     // Days that have rules (day-of-week based).
     final ruleDays = rules.map((r) => r.dayOfWeek).toSet();
 
-    bool _hasActivity(DateTime day) =>
-        ruleDays.contains(day.weekday) || bookedDays.contains(
+    bool hasActivity(DateTime day) =>
+        ruleDays.contains(day.weekday) ||
+        bookedDays.contains(
           DateTime(day.year, day.month, day.day),
         );
 
@@ -250,7 +253,7 @@ class _TrainerCalendar extends ConsumerWidget {
       onDaySelected: onDaySelected,
       onPageChanged: onPageChanged,
       calendarFormat: CalendarFormat.month,
-      eventLoader: (day) => _hasActivity(day) ? [null] : [],
+      eventLoader: (day) => hasActivity(day) ? [null] : [],
       calendarStyle: CalendarStyle(
         outsideDaysVisible: false,
         todayDecoration: BoxDecoration(
@@ -286,8 +289,7 @@ class _TrainerCalendar extends ConsumerWidget {
           color: palette.textPrimary,
         ),
         leftChevronIcon: Icon(TreinoIcon.back, color: palette.textPrimary),
-        rightChevronIcon:
-            Icon(TreinoIcon.forward, color: palette.textPrimary),
+        rightChevronIcon: Icon(TreinoIcon.forward, color: palette.textPrimary),
       ),
       daysOfWeekStyle: DaysOfWeekStyle(
         weekdayStyle: GoogleFonts.barlowCondensed(

@@ -234,8 +234,9 @@ final trainerDiscoveryProvider =
   // Fase 2b: price filter — siempre aplica. Trainers sin rate set se
   // incluyen (matches retorna true cuando rate es null).
   if (selectedPrice != PriceFilter.any) {
-    trainers =
-        trainers.where((t) => selectedPrice.matches(t.trainerMonthlyRate)).toList();
+    trainers = trainers
+        .where((t) => selectedPrice.matches(t.trainerMonthlyRate))
+        .toList();
   }
 
   // Reorder by haversine ASC when location is available (D9)
