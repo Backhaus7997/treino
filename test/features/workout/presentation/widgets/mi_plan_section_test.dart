@@ -279,6 +279,58 @@ void main() {
       expect(find.byKey(const Key('mi_plan_card')), findsOneWidget);
     });
 
+    testWidgets(
+        'current badge: single plan does NOT show "Actual" chip (redundant)',
+        (tester) async {
+      final plan = _makePlan();
+
+      await _pumpMiPlanSection(
+        tester,
+        overrides: [
+          authStateChangesProvider
+              .overrideWith((ref) => Stream.value(_userWithUid('athlete-1'))),
+          assignedRoutinesProvider('athlete-1')
+              .overrideWith((ref) async => [plan]),
+          currentAthleteLinkProvider.overrideWith((ref) async => null),
+          userPublicProfileProvider('trainer-1').overrideWith(
+            (ref) => Stream.value(_makeProfile('trainer-1', 'Lucas')),
+          ),
+        ],
+      );
+
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('mi_plan_current_chip')), findsNothing);
+    });
+
+    testWidgets(
+        'current badge: multiple plans → only the FIRST shows the "Actual" chip',
+        (tester) async {
+      final planNew = _makePlan(id: 'plan-new', name: 'Plan Nuevo');
+      final planOld = _makePlan(id: 'plan-old', name: 'Plan Viejo');
+
+      await _pumpMiPlanSection(
+        tester,
+        overrides: [
+          authStateChangesProvider
+              .overrideWith((ref) => Stream.value(_userWithUid('athlete-1'))),
+          // listAssignedTo returns newest first; the order here mirrors that.
+          assignedRoutinesProvider('athlete-1')
+              .overrideWith((ref) async => [planNew, planOld]),
+          currentAthleteLinkProvider.overrideWith((ref) async => null),
+          userPublicProfileProvider('trainer-1').overrideWith(
+            (ref) => Stream.value(_makeProfile('trainer-1', 'Lucas')),
+          ),
+        ],
+      );
+
+      await tester.pumpAndSettle();
+
+      // Exactly one "Actual" chip, sitting next to the newest plan.
+      expect(find.byKey(const Key('mi_plan_current_chip')), findsOneWidget);
+      expect(find.text(CoachStrings.miPlanCurrent.toUpperCase()), findsOneWidget);
+    });
+
     testWidgets('SCENARIO-451: no badge when link is active', (tester) async {
       final plan = _makePlan();
       final link = _makeLink(status: TrainerLinkStatus.active);
