@@ -17,15 +17,10 @@ final acceptedFriendsProvider =
   return ref.watch(friendshipRepositoryProvider).watchAcceptedFriendsOf(uid);
 });
 
-// ORPHAN DELETION PENDING: `pendingRequestsProvider` (Future variant)
-// has zero consumers in lib/ or test/ (confirmed by SDD explore phase).
-// Will be removed in T17 GREEN per REQ-FPS-009 / SCENARIO-491.
-// After deletion, any file that imports and uses `pendingRequestsProvider`
-// MUST fail to compile — `flutter analyze` will surface it as "Undefined name".
-final pendingRequestsProvider =
-    FutureProvider.family<List<Friendship>, String>((ref, uid) {
-  return ref.watch(friendshipRepositoryProvider).pendingRequestsFor(uid);
-});
+// `pendingRequestsProvider` (Future variant) removed 2026-05-26 per SDD
+// `feed-providers-stream-conversion` — superseded by `pendingRequestsStreamProvider`.
+// Zero consumers confirmed by explore phase. Any file importing and using
+// `pendingRequestsProvider` WILL fail to compile — "Undefined name" error.
 
 /// Live stream of pending friendship requests received by [uid]
 /// (status=pending, requesterId != uid). Backs the inbox screen.
