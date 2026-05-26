@@ -379,9 +379,10 @@ class _ShellScaffold extends StatelessWidget {
         currentIndex: _currentIndex,
         onTap: (i) {
           // Dismiss any open popup (modal bottom sheet, dialog) before
-          // switching tabs so overlays don't persist on top of the next tab
-          // (e.g. coach agenda day sheet hovering on Perfil). Regular
-          // GoRoute pages are PageRoute, not PopupRoute, so they survive.
+          // switching tabs. showModalBottomSheet defaults to
+          // useRootNavigator: false, so the modal lives on the local
+          // Navigator — NOT rootNavigator: true. Pop both to be safe.
+          Navigator.of(context).popUntil((route) => route is! PopupRoute);
           Navigator.of(context, rootNavigator: true)
               .popUntil((route) => route is! PopupRoute);
           context.go(_kTabs[i]);

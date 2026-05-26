@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
+import '../../../profile/application/user_public_profile_providers.dart';
 import '../../application/agenda_providers.dart';
 import '../../domain/agenda_exceptions.dart';
 import '../../domain/appointment.dart';
@@ -348,6 +349,17 @@ class _BookedSlotChip extends ConsumerWidget {
     final canCancel = appointment.startsAt.difference(DateTime.now().toUtc()) >
         const Duration(hours: 24);
 
+    // Resolve athlete display name at READ time via the public profile.
+    // The Appointment doc has athleteDisplayName cached at book time, but old
+    // bookings (pre-bugfix) wrote the UID there. Reading from the public
+    // profile gives us the canonical current name regardless.
+    final profileAsync =
+        ref.watch(userPublicProfileProvider(appointment.athleteId));
+    final displayName = profileAsync.maybeWhen(
+      data: (p) => p?.displayName ?? athleteName,
+      orElse: () => athleteName,
+    );
+
     return GestureDetector(
       onTap: () => _showActionMenu(context, ref, canCancel),
       child: Container(
@@ -370,7 +382,7 @@ class _BookedSlotChip extends ConsumerWidget {
               ),
             ),
             Text(
-              athleteName,
+              displayName,
               style: GoogleFonts.barlow(
                 fontSize: 11,
                 color: Colors.blue.withAlpha(200),

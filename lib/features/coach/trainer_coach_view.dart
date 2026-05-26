@@ -44,8 +44,10 @@ class TrainerCoachView extends StatelessWidget {
             ),
             tabs: [for (final l in _labels) Tab(text: l)],
             // Close any open popup (e.g. agenda day sheet) when the trainer
-            // switches sub-tabs so overlays don't persist.
+            // switches sub-tabs. Pop both navigators because showModalBottomSheet
+            // defaults to useRootNavigator: false (local navigator).
             onTap: (_) {
+              Navigator.of(context).popUntil((route) => route is! PopupRoute);
               Navigator.of(context, rootNavigator: true)
                   .popUntil((route) => route is! PopupRoute);
             },

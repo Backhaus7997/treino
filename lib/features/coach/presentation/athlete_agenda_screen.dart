@@ -206,6 +206,28 @@ class _AthleteAgendaScreenState extends ConsumerState<AthleteAgendaScreen> {
 
   Future<void> _onBook(BuildContext context, DateTime slot) async {
     final repo = ref.read(appointmentRepositoryProvider);
+
+    // Block double-booking on the same day. Athlete can have at most ONE
+    // confirmed appointment per calendar day with their PF.
+    final allMine =
+        ref.read(appointmentsForAthleteStreamProvider(widget.athleteId)).value ??
+            const [];
+    final alreadyBookedSameDay = allMine.any((a) =>
+        a.status == AppointmentStatus.confirmed &&
+        a.startsAt.year == slot.year &&
+        a.startsAt.month == slot.month &&
+        a.startsAt.day == slot.day);
+    if (alreadyBookedSameDay) {
+      if (!context.mounted) return;
+      Navigator.of(context).pop(); // close sheet
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Ya tenés una reserva con tu PF ese día.'),
+        ),
+      );
+      return;
+    }
+
     // Resolve athlete display name from their public profile so the trainer
     // sees a name (not a UID) on the booked chip.
     final profile =
