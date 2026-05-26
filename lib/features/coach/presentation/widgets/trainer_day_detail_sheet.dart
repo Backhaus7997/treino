@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../profile/application/user_public_profile_providers.dart';
+import '../../../profile/domain/user_public_profile.dart';
 import '../../application/agenda_providers.dart';
 import '../../domain/agenda_exceptions.dart';
 import '../../domain/appointment.dart';
@@ -329,7 +330,7 @@ class _SlotChip extends StatelessWidget {
 
 // ── Booked slot chip ──────────────────────────────────────────────────────────
 
-class _BookedSlotChip extends ConsumerWidget {
+class _BookedSlotChip extends ConsumerStatefulWidget {
   const _BookedSlotChip({
     required this.time,
     required this.athleteName,
@@ -345,20 +346,31 @@ class _BookedSlotChip extends ConsumerWidget {
   final AppPalette palette;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_BookedSlotChip> createState() => _BookedSlotChipState();
+}
+
+class _BookedSlotChipState extends ConsumerState<_BookedSlotChip> {
+  /// Fresh one-shot fetch via the repository — BYPASSES the cached
+  /// `userPublicProfileProvider`. The cached provider is a non-autoDispose
+  /// FutureProvider: if the first read happened before the user's profile
+  /// was backfilled, it cached `null` forever within the app session, even
+  /// after the backfill. This fetch reads Firestore fresh every time the
+  /// sheet opens (initState fires once per chip mount).
+  late final Future<UserPublicProfile?> _profileFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _profileFuture = ref
+        .read(userPublicProfileRepositoryProvider)
+        .get(widget.appointment.athleteId);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final appointment = widget.appointment;
     final canCancel = appointment.startsAt.difference(DateTime.now().toUtc()) >
         const Duration(hours: 24);
-
-    // Resolve athlete display name at READ time via the public profile.
-    // The Appointment doc has athleteDisplayName cached at book time, but old
-    // bookings (pre-bugfix) wrote the UID there. Reading from the public
-    // profile gives us the canonical current name regardless.
-    final profileAsync =
-        ref.watch(userPublicProfileProvider(appointment.athleteId));
-    final displayName = profileAsync.maybeWhen(
-      data: (p) => p?.displayName ?? athleteName,
-      orElse: () => athleteName,
-    );
 
     return GestureDetector(
       onTap: () => _showActionMenu(context, ref, canCancel),
@@ -374,19 +386,25 @@ class _BookedSlotChip extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              time,
+              widget.time,
               style: GoogleFonts.barlowCondensed(
                 fontWeight: FontWeight.w700,
                 fontSize: 14,
                 color: Colors.blue,
               ),
             ),
-            Text(
-              displayName,
-              style: GoogleFonts.barlow(
-                fontSize: 11,
-                color: Colors.blue.withAlpha(200),
-              ),
+            FutureBuilder<UserPublicProfile?>(
+              future: _profileFuture,
+              builder: (ctx, snap) {
+                final name = snap.data?.displayName ?? widget.athleteName;
+                return Text(
+                  name,
+                  style: GoogleFonts.barlow(
+                    fontSize: 11,
+                    color: Colors.blue.withAlpha(200),
+                  ),
+                );
+              },
             ),
           ],
         ),
@@ -456,7 +474,7 @@ class _BookedSlotChip extends ConsumerWidget {
     } else if (action == 'ver-alumno') {
       // Close the day-detail sheet first, then push athlete detail.
       Navigator.of(context).pop();
-      context.push('/coach/athlete/${appointment.athleteId}');
+      context.push('/coach/athlete/${widget.appointment.athleteId}');
     }
   }
 
@@ -472,8 +490,8 @@ class _BookedSlotChip extends ConsumerWidget {
 
     try {
       await ref.read(appointmentRepositoryProvider).cancel(
-            appointment: appointment,
-            actorUid: trainerId,
+            appointment: widget.appointment,
+            actorUid: widget.trainerId,
             reason: AgendaStrings.bookingCancelledByCoach,
           );
       if (!context.mounted) return;
