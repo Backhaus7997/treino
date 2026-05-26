@@ -69,7 +69,7 @@ void main() {
               availabilityRulesStreamProvider('trainer-1').overrideWith(
                 (ref) => Stream.value([]),
               ),
-              overridesStreamProvider(const OverridesKey(
+              overridesStreamProvider(OverridesKey(
                 trainerId: 'trainer-1',
                 fromDate: _kFrom,
                 toDate: _kTo,
@@ -113,7 +113,7 @@ void main() {
               availabilityRulesStreamProvider('trainer-1').overrideWith(
                 (ref) => Stream.value([]),
               ),
-              overridesStreamProvider(const OverridesKey(
+              overridesStreamProvider(OverridesKey(
                 trainerId: 'trainer-1',
                 fromDate: _kFrom,
                 toDate: _kTo,
@@ -240,15 +240,15 @@ void main() {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 // A fixed date far in the future to use as range keys in overrides.
-const _kFrom = DateTime.utc(2026, 1, 1);
-const _kTo = DateTime.utc(2027, 12, 31);
+final _kFrom = DateTime.utc(2026, 1, 1);
+final _kTo = DateTime.utc(2027, 12, 31);
 
 List<Override> _overridesWithRules(List<AvailabilityRule> rules) {
   return [
     availabilityRulesStreamProvider('trainer-1').overrideWith(
       (ref) => Stream.value(rules),
     ),
-    overridesStreamProvider(const OverridesKey(
+    overridesStreamProvider(OverridesKey(
       trainerId: 'trainer-1',
       fromDate: _kFrom,
       toDate: _kTo,
@@ -275,7 +275,7 @@ List<Override> _overridesWithRulesAndAppointments(
     availabilityRulesStreamProvider('trainer-1').overrideWith(
       (ref) => Stream.value(rules),
     ),
-    overridesStreamProvider(const OverridesKey(
+    overridesStreamProvider(OverridesKey(
       trainerId: 'trainer-1',
       fromDate: _kFrom,
       toDate: _kTo,
