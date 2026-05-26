@@ -25,22 +25,6 @@ import 'package:treino/features/profile/application/user_providers.dart'
     show firestoreProvider;
 
 // ---------------------------------------------------------------------------
-// Invalidation observer: records which providers were invalidated.
-// ---------------------------------------------------------------------------
-
-class _InvalidationObserver extends ProviderObserver {
-  final List<String> disposedProviders = [];
-
-  @override
-  void didDisposeProvider(
-    ProviderBase<Object?> provider,
-    ProviderContainer container,
-  ) {
-    disposedProviders.add(provider.toString());
-  }
-}
-
-// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -50,16 +34,6 @@ Friendship _pending({required String requesterId}) => Friendship(
       uidB: 'viewer',
       status: FriendshipStatus.pending,
       requesterId: requesterId,
-      members: const ['target', 'viewer'],
-      createdAt: DateTime.utc(2026, 1, 1),
-    );
-
-Friendship _accepted() => Friendship(
-      id: Friendship.sortedDocId('viewer', 'target'),
-      uidA: 'target',
-      uidB: 'viewer',
-      status: FriendshipStatus.accepted,
-      requesterId: 'viewer',
       members: const ['target', 'viewer'],
       createdAt: DateTime.utc(2026, 1, 1),
     );
@@ -134,8 +108,7 @@ void main() {
 
       // Primary action: friendship doc written
       final docId = Friendship.sortedDocId('viewer', 'target');
-      final snap =
-          await firestore.collection('friendships').doc(docId).get();
+      final snap = await firestore.collection('friendships').doc(docId).get();
       expect(snap.exists, isTrue);
       expect(snap.data()!['requesterId'], equals('viewer'));
       // No crash occurred — the tap succeeded without the obsolete invalidation calls

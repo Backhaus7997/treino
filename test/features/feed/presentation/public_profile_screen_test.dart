@@ -25,15 +25,16 @@ class _StubPublicProfileViewNotifier extends PublicProfileViewNotifier {
 
   @override
   Future<PublicProfileView> build(String arg) async {
-    if (_value is AsyncData<PublicProfileView>) {
-      return (_value as AsyncData<PublicProfileView>).value;
+    switch (_value) {
+      case AsyncData<PublicProfileView>(:final value):
+        return value;
+      case AsyncError<PublicProfileView>(:final error):
+        throw error;
+      default:
+        // Loading: never resolve.
+        await Completer<void>().future;
+        return _value.requireValue;
     }
-    if (_value is AsyncError<PublicProfileView>) {
-      throw (_value as AsyncError<PublicProfileView>).error;
-    }
-    // Loading: never resolve.
-    await Completer<void>().future;
-    return _value.requireValue;
   }
 }
 

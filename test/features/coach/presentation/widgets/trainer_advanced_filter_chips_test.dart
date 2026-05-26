@@ -38,7 +38,8 @@ Widget _wrap(Widget child, {List<Override> overrides = const []}) =>
 
 void main() {
   group('TrainerAdvancedFilterChips', () {
-    testWidgets('renderiza ambos chips con labels default ("Distancia" + "Precio")',
+    testWidgets(
+        'renderiza ambos chips con labels default ("Distancia" + "Precio")',
         (tester) async {
       await tester.pumpWidget(_wrap(
         const TrainerAdvancedFilterChips(),
@@ -74,8 +75,7 @@ void main() {
         const TrainerAdvancedFilterChips(),
         overrides: [
           _withFakeLocation(),
-          selectedPriceFilterProvider
-              .overrideWith((_) => PriceFilter.k5to10k),
+          selectedPriceFilterProvider.overrideWith((_) => PriceFilter.k5to10k),
         ],
       ));
       await tester.pumpAndSettle();
@@ -96,8 +96,7 @@ void main() {
       expect(find.byIcon(Icons.location_off), findsOneWidget);
     });
 
-    testWidgets(
-        'con ubicación: chip Distancia muestra arrow_down (enabled)',
+    testWidgets('con ubicación: chip Distancia muestra arrow_down (enabled)',
         (tester) async {
       await tester.pumpWidget(_wrap(
         const TrainerAdvancedFilterChips(),
@@ -118,8 +117,7 @@ void main() {
       await tester.pumpWidget(_wrap(
         const TrainerAdvancedFilterChips(),
         overrides: [
-          selectedPriceFilterProvider
-              .overrideWith((_) => PriceFilter.under5k),
+          selectedPriceFilterProvider.overrideWith((_) => PriceFilter.under5k),
         ],
       ));
       await tester.pumpAndSettle();

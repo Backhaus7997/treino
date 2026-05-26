@@ -524,7 +524,8 @@ void main() {
       expect(
         myFriendsFeedBuildCount,
         greaterThan(countBeforeTap),
-        reason: '_onAceptar must call container.invalidate(myFriendsFeedProvider)',
+        reason:
+            '_onAceptar must call container.invalidate(myFriendsFeedProvider)',
       );
     });
   });

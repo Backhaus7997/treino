@@ -13,7 +13,6 @@ import 'package:treino/features/feed/domain/friendship.dart';
 import 'package:treino/features/feed/domain/friendship_status.dart';
 import 'package:treino/features/feed/domain/public_profile_view.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
-import 'package:treino/features/profile/data/user_public_profile_repository.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
 
 // ---------------------------------------------------------------------------
@@ -208,8 +207,8 @@ void main() {
     // Simulate the FriendRequestInboxTile.build pattern: .valueOrNull
     // This must work without any cast or .future access — drop-in guarantee.
     // Use .future to wait for the first emission.
-    final value = await container
-        .read(userPublicProfileProvider('alice').future);
+    final value =
+        await container.read(userPublicProfileProvider('alice').future);
     expect(value, equals(_profileAlice));
     expect(value!.displayName, equals('Alice'));
   });
@@ -239,8 +238,8 @@ void main() {
       );
       addTearDown(container.dispose);
 
-      final view = await container
-          .read(publicProfileViewProvider('target').future);
+      final view =
+          await container.read(publicProfileViewProvider('target').future);
       expect(view, isA<PublicProfileView>());
       expect(view.authorDisplayName, equals('Alice'));
       expect(view.friendship, equals(friendship));
@@ -277,19 +276,18 @@ void main() {
       );
 
       // Emit first profile
-      profileController
-          .add(const UserPublicProfile(uid: 'target', displayName: 'InitialName'));
+      profileController.add(
+          const UserPublicProfile(uid: 'target', displayName: 'InitialName'));
       await Future<void>.delayed(const Duration(milliseconds: 50));
 
       // Emit updated profile
-      profileController
-          .add(const UserPublicProfile(uid: 'target', displayName: 'UpdatedName'));
+      profileController.add(
+          const UserPublicProfile(uid: 'target', displayName: 'UpdatedName'));
       await Future<void>.delayed(const Duration(milliseconds: 50));
 
       // Should have data emissions with updated profile
-      final dataEmissions = emissions
-          .whereType<AsyncData<PublicProfileView>>()
-          .toList();
+      final dataEmissions =
+          emissions.whereType<AsyncData<PublicProfileView>>().toList();
       expect(dataEmissions, isNotEmpty);
       expect(
         dataEmissions.last.value.authorDisplayName,
@@ -326,7 +324,8 @@ void main() {
       );
 
       // Emit pending friendship
-      friendshipController.add(_makeFriendship(status: FriendshipStatus.pending));
+      friendshipController
+          .add(_makeFriendship(status: FriendshipStatus.pending));
       await Future<void>.delayed(const Duration(milliseconds: 50));
 
       // Emit accepted friendship
@@ -334,9 +333,8 @@ void main() {
           .add(_makeFriendship(status: FriendshipStatus.accepted));
       await Future<void>.delayed(const Duration(milliseconds: 50));
 
-      final dataEmissions = emissions
-          .whereType<AsyncData<PublicProfileView>>()
-          .toList();
+      final dataEmissions =
+          emissions.whereType<AsyncData<PublicProfileView>>().toList();
       expect(dataEmissions, isNotEmpty);
       expect(
         dataEmissions.last.value.friendship?.status,
@@ -372,8 +370,7 @@ void main() {
     });
 
     // SCENARIO-489: AsyncError propagates from upstream
-    test(
-        'SCENARIO-489: propagates AsyncError when upstream emits an error',
+    test('SCENARIO-489: propagates AsyncError when upstream emits an error',
         () async {
       final user = MockUser(uid: 'viewer');
       final error = StateError('upstream error');
@@ -415,7 +412,8 @@ void main() {
             friendshipSubscribeCount++;
             return Stream.fromFuture(
               Future.error(
-                StateError('isSelf branch should NOT subscribe to friendshipByPairProvider'),
+                StateError(
+                    'isSelf branch should NOT subscribe to friendshipByPairProvider'),
               ),
             );
           }),

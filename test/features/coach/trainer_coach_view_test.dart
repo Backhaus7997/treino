@@ -67,8 +67,8 @@ UserPublicProfile _pub(String uid, String name) => UserPublicProfile(
 List<Override> _stubLinks(List<TrainerLink> links) => [
       trainerLinksStreamProvider.overrideWith((ref) => Stream.value(links)),
       for (final l in links)
-        userPublicProfileProvider(l.athleteId)
-            .overrideWith((ref) => Stream.value(_pub(l.athleteId, 'Atleta ${l.id}'))),
+        userPublicProfileProvider(l.athleteId).overrideWith(
+            (ref) => Stream.value(_pub(l.athleteId, 'Atleta ${l.id}'))),
     ];
 
 void main() {

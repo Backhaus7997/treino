@@ -291,8 +291,7 @@ void main() {
       expect(find.text('EXPLORAR RUTINAS  →'), findsOneWidget);
     });
 
-    testWidgets(
-        'sessionsCount == 0 (cuenta nueva) → renderiza empty state',
+    testWidgets('sessionsCount == 0 (cuenta nueva) → renderiza empty state',
         (tester) async {
       await tester.pumpWidget(_wrapCard(overrides: [
         weeklyInsightsProvider.overrideWith(
@@ -311,8 +310,7 @@ void main() {
       expect(find.text('EXPLORAR RUTINAS  →'), findsOneWidget);
     });
 
-    testWidgets(
-        'empty state → tap EXPLORAR RUTINAS navega a /workout',
+    testWidgets('empty state → tap EXPLORAR RUTINAS navega a /workout',
         (tester) async {
       String? navigated;
       final router = GoRouter(routes: [

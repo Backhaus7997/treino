@@ -513,8 +513,7 @@ void main() {
     final now = DateTime.utc(2026, 1, 1);
 
     // SCENARIO-473: watchByPair emits null when no friendship doc exists
-    test(
-        'SCENARIO-473: watchByPair emits null when no doc exists for the pair',
+    test('SCENARIO-473: watchByPair emits null when no doc exists for the pair',
         () async {
       final stream = repo.watchByPair('alice', 'bob');
       await expectLater(stream, emits(isNull));
