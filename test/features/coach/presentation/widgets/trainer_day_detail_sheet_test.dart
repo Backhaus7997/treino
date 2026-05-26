@@ -55,7 +55,7 @@ Appointment _makeAppointment({
 AvailabilityOverride _makeBlockOverride() => AvailabilityOverride.block(
       id: 'override-1',
       trainerId: 'trainer-1',
-      date: DateTime.utc(2026, 6, 3),
+      date: _kDay, // must match the day the sheet is rendering
     );
 
 Widget _wrap(Widget child, {List<Override> overrides = const []}) {
