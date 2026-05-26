@@ -230,7 +230,9 @@ class _TrainerCalendar extends ConsumerWidget {
     final bookedDays = <DateTime>{};
     for (final appt in appointments) {
       if (appt.status == AppointmentStatus.confirmed) {
-        final d = appt.startsAt.toLocal();
+        // startsAt is a wall-clock UTC value per ADR-7; no toLocal() needed
+        // (would shift the calendar dot to the wrong day in AR TZ).
+        final d = appt.startsAt;
         bookedDays.add(DateTime(d.year, d.month, d.day));
       }
     }

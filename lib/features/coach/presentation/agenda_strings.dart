@@ -68,19 +68,22 @@ abstract final class AgendaStrings {
 
   // ── Helpers ───────────────────────────────────────────────────────────────
 
-  /// Formats a [DateTime] as `dd/MM/yyyy` in local time.
+  /// Formats a [DateTime] as `dd/MM/yyyy`.
+  ///
+  /// Per the agenda design (single-TZ Argentina, ADR-7), all stored DateTimes
+  /// are UTC values that REPRESENT Argentina wall-clock time directly — they
+  /// are NOT actual UTC instants. So we read fields directly without calling
+  /// `.toLocal()` (which would subtract 3h and break display).
   static String formatDate(DateTime dt) {
-    final d = dt.toLocal();
-    final dd = d.day.toString().padLeft(2, '0');
-    final mm = d.month.toString().padLeft(2, '0');
-    return '$dd/$mm/${d.year}';
+    final dd = dt.day.toString().padLeft(2, '0');
+    final mm = dt.month.toString().padLeft(2, '0');
+    return '$dd/$mm/${dt.year}';
   }
 
-  /// Formats a [DateTime] as `HH:mm` in local time.
+  /// Formats a [DateTime] as `HH:mm`. See [formatDate] for TZ rationale.
   static String formatTime(DateTime dt) {
-    final d = dt.toLocal();
-    final hh = d.hour.toString().padLeft(2, '0');
-    final min = d.minute.toString().padLeft(2, '0');
+    final hh = dt.hour.toString().padLeft(2, '0');
+    final min = dt.minute.toString().padLeft(2, '0');
     return '$hh:$min';
   }
 }

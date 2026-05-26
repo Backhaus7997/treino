@@ -37,7 +37,11 @@ class DaySlotsSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    final hasContent = slots.isNotEmpty || existingBookings.isNotEmpty;
+    // Hide past slots — athletes can't book a slot that already happened.
+    // The day-level decision (e.g. whole day is in the past) collapses to
+    // futureSlots.isEmpty + existingBookings.isEmpty → empty state.
+    final futureSlots = slots.where((s) => s.isAfter(now)).toList();
+    final hasContent = futureSlots.isNotEmpty || existingBookings.isNotEmpty;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
@@ -99,8 +103,8 @@ class DaySlotsSheet extends StatelessWidget {
               const SizedBox(height: 16),
             ],
 
-            // Free slots section
-            if (slots.isNotEmpty) ...[
+            // Free slots section (filtered to future only)
+            if (futureSlots.isNotEmpty) ...[
               Text(
                 'HORARIOS DISPONIBLES',
                 style: GoogleFonts.barlowCondensed(
@@ -114,7 +118,7 @@ class DaySlotsSheet extends StatelessWidget {
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
-                children: slots
+                children: futureSlots
                     .map(
                       (slot) => ActionChip(
                         label: Text(
