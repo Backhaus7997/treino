@@ -13,16 +13,20 @@ final userPublicProfileRepositoryProvider =
   ),
 );
 
-/// Fetches a single public profile by [uid]. Auth-gated: returns `null` when
-/// the viewer is not authenticated (defensive — profile routes are already
-/// auth-gated by the router). Returns `null` also when the document does not
-/// exist (e.g. pre-backfill user).
-///
-/// REQ-UPP-007, REQ-UPP-008.
+/// Live stream of a single public profile by [uid]. Auth-gated: emits `null`
+/// when the viewer is not authenticated. Emits `null` also when the document
+/// does not exist (e.g. pre-backfill user). Drop-in replacement for the
+/// former FutureProvider.family — same name, same `AsyncValue<UserPublicProfile?>`
+/// consumer surface. `autoDispose` bounds the Firestore listener to consumer
+/// lifetime. REQ-FPS-006, ADR-FPS-001.
 final userPublicProfileProvider =
-    FutureProvider.family<UserPublicProfile?, String>((ref, uid) async {
-  final auth = await ref.watch(authStateChangesProvider.future);
-  if (auth == null) return null;
-
-  return ref.watch(userPublicProfileRepositoryProvider).get(uid);
-});
+    StreamProvider.family.autoDispose<UserPublicProfile?, String>(
+  (ref, uid) async* {
+    final auth = await ref.watch(authStateChangesProvider.future);
+    if (auth == null) {
+      yield null;
+      return;
+    }
+    yield* ref.watch(userPublicProfileRepositoryProvider).watch(uid);
+  },
+);

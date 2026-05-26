@@ -40,8 +40,8 @@ class TrainersMapBottomSheet extends ConsumerWidget {
       error: (_, __) => const SizedBox.shrink(),
       data: (trainers) {
         final visible = trainers
-            .where((t) =>
-                t.trainerLatitude != null && t.trainerLongitude != null)
+            .where(
+                (t) => t.trainerLatitude != null && t.trainerLongitude != null)
             .toList();
 
         return Container(

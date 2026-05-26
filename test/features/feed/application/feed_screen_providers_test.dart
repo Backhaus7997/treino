@@ -80,7 +80,7 @@ void main() {
         overrides: [
           authStateChangesProvider.overrideWith((ref) => Stream.value(user)),
           acceptedFriendsProvider('u1')
-              .overrideWith((ref) => Future.value(['u2', 'u3'])),
+              .overrideWith((ref) => Stream.value(['u2', 'u3'])),
           feedForFriendsProvider.overrideWith((ref, _) => Future.value(posts)),
         ],
       );
@@ -99,7 +99,7 @@ void main() {
         overrides: [
           authStateChangesProvider.overrideWith((ref) => Stream.value(user)),
           acceptedFriendsProvider('u1')
-              .overrideWith((ref) => Future.value(const <String>[])),
+              .overrideWith((ref) => Stream.value(const <String>[])),
         ],
       );
       addTearDown(container.dispose);

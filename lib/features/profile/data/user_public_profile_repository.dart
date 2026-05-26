@@ -30,6 +30,16 @@ class UserPublicProfileRepository {
     return UserPublicProfile.fromJson(data);
   }
 
+  /// Live stream of the public profile at `userPublicProfiles/{uid}`, or null
+  /// when the doc does not exist. Mirrors [get] but streamed.
+  Stream<UserPublicProfile?> watch(String uid) {
+    return _col.doc(uid).snapshots().map((snap) {
+      final data = snap.data();
+      if (!snap.exists || data == null) return null;
+      return UserPublicProfile.fromJson(data);
+    });
+  }
+
   /// Writes [profile] to `userPublicProfiles/{profile.uid}` with merge
   /// semantics so partial updates do not overwrite existing fields.
   Future<void> set(UserPublicProfile profile) async {

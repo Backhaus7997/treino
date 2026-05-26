@@ -72,10 +72,10 @@ void main() {
           firestore,
           extraOverrides: [
             userPublicProfileProvider('target').overrideWith(
-              (_) async => const UserPublicProfile(
+              (_) => Stream.value(const UserPublicProfile(
                 uid: 'target',
                 displayName: 'Vicente',
-              ),
+              )),
             ),
           ],
         ),
@@ -117,10 +117,10 @@ void main() {
           firestore,
           extraOverrides: [
             userPublicProfileProvider('target').overrideWith(
-              (_) async => const UserPublicProfile(
+              (_) => Stream.value(const UserPublicProfile(
                 uid: 'target',
                 displayName: 'Vicente',
-              ),
+              )),
             ),
           ],
         ),

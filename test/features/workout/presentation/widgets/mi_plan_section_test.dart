@@ -189,7 +189,7 @@ void main() {
               .overrideWith((ref) async => [plan]),
           currentAthleteLinkProvider.overrideWith((ref) async => null),
           userPublicProfileProvider('trainer-1').overrideWith(
-            (ref) async => _makeProfile('trainer-1', 'Lucas Pérez'),
+            (ref) => Stream.value(_makeProfile('trainer-1', 'Lucas Pérez')),
           ),
         ],
       );
@@ -213,7 +213,7 @@ void main() {
               .overrideWith((ref) async => [plan]),
           currentAthleteLinkProvider.overrideWith((ref) async => null),
           userPublicProfileProvider('trainer-1').overrideWith(
-            (ref) async => _makeProfile('trainer-1', 'Lucas'),
+            (ref) => Stream.value(_makeProfile('trainer-1', 'Lucas')),
           ),
         ],
       );
@@ -240,7 +240,7 @@ void main() {
               .overrideWith((ref) async => [planNew, planOld]),
           currentAthleteLinkProvider.overrideWith((ref) async => null),
           userPublicProfileProvider('trainer-1').overrideWith(
-            (ref) async => _makeProfile('trainer-1', 'Lucas'),
+            (ref) => Stream.value(_makeProfile('trainer-1', 'Lucas')),
           ),
         ],
       );
@@ -267,7 +267,7 @@ void main() {
               .overrideWith((ref) async => [plan]),
           currentAthleteLinkProvider.overrideWith((ref) async => link),
           userPublicProfileProvider('trainer-1').overrideWith(
-            (ref) async => _makeProfile('trainer-1', 'Lucas'),
+            (ref) => Stream.value(_makeProfile('trainer-1', 'Lucas')),
           ),
         ],
       );
@@ -292,7 +292,7 @@ void main() {
               .overrideWith((ref) async => [plan]),
           currentAthleteLinkProvider.overrideWith((ref) async => link),
           userPublicProfileProvider('trainer-1').overrideWith(
-            (ref) async => _makeProfile('trainer-1', 'Lucas'),
+            (ref) => Stream.value(_makeProfile('trainer-1', 'Lucas')),
           ),
         ],
       );

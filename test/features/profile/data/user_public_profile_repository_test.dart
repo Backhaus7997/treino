@@ -135,6 +135,55 @@ void main() {
   });
 
   // ──────────────────────────────────────────────────────────────────────────
+  // T06 RED: watch (SCENARIO-479..480)
+  // ──────────────────────────────────────────────────────────────────────────
+
+  // SCENARIO-479: watch emits null when the profile doc does not exist
+  test('SCENARIO-479: watch emits null when no profile doc exists for uid',
+      () async {
+    final stream = repo.watch('u99');
+    await expectLater(stream, emits(isNull));
+  });
+
+  // SCENARIO-480: watch re-emits updated profile on Firestore doc update
+  test(
+      'SCENARIO-480: watch re-emits updated UserPublicProfile after Firestore doc update',
+      () async {
+    // Seed initial profile with followersCount: 0
+    await firestore.collection('userPublicProfiles').doc('u1').set({
+      'uid': 'u1',
+      'displayName': 'Ana',
+      'displayNameLowercase': 'ana',
+      'avatarUrl': null,
+      'gymId': null,
+      'followersCount': 0,
+    });
+
+    final stream = repo.watch('u1');
+    final emissions = <UserPublicProfile?>[];
+    final sub = stream.listen(emissions.add);
+
+    // Wait for initial emission
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+    expect(emissions.length, equals(1));
+    expect(emissions.first, isNotNull);
+    expect(emissions.first!.followersCount, equals(0));
+
+    // Update the doc
+    await firestore
+        .collection('userPublicProfiles')
+        .doc('u1')
+        .update({'followersCount': 5});
+
+    // Wait for re-emission
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+    expect(emissions.length, greaterThanOrEqualTo(2));
+    expect(emissions.last!.followersCount, equals(5));
+
+    await sub.cancel();
+  });
+
+  // ──────────────────────────────────────────────────────────────────────────
   // SCENARIO-258: searchByDisplayName returns empty list for blank query
   // ──────────────────────────────────────────────────────────────────────────
   test(

@@ -52,7 +52,9 @@ class TrainerAdvancedFilterChips extends ConsumerWidget {
             isLoading: isLoadingLocation && !hasLocation,
             palette: palette,
             onTap: () {
-              if (isLoadingLocation && !hasLocation) return; // no-op mientras carga
+              if (isLoadingLocation && !hasLocation) {
+                return; // no-op mientras carga
+              }
               if (hasLocation) {
                 _showDistanceSheet(context, ref, distance);
               } else {
@@ -237,16 +239,12 @@ class TrainerAdvancedFilterChips extends ConsumerWidget {
         // Ya estaba otorgado (caso típico cuando el user volvió de app
         // settings después de activar manualmente). Solo refrescamos
         // posición — no re-disparamos diálogo del sistema.
-        await ref
-            .read(athleteLocationProvider.notifier)
-            .requestPermission();
+        await ref.read(athleteLocationProvider.notifier).requestPermission();
       } else {
         // Estado `denied` (preguntado y rechazado pero no permanente) o
         // `unableToDetermine` — pedir permission normalmente. Sistema
         // muestra diálogo y el user puede aceptar.
-        await ref
-            .read(athleteLocationProvider.notifier)
-            .requestPermission();
+        await ref.read(athleteLocationProvider.notifier).requestPermission();
       }
     } catch (_) {
       // Errores del plugin se tragan silenciosamente — el provider state
@@ -447,8 +445,7 @@ class _FilterOptionTile extends StatelessWidget {
                 ),
               ),
             ),
-            if (isSelected)
-              Icon(Icons.check, color: palette.accent, size: 20),
+            if (isSelected) Icon(Icons.check, color: palette.accent, size: 20),
           ],
         ),
       ),

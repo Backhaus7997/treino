@@ -16,8 +16,7 @@ Widget _wrap(Widget child, {List<Override> overrides = const []}) =>
 
 void main() {
   group('TrainersListScreen — toggle MAPA/Lista', () {
-    testWidgets(
-        'header muestra "ENCONTRÁ TU COACH" en stack magenta + blanco',
+    testWidgets('header muestra "ENCONTRÁ TU COACH" en stack magenta + blanco',
         (tester) async {
       await tester.pumpWidget(_wrap(
         const TrainersListScreen(),
@@ -31,9 +30,7 @@ void main() {
       expect(find.text('COACH'), findsOneWidget);
     });
 
-    testWidgets(
-        'header tiene toggle MAPA / LISTA visible',
-        (tester) async {
+    testWidgets('header tiene toggle MAPA / LISTA visible', (tester) async {
       await tester.pumpWidget(_wrap(
         const TrainersListScreen(),
         overrides: [
@@ -46,8 +43,7 @@ void main() {
       expect(find.text('LISTA'), findsOneWidget);
     });
 
-    testWidgets(
-        'estado inicial: LISTA activa, FlutterMap NO visible',
+    testWidgets('estado inicial: LISTA activa, FlutterMap NO visible',
         (tester) async {
       await tester.pumpWidget(_wrap(
         const TrainersListScreen(),
@@ -62,8 +58,8 @@ void main() {
       // en IndexedStack el hijo no-activo se construye pero no es visible.
       // Más simple: comprobamos que el empty state de la lista renderiza
       // (porque la lista es la default visible).
-      expect(find.text('No encontramos entrenadores en tu zona.'),
-          findsOneWidget);
+      expect(
+          find.text('No encontramos entrenadores en tu zona.'), findsOneWidget);
     });
 
     // NOTA: el comportamiento de switching real (tap MAPA → renderiza
