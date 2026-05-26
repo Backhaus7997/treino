@@ -5,6 +5,7 @@ import 'package:table_calendar/table_calendar.dart';
 
 import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/treino_icon.dart';
+import '../../profile/application/user_public_profile_providers.dart';
 import '../application/agenda_providers.dart';
 import '../domain/agenda_exceptions.dart';
 import '../domain/appointment.dart';
@@ -205,11 +206,16 @@ class _AthleteAgendaScreenState extends ConsumerState<AthleteAgendaScreen> {
 
   Future<void> _onBook(BuildContext context, DateTime slot) async {
     final repo = ref.read(appointmentRepositoryProvider);
+    // Resolve athlete display name from their public profile so the trainer
+    // sees a name (not a UID) on the booked chip.
+    final profile =
+        await ref.read(userPublicProfileProvider(widget.athleteId).future);
+    final athleteDisplayName = profile?.displayName ?? widget.athleteId;
     try {
       await repo.book(
         trainerId: widget.trainerId,
         athleteId: widget.athleteId,
-        athleteDisplayName: widget.athleteId, // caller sets display name
+        athleteDisplayName: athleteDisplayName,
         startsAt: slot,
         durationMin: 60,
       );

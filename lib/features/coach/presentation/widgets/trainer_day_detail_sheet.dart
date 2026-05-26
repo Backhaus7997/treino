@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
@@ -437,8 +438,13 @@ class _BookedSlotChip extends ConsumerWidget {
       ),
     );
 
-    if (action == 'cancelar' && context.mounted) {
+    if (!context.mounted) return;
+    if (action == 'cancelar') {
       await _cancelAppointment(context, ref);
+    } else if (action == 'ver-alumno') {
+      // Close the day-detail sheet first, then push athlete detail.
+      Navigator.of(context).pop();
+      context.push('/coach/athlete/${appointment.athleteId}');
     }
   }
 

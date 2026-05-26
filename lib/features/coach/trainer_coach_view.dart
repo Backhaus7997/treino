@@ -43,6 +43,12 @@ class TrainerCoachView extends StatelessWidget {
               letterSpacing: 0.5,
             ),
             tabs: [for (final l in _labels) Tab(text: l)],
+            // Close any open popup (e.g. agenda day sheet) when the trainer
+            // switches sub-tabs so overlays don't persist.
+            onTap: (_) {
+              Navigator.of(context, rootNavigator: true)
+                  .popUntil((route) => route is! PopupRoute);
+            },
           ),
           const SizedBox(height: 8),
           Expanded(

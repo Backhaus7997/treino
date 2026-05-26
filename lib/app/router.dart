@@ -377,7 +377,15 @@ class _ShellScaffold extends StatelessWidget {
       body: AppBackground(child: SafeArea(child: child)),
       bottomNavigationBar: TreinoBottomBar(
         currentIndex: _currentIndex,
-        onTap: (i) => context.go(_kTabs[i]),
+        onTap: (i) {
+          // Dismiss any open popup (modal bottom sheet, dialog) before
+          // switching tabs so overlays don't persist on top of the next tab
+          // (e.g. coach agenda day sheet hovering on Perfil). Regular
+          // GoRoute pages are PageRoute, not PopupRoute, so they survive.
+          Navigator.of(context, rootNavigator: true)
+              .popUntil((route) => route is! PopupRoute);
+          context.go(_kTabs[i]);
+        },
       ),
     );
   }
