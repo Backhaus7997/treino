@@ -3,9 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 import '../../../../app/theme/app_palette.dart';
-import '../../../profile/application/user_public_profile_providers.dart';
-import '../../../profile/domain/user_public_profile.dart';
+import '../../../profile/application/user_providers.dart' show firestoreProvider;
 import '../../application/agenda_providers.dart';
 import '../../domain/agenda_exceptions.dart';
 import '../../domain/appointment.dart';
@@ -350,20 +351,28 @@ class _BookedSlotChip extends ConsumerStatefulWidget {
 }
 
 class _BookedSlotChipState extends ConsumerState<_BookedSlotChip> {
-  /// Fresh one-shot fetch via the repository — BYPASSES the cached
-  /// `userPublicProfileProvider`. The cached provider is a non-autoDispose
-  /// FutureProvider: if the first read happened before the user's profile
-  /// was backfilled, it cached `null` forever within the app session, even
-  /// after the backfill. This fetch reads Firestore fresh every time the
-  /// sheet opens (initState fires once per chip mount).
-  late final Future<UserPublicProfile?> _profileFuture;
+  /// Live Firestore stream for the athlete's public profile.
+  ///
+  /// We use a STREAM rather than a one-shot Future for two reasons:
+  /// 1. Survives stale-cache scenarios — if the device's Firestore cache
+  ///    held `null` (from pre-backfill read), the stream emits cache-first
+  ///    then immediately re-emits when the server responds with the doc.
+  ///    A `get()` Future would return whichever source resolves first and
+  ///    stop there.
+  /// 2. Auto-updates if the athlete renames themselves — chip stays in
+  ///    sync without manual invalidation.
+  ///
+  /// Bypasses the cached `userPublicProfileProvider` deliberately.
+  late final Stream<DocumentSnapshot<Map<String, Object?>>> _profileStream;
 
   @override
   void initState() {
     super.initState();
-    _profileFuture = ref
-        .read(userPublicProfileRepositoryProvider)
-        .get(widget.appointment.athleteId);
+    _profileStream = ref
+        .read(firestoreProvider)
+        .collection('userPublicProfiles')
+        .doc(widget.appointment.athleteId)
+        .snapshots();
   }
 
   @override
@@ -393,10 +402,11 @@ class _BookedSlotChipState extends ConsumerState<_BookedSlotChip> {
                 color: Colors.blue,
               ),
             ),
-            FutureBuilder<UserPublicProfile?>(
-              future: _profileFuture,
+            StreamBuilder<DocumentSnapshot<Map<String, Object?>>>(
+              stream: _profileStream,
               builder: (ctx, snap) {
-                final name = snap.data?.displayName ?? widget.athleteName;
+                final remoteName = snap.data?.data()?['displayName'] as String?;
+                final name = remoteName ?? widget.athleteName;
                 return Text(
                   name,
                   style: GoogleFonts.barlow(

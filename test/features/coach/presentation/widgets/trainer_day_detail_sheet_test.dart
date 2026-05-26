@@ -1,3 +1,4 @@
+import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -10,9 +11,7 @@ import 'package:treino/features/coach/domain/availability_override.dart';
 import 'package:treino/features/coach/domain/availability_rule.dart';
 import 'package:treino/features/coach/presentation/agenda_strings.dart';
 import 'package:treino/features/coach/presentation/widgets/trainer_day_detail_sheet.dart';
-import 'package:treino/features/profile/application/user_public_profile_providers.dart';
-import 'package:treino/features/profile/data/user_public_profile_repository.dart';
-import 'package:treino/features/profile/domain/user_public_profile.dart';
+import 'package:treino/features/profile/application/user_providers.dart';
 
 // ── Fakes ─────────────────────────────────────────────────────────────────────
 
@@ -21,14 +20,6 @@ class _FakeAvailabilityRepository extends Fake
 
 class _FakeAppointmentRepository extends Fake
     implements AppointmentRepository {}
-
-/// Returns null for every uid — chips fall back to the cached athleteDisplayName
-/// from the Appointment doc, which the SCENARIO-521 fixture sets explicitly.
-class _NullUserPublicProfileRepository extends Fake
-    implements UserPublicProfileRepository {
-  @override
-  Future<UserPublicProfile?> get(String uid) async => null;
-}
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -77,8 +68,9 @@ Widget _wrap(Widget child, {List<Override> overrides = const []}) {
           .overrideWithValue(_FakeAvailabilityRepository()),
       appointmentRepositoryProvider
           .overrideWithValue(_FakeAppointmentRepository()),
-      userPublicProfileRepositoryProvider
-          .overrideWithValue(_NullUserPublicProfileRepository()),
+      // Empty fake Firestore — _BookedSlotChip's stream emits a "doesn't
+      // exist" snapshot, chip falls back to athleteDisplayName from fixture.
+      firestoreProvider.overrideWithValue(FakeFirebaseFirestore()),
     ],
     child: MaterialApp(
       theme: AppTheme.dark(),
