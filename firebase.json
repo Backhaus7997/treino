@@ -21,7 +21,8 @@
           "projectId": "treino-dev",
           "configurations": {
             "android": "1:1079774251763:android:6810a95a4b3dce9b3f8586",
-            "ios": "1:1079774251763:ios:c292394709b082553f8586"
+            "ios": "1:1079774251763:ios:006f7766b93ce5dc3f8586",
+            "web": "1:1079774251763:web:e78f5ea99effb1593f8586"
           }
         }
       }
@@ -31,6 +32,23 @@
     "rules": "firestore.rules",
     "indexes": "firestore.indexes.json"
   },
+  "hosting": [
+    {
+      "target": "coach-hub-dev",
+      "public": "build/web",
+      "ignore": [
+        "firebase.json",
+        "**/.*",
+        "**/node_modules/**"
+      ],
+      "rewrites": [
+        {
+          "source": "**",
+          "destination": "/index.html"
+        }
+      ]
+    }
+  ],
   "emulators": {
     "auth": { "port": 9099 },
     "firestore": { "port": 8080 },

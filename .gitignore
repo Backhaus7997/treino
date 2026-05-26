@@ -56,3 +56,6 @@ scripts/sa-key.json
 scripts/node_modules/
 scripts/rules_test/node_modules/
 scripts/.env
+
+# Firebase Hosting deploy cache (local only — regenerated on each deploy)
+.firebase/
