@@ -95,7 +95,7 @@ void main() {
               (ref) async => routine,
             ),
             userPublicProfileProvider('trainer-1').overrideWith(
-              (ref) async => _makeProfile('trainer-1', 'Lucas Pérez'),
+              (ref) => Stream.value(_makeProfile('trainer-1', 'Lucas Pérez')),
             ),
           ],
         ),

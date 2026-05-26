@@ -88,34 +88,34 @@ void main() {
   test(
       'SCENARIO-481: friendshipByPairProvider consumer receives AsyncValue<Friendship?> and rebuilds on emit',
       () async {
-    final firestore = FakeFirebaseFirestore();
     final user = MockUser(uid: 'viewer');
+    final friendship = _makeFriendship();
 
     final container = ProviderContainer(
       overrides: [
         authStateChangesProvider.overrideWith((ref) => Stream.value(user)),
-        // Use a real FriendshipRepository backed by FakeFirestore
-        // We wire the private repo provider via firestoreProvider
-        // but we can override friendshipByPairProvider directly to test surface.
+        friendshipByPairProvider.overrideWith(
+          (ref, pair) => Stream.value(friendship),
+        ),
       ],
     );
     addTearDown(container.dispose);
 
-    // Seed a friendship doc so the real stream returns data
-    final docId = Friendship.sortedDocId('viewer', 'target');
-    await firestore.collection('friendships').doc(docId).set(
-          _makeFriendship().toJson(),
-        );
-
-    // friendshipByPairProvider must be a StreamProvider.family.autoDispose
-    expect(
+    // Reading gives AsyncValue<Friendship?> — same surface as former FutureProvider
+    final value = await container.read(
       friendshipByPairProvider(
         (viewerUid: 'viewer', targetUid: 'target'),
-      ),
-      isA<AutoDisposeStreamProviderFamily<Friendship?, FriendshipPair>>(
-        // We check that reading it gives AsyncValue, not a Future
-      ),
+      ).future,
     );
+    expect(value, equals(friendship));
+    expect(value?.status, equals(FriendshipStatus.pending));
+
+    // The provider itself (the family) is a StreamProvider.family.autoDispose
+    // Calling the family with args produces an AutoDisposeStreamProvider
+    final provider = friendshipByPairProvider(
+      (viewerUid: 'viewer', targetUid: 'target'),
+    );
+    expect(provider, isA<AutoDisposeStreamProvider<Friendship?>>());
   });
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -182,14 +182,9 @@ void main() {
   test(
       'SCENARIO-483: acceptedFriendsProvider is StreamProvider.family.autoDispose returning AsyncValue<List<String>>',
       () {
-    // The provider type itself must be StreamProvider.family.autoDispose
-    // — ref.watch(acceptedFriendsProvider(uid)) returns AsyncValue<List<String>>
-    // just like the old FutureProvider.family did. No consumer change required.
+    // Calling the family with args produces an AutoDisposeStreamProvider
     final provider = acceptedFriendsProvider('u1');
-    expect(
-      provider,
-      isA<AutoDisposeStreamProviderFamily<List<String>, String>>(),
-    );
+    expect(provider, isA<AutoDisposeStreamProvider<List<String>>>());
   });
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -211,10 +206,10 @@ void main() {
     addTearDown(container.dispose);
 
     // Simulate the FriendRequestInboxTile.build pattern: .valueOrNull
-    // This must work without any cast or .future access — drop-in guarantee
-    await Future<void>.delayed(const Duration(milliseconds: 50));
-    final value =
-        container.read(userPublicProfileProvider('alice')).valueOrNull;
+    // This must work without any cast or .future access — drop-in guarantee.
+    // Use .future to wait for the first emission.
+    final value = await container
+        .read(userPublicProfileProvider('alice').future);
     expect(value, equals(_profileAlice));
     expect(value!.displayName, equals('Alice'));
   });
@@ -396,9 +391,11 @@ void main() {
       );
       addTearDown(container.dispose);
 
-      await Future<void>.delayed(const Duration(milliseconds: 50));
-      final state = container.read(publicProfileViewProvider('target'));
-      expect(state, isA<AsyncError<PublicProfileView>>());
+      // Wait for the error to propagate through the async notifier
+      await expectLater(
+        container.read(publicProfileViewProvider('target').future),
+        throwsA(isA<StateError>()),
+      );
     });
 
     // SCENARIO-490: isSelf branch — friendshipByPairProvider NOT subscribed
@@ -445,11 +442,8 @@ void main() {
     test(
         'SCENARIO-483 (container): acceptedFriendsProvider emits AsyncValue<List<String>> from stream',
         () async {
-      final user = MockUser(uid: 'u1');
-
       final container = ProviderContainer(
         overrides: [
-          authStateChangesProvider.overrideWith((ref) => Stream.value(user)),
           acceptedFriendsProvider('u1').overrideWith(
             (ref) => Stream.value(const ['u2', 'u3']),
           ),
@@ -457,18 +451,17 @@ void main() {
       );
       addTearDown(container.dispose);
 
-      await Future<void>.delayed(const Duration(milliseconds: 50));
-      final value = container.read(acceptedFriendsProvider('u1'));
-      expect(value, isA<AsyncValue<List<String>>>());
-      expect(value.valueOrNull, equals(['u2', 'u3']));
+      final value = await container.read(acceptedFriendsProvider('u1').future);
+      expect(value, isA<List<String>>());
+      expect(value, equals(['u2', 'u3']));
     });
 
     test(
-        'acceptedFriendsProvider autoDispose: provider type is AutoDisposeStreamProviderFamily',
+        'acceptedFriendsProvider autoDispose: provider type is AutoDisposeStreamProvider',
         () {
       expect(
         acceptedFriendsProvider('u1'),
-        isA<AutoDisposeStreamProviderFamily<List<String>, String>>(),
+        isA<AutoDisposeStreamProvider<List<String>>>(),
       );
     });
   });
@@ -478,22 +471,19 @@ void main() {
   // ──────────────────────────────────────────────────────────────────────────
   group('userPublicProfileProvider StreamProvider contract', () {
     test(
-        'SCENARIO-484: userPublicProfileProvider is StreamProvider.family.autoDispose',
+        'SCENARIO-484: userPublicProfileProvider is AutoDisposeStreamProvider when called with arg',
         () {
       expect(
         userPublicProfileProvider('alice'),
-        isA<AutoDisposeStreamProviderFamily<UserPublicProfile?, String>>(),
+        isA<AutoDisposeStreamProvider<UserPublicProfile?>>(),
       );
     });
 
     test(
         'SCENARIO-484 (consumer): valueOrNull access still resolves correctly — drop-in guarantee',
         () async {
-      final user = MockUser(uid: 'viewer');
-
       final container = ProviderContainer(
         overrides: [
-          authStateChangesProvider.overrideWith((ref) => Stream.value(user)),
           userPublicProfileProvider('alice').overrideWith(
             (ref) => Stream.value(_profileAlice),
           ),
@@ -501,9 +491,9 @@ void main() {
       );
       addTearDown(container.dispose);
 
-      await Future<void>.delayed(const Duration(milliseconds: 50));
-
-      // FriendRequestInboxTile pattern: .valueOrNull — no .future, no cast
+      // FriendRequestInboxTile pattern: .valueOrNull — no .future, no cast.
+      // Wait for first emission before reading valueOrNull.
+      await container.read(userPublicProfileProvider('alice').future);
       final valueOrNull =
           container.read(userPublicProfileProvider('alice')).valueOrNull;
       expect(valueOrNull, isA<UserPublicProfile?>());

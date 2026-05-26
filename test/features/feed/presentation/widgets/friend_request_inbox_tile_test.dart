@@ -116,8 +116,8 @@ void main() {
           overrides: [
             friendshipRepositoryProvider.overrideWithValue(stub),
             userPublicProfileProvider('bob').overrideWith(
-              (_) async =>
-                  const UserPublicProfile(uid: 'bob', displayName: 'Bob'),
+              (_) => Stream.value(
+                  const UserPublicProfile(uid: 'bob', displayName: 'Bob')),
             ),
           ],
         ),
@@ -150,8 +150,8 @@ void main() {
           overrides: [
             friendshipRepositoryProvider.overrideWithValue(slowStub),
             userPublicProfileProvider('bob').overrideWith(
-              (_) async =>
-                  const UserPublicProfile(uid: 'bob', displayName: 'Bob'),
+              (_) => Stream.value(
+                  const UserPublicProfile(uid: 'bob', displayName: 'Bob')),
             ),
           ],
         ),
@@ -192,7 +192,7 @@ void main() {
           viewerUid: 'alice',
           overrides: [
             userPublicProfileProvider('bob').overrideWith(
-              (_) async => profile,
+              (_) => Stream.value(profile),
             ),
           ],
         ),
@@ -220,7 +220,7 @@ void main() {
           viewerUid: 'alice',
           overrides: [
             userPublicProfileProvider('bob').overrideWith(
-              (_) async => null,
+              (_) => Stream.value(null),
             ),
           ],
         ),
@@ -248,10 +248,10 @@ void main() {
           overrides: [
             friendshipRepositoryProvider.overrideWithValue(stub),
             userPublicProfileProvider('bob').overrideWith(
-              (_) async => const UserPublicProfile(
+              (_) => Stream.value(const UserPublicProfile(
                 uid: 'bob',
                 displayName: 'Bob',
-              ),
+              )),
             ),
           ],
         ),
@@ -280,10 +280,10 @@ void main() {
           overrides: [
             friendshipRepositoryProvider.overrideWithValue(stub),
             userPublicProfileProvider('bob').overrideWith(
-              (_) async => const UserPublicProfile(
+              (_) => Stream.value(const UserPublicProfile(
                 uid: 'bob',
                 displayName: 'Bob',
-              ),
+              )),
             ),
           ],
         ),
@@ -360,10 +360,10 @@ void main() {
           viewerUid: 'alice',
           overrides: [
             userPublicProfileProvider('vicente-uid').overrideWith(
-              (_) async => const UserPublicProfile(
+              (_) => Stream.value(const UserPublicProfile(
                 uid: 'vicente-uid',
                 displayName: 'Vicente',
-              ),
+              )),
             ),
           ],
           navigatedRoutes: navigatedRoutes,
@@ -394,10 +394,10 @@ void main() {
           overrides: [
             friendshipRepositoryProvider.overrideWithValue(stub),
             userPublicProfileProvider('vicente-uid').overrideWith(
-              (_) async => const UserPublicProfile(
+              (_) => Stream.value(const UserPublicProfile(
                 uid: 'vicente-uid',
                 displayName: 'Vicente',
-              ),
+              )),
             ),
           ],
           navigatedRoutes: navigatedRoutes,
@@ -430,10 +430,10 @@ void main() {
           overrides: [
             friendshipRepositoryProvider.overrideWithValue(stub),
             userPublicProfileProvider('vicente-uid').overrideWith(
-              (_) async => const UserPublicProfile(
+              (_) => Stream.value(const UserPublicProfile(
                 uid: 'vicente-uid',
                 displayName: 'Vicente',
-              ),
+              )),
             ),
           ],
           navigatedRoutes: navigatedRoutes,

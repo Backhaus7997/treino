@@ -77,7 +77,7 @@ void main() {
             ]),
           ),
           userPublicProfileProvider('bbb').overrideWith(
-            (_) async => _pub('bbb', 'Coach Joe'),
+            (_) => Stream.value(_pub('bbb', 'Coach Joe')),
           ),
         ],
       ));
@@ -99,7 +99,7 @@ void main() {
             ]),
           ),
           userPublicProfileProvider('bbb').overrideWith(
-            (_) async => _pub('bbb', 'Coach Joe'),
+            (_) => Stream.value(_pub('bbb', 'Coach Joe')),
           ),
         ],
       ));

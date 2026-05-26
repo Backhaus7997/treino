@@ -16,6 +16,27 @@ import 'package:treino/features/feed/presentation/widgets/public_profile_follow_
 import 'package:treino/features/profile/application/user_providers.dart'
     show firestoreProvider;
 
+// Stub notifier that resolves/errors based on the injected AsyncValue.
+// Must extend PublicProfileViewNotifier so the type is compatible with
+// publicProfileViewProvider.overrideWith(() => ...).
+class _StubPublicProfileViewNotifier extends PublicProfileViewNotifier {
+  _StubPublicProfileViewNotifier(this._value);
+  final AsyncValue<PublicProfileView> _value;
+
+  @override
+  Future<PublicProfileView> build(String arg) async {
+    if (_value is AsyncData<PublicProfileView>) {
+      return (_value as AsyncData<PublicProfileView>).value;
+    }
+    if (_value is AsyncError<PublicProfileView>) {
+      throw (_value as AsyncError<PublicProfileView>).error;
+    }
+    // Loading: never resolve.
+    await Completer<void>().future;
+    return _value.requireValue;
+  }
+}
+
 class _MockUser extends Mock implements User {}
 
 User _userWithUid(String uid) {
@@ -49,15 +70,9 @@ Widget _wrap({
       firestoreProvider.overrideWithValue(firestore),
       authStateChangesProvider
           .overrideWith((_) => Stream.value(_userWithUid(viewerUid))),
-      publicProfileViewProvider('target').overrideWith((ref) async {
-        if (view is AsyncData<PublicProfileView>) return view.value;
-        if (view is AsyncError<PublicProfileView>) {
-          throw view.error;
-        }
-        // Loading: never resolve.
-        await Completer<void>().future;
-        return view.requireValue;
-      }),
+      publicProfileViewProvider.overrideWith(
+        () => _StubPublicProfileViewNotifier(view),
+      ),
     ],
     child: MaterialApp(
       theme: AppTheme.dark(),

@@ -76,7 +76,7 @@ void main() {
         overrides: [
           currentAthleteLinkProvider.overrideWith((ref) async => _makeLink()),
           userPublicProfileProvider('trainer-1')
-              .overrideWith((ref) async => _makePub()),
+              .overrideWith((ref) => Stream.value(_makePub())),
         ],
       ));
       await tester.pumpAndSettle();
@@ -93,7 +93,7 @@ void main() {
         overrides: [
           currentAthleteLinkProvider.overrideWith((ref) async => _makeLink()),
           userPublicProfileProvider('trainer-1')
-              .overrideWith((ref) async => _makePub()),
+              .overrideWith((ref) => Stream.value(_makePub())),
         ],
       ));
       await tester.pumpAndSettle();
@@ -109,7 +109,7 @@ void main() {
           currentAthleteLinkProvider.overrideWith(
               (ref) async => _makeLink(status: TrainerLinkStatus.pending)),
           userPublicProfileProvider('trainer-1')
-              .overrideWith((ref) async => _makePub()),
+              .overrideWith((ref) => Stream.value(_makePub())),
         ],
       ));
       await tester.pumpAndSettle();
@@ -126,7 +126,7 @@ void main() {
           currentAthleteLinkProvider.overrideWith(
               (ref) async => _makeLink(status: TrainerLinkStatus.pending)),
           userPublicProfileProvider('trainer-1')
-              .overrideWith((ref) async => _makePub()),
+              .overrideWith((ref) => Stream.value(_makePub())),
         ],
       ));
       await tester.pumpAndSettle();
@@ -171,7 +171,7 @@ void main() {
             currentAthleteLinkProvider.overrideWith(
                 (ref) async => _makeLink(sharedWithTrainer: false)),
             userPublicProfileProvider('trainer-1')
-                .overrideWith((ref) async => _makePub()),
+                .overrideWith((ref) => Stream.value(_makePub())),
             trainerLinkRepositoryProvider.overrideWithValue(mockRepo),
           ],
         ));
@@ -195,7 +195,7 @@ void main() {
             currentAthleteLinkProvider.overrideWith(
                 (ref) async => _makeLink(status: TrainerLinkStatus.pending)),
             userPublicProfileProvider('trainer-1')
-                .overrideWith((ref) async => _makePub()),
+                .overrideWith((ref) => Stream.value(_makePub())),
             trainerLinkRepositoryProvider.overrideWithValue(mockRepo),
           ],
         ));
@@ -216,7 +216,7 @@ void main() {
             currentAthleteLinkProvider.overrideWith(
                 (ref) async => _makeLink(sharedWithTrainer: true)),
             userPublicProfileProvider('trainer-1')
-                .overrideWith((ref) async => _makePub()),
+                .overrideWith((ref) => Stream.value(_makePub())),
             trainerLinkRepositoryProvider.overrideWithValue(mockRepo),
           ],
         ));
@@ -240,7 +240,7 @@ void main() {
             currentAthleteLinkProvider.overrideWith(
                 (ref) async => _makeLink(sharedWithTrainer: false)),
             userPublicProfileProvider('trainer-1')
-                .overrideWith((ref) async => _makePub()),
+                .overrideWith((ref) => Stream.value(_makePub())),
             trainerLinkRepositoryProvider.overrideWithValue(mockRepo),
           ],
         ));
@@ -276,7 +276,7 @@ void main() {
               return _makeLink(sharedWithTrainer: false);
             }),
             userPublicProfileProvider('trainer-1')
-                .overrideWith((ref) async => _makePub()),
+                .overrideWith((ref) => Stream.value(_makePub())),
             trainerLinkRepositoryProvider.overrideWithValue(mockRepo),
           ],
         ));
@@ -311,7 +311,7 @@ void main() {
               return _makeLink(sharedWithTrainer: true);
             }),
             userPublicProfileProvider('trainer-1')
-                .overrideWith((ref) async => _makePub()),
+                .overrideWith((ref) => Stream.value(_makePub())),
             trainerLinkRepositoryProvider.overrideWithValue(mockRepo),
           ],
         ));

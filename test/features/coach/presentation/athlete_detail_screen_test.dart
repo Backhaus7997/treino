@@ -99,7 +99,7 @@ void main() {
         overrides: [
           currentUidProvider.overrideWithValue('trainer-1'),
           userPublicProfileProvider('athlete-1').overrideWith(
-            (ref) async => _makeProfile('athlete-1', 'Martín García'),
+            (ref) => Stream.value(_makeProfile('athlete-1', 'Martín García')),
           ),
           assignedRoutinesProvider('athlete-1').overrideWith(
             (ref) async => const [],
@@ -140,7 +140,7 @@ void main() {
         overrides: [
           currentUidProvider.overrideWithValue('trainer-1'),
           userPublicProfileProvider('athlete-1').overrideWith(
-            (ref) async => _makeProfile('athlete-1', 'Martín García'),
+            (ref) => Stream.value(_makeProfile('athlete-1', 'Martín García')),
           ),
           assignedRoutinesProvider('athlete-1').overrideWith(
             (ref) async => [myPlan, otherPlan],
@@ -166,7 +166,7 @@ void main() {
         overrides: [
           currentUidProvider.overrideWithValue('trainer-1'),
           userPublicProfileProvider('athlete-1').overrideWith(
-            (ref) async => _makeProfile('athlete-1', 'Martín García'),
+            (ref) => Stream.value(_makeProfile('athlete-1', 'Martín García')),
           ),
           assignedRoutinesProvider('athlete-1').overrideWith(
             (ref) async => const [],
@@ -189,7 +189,7 @@ void main() {
         overrides: [
           currentUidProvider.overrideWithValue('trainer-1'),
           userPublicProfileProvider('athlete-1').overrideWith(
-            (ref) async => _makeProfile('athlete-1', 'Martín García'),
+            (ref) => Stream.value(_makeProfile('athlete-1', 'Martín García')),
           ),
           assignedRoutinesProvider('athlete-1').overrideWith(
             (ref) async => const [],
