@@ -11,8 +11,12 @@ import '../features/auth/presentation/splash_screen.dart';
 import '../features/auth/presentation/welcome_screen.dart';
 import '../features/chat/presentation/chat_screen.dart';
 import '../features/coach/coach_screen.dart';
+import '../features/coach/application/trainer_link_providers.dart';
+import '../features/coach/presentation/athlete_agenda_screen.dart';
 import '../features/coach/presentation/athlete_detail_screen.dart';
+import '../features/coach/presentation/availability_editor_screen.dart';
 import '../features/coach/presentation/trainer_public_profile_screen.dart';
+import '../features/workout/application/session_providers.dart' show currentUidProvider;
 import '../features/workout/presentation/routine_editor_screen.dart';
 import '../features/workout/application/session_init.dart';
 import '../features/workout/presentation/exercise_detail_screen.dart';
@@ -34,6 +38,15 @@ import '../features/workout/workout_screen.dart';
 import 'theme/app_background.dart';
 
 const _kTabs = ['/workout', '/feed', '/home', '/coach', '/profile'];
+
+/// Key for the ShellRoute's nested Navigator. We need a handle to it so the
+/// bottom bar's onTap can pop popup routes (e.g. agenda day sheets) that
+/// were pushed onto the shell nav via `showModalBottomSheet`. Without this
+/// key, `Navigator.of(_ShellScaffold.context)` returns the ROOT navigator
+/// (because _ShellScaffold sits ABOVE the shell nav in the widget tree), so
+/// the modal — which lives on the shell nav — would be unreachable.
+final GlobalKey<NavigatorState> _shellNavigatorKey =
+    GlobalKey<NavigatorState>(debugLabel: 'ShellNav');
 
 /// Routes that are public (no redirect when anonymous).
 const _publicRoutes = {
@@ -184,6 +197,7 @@ GoRouter buildRouter({
       // otherwise the default iOS slide animation runs and the previous
       // screen (splash) is briefly visible behind the home content.
       ShellRoute(
+        navigatorKey: _shellNavigatorKey,
         pageBuilder: (context, state, child) => _noAnim(
           _ShellScaffold(
             location: state.uri.toString(),
@@ -279,7 +293,15 @@ GoRouter buildRouter({
               ),
               GoRoute(
                 path: 'agenda',
-                pageBuilder: (_, __) => _noAnim(const _AgendaPlaceholder()),
+                pageBuilder: (_, __) =>
+                    _noAnim(const _AthleteAgendaRouteHost()),
+              ),
+              GoRoute(
+                path: 'availability-editor',
+                pageBuilder: (context, state) {
+                  final uid = state.uri.queryParameters['trainerId'] ?? '';
+                  return _noAnim(AvailabilityEditorScreen(trainerId: uid));
+                },
               ),
             ],
           ),
@@ -307,15 +329,43 @@ CustomTransitionPage<void> _noAnim(Widget child) => CustomTransitionPage(
       transitionsBuilder: (_, __, ___, child) => child,
     );
 
-class _AgendaPlaceholder extends StatelessWidget {
-  const _AgendaPlaceholder();
+/// Resuelve athleteId (currentUid) y trainerId (active link) y monta
+/// AthleteAgendaScreen. Loading state mientras se resuelve el link.
+class _AthleteAgendaRouteHost extends ConsumerWidget {
+  const _AthleteAgendaRouteHost();
 
   @override
-  Widget build(BuildContext context) {
-    return const Scaffold(
-      body: Center(
-        child: Text('PRÓXIMAMENTE — AgendaScreen (PR2)'),
+  Widget build(BuildContext context, WidgetRef ref) {
+    final athleteId = ref.watch(currentUidProvider) ?? '';
+    final linkAsync = ref.watch(currentAthleteLinkProvider);
+
+    return linkAsync.when(
+      loading: () => const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
       ),
+      error: (err, _) => Scaffold(
+        body: Center(child: Text('Error: $err')),
+      ),
+      data: (link) {
+        final trainerId = link?.trainerId ?? '';
+        if (trainerId.isEmpty || athleteId.isEmpty) {
+          return const Scaffold(
+            body: Center(
+              child: Padding(
+                padding: EdgeInsets.all(24),
+                child: Text(
+                  'Necesitás un vínculo activo con un PF para ver su agenda.',
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ),
+          );
+        }
+        return AthleteAgendaScreen(
+          trainerId: trainerId,
+          athleteId: athleteId,
+        );
+      },
     );
   }
 }
@@ -337,7 +387,22 @@ class _ShellScaffold extends StatelessWidget {
       body: AppBackground(child: SafeArea(child: child)),
       bottomNavigationBar: TreinoBottomBar(
         currentIndex: _currentIndex,
-        onTap: (i) => context.go(_kTabs[i]),
+        onTap: (i) {
+          // Pop any open popup (modal bottom sheet, dialog) on the SHELL
+          // navigator so it animates closed when the user switches tabs —
+          // mirrors the auto-dismiss behavior the user expects from the
+          // athlete agenda. We MUST use the shell navigator key here:
+          // showModalBottomSheet defaults to useRootNavigator: false, so
+          // the modal lives on the shell nav, which is BELOW _ShellScaffold
+          // in the tree — unreachable via Navigator.of(context).
+          _shellNavigatorKey.currentState
+              ?.popUntil((route) => route is! PopupRoute);
+          // Defensive: also pop popups on the root navigator (dialogs that
+          // explicitly opted into useRootNavigator: true).
+          Navigator.of(context, rootNavigator: true)
+              .popUntil((route) => route is! PopupRoute);
+          context.go(_kTabs[i]);
+        },
       ),
     );
   }

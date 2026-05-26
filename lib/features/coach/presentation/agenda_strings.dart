@@ -37,21 +37,53 @@ abstract final class AgendaStrings {
   // ── Generic error ─────────────────────────────────────────────────────────
   static const genericError = 'Hubo un problema. Intentá de nuevo.';
 
+  // ── Trainer UI strings (PR3) ──────────────────────────────────────────────
+  static const trainerEmptyAvailability =
+      'Todavía no configuraste tus horarios de trabajo. '
+      'Agregá uno para que tus alumnos puedan reservar.';
+  static const configureHoursCta = 'CONFIGURAR HORARIOS';
+  static const myWorkingHoursHeading = 'MIS HORARIOS DE TRABAJO';
+  static const addRuleCta = 'AGREGAR HORARIO';
+  static const blockDayCta = 'BLOQUEAR UN DÍA';
+  static const editorTitle = 'Mis horarios';
+  static const ruleDeleteConfirm =
+      '¿Borrar este horario? Las reservas existentes se mantienen.';
+  static const bookingCancelledByCoach = 'Reserva cancelada por el entrenador.';
+  static const slotFreeLabel = 'Disponible';
+  static const slotBlockedLabel = 'Bloqueado';
+
+  static String slotBookedByLabel(String athleteName) =>
+      'Reservado por $athleteName';
+
+  /// ISO weekday → display label (1=Monday … 7=Sunday).
+  static const Map<int, String> dayOfWeekLabels = {
+    1: 'Lunes',
+    2: 'Martes',
+    3: 'Miércoles',
+    4: 'Jueves',
+    5: 'Viernes',
+    6: 'Sábado',
+    7: 'Domingo',
+  };
+
   // ── Helpers ───────────────────────────────────────────────────────────────
 
-  /// Formats a [DateTime] as `dd/MM/yyyy` in local time.
+  /// Formats a [DateTime] as `dd/MM/yyyy`.
+  ///
+  /// Per the agenda design (single-TZ Argentina, ADR-7), all stored DateTimes
+  /// are UTC values that REPRESENT Argentina wall-clock time directly — they
+  /// are NOT actual UTC instants. So we read fields directly without calling
+  /// `.toLocal()` (which would subtract 3h and break display).
   static String formatDate(DateTime dt) {
-    final d = dt.toLocal();
-    final dd = d.day.toString().padLeft(2, '0');
-    final mm = d.month.toString().padLeft(2, '0');
-    return '$dd/$mm/${d.year}';
+    final dd = dt.day.toString().padLeft(2, '0');
+    final mm = dt.month.toString().padLeft(2, '0');
+    return '$dd/$mm/${dt.year}';
   }
 
-  /// Formats a [DateTime] as `HH:mm` in local time.
+  /// Formats a [DateTime] as `HH:mm`. See [formatDate] for TZ rationale.
   static String formatTime(DateTime dt) {
-    final d = dt.toLocal();
-    final hh = d.hour.toString().padLeft(2, '0');
-    final min = d.minute.toString().padLeft(2, '0');
+    final hh = dt.hour.toString().padLeft(2, '0');
+    final min = dt.minute.toString().padLeft(2, '0');
     return '$hh:$min';
   }
 }
