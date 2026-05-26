@@ -1,6 +1,6 @@
 # Roadmap — TREINO
 
-Estado de las fases y desglose detallado de Fase 4 (en curso).
+Estado de las fases y desglose detallado de Fase 5 (en curso).
 
 ## Estado por fase
 
@@ -8,8 +8,8 @@ Estado de las fases y desglose detallado de Fase 4 (en curso).
 - [x] **Fase 1** — Auth (email/Google/Apple) + Firebase + Firestore + ProfileSetup + Roles & guards. ✅ **COMPLETA** — 7/7 etapas mergeadas. Cerró 2026-05-13 con Apple Sign-In (PR #10).
 - [x] **Fase 2** — Home (paridad con mockup Mobile Home) + Rutinas básicas read-only. ✅ **COMPLETA** — 5/5 etapas mergeadas. Cerró ~2026-05-15 con Wire Home → Plantillas (PR #18).
 - [x] **Fase 3** — Feed social (amigos · mi gym · público) + perfiles públicos. ✅ **COMPLETA** — 6/6 etapas + sub-fase 5.5 (`user-public-profiles`) mergeadas. Cerró 2026-05-22 con Etapa 6 (feed-friend-requests-inbox, PR #78).
-- [ ] **Fase 4** — Workout++ (session tracking, sesión activa, post-entreno, historial, insights, wire de stats). 🔄 **4/6 etapas hechas** (Etapas 1, 2, 3, 4 ✅; Etapas 5 y 6 pending). IA buscador y videos quedan deferrables a Fase 4.5.
-- [ ] **Fase 5** — Coach / Personal Trainer (discovery con geohash, chat, agenda, planes asignados, importación de planes Excel).
+- [x] **Fase 4** — Workout++ (session tracking, sesión activa, post-entreno, historial, insights, wire de stats). ✅ **COMPLETA** — 6/6 etapas mergeadas. Cerró 2026-05-21 con Etapa 6 (wire-real-stats, 4 PRs #56/#57/#65/#67 + archive #69) tras Etapa 5 (insights, PR #51, mergeada 2026-05-19). IA buscador y videos quedaron deferrables a Fase 4.5.
+- [ ] **Fase 5** — Coach / Personal Trainer (discovery con geohash, chat, agenda, planes asignados, importación de planes Excel). 🔄 **6/8 etapas hechas** (Etapas 1, 2, 3, 4, 5, 6 ✅ + sub-fase `shared-with-trainer` ✅; Etapas 7 y 8 pending).
 - [ ] **Fase 6** — Polish + lanzamiento beta (TestFlight + Play Internal). Incluye App Check, Analytics, Crashlytics, deep links, localización, app icon final.
 
 ## Fase 1 — desglose en 7 etapas ✅ COMPLETA
@@ -176,7 +176,7 @@ Durante 5.5 quedaron documentadas 3 mejoras para futuros SDDs que toquen Firesto
 - ✅ Etapa 1: colecciones `posts` + `friendships` pobladas via `scripts/seed_posts.js`.
 - ✅ Etapa 5.5: nueva collection `userPublicProfiles` deployada + rules deployadas a `treino-dev`.
 
-## Fase 4 — desglose en 6 etapas (4/6 hechas 🔄)
+## Fase 4 — desglose en 6 etapas ✅ COMPLETA
 
 Workout++ es donde la app deja de ser exploración read-only y se vuelve **ejecutable**: el alumno arranca un workout, marca sets en tiempo real, ve su progreso a lo largo del tiempo. Cierra los carry-overs visibles de Fases 1-3 (Home "Esta semana", Profile stats, PostCard stats stub, "Compartir post-entreno").
 
@@ -199,15 +199,15 @@ Workout++ es donde la app deja de ser exploración read-only y se vuelve **ejecu
 | 2 | Sesión activa (player) ✅ | `09680f0` (#36) + `499c2c8` (#37) + `efb1dc2` (#38) | Nada | Pantalla nueva accesible desde "EMPEZAR ENTRENAMIENTO" en RoutineDetailScreen. Timer running, marcado de sets en vivo (reps + peso + check), persiste cada `SetLog` en Firestore on-completion. Botón "TERMINAR SESIÓN" → finaliza Session + navega a resumen post-entreno. Entregado en 3 chained PRs (foundation + logic + UI). | B |
 | 3 | Resumen post-entreno + compartir ✅ | `c23c80c` (#39) | Nada | Pantalla `post-entreno.png` con stats finales (volumen total, duración, PRs alcanzados). Opción "Compartir" → genera Post automáticamente con `routineTag` set + texto autocompletado + privacy default friends. Navega de vuelta a Home o Entrenamiento. | B |
 | 4 | Historial + expandir ✅ | `65455c6` (#46) | Nada | Tab Entrenamiento sección Historial según `historial.png`. Lista de sesiones pasadas con día, volumen, duración. Tap expande a `expandir-historial.png` mostrando sets/reps reales de la sesión. | C |
-| 5 | Insights screen ⏳ | `feat/insights` (pendiente) | Nada | Pantalla Insights (`insights.png`) con volumen semanal, racha de días, PRs por grupo muscular, frecuencia. Lee de la colección `sessions` y agrega client-side (server aggregation queda para Fase 6 cuando aparezca App Check / Cloud Functions). | C |
-| 6 | Wire data atrasada (Home + Profile + check-in) ⏳ | `feat/wire-real-stats` (pendiente) | Nada | Home "Esta semana" con streak real, muscle map basado en último 7d, dots de días entrenados, stats SEMANA/MES. Profile public + own: stats `workouts` y `racha` reales (seguidores/siguiendo siguen siendo de `friendships`, que ya existe). Check-in básico (`check-in.png`) — daily prompt para registrar estado. | B |
+| 5 | Insights screen ✅ | `12b7304` (#51) | Nada | Pantalla Insights (`insights.png`) con volumen semanal, racha de días, PRs por grupo muscular, frecuencia. Lee de la colección `sessions` y agrega client-side. Domain: `MuscleGroupDisplay` enum (6 grupos) + mapping desde 10 categorías granulares del catálogo. Server aggregation queda para Fase 6 cuando aparezca App Check / Cloud Functions. 47 tests nuevos. SDD en `openspec/changes/insights/`. | C |
+| 6 | Wire data atrasada (Home + Profile + Public Profile + check-in) ✅ | `c48f577` (PR#1-4: #56/#57/#65/#67, archive #69) | Nada | 4 PRs encadenados. PR#1 Home "Esta Semana" (streak real + body silhouettes + day strip + SEMANA/MES cards). PR#2 Own Profile stats row (SESIONES + VOLUMEN KG via `kFormat` + RACHA magenta). PR#3 Public Profile counter denormalization (4 nullable fields en `UserPublicProfile` + cross-feature writes en `SessionRepository.finish` y `FriendshipRepository.accept/delete` con self-refresh per ADR-WRS-12, breaking change en `delete(id, myUid)` signature). PR#4 Check-in daily prompt (`check-in.png`) — dialog en Feed mount con `/users/{uid}/checkIns/{date}` collection + rules owner-only + 3 SCENARIOs en emulator. Lessons promovidas: try/catch + no-rethrow para cross-feature writes (ADR-WRS-10), container-presentational pattern (ADR-WRS-19 props-down dialog). | C |
 
 ### Dependencias entre etapas
 
 ```
 1 ✅ ──► 2 ✅ ──► 3 ✅
-  ├──► 4 ✅ ──► 5 ⏳
-  └─────────────► 6 ⏳
+  ├──► 4 ✅ ──► 5 ✅
+  └─────────────► 6 ✅
 ```
 
 - **1 bloqueante absoluto**: sin `Session` model + repo no hay nada que ejecutar, persistir, ni leer.
@@ -221,10 +221,10 @@ Workout++ es donde la app deja de ser exploración read-only y se vuelve **ejecu
 | Dev | Etapas |
 |---|---|
 | **A** | Etapa 1 (modelo + seed + reglas) ✅ |
-| **B** | Etapa 2 (player) ✅ + Etapa 3 (resumen + compartir) ✅ + Etapa 6 (wire stats) ⏳ |
-| **C** | Etapa 4 (historial) ✅ + Etapa 5 (insights) ⏳ |
+| **B** | Etapa 2 (player) ✅ + Etapa 3 (resumen + compartir) ✅ |
+| **C** | Etapa 4 (historial) ✅ + Etapa 5 (insights) ✅ + Etapa 6 (wire-real-stats) ✅ — reasignación 2026-05-20: Etapa 6 movida de B a C porque B arrancó Fase 5 foundations |
 
-**Tiempo real (parcial)**: ~4 días desde el cierre de Fase 3 etapas paralelas. Etapas 5 y 6 pendientes — proyección ~1-2 semanas más con 2 devs en paralelo.
+**Tiempo real**: ~6 días desde el cierre de Fase 3 etapas paralelas hasta cerrar Fase 4. Etapa 5 (insights) cerró 2026-05-19; Etapa 6 (wire-real-stats, 4 PRs chained) cerró 2026-05-21 con archive 2026-05-21. Proyección original era ~1-2 semanas más — terminó pasando casi exacto por paralelización con Fase 5 (que arrancó foundations en paralelo).
 
 ### Trabajo paralelo entre Fase 3 y 4
 
@@ -279,23 +279,23 @@ El módulo de Personal Trainer (PF). Esta fase introduce un segundo tipo de usua
 
 | # | Etapa | Branch | Console (manual) | Código clave | Owner sugerido |
 |---|---|---|---|---|---|
-| 1 | **Foundations** — modelos + reglas + Routine extension | `feat/coach-foundations` | Reglas Firestore deployadas para `trainer_links/**` y queries de Routine | UserProfile extendido con `trainerBio?`, `trainerSpecialty?`, `trainerLocation: GeoPoint?`, `trainerGeohash: String?`, `trainerHourlyRate: int?`. Modelo `TrainerLink` (freezed) con `linkId, trainerId, athleteId, status, requestedAt, acceptedAt?, terminatedAt?`. `TrainerLinkRepository` con request/accept/decline/terminate/listForTrainer/listForAthlete. Routine extension: `source: 'system' \| 'trainer-assigned' \| 'user-created'`, `assignedBy: String?`, `assignedTo: String?`, `visibility: 'public' \| 'private' \| 'shared'`. Migration script para backfill `source='system'` + `visibility='public'` en las plantillas seedeadas. Reglas Firestore: `trainer_links` solo legibles por members; Routines privadas solo legibles por assignedBy/assignedTo. | B |
-| 2 | **Discovery con geohash** | `feat/coach-discovery` | Nada (la geohash query es client-side) | Pantalla `TrainersListScreen` accesible desde tab Coach (rol athlete) — lista de PFs filtrable por especialidad + distancia. Geohash precomputado en el `UserProfile` del PF (Etapa 1 ya agregó el campo). Query: `users.where('role','==','trainer').where('trainerGeohash', isGreaterThan, prefix).where('trainerGeohash', isLessThan, prefix+'\\uf8ff')`. Pantalla `TrainerPublicProfileScreen` (variante de `PublicProfileScreen` ya existente — comparten widgets de header/avatar/stats pero el trainer muestra especialidad/tarifa/CTA "PEDIR VÍNCULO"). | C |
-| 3 | **Link lifecycle (mobile)** — request / accept / decline / terminate | `feat/coach-link-lifecycle` | Nada | Athlete tap en CTA "PEDIR VÍNCULO" en TrainerPublicProfile → crea doc en `trainer_links` con `status: 'pending'`. PF abre tab Coach (rol trainer) → ve sección "Solicitudes pendientes" + sección "Mis alumnos activos". Botones aceptar/rechazar. Athlete ve estado del vínculo en su tab Coach (rol athlete). Provider `myTrainerLinkProvider` para athlete (single link activo). UI patrón `friendship_button` reusada. | B |
-| 4 | **Plans assignment (mobile)** — visualización + creación básica desde mobile | `feat/coach-plans-mobile` | Reglas Firestore actualizadas para Routine privadas | Athlete ve sus planes asignados en tab Workout, sección nueva "MI PLAN" arriba de PLANTILLAS. RoutineDetailScreen muestra badge "Asignado por <PF>" cuando `source == 'trainer-assigned'`. SessionPlayer funciona sin cambios. Trainer-side: tap en alumno → ve sus planes asignados; botón "CREAR PLAN" abre RoutineEditorScreen (nueva — formulario con day selector + slots editables). Después de submit, plan se asigna automáticamente a ese alumno. NOTE: edición avanzada de planes vive en Coach Hub (Etapa 7) — mobile solo soporta CRUD básico. | B |
-| 5 | **Chat 1-1 real-time** | `feat/coach-chat` | Reglas Firestore para `chats/**` | Colección `chats/{chatId}` (id determinístico — `sortedUids.join('_')`) + sub-colección `chats/{chatId}/messages/{messageId}` con `{senderId, text, createdAt}`. Stream provider via Firestore snapshots para real-time. UI: lista de chats (todos los vínculos activos), pantalla de chat con burbujas + scroll auto-bottom + textfield. Reglas: solo members del chat pueden leer/escribir. Sin push notifications todavía (Fase 6). | C |
-| 6 | **Agenda** — appointments one-off | `feat/coach-agenda` | Nada | Colección `appointments/{appointmentId}` con `{trainerId, athleteId, startsAt, duration, status: 'proposed' \| 'confirmed' \| 'cancelled', notes?}`. Cualquier member del link activo puede proponer; el otro debe confirmar. Pantalla `AgendaScreen` con calendario (paquete `table_calendar`) accesible desde tab Coach. Crear/cancelar appointment via bottom sheet. Sin recurrencia (one-off only). | C |
-| 7 | **Coach Hub bootstrap (web)** | `feat/coach-hub-bootstrap` | Build target Flutter Web configurado; Firebase hosting site creado en Console | Nuevo entry point `lib/main_coach_hub.dart` con tema propio (mismo Mint Magenta) + routing limitado a rol trainer + landing page autenticada con dashboard. Reutilizá `firestoreProvider`, `authStateChangesProvider`, `UserProfile`. Auth restringe acceso a `role == 'trainer'` — redirect a página de info para no-trainers. Web hosting via Firebase Hosting site `coach-treino.web.app` (nombre tentativo). NO incluye editor de planes ni uploader — eso es Etapa 8. | A o C |
-| 8 | **Excel import (Coach Hub + Cloud Function)** | `feat/coach-excel-import` | Cloud Function `parsePlan` deployada en Firebase; Storage bucket habilitado | Cloud Function HTTP onCall `parsePlan`: recibe path al archivo subido a Storage temporal + `mode: 'template' \| 'ai'`. Modo template: parser determinístico para la plantilla `.xlsx` oficial TREINO (~150 LOC Node.js). Modo AI: Gemini API extrae JSON estructurado del Excel arbitrario; key vive en secret manager. Output JSON mapea a Routine schema. Coach Hub agrega flow de upload → preview → edit → assign. Routine resultante tiene `source: 'excel-import'`. Manejo de errores: archivo inválido, schema incompleto, ambigüedad de ejercicios (Gemini debe matchear a `exercises` catalog). | A |
+| 1 | **Foundations** ✅ — modelos + reglas + Routine extension | `0e22252` (#54, archive #55) | Reglas Firestore deployadas para `trainer_links/**` y queries de Routine | UserProfile extendido con `trainerBio?`, `trainerSpecialty?`, `trainerLocation: GeoPoint?`, `trainerGeohash?`, `trainerMonthlyRate?` (rate moved from hourly per decisión #5). Modelo `TrainerLink` (freezed) con `linkId, trainerId, athleteId, status, requestedAt, acceptedAt?, terminatedAt?`. `TrainerLinkRepository` con request/accept/decline/terminate/listForTrainer/listForAthlete. Routine extension: `source`, `assignedBy?`, `assignedTo?`, `visibility`. SDD en `openspec/changes/coach-foundations/`. | B |
+| 2 | **Discovery con geohash** ✅ | `034e3d9` (#58 infra) + `760ea3b` (#59 UI); visual refresh: `d1e8833` (#82) + `ae3a1f4` (#83) + `067cdc3` (#84) | Nada (geohash query es client-side) | Pantalla `TrainersListScreen` accesible desde tab Coach (rol athlete) — lista de PFs filtrable por especialidad + distancia. Pantalla `TrainerPublicProfileScreen` (variante de `PublicProfileScreen`). **Refresh 2026-05-23..26**: 3 PRs encadenados rediseñaron la pantalla a un MAPA/Lista toggle con dark tiles + pill markers + bottom sheet + filter chips (distancia + precio). SDD original en `openspec/changes/coach-discovery/`. | C |
+| 3 | **Link lifecycle (mobile)** ✅ — request / accept / decline / terminate / cancel | `2d419f4` (#61, archive #62) + sub-fase `shared-with-trainer` `fa42aa4` (#73, archive #76) | Nada | Athlete tap en CTA "PEDIR VÍNCULO" → crea doc en `trainer_links` con `status: 'pending'`. PF ve sección "Solicitudes pendientes" + "Mis alumnos activos". Botones aceptar/rechazar/cancelar. Athlete ve estado del vínculo en su tab Coach. **Sub-fase `shared-with-trainer`**: agrega el flag `sharedWithTrainer: bool` (default false) que el athlete toggle desde su side, gating del historial sharing per decisión #4. SDDs: `coach-link-lifecycle` + `archive/2026-05-22-shared-with-trainer/`. | B |
+| 4 | **Plans assignment (mobile)** ✅ — visualización + creación básica desde mobile | `6642fe8` (#64 data) + `d354568` (#70 MI PLAN section) + `a864448` (#71 UI trainer), archive #72 | Reglas Firestore actualizadas para Routine privadas | Athlete ve sus planes asignados en tab Workout, sección "MI PLAN" arriba de PLANTILLAS. RoutineDetailScreen muestra badge "Asignado por <PF>" cuando `source == 'trainer-assigned'`. SessionPlayer funciona sin cambios. Trainer-side: tap en alumno → ve planes asignados; botón "CREAR PLAN" abre RoutineEditorScreen. NOTE: edición avanzada vive en Coach Hub (Etapa 7). SDD `archive/2026-05-21-coach-plans-mobile/`. | B |
+| 5 | **Chat 1-1 real-time** ✅ | `705d0df` (#74, archive #75) | Reglas Firestore para `chats/**` | Colección `chats/{chatId}` (id determinístico — `sortedUids.join('_')`) + sub-colección `chats/{chatId}/messages/{messageId}` con `{senderId, text, createdAt}`. Stream provider via Firestore snapshots para real-time. UI: lista de chats (todos los vínculos activos), pantalla de chat con burbujas + scroll auto-bottom + textfield. Reglas: solo members del chat pueden leer/escribir. Sin push notifications todavía (Fase 6). SDD `openspec/changes/coach-chat/`. | C |
+| 6 | **Agenda** — appointments one-off ✅ | `eb4069f` (#79 data) + `e51d257` (#81 UI athlete) | Nada | Colección `appointments/{appointmentId}` con `{trainerId, athleteId, startsAt, duration, status: 'proposed' \| 'confirmed' \| 'cancelled', notes?}`. Cualquier member del link activo puede proponer; el otro debe confirmar. Pantalla `AgendaScreen` con calendario (paquete `table_calendar`). Crear/cancelar appointment via bottom sheet. Sin recurrencia (one-off only). Plus availability rules + overrides + `compute_free_slots` para que el athlete vea solo slots disponibles. SDD `openspec/changes/coach-agenda/` — **pendiente verify + archive** (apply-progress.md existe pero archive-report.md no). | C |
+| 7 | **Coach Hub bootstrap (web)** ⏳ | `feat/coach-hub-bootstrap` (pendiente) | Build target Flutter Web configurado; Firebase hosting site creado en Console | Nuevo entry point `lib/main_coach_hub.dart` con tema propio (mismo Mint Magenta) + routing limitado a rol trainer + landing page autenticada con dashboard. Reutilizá `firestoreProvider`, `authStateChangesProvider`, `UserProfile`. Auth restringe acceso a `role == 'trainer'` — redirect a página de info para no-trainers. Web hosting via Firebase Hosting site `coach-treino.web.app` (nombre tentativo). NO incluye editor de planes ni uploader — eso es Etapa 8. | A o C |
+| 8 | **Excel import (Coach Hub + Cloud Function)** ⏳ | `feat/coach-excel-import` (pendiente) | Cloud Function `parsePlan` deployada en Firebase; Storage bucket habilitado | Cloud Function HTTP onCall `parsePlan`: recibe path al archivo subido a Storage temporal + `mode: 'template' \| 'ai'`. Modo template: parser determinístico para la plantilla `.xlsx` oficial TREINO (~150 LOC Node.js). Modo AI: Gemini API extrae JSON estructurado del Excel arbitrario; key vive en secret manager. Output JSON mapea a Routine schema. Coach Hub agrega flow de upload → preview → edit → assign. Routine resultante tiene `source: 'excel-import'`. Manejo de errores: archivo inválido, schema incompleto, ambigüedad de ejercicios (Gemini debe matchear a `exercises` catalog). | A |
 
 ### Dependencias entre etapas
 
 ```
-1 ──┬──► 2
-    ├──► 3 ──┬──► 4
-    │        ├──► 5
-    │        └──► 6
-    └──► 7 ──► 8
+1 ✅ ──┬──► 2 ✅
+       ├──► 3 ✅ ──┬──► 4 ✅
+       │           ├──► 5 ✅
+       │           └──► 6 ✅
+       └──► 7 ⏳ ──► 8 ⏳
 ```
 
 - **1 bloqueante absoluto**: sin el modelo `TrainerLink` + Routine extendida + reglas, ninguna otra etapa puede empezar.
@@ -308,13 +308,13 @@ El módulo de Personal Trainer (PF). Esta fase introduce un segundo tipo de usua
 
 | Dev | Etapas |
 |---|---|
-| **A** | Etapa 7 (Coach Hub bootstrap) + Etapa 8 (Excel + Cloud Function) — backend-leaning + dueño del web target |
-| **B** | Etapa 1 (foundations + reglas) + Etapa 3 (link lifecycle) + Etapa 4 (plans mobile) — track de modelos + features de planes (continuidad con la familia Routine de Fase 2/4) |
-| **C** | Etapa 2 (discovery) + Etapa 5 (chat) + Etapa 6 (agenda) — UI-heavy con paquetes nuevos (`table_calendar`, geohash queries) |
+| **A** | Etapa 7 (Coach Hub bootstrap) ⏳ + Etapa 8 (Excel + Cloud Function) ⏳ — backend-leaning + dueño del web target |
+| **B** | Etapa 1 (foundations + reglas) ✅ + Etapa 3 (link lifecycle) ✅ + Etapa 4 (plans mobile) ✅ — track de modelos + features de planes (continuidad con la familia Routine de Fase 2/4) |
+| **C** | Etapa 2 (discovery) ✅ + Etapa 5 (chat) ✅ + Etapa 6 (agenda) ✅ — UI-heavy con paquetes nuevos (`table_calendar`, geohash queries) |
 
 **Reasignación 2026-05-20**: Etapa 1 movida de A a B. B arranca foundations mientras C cierra Etapa 6 de Fase 4 y A se incorpora más tarde. La continuidad B → 1 → 3 → 4 también ayuda — el modelo de datos lo arma quien después construye los features que lo consumen.
 
-**Estimación**: ~3-4 semanas en paralelo con los 3 devs. Más arriesgada que Fase 4 por el factor web (curva Flutter Web) + Cloud Function (Node + Gemini API). Recomendado +30% buffer.
+**Estimación**: ~3-4 semanas en paralelo con los 3 devs era el plan original. **Real (parcial)**: Etapas 1-6 cerradas entre 2026-05-19 y 2026-05-26 (~7 días) — adelanto significativo. Etapas 7-8 (Coach Hub web + Excel/Cloud Function) son las más arriesgadas: primer target Flutter Web + primera Cloud Function + Gemini API. Mantener +30% buffer para esas 2 etapas finales.
 
 ### Cross-cutting concerns (válidos para todas las etapas)
 
@@ -342,17 +342,17 @@ La definimos durante Etapa 8 con Dev A. Contrato propuesto:
 
 
 
-Actualizado a 2026-05-19.
+Actualizado a 2026-05-26.
 
 | Fase | Estado | Estimado original | Real / proyectado |
 |---|---|---|---|
 | Fase 1 (Auth + Firebase + ProfileSetup) | ✅ Cerrada 2026-05-13 | ~2026-05-08 | +5 días (drama Apple Sign-In) |
 | Fase 2 (Home + Rutinas) | ✅ Cerrada ~2026-05-15 | ~2026-05-29 | **Adelantada ~2 semanas** |
-| Fase 3 (Feed + sub-fase 5.5) | ✅ Cerrada 2026-05-19 | ~2026-06-12 | **Adelantada ~3.5 semanas** (incluyó sub-fase 5.5 imprevista por bug architectural) |
-| Fase 4 (Workout++) | 🔄 4/6 etapas (1-4 ✅, 5-6 ⏳) | ~2026-07-03 | Proyectada cerrar ~2026-05-28 (**~5 semanas adelantada** si se mantiene el ritmo) |
-| Fase 5 (Coach + Excel + Coach Hub web) | ⏳ | ~2026-08-07 | Proyectada ~2026-06-15 |
-| Fase 6 (Polish + lanzamiento beta) | ⏳ | ~2026-08-21 | Proyectada ~2026-06-30 |
+| Fase 3 (Feed + sub-fase 5.5 + Etapa 6 inbox post-cierre) | ✅ Cerrada **inicialmente** 2026-05-19; re-cerrada 2026-05-22 con Etapa 6 (`feed-friend-requests-inbox`, PR #78) | ~2026-06-12 | **Adelantada ~3 semanas** (incluyó sub-fase 5.5 + Etapa 6 imprevistas, ambas con justificación UX) |
+| Fase 4 (Workout++) | ✅ Cerrada 2026-05-21 (Etapa 5 insights el 19; Etapa 6 wire-real-stats el 21) | ~2026-07-03 | **Adelantada ~6 semanas** |
+| Fase 5 (Coach + Excel + Coach Hub web) | 🔄 6/8 etapas (1-6 ✅, 7-8 ⏳) | ~2026-08-07 | Proyectada cerrar ~2026-06-05 (**~9 semanas adelantada** si se mantiene el ritmo de los 3 PRs/día visto en Coach Hub mobile track) |
+| Fase 6 (Polish + lanzamiento beta) | ⏳ | ~2026-08-21 | Proyectada ~2026-06-20 |
 
-**Total**: ~17 semanas full-time originales → si seguimos el ritmo actual, ~7-8 semanas reales (~2 meses). El ritmo de Fase 3-4 con 3 devs en paralelo + SDD disciplinado superó las proyecciones.
+**Total**: ~17 semanas full-time originales → al ritmo actual, ~6-7 semanas reales (~1.5 meses) para cerrar todo. El ritmo de Fase 3-5 con 3 devs en paralelo + SDD disciplinado siguió superando las proyecciones.
 
-Buffer recomendado: +25% para imprevistos. **No bajar la guardia con Fase 5** — el Coach Hub web es la fase más grande y arriesgada (decisión Flutter Web vs Next.js todavía pendiente).
+Buffer recomendado: +25% para imprevistos. **Atención con Fase 5 Etapa 7** — Coach Hub web es la primera fase con target Flutter Web, riesgo de configuración + curva de aprendizaje. Etapa 8 (Excel + Cloud Function) trae Gemini API y Cloud Functions por primera vez.
