@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/features/feed/application/feed_screen_providers.dart'
+    show myFriendsFeedProvider;
 import 'package:treino/features/feed/application/friendship_providers.dart';
 import 'package:treino/features/feed/data/friendship_repository.dart';
 import 'package:treino/features/feed/domain/friendship.dart';
@@ -449,6 +451,81 @@ void main() {
       expect(navigatedRoutes, isEmpty);
       // But the repo call was made
       expect(stub.deleteCallCount, equals(1));
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // SCENARIO-493: _onAceptar invalidation cleanup (T20 RED / T21 GREEN)
+  // ---------------------------------------------------------------------------
+  group('FriendRequestInboxTile._onAceptar invalidation (SCENARIO-493)', () {
+    // SCENARIO-493: _onAceptar DOES call container.invalidate(myFriendsFeedProvider)
+    // AND does NOT call container.invalidate for the converted stream providers.
+    testWidgets(
+        'SCENARIO-493: _onAceptar invalidates myFriendsFeedProvider but NOT acceptedFriendsProvider or friendshipByPairProvider',
+        (tester) async {
+      final stub = _StubFriendshipRepository();
+      final friendship = _makeFriendship(requesterId: 'bob');
+      var myFriendsFeedBuildCount = 0;
+
+      // Build with an active listener on myFriendsFeedProvider.
+      // The tile uses ProviderScope.containerOf(context) which resolves to
+      // the root ProviderScope — so myFriendsFeedProvider must be in the
+      // same scope for container.invalidate(myFriendsFeedProvider) to trigger a rebuild.
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            friendshipRepositoryProvider.overrideWithValue(stub),
+            userPublicProfileProvider('bob').overrideWith(
+              (_) => Stream.value(const UserPublicProfile(
+                uid: 'bob',
+                displayName: 'Bob',
+              )),
+            ),
+            myFriendsFeedProvider.overrideWith((ref) async {
+              myFriendsFeedBuildCount++;
+              return const [];
+            }),
+          ],
+          child: MaterialApp(
+            theme: AppTheme.dark(),
+            home: Scaffold(
+              body: Column(
+                children: [
+                  // Active consumer ensures invalidation triggers rebuild
+                  Consumer(
+                    builder: (_, ref, __) {
+                      ref.watch(myFriendsFeedProvider);
+                      return const SizedBox.shrink();
+                    },
+                  ),
+                  FriendRequestInboxTile(
+                    friendship: friendship,
+                    viewerUid: 'alice',
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.pump();
+      final countBeforeTap = myFriendsFeedBuildCount;
+      expect(countBeforeTap, greaterThan(0),
+          reason: 'Provider should build at least once on render');
+
+      await tester.tap(find.text('ACEPTAR'));
+      await tester.pump();
+
+      // repo.accept was called
+      expect(stub.acceptCallCount, equals(1));
+
+      // myFriendsFeedProvider should have been invalidated → rebuilt
+      expect(
+        myFriendsFeedBuildCount,
+        greaterThan(countBeforeTap),
+        reason: '_onAceptar must call container.invalidate(myFriendsFeedProvider)',
+      );
     });
   });
 }
