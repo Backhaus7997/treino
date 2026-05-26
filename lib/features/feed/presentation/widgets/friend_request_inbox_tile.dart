@@ -7,9 +7,8 @@ import '../../../../app/theme/app_palette.dart';
 import '../../../profile/application/user_public_profile_providers.dart';
 import '../../application/feed_screen_providers.dart'
     show myFriendsFeedProvider;
-import '../../application/friendship_providers.dart';
-import '../../application/public_profile_providers.dart'
-    show friendshipByPairProvider;
+import '../../application/friendship_providers.dart'
+    show friendshipRepositoryProvider;
 import '../../domain/friendship.dart';
 import '../../domain/gym_name.dart';
 import 'post_avatar.dart';
@@ -20,14 +19,12 @@ import 'post_avatar.dart';
 /// gym name subtitle + RECHAZAR / ACEPTAR action pills.
 ///
 /// Actions are fire-and-forget — the inbox stream re-emission removes the
-/// row. After commit we ALSO invalidate sibling consumers that hold cached
-/// snapshots of friendship state but are not subscribed to this row's
-/// stream — `acceptedFriendsProvider` (Feed AMIGOS) and
-/// `friendshipByPairProvider` (PublicProfile follow button). Per
-/// ADR-FRI-013 (targeted invalidation in action handlers): on-device
-/// staleness is closed without converting those providers to streams.
-/// Cross-device staleness remains the scope of the deferred
-/// Stream-conversion follow-up SDD.
+/// row. `acceptedFriendsProvider` and `friendshipByPairProvider` are now
+/// `StreamProvider.family.autoDispose` and self-update on Firestore mutations
+/// — no manual `invalidate` needed for them (REQ-FPS-008, ADR-FPS-006).
+/// `myFriendsFeedProvider` (still a FutureProvider) MUST be explicitly
+/// invalidated after ACEPTAR because Riverpod does not auto-cascade
+/// invalidation to providers with no active listener at the moment.
 class FriendRequestInboxTile extends ConsumerStatefulWidget {
   const FriendRequestInboxTile({
     super.key,
@@ -150,31 +147,20 @@ class _FriendRequestInboxTileState
     // row and the ListView disposes the tile — `ref` from a disposed
     // ConsumerStatefulWidget can silently no-op on `invalidate`, leaving
     // sibling consumers (Feed AMIGOS) stale. The container lives at the
-    // root and survives the tile's disposal, so its invalidates always run.
+    // root and survives the tile's disposal, so its invalidate always runs.
+    // ADR-FPS-006: This dispose-safe capture pattern MUST be kept for the
+    // surviving `myFriendsFeedProvider` invalidation.
     final container = ProviderScope.containerOf(context, listen: false);
     final repo = container.read(friendshipRepositoryProvider);
-    final requesterUid = widget.friendship.requesterId;
     final viewerUid = widget.viewerUid;
     try {
       await repo.accept(widget.friendship.id, viewerUid);
-      // Refresh sibling consumers (ADR-FRI-013). The inbox itself updates
-      // via stream re-emit. For the rest:
-      //   - `acceptedFriendsProvider` is the source list of friend uids
-      //   - `myFriendsFeedProvider` MUST be invalidated explicitly (Riverpod
-      //     does NOT auto-cascade invalidation to downstream providers when
-      //     they have no active listener at the moment of invalidate — and
-      //     here the user is on the inbox screen, NOT on Feed AMIGOS). This
-      //     mirrors the pattern in `create_post_notifier` and
-      //     `post_workout_notifier`.
-      //   - `friendshipByPairProvider` keeps the public-profile follow
-      //     button in sync if the viewer visits the requester's profile.
-      container.invalidate(acceptedFriendsProvider(viewerUid));
+      // Stream providers (`acceptedFriendsProvider`, `friendshipByPairProvider`)
+      // self-update via .snapshots() — no manual invalidation needed.
+      // `myFriendsFeedProvider` (still a FutureProvider) MUST be invalidated
+      // explicitly — Riverpod does NOT auto-cascade invalidation to downstream
+      // providers with no active listener at the moment (ADR-FPS-006).
       container.invalidate(myFriendsFeedProvider);
-      container.invalidate(
-        friendshipByPairProvider(
-          (viewerUid: viewerUid, targetUid: requesterUid),
-        ),
-      );
     } catch (_) {
       // Swallow — stream will not emit a removal, so row stays.
     } finally {
@@ -185,22 +171,16 @@ class _FriendRequestInboxTileState
   Future<void> _onRechazar() async {
     if (_busy) return;
     setState(() => _busy = true);
-    // Same dispose-safe pattern as `_onAceptar` (see comments there).
+    // Same dispose-safe container capture as `_onAceptar` — not needed for
+    // invalidation here (rejection never affects AMIGOS feed), but kept
+    // for consistency and in case future calls need it.
     final container = ProviderScope.containerOf(context, listen: false);
     final repo = container.read(friendshipRepositoryProvider);
-    final requesterUid = widget.friendship.requesterId;
-    final viewerUid = widget.viewerUid;
     try {
-      await repo.delete(widget.friendship.id, viewerUid);
-      // Refresh the public-profile follow button (ADR-FRI-013) so it shows
-      // SEGUIR again if the viewer visits the (former) requester's profile.
-      // No `acceptedFriendsProvider` invalidation — the friendship was never
-      // accepted, so the AMIGOS feed list is unaffected.
-      container.invalidate(
-        friendshipByPairProvider(
-          (viewerUid: viewerUid, targetUid: requesterUid),
-        ),
-      );
+      await repo.delete(widget.friendship.id, widget.viewerUid);
+      // Stream providers self-update on Firestore mutation — no manual
+      // invalidation required. Rejection never created a friendship, so
+      // myFriendsFeedProvider is unaffected.
     } catch (_) {
       // Swallow — stream will not emit a removal, so row stays.
     } finally {

@@ -52,8 +52,9 @@ class TrainerAdvancedFilterChips extends ConsumerWidget {
             isLoading: isLoadingLocation && !hasLocation,
             palette: palette,
             onTap: () {
-              if (isLoadingLocation && !hasLocation)
+              if (isLoadingLocation && !hasLocation) {
                 return; // no-op mientras carga
+              }
               if (hasLocation) {
                 _showDistanceSheet(context, ref, distance);
               } else {

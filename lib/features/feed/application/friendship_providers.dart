@@ -8,17 +8,19 @@ final friendshipRepositoryProvider = Provider<FriendshipRepository>(
   (ref) => FriendshipRepository(firestore: ref.watch(firestoreProvider)),
 );
 
-/// Returns the list of UIDs that [uid] is friends with (status = accepted).
+/// Live stream of UIDs that [uid] is friends with (status = accepted).
+/// Drop-in replacement for the former FutureProvider.family — same name,
+/// same `AsyncValue<List<String>>` consumer surface. `autoDispose` bounds
+/// the Firestore listener to consumer lifetime. REQ-FPS-005, ADR-FPS-001.
 final acceptedFriendsProvider =
-    FutureProvider.family<List<String>, String>((ref, uid) {
-  return ref.watch(friendshipRepositoryProvider).acceptedFriendsOf(uid);
+    StreamProvider.family.autoDispose<List<String>, String>((ref, uid) {
+  return ref.watch(friendshipRepositoryProvider).watchAcceptedFriendsOf(uid);
 });
 
-/// Returns pending friendship requests received by [uid] (inbox — requesterId != uid).
-final pendingRequestsProvider =
-    FutureProvider.family<List<Friendship>, String>((ref, uid) {
-  return ref.watch(friendshipRepositoryProvider).pendingRequestsFor(uid);
-});
+// `pendingRequestsProvider` (Future variant) removed 2026-05-26 per SDD
+// `feed-providers-stream-conversion` — superseded by `pendingRequestsStreamProvider`.
+// Zero consumers confirmed by explore phase. Any file importing and using
+// `pendingRequestsProvider` WILL fail to compile — "Undefined name" error.
 
 /// Live stream of pending friendship requests received by [uid]
 /// (status=pending, requesterId != uid). Backs the inbox screen.

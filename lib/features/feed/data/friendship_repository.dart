@@ -174,6 +174,30 @@ class FriendshipRepository {
     return _fromDoc(snap);
   }
 
+  /// Live stream of the friendship doc between [uidA] and [uidB], or null when
+  /// no doc exists. Subscribes to `friendships/{sortedDocId(uidA, uidB)}` via
+  /// `.snapshots()`. Mirrors [getByPair] but streamed.
+  Stream<Friendship?> watchByPair(String uidA, String uidB) {
+    final id = Friendship.sortedDocId(uidA, uidB);
+    return _friendships.doc(id).snapshots().map(_fromDoc);
+  }
+
+  /// Live stream of UIDs that [uid] is friends with (status == accepted).
+  /// Query shape is IDENTICAL to [acceptedFriendsOf] — same composite index.
+  Stream<List<String>> watchAcceptedFriendsOf(String uid) {
+    return _friendships
+        .where('members', arrayContains: uid)
+        .where('status', isEqualTo: FriendshipStatus.accepted.toJson())
+        .snapshots()
+        .map((snap) => snap.docs
+            .map((doc) {
+              final members = (doc.data()['members'] as List).cast<String>();
+              return members.firstWhere((m) => m != uid, orElse: () => '');
+            })
+            .where((m) => m.isNotEmpty)
+            .toList());
+  }
+
   Friendship? _fromDoc(DocumentSnapshot<Map<String, Object?>> snap) {
     final data = snap.data();
     if (!snap.exists || data == null) return null;

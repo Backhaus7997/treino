@@ -51,7 +51,7 @@ void main() {
             (_) => Stream.value(const <Message>[]),
           ),
           userPublicProfileProvider('bbb').overrideWith(
-            (_) async => _pub('bbb', 'Coach Joe'),
+            (_) => Stream.value(_pub('bbb', 'Coach Joe')),
           ),
         ],
       ));
@@ -84,7 +84,7 @@ void main() {
             ]),
           ),
           userPublicProfileProvider('bbb').overrideWith(
-            (_) async => _pub('bbb', 'Coach Joe'),
+            (_) => Stream.value(_pub('bbb', 'Coach Joe')),
           ),
         ],
       ));
@@ -104,7 +104,7 @@ void main() {
             (_) => Stream.value(const <Message>[]),
           ),
           userPublicProfileProvider('bbb').overrideWith(
-            (_) async => _pub('bbb', 'Coach Joe'),
+            (_) => Stream.value(_pub('bbb', 'Coach Joe')),
           ),
         ],
       ));
@@ -126,7 +126,7 @@ void main() {
           firestoreProvider.overrideWithValue(firestore),
           currentUidProvider.overrideWith((_) => 'aaa'),
           userPublicProfileProvider('bbb').overrideWith(
-            (_) async => _pub('bbb', 'Coach Joe'),
+            (_) => Stream.value(_pub('bbb', 'Coach Joe')),
           ),
         ],
       ));
@@ -162,7 +162,7 @@ void main() {
           firestoreProvider.overrideWithValue(firestore),
           currentUidProvider.overrideWith((_) => 'aaa'),
           userPublicProfileProvider('bbb').overrideWith(
-            (_) async => _pub('bbb', 'Coach Joe'),
+            (_) => Stream.value(_pub('bbb', 'Coach Joe')),
           ),
         ],
       ));
