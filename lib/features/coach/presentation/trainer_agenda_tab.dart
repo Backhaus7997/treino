@@ -175,11 +175,6 @@ class _TrainerAgendaTabState extends ConsumerState<TrainerAgendaTab> {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      // Use root navigator so the modal covers the bottom bar AND is
-      // reachable by the bottom-bar onTap popUntil. With the default
-      // (useRootNavigator: false) the modal lives on go_router's nested
-      // ShellRoute navigator, which the bottom-bar tap cannot reach.
-      useRootNavigator: true,
       backgroundColor: AppPalette.of(context).bgCard,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),

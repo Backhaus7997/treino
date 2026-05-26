@@ -39,6 +39,15 @@ import 'theme/app_background.dart';
 
 const _kTabs = ['/workout', '/feed', '/home', '/coach', '/profile'];
 
+/// Key for the ShellRoute's nested Navigator. We need a handle to it so the
+/// bottom bar's onTap can pop popup routes (e.g. agenda day sheets) that
+/// were pushed onto the shell nav via `showModalBottomSheet`. Without this
+/// key, `Navigator.of(_ShellScaffold.context)` returns the ROOT navigator
+/// (because _ShellScaffold sits ABOVE the shell nav in the widget tree), so
+/// the modal — which lives on the shell nav — would be unreachable.
+final GlobalKey<NavigatorState> _shellNavigatorKey =
+    GlobalKey<NavigatorState>(debugLabel: 'ShellNav');
+
 /// Routes that are public (no redirect when anonymous).
 const _publicRoutes = {
   '/splash',
@@ -188,6 +197,7 @@ GoRouter buildRouter({
       // otherwise the default iOS slide animation runs and the previous
       // screen (splash) is briefly visible behind the home content.
       ShellRoute(
+        navigatorKey: _shellNavigatorKey,
         pageBuilder: (context, state, child) => _noAnim(
           _ShellScaffold(
             location: state.uri.toString(),
@@ -378,11 +388,17 @@ class _ShellScaffold extends StatelessWidget {
       bottomNavigationBar: TreinoBottomBar(
         currentIndex: _currentIndex,
         onTap: (i) {
-          // Dismiss any open popup (modal bottom sheet, dialog) before
-          // switching tabs. showModalBottomSheet defaults to
-          // useRootNavigator: false, so the modal lives on the local
-          // Navigator — NOT rootNavigator: true. Pop both to be safe.
-          Navigator.of(context).popUntil((route) => route is! PopupRoute);
+          // Pop any open popup (modal bottom sheet, dialog) on the SHELL
+          // navigator so it animates closed when the user switches tabs —
+          // mirrors the auto-dismiss behavior the user expects from the
+          // athlete agenda. We MUST use the shell navigator key here:
+          // showModalBottomSheet defaults to useRootNavigator: false, so
+          // the modal lives on the shell nav, which is BELOW _ShellScaffold
+          // in the tree — unreachable via Navigator.of(context).
+          _shellNavigatorKey.currentState
+              ?.popUntil((route) => route is! PopupRoute);
+          // Defensive: also pop popups on the root navigator (dialogs that
+          // explicitly opted into useRootNavigator: true).
           Navigator.of(context, rootNavigator: true)
               .popUntil((route) => route is! PopupRoute);
           context.go(_kTabs[i]);
