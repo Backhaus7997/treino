@@ -17,6 +17,10 @@ _$ExerciseImpl _$$ExerciseImplFromJson(Map<String, dynamic> json) =>
           .toList(),
       videoUrl: json['videoUrl'] as String?,
       defaultRestSeconds: (json['defaultRestSeconds'] as num?)?.toInt(),
+      aliases: (json['aliases'] as List<dynamic>?)
+              ?.map((e) => e as String)
+              .toList() ??
+          const <String>[],
     );
 
 Map<String, dynamic> _$$ExerciseImplToJson(_$ExerciseImpl instance) =>
@@ -28,4 +32,5 @@ Map<String, dynamic> _$$ExerciseImplToJson(_$ExerciseImpl instance) =>
       'techniqueInstructions': instance.techniqueInstructions,
       'videoUrl': instance.videoUrl,
       'defaultRestSeconds': instance.defaultRestSeconds,
+      'aliases': instance.aliases,
     };
