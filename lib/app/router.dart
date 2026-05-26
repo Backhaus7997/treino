@@ -11,9 +11,12 @@ import '../features/auth/presentation/splash_screen.dart';
 import '../features/auth/presentation/welcome_screen.dart';
 import '../features/chat/presentation/chat_screen.dart';
 import '../features/coach/coach_screen.dart';
+import '../features/coach/application/trainer_link_providers.dart';
+import '../features/coach/presentation/athlete_agenda_screen.dart';
 import '../features/coach/presentation/athlete_detail_screen.dart';
 import '../features/coach/presentation/availability_editor_screen.dart';
 import '../features/coach/presentation/trainer_public_profile_screen.dart';
+import '../features/workout/application/session_providers.dart' show currentUidProvider;
 import '../features/workout/presentation/routine_editor_screen.dart';
 import '../features/workout/application/session_init.dart';
 import '../features/workout/presentation/exercise_detail_screen.dart';
@@ -280,7 +283,8 @@ GoRouter buildRouter({
               ),
               GoRoute(
                 path: 'agenda',
-                pageBuilder: (_, __) => _noAnim(const _AgendaPlaceholder()),
+                pageBuilder: (_, __) =>
+                    _noAnim(const _AthleteAgendaRouteHost()),
               ),
               GoRoute(
                 path: 'availability-editor',
@@ -315,15 +319,43 @@ CustomTransitionPage<void> _noAnim(Widget child) => CustomTransitionPage(
       transitionsBuilder: (_, __, ___, child) => child,
     );
 
-class _AgendaPlaceholder extends StatelessWidget {
-  const _AgendaPlaceholder();
+/// Resuelve athleteId (currentUid) y trainerId (active link) y monta
+/// AthleteAgendaScreen. Loading state mientras se resuelve el link.
+class _AthleteAgendaRouteHost extends ConsumerWidget {
+  const _AthleteAgendaRouteHost();
 
   @override
-  Widget build(BuildContext context) {
-    return const Scaffold(
-      body: Center(
-        child: Text('PRÓXIMAMENTE — AgendaScreen (PR2)'),
+  Widget build(BuildContext context, WidgetRef ref) {
+    final athleteId = ref.watch(currentUidProvider) ?? '';
+    final linkAsync = ref.watch(currentAthleteLinkProvider);
+
+    return linkAsync.when(
+      loading: () => const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
       ),
+      error: (err, _) => Scaffold(
+        body: Center(child: Text('Error: $err')),
+      ),
+      data: (link) {
+        final trainerId = link?.trainerId ?? '';
+        if (trainerId.isEmpty || athleteId.isEmpty) {
+          return const Scaffold(
+            body: Center(
+              child: Padding(
+                padding: EdgeInsets.all(24),
+                child: Text(
+                  'Necesitás un vínculo activo con un PF para ver su agenda.',
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ),
+          );
+        }
+        return AthleteAgendaScreen(
+          trainerId: trainerId,
+          athleteId: athleteId,
+        );
+      },
     );
   }
 }
