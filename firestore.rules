@@ -176,6 +176,34 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // Gym catalog — Fase 6 Etapa 0 (multi-location).
+    //
+    // Cualquier user autenticado puede leer (lo necesitan athletes para
+    // mostrar el nombre del gym cuando ven una `TrainerLocation`, y trainers
+    // para elegirlo en el form de edición de perfil).
+    //
+    // Solo PFs (role == trainer) pueden crear via self-service. El doc tiene
+    // que setear `source: 'self-service'` y `createdBy: request.auth.uid` —
+    // si no, denied. Update/delete denegado del cliente — moderación va por
+    // Console o un Cloud Function privilegiado en el futuro.
+    match /gyms/{gymId} {
+      allow read: if request.auth != null;
+
+      allow create: if request.auth != null
+                    && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'trainer'
+                    && request.resource.data.source == 'self-service'
+                    && request.resource.data.createdBy == request.auth.uid
+                    && request.resource.data.keys().hasAll(['name', 'lat', 'lng', 'geohash', 'source', 'createdBy', 'createdAt'])
+                    && request.resource.data.name is string
+                    && request.resource.data.name.size() > 0
+                    && request.resource.data.name.size() <= 100
+                    && request.resource.data.lat is number
+                    && request.resource.data.lng is number
+                    && request.resource.data.geohash is string;
+
+      allow update, delete: if false;
+    }
+
     match /friendships/{friendshipId} {
       // Read: only members of the friendship — OR doc does not exist (returns
       // empty snapshot without leaking data). The `resource == null` branch is

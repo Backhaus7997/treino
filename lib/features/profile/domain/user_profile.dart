@@ -2,6 +2,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
 import 'package:freezed_annotation/freezed_annotation.dart';
 
+import '../../coach/domain/trainer_location.dart';
 import '../data/timestamp_converter.dart';
 import 'experience_level.dart';
 import 'gender.dart';
@@ -39,10 +40,35 @@ class UserProfile with _$UserProfile {
     // ── Trainer-specific (Fase 5 Etapa 1 foundations) ───────────────────
     String? trainerBio,
     String? trainerSpecialty,
-    double? trainerLatitude,
-    double? trainerLongitude,
-    String? trainerGeohash,
     int? trainerMonthlyRate,
+
+    // ── Multi-location (Fase 6 Etapa 0) ────────────────────────────────
+    //
+    // `trainerLatitude/Longitude/Geohash` (singulares, marcados DEPRECATED)
+    // se mantienen por backward compat — clientes viejos siguen leyendo el
+    // campo legacy hasta que actualicen. La migration de `treino-dev`
+    // (scripts/migrate_trainer_locations.js) convierte cada doc legacy a
+    // `trainerLocations: [{type: custom OR gym, ...}]`. Cleanup PR borra
+    // los campos legacy cuando todas las clientes estén en la versión nueva.
+    //
+    // `trainerLocations` mezcla gyms del catálogo (`type == gym`, `gymId`
+    // referencia `gyms/{gymId}`) y lugares propios (`type == custom`,
+    // `customLabel` lleva el nombre).
+    //
+    // `trainerGeohashes` es array derivado en write-time desde
+    // `trainerLocations` — necesario para el query
+    // `where('trainerGeohashes', array-contains-any, [vecinos del atleta])`
+    // que reemplaza el `where('trainerGeohash', >=, prefix5)` original.
+    //
+    // `trainerOffersOnline` es flag independiente. La combinación
+    // `trainerLocations.isEmpty && !trainerOffersOnline` es inválida —
+    // UserRepository.update() la rechaza con ArgumentError antes del write.
+    double? trainerLatitude, // DEPRECATED
+    double? trainerLongitude, // DEPRECATED
+    String? trainerGeohash, // DEPRECATED
+    @Default(<TrainerLocation>[]) List<TrainerLocation> trainerLocations,
+    @Default(<String>[]) List<String> trainerGeohashes,
+    @Default(false) bool trainerOffersOnline,
   }) = _UserProfile;
 
   factory UserProfile.fromJson(Map<String, Object?> json) =>

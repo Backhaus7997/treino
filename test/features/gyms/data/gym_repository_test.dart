@@ -1,0 +1,106 @@
+import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
+import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:treino/features/gyms/data/gym_repository.dart';
+import 'package:treino/features/gyms/domain/gym_source.dart';
+
+// ignore_for_file: avoid_dynamic_calls
+
+Map<String, Object?> _gymDoc({
+  required String name,
+  required double lat,
+  required double lng,
+  String? address,
+  String source = 'seed',
+  String? createdBy,
+}) =>
+    {
+      'name': name,
+      'address': address,
+      'lat': lat,
+      'lng': lng,
+      'geohash': '6d6m7', // fake — tests del repo no necesitan geohash real
+      'source': source,
+      'createdBy': createdBy,
+      'createdAt': Timestamp.fromDate(DateTime.utc(2026, 1, 1)),
+    };
+
+void main() {
+  late FakeFirebaseFirestore firestore;
+  late GymRepository repo;
+
+  setUp(() {
+    firestore = FakeFirebaseFirestore();
+    repo = GymRepository(firestore: firestore);
+  });
+
+  group('GymRepository.listAll', () {
+    test('devuelve lista vacía cuando no hay gyms', () async {
+      expect(await repo.listAll(), isEmpty);
+    });
+
+    test('devuelve todos los gyms del catálogo', () async {
+      await firestore.collection('gyms').doc('gym-1').set(
+            _gymDoc(name: 'Megatlon Belgrano', lat: -34.55, lng: -58.46),
+          );
+      await firestore.collection('gyms').doc('gym-2').set(
+            _gymDoc(name: 'SmartFit Caballito', lat: -34.61, lng: -58.44),
+          );
+
+      final all = await repo.listAll();
+      expect(all, hasLength(2));
+      expect(all.map((g) => g.id).toSet(), {'gym-1', 'gym-2'});
+      expect(all.first.source, equals(GymSource.seed));
+    });
+
+    test('inyecta el doc id como Gym.id', () async {
+      await firestore.collection('gyms').doc('mi-id-custom').set(
+            _gymDoc(name: 'X', lat: 0, lng: 0),
+          );
+      final all = await repo.listAll();
+      expect(all.single.id, 'mi-id-custom');
+    });
+  });
+
+  group('GymRepository.getById', () {
+    test('devuelve null cuando el gym no existe', () async {
+      expect(await repo.getById('nope'), isNull);
+    });
+
+    test('devuelve el gym cuando existe', () async {
+      await firestore.collection('gyms').doc('gym-x').set(
+            _gymDoc(
+              name: 'Sieger Gym',
+              lat: -31.41,
+              lng: -64.19,
+              source: 'self-service',
+              createdBy: 'trainer-uid-1',
+            ),
+          );
+      final gym = await repo.getById('gym-x');
+      expect(gym, isNotNull);
+      expect(gym!.name, 'Sieger Gym');
+      expect(gym.source, GymSource.selfService);
+      expect(gym.createdBy, 'trainer-uid-1');
+    });
+  });
+
+  group('GymRepository.getByIds', () {
+    test('input vacío → lista vacía (sin I/O)', () async {
+      expect(await repo.getByIds(const []), isEmpty);
+    });
+
+    test('devuelve solo los gyms encontrados (ignora ids inexistentes)',
+        () async {
+      await firestore.collection('gyms').doc('found-1').set(
+            _gymDoc(name: 'A', lat: 0, lng: 0),
+          );
+      await firestore.collection('gyms').doc('found-2').set(
+            _gymDoc(name: 'B', lat: 0, lng: 0),
+          );
+
+      final gyms = await repo.getByIds(['found-1', 'missing', 'found-2']);
+      expect(gyms.map((g) => g.id).toSet(), {'found-1', 'found-2'});
+    });
+  });
+}

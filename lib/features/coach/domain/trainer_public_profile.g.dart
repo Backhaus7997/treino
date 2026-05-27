@@ -19,6 +19,15 @@ _$TrainerPublicProfileImpl _$$TrainerPublicProfileImplFromJson(
       trainerLatitude: (json['trainerLatitude'] as num?)?.toDouble(),
       trainerLongitude: (json['trainerLongitude'] as num?)?.toDouble(),
       trainerMonthlyRate: (json['trainerMonthlyRate'] as num?)?.toInt(),
+      trainerLocations: (json['trainerLocations'] as List<dynamic>?)
+              ?.map((e) => TrainerLocation.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          const <TrainerLocation>[],
+      trainerGeohashes: (json['trainerGeohashes'] as List<dynamic>?)
+              ?.map((e) => e as String)
+              .toList() ??
+          const <String>[],
+      trainerOffersOnline: json['trainerOffersOnline'] as bool? ?? false,
     );
 
 Map<String, dynamic> _$$TrainerPublicProfileImplToJson(
@@ -34,4 +43,8 @@ Map<String, dynamic> _$$TrainerPublicProfileImplToJson(
       'trainerLatitude': instance.trainerLatitude,
       'trainerLongitude': instance.trainerLongitude,
       'trainerMonthlyRate': instance.trainerMonthlyRate,
+      'trainerLocations':
+          instance.trainerLocations.map((e) => e.toJson()).toList(),
+      'trainerGeohashes': instance.trainerGeohashes,
+      'trainerOffersOnline': instance.trainerOffersOnline,
     };
