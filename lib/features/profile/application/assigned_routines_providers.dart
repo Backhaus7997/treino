@@ -2,7 +2,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../workout/application/assigned_routine_providers.dart'
     show assignedRoutinesProvider;
-import '../../workout/domain/routine.dart';
 
 export '../../workout/application/assigned_routine_providers.dart'
     show assignedRoutinesProvider;
