@@ -142,6 +142,40 @@ void main() {
       ).called(1);
     });
 
+    // Regression guard 2026-05-27 — gymSearchQueryProvider was retaining
+    // its value across screen re-entries while the TextField re-initialized
+    // empty, producing a stale filter with no visible query.
+    testWidgets(
+        'regression: gymSearchQueryProvider resets to "" on mount even if previously set',
+        (tester) async {
+      final mockUser = MockUser();
+      final container = ProviderContainer(
+        overrides: [
+          authStateChangesProvider.overrideWith((_) => Stream.value(mockUser)),
+          userProfileProvider.overrideWith((_) => Stream.value(_profile())),
+          userRepositoryProvider.overrideWithValue(mockRepo),
+          filteredGymsProvider.overrideWithValue(_testGyms),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      container.read(gymSearchQueryProvider.notifier).state = 'palermo';
+      expect(container.read(gymSearchQueryProvider), 'palermo');
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            theme: AppTheme.dark(),
+            home: const Scaffold(body: ProfileGymScreen()),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(container.read(gymSearchQueryProvider), '');
+    });
+
     // Save disabled when selection == current gymId
     testWidgets(
         'save button is disabled when pending selection equals current gymId',

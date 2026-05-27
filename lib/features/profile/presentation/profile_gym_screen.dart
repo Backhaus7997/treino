@@ -30,8 +30,16 @@ class _ProfileGymScreenState extends ConsumerState<ProfileGymScreen> {
   bool _saving = false;
 
   @override
-  void dispose() {
-    super.dispose();
+  void initState() {
+    super.initState();
+    // Reset the shared gymSearchQueryProvider when re-entering the screen so
+    // the empty TextField matches an unfiltered list. Scheduled via microtask
+    // because providers must not be mutated during initState directly.
+    Future.microtask(() {
+      if (mounted) {
+        ref.read(gymSearchQueryProvider.notifier).state = '';
+      }
+    });
   }
 
   Future<void> _save(String uid, String? gymId) async {
