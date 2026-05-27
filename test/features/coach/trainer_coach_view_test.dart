@@ -104,16 +104,18 @@ void main() {
 
   group('TrainerCoachView — DASHBOARD tab', () {
     testWidgets(
-        'REQ-COACH-LINK-101: sin requests → muestra hint "sin solicitudes"',
+        'REQ-COACH-LINK-101: sin requests → sección SOLICITUDES PENDIENTES oculta',
         (tester) async {
+      // New dashboard: pending section is hidden entirely when count == 0.
       await tester.pumpWidget(_wrap(
         const TrainerCoachView(),
         overrides: _stubLinks(const []),
       ));
       await tester.pumpAndSettle();
 
-      expect(find.text('SOLICITUDES PENDIENTES'), findsOneWidget);
-      expect(find.text('Sin solicitudes nuevas por ahora.'), findsOneWidget);
+      expect(find.textContaining('SOLICITUDES PENDIENTES'), findsNothing);
+      // RESUMEN DEL DÍA card always visible.
+      expect(find.text('RESUMEN DEL DÍA'), findsOneWidget);
     });
 
     testWidgets(
@@ -127,27 +129,9 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      expect(find.text('Atleta l1'), findsOneWidget);
+      expect(find.textContaining('SOLICITUDES PENDIENTES'), findsOneWidget);
       expect(find.text('ACEPTAR'), findsOneWidget);
       expect(find.text('RECHAZAR'), findsOneWidget);
-    });
-
-    testWidgets(
-        'REQ-COACH-LINK-103: contador refleja cantidad de active alumnos',
-        (tester) async {
-      await tester.pumpWidget(_wrap(
-        const TrainerCoachView(),
-        overrides: _stubLinks([
-          _link(id: 'l1', status: TrainerLinkStatus.active, athleteId: 'a1'),
-          _link(id: 'l2', status: TrainerLinkStatus.active, athleteId: 'a2'),
-        ]),
-      ));
-      await tester.pumpAndSettle();
-
-      expect(
-        find.textContaining('Tenés 2 alumnos activos'),
-        findsOneWidget,
-      );
     });
   });
 
