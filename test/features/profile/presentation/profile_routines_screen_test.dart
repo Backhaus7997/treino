@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -76,6 +78,10 @@ void main() {
 
     // Loading state
     testWidgets('shows CircularProgressIndicator during loading', (tester) async {
+      // Use a Completer that never completes to hold loading state without
+      // creating a pending timer (which would fail the test teardown).
+      final completer = Completer<List<Routine>>();
+
       await tester.pumpWidget(
         _buildScreen(
           overrides: [
@@ -83,10 +89,7 @@ void main() {
               (_) => Stream.value(mockUser),
             ),
             assignedRoutinesProvider(_uid).overrideWith(
-              (_) => Future<List<Routine>>(() async {
-                await Future<void>.delayed(const Duration(seconds: 60));
-                return [];
-              }),
+              (_) => completer.future,
             ),
           ],
         ),
@@ -94,6 +97,9 @@ void main() {
       await tester.pump(); // One frame — loading state only.
 
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
+
+      // Complete the future before test ends to avoid resource leak warnings.
+      completer.complete([]);
     });
 
     // SCENARIO-521: empty state
