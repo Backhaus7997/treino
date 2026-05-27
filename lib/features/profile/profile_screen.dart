@@ -6,12 +6,37 @@ import '../../core/utils/k_formatter.dart';
 import '../auth/application/auth_providers.dart';
 import '../auth/presentation/auth_strings.dart';
 import 'application/profile_stats_providers.dart';
+import 'application/user_providers.dart';
+import 'domain/user_role.dart';
 import 'presentation/widgets/profile_avatar_card.dart';
 import 'presentation/widgets/profile_cuenta_section.dart';
 import 'presentation/widgets/profile_header.dart';
+import 'trainer_profile_view.dart';
 
+/// Role-aware profile screen.
+///
+/// - Trainer → [TrainerProfileView] (matches docs/app-trainer/screens/perfil).
+/// - Athlete (default) → existing rewrite chain (PR#1..PR#3 / Fase 3 Etapa 7):
+///   header + stats + avatar card + cuenta section + legacy footer sign out.
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final UserRole? role = ref.watch(
+      userProfileProvider.select((async) => async.valueOrNull?.role),
+    );
+
+    // Default to athlete (dominant role, matches HomeScreen/WorkoutScreen).
+    return role == UserRole.trainer
+        ? const TrainerProfileView()
+        : const _AthleteProfile();
+  }
+}
+
+/// Athlete profile — original [ProfileScreen] body extracted intact.
+class _AthleteProfile extends ConsumerWidget {
+  const _AthleteProfile();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
