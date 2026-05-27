@@ -42,13 +42,6 @@ Widget _buildCard({
             builder: (_, __) => const Scaffold(
               body: ProfileAvatarCard(),
             ),
-            routes: [
-              GoRoute(
-                path: 'edit-personal',
-                builder: (_, __) =>
-                    const Scaffold(body: Text('EDIT_PERSONAL_SCREEN')),
-              ),
-            ],
           ),
         ],
       );
@@ -114,17 +107,16 @@ void main() {
       expect(find.byKey(const Key('profile_avatar_gym_chip')), findsNothing);
     });
 
-    // SCENARIO-500: pencil tap navigates to /profile/edit-personal
+    // SCENARIO-500: REMOVED 2026-05-27 — pencil dropped from ProfileAvatarCard
+    // (single edit entry point via "Datos personales" tile of CUENTA).
+    // Guard test: card is read-only, pencil key MUST NOT exist.
     testWidgets(
-        'SCENARIO-500: tapping pencil icon navigates to /profile/edit-personal',
+        'SCENARIO-500 (guard): no pencil key — card is read-only after 2026-05-27',
         (tester) async {
       await tester.pumpWidget(_buildCard(profile: _profile()));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byKey(const Key('profile_avatar_pencil')));
-      await tester.pumpAndSettle();
-
-      expect(find.text('EDIT_PERSONAL_SCREEN'), findsOneWidget);
+      expect(find.byKey(const Key('profile_avatar_pencil')), findsNothing);
     });
   });
 }

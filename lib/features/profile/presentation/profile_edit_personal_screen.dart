@@ -287,6 +287,8 @@ class _ProfileEditPersonalScreenState
           'Lo que editaste se va a perder.', // i18n: Fase 6 Etapa 3
           style: GoogleFonts.barlow(color: palette.textMuted, fontSize: 14),
         ),
+        // Center the action buttons (decision 2026-05-27).
+        actionsAlignment: MainAxisAlignment.center,
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -371,13 +373,15 @@ class _ProfileEditPersonalScreenState
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Avatar editor
-                  _AvatarEditor(
-                    key: const Key('edit_personal_avatar_editor'),
-                    existingAvatarUrl: _existingAvatarUrl,
-                    pendingLocalPath: _pendingLocalPath,
-                    onTap: _pickAvatar,
-                    palette: palette,
+                  // Avatar editor — centered (decision 2026-05-27)
+                  Center(
+                    child: _AvatarEditor(
+                      key: const Key('edit_personal_avatar_editor'),
+                      existingAvatarUrl: _existingAvatarUrl,
+                      pendingLocalPath: _pendingLocalPath,
+                      onTap: _pickAvatar,
+                      palette: palette,
+                    ),
                   ),
                   const SizedBox(height: 20),
 
