@@ -45,7 +45,7 @@ class TrainerDashboardTab extends ConsumerWidget {
         _SectionHeader(
           label: 'PRÓXIMAS SESIONES',
           trailingLabel: 'Agenda',
-          trailingOnTap: () => DefaultTabController.maybeOf(context)?.animateTo(2),
+          trailingOnTap: () => context.go('/coach?tab=agenda'),
         ),
         const SizedBox(height: 8),
         const _ProximasSesionesList(),
@@ -738,9 +738,7 @@ class _BottomActions extends StatelessWidget {
         const SizedBox(width: 12),
         Expanded(
           child: ElevatedButton(
-            onPressed: () {
-              DefaultTabController.maybeOf(context)?.animateTo(1);
-            },
+            onPressed: () => context.go('/coach?tab=alumnos'),
             style: ElevatedButton.styleFrom(
               backgroundColor: palette.accent,
               foregroundColor: palette.bg,

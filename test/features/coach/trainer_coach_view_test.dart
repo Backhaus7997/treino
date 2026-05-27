@@ -73,14 +73,16 @@ List<Override> _stubLinks(List<TrainerLink> links) => [
 
 void main() {
   group('TrainerCoachView — structure', () {
-    testWidgets('renders 4 sub-tab labels in a TabBar', (tester) async {
+    testWidgets('renders 3 sub-tab labels (DASHBOARD moved to HOME tab)',
+        (tester) async {
       await tester.pumpWidget(_wrap(
         const TrainerCoachView(),
         overrides: _stubLinks(const []),
       ));
       await tester.pumpAndSettle();
 
-      expect(find.text('DASHBOARD'), findsWidgets);
+      // DASHBOARD moved to the HOME bottom-bar tab — not present here.
+      expect(find.text('DASHBOARD'), findsNothing);
       expect(find.text('ALUMNOS'), findsWidgets);
       expect(find.text('AGENDA'), findsWidgets);
       expect(find.text('COMUNIDADES'), findsWidgets);
@@ -88,50 +90,33 @@ void main() {
     });
 
     testWidgets(
-        'COMUNIDADES sigue como placeholder; AGENDA ahora trae TrainerAgendaTab (Etapa 6)',
+        'initialTab="agenda" sets DefaultTabController.initialIndex to 1',
+        (tester) async {
+      await tester.pumpWidget(_wrap(
+        const TrainerCoachView(initialTab: 'agenda'),
+        overrides: _stubLinks(const []),
+      ));
+      // First-frame only — avoid pumpAndSettle so unstubbed agenda streams
+      // can't time out the test. We only verify the TabController landed
+      // on the AGENDA index (1), not its content.
+      await tester.pump();
+
+      final controller =
+          DefaultTabController.of(tester.element(find.byType(TabBar)));
+      expect(controller.index, 1);
+    });
+
+    testWidgets(
+        'COMUNIDADES sigue como placeholder; AGENDA es TrainerAgendaTab',
         (tester) async {
       await tester.pumpWidget(_wrap(
         const TrainerCoachView(),
         overrides: _stubLinks(const []),
       ));
       await tester.pumpAndSettle();
-      // COMUNIDADES sigue placeholder
       await tester.tap(find.text('COMUNIDADES'));
       await tester.pumpAndSettle();
       expect(find.text('PRÓXIMAMENTE'), findsOneWidget);
-    });
-  });
-
-  group('TrainerCoachView — DASHBOARD tab', () {
-    testWidgets(
-        'REQ-COACH-LINK-101: sin requests → sección SOLICITUDES PENDIENTES oculta',
-        (tester) async {
-      // New dashboard: pending section is hidden entirely when count == 0.
-      await tester.pumpWidget(_wrap(
-        const TrainerCoachView(),
-        overrides: _stubLinks(const []),
-      ));
-      await tester.pumpAndSettle();
-
-      expect(find.textContaining('SOLICITUDES PENDIENTES'), findsNothing);
-      // RESUMEN DEL DÍA card always visible.
-      expect(find.text('RESUMEN DEL DÍA'), findsOneWidget);
-    });
-
-    testWidgets(
-        'REQ-COACH-LINK-102: con request pending → muestra card con ACEPTAR/RECHAZAR',
-        (tester) async {
-      await tester.pumpWidget(_wrap(
-        const TrainerCoachView(),
-        overrides: _stubLinks([
-          _link(id: 'l1', status: TrainerLinkStatus.pending, athleteId: 'a1'),
-        ]),
-      ));
-      await tester.pumpAndSettle();
-
-      expect(find.textContaining('SOLICITUDES PENDIENTES'), findsOneWidget);
-      expect(find.text('ACEPTAR'), findsOneWidget);
-      expect(find.text('RECHAZAR'), findsOneWidget);
     });
   });
 

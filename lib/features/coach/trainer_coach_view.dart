@@ -12,17 +12,28 @@ import 'application/trainer_link_providers.dart';
 import 'domain/trainer_link.dart';
 import 'domain/trainer_link_status.dart';
 import 'presentation/trainer_agenda_tab.dart';
-import 'presentation/trainer_dashboard_tab.dart';
 
 class TrainerCoachView extends StatelessWidget {
-  const TrainerCoachView({super.key});
+  const TrainerCoachView({super.key, this.initialTab});
 
-  static const _labels = <String>[
-    'DASHBOARD',
-    'ALUMNOS',
-    'AGENDA',
-    'COMUNIDADES',
-  ];
+  /// Optional initial sub-tab — accepts `'alumnos'`, `'agenda'`, or
+  /// `'comunidades'`. Read from the `?tab=` query param by [CoachScreen]
+  /// so deep links from the trainer dashboard land on the right tab.
+  final String? initialTab;
+
+  static const _labels = <String>['ALUMNOS', 'AGENDA', 'COMUNIDADES'];
+
+  static int _resolveInitialIndex(String? tab) {
+    switch (tab) {
+      case 'agenda':
+        return 1;
+      case 'comunidades':
+        return 2;
+      case 'alumnos':
+      default:
+        return 0;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -31,6 +42,7 @@ class TrainerCoachView extends StatelessWidget {
 
     return DefaultTabController(
       length: _labels.length,
+      initialIndex: _resolveInitialIndex(initialTab),
       child: Column(
         children: [
           TabBar(
@@ -58,7 +70,6 @@ class TrainerCoachView extends StatelessWidget {
             child: TabBarView(
               physics: const NeverScrollableScrollPhysics(),
               children: [
-                const TrainerDashboardTab(),
                 const _AlumnosTab(),
                 Consumer(
                   builder: (context, ref, _) {

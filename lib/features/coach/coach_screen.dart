@@ -7,7 +7,12 @@ import 'athlete_coach_view.dart';
 import 'trainer_coach_view.dart';
 
 class CoachScreen extends ConsumerWidget {
-  const CoachScreen({super.key});
+  const CoachScreen({super.key, this.initialTab});
+
+  /// Optional initial sub-tab for the trainer view, sourced from go_router's
+  /// `?tab=` query param. See [TrainerCoachView.initialTab] for accepted
+  /// values. Ignored for the athlete view.
+  final String? initialTab;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -23,7 +28,7 @@ class CoachScreen extends ConsumerWidget {
 
     return switch (role) {
       UserRole.athlete => const AthleteCoachView(),
-      UserRole.trainer => const TrainerCoachView(),
+      UserRole.trainer => TrainerCoachView(initialTab: initialTab),
       null => const _CoachLoadingView(),
     };
   }

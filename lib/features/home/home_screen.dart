@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../coach/presentation/trainer_dashboard_tab.dart';
 import '../profile/application/user_providers.dart';
+import '../profile/domain/user_role.dart';
 import '../workout/application/session_providers.dart';
 import '../workout/domain/session.dart';
 import '../workout/domain/set_log.dart';
@@ -11,19 +13,43 @@ import 'widgets/empezar_entrenamiento_card.dart';
 import 'widgets/esta_semana_card.dart';
 import 'widgets/home_header.dart';
 
-/// Home screen — single ConsumerWidget that owns the one ref.watch call
-/// (REQ-HOME-SCREEN-001). No Scaffold, AppBackground, or SafeArea — those
-/// are provided by _ShellScaffold in router.dart (REQ-HOME-SCREEN-002).
+/// Role-aware home screen.
+///
+/// - Trainer → [TrainerDashboardTab] (mirrors docs/app-trainer/screens/dashboard).
+/// - Athlete → existing athlete home (header + Empezar + Esta semana + resume
+///   session modal listener).
+/// - Loading → empty surface (cheap, no spinner — matches `_CoachLoadingView`
+///   pattern in [CoachScreen]).
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final UserRole? role = ref.watch(
+      userProfileProvider.select((async) => async.valueOrNull?.role),
+    );
+
+    // Default to athlete view while role is loading. Athletes are the
+    // dominant user, and the athlete home is safe to render without role
+    // confirmation (HomeHeader gracefully handles a null profile). Trainers
+    // may see a brief athlete flicker before their dashboard mounts — an
+    // acceptable trade for not stalling the 99% common case.
+    return role == UserRole.trainer
+        ? const TrainerDashboardTab()
+        : const _AthleteHome();
+  }
+}
+
+/// Athlete home — original [HomeScreen] body extracted intact so role split
+/// is purely additive.
+class _AthleteHome extends ConsumerWidget {
+  const _AthleteHome();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final profileAsync = ref.watch(userProfileProvider);
 
     // Resume-on-reopen listener (REQ-SESSION-RESUME-002 / Decision 12).
-    // Watches activeSessionForUidProvider; cuando llega un record no-null
-    // disparamos el ResumeSessionModal en el siguiente frame.
     ref.listen<AsyncValue<({Session session, List<SetLog> setLogs})?>>(
       activeSessionForUidProvider,
       (prev, next) {

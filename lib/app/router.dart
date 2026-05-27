@@ -270,7 +270,10 @@ GoRouter buildRouter({
           ),
           GoRoute(
             path: '/coach',
-            pageBuilder: (_, __) => _noAnim(const CoachScreen()),
+            pageBuilder: (context, state) {
+              final tab = state.uri.queryParameters['tab'];
+              return _noAnim(CoachScreen(initialTab: tab));
+            },
             routes: [
               GoRoute(
                 path: 'trainer/:uid',
