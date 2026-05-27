@@ -6,7 +6,9 @@ import '../../core/utils/k_formatter.dart';
 import '../auth/application/auth_providers.dart';
 import '../auth/presentation/auth_strings.dart';
 import 'application/profile_stats_providers.dart';
-import 'presentation/widgets/profile_friend_requests_tile.dart';
+import 'presentation/widgets/profile_avatar_card.dart';
+import 'presentation/widgets/profile_cuenta_section.dart';
+import 'presentation/widgets/profile_header.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -16,42 +18,30 @@ class ProfileScreen extends ConsumerWidget {
     final palette = AppPalette.of(context);
     final theme = Theme.of(context);
 
-    return Column(
-      children: [
-        _OwnProfileStatsRow(palette: palette, theme: theme),
-        const ProfileFriendRequestsTile(),
-        Expanded(
-          child: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  'PERFIL',
-                  style: theme.textTheme.displayMedium?.copyWith(
-                    color: palette.accent,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Tu cuenta y ajustes',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: palette.textMuted,
-                  ),
-                ),
-                const SizedBox(height: 20),
-                TextButton(
-                  onPressed: () =>
-                      ref.read(authNotifierProvider.notifier).signOut(),
-                  child: Text(
-                    AuthStrings.profileSignOut,
-                    style: TextStyle(color: palette.textMuted),
-                  ),
-                ),
-              ],
+    return SingleChildScrollView(
+      child: Column(
+        children: [
+          const ProfileHeader(),
+          _OwnProfileStatsRow(palette: palette, theme: theme),
+          const ProfileAvatarCard(),
+          const ProfileCuentaSection(),
+          // ── Legacy "Cerrar sesión" footer — intentional duplication ─────────
+          // Kept through PR#1..PR#3 so sign-out is never broken mid-chain.
+          // Removed in PR#4 the same commit the real Settings screen ships.
+          // Per ADR-PSR-008.
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 20),
+            child: TextButton(
+              onPressed: () =>
+                  ref.read(authNotifierProvider.notifier).signOut(),
+              child: Text(
+                AuthStrings.profileSignOut, // i18n: Fase 6 Etapa 3
+                style: TextStyle(color: palette.textMuted),
+              ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -76,7 +66,7 @@ class _OwnProfileStatsRow extends ConsumerWidget {
       child: Row(
         children: [
           _StatTile(
-            label: 'SESIONES',
+            label: 'SESIONES', // i18n: Fase 6 Etapa 3
             value: statsAsync.when(
               data: (s) => s.totalSessions.toString(),
               loading: () => '--',
@@ -87,7 +77,7 @@ class _OwnProfileStatsRow extends ConsumerWidget {
             palette: palette,
           ),
           _StatTile(
-            label: 'VOLUMEN KG',
+            label: 'VOLUMEN KG', // i18n: Fase 6 Etapa 3
             value: statsAsync.when(
               data: (s) => kFormat(s.totalVolumeKg),
               loading: () => '--',
@@ -98,7 +88,7 @@ class _OwnProfileStatsRow extends ConsumerWidget {
             palette: palette,
           ),
           _StatTile(
-            label: 'RACHA',
+            label: 'RACHA', // i18n: Fase 6 Etapa 3
             value: statsAsync.when(
               data: (s) => s.streak.toString(),
               loading: () => '--',

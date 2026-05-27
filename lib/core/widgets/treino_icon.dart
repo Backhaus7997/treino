@@ -98,6 +98,9 @@ class TreinoIcon {
   static const IconData send = PhosphorIconsFill.paperPlaneTilt;
   static const IconData chatEmpty = PhosphorIconsRegular.chatsCircle;
 
+  // Profile settings
+  static const IconData settings = PhosphorIconsRegular.gearSix;
+
   // Coach Hub (web) — import flow
   static const IconData arrowLeft = PhosphorIconsRegular.arrowLeft;
   static const IconData download = PhosphorIconsRegular.downloadSimple;
