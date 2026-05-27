@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
@@ -88,7 +89,30 @@ class CoachHubDashboardScreen extends ConsumerWidget {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 18),
+                  ElevatedButton.icon(
+                    onPressed: () => context.go('/upload-plan'),
+                    icon: Icon(TreinoIcon.upload, size: 18, color: palette.bg),
+                    label: Text(
+                      'IMPORTAR PLAN DESDE EXCEL',
+                      style: GoogleFonts.barlowCondensed(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                        letterSpacing: 1.4,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: palette.accent,
+                      foregroundColor: palette.bg,
+                      minimumSize: const Size.fromHeight(48),
+                      shape: const StadiumBorder(),
+                    ),
+                  ),
                   const SizedBox(height: 24),
+                  if (uid != null) ...[
+                    // Solicitudes pendientes — solo aparece si hay alguna.
+                    _PendingRequestsList(trainerId: uid),
+                  ],
                   // Alumnos section
                   Text(
                     'TUS ALUMNOS',
@@ -238,5 +262,196 @@ class _StudentTile extends ConsumerWidget {
     final dd = d.day.toString().padLeft(2, '0');
     final mm = d.month.toString().padLeft(2, '0');
     return '$dd/$mm/${d.year}';
+  }
+}
+
+/// Sección de solicitudes pendientes: aparece sobre "TUS ALUMNOS" cuando
+/// hay vínculos en estado `pending`. Cada solicitud muestra avatar + nombre
+/// del atleta + botones Aceptar/Rechazar. Acción dispara
+/// `TrainerLinkRepository.accept()` o `.decline()` y luego invalida
+/// `linksForTrainerProvider` para que el dashboard refresque.
+class _PendingRequestsList extends ConsumerWidget {
+  const _PendingRequestsList({required this.trainerId});
+  final String trainerId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final palette = AppPalette.of(context);
+    final linksAsync = ref.watch(linksForTrainerProvider(trainerId));
+
+    return linksAsync.maybeWhen(
+      data: (links) {
+        final pending = links
+            .where((l) => l.status == TrainerLinkStatus.pending)
+            .toList();
+        if (pending.isEmpty) return const SizedBox.shrink();
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'SOLICITUDES PENDIENTES · ${pending.length}',
+              style: GoogleFonts.barlowCondensed(
+                color: palette.highlight,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1.4,
+              ),
+            ),
+            const SizedBox(height: 12),
+            ...pending.map(
+              (link) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: _PendingRequestTile(link: link, trainerId: trainerId),
+              ),
+            ),
+            const SizedBox(height: 18),
+          ],
+        );
+      },
+      orElse: () => const SizedBox.shrink(),
+    );
+  }
+}
+
+class _PendingRequestTile extends ConsumerStatefulWidget {
+  const _PendingRequestTile({required this.link, required this.trainerId});
+  final TrainerLink link;
+  final String trainerId;
+
+  @override
+  ConsumerState<_PendingRequestTile> createState() =>
+      _PendingRequestTileState();
+}
+
+class _PendingRequestTileState extends ConsumerState<_PendingRequestTile> {
+  bool _busy = false;
+
+  Future<void> _accept() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    final repo = ref.read(trainerLinkRepositoryProvider);
+    try {
+      await repo.accept(widget.link.id);
+      if (!mounted) return;
+      ref.invalidate(linksForTrainerProvider(widget.trainerId));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Vínculo aceptado.')),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No pudimos aceptar el vínculo.')),
+      );
+    }
+  }
+
+  Future<void> _decline() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    final repo = ref.read(trainerLinkRepositoryProvider);
+    try {
+      await repo.decline(widget.link.id);
+      if (!mounted) return;
+      ref.invalidate(linksForTrainerProvider(widget.trainerId));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Solicitud rechazada.')),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No pudimos rechazar la solicitud.')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final pubAsync =
+        ref.watch(userPublicProfileProvider(widget.link.athleteId));
+    final name = pubAsync.valueOrNull?.displayName ?? 'Atleta';
+    final avatar = pubAsync.valueOrNull?.avatarUrl;
+
+    return Container(
+      key: Key('pending_request_${widget.link.id}'),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: palette.bgCard,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: palette.highlight.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        children: [
+          PostAvatar(
+            authorDisplayName: name,
+            authorAvatarUrl: avatar,
+            size: 40,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  name,
+                  style: TextStyle(
+                    color: palette.textPrimary,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Quiere vincularse con vos',
+                  style: TextStyle(
+                    color: palette.textMuted,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          if (_busy)
+            SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: palette.accent,
+              ),
+            )
+          else ...[
+            TextButton(
+              key: Key('decline_${widget.link.id}'),
+              onPressed: _decline,
+              style: TextButton.styleFrom(
+                foregroundColor: palette.textMuted,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+              ),
+              child: const Text('Rechazar'),
+            ),
+            const SizedBox(width: 4),
+            ElevatedButton(
+              key: Key('accept_${widget.link.id}'),
+              onPressed: _accept,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: palette.accent,
+                foregroundColor: palette.bg,
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                shape: const StadiumBorder(),
+              ),
+              child: const Text('Aceptar'),
+            ),
+          ],
+        ],
+      ),
+    );
   }
 }

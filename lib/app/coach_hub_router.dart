@@ -6,6 +6,8 @@ import '../features/auth/application/auth_providers.dart';
 import '../features/coach_hub/presentation/coach_hub_dashboard_screen.dart';
 import '../features/coach_hub/presentation/coach_hub_login_screen.dart';
 import '../features/coach_hub/presentation/coach_hub_not_allowed_screen.dart';
+import '../features/coach_hub/presentation/coach_hub_plan_preview_screen.dart';
+import '../features/coach_hub/presentation/coach_hub_upload_plan_screen.dart';
 import '../features/profile/application/user_providers.dart';
 import '../features/profile/domain/user_role.dart';
 
@@ -90,6 +92,14 @@ GoRouter buildCoachHubRouter({
       GoRoute(
         path: '/dashboard',
         builder: (_, __) => const CoachHubDashboardScreen(),
+      ),
+      GoRoute(
+        path: '/upload-plan',
+        builder: (_, __) => const CoachHubUploadPlanScreen(),
+      ),
+      GoRoute(
+        path: '/upload-plan/preview',
+        builder: (_, __) => const CoachHubPlanPreviewScreen(),
       ),
       GoRoute(
         path: '/not-allowed',

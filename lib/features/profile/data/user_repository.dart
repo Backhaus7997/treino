@@ -40,10 +40,14 @@ class UserRepository {
   static const _trainerPublicFields = {
     'trainerBio',
     'trainerSpecialty',
-    'trainerGeohash',
-    'trainerLatitude',
-    'trainerLongitude',
+    'trainerGeohash', // DEPRECATED — backward compat
+    'trainerLatitude', // DEPRECATED
+    'trainerLongitude', // DEPRECATED
     'trainerMonthlyRate',
+    // Multi-location (Fase 6 Etapa 0)
+    'trainerLocations',
+    'trainerGeohashes',
+    'trainerOffersOnline',
   };
 
   CollectionReference<Map<String, Object?>> get _users =>
@@ -145,7 +149,41 @@ class UserRepository {
     if (partial.containsKey('trainerMonthlyRate')) {
       result['trainerMonthlyRate'] = partial['trainerMonthlyRate'];
     }
+    // ── Multi-location (Fase 6 Etapa 0) ──────────────────────────────────
+    if (partial.containsKey('trainerLocations')) {
+      result['trainerLocations'] = partial['trainerLocations'];
+    }
+    if (partial.containsKey('trainerGeohashes')) {
+      result['trainerGeohashes'] = partial['trainerGeohashes'];
+    }
+    if (partial.containsKey('trainerOffersOnline')) {
+      result['trainerOffersOnline'] = partial['trainerOffersOnline'];
+    }
     return result;
+  }
+
+  /// Valida que el partial NO deje al PF en estado inválido. Combinación
+  /// `trainerLocations vacío + trainerOffersOnline:false` significa "no
+  /// trabaja en ningún lado" — no tiene sentido + rompe discovery.
+  ///
+  /// Solo aplica cuando AMBOS campos están en el partial (un update parcial
+  /// que solo toca uno no puede saber el estado final sin un get previo;
+  /// asumimos que el caller maneja el estado consistente).
+  static void _assertTrainerLocationStateIsValid(
+    Map<String, Object?> partial,
+  ) {
+    final hasLocations = partial.containsKey('trainerLocations');
+    final hasOnline = partial.containsKey('trainerOffersOnline');
+    if (!hasLocations || !hasOnline) return;
+    final locations = partial['trainerLocations'] as List?;
+    final online = partial['trainerOffersOnline'] as bool?;
+    final isEmpty = locations == null || locations.isEmpty;
+    if (isEmpty && (online == false || online == null)) {
+      throw ArgumentError(
+        'Un PF no puede tener cero ubicaciones físicas Y offersOnline:false. '
+        'Activá clases virtuales o agregá al menos una ubicación.',
+      );
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -232,6 +270,7 @@ class UserRepository {
   ///
   /// All three writes are in a single batch.commit() — no partial state.
   Future<void> update(String uid, Map<String, Object?> partial) async {
+    _assertTrainerLocationStateIsValid(partial);
     final sanitized = Map<String, Object?>.fromEntries(
       partial.entries.where((e) => !_immutableFields.contains(e.key)),
     )..['updatedAt'] = Timestamp.fromDate(DateTime.now().toUtc());

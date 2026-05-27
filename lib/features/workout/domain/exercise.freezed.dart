@@ -29,6 +29,7 @@ mixin _$Exercise {
       throw _privateConstructorUsedError; // null means "not yet authored" (ADR-1)
   String? get videoUrl => throw _privateConstructorUsedError;
   int? get defaultRestSeconds => throw _privateConstructorUsedError;
+  List<String> get aliases => throw _privateConstructorUsedError;
 
   /// Serializes this Exercise to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -52,7 +53,8 @@ abstract class $ExerciseCopyWith<$Res> {
       String category,
       List<String>? techniqueInstructions,
       String? videoUrl,
-      int? defaultRestSeconds});
+      int? defaultRestSeconds,
+      List<String> aliases});
 }
 
 /// @nodoc
@@ -77,6 +79,7 @@ class _$ExerciseCopyWithImpl<$Res, $Val extends Exercise>
     Object? techniqueInstructions = freezed,
     Object? videoUrl = freezed,
     Object? defaultRestSeconds = freezed,
+    Object? aliases = null,
   }) {
     return _then(_value.copyWith(
       id: null == id
@@ -107,6 +110,10 @@ class _$ExerciseCopyWithImpl<$Res, $Val extends Exercise>
           ? _value.defaultRestSeconds
           : defaultRestSeconds // ignore: cast_nullable_to_non_nullable
               as int?,
+      aliases: null == aliases
+          ? _value.aliases
+          : aliases // ignore: cast_nullable_to_non_nullable
+              as List<String>,
     ) as $Val);
   }
 }
@@ -126,7 +133,8 @@ abstract class _$$ExerciseImplCopyWith<$Res>
       String category,
       List<String>? techniqueInstructions,
       String? videoUrl,
-      int? defaultRestSeconds});
+      int? defaultRestSeconds,
+      List<String> aliases});
 }
 
 /// @nodoc
@@ -149,6 +157,7 @@ class __$$ExerciseImplCopyWithImpl<$Res>
     Object? techniqueInstructions = freezed,
     Object? videoUrl = freezed,
     Object? defaultRestSeconds = freezed,
+    Object? aliases = null,
   }) {
     return _then(_$ExerciseImpl(
       id: null == id
@@ -179,6 +188,10 @@ class __$$ExerciseImplCopyWithImpl<$Res>
           ? _value.defaultRestSeconds
           : defaultRestSeconds // ignore: cast_nullable_to_non_nullable
               as int?,
+      aliases: null == aliases
+          ? _value._aliases
+          : aliases // ignore: cast_nullable_to_non_nullable
+              as List<String>,
     ));
   }
 }
@@ -193,8 +206,10 @@ class _$ExerciseImpl implements _Exercise {
       required this.category,
       final List<String>? techniqueInstructions,
       this.videoUrl,
-      this.defaultRestSeconds})
-      : _techniqueInstructions = techniqueInstructions;
+      this.defaultRestSeconds,
+      final List<String> aliases = const <String>[]})
+      : _techniqueInstructions = techniqueInstructions,
+        _aliases = aliases;
 
   factory _$ExerciseImpl.fromJson(Map<String, dynamic> json) =>
       _$$ExerciseImplFromJson(json);
@@ -225,10 +240,18 @@ class _$ExerciseImpl implements _Exercise {
   final String? videoUrl;
   @override
   final int? defaultRestSeconds;
+  final List<String> _aliases;
+  @override
+  @JsonKey()
+  List<String> get aliases {
+    if (_aliases is EqualUnmodifiableListView) return _aliases;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(_aliases);
+  }
 
   @override
   String toString() {
-    return 'Exercise(id: $id, name: $name, muscleGroup: $muscleGroup, category: $category, techniqueInstructions: $techniqueInstructions, videoUrl: $videoUrl, defaultRestSeconds: $defaultRestSeconds)';
+    return 'Exercise(id: $id, name: $name, muscleGroup: $muscleGroup, category: $category, techniqueInstructions: $techniqueInstructions, videoUrl: $videoUrl, defaultRestSeconds: $defaultRestSeconds, aliases: $aliases)';
   }
 
   @override
@@ -247,7 +270,8 @@ class _$ExerciseImpl implements _Exercise {
             (identical(other.videoUrl, videoUrl) ||
                 other.videoUrl == videoUrl) &&
             (identical(other.defaultRestSeconds, defaultRestSeconds) ||
-                other.defaultRestSeconds == defaultRestSeconds));
+                other.defaultRestSeconds == defaultRestSeconds) &&
+            const DeepCollectionEquality().equals(other._aliases, _aliases));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -260,7 +284,8 @@ class _$ExerciseImpl implements _Exercise {
       category,
       const DeepCollectionEquality().hash(_techniqueInstructions),
       videoUrl,
-      defaultRestSeconds);
+      defaultRestSeconds,
+      const DeepCollectionEquality().hash(_aliases));
 
   /// Create a copy of Exercise
   /// with the given fields replaced by the non-null parameter values.
@@ -286,7 +311,8 @@ abstract class _Exercise implements Exercise {
       required final String category,
       final List<String>? techniqueInstructions,
       final String? videoUrl,
-      final int? defaultRestSeconds}) = _$ExerciseImpl;
+      final int? defaultRestSeconds,
+      final List<String> aliases}) = _$ExerciseImpl;
 
   factory _Exercise.fromJson(Map<String, dynamic> json) =
       _$ExerciseImpl.fromJson;
@@ -307,6 +333,8 @@ abstract class _Exercise implements Exercise {
   String? get videoUrl;
   @override
   int? get defaultRestSeconds;
+  @override
+  List<String> get aliases;
 
   /// Create a copy of Exercise
   /// with the given fields replaced by the non-null parameter values.

@@ -52,6 +52,7 @@ abstract final class CoachStrings {
   static const miPlanEmpty = 'No tenés rutina asignada todavía.';
   static const miPlanError = 'Error al cargar tu plan.';
   static const miPlanFinalizado = 'Plan finalizado';
+  static const miPlanCurrent = 'Actual';
   static const assignedByPrefix = 'Asignado por ';
   static const assignedByLoading = 'Asignado por …';
   static const assignedByError = 'Asignado por un PF';

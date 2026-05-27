@@ -4,14 +4,17 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/auth/application/auth_notifier.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/feed/application/friendship_providers.dart';
 import 'package:treino/features/profile/application/profile_stats_providers.dart';
+import 'package:treino/features/profile/application/user_providers.dart';
+import 'package:treino/features/profile/domain/user_profile.dart';
+import 'package:treino/features/profile/domain/user_role.dart';
 import 'package:treino/features/profile/domain/user_session_stats.dart';
-import 'package:treino/features/profile/presentation/widgets/profile_friend_requests_tile.dart';
 import 'package:treino/features/profile/profile_screen.dart';
 
 /// Minimal [AuthNotifier] stub that does not call Firebase.
@@ -26,15 +29,64 @@ class _StubAuthNotifier extends AuthNotifier {
   Future<void> signOut() async {}
 }
 
+UserProfile _testProfile() => UserProfile(
+      uid: 'uid-test',
+      email: 'test@test.com',
+      displayName: 'Test User',
+      role: UserRole.athlete,
+      createdAt: DateTime(2025),
+      updatedAt: DateTime(2025),
+    );
+
 Widget _buildScreen({required List<Override> overrides}) {
+  final router = GoRouter(
+    initialLocation: '/profile',
+    routes: [
+      GoRoute(
+        path: '/profile',
+        builder: (_, __) => const Scaffold(body: ProfileScreen()),
+        routes: [
+          GoRoute(
+            path: 'friend-requests',
+            builder: (_, __) => const Scaffold(body: Text('FRIEND_REQUESTS')),
+          ),
+          GoRoute(
+            path: 'edit-personal',
+            builder: (_, __) => const Scaffold(body: Text('EDIT_PERSONAL')),
+          ),
+          GoRoute(
+            path: 'gym',
+            builder: (_, __) => const Scaffold(body: Text('GYM')),
+          ),
+          GoRoute(
+            path: 'routines',
+            builder: (_, __) => const Scaffold(body: Text('ROUTINES')),
+          ),
+          GoRoute(
+            path: 'settings',
+            builder: (_, __) => const Scaffold(body: Text('SETTINGS')),
+          ),
+        ],
+      ),
+    ],
+  );
+
   return ProviderScope(
     overrides: overrides,
-    child: MaterialApp(
+    child: MaterialApp.router(
       theme: AppTheme.dark(),
-      home: const Scaffold(body: ProfileScreen()),
+      routerConfig: router,
     ),
   );
 }
+
+List<Override> _baseOverrides() => [
+      authNotifierProvider.overrideWith(_StubAuthNotifier.new),
+      authStateChangesProvider.overrideWith((_) => Stream.value(null)),
+      userProfileProvider.overrideWith((_) => Stream.value(_testProfile())),
+      pendingRequestCountProvider('').overrideWith((_) => 0),
+      pendingRequestsStreamProvider('').overrideWith((_) => Stream.value([])),
+    ];
 
 void main() {
   group('ProfileScreen — stats row (SCENARIO-316..319)', () {
@@ -46,7 +98,7 @@ void main() {
 
       await tester.pumpWidget(
         _buildScreen(overrides: [
-          authNotifierProvider.overrideWith(_StubAuthNotifier.new),
+          ..._baseOverrides(),
           userSessionStatsProvider.overrideWith((_) => completer.future),
         ]),
       );
@@ -71,7 +123,7 @@ void main() {
         (tester) async {
       await tester.pumpWidget(
         _buildScreen(overrides: [
-          authNotifierProvider.overrideWith(_StubAuthNotifier.new),
+          ..._baseOverrides(),
           userSessionStatsProvider.overrideWith((_) async =>
               const UserSessionStats(
                   totalSessions: 42, totalVolumeKg: 15000.0, streak: 7)),
@@ -93,7 +145,7 @@ void main() {
         (tester) async {
       await tester.pumpWidget(
         _buildScreen(overrides: [
-          authNotifierProvider.overrideWith(_StubAuthNotifier.new),
+          ..._baseOverrides(),
           userSessionStatsProvider.overrideWith((_) async {
             throw Exception('Firestore unavailable');
           }),
@@ -108,13 +160,13 @@ void main() {
       expect(find.text('--'), findsNWidgets(3));
     });
 
-    // SCENARIO-319: Existing ProfileScreen content is preserved
+    // SCENARIO-319: PERFIL text (now in ProfileHeader) and sign-out button are always visible
     testWidgets(
         'SCENARIO-319: PERFIL text and sign-out button are always visible',
         (tester) async {
       await tester.pumpWidget(
         _buildScreen(overrides: [
-          authNotifierProvider.overrideWith(_StubAuthNotifier.new),
+          ..._baseOverrides(),
           userSessionStatsProvider.overrideWith((_) async =>
               const UserSessionStats(
                   totalSessions: 0, totalVolumeKg: 0, streak: 0)),
@@ -123,7 +175,8 @@ void main() {
 
       await tester.pump();
 
-      // PERFIL heading and sign-out button must survive regardless of stats.
+      // PERFIL heading (from ProfileHeader) and sign-out button must survive
+      // regardless of stats.
       expect(find.text('PERFIL'), findsOneWidget);
       expect(find.text('Cerrar sesión'), findsOneWidget);
     });
@@ -133,7 +186,7 @@ void main() {
         (tester) async {
       await tester.pumpWidget(
         _buildScreen(overrides: [
-          authNotifierProvider.overrideWith(_StubAuthNotifier.new),
+          ..._baseOverrides(),
           userSessionStatsProvider.overrideWith((_) async =>
               const UserSessionStats(
                   totalSessions: 10, totalVolumeKg: 2000, streak: 5)),
@@ -144,7 +197,6 @@ void main() {
 
       // Verify that data state renders — color assertions are via palette
       // constants since building context to call AppPalette.of() is complex.
-      // The palette is minted via AppPalette.mintMagenta = the dark theme.
       // SESIONES + VOLUMEN KG value → mint accent (#2CE5A2)
       // RACHA value → magenta highlight (#C123E0)
       final sesionesValue = tester.widgetList<Text>(find.text('10')).first;
@@ -160,7 +212,7 @@ void main() {
 
       await tester.pumpWidget(
         _buildScreen(overrides: [
-          authNotifierProvider.overrideWith(_StubAuthNotifier.new),
+          ..._baseOverrides(),
           userSessionStatsProvider.overrideWith((_) => completer.future),
         ]),
       );
@@ -171,30 +223,6 @@ void main() {
       expect(find.text('Cerrar sesión'), findsOneWidget);
 
       completer.completeError(Exception('cleanup'));
-    });
-  });
-
-  // ---------------------------------------------------------------------------
-  // T14 RED: SCENARIO-468a — ProfileFriendRequestsTile is in the ProfileScreen
-  // ---------------------------------------------------------------------------
-  group('ProfileScreen — friend requests tile (SCENARIO-468a)', () {
-    testWidgets(
-        'SCENARIO-468a: ProfileScreen widget tree contains ProfileFriendRequestsTile',
-        (tester) async {
-      await tester.pumpWidget(
-        _buildScreen(overrides: [
-          authNotifierProvider.overrideWith(_StubAuthNotifier.new),
-          authStateChangesProvider.overrideWith((_) => Stream.value(null)),
-          userSessionStatsProvider.overrideWith((_) async =>
-              const UserSessionStats(
-                  totalSessions: 0, totalVolumeKg: 0, streak: 0)),
-          pendingRequestCountProvider('').overrideWith((_) => 0),
-        ]),
-      );
-
-      await tester.pump();
-
-      expect(find.byType(ProfileFriendRequestsTile), findsOneWidget);
     });
   });
 }

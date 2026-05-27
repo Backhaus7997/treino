@@ -48,14 +48,24 @@ class MiPlanSection extends ConsumerWidget {
             if (plans.isEmpty) {
               return const _SectionEmptyState();
             }
+            // Solo marcamos el más reciente como "Actual" cuando hay más
+            // de un plan asignado — con uno solo el badge es redundante.
+            // `listAssignedTo` ordena por createdAt DESC, así que el más
+            // nuevo es plans[0].
+            final showCurrentBadge = plans.length > 1;
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: plans
-                  .map((plan) => Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: _PlanCard(plan: plan, linkAsync: linkAsync),
-                      ))
-                  .toList(),
+              children: [
+                for (var i = 0; i < plans.length; i++)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: _PlanCard(
+                      plan: plans[i],
+                      linkAsync: linkAsync,
+                      isCurrent: showCurrentBadge && i == 0,
+                    ),
+                  ),
+              ],
             );
           },
         ),
@@ -156,10 +166,19 @@ bool _isLinkTerminated(AsyncValue<TrainerLink?> linkAsync, Routine routine) {
 }
 
 class _PlanCard extends ConsumerWidget {
-  const _PlanCard({required this.plan, required this.linkAsync});
+  const _PlanCard({
+    required this.plan,
+    required this.linkAsync,
+    this.isCurrent = false,
+  });
 
   final Routine plan;
   final AsyncValue<TrainerLink?> linkAsync;
+
+  /// Marca este card como el plan activo del atleta. Solo se setea desde
+  /// `MiPlanSection` cuando hay más de un plan asignado y este es el más
+  /// reciente (plans[0], ordenado por createdAt DESC).
+  final bool isCurrent;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -183,19 +202,34 @@ class _PlanCard extends ConsumerWidget {
         decoration: BoxDecoration(
           color: palette.bgCard,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: palette.border, width: 1),
+          // Outline más marcado en el actual para que destaque sin gritar.
+          border: Border.all(
+            color: isCurrent ? palette.accent : palette.border,
+            width: isCurrent ? 1.5 : 1,
+          ),
         ),
         padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              plan.name,
-              style: GoogleFonts.barlow(
-                fontWeight: FontWeight.w600,
-                fontSize: 14,
-                color: palette.textPrimary,
-              ),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Text(
+                    plan.name,
+                    style: GoogleFonts.barlow(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                      color: palette.textPrimary,
+                    ),
+                  ),
+                ),
+                if (isCurrent) ...[
+                  const SizedBox(width: 8),
+                  const _ActualChip(),
+                ],
+              ],
             ),
             if (trainerName != null) ...[
               const SizedBox(height: 4),
@@ -213,6 +247,35 @@ class _PlanCard extends ConsumerWidget {
               _FinalizadoChip(),
             ],
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Actual chip ───────────────────────────────────────────────────────────────
+
+class _ActualChip extends StatelessWidget {
+  const _ActualChip();
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    return Container(
+      key: const Key('mi_plan_current_chip'),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+      decoration: BoxDecoration(
+        color: palette.accent.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(9999),
+        border: Border.all(color: palette.accent.withValues(alpha: 0.5)),
+      ),
+      child: Text(
+        CoachStrings.miPlanCurrent.toUpperCase(),
+        style: GoogleFonts.barlowCondensed(
+          fontWeight: FontWeight.w700,
+          fontSize: 11,
+          letterSpacing: 1.2,
+          color: palette.accent,
         ),
       ),
     );
