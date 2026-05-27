@@ -26,11 +26,18 @@ mixin _$TrainerPublicProfile {
   String? get avatarUrl => throw _privateConstructorUsedError;
   String? get trainerBio => throw _privateConstructorUsedError;
   @JsonKey(fromJson: _specialtyFromJson, toJson: _specialtyToJson)
-  TrainerSpecialty? get trainerSpecialty => throw _privateConstructorUsedError;
+  TrainerSpecialty? get trainerSpecialty =>
+      throw _privateConstructorUsedError; // DEPRECATED — singular location campos legacy. Mantenidos por backward
+// compat hasta el cleanup PR. Ver doc del campo equivalente en UserProfile.
   String? get trainerGeohash => throw _privateConstructorUsedError;
   double? get trainerLatitude => throw _privateConstructorUsedError;
   double? get trainerLongitude => throw _privateConstructorUsedError;
-  int? get trainerMonthlyRate => throw _privateConstructorUsedError;
+  int? get trainerMonthlyRate =>
+      throw _privateConstructorUsedError; // ── Multi-location (Fase 6 Etapa 0) ────────────────────────────────
+  List<TrainerLocation> get trainerLocations =>
+      throw _privateConstructorUsedError;
+  List<String> get trainerGeohashes => throw _privateConstructorUsedError;
+  bool get trainerOffersOnline => throw _privateConstructorUsedError;
 
   /// Serializes this TrainerPublicProfile to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -59,7 +66,10 @@ abstract class $TrainerPublicProfileCopyWith<$Res> {
       String? trainerGeohash,
       double? trainerLatitude,
       double? trainerLongitude,
-      int? trainerMonthlyRate});
+      int? trainerMonthlyRate,
+      List<TrainerLocation> trainerLocations,
+      List<String> trainerGeohashes,
+      bool trainerOffersOnline});
 }
 
 /// @nodoc
@@ -88,6 +98,9 @@ class _$TrainerPublicProfileCopyWithImpl<$Res,
     Object? trainerLatitude = freezed,
     Object? trainerLongitude = freezed,
     Object? trainerMonthlyRate = freezed,
+    Object? trainerLocations = null,
+    Object? trainerGeohashes = null,
+    Object? trainerOffersOnline = null,
   }) {
     return _then(_value.copyWith(
       uid: null == uid
@@ -130,6 +143,18 @@ class _$TrainerPublicProfileCopyWithImpl<$Res,
           ? _value.trainerMonthlyRate
           : trainerMonthlyRate // ignore: cast_nullable_to_non_nullable
               as int?,
+      trainerLocations: null == trainerLocations
+          ? _value.trainerLocations
+          : trainerLocations // ignore: cast_nullable_to_non_nullable
+              as List<TrainerLocation>,
+      trainerGeohashes: null == trainerGeohashes
+          ? _value.trainerGeohashes
+          : trainerGeohashes // ignore: cast_nullable_to_non_nullable
+              as List<String>,
+      trainerOffersOnline: null == trainerOffersOnline
+          ? _value.trainerOffersOnline
+          : trainerOffersOnline // ignore: cast_nullable_to_non_nullable
+              as bool,
     ) as $Val);
   }
 }
@@ -153,7 +178,10 @@ abstract class _$$TrainerPublicProfileImplCopyWith<$Res>
       String? trainerGeohash,
       double? trainerLatitude,
       double? trainerLongitude,
-      int? trainerMonthlyRate});
+      int? trainerMonthlyRate,
+      List<TrainerLocation> trainerLocations,
+      List<String> trainerGeohashes,
+      bool trainerOffersOnline});
 }
 
 /// @nodoc
@@ -179,6 +207,9 @@ class __$$TrainerPublicProfileImplCopyWithImpl<$Res>
     Object? trainerLatitude = freezed,
     Object? trainerLongitude = freezed,
     Object? trainerMonthlyRate = freezed,
+    Object? trainerLocations = null,
+    Object? trainerGeohashes = null,
+    Object? trainerOffersOnline = null,
   }) {
     return _then(_$TrainerPublicProfileImpl(
       uid: null == uid
@@ -221,6 +252,18 @@ class __$$TrainerPublicProfileImplCopyWithImpl<$Res>
           ? _value.trainerMonthlyRate
           : trainerMonthlyRate // ignore: cast_nullable_to_non_nullable
               as int?,
+      trainerLocations: null == trainerLocations
+          ? _value._trainerLocations
+          : trainerLocations // ignore: cast_nullable_to_non_nullable
+              as List<TrainerLocation>,
+      trainerGeohashes: null == trainerGeohashes
+          ? _value._trainerGeohashes
+          : trainerGeohashes // ignore: cast_nullable_to_non_nullable
+              as List<String>,
+      trainerOffersOnline: null == trainerOffersOnline
+          ? _value.trainerOffersOnline
+          : trainerOffersOnline // ignore: cast_nullable_to_non_nullable
+              as bool,
     ));
   }
 }
@@ -239,7 +282,12 @@ class _$TrainerPublicProfileImpl implements _TrainerPublicProfile {
       this.trainerGeohash,
       this.trainerLatitude,
       this.trainerLongitude,
-      this.trainerMonthlyRate});
+      this.trainerMonthlyRate,
+      final List<TrainerLocation> trainerLocations = const <TrainerLocation>[],
+      final List<String> trainerGeohashes = const <String>[],
+      this.trainerOffersOnline = false})
+      : _trainerLocations = trainerLocations,
+        _trainerGeohashes = trainerGeohashes;
 
   factory _$TrainerPublicProfileImpl.fromJson(Map<String, dynamic> json) =>
       _$$TrainerPublicProfileImplFromJson(json);
@@ -257,6 +305,8 @@ class _$TrainerPublicProfileImpl implements _TrainerPublicProfile {
   @override
   @JsonKey(fromJson: _specialtyFromJson, toJson: _specialtyToJson)
   final TrainerSpecialty? trainerSpecialty;
+// DEPRECATED — singular location campos legacy. Mantenidos por backward
+// compat hasta el cleanup PR. Ver doc del campo equivalente en UserProfile.
   @override
   final String? trainerGeohash;
   @override
@@ -265,10 +315,35 @@ class _$TrainerPublicProfileImpl implements _TrainerPublicProfile {
   final double? trainerLongitude;
   @override
   final int? trainerMonthlyRate;
+// ── Multi-location (Fase 6 Etapa 0) ────────────────────────────────
+  final List<TrainerLocation> _trainerLocations;
+// ── Multi-location (Fase 6 Etapa 0) ────────────────────────────────
+  @override
+  @JsonKey()
+  List<TrainerLocation> get trainerLocations {
+    if (_trainerLocations is EqualUnmodifiableListView)
+      return _trainerLocations;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(_trainerLocations);
+  }
+
+  final List<String> _trainerGeohashes;
+  @override
+  @JsonKey()
+  List<String> get trainerGeohashes {
+    if (_trainerGeohashes is EqualUnmodifiableListView)
+      return _trainerGeohashes;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(_trainerGeohashes);
+  }
+
+  @override
+  @JsonKey()
+  final bool trainerOffersOnline;
 
   @override
   String toString() {
-    return 'TrainerPublicProfile(uid: $uid, displayName: $displayName, displayNameLowercase: $displayNameLowercase, avatarUrl: $avatarUrl, trainerBio: $trainerBio, trainerSpecialty: $trainerSpecialty, trainerGeohash: $trainerGeohash, trainerLatitude: $trainerLatitude, trainerLongitude: $trainerLongitude, trainerMonthlyRate: $trainerMonthlyRate)';
+    return 'TrainerPublicProfile(uid: $uid, displayName: $displayName, displayNameLowercase: $displayNameLowercase, avatarUrl: $avatarUrl, trainerBio: $trainerBio, trainerSpecialty: $trainerSpecialty, trainerGeohash: $trainerGeohash, trainerLatitude: $trainerLatitude, trainerLongitude: $trainerLongitude, trainerMonthlyRate: $trainerMonthlyRate, trainerLocations: $trainerLocations, trainerGeohashes: $trainerGeohashes, trainerOffersOnline: $trainerOffersOnline)';
   }
 
   @override
@@ -294,7 +369,13 @@ class _$TrainerPublicProfileImpl implements _TrainerPublicProfile {
             (identical(other.trainerLongitude, trainerLongitude) ||
                 other.trainerLongitude == trainerLongitude) &&
             (identical(other.trainerMonthlyRate, trainerMonthlyRate) ||
-                other.trainerMonthlyRate == trainerMonthlyRate));
+                other.trainerMonthlyRate == trainerMonthlyRate) &&
+            const DeepCollectionEquality()
+                .equals(other._trainerLocations, _trainerLocations) &&
+            const DeepCollectionEquality()
+                .equals(other._trainerGeohashes, _trainerGeohashes) &&
+            (identical(other.trainerOffersOnline, trainerOffersOnline) ||
+                other.trainerOffersOnline == trainerOffersOnline));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -310,7 +391,10 @@ class _$TrainerPublicProfileImpl implements _TrainerPublicProfile {
       trainerGeohash,
       trainerLatitude,
       trainerLongitude,
-      trainerMonthlyRate);
+      trainerMonthlyRate,
+      const DeepCollectionEquality().hash(_trainerLocations),
+      const DeepCollectionEquality().hash(_trainerGeohashes),
+      trainerOffersOnline);
 
   /// Create a copy of TrainerPublicProfile
   /// with the given fields replaced by the non-null parameter values.
@@ -342,7 +426,10 @@ abstract class _TrainerPublicProfile implements TrainerPublicProfile {
       final String? trainerGeohash,
       final double? trainerLatitude,
       final double? trainerLongitude,
-      final int? trainerMonthlyRate}) = _$TrainerPublicProfileImpl;
+      final int? trainerMonthlyRate,
+      final List<TrainerLocation> trainerLocations,
+      final List<String> trainerGeohashes,
+      final bool trainerOffersOnline}) = _$TrainerPublicProfileImpl;
 
   factory _TrainerPublicProfile.fromJson(Map<String, dynamic> json) =
       _$TrainerPublicProfileImpl.fromJson;
@@ -359,7 +446,9 @@ abstract class _TrainerPublicProfile implements TrainerPublicProfile {
   String? get trainerBio;
   @override
   @JsonKey(fromJson: _specialtyFromJson, toJson: _specialtyToJson)
-  TrainerSpecialty? get trainerSpecialty;
+  TrainerSpecialty?
+      get trainerSpecialty; // DEPRECATED — singular location campos legacy. Mantenidos por backward
+// compat hasta el cleanup PR. Ver doc del campo equivalente en UserProfile.
   @override
   String? get trainerGeohash;
   @override
@@ -367,7 +456,14 @@ abstract class _TrainerPublicProfile implements TrainerPublicProfile {
   @override
   double? get trainerLongitude;
   @override
-  int? get trainerMonthlyRate;
+  int?
+      get trainerMonthlyRate; // ── Multi-location (Fase 6 Etapa 0) ────────────────────────────────
+  @override
+  List<TrainerLocation> get trainerLocations;
+  @override
+  List<String> get trainerGeohashes;
+  @override
+  bool get trainerOffersOnline;
 
   /// Create a copy of TrainerPublicProfile
   /// with the given fields replaced by the non-null parameter values.

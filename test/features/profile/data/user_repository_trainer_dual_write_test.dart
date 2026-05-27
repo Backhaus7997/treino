@@ -401,4 +401,110 @@ void main() {
           equals('https://example.com/img.jpg'));
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // Fase 6 Etapa 0 — Multi-location
+  // ---------------------------------------------------------------------------
+  group('UserRepository multi-location dual-write', () {
+    test('trainerLocations partial propaga a trainerPublicProfiles', () async {
+      await seedDoc('trainer-ml-1');
+      final loc = {
+        'id': 'loc-1',
+        'type': 'gym',
+        'gymId': 'megatlon-belgrano',
+        'customLabel': null,
+        'lat': -34.5598,
+        'lng': -58.4615,
+        'geohash': '69y7w',
+      };
+
+      await repo.update('trainer-ml-1', {
+        'trainerLocations': [loc],
+        'trainerGeohashes': ['69y7w'],
+        'trainerOffersOnline': true,
+      });
+
+      final snap = await firestore
+          .collection('trainerPublicProfiles')
+          .doc('trainer-ml-1')
+          .get();
+      expect(snap.exists, isTrue);
+      expect((snap.data()!['trainerLocations'] as List).length, equals(1));
+      expect(snap.data()!['trainerGeohashes'], equals(['69y7w']));
+      expect(snap.data()!['trainerOffersOnline'], isTrue);
+    });
+
+    test(
+        'rechaza partial con trainerLocations vacío + trainerOffersOnline:false',
+        () async {
+      await seedDoc('trainer-invalid');
+      expect(
+        () => repo.update('trainer-invalid', {
+          'trainerLocations': <Map<String, Object?>>[],
+          'trainerOffersOnline': false,
+        }),
+        throwsArgumentError,
+      );
+    });
+
+    test(
+        'acepta trainerLocations vacío + trainerOffersOnline:true (solo virtual)',
+        () async {
+      await seedDoc('trainer-virtual');
+      await repo.update('trainer-virtual', {
+        'trainerLocations': <Map<String, Object?>>[],
+        'trainerGeohashes': <String>[],
+        'trainerOffersOnline': true,
+      });
+      final snap = await firestore
+          .collection('trainerPublicProfiles')
+          .doc('trainer-virtual')
+          .get();
+      expect(snap.data()!['trainerOffersOnline'], isTrue);
+      expect(snap.data()!['trainerLocations'], isEmpty);
+    });
+
+    test('acepta locations non-vacío + offersOnline:false (solo presencial)',
+        () async {
+      await seedDoc('trainer-presencial');
+      await repo.update('trainer-presencial', {
+        'trainerLocations': [
+          {
+            'id': 'loc-x',
+            'type': 'custom',
+            'gymId': null,
+            'customLabel': 'Mi estudio',
+            'lat': -31.4,
+            'lng': -64.1,
+            'geohash': '6d6m7',
+          }
+        ],
+        'trainerGeohashes': ['6d6m7'],
+        'trainerOffersOnline': false,
+      });
+      final snap = await firestore
+          .collection('trainerPublicProfiles')
+          .doc('trainer-presencial')
+          .get();
+      expect(snap.data()!['trainerOffersOnline'], isFalse);
+      expect((snap.data()!['trainerLocations'] as List).length, equals(1));
+    });
+
+    test(
+        'update parcial que solo toca trainerLocations (sin offersOnline) '
+        'NO valida estado — caller responsable de consistencia', () async {
+      await seedDoc('trainer-partial');
+      // Sólo locations vacío sin offersOnline → no entra al assert,
+      // pasa al write. Caller debió haber gettado primero. Documenta
+      // el contrato del repo.
+      await repo.update('trainer-partial', {
+        'trainerLocations': <Map<String, Object?>>[],
+      });
+      final snap = await firestore
+          .collection('trainerPublicProfiles')
+          .doc('trainer-partial')
+          .get();
+      expect(snap.data()!['trainerLocations'], isEmpty);
+    });
+  });
 }

@@ -27,10 +27,19 @@ _$UserProfileImpl _$$UserProfileImplFromJson(Map<String, dynamic> json) =>
           json['bornAt'], const TimestampConverter().fromJson),
       trainerBio: json['trainerBio'] as String?,
       trainerSpecialty: json['trainerSpecialty'] as String?,
+      trainerMonthlyRate: (json['trainerMonthlyRate'] as num?)?.toInt(),
       trainerLatitude: (json['trainerLatitude'] as num?)?.toDouble(),
       trainerLongitude: (json['trainerLongitude'] as num?)?.toDouble(),
       trainerGeohash: json['trainerGeohash'] as String?,
-      trainerMonthlyRate: (json['trainerMonthlyRate'] as num?)?.toInt(),
+      trainerLocations: (json['trainerLocations'] as List<dynamic>?)
+              ?.map((e) => TrainerLocation.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          const <TrainerLocation>[],
+      trainerGeohashes: (json['trainerGeohashes'] as List<dynamic>?)
+              ?.map((e) => e as String)
+              .toList() ??
+          const <String>[],
+      trainerOffersOnline: json['trainerOffersOnline'] as bool? ?? false,
     );
 
 Map<String, dynamic> _$$UserProfileImplToJson(_$UserProfileImpl instance) =>
@@ -51,10 +60,14 @@ Map<String, dynamic> _$$UserProfileImplToJson(_$UserProfileImpl instance) =>
           instance.bornAt, const TimestampConverter().toJson),
       'trainerBio': instance.trainerBio,
       'trainerSpecialty': instance.trainerSpecialty,
+      'trainerMonthlyRate': instance.trainerMonthlyRate,
       'trainerLatitude': instance.trainerLatitude,
       'trainerLongitude': instance.trainerLongitude,
       'trainerGeohash': instance.trainerGeohash,
-      'trainerMonthlyRate': instance.trainerMonthlyRate,
+      'trainerLocations':
+          instance.trainerLocations.map((e) => e.toJson()).toList(),
+      'trainerGeohashes': instance.trainerGeohashes,
+      'trainerOffersOnline': instance.trainerOffersOnline,
     };
 
 const _$UserRoleEnumMap = {
