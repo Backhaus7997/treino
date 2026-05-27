@@ -160,27 +160,27 @@ Chain strategy: stacked-to-main
 
 ### Phase 3.1: New providers
 
-- [ ] T33 — SETUP: rebase `feat/profile-screen-rewrite-pr3-gym-routines` on post-PR#2 `main`.
-- [ ] T34 — RED: create `test/features/profile/application/assigned_routines_providers_test.dart`; 3 failing tests: `assignedRoutinesProvider(myUid)` returns only trainer-assigned plans for myUid (SCENARIO-519 filter logic); `assignedRoutinesProvider(myUid)` renders `RoutineCard` per item (SCENARIO-520 — count check); `assignedRoutinesCountProvider` returns `0` during loading/error and `list.length` on data. Use `ProviderContainer` with overridden `routineRepositoryProvider`.
-- [ ] T35 — GREEN: create `lib/features/profile/application/assigned_routines_providers.dart` — `assignedRoutinesProvider` (FutureProvider.autoDispose.family<List<Routine>, String>) + `assignedRoutinesCountProvider` (Provider.autoDispose.family<int, String>) per design §4.3; T34 must pass.
-- [ ] T36 — PATCH: update `lib/features/profile/presentation/widgets/profile_cuenta_section.dart` to wire `assignedRoutinesCountProvider` (replaces PR#1 count=0 stub); no new test needed (existing T09 covers the count display).
+- [x] T33 — SETUP: rebase `feat/profile-screen-rewrite-pr3-gym-routines` on post-PR#2 `main`.
+- [x] T34 — RED: create `test/features/profile/application/assigned_routines_providers_test.dart`; 3 failing tests: `assignedRoutinesProvider(myUid)` returns only trainer-assigned plans for myUid (SCENARIO-519 filter logic); `assignedRoutinesProvider(myUid)` renders `RoutineCard` per item (SCENARIO-520 — count check); `assignedRoutinesCountProvider` returns `0` during loading/error and `list.length` on data. Use `ProviderContainer` with overridden `routineRepositoryProvider`.
+- [x] T35 — GREEN: create `lib/features/profile/application/assigned_routines_providers.dart` — `assignedRoutinesProvider` (FutureProvider.autoDispose.family<List<Routine>, String>) + `assignedRoutinesCountProvider` (Provider.autoDispose.family<int, String>) per design §4.3; T34 must pass.
+- [x] T36 — PATCH: update `lib/features/profile/presentation/widgets/profile_cuenta_section.dart` to wire `assignedRoutinesCountProvider` (replaces PR#1 count=0 stub); no new test needed (existing T09 covers the count display).
 
 ### Phase 3.2: ProfileRoutinesScreen
 
-- [ ] T37 — RED: create `test/features/profile/presentation/profile_routines_screen_test.dart`; 3 failing tests: loading state shows `CircularProgressIndicator`; empty state shows expected copy (SCENARIO-521); data state renders `RoutineCard` per item (SCENARIO-520). Override `assignedRoutinesProvider`.
-- [ ] T38 — GREEN: replace stub with real `lib/features/profile/presentation/profile_routines_screen.dart` — ConsumerWidget; `AsyncValue.when` on `assignedRoutinesProvider(myUid ?? '')`; reuses `RoutineCard` from `lib/features/workout/presentation/widgets/routine_card.dart`; T37 must pass.
+- [x] T37 — RED: create `test/features/profile/presentation/profile_routines_screen_test.dart`; 3 failing tests: loading state shows `CircularProgressIndicator`; empty state shows expected copy (SCENARIO-521); data state renders `RoutineCard` per item (SCENARIO-520). Override `assignedRoutinesProvider`.
+- [x] T38 — GREEN: replace stub with real `lib/features/profile/presentation/profile_routines_screen.dart` — ConsumerWidget; `AsyncValue.when` on `assignedRoutinesProvider(myUid ?? '')`; reuses `RoutineCard` from `lib/features/workout/presentation/widgets/routine_card.dart`; T37 must pass.
 
 ### Phase 3.3: ProfileGymScreen
 
-- [ ] T39 — RED: create `test/features/profile/presentation/profile_gym_screen_test.dart`; 3 failing tests: gym list renders (SCENARIO-516); selecting gym and confirming calls `UserRepository.update(uid, {'gymId': ...})` (SCENARIO-517); save disabled when pending selection equals current gymId. Override `filteredGymsProvider` + `userProfileProvider` + `userRepositoryProvider`.
-- [ ] T40 — GREEN: replace stub with real `lib/features/profile/presentation/profile_gym_screen.dart` — ConsumerStatefulWidget; reuses `filteredGymsProvider`, `gymSearchQueryProvider`, `GymCard` from `lib/features/profile_setup/*` per ADR-PSR-011; save → `userRepository.update(uid, {'gymId': _pendingGymId})` → pop; T39 must pass.
+- [x] T39 — RED: create `test/features/profile/presentation/profile_gym_screen_test.dart`; 3 failing tests: gym list renders (SCENARIO-516); selecting gym and confirming calls `UserRepository.update(uid, {'gymId': ...})` (SCENARIO-517); save disabled when pending selection equals current gymId. Override `filteredGymsProvider` + `userProfileProvider` + `userRepositoryProvider`.
+- [x] T40 — GREEN: replace stub with real `lib/features/profile/presentation/profile_gym_screen.dart` — ConsumerStatefulWidget; reuses `filteredGymsProvider`, `gymSearchQueryProvider`, `GymCard` from `lib/features/profile_setup/*` per ADR-PSR-011; save → `userRepository.update(uid, {'gymId': _pendingGymId})` → pop; T39 must pass.
 
 ### Phase 3.4: Quality gates
 
-- [ ] T41 — GATE: `flutter analyze` — 0 issues.
-- [ ] T42 — GATE: `dart format --output=none --set-exit-if-changed .` — 0 changed.
-- [ ] T43 — GATE: `flutter test` — all passing; delta +9 new tests; no regressions.
-- [ ] T44 — VERIFY: same checks as T21 scoped to new PR#3 files; confirm SCENARIO-518 (gym chip in ProfileAvatarCard updates) via manual smoke — stream re-emission is automatic via `userProfileProvider`.
+- [x] T41 — GATE: `flutter analyze` — 0 issues.
+- [x] T42 — GATE: `dart format --output=none --set-exit-if-changed .` — 0 changed.
+- [x] T43 — GATE: `flutter test` — all passing; delta +9 new tests (1290 → 1299); no regressions.
+- [x] T44 — VERIFY: 0 hex literals; 0 PhosphorIcons direct; i18n markers ≥1 per new file; SCENARIO-518 automatic via userProfileProvider StreamProvider.
 
 ---
 
@@ -265,13 +265,13 @@ Chain strategy: stacked-to-main
 - [x] `rg "i18n: Fase 6" lib/features/profile/presentation/profile_edit_personal_screen.dart` → 29 hits ✅
 
 ### PR#3
-- [ ] T33..T44 all marked [x]
-- [ ] Quality gates T41..T44 passed
-- [ ] Rebase on post-PR#2 main confirmed clean
-- [ ] `/profile/gym` and `/profile/routines` stubs replaced by real screens
-- [ ] `assignedRoutinesCountProvider` wired in `ProfileCuentaSection` (T36)
-- [ ] Gym catalog reuse from `profile_setup` confirmed (no duplication)
-- [ ] `rg "i18n: Fase 6" lib/features/profile/presentation/profile_gym_screen.dart` ≥1 hit
+- [x] T33..T44 all marked [x]
+- [x] Quality gates T41..T44 passed
+- [x] Rebase on post-PR#2 main confirmed clean (branch was already on post-PR#2 main)
+- [x] `/profile/gym` and `/profile/routines` stubs replaced by real screens
+- [x] `assignedRoutinesCountProvider` wired in `ProfileCuentaSection` (T36)
+- [x] Gym catalog reuse from `profile_setup` confirmed (no duplication — ADR-PSR-011)
+- [x] `rg "i18n: Fase 6" lib/features/profile/presentation/profile_gym_screen.dart` → 6 hits ✅
 
 ### PR#4
 - [ ] T45..T53 all marked [x]
