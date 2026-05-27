@@ -83,8 +83,7 @@ void main() {
     });
 
     // SCENARIO-497: @handle derivation preserves accented chars and lowercase
-    testWidgets(
-        'SCENARIO-497: @handle for "Ana Núñez" becomes "@ana.núñez"',
+    testWidgets('SCENARIO-497: @handle for "Ana Núñez" becomes "@ana.núñez"',
         (tester) async {
       await tester.pumpWidget(
         _buildCard(profile: _profile(displayName: 'Ana Núñez')),
@@ -112,8 +111,7 @@ void main() {
       await tester.pumpWidget(_buildCard(profile: _profile()));
       await tester.pumpAndSettle();
 
-      expect(
-          find.byKey(const Key('profile_avatar_gym_chip')), findsNothing);
+      expect(find.byKey(const Key('profile_avatar_gym_chip')), findsNothing);
     });
 
     // SCENARIO-500: pencil tap navigates to /profile/edit-personal

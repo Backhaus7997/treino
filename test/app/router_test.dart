@@ -37,8 +37,7 @@ List<Override> _baseOverrides() => [
       ),
       pendingRequestCountProvider('').overrideWith((_) => 0),
       pendingRequestsStreamProvider('').overrideWith((_) => Stream.value([])),
-      userProfileProvider
-          .overrideWith((_) => Stream.value(_testProfile())),
+      userProfileProvider.overrideWith((_) => Stream.value(_testProfile())),
     ];
 
 // ---------------------------------------------------------------------------
@@ -122,8 +121,7 @@ void main() {
       expect(find.byType(ProfileEditPersonalScreen), findsOneWidget);
     });
 
-    testWidgets(
-        'SCENARIO-507b: /profile/gym resolves to ProfileGymScreen',
+    testWidgets('SCENARIO-507b: /profile/gym resolves to ProfileGymScreen',
         (tester) async {
       final container = ProviderContainer(overrides: _baseOverrides());
       addTearDown(container.dispose);
@@ -196,7 +194,8 @@ void main() {
   // SCENARIO-508: /profile/friend-requests still navigates to FriendRequestsInboxScreen
   // after PR#1 changes (regression guard)
   // ---------------------------------------------------------------------------
-  group('Router — /profile/friend-requests not broken by PR#1 (SCENARIO-508)', () {
+  group('Router — /profile/friend-requests not broken by PR#1 (SCENARIO-508)',
+      () {
     testWidgets(
         'SCENARIO-508: /profile/friend-requests still renders FriendRequestsInboxScreen',
         (tester) async {

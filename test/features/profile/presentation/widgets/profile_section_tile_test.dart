@@ -38,7 +38,8 @@ Widget _buildTile({
 void main() {
   group('ProfileSectionTile', () {
     // SCENARIO-509a: renders title only (no subtitle)
-    testWidgets('SCENARIO-509a: renders title without subtitle', (tester) async {
+    testWidgets('SCENARIO-509a: renders title without subtitle',
+        (tester) async {
       await tester.pumpWidget(
         _buildTile(
           icon: TreinoIcon.edit,
@@ -69,7 +70,8 @@ void main() {
     });
 
     // SCENARIO-509c: renders custom trailing override (no chevron)
-    testWidgets('SCENARIO-509c: renders custom trailing widget', (tester) async {
+    testWidgets('SCENARIO-509c: renders custom trailing widget',
+        (tester) async {
       const customKey = Key('custom-trailing');
       await tester.pumpWidget(
         _buildTile(

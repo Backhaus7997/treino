@@ -37,8 +37,9 @@ class ProfileCuentaSection extends ConsumerWidget {
     // Count defaults to 0 until the provider is wired.
     const int routinesCount = 0;
 
-    final solicitudesSubtitle =
-        requestCount > 0 ? '$requestCount nuevas' : null; // i18n: Fase 6 Etapa 3
+    final solicitudesSubtitle = requestCount > 0
+        ? '$requestCount nuevas'
+        : null; // i18n: Fase 6 Etapa 3
     final gymSubtitle = gymId == null
         ? 'Sin gym' // i18n: Fase 6 Etapa 3
         : gymNameFromId(gymId);
@@ -91,8 +92,7 @@ class ProfileCuentaSection extends ConsumerWidget {
           ProfileSectionTile(
             icon: TreinoIcon.dumbbell,
             title: 'Mis rutinas', // i18n: Fase 6 Etapa 3
-            subtitle:
-                '$routinesCount activas', // i18n: Fase 6 Etapa 3
+            subtitle: '$routinesCount activas', // i18n: Fase 6 Etapa 3
             onTap: () => context.push('/profile/routines'),
           ),
         ],

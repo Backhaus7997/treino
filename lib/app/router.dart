@@ -16,7 +16,8 @@ import '../features/coach/presentation/athlete_agenda_screen.dart';
 import '../features/coach/presentation/athlete_detail_screen.dart';
 import '../features/coach/presentation/availability_editor_screen.dart';
 import '../features/coach/presentation/trainer_public_profile_screen.dart';
-import '../features/workout/application/session_providers.dart' show currentUidProvider;
+import '../features/workout/application/session_providers.dart'
+    show currentUidProvider;
 import '../features/workout/presentation/routine_editor_screen.dart';
 import '../features/workout/application/session_init.dart';
 import '../features/workout/presentation/exercise_detail_screen.dart';
@@ -331,13 +332,11 @@ GoRouter buildRouter({
               ),
               GoRoute(
                 path: 'routines',
-                pageBuilder: (_, __) =>
-                    _noAnim(const ProfileRoutinesScreen()),
+                pageBuilder: (_, __) => _noAnim(const ProfileRoutinesScreen()),
               ),
               GoRoute(
                 path: 'settings',
-                pageBuilder: (_, __) =>
-                    _noAnim(const ProfileSettingsScreen()),
+                pageBuilder: (_, __) => _noAnim(const ProfileSettingsScreen()),
               ),
             ],
           ),

@@ -64,8 +64,7 @@ Widget _buildProfileScreen() {
   return ProviderScope(
     overrides: [
       authStateChangesProvider.overrideWith((_) => Stream.value(null)),
-      userProfileProvider
-          .overrideWith((_) => Stream.value(_profile())),
+      userProfileProvider.overrideWith((_) => Stream.value(_profile())),
       pendingRequestCountProvider('').overrideWith((_) => 0),
       pendingRequestsStreamProvider('').overrideWith((_) => Stream.value([])),
       userSessionStatsProvider.overrideWith(

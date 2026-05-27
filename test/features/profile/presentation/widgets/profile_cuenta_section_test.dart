@@ -14,7 +14,7 @@ import 'package:treino/features/profile/presentation/widgets/profile_cuenta_sect
 // Helpers
 // ---------------------------------------------------------------------------
 
-final _uid = 'test-uid';
+const _uid = 'test-uid';
 
 UserProfile _profile({String? gymId}) => UserProfile(
       uid: _uid,
@@ -47,8 +47,7 @@ Widget _buildSection({
               ),
               GoRoute(
                 path: 'edit-personal',
-                builder: (_, __) =>
-                    const Scaffold(body: Text('EDIT_PERSONAL')),
+                builder: (_, __) => const Scaffold(body: Text('EDIT_PERSONAL')),
               ),
               GoRoute(
                 path: 'gym',
@@ -89,8 +88,7 @@ void main() {
         _buildSection(
           overrides: [
             authStateChangesProvider.overrideWith((_) => Stream.value(null)),
-            userProfileProvider
-                .overrideWith((_) => Stream.value(_profile())),
+            userProfileProvider.overrideWith((_) => Stream.value(_profile())),
             pendingRequestCountProvider('').overrideWith((_) => 0),
           ],
         ),
@@ -111,8 +109,7 @@ void main() {
         _buildSection(
           overrides: [
             authStateChangesProvider.overrideWith((_) => Stream.value(null)),
-            userProfileProvider
-                .overrideWith((_) => Stream.value(_profile())),
+            userProfileProvider.overrideWith((_) => Stream.value(_profile())),
             pendingRequestCountProvider('').overrideWith((_) => 4),
           ],
         ),
@@ -130,8 +127,7 @@ void main() {
         _buildSection(
           overrides: [
             authStateChangesProvider.overrideWith((_) => Stream.value(null)),
-            userProfileProvider
-                .overrideWith((_) => Stream.value(_profile())),
+            userProfileProvider.overrideWith((_) => Stream.value(_profile())),
             pendingRequestCountProvider('').overrideWith((_) => 0),
           ],
         ),
@@ -151,8 +147,7 @@ void main() {
         _buildSection(
           overrides: [
             authStateChangesProvider.overrideWith((_) => Stream.value(null)),
-            userProfileProvider
-                .overrideWith((_) => Stream.value(_profile())),
+            userProfileProvider.overrideWith((_) => Stream.value(_profile())),
             pendingRequestCountProvider('').overrideWith((_) => 0),
           ],
         ),
@@ -173,8 +168,7 @@ void main() {
         _buildSection(
           overrides: [
             authStateChangesProvider.overrideWith((_) => Stream.value(null)),
-            userProfileProvider
-                .overrideWith((_) => Stream.value(_profile())),
+            userProfileProvider.overrideWith((_) => Stream.value(_profile())),
             pendingRequestCountProvider('').overrideWith((_) => 0),
           ],
         ),
@@ -196,8 +190,7 @@ void main() {
         _buildSection(
           overrides: [
             authStateChangesProvider.overrideWith((_) => Stream.value(null)),
-            userProfileProvider
-                .overrideWith((_) => Stream.value(_profile())),
+            userProfileProvider.overrideWith((_) => Stream.value(_profile())),
             pendingRequestCountProvider('').overrideWith((_) => 3),
           ],
         ),
@@ -215,8 +208,7 @@ void main() {
         _buildSection(
           overrides: [
             authStateChangesProvider.overrideWith((_) => Stream.value(null)),
-            userProfileProvider
-                .overrideWith((_) => Stream.value(_profile())),
+            userProfileProvider.overrideWith((_) => Stream.value(_profile())),
             pendingRequestCountProvider('').overrideWith((_) => 0),
           ],
         ),
@@ -236,8 +228,7 @@ void main() {
         _buildSection(
           overrides: [
             authStateChangesProvider.overrideWith((_) => Stream.value(null)),
-            userProfileProvider
-                .overrideWith((_) => Stream.value(_profile())),
+            userProfileProvider.overrideWith((_) => Stream.value(_profile())),
             pendingRequestCountProvider('').overrideWith((_) => 2),
           ],
         ),
