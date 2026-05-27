@@ -15,10 +15,10 @@
 |---|---|---|---|
 | REQ-PSR-001 | PR#1 | MUST | `ProfileHeader` renders "TU CUENTA" label + "PERFIL" Barlow Condensed title + gear icon |
 | REQ-PSR-002 | PR#1 | MUST | Gear icon in `ProfileHeader` navigates to `/profile/settings` |
-| REQ-PSR-003 | PR#1 | MUST | `ProfileAvatarCard` renders avatar + `displayName` + derived `@handle` + gym chip (when gymId is set) + pencil icon |
+| REQ-PSR-003 | PR#1 | MUST | `ProfileAvatarCard` renders avatar + `displayName` + derived `@handle` + gym chip (when gymId is set). **Pencil icon REMOVED per design decision 2026-05-27** — card is read-only, edit access lives in the "Datos personales" tile of CUENTA |
 | REQ-PSR-004 | PR#1 | MUST | `@handle` is derived on render: `displayName.toLowerCase().replaceAll(' ', '.')` — NOT a persisted field |
 | REQ-PSR-005 | PR#1 | MUST | Gym chip is visible when `UserProfile.gymId` is non-null; MUST NOT render when `gymId` is null |
-| REQ-PSR-006 | PR#1 | MUST | Pencil icon on `ProfileAvatarCard` navigates to `/profile/edit-personal` |
+| ~~REQ-PSR-006~~ | — | — | **REMOVED 2026-05-27** — Pencil icon dropped from `ProfileAvatarCard`; edit access is single-entry via the "Datos personales" tile of CUENTA. Placeholder ID kept for numbering continuity |
 | REQ-PSR-007 | PR#1 | MUST | `ProfileCuentaSection` renders 4 tiles in exact order: Solicitudes / Datos personales / Gimnasio / Mis rutinas. Historial tile is **explicitly excluded** from this SDD scope per user decision 2026-05-27 (no dedicated historial route exists yet; access remains via Workout tab → HistorialSection scroll) |
 | REQ-PSR-008 | PR#1 | MUST | Solicitudes tile displays count from `pendingRequestsCountProvider(myUid)` and navigates to `/profile/friend-requests` |
 | REQ-PSR-009 | PR#1 | MUST | Datos personales tile navigates to `/profile/edit-personal` (stub body in PR#1, real screen from PR#2 onward) |
@@ -67,9 +67,9 @@
 
 ---
 
-### Requirement: ProfileAvatarCard Composition (REQ-PSR-003, REQ-PSR-004, REQ-PSR-005, REQ-PSR-006)
+### Requirement: ProfileAvatarCard Composition (REQ-PSR-003, REQ-PSR-004, REQ-PSR-005, ~~REQ-PSR-006~~)
 
-`ProfileAvatarCard` MUST display the user's avatar image, their `displayName`, a derived `@handle`, an optional gym chip, and a pencil edit icon. The `@handle` MUST be derived at render time via `displayName.toLowerCase().replaceAll(' ', '.')` — it MUST NOT be read from Firestore or any persisted field.
+`ProfileAvatarCard` MUST display the user's avatar image, their `displayName`, a derived `@handle`, and an optional gym chip. **The card is READ-ONLY** — no pencil icon, no edit affordance. Edit access lives exclusively in the "Datos personales" tile of CUENTA section per design decision 2026-05-27. The `@handle` MUST be derived at render time via `displayName.toLowerCase().replaceAll(' ', '.')` — it MUST NOT be read from Firestore or any persisted field.
 
 #### SCENARIO-496: ProfileAvatarCard renders avatar, displayName, and derived @handle
 
@@ -97,7 +97,7 @@
 - WHEN `ProfileAvatarCard` builds
 - THEN no gym chip is rendered
 
-#### SCENARIO-500: Tapping the pencil icon navigates to /profile/edit-personal
+#### ~~SCENARIO-500~~: REMOVED 2026-05-27 — Pencil icon dropped from ProfileAvatarCard (placeholder kept for numbering continuity)
 
 - GIVEN `ProfileAvatarCard` is rendered
 - WHEN the user taps the pencil icon
@@ -365,7 +365,7 @@ All files touched across PR#1–PR#4 MUST use `AppPalette.of(context)` for color
 | REQ-PSR-003 | 496 |
 | REQ-PSR-004 | 496, 497 |
 | REQ-PSR-005 | 498, 499 |
-| REQ-PSR-006 | 500 |
+| ~~REQ-PSR-006~~ | ~~500~~ (both REMOVED 2026-05-27) |
 | REQ-PSR-007 | 501 |
 | REQ-PSR-008 | 502 |
 | REQ-PSR-009 | 503 |

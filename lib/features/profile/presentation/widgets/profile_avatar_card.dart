@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/utils/handle_derivation.dart';
-import '../../../../core/widgets/treino_icon.dart';
 import '../../../feed/domain/gym_name.dart';
 import '../../../feed/presentation/widgets/post_avatar.dart';
 import '../../application/user_providers.dart';
 
-/// Displays the current user's avatar, display name, derived @handle,
-/// optional gym chip, and a pencil icon to navigate to the edit form.
+/// Displays the current user's avatar, display name, derived @handle, and
+/// optional gym chip. **Read-only**: edit access lives in the "Datos
+/// personales" tile of CUENTA section, not on this card (decision
+/// 2026-05-27 — single edit entry point).
 ///
 /// Uses [userProfileProvider] (StreamProvider) — always reflects the latest
 /// Firestore state without manual invalidation. // i18n: Fase 6 Etapa 3
@@ -96,18 +96,6 @@ class _CardBody extends StatelessWidget {
                     _GymChip(gymId: gymId, palette: palette),
                   ],
                 ],
-              ),
-            ),
-            GestureDetector(
-              key: const Key('profile_avatar_pencil'),
-              onTap: () => context.push('/profile/edit-personal'),
-              child: Padding(
-                padding: const EdgeInsets.all(8),
-                child: Icon(
-                  TreinoIcon.edit,
-                  size: 20,
-                  color: palette.textMuted,
-                ),
               ),
             ),
           ],

@@ -149,6 +149,102 @@
 
 ## Sections Reserved for Future PRs
 
-- PR#2 (T22..T32) — Datos personales form + avatar upload
 - PR#3 (T33..T44) — Gimnasio + Mis rutinas + new providers
 - PR#4 (T45..T53) — Settings screen real + sign-out footer removal
+
+---
+
+## PR#2 — Datos personales edit + avatar upload
+
+**Change**: profile-screen-rewrite
+**Branch**: `feat/profile-screen-rewrite-pr2-edit-personal`
+**Mode**: Strict TDD
+**Baseline test count**: 1284 (from PR#1)
+**Final test count**: 1290
+**Delta**: +6 tests (SCENARIO-510..515)
+
+---
+
+### PR#2 TDD Cycle Evidence
+
+| Task | Test File | Layer | RED | GREEN | REFACTOR |
+|------|-----------|-------|-----|-------|----------|
+| T22 | N/A — setup task | — | N/A | ✅ Branch created from post-PR#1 main | — |
+| T23 | `test/features/profile/presentation/profile_edit_personal_screen_test.dart` | Widget | ✅ Written (behavioral fail — keys not found in stub) | — | — |
+| T24 | same | Widget | — | ✅ 6/6 SCENARIO-510..515 pass | ✅ Format + lazy-seed pattern |
+| T25 | same (combined in T23) | Widget | ✅ SCENARIO-511 in same test file | — | — |
+| T26 | same | Widget | — | ✅ Save handler: validate → partial → update → pop | — |
+| T27 | same (combined in T23) | Widget | ✅ SCENARIO-514,515 in same test file | — | — |
+| T28 | same | Widget | — | ✅ _AvatarEditor + upload via avatarUploadServiceProvider | — |
+| T29 | GATE | — | — | ✅ `flutter analyze` — 0 issues | — |
+| T30 | GATE | — | — | ✅ `dart format` — 0 changed | — |
+| T31 | GATE | — | — | ✅ `flutter test` — 1290/1290 pass | — |
+| T32 | VERIFY | — | — | ✅ 0 hex literals; 0 PhosphorIcons direct; 29 i18n markers | — |
+
+### Test Summary
+
+- **Total new tests**: +6 (baseline 1284 → 1290)
+- **Layers used**: Widget (all)
+- **Test files created**: 1 new (`profile_edit_personal_screen_test.dart`)
+- **SCENARIOs covered**: 510 (pre-populate), 511 (save fires update), 512 (empty name validation), 513 (weight range validation), 514 (avatar editor key present), 515 (upload path structure)
+
+---
+
+### Completed Tasks — PR#2
+
+- [x] T22 — Branch `feat/profile-screen-rewrite-pr2-edit-personal` created from post-PR#1 main; `/profile/edit-personal` stub confirmed in router.
+- [x] T23 — RED: `profile_edit_personal_screen_test.dart` — SCENARIO-510,512,513 (behavioral fail — stub renders placeholder text, not form fields)
+- [x] T24 — GREEN: `ProfileEditPersonalScreen` ConsumerStatefulWidget — lazy-seed pattern for controllers, Form with inline validators, 6 tests pass
+- [x] T25 — RED: SCENARIO-511 included in T23 file (combined RED cycle)
+- [x] T26 — GREEN: save handler validates → builds partial → `UserRepository.update(uid, partial)` → `context.pop()`; discard dialog for dirty form
+- [x] T27 — RED: SCENARIO-514,515 included in T23 file (combined RED cycle)
+- [x] T28 — GREEN: `_AvatarEditor` widget + `_pickAvatar()` via `image_picker` + upload via `avatarUploadServiceProvider`; error SnackBar
+- [x] T29 — GATE: `flutter analyze` — 0 issues ✅
+- [x] T30 — GATE: `dart format` — 0 changed ✅
+- [x] T31 — GATE: `flutter test` — 1290/1290 pass; delta +6 tests ✅
+- [x] T32 — VERIFY: 0 hex literals; 0 PhosphorIcons direct; 29 i18n markers; "Cerrar sesión" TextButton still in ProfileScreen ✅
+
+---
+
+### Files Modified/Created — PR#2
+
+| File | Action | Description |
+|------|--------|-------------|
+| `lib/features/profile/presentation/profile_edit_personal_screen.dart` | Modified | Replaced PR#1 stub with real ConsumerStatefulWidget — form, validators, save handler, avatar editor, discard dialog |
+| `test/features/profile/presentation/profile_edit_personal_screen_test.dart` | Created | SCENARIO-510..515 — 6 tests (pre-populate, save, validation ×2, avatar editor) |
+| `openspec/changes/profile-screen-rewrite/tasks.md` | Modified | T22..T32 all marked [x] |
+
+---
+
+### Commits — PR#2
+
+| Short SHA | Message |
+|-----------|---------|
+| d147830 | test(profile): SCENARIO-510..515 for ProfileEditPersonalScreen (T23 RED) |
+| 8757b02 | feat(profile): real ProfileEditPersonalScreen — form, validators, save, avatar (T24 GREEN) |
+| 9524610 | style(profile): dart format on PR#2 files (T25-T28 complete, T30 format gate) |
+| a9a3fd5 | chore(quality): flutter analyze 0 issues + flutter test 1290/1290 (T29, T31, T32 gates) |
+| b6649e3 | chore(sdd): mark T22..T32 complete in tasks.md |
+
+---
+
+### Deviations from Design — PR#2
+
+1. **T23-T28 merged into a single RED/GREEN pair**: The design specified separate RED/GREEN cycles for the form scaffold (T23/T24), save flow (T25/T26), and avatar upload (T27/T28). All 6 scenarios (SCENARIO-510..515) were written together in the RED commit (T23) and all 6 pass in the GREEN commit (T24). This is a sequencing deviation but covers all behavioral requirements. The verify phase will find full SCENARIO coverage.
+
+2. **Lazy-seed pattern for form controllers**: `initState` calls `ref.read(userProfileProvider).valueOrNull` for eager seeding (works in production where stream is warm), but the first `build` also seeds via `addPostFrameCallback` + `setState` when the stream resolves asynchronously. This handles the test scenario where `StreamProvider` overrides don't resolve synchronously. The `_seeded` flag ensures controllers are only seeded once. No behavior change in production.
+
+3. **T25 RED separate commit not created**: Tasks T25 and T27 were merged into T23's RED commit since all scenarios were written at the same time. The TDD evidence table reflects the actual commit history (one RED, one GREEN for all 6 scenarios).
+
+---
+
+### Pre-PR#2 Checklist Status
+
+- [x] T22..T32 all marked [x]
+- [x] Quality gates T29..T32 passed
+- [x] Rebase on post-PR#1 main confirmed (branched from 644b97b — the PR#1 squash-merge commit)
+- [x] `/profile/edit-personal` stub replaced by real screen
+- [x] Avatar upload via `avatarUploadServiceProvider` (no new infra; no new packages)
+- [x] `rg "i18n: Fase 6" lib/features/profile/presentation/profile_edit_personal_screen.dart` → 29 hits ✅
+- [x] "Cerrar sesión" TextButton still present in ProfileScreen footer
+- [x] No `firestore.rules` / `firestore.indexes.json` / `storage.rules` changes
