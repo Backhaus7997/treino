@@ -103,7 +103,7 @@ class TrainerProfileView extends ConsumerWidget {
         ),
         const SizedBox(height: 18),
 
-        // Menu rows
+        // Menu rows — each a standalone card with 10px gaps.
         _MenuRow(
           icon: TreinoIcon.users,
           label: 'Solicitudes entrantes',
@@ -111,7 +111,7 @@ class TrainerProfileView extends ConsumerWidget {
           onTap: () => context.go('/home'),
           palette: palette,
         ),
-        _MenuDivider(palette: palette),
+        const SizedBox(height: 10),
         _MenuRow(
           icon: TreinoIcon.bell,
           label: 'Disponibilidad',
@@ -120,21 +120,21 @@ class TrainerProfileView extends ConsumerWidget {
               : context.push('/coach/availability-editor?trainerId=$uid'),
           palette: palette,
         ),
-        _MenuDivider(palette: palette),
+        const SizedBox(height: 10),
         _MenuRow(
           icon: TreinoIcon.sparkle,
           label: 'Planes comerciales',
           onTap: () => _toast(context, 'Planes comerciales — próximamente.'),
           palette: palette,
         ),
-        _MenuDivider(palette: palette),
+        const SizedBox(height: 10),
         _MenuRow(
           icon: TreinoIcon.timer,
           label: 'Configuración por defecto',
           onTap: () => context.push('/profile/settings'),
           palette: palette,
         ),
-        _MenuDivider(palette: palette),
+        const SizedBox(height: 10),
         _MenuRow(
           icon: TreinoIcon.signOut,
           label: 'Cerrar sesión',
@@ -165,19 +165,19 @@ class _IdentityCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       decoration: BoxDecoration(
         color: palette.bgCard,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: palette.border, width: 1),
       ),
-      child: Column(
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           // Avatar
           Container(
-            width: 72,
-            height: 72,
+            width: 52,
+            height: 52,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               gradient: LinearGradient(
@@ -194,52 +194,59 @@ class _IdentityCard extends StatelessWidget {
               initials,
               style: GoogleFonts.barlowCondensed(
                 fontWeight: FontWeight.w700,
-                fontSize: 26,
+                fontSize: 20,
                 letterSpacing: 0.5,
                 color: palette.bg,
               ),
             ),
           ),
-          const SizedBox(height: 14),
-          Text(
-            displayName,
-            style: GoogleFonts.barlowCondensed(
-              fontWeight: FontWeight.w700,
-              fontSize: 22,
-              letterSpacing: 0.5,
-              color: palette.textPrimary,
+          const SizedBox(width: 14),
+          // Name + tier + stats
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  displayName,
+                  style: GoogleFonts.barlowCondensed(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 18,
+                    letterSpacing: 0.3,
+                    color: palette.textPrimary,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                // Hardcoded tier label — billing module not implemented yet.
+                Text(
+                  'Coach · Plan Pro',
+                  style: GoogleFonts.barlow(
+                    fontWeight: FontWeight.w400,
+                    fontSize: 12,
+                    color: palette.textMuted,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    _IdentityStat(
+                      value: '$activeAlumnos',
+                      label: 'ALUMNOS',
+                      color: palette.accent,
+                      palette: palette,
+                    ),
+                    const SizedBox(width: 18),
+                    _IdentityStat(
+                      value: '—',
+                      label: 'RATING',
+                      color: palette.textPrimary,
+                      palette: palette,
+                    ),
+                  ],
+                ),
+              ],
             ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 2),
-          // Hardcoded tier label — billing module not implemented yet.
-          Text(
-            'Coach · Plan Pro',
-            style: GoogleFonts.barlow(
-              fontWeight: FontWeight.w400,
-              fontSize: 13,
-              color: palette.textMuted,
-            ),
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              _IdentityStat(
-                value: '$activeAlumnos',
-                label: 'ALUMNOS',
-                color: palette.accent,
-                palette: palette,
-              ),
-              _IdentityStatDivider(palette: palette),
-              // No rating aggregate yet — render an em-dash so the layout
-              // matches the mockup without inventing a fake score.
-              _IdentityStat(
-                value: '—',
-                label: 'RATING',
-                color: palette.textPrimary,
-                palette: palette,
-              ),
-            ],
           ),
         ],
       ),
@@ -262,44 +269,30 @@ class _IdentityStat extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: Column(
-        children: [
-          Text(
-            value,
-            style: GoogleFonts.barlowCondensed(
-              fontWeight: FontWeight.w700,
-              fontSize: 24,
-              color: color,
-            ),
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.baseline,
+      textBaseline: TextBaseline.alphabetic,
+      children: [
+        Text(
+          value,
+          style: GoogleFonts.barlowCondensed(
+            fontWeight: FontWeight.w700,
+            fontSize: 18,
+            color: color,
           ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            style: GoogleFonts.barlowCondensed(
-              fontWeight: FontWeight.w700,
-              fontSize: 10,
-              letterSpacing: 1.2,
-              color: palette.textMuted,
-            ),
+        ),
+        const SizedBox(width: 5),
+        Text(
+          label,
+          style: GoogleFonts.barlowCondensed(
+            fontWeight: FontWeight.w700,
+            fontSize: 10,
+            letterSpacing: 1.2,
+            color: palette.textMuted,
           ),
-        ],
-      ),
-    );
-  }
-}
-
-class _IdentityStatDivider extends StatelessWidget {
-  const _IdentityStatDivider({required this.palette});
-  final AppPalette palette;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 1,
-      height: 32,
-      margin: const EdgeInsets.symmetric(horizontal: 8),
-      color: palette.border,
+        ),
+      ],
     );
   }
 }
@@ -471,11 +464,16 @@ class _MenuRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final fg = color ?? palette.textPrimary;
     return Material(
-      color: Colors.transparent,
+      color: palette.bgCard,
+      borderRadius: BorderRadius.circular(14),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: palette.border, width: 1),
+          ),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
           child: Row(
             children: [
@@ -517,23 +515,6 @@ class _MenuRow extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _MenuDivider extends StatelessWidget {
-  const _MenuDivider({required this.palette});
-  final AppPalette palette;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 14),
-      child: Divider(
-        color: palette.border,
-        height: 1,
-        thickness: 1,
       ),
     );
   }
