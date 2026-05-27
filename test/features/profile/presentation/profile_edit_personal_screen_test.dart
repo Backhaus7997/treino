@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -18,6 +19,8 @@ import 'package:treino/features/profile_setup/data/avatar_upload_service.dart';
 // ---------------------------------------------------------------------------
 // Mocks & fakes
 // ---------------------------------------------------------------------------
+
+class MockUser extends Mock implements User {}
 
 class MockUserRepository extends Mock implements UserRepository {}
 
@@ -69,11 +72,22 @@ UserProfile _profile({
       gymId: gymId,
     );
 
+/// Creates a [MockUser] with a fixed uid for use in tests that need an
+/// authenticated user.
+MockUser _makeAuthUser({String uid = 'uid-test'}) {
+  final user = MockUser();
+  when(() => user.uid).thenReturn(uid);
+  return user;
+}
+
 Widget _buildScreen({
   required UserProfile profile,
   UserRepository? userRepository,
   AvatarUploadService? avatarService,
   GoRouter? router,
+  /// When true, the auth provider returns an authenticated user (uid = 'uid-test').
+  /// Default false for read-only / display tests.
+  bool authenticated = false,
 }) {
   final mockRepo = userRepository ?? MockUserRepository();
 
@@ -86,6 +100,8 @@ Widget _buildScreen({
       ),
     ).thenAnswer((_) async {});
   }
+
+  final authUser = authenticated ? _makeAuthUser() : null;
 
   final effectiveRouter = router ??
       GoRouter(
@@ -108,7 +124,8 @@ Widget _buildScreen({
 
   return ProviderScope(
     overrides: [
-      authStateChangesProvider.overrideWith((_) => Stream.value(null)),
+      authStateChangesProvider.overrideWith(
+          (_) => Stream.value(authUser)),
       userProfileProvider.overrideWith((_) => Stream.value(profile)),
       userRepositoryProvider.overrideWithValue(mockRepo),
       if (avatarService != null)
@@ -148,9 +165,20 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Carlos'), findsOneWidget);
-      expect(find.text('175'), findsOneWidget);
-      expect(find.text('80.0'), findsOneWidget);
+      // Check pre-populated values via controller text in the form fields
+      final nameField = tester.widget<TextFormField>(
+        find.byKey(const Key('edit_personal_display_name')),
+      );
+      final weightField = tester.widget<TextFormField>(
+        find.byKey(const Key('edit_personal_weight_field')),
+      );
+      final heightField = tester.widget<TextFormField>(
+        find.byKey(const Key('edit_personal_height_field')),
+      );
+
+      expect(nameField.controller?.text, equals('Carlos'));
+      expect(weightField.controller?.text, equals('80.0'));
+      expect(heightField.controller?.text, equals('175'));
     });
   });
 
@@ -176,7 +204,12 @@ void main() {
       await tester.enterText(nameField, '');
       await tester.pump();
 
-      // Tap save
+      // Scroll to and tap save
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('edit_personal_save_button')),
+        100,
+        scrollable: find.byType(Scrollable).first,
+      );
       await tester.tap(find.byKey(const Key('edit_personal_save_button')));
       await tester.pumpAndSettle();
 
@@ -205,6 +238,11 @@ void main() {
       await tester.enterText(weightField, '0');
       await tester.pump();
 
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('edit_personal_save_button')),
+        100,
+        scrollable: find.byType(Scrollable).first,
+      );
       await tester.tap(find.byKey(const Key('edit_personal_save_button')));
       await tester.pumpAndSettle();
 
@@ -225,42 +263,24 @@ void main() {
       final repo = MockUserRepository();
       when(() => repo.update(any(), any())).thenAnswer((_) async {});
 
-      late GoRouter capturedRouter;
-      final router = GoRouter(
-        initialLocation: '/profile/edit-personal',
-        routes: [
-          GoRoute(
-            path: '/profile',
-            builder: (_, __) =>
-                const Scaffold(body: Text('PROFILE_SCREEN')),
-            routes: [
-              GoRoute(
-                path: 'edit-personal',
-                builder: (context, __) {
-                  capturedRouter = GoRouter.of(context);
-                  return const Scaffold(body: ProfileEditPersonalScreen());
-                },
-              ),
-            ],
-          ),
-        ],
-      );
-
       await tester.pumpWidget(
         _buildScreen(
           profile: _profile(displayName: 'Carlos'),
           userRepository: repo,
-          router: router,
+          authenticated: true,
         ),
       );
       await tester.pumpAndSettle();
 
+      // Edit display name
       final nameField = find.byKey(const Key('edit_personal_display_name'));
-      await tester.tap(nameField);
-      await tester.pump();
       await tester.enterText(nameField, 'Carlos R.');
       await tester.pump();
 
+      // Scroll to and tap save button
+      await tester.ensureVisible(
+          find.byKey(const Key('edit_personal_save_button')));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('edit_personal_save_button')));
       await tester.pumpAndSettle();
 
