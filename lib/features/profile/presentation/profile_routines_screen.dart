@@ -21,8 +21,7 @@ class ProfileRoutinesScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
-    final myUid =
-        ref.watch(authStateChangesProvider).valueOrNull?.uid ?? '';
+    final myUid = ref.watch(authStateChangesProvider).valueOrNull?.uid ?? '';
 
     final routinesAsync = ref.watch(assignedRoutinesProvider(myUid));
 

@@ -48,8 +48,7 @@ class _ProfileGymScreenState extends ConsumerState<ProfileGymScreen> {
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final myUid = ref.watch(authStateChangesProvider).valueOrNull?.uid ?? '';
-    final currentGymId =
-        ref.watch(userProfileProvider).valueOrNull?.gymId;
+    final currentGymId = ref.watch(userProfileProvider).valueOrNull?.gymId;
 
     // Lazy-initialize _pendingGymId to currentGymId on first build.
     if (!_initialized) {
@@ -144,7 +143,8 @@ class _ProfileGymScreenState extends ConsumerState<ProfileGymScreen> {
             child: SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: saveEnabled ? () => _save(myUid, _pendingGymId) : null,
+                onPressed:
+                    saveEnabled ? () => _save(myUid, _pendingGymId) : null,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: palette.accent,
                   foregroundColor: palette.bg,

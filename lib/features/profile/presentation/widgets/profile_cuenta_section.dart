@@ -36,8 +36,7 @@ class ProfileCuentaSection extends ConsumerWidget {
 
     // Derives count from assignedRoutinesProvider (one-shot Future per mount).
     // Returns 0 during loading/error — no flicker on the tile subtitle.
-    final routinesCount =
-        ref.watch(assignedRoutinesCountProvider(myUid ?? ''));
+    final routinesCount = ref.watch(assignedRoutinesCountProvider(myUid ?? ''));
 
     final solicitudesSubtitle = requestCount > 0
         ? '$requestCount nuevas'

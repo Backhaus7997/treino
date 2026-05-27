@@ -143,7 +143,8 @@ void main() {
     });
 
     // Save disabled when selection == current gymId
-    testWidgets('save button is disabled when pending selection equals current gymId',
+    testWidgets(
+        'save button is disabled when pending selection equals current gymId',
         (tester) async {
       await tester.pumpWidget(
         _buildScreen(

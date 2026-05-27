@@ -77,7 +77,8 @@ void main() {
     final mockUser = MockUser();
 
     // Loading state
-    testWidgets('shows CircularProgressIndicator during loading', (tester) async {
+    testWidgets('shows CircularProgressIndicator during loading',
+        (tester) async {
       // Use a Completer that never completes to hold loading state without
       // creating a pending timer (which would fail the test teardown).
       final completer = Completer<List<Routine>>();
@@ -103,8 +104,7 @@ void main() {
     });
 
     // SCENARIO-521: empty state
-    testWidgets(
-        'SCENARIO-521: shows empty state when no routines are assigned',
+    testWidgets('SCENARIO-521: shows empty state when no routines are assigned',
         (tester) async {
       await tester.pumpWidget(
         _buildScreen(
@@ -127,8 +127,7 @@ void main() {
     });
 
     // SCENARIO-520: data state renders RoutineCard per item
-    testWidgets(
-        'SCENARIO-520: renders one RoutineCard per assigned routine',
+    testWidgets('SCENARIO-520: renders one RoutineCard per assigned routine',
         (tester) async {
       final routines = [
         _routine(id: 'r1', name: 'Plan Hipertrofia'),
