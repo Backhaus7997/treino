@@ -32,6 +32,10 @@ import '../features/feed/presentation/search_users_screen.dart';
 import '../features/home/home_screen.dart';
 import '../features/insights/presentation/insights_screen.dart';
 import '../features/profile/application/user_providers.dart';
+import '../features/profile/presentation/profile_edit_personal_screen.dart';
+import '../features/profile/presentation/profile_gym_screen.dart';
+import '../features/profile/presentation/profile_routines_screen.dart';
+import '../features/profile/presentation/profile_settings_screen.dart';
 import '../features/profile/profile_screen.dart';
 import '../features/profile_setup/presentation/profile_setup_flow.dart';
 import '../features/workout/workout_screen.dart';
@@ -309,10 +313,31 @@ GoRouter buildRouter({
             path: '/profile',
             pageBuilder: (_, __) => _noAnim(const ProfileScreen()),
             routes: [
+              // Existing — Fase 3 Etapa 6
               GoRoute(
                 path: 'friend-requests',
                 pageBuilder: (_, __) =>
                     _noAnim(const FriendRequestsInboxScreen()),
+              ),
+              // NEW — Fase 3 Etapa 7 (profile-screen-rewrite)
+              GoRoute(
+                path: 'edit-personal',
+                pageBuilder: (_, __) =>
+                    _noAnim(const ProfileEditPersonalScreen()),
+              ),
+              GoRoute(
+                path: 'gym',
+                pageBuilder: (_, __) => _noAnim(const ProfileGymScreen()),
+              ),
+              GoRoute(
+                path: 'routines',
+                pageBuilder: (_, __) =>
+                    _noAnim(const ProfileRoutinesScreen()),
+              ),
+              GoRoute(
+                path: 'settings',
+                pageBuilder: (_, __) =>
+                    _noAnim(const ProfileSettingsScreen()),
               ),
             ],
           ),
