@@ -8,6 +8,7 @@ import '../../../../core/widgets/treino_icon.dart';
 import '../../../auth/application/auth_providers.dart';
 import '../../../feed/application/friendship_providers.dart';
 import '../../../feed/domain/gym_name.dart';
+import '../../application/assigned_routines_providers.dart';
 import '../../application/user_providers.dart';
 import 'profile_section_tile.dart';
 
@@ -33,9 +34,9 @@ class ProfileCuentaSection extends ConsumerWidget {
 
     final gymId = profileAsync.valueOrNull?.gymId;
 
-    // PR#1 stub: assignedRoutinesCountProvider arrives in PR#3.
-    // Count defaults to 0 until the provider is wired.
-    const int routinesCount = 0;
+    // Derives count from assignedRoutinesProvider (one-shot Future per mount).
+    // Returns 0 during loading/error — no flicker on the tile subtitle.
+    final routinesCount = ref.watch(assignedRoutinesCountProvider(myUid ?? ''));
 
     final solicitudesSubtitle = requestCount > 0
         ? '$requestCount nuevas'
@@ -88,7 +89,7 @@ class ProfileCuentaSection extends ConsumerWidget {
             onTap: () => context.push('/profile/gym'),
           ),
 
-          // 4. Mis rutinas (count stub — real provider arrives in PR#3)
+          // 4. Mis rutinas
           ProfileSectionTile(
             icon: TreinoIcon.dumbbell,
             title: 'Mis rutinas', // i18n: Fase 6 Etapa 3

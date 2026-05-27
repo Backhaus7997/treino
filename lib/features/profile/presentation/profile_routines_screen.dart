@@ -1,23 +1,34 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/treino_icon.dart';
+import '../../auth/application/auth_providers.dart';
+import '../../workout/application/assigned_routine_providers.dart';
+import '../../workout/presentation/widgets/routine_card.dart';
 
-/// Stub implementation for PR#1. Real routines list arrives in PR#3.
+/// Lists trainer-assigned plans for the authenticated athlete.
 ///
-/// Renders a minimal back-navigation header so the route is usable
-/// in end-to-end smoke tests mid-chain. // i18n: Fase 6 Etapa 3
-class ProfileRoutinesScreen extends StatelessWidget {
+/// REQ-PSR-020: only `source == 'trainer-assigned' AND assignedTo == myUid`.
+/// REQ-PSR-021: renders empty state when no plans exist.
+/// Reuses [RoutineCard] and [assignedRoutinesProvider] from the workout feature.
+/// // i18n: Fase 6 Etapa 3
+class ProfileRoutinesScreen extends ConsumerWidget {
   const ProfileRoutinesScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
+    final myUid = ref.watch(authStateChangesProvider).valueOrNull?.uid ?? '';
+
+    final routinesAsync = ref.watch(assignedRoutinesProvider(myUid));
 
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // Header
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
           child: GestureDetector(
@@ -39,16 +50,57 @@ class ProfileRoutinesScreen extends StatelessWidget {
             ),
           ),
         ),
+
+        // Body
         Expanded(
-          child: Center(
-            child: Text(
-              'Próximamente en PR#3', // i18n: Fase 6 Etapa 3
-              style: GoogleFonts.barlow(
-                fontWeight: FontWeight.w400,
-                fontSize: 14,
-                color: palette.textMuted,
+          child: routinesAsync.when(
+            loading: () => Center(
+              child: CircularProgressIndicator(
+                color: palette.accent,
               ),
             ),
+            error: (_, __) => Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Text(
+                  'No pudimos cargar tus rutinas. Intentá de nuevo.', // i18n: Fase 6 Etapa 3
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.barlow(
+                    fontWeight: FontWeight.w400,
+                    fontSize: 14,
+                    color: palette.textMuted,
+                  ),
+                ),
+              ),
+            ),
+            data: (routines) {
+              if (routines.isEmpty) {
+                return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Text(
+                      'Tu PF todavía no te asignó ninguna rutina.', // i18n: Fase 6 Etapa 3
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.barlow(
+                        fontWeight: FontWeight.w400,
+                        fontSize: 14,
+                        color: palette.textMuted,
+                      ),
+                    ),
+                  ),
+                );
+              }
+
+              return ListView.separated(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 14,
+                ),
+                itemCount: routines.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 12),
+                itemBuilder: (_, i) => RoutineCard(routine: routines[i]),
+              );
+            },
           ),
         ),
       ],

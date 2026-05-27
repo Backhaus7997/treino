@@ -248,3 +248,113 @@
 - [x] `rg "i18n: Fase 6" lib/features/profile/presentation/profile_edit_personal_screen.dart` → 29 hits ✅
 - [x] "Cerrar sesión" TextButton still present in ProfileScreen footer
 - [x] No `firestore.rules` / `firestore.indexes.json` / `storage.rules` changes
+
+---
+
+## PR#3 — Gimnasio + Mis Rutinas
+
+**Change**: profile-screen-rewrite
+**Branch**: `feat/profile-screen-rewrite-pr3-gym-routines`
+**Mode**: Strict TDD
+**Baseline test count**: 1290 (from PR#2)
+**Final test count**: 1299
+**Delta**: +9 tests (3 provider tests + 3 routines screen tests + 3 gym screen tests)
+
+---
+
+### PR#3 TDD Cycle Evidence
+
+| Task | Test File | Layer | RED | GREEN | REFACTOR |
+|------|-----------|-------|-----|-------|----------|
+| T33 | N/A — setup task | — | N/A | ✅ Branch already on post-PR#2 main | — |
+| T34 | `test/features/profile/application/assigned_routines_providers_test.dart` | Provider | ✅ Written (compile fail — assignedRoutinesCountProvider not found) | — | — |
+| T35 | same | Provider | — | ✅ 3/3 SCENARIO-519,520 + error→0 pass | — |
+| T36 | N/A — patch (existing T09 covers) | Widget | — | ✅ ProfileCuentaSection wired; 8/8 existing tests pass | — |
+| T37 | `test/features/profile/presentation/profile_routines_screen_test.dart` | Widget | ✅ Written (behavioral fail — stub screen) | — | — |
+| T38 | same | Widget | — | ✅ 3/3 loading/SCENARIO-521/SCENARIO-520 pass | ✅ Completer pattern for loading test |
+| T39 | `test/features/profile/presentation/profile_gym_screen_test.dart` | Widget | ✅ Written (behavioral fail — stub screen) | — | — |
+| T40 | same | Widget | — | ✅ 3/3 SCENARIO-516/SCENARIO-517/save-disabled pass | — |
+| T41 | GATE | — | — | ✅ `flutter analyze` — 0 issues | — |
+| T42 | GATE | — | — | ✅ `dart format` — 0 changed | — |
+| T43 | GATE | — | — | ✅ `flutter test` — 1299/1299 pass | — |
+| T44 | VERIFY | — | — | ✅ 0 hex literals; 0 PhosphorIcons direct; i18n markers present | — |
+
+### Test Summary
+
+- **Total new tests**: +9 (baseline 1290 → 1299)
+- **Layers used**: Provider (3) + Widget (6)
+- **Test files created**: 3 new
+- **SCENARIOs covered**: 516, 517, 519, 520, 521
+
+---
+
+### Completed Tasks — PR#3
+
+- [x] T33 — Branch `feat/profile-screen-rewrite-pr3-gym-routines` confirmed on post-PR#2 main (already checked out — no rebase needed).
+- [x] T34 — RED: `assigned_routines_providers_test.dart` — SCENARIO-519, SCENARIO-520, error→0 (compile fail — provider not found)
+- [x] T35 — GREEN: `lib/features/profile/application/assigned_routines_providers.dart` created — exports `assignedRoutinesProvider` from workout, adds `assignedRoutinesCountProvider`; all 3 tests pass
+- [x] T36 — PATCH: `ProfileCuentaSection` updated to watch `assignedRoutinesCountProvider(myUid ?? '')` — replaces PR#1 `const int routinesCount = 0` stub; 8/8 existing tests pass
+- [x] T37 — RED: `profile_routines_screen_test.dart` — loading/SCENARIO-521/SCENARIO-520 (behavioral fail — stub renders placeholder)
+- [x] T38 — GREEN: `ProfileRoutinesScreen` real ConsumerWidget — `AsyncValue.when` on `assignedRoutinesProvider`; reuses `RoutineCard`; all 3 tests pass
+- [x] T39 — RED: `profile_gym_screen_test.dart` — SCENARIO-516/517/save-disabled (behavioral fail — stub renders placeholder)
+- [x] T40 — GREEN: `ProfileGymScreen` real ConsumerStatefulWidget — reuses `filteredGymsProvider`, `gymSearchQueryProvider`, `GymCard` from profile_setup; save → `UserRepository.update(uid, {'gymId': ...})` → pop; all 3 tests pass
+- [x] T41 — GATE: `flutter analyze` — 0 issues ✅
+- [x] T42 — GATE: `dart format` — 0 changed ✅
+- [x] T43 — GATE: `flutter test` — 1299/1299 pass; delta +9 tests ✅
+- [x] T44 — VERIFY: 0 hex literals; 0 PhosphorIcons direct; i18n markers in all new files; SCENARIO-518 automatic via userProfileProvider StreamProvider ✅
+
+---
+
+### Files Modified/Created — PR#3
+
+| File | Action | Description |
+|------|--------|-------------|
+| `lib/features/profile/application/assigned_routines_providers.dart` | Created | Re-exports `assignedRoutinesProvider` from workout; adds `assignedRoutinesCountProvider` (Provider.autoDispose.family<int, String>) |
+| `lib/features/profile/presentation/widgets/profile_cuenta_section.dart` | Modified | Wired `assignedRoutinesCountProvider` — replaces PR#1 `count=0` stub |
+| `lib/features/profile/presentation/profile_routines_screen.dart` | Modified | Replaced PR#1 stub with real ConsumerWidget — `AsyncValue.when` + `RoutineCard` |
+| `lib/features/profile/presentation/profile_gym_screen.dart` | Modified | Replaced PR#1 stub with real ConsumerStatefulWidget — search/select/save |
+| `test/features/profile/application/assigned_routines_providers_test.dart` | Created | SCENARIO-519,520 + error state — 3 tests |
+| `test/features/profile/presentation/profile_routines_screen_test.dart` | Created | loading/SCENARIO-521/SCENARIO-520 — 3 tests |
+| `test/features/profile/presentation/profile_gym_screen_test.dart` | Created | SCENARIO-516/517/save-disabled — 3 tests |
+| `openspec/changes/profile-screen-rewrite/tasks.md` | Modified | T33..T44 all marked [x] |
+
+---
+
+### Commits — PR#3
+
+| Short SHA | Message |
+|-----------|---------|
+| 55cb609 | test(profile): SCENARIO-519,520 for assignedRoutinesCountProvider (T34 RED) |
+| cd0b252 | feat(profile): add assignedRoutinesCountProvider derived from workout (T35 GREEN) |
+| 2bd5d66 | feat(profile): wire assignedRoutinesCountProvider into ProfileCuentaSection (T36 PATCH) |
+| c0ffc24 | test(profile): SCENARIO-520,521 for ProfileRoutinesScreen (T37 RED) |
+| 7cb4012 | feat(profile): real ProfileRoutinesScreen with AsyncValue.when + RoutineCard (T38 GREEN) |
+| 816efb3 | test(profile): SCENARIO-516,517 + save-disabled for ProfileGymScreen (T39 RED) |
+| 4613994 | feat(profile): real ProfileGymScreen — search, select, save via UserRepository (T40 GREEN) |
+| 0db5357 | chore(quality): remove unused import in providers + test; analyze 0 issues (T41) |
+| d232fbb | chore(quality): dart format PR#3 files; flutter test 1299/1299 pass (T42 T43 T44) |
+| ff85181 | chore(sdd): mark T33..T44 complete in tasks.md |
+
+---
+
+### Deviations from Design — PR#3
+
+1. **`assignedRoutinesProvider` not duplicated in profile layer**: Design §4.3 shows a profile-level `assignedRoutinesProvider` that shadows the workout one. An identical provider already exists in `lib/features/workout/application/assigned_routine_providers.dart`. Rather than duplicate, `assigned_routines_providers.dart` re-exports the workout provider and only adds the new `assignedRoutinesCountProvider`. ProfileRoutinesScreen imports `assignedRoutinesProvider` directly from the workout feature. Behavior is identical — no coverage gap.
+
+2. **Loading test uses `Completer` instead of never-completing timer**: Original approach used `Future(() async { await Future.delayed(Duration(seconds: 60)); ...})`. This creates a pending timer that fails the test teardown invariant (`A Timer is still pending`). Replaced with a `Completer<List<Routine>>` that is completed at the end of the test. Same behavioral coverage, no resource leak.
+
+3. **`dispose()` method in ProfileGymScreen simplified**: Design mentioned resetting `gymSearchQueryProvider` in `dispose()`. Calling `ref.read(...)` inside `dispose()` after `super.dispose()` throws `Bad state: Cannot use ref after widget was disposed`. The reset was removed. The `gymSearchQueryProvider` is a `StateProvider` (not autoDispose), so the query string persists across navigations — acceptable for now.
+
+---
+
+### Pre-PR#3 Checklist Status
+
+- [x] T33..T44 all marked [x]
+- [x] Quality gates T41..T44 passed
+- [x] No `firestore.rules` / `firestore.indexes.json` / `storage.rules` changes
+- [x] `/profile/gym` stub replaced by real screen with search, select, save
+- [x] `/profile/routines` stub replaced by real screen with AsyncValue.when + RoutineCard
+- [x] `assignedRoutinesCountProvider` wired in `ProfileCuentaSection` (T36)
+- [x] Gym catalog reuse from `profile_setup` confirmed — no duplication (ADR-PSR-011)
+- [x] `rg "i18n: Fase 6" lib/features/profile/presentation/profile_gym_screen.dart` → 6 hits ✅
+- [x] `rg "i18n: Fase 6" lib/features/profile/presentation/profile_routines_screen.dart` → 4 hits ✅
