@@ -85,6 +85,7 @@ Widget _buildScreen({
   UserRepository? userRepository,
   AvatarUploadService? avatarService,
   GoRouter? router,
+
   /// When true, the auth provider returns an authenticated user (uid = 'uid-test').
   /// Default false for read-only / display tests.
   bool authenticated = false,
@@ -109,8 +110,7 @@ Widget _buildScreen({
         routes: [
           GoRoute(
             path: '/profile',
-            builder: (_, __) =>
-                const Scaffold(body: Text('PROFILE_SCREEN')),
+            builder: (_, __) => const Scaffold(body: Text('PROFILE_SCREEN')),
             routes: [
               GoRoute(
                 path: 'edit-personal',
@@ -124,8 +124,7 @@ Widget _buildScreen({
 
   return ProviderScope(
     overrides: [
-      authStateChangesProvider.overrideWith(
-          (_) => Stream.value(authUser)),
+      authStateChangesProvider.overrideWith((_) => Stream.value(authUser)),
       userProfileProvider.overrideWith((_) => Stream.value(profile)),
       userRepositoryProvider.overrideWithValue(mockRepo),
       if (avatarService != null)
@@ -213,7 +212,8 @@ void main() {
       await tester.tap(find.byKey(const Key('edit_personal_save_button')));
       await tester.pumpAndSettle();
 
-      expect(find.text('Ingresá un nombre'), findsOneWidget); // i18n: Fase 6 Etapa 3
+      expect(find.text('Ingresá un nombre'),
+          findsOneWidget); // i18n: Fase 6 Etapa 3
       verifyNever(() => repo.update(any(), any()));
     });
   });
@@ -278,14 +278,14 @@ void main() {
       await tester.pump();
 
       // Scroll to and tap save button
-      await tester.ensureVisible(
-          find.byKey(const Key('edit_personal_save_button')));
+      await tester
+          .ensureVisible(find.byKey(const Key('edit_personal_save_button')));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('edit_personal_save_button')));
       await tester.pumpAndSettle();
 
-      final captured = verify(() => repo.update(captureAny(), captureAny()))
-          .captured;
+      final captured =
+          verify(() => repo.update(captureAny(), captureAny())).captured;
       expect(captured[0], equals('uid-test'));
       final partial = captured[1] as Map<String, Object?>;
       expect(partial['displayName'], equals('Carlos R.'));
@@ -314,8 +314,7 @@ void main() {
   // SCENARIO-515: avatar upload happy path stores URL in UserRepository.update
   // ──────────────────────────────────────────────────────────────────────────
   group('SCENARIO-515: avatar upload updates UserRepository', () {
-    testWidgets(
-        'after upload, avatarUrl is included in update partial',
+    testWidgets('after upload, avatarUrl is included in update partial',
         (tester) async {
       // This test verifies that when an avatar path is staged,
       // the save handler uploads and includes avatarUrl in the partial.

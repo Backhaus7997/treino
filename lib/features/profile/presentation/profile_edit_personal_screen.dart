@@ -342,8 +342,7 @@ class _ProfileEditPersonalScreenState
       children: [
         // ── Header ──────────────────────────────────────────────────────────
         Padding(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
           child: GestureDetector(
             onTap: _onBackTap,
             behavior: HitTestBehavior.opaque,
@@ -366,8 +365,7 @@ class _ProfileEditPersonalScreenState
         // ── Form ────────────────────────────────────────────────────────────
         Expanded(
           child: SingleChildScrollView(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
             child: Form(
               key: _formKey,
               child: Column(
@@ -385,7 +383,8 @@ class _ProfileEditPersonalScreenState
 
                   // Display name
                   _FieldLabel(
-                      label: 'NOMBRE', palette: palette), // i18n: Fase 6 Etapa 3
+                      label: 'NOMBRE',
+                      palette: palette), // i18n: Fase 6 Etapa 3
                   const SizedBox(height: 8),
                   TextFormField(
                     key: const Key('edit_personal_display_name'),
@@ -404,26 +403,27 @@ class _ProfileEditPersonalScreenState
 
                   // Gender
                   _FieldLabel(
-                      label: 'GÉNERO', palette: palette), // i18n: Fase 6 Etapa 3
+                      label: 'GÉNERO',
+                      palette: palette), // i18n: Fase 6 Etapa 3
                   const SizedBox(height: 8),
                   _GenderSelector(
                     selected: _selectedGender,
-                    onChanged: (g) =>
-                        setState(() => _selectedGender = g),
+                    onChanged: (g) => setState(() => _selectedGender = g),
                     palette: palette,
                   ),
                   const SizedBox(height: 18),
 
                   // Body weight
                   _FieldLabel(
-                      label: 'PESO (KG)', palette: palette), // i18n: Fase 6 Etapa 3
+                      label: 'PESO (KG)',
+                      palette: palette), // i18n: Fase 6 Etapa 3
                   const SizedBox(height: 8),
                   TextFormField(
                     key: const Key('edit_personal_weight_field'),
                     controller: _weightCtrl,
                     validator: _validateBodyWeightKg,
-                    keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true),
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
                     style: GoogleFonts.barlow(
                       color: palette.textPrimary,
                       fontSize: 14,
@@ -437,7 +437,8 @@ class _ProfileEditPersonalScreenState
 
                   // Height
                   _FieldLabel(
-                      label: 'ALTURA (CM)', palette: palette), // i18n: Fase 6 Etapa 3
+                      label: 'ALTURA (CM)',
+                      palette: palette), // i18n: Fase 6 Etapa 3
                   const SizedBox(height: 8),
                   TextFormField(
                     key: const Key('edit_personal_height_field'),
@@ -457,12 +458,12 @@ class _ProfileEditPersonalScreenState
 
                   // Experience level
                   _FieldLabel(
-                      label: 'EXPERIENCIA', palette: palette), // i18n: Fase 6 Etapa 3
+                      label: 'EXPERIENCIA',
+                      palette: palette), // i18n: Fase 6 Etapa 3
                   const SizedBox(height: 8),
                   _ExperienceLevelSelector(
                     selected: _selectedExperience,
-                    onChanged: (e) =>
-                        setState(() => _selectedExperience = e),
+                    onChanged: (e) => setState(() => _selectedExperience = e),
                     palette: palette,
                   ),
                   const SizedBox(height: 20),
@@ -477,8 +478,7 @@ class _ProfileEditPersonalScreenState
                         children: [
                           Expanded(
                             child: _OutlinedPill(
-                              key: const Key(
-                                  'edit_personal_discard_button'),
+                              key: const Key('edit_personal_discard_button'),
                               label: 'DESCARTAR', // i18n: Fase 6 Etapa 3
                               onTap: busy ? null : _onBackTap,
                               palette: palette,
@@ -521,8 +521,7 @@ class _ProfileEditPersonalScreenState
       ),
       filled: true,
       fillColor: palette.bgCard,
-      contentPadding:
-          const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide(
@@ -613,8 +612,7 @@ class _AvatarEditor extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: palette.accent,
                     shape: BoxShape.circle,
-                    border:
-                        Border.all(color: palette.bg, width: 2),
+                    border: Border.all(color: palette.bg, width: 2),
                   ),
                   child: Icon(
                     TreinoIcon.edit,
@@ -676,25 +674,21 @@ class _GenderSelector extends StatelessWidget {
       children: _choices.map((choice) {
         final isSelected = selected == choice.value;
         return GestureDetector(
-          onTap: () =>
-              onChanged(isSelected ? null : choice.value),
+          onTap: () => onChanged(isSelected ? null : choice.value),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 150),
-            padding: const EdgeInsets.symmetric(
-                horizontal: 18, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
             decoration: BoxDecoration(
               color: isSelected ? palette.accent : Colors.transparent,
               borderRadius: BorderRadius.circular(9999),
               border: Border.all(
-                color:
-                    isSelected ? palette.accent : palette.border,
+                color: isSelected ? palette.accent : palette.border,
               ),
             ),
             child: Text(
               choice.label,
               style: GoogleFonts.barlowCondensed(
-                color:
-                    isSelected ? palette.bg : palette.textMuted,
+                color: isSelected ? palette.bg : palette.textMuted,
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
                 letterSpacing: 1.0,
@@ -748,8 +742,7 @@ class _ExperienceLevelSelector extends StatelessWidget {
         return Padding(
           padding: const EdgeInsets.only(bottom: 8),
           child: GestureDetector(
-            onTap: () =>
-                onChanged(isSelected ? null : choice.value),
+            onTap: () => onChanged(isSelected ? null : choice.value),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 150),
               width: double.infinity,
@@ -758,8 +751,7 @@ class _ExperienceLevelSelector extends StatelessWidget {
                 color: palette.bgCard,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color:
-                      isSelected ? palette.accent : palette.border,
+                  color: isSelected ? palette.accent : palette.border,
                   width: isSelected ? 1.5 : 1,
                 ),
               ),
@@ -769,9 +761,7 @@ class _ExperienceLevelSelector extends StatelessWidget {
                   Text(
                     choice.label,
                     style: GoogleFonts.barlowCondensed(
-                      color: isSelected
-                          ? palette.accent
-                          : palette.textPrimary,
+                      color: isSelected ? palette.accent : palette.textPrimary,
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
                       letterSpacing: 0.8,
