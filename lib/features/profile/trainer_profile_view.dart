@@ -124,7 +124,7 @@ class TrainerProfileView extends ConsumerWidget {
         _MenuRow(
           icon: TreinoIcon.sparkle,
           label: 'Planes comerciales',
-          onTap: () => _toast(context, 'Planes comerciales — próximamente.'),
+          onTap: () => context.push('/profile/commercial-plans'),
           palette: palette,
         ),
         const SizedBox(height: 10),

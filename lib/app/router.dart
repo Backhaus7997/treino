@@ -15,6 +15,8 @@ import '../features/coach/application/trainer_link_providers.dart';
 import '../features/coach/presentation/athlete_agenda_screen.dart';
 import '../features/coach/presentation/athlete_detail_screen.dart';
 import '../features/coach/presentation/availability_editor_screen.dart';
+import '../features/coach/presentation/commercial_plan_editor_screen.dart';
+import '../features/coach/presentation/commercial_plans_list_screen.dart';
 import '../features/coach/presentation/trainer_public_profile_screen.dart';
 import '../features/workout/application/session_providers.dart'
     show currentUidProvider;
@@ -340,6 +342,23 @@ GoRouter buildRouter({
               GoRoute(
                 path: 'settings',
                 pageBuilder: (_, __) => _noAnim(const ProfileSettingsScreen()),
+              ),
+              // Trainer commercial plans (Fase 6) — list + create/edit form.
+              GoRoute(
+                path: 'commercial-plans',
+                pageBuilder: (_, __) =>
+                    _noAnim(const CommercialPlansListScreen()),
+                routes: [
+                  GoRoute(
+                    path: ':planId',
+                    pageBuilder: (context, state) {
+                      final planId = state.pathParameters['planId'];
+                      return _noAnim(
+                        CommercialPlanEditorScreen(planId: planId),
+                      );
+                    },
+                  ),
+                ],
               ),
             ],
           ),

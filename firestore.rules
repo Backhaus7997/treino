@@ -347,5 +347,30 @@ service cloud.firestore {
       );
       allow delete: if false;
     }
+
+    // ─── commercialPlans (trainer pricing tiers) ──────────────────────────
+    //
+    // Owner-scoped: the trainer is the sole writer and reader of their own
+    // plans. Athletes will only be able to read active plans through a
+    // future "subscription" surface — denied here for now to keep blast
+    // radius small (no athlete reads until the subscribe flow ships).
+    //
+    // Status is enforced as a string enum at write time; client UI does its
+    // own validation, rules just gate ownership + immutability of trainerId.
+    match /commercialPlans/{planId} {
+      allow read: if request.auth != null
+                  && request.auth.uid == resource.data.trainerId;
+      allow create: if request.auth != null
+                    && request.resource.data.trainerId == request.auth.uid
+                    && request.resource.data.status in ['active', 'archived']
+                    && request.resource.data.name is string
+                    && request.resource.data.name.size() > 0
+                    && request.resource.data.priceArs is int
+                    && request.resource.data.priceArs >= 0;
+      allow update: if request.auth != null
+                    && request.auth.uid == resource.data.trainerId
+                    && request.resource.data.trainerId == resource.data.trainerId;
+      allow delete: if false; // soft-delete only (status → archived)
+    }
   }
 }
