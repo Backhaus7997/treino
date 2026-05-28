@@ -70,33 +70,33 @@ Total: ~900 LOC across 3 PRs.
 
 ### Phase 1.1: CF infrastructure bootstrap
 
-- [ ] T01 — SETUP: create branch `feat/account-deletion-pr1-cf-bootstrap` from `main`; confirm clean working tree.
-- [ ] T02 — SETUP: create `functions/` directory; create `functions/package.json` with deps `firebase-admin`, `firebase-functions@^4`, `typescript`, `@types/node`, `jest`, `ts-jest`, `firebase-functions-test`; npm scripts: `build`, `serve`, `test`.
-- [ ] T03 — SETUP: create `functions/tsconfig.json` (strict, target ES2022, outDir `lib`, module commonjs).
-- [ ] T04 — SETUP: create `functions/.eslintrc.js` (Firebase recommended TS rules) and `functions/.gitignore` (ignore `lib/`, `node_modules/`, `.runtimeconfig.json`).
-- [ ] T05 — SETUP: edit `firebase.json` — add `"functions": { "source": "functions", "predeploy": ["npm --prefix functions run build"], "runtime": "nodejs20" }` block (+10 LOC).
+- [x] T01 — SETUP: create branch `feat/account-deletion-pr1-cf-bootstrap` from `main`; confirm clean working tree.
+- [x] T02 — SETUP: create `functions/` directory; create `functions/package.json` with deps `firebase-admin`, `firebase-functions@^4`, `typescript`, `@types/node`, `jest`, `ts-jest`, `firebase-functions-test`; npm scripts: `build`, `serve`, `test`.
+- [x] T03 — SETUP: create `functions/tsconfig.json` (strict, target ES2022, outDir `lib`, module commonjs).
+- [x] T04 — SETUP: create `functions/.eslintrc.js` (Firebase recommended TS rules) and `functions/.gitignore` (ignore `lib/`, `node_modules/`, `.runtimeconfig.json`).
+- [x] T05 — SETUP: edit `firebase.json` — add `"functions": { "source": "functions", "predeploy": ["npm --prefix functions run build"], "runtime": "nodejs20" }` block (+10 LOC).
 
 ### Phase 1.2: Shared types + audit-log module
 
-- [ ] T06 — RED: create `functions/src/__tests__/audit-log.test.ts`; failing unit tests: `writeStarted` writes `status: 'started'` and `startedAt` to `audit_log/{uid}`; `writeFinal` updates `status`, `deletedAt`, `deletedCollections`, `errors`.
-- [ ] T07 — GREEN: create `functions/src/types.ts` (`DeleteAccountRequest`, `DeleteAccountResponse`, `AuditLogEntry`, `CascadeResult` interfaces). Create `functions/src/cascade/audit-log.ts` — `writeStarted(uid, provider)` and `writeFinal(uid, status, deletedCollections, errors)`; T06 must pass.
+- [x] T06 — RED: create `functions/src/__tests__/audit-log.test.ts`; failing unit tests: `writeStarted` writes `status: 'started'` and `startedAt` to `audit_log/{uid}`; `writeFinal` updates `status`, `deletedAt`, `deletedCollections`, `errors`.
+- [x] T07 — GREEN: create `functions/src/types.ts` (`DeleteAccountRequest`, `DeleteAccountResponse`, `AuditLogEntry`, `CascadeResult` interfaces). Create `functions/src/cascade/audit-log.ts` — `writeStarted(uid, provider)` and `writeFinal(uid, status, deletedCollections, errors)`; T06 must pass.
 
 ### Phase 1.3: Main handler skeleton
 
-- [ ] T08 — RED: create `functions/src/__tests__/delete-account.smoke.test.ts`; emulator-backed tests using `firebase-functions-test` in online mode:
+- [x] T08 — RED: create `functions/src/__tests__/delete-account.smoke.test.ts`; emulator-backed tests using `firebase-functions-test` in online mode:
   - SCENARIO-533: authenticated athlete can call `deleteAccount({uid: callerUid})` without `permission-denied`.
   - SCENARIO-534: calling `deleteAccount({uid: 'other-uid'})` throws `HttpsError` code `permission-denied`.
   - SCENARIO-549: after successful call, `admin.auth().getUser(uid)` throws `user-not-found`.
   - SCENARIO-551: successful response has `status == 'success'` and non-empty `deletedCollections`.
   - SCENARIO-547 (partial): `audit_log/{uid}` exists with `status == 'started'` written at entry.
-- [ ] T09 — GREEN: create `functions/src/index.ts` (exports `deleteAccount`). Create `functions/src/delete-account.ts` — skeleton handler with: auth context check, anti-spoofing guard (ADR-ACCDEL-014), role read (`users/{uid}.role`; returns `permission-denied` if trainer), `writeStarted` audit call, deletes Auth user via `admin.auth().deleteUser(uid)`, `writeFinal` with `status: 'success'`, returns response shape (no cascade modules yet). Wired to emulator for T08; all T08 tests must pass.
+- [x] T09 — GREEN: create `functions/src/index.ts` (exports `deleteAccount`). Create `functions/src/delete-account.ts` — skeleton handler with: auth context check, anti-spoofing guard (ADR-ACCDEL-014), role read (`users/{uid}.role`; returns `permission-denied` if trainer), `writeStarted` audit call, deletes Auth user via `admin.auth().deleteUser(uid)`, `writeFinal` with `status: 'success'`, returns response shape (no cascade modules yet). Wired to emulator for T08; all T08 tests must pass.
 
 ### Phase 1.4: PR#1 quality gates
 
-- [ ] T10 — GATE: `npm --prefix functions run build` — TypeScript compilation 0 errors.
-- [ ] T11 — GATE: ESLint — 0 warnings/errors.
-- [ ] T12 — GATE: `firebase emulators:exec --only firestore,auth,storage "npm --prefix functions test"` — all PR#1 smoke tests pass.
-- [ ] T13 — VERIFY: deployment dry-run (`firebase deploy --only functions --dry-run`) succeeds; document Blaze billing action item.
+- [x] T10 — GATE: `npm --prefix functions run build` — TypeScript compilation 0 errors.
+- [x] T11 — GATE: ESLint — 0 warnings/errors.
+- [x] T12 — GATE: `firebase emulators:exec --only firestore,auth,storage "npm --prefix functions test"` — all PR#1 smoke tests pass.
+- [x] T13 — VERIFY: deployment dry-run — predeploy `tsc` step passes; full deploy deferred to post-merge (requires `firebase login --reauth` — headless CI environment). Blaze plan confirmed active on treino-dev.
 
 ---
 
