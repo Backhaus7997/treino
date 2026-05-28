@@ -11,6 +11,7 @@ const exercises = [
   {
     id: 'bench-press',
     name: 'Press de banca',
+    videoUrl: 'https://www.youtube.com/watch?v=7aQY3u0Dk-Q',
     muscleGroup: 'chest',
     category: 'compound',
     aliases: ['Press banca', 'Press de banca', 'Press plano', 'Press de banca plano', 'Press de pecho'],
@@ -24,6 +25,7 @@ const exercises = [
   {
     id: 'incline-dumbbell-press',
     name: 'Press inclinado con mancuernas',
+    videoUrl: 'https://www.youtube.com/watch?v=oTD5g77GgSA',
     muscleGroup: 'chest',
     category: 'compound',
     aliases: ['Press inclinado con mancuernas', 'Press inclinado mancuernas', 'Press inclinado', 'Press inclinado DB', 'Press inclinado de mancuernas', 'Press en banco inclinado'],
@@ -37,6 +39,7 @@ const exercises = [
   {
     id: 'cable-fly',
     name: 'Cruces en polea',
+    videoUrl: 'https://www.youtube.com/watch?v=TmYsga_aOfo',
     muscleGroup: 'chest',
     category: 'isolation',
     aliases: ['Cruce de poleas', 'Cruces en polea', 'Aperturas en polea', 'Aperturas con poleas', 'Cruces de cable', 'Cruces poleas'],
@@ -52,6 +55,7 @@ const exercises = [
   {
     id: 'deadlift',
     name: 'Peso muerto',
+    videoUrl: 'https://www.youtube.com/watch?v=Ysfd_ExNKbM',
     muscleGroup: 'back',
     category: 'compound',
     aliases: ['Peso muerto', 'Peso muerto convencional', 'Peso muerto con barra', 'Muerto'],
@@ -65,6 +69,7 @@ const exercises = [
   {
     id: 'barbell-row',
     name: 'Remo con barra',
+    videoUrl: 'https://www.youtube.com/watch?v=VBhFIZWMKUs',
     muscleGroup: 'back',
     category: 'compound',
     aliases: ['Remo con barra', 'Remo barra', 'Remo inclinado con barra', 'Remo Pendlay', 'Remo con barra al pecho', 'Remo agarre pronado'],
@@ -78,6 +83,7 @@ const exercises = [
   {
     id: 'pull-up',
     name: 'Dominadas',
+    videoUrl: 'https://www.youtube.com/watch?v=ICQoykUbkWk',
     muscleGroup: 'back',
     category: 'compound',
     aliases: ['Dominadas', 'Dominada', 'Pull up', 'Pull ups', 'Dominada pronada', 'Dominadas pronadas'],
@@ -91,6 +97,7 @@ const exercises = [
   {
     id: 'lat-pulldown',
     name: 'Jalón al pecho',
+    videoUrl: 'https://www.youtube.com/watch?v=lL2eS7_Btug',
     muscleGroup: 'back',
     category: 'compound',
     aliases: ['Jalón al pecho', 'Polea al pecho', 'Jalón frontal', 'Polea dorsal', 'Jalón dorsal', 'Polea al pecho con barra', 'Pulldown'],
@@ -106,6 +113,7 @@ const exercises = [
   {
     id: 'overhead-press',
     name: 'Press militar',
+    videoUrl: 'https://www.youtube.com/watch?v=OHxSwnkSxB8',
     muscleGroup: 'shoulders',
     category: 'compound',
     aliases: ['Press militar', 'Press de hombros', 'Press de pie', 'Press hombro con barra', 'Press militar de pie', 'OHP', 'Press de hombro'],
@@ -119,6 +127,7 @@ const exercises = [
   {
     id: 'lateral-raise',
     name: 'Elevaciones laterales',
+    videoUrl: 'https://www.youtube.com/watch?v=b6KtNTSHA54',
     muscleGroup: 'shoulders',
     category: 'isolation',
     aliases: ['Elevaciones laterales', 'Vuelos laterales', 'Laterales con mancuernas', 'Elevaciones laterales con mancuernas', 'Aperturas laterales', 'Laterales'],
@@ -134,6 +143,7 @@ const exercises = [
   {
     id: 'back-squat',
     name: 'Sentadilla',
+    videoUrl: 'https://www.youtube.com/watch?v=OySgsMhs2pk',
     muscleGroup: 'quads',
     category: 'compound',
     aliases: ['Sentadilla', 'Sentadilla con barra', 'Sentadilla trasera', 'Squat', 'Squat trasero', 'Sentadilla libre', 'Sentadilla profunda', 'Sentadilla con barra trasera'],
@@ -147,6 +157,7 @@ const exercises = [
   {
     id: 'leg-press',
     name: 'Prensa de piernas',
+    videoUrl: 'https://www.youtube.com/watch?v=xR5GRg_E6kk',
     muscleGroup: 'quads',
     category: 'compound',
     aliases: ['Prensa de piernas', 'Prensa', 'Prensa 45', 'Prensa horizontal', 'Press de pierna', 'Prensa de pierna'],
@@ -160,6 +171,7 @@ const exercises = [
   {
     id: 'leg-extension',
     name: 'Extensión de cuádriceps',
+    videoUrl: 'https://www.youtube.com/watch?v=ndnA6yvGoqQ',
     muscleGroup: 'quads',
     category: 'isolation',
     aliases: ['Extensión de cuádriceps', 'Extensión de piernas', 'Cuádriceps en máquina', 'Camilla de cuádriceps', 'Silla de cuádriceps', 'Extensiones de cuadriceps'],
@@ -173,6 +185,7 @@ const exercises = [
   {
     id: 'romanian-deadlift',
     name: 'Peso muerto rumano',
+    videoUrl: 'https://www.youtube.com/watch?v=pCrNlGFo7h4',
     muscleGroup: 'hamstrings',
     category: 'compound',
     aliases: ['Peso muerto rumano', 'Peso muerto a piernas rectas', 'Rumano', 'RDL', 'Peso muerto piernas semi-rígidas', 'Peso muerto rumano con barra'],
@@ -186,6 +199,7 @@ const exercises = [
   {
     id: 'leg-curl',
     name: 'Curl femoral',
+    videoUrl: 'https://www.youtube.com/watch?v=EAq2oJn9URk',
     muscleGroup: 'hamstrings',
     category: 'isolation',
     aliases: ['Curl femoral', 'Camilla femoral', 'Femoral acostado', 'Femoral en máquina', 'Flexión de pierna en máquina', 'Curl de pierna acostado', 'Femoral'],
@@ -199,6 +213,7 @@ const exercises = [
   {
     id: 'hip-thrust',
     name: 'Empuje de cadera',
+    videoUrl: 'https://www.youtube.com/watch?v=QTkgUetv6vo',
     muscleGroup: 'glutes',
     category: 'compound',
     aliases: ['Empuje de cadera', 'Empuje de caderas', 'Empuje pélvico', 'Hip thrust con barra', 'Glute bridge con barra', 'Puente de glúteos con barra'],
@@ -212,6 +227,7 @@ const exercises = [
   {
     id: 'calf-raise',
     name: 'Elevación de pantorrillas',
+    videoUrl: 'https://www.youtube.com/watch?v=_R3TOH-vnF8',
     muscleGroup: 'calves',
     category: 'isolation',
     aliases: ['Elevación de pantorrillas', 'Gemelos de pie', 'Pantorrilla en máquina', 'Elevaciones de gemelos', 'Gemelos', 'Pantorrillas'],
@@ -227,6 +243,7 @@ const exercises = [
   {
     id: 'barbell-curl',
     name: 'Curl con barra',
+    videoUrl: 'https://www.youtube.com/watch?v=z5RwgAMUEQo',
     muscleGroup: 'biceps',
     category: 'isolation',
     aliases: ['Curl con barra', 'Curl de bíceps con barra', 'Bíceps con barra', 'Curl barra recta', 'Curl barra'],
@@ -240,6 +257,7 @@ const exercises = [
   {
     id: 'hammer-curl',
     name: 'Curl martillo',
+    videoUrl: 'https://www.youtube.com/watch?v=mPvlpDWIoDA',
     muscleGroup: 'biceps',
     category: 'isolation',
     aliases: ['Curl martillo', 'Curl tipo martillo', 'Martillo con mancuernas', 'Curl neutro', 'Curl de bíceps martillo'],
@@ -255,6 +273,7 @@ const exercises = [
   {
     id: 'tricep-pushdown',
     name: 'Extensión de tríceps en polea',
+    videoUrl: 'https://www.youtube.com/watch?v=cNa_2g-ET5g',
     muscleGroup: 'triceps',
     category: 'isolation',
     aliases: ['Jalón de tríceps', 'Extensión de tríceps en polea', 'Tríceps en polea', 'Polea de tríceps', 'Pushdown', 'Extensión polea alta', 'Tríceps polea'],
@@ -268,6 +287,7 @@ const exercises = [
   {
     id: 'skull-crusher',
     name: 'Press francés',
+    videoUrl: 'https://www.youtube.com/watch?v=_n194KVOxLU',
     muscleGroup: 'triceps',
     category: 'isolation',
     aliases: ['Press francés', 'Rompecráneos', 'Frances', 'Press francés con barra EZ', 'Extensión de tríceps acostado', 'Press francés acostado'],
@@ -281,6 +301,7 @@ const exercises = [
   {
     id: 'close-grip-bench-press',
     name: 'Press cerrado',
+    videoUrl: 'https://www.youtube.com/watch?v=lTZkcejjFl0',
     muscleGroup: 'triceps',
     category: 'compound',
     aliases: ['Press cerrado', 'Press banca cerrado', 'Press agarre cerrado', 'Press de banca agarre cerrado', 'Press banca tríceps'],
@@ -296,6 +317,7 @@ const exercises = [
   {
     id: 'plank',
     name: 'Plancha',
+    videoUrl: 'https://www.youtube.com/watch?v=d0atctiI7Vw',
     muscleGroup: 'core',
     category: 'isolation',
     aliases: ['Plancha', 'Plancha frontal', 'Plancha abdominal', 'Plancha isométrica'],
@@ -309,6 +331,7 @@ const exercises = [
   {
     id: 'cable-crunch',
     name: 'Crunch en polea',
+    videoUrl: 'https://www.youtube.com/watch?v=ui3iEsYbXtI',
     muscleGroup: 'core',
     category: 'isolation',
     aliases: ['Crunch en polea', 'Abdominales en polea', 'Crunch con cuerda', 'Abdominal polea alta', 'Abdominales con polea'],
@@ -322,6 +345,7 @@ const exercises = [
   {
     id: 'hanging-leg-raise',
     name: 'Elevación de piernas colgado',
+    videoUrl: 'https://www.youtube.com/watch?v=_CdK3sdzMRw',
     muscleGroup: 'core',
     category: 'isolation',
     aliases: ['Elevación de piernas colgado', 'Elevaciones de piernas colgado', 'Piernas en barra', 'Elevación de piernas en barra', 'Elevación de rodillas colgado'],
@@ -337,6 +361,7 @@ const exercises = [
   {
     id: 'face-pull',
     name: 'Jalón al rostro',
+    videoUrl: 'https://www.youtube.com/watch?v=Q18p2QtQAes',
     muscleGroup: 'shoulders',
     category: 'isolation',
     aliases: ['Jalón al rostro', 'Jalón a la cara', 'Face pull con cuerda', 'Polea cara con cuerda', 'Jalón facial'],
