@@ -34,6 +34,7 @@ import '../features/home/home_screen.dart';
 import '../features/insights/presentation/insights_screen.dart';
 import '../features/profile/application/user_providers.dart';
 import '../features/profile/presentation/profile_edit_personal_screen.dart';
+import '../features/profile/presentation/profile_edit_trainer_screen.dart';
 import '../features/profile/presentation/profile_gym_screen.dart';
 import '../features/profile/presentation/profile_routines_screen.dart';
 // profile_settings_screen.dart import REMOVED 2026-05-28 — /profile/settings
@@ -327,6 +328,12 @@ GoRouter buildRouter({
                 path: 'edit-personal',
                 pageBuilder: (_, __) =>
                     _noAnim(const ProfileEditPersonalScreen()),
+              ),
+              // NEW — Fase 6 Etapa 1 (trainer-profile-onboarding)
+              GoRoute(
+                path: 'edit-trainer',
+                pageBuilder: (_, __) =>
+                    _noAnim(const ProfileEditTrainerScreen()),
               ),
               GoRoute(
                 path: 'gym',

@@ -143,7 +143,7 @@ class _VirtualBadge extends StatelessWidget {
         border: Border.all(color: palette.accent.withValues(alpha: 0.5)),
       ),
       child: Text(
-        'VIRTUAL',
+        'ONLINE',
         style: GoogleFonts.barlowCondensed(
           fontWeight: FontWeight.w700,
           fontSize: 11,

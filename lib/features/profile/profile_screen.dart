@@ -11,6 +11,7 @@ import 'presentation/widgets/profile_avatar_card.dart';
 import 'presentation/widgets/profile_cuenta_section.dart';
 import 'presentation/widgets/profile_header.dart';
 import 'presentation/widgets/profile_section_tile.dart';
+import 'presentation/widgets/profile_trainer_section.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -27,6 +28,10 @@ class ProfileScreen extends ConsumerWidget {
           _OwnProfileStatsRow(palette: palette, theme: theme),
           const ProfileAvatarCard(),
           const ProfileCuentaSection(),
+          // Sección "ENTRENADOR" condicional — solo visible cuando
+          // role == trainer. Tile que abre /profile/edit-trainer para
+          // editar perfil público multi-location (Fase 6 Etapa 0 PR#3).
+          const ProfileTrainerSection(),
           // ── Account actions — PR#4 v2 pivot 2026-05-28 ───────────────────
           // Sign-out and account deletion tiles live here directly.
           // Settings as a surface deferred to a future SDD (notifications,
