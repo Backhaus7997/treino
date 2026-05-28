@@ -132,8 +132,10 @@ void main() {
       await tester.pumpAndSettle();
 
       // Both tiles must be present.
-      expect(find.text('Cerrar sesión'), findsOneWidget); // i18n: Fase 6 Etapa 3
-      expect(find.text('Eliminar cuenta'), findsOneWidget); // i18n: Fase 6 Etapa 3
+      expect(
+          find.text('Cerrar sesión'), findsOneWidget); // i18n: Fase 6 Etapa 3
+      expect(
+          find.text('Eliminar cuenta'), findsOneWidget); // i18n: Fase 6 Etapa 3
 
       // Legacy TextButton must be gone — it was rendered as a TextButton widget.
       // Now "Cerrar sesión" is a ProfileSectionTile, not a TextButton.
@@ -152,6 +154,9 @@ void main() {
       await tester.pumpWidget(_buildProfileScreen());
       await tester.pumpAndSettle();
 
+      // Tiles are below the fold — scroll to them first.
+      await tester.scrollUntilVisible(
+          find.text('Cerrar sesión'), 50); // i18n: Fase 6 Etapa 3
       await tester.tap(find.text('Cerrar sesión')); // i18n: Fase 6 Etapa 3
       await tester.pumpAndSettle();
 
@@ -165,6 +170,9 @@ void main() {
       await tester.pumpWidget(_buildProfileScreen());
       await tester.pumpAndSettle();
 
+      // Tiles are below the fold — scroll to them first.
+      await tester.scrollUntilVisible(
+          find.text('Eliminar cuenta'), 50); // i18n: Fase 6 Etapa 3
       await tester.tap(find.text('Eliminar cuenta')); // i18n: Fase 6 Etapa 3
       await tester.pumpAndSettle();
 
@@ -179,6 +187,10 @@ void main() {
         (tester) async {
       await tester.pumpWidget(_buildProfileScreen());
       await tester.pumpAndSettle();
+
+      // Tiles are below the fold — scroll to them first.
+      await tester.scrollUntilVisible(
+          find.text('Eliminar cuenta'), 50); // i18n: Fase 6 Etapa 3
 
       // Open sheet.
       await tester.tap(find.text('Eliminar cuenta')); // i18n: Fase 6 Etapa 3

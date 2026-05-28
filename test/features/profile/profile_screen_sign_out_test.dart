@@ -73,10 +73,7 @@ void main() {
               path: 'routines',
               builder: (_, __) => const Scaffold(body: Text('ROUTINES')),
             ),
-            GoRoute(
-              path: 'settings',
-              builder: (_, __) => const Scaffold(body: Text('SETTINGS')),
-            ),
+            // settings route REMOVED 2026-05-28 — PR#4 pivot
           ],
         ),
       ],
