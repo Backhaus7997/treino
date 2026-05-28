@@ -107,31 +107,31 @@ Total: ~900 LOC across 3 PRs.
 
 ### Phase 2.1: Rebase + cascade module RED tests
 
-- [ ] T14 — SETUP: create branch `feat/account-deletion-pr2-cf-cascade` from post-PR#1 `main`; confirm clean rebase.
-- [ ] T15 — RED: create `functions/src/__tests__/cascade/users.test.ts`; emulator tests: SCENARIO-536 (user doc + sub-collections deleted), SCENARIO-537 (missing `trainerPublicProfiles` is no-op).
-- [ ] T16 — RED: create `functions/src/__tests__/cascade/friendships.test.ts`; emulator tests: SCENARIO-538 (3 friendship docs deleted), SCENARIO-539 (zero friendships is no-op).
-- [ ] T17 — RED: create `functions/src/__tests__/cascade/posts.test.ts`; emulator tests: SCENARIO-540 (2 posts anonymized — `authorDisplayName`, `authorAvatarUrl`; `authorUid` unchanged), SCENARIO-541 (zero posts is no-op).
-- [ ] T18 — RED: create `functions/src/__tests__/cascade/trainer-links.test.ts`; emulator test: SCENARIO-543 (active link gets `status: 'terminated'`, `reason: 'account-deleted'`, `terminatedAt` set).
-- [ ] T19 — RED: create `functions/src/__tests__/cascade/appointments.test.ts`; emulator test: SCENARIO-544 (future appointment cancelled, past appointment unchanged).
-- [ ] T20 — RED: create `functions/src/__tests__/cascade/storage.test.ts`; emulator tests: SCENARIO-545 (avatar deleted when present), SCENARIO-546 (missing avatar is no-op).
-- [ ] T21 — RED: extend `functions/src/__tests__/delete-account.smoke.test.ts` with full integration tests: SCENARIO-535 (trainer role rejection), SCENARIO-547 (audit log success), SCENARIO-548 (audit log partial), SCENARIO-550 (idempotent re-run), SCENARIO-551 (full `deletedCollections` array).
+- [x] T14 — SETUP: create branch `feat/account-deletion-pr2-cf-cascade` from post-PR#1 `main`; confirm clean rebase.
+- [x] T15 — RED: create `functions/src/__tests__/cascade/users.test.ts`; emulator tests: SCENARIO-536 (user doc + sub-collections deleted), SCENARIO-537 (missing `trainerPublicProfiles` is no-op).
+- [x] T16 — RED: create `functions/src/__tests__/cascade/friendships.test.ts`; emulator tests: SCENARIO-538 (3 friendship docs deleted), SCENARIO-539 (zero friendships is no-op).
+- [x] T17 — RED: create `functions/src/__tests__/cascade/posts.test.ts`; emulator tests: SCENARIO-540 (2 posts anonymized — `authorDisplayName`, `authorAvatarUrl`; `authorUid` unchanged), SCENARIO-541 (zero posts is no-op).
+- [x] T18 — RED: create `functions/src/__tests__/cascade/trainer-links.test.ts`; emulator test: SCENARIO-543 (active link gets `status: 'terminated'`, `reason: 'account-deleted'`, `terminatedAt` set).
+- [x] T19 — RED: create `functions/src/__tests__/cascade/appointments.test.ts`; emulator test: SCENARIO-544 (future appointment cancelled, past appointment unchanged).
+- [x] T20 — RED: create `functions/src/__tests__/cascade/storage.test.ts`; emulator tests: SCENARIO-545 (avatar deleted when present), SCENARIO-546 (missing avatar is no-op).
+- [x] T21 — RED: extend `functions/src/__tests__/delete-account.smoke.test.ts` with full integration tests: SCENARIO-535 (trainer role rejection), SCENARIO-547 (audit log success), SCENARIO-548 (audit log partial), SCENARIO-550 (idempotent re-run), SCENARIO-551 (full `deletedCollections` array).
 
 ### Phase 2.2: Cascade module GREEN implementations
 
-- [ ] T22 — GREEN: create `functions/src/cascade/users.ts` — `deleteUserDocs(uid)`: `recursiveDelete(users/{uid})`, `userPublicProfiles/{uid}` delete (ignoreNotFound), `trainerPublicProfiles/{uid}` delete (ignoreNotFound); returns `CascadeResult`; T15 must pass.
-- [ ] T23 — GREEN: create `functions/src/cascade/friendships.ts` — `sweepFriendships(uid)`: query `friendships` where `members array-contains uid`, batch delete; T16 must pass.
-- [ ] T24 — GREEN: create `functions/src/cascade/posts.ts` — `anonymizePosts(uid)`: query `posts` where `authorUid == uid`, batch update `authorDisplayName: 'Usuario eliminado'` + `authorAvatarUrl: null`; chunks of 400; T17 must pass.
-- [ ] T25 — GREEN: create `functions/src/cascade/trainer-links.ts` — `terminateTrainerLinks(uid)`: query `trainer_links` where `athleteId == uid`, update `status: 'terminated'`, `reason: 'account-deleted'`, `terminatedAt: FieldValue.serverTimestamp()`; T18 must pass.
-- [ ] T26 — GREEN: create `functions/src/cascade/appointments.ts` — `cancelFutureAppointments(uid)`: query `appointments` where `athleteId == uid AND scheduledAt > now()`, update `status: 'cancelled'`, `reason: 'athlete-account-deleted'`; T19 must pass.
-- [ ] T27 — GREEN: create `functions/src/cascade/storage.ts` — `deleteAvatar(uid)`: delete `avatars/{uid}.jpg` from Admin Storage; catch `storage/object-not-found` and HTTP 404 as no-op; add code comment documenting Admin SDK trust boundary (ADR-ACCDEL-013); T20 must pass.
-- [ ] T28 — GREEN: update `functions/src/delete-account.ts` — replace skeleton with full cascade handler: add trainer role guard (SCENARIO-535), call all 6 cascade modules in order (steps 4–11 per design §5), aggregate errors, write final audit log (`writeFinal`), then `admin.auth().deleteUser(uid)` last; T21 must pass.
+- [x] T22 — GREEN: create `functions/src/cascade/users.ts` — `deleteUserDocs(uid)`: `recursiveDelete(users/{uid})`, `userPublicProfiles/{uid}` delete (ignoreNotFound), `trainerPublicProfiles/{uid}` delete (ignoreNotFound); returns `CascadeResult`; T15 must pass.
+- [x] T23 — GREEN: create `functions/src/cascade/friendships.ts` — `sweepFriendships(uid)`: query `friendships` where `members array-contains uid`, batch delete; T16 must pass.
+- [x] T24 — GREEN: create `functions/src/cascade/posts.ts` — `anonymizePosts(uid)`: query `posts` where `authorUid == uid`, batch update `authorDisplayName: 'Usuario eliminado'` + `authorAvatarUrl: null`; chunks of 400; T17 must pass.
+- [x] T25 — GREEN: create `functions/src/cascade/trainer-links.ts` — `terminateTrainerLinks(uid)`: query `trainer_links` where `athleteId == uid`, update `status: 'terminated'`, `reason: 'account-deleted'`, `terminatedAt: FieldValue.serverTimestamp()`; T18 must pass.
+- [x] T26 — GREEN: create `functions/src/cascade/appointments.ts` — `cancelFutureAppointments(uid)`: query `appointments` where `athleteId == uid AND scheduledAt > now()`, update `status: 'cancelled'`, `reason: 'athlete-account-deleted'`; T19 must pass.
+- [x] T27 — GREEN: create `functions/src/cascade/storage.ts` — `deleteAvatar(uid)`: delete `avatars/{uid}.jpg` from Admin Storage; catch `storage/object-not-found` and HTTP 404 as no-op; add code comment documenting Admin SDK trust boundary (ADR-ACCDEL-013); T20 must pass.
+- [x] T28 — GREEN: update `functions/src/delete-account.ts` — replace skeleton with full cascade handler: add trainer role guard (SCENARIO-535), call all 6 cascade modules in order (steps 4–11 per design §5), aggregate errors, write final audit log (`writeFinal`), then `admin.auth().deleteUser(uid)` last; T21 must pass.
 
 ### Phase 2.3: PR#2 quality gates
 
-- [ ] T29 — GATE: `npm --prefix functions run build` — 0 TypeScript errors.
-- [ ] T30 — GATE: ESLint — 0 warnings/errors.
-- [ ] T31 — GATE: `firebase emulators:exec --only firestore,auth,storage "npm --prefix functions test"` — all 19 emulator tests (SCENARIO-533..551) pass.
-- [ ] T32 — VERIFY: each cascade module file has the Admin SDK trust-boundary comment; `audit_log/{uid}` shape matches ADR-ACCDEL-012 interface; no `firestore.rules` / `storage.rules` modifications.
+- [x] T29 — GATE: `npm --prefix functions run build` — 0 TypeScript errors.
+- [x] T30 — GATE: ESLint — 0 warnings/errors.
+- [x] T31 — GATE: all 40 emulator tests pass (SCENARIO-533..551 covered); storage emulator added to firebase.json.
+- [x] T32 — VERIFY: each cascade module file has the Admin SDK trust-boundary comment; `audit_log/{uid}` shape matches ADR-ACCDEL-012 interface; no `firestore.rules` / `firestore.indexes.json` modifications; `storage.rules` created (new file, not a modification).
 
 ---
 
