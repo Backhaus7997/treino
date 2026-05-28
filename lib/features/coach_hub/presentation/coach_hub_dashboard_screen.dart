@@ -159,9 +159,8 @@ class _ActiveStudentsList extends ConsumerWidget {
         style: TextStyle(color: palette.textMuted),
       ),
       data: (links) {
-        final active = links
-            .where((l) => l.status == TrainerLinkStatus.active)
-            .toList();
+        final active =
+            links.where((l) => l.status == TrainerLinkStatus.active).toList();
         if (active.isEmpty) {
           return Center(
             child: Padding(
@@ -281,9 +280,8 @@ class _PendingRequestsList extends ConsumerWidget {
 
     return linksAsync.maybeWhen(
       data: (links) {
-        final pending = links
-            .where((l) => l.status == TrainerLinkStatus.pending)
-            .toList();
+        final pending =
+            links.where((l) => l.status == TrainerLinkStatus.pending).toList();
         if (pending.isEmpty) return const SizedBox.shrink();
 
         return Column(

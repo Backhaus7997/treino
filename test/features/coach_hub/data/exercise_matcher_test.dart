@@ -7,8 +7,7 @@ final _exercises = [
       id: 'sentadilla-barra',
       name: 'Sentadilla con barra',
       muscleGroup: 'Piernas'),
-  MatcherExercise(
-      id: 'press-banca', name: 'Press banca', muscleGroup: 'Pecho'),
+  MatcherExercise(id: 'press-banca', name: 'Press banca', muscleGroup: 'Pecho'),
   MatcherExercise(
       id: 'peso-muerto', name: 'Peso muerto', muscleGroup: 'Espalda'),
 ];
@@ -66,8 +65,7 @@ void main() {
     });
 
     test('no matchea ejercicio totalmente distinto', () {
-      final result =
-          matchExercises(_dayWith(['Curl bíceps']), _exercises);
+      final result = matchExercises(_dayWith(['Curl bíceps']), _exercises);
       expect(result.unmatched, hasLength(1));
       expect(result.unmatched.first.rowName, 'Curl bíceps');
       expect(result.days.first.items.first.exerciseId, isNull);

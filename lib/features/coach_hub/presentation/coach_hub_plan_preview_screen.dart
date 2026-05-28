@@ -142,13 +142,14 @@ class _CoachHubPlanPreviewScreenState
             ? d
             : d.copyWith(
                 items: d.items
-                    .map((it) => (it.rowName == rowName && it.exerciseId == null)
-                        ? it.copyWith(
-                            exerciseId: picked.id,
-                            exerciseName: picked.name,
-                            muscleGroup: picked.muscleGroup,
-                          )
-                        : it)
+                    .map(
+                        (it) => (it.rowName == rowName && it.exerciseId == null)
+                            ? it.copyWith(
+                                exerciseId: picked.id,
+                                exerciseName: picked.name,
+                                muscleGroup: picked.muscleGroup,
+                              )
+                            : it)
                     .toList(),
               ))
         .toList();
@@ -278,7 +279,8 @@ class _CoachHubPlanPreviewScreenState
                   ],
                   const SizedBox(height: 18),
                   ElevatedButton(
-                    onPressed: _saving ? null : () => _assign(plan, profile.uid),
+                    onPressed:
+                        _saving ? null : () => _assign(plan, profile.uid),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: palette.accent,
                       foregroundColor: palette.bg,
@@ -598,7 +600,8 @@ class _DayCard extends StatelessWidget {
   }
 
   String _itemSubtitle(ParsedPlanItem i) {
-    final reps = i.repsMin == i.repsMax ? '${i.repsMin}' : '${i.repsMin}-${i.repsMax}';
+    final reps =
+        i.repsMin == i.repsMax ? '${i.repsMin}' : '${i.repsMin}-${i.repsMax}';
     final base = '${i.sets} × $reps';
     final rest = i.restSec != null ? ' · ${i.restSec}s' : '';
     final w = i.weightKg != null ? ' · ${i.weightKg} kg' : '';
@@ -805,9 +808,8 @@ class _AthletePicker extends ConsumerWidget {
         style: TextStyle(color: palette.textMuted),
       ),
       data: (links) {
-        final active = links
-            .where((l) => l.status == TrainerLinkStatus.active)
-            .toList();
+        final active =
+            links.where((l) => l.status == TrainerLinkStatus.active).toList();
         if (active.isEmpty) {
           return Container(
             padding: const EdgeInsets.all(14),

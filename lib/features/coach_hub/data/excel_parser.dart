@@ -108,8 +108,7 @@ RawParsedPlan _parsePlanSheet(Sheet sheet) {
   }
 
   final name = _asString(map['nombre'] ?? map['nombre del plan'] ?? '');
-  final daysPerWeek =
-      _asInt(map['dias por semana'] ?? map['días por semana']);
+  final daysPerWeek = _asInt(map['dias por semana'] ?? map['días por semana']);
   final durationWeeks = _asInt(map['duracion semanas'] ??
       map['duración semanas'] ??
       map['duracion (semanas)']);

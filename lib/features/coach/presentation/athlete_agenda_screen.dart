@@ -209,9 +209,10 @@ class _AthleteAgendaScreenState extends ConsumerState<AthleteAgendaScreen> {
 
     // Block double-booking on the same day. Athlete can have at most ONE
     // confirmed appointment per calendar day with their PF.
-    final allMine =
-        ref.read(appointmentsForAthleteStreamProvider(widget.athleteId)).value ??
-            const [];
+    final allMine = ref
+            .read(appointmentsForAthleteStreamProvider(widget.athleteId))
+            .value ??
+        const [];
     final alreadyBookedSameDay = allMine.any((a) =>
         a.status == AppointmentStatus.confirmed &&
         a.startsAt.year == slot.year &&

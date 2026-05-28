@@ -40,7 +40,8 @@ void main() {
     repo = PlanImportRepository(exerciseRepository: exerciseRepo);
   });
 
-  test('parseAndMatch: template default matchea contra catálogo y devuelve plan',
+  test(
+      'parseAndMatch: template default matchea contra catálogo y devuelve plan',
       () async {
     when(() => exerciseRepo.listAll()).thenAnswer((_) async => [
           _ex('sentadilla-barra', 'Sentadilla con barra', 'Piernas'),
@@ -60,8 +61,7 @@ void main() {
     expect(plan.days.first.items.first.muscleGroup, 'Piernas');
   });
 
-  test('parseAndMatch: ejercicios no catalogados van a unmatched',
-      () async {
+  test('parseAndMatch: ejercicios no catalogados van a unmatched', () async {
     // Catálogo completamente disjunto del template (que usa Sentadilla,
     // Press banca, Remo) → todos los items quedan unmatched.
     when(() => exerciseRepo.listAll()).thenAnswer((_) async => [
@@ -93,8 +93,7 @@ void main() {
     );
   });
 
-  test('parseAndMatch: bytes corruptos → PlanImportException',
-      () async {
+  test('parseAndMatch: bytes corruptos → PlanImportException', () async {
     when(() => exerciseRepo.listAll()).thenAnswer((_) async => const []);
 
     expect(

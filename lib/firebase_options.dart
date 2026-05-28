@@ -60,8 +60,10 @@ class DefaultFirebaseOptions {
     messagingSenderId: '1079774251763',
     projectId: 'treino-dev',
     storageBucket: 'treino-dev.firebasestorage.app',
-    androidClientId: '1079774251763-kf6ct53t2olntalhafgtj5bvufpa6rfd.apps.googleusercontent.com',
-    iosClientId: '1079774251763-rbcocukjq4mc8onmohitp65jualmvmo5.apps.googleusercontent.com',
+    androidClientId:
+        '1079774251763-kf6ct53t2olntalhafgtj5bvufpa6rfd.apps.googleusercontent.com',
+    iosClientId:
+        '1079774251763-rbcocukjq4mc8onmohitp65jualmvmo5.apps.googleusercontent.com',
     iosBundleId: 'com.backhaus.treino',
   );
 
@@ -74,5 +76,4 @@ class DefaultFirebaseOptions {
     storageBucket: 'treino-dev.firebasestorage.app',
     measurementId: 'G-KT3CZ3EL8S',
   );
-
 }
