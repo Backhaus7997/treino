@@ -2,6 +2,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:flutter_map_marker_cluster/flutter_map_marker_cluster.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
@@ -11,6 +12,7 @@ import 'package:latlong2/latlong.dart';
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/treino_icon.dart';
 import '../../application/trainer_discovery_providers.dart';
+import '../../domain/trainer_location.dart';
 import '../../domain/trainer_public_profile.dart';
 import 'trainers_map_bottom_sheet.dart';
 
@@ -93,19 +95,21 @@ class _TrainersMapViewState extends ConsumerState<TrainersMapView> {
         // cada `TrainerLocation` (gym o custom) de cada PF. Un híbrido con
         // 2 gyms tiene 2 pines — tap en cualquiera abre el mismo perfil.
         final virtualOnly = ref.watch(virtualOnlyFilterProvider);
-        final markers = <Marker>[
+        final trainerMarkers = <Marker>[
           if (!virtualOnly)
             for (final t in trainers)
               for (final loc in effectiveLocationsOf(t))
-                _buildTrainerMarker(
+                _buildLocationMarker(
                   context,
                   t,
                   palette,
                   LatLng(loc.lat, loc.lng),
+                  loc.type,
                 ),
-          if (athletePosition != null)
-            _buildAthleteMarker(athletePosition, palette),
         ];
+        final athleteMarker = athletePosition != null
+            ? _buildAthleteMarker(athletePosition, palette)
+            : null;
 
         // Banner CTA: aparece siempre que el filtro "Online" esté ON. Lo
         // que el atleta quiere ver no es geográfico — el mapa no aplica.
@@ -141,7 +145,41 @@ class _TrainersMapViewState extends ConsumerState<TrainersMapView> {
                   // cuando se hace pan rápido a una zona no cacheada.
                   panBuffer: 1,
                 ),
-                MarkerLayer(markers: markers),
+                // Cluster layer: agrupa pines cercanos cuando el mapa está
+                // alejado. Mientras el zoom < 14, markers con overlap (~50px)
+                // se colapsan en un círculo numerado. Zoom >= 14 (barrio
+                // nivel) → cada pin se renderea individual. Tap en cluster
+                // → zoom in al área.
+                MarkerClusterLayerWidget(
+                  options: MarkerClusterLayerOptions(
+                    maxClusterRadius: 50,
+                    disableClusteringAtZoom: 14,
+                    size: const Size(44, 44),
+                    alignment: Alignment.center,
+                    padding: const EdgeInsets.all(50),
+                    markers: trainerMarkers,
+                    // Default era `zoomToBoundsOnClick: true` que calcula
+                    // bounds y zoomea de golpe — muy agresivo, dejaba al
+                    // atleta perdido con un solo pin sin contexto. Lo
+                    // override: zoom progresivo +2 niveles por tap, capeado
+                    // a 14 (que es donde el cluster naturalmente se separa).
+                    zoomToBoundsOnClick: false,
+                    onClusterTap: (cluster) {
+                      final current = _mapController.camera.zoom;
+                      final next = (current + 2).clamp(3.0, 14.0);
+                      _mapController.move(cluster.bounds.center, next);
+                    },
+                    builder: (context, markers) => _ClusterBubble(
+                      count: markers.length,
+                      palette: palette,
+                    ),
+                  ),
+                ),
+                // El dot del atleta queda FUERA del cluster — siempre visible
+                // como referencia "estás acá", incluso cuando los PFs cerca
+                // se colapsaron en cluster.
+                if (athleteMarker != null)
+                  MarkerLayer(markers: [athleteMarker]),
               ],
             ),
             // Atribución OSM + CARTO (legal compliance) — top-right del map,
@@ -195,16 +233,24 @@ class _TrainersMapViewState extends ConsumerState<TrainersMapView> {
 
   // ── Markers ────────────────────────────────────────────────────────────────
 
-  Marker _buildTrainerMarker(
+  /// Pill marker para una ubicación del PF. Color + ícono cambian según el
+  /// `type` de la ubicación:
+  ///   - `gym`    → pill **mint** (accent) + ícono de mancuernas.
+  ///   - `custom` → pill **magenta** (highlight) + ícono de pin.
+  ///
+  /// Esto resuelve la confusión visual del PR#2 donde todos los markers se
+  /// veían iguales — ahora el atleta distingue gym (catálogo) de lugar
+  /// propio del PF a primera vista.
+  Marker _buildLocationMarker(
     BuildContext context,
     TrainerPublicProfile t,
     AppPalette palette,
     LatLng point,
+    TrainerLocationType type,
   ) {
-    final initial = (t.displayName?.trim().isNotEmpty == true
-            ? t.displayName!.trim()[0]
-            : '?')
-        .toUpperCase();
+    final isGym = type == TrainerLocationType.gym;
+    final pillColor = isGym ? palette.accent : palette.highlight;
+    final icon = isGym ? TreinoIcon.dumbbell : TreinoIcon.mapPin;
     final priceLabel = t.trainerMonthlyRate != null
         ? '\$${(t.trainerMonthlyRate! / 1000).toStringAsFixed(0)}k/mes'
         : 'Consultar';
@@ -222,7 +268,7 @@ class _TrainersMapViewState extends ConsumerState<TrainersMapView> {
             Container(
               padding: const EdgeInsets.fromLTRB(4, 4, 10, 4),
               decoration: BoxDecoration(
-                color: palette.highlight,
+                color: pillColor,
                 borderRadius: BorderRadius.circular(9999),
                 boxShadow: [
                   BoxShadow(
@@ -243,14 +289,7 @@ class _TrainersMapViewState extends ConsumerState<TrainersMapView> {
                       shape: BoxShape.circle,
                     ),
                     alignment: Alignment.center,
-                    child: Text(
-                      initial,
-                      style: GoogleFonts.barlowCondensed(
-                        color: palette.textPrimary,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13,
-                      ),
-                    ),
+                    child: Icon(icon, color: pillColor, size: 15),
                   ),
                   const SizedBox(width: 6),
                   Text(
@@ -267,7 +306,7 @@ class _TrainersMapViewState extends ConsumerState<TrainersMapView> {
             ),
             CustomPaint(
               size: const Size(10, 8),
-              painter: _DownArrowPainter(color: palette.highlight),
+              painter: _DownArrowPainter(color: pillColor),
             ),
           ],
         ),
@@ -468,6 +507,47 @@ class _VirtualOnlyBanner extends StatelessWidget {
               Icon(TreinoIcon.forward, size: 18, color: palette.accent),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Cluster bubble ──────────────────────────────────────────────────────────
+
+/// Burbuja que reemplaza visualmente a múltiples markers cuando se solapan
+/// (zoom < 14). Círculo magenta (highlight) con el count adentro — consistente
+/// con el color dominante de los pines. Tap → zoom incremental +2 niveles
+/// hasta que naturalmente se separe (override del default que hacía zoom muy
+/// agresivo).
+class _ClusterBubble extends StatelessWidget {
+  const _ClusterBubble({required this.count, required this.palette});
+  final int count;
+  final AppPalette palette;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: palette.highlight,
+        border: Border.all(color: palette.bg, width: 2),
+        boxShadow: [
+          BoxShadow(
+            color: palette.bg.withValues(alpha: 0.6),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        '$count',
+        style: GoogleFonts.barlowCondensed(
+          color: palette.bg,
+          fontWeight: FontWeight.w700,
+          fontSize: 17,
+          letterSpacing: 0.3,
         ),
       ),
     );
