@@ -1,16 +1,27 @@
 rules_version = '2';
 
 // Firebase Storage security rules for TREINO.
-// Client access rules — Admin SDK in Cloud Functions bypasses these entirely (ADR-ACCDEL-013).
+// Admin SDK in Cloud Functions bypasses these entirely (ADR-ACCDEL-013).
 service firebase.storage {
   match /b/{bucket}/o {
-    // Avatars: authenticated users can read/write their own avatar
-    match /avatars/{userId}.jpg {
+    // Avatars: any image extension owned by the authenticated user.
+    // Path pattern: /avatars/{uid}.{ext}  e.g. avatars/abc123.jpg, avatars/abc123.heic
+    match /avatars/{fileName} {
       allow read: if request.auth != null;
+      allow write: if request.auth != null
+                  && fileName.matches(request.auth.uid + '\\..+')
+                  && request.resource.size < 5 * 1024 * 1024
+                  && request.resource.contentType.matches('image/.*');
+    }
+
+    // Excel imports: trainers upload Excel plan files under /temp/uploads/{uid}/...
+    // Authenticated users can write to their own folder; reads denied (server-only).
+    match /temp/uploads/{userId}/{file=**} {
+      allow read: if false;
       allow write: if request.auth != null && request.auth.uid == userId;
     }
 
-    // Default: deny all other access
+    // Default: deny all other access.
     match /{allPaths=**} {
       allow read, write: if false;
     }

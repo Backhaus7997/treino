@@ -66,7 +66,7 @@
     "functions": { "port": 5001 },
     "storage": { "port": 9199 },
     "hosting": { "port": 5000 },
-    "ui": { "enabled": false },
+    "ui": { "enabled": true, "port": 4444 },
     "singleProjectMode": true
   }
 }
