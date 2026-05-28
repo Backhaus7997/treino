@@ -16,6 +16,7 @@ TrainerPublicProfile _trainer({
   TrainerSpecialty? specialty = TrainerSpecialty.crossfit,
   double? lat = -31.40,
   double? lon = -64.18,
+  String? geohash = '6d6m7',
   int? rate = 7500,
 }) =>
     TrainerPublicProfile(
@@ -23,8 +24,11 @@ TrainerPublicProfile _trainer({
       displayName: displayName,
       displayNameLowercase: displayName.toLowerCase(),
       trainerSpecialty: specialty,
+      // Legacy singular fields — el fallback de `effectiveLocationsOf` los
+      // sigue usando para PFs no migrados al schema array todavía.
       trainerLatitude: lat,
       trainerLongitude: lon,
+      trainerGeohash: geohash,
       trainerMonthlyRate: rate,
     );
 

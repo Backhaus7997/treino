@@ -35,7 +35,6 @@ class TrainersListScreen extends ConsumerStatefulWidget {
 
 class _TrainersListScreenState extends ConsumerState<TrainersListScreen> {
   bool _rationaleShown = false;
-  bool _showMap = false;
 
   @override
   void initState() {
@@ -63,6 +62,10 @@ class _TrainersListScreenState extends ConsumerState<TrainersListScreen> {
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final selected = ref.watch(selectedSpecialtyProvider);
+    // Estado del toggle MAPA/LISTA vive en `mapModeProvider` (top-level del
+    // feature). Necesita ser shared con el banner del mapa (TrainersMapView)
+    // que también lo setea cuando el atleta tap "Tocá para verlos en lista".
+    final showMap = ref.watch(mapModeProvider);
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -74,8 +77,9 @@ class _TrainersListScreenState extends ConsumerState<TrainersListScreen> {
           Padding(
             padding: const EdgeInsets.only(right: 12),
             child: _ListMapToggle(
-              showMap: _showMap,
-              onChanged: (v) => setState(() => _showMap = v),
+              showMap: showMap,
+              onChanged: (v) =>
+                  ref.read(mapModeProvider.notifier).state = v,
             ),
           ),
         ],
@@ -83,21 +87,32 @@ class _TrainersListScreenState extends ConsumerState<TrainersListScreen> {
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: TrainerSpecialtyChips(
-              selected: selected,
-              onChanged: (s) =>
-                  ref.read(selectedSpecialtyProvider.notifier).state = s,
-            ),
-          ),
+          // 1. Modo: Presencial vs Online — decisión más importante.
           const Padding(
-            padding: EdgeInsets.only(top: 4, bottom: 8),
-            child: TrainerAdvancedFilterChips(),
+            padding: EdgeInsets.fromLTRB(16, 12, 16, 8),
+            child: _ModeTabs(),
           ),
+          // 2. Especialidad — categórico, multi-uso.
+          _SectionHeader(palette: palette, text: 'ESPECIALIDAD'),
+          const SizedBox(height: 6),
+          TrainerSpecialtyChips(
+            selected: selected,
+            onChanged: (s) =>
+                ref.read(selectedSpecialtyProvider.notifier).state = s,
+          ),
+          // 3. Filtros (distancia + precio) — solo en modo Presencial. En
+          // modo Online no aplica distancia (sin ubicación física) y precio
+          // es info que el atleta puede ver en el card del PF.
+          if (!ref.watch(virtualOnlyFilterProvider)) ...[
+            const SizedBox(height: 12),
+            _SectionHeader(palette: palette, text: 'FILTROS'),
+            const SizedBox(height: 6),
+            const TrainerAdvancedFilterChips(),
+          ],
+          const SizedBox(height: 8),
           Expanded(
             child: IndexedStack(
-              index: _showMap ? 1 : 0,
+              index: showMap ? 1 : 0,
               children: const [
                 _ListContent(),
                 TrainersMapView(),
@@ -348,6 +363,116 @@ class _ErrorState extends StatelessWidget {
               child: const Text(CoachStrings.retryLabel),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Mode tabs (Presencial / Online) ─────────────────────────────────────────
+//
+// Segmented control binario. Controla `virtualOnlyFilterProvider`: ON cuando
+// el atleta elige "Online", OFF cuando elige "Presencial". Esta decisión es
+// la más importante de la pantalla — modalidad de servicio, no filtro. Por
+// eso vive arriba de todo, con peso visual distinto a los chips de abajo.
+
+class _ModeTabs extends ConsumerWidget {
+  const _ModeTabs();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final palette = AppPalette.of(context);
+    final virtualOnly = ref.watch(virtualOnlyFilterProvider);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: palette.bgCard,
+        borderRadius: BorderRadius.circular(9999),
+        border: Border.all(color: palette.border),
+      ),
+      padding: const EdgeInsets.all(4),
+      child: Row(
+        children: [
+          _ModeTab(
+            label: 'PRESENCIAL',
+            active: !virtualOnly,
+            onTap: () =>
+                ref.read(virtualOnlyFilterProvider.notifier).state = false,
+            palette: palette,
+          ),
+          _ModeTab(
+            label: 'ONLINE',
+            active: virtualOnly,
+            onTap: () =>
+                ref.read(virtualOnlyFilterProvider.notifier).state = true,
+            palette: palette,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ModeTab extends StatelessWidget {
+  const _ModeTab({
+    required this.label,
+    required this.active,
+    required this.onTap,
+    required this.palette,
+  });
+  final String label;
+  final bool active;
+  final VoidCallback onTap;
+  final AppPalette palette;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: active ? palette.accent : Colors.transparent,
+            borderRadius: BorderRadius.circular(9999),
+          ),
+          child: Center(
+            child: Text(
+              label,
+              style: GoogleFonts.barlowCondensed(
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+                letterSpacing: 1.2,
+                color: active ? palette.bg : palette.textMuted,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Section header ──────────────────────────────────────────────────────────
+
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({required this.palette, required this.text});
+  final AppPalette palette;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
+      child: Text(
+        text,
+        style: GoogleFonts.barlowCondensed(
+          fontWeight: FontWeight.w700,
+          fontSize: 11,
+          letterSpacing: 1.4,
+          color: palette.textMuted,
         ),
       ),
     );

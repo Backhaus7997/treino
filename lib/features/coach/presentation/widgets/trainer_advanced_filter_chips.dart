@@ -71,10 +71,8 @@ class TrainerAdvancedFilterChips extends ConsumerWidget {
             palette: palette,
             onTap: () => _showPriceSheet(context, ref, price),
           ),
-          const SizedBox(width: 8),
-          // Solo virtual — Fase 6 Etapa 0 PR#2. Toggle directo (no abre
-          // sheet): tap flippea el provider boolean.
-          _VirtualOnlyChip(palette: palette),
+          // "Online" se promocionó a tabs Presencial/Online en el header
+          // (Fase 6 Etapa 0 PR#3). Ya no vive como chip en esta row.
         ],
       ),
     );
@@ -326,7 +324,6 @@ class _FilterChip extends StatelessWidget {
     required this.isLoading,
     required this.palette,
     required this.onTap,
-    this.showArrow = true,
   });
   final String label;
   final bool isActive;
@@ -334,11 +331,6 @@ class _FilterChip extends StatelessWidget {
   final bool isLoading;
   final AppPalette palette;
   final VoidCallback onTap;
-
-  /// Si true, renderiza la flechita keyboard_arrow_down al final del chip
-  /// (default — usado por chips que abren un sheet de opciones). False para
-  /// chips toggle directo ("Solo virtual") donde no abre sheet.
-  final bool showArrow;
 
   @override
   Widget build(BuildContext context) {
@@ -411,7 +403,7 @@ class _FilterChip extends StatelessWidget {
                   color: fg,
                 ),
               ),
-              if (!isLoading && showArrow) ...[
+              if (!isLoading) ...[
                 const SizedBox(width: 4),
                 Icon(Icons.keyboard_arrow_down, size: 16, color: fg),
               ],
@@ -463,28 +455,3 @@ class _FilterOptionTile extends StatelessWidget {
   }
 }
 
-/// Chip toggle "Solo virtual" — Fase 6 Etapa 0 PR#2.
-///
-/// Tap directo flippea `virtualOnlyFilterProvider`. Cuando está activo, el
-/// query del discovery cambia a `listVirtualOnly()` (ignora geohash +
-/// distance filter).
-class _VirtualOnlyChip extends ConsumerWidget {
-  const _VirtualOnlyChip({required this.palette});
-  final AppPalette palette;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final active = ref.watch(virtualOnlyFilterProvider);
-    return _FilterChip(
-      label: 'Online',
-      isActive: active,
-      disabled: false,
-      isLoading: false,
-      palette: palette,
-      showArrow: false,
-      onTap: () {
-        ref.read(virtualOnlyFilterProvider.notifier).state = !active;
-      },
-    );
-  }
-}
