@@ -37,6 +37,9 @@ dependencies:
   flutter_map: ^7.0.2
   flutter_map_marker_cluster: ^1.3.6
   latlong2: ^0.9.1
+  # Embedded YouTube player so trainers can watch exercise tutorial videos
+  # inside the app instead of being kicked out to the YouTube app/web.
+  youtube_player_iframe: ^5.2.0
 
 dev_dependencies:
   flutter_test:

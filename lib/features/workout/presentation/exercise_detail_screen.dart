@@ -7,6 +7,7 @@ import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../application/exercise_providers.dart';
 import '../domain/exercise.dart';
+import 'widgets/exercise_video_player.dart';
 import 'widgets/stat_tile.dart';
 import 'widgets/technique_instruction_item.dart';
 
@@ -110,7 +111,6 @@ class _ExerciseDetailContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final instructions = exercise.techniqueInstructions;
-    final hasVideo = exercise.videoUrl != null;
     final badgeText =
         '${_muscleEs(exercise.muscleGroup)} · ${_categoryEsOf(exercise.category)}';
 
@@ -136,10 +136,13 @@ class _ExerciseDetailContent extends StatelessWidget {
                   StatTile(label: 'PROGRESO', value: null),
                 ],
               ),
-              if (hasVideo) ...[
-                const SizedBox(height: 20),
-                const _VideoComingSoon(),
-              ],
+              const SizedBox(height: 20),
+              const _SectionHeader(text: 'VIDEO'),
+              const SizedBox(height: 12),
+              // ExerciseVideoPlayer handles all states (null/invalid/valid)
+              // internally — we always render the slot so trainers can see
+              // there's a video surface even before URLs are populated.
+              ExerciseVideoPlayer(videoUrl: exercise.videoUrl),
               const SizedBox(height: 20),
               const _SectionHeader(text: 'TÉCNICA'),
               const SizedBox(height: 12),
@@ -411,23 +414,6 @@ class _HistoryEmptyState extends StatelessWidget {
     final palette = AppPalette.of(context);
     return Text(
       'Aún no entrenaste este ejercicio',
-      style: GoogleFonts.barlow(
-        fontWeight: FontWeight.w400,
-        fontSize: 14,
-        color: palette.textMuted,
-      ),
-    );
-  }
-}
-
-class _VideoComingSoon extends StatelessWidget {
-  const _VideoComingSoon();
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-    return Text(
-      'Video próximamente',
       style: GoogleFonts.barlow(
         fontWeight: FontWeight.w400,
         fontSize: 14,
