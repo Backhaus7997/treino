@@ -1,17 +1,38 @@
 /**
  * deleteAccount — Firebase Callable Cloud Function handler.
  *
- * PR#1 skeleton: handles auth guard, anti-spoofing, trainer role guard,
- * audit log, and Auth user deletion. Full Firestore/Storage cascade in PR#2.
+ * Full cascade handler (PR#2): handles auth guard, anti-spoofing, trainer role guard,
+ * audit log, full Firestore/Storage cascade, and Auth user deletion (last).
  *
- * ADRs: ACCDEL-001 (CF over client), ACCDEL-003 (callable), ACCDEL-014
- * (anti-spoofing), ACCDEL-012 (audit log shape).
+ * Cascade order (REQ-ACCDEL-CF-012: Auth MUST be last):
+ *   1. Validate + anti-spoof (callable wrapper)
+ *   2. Trainer role guard
+ *   3. Audit log: started
+ *   4. Sweep friendships
+ *   5. Anonymize posts
+ *   6. Terminate trainer links
+ *   7. Cancel future appointments
+ *   8. Delete storage avatar
+ *   9. Delete user docs (users + userPublicProfiles + trainerPublicProfiles)
+ *  10. Update audit log with cascade results
+ *  11. Delete Auth user (LAST — REQ-ACCDEL-CF-012)
+ *  12. Update audit log to success/partial
+ *
+ * ADRs: ACCDEL-001 (CF over client), ACCDEL-003 (callable), ACCDEL-010 (idempotency),
+ *       ACCDEL-012 (audit log shape), ACCDEL-013 (storage trust boundary),
+ *       ACCDEL-014 (anti-spoofing).
  */
 
 import * as admin from "firebase-admin";
 import * as functions from "firebase-functions/v2/https";
 import { HttpsError } from "firebase-functions/v2/https";
 import { writeStarted, writeFinal } from "./cascade/audit-log";
+import { sweepFriendships } from "./cascade/friendships";
+import { anonymizePosts } from "./cascade/posts";
+import { terminateTrainerLinks } from "./cascade/trainer-links";
+import { cancelFutureAppointments } from "./cascade/appointments";
+import { deleteAvatar } from "./cascade/storage";
+import { deleteUserDocs } from "./cascade/users";
 import {
   DeleteAccountRequest,
   DeleteAccountResponse,
@@ -35,6 +56,10 @@ function getApp(): admin.app.App {
  * Core deletion logic, extracted for unit-testability.
  * The caller supplies the firebase-admin App so tests can pass a named
  * emulator-backed app without relying on the default app.
+ *
+ * Each cascade step is wrapped in try/catch — a single step failure does not
+ * abort the overall flow. Errors are accumulated and reported in the final
+ * audit log and response.
  */
 export async function runDeleteAccount(
   app: admin.app.App,
@@ -44,7 +69,6 @@ export async function runDeleteAccount(
   const db = admin.firestore(app);
 
   // ── Guard: trainers cannot self-delete (REQ-ACCDEL-CF-003) ─────────────
-  // Full trainer check is enforced here. PR#2 adds the 6 cascade modules.
   const userSnap = await db.collection("users").doc(uid).get();
   if (userSnap.exists) {
     const role = userSnap.data()?.role as string | undefined;
@@ -59,49 +83,92 @@ export async function runDeleteAccount(
   // ── Audit log: started ─────────────────────────────────────────────────
   await writeStarted(app, uid, provider);
 
+  const errors: string[] = [];
+  const deletedCollections: string[] = [];
+
+  // ── Step 4: Sweep friendships ──────────────────────────────────────────
   try {
-    // ── Auth user deletion (REQ-ACCDEL-CF-012) ─────────────────────────
-    // In the full cascade (PR#2) this is the LAST step. In PR#1 skeleton
-    // it is the only cascade step, so it is effectively last.
-    try {
-      await admin.auth(app).deleteUser(uid);
-    } catch (authErr: unknown) {
-      // Idempotency (REQ-ACCDEL-CF-013): if the user was already deleted
-      // in a prior partial run, treat it as a no-op.
-      const code = (authErr as { code?: string }).code;
-      if (code !== "auth/user-not-found") {
-        throw authErr;
+    await sweepFriendships(app, uid);
+    deletedCollections.push("friendships");
+  } catch (err: unknown) {
+    errors.push(`friendships: ${(err as Error).message ?? String(err)}`);
+  }
+
+  // ── Step 5: Anonymize posts ────────────────────────────────────────────
+  try {
+    await anonymizePosts(app, uid);
+    deletedCollections.push("posts");
+  } catch (err: unknown) {
+    errors.push(`posts: ${(err as Error).message ?? String(err)}`);
+  }
+
+  // ── Step 6: Terminate trainer links ───────────────────────────────────
+  try {
+    await terminateTrainerLinks(app, uid);
+    deletedCollections.push("trainer_links");
+  } catch (err: unknown) {
+    errors.push(`trainer_links: ${(err as Error).message ?? String(err)}`);
+  }
+
+  // ── Step 7: Cancel future appointments ────────────────────────────────
+  try {
+    await cancelFutureAppointments(app, uid);
+    deletedCollections.push("appointments");
+  } catch (err: unknown) {
+    errors.push(`appointments: ${(err as Error).message ?? String(err)}`);
+  }
+
+  // ── Step 8: Delete storage avatar ─────────────────────────────────────
+  // Admin SDK bypasses Storage security rules (ADR-ACCDEL-013).
+  try {
+    await deleteAvatar(app, uid);
+    deletedCollections.push("storage");
+  } catch (err: unknown) {
+    errors.push(`storage: ${(err as Error).message ?? String(err)}`);
+  }
+
+  // ── Step 9: Delete user docs ───────────────────────────────────────────
+  try {
+    await deleteUserDocs(app, uid);
+    deletedCollections.push("users");
+    deletedCollections.push("userPublicProfiles");
+  } catch (err: unknown) {
+    errors.push(`users: ${(err as Error).message ?? String(err)}`);
+  }
+
+  // ── Step 10-11: Auth user deletion (REQ-ACCDEL-CF-012) ─────────────────
+  // MUST be last — so role guard still works if retry happens mid-cascade.
+  try {
+    await admin.auth(app).deleteUser(uid);
+    deletedCollections.push("users-auth");
+  } catch (authErr: unknown) {
+    // Idempotency (REQ-ACCDEL-CF-013): if the user was already deleted
+    // in a prior partial run, treat it as a no-op.
+    const code = (authErr as { code?: string }).code;
+    if (code !== "auth/user-not-found") {
+      errors.push(`auth: ${(authErr as Error).message ?? String(authErr)}`);
+    } else {
+      // Already deleted — still mark as complete for idempotent runs
+      if (!deletedCollections.includes("users-auth")) {
+        deletedCollections.push("users-auth");
       }
     }
-
-    // ── Audit log: success ─────────────────────────────────────────────
-    const deletedCollections = ["users-auth"];
-    await writeFinal(app, uid, "success", deletedCollections, []);
-
-    // ── Structured response (REQ-ACCDEL-CF-014) ────────────────────────
-    return {
-      status: "success",
-      deletedCollections,
-      errors: [],
-    };
-  } catch (err: unknown) {
-    // ── Audit log: failed ──────────────────────────────────────────────
-    const message =
-      err instanceof Error ? err.message : "Unknown error during deletion";
-    try {
-      await writeFinal(app, uid, "failed", [], [message]);
-    } catch {
-      // Swallow audit write failure — original error takes priority.
-    }
-
-    if (err instanceof HttpsError) {
-      throw err;
-    }
-    throw new HttpsError(
-      "internal",
-      `Account deletion failed: ${message}`
-    );
   }
+
+  // ── Audit log: final ───────────────────────────────────────────────────
+  const finalStatus = errors.length > 0 ? "partial" : "success";
+  try {
+    await writeFinal(app, uid, finalStatus, deletedCollections, errors);
+  } catch {
+    // Swallow audit write failure — cascade results take priority.
+  }
+
+  // ── Structured response (REQ-ACCDEL-CF-014) ────────────────────────────
+  return {
+    status: finalStatus,
+    deletedCollections,
+    errors,
+  };
 }
 
 /**
