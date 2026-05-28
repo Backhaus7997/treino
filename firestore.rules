@@ -347,5 +347,10 @@ service cloud.firestore {
       );
       allow delete: if false;
     }
+
+    // commercialPlans block REMOVED 2026-05-28. The dual pricing model was
+    // confusing trainers; pricing now lives ONLY on the trainer's public
+    // profile via trainerMonthlyRate. A future subscribe flow may
+    // reintroduce a plan catalog with its own rules block.
   }
 }

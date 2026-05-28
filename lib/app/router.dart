@@ -273,7 +273,10 @@ GoRouter buildRouter({
           ),
           GoRoute(
             path: '/coach',
-            pageBuilder: (_, __) => _noAnim(const CoachScreen()),
+            pageBuilder: (context, state) {
+              final tab = state.uri.queryParameters['tab'];
+              return _noAnim(CoachScreen(initialTab: tab));
+            },
             routes: [
               GoRoute(
                 path: 'trainer/:uid',
@@ -346,6 +349,13 @@ GoRouter buildRouter({
               // /profile/settings GoRoute REMOVED 2026-05-28 — PR#4 pivot.
               // Sign-out and eliminar-cuenta tiles now live directly in
               // ProfileScreen body. Settings surface deferred to future SDD.
+              //
+              // /profile/commercial-plans GoRoutes REMOVED 2026-05-28 — the
+              // dual pricing model (single trainerMonthlyRate on the public
+              // profile + a separate plan catalog) was confusing trainers.
+              // Pricing now lives ONLY in the public profile via the EDITAR
+              // CTA on the PERFIL PÚBLICO card. A future subscribe flow can
+              // reintroduce a multi-tier catalog if needed.
             ],
           ),
         ],

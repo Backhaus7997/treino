@@ -14,14 +14,26 @@ import 'domain/trainer_link_status.dart';
 import 'presentation/trainer_agenda_tab.dart';
 
 class TrainerCoachView extends StatelessWidget {
-  const TrainerCoachView({super.key});
+  const TrainerCoachView({super.key, this.initialTab});
 
-  static const _labels = <String>[
-    'DASHBOARD',
-    'ALUMNOS',
-    'AGENDA',
-    'COMUNIDADES',
-  ];
+  /// Optional initial sub-tab — accepts `'alumnos'`, `'agenda'`, or
+  /// `'comunidades'`. Read from the `?tab=` query param by [CoachScreen]
+  /// so deep links from the trainer dashboard land on the right tab.
+  final String? initialTab;
+
+  static const _labels = <String>['ALUMNOS', 'AGENDA', 'COMUNIDADES'];
+
+  static int _resolveInitialIndex(String? tab) {
+    switch (tab) {
+      case 'agenda':
+        return 1;
+      case 'comunidades':
+        return 2;
+      case 'alumnos':
+      default:
+        return 0;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -30,6 +42,7 @@ class TrainerCoachView extends StatelessWidget {
 
     return DefaultTabController(
       length: _labels.length,
+      initialIndex: _resolveInitialIndex(initialTab),
       child: Column(
         children: [
           TabBar(
@@ -57,7 +70,6 @@ class TrainerCoachView extends StatelessWidget {
             child: TabBarView(
               physics: const NeverScrollableScrollPhysics(),
               children: [
-                const _DashboardTab(),
                 const _AlumnosTab(),
                 Consumer(
                   builder: (context, ref, _) {
@@ -71,74 +83,6 @@ class TrainerCoachView extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-// ── DASHBOARD tab ─────────────────────────────────────────────────────────────
-
-class _DashboardTab extends ConsumerWidget {
-  const _DashboardTab();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final palette = AppPalette.of(context);
-    final linksAsync = ref.watch(trainerLinksStreamProvider);
-
-    return linksAsync.when(
-      loading: () => Center(
-        child: CircularProgressIndicator(color: palette.accent),
-      ),
-      error: (_, __) => Center(
-        child: Text(
-          'No pudimos cargar tus vínculos.',
-          style: GoogleFonts.barlow(fontSize: 14, color: palette.textMuted),
-        ),
-      ),
-      data: (links) {
-        final pending =
-            links.where((l) => l.status == TrainerLinkStatus.pending).toList();
-        final active =
-            links.where((l) => l.status == TrainerLinkStatus.active).toList();
-
-        return ListView(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-          physics: const ClampingScrollPhysics(),
-          children: [
-            _SectionHeader(
-              label: 'SOLICITUDES PENDIENTES',
-              count: pending.length,
-            ),
-            const SizedBox(height: 12),
-            if (pending.isEmpty)
-              const _EmptyHint(message: 'Sin solicitudes nuevas por ahora.')
-            else
-              for (final link in pending) ...[
-                _PendingRequestCard(link: link),
-                const SizedBox(height: 12),
-              ],
-            const SizedBox(height: 20),
-            _SectionHeader(
-              label: 'ALUMNOS ACTIVOS',
-              count: active.length,
-            ),
-            const SizedBox(height: 12),
-            if (active.isEmpty)
-              const _EmptyHint(
-                  message:
-                      'Cuando aceptes solicitudes, tus alumnos van a aparecer acá.')
-            else
-              Text(
-                'Tenés ${active.length} ${active.length == 1 ? "alumno activo" : "alumnos activos"}. Tocá la tab ALUMNOS para verlos.',
-                style: GoogleFonts.barlow(
-                  fontWeight: FontWeight.w400,
-                  fontSize: 14,
-                  color: palette.textMuted,
-                ),
-              ),
-          ],
-        );
-      },
     );
   }
 }
@@ -198,96 +142,6 @@ class _AlumnosTab extends ConsumerWidget {
         );
       },
     );
-  }
-}
-
-// ── Pending request card ─────────────────────────────────────────────────────
-
-class _PendingRequestCard extends ConsumerWidget {
-  const _PendingRequestCard({required this.link});
-  final TrainerLink link;
-
-  Future<void> _accept(WidgetRef ref) async {
-    await ref.read(trainerLinkRepositoryProvider).accept(link.id);
-  }
-
-  Future<void> _decline(WidgetRef ref) async {
-    await ref.read(trainerLinkRepositoryProvider).decline(link.id);
-  }
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final palette = AppPalette.of(context);
-    final pubAsync = ref.watch(userPublicProfileProvider(link.athleteId));
-
-    return Container(
-      decoration: BoxDecoration(
-        color: palette.bgCard,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: palette.border, width: 1),
-      ),
-      padding: const EdgeInsets.all(14),
-      child: Column(
-        children: [
-          _UserHeader(pubAsync: pubAsync, subtitle: _formatRequestedAt(link)),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () => _decline(ref),
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: palette.highlight, width: 1),
-                    foregroundColor: palette.highlight,
-                    minimumSize: const Size.fromHeight(40),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(9999),
-                    ),
-                  ),
-                  child: Text(
-                    'RECHAZAR',
-                    style: GoogleFonts.barlowCondensed(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 12,
-                      letterSpacing: 0.8,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: () => _accept(ref),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: palette.accent,
-                    foregroundColor: palette.bg,
-                    minimumSize: const Size.fromHeight(40),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(9999),
-                    ),
-                  ),
-                  child: Text(
-                    'ACEPTAR',
-                    style: GoogleFonts.barlowCondensed(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 12,
-                      letterSpacing: 0.8,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _formatRequestedAt(TrainerLink l) {
-    final dt = l.requestedAt.toLocal();
-    final dd = dt.day.toString().padLeft(2, '0');
-    final mm = dt.month.toString().padLeft(2, '0');
-    return 'Solicitó vincularse el $dd/$mm';
   }
 }
 
@@ -463,78 +317,6 @@ class _UserHeader extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({required this.label, required this.count});
-  final String label;
-  final int count;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-    return Row(
-      children: [
-        Text(
-          label,
-          style: GoogleFonts.barlowCondensed(
-            fontWeight: FontWeight.w700,
-            fontSize: 12,
-            letterSpacing: 1.2,
-            color: palette.textMuted,
-          ),
-        ),
-        const SizedBox(width: 8),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-          decoration: BoxDecoration(
-            color:
-                count > 0 ? palette.accent.withValues(alpha: 0.15) : palette.bg,
-            borderRadius: BorderRadius.circular(9999),
-            border: Border.all(
-              color: count > 0 ? palette.accent : palette.border,
-              width: 1,
-            ),
-          ),
-          child: Text(
-            '$count',
-            style: GoogleFonts.barlowCondensed(
-              fontWeight: FontWeight.w700,
-              fontSize: 11,
-              color: count > 0 ? palette.accent : palette.textMuted,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _EmptyHint extends StatelessWidget {
-  const _EmptyHint({required this.message});
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: palette.bgCard,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: palette.border, width: 1),
-      ),
-      child: Text(
-        message,
-        style: GoogleFonts.barlow(
-          fontWeight: FontWeight.w400,
-          fontSize: 13,
-          color: palette.textMuted,
-        ),
-      ),
     );
   }
 }
