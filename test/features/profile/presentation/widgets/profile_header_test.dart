@@ -19,13 +19,6 @@ Widget _buildHeader({GoRouter? router}) {
             builder: (_, __) => const Scaffold(
               body: ProfileHeader(),
             ),
-            routes: [
-              GoRoute(
-                path: 'settings',
-                builder: (_, __) =>
-                    const Scaffold(body: Text('SETTINGS_SCREEN')),
-              ),
-            ],
           ),
         ],
       );
@@ -39,34 +32,29 @@ Widget _buildHeader({GoRouter? router}) {
 }
 
 // ---------------------------------------------------------------------------
-// Tests — SCENARIO-494, SCENARIO-495
+// Tests — SCENARIO-494
+// SCENARIO-495: REMOVED 2026-05-28 — Gear icon navigation to /profile/settings
+// was removed as part of the PR#4 pivot. The ProfileHeader no longer contains
+// a gear icon or any settings navigation.
 // ---------------------------------------------------------------------------
 
 void main() {
   group('ProfileHeader', () {
-    // SCENARIO-494: renders "TU CUENTA" and "PERFIL" texts
-    testWidgets('SCENARIO-494: renders "TU CUENTA" and "PERFIL" texts',
+    // SCENARIO-494: renders "TU CUENTA" and "PERFIL" texts (gear icon absent)
+    testWidgets(
+        'SCENARIO-494: renders "TU CUENTA" and "PERFIL" texts; no gear icon',
         (tester) async {
       await tester.pumpWidget(_buildHeader());
       await tester.pumpAndSettle();
 
       expect(find.text('TU CUENTA'), findsOneWidget);
       expect(find.text('PERFIL'), findsOneWidget);
+      // SCENARIO-495 was removed — gear icon is now absent.
+      expect(find.byKey(const Key('profile_header_gear')), findsNothing);
     });
 
-    // SCENARIO-495: tapping the gear icon navigates to /profile/settings
-    testWidgets(
-        'SCENARIO-495: tapping gear icon navigates to /profile/settings',
-        (tester) async {
-      await tester.pumpWidget(_buildHeader());
-      await tester.pumpAndSettle();
-
-      // Tap the GestureDetector wrapping the gear icon.
-      // The gear is the only GestureDetector in ProfileHeader's trailing slot.
-      await tester.tap(find.byKey(const Key('profile_header_gear')));
-      await tester.pumpAndSettle();
-
-      expect(find.text('SETTINGS_SCREEN'), findsOneWidget);
-    });
+    // SCENARIO-495: REMOVED 2026-05-28 — gear icon navigation removed.
+    // testWidgets('SCENARIO-495: tapping gear icon navigates to /profile/settings', ...)
+    // ← REMOVED. Settings surface deferred to a future SDD.
   });
 }

@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:treino/features/auth/application/auth_notifier.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/feed/application/friendship_providers.dart';
 import 'package:treino/features/profile/application/profile_stats_providers.dart';
@@ -28,6 +30,22 @@ UserProfile _profile() => UserProfile(
       updatedAt: DateTime(2025),
     );
 
+// Stub AuthNotifier that tracks signOut calls.
+class _TrackingAuthNotifier extends AuthNotifier {
+  bool signOutCalled = false;
+
+  @override
+  Future<User?> build() async => null;
+
+  @override
+  Future<void> signOut() async {
+    signOutCalled = true;
+  }
+}
+
+// Shared notifier instance — reset per test if needed.
+_TrackingAuthNotifier _notifier = _TrackingAuthNotifier();
+
 Widget _buildProfileScreen() {
   final router = GoRouter(
     initialLocation: '/profile',
@@ -52,10 +70,6 @@ Widget _buildProfileScreen() {
             path: 'routines',
             builder: (_, __) => const Scaffold(body: Text('ROUTINES')),
           ),
-          GoRoute(
-            path: 'settings',
-            builder: (_, __) => const Scaffold(body: Text('SETTINGS')),
-          ),
         ],
       ),
     ],
@@ -64,6 +78,7 @@ Widget _buildProfileScreen() {
   return ProviderScope(
     overrides: [
       authStateChangesProvider.overrideWith((_) => Stream.value(null)),
+      authNotifierProvider.overrideWith(() => _notifier),
       userProfileProvider.overrideWith((_) => Stream.value(_profile())),
       pendingRequestCountProvider('').overrideWith((_) => 0),
       pendingRequestsStreamProvider('').overrideWith((_) => Stream.value([])),
@@ -80,10 +95,15 @@ Widget _buildProfileScreen() {
 }
 
 // ---------------------------------------------------------------------------
-// Tests — SCENARIO-507 (composition), SCENARIO-509 (Cerrar sesión present)
+// Tests
 // ---------------------------------------------------------------------------
 
 void main() {
+  setUp(() {
+    // Fresh notifier per test to reset call tracking.
+    _notifier = _TrackingAuthNotifier();
+  });
+
   group('ProfileScreen', () {
     // SCENARIO-507: ProfileScreen contains ProfileHeader, ProfileAvatarCard,
     // ProfileCuentaSection in body
@@ -98,14 +118,81 @@ void main() {
       expect(find.byType(ProfileCuentaSection), findsOneWidget);
     });
 
-    // SCENARIO-509: "Cerrar sesión" TextButton is present in ProfileScreen body footer
+    // SCENARIO-509: REMOVED — superseded by SCENARIO-529.
+    // The legacy "Cerrar sesión" TextButton is replaced by a ProfileSectionTile
+    // in PR#4 v2. SCENARIO-529 covers the new tile's presence.
+    // testWidgets('SCENARIO-509: ...', ...)  ← REMOVED 2026-05-28
+
+    // SCENARIO-529: ProfileScreen body renders "Cerrar sesión" + "Eliminar
+    // cuenta" tiles below ProfileCuentaSection; legacy TextButton is absent.
     testWidgets(
-        'SCENARIO-509: "Cerrar sesión" TextButton is present in body footer',
+        'SCENARIO-529: body renders "Cerrar sesión" + "Eliminar cuenta" tiles; legacy TextButton absent',
         (tester) async {
       await tester.pumpWidget(_buildProfileScreen());
       await tester.pumpAndSettle();
 
-      expect(find.text('Cerrar sesión'), findsOneWidget);
+      // Both tiles must be present.
+      expect(find.text('Cerrar sesión'), findsOneWidget); // i18n: Fase 6 Etapa 3
+      expect(find.text('Eliminar cuenta'), findsOneWidget); // i18n: Fase 6 Etapa 3
+
+      // Legacy TextButton must be gone — it was rendered as a TextButton widget.
+      // Now "Cerrar sesión" is a ProfileSectionTile, not a TextButton.
+      expect(
+        find.ancestor(
+          of: find.text('Cerrar sesión'),
+          matching: find.byType(TextButton),
+        ),
+        findsNothing,
+      );
+    });
+
+    // SCENARIO-530: Tapping "Cerrar sesión" tile calls signOut.
+    testWidgets('SCENARIO-530: tapping "Cerrar sesión" tile calls signOut',
+        (tester) async {
+      await tester.pumpWidget(_buildProfileScreen());
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Cerrar sesión')); // i18n: Fase 6 Etapa 3
+      await tester.pumpAndSettle();
+
+      expect(_notifier.signOutCalled, isTrue);
+    });
+
+    // SCENARIO-531: Tapping "Eliminar cuenta" opens the stub sheet.
+    testWidgets(
+        'SCENARIO-531: tapping "Eliminar cuenta" opens stub sheet with expected copy',
+        (tester) async {
+      await tester.pumpWidget(_buildProfileScreen());
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Eliminar cuenta')); // i18n: Fase 6 Etapa 3
+      await tester.pumpAndSettle();
+
+      // Sheet title text and CANCELAR button must appear.
+      expect(find.text('CANCELAR'), findsOneWidget); // i18n: Fase 6 Etapa 3
+      // The sheet must NOT have a destructive confirm button.
+      expect(find.text('ELIMINAR'), findsNothing);
+    });
+
+    // SCENARIO-532: CANCELAR in the stub sheet closes it without action.
+    testWidgets('SCENARIO-532: CANCELAR closes the stub sheet without action',
+        (tester) async {
+      await tester.pumpWidget(_buildProfileScreen());
+      await tester.pumpAndSettle();
+
+      // Open sheet.
+      await tester.tap(find.text('Eliminar cuenta')); // i18n: Fase 6 Etapa 3
+      await tester.pumpAndSettle();
+
+      expect(find.text('CANCELAR'), findsOneWidget); // i18n: Fase 6 Etapa 3
+
+      // Tap CANCELAR — sheet should close.
+      await tester.tap(find.text('CANCELAR')); // i18n: Fase 6 Etapa 3
+      await tester.pumpAndSettle();
+
+      expect(find.text('CANCELAR'), findsNothing);
+      // No deletion was triggered (signOut not called either).
+      expect(_notifier.signOutCalled, isFalse);
     });
   });
 }
