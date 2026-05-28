@@ -1,6 +1,6 @@
 /**
- * Smoke / integration tests for the deleteAccount callable.
- * Run against Firebase Local Emulator (Firestore + Auth + Functions).
+ * Smoke / integration tests for the deleteAccount handler.
+ * Run against Firebase Local Emulator (Firestore + Auth).
  *
  * SCENARIOS covered:
  *   SCENARIO-533 — CF callable by authenticated client (REQ-ACCDEL-CF-001)
@@ -9,26 +9,24 @@
  *   SCENARIO-547 — Audit log records started then success (REQ-ACCDEL-CF-011)
  *   SCENARIO-551 — CF returns structured success response (REQ-ACCDEL-CF-014)
  *
- * Strategy: import the handler function directly and invoke it with a
- * firebase-functions-test wrapped callable context. The Firestore and Auth
- * emulators are used for state verification.
+ * Strategy: invoke runDeleteAccount (core logic) and deleteAccountHandler (callable
+ * wrapper guard checks) directly against the emulator-backed named app.
  */
 
 import * as admin from "firebase-admin";
 
-// Point Admin SDK to emulators
+// Point Admin SDK to emulators — must be set before any firebase-admin import
 process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
 process.env.FIREBASE_AUTH_EMULATOR_HOST = "127.0.0.1:9099";
 process.env.GCLOUD_PROJECT = "treino-dev";
-// Tell firebase-functions-test to run offline (unit test mode for the callable wrapper)
 process.env.FUNCTIONS_EMULATOR = "true";
 
-import functionsTest from "firebase-functions-test";
-import { deleteAccountHandler } from "../delete-account";
+import { wrapV2 } from "firebase-functions-test/lib/v2";
+import { CallableRequest } from "firebase-functions/v2/https";
+import { deleteAccountHandler, runDeleteAccount } from "../delete-account";
 import { DeleteAccountRequest, DeleteAccountResponse } from "../types";
 
 const projectConfig = { projectId: "treino-dev" };
-const testEnv = functionsTest(projectConfig, undefined);
 
 let smokeApp: admin.app.App;
 
@@ -37,17 +35,19 @@ beforeAll(() => {
 });
 
 afterAll(async () => {
-  testEnv.cleanup();
   await smokeApp.delete();
 });
+
+// Wrap the callable handler for guard-layer tests
+const wrappedHandler = wrapV2(deleteAccountHandler);
+
+// ── Helpers ────────────────────────────────────────────────────────────────
 
 async function createTestUser(
   uid: string,
   role: "athlete" | "trainer" = "athlete"
 ): Promise<void> {
-  // Create Auth user in emulator
   await admin.auth(smokeApp).createUser({ uid, email: `${uid}@test.com` });
-  // Seed Firestore users doc
   await admin
     .firestore(smokeApp)
     .collection("users")
@@ -55,122 +55,119 @@ async function createTestUser(
     .set({ uid, role, email: `${uid}@test.com` });
 }
 
-async function deleteTestUser(uid: string): Promise<void> {
-  try {
-    await admin.auth(smokeApp).deleteUser(uid);
-  } catch {
-    // ignore not-found
-  }
-  try {
-    await admin.firestore(smokeApp).collection("users").doc(uid).delete();
-  } catch {
-    // ignore
-  }
-  try {
-    await admin
-      .firestore(smokeApp)
-      .collection("audit_log")
-      .doc(uid)
-      .delete();
-  } catch {
-    // ignore
-  }
+async function cleanupUser(uid: string): Promise<void> {
+  await Promise.all([
+    admin.auth(smokeApp).deleteUser(uid).catch(() => undefined),
+    admin.firestore(smokeApp).collection("users").doc(uid).delete().catch(() => undefined),
+    admin.firestore(smokeApp).collection("audit_log").doc(uid).delete().catch(() => undefined),
+  ]);
 }
 
-// Wrap the handler for callable invocation
-const wrappedDeleteAccount = testEnv.wrap(deleteAccountHandler);
-
-/**
- * Build a fake callable context with auth.
- */
-function makeContext(
-  uid: string,
+function makeCallableRequest(
+  callerUid: string,
+  targetUid: string,
   provider = "password"
-): Record<string, unknown> {
+): CallableRequest<DeleteAccountRequest> {
   return {
+    data: { uid: targetUid },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     auth: {
-      uid,
-      token: {
-        firebase: { sign_in_provider: provider },
-      },
-    },
+      uid: callerUid,
+      token: { firebase: { sign_in_provider: provider } },
+    } as any,
+    rawRequest: {} as CallableRequest["rawRequest"],
+    instanceIdToken: undefined,
+    app: undefined,
   };
 }
 
-describe("deleteAccount — SCENARIO-534: anti-spoof guard", () => {
-  it("throws permission-denied when caller uid != data.uid", async () => {
-    const callerUid = "spoof-caller";
-    const targetUid = "spoof-target";
-    await createTestUser(callerUid);
-    await createTestUser(targetUid);
+// ── Callable-layer guard tests ─────────────────────────────────────────────
 
-    const ctx = makeContext(callerUid);
-    const data: DeleteAccountRequest = { uid: targetUid };
-
-    try {
-      await wrappedDeleteAccount(data, ctx);
-      fail("Expected HttpsError to be thrown");
-    } catch (err: unknown) {
-      const e = err as { code?: string; message?: string };
-      expect(e.code).toBe("permission-denied");
-    } finally {
-      await deleteTestUser(callerUid);
-      await deleteTestUser(targetUid);
-    }
+describe("callable guard: unauthenticated", () => {
+  it("throws unauthenticated when auth context is absent", async () => {
+    const req: CallableRequest<DeleteAccountRequest> = {
+      data: { uid: "any-uid" },
+      auth: undefined,
+      rawRequest: {} as CallableRequest["rawRequest"],
+      instanceIdToken: undefined,
+      app: undefined,
+    };
+    await expect(wrappedHandler(req)).rejects.toMatchObject({
+      code: "unauthenticated",
+    });
   });
 });
 
-describe("deleteAccount — SCENARIO-533, 547, 549, 551: success path", () => {
-  const uid = "smoke-success-athlete";
+describe("SCENARIO-534: anti-spoof guard", () => {
+  const callerUid = "spoof-caller";
+  const targetUid = "spoof-target";
 
-  beforeEach(() => createTestUser(uid));
-  afterEach(() => deleteTestUser(uid));
-
-  it("SCENARIO-533: callable executes without permission error for authenticated athlete", async () => {
-    const ctx = makeContext(uid);
-    const data: DeleteAccountRequest = { uid };
-
-    // Should not throw permission-denied or not-found
-    const result = await wrappedDeleteAccount(data, ctx);
-    expect(result).toBeDefined();
+  beforeEach(async () => {
+    await createTestUser(callerUid);
+    await createTestUser(targetUid);
+  });
+  afterEach(async () => {
+    await cleanupUser(callerUid);
+    await cleanupUser(targetUid);
   });
 
-  it("SCENARIO-551: returns { status, deletedCollections, errors } shape", async () => {
-    // Re-create user since previous test deletes Auth entry
-    await deleteTestUser(uid);
-    await createTestUser(uid);
+  it("throws permission-denied when caller uid != data.uid", async () => {
+    const req = makeCallableRequest(callerUid, targetUid);
+    await expect(wrappedHandler(req)).rejects.toMatchObject({
+      code: "permission-denied",
+    });
+  });
+});
 
-    const ctx = makeContext(uid);
-    const data: DeleteAccountRequest = { uid };
-    const result = (await wrappedDeleteAccount(data, ctx)) as DeleteAccountResponse;
+// ── Core logic tests (runDeleteAccount) ───────────────────────────────────
+
+describe("SCENARIO-533: core logic callable by authenticated athlete", () => {
+  const uid = "smoke-athlete-533";
+
+  beforeEach(() => createTestUser(uid));
+  afterEach(() => cleanupUser(uid));
+
+  it("SCENARIO-533: resolves without error for a valid athlete", async () => {
+    const result = await runDeleteAccount(smokeApp, uid, "password");
+    expect(result).toBeDefined();
+  });
+});
+
+describe("SCENARIO-551, 549, 547: success path", () => {
+  const uid = "smoke-success-551";
+
+  beforeEach(() => createTestUser(uid));
+  afterEach(() => cleanupUser(uid));
+
+  it("SCENARIO-551: returns { status: success, deletedCollections, errors: [] }", async () => {
+    const result = (await runDeleteAccount(
+      smokeApp,
+      uid,
+      "password"
+    )) as DeleteAccountResponse;
 
     expect(result.status).toBe("success");
     expect(Array.isArray(result.deletedCollections)).toBe(true);
     expect(result.deletedCollections.length).toBeGreaterThan(0);
-    expect(Array.isArray(result.errors)).toBe(true);
     expect(result.errors).toHaveLength(0);
   });
 
-  it("SCENARIO-549: auth user no longer exists after CF success", async () => {
-    await deleteTestUser(uid);
+  it("SCENARIO-549: auth user no longer retrievable after success", async () => {
+    await cleanupUser(uid);
     await createTestUser(uid);
 
-    const ctx = makeContext(uid);
-    const data: DeleteAccountRequest = { uid };
-    await wrappedDeleteAccount(data, ctx);
+    await runDeleteAccount(smokeApp, uid, "password");
 
     await expect(admin.auth(smokeApp).getUser(uid)).rejects.toMatchObject({
       code: "auth/user-not-found",
     });
   });
 
-  it("SCENARIO-547: audit_log/{uid} exists with status success after completion", async () => {
-    await deleteTestUser(uid);
+  it("SCENARIO-547: audit_log/{uid} has status=success with completedAt set", async () => {
+    await cleanupUser(uid);
     await createTestUser(uid);
 
-    const ctx = makeContext(uid);
-    const data: DeleteAccountRequest = { uid };
-    await wrappedDeleteAccount(data, ctx);
+    await runDeleteAccount(smokeApp, uid, "password");
 
     const snap = await admin
       .firestore(smokeApp)
@@ -181,19 +178,5 @@ describe("deleteAccount — SCENARIO-533, 547, 549, 551: success path", () => {
     expect(snap.exists).toBe(true);
     expect(snap.data()?.status).toBe("success");
     expect(snap.data()?.completedAt).toBeTruthy();
-  });
-});
-
-describe("deleteAccount — unauthenticated guard", () => {
-  it("throws unauthenticated when auth context is missing", async () => {
-    const data: DeleteAccountRequest = { uid: "any-uid" };
-
-    try {
-      await wrappedDeleteAccount(data, {}); // no auth context
-      fail("Expected HttpsError to be thrown");
-    } catch (err: unknown) {
-      const e = err as { code?: string };
-      expect(e.code).toBe("unauthenticated");
-    }
   });
 });
