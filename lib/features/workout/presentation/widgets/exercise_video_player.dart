@@ -56,11 +56,16 @@ class _ExerciseVideoPlayerState extends State<ExerciseVideoPlayer> {
       _controller = YoutubePlayerController.fromVideoId(
         videoId: id,
         autoPlay: false,
+        // Tuned to maximize embed compatibility on iOS WKWebView. Default
+        // origin='https://www.youtube.com' already; strictRelatedVideos off
+        // because enforcing it from a non-youtube document caused legit
+        // embed-enabled videos to surface "Video unavailable" here while
+        // playing fine elsewhere.
         params: const YoutubePlayerParams(
           showControls: true,
           showFullscreenButton: true,
           enableCaption: false,
-          strictRelatedVideos: true,
+          strictRelatedVideos: false,
         ),
       );
     }
