@@ -1,0 +1,64 @@
+change_name: profile-screen-rewrite
+phase_etapa: "Fase 3 / Etapa 7"
+owner: Backhaus
+artifact_store: "openspec + engram"
+status: ARCHIVED
+archived_date: 2026-05-28
+
+# All artifacts present
+artifacts:
+  proposal: true
+  spec: true
+  design: true
+  tasks: true
+  apply_progress: false  # stored only in openspec, not mirrored to engram
+  verify_report: true
+  archive_report: true
+
+# Verification
+verify_status: PASS-WITH-DEVIATIONS
+merged_prs:
+  - pr: 95
+    commit: 644b97b
+    description: "Scaffold (PR#1)"
+  - pr: 97
+    commit: 941902a
+    description: "Edit Personal (PR#2)"
+  - pr: 99
+    commit: f377d8d
+    description: "Gym + Routines (PR#3)"
+  - pr: 101
+    commit: 27a7918
+    description: "Actions v2 PIVOT (PR#4)"
+
+# Main spec merge
+main_spec_updated: "openspec/specs/profile/spec.md"
+reqs_merged: 22
+reqs_removed: 6
+reqs_added: 3  # PR#4 pivot additions (REQ-PSR-026, 027, 028)
+
+# Engram observation IDs (for traceability)
+engram:
+  proposal: 101
+  spec: 102
+  design: 103
+  tasks: 104
+  verify_report: 112
+  archive_report: null  # saved after archiving
+
+# Decision memories (survive archive)
+decision_memories:
+  - key: "profile/mis-rutinas-scope"
+    description: "Mis rutinas = trainer-assigned only"
+  - key: "profile/settings-deferred"
+    description: "Settings surface deferred until real settings exist"
+
+# Follow-ups
+followups:
+  - "Declare storage.rules in repo"
+  - "gymSearchQueryProvider autoDispose refactor"
+  - "account-deletion SDD (real flow)"
+  - "i18n sweep (Fase 6 Etapa 3)"
+
+# Archive location
+archive_path: "openspec/changes/archive/2026-05-28-profile-screen-rewrite/"
