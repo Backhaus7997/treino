@@ -298,6 +298,16 @@ service cloud.firestore {
                          && request.auth.uid == uid;
     }
 
+    // Trainer custom exercise library — owner-only.
+    // Each trainer's personal exercise catalogue (names they prefer, video
+    // URLs they trust). Hard delete allowed because the routine slots that
+    // reference these exercises already denormalize name/group at assign time,
+    // so removing the source doesn't break athletes' assigned plans.
+    match /users/{uid}/customExercises/{exId} {
+      allow read, write: if request.auth != null
+                         && request.auth.uid == uid;
+    }
+
     // Coach Agenda — availability rules (Fase 5 Etapa 6, REQ-027).
     // Trainers own their rules; athletes and trainers can read any rule
     // (needed to compute free slots client-side). Create/update/delete

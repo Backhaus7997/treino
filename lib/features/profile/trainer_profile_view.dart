@@ -121,6 +121,13 @@ class TrainerProfileView extends ConsumerWidget {
           palette: palette,
         ),
         const SizedBox(height: 10),
+        _MenuRow(
+          icon: TreinoIcon.sparkle,
+          label: 'Mis ejercicios',
+          onTap: () => context.push('/profile/my-exercises'),
+          palette: palette,
+        ),
+        const SizedBox(height: 10),
         // "Planes comerciales" menu row REMOVED 2026-05-28 — the dual
         // pricing model (profile monthly rate + plan catalog) was confusing.
         // Trainer pricing now lives ONLY in the PERFIL PÚBLICO card EDITAR
