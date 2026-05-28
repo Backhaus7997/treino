@@ -15,8 +15,6 @@ import '../features/coach/application/trainer_link_providers.dart';
 import '../features/coach/presentation/athlete_agenda_screen.dart';
 import '../features/coach/presentation/athlete_detail_screen.dart';
 import '../features/coach/presentation/availability_editor_screen.dart';
-import '../features/coach/presentation/commercial_plan_editor_screen.dart';
-import '../features/coach/presentation/commercial_plans_list_screen.dart';
 import '../features/coach/presentation/trainer_public_profile_screen.dart';
 import '../features/workout/application/session_providers.dart'
     show currentUidProvider;
@@ -352,23 +350,12 @@ GoRouter buildRouter({
               // Sign-out and eliminar-cuenta tiles now live directly in
               // ProfileScreen body. Settings surface deferred to future SDD.
               //
-              // Trainer commercial plans (Fase 6) — list + create/edit form.
-              GoRoute(
-                path: 'commercial-plans',
-                pageBuilder: (_, __) =>
-                    _noAnim(const CommercialPlansListScreen()),
-                routes: [
-                  GoRoute(
-                    path: ':planId',
-                    pageBuilder: (context, state) {
-                      final planId = state.pathParameters['planId'];
-                      return _noAnim(
-                        CommercialPlanEditorScreen(planId: planId),
-                      );
-                    },
-                  ),
-                ],
-              ),
+              // /profile/commercial-plans GoRoutes REMOVED 2026-05-28 — the
+              // dual pricing model (single trainerMonthlyRate on the public
+              // profile + a separate plan catalog) was confusing trainers.
+              // Pricing now lives ONLY in the public profile via the EDITAR
+              // CTA on the PERFIL PÚBLICO card. A future subscribe flow can
+              // reintroduce a multi-tier catalog if needed.
             ],
           ),
         ],

@@ -83,14 +83,6 @@
       ]
     },
     {
-      "collectionGroup": "commercialPlans",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "trainerId", "order": "ASCENDING" },
-        { "fieldPath": "createdAt", "order": "DESCENDING" }
-      ]
-    },
-    {
       "collectionGroup": "posts",
       "queryScope": "COLLECTION",
       "fields": [

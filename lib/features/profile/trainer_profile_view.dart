@@ -121,13 +121,12 @@ class TrainerProfileView extends ConsumerWidget {
           palette: palette,
         ),
         const SizedBox(height: 10),
-        _MenuRow(
-          icon: TreinoIcon.sparkle,
-          label: 'Planes comerciales',
-          onTap: () => context.push('/profile/commercial-plans'),
-          palette: palette,
-        ),
-        const SizedBox(height: 10),
+        // "Planes comerciales" menu row REMOVED 2026-05-28 — the dual
+        // pricing model (profile monthly rate + plan catalog) was confusing.
+        // Trainer pricing now lives ONLY in the PERFIL PÚBLICO card EDITAR
+        // CTA above. Plan catalog can come back in a later phase once we
+        // build the athlete-side subscribe flow that justifies multi-tier.
+        //
         // "Configuración por defecto" menu row REMOVED 2026-05-28 — main
         // PR#4 pivot deleted the /profile/settings route. Settings surface
         // deferred to a future SDD (notifications/theme/language).
