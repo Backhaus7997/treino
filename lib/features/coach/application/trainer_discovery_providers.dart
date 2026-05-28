@@ -4,6 +4,7 @@ import 'package:geolocator/geolocator.dart';
 import '../../profile/application/user_providers.dart' show firestoreProvider;
 import '../data/trainer_public_profile_repository.dart';
 import '../domain/discovery_filters.dart';
+import '../domain/trainer_location.dart';
 import '../domain/trainer_public_profile.dart';
 import '../domain/trainer_specialty.dart';
 import '../../../core/utils/geohash.dart';
@@ -14,8 +15,19 @@ import '../../../core/utils/haversine.dart';
 /// Abstraction over [TrainerPublicProfileRepository] used by providers so
 /// widget and unit tests can inject a fake without a real Firestore.
 abstract interface class TrainerPublicProfileRepositoryInterface {
+  /// DEPRECATED — usar [listByGeohashes] en lugar. Mantenido por backward
+  /// compat con tests legacy hasta que se migren todos.
   Future<List<TrainerPublicProfile>> listByGeohashPrefix(
     String prefix5, {
+    TrainerSpecialty? specialty,
+  });
+
+  Future<List<TrainerPublicProfile>> listByGeohashes(
+    List<String> geohashes, {
+    TrainerSpecialty? specialty,
+  });
+
+  Future<List<TrainerPublicProfile>> listVirtualOnly({
     TrainerSpecialty? specialty,
   });
 
@@ -46,6 +58,19 @@ class _RealRepoAdapter implements TrainerPublicProfileRepositoryInterface {
     TrainerSpecialty? specialty,
   }) =>
       _repo.listByGeohashPrefix(prefix5, specialty: specialty);
+
+  @override
+  Future<List<TrainerPublicProfile>> listByGeohashes(
+    List<String> geohashes, {
+    TrainerSpecialty? specialty,
+  }) =>
+      _repo.listByGeohashes(geohashes, specialty: specialty);
+
+  @override
+  Future<List<TrainerPublicProfile>> listVirtualOnly({
+    TrainerSpecialty? specialty,
+  }) =>
+      _repo.listVirtualOnly(specialty: specialty);
 
   @override
   Future<List<TrainerPublicProfile>> listAll({TrainerSpecialty? specialty}) =>
@@ -164,6 +189,26 @@ final selectedPriceFilterProvider = StateProvider<PriceFilter>(
   (ref) => PriceFilter.any,
 );
 
+// ── virtualOnlyFilterProvider ─────────────────────────────────────────────
+
+/// Chip "Online" del discovery — Fase 6 Etapa 0 PR#2.
+///
+/// Default OFF: la lista trae presenciales del área del atleta UNION
+/// virtuales (todos los PFs con `trainerOffersOnline: true`). Los híbridos
+/// aparecen una sola vez (dedup por uid).
+///
+/// Cuando está ON:
+///   - El query base pasa a `repo.listVirtualOnly()` — solo PFs con
+///     `trainerOffersOnline: true`, ignorando el geohash del atleta.
+///   - Distance filter se ignora (un virtual no tiene "distancia").
+///   - Specialty + price filters siguen aplicando client-side.
+///
+/// Nombre interno del provider sigue siendo `virtualOnly` por backward
+/// compat con el código del PR#2 — el label visible cambió a "Online".
+///
+/// Persiste como los otros filters (NOT autoDispose).
+final virtualOnlyFilterProvider = StateProvider<bool>((ref) => false);
+
 // ── trainerDiscoveryProvider ──────────────────────────────────────────────
 
 /// Fetches and orders trainers for the discovery list.
@@ -190,20 +235,40 @@ final trainerDiscoveryProvider =
   final selectedSpecialty = ref.watch(selectedSpecialtyProvider);
   final selectedDistance = ref.watch(selectedDistanceFilterProvider);
   final selectedPrice = ref.watch(selectedPriceFilterProvider);
+  final virtualOnly = ref.watch(virtualOnlyFilterProvider);
   final repo = ref.watch(trainerPublicProfileRepositoryProvider);
 
   List<TrainerPublicProfile> trainers;
 
-  if (pos != null) {
-    final prefix = geohash5(pos.latitude, pos.longitude);
-    trainers = await repo.listByGeohashPrefix(prefix);
-    // Fallback UX: si el geohash cell del atleta no tiene trainers,
-    // mostrar todos (haversine reorder igual aplica). Mejor que dejar el
-    // empty state cuando hay PFs disponibles en otras ciudades.
+  if (virtualOnly) {
+    // Filtro ON: solo virtuales (ignora geohash + distance filter).
+    trainers = await repo.listVirtualOnly();
+  } else if (pos != null) {
+    // Filtro OFF + location disponible: UNION de presenciales del área
+    // (los que tienen al menos una ubicación cerca del atleta) + virtuales
+    // (los que ofrecen online, independiente de su ubicación). Dedup por
+    // uid — un PF híbrido (locations + offersOnline) aparece UNA sola vez.
+    //
+    // Esto resuelve un bug UX donde los PFs virtuales puros (sin
+    // trainerGeohashes) no aparecían sin tocar el filtro "Online".
+    final athleteGeohash = geohash5(pos.latitude, pos.longitude);
+    final nearby = await repo.listByGeohashes([athleteGeohash]);
+    final virtuals = await repo.listVirtualOnly();
+    final byUid = <String, TrainerPublicProfile>{};
+    for (final t in nearby) {
+      byUid[t.uid] = t;
+    }
+    for (final t in virtuals) {
+      byUid.putIfAbsent(t.uid, () => t);
+    }
+    trainers = byUid.values.toList();
+    // Fallback UX: si nadie matchea (ni geohash ni virtual), mostrar
+    // todos. Haversine reorder igual ordena los que tienen ubicación.
     if (trainers.isEmpty) {
       trainers = await repo.listAll();
     }
   } else {
+    // Sin location del atleta: listAll.
     trainers = await repo.listAll();
   }
 
@@ -213,39 +278,35 @@ final trainerDiscoveryProvider =
         trainers.where((t) => t.trainerSpecialty == selectedSpecialty).toList();
   }
 
-  // Fase 2b: distance filter — solo aplica cuando hay location del athlete.
-  // Si pos == null, el filtro es no-op (no descarta nada).
+  // Distance filter — solo aplica cuando hay location del athlete y NO
+  // estamos en modo virtual-only (los PFs virtuales no tienen ubicación
+  // "cercana" que medir).
   final maxKm = selectedDistance.maxKm;
-  if (pos != null && maxKm != null) {
+  if (pos != null && maxKm != null && !virtualOnly) {
     trainers = trainers.where((t) {
-      if (t.trainerLatitude == null || t.trainerLongitude == null) {
+      final km = nearestDistanceKm(t, pos);
+      if (km == null) {
         return false; // sin location no podemos saber la distancia
       }
-      final km = haversineKm(
-        pos.latitude,
-        pos.longitude,
-        t.trainerLatitude!,
-        t.trainerLongitude!,
-      );
       return km <= maxKm;
     }).toList();
   }
 
-  // Fase 2b: price filter — siempre aplica. Trainers sin rate set se
-  // incluyen (matches retorna true cuando rate es null).
+  // Price filter — siempre aplica. Trainers sin rate set se incluyen
+  // (matches retorna true cuando rate es null).
   if (selectedPrice != PriceFilter.any) {
     trainers = trainers
         .where((t) => selectedPrice.matches(t.trainerMonthlyRate))
         .toList();
   }
 
-  // Reorder by haversine ASC when location is available (D9)
-  if (pos != null) {
+  // Reorder by haversine ASC when location is available + NOT virtual-only.
+  // Tiebreaker: displayName ASC.
+  if (pos != null && !virtualOnly) {
     trainers.sort((a, b) {
-      final da = _distanceOrMax(a, pos);
-      final db = _distanceOrMax(b, pos);
+      final da = nearestDistanceKm(a, pos) ?? double.maxFinite;
+      final db = nearestDistanceKm(b, pos) ?? double.maxFinite;
       if (da != db) return da.compareTo(db);
-      // Tiebreaker: displayName ASC (D9)
       return (a.displayNameLowercase ?? a.uid)
           .compareTo(b.displayNameLowercase ?? b.uid);
     });
@@ -254,12 +315,61 @@ final trainerDiscoveryProvider =
   return trainers;
 });
 
-double _distanceOrMax(TrainerPublicProfile t, Position pos) {
-  if (t.trainerLatitude == null || t.trainerLongitude == null) {
-    return double.maxFinite;
+/// Devuelve las ubicaciones efectivas de un PF, fallback a los campos legacy
+/// cuando el doc no tiene `trainerLocations` (PFs no migrados todavía o tests
+/// con docs legacy). Es PUREZA — no toca network.
+///
+/// Si `trainerLocations` no está vacío → ese array.
+/// Sino, si `trainerLatitude/Longitude/Geohash` legacy están seteados →
+/// devuelve un `TrainerLocation` sintético de tipo `custom`.
+/// Sino → lista vacía.
+List<TrainerLocation> effectiveLocationsOf(TrainerPublicProfile t) {
+  if (t.trainerLocations.isNotEmpty) return t.trainerLocations;
+  if (t.trainerLatitude != null &&
+      t.trainerLongitude != null &&
+      t.trainerGeohash != null) {
+    return [
+      TrainerLocation(
+        id: 'legacy',
+        type: TrainerLocationType.custom,
+        customLabel: 'Ubicación principal',
+        lat: t.trainerLatitude!,
+        lng: t.trainerLongitude!,
+        geohash: t.trainerGeohash!,
+      ),
+    ];
   }
-  return haversineKm(
-      pos.latitude, pos.longitude, t.trainerLatitude!, t.trainerLongitude!);
+  return const [];
+}
+
+/// Distancia haversine en km a la ubicación MÁS CERCANA del PF. Null si el
+/// PF no tiene ninguna ubicación con lat/lng.
+double? nearestDistanceKm(TrainerPublicProfile t, Position pos) {
+  final locations = effectiveLocationsOf(t);
+  if (locations.isEmpty) return null;
+  double? best;
+  for (final loc in locations) {
+    final km = haversineKm(pos.latitude, pos.longitude, loc.lat, loc.lng);
+    if (best == null || km < best) best = km;
+  }
+  return best;
+}
+
+/// Devuelve la ubicación más cercana del PF al atleta. Null si no tiene
+/// ubicaciones. Usada por `TrainerListTile` para mostrar el label correcto.
+TrainerLocation? nearestLocationOf(TrainerPublicProfile t, Position pos) {
+  final locations = effectiveLocationsOf(t);
+  if (locations.isEmpty) return null;
+  TrainerLocation? best;
+  double? bestKm;
+  for (final loc in locations) {
+    final km = haversineKm(pos.latitude, pos.longitude, loc.lat, loc.lng);
+    if (bestKm == null || km < bestKm) {
+      bestKm = km;
+      best = loc;
+    }
+  }
+  return best;
 }
 
 // ── trainerByIdProvider ───────────────────────────────────────────────────
