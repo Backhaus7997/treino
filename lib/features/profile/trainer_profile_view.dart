@@ -128,13 +128,9 @@ class TrainerProfileView extends ConsumerWidget {
           palette: palette,
         ),
         const SizedBox(height: 10),
-        _MenuRow(
-          icon: TreinoIcon.timer,
-          label: 'Configuración por defecto',
-          onTap: () => context.push('/profile/settings'),
-          palette: palette,
-        ),
-        const SizedBox(height: 10),
+        // "Configuración por defecto" menu row REMOVED 2026-05-28 — main
+        // PR#4 pivot deleted the /profile/settings route. Settings surface
+        // deferred to a future SDD (notifications/theme/language).
         _MenuRow(
           icon: TreinoIcon.signOut,
           label: 'Cerrar sesión',
@@ -403,7 +399,13 @@ class _PerfilPublicoCard extends StatelessWidget {
               const SizedBox(width: 12),
               Expanded(
                 child: ElevatedButton(
-                  onPressed: () => context.push('/profile/edit-personal'),
+                  // Edit the trainer's PUBLIC profile (bio, specialty,
+                  // multi-location, monthly price, online toggle). Wires the
+                  // new ProfileEditTrainerScreen merged from main PR #102.
+                  // The basic name/avatar form remains at /profile/edit-
+                  // personal — accessible to the trainer if they go through
+                  // the athlete-shared cuenta section, not from this CTA.
+                  onPressed: () => context.push('/profile/edit-trainer'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: palette.accent,
                     foregroundColor: palette.bg,
