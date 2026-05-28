@@ -14,7 +14,9 @@ import 'package:treino/features/profile/domain/user_session_stats.dart';
 import 'package:treino/features/profile/presentation/profile_edit_personal_screen.dart';
 import 'package:treino/features/profile/presentation/profile_gym_screen.dart';
 import 'package:treino/features/profile/presentation/profile_routines_screen.dart';
-import 'package:treino/features/profile/presentation/profile_settings_screen.dart';
+// ProfileSettingsScreen import REMOVED 2026-05-28 — /profile/settings route
+// was removed as part of the PR#4 pivot. The SCENARIO-507d test that asserted
+// the route existed has been removed accordingly.
 
 // ---------------------------------------------------------------------------
 // Shared test scaffolding
@@ -166,28 +168,9 @@ void main() {
       expect(find.byType(ProfileRoutinesScreen), findsOneWidget);
     });
 
-    testWidgets(
-        'SCENARIO-507d: /profile/settings resolves to ProfileSettingsScreen',
-        (tester) async {
-      final container = ProviderContainer(overrides: _baseOverrides());
-      addTearDown(container.dispose);
-      final router = buildRouter(
-        refreshListenable: ValueNotifier<int>(0),
-        read: container.read,
-      );
-      router.go('/profile/settings');
-      await tester.pumpWidget(
-        UncontrolledProviderScope(
-          container: container,
-          child: MaterialApp.router(
-            theme: AppTheme.dark(),
-            routerConfig: router,
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-      expect(find.byType(ProfileSettingsScreen), findsOneWidget);
-    });
+    // SCENARIO-507d: REMOVED 2026-05-28 — /profile/settings route was removed
+    // as part of the PR#4 pivot. The router now registers 3 sub-routes
+    // (edit-personal, gym, routines). Settings surface deferred to a future SDD.
   });
 
   // ---------------------------------------------------------------------------

@@ -36,7 +36,9 @@ import '../features/profile/application/user_providers.dart';
 import '../features/profile/presentation/profile_edit_personal_screen.dart';
 import '../features/profile/presentation/profile_gym_screen.dart';
 import '../features/profile/presentation/profile_routines_screen.dart';
-import '../features/profile/presentation/profile_settings_screen.dart';
+// profile_settings_screen.dart import REMOVED 2026-05-28 — /profile/settings
+// route was removed as part of the PR#4 pivot. Settings surface deferred until
+// real settings content exists (notifications/theme/language).
 import '../features/profile/profile_screen.dart';
 import '../features/profile_setup/presentation/profile_setup_flow.dart';
 import '../features/workout/workout_screen.dart';
@@ -334,10 +336,9 @@ GoRouter buildRouter({
                 path: 'routines',
                 pageBuilder: (_, __) => _noAnim(const ProfileRoutinesScreen()),
               ),
-              GoRoute(
-                path: 'settings',
-                pageBuilder: (_, __) => _noAnim(const ProfileSettingsScreen()),
-              ),
+              // /profile/settings GoRoute REMOVED 2026-05-28 — PR#4 pivot.
+              // Sign-out and eliminar-cuenta tiles now live directly in
+              // ProfileScreen body. Settings surface deferred to future SDD.
             ],
           ),
         ],

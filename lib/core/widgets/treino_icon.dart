@@ -98,8 +98,8 @@ class TreinoIcon {
   static const IconData send = PhosphorIconsFill.paperPlaneTilt;
   static const IconData chatEmpty = PhosphorIconsRegular.chatsCircle;
 
-  // Profile settings
-  static const IconData settings = PhosphorIconsRegular.gearSix;
+  // Profile settings constant REMOVED 2026-05-28 — gear icon was removed from
+  // ProfileHeader as part of the PR#4 pivot. Zero remaining usages.
 
   // Coach Hub (web) — import flow
   static const IconData arrowLeft = PhosphorIconsRegular.arrowLeft;

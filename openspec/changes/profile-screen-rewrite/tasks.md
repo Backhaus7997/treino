@@ -184,28 +184,66 @@ Chain strategy: stacked-to-main
 
 ---
 
-## PR#4 — Settings + Sign-Out Cleanup (~200 LOC)
+## ~~PR#4 v1~~ — SUPERSEDED BY PR#4 v2 PIVOT 2026-05-28
 
-**REQs covered**: REQ-PSR-022..025, REQ-PSR-CX-001..004
-**SCENARIOs covered**: 522..528
+> **PIVOT 2026-05-28**: Original PR#4 tasks T45..T53 are SUPERSEDED. The separate
+> Settings screen approach was scrapped. See PR#4 v2 section below.
 
-### Phase 4.1: ProfileSettingsScreen (real)
+### ~~Phase 4.1: ProfileSettingsScreen (real)~~ — SUPERSEDED
 
-- [ ] T45 — SETUP: rebase `feat/profile-screen-rewrite-pr4-settings` on post-PR#3 `main`.
-- [ ] T46 — RED: create `test/features/profile/presentation/profile_settings_screen_test.dart`; 4 failing tests: exactly 2 tiles visible — "Cerrar sesión" and "Eliminar cuenta" (SCENARIO-522); "Cerrar sesión" tile tap calls `authNotifierProvider.notifier.signOut()` (SCENARIO-523); "Eliminar cuenta" tile opens bottom sheet with correct copy (SCENARIO-524); CANCELAR in sheet closes it without action (SCENARIO-525). Mock `authNotifierProvider`.
-- [ ] T47 — GREEN: replace stub with real `lib/features/profile/presentation/profile_settings_screen.dart` — ConsumerWidget; 2 `ProfileSectionTile`s; "Eliminar cuenta" opens `EliminarCuentaStubSheet` via `showModalBottomSheet`; create `lib/features/profile/presentation/widgets/eliminar_cuenta_stub_sheet.dart` with drag handle + copy + CANCELAR only; T46 must pass.
+- [~~T45~~] — ~~SETUP~~ (superseded by T45v2)
+- [~~T46~~] — ~~RED: profile_settings_screen_test~~ (superseded by T46v2)
+- [~~T47~~] — ~~GREEN: ProfileSettingsScreen real~~ (superseded by T47v2)
 
-### Phase 4.2: Legacy sign-out removal
+### ~~Phase 4.2: Legacy sign-out removal~~ — SUPERSEDED
 
-- [ ] T48 — RED: add 1 failing test to `test/features/profile/presentation/profile_screen_test.dart`: "Cerrar sesión" TextButton is absent from body footer (SCENARIO-526).
-- [ ] T49 — GREEN: remove legacy "Cerrar sesión" `TextButton` from `lib/features/profile/profile_screen.dart` body; refactor layout to absorb space cleanly; T48 must pass.
+- [~~T48~~] — ~~RED: SCENARIO-526 (footer absent)~~ (superseded — pivot handles this differently)
+- [~~T49~~] — ~~GREEN: remove TextButton footer~~ (superseded by T49v2)
 
-### Phase 4.3: Quality gates
+### ~~Phase 4.3: Quality gates~~ — SUPERSEDED
 
-- [ ] T50 — GATE: `flutter analyze` — 0 issues.
-- [ ] T51 — GATE: `dart format --output=none --set-exit-if-changed .` — 0 changed.
-- [ ] T52 — GATE: `flutter test` — all passing; delta +5 new tests; no regressions; SCENARIO-528 (no PhosphorIcons direct usage) confirmed by rg gate.
-- [ ] T53 — VERIFY: same checks as T21 scoped to new PR#4 files; `rg "Cerrar sesión" lib/features/profile/profile_screen.dart` → 0 hits (footer button gone).
+- [~~T50~~] — (superseded by T50v2)
+- [~~T51~~] — (superseded by T51v2)
+- [~~T52~~] — (superseded by T52v2)
+- [~~T53~~] — (superseded by T53v2)
+
+---
+
+## PR#4 v2 — PIVOT 2026-05-28: Actions in Body (~150 LOC)
+
+> **Rationale**: Settings as a surface is premature — only 2 tiles, no real settings yet.
+> Sign-out + eliminar-cuenta tiles live directly at the bottom of ProfileScreen body.
+> /profile/settings route, ProfileSettingsScreen, and TreinoIcon.settings all REMOVED.
+
+**REQs covered**: REQ-PSR-026..028, REQ-PSR-CX-001..004
+**SCENARIOs covered**: 529..532, 527, 528
+
+### Phase 4v2.1: Spec update + RED tests
+
+- [x] T45v2 — SETUP: Hard-reset branch `feat/profile-screen-rewrite-pr4-settings` to `b1e592b` (post-PR#3 main). Commit spec update (docs). Write RED tests:
+  - `test/features/profile/presentation/profile_screen_test.dart` — SCENARIO-529 (tiles present + no legacy TextButton), SCENARIO-530 (signOut called), SCENARIO-531 (stub sheet opens), SCENARIO-532 (CANCELAR closes); extends with `_TrackingAuthNotifier` stub.
+  - `test/features/profile/presentation/widgets/profile_header_test.dart` — SCENARIO-494 updated to assert `Key('profile_header_gear')` ABSENT; SCENARIO-495 test REMOVED.
+  - `test/app/router_test.dart` — SCENARIO-507d test REMOVED; import of `ProfileSettingsScreen` REMOVED.
+  - RED commit SHA: `ff52df9`
+
+### Phase 4v2.2: GREEN implementation
+
+- [x] T46v2 — GREEN: Implement all changes in one GREEN commit:
+  - CREATE `lib/features/profile/presentation/widgets/eliminar_cuenta_stub_sheet.dart` — drag handle + title + copy + CANCELAR only; no destructive logic.
+  - MODIFY `lib/features/profile/presentation/widgets/profile_header.dart` — remove gear `GestureDetector`, `go_router` import, `treino_icon.dart` import. Header is now a simple Column with 2 Text widgets.
+  - MODIFY `lib/features/profile/profile_screen.dart` — remove legacy TextButton footer; add `ProfileSectionTile` for "Cerrar sesión" (TreinoIcon.signOut) and "Eliminar cuenta" (TreinoIcon.trash, destructive=true + showModalBottomSheet).
+  - MODIFY `lib/app/router.dart` — remove `profile_settings_screen.dart` import; remove `GoRoute(path: 'settings')`.
+  - DELETE `lib/features/profile/presentation/profile_settings_screen.dart`.
+  - MODIFY `lib/core/widgets/treino_icon.dart` — remove `settings` constant.
+  - MODIFY `test/features/profile/profile_screen_sign_out_test.dart` — remove stale `settings` route from local test router.
+  - GREEN commit SHA: `cb2cac7`
+
+### Phase 4v2.3: Quality gates
+
+- [x] T50v2 — GATE: `flutter analyze` — 0 issues ✅
+- [x] T51v2 — GATE: `dart format --output=none --set-exit-if-changed .` — 0 changed ✅
+- [x] T52v2 — GATE: `flutter test` — 1313/1313 passing; delta +14 vs 1299 baseline ✅
+- [x] T53v2 — VERIFY: 0 hex literals; 0 PhosphorIcons direct; 4 i18n markers in EliminarCuentaStubSheet; `rg "TreinoIcon.settings"` → 0 hits; `rg "profile/settings|ProfileSettingsScreen"` in lib/ → 0 code hits (comments only) ✅
 
 ---
 
@@ -213,8 +251,8 @@ Chain strategy: stacked-to-main
 
 | REQ | Tasks | SCENARIOs |
 |---|---|---|
-| REQ-PSR-001 | T05, T06 | 494 |
-| REQ-PSR-002 | T05, T06 | 495 |
+| REQ-PSR-001 | T05, T06 | 494 (**UPDATED 2026-05-28** — gear absent assertion added) |
+| ~~REQ-PSR-002~~ | ~~T05, T06~~ | ~~495~~ (REMOVED 2026-05-28 — gear icon removed in PR#4v2) |
 | REQ-PSR-003 | T07, T08 | 496 |
 | REQ-PSR-004 | T07, T08 | 496, 497 |
 | REQ-PSR-005 | T07, T08 | 498, 499 |
@@ -234,14 +272,17 @@ Chain strategy: stacked-to-main
 | REQ-PSR-019 | T39, T40 | 516, 517, 518 |
 | REQ-PSR-020 | T34, T35, T37, T38 | 519, 520 |
 | REQ-PSR-021 | T37, T38 | 521 |
-| REQ-PSR-022 | T46, T47 | 522 |
-| REQ-PSR-023 | T46, T47 | 523 |
-| REQ-PSR-024 | T46, T47 | 524 |
-| REQ-PSR-025 | T48, T49 | 525, 526 |
-| REQ-PSR-CX-001 | T21, T32, T44, T53 | 527 |
-| REQ-PSR-CX-002 | T21, T32, T44, T53 | 528 |
-| REQ-PSR-CX-003 | T21, T32, T44, T53 | 527 |
-| REQ-PSR-CX-004 | T03..T49 (TDD order) | — (process-enforced) |
+| ~~REQ-PSR-022~~ | ~~T46, T47~~ | ~~522~~ (REMOVED 2026-05-28 — settings screen scrapped) |
+| ~~REQ-PSR-023~~ | ~~T46, T47~~ | ~~523~~ (REMOVED 2026-05-28 — superseded by REQ-PSR-027) |
+| ~~REQ-PSR-024~~ | ~~T46, T47~~ | ~~524~~ (REMOVED 2026-05-28 — superseded by REQ-PSR-028) |
+| ~~REQ-PSR-025~~ | ~~T48, T49~~ | ~~525~~ (MOVED→532), ~~526~~ (REMOVED 2026-05-28) |
+| REQ-PSR-026 | T45v2, T46v2 | 529 |
+| REQ-PSR-027 | T45v2, T46v2 | 530 |
+| REQ-PSR-028 | T45v2, T46v2 | 531, 532 |
+| REQ-PSR-CX-001 | T21, T32, T44, T53v2 | 527 |
+| REQ-PSR-CX-002 | T21, T32, T44, T53v2 | 528 |
+| REQ-PSR-CX-003 | T21, T32, T44, T53v2 | 527 |
+| REQ-PSR-CX-004 | T03..T46v2 (TDD order) | — (process-enforced) |
 
 ---
 
@@ -273,14 +314,19 @@ Chain strategy: stacked-to-main
 - [x] Gym catalog reuse from `profile_setup` confirmed (no duplication — ADR-PSR-011)
 - [x] `rg "i18n: Fase 6" lib/features/profile/presentation/profile_gym_screen.dart` → 6 hits ✅
 
-### PR#4
-- [ ] T45..T53 all marked [x]
-- [ ] Quality gates T50..T53 passed
-- [ ] Rebase on post-PR#3 main confirmed clean
-- [ ] `/profile/settings` stub replaced by real screen
-- [ ] "Cerrar sesión" TextButton removed from ProfileScreen body (T48, T49)
-- [ ] `rg "Cerrar sesión" lib/features/profile/profile_screen.dart` → 0 hits
-- [ ] Only sign-out path is via gear icon → `/profile/settings` → "Cerrar sesión" tile
+### PR#4 v2 (PIVOT 2026-05-28)
+- [x] T45v2..T53v2 all marked [x]
+- [x] Quality gates T50v2..T53v2 passed
+- [x] Branch hard-reset to b1e592b (post-PR#3 main) — clean base confirmed
+- [x] `profile_settings_screen.dart` DELETED
+- [x] `TreinoIcon.settings` constant REMOVED
+- [x] `/profile/settings` GoRoute REMOVED from router
+- [x] "Cerrar sesión" TextButton REMOVED from ProfileScreen footer
+- [x] Two new tiles added at bottom of ProfileScreen: "Cerrar sesión" (signOut) + "Eliminar cuenta" (stub sheet)
+- [x] ProfileHeader gear icon REMOVED
+- [x] `rg "TreinoIcon.settings" lib/ test/` → 0 hits ✅
+- [x] `rg "profile/settings|ProfileSettingsScreen" lib/` → 0 code hits (comments only) ✅
+- [x] `flutter test` — 1313/1313 pass; all 4 new SCENARIOs (529..532) covered ✅
 
 ---
 
