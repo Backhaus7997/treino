@@ -271,17 +271,15 @@ class _ListContent extends ConsumerWidget {
           itemCount: trainers.length,
           itemBuilder: (context, i) {
             final t = trainers[i];
-            final nearest = position == null
-                ? null
-                : nearestLocationOf(t, position);
+            final nearest =
+                position == null ? null : nearestLocationOf(t, position);
             final label = _labelFor(nearest, gymsById);
             final isVirtual = virtualOnly ||
                 (effectiveLocationsOf(t).isEmpty && t.trainerOffersOnline);
             return TrainerListTile(
               profile: t,
-              distanceKm: position == null
-                  ? null
-                  : nearestDistanceKm(t, position),
+              distanceKm:
+                  position == null ? null : nearestDistanceKm(t, position),
               onTap: () => context.go('/coach/trainer/${t.uid}'),
               locationLabel: label,
               isVirtualOnly: isVirtual,

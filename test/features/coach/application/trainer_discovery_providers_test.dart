@@ -217,8 +217,7 @@ void main() {
       expect(ids, {'presencial', 'virtual'});
     });
 
-    test(
-        'UNION: PF híbrido (en geohash + offersOnline) aparece UNA sola vez',
+    test('UNION: PF híbrido (en geohash + offersOnline) aparece UNA sola vez',
         () async {
       final hibrido = _trainer(
         uid: 'hibrido',

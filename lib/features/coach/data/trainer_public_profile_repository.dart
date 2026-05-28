@@ -111,9 +111,8 @@ class TrainerPublicProfileRepository {
     TrainerSpecialty? specialty,
   }) async {
     if (geohashes.isEmpty) return const [];
-    final snap = await _col
-        .where('trainerGeohashes', arrayContainsAny: geohashes)
-        .get();
+    final snap =
+        await _col.where('trainerGeohashes', arrayContainsAny: geohashes).get();
     final byUid = <String, TrainerPublicProfile>{};
     for (final d in snap.docs) {
       final profile = TrainerPublicProfile.fromJson(d.data());
