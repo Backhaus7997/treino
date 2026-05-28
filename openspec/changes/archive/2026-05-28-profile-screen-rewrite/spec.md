@@ -13,8 +13,8 @@
 
 | ID | PR# | Strength | Description |
 |---|---|---|---|
-| REQ-PSR-001 | PR#1 | MUST | `ProfileHeader` renders "TU CUENTA" label + "PERFIL" Barlow Condensed title + gear icon |
-| REQ-PSR-002 | PR#1 | MUST | Gear icon in `ProfileHeader` navigates to `/profile/settings` |
+| REQ-PSR-001 | PR#1 | MUST | `ProfileHeader` renders "TU CUENTA" label + "PERFIL" Barlow Condensed title. **Gear icon REMOVED 2026-05-28 (PR#4 pivot)** — no settings navigation from header |
+| ~~REQ-PSR-002~~ | — | — | **REMOVED 2026-05-28 (PR#4 pivot)** — Gear icon and `/profile/settings` navigation dropped from ProfileHeader. Settings surface deferred until real settings exist. Placeholder ID kept for numbering continuity |
 | REQ-PSR-003 | PR#1 | MUST | `ProfileAvatarCard` renders avatar + `displayName` + derived `@handle` + gym chip (when gymId is set). **Pencil icon REMOVED per design decision 2026-05-27** — card is read-only, edit access lives in the "Datos personales" tile of CUENTA |
 | REQ-PSR-004 | PR#1 | MUST | `@handle` is derived on render: `displayName.toLowerCase().replaceAll(' ', '.')` — NOT a persisted field |
 | REQ-PSR-005 | PR#1 | MUST | Gym chip is visible when `UserProfile.gymId` is non-null; MUST NOT render when `gymId` is null |
@@ -25,7 +25,7 @@
 | REQ-PSR-010 | PR#1 | MUST | Gimnasio tile navigates to `/profile/gym` (stub in PR#1, real in PR#3) |
 | REQ-PSR-011 | PR#1 | MUST | Mis rutinas tile navigates to `/profile/routines` (stub in PR#1, real in PR#3) |
 | ~~REQ-PSR-012~~ | — | — | **REMOVED 2026-05-27** — Historial tile explicitly excluded per scope reduction; placeholder ID kept to preserve numbering continuity downstream |
-| REQ-PSR-013 | PR#1 | MUST | Router registers 4 new sub-routes: `/profile/settings`, `/profile/edit-personal`, `/profile/gym`, `/profile/routines`; existing `/profile/friend-requests` MUST NOT be broken |
+| REQ-PSR-013 | PR#1 | MUST | Router registers 3 new sub-routes: `/profile/edit-personal`, `/profile/gym`, `/profile/routines`; existing `/profile/friend-requests` MUST NOT be broken. **`/profile/settings` route REMOVED 2026-05-28 (PR#4 pivot)** |
 | REQ-PSR-014 | PR#1 | MUST | "Cerrar sesión" TextButton remains in `ProfileScreen` body footer through PR#1–PR#3 (intentional duplication) |
 | REQ-PSR-015 | PR#2 | MUST | `/profile/edit-personal` screen renders a form pre-populated with current `UserProfile` values: displayName, gender, bodyWeightKg, heightCm, experienceLevel, avatar |
 | REQ-PSR-016 | PR#2 | MUST | Saving the form calls `UserRepository.update(uid, partial)` with only the changed fields; successful save returns to the previous screen |
@@ -34,10 +34,13 @@
 | REQ-PSR-019 | PR#3 | MUST | `/profile/gym` screen allows search + selection from the gym catalog; confirming updates `UserProfile.gymId` via `UserRepository.update` |
 | REQ-PSR-020 | PR#3 | MUST | `/profile/routines` screen lists only trainer-assigned plans: `source == 'trainer-assigned' AND assignedTo == myUid`; reuses `RoutineRepository.listAssignedTo` |
 | REQ-PSR-021 | PR#3 | MUST | `/profile/routines` screen renders an empty state when no assigned plans exist |
-| REQ-PSR-022 | PR#4 | MUST | `/profile/settings` real screen renders exactly 2 tiles: "Cerrar sesión" and "Eliminar cuenta" |
-| REQ-PSR-023 | PR#4 | MUST | Tapping "Cerrar sesión" in Settings calls `authNotifierProvider.notifier.signOut()` |
-| REQ-PSR-024 | PR#4 | MUST | Tapping "Eliminar cuenta" opens a bottom sheet with copy "Esta función estará disponible en una versión futura" + CANCELAR button only; CANCELAR closes the sheet without any destructive action |
-| REQ-PSR-025 | PR#4 | MUST | `ProfileScreen` body footer "Cerrar sesión" TextButton is REMOVED after PR#4 merges |
+| ~~REQ-PSR-022~~ | — | — | **REMOVED 2026-05-28 (PR#4 pivot)** — `/profile/settings` dedicated screen removed; sign-out + eliminar-cuenta tiles live directly in ProfileScreen body. Placeholder ID kept for numbering continuity |
+| ~~REQ-PSR-023~~ | — | — | **REMOVED 2026-05-28 (PR#4 pivot)** — Superseded by REQ-PSR-027. Placeholder ID kept for numbering continuity |
+| ~~REQ-PSR-024~~ | — | — | **REMOVED 2026-05-28 (PR#4 pivot)** — Superseded by REQ-PSR-028. Placeholder ID kept for numbering continuity |
+| ~~REQ-PSR-025~~ | — | — | **REMOVED 2026-05-28 (PR#4 pivot)** — Legacy TextButton removal still applies but sign-out is now a tile in ProfileScreen body, not behind a settings route. Superseded by REQ-PSR-026. Placeholder ID kept for numbering continuity |
+| REQ-PSR-026 | PR#4v2 | MUST | `ProfileScreen` body MUST render a "Cerrar sesión" tile and an "Eliminar cuenta" tile (destructive variant) below `ProfileCuentaSection`, in that order. The legacy "Cerrar sesión" TextButton is removed simultaneously |
+| REQ-PSR-027 | PR#4v2 | MUST | Tapping the "Cerrar sesión" tile calls `authNotifierProvider.notifier.signOut()` |
+| REQ-PSR-028 | PR#4v2 | MUST | Tapping the "Eliminar cuenta" tile opens `EliminarCuentaStubSheet` via `showModalBottomSheet`; CANCELAR closes the sheet without any destructive action |
 | REQ-PSR-CX-001 | All | MUST | Colors via `AppPalette.of(context)` only — no hex literals |
 | REQ-PSR-CX-002 | All | MUST | Icons via `TreinoIcon.X` only — no `PhosphorIcons.X` direct usage |
 | REQ-PSR-CX-003 | All | MUST | Spacing values from scale: 8 / 12 / 14 / 18 / 20 |
@@ -47,23 +50,19 @@
 
 ## Section A — PR#1 Read-Only Scaffold: REQ-PSR-001–014
 
-### Requirement: ProfileHeader Composition (REQ-PSR-001, REQ-PSR-002)
+### Requirement: ProfileHeader Composition (REQ-PSR-001, ~~REQ-PSR-002~~)
 
-`ProfileHeader` MUST render a "TU CUENTA" label (small caps / secondary style) and a "PERFIL" title in Barlow Condensed. It MUST render a gear icon that, when tapped, navigates to `/profile/settings`. No back-navigation arrow on this top-level screen.
+`ProfileHeader` MUST render a "TU CUENTA" label (small caps / secondary style) and a "PERFIL" title in Barlow Condensed. **Gear icon REMOVED 2026-05-28 (PR#4 pivot)** — no settings navigation from header. No back-navigation arrow on this top-level screen.
 
-#### SCENARIO-494: ProfileHeader renders all three elements
+#### SCENARIO-494: ProfileHeader renders "TU CUENTA" and "PERFIL" texts
 
 - GIVEN an authenticated user is on `ProfileScreen`
 - WHEN the screen builds
 - THEN the text "TU CUENTA" is visible
 - AND the text "PERFIL" is visible in Barlow Condensed style
-- AND a gear icon is present in the header
+- AND NO gear icon is present in the header (**UPDATED 2026-05-28 — gear removed**)
 
-#### SCENARIO-495: Tapping the gear icon navigates to /profile/settings
-
-- GIVEN `ProfileScreen` is rendered
-- WHEN the user taps the gear icon in `ProfileHeader`
-- THEN the router navigates to `/profile/settings`
+#### ~~SCENARIO-495~~: REMOVED 2026-05-28 — Gear icon navigation to /profile/settings removed (PR#4 pivot). Settings surface deferred to a future SDD. Placeholder ID kept for SCENARIO numbering continuity.
 
 ---
 
@@ -283,54 +282,60 @@ The avatar field in `ProfileEditPersonalScreen` MUST reuse the existing image pi
 
 ---
 
-## Section D — PR#4 Settings + Cleanup: REQ-PSR-022–025
+## Section D — PR#4 v2 PIVOT 2026-05-28: Actions in ProfileScreen Body (REQ-PSR-026–028)
 
-### Requirement: Settings Screen Real Implementation (REQ-PSR-022, REQ-PSR-023, REQ-PSR-024)
+> **PIVOT NOTE**: The original PR#4 planned a separate `/profile/settings` screen.
+> On 2026-05-28 the user decided to scrap that approach: Settings as a surface is
+> premature (only 2 tiles, no real settings content yet). Instead, "Cerrar sesión"
+> and "Eliminar cuenta" tiles live directly at the bottom of `ProfileScreen` body.
+> The `/profile/settings` GoRoute, `ProfileSettingsScreen`, and `TreinoIcon.settings`
+> are all REMOVED. When real settings are needed (notifications/theme/language),
+> they will come back via a separate SDD.
 
-`ProfileSettingsScreen` real implementation MUST render exactly 2 tiles: "Cerrar sesión" and "Eliminar cuenta". No other tiles (idioma, theme, privacy) MUST appear. Tapping "Cerrar sesión" MUST call `authNotifierProvider.notifier.signOut()`. Tapping "Eliminar cuenta" MUST open a modal bottom sheet with the copy "Esta función estará disponible en una versión futura" and a CANCELAR button only — no destructive confirm action.
+### ~~REQ-PSR-022, REQ-PSR-023, REQ-PSR-024, REQ-PSR-025~~: REMOVED 2026-05-28 (PR#4 pivot)
 
-#### SCENARIO-522: Settings screen renders exactly 2 tiles
+~~SCENARIO-522~~, ~~SCENARIO-523~~, ~~SCENARIO-524~~: REMOVED 2026-05-28 — Settings screen scrapped.
 
-- GIVEN an authenticated user opens `/profile/settings`
-- WHEN `ProfileSettingsScreen` builds (PR#4 real implementation)
-- THEN exactly 2 tiles are visible: "Cerrar sesión" and "Eliminar cuenta"
-- AND no other settings tiles are present
+~~SCENARIO-525~~: MOVED — CANCELAR behavior is preserved but re-anchored to SCENARIO-532.
 
-#### SCENARIO-523: Tapping Cerrar sesión calls signOut
+~~SCENARIO-526~~: REMOVED 2026-05-28 — The "no sign-out TextButton" assertion flips to "Cerrar sesión tile IS present" (via SCENARIO-529).
 
-- GIVEN `ProfileSettingsScreen` is rendered
+---
+
+### Requirement: Sign-Out + Eliminar-Cuenta Tiles in ProfileScreen Body (REQ-PSR-026, REQ-PSR-027, REQ-PSR-028)
+
+`ProfileScreen` body MUST render a "Cerrar sesión" tile and an "Eliminar cuenta" tile (destructive variant) below `ProfileCuentaSection`, in that order. The legacy "Cerrar sesión" TextButton is removed in the same commit. Tapping "Cerrar sesión" tile calls `authNotifierProvider.notifier.signOut()`. Tapping "Eliminar cuenta" tile opens `EliminarCuentaStubSheet` via `showModalBottomSheet`; CANCELAR closes the sheet without any destructive action.
+
+#### SCENARIO-529: ProfileScreen body renders "Cerrar sesión" + "Eliminar cuenta" tiles below ProfileCuentaSection
+
+- GIVEN an authenticated user is on `ProfileScreen`
+- WHEN `ProfileScreen` builds (PR#4v2)
+- THEN a "Cerrar sesión" `ProfileSectionTile` is visible below `ProfileCuentaSection`
+- AND an "Eliminar cuenta" `ProfileSectionTile` is visible below the "Cerrar sesión" tile
+- AND the legacy "Cerrar sesión" TextButton is ABSENT from the footer
+
+#### SCENARIO-530: Tapping "Cerrar sesión" tile calls signOut
+
+- GIVEN `ProfileScreen` is rendered
 - WHEN the user taps the "Cerrar sesión" tile
 - THEN `authNotifierProvider.notifier.signOut()` is called
 
-#### SCENARIO-524: Tapping Eliminar cuenta opens bottom sheet with stub copy
+#### SCENARIO-531: Tapping "Eliminar cuenta" tile opens the stub sheet with expected copy
 
-- GIVEN `ProfileSettingsScreen` is rendered
+- GIVEN `ProfileScreen` is rendered
 - WHEN the user taps the "Eliminar cuenta" tile
 - THEN a modal bottom sheet opens
-- AND the copy "Esta función estará disponible en una versión futura" is visible
+- AND the copy "Eliminar cuenta" is visible in the sheet title
 - AND a "CANCELAR" button is present
 - AND NO destructive confirm button is present
 
-#### SCENARIO-525: CANCELAR in Eliminar cuenta sheet closes without action
+#### SCENARIO-532: CANCELAR in Eliminar cuenta stub sheet closes it without action
 
 - GIVEN the "Eliminar cuenta" bottom sheet is open
 - WHEN the user taps "CANCELAR"
 - THEN the sheet closes
 - AND no destructive operation is performed
 - AND the user remains authenticated
-
----
-
-### Requirement: Footer Sign-Out Button Removal (REQ-PSR-025)
-
-After PR#4 merges, the "Cerrar sesión" TextButton in `ProfileScreen` body footer MUST be absent. The only sign-out entry point MUST be the "Cerrar sesión" tile inside `/profile/settings`.
-
-#### SCENARIO-526: Cerrar sesión button is absent from ProfileScreen body after PR#4
-
-- GIVEN PR#4 changes are applied to `ProfileScreen`
-- WHEN `ProfileScreen` builds
-- THEN no "Cerrar sesión" TextButton exists in the body footer
-- AND sign-out remains reachable via the gear icon → `/profile/settings`
 
 ---
 
@@ -361,7 +366,7 @@ All files touched across PR#1–PR#4 MUST use `AppPalette.of(context)` for color
 | REQ | SCENARIOs |
 |---|---|
 | REQ-PSR-001 | 494 |
-| REQ-PSR-002 | 495 |
+| ~~REQ-PSR-002~~ | ~~495~~ (REMOVED 2026-05-28 — gear icon removed) |
 | REQ-PSR-003 | 496 |
 | REQ-PSR-004 | 496, 497 |
 | REQ-PSR-005 | 498, 499 |
@@ -372,7 +377,7 @@ All files touched across PR#1–PR#4 MUST use `AppPalette.of(context)` for color
 | REQ-PSR-010 | 504 |
 | REQ-PSR-011 | 505 |
 | REQ-PSR-012 | 506 |
-| REQ-PSR-013 | 507, 508 |
+| REQ-PSR-013 | 507, 508 (**UPDATED 2026-05-28** — /profile/settings route removed; 3 sub-routes remain) |
 | REQ-PSR-014 | 509 |
 | REQ-PSR-015 | 510 |
 | REQ-PSR-016 | 511 |
@@ -381,10 +386,13 @@ All files touched across PR#1–PR#4 MUST use `AppPalette.of(context)` for color
 | REQ-PSR-019 | 516, 517, 518 |
 | REQ-PSR-020 | 519, 520 |
 | REQ-PSR-021 | 521 |
-| REQ-PSR-022 | 522 |
-| REQ-PSR-023 | 523 |
-| REQ-PSR-024 | 524 |
-| REQ-PSR-025 | 525, 526 |
+| ~~REQ-PSR-022~~ | ~~522~~ (REMOVED 2026-05-28 — settings screen scrapped) |
+| ~~REQ-PSR-023~~ | ~~523~~ (REMOVED 2026-05-28 — superseded by REQ-PSR-027) |
+| ~~REQ-PSR-024~~ | ~~524~~ (REMOVED 2026-05-28 — superseded by REQ-PSR-028) |
+| ~~REQ-PSR-025~~ | ~~525~~ (MOVED→532), ~~526~~ (REMOVED 2026-05-28) |
+| REQ-PSR-026 | 529 |
+| REQ-PSR-027 | 530 |
+| REQ-PSR-028 | 531, 532 |
 | REQ-PSR-CX-001 | 527 |
 | REQ-PSR-CX-002 | 528 |
 | REQ-PSR-CX-003 | 527 |

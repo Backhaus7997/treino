@@ -39,10 +39,21 @@ class TrainersMapBottomSheet extends ConsumerWidget {
       loading: () => const SizedBox.shrink(),
       error: (_, __) => const SizedBox.shrink(),
       data: (trainers) {
-        final visible = trainers
-            .where(
-                (t) => t.trainerLatitude != null && t.trainerLongitude != null)
-            .toList();
+        // Cuando el filtro "Online" está ON, el sheet del mapa queda vacío
+        // — la decisión UX es que online se ve en lista, no en mapa. El
+        // banner del mapa redirige al atleta. El sheet renderea su empty
+        // state ('Sin entrenadores con ubicación en esta zona') que también
+        // aplica acá.
+        //
+        // Cuando OFF (default), el sheet muestra PFs con AL MENOS UNA
+        // ubicación física efectiva (gym o custom). Los virtuales puros no
+        // aparecen — no tienen pin que pueda asociarse al card.
+        final virtualOnly = ref.watch(virtualOnlyFilterProvider);
+        final visible = virtualOnly
+            ? const <TrainerPublicProfile>[]
+            : trainers
+                .where((t) => effectiveLocationsOf(t).isNotEmpty)
+                .toList();
 
         return Container(
           decoration: BoxDecoration(
@@ -83,6 +94,7 @@ class TrainersMapBottomSheet extends ConsumerWidget {
                 child: _Header(
                   count: visible.length,
                   hasLocation: hasLocation,
+                  virtualOnly: virtualOnly,
                 ),
               ),
               const SizedBox(height: 12),
@@ -90,7 +102,7 @@ class TrainersMapBottomSheet extends ConsumerWidget {
               SizedBox(
                 height: 110,
                 child: visible.isEmpty
-                    ? _EmptyState(palette: palette)
+                    ? _EmptyState(palette: palette, virtualOnly: virtualOnly)
                     : ListView.separated(
                         scrollDirection: Axis.horizontal,
                         padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -111,7 +123,11 @@ class TrainersMapBottomSheet extends ConsumerWidget {
 // ── Header ───────────────────────────────────────────────────────────────────
 
 class _Header extends StatelessWidget {
-  const _Header({required this.count, required this.hasLocation});
+  const _Header({
+    required this.count,
+    required this.hasLocation,
+    required this.virtualOnly,
+  });
   final int count;
 
   /// Si el athlete tiene ubicación, el label incluye "CERCA" (proximidad
@@ -119,18 +135,26 @@ class _Header extends StatelessWidget {
   /// qué tan cerca está cada PF).
   final bool hasLocation;
 
+  /// Cuando el filtro "Online" está ON, el header dice "MODO ONLINE" sin
+  /// count — el mapa no es donde se ven los online, eso vive en lista.
+  final bool virtualOnly;
+
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    final singular = count == 1;
     final String label;
-    if (hasLocation) {
-      label = singular ? 'ENTRENADOR CERCA' : 'ENTRENADORES CERCA';
+    if (virtualOnly) {
+      label = 'MODO ONLINE';
     } else {
-      label = singular ? 'ENTRENADOR' : 'ENTRENADORES';
+      final singular = count == 1;
+      if (hasLocation) {
+        label = singular ? 'ENTRENADOR CERCA' : 'ENTRENADORES CERCA';
+      } else {
+        label = singular ? 'ENTRENADOR' : 'ENTRENADORES';
+      }
     }
     return Text(
-      '$count $label',
+      virtualOnly ? label : '$count $label',
       style: GoogleFonts.barlowCondensed(
         fontWeight: FontWeight.w700,
         fontSize: 13,
@@ -141,19 +165,23 @@ class _Header extends StatelessWidget {
   }
 }
 
-// ── Empty state — sin entrenadores con location ──────────────────────────────
+// ── Empty state ──────────────────────────────────────────────────────────────
 
 class _EmptyState extends StatelessWidget {
-  const _EmptyState({required this.palette});
+  const _EmptyState({required this.palette, required this.virtualOnly});
   final AppPalette palette;
+  final bool virtualOnly;
 
   @override
   Widget build(BuildContext context) {
+    final message = virtualOnly
+        ? 'Los entrenadores online se ven en lista.'
+        : 'Sin entrenadores con ubicación en esta zona.';
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 24),
         child: Text(
-          'Sin entrenadores con ubicación en esta zona.',
+          message,
           textAlign: TextAlign.center,
           style: GoogleFonts.barlow(
             fontSize: 13,

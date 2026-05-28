@@ -6,7 +6,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../../../app/theme/app_palette.dart';
-import '../../../profile/application/user_providers.dart' show firestoreProvider;
+import '../../../profile/application/user_providers.dart'
+    show firestoreProvider;
 import '../../application/agenda_providers.dart';
 import '../../domain/agenda_exceptions.dart';
 import '../../domain/appointment.dart';

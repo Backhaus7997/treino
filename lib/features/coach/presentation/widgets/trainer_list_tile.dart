@@ -19,11 +19,23 @@ class TrainerListTile extends StatelessWidget {
     required this.profile,
     required this.distanceKm,
     required this.onTap,
+    this.locationLabel,
+    this.isVirtualOnly = false,
   });
 
   final TrainerPublicProfile profile;
   final double? distanceKm;
   final VoidCallback onTap;
+
+  /// Label opcional de la ubicación más cercana del PF — ej. "Megatlon Belgrano"
+  /// (cuando la ubicación más cercana es un gym del catálogo) o "Estudio personal"
+  /// (cuando es custom). Si es null, no se renderea.
+  final String? locationLabel;
+
+  /// Cuando true, en lugar de distance muestra el badge "VIRTUAL".
+  /// Lo setea el caller cuando el PF aparece via el filtro "Solo virtual" y/o
+  /// no tiene ninguna ubicación física pero ofrece online.
+  final bool isVirtualOnly;
 
   String _formatDistance() {
     final d = distanceKm;
@@ -84,16 +96,59 @@ class TrainerListTile extends StatelessWidget {
                     ),
                   ),
                 const SizedBox(height: 4),
-                Text(
-                  _formatDistance(),
-                  style: GoogleFonts.barlow(
-                    fontSize: 12,
-                    color: palette.textMuted,
+                if (isVirtualOnly)
+                  _VirtualBadge()
+                else
+                  Text(
+                    _formatDistance(),
+                    style: GoogleFonts.barlow(
+                      fontSize: 12,
+                      color: palette.textMuted,
+                    ),
                   ),
-                ),
+                if (locationLabel != null && locationLabel!.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 140),
+                    child: Text(
+                      locationLabel!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.end,
+                      style: GoogleFonts.barlow(
+                        fontSize: 11,
+                        color: palette.textMuted,
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _VirtualBadge extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: palette.accent.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(9999),
+        border: Border.all(color: palette.accent.withValues(alpha: 0.5)),
+      ),
+      child: Text(
+        'ONLINE',
+        style: GoogleFonts.barlowCondensed(
+          fontWeight: FontWeight.w700,
+          fontSize: 11,
+          letterSpacing: 1.2,
+          color: palette.accent,
         ),
       ),
     );

@@ -9,10 +9,17 @@ import '../domain/trainer_specialty.dart';
 /// Readable by any authenticated user; writable only by the owner via
 /// [UserRepository] dual-write.
 ///
-/// Query strategy per design D9/D10:
-///   - [listByGeohashPrefix]: Firestore range query on `trainerGeohash`.
-///     Optional [specialty] filter applied client-side (D10 — no compound index).
-///   - [listAll]: Firestore `orderBy displayNameLowercase ASC` with limit 50 (D14).
+/// Query strategy:
+///   - [listByGeohashPrefix]: legacy range query on `trainerGeohash` (singular,
+///     DEPRECATED — kept until all clients migrate). New code should use
+///     [listByGeohashes] instead.
+///   - [listByGeohashes]: Firestore `array-contains-any` query on the
+///     `trainerGeohashes` array. Devuelve PFs que tienen al menos una
+///     ubicación con uno de los geohashes provistos. Reemplazo de
+///     `listByGeohashPrefix` para el modelo multi-location (Fase 6 Etapa 0).
+///   - [listVirtualOnly]: Firestore `where('trainerOffersOnline', true)`.
+///     Usado por el chip "Solo virtual" del discovery.
+///   - [listAll]: Firestore `orderBy displayNameLowercase ASC` with limit 50.
 ///     Optional [specialty] filter applied client-side.
 ///   - [getById]: single doc read, returns null if `!exists` (D12).
 ///
@@ -87,5 +94,54 @@ class TrainerPublicProfileRepository {
     final data = snap.data();
     if (!snap.exists || data == null) return null;
     return TrainerPublicProfile.fromJson(data);
+  }
+
+  /// Multi-location query (Fase 6 Etapa 0).
+  ///
+  /// Devuelve PFs cuyo array `trainerGeohashes` contiene cualquiera de los
+  /// [geohashes] provistos. Útil para buscar el geohash5 del atleta + los 8
+  /// vecinos cardinales en una sola query, dedupeando client-side.
+  ///
+  /// Firestore tiene un límite duro de 30 valores para `array-contains-any`.
+  /// Para el caso de uso actual (1-9 geohashes por consulta) estamos OK.
+  ///
+  /// Si [specialty] es provided, el filtro se aplica client-side.
+  Future<List<TrainerPublicProfile>> listByGeohashes(
+    List<String> geohashes, {
+    TrainerSpecialty? specialty,
+  }) async {
+    if (geohashes.isEmpty) return const [];
+    final snap =
+        await _col.where('trainerGeohashes', arrayContainsAny: geohashes).get();
+    final byUid = <String, TrainerPublicProfile>{};
+    for (final d in snap.docs) {
+      final profile = TrainerPublicProfile.fromJson(d.data());
+      // Dedupe by uid — un PF con N ubicaciones cuyo geohashes solapan con
+      // [geohashes] podría salir N veces; nos quedamos con la primera lectura
+      // (todos los duplicates son el mismo doc).
+      byUid.putIfAbsent(profile.uid, () => profile);
+    }
+    var results = byUid.values.toList();
+    if (specialty != null) {
+      results = results.where((t) => t.trainerSpecialty == specialty).toList();
+    }
+    return results;
+  }
+
+  /// Lista PFs que ofrecen clases virtuales (`trainerOffersOnline: true`),
+  /// sin filtro de ubicación.
+  ///
+  /// Usado por el chip "Solo virtual" — útil para atletas que quieren un PF
+  /// remoto independientemente de su ubicación física.
+  Future<List<TrainerPublicProfile>> listVirtualOnly({
+    TrainerSpecialty? specialty,
+  }) async {
+    final snap = await _col.where('trainerOffersOnline', isEqualTo: true).get();
+    var results =
+        snap.docs.map((d) => TrainerPublicProfile.fromJson(d.data())).toList();
+    if (specialty != null) {
+      results = results.where((t) => t.trainerSpecialty == specialty).toList();
+    }
+    return results;
   }
 }

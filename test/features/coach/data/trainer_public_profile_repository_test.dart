@@ -167,4 +167,97 @@ void main() {
       expect(result.displayName, equals('Found Trainer'));
     });
   });
+
+  // ─── listByGeohashes (Fase 6 Etapa 0 — multi-location) ────────────────────
+
+  Future<void> seedTrainerWithGeohashes({
+    required String uid,
+    required String displayName,
+    List<String> geohashes = const [],
+    bool offersOnline = false,
+  }) async {
+    await firestore.collection('trainerPublicProfiles').doc(uid).set({
+      'uid': uid,
+      'displayName': displayName,
+      'displayNameLowercase': displayName.trim().toLowerCase(),
+      'trainerGeohashes': geohashes,
+      'trainerOffersOnline': offersOnline,
+    });
+  }
+
+  group('TrainerPublicProfileRepository.listByGeohashes', () {
+    test('input vacío → lista vacía (sin I/O)', () async {
+      expect(await repo.listByGeohashes(const []), isEmpty);
+    });
+
+    test('devuelve PFs cuyo trainerGeohashes contiene cualquier valor pedido',
+        () async {
+      await seedTrainerWithGeohashes(
+        uid: 't1',
+        displayName: 'Ana',
+        geohashes: ['6d6m7', '69y7m'],
+      );
+      await seedTrainerWithGeohashes(
+        uid: 't2',
+        displayName: 'Bob',
+        geohashes: ['69y7m'],
+      );
+      await seedTrainerWithGeohashes(
+        uid: 't3',
+        displayName: 'Car',
+        geohashes: ['u33dc'],
+      );
+
+      final result = await repo.listByGeohashes(['6d6m7']);
+      expect(result.map((t) => t.uid).toSet(), {'t1'});
+
+      final result2 = await repo.listByGeohashes(['69y7m']);
+      expect(result2.map((t) => t.uid).toSet(), {'t1', 't2'});
+    });
+
+    test('dedupe — un PF con N geohashes que matchean N pedidos sale 1 vez',
+        () async {
+      await seedTrainerWithGeohashes(
+        uid: 'multi',
+        displayName: 'Multi',
+        geohashes: ['6d6m7', '69y7m'],
+      );
+      final result = await repo.listByGeohashes(['6d6m7', '69y7m']);
+      expect(result, hasLength(1));
+      expect(result.single.uid, 'multi');
+    });
+  });
+
+  group('TrainerPublicProfileRepository.listVirtualOnly', () {
+    test('devuelve solo PFs con trainerOffersOnline:true', () async {
+      await seedTrainerWithGeohashes(
+        uid: 'v1',
+        displayName: 'Virtual1',
+        offersOnline: true,
+      );
+      await seedTrainerWithGeohashes(
+        uid: 'p1',
+        displayName: 'Presencial',
+        offersOnline: false,
+      );
+      await seedTrainerWithGeohashes(
+        uid: 'v2',
+        displayName: 'Virtual2',
+        offersOnline: true,
+        geohashes: ['6d6m7'],
+      );
+
+      final result = await repo.listVirtualOnly();
+      expect(result.map((t) => t.uid).toSet(), {'v1', 'v2'});
+    });
+
+    test('lista vacía cuando no hay PFs virtuales', () async {
+      await seedTrainerWithGeohashes(
+        uid: 'p1',
+        displayName: 'Presencial',
+        offersOnline: false,
+      );
+      expect(await repo.listVirtualOnly(), isEmpty);
+    });
+  });
 }

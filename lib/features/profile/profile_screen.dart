@@ -3,14 +3,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/theme/app_palette.dart';
 import '../../core/utils/k_formatter.dart';
+import '../../core/widgets/treino_icon.dart';
 import '../auth/application/auth_providers.dart';
-import '../auth/presentation/auth_strings.dart';
 import 'application/profile_stats_providers.dart';
 import 'application/user_providers.dart';
 import 'domain/user_role.dart';
+import 'presentation/widgets/eliminar_cuenta_stub_sheet.dart';
 import 'presentation/widgets/profile_avatar_card.dart';
 import 'presentation/widgets/profile_cuenta_section.dart';
 import 'presentation/widgets/profile_header.dart';
+import 'presentation/widgets/profile_section_tile.dart';
+import 'presentation/widgets/profile_trainer_section.dart';
 import 'trainer_profile_view.dart';
 
 /// Role-aware profile screen.
@@ -50,21 +53,34 @@ class _AthleteProfile extends ConsumerWidget {
           _OwnProfileStatsRow(palette: palette, theme: theme),
           const ProfileAvatarCard(),
           const ProfileCuentaSection(),
-          // ── Legacy "Cerrar sesión" footer — intentional duplication ─────────
-          // Kept through PR#1..PR#3 so sign-out is never broken mid-chain.
-          // Removed in PR#4 the same commit the real Settings screen ships.
-          // Per ADR-PSR-008.
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 20),
-            child: TextButton(
-              onPressed: () =>
-                  ref.read(authNotifierProvider.notifier).signOut(),
-              child: Text(
-                AuthStrings.profileSignOut, // i18n: Fase 6 Etapa 3
-                style: TextStyle(color: palette.textMuted),
+          // Sección "ENTRENADOR" condicional — solo visible cuando
+          // role == trainer. Tile que abre /profile/edit-trainer para
+          // editar perfil público multi-location (Fase 6 Etapa 0 PR#3).
+          const ProfileTrainerSection(),
+          // ── Account actions — PR#4 v2 pivot 2026-05-28 ───────────────────
+          // Sign-out and account deletion tiles live here directly.
+          // Settings as a surface deferred to a future SDD (notifications,
+          // theme, language). Per PR#4 pivot decision.
+          ProfileSectionTile(
+            icon: TreinoIcon.signOut,
+            title: 'Cerrar sesión', // i18n: Fase 6 Etapa 3
+            onTap: () => ref.read(authNotifierProvider.notifier).signOut(),
+          ),
+          ProfileSectionTile(
+            icon: TreinoIcon.trash,
+            title: 'Eliminar cuenta', // i18n: Fase 6 Etapa 3
+            destructive: true,
+            onTap: () => showModalBottomSheet<void>(
+              context: context,
+              backgroundColor: palette.bgCard,
+              shape: const RoundedRectangleBorder(
+                borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
               ),
+              isScrollControlled: false,
+              builder: (_) => const EliminarCuentaStubSheet(),
             ),
           ),
+          const SizedBox(height: 20),
         ],
       ),
     );

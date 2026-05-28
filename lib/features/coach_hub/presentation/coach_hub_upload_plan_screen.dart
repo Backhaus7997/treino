@@ -142,8 +142,9 @@ class _CoachHubUploadPlanScreenState
                   ],
                   const SizedBox(height: 18),
                   ElevatedButton(
-                    onPressed:
-                        (_pickedFile == null || _submitting) ? null : _processFile,
+                    onPressed: (_pickedFile == null || _submitting)
+                        ? null
+                        : _processFile,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: palette.accent,
                       foregroundColor: palette.bg,

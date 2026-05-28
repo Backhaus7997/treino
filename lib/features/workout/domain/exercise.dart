@@ -15,7 +15,8 @@ class Exercise with _$Exercise {
         techniqueInstructions, // null means "not yet authored" (ADR-1)
     String? videoUrl,
     int? defaultRestSeconds,
-    @Default(<String>[]) List<String>
+    @Default(<String>[])
+    List<String>
         aliases, // Spanish/jargon synonyms for the Excel importer match
   }) = _Exercise;
 

@@ -9,6 +9,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../../../app/theme/app_palette.dart';
+import '../../../../core/widgets/treino_icon.dart';
 import '../../application/trainer_discovery_providers.dart';
 import '../../domain/trainer_public_profile.dart';
 import 'trainers_map_bottom_sheet.dart';
@@ -19,7 +20,11 @@ import 'trainers_map_bottom_sheet.dart';
 /// NO incluye Scaffold ni AppBar — esos los provee la pantalla parent.
 /// Tiles oscuros (CartoDB Dark Matter), pill markers con precio +
 /// inicial del PF, dot de ubicación del athlete, attribution OSM + CARTO.
-class TrainersMapView extends ConsumerWidget {
+///
+/// Es `ConsumerStatefulWidget` para mantener un `MapController` persistente
+/// entre rebuilds — necesario para el FAB "centrar en mi ubicación" que
+/// llama `mapController.move()` programáticamente.
+class TrainersMapView extends ConsumerStatefulWidget {
   const TrainersMapView({super.key});
 
   /// Centro inicial del mapa — Córdoba Capital, zona Centro-Norte.
@@ -34,7 +39,29 @@ class TrainersMapView extends ConsumerWidget {
   static const _tileSubdomains = ['a', 'b', 'c', 'd'];
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<TrainersMapView> createState() => _TrainersMapViewState();
+}
+
+class _TrainersMapViewState extends ConsumerState<TrainersMapView> {
+  final _mapController = MapController();
+
+  @override
+  void dispose() {
+    _mapController.dispose();
+    super.dispose();
+  }
+
+  /// Centra el mapa en la ubicación actual del atleta, manteniendo el zoom.
+  /// No-op si el atleta no tiene ubicación.
+  void _recenterToAthlete(Position pos) {
+    _mapController.move(
+      LatLng(pos.latitude, pos.longitude),
+      _mapController.camera.zoom,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final discoveryAsync = ref.watch(trainerDiscoveryProvider);
     // Scoped: solo rebuild cuando el Position cambia, no en cada
@@ -56,35 +83,63 @@ class TrainersMapView extends ConsumerWidget {
         ),
       ),
       data: (trainers) {
+        // UX decisión: cuando el filtro "Online" está ON, el mapa queda
+        // "neutralizado" — el atleta quiso ver virtuales y eso es info de
+        // lista, no de mapa. No renderamos markers de trainers; el banner
+        // CTA lo redirige a modo lista. (El dot del atleta se mantiene como
+        // referencia visual de "estás acá".)
+        //
+        // Cuando "Online" está OFF (default), markers normales: uno por
+        // cada `TrainerLocation` (gym o custom) de cada PF. Un híbrido con
+        // 2 gyms tiene 2 pines — tap en cualquiera abre el mismo perfil.
+        final virtualOnly = ref.watch(virtualOnlyFilterProvider);
         final markers = <Marker>[
-          ...trainers
-              .where((t) =>
-                  t.trainerLatitude != null && t.trainerLongitude != null)
-              .map((t) => _buildTrainerMarker(context, t, palette)),
+          if (!virtualOnly)
+            for (final t in trainers)
+              for (final loc in effectiveLocationsOf(t))
+                _buildTrainerMarker(
+                  context,
+                  t,
+                  palette,
+                  LatLng(loc.lat, loc.lng),
+                ),
           if (athletePosition != null)
             _buildAthleteMarker(athletePosition, palette),
         ];
+
+        // Banner CTA: aparece siempre que el filtro "Online" esté ON. Lo
+        // que el atleta quiere ver no es geográfico — el mapa no aplica.
+        final showVirtualBanner = virtualOnly;
 
         return Stack(
           children: [
             // Mapa de fondo
             FlutterMap(
-              options: const MapOptions(
-                initialCenter: _initialCenter,
-                initialZoom: _initialZoom,
+              mapController: _mapController,
+              options: MapOptions(
+                initialCenter: TrainersMapView._initialCenter,
+                initialZoom: TrainersMapView._initialZoom,
                 minZoom: 3,
                 maxZoom: 18,
-                interactionOptions: InteractionOptions(
+                // Pinta el canvas del mapa con el bg del theme dark mientras
+                // las tiles del CDN cargan. Sin esto, scrollear rápido muestra
+                // "cuadrados blancos" donde aún no llegó la tile — flicker
+                // feo que contrasta con el theme oscuro.
+                backgroundColor: palette.bg,
+                interactionOptions: const InteractionOptions(
                   flags: InteractiveFlag.all,
                 ),
               ),
               children: [
                 TileLayer(
-                  urlTemplate: _tileUrl,
-                  subdomains: _tileSubdomains,
+                  urlTemplate: TrainersMapView._tileUrl,
+                  subdomains: TrainersMapView._tileSubdomains,
                   userAgentPackageName: 'com.treino.app',
                   retinaMode: MediaQuery.of(context).devicePixelRatio > 1.5,
                   maxZoom: 19,
+                  // Pre-carga tiles vecinas (1 buffer ring) — reduce el flash
+                  // cuando se hace pan rápido a una zona no cacheada.
+                  panBuffer: 1,
                 ),
                 MarkerLayer(markers: markers),
               ],
@@ -96,6 +151,35 @@ class TrainersMapView extends ConsumerWidget {
               right: 8,
               child: _AttributionChip(palette: palette),
             ),
+            // Banner CTA: aparece sobre el mapa cuando el atleta activa
+            // "Online" — el mapa no aplica para virtuales, el banner ofrece
+            // switch a modo lista donde sí se ven todos los que ofrecen online.
+            if (showVirtualBanner)
+              Positioned(
+                top: 8,
+                left: 16,
+                right: 80, // deja espacio para el _AttributionChip top-right
+                child: _VirtualOnlyBanner(
+                  palette: palette,
+                  onTapList: () =>
+                      ref.read(mapModeProvider.notifier).state = false,
+                ),
+              ),
+            // FAB "Centrar en mi ubicación" — solo aparece si el atleta tiene
+            // location concedida. Ubicado a la derecha, con offset de ~220px
+            // desde el bottom para quedar arriba del bottom sheet collapsed
+            // (drag handle ~28 + header ~24 + carousel 110 + paddings ~40 ≈
+            // 200px) + 20px de aire. Si el sheet se expande, el FAB queda
+            // detrás — aceptable UX, el user quiso ver detalles.
+            if (athletePosition != null)
+              Positioned(
+                right: 16,
+                bottom: 220,
+                child: _RecenterFab(
+                  palette: palette,
+                  onTap: () => _recenterToAthlete(athletePosition),
+                ),
+              ),
             // Bottom sheet con carousel de cards.
             const Positioned(
               left: 0,
@@ -115,6 +199,7 @@ class TrainersMapView extends ConsumerWidget {
     BuildContext context,
     TrainerPublicProfile t,
     AppPalette palette,
+    LatLng point,
   ) {
     final initial = (t.displayName?.trim().isNotEmpty == true
             ? t.displayName!.trim()[0]
@@ -125,7 +210,7 @@ class TrainersMapView extends ConsumerWidget {
         : 'Consultar';
 
     return Marker(
-      point: LatLng(t.trainerLatitude!, t.trainerLongitude!),
+      point: point,
       width: 110,
       height: 48,
       alignment: Alignment.bottomCenter,
@@ -281,4 +366,110 @@ class _DownArrowPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _DownArrowPainter old) => old.color != color;
+}
+
+// ── Recenter FAB ──────────────────────────────────────────────────────────────
+
+/// Botón flotante "Centrar en mi ubicación". Pattern estándar de apps de
+/// mapas (Google Maps, Waze, Uber). Recentra el viewport en la `Position`
+/// actual del atleta sin cambiar el zoom — útil cuando el user paneó lejos
+/// y se "perdió". Solo se renderea cuando `athleteLocationProvider` tiene
+/// `Position` válida (sino el botón no tiene a dónde ir).
+class _RecenterFab extends StatelessWidget {
+  const _RecenterFab({required this.palette, required this.onTap});
+  final AppPalette palette;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: palette.bgCard,
+      shape: const CircleBorder(),
+      elevation: 4,
+      child: InkWell(
+        onTap: onTap,
+        customBorder: const CircleBorder(),
+        child: Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(color: palette.border),
+          ),
+          child: Icon(
+            TreinoIcon.mapPin,
+            color: palette.accent,
+            size: 20,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Virtual-only banner ──────────────────────────────────────────────────────
+
+/// Banner que aparece en modo mapa cuando el filtro "Online" está ON y hay
+/// PFs virtuales puros (sin ubicación física) que el mapa no puede mostrar.
+/// Tap → cambia a modo lista para que el atleta los vea.
+class _VirtualOnlyBanner extends StatelessWidget {
+  const _VirtualOnlyBanner({
+    required this.palette,
+    required this.onTapList,
+  });
+  final AppPalette palette;
+  final VoidCallback onTapList;
+
+  @override
+  Widget build(BuildContext context) {
+    const label = 'Entrenadores online no se ven en el mapa';
+    return Material(
+      color: palette.bgCard,
+      borderRadius: BorderRadius.circular(14),
+      elevation: 4,
+      child: InkWell(
+        onTap: onTapList,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: palette.accent.withValues(alpha: 0.4)),
+          ),
+          child: Row(
+            children: [
+              Icon(TreinoIcon.infoCircle, size: 18, color: palette.accent),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      label,
+                      style: TextStyle(
+                        color: palette.textPrimary,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      'Tocá para verlos en lista',
+                      style: TextStyle(
+                        color: palette.textMuted,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(TreinoIcon.forward, size: 18, color: palette.accent),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

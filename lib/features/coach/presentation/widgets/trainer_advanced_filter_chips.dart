@@ -71,6 +71,8 @@ class TrainerAdvancedFilterChips extends ConsumerWidget {
             palette: palette,
             onTap: () => _showPriceSheet(context, ref, price),
           ),
+          // "Online" se promocionó a tabs Presencial/Online en el header
+          // (Fase 6 Etapa 0 PR#3). Ya no vive como chip en esta row.
         ],
       ),
     );
@@ -452,3 +454,4 @@ class _FilterOptionTile extends StatelessWidget {
     );
   }
 }
+
