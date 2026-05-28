@@ -744,7 +744,15 @@ async function seedRoutines() {
   validateRoutineRefs();
   console.log(`Seeding ${routines.length} routines...`);
   for (const r of routines) {
-    await db.collection('routines').doc(r.id).set(r);
+    // Stamp the discovery contract on every seeded template:
+    //   visibility: 'public' → required by RoutineRepository.listAll() which
+    //                          queries `.where('visibility', isEqualTo: 'public')`.
+    //   source: 'system'     → marks the doc as a stock template (not an
+    //                          assignment), per RoutineSource enum.
+    // Without these fields the athlete's PlantillasSection silently returns
+    // an empty list because the where-filter excludes docs missing the field.
+    const doc = { ...r, source: 'system', visibility: 'public' };
+    await db.collection('routines').doc(r.id).set(doc);
     console.log(`  Seeded routine: ${r.id}`);
   }
   console.log('Routines seeded.');
