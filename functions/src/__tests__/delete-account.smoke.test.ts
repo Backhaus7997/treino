@@ -70,10 +70,10 @@ function makeCallableRequest(
 ): CallableRequest<DeleteAccountRequest> {
   return {
     data: { uid: targetUid },
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     auth: {
       uid: callerUid,
       token: { firebase: { sign_in_provider: provider } },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any,
     rawRequest: {} as CallableRequest["rawRequest"],
     instanceIdToken: undefined,
