@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
-import '../../../core/utils/haversine.dart';
 import '../../../core/widgets/treino_icon.dart';
+import '../../gyms/application/gym_providers.dart';
+import '../../gyms/domain/gym.dart';
 import '../application/trainer_discovery_providers.dart';
-import '../domain/trainer_public_profile.dart';
+import '../domain/trainer_location.dart';
 import 'coach_strings.dart';
 import 'widgets/location_permission_rationale_sheet.dart';
 import 'widgets/trainer_advanced_filter_chips.dart';
@@ -247,6 +247,13 @@ class _ListContent extends ConsumerWidget {
     final palette = AppPalette.of(context);
     final discoveryAsync = ref.watch(trainerDiscoveryProvider);
     final position = ref.watch(athleteLocationProvider).valueOrNull;
+    final virtualOnly = ref.watch(virtualOnlyFilterProvider);
+    // Cargamos el catálogo completo una sola vez — el provider está cacheado
+    // (FutureProvider sin autoDispose). Lookup por gymId es O(1) en el map.
+    final gymsAsync = ref.watch(gymsProvider);
+    final gymsById = <String, Gym>{
+      for (final g in gymsAsync.valueOrNull ?? const <Gym>[]) g.id: g,
+    };
 
     return discoveryAsync.when(
       loading: () => Center(
@@ -264,10 +271,20 @@ class _ListContent extends ConsumerWidget {
           itemCount: trainers.length,
           itemBuilder: (context, i) {
             final t = trainers[i];
+            final nearest = position == null
+                ? null
+                : nearestLocationOf(t, position);
+            final label = _labelFor(nearest, gymsById);
+            final isVirtual = virtualOnly ||
+                (effectiveLocationsOf(t).isEmpty && t.trainerOffersOnline);
             return TrainerListTile(
               profile: t,
-              distanceKm: _distanceFor(t, position),
+              distanceKm: position == null
+                  ? null
+                  : nearestDistanceKm(t, position),
               onTap: () => context.go('/coach/trainer/${t.uid}'),
+              locationLabel: label,
+              isVirtualOnly: isVirtual,
             );
           },
         );
@@ -275,18 +292,18 @@ class _ListContent extends ConsumerWidget {
     );
   }
 
-  double? _distanceFor(TrainerPublicProfile t, Position? pos) {
-    if (pos == null ||
-        t.trainerLatitude == null ||
-        t.trainerLongitude == null) {
-      return null;
+  /// Devuelve un label corto para la ubicación más cercana del PF:
+  ///   - Si es `gym` y el gym está en `gymsById` → el `name` del gym.
+  ///   - Si es `gym` pero no encontramos el doc (cache miss) → 'Gimnasio'.
+  ///   - Si es `custom` → el `customLabel`.
+  ///   - Si `nearest` es null → null (sin label).
+  String? _labelFor(TrainerLocation? nearest, Map<String, Gym> gymsById) {
+    if (nearest == null) return null;
+    if (nearest.type == TrainerLocationType.gym) {
+      final gym = nearest.gymId == null ? null : gymsById[nearest.gymId];
+      return gym?.name ?? 'Gimnasio';
     }
-    return haversineKm(
-      pos.latitude,
-      pos.longitude,
-      t.trainerLatitude!,
-      t.trainerLongitude!,
-    );
+    return nearest.customLabel;
   }
 }
 

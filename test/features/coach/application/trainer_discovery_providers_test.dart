@@ -28,6 +28,7 @@ TrainerPublicProfile _trainer({
   double? lon,
   String? geohash,
   int? rate,
+  bool offersOnline = false,
 }) =>
     TrainerPublicProfile(
       uid: uid,
@@ -38,6 +39,7 @@ TrainerPublicProfile _trainer({
       trainerLongitude: lon,
       trainerGeohash: geohash,
       trainerMonthlyRate: rate,
+      trainerOffersOnline: offersOnline,
     );
 
 // ── Fake GeolocatorPlatform stub ──────────────────────────────────────────
@@ -175,6 +177,112 @@ void main() {
       expect(result.length, 1);
       expect(result.first.uid, 'a');
     });
+
+    // ── Fase 6 Etapa 0 PR#2 — UNION presenciales + virtuales ────────────
+    test(
+        'UNION: con location + virtualOnly OFF, incluye presenciales del '
+        'área Y virtuales puros (caso bug pre-fix)', () async {
+      final presencial = _trainer(
+        uid: 'presencial',
+        displayName: 'P',
+        lat: -34.6,
+        lon: -58.4,
+        geohash: 'd2h4j',
+      );
+      // PF virtual puro: sin location ni geohash, solo offersOnline:true.
+      final virtual = _trainer(
+        uid: 'virtual',
+        displayName: 'V',
+        offersOnline: true,
+      );
+      final pos = _makePosition(lat: -34.6, lon: -58.4);
+
+      final container = ProviderContainer(overrides: [
+        athleteLocationProvider.overrideWith(
+          (_) => AthleteLocationNotifier()..setForTest(pos),
+        ),
+        selectedSpecialtyProvider.overrideWith((_) => null),
+        virtualOnlyFilterProvider.overrideWith((_) => false),
+        trainerPublicProfileRepositoryProvider.overrideWith(
+          (_) => _FakeTrainerRepo(
+            all: [presencial, virtual],
+            geohash: [presencial],
+          ),
+        ),
+      ]);
+      addTearDown(container.dispose);
+
+      final result = await container.read(trainerDiscoveryProvider.future);
+      final ids = result.map((t) => t.uid).toSet();
+      expect(ids, {'presencial', 'virtual'});
+    });
+
+    test(
+        'UNION: PF híbrido (en geohash + offersOnline) aparece UNA sola vez',
+        () async {
+      final hibrido = _trainer(
+        uid: 'hibrido',
+        displayName: 'H',
+        lat: -34.6,
+        lon: -58.4,
+        geohash: 'd2h4j',
+        offersOnline: true,
+      );
+      final pos = _makePosition(lat: -34.6, lon: -58.4);
+
+      final container = ProviderContainer(overrides: [
+        athleteLocationProvider.overrideWith(
+          (_) => AthleteLocationNotifier()..setForTest(pos),
+        ),
+        selectedSpecialtyProvider.overrideWith((_) => null),
+        virtualOnlyFilterProvider.overrideWith((_) => false),
+        trainerPublicProfileRepositoryProvider.overrideWith(
+          (_) => _FakeTrainerRepo(
+            all: [hibrido],
+            geohash: [hibrido],
+          ),
+        ),
+      ]);
+      addTearDown(container.dispose);
+
+      final result = await container.read(trainerDiscoveryProvider.future);
+      expect(result, hasLength(1));
+      expect(result.single.uid, 'hibrido');
+    });
+
+    test('virtualOnly ON → solo virtuales, ignora geohash', () async {
+      final presencial = _trainer(
+        uid: 'presencial',
+        displayName: 'P',
+        lat: -34.6,
+        lon: -58.4,
+        geohash: 'd2h4j',
+      );
+      final virtual = _trainer(
+        uid: 'virtual',
+        displayName: 'V',
+        offersOnline: true,
+      );
+      final pos = _makePosition(lat: -34.6, lon: -58.4);
+
+      final container = ProviderContainer(overrides: [
+        athleteLocationProvider.overrideWith(
+          (_) => AthleteLocationNotifier()..setForTest(pos),
+        ),
+        selectedSpecialtyProvider.overrideWith((_) => null),
+        virtualOnlyFilterProvider.overrideWith((_) => true),
+        trainerPublicProfileRepositoryProvider.overrideWith(
+          (_) => _FakeTrainerRepo(
+            all: [presencial, virtual],
+            geohash: [presencial],
+          ),
+        ),
+      ]);
+      addTearDown(container.dispose);
+
+      final result = await container.read(trainerDiscoveryProvider.future);
+      expect(result.map((t) => t.uid).toSet(), {'virtual'});
+    });
   });
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -242,6 +350,33 @@ class _FakeTrainerRepo implements TrainerPublicProfileRepositoryInterface {
     TrainerSpecialty? specialty,
   }) async {
     var r = _geohash;
+    if (specialty != null) {
+      r = r.where((t) => t.trainerSpecialty == specialty).toList();
+    }
+    return r;
+  }
+
+  @override
+  Future<List<TrainerPublicProfile>> listByGeohashes(
+    List<String> geohashes, {
+    TrainerSpecialty? specialty,
+  }) async {
+    // Para los tests del provider, reutilizamos `_geohash` (el fake setup ya
+    // los simula como "los que están en el geohash del atleta"). Si el caller
+    // pasa varios geohashes, igual devolvemos `_geohash` — los tests del
+    // provider no diferencian entre 1 y N geohashes.
+    var r = _geohash;
+    if (specialty != null) {
+      r = r.where((t) => t.trainerSpecialty == specialty).toList();
+    }
+    return r;
+  }
+
+  @override
+  Future<List<TrainerPublicProfile>> listVirtualOnly({
+    TrainerSpecialty? specialty,
+  }) async {
+    var r = _all.where((t) => t.trainerOffersOnline).toList();
     if (specialty != null) {
       r = r.where((t) => t.trainerSpecialty == specialty).toList();
     }
