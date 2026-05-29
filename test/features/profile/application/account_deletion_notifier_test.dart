@@ -126,7 +126,8 @@ void main() {
       () => mockDeletionService.call(uid: any(named: 'uid')),
     ).thenAnswer((_) async {
       callOrder.add('cf');
-      return FakeDeletionResult(status: 'success');
+      return FakeDeletionResult(
+          status: 'success', deletedCollections: const ['users-auth']);
     });
     when(() => mockAuthService.signOut()).thenAnswer((_) async {
       callOrder.add('signOut');
@@ -189,8 +190,9 @@ void main() {
     var sheetOpenCount = 0;
 
     when(() => mockAuthService.reauthenticate(any())).thenAnswer((_) async {});
-    when(() => mockDeletionService.call(uid: any(named: 'uid')))
-        .thenAnswer((_) async => FakeDeletionResult(status: 'success'));
+    when(() => mockDeletionService.call(uid: any(named: 'uid'))).thenAnswer(
+        (_) async => FakeDeletionResult(
+            status: 'success', deletedCollections: const ['users-auth']));
     when(() => mockAuthService.signOut()).thenAnswer((_) async {});
 
     final container = buildContainer(sheetResult: () async {
@@ -205,8 +207,9 @@ void main() {
     expect(sheetOpenCount, 1);
 
     // Reset state to simulate retry scenario (CF failing after reauth)
-    when(() => mockDeletionService.call(uid: any(named: 'uid')))
-        .thenAnswer((_) async => FakeDeletionResult(status: 'success'));
+    when(() => mockDeletionService.call(uid: any(named: 'uid'))).thenAnswer(
+        (_) async => FakeDeletionResult(
+            status: 'success', deletedCollections: const ['users-auth']));
 
     // Retry within 5 min — should NOT open sheet again
     await container.read(accountDeletionNotifierProvider.notifier).retry();

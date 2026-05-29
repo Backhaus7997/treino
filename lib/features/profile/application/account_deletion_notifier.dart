@@ -102,7 +102,17 @@ class AccountDeletionNotifier extends AsyncNotifier<void> {
       '[AccountDeletion] CF returned: status=${result.status}, '
       'deletedCollections=${result.deletedCollections}, errors=${result.errors}',
     );
-    if (result.status == 'partial') {
+
+    // The definitive signal that the account is gone: Auth user deleted.
+    // CF reports 'partial' when any non-auth cascade step errors (e.g.,
+    // sweeping friendships with a missing index, audit log write fails) —
+    // but if Auth was deleted, the user's account is effectively gone and
+    // we MUST sign out + redirect. Treating partial-with-auth-deleted as
+    // failure leaves the UI stuck and confuses the user.
+    final authDeleted = result.deletedCollections.contains('users-auth');
+
+    if (!authDeleted) {
+      // Real failure — Auth user still exists.
       state = AsyncError(
         const AuthFailure.deletionFailed(),
         StackTrace.current,

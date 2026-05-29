@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:treino/app/theme/app_palette.dart';
@@ -19,6 +20,22 @@ class EliminarCuentaSheet extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
     final notifierState = ref.watch(accountDeletionNotifierProvider);
+
+    // On confirmed account deletion (notifier flips this flag after the
+    // CF reports the Auth user was deleted), force-navigate to /welcome.
+    // The router's redirect would normally handle this when authStateChanges
+    // emits null, but the CF deletes the Firestore user_profile BEFORE the
+    // Auth user, which creates a brief window where loggedIn=true +
+    // profile=null and the redirect lands on /profile-setup instead.
+    // Forcing /welcome here makes the destination deterministic.
+    ref.listen<bool>(
+      accountDeletedFlagProvider,
+      (previous, next) {
+        if (next == true) {
+          context.go('/welcome');
+        }
+      },
+    );
 
     ref.listen<AsyncValue<void>>(
       accountDeletionNotifierProvider,
