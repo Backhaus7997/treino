@@ -1,3 +1,5 @@
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -80,6 +82,17 @@ class _AthleteProfile extends ConsumerWidget {
               builder: (_) => const EliminarCuentaStubSheet(),
             ),
           ),
+          // Tile dev-only para validar el wire de Crashlytics. Gated por
+          // kDebugMode → NUNCA aparece en builds de release (Play/App Store).
+          // Force-crashea via Crashlytics.crash() (no throw) para que el
+          // reporte llegue como native crash, exactamente como uno real.
+          if (kDebugMode)
+            ProfileSectionTile(
+              icon: TreinoIcon.trash,
+              title: 'Forzar crash (debug)',
+              destructive: true,
+              onTap: () => FirebaseCrashlytics.instance.crash(),
+            ),
           const SizedBox(height: 20),
         ],
       ),
