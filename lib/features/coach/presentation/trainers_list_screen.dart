@@ -78,8 +78,7 @@ class _TrainersListScreenState extends ConsumerState<TrainersListScreen> {
             padding: const EdgeInsets.only(right: 12),
             child: _ListMapToggle(
               showMap: showMap,
-              onChanged: (v) =>
-                  ref.read(mapModeProvider.notifier).state = v,
+              onChanged: (v) => ref.read(mapModeProvider.notifier).state = v,
             ),
           ),
         ],

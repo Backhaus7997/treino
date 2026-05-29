@@ -454,4 +454,3 @@ class _FilterOptionTile extends StatelessWidget {
     );
   }
 }
-

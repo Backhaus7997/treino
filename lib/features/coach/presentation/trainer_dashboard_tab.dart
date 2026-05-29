@@ -7,7 +7,8 @@ import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../profile/application/user_providers.dart';
 import '../../profile/application/user_public_profile_providers.dart';
-import '../../workout/application/session_providers.dart' show currentUidProvider;
+import '../../workout/application/session_providers.dart'
+    show currentUidProvider;
 import '../application/agenda_providers.dart';
 import '../application/trainer_link_providers.dart';
 import '../domain/appointment.dart';
@@ -121,9 +122,7 @@ class _DashboardHeader extends ConsumerWidget {
           children: [
             Expanded(
               child: Text(
-                firstName.isEmpty
-                    ? 'HOLA'
-                    : 'HOLA, ${firstName.toUpperCase()}',
+                firstName.isEmpty ? 'HOLA' : 'HOLA, ${firstName.toUpperCase()}',
                 style: GoogleFonts.barlowCondensed(
                   fontWeight: FontWeight.w700,
                   fontSize: 28,
@@ -161,8 +160,7 @@ class _BellWithBadge extends StatelessWidget {
             right: -4,
             top: -4,
             child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
               decoration: BoxDecoration(
                 color: palette.accent,
                 borderRadius: BorderRadius.circular(9999),
@@ -283,9 +281,8 @@ class _PendingRequestCard extends ConsumerWidget {
             children: [
               Expanded(
                 child: OutlinedButton(
-                  onPressed: () => ref
-                      .read(trainerLinkRepositoryProvider)
-                      .decline(link.id),
+                  onPressed: () =>
+                      ref.read(trainerLinkRepositoryProvider).decline(link.id),
                   style: OutlinedButton.styleFrom(
                     side: BorderSide(color: palette.highlight, width: 1),
                     foregroundColor: palette.highlight,
@@ -307,9 +304,8 @@ class _PendingRequestCard extends ConsumerWidget {
               const SizedBox(width: 12),
               Expanded(
                 child: ElevatedButton(
-                  onPressed: () => ref
-                      .read(trainerLinkRepositoryProvider)
-                      .accept(link.id),
+                  onPressed: () =>
+                      ref.read(trainerLinkRepositoryProvider).accept(link.id),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: palette.accent,
                     foregroundColor: palette.bg,
@@ -347,11 +343,13 @@ class _ResumenDelDiaCard extends ConsumerWidget {
     final trainerId = ref.watch(currentUidProvider) ?? '';
     final apptAsync = trainerId.isEmpty
         ? const AsyncValue<List<Appointment>>.data(<Appointment>[])
-        : ref.watch(trainerAppointmentsStreamProvider(_appointmentsKey(trainerId)));
+        : ref.watch(
+            trainerAppointmentsStreamProvider(_appointmentsKey(trainerId)));
 
     final all = apptAsync.valueOrNull ?? const <Appointment>[];
     final now = DateTime.now().toUtc();
-    final todayAppts = all.where((a) => _isSameLocalDay(a.startsAt, now)).toList();
+    final todayAppts =
+        all.where((a) => _isSameLocalDay(a.startsAt, now)).toList();
     final pending = todayAppts
         .where((a) =>
             a.status == AppointmentStatus.confirmed && a.startsAt.isAfter(now))
@@ -360,9 +358,8 @@ class _ResumenDelDiaCard extends ConsumerWidget {
         .where((a) =>
             a.status == AppointmentStatus.confirmed && !a.startsAt.isAfter(now))
         .length;
-    final cancelled = todayAppts
-        .where((a) => a.status == AppointmentStatus.cancelled)
-        .length;
+    final cancelled =
+        todayAppts.where((a) => a.status == AppointmentStatus.cancelled).length;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
@@ -542,10 +539,12 @@ class _ProximasSesionesList extends ConsumerWidget {
     final palette = AppPalette.of(context);
     final trainerId = ref.watch(currentUidProvider) ?? '';
     if (trainerId.isEmpty) {
-      return _PlaceholderCard(palette: palette, message: 'Iniciá sesión para ver tus próximos turnos.');
+      return _PlaceholderCard(
+          palette: palette,
+          message: 'Iniciá sesión para ver tus próximos turnos.');
     }
-    final apptAsync =
-        ref.watch(trainerAppointmentsStreamProvider(_appointmentsKey(trainerId)));
+    final apptAsync = ref
+        .watch(trainerAppointmentsStreamProvider(_appointmentsKey(trainerId)));
 
     return apptAsync.when(
       loading: () => _PlaceholderCard(
@@ -609,8 +608,8 @@ class _ProximaSesionRow extends ConsumerWidget {
     final palette = AppPalette.of(context);
     final profileAsync =
         ref.watch(userPublicProfileProvider(appointment.athleteId));
-    final athleteName = profileAsync.valueOrNull?.displayName ??
-        appointment.athleteDisplayName;
+    final athleteName =
+        profileAsync.valueOrNull?.displayName ?? appointment.athleteDisplayName;
     final showName = _looksLikeUid(athleteName) ? 'Alumno' : athleteName;
     final initials = _initials(showName);
 
