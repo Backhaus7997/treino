@@ -44,7 +44,7 @@ class FakeDeletionResult extends Fake implements DeletionResult {
   @override
   final List<String> deletedCollections;
   @override
-  final List<Map<String, dynamic>> errors;
+  final List<String> errors;
 }
 
 void main() {

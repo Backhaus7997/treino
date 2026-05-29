@@ -12,7 +12,10 @@ class DeletionResult {
   /// 'success' | 'partial'
   final String status;
   final List<String> deletedCollections;
-  final List<Map<String, dynamic>> errors;
+
+  /// CF reports errors as a list of human-readable strings, e.g.
+  /// `"friendships: PERMISSION_DENIED: ..."`. NOT structured objects.
+  final List<String> errors;
 }
 
 /// Sealed class for client-side account deletion failures (NOT freezed).
@@ -68,9 +71,9 @@ class AccountDeletionService {
         deletedCollections: List<String>.from(
           data['deletedCollections'] as List<dynamic>? ?? const [],
         ),
-        errors: List<Map<String, dynamic>>.from(
+        errors: List<String>.from(
           (data['errors'] as List<dynamic>? ?? const [])
-              .map((e) => Map<String, dynamic>.from(e as Map)),
+              .map((e) => e.toString()),
         ),
       );
     } on FirebaseFunctionsException catch (e) {
