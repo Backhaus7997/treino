@@ -120,10 +120,20 @@ class AccountDeletionNotifier extends AsyncNotifier<void> {
       return;
     }
 
-    // Signal WelcomeScreen to show "Tu cuenta fue eliminada" SnackBar.
-    ref.read(accountDeletedFlagProvider.notifier).state = true;
+    // Order matters: sign out BEFORE flipping the deleted-flag.
+    //
+    // The flag listener in EliminarCuentaSheet calls context.go('/welcome')
+    // when the flag becomes true. If the flag flips while the local auth
+    // state is still cached (loggedIn=true) + the Firestore profile is null
+    // (deleted by the CF cascade), the router's redirect logic resolves
+    // /welcome → /home → /profile-setup, stranding the user mid-onboarding.
+    //
+    // By awaiting signOut first, authStateChanges emits null before we
+    // signal the navigation, so the router sees !loggedIn and routes to
+    // /welcome cleanly.
     await ref.read(authServiceProvider).signOut();
     state = const AsyncData(null);
+    ref.read(accountDeletedFlagProvider.notifier).state = true;
   }
 
   /// Opens the ReAuthBottomSheet and returns the credential or null.
