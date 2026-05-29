@@ -34,9 +34,17 @@ class MockUser extends Mock implements User {}
 class FakeAuthCredential extends Fake implements AuthCredential {}
 
 class FakeDeletionResult extends Fake implements DeletionResult {
-  FakeDeletionResult({required this.status});
+  FakeDeletionResult({
+    required this.status,
+    this.deletedCollections = const [],
+    this.errors = const [],
+  });
   @override
   final String status;
+  @override
+  final List<String> deletedCollections;
+  @override
+  final List<Map<String, dynamic>> errors;
 }
 
 void main() {

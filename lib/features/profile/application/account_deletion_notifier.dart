@@ -47,7 +47,10 @@ class AccountDeletionNotifier extends AsyncNotifier<void> {
   /// when [_sheetOpener] is injected.
   Future<void> deleteAccount([BuildContext? context]) async {
     final credential = await _openReAuthSheet(context);
-    if (credential == null) return; // user cancelled — stay idle
+    if (credential == null) {
+      debugPrint('[AccountDeletion] re-auth sheet returned null — aborted');
+      return;
+    }
 
     state = const AsyncLoading();
     try {
@@ -56,8 +59,10 @@ class AccountDeletionNotifier extends AsyncNotifier<void> {
       _lastReauthAt = DateTime.now();
       await _callCfAndFinish();
     } on AuthFailure catch (e) {
+      debugPrint('[AccountDeletion] AuthFailure: $e');
       state = AsyncError(e, StackTrace.current);
     } catch (e, st) {
+      debugPrint('[AccountDeletion] unexpected error: $e\n$st');
       state = AsyncError(AuthFailure.deletionFailed(cause: e), st);
     }
   }
@@ -93,6 +98,10 @@ class AccountDeletionNotifier extends AsyncNotifier<void> {
     }
 
     final result = await service.call(uid: uid);
+    debugPrint(
+      '[AccountDeletion] CF returned: status=${result.status}, '
+      'deletedCollections=${result.deletedCollections}, errors=${result.errors}',
+    );
     if (result.status == 'partial') {
       state = AsyncError(
         const AuthFailure.deletionFailed(),

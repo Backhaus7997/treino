@@ -23,6 +23,10 @@ class EliminarCuentaSheet extends ConsumerWidget {
     ref.listen<AsyncValue<void>>(
       accountDeletionNotifierProvider,
       (previous, next) {
+        // On success, the notifier signs out and GoRouter redirects to
+        // WelcomeScreen — the modal route is naturally removed by the
+        // navigator pop that the redirect performs. No explicit pop here.
+
         next.whenOrNull(
           error: (e, _) {
             final message = e is AuthFailure
@@ -107,14 +111,15 @@ class EliminarCuentaSheet extends ConsumerWidget {
                 ),
                 const SizedBox(height: 20),
                 ElevatedButton(
+                  // Do NOT pop the sheet here — the notifier's flow needs
+                  // a mounted listener for the loading overlay and the
+                  // error snackbar to be visible. The success path pops the
+                  // sheet via the `ref.listen` above.
                   onPressed: isLoading
                       ? null
-                      : () {
-                          Navigator.of(context).pop();
-                          ref
-                              .read(accountDeletionNotifierProvider.notifier)
-                              .deleteAccount(context);
-                        },
+                      : () => ref
+                          .read(accountDeletionNotifierProvider.notifier)
+                          .deleteAccount(context),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: palette.danger,
                     padding: const EdgeInsets.symmetric(vertical: 14),
