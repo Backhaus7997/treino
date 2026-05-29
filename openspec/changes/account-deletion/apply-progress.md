@@ -240,7 +240,129 @@ Blaze plan confirmed active on `treino-dev` (user confirmed prior to apply phase
 
 ---
 
-## Next Steps
+## Next Steps (post-PR#2)
 
 - PR#2 ready for smoke test + push + PR (orchestrator handles).
 - After PR#2 merges: branch `feat/account-deletion-pr3-flutter-ui` for T33..T54 (Flutter UI).
+
+---
+
+## PR#3 — Flutter UI + Re-auth + Stub Delete + Chat Fallback
+
+**Change**: account-deletion
+**Branch**: `feat/account-deletion-pr3-flutter-ui`
+**Base**: `main` at `7fed350` (post-PR#2 + dart format housekeeping)
+**Mode**: Strict TDD
+**PR scope**: T33..T54 (Phase 3.1–3.9)
+**LOC actual**: ~380 (forecast ~390)
+
+---
+
+## PR#3 TDD Cycle Evidence
+
+| Task | Test File | Layer | RED | GREEN | REFACTOR |
+|------|-----------|-------|-----|-------|----------|
+| T33 | N/A — branch + pubspec + pod | — | N/A | ✅ cloud_functions 5.6.2 resolved, pod install done | — |
+| T34 | `test/features/auth/domain/auth_failure_test.dart` (extended) | Unit | ✅ 4 new tests fail — variants not defined | — | — |
+| T35 | same | Unit | — | ✅ 3 new freezed variants + fromFirebase mapping + build_runner | ✅ Clean |
+| T36 | `test/features/profile/data/account_deletion_service_test.dart` | Unit | ✅ Compile fail — service not found | — | — |
+| T37 | same | Unit | — | ✅ 4/4 pass | ✅ Clean |
+| T38 | `test/features/auth/data/auth_service_reauth_test.dart` | Unit | ✅ Compile fail — methods not found | — | — |
+| T39 | same | Unit | — | ✅ 11/11 pass | ✅ Clean |
+| T40 | `test/features/profile/application/account_deletion_notifier_test.dart` | Unit | ✅ Compile fail — notifier not found | — | — |
+| T41 | same | Unit | — | ✅ 6/6 pass | ✅ Clean |
+| T42 | `test/features/profile/presentation/widgets/re_auth_bottom_sheet_test.dart` | Widget | ✅ Compile fail — widget not found | — | — |
+| T43 | same | Widget | — | ✅ 4/4 pass | ✅ Clean |
+| T44 | `test/features/profile/presentation/widgets/eliminar_cuenta_sheet_test.dart` | Widget | ✅ Compile fail — widget not found | — | — |
+| T45 | same | Widget | — | ✅ 4/4 pass | ✅ Clean |
+| T46 | `test/features/profile/presentation/profile_screen_test.dart` (extended) | Widget | ✅ SCENARIO-531 updated: ELIMINAR expected | — | — |
+| T47 | same | Widget | — | ✅ 5/5 pass (stub replaced by real sheet) | ✅ Clean |
+| T48 | N/A — file delete | — | N/A | ✅ Stub deleted, 0 remaining refs | — |
+| T49 | `test/features/chat/presentation/widgets/chat_deleted_user_test.dart` | Widget | ✅ null profile shows 'Usuario' (wrong fallback) | — | — |
+| T50 | same | Widget | — | ✅ 2/2 pass — fallback is 'Usuario eliminado' | ✅ Clean |
+| T51 | N/A — gate | — | — | ✅ flutter analyze: 0 issues | — |
+| T52 | N/A — gate | — | — | ✅ dart format: 0 changed | — |
+| T53 | N/A — gate | — | — | ✅ flutter test: 1358/1358 pass (+35 vs baseline 1323) | — |
+| T54 | N/A — verify | — | — | ✅ 0 hex literals, 0 PhosphorIcons direct, ≥1 i18n marker per file, 0 stub refs | — |
+
+---
+
+## Completed Tasks — PR#3
+
+- [x] T33 — Branch + pubspec `cloud_functions: ^5.2.0` (resolved: 5.6.2) + pod install.
+- [x] T34 — RED: 4 new auth_failure tests (requiresRecentLogin, reAuthFailed, deletionFailed, fromFirebase mapping).
+- [x] T35 — GREEN: 3 new AuthFailure variants in auth_failure.dart + freezed regen + fromFirebase mapping.
+- [x] T36 — RED: account_deletion_service_test.dart with 4 tests (SCENARIO-561, 562, 563).
+- [x] T37 — GREEN: account_deletion_service.dart — `AccountDeletionService` + `DeletionResult` + `AccountDeletionFailure` sealed class (NOT freezed). Provider: `accountDeletionServiceProvider`.
+- [x] T38 — RED: auth_service_reauth_test.dart with 11 tests (SCENARIO-552, 553 + credential builders).
+- [x] T39 — GREEN: `AuthService.reauthenticate`, `getPasswordCredential`, `getGoogleCredential`, `getAppleCredential` added to auth_service.dart.
+- [x] T40 — RED: account_deletion_notifier_test.dart with 6 tests (SCENARIO-554, 558, 559, 563, 564 + retry).
+- [x] T41 — GREEN: `AccountDeletionNotifier` — AsyncNotifier<void>, 5-min retry window, `accountDeletedFlagProvider`, injectable `_sheetOpener` for testability.
+- [x] T42 — RED: re_auth_bottom_sheet_test.dart with 4 tests (SCENARIO-555, 556, 557, 559).
+- [x] T43 — GREEN: `ReAuthBottomSheet` + `_PasswordReAuthBody`, `_GoogleReAuthBody`, `_AppleReAuthBody` private widgets.
+- [x] T44 — RED: eliminar_cuenta_sheet_test.dart with 4 tests (SCENARIO-560, 561, 562, 564).
+- [x] T45 — GREEN: `EliminarCuentaSheet` — ConsumerWidget, RichText body with bold "irreversible", CANCELAR + ELIMINAR, loading overlay, error SnackBar with Reintentar.
+- [x] T46 — RED: profile_screen_test.dart SCENARIO-531 updated to expect ELIMINAR (real sheet).
+- [x] T47 — GREEN: profile_screen.dart import changed to EliminarCuentaSheet; `_NoOpDeletionNotifier` stub in tests.
+- [x] T48 — REFACTOR: eliminar_cuenta_stub_sheet.dart deleted. 0 remaining references.
+- [x] T49 — RED: chat_deleted_user_test.dart — null profile shows 'Usuario eliminado' (SCENARIO-570).
+- [x] T50 — GREEN: chat_list_screen.dart + chat_screen.dart: `pub?.displayName ?? 'Usuario eliminado'` with i18n comment.
+- [x] T51 — GATE: `flutter analyze` → No issues found! (Exit: 0)
+- [x] T52 — GATE: `dart format` → 0 changed (Exit: 0)
+- [x] T53 — GATE: `flutter test` → 1358/1358 (+35 vs baseline 1323)
+- [x] T54 — VERIFY: 0 hex literals, 0 PhosphorIcons direct, ≥1 i18n per file, 0 stub refs
+
+---
+
+## Commits — PR#3
+
+| SHA | Type | Message |
+|-----|------|---------|
+| 661eb6b | chore | deps: add cloud_functions ^5.2.0 + pod install (T33) |
+| ed5d21b | test | RED — account deletion PR3 test suite (T34, T36, T38, T40, T42, T44, T49) |
+| 21ae789 | feat | GREEN — account deletion PR3 Flutter UI + re-auth + chat fallback (T34-T50) |
+| 8b615fa | refactor | delete EliminarCuentaStubSheet — replaced by real EliminarCuentaSheet (T48) |
+
+---
+
+## Quality Gates — PR#3
+
+| Gate | Result |
+|------|--------|
+| flutter analyze (T51) | ✅ PASS — No issues found |
+| dart format (T52) | ✅ PASS — 0 changed |
+| flutter test (T53) | ✅ PASS — 1358/1358 (+35 vs baseline) |
+| Hex literals | ✅ 0 hits in lib/features/profile/ lib/features/chat/ |
+| PhosphorIcons direct | ✅ 0 hits |
+| i18n markers | ✅ ≥17 markers across new files |
+| Stub ref check | ✅ 0 refs to EliminarCuentaStubSheet |
+
+---
+
+## Deviations from Design — PR#3
+
+1. **Tasks numbering vs prompt**: The orchestrator prompt numbered tasks as T33-T54 following the task.md file numbering which differs from the design's task numbering. Followed the tasks.md file as canonical source.
+
+2. **T51 numbering**: In the instruction prompt, T51 maps to "sign-in snackbar" and T52-T54 map to quality gates. In tasks.md, T51 is `flutter analyze`. Implemented the sign-in snackbar via `accountDeletedFlagProvider` + WelcomeScreen listener (lightweight `StateProvider<bool>` pattern — no query params, no GoRouter extra). The flag approach is safe, zero-cost, and does not modify the router.
+
+3. **ReAuthBottomSheet takes `providerId` parameter**: The design shows provider detection from `initState` via `FirebaseAuth.instance.currentUser`. Since the notifier reads the user from `firebaseAuthProvider` and passes `providerId` to the sheet, the widget is cleaner and fully testable without a real FirebaseAuth instance.
+
+4. **auth_service_test.dart `.map()` calls updated**: Adding 3 new freezed variants required adding `requiresRecentLogin`, `reAuthFailed`, `deletionFailed` branches to the 2 existing exhaustive `.map()` calls in auth_service_test.dart. Minor update, keeps all tests passing.
+
+5. **LOC actual ~380**: Slightly under the 390 forecast. No LOC budget violation.
+
+---
+
+## Risks for Smoke
+
+1. **Apple Sign-In re-auth**: Cannot be auto-tested. MUST be smoke-tested manually on a real iOS device against treino-dev. The `_AppleReAuthBody` is isolated and its trigger path is `AuthService.getAppleCredential()`.
+2. **Real CF invocation**: Tests mock the CF call. End-to-end test requires real account on treino-dev with the deployed `deleteAccount` callable. Smoke test: create athlete, tap "Eliminar cuenta", complete re-auth, verify Firestore + Auth + Storage cleaned.
+3. **Google re-auth on simulator**: GoogleSignIn `authenticate()` requires proper Google Sign-In configuration. May need real device for full flow.
+
+---
+
+## Next Steps (PR#3)
+
+- Branch ready: `feat/account-deletion-pr3-flutter-ui`
+- Orchestrator handles: smoke test → push → PR (targeting `main`)
+- After smoke + PR merge: `sdd-verify` → `sdd-archive`
