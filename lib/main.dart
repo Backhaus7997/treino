@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart' show FirebaseFirestore;
 import 'package:firebase_analytics/firebase_analytics.dart';
+import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
@@ -22,6 +23,33 @@ Future<void> main() async {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
+
+    // App Check: validación de que el request viene de una app legítima
+    // (no de un script o emulator random). Se activa ANTES que cualquier
+    // otra service call (Firestore/Auth/Analytics) para que todas las
+    // requests subsiguientes incluyan el token.
+    //
+    // En debug: `AndroidProvider.debug` + `AppleProvider.debug` — la primera
+    // vez que la app arranca, el SDK printa un debug token en consola del
+    // tipo `Enter this debug secret into the allow list...`. Ese token hay
+    // que agregarlo manualmente en Firebase Console → App Check → Apps →
+    // app → Manage debug tokens, una sola vez por device de dev.
+    //
+    // En release: Play Integrity (Android) y AppAttest (iOS). Estos
+    // requieren signed builds y firebase config correcta en Console.
+    //
+    // Modo de enforcement (accept/reject sin token): se controla desde
+    // Firebase Console, no desde código. Lo dejamos en monitoring por
+    // ahora — Firestore acepta todo, el dashboard muestra qué % de
+    // requests pasarían si activáramos enforce.
+    if (!kIsWeb) {
+      await FirebaseAppCheck.instance.activate(
+        androidProvider:
+            kDebugMode ? AndroidProvider.debug : AndroidProvider.playIntegrity,
+        appleProvider:
+            kDebugMode ? AppleProvider.debug : AppleProvider.appAttest,
+      );
+    }
 
     // Crashlytics no soporta web — guardamos el wire bajo !kIsWeb. En web este
     // entry no se usa (el web target levanta main_coach_hub.dart), pero el
