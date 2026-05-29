@@ -33,14 +33,21 @@ class EliminarCuentaSheet extends ConsumerWidget {
                 ? e.userMessage
                 : 'No pudimos eliminar tu cuenta. Probá de nuevo.'; // i18n: Fase 6 Etapa 3
 
-            ScaffoldMessenger.of(context).showSnackBar(
+            final messenger = ScaffoldMessenger.of(context);
+            messenger.hideCurrentSnackBar();
+            messenger.showSnackBar(
               SnackBar(
                 content: Text(message),
+                behavior: SnackBarBehavior.floating,
+                duration: const Duration(seconds: 6),
                 action: SnackBarAction(
                   label: 'Reintentar', // i18n: Fase 6 Etapa 3
-                  onPressed: () => ref
-                      .read(accountDeletionNotifierProvider.notifier)
-                      .retry(context),
+                  onPressed: () {
+                    messenger.hideCurrentSnackBar();
+                    ref
+                        .read(accountDeletionNotifierProvider.notifier)
+                        .retry(context);
+                  },
                 ),
               ),
             );
