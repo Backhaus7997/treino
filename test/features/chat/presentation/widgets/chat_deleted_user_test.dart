@@ -28,7 +28,7 @@ void main() {
 
   final fakeChat = Chat(
     chatId: 'chat-1',
-    members: [currentUid, deletedUid],
+    members: const [currentUid, deletedUid],
     createdAt: DateTime(2026, 5, 1),
     lastMessageText: 'Hola',
     lastMessageAt: DateTime(2026, 5, 27),
@@ -47,7 +47,7 @@ void main() {
           (_) => Stream.value(deletedUserProfile),
         ),
       ],
-      child: TestAppWrapper(child: const ChatListScreen()),
+      child: const TestAppWrapper(child: ChatListScreen()),
     );
   }
 
@@ -68,14 +68,13 @@ void main() {
 
   // Positive: existing profile shows the real display name
   testWidgets('existing public profile shows display name', (tester) async {
-    final profile = UserPublicProfile(
+    const profile = UserPublicProfile(
       uid: deletedUid,
       displayName: 'Ana García',
       avatarUrl: null,
     );
 
-    await tester.pumpWidget(
-        buildChatListScreen(deletedUserProfile: profile));
+    await tester.pumpWidget(buildChatListScreen(deletedUserProfile: profile));
     await tester.pumpAndSettle();
 
     expect(find.text('Ana García'), findsAtLeastNWidgets(1));

@@ -1,0 +1,153 @@
+import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../auth/application/auth_providers.dart';
+import '../../auth/domain/auth_failure.dart';
+import '../data/account_deletion_service.dart';
+import '../presentation/widgets/re_auth_bottom_sheet.dart';
+
+/// Orchestrates the full account deletion flow per ADR-ACCDEL-009:
+///
+///   1. Open ReAuthBottomSheet → get AuthCredential?
+///   2. If null (cancelled) → stay idle
+///   3. AuthService.reauthenticate(credential)
+///   4. AccountDeletionService.call(uid)
+///   5. On success → signOut → state = AsyncData(null)
+///   6. On partial/error → state = AsyncError(AuthFailure)
+///
+/// Retry policy per ADR-ACCDEL-011:
+///   - Within 5 min of last re-auth → skip re-auth sheet, call CF directly
+///   - After 5 min → full re-auth path
+class AccountDeletionNotifier extends AsyncNotifier<void> {
+  AccountDeletionNotifier() : _sheetOpener = null;
+
+  /// Constructor used by tests to inject a fake sheet opener that does not
+  /// require a real BuildContext / Navigator.
+  AccountDeletionNotifier.withSheetOpener(
+    Future<AuthCredential?> Function() sheetOpener,
+  ) : _sheetOpener = sheetOpener;
+
+  /// Overridable sheet opener. When null, [_openReAuthSheet] uses the real
+  /// showModalBottomSheet with a BuildContext.
+  final Future<AuthCredential?> Function()? _sheetOpener;
+
+  /// Timestamp of the last successful re-authentication.
+  /// Used to implement the 5-minute retry window (ADR-ACCDEL-011).
+  DateTime? _lastReauthAt;
+
+  @override
+  Future<void> build() async {}
+
+  /// Initiates the full deletion flow: shows re-auth sheet, authenticates,
+  /// calls CF, signs out.
+  ///
+  /// [context] is used to open the re-auth sheet. May be null in tests
+  /// when [_sheetOpener] is injected.
+  Future<void> deleteAccount([BuildContext? context]) async {
+    final credential = await _openReAuthSheet(context);
+    if (credential == null) return; // user cancelled — stay idle
+
+    state = const AsyncLoading();
+    try {
+      final authService = ref.read(authServiceProvider);
+      await authService.reauthenticate(credential);
+      _lastReauthAt = DateTime.now();
+      await _callCfAndFinish();
+    } on AuthFailure catch (e) {
+      state = AsyncError(e, StackTrace.current);
+    } catch (e, st) {
+      state = AsyncError(AuthFailure.deletionFailed(cause: e), st);
+    }
+  }
+
+  /// Retries without re-auth if within the 5-min window (ADR-ACCDEL-011).
+  Future<void> retry([BuildContext? context]) async {
+    final reauthFresh = _lastReauthAt != null &&
+        DateTime.now().difference(_lastReauthAt!) < const Duration(minutes: 5);
+    if (!reauthFresh) {
+      // Window expired — full re-auth path.
+      await deleteAccount(context);
+      return;
+    }
+    state = const AsyncLoading();
+    try {
+      await _callCfAndFinish();
+    } catch (e, st) {
+      state = AsyncError(_mapError(e), st);
+    }
+  }
+
+  /// Calls the CF and, on success, signs out and emits [AsyncData(null)].
+  Future<void> _callCfAndFinish() async {
+    final service = ref.read(accountDeletionServiceProvider);
+    final firebaseAuth = ref.read(firebaseAuthProvider);
+    final uid = firebaseAuth.currentUser?.uid;
+    if (uid == null) {
+      state = AsyncError(
+        const AuthFailure.userNotFound(),
+        StackTrace.current,
+      );
+      return;
+    }
+
+    final result = await service.call(uid: uid);
+    if (result.status == 'partial') {
+      state = AsyncError(
+        const AuthFailure.deletionFailed(),
+        StackTrace.current,
+      );
+      return;
+    }
+
+    // Signal WelcomeScreen to show "Tu cuenta fue eliminada" SnackBar.
+    ref.read(accountDeletedFlagProvider.notifier).state = true;
+    await ref.read(authServiceProvider).signOut();
+    state = const AsyncData(null);
+  }
+
+  /// Opens the ReAuthBottomSheet and returns the credential or null.
+  Future<AuthCredential?> _openReAuthSheet([BuildContext? context]) async {
+    // Injected opener takes priority (used in tests).
+    final opener = _sheetOpener;
+    if (opener != null) return opener();
+
+    if (context == null || !context.mounted) return null;
+
+    // Detect provider from current user.
+    final user = ref.read(firebaseAuthProvider).currentUser;
+    final providerId = user?.providerData.isNotEmpty == true
+        ? user!.providerData[0].providerId
+        : 'password';
+
+    return showModalBottomSheet<AuthCredential?>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => ReAuthBottomSheet(providerId: providerId),
+    );
+  }
+
+  AuthFailure _mapError(Object e) {
+    if (e is FirebaseFunctionsException) {
+      if (e.code == 'unauthenticated' ||
+          (e.code == 'permission-denied' &&
+              (e.message?.contains('recent-login') ?? false))) {
+        return const AuthFailure.requiresRecentLogin();
+      }
+    }
+    if (e is AuthFailure) return e;
+    return AuthFailure.deletionFailed(cause: e);
+  }
+}
+
+/// Riverpod provider for [AccountDeletionNotifier].
+final accountDeletionNotifierProvider =
+    AsyncNotifierProvider<AccountDeletionNotifier, void>(
+  AccountDeletionNotifier.new,
+);
+
+/// Set to `true` when an account deletion succeeds. Consumed by [WelcomeScreen]
+/// to show "Tu cuenta fue eliminada" SnackBar after GoRouter redirects. Resets
+/// to `false` once the snackbar has been shown.
+final accountDeletedFlagProvider = StateProvider<bool>((_) => false);

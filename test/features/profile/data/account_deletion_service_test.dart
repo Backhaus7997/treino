@@ -56,8 +56,8 @@ void main() {
       expect(result.status, equals('success'));
     });
 
-    test(
-        'SCENARIO-561: status=partial is parsed to DeletionResult.partial', () async {
+    test('SCENARIO-561: status=partial is parsed to DeletionResult.partial',
+        () async {
       when(() => mockCallable.call<Map<String, dynamic>>(any())).thenAnswer(
         (_) async {
           when(() => mockResult.data).thenReturn({

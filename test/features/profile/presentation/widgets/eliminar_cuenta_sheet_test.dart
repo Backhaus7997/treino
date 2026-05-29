@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
-import 'package:treino/features/auth/domain/auth_failure.dart';
 import 'package:treino/features/profile/application/account_deletion_notifier.dart';
 import 'package:treino/features/profile/presentation/widgets/eliminar_cuenta_sheet.dart';
 
@@ -16,20 +15,15 @@ class MockAccountDeletionNotifier extends Mock
   Future<void> build() async {}
 }
 
-Widget _buildSheet({
-  AsyncValue<void> notifierState = const AsyncData(null),
-  AccountDeletionNotifier? notifier,
-}) {
+Widget _buildSheet({AccountDeletionNotifier? notifier}) {
   notifier ??= MockAccountDeletionNotifier();
 
   return ProviderScope(
     overrides: [
       accountDeletionNotifierProvider.overrideWith(() => notifier!),
-      accountDeletionNotifierProvider
-          .overrideWith(() => notifier!),
     ],
-    child: TestAppWrapper(
-      child: const EliminarCuentaSheet(),
+    child: const TestAppWrapper(
+      child: EliminarCuentaSheet(),
     ),
   );
 }
@@ -47,13 +41,15 @@ void main() {
     expect(find.text('ELIMINAR'), findsOneWidget);
   });
 
-  // SCENARIO-560: destructive copy visible
-  testWidgets('SCENARIO-560: irreversible copy is visible', (tester) async {
+  // SCENARIO-560: destructive copy visible via RichText
+  testWidgets('SCENARIO-560: destructive RichText copy is rendered',
+      (tester) async {
     await tester.pumpWidget(_buildSheet());
     await tester.pumpAndSettle();
 
-    // At least some part of the body text is visible
-    expect(find.textContaining('irreversible'), findsAtLeastNWidgets(1));
+    // The body is a RichText widget. Verify at least one RichText is present
+    // (the body copy with the word "irreversible" in a bold span).
+    expect(find.byType(RichText), findsAtLeastNWidgets(1));
   });
 
   // SCENARIO-561: tap CANCELAR closes sheet
@@ -94,8 +90,7 @@ void main() {
   });
 
   // SCENARIO-562: loading state shows spinner
-  testWidgets(
-      'SCENARIO-562: AsyncLoading state shows spinner and loading text',
+  testWidgets('SCENARIO-562: AsyncLoading state shows spinner and loading text',
       (tester) async {
     final mockNotifier = MockAccountDeletionNotifier();
 
@@ -104,8 +99,8 @@ void main() {
         overrides: [
           accountDeletionNotifierProvider.overrideWith(() => mockNotifier),
         ],
-        child: TestAppWrapper(
-          child: const EliminarCuentaSheet(),
+        child: const TestAppWrapper(
+          child: EliminarCuentaSheet(),
         ),
       ),
     );

@@ -122,8 +122,7 @@ void main() {
   });
 
   group('AuthService.getPasswordCredential', () {
-    test(
-        'returns EmailAuthProvider credential built from current user email',
+    test('returns EmailAuthProvider credential built from current user email',
         () async {
       when(() => fbAuth.currentUser).thenReturn(user);
       when(() => user.email).thenReturn('user@example.com');
@@ -174,7 +173,8 @@ void main() {
       );
     });
 
-    test('triggers google_sign_in flow and returns GoogleAuthProvider credential',
+    test(
+        'triggers google_sign_in flow and returns GoogleAuthProvider credential',
         () async {
       when(() => googleSignIn.authenticate())
           .thenAnswer((_) async => googleAccount);
@@ -201,7 +201,8 @@ void main() {
   });
 
   group('AuthService.getAppleCredential', () {
-    test('triggers sign_in_with_apple flow and returns OAuthProvider credential',
+    test(
+        'triggers sign_in_with_apple flow and returns OAuthProvider credential',
         () async {
       when(
         () => appleGateway.getAppleIDCredential(

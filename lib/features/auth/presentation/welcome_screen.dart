@@ -8,6 +8,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../app/theme/app_background.dart';
 import '../../../app/theme/app_palette.dart';
 import '../application/auth_providers.dart';
+import '../../profile/application/account_deletion_notifier.dart';
 import 'auth_strings.dart';
 import 'widgets/auth_pill_button.dart';
 import 'widgets/auth_secondary_button.dart';
@@ -20,6 +21,24 @@ class WelcomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
     final isLoading = ref.watch(authNotifierProvider).isLoading;
+
+    // Show "Tu cuenta fue eliminada" SnackBar when the deletion flag is set.
+    ref.listen<bool>(accountDeletedFlagProvider, (_, isDeleted) {
+      if (!isDeleted) return;
+      // Reset flag immediately so the snackbar only shows once.
+      ref.read(accountDeletedFlagProvider.notifier).state = false;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Tu cuenta fue eliminada', // i18n: Fase 6 Etapa 3
+              ),
+            ),
+          );
+        }
+      });
+    });
 
     return Scaffold(
       backgroundColor: palette.bg,

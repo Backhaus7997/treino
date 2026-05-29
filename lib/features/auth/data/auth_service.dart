@@ -265,6 +265,116 @@ class AuthService {
     return cred.user!;
   }
 
+  // ── Re-auth helpers (Fase 6 Etapa 3 — account-deletion PR#3) ────────────────
+  //
+  // Per ADR-ACCDEL-009: AuthService stays thin. These methods expose Firebase
+  // re-auth and per-provider credential builders. ALL orchestration lives in
+  // AccountDeletionNotifier.
+
+  /// Re-authenticates the current user with [credential].
+  ///
+  /// Throws [AuthFailure.userNotFound] when there is no signed-in user.
+  /// Throws [AuthFailure.reAuthFailed] on wrong-password / invalid-credential.
+  /// Throws [AuthFailure.fromFirebase] for any other FirebaseAuthException.
+  Future<void> reauthenticate(AuthCredential credential) async {
+    final user = _auth.currentUser;
+    if (user == null) throw const AuthFailure.userNotFound();
+    try {
+      await user.reauthenticateWithCredential(credential);
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'wrong-password' || e.code == 'invalid-credential') {
+        throw const AuthFailure.reAuthFailed();
+      }
+      throw AuthFailure.fromFirebase(e);
+    }
+  }
+
+  /// Returns an [EmailAuthProvider] credential for the current user.
+  ///
+  /// Throws [AuthFailure.reAuthFailed] when there is no signed-in user or
+  /// the current user has no email.
+  // i18n: Fase 6 Etapa 3
+  Future<AuthCredential> getPasswordCredential({
+    required String password,
+  }) async {
+    final user = _auth.currentUser;
+    if (user == null || user.email == null) {
+      throw const AuthFailure.reAuthFailed(provider: 'password');
+    }
+    return EmailAuthProvider.credential(
+      email: user.email!,
+      password: password,
+    );
+  }
+
+  /// Triggers the Google sign-in flow and returns a [GoogleAuthProvider]
+  /// credential suitable for re-authentication.
+  ///
+  /// Throws [AuthFailure.signInCancelled] on user-cancel.
+  /// Throws [AuthFailure.reAuthFailed] on other Google errors.
+  // i18n: Fase 6 Etapa 3
+  Future<AuthCredential> getGoogleCredential() async {
+    final GoogleSignInAccount googleUser;
+    try {
+      googleUser = await _googleSignIn.authenticate();
+    } on GoogleSignInException catch (e) {
+      if (e.code == GoogleSignInExceptionCode.canceled) {
+        throw const AuthFailure.signInCancelled();
+      }
+      throw const AuthFailure.reAuthFailed(provider: 'google.com');
+    }
+
+    final GoogleSignInClientAuthorization authorization;
+    try {
+      authorization = await googleUser.authorizationClient
+          .authorizeScopes(const <String>['email']);
+    } on GoogleSignInException catch (e) {
+      if (e.code == GoogleSignInExceptionCode.canceled) {
+        throw const AuthFailure.signInCancelled();
+      }
+      throw const AuthFailure.reAuthFailed(provider: 'google.com');
+    }
+
+    return GoogleAuthProvider.credential(
+      idToken: googleUser.authentication.idToken,
+      accessToken: authorization.accessToken,
+    );
+  }
+
+  /// Triggers Apple Sign-In and returns an [OAuthProvider] credential
+  /// suitable for re-authentication.
+  ///
+  /// Throws [AuthFailure.signInCancelled] on user-cancel.
+  /// Throws [AuthFailure.reAuthFailed] on other Apple errors.
+  // i18n: Fase 6 Etapa 3
+  Future<AuthCredential> getAppleCredential() async {
+    final rawNonce = generateNonce();
+    final hashedNonce = sha256OfString(rawNonce);
+
+    final AuthorizationCredentialAppleID appleCred;
+    try {
+      appleCred = await _appleGateway.getAppleIDCredential(
+        scopes: const [AppleIDAuthorizationScopes.email],
+        nonce: hashedNonce,
+      );
+    } on SignInWithAppleAuthorizationException catch (e) {
+      if (e.code == AuthorizationErrorCode.canceled) {
+        throw const AuthFailure.signInCancelled();
+      }
+      throw const AuthFailure.reAuthFailed(provider: 'apple.com');
+    } catch (_) {
+      throw const AuthFailure.reAuthFailed(provider: 'apple.com');
+    }
+
+    return OAuthProvider('apple.com').credential(
+      idToken: appleCred.identityToken,
+      rawNonce: rawNonce,
+      accessToken: appleCred.authorizationCode,
+    );
+  }
+
+  // ── End re-auth helpers ────────────────────────────────────────────────────
+
   Future<void> signOut() async {
     try {
       // Disconnect Google session too — otherwise a subsequent signIn() would

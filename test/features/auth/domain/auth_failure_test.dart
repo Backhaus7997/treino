@@ -202,8 +202,7 @@ void main() {
       expect(failure.userMessage, isNotEmpty);
     });
 
-    test(
-        'fromFirebase maps requires-recent-login code to requiresRecentLogin',
+    test('fromFirebase maps requires-recent-login code to requiresRecentLogin',
         () {
       final failure = AuthFailure.fromFirebase(
         FirebaseAuthException(code: 'requires-recent-login'),

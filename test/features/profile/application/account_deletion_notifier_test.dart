@@ -12,7 +12,6 @@
 //   - Mocked providers for AuthService, AccountDeletionService, FirebaseAuth
 
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -43,7 +42,7 @@ class FakeDeletionResult extends Fake implements DeletionResult {
 void main() {
   setUpAll(() {
     registerFallbackValue(FakeAuthCredential());
-    registerFallbackValue(const ProviderContainer());
+    // No fallback values needed beyond FakeAuthCredential
   });
 
   late MockAuthService mockAuthService;
@@ -69,8 +68,7 @@ void main() {
     final container = ProviderContainer(
       overrides: [
         authServiceProvider.overrideWithValue(mockAuthService),
-        accountDeletionServiceProvider
-            .overrideWithValue(mockDeletionService),
+        accountDeletionServiceProvider.overrideWithValue(mockDeletionService),
         firebaseAuthProvider.overrideWithValue(mockFirebaseAuth),
         accountDeletionNotifierProvider.overrideWith(
           () => AccountDeletionNotifier.withSheetOpener(sheetResult),
@@ -82,8 +80,10 @@ void main() {
   }
 
   // SCENARIO-564 initial state
-  test('SCENARIO-564: initial state is AsyncData(null)', () {
+  test('SCENARIO-564: initial state resolves to AsyncData(null)', () async {
     final container = buildContainer(sheetResult: () async => null);
+    // Wait for the AsyncNotifier.build() to complete.
+    await container.read(accountDeletionNotifierProvider.future);
     final state = container.read(accountDeletionNotifierProvider);
     expect(state, isA<AsyncData<void>>());
     expect(state.hasValue, isTrue);
@@ -124,8 +124,7 @@ void main() {
       callOrder.add('signOut');
     });
 
-    final container =
-        buildContainer(sheetResult: () async => credential);
+    final container = buildContainer(sheetResult: () async => credential);
 
     await container
         .read(accountDeletionNotifierProvider.notifier)
@@ -137,18 +136,15 @@ void main() {
   });
 
   // SCENARIO-564 / partial → AsyncError
-  test(
-      'SCENARIO-564: CF returns partial → state is AsyncError(deletionFailed)',
+  test('SCENARIO-564: CF returns partial → state is AsyncError(deletionFailed)',
       () async {
     final credential = FakeAuthCredential();
 
-    when(() => mockAuthService.reauthenticate(any()))
-        .thenAnswer((_) async {});
+    when(() => mockAuthService.reauthenticate(any())).thenAnswer((_) async {});
     when(() => mockDeletionService.call(uid: any(named: 'uid')))
         .thenAnswer((_) async => FakeDeletionResult(status: 'partial'));
 
-    final container =
-        buildContainer(sheetResult: () async => credential);
+    final container = buildContainer(sheetResult: () async => credential);
 
     await container
         .read(accountDeletionNotifierProvider.notifier)
@@ -160,8 +156,7 @@ void main() {
   });
 
   // SCENARIO-558 re-auth failed → AsyncError
-  test(
-      'SCENARIO-558: re-auth fails → state is AsyncError(reAuthFailed)',
+  test('SCENARIO-558: re-auth fails → state is AsyncError(reAuthFailed)',
       () async {
     final credential = FakeAuthCredential();
 
@@ -169,8 +164,7 @@ void main() {
         .thenThrow(const AuthFailure.reAuthFailed());
     verifyNever(() => mockDeletionService.call(uid: any(named: 'uid')));
 
-    final container =
-        buildContainer(sheetResult: () async => credential);
+    final container = buildContainer(sheetResult: () async => credential);
 
     await container
         .read(accountDeletionNotifierProvider.notifier)
@@ -186,8 +180,7 @@ void main() {
     final credential = FakeAuthCredential();
     var sheetOpenCount = 0;
 
-    when(() => mockAuthService.reauthenticate(any()))
-        .thenAnswer((_) async {});
+    when(() => mockAuthService.reauthenticate(any())).thenAnswer((_) async {});
     when(() => mockDeletionService.call(uid: any(named: 'uid')))
         .thenAnswer((_) async => FakeDeletionResult(status: 'success'));
     when(() => mockAuthService.signOut()).thenAnswer((_) async {});
@@ -208,9 +201,7 @@ void main() {
         .thenAnswer((_) async => FakeDeletionResult(status: 'success'));
 
     // Retry within 5 min — should NOT open sheet again
-    await container
-        .read(accountDeletionNotifierProvider.notifier)
-        .retry();
+    await container.read(accountDeletionNotifierProvider.notifier).retry();
 
     // Sheet was opened only once (on first deleteAccount call)
     expect(sheetOpenCount, 1);
