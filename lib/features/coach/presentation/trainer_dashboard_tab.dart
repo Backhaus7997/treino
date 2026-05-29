@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
+import '../../../core/analytics/analytics_service.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../profile/application/user_providers.dart';
 import '../../profile/application/user_public_profile_providers.dart';
@@ -304,8 +305,14 @@ class _PendingRequestCard extends ConsumerWidget {
               const SizedBox(width: 12),
               Expanded(
                 child: ElevatedButton(
-                  onPressed: () =>
-                      ref.read(trainerLinkRepositoryProvider).accept(link.id),
+                  onPressed: () async {
+                    await ref
+                        .read(trainerLinkRepositoryProvider)
+                        .accept(link.id);
+                    ref
+                        .read(analyticsServiceProvider)
+                        .logLinkAccepted(linkId: link.id);
+                  },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: palette.accent,
                     foregroundColor: palette.bg,

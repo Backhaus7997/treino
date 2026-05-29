@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
+import '../../../core/analytics/analytics_service.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../coach/presentation/coach_strings.dart';
 import '../../profile/application/user_public_profile_providers.dart';
@@ -507,14 +508,14 @@ class _EmptyState extends StatelessWidget {
   }
 }
 
-class _StartSessionCTABar extends StatelessWidget {
+class _StartSessionCTABar extends ConsumerWidget {
   const _StartSessionCTABar({required this.routine, required this.day});
 
   final Routine routine;
   final RoutineDay day;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 18),
@@ -548,9 +549,15 @@ class _StartSessionCTABar extends StatelessWidget {
           const SizedBox(width: 12),
           Expanded(
             child: ElevatedButton(
-              onPressed: () => context.push(
-                '/workout/session/${routine.id}/${day.dayNumber}',
-              ),
+              onPressed: () {
+                ref.read(analyticsServiceProvider).logRoutineStarted(
+                      routineId: routine.id,
+                      routineName: routine.name,
+                    );
+                context.push(
+                  '/workout/session/${routine.id}/${day.dayNumber}',
+                );
+              },
               style: ElevatedButton.styleFrom(
                 backgroundColor: palette.accent,
                 minimumSize: const Size.fromHeight(56),

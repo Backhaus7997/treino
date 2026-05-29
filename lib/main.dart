@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart' show FirebaseFirestore;
+import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
@@ -45,6 +46,10 @@ Future<void> main() async {
         return true;
       };
     }
+
+    // Analytics: colección habilitada explícitamente para que los eventos
+    // lleguen tanto en debug (DebugView) como en release (dashboard real).
+    await FirebaseAnalytics.instance.setAnalyticsCollectionEnabled(true);
 
     // google_sign_in 7.x requires a single initialize() before any authenticate()
     // call. Both iOS and Android pick up clientId/serverClientId from their

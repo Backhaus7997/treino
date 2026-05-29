@@ -7,12 +7,14 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:treino/core/analytics/analytics_service.dart';
 import 'package:treino/features/workout/application/session_init.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
 import 'package:treino/features/workout/application/routine_providers.dart';
 import 'package:treino/features/workout/data/session_repository.dart';
 import 'package:treino/features/workout/domain/routine.dart';
 
+import '../../../helpers/fake_analytics_service.dart';
 import 'stub_factories.dart';
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
@@ -31,6 +33,9 @@ ProviderContainer _makeContainer({
     overrides: [
       sessionRepositoryProvider.overrideWithValue(repo),
       currentUidProvider.overrideWithValue(uid),
+      // Analytics is fired post-finishSession; override con fake para evitar
+      // que FirebaseAnalytics.instance se invoque sin Firebase init en tests.
+      analyticsServiceProvider.overrideWithValue(FakeAnalyticsService()),
       if (routine != null)
         routineByIdProvider(routine.id).overrideWith(
           (ref) async => routine,

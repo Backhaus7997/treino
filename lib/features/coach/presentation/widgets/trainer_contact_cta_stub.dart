@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
+import '../../../../core/analytics/analytics_service.dart';
 import '../../../workout/application/session_providers.dart'
     show currentUidProvider;
 import '../../application/trainer_link_providers.dart';
@@ -44,6 +45,10 @@ class _TrainerContactCtaStubState extends ConsumerState<TrainerContactCtaStub> {
       await ref
           .read(trainerLinkRepositoryProvider)
           .request(trainerId: widget.trainerId, athleteId: athleteId);
+      ref.read(analyticsServiceProvider).logLinkRequested(
+            trainerId: widget.trainerId,
+            athleteId: athleteId,
+          );
       ref.invalidate(currentAthleteLinkProvider);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
