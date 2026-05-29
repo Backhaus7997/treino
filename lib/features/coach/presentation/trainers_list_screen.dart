@@ -79,6 +79,7 @@ class _TrainersListScreenState extends ConsumerState<TrainersListScreen> {
             child: _ListMapToggle(
               showMap: showMap,
               onChanged: (v) => ref.read(mapModeProvider.notifier).state = v,
+              mapDisabled: ref.watch(virtualOnlyFilterProvider),
             ),
           ),
         ],
@@ -166,9 +167,18 @@ class _TitleStack extends StatelessWidget {
 // ── Toggle pills MAPA / Lista — segmented control ────────────────────────────
 
 class _ListMapToggle extends StatelessWidget {
-  const _ListMapToggle({required this.showMap, required this.onChanged});
+  const _ListMapToggle({
+    required this.showMap,
+    required this.onChanged,
+    this.mapDisabled = false,
+  });
   final bool showMap;
   final ValueChanged<bool> onChanged;
+
+  /// Cuando true, el pill MAPA se renderea muted + tap no hace nada.
+  /// Lo setea el caller cuando el filtro Online está ON — el modo MAPA no
+  /// aplica para virtuales (se ve solo en LISTA).
+  final bool mapDisabled;
 
   @override
   Widget build(BuildContext context) {
@@ -186,7 +196,8 @@ class _ListMapToggle extends StatelessWidget {
           _TogglePill(
             label: 'MAPA',
             icon: TreinoIcon.mapPin,
-            active: showMap,
+            active: showMap && !mapDisabled,
+            disabled: mapDisabled,
             palette: palette,
             onTap: () => onChanged(true),
           ),
@@ -194,7 +205,7 @@ class _ListMapToggle extends StatelessWidget {
           _TogglePill(
             label: 'LISTA',
             icon: TreinoIcon.users,
-            active: !showMap,
+            active: !showMap || mapDisabled,
             palette: palette,
             onTap: () => onChanged(false),
           ),
@@ -211,6 +222,7 @@ class _TogglePill extends StatelessWidget {
     required this.active,
     required this.palette,
     required this.onTap,
+    this.disabled = false,
   });
   final String label;
   final IconData icon;
@@ -218,33 +230,45 @@ class _TogglePill extends StatelessWidget {
   final AppPalette palette;
   final VoidCallback onTap;
 
+  /// Cuando true: pill se muestra muted (opacidad reducida + colores
+  /// neutros) y el tap no dispara onTap. Lo usa el pill MAPA cuando el
+  /// modo Online está activo (mapa no aplica para virtuales).
+  final bool disabled;
+
   @override
   Widget build(BuildContext context) {
-    final bg = active ? palette.highlight : Colors.transparent;
-    final fg = active ? palette.bg : palette.textMuted;
+    final bg = disabled
+        ? Colors.transparent
+        : (active ? palette.highlight : Colors.transparent);
+    final fg = disabled
+        ? palette.textMuted
+        : (active ? palette.bg : palette.textMuted);
     return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(9999),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: fg, size: 14),
-            const SizedBox(width: 4),
-            Text(
-              label,
-              style: GoogleFonts.barlowCondensed(
-                color: fg,
-                fontWeight: FontWeight.w700,
-                fontSize: 12,
-                letterSpacing: 0.8,
+      onTap: disabled ? null : onTap,
+      child: Opacity(
+        opacity: disabled ? 0.4 : 1.0,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(9999),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: fg, size: 14),
+              const SizedBox(width: 4),
+              Text(
+                label,
+                style: GoogleFonts.barlowCondensed(
+                  color: fg,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12,
+                  letterSpacing: 0.8,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -395,15 +419,29 @@ class _ModeTabs extends ConsumerWidget {
           _ModeTab(
             label: 'PRESENCIAL',
             active: !virtualOnly,
-            onTap: () =>
-                ref.read(virtualOnlyFilterProvider.notifier).state = false,
+            onTap: () {
+              final wasVirtualOnly = ref.read(virtualOnlyFilterProvider);
+              ref.read(virtualOnlyFilterProvider.notifier).state = false;
+              // Auto-switch a MAPA solo cuando venimos de ONLINE —
+              // simétrico al tap ONLINE que auto-switchea a LISTA. Si ya
+              // estabas en PRESENCIAL y elegiste LISTA, respetamos esa
+              // elección (no forzamos MAPA en cada re-tap).
+              if (wasVirtualOnly) {
+                ref.read(mapModeProvider.notifier).state = true;
+              }
+            },
             palette: palette,
           ),
           _ModeTab(
             label: 'ONLINE',
             active: virtualOnly,
-            onTap: () =>
-                ref.read(virtualOnlyFilterProvider.notifier).state = true,
+            onTap: () {
+              // Auto-switch a LISTA: el mapa no aplica para virtuales,
+              // así que el atleta cae directo en LISTA sin pasos extra.
+              // El toggle MAPA queda visualmente disabled mientras Online ON.
+              ref.read(virtualOnlyFilterProvider.notifier).state = true;
+              ref.read(mapModeProvider.notifier).state = false;
+            },
             palette: palette,
           ),
         ],
