@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../auth/application/auth_providers.dart';
 import '../../auth/domain/auth_failure.dart';
+import '../../profile_setup/application/profile_setup_providers.dart';
 import '../data/account_deletion_service.dart';
 import '../presentation/widgets/re_auth_bottom_sheet.dart';
 
@@ -132,6 +133,12 @@ class AccountDeletionNotifier extends AsyncNotifier<void> {
     // signal the navigation, so the router sees !loggedIn and routes to
     // /welcome cleanly.
     await ref.read(authServiceProvider).signOut();
+
+    // Reset any onboarding state from the deleted user so a follow-up
+    // signup starts on a blank form (otherwise the previous user's draft
+    // re-appears in profile-setup if the user creates a new account).
+    ref.invalidate(profileSetupNotifierProvider);
+
     state = const AsyncData(null);
     ref.read(accountDeletedFlagProvider.notifier).state = true;
   }
