@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
+import '../../../core/analytics/analytics_service.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../coach/presentation/coach_strings.dart';
 import '../../coach/presentation/widgets/exercise_picker_sheet.dart';
@@ -157,7 +158,13 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
     );
 
     try {
-      await ref.read(routineRepositoryProvider).createAssigned(routine);
+      final created =
+          await ref.read(routineRepositoryProvider).createAssigned(routine);
+      ref.read(analyticsServiceProvider).logPlanAssigned(
+            routineId: created.id,
+            assignedBy: trainerUid,
+            assignedTo: widget.athleteId,
+          );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text(CoachStrings.createPlanSuccess)),

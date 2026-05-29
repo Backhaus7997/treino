@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:table_calendar/table_calendar.dart';
 
 import '../../../app/theme/app_palette.dart';
+import '../../../core/analytics/analytics_service.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../profile/application/user_public_profile_providers.dart';
 import '../application/agenda_providers.dart';
@@ -235,13 +236,18 @@ class _AthleteAgendaScreenState extends ConsumerState<AthleteAgendaScreen> {
         await ref.read(userPublicProfileProvider(widget.athleteId).future);
     final athleteDisplayName = profile?.displayName ?? widget.athleteId;
     try {
-      await repo.book(
+      final created = await repo.book(
         trainerId: widget.trainerId,
         athleteId: widget.athleteId,
         athleteDisplayName: athleteDisplayName,
         startsAt: slot,
         durationMin: 60,
       );
+      ref.read(analyticsServiceProvider).logAppointmentCreated(
+            appointmentId: created.id,
+            trainerId: widget.trainerId,
+            athleteId: widget.athleteId,
+          );
       if (!context.mounted) return;
       Navigator.of(context).pop(); // close sheet
       ScaffoldMessenger.of(context).showSnackBar(

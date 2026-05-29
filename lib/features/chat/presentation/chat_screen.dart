@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
+import '../../../core/analytics/analytics_service.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../feed/presentation/widgets/post_avatar.dart';
 import '../../profile/application/user_public_profile_providers.dart';
@@ -52,6 +53,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             chatId: widget.chatId,
             senderId: currentUid,
             text: text,
+          );
+      ref.read(analyticsServiceProvider).logChatMessageSent(
+            chatId: widget.chatId,
+            senderId: currentUid,
           );
       _textController.clear();
     } catch (e, st) {

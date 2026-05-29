@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
+import '../../../core/analytics/analytics_service.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../coach/application/trainer_link_providers.dart';
 import '../../coach/domain/trainer_link.dart';
@@ -73,6 +74,7 @@ class _CoachHubPlanPreviewScreenState
     final athleteIds = _selectedAthleteIds.toList();
     final failed = <String>[];
 
+    final analytics = ref.read(analyticsServiceProvider);
     for (final athleteId in athleteIds) {
       final routine = _buildRoutine(
         plan: plan,
@@ -80,7 +82,12 @@ class _CoachHubPlanPreviewScreenState
         athleteId: athleteId,
       );
       try {
-        await repo.createAssigned(routine);
+        final created = await repo.createAssigned(routine);
+        analytics.logPlanAssigned(
+          routineId: created.id,
+          assignedBy: trainerUid,
+          assignedTo: athleteId,
+        );
       } catch (_) {
         failed.add(athleteId);
       }

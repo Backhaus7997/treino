@@ -6,9 +6,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_background.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/core/analytics/analytics_service.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/workout/application/routine_providers.dart';
 import 'package:treino/features/workout/domain/routine.dart';
+
+import '../../../helpers/fake_analytics_service.dart';
 import 'package:treino/features/workout/domain/routine_day.dart';
 import 'package:treino/features/workout/domain/routine_slot.dart';
 import 'package:treino/features/workout/presentation/routine_detail_screen.dart';
@@ -375,6 +378,7 @@ void main() {
           },
         ),
       ]);
+      final analytics = FakeAnalyticsService();
       await tester.pumpWidget(ProviderScope(
         overrides: [
           routineByIdProvider('test-id').overrideWith(
@@ -382,6 +386,7 @@ void main() {
               days: [_makeDay(dayNumber: 4)],
             ),
           ),
+          analyticsServiceProvider.overrideWithValue(analytics),
         ],
         child: MaterialApp.router(
           theme: AppTheme.dark(),
@@ -394,6 +399,7 @@ void main() {
       await tester.tap(find.text('EMPEZAR'));
       await tester.pumpAndSettle();
       expect(pushedLocation, equals('/workout/session/test-id/4'));
+      expect(analytics.events, contains('routine_started'));
     });
 
     testWidgets(

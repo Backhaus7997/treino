@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/core/analytics/analytics_service.dart';
 import 'package:treino/features/chat/application/chat_providers.dart';
 import 'package:treino/features/chat/data/chat_repository.dart';
 import 'package:treino/features/chat/domain/message.dart';
@@ -11,6 +12,8 @@ import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
+
+import '../../../helpers/fake_analytics_service.dart';
 
 Widget _wrap(Widget child, {List<Override> overrides = const []}) =>
     ProviderScope(
@@ -119,6 +122,7 @@ void main() {
       final firestore = FakeFirebaseFirestore();
       final repo = ChatRepository(firestore: firestore);
       final chat = await repo.getOrCreate(selfId: 'aaa', otherId: 'bbb');
+      final analytics = FakeAnalyticsService();
 
       await tester.pumpWidget(_wrap(
         ChatScreen(chatId: chat.chatId, otherUid: 'bbb'),
@@ -128,6 +132,7 @@ void main() {
           userPublicProfileProvider('bbb').overrideWith(
             (_) => Stream.value(_pub('bbb', 'Coach Joe')),
           ),
+          analyticsServiceProvider.overrideWithValue(analytics),
         ],
       ));
       await tester.pumpAndSettle();
@@ -148,6 +153,9 @@ void main() {
       // Textfield limpio
       final tf = tester.widget<TextField>(find.byType(TextField));
       expect(tf.controller!.text, '');
+
+      // Analytics event disparado.
+      expect(analytics.events, contains('chat_message_sent'));
     });
 
     testWidgets('tap en send con texto vacío no crea ningún mensaje',

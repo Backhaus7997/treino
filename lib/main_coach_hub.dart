@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart' show FirebaseFirestore;
+import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
@@ -24,6 +25,10 @@ Future<void> main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  // Analytics: colección habilitada para tracking de actions del Coach Hub
+  // web. Crashlytics no aplica acá (no soporta web).
+  await FirebaseAnalytics.instance.setAnalyticsCollectionEnabled(true);
 
   // Coach Hub MVP NO usa Google Sign-In (decisión #2 del propose). Solo
   // email/password. Por eso NO inicializamos `GoogleSignIn.instance` acá

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/analytics/analytics_service.dart';
 import '../domain/routine_day.dart';
 import '../domain/set_log.dart';
 import '../../workout/application/routine_providers.dart';
@@ -225,6 +226,14 @@ class SessionNotifier
       totalVolumeKg: current.totalVolumeKg,
       durationMin: _durationMin(current.elapsedSeconds),
     );
+    // Solo en el path "finished fully completed" — los abandonos no cuentan
+    // como "routine_finished" para producto. Si más adelante producto pide
+    // ver abandons, se agrega `routine_abandoned` aparte.
+    ref.read(analyticsServiceProvider).logRoutineFinished(
+          routineId: current.session.routineId,
+          sessionId: current.session.id,
+          durationSeconds: current.elapsedSeconds,
+        );
     state = AsyncData(current.copyWith(
       session: current.session.copyWith(wasFullyCompleted: true),
     ));

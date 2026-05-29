@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
+import '../../../core/analytics/analytics_service.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../coach/application/trainer_link_providers.dart';
 import '../../coach/domain/trainer_link.dart';
@@ -331,6 +332,9 @@ class _PendingRequestTileState extends ConsumerState<_PendingRequestTile> {
     final repo = ref.read(trainerLinkRepositoryProvider);
     try {
       await repo.accept(widget.link.id);
+      ref
+          .read(analyticsServiceProvider)
+          .logLinkAccepted(linkId: widget.link.id);
       if (!mounted) return;
       ref.invalidate(linksForTrainerProvider(widget.trainerId));
       ScaffoldMessenger.of(context).showSnackBar(
