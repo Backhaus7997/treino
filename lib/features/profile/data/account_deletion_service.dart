@@ -29,6 +29,10 @@ final class AccountDeletionFailure$Server extends AccountDeletionFailure {
 
   final String code;
   final String message;
+
+  @override
+  String toString() =>
+      'AccountDeletionFailure\$Server(code: $code, message: $message)';
 }
 
 /// Unknown / network / unexpected error.
@@ -36,6 +40,9 @@ final class AccountDeletionFailure$Unknown extends AccountDeletionFailure {
   const AccountDeletionFailure$Unknown({this.cause});
 
   final Object? cause;
+
+  @override
+  String toString() => 'AccountDeletionFailure\$Unknown(cause: $cause)';
 }
 
 /// Thin wrapper around the `deleteAccount` Firebase Callable Function.
