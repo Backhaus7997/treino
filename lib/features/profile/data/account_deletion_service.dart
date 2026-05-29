@@ -85,6 +85,12 @@ class AccountDeletionService {
 }
 
 /// Riverpod provider for [AccountDeletionService].
+///
+/// Uses the `southamerica-east1` region to match the `deleteAccount` CF
+/// deployment region (see functions/src/delete-account.ts). The Firebase
+/// client default is `us-central1`, so an explicit `instanceFor` is required.
 final accountDeletionServiceProvider = Provider<AccountDeletionService>(
-  (ref) => AccountDeletionService(functions: FirebaseFunctions.instance),
+  (ref) => AccountDeletionService(
+    functions: FirebaseFunctions.instanceFor(region: 'southamerica-east1'),
+  ),
 );
