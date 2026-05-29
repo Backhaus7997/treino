@@ -411,7 +411,22 @@ class AuthService {
     try {
       await user.delete();
     } on FirebaseAuthException catch (e) {
-      throw AuthFailure.fromFirebase(e);
+      // Stale-auth escape hatch: if the user no longer exists server-side
+      // (e.g., previously deleted by the account-deletion Cloud Function or
+      // by Firebase Console while this client still had a cached token),
+      // user.delete() returns user-not-found / token-expired. The local
+      // session is the only thing left to clean up — force-sign-out so the
+      // user is not stuck in a phantom auth state on profile-setup.
+      const staleAuthCodes = {
+        'user-not-found',
+        'user-token-expired',
+        'invalid-user-token',
+      };
+      if (staleAuthCodes.contains(e.code)) {
+        await _auth.signOut();
+      } else {
+        throw AuthFailure.fromFirebase(e);
+      }
     }
 
     // Cleanup Google session cache. Firebase Auth is already cleared by
