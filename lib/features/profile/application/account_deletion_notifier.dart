@@ -54,6 +54,7 @@ class AccountDeletionNotifier extends AsyncNotifier<void> {
     }
 
     state = const AsyncLoading();
+    ref.read(accountDeletionInFlightProvider.notifier).state = true;
     try {
       final authService = ref.read(authServiceProvider);
       await authService.reauthenticate(credential);
@@ -65,6 +66,8 @@ class AccountDeletionNotifier extends AsyncNotifier<void> {
     } catch (e, st) {
       debugPrint('[AccountDeletion] unexpected error: $e\n$st');
       state = AsyncError(AuthFailure.deletionFailed(cause: e), st);
+    } finally {
+      ref.read(accountDeletionInFlightProvider.notifier).state = false;
     }
   }
 
@@ -187,3 +190,10 @@ final accountDeletionNotifierProvider =
 /// to show "Tu cuenta fue eliminada" SnackBar after GoRouter redirects. Resets
 /// to `false` once the snackbar has been shown.
 final accountDeletedFlagProvider = StateProvider<bool>((_) => false);
+
+/// Set to `true` while the CF cascade is mid-flight (between the moment the
+/// notifier kicks off the CF call and the moment signOut completes). Consumed
+/// by the GoRouter redirect to suppress the loggedIn=true + profile=null →
+/// /profile-setup detour during the window where the Firestore profile has
+/// already been deleted but the Auth user has not. Defaults to `false`.
+final accountDeletionInFlightProvider = StateProvider<bool>((_) => false);

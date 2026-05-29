@@ -28,6 +28,7 @@ import '../features/workout/presentation/session_player_screen.dart';
 import '../features/feed/feed_screen.dart';
 import '../features/feed/presentation/create_post_screen.dart';
 import '../features/feed/presentation/friend_requests_inbox_screen.dart';
+import '../features/profile/application/account_deletion_notifier.dart';
 import '../features/feed/presentation/public_profile_screen.dart';
 import '../features/feed/presentation/search_users_screen.dart';
 import '../features/home/home_screen.dart';
@@ -106,6 +107,14 @@ String? authRedirect(
   // el branch va EXACTAMENTE acá — después del gate de profile completo y
   // antes del redirect "/public → /home".
   if (loggedIn && !isProfileSetup) {
+    // Account deletion gate: while the CF cascade is in flight, the
+    // Firestore profile is deleted BEFORE the Auth user (cascade order).
+    // That window opens a 1-2s gap where loggedIn=true + profile=null,
+    // which would otherwise redirect mid-flow to /profile-setup before
+    // the auth state transitions and lands the user on /welcome. Defer
+    // any redirect while the deletion flag is active.
+    if (read(accountDeletionInFlightProvider)) return null;
+
     final profileAsync = read(userProfileProvider);
     if (profileAsync.isLoading) return null;
     final profile = profileAsync.valueOrNull;
