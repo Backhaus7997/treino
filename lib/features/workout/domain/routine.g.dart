@@ -49,6 +49,7 @@ const _$ExperienceLevelEnumMap = {
 
 const _$RoutineSourceEnumMap = {
   RoutineSource.system: 'system',
+  RoutineSource.trainerTemplate: 'trainer-template',
   RoutineSource.trainerAssigned: 'trainer-assigned',
   RoutineSource.userCreated: 'user-created',
 };

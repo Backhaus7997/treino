@@ -18,6 +18,14 @@ final routinesProvider = FutureProvider<List<Routine>>((ref) async {
   return ref.watch(routineRepositoryProvider).listAll();
 });
 
+/// Live stream of the trainer's own templates (assignedBy == trainerId,
+/// source == trainer-template). Powers the template library section of
+/// `TrainerWorkoutView`.
+final trainerTemplatesStreamProvider = StreamProvider.autoDispose
+    .family<List<Routine>, String>((ref, trainerId) {
+  return ref.read(routineRepositoryProvider).watchTemplatesBy(trainerId);
+});
+
 /// Single-doc fetch. Hits Firestore directly via `getById` so it works for
 /// BOTH public catalog plantillas AND private trainer-assigned plans
 /// (which are not in [routinesProvider] because [listAll] now filters

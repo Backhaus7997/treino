@@ -2,6 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart'
     show CollectionReference, DocumentSnapshot, FieldValue, FirebaseFirestore;
 
 import '../domain/routine.dart';
+import '../domain/routine_source.dart';
+import '../domain/routine_visibility.dart';
 
 class RoutineRepository {
   RoutineRepository({required FirebaseFirestore firestore})
@@ -85,6 +87,81 @@ class RoutineRepository {
     json['createdAt'] = FieldValue.serverTimestamp();
     final ref = await _collection.add(json);
     return routine.copyWith(id: ref.id);
+  }
+
+  /// Persists a trainer template — a routine the PF owns but hasn't
+  /// assigned to any athlete yet. Lives in the same `routines` collection
+  /// with `source = 'trainer-template'` and `assignedTo = null`, so
+  /// `assignTemplateToAthlete` can later copy it into a regular
+  /// `trainer-assigned` doc when the PF picks an alumno for it.
+  Future<Routine> createTemplate(Routine routine) async {
+    if (routine.assignedBy == null || routine.assignedBy!.isEmpty) {
+      throw ArgumentError.value(
+        routine.assignedBy,
+        'assignedBy',
+        'assignedBy must be a non-empty trainer uid',
+      );
+    }
+    if (routine.assignedTo != null && routine.assignedTo!.isNotEmpty) {
+      throw ArgumentError.value(
+        routine.assignedTo,
+        'assignedTo',
+        'templates must not have an assignedTo athlete',
+      );
+    }
+    final templateRoutine = routine.copyWith(
+      source: RoutineSource.trainerTemplate,
+      assignedTo: null,
+      visibility: RoutineVisibility.private,
+    );
+    final json = templateRoutine.toJson()..remove('id');
+    json['createdAt'] = FieldValue.serverTimestamp();
+    final ref = await _collection.add(json);
+    return templateRoutine.copyWith(id: ref.id);
+  }
+
+  /// Live stream of the trainer's personal templates ordered newest-first.
+  ///
+  /// Rules: only the owner (`assignedBy == request.auth.uid`) can read
+  /// templates. Composite index on `assignedBy + source + createdAt` is
+  /// declared alongside the existing `assignedTo` index.
+  Stream<List<Routine>> watchTemplatesBy(String trainerId) {
+    return _collection
+        .where('assignedBy', isEqualTo: trainerId)
+        .where('source', isEqualTo: 'trainer-template')
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((s) => s.docs.map(_fromDoc).whereType<Routine>().toList());
+  }
+
+  /// Copies an existing template into a brand-new trainer-assigned routine
+  /// for [athleteId]. The template itself is left untouched so it can be
+  /// reused for other athletes. Returns the freshly created assigned routine.
+  Future<Routine> assignTemplateToAthlete({
+    required Routine template,
+    required String athleteId,
+  }) async {
+    if (template.source != RoutineSource.trainerTemplate) {
+      throw ArgumentError.value(
+        template.source,
+        'template.source',
+        'only trainer templates can be assigned via this method',
+      );
+    }
+    if (template.assignedBy == null || template.assignedBy!.isEmpty) {
+      throw ArgumentError.value(
+        template.assignedBy,
+        'template.assignedBy',
+        'template must carry the trainer uid',
+      );
+    }
+    final assigned = template.copyWith(
+      id: '',
+      source: RoutineSource.trainerAssigned,
+      assignedTo: athleteId,
+      visibility: RoutineVisibility.private,
+    );
+    return createAssigned(assigned);
   }
 
   /// Deserializes a Firestore doc into a [Routine], injecting the doc id.

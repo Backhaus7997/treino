@@ -18,6 +18,8 @@ import '../features/coach/presentation/availability_editor_screen.dart';
 import '../features/coach/presentation/trainer_public_profile_screen.dart';
 import '../features/workout/application/session_providers.dart'
     show currentUidProvider;
+import '../features/workout/presentation/custom_exercise_editor_screen.dart';
+import '../features/workout/presentation/my_exercises_screen.dart';
 import '../features/workout/presentation/routine_editor_screen.dart';
 import '../features/workout/application/session_init.dart';
 import '../features/workout/presentation/exercise_detail_screen.dart';
@@ -247,6 +249,14 @@ GoRouter buildRouter({
                   return _noAnim(RoutineEditorScreen(athleteId: athleteId));
                 },
               ),
+              // Template editor: same RoutineEditorScreen with athleteId
+              // null. Used by the trainer's "NUEVA PLANTILLA" CTA in
+              // TrainerWorkoutView.
+              GoRoute(
+                path: 'template-editor',
+                pageBuilder: (_, __) =>
+                    _noAnim(const RoutineEditorScreen()),
+              ),
             ],
           ),
           GoRoute(
@@ -365,6 +375,23 @@ GoRouter buildRouter({
               // Pricing now lives ONLY in the public profile via the EDITAR
               // CTA on the PERFIL PÚBLICO card. A future subscribe flow can
               // reintroduce a multi-tier catalog if needed.
+
+              // Trainer custom exercise library — list + create/edit form.
+              GoRoute(
+                path: 'my-exercises',
+                pageBuilder: (_, __) => _noAnim(const MyExercisesScreen()),
+                routes: [
+                  GoRoute(
+                    path: ':exId',
+                    pageBuilder: (context, state) {
+                      final exId = state.pathParameters['exId'];
+                      return _noAnim(
+                        CustomExerciseEditorScreen(exerciseId: exId),
+                      );
+                    },
+                  ),
+                ],
+              ),
             ],
           ),
         ],

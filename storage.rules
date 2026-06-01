@@ -21,6 +21,19 @@ service firebase.storage {
       allow write: if request.auth != null && request.auth.uid == userId;
     }
 
+    // Custom exercise tutorial videos: a trainer uploads short clips
+    // (MP4 / MOV / M4V, max 100 MB) under /customExerciseVideos/{uid}/...
+    // Anyone authenticated can read so the trainer's athletes can play
+    // them inline; only the owner can write or delete.
+    match /customExerciseVideos/{userId}/{file=**} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+                  && request.auth.uid == userId
+                  && request.resource.size < 100 * 1024 * 1024
+                  && request.resource.contentType.matches('video/.*');
+      allow delete: if request.auth != null && request.auth.uid == userId;
+    }
+
     // Default: deny all other access.
     match /{allPaths=**} {
       allow read, write: if false;

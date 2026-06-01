@@ -41,6 +41,17 @@ dependencies:
   flutter_map: ^7.0.2
   flutter_map_marker_cluster: ^1.3.6
   latlong2: ^0.9.1
+  # ExerciseVideoPlayer is dual-mode:
+  # • YouTube links → thumbnail card; tap opens youtube.com in a
+  #   Safari View Controller / Chrome Custom Tab via url_launcher's
+  #   inAppBrowserView mode (the user never leaves TREINO).
+  # • Firebase Storage videos (trainer's own uploads) → native inline
+  #   playback via video_player, no WebView in the loop at all.
+  # We landed here after 7 iterations proving that YouTube embeds inside
+  # any iOS WKWebView wrapper get rejected with Error 152/153 by YouTube's
+  # server-side "real browser" check.
+  url_launcher: ^6.3.0
+  video_player: ^2.9.0
 
 dev_dependencies:
   flutter_test:

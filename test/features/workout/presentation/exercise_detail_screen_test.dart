@@ -149,6 +149,13 @@ void main() {
         ],
       ));
       await tester.pump(const Duration(milliseconds: 50));
+      // The new VIDEO section pushed TÉCNICA below the default 800x600 test
+      // viewport, so we scroll the CustomScrollView until the header mounts.
+      await tester.scrollUntilVisible(
+        find.text('TÉCNICA'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
       expect(find.text('TÉCNICA'), findsOneWidget);
       expect(find.byType(TechniqueInstructionItem), findsNWidgets(3));
     });
@@ -164,6 +171,12 @@ void main() {
         ],
       ));
       await tester.pump(const Duration(milliseconds: 50));
+      // VIDEO section pushes TÉCNICA empty state below the 800x600 viewport.
+      await tester.scrollUntilVisible(
+        find.text('No hay instrucciones de técnica todavía'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
       expect(
         find.text('No hay instrucciones de técnica todavía'),
         findsOneWidget,
@@ -182,6 +195,11 @@ void main() {
         ],
       ));
       await tester.pump(const Duration(milliseconds: 50));
+      await tester.scrollUntilVisible(
+        find.text('No hay instrucciones de técnica todavía'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
       expect(
         find.text('No hay instrucciones de técnica todavía'),
         findsOneWidget,
@@ -228,8 +246,12 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('SCENARIO-108: videoUrl non-null shows "Video próximamente"',
+    testWidgets(
+        'SCENARIO-108: non-YouTube videoUrl falls back to "No pudimos leer el video." placeholder',
         (tester) async {
+      // ExerciseVideoPlayer only embeds parseable YouTube URLs. A non-YT URL
+      // like the legacy example here resolves to a null video id and the
+      // widget renders its bad-URL placeholder instead of crashing.
       await tester.pumpWidget(_wrapWithOverrides(
         const ExerciseDetailScreen(exerciseId: 'bench-press'),
         [
@@ -240,7 +262,7 @@ void main() {
         ],
       ));
       await tester.pump(const Duration(milliseconds: 50));
-      expect(find.text('Video próximamente'), findsOneWidget);
+      expect(find.text('No pudimos leer el video.'), findsOneWidget);
     });
 
     testWidgets(
