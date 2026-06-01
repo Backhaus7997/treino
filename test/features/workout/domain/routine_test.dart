@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/features/profile/domain/experience_level.dart';
 import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/domain/routine_source.dart';
+import 'package:treino/features/workout/domain/routine_status.dart';
 import 'package:treino/features/workout/domain/routine_visibility.dart';
 
 void main() {
@@ -278,6 +279,89 @@ void main() {
       final routine = Routine.fromJson(rawMap);
       expect(routine.source, RoutineSource.system);
       expect(routine.visibility, RoutineVisibility.public);
+    });
+
+    // ── athlete-self-routines (Fase 6 Etapa 1.5 — REQ-USR-010) ─────────────
+
+    test('SCENARIO-USR-026: createdBy is null when absent in raw Firestore doc',
+        () {
+      final rawMap = <String, dynamic>{
+        'id': 'old-template',
+        'name': 'Old Template',
+        'split': 'Full Body',
+        'level': 'beginner',
+        'days': <Map<String, dynamic>>[],
+        // createdBy intentionally absent — legacy doc
+      };
+      final routine = Routine.fromJson(rawMap);
+      expect(routine.createdBy, isNull);
+    });
+
+    test('SCENARIO-USR-026: createdBy roundtrip preserves uid when present',
+        () {
+      const routine = Routine(
+        id: 'r-user',
+        name: 'Mi rutina',
+        split: 'Full Body',
+        level: ExperienceLevel.beginner,
+        days: [],
+        source: RoutineSource.userCreated,
+        createdBy: 'user-abc',
+        visibility: RoutineVisibility.private,
+        status: RoutineStatus.active,
+      );
+      final decoded = Routine.fromJson(routine.toJson());
+      expect(decoded.createdBy, equals('user-abc'));
+    });
+
+    test('REQ-USR-010: status defaults to active when field absent in raw doc',
+        () {
+      final rawMap = <String, dynamic>{
+        'id': 'legacy-routine',
+        'name': 'Legacy',
+        'split': 'PPL',
+        'level': 'beginner',
+        'days': <Map<String, dynamic>>[],
+        // status intentionally absent — retro-compat
+      };
+      final routine = Routine.fromJson(rawMap);
+      expect(routine.status, equals(RoutineStatus.active));
+    });
+
+    test('REQ-USR-010: status archived roundtrip', () {
+      const routine = Routine(
+        id: 'r-archived',
+        name: 'Archived',
+        split: 'PPL',
+        level: ExperienceLevel.beginner,
+        days: [],
+        status: RoutineStatus.archived,
+      );
+      final decoded = Routine.fromJson(routine.toJson());
+      expect(decoded.status, equals(RoutineStatus.archived));
+    });
+  });
+
+  group('RoutineStatus', () {
+    test('toJson returns correct string values', () {
+      expect(RoutineStatus.active.toJson(), equals('active'));
+      expect(RoutineStatus.archived.toJson(), equals('archived'));
+    });
+
+    test('fromJson parses active and archived', () {
+      expect(RoutineStatusX.fromJson('active'), equals(RoutineStatus.active));
+      expect(
+          RoutineStatusX.fromJson('archived'), equals(RoutineStatus.archived));
+    });
+
+    test('fromJson unknown value falls back to active', () {
+      expect(RoutineStatusX.fromJson('unknown'), equals(RoutineStatus.active));
+      expect(RoutineStatusX.fromJson(''), equals(RoutineStatus.active));
+    });
+
+    test('label returns Spanish display strings', () {
+      expect(RoutineStatus.active.label, equals('Activa'));
+      expect(RoutineStatus.archived.label, equals('Archivada'));
     });
   });
 }
