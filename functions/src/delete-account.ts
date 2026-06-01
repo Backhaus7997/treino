@@ -176,7 +176,9 @@ export async function runDeleteAccount(
  * Named export so firebase-functions-test can wrap it directly.
  */
 export const deleteAccountHandler = functions.onCall(
-  { region: "us-central1" },
+  // Region aligned with the existing parsePlan CF for latency
+  // consistency for LATAM users.
+  { region: "southamerica-east1" },
   async (request): Promise<DeleteAccountResponse> => {
     // ── Guard: caller must be authenticated ─────────────────────────────────
     if (!request.auth) {

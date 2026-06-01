@@ -22,6 +22,11 @@ sealed class AuthFailure with _$AuthFailure implements Exception {
   const factory AuthFailure.profileCreateFailed({Object? cause}) =
       _ProfileCreateFailed;
 
+  // Account deletion variants (Fase 6 Etapa 3 — account-deletion SDD PR#3)
+  const factory AuthFailure.requiresRecentLogin() = _RequiresRecentLogin;
+  const factory AuthFailure.reAuthFailed({String? provider}) = _ReAuthFailed;
+  const factory AuthFailure.deletionFailed({Object? cause}) = _DeletionFailed;
+
   factory AuthFailure.fromFirebase(FirebaseAuthException e) => switch (e.code) {
         'invalid-email' => const AuthFailure.invalidEmail(),
         'user-disabled' => const AuthFailure.userDisabled(),
@@ -35,6 +40,7 @@ sealed class AuthFailure with _$AuthFailure implements Exception {
         'network-request-failed' => const AuthFailure.networkError(),
         'account-exists-with-different-credential' =>
           const AuthFailure.accountExistsWithDifferentCredential(),
+        'requires-recent-login' => const AuthFailure.requiresRecentLogin(),
         final code => AuthFailure.unknown(code),
       };
 
@@ -56,5 +62,12 @@ sealed class AuthFailure with _$AuthFailure implements Exception {
         _Unknown() => 'Algo salió mal. Intentá de nuevo',
         _ProfileCreateFailed() =>
           'Hubo un problema creando tu perfil. Probá de nuevo',
+        // i18n: Fase 6 Etapa 3
+        _RequiresRecentLogin() =>
+          'Tu sesión venció. Tenés que volver a confirmar tu identidad.',
+        // i18n: Fase 6 Etapa 3
+        _ReAuthFailed() => 'No pudimos verificar tu identidad. Probá de nuevo.',
+        // i18n: Fase 6 Etapa 3
+        _DeletionFailed() => 'No pudimos eliminar tu cuenta. Probá de nuevo.',
       };
 }

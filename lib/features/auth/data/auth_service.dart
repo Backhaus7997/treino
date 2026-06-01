@@ -265,6 +265,141 @@ class AuthService {
     return cred.user!;
   }
 
+  // ── Re-auth helpers (Fase 6 Etapa 3 — account-deletion PR#3) ────────────────
+  //
+  // Per ADR-ACCDEL-009: AuthService stays thin. These methods expose Firebase
+  // re-auth and per-provider credential builders. ALL orchestration lives in
+  // AccountDeletionNotifier.
+
+  /// Re-authenticates the current user with [credential].
+  ///
+  /// Throws [AuthFailure.userNotFound] when there is no signed-in user.
+  /// Throws [AuthFailure.reAuthFailed] on wrong-password / invalid-credential.
+  /// Throws [AuthFailure.fromFirebase] for any other FirebaseAuthException.
+  /// Sentinel providerId used by [getAppleCredential] to signal that the
+  /// re-authentication was already performed by Firebase's
+  /// `reauthenticateWithProvider` flow (which bypasses the nonce-cache
+  /// quirks of sign_in_with_apple's native iOS sheet on re-auth). When
+  /// [reauthenticate] sees this providerId, it short-circuits since the
+  /// re-auth has already happened server-side.
+  static const String _appleReauthDoneSentinelProviderId =
+      '__apple_reauth_done_sentinel__';
+
+  Future<void> reauthenticate(AuthCredential credential) async {
+    // Apple re-auth already completed by getAppleCredential. See sentinel doc.
+    if (credential.providerId == _appleReauthDoneSentinelProviderId) return;
+
+    final user = _auth.currentUser;
+    if (user == null) throw const AuthFailure.userNotFound();
+    try {
+      await user.reauthenticateWithCredential(credential);
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'wrong-password' || e.code == 'invalid-credential') {
+        throw const AuthFailure.reAuthFailed();
+      }
+      throw AuthFailure.fromFirebase(e);
+    }
+  }
+
+  /// Returns an [EmailAuthProvider] credential for the current user.
+  ///
+  /// Throws [AuthFailure.reAuthFailed] when there is no signed-in user or
+  /// the current user has no email.
+  // i18n: Fase 6 Etapa 3
+  Future<AuthCredential> getPasswordCredential({
+    required String password,
+  }) async {
+    final user = _auth.currentUser;
+    if (user == null || user.email == null) {
+      throw const AuthFailure.reAuthFailed(provider: 'password');
+    }
+    return EmailAuthProvider.credential(
+      email: user.email!,
+      password: password,
+    );
+  }
+
+  /// Triggers the Google sign-in flow and returns a [GoogleAuthProvider]
+  /// credential suitable for re-authentication.
+  ///
+  /// Unlike [signInWithGoogle], this re-auth helper does NOT call
+  /// `authorizationClient.authorizeScopes(...)`. On iOS each OAuth-style
+  /// call opens its own ASWebAuthenticationSession, which surfaces the
+  /// system "treino quiere utilizar google.com" sheet — so requesting
+  /// scopes in addition to authenticate() would surface that sheet TWICE
+  /// in a row (poor UX during a deletion confirmation). Firebase's
+  /// `reauthenticateWithCredential` only needs the `idToken` to verify
+  /// identity; the accessToken is optional and unused for re-auth.
+  ///
+  /// Throws [AuthFailure.signInCancelled] on user-cancel.
+  /// Throws [AuthFailure.reAuthFailed] on other Google errors.
+  // i18n: Fase 6 Etapa 3
+  Future<AuthCredential> getGoogleCredential() async {
+    final GoogleSignInAccount googleUser;
+    try {
+      googleUser = await _googleSignIn.authenticate();
+    } on GoogleSignInException catch (e) {
+      if (e.code == GoogleSignInExceptionCode.canceled) {
+        throw const AuthFailure.signInCancelled();
+      }
+      throw const AuthFailure.reAuthFailed(provider: 'google.com');
+    }
+
+    return GoogleAuthProvider.credential(
+      idToken: googleUser.authentication.idToken,
+    );
+  }
+
+  /// Triggers Apple re-authentication via Firebase's
+  /// `reauthenticateWithProvider` flow. Returns a SENTINEL credential that
+  /// [reauthenticate] recognizes as "already done, skip" — because the
+  /// actual re-auth is performed server-side by Firebase inside this method,
+  /// not separately as in the email/password / Google paths.
+  ///
+  /// Why not the same shape as [signInWithApple] / [getGoogleCredential]?
+  /// On iOS, `sign_in_with_apple`'s native sheet on RE-auth (after a prior
+  /// successful Apple sign-in) tends to return a cached identityToken whose
+  /// embedded nonce no longer matches the fresh rawNonce we generate, and
+  /// Firebase rejects the credential with `missing-or-invalid-nonce`.
+  /// Firebase's `reauthenticateWithProvider(OAuthProvider('apple.com'))`
+  /// drives the OAuth dance internally and handles the nonce correctly.
+  ///
+  /// Throws [AuthFailure.signInCancelled] on user-cancel.
+  /// Throws [AuthFailure.reAuthFailed] on other Apple errors.
+  // i18n: Fase 6 Etapa 3
+  Future<AuthCredential> getAppleCredential() async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw const AuthFailure.userNotFound();
+    }
+
+    try {
+      await user.reauthenticateWithProvider(OAuthProvider('apple.com'));
+    } on FirebaseAuthException catch (e) {
+      // iOS surfaces user-cancel via several codes depending on iOS version
+      // and which native sheet was active.
+      const cancelCodes = {
+        'cancelled-popup-request',
+        'web-context-cancelled',
+        'web-context-canceled',
+        'user-cancelled',
+        'popup-closed-by-user',
+      };
+      if (cancelCodes.contains(e.code)) {
+        throw const AuthFailure.signInCancelled();
+      }
+      throw const AuthFailure.reAuthFailed(provider: 'apple.com');
+    } catch (_) {
+      throw const AuthFailure.reAuthFailed(provider: 'apple.com');
+    }
+
+    // Sentinel — reauthenticate() short-circuits on this providerId.
+    return OAuthProvider(_appleReauthDoneSentinelProviderId)
+        .credential(accessToken: 'sentinel');
+  }
+
+  // ── End re-auth helpers ────────────────────────────────────────────────────
+
   Future<void> signOut() async {
     try {
       // Disconnect Google session too — otherwise a subsequent signIn() would
@@ -301,7 +436,22 @@ class AuthService {
     try {
       await user.delete();
     } on FirebaseAuthException catch (e) {
-      throw AuthFailure.fromFirebase(e);
+      // Stale-auth escape hatch: if the user no longer exists server-side
+      // (e.g., previously deleted by the account-deletion Cloud Function or
+      // by Firebase Console while this client still had a cached token),
+      // user.delete() returns user-not-found / token-expired. The local
+      // session is the only thing left to clean up — force-sign-out so the
+      // user is not stuck in a phantom auth state on profile-setup.
+      const staleAuthCodes = {
+        'user-not-found',
+        'user-token-expired',
+        'invalid-user-token',
+      };
+      if (staleAuthCodes.contains(e.code)) {
+        await _auth.signOut();
+      } else {
+        throw AuthFailure.fromFirebase(e);
+      }
     }
 
     // Cleanup Google session cache. Firebase Auth is already cleared by
