@@ -315,3 +315,155 @@ test('SCENARIO-274: non-owner cannot write another user check-in', async () => {
       .set({ uid: 'u1', date: '2026-05-15', checkedInAt: new Date() }),
   );
 });
+
+// ---------------------------------------------------------------------------
+// routines (user-created) — SCENARIO-600..608
+// REQ-USR-004, REQ-USR-008, REQ-USR-009, REQ-USR-012, REQ-USR-013,
+// REQ-USR-014, ADR-USR-03, ADR-USR-06.
+// ---------------------------------------------------------------------------
+
+/** Helper: base valid user-created routine payload for athlete A. */
+const validUserCreated = (uid) => ({
+  source: 'user-created',
+  createdBy: uid,
+  visibility: 'private',
+  name: 'Mi rutina',
+  split: 'Full Body',
+  level: 'beginner',
+  days: [],
+  status: 'active',
+  createdAt: new Date(), // resolved as timestamp by the emulator
+});
+
+// SCENARIO-600: owner create succeeds (all 6 conditions satisfied).
+test('SCENARIO-600: owner can create user-created routine with valid payload', async () => {
+  const athleteA = testEnv.authenticatedContext('athlete-a');
+  await assertSucceeds(
+    athleteA.firestore().collection('routines').doc('r-600').set(
+      validUserCreated('athlete-a'),
+    ),
+  );
+});
+
+// SCENARIO-601: spoofed createdBy is denied (REQ-USR-014).
+test('SCENARIO-601: spoofed createdBy is denied', async () => {
+  const athleteA = testEnv.authenticatedContext('athlete-a');
+  await assertFails(
+    athleteA.firestore().collection('routines').doc('r-601').set({
+      ...validUserCreated('athlete-a'),
+      createdBy: 'athlete-b', // impersonation attempt
+    }),
+  );
+});
+
+// SCENARIO-602: visibility=public is denied for user-created (REQ-USR-012).
+test('SCENARIO-602: visibility=public is denied on user-created create', async () => {
+  const athleteA = testEnv.authenticatedContext('athlete-a');
+  await assertFails(
+    athleteA.firestore().collection('routines').doc('r-602').set({
+      ...validUserCreated('athlete-a'),
+      visibility: 'public',
+    }),
+  );
+});
+
+// SCENARIO-603: assignedBy present is denied (REQ-USR-004).
+test('SCENARIO-603: assignedBy present on user-created create is denied', async () => {
+  const athleteA = testEnv.authenticatedContext('athlete-a');
+  await assertFails(
+    athleteA.firestore().collection('routines').doc('r-603').set({
+      ...validUserCreated('athlete-a'),
+      assignedBy: 'trainer-x',
+    }),
+  );
+});
+
+// SCENARIO-604: assignedTo present is denied (REQ-USR-004).
+test('SCENARIO-604: assignedTo present on user-created create is denied', async () => {
+  const athleteA = testEnv.authenticatedContext('athlete-a');
+  await assertFails(
+    athleteA.firestore().collection('routines').doc('r-604').set({
+      ...validUserCreated('athlete-a'),
+      assignedTo: 'athlete-z',
+    }),
+  );
+});
+
+// SCENARIO-605: owner reads own private user-created routine — succeeds.
+test('SCENARIO-605: owner can read their own user-created routine', async () => {
+  // Seed directly to bypass rules.
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await ctx.firestore().collection('routines').doc('r-605').set(
+      validUserCreated('athlete-a'),
+    );
+  });
+
+  const athleteA = testEnv.authenticatedContext('athlete-a');
+  await assertSucceeds(
+    athleteA.firestore().collection('routines').doc('r-605').get(),
+  );
+});
+
+// SCENARIO-606: other auth'd user cannot read another's private user-created
+// routine (REQ-USR-007, REQ-USR-008).
+test('SCENARIO-606: non-owner cannot read another user\'s private user-created routine', async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await ctx.firestore().collection('routines').doc('r-606').set(
+      validUserCreated('athlete-a'),
+    );
+  });
+
+  const athleteB = testEnv.authenticatedContext('athlete-b');
+  await assertFails(
+    athleteB.firestore().collection('routines').doc('r-606').get(),
+  );
+});
+
+// SCENARIO-607: owner can flip status active→archived (REQ-USR-013).
+test('SCENARIO-607: owner can update status from active to archived', async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await ctx.firestore().collection('routines').doc('r-607').set(
+      validUserCreated('athlete-a'),
+    );
+  });
+
+  const athleteA = testEnv.authenticatedContext('athlete-a');
+  await assertSucceeds(
+    athleteA.firestore().collection('routines').doc('r-607').update({
+      status: 'archived',
+    }),
+  );
+});
+
+// SCENARIO-608a: owner cannot update name — diff has non-status key
+// (ADR-USR-05 — DO NOT widen affectedKeys).
+test('SCENARIO-608a: owner cannot update name field (affectedKeys guard)', async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await ctx.firestore().collection('routines').doc('r-608a').set(
+      validUserCreated('athlete-a'),
+    );
+  });
+
+  const athleteA = testEnv.authenticatedContext('athlete-a');
+  await assertFails(
+    athleteA.firestore().collection('routines').doc('r-608a').update({
+      name: 'Nombre cambiado',
+    }),
+  );
+});
+
+// SCENARIO-608b: non-owner cannot flip status (REQ-USR-009).
+test('SCENARIO-608b: non-owner cannot update status of another user\'s routine', async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await ctx.firestore().collection('routines').doc('r-608b').set(
+      validUserCreated('athlete-a'),
+    );
+  });
+
+  const athleteB = testEnv.authenticatedContext('athlete-b');
+  await assertFails(
+    athleteB.firestore().collection('routines').doc('r-608b').update({
+      status: 'archived',
+    }),
+  );
+});
