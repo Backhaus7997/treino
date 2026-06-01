@@ -24,12 +24,18 @@ const List<Gym> _kHardcodedGyms = [
   ),
 ];
 
-/// Query actual de búsqueda de gym (step 2). La UI escribe acá desde el search bar.
-final gymSearchQueryProvider = StateProvider<String>((_) => '');
+/// Query actual de búsqueda de gym (step 2 del onboarding + ProfileGymScreen
+/// standalone). La UI escribe acá desde el search bar.
+///
+/// `autoDispose`: el estado se destruye cuando ningún widget lo mira. Esto
+/// hace que cada re-entrada a ProfileGymScreen arranque con el query vacío
+/// (el TextField siempre se monta vacío, ahora el provider también) — sin
+/// necesidad del workaround manual de reset en `initState`.
+final gymSearchQueryProvider = StateProvider.autoDispose<String>((_) => '');
 
 /// Lista de gyms filtrada por el query. Mientras está vacío, devuelve el
-/// catálogo completo.
-final filteredGymsProvider = Provider<List<Gym>>((ref) {
+/// catálogo completo. autoDispose porque depende de un provider autoDispose.
+final filteredGymsProvider = Provider.autoDispose<List<Gym>>((ref) {
   final query = ref.watch(gymSearchQueryProvider).trim().toLowerCase();
   if (query.isEmpty) return _kHardcodedGyms;
   return _kHardcodedGyms

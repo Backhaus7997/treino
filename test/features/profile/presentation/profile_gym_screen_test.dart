@@ -142,37 +142,29 @@ void main() {
       ).called(1);
     });
 
-    // Regression guard 2026-05-27 — gymSearchQueryProvider was retaining
-    // its value across screen re-entries while the TextField re-initialized
-    // empty, producing a stale filter with no visible query.
-    testWidgets(
-        'regression: gymSearchQueryProvider resets to "" on mount even if previously set',
-        (tester) async {
-      final mockUser = MockUser();
-      final container = ProviderContainer(
-        overrides: [
-          authStateChangesProvider.overrideWith((_) => Stream.value(mockUser)),
-          userProfileProvider.overrideWith((_) => Stream.value(_profile())),
-          userRepositoryProvider.overrideWithValue(mockRepo),
-          filteredGymsProvider.overrideWithValue(_testGyms),
-        ],
-      );
+    // Regression guard 2026-05-27 (rewritten 2026-06-01):
+    // gymSearchQueryProvider was retaining its value across screen re-entries
+    // while the TextField re-initialized empty, producing a stale filter with
+    // no visible query. Original fix was a manual reset in initState; proper
+    // fix (2026-06-01) was to mark the provider as autoDispose so its state
+    // is destroyed automatically when no widget watches it. This test asserts
+    // the provider IS autoDispose — if someone removes the .autoDispose, the
+    // bug returns and this test fails.
+    test('regression: gymSearchQueryProvider is autoDispose', () async {
+      final container = ProviderContainer();
       addTearDown(container.dispose);
 
+      // Listen + mutate state.
+      final sub = container.listen(gymSearchQueryProvider, (_, __) {});
       container.read(gymSearchQueryProvider.notifier).state = 'palermo';
       expect(container.read(gymSearchQueryProvider), 'palermo');
 
-      await tester.pumpWidget(
-        UncontrolledProviderScope(
-          container: container,
-          child: MaterialApp(
-            theme: AppTheme.dark(),
-            home: const Scaffold(body: ProfileGymScreen()),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
+      // Drop the subscription. Riverpod's autoDispose runs on the next
+      // microtask — not synchronously — so we yield once before re-reading.
+      sub.close();
+      await Future<void>.delayed(Duration.zero);
 
+      // Provider was disposed and re-built with its default value.
       expect(container.read(gymSearchQueryProvider), '');
     });
 
