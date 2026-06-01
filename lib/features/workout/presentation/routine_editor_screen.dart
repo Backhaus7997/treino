@@ -11,12 +11,16 @@ import '../../coach/presentation/widgets/exercise_picker_sheet.dart';
 import '../../profile/domain/experience_level.dart';
 import '../application/routine_providers.dart' show routineRepositoryProvider;
 import '../application/session_providers.dart' show currentUidProvider;
+import '../application/user_routines_providers.dart'
+    show userCreatedRoutinesProvider;
 import '../domain/exercise.dart';
 import '../domain/routine.dart';
 import '../domain/routine_day.dart';
 import '../domain/routine_slot.dart';
 import '../domain/routine_source.dart';
 import '../domain/routine_visibility.dart';
+import 'routine_editor_mode.dart';
+import 'workout_strings.dart';
 
 // ── Mutable local state classes ───────────────────────────────────────────────
 
@@ -40,30 +44,39 @@ class _EditableDay {
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
-/// Full-screen plan builder for trainers.
+/// Full-screen plan builder parametrized by [RoutineEditorMode].
 ///
 /// Lives inside the ShellRoute — NO own Scaffold (bottom bar provided by
 /// shell). Uses local StatefulWidget state for the mutable form.
 ///
-/// Dual-mode:
-///   * `athleteId` non-null → trainer-assigned plan for that athlete.
-///     Submits via `RoutineRepository.createAssigned`.
-///   * `athleteId == null` → reusable template that the PF keeps in their
-///     own library without assigning yet. Submits via
-///     `RoutineRepository.createTemplate`. The PF can later copy it into
-///     a real assigned plan from the TrainerWorkoutView template list.
+/// Modes (ADR-USR-01):
+///   * [TrainerAssigning] — trainer creates a plan for a specific athlete.
+///     Submits via [RoutineRepository.createAssigned].
+///   * [SelfCreating] — athlete self-authors a personal routine.
+///     Submits via [RoutineRepository.createUserOwned].
+///     With a non-null existingRoutineId → stub toast (full edit deferred).
 ///
-/// REQ-COACH-PLANS-023..028 · SCENARIO-457..463.
+/// REQ-COACH-PLANS-023..028 · REQ-USR-011 · SCENARIO-457..463, 616..619.
 class RoutineEditorScreen extends StatefulWidget {
-  const RoutineEditorScreen({super.key, this.athleteId});
+  const RoutineEditorScreen({super.key, required this.mode});
 
-  final String? athleteId;
-
-  bool get isTemplate => athleteId == null;
+  final RoutineEditorMode mode;
 
   @override
   State<RoutineEditorScreen> createState() => _RoutineEditorScreenState();
 }
+
+String _titleFor(RoutineEditorMode mode) => switch (mode) {
+      TrainerAssigning() => CoachStrings.editorTitle,
+      TrainerTemplating() => CoachStrings.editorTitle,
+      SelfCreating() => WorkoutStrings.selfEditorTitle,
+    };
+
+String _submitLabelFor(RoutineEditorMode mode) => switch (mode) {
+      TrainerAssigning() => CoachStrings.editorSubmit,
+      TrainerTemplating() => CoachStrings.editorSubmit,
+      SelfCreating() => WorkoutStrings.selfEditorSubmitLabel,
+    };
 
 class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
   String _name = '';
@@ -135,81 +148,134 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
 
   Future<void> _submit(WidgetRef ref) async {
     if (!_isValid || _submitting) return;
-    setState(() => _submitting = true);
 
-    final trainerUid = ref.read(currentUidProvider) ?? '';
-    final isTemplate = widget.isTemplate;
-    final routine = Routine(
-      id: '',
-      name: _name.trim(),
-      split: _split.trim(),
-      level: _level,
-      days: _days
-          .map((d) => RoutineDay(
-                dayNumber: d.dayNumber,
-                name: d.name,
-                slots: d.slots
-                    .map((s) => RoutineSlot(
-                          exerciseId: s.exercise!.id,
-                          exerciseName: s.exercise!.name,
-                          muscleGroup: s.exercise!.muscleGroup,
-                          targetSets: s.targetSets,
-                          targetRepsMin: s.targetRepsMin,
-                          targetRepsMax: s.targetRepsMax,
-                          restSeconds: s.restSeconds,
-                        ))
-                    .toList(),
-              ))
-          .toList(),
-      source: isTemplate
-          ? RoutineSource.trainerTemplate
-          : RoutineSource.trainerAssigned,
-      assignedBy: trainerUid,
-      assignedTo: isTemplate ? null : widget.athleteId,
-      visibility: RoutineVisibility.private,
-    );
+    // SelfCreating with existingRoutineId → stub toast; no network call.
+    if (widget.mode case SelfCreating(existingRoutineId: final id?)
+        when id.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text(WorkoutStrings.editStubToast)),
+      );
+      return;
+    }
+
+    setState(() => _submitting = true);
+    final uid = ref.read(currentUidProvider) ?? '';
+
+    final days = _days
+        .map((d) => RoutineDay(
+              dayNumber: d.dayNumber,
+              name: d.name,
+              slots: d.slots
+                  .map((s) => RoutineSlot(
+                        exerciseId: s.exercise!.id,
+                        exerciseName: s.exercise!.name,
+                        muscleGroup: s.exercise!.muscleGroup,
+                        targetSets: s.targetSets,
+                        targetRepsMin: s.targetRepsMin,
+                        targetRepsMax: s.targetRepsMax,
+                        restSeconds: s.restSeconds,
+                      ))
+                  .toList(),
+            ))
+        .toList();
 
     try {
       final repo = ref.read(routineRepositoryProvider);
-      if (isTemplate) {
-        await repo.createTemplate(routine);
-      } else {
-        final created = await repo.createAssigned(routine);
-        // Non-null inside the else branch — isTemplate already gated on this.
-        ref.read(analyticsServiceProvider).logPlanAssigned(
-              routineId: created.id,
-              assignedBy: trainerUid,
-              assignedTo: widget.athleteId!,
+
+      switch (widget.mode) {
+        case TrainerAssigning(:final athleteId):
+          // Preserve existing trainer-assigned flow — unchanged behaviour.
+          final routine = Routine(
+            id: '',
+            name: _name.trim(),
+            split: _split.trim(),
+            level: _level,
+            days: days,
+            source: RoutineSource.trainerAssigned,
+            assignedBy: uid,
+            assignedTo: athleteId,
+            visibility: RoutineVisibility.private,
+          );
+          final created = await repo.createAssigned(routine);
+          ref.read(analyticsServiceProvider).logPlanAssigned(
+                routineId: created.id,
+                assignedBy: uid,
+                assignedTo: athleteId,
+              );
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content: Text(CoachStrings.createPlanSuccess)),
+          );
+          context.pop();
+
+        case TrainerTemplating():
+          // Pre-existing trainer template flow — reusable plantilla, no
+          // athlete assignment. Mirrors pre-PR2 isTemplate branch.
+          final routine = Routine(
+            id: '',
+            name: _name.trim(),
+            split: _split.trim(),
+            level: _level,
+            days: days,
+            source: RoutineSource.trainerTemplate,
+            assignedBy: uid,
+            visibility: RoutineVisibility.private,
+          );
+          await repo.createTemplate(routine);
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content: Text(CoachStrings.createPlanSuccess)),
+          );
+          context.pop();
+
+        case SelfCreating(existingRoutineId: null):
+          // Client-side cap check (ADR-USR-02).
+          final userRoutines =
+              ref.read(userCreatedRoutinesProvider(uid)).valueOrNull ?? [];
+          if (userRoutines.length >= 10) {
+            if (!mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                  content: Text(WorkoutStrings.selfEditorCapReached)),
             );
+            setState(() => _submitting = false);
+            return;
+          }
+          final draft = Routine(
+            id: '',
+            name: _name.trim(),
+            split: _split.trim(),
+            level: _level,
+            days: days,
+            source: RoutineSource.userCreated,
+            visibility: RoutineVisibility.private,
+          );
+          await repo.createUserOwned(uid: uid, draft: draft);
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content: Text(WorkoutStrings.selfEditorSuccess)),
+          );
+          context.pop();
+
+        case SelfCreating(existingRoutineId: _):
+          // Non-null existingRoutineId handled above via early return.
+          // This branch is unreachable in practice but exhausts the switch.
+          break;
       }
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            isTemplate
-                ? 'Plantilla guardada.'
-                : CoachStrings.createPlanSuccess,
-          ),
-        ),
-      );
-      context.pop();
     } catch (e) {
       if (!mounted) return;
-      // For the new template path we surface the actual error message until
-      // the flow is hardened in real Firestore — `permission-denied` vs
-      // `failed-precondition` vs other tells us immediately what to deploy.
-      // The assigned-plan path keeps the original generic copy so existing
-      // SCENARIO-463 stays valid.
+      final errorText = switch (widget.mode) {
+        TrainerAssigning() => CoachStrings.createPlanError,
+        TrainerTemplating() => CoachStrings.createPlanError,
+        SelfCreating() => e.toString().contains('permission-denied')
+            ? WorkoutStrings.selfEditorPermissionDenied
+            : WorkoutStrings.selfEditorError,
+      };
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            isTemplate
-                ? 'No pudimos crear la plantilla: $e'
-                : CoachStrings.createPlanError,
-          ),
-          duration:
-              isTemplate ? const Duration(seconds: 6) : const Duration(seconds: 4),
-        ),
+        SnackBar(content: Text(errorText)),
       );
       setState(() => _submitting = false);
     }
@@ -235,7 +301,7 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
                   ),
                   const SizedBox(width: 4),
                   Text(
-                    CoachStrings.editorTitle,
+                    _titleFor(widget.mode),
                     style: GoogleFonts.barlowCondensed(
                       fontWeight: FontWeight.w700,
                       fontSize: 20,
@@ -412,7 +478,7 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
                           ),
                         )
                       : Text(
-                          CoachStrings.editorSubmit,
+                          _submitLabelFor(widget.mode),
                           style: GoogleFonts.barlowCondensed(
                             fontWeight: FontWeight.w700,
                             fontSize: 14,
