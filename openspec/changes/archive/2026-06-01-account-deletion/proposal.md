@@ -142,17 +142,17 @@ Only 2 remain (all others LOCKED in §3):
 
 ## 10. Success Criteria
 
-- [ ] Tap "Eliminar cuenta" → confirmation sheet → ELIMINAR → re-auth sheet for current provider.
-- [ ] Re-auth succeeds for **all 3 providers** (password / Google / Apple) on real device.
-- [ ] CF call returns success within p95 < 5s (post-warm).
-- [ ] User signed out and redirected to `/sign-in` with "Tu cuenta fue eliminada" snackbar.
-- [ ] Firebase Console verification: `users/{uid}`, `userPublicProfiles/{uid}`, all sub-collections, Storage avatar — all gone.
-- [ ] `friendships`, `trainer_links`, `appointments` — swept/terminated/cancelled as specified.
-- [ ] `posts` and `chats/messages` — sender anonymized to "Usuario eliminado".
-- [ ] `audit_log/{uid}` exists with `status: 'success'`, timestamp, provider.
-- [ ] CF rejects trainer-role caller with `permission-denied`.
-- [ ] `flutter analyze` 0 issues; `dart format .` clean; all tests green (Flutter + CF integration).
-- [ ] Each PR diff ≤ 400 lines (or `size:exception` recorded if exceeded).
+- [x] Tap "Eliminar cuenta" → confirmation sheet → ELIMINAR → re-auth sheet for current provider.
+- [x] Re-auth succeeds for **all 3 providers** (password / Google / Apple) on real device.
+- [x] CF call returns success within p95 < 5s (post-warm).
+- [x] User signed out and redirected to `/sign-in` with "Tu cuenta fue eliminada" snackbar.
+- [x] Firebase Console verification: `users/{uid}`, `userPublicProfiles/{uid}`, all sub-collections, Storage avatar — all gone.
+- [x] `friendships`, `trainer_links`, `appointments` — swept/terminated/cancelled as specified.
+- [x] `posts` and `chats/messages` — sender anonymized to "Usuario eliminado".
+- [x] `audit_log/{uid}` exists with `status: 'success'`, timestamp, provider.
+- [x] CF rejects trainer-role caller with `permission-denied`.
+- [x] `flutter analyze` 0 issues; `dart format .` clean; all tests green (Flutter + CF integration).
+- [x] Each PR diff ≤ 400 lines (or `size:exception` recorded if exceeded).
 
 ---
 
