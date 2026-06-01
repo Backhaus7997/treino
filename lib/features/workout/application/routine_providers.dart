@@ -10,12 +10,15 @@ final routineRepositoryProvider = Provider<RoutineRepository>(
   (ref) => RoutineRepository(firestore: ref.watch(firestoreProvider)),
 );
 
-/// Eager-loads the full routine catalogue (~6 docs). Auth-gated:
+/// Eager-loads the system template catalogue (~6 docs). Auth-gated:
 /// returns an empty list when unauthenticated, mirroring [exercisesProvider].
+/// Uses [RoutineRepository.listSystemTemplates] (REQ-USR-015, ADR-USR-05) —
+/// only `source == 'system'` routines; athlete-created routines are isolated
+/// in [userCreatedRoutinesProvider].
 final routinesProvider = FutureProvider<List<Routine>>((ref) async {
   final user = await ref.watch(authStateChangesProvider.future);
   if (user == null) return const [];
-  return ref.watch(routineRepositoryProvider).listAll();
+  return ref.watch(routineRepositoryProvider).listSystemTemplates();
 });
 
 /// Live stream of the trainer's own templates (assignedBy == trainerId,
@@ -28,8 +31,8 @@ final trainerTemplatesStreamProvider = StreamProvider.autoDispose
 
 /// Single-doc fetch. Hits Firestore directly via `getById` so it works for
 /// BOTH public catalog plantillas AND private trainer-assigned plans
-/// (which are not in [routinesProvider] because [listAll] now filters
-/// `whereIn ['public', 'shared']`).
+/// (which are not in [routinesProvider] because [listSystemTemplates] filters
+/// by `source == 'system'` and `visibility == 'public'`).
 final routineByIdProvider = FutureProvider.family<Routine?, String>(
   (ref, id) async {
     return ref.watch(routineRepositoryProvider).getById(id);

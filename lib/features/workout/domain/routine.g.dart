@@ -24,6 +24,9 @@ _$RoutineImpl _$$RoutineImplFromJson(Map<String, dynamic> json) =>
       visibility:
           $enumDecodeNullable(_$RoutineVisibilityEnumMap, json['visibility']) ??
               RoutineVisibility.public,
+      createdBy: json['createdBy'] as String?,
+      status: $enumDecodeNullable(_$RoutineStatusEnumMap, json['status']) ??
+          RoutineStatus.active,
     );
 
 Map<String, dynamic> _$$RoutineImplToJson(_$RoutineImpl instance) =>
@@ -39,6 +42,8 @@ Map<String, dynamic> _$$RoutineImplToJson(_$RoutineImpl instance) =>
       'assignedBy': instance.assignedBy,
       'assignedTo': instance.assignedTo,
       'visibility': _$RoutineVisibilityEnumMap[instance.visibility]!,
+      'createdBy': instance.createdBy,
+      'status': _$RoutineStatusEnumMap[instance.status]!,
     };
 
 const _$ExperienceLevelEnumMap = {
@@ -58,4 +63,9 @@ const _$RoutineVisibilityEnumMap = {
   RoutineVisibility.public: 'public',
   RoutineVisibility.private: 'private',
   RoutineVisibility.shared: 'shared',
+};
+
+const _$RoutineStatusEnumMap = {
+  RoutineStatus.active: 'active',
+  RoutineStatus.archived: 'archived',
 };
