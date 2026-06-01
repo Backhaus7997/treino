@@ -28,7 +28,14 @@ mixin _$UserPublicProfile {
   int? get workoutsCount => throw _privateConstructorUsedError;
   int? get racha => throw _privateConstructorUsedError;
   int? get followersCount => throw _privateConstructorUsedError;
-  int? get followingCount => throw _privateConstructorUsedError;
+  int? get followingCount =>
+      throw _privateConstructorUsedError; // Opt-in flag a trainer can flip to expose ALL their `trainer-template`
+// routines to their active athletes (a "buffet" the athletes can browse
+// and run sessions from without being explicitly assigned). Defaults to
+// false so existing docs without the field decode safely and no template
+// becomes public retroactively. Off = athletes only see plans the
+// trainer assigned to them one-by-one.
+  bool get sharedTemplatesWithAthletes => throw _privateConstructorUsedError;
 
   /// Serializes this UserPublicProfile to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -55,7 +62,8 @@ abstract class $UserPublicProfileCopyWith<$Res> {
       int? workoutsCount,
       int? racha,
       int? followersCount,
-      int? followingCount});
+      int? followingCount,
+      bool sharedTemplatesWithAthletes});
 }
 
 /// @nodoc
@@ -82,6 +90,7 @@ class _$UserPublicProfileCopyWithImpl<$Res, $Val extends UserPublicProfile>
     Object? racha = freezed,
     Object? followersCount = freezed,
     Object? followingCount = freezed,
+    Object? sharedTemplatesWithAthletes = null,
   }) {
     return _then(_value.copyWith(
       uid: null == uid
@@ -120,6 +129,10 @@ class _$UserPublicProfileCopyWithImpl<$Res, $Val extends UserPublicProfile>
           ? _value.followingCount
           : followingCount // ignore: cast_nullable_to_non_nullable
               as int?,
+      sharedTemplatesWithAthletes: null == sharedTemplatesWithAthletes
+          ? _value.sharedTemplatesWithAthletes
+          : sharedTemplatesWithAthletes // ignore: cast_nullable_to_non_nullable
+              as bool,
     ) as $Val);
   }
 }
@@ -141,7 +154,8 @@ abstract class _$$UserPublicProfileImplCopyWith<$Res>
       int? workoutsCount,
       int? racha,
       int? followersCount,
-      int? followingCount});
+      int? followingCount,
+      bool sharedTemplatesWithAthletes});
 }
 
 /// @nodoc
@@ -166,6 +180,7 @@ class __$$UserPublicProfileImplCopyWithImpl<$Res>
     Object? racha = freezed,
     Object? followersCount = freezed,
     Object? followingCount = freezed,
+    Object? sharedTemplatesWithAthletes = null,
   }) {
     return _then(_$UserPublicProfileImpl(
       uid: null == uid
@@ -204,6 +219,10 @@ class __$$UserPublicProfileImplCopyWithImpl<$Res>
           ? _value.followingCount
           : followingCount // ignore: cast_nullable_to_non_nullable
               as int?,
+      sharedTemplatesWithAthletes: null == sharedTemplatesWithAthletes
+          ? _value.sharedTemplatesWithAthletes
+          : sharedTemplatesWithAthletes // ignore: cast_nullable_to_non_nullable
+              as bool,
     ));
   }
 }
@@ -220,7 +239,8 @@ class _$UserPublicProfileImpl implements _UserPublicProfile {
       this.workoutsCount,
       this.racha,
       this.followersCount,
-      this.followingCount});
+      this.followingCount,
+      this.sharedTemplatesWithAthletes = false});
 
   factory _$UserPublicProfileImpl.fromJson(Map<String, dynamic> json) =>
       _$$UserPublicProfileImplFromJson(json);
@@ -243,10 +263,19 @@ class _$UserPublicProfileImpl implements _UserPublicProfile {
   final int? followersCount;
   @override
   final int? followingCount;
+// Opt-in flag a trainer can flip to expose ALL their `trainer-template`
+// routines to their active athletes (a "buffet" the athletes can browse
+// and run sessions from without being explicitly assigned). Defaults to
+// false so existing docs without the field decode safely and no template
+// becomes public retroactively. Off = athletes only see plans the
+// trainer assigned to them one-by-one.
+  @override
+  @JsonKey()
+  final bool sharedTemplatesWithAthletes;
 
   @override
   String toString() {
-    return 'UserPublicProfile(uid: $uid, displayName: $displayName, displayNameLowercase: $displayNameLowercase, avatarUrl: $avatarUrl, gymId: $gymId, workoutsCount: $workoutsCount, racha: $racha, followersCount: $followersCount, followingCount: $followingCount)';
+    return 'UserPublicProfile(uid: $uid, displayName: $displayName, displayNameLowercase: $displayNameLowercase, avatarUrl: $avatarUrl, gymId: $gymId, workoutsCount: $workoutsCount, racha: $racha, followersCount: $followersCount, followingCount: $followingCount, sharedTemplatesWithAthletes: $sharedTemplatesWithAthletes)';
   }
 
   @override
@@ -268,7 +297,11 @@ class _$UserPublicProfileImpl implements _UserPublicProfile {
             (identical(other.followersCount, followersCount) ||
                 other.followersCount == followersCount) &&
             (identical(other.followingCount, followingCount) ||
-                other.followingCount == followingCount));
+                other.followingCount == followingCount) &&
+            (identical(other.sharedTemplatesWithAthletes,
+                    sharedTemplatesWithAthletes) ||
+                other.sharedTemplatesWithAthletes ==
+                    sharedTemplatesWithAthletes));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -283,7 +316,8 @@ class _$UserPublicProfileImpl implements _UserPublicProfile {
       workoutsCount,
       racha,
       followersCount,
-      followingCount);
+      followingCount,
+      sharedTemplatesWithAthletes);
 
   /// Create a copy of UserPublicProfile
   /// with the given fields replaced by the non-null parameter values.
@@ -312,7 +346,8 @@ abstract class _UserPublicProfile implements UserPublicProfile {
       final int? workoutsCount,
       final int? racha,
       final int? followersCount,
-      final int? followingCount}) = _$UserPublicProfileImpl;
+      final int? followingCount,
+      final bool sharedTemplatesWithAthletes}) = _$UserPublicProfileImpl;
 
   factory _UserPublicProfile.fromJson(Map<String, dynamic> json) =
       _$UserPublicProfileImpl.fromJson;
@@ -334,7 +369,15 @@ abstract class _UserPublicProfile implements UserPublicProfile {
   @override
   int? get followersCount;
   @override
-  int? get followingCount;
+  int?
+      get followingCount; // Opt-in flag a trainer can flip to expose ALL their `trainer-template`
+// routines to their active athletes (a "buffet" the athletes can browse
+// and run sessions from without being explicitly assigned). Defaults to
+// false so existing docs without the field decode safely and no template
+// becomes public retroactively. Off = athletes only see plans the
+// trainer assigned to them one-by-one.
+  @override
+  bool get sharedTemplatesWithAthletes;
 
   /// Create a copy of UserPublicProfile
   /// with the given fields replaced by the non-null parameter values.

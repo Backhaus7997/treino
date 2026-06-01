@@ -26,6 +26,13 @@ class UserPublicProfile with _$UserPublicProfile {
     int? racha,
     int? followersCount,
     int? followingCount,
+    // Opt-in flag a trainer can flip to expose ALL their `trainer-template`
+    // routines to their active athletes (a "buffet" the athletes can browse
+    // and run sessions from without being explicitly assigned). Defaults to
+    // false so existing docs without the field decode safely and no template
+    // becomes public retroactively. Off = athletes only see plans the
+    // trainer assigned to them one-by-one.
+    @Default(false) bool sharedTemplatesWithAthletes,
   }) = _UserPublicProfile;
 
   factory UserPublicProfile.fromJson(Map<String, Object?> json) =>

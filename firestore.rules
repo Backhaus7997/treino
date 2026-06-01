@@ -51,7 +51,16 @@ service cloud.firestore {
                       || resource.data.visibility == 'public'
                       || resource.data.visibility == 'shared'
                       || request.auth.uid == resource.data.assignedTo
-                      || request.auth.uid == resource.data.assignedBy);
+                      || request.auth.uid == resource.data.assignedBy
+                      // Trainer-public templates: any authenticated user
+                      // can read a `trainer-template` doc IF the owning
+                      // trainer flipped `sharedTemplatesWithAthletes` on
+                      // their public profile. The athlete client filters
+                      // results by their linked trainer's uid; non-linked
+                      // users could technically query but it's the same
+                      // privacy model as the public system catalogue.
+                      || (resource.data.source == 'trainer-template'
+                          && get(/databases/$(database)/documents/userPublicProfiles/$(resource.data.assignedBy)).data.sharedTemplatesWithAthletes == true));
       // Create: solo PFs autenticados pueden crear planes asignados.
       // - assignedBy debe coincidir con el uid del caller (anti-spoofing).
       // - source debe ser 'trainer-assigned' (no system, no user).

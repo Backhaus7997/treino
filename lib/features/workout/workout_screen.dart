@@ -6,6 +6,7 @@ import '../profile/domain/user_role.dart';
 import 'presentation/widgets/historial_section.dart';
 import 'presentation/widgets/mi_plan_section.dart';
 import 'presentation/widgets/plantillas_section.dart';
+import 'presentation/widgets/trainer_templates_section.dart';
 import 'trainer_workout_view.dart';
 
 /// Role-aware workout screen.
@@ -45,6 +46,13 @@ class _AthleteWorkout extends StatelessWidget {
         physics: const ClampingScrollPhysics(),
         children: const [
           MiPlanSection(),
+          SizedBox(height: 20),
+          // Trainer-shared templates surface — invisible if the athlete has
+          // no active link or the trainer hasn't opted in. Sits between
+          // "Mi plan" (their assigned routine) and "Plantillas" (catalog)
+          // because conceptually it's still "stuff your trainer made for
+          // you", just non-assigned.
+          TrainerTemplatesSection(),
           SizedBox(height: 20),
           PlantillasSection(),
           SizedBox(height: 20),
