@@ -181,4 +181,33 @@ void main() {
       }
     });
   });
+
+  // T34 RED — SCENARIO-561..563 (account deletion failure variants)
+  group('AuthFailure new variants — account deletion (T34 RED)', () {
+    test('requiresRecentLogin exists and has non-empty userMessage', () {
+      const failure = AuthFailure.requiresRecentLogin();
+      expect(failure, isA<AuthFailure>());
+      expect(failure.userMessage, isNotEmpty);
+    });
+
+    test('reAuthFailed with provider exists and has non-empty userMessage', () {
+      const failure = AuthFailure.reAuthFailed(provider: 'google.com');
+      expect(failure, isA<AuthFailure>());
+      expect(failure.userMessage, isNotEmpty);
+    });
+
+    test('deletionFailed with cause exists and has non-empty userMessage', () {
+      final failure = AuthFailure.deletionFailed(cause: Exception('oops'));
+      expect(failure, isA<AuthFailure>());
+      expect(failure.userMessage, isNotEmpty);
+    });
+
+    test('fromFirebase maps requires-recent-login code to requiresRecentLogin',
+        () {
+      final failure = AuthFailure.fromFirebase(
+        FirebaseAuthException(code: 'requires-recent-login'),
+      );
+      expect(failure, const AuthFailure.requiresRecentLogin());
+    });
+  });
 }

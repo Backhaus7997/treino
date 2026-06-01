@@ -82,9 +82,8 @@ class _ProfileEditTrainerScreenState
     if (!mounted) return;
     // Filtramos los gyms ya seleccionados — evita duplicados.
     final selectedIds = _gymLocations.map((l) => l.gymId).toSet();
-    final available =
-        gyms.where((g) => !selectedIds.contains(g.id)).toList()
-          ..sort((a, b) => a.name.compareTo(b.name));
+    final available = gyms.where((g) => !selectedIds.contains(g.id)).toList()
+      ..sort((a, b) => a.name.compareTo(b.name));
 
     final picked = await showModalBottomSheet<Gym>(
       context: context,
@@ -149,8 +148,8 @@ class _ProfileEditTrainerScreenState
       return;
     }
     if (_locations.isEmpty && !_offersOnline) {
-      setState(() => _error =
-          'Agregá al menos una ubicación o activá clases virtuales.');
+      setState(() =>
+          _error = 'Agregá al menos una ubicación o activá clases virtuales.');
       return;
     }
 
@@ -164,8 +163,7 @@ class _ProfileEditTrainerScreenState
       'trainerSpecialty': TrainerSpecialtyX.toWire(_specialty!),
       'trainerMonthlyRate': int.parse(_priceController.text.trim()),
       'trainerLocations': _locations.map((l) => l.toJson()).toList(),
-      'trainerGeohashes':
-          _locations.map((l) => l.geohash).toSet().toList(),
+      'trainerGeohashes': _locations.map((l) => l.geohash).toSet().toList(),
       'trainerOffersOnline': _offersOnline,
       // Limpiar legacy singular — este form trabaja con el modelo array-based.
       // Si no los nulleamos, quedan zombi en Firestore (de la migration original)
@@ -299,8 +297,7 @@ class _ProfileEditTrainerScreenState
                 foregroundColor: palette.bg,
                 minimumSize: const Size.fromHeight(48),
                 shape: const StadiumBorder(),
-                disabledBackgroundColor:
-                    palette.accent.withValues(alpha: 0.3),
+                disabledBackgroundColor: palette.accent.withValues(alpha: 0.3),
               ),
               child: _saving
                   ? SizedBox(
@@ -994,9 +991,8 @@ class _CustomLocationSheetState extends State<_CustomLocationSheet> {
                         ? '${_lat!.toStringAsFixed(4)}, ${_lng!.toStringAsFixed(4)}'
                         : 'Sin ubicación detectada',
                     style: TextStyle(
-                      color: hasLocation
-                          ? palette.textPrimary
-                          : palette.textMuted,
+                      color:
+                          hasLocation ? palette.textPrimary : palette.textMuted,
                       fontSize: 13,
                     ),
                   ),

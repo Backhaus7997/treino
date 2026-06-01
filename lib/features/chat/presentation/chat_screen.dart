@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
+import '../../../core/analytics/analytics_service.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../feed/presentation/widgets/post_avatar.dart';
 import '../../profile/application/user_public_profile_providers.dart';
@@ -53,6 +54,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             senderId: currentUid,
             text: text,
           );
+      ref.read(analyticsServiceProvider).logChatMessageSent(
+            chatId: widget.chatId,
+            senderId: currentUid,
+          );
       _textController.clear();
     } catch (e, st) {
       developer.log(
@@ -96,7 +101,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             style: TextStyle(color: palette.textPrimary, fontSize: 16),
           ),
           data: (pub) {
-            final name = pub?.displayName ?? 'Usuario';
+            // i18n: Fase 6 Etapa 3
+            // When userPublicProfiles/{uid} is deleted, pub is null →
+            // show "Usuario eliminado" per ADR-ACCDEL-005.
+            final name = pub?.displayName ?? 'Usuario eliminado';
             final avatar = pub?.avatarUrl;
             return Row(
               children: [

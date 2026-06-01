@@ -9,6 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/core/analytics/analytics_service.dart';
 import 'package:treino/features/coach/presentation/coach_strings.dart';
 import 'package:treino/features/workout/application/custom_exercise_providers.dart';
 import 'package:treino/features/workout/application/exercise_providers.dart';
@@ -23,6 +24,8 @@ import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/profile/domain/experience_level.dart';
 import 'package:treino/features/workout/domain/routine_source.dart';
 import 'package:treino/features/workout/presentation/routine_editor_screen.dart';
+
+import '../../../helpers/fake_analytics_service.dart';
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
@@ -101,6 +104,9 @@ List<Override> _baseOverrides({
     customExercisesForTrainerStreamProvider('trainer-1').overrideWith(
       (ref) => Stream<List<CustomExercise>>.value(const <CustomExercise>[]),
     ),
+    // Analytics fired post-createAssigned; fake evita FirebaseAnalytics.instance
+    // que rompe en tests sin Firebase init.
+    analyticsServiceProvider.overrideWithValue(FakeAnalyticsService()),
   ];
 }
 
@@ -299,6 +305,7 @@ void main() {
         ],
       );
 
+      final analytics = FakeAnalyticsService();
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
@@ -309,6 +316,7 @@ void main() {
               (ref) =>
                   Stream<List<CustomExercise>>.value(const <CustomExercise>[]),
             ),
+            analyticsServiceProvider.overrideWithValue(analytics),
           ],
           child: MaterialApp.router(
             theme: AppTheme.dark(),
@@ -334,6 +342,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text(CoachStrings.createPlanSuccess), findsOneWidget);
+      expect(analytics.events, contains('plan_assigned'));
     });
 
     testWidgets(

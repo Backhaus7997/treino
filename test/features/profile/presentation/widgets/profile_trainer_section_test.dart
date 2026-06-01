@@ -42,8 +42,7 @@ UserProfile _trainer({
       trainerOffersOnline: offersOnline,
     );
 
-TrainerLocation _customLoc({String label = 'Mi estudio'}) =>
-    TrainerLocation(
+TrainerLocation _customLoc({String label = 'Mi estudio'}) => TrainerLocation(
       id: 'loc-1',
       type: TrainerLocationType.custom,
       customLabel: label,
@@ -95,8 +94,7 @@ void main() {
       await tester.pumpWidget(_pump(overrides: [
         authStateChangesProvider
             .overrideWith((ref) => Stream.value(_userWithUid('test-uid'))),
-        userProfileProvider
-            .overrideWith((ref) => Stream.value(_athlete())),
+        userProfileProvider.overrideWith((ref) => Stream.value(_athlete())),
       ]));
       await tester.pumpAndSettle();
 

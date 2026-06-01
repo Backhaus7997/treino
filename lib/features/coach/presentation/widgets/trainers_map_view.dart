@@ -85,35 +85,30 @@ class _TrainersMapViewState extends ConsumerState<TrainersMapView> {
         ),
       ),
       data: (trainers) {
-        // UX decisión: cuando el filtro "Online" está ON, el mapa queda
-        // "neutralizado" — el atleta quiso ver virtuales y eso es info de
-        // lista, no de mapa. No renderamos markers de trainers; el banner
-        // CTA lo redirige a modo lista. (El dot del atleta se mantiene como
-        // referencia visual de "estás acá".)
+        // Markers: uno por cada `TrainerLocation` (gym o custom) de cada
+        // PF. Un híbrido con 2 gyms tiene 2 pines — tap en cualquiera abre
+        // el mismo perfil.
         //
-        // Cuando "Online" está OFF (default), markers normales: uno por
-        // cada `TrainerLocation` (gym o custom) de cada PF. Un híbrido con
-        // 2 gyms tiene 2 pines — tap en cualquiera abre el mismo perfil.
-        final virtualOnly = ref.watch(virtualOnlyFilterProvider);
+        // El modo "Online" no se chequea acá: cuando el atleta lo activa,
+        // el screen padre hace auto-switch a LISTA y el toggle MAPA queda
+        // disabled, así que esta vista nunca se rendera con virtualOnly ON
+        // bajo flujos normales. El conditional `if (!virtualOnly)` se
+        // mantenía como guardia defensiva — removido ahora que el flow es
+        // determinístico.
         final trainerMarkers = <Marker>[
-          if (!virtualOnly)
-            for (final t in trainers)
-              for (final loc in effectiveLocationsOf(t))
-                _buildLocationMarker(
-                  context,
-                  t,
-                  palette,
-                  LatLng(loc.lat, loc.lng),
-                  loc.type,
-                ),
+          for (final t in trainers)
+            for (final loc in effectiveLocationsOf(t))
+              _buildLocationMarker(
+                context,
+                t,
+                palette,
+                LatLng(loc.lat, loc.lng),
+                loc.type,
+              ),
         ];
         final athleteMarker = athletePosition != null
             ? _buildAthleteMarker(athletePosition, palette)
             : null;
-
-        // Banner CTA: aparece siempre que el filtro "Online" esté ON. Lo
-        // que el atleta quiere ver no es geográfico — el mapa no aplica.
-        final showVirtualBanner = virtualOnly;
 
         return Stack(
           children: [
@@ -189,20 +184,6 @@ class _TrainersMapViewState extends ConsumerState<TrainersMapView> {
               right: 8,
               child: _AttributionChip(palette: palette),
             ),
-            // Banner CTA: aparece sobre el mapa cuando el atleta activa
-            // "Online" — el mapa no aplica para virtuales, el banner ofrece
-            // switch a modo lista donde sí se ven todos los que ofrecen online.
-            if (showVirtualBanner)
-              Positioned(
-                top: 8,
-                left: 16,
-                right: 80, // deja espacio para el _AttributionChip top-right
-                child: _VirtualOnlyBanner(
-                  palette: palette,
-                  onTapList: () =>
-                      ref.read(mapModeProvider.notifier).state = false,
-                ),
-              ),
             // FAB "Centrar en mi ubicación" — solo aparece si el atleta tiene
             // location concedida. Ubicado a la derecha, con offset de ~220px
             // desde el bottom para quedar arriba del bottom sheet collapsed
@@ -439,73 +420,6 @@ class _RecenterFab extends StatelessWidget {
             TreinoIcon.mapPin,
             color: palette.accent,
             size: 20,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ── Virtual-only banner ──────────────────────────────────────────────────────
-
-/// Banner que aparece en modo mapa cuando el filtro "Online" está ON y hay
-/// PFs virtuales puros (sin ubicación física) que el mapa no puede mostrar.
-/// Tap → cambia a modo lista para que el atleta los vea.
-class _VirtualOnlyBanner extends StatelessWidget {
-  const _VirtualOnlyBanner({
-    required this.palette,
-    required this.onTapList,
-  });
-  final AppPalette palette;
-  final VoidCallback onTapList;
-
-  @override
-  Widget build(BuildContext context) {
-    const label = 'Entrenadores online no se ven en el mapa';
-    return Material(
-      color: palette.bgCard,
-      borderRadius: BorderRadius.circular(14),
-      elevation: 4,
-      child: InkWell(
-        onTap: onTapList,
-        borderRadius: BorderRadius.circular(14),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: palette.accent.withValues(alpha: 0.4)),
-          ),
-          child: Row(
-            children: [
-              Icon(TreinoIcon.infoCircle, size: 18, color: palette.accent),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      label,
-                      style: TextStyle(
-                        color: palette.textPrimary,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    Text(
-                      'Tocá para verlos en lista',
-                      style: TextStyle(
-                        color: palette.textMuted,
-                        fontSize: 11,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Icon(TreinoIcon.forward, size: 18, color: palette.accent),
-            ],
           ),
         ),
       ),

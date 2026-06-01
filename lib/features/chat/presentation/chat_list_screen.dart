@@ -107,7 +107,10 @@ class _ChatRow extends ConsumerWidget {
           loading: () => _RowSkeleton(palette: palette),
           error: (_, __) => _RowSkeleton(palette: palette),
           data: (pub) {
-            final name = pub?.displayName ?? 'Usuario';
+            // i18n: Fase 6 Etapa 3
+            // When userPublicProfiles/{uid} is deleted (account deletion cascade),
+            // pub is null → show "Usuario eliminado" per ADR-ACCDEL-005.
+            final name = pub?.displayName ?? 'Usuario eliminado';
             final avatarUrl = pub?.avatarUrl;
             return Row(
               children: [

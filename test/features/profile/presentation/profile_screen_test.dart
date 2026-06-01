@@ -7,6 +7,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:treino/features/auth/application/auth_notifier.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/feed/application/friendship_providers.dart';
+import 'package:treino/features/profile/application/account_deletion_notifier.dart';
 import 'package:treino/features/profile/application/profile_stats_providers.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
@@ -45,6 +46,20 @@ class _TrackingAuthNotifier extends AuthNotifier {
 
 // Shared notifier instance — reset per test if needed.
 _TrackingAuthNotifier _notifier = _TrackingAuthNotifier();
+
+// Stub AccountDeletionNotifier that never calls the real CF.
+class _NoOpDeletionNotifier extends AccountDeletionNotifier {
+  _NoOpDeletionNotifier() : super();
+
+  @override
+  Future<void> build() async {}
+
+  @override
+  Future<void> deleteAccount([dynamic context]) async {}
+
+  @override
+  Future<void> retry([dynamic context]) async {}
+}
 
 Widget _buildProfileScreen() {
   final router = GoRouter(
@@ -86,6 +101,8 @@ Widget _buildProfileScreen() {
         (_) async => const UserSessionStats(
             totalSessions: 0, totalVolumeKg: 0, streak: 0),
       ),
+      accountDeletionNotifierProvider
+          .overrideWith(() => _NoOpDeletionNotifier()),
     ],
     child: MaterialApp.router(
       theme: AppTheme.dark(),
@@ -163,10 +180,11 @@ void main() {
       expect(_notifier.signOutCalled, isTrue);
     });
 
-    // SCENARIO-531: Tapping "Eliminar cuenta" opens the stub sheet.
+    // SCENARIO-531 (updated for real sheet) + SCENARIO-565: Tapping "Eliminar cuenta"
+    // opens EliminarCuentaSheet (not stub). The real sheet has both CANCELAR and ELIMINAR.
     testWidgets(
-        'SCENARIO-531: tapping "Eliminar cuenta" opens stub sheet with expected copy',
-        (tester) async {
+        'SCENARIO-565: tapping "Eliminar cuenta" opens EliminarCuentaSheet with '
+        'CANCELAR + ELIMINAR buttons (real sheet, not stub)', (tester) async {
       await tester.pumpWidget(_buildProfileScreen());
       await tester.pumpAndSettle();
 
@@ -176,10 +194,9 @@ void main() {
       await tester.tap(find.text('Eliminar cuenta')); // i18n: Fase 6 Etapa 3
       await tester.pumpAndSettle();
 
-      // Sheet title text and CANCELAR button must appear.
+      // Real sheet has both CANCELAR and ELIMINAR (unlike stub which had no ELIMINAR).
       expect(find.text('CANCELAR'), findsOneWidget); // i18n: Fase 6 Etapa 3
-      // The sheet must NOT have a destructive confirm button.
-      expect(find.text('ELIMINAR'), findsNothing);
+      expect(find.text('ELIMINAR'), findsOneWidget); // i18n: Fase 6 Etapa 3
     });
 
     // SCENARIO-532: CANCELAR in the stub sheet closes it without action.

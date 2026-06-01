@@ -48,8 +48,7 @@ class TrainerProfileView extends ConsumerWidget {
         ? const AsyncValue<TrainerPublicProfile?>.data(null)
         : ref.watch(trainerByIdProvider(uid));
 
-    final displayName =
-        profileAsync.valueOrNull?.displayName ?? '';
+    final displayName = profileAsync.valueOrNull?.displayName ?? '';
     final initials = _initials(displayName);
     final links = linksAsync.valueOrNull ?? const [];
     final activeAlumnos =

@@ -30,6 +30,9 @@ mixin _$AuthFailure {
     required TResult Function() accountExistsWithDifferentCredential,
     required TResult Function(String code) unknown,
     required TResult Function(Object? cause) profileCreateFailed,
+    required TResult Function() requiresRecentLogin,
+    required TResult Function(String? provider) reAuthFailed,
+    required TResult Function(Object? cause) deletionFailed,
   }) =>
       throw _privateConstructorUsedError;
   @optionalTypeArgs
@@ -46,6 +49,9 @@ mixin _$AuthFailure {
     TResult? Function()? accountExistsWithDifferentCredential,
     TResult? Function(String code)? unknown,
     TResult? Function(Object? cause)? profileCreateFailed,
+    TResult? Function()? requiresRecentLogin,
+    TResult? Function(String? provider)? reAuthFailed,
+    TResult? Function(Object? cause)? deletionFailed,
   }) =>
       throw _privateConstructorUsedError;
   @optionalTypeArgs
@@ -62,6 +68,9 @@ mixin _$AuthFailure {
     TResult Function()? accountExistsWithDifferentCredential,
     TResult Function(String code)? unknown,
     TResult Function(Object? cause)? profileCreateFailed,
+    TResult Function()? requiresRecentLogin,
+    TResult Function(String? provider)? reAuthFailed,
+    TResult Function(Object? cause)? deletionFailed,
     required TResult orElse(),
   }) =>
       throw _privateConstructorUsedError;
@@ -80,6 +89,9 @@ mixin _$AuthFailure {
         accountExistsWithDifferentCredential,
     required TResult Function(_Unknown value) unknown,
     required TResult Function(_ProfileCreateFailed value) profileCreateFailed,
+    required TResult Function(_RequiresRecentLogin value) requiresRecentLogin,
+    required TResult Function(_ReAuthFailed value) reAuthFailed,
+    required TResult Function(_DeletionFailed value) deletionFailed,
   }) =>
       throw _privateConstructorUsedError;
   @optionalTypeArgs
@@ -97,6 +109,9 @@ mixin _$AuthFailure {
         accountExistsWithDifferentCredential,
     TResult? Function(_Unknown value)? unknown,
     TResult? Function(_ProfileCreateFailed value)? profileCreateFailed,
+    TResult? Function(_RequiresRecentLogin value)? requiresRecentLogin,
+    TResult? Function(_ReAuthFailed value)? reAuthFailed,
+    TResult? Function(_DeletionFailed value)? deletionFailed,
   }) =>
       throw _privateConstructorUsedError;
   @optionalTypeArgs
@@ -114,6 +129,9 @@ mixin _$AuthFailure {
         accountExistsWithDifferentCredential,
     TResult Function(_Unknown value)? unknown,
     TResult Function(_ProfileCreateFailed value)? profileCreateFailed,
+    TResult Function(_RequiresRecentLogin value)? requiresRecentLogin,
+    TResult Function(_ReAuthFailed value)? reAuthFailed,
+    TResult Function(_DeletionFailed value)? deletionFailed,
     required TResult orElse(),
   }) =>
       throw _privateConstructorUsedError;
@@ -193,6 +211,9 @@ class _$InvalidEmailImpl extends _InvalidEmail {
     required TResult Function() accountExistsWithDifferentCredential,
     required TResult Function(String code) unknown,
     required TResult Function(Object? cause) profileCreateFailed,
+    required TResult Function() requiresRecentLogin,
+    required TResult Function(String? provider) reAuthFailed,
+    required TResult Function(Object? cause) deletionFailed,
   }) {
     return invalidEmail();
   }
@@ -212,6 +233,9 @@ class _$InvalidEmailImpl extends _InvalidEmail {
     TResult? Function()? accountExistsWithDifferentCredential,
     TResult? Function(String code)? unknown,
     TResult? Function(Object? cause)? profileCreateFailed,
+    TResult? Function()? requiresRecentLogin,
+    TResult? Function(String? provider)? reAuthFailed,
+    TResult? Function(Object? cause)? deletionFailed,
   }) {
     return invalidEmail?.call();
   }
@@ -231,6 +255,9 @@ class _$InvalidEmailImpl extends _InvalidEmail {
     TResult Function()? accountExistsWithDifferentCredential,
     TResult Function(String code)? unknown,
     TResult Function(Object? cause)? profileCreateFailed,
+    TResult Function()? requiresRecentLogin,
+    TResult Function(String? provider)? reAuthFailed,
+    TResult Function(Object? cause)? deletionFailed,
     required TResult orElse(),
   }) {
     if (invalidEmail != null) {
@@ -255,6 +282,9 @@ class _$InvalidEmailImpl extends _InvalidEmail {
         accountExistsWithDifferentCredential,
     required TResult Function(_Unknown value) unknown,
     required TResult Function(_ProfileCreateFailed value) profileCreateFailed,
+    required TResult Function(_RequiresRecentLogin value) requiresRecentLogin,
+    required TResult Function(_ReAuthFailed value) reAuthFailed,
+    required TResult Function(_DeletionFailed value) deletionFailed,
   }) {
     return invalidEmail(this);
   }
@@ -275,6 +305,9 @@ class _$InvalidEmailImpl extends _InvalidEmail {
         accountExistsWithDifferentCredential,
     TResult? Function(_Unknown value)? unknown,
     TResult? Function(_ProfileCreateFailed value)? profileCreateFailed,
+    TResult? Function(_RequiresRecentLogin value)? requiresRecentLogin,
+    TResult? Function(_ReAuthFailed value)? reAuthFailed,
+    TResult? Function(_DeletionFailed value)? deletionFailed,
   }) {
     return invalidEmail?.call(this);
   }
@@ -295,6 +328,9 @@ class _$InvalidEmailImpl extends _InvalidEmail {
         accountExistsWithDifferentCredential,
     TResult Function(_Unknown value)? unknown,
     TResult Function(_ProfileCreateFailed value)? profileCreateFailed,
+    TResult Function(_RequiresRecentLogin value)? requiresRecentLogin,
+    TResult Function(_ReAuthFailed value)? reAuthFailed,
+    TResult Function(_DeletionFailed value)? deletionFailed,
     required TResult orElse(),
   }) {
     if (invalidEmail != null) {
@@ -362,6 +398,9 @@ class _$UserDisabledImpl extends _UserDisabled {
     required TResult Function() accountExistsWithDifferentCredential,
     required TResult Function(String code) unknown,
     required TResult Function(Object? cause) profileCreateFailed,
+    required TResult Function() requiresRecentLogin,
+    required TResult Function(String? provider) reAuthFailed,
+    required TResult Function(Object? cause) deletionFailed,
   }) {
     return userDisabled();
   }
@@ -381,6 +420,9 @@ class _$UserDisabledImpl extends _UserDisabled {
     TResult? Function()? accountExistsWithDifferentCredential,
     TResult? Function(String code)? unknown,
     TResult? Function(Object? cause)? profileCreateFailed,
+    TResult? Function()? requiresRecentLogin,
+    TResult? Function(String? provider)? reAuthFailed,
+    TResult? Function(Object? cause)? deletionFailed,
   }) {
     return userDisabled?.call();
   }
@@ -400,6 +442,9 @@ class _$UserDisabledImpl extends _UserDisabled {
     TResult Function()? accountExistsWithDifferentCredential,
     TResult Function(String code)? unknown,
     TResult Function(Object? cause)? profileCreateFailed,
+    TResult Function()? requiresRecentLogin,
+    TResult Function(String? provider)? reAuthFailed,
+    TResult Function(Object? cause)? deletionFailed,
     required TResult orElse(),
   }) {
     if (userDisabled != null) {
@@ -424,6 +469,9 @@ class _$UserDisabledImpl extends _UserDisabled {
         accountExistsWithDifferentCredential,
     required TResult Function(_Unknown value) unknown,
     required TResult Function(_ProfileCreateFailed value) profileCreateFailed,
+    required TResult Function(_RequiresRecentLogin value) requiresRecentLogin,
+    required TResult Function(_ReAuthFailed value) reAuthFailed,
+    required TResult Function(_DeletionFailed value) deletionFailed,
   }) {
     return userDisabled(this);
   }
@@ -444,6 +492,9 @@ class _$UserDisabledImpl extends _UserDisabled {
         accountExistsWithDifferentCredential,
     TResult? Function(_Unknown value)? unknown,
     TResult? Function(_ProfileCreateFailed value)? profileCreateFailed,
+    TResult? Function(_RequiresRecentLogin value)? requiresRecentLogin,
+    TResult? Function(_ReAuthFailed value)? reAuthFailed,
+    TResult? Function(_DeletionFailed value)? deletionFailed,
   }) {
     return userDisabled?.call(this);
   }
@@ -464,6 +515,9 @@ class _$UserDisabledImpl extends _UserDisabled {
         accountExistsWithDifferentCredential,
     TResult Function(_Unknown value)? unknown,
     TResult Function(_ProfileCreateFailed value)? profileCreateFailed,
+    TResult Function(_RequiresRecentLogin value)? requiresRecentLogin,
+    TResult Function(_ReAuthFailed value)? reAuthFailed,
+    TResult Function(_DeletionFailed value)? deletionFailed,
     required TResult orElse(),
   }) {
     if (userDisabled != null) {
@@ -531,6 +585,9 @@ class _$UserNotFoundImpl extends _UserNotFound {
     required TResult Function() accountExistsWithDifferentCredential,
     required TResult Function(String code) unknown,
     required TResult Function(Object? cause) profileCreateFailed,
+    required TResult Function() requiresRecentLogin,
+    required TResult Function(String? provider) reAuthFailed,
+    required TResult Function(Object? cause) deletionFailed,
   }) {
     return userNotFound();
   }
@@ -550,6 +607,9 @@ class _$UserNotFoundImpl extends _UserNotFound {
     TResult? Function()? accountExistsWithDifferentCredential,
     TResult? Function(String code)? unknown,
     TResult? Function(Object? cause)? profileCreateFailed,
+    TResult? Function()? requiresRecentLogin,
+    TResult? Function(String? provider)? reAuthFailed,
+    TResult? Function(Object? cause)? deletionFailed,
   }) {
     return userNotFound?.call();
   }
@@ -569,6 +629,9 @@ class _$UserNotFoundImpl extends _UserNotFound {
     TResult Function()? accountExistsWithDifferentCredential,
     TResult Function(String code)? unknown,
     TResult Function(Object? cause)? profileCreateFailed,
+    TResult Function()? requiresRecentLogin,
+    TResult Function(String? provider)? reAuthFailed,
+    TResult Function(Object? cause)? deletionFailed,
     required TResult orElse(),
   }) {
     if (userNotFound != null) {
@@ -593,6 +656,9 @@ class _$UserNotFoundImpl extends _UserNotFound {
         accountExistsWithDifferentCredential,
     required TResult Function(_Unknown value) unknown,
     required TResult Function(_ProfileCreateFailed value) profileCreateFailed,
+    required TResult Function(_RequiresRecentLogin value) requiresRecentLogin,
+    required TResult Function(_ReAuthFailed value) reAuthFailed,
+    required TResult Function(_DeletionFailed value) deletionFailed,
   }) {
     return userNotFound(this);
   }
@@ -613,6 +679,9 @@ class _$UserNotFoundImpl extends _UserNotFound {
         accountExistsWithDifferentCredential,
     TResult? Function(_Unknown value)? unknown,
     TResult? Function(_ProfileCreateFailed value)? profileCreateFailed,
+    TResult? Function(_RequiresRecentLogin value)? requiresRecentLogin,
+    TResult? Function(_ReAuthFailed value)? reAuthFailed,
+    TResult? Function(_DeletionFailed value)? deletionFailed,
   }) {
     return userNotFound?.call(this);
   }
@@ -633,6 +702,9 @@ class _$UserNotFoundImpl extends _UserNotFound {
         accountExistsWithDifferentCredential,
     TResult Function(_Unknown value)? unknown,
     TResult Function(_ProfileCreateFailed value)? profileCreateFailed,
+    TResult Function(_RequiresRecentLogin value)? requiresRecentLogin,
+    TResult Function(_ReAuthFailed value)? reAuthFailed,
+    TResult Function(_DeletionFailed value)? deletionFailed,
     required TResult orElse(),
   }) {
     if (userNotFound != null) {
@@ -700,6 +772,9 @@ class _$WrongPasswordImpl extends _WrongPassword {
     required TResult Function() accountExistsWithDifferentCredential,
     required TResult Function(String code) unknown,
     required TResult Function(Object? cause) profileCreateFailed,
+    required TResult Function() requiresRecentLogin,
+    required TResult Function(String? provider) reAuthFailed,
+    required TResult Function(Object? cause) deletionFailed,
   }) {
     return wrongPassword();
   }
@@ -719,6 +794,9 @@ class _$WrongPasswordImpl extends _WrongPassword {
     TResult? Function()? accountExistsWithDifferentCredential,
     TResult? Function(String code)? unknown,
     TResult? Function(Object? cause)? profileCreateFailed,
+    TResult? Function()? requiresRecentLogin,
+    TResult? Function(String? provider)? reAuthFailed,
+    TResult? Function(Object? cause)? deletionFailed,
   }) {
     return wrongPassword?.call();
   }
@@ -738,6 +816,9 @@ class _$WrongPasswordImpl extends _WrongPassword {
     TResult Function()? accountExistsWithDifferentCredential,
     TResult Function(String code)? unknown,
     TResult Function(Object? cause)? profileCreateFailed,
+    TResult Function()? requiresRecentLogin,
+    TResult Function(String? provider)? reAuthFailed,
+    TResult Function(Object? cause)? deletionFailed,
     required TResult orElse(),
   }) {
     if (wrongPassword != null) {
@@ -762,6 +843,9 @@ class _$WrongPasswordImpl extends _WrongPassword {
         accountExistsWithDifferentCredential,
     required TResult Function(_Unknown value) unknown,
     required TResult Function(_ProfileCreateFailed value) profileCreateFailed,
+    required TResult Function(_RequiresRecentLogin value) requiresRecentLogin,
+    required TResult Function(_ReAuthFailed value) reAuthFailed,
+    required TResult Function(_DeletionFailed value) deletionFailed,
   }) {
     return wrongPassword(this);
   }
@@ -782,6 +866,9 @@ class _$WrongPasswordImpl extends _WrongPassword {
         accountExistsWithDifferentCredential,
     TResult? Function(_Unknown value)? unknown,
     TResult? Function(_ProfileCreateFailed value)? profileCreateFailed,
+    TResult? Function(_RequiresRecentLogin value)? requiresRecentLogin,
+    TResult? Function(_ReAuthFailed value)? reAuthFailed,
+    TResult? Function(_DeletionFailed value)? deletionFailed,
   }) {
     return wrongPassword?.call(this);
   }
@@ -802,6 +889,9 @@ class _$WrongPasswordImpl extends _WrongPassword {
         accountExistsWithDifferentCredential,
     TResult Function(_Unknown value)? unknown,
     TResult Function(_ProfileCreateFailed value)? profileCreateFailed,
+    TResult Function(_RequiresRecentLogin value)? requiresRecentLogin,
+    TResult Function(_ReAuthFailed value)? reAuthFailed,
+    TResult Function(_DeletionFailed value)? deletionFailed,
     required TResult orElse(),
   }) {
     if (wrongPassword != null) {
@@ -869,6 +959,9 @@ class _$EmailAlreadyInUseImpl extends _EmailAlreadyInUse {
     required TResult Function() accountExistsWithDifferentCredential,
     required TResult Function(String code) unknown,
     required TResult Function(Object? cause) profileCreateFailed,
+    required TResult Function() requiresRecentLogin,
+    required TResult Function(String? provider) reAuthFailed,
+    required TResult Function(Object? cause) deletionFailed,
   }) {
     return emailAlreadyInUse();
   }
@@ -888,6 +981,9 @@ class _$EmailAlreadyInUseImpl extends _EmailAlreadyInUse {
     TResult? Function()? accountExistsWithDifferentCredential,
     TResult? Function(String code)? unknown,
     TResult? Function(Object? cause)? profileCreateFailed,
+    TResult? Function()? requiresRecentLogin,
+    TResult? Function(String? provider)? reAuthFailed,
+    TResult? Function(Object? cause)? deletionFailed,
   }) {
     return emailAlreadyInUse?.call();
   }
@@ -907,6 +1003,9 @@ class _$EmailAlreadyInUseImpl extends _EmailAlreadyInUse {
     TResult Function()? accountExistsWithDifferentCredential,
     TResult Function(String code)? unknown,
     TResult Function(Object? cause)? profileCreateFailed,
+    TResult Function()? requiresRecentLogin,
+    TResult Function(String? provider)? reAuthFailed,
+    TResult Function(Object? cause)? deletionFailed,
     required TResult orElse(),
   }) {
     if (emailAlreadyInUse != null) {
@@ -931,6 +1030,9 @@ class _$EmailAlreadyInUseImpl extends _EmailAlreadyInUse {
         accountExistsWithDifferentCredential,
     required TResult Function(_Unknown value) unknown,
     required TResult Function(_ProfileCreateFailed value) profileCreateFailed,
+    required TResult Function(_RequiresRecentLogin value) requiresRecentLogin,
+    required TResult Function(_ReAuthFailed value) reAuthFailed,
+    required TResult Function(_DeletionFailed value) deletionFailed,
   }) {
     return emailAlreadyInUse(this);
   }
@@ -951,6 +1053,9 @@ class _$EmailAlreadyInUseImpl extends _EmailAlreadyInUse {
         accountExistsWithDifferentCredential,
     TResult? Function(_Unknown value)? unknown,
     TResult? Function(_ProfileCreateFailed value)? profileCreateFailed,
+    TResult? Function(_RequiresRecentLogin value)? requiresRecentLogin,
+    TResult? Function(_ReAuthFailed value)? reAuthFailed,
+    TResult? Function(_DeletionFailed value)? deletionFailed,
   }) {
     return emailAlreadyInUse?.call(this);
   }
@@ -971,6 +1076,9 @@ class _$EmailAlreadyInUseImpl extends _EmailAlreadyInUse {
         accountExistsWithDifferentCredential,
     TResult Function(_Unknown value)? unknown,
     TResult Function(_ProfileCreateFailed value)? profileCreateFailed,
+    TResult Function(_RequiresRecentLogin value)? requiresRecentLogin,
+    TResult Function(_ReAuthFailed value)? reAuthFailed,
+    TResult Function(_DeletionFailed value)? deletionFailed,
     required TResult orElse(),
   }) {
     if (emailAlreadyInUse != null) {
@@ -1038,6 +1146,9 @@ class _$WeakPasswordImpl extends _WeakPassword {
     required TResult Function() accountExistsWithDifferentCredential,
     required TResult Function(String code) unknown,
     required TResult Function(Object? cause) profileCreateFailed,
+    required TResult Function() requiresRecentLogin,
+    required TResult Function(String? provider) reAuthFailed,
+    required TResult Function(Object? cause) deletionFailed,
   }) {
     return weakPassword();
   }
@@ -1057,6 +1168,9 @@ class _$WeakPasswordImpl extends _WeakPassword {
     TResult? Function()? accountExistsWithDifferentCredential,
     TResult? Function(String code)? unknown,
     TResult? Function(Object? cause)? profileCreateFailed,
+    TResult? Function()? requiresRecentLogin,
+    TResult? Function(String? provider)? reAuthFailed,
+    TResult? Function(Object? cause)? deletionFailed,
   }) {
     return weakPassword?.call();
   }
@@ -1076,6 +1190,9 @@ class _$WeakPasswordImpl extends _WeakPassword {
     TResult Function()? accountExistsWithDifferentCredential,
     TResult Function(String code)? unknown,
     TResult Function(Object? cause)? profileCreateFailed,
+    TResult Function()? requiresRecentLogin,
+    TResult Function(String? provider)? reAuthFailed,
+    TResult Function(Object? cause)? deletionFailed,
     required TResult orElse(),
   }) {
     if (weakPassword != null) {
@@ -1100,6 +1217,9 @@ class _$WeakPasswordImpl extends _WeakPassword {
         accountExistsWithDifferentCredential,
     required TResult Function(_Unknown value) unknown,
     required TResult Function(_ProfileCreateFailed value) profileCreateFailed,
+    required TResult Function(_RequiresRecentLogin value) requiresRecentLogin,
+    required TResult Function(_ReAuthFailed value) reAuthFailed,
+    required TResult Function(_DeletionFailed value) deletionFailed,
   }) {
     return weakPassword(this);
   }
@@ -1120,6 +1240,9 @@ class _$WeakPasswordImpl extends _WeakPassword {
         accountExistsWithDifferentCredential,
     TResult? Function(_Unknown value)? unknown,
     TResult? Function(_ProfileCreateFailed value)? profileCreateFailed,
+    TResult? Function(_RequiresRecentLogin value)? requiresRecentLogin,
+    TResult? Function(_ReAuthFailed value)? reAuthFailed,
+    TResult? Function(_DeletionFailed value)? deletionFailed,
   }) {
     return weakPassword?.call(this);
   }
@@ -1140,6 +1263,9 @@ class _$WeakPasswordImpl extends _WeakPassword {
         accountExistsWithDifferentCredential,
     TResult Function(_Unknown value)? unknown,
     TResult Function(_ProfileCreateFailed value)? profileCreateFailed,
+    TResult Function(_RequiresRecentLogin value)? requiresRecentLogin,
+    TResult Function(_ReAuthFailed value)? reAuthFailed,
+    TResult Function(_DeletionFailed value)? deletionFailed,
     required TResult orElse(),
   }) {
     if (weakPassword != null) {
@@ -1207,6 +1333,9 @@ class _$TooManyRequestsImpl extends _TooManyRequests {
     required TResult Function() accountExistsWithDifferentCredential,
     required TResult Function(String code) unknown,
     required TResult Function(Object? cause) profileCreateFailed,
+    required TResult Function() requiresRecentLogin,
+    required TResult Function(String? provider) reAuthFailed,
+    required TResult Function(Object? cause) deletionFailed,
   }) {
     return tooManyRequests();
   }
@@ -1226,6 +1355,9 @@ class _$TooManyRequestsImpl extends _TooManyRequests {
     TResult? Function()? accountExistsWithDifferentCredential,
     TResult? Function(String code)? unknown,
     TResult? Function(Object? cause)? profileCreateFailed,
+    TResult? Function()? requiresRecentLogin,
+    TResult? Function(String? provider)? reAuthFailed,
+    TResult? Function(Object? cause)? deletionFailed,
   }) {
     return tooManyRequests?.call();
   }
@@ -1245,6 +1377,9 @@ class _$TooManyRequestsImpl extends _TooManyRequests {
     TResult Function()? accountExistsWithDifferentCredential,
     TResult Function(String code)? unknown,
     TResult Function(Object? cause)? profileCreateFailed,
+    TResult Function()? requiresRecentLogin,
+    TResult Function(String? provider)? reAuthFailed,
+    TResult Function(Object? cause)? deletionFailed,
     required TResult orElse(),
   }) {
     if (tooManyRequests != null) {
@@ -1269,6 +1404,9 @@ class _$TooManyRequestsImpl extends _TooManyRequests {
         accountExistsWithDifferentCredential,
     required TResult Function(_Unknown value) unknown,
     required TResult Function(_ProfileCreateFailed value) profileCreateFailed,
+    required TResult Function(_RequiresRecentLogin value) requiresRecentLogin,
+    required TResult Function(_ReAuthFailed value) reAuthFailed,
+    required TResult Function(_DeletionFailed value) deletionFailed,
   }) {
     return tooManyRequests(this);
   }
@@ -1289,6 +1427,9 @@ class _$TooManyRequestsImpl extends _TooManyRequests {
         accountExistsWithDifferentCredential,
     TResult? Function(_Unknown value)? unknown,
     TResult? Function(_ProfileCreateFailed value)? profileCreateFailed,
+    TResult? Function(_RequiresRecentLogin value)? requiresRecentLogin,
+    TResult? Function(_ReAuthFailed value)? reAuthFailed,
+    TResult? Function(_DeletionFailed value)? deletionFailed,
   }) {
     return tooManyRequests?.call(this);
   }
@@ -1309,6 +1450,9 @@ class _$TooManyRequestsImpl extends _TooManyRequests {
         accountExistsWithDifferentCredential,
     TResult Function(_Unknown value)? unknown,
     TResult Function(_ProfileCreateFailed value)? profileCreateFailed,
+    TResult Function(_RequiresRecentLogin value)? requiresRecentLogin,
+    TResult Function(_ReAuthFailed value)? reAuthFailed,
+    TResult Function(_DeletionFailed value)? deletionFailed,
     required TResult orElse(),
   }) {
     if (tooManyRequests != null) {
@@ -1376,6 +1520,9 @@ class _$NetworkErrorImpl extends _NetworkError {
     required TResult Function() accountExistsWithDifferentCredential,
     required TResult Function(String code) unknown,
     required TResult Function(Object? cause) profileCreateFailed,
+    required TResult Function() requiresRecentLogin,
+    required TResult Function(String? provider) reAuthFailed,
+    required TResult Function(Object? cause) deletionFailed,
   }) {
     return networkError();
   }
@@ -1395,6 +1542,9 @@ class _$NetworkErrorImpl extends _NetworkError {
     TResult? Function()? accountExistsWithDifferentCredential,
     TResult? Function(String code)? unknown,
     TResult? Function(Object? cause)? profileCreateFailed,
+    TResult? Function()? requiresRecentLogin,
+    TResult? Function(String? provider)? reAuthFailed,
+    TResult? Function(Object? cause)? deletionFailed,
   }) {
     return networkError?.call();
   }
@@ -1414,6 +1564,9 @@ class _$NetworkErrorImpl extends _NetworkError {
     TResult Function()? accountExistsWithDifferentCredential,
     TResult Function(String code)? unknown,
     TResult Function(Object? cause)? profileCreateFailed,
+    TResult Function()? requiresRecentLogin,
+    TResult Function(String? provider)? reAuthFailed,
+    TResult Function(Object? cause)? deletionFailed,
     required TResult orElse(),
   }) {
     if (networkError != null) {
@@ -1438,6 +1591,9 @@ class _$NetworkErrorImpl extends _NetworkError {
         accountExistsWithDifferentCredential,
     required TResult Function(_Unknown value) unknown,
     required TResult Function(_ProfileCreateFailed value) profileCreateFailed,
+    required TResult Function(_RequiresRecentLogin value) requiresRecentLogin,
+    required TResult Function(_ReAuthFailed value) reAuthFailed,
+    required TResult Function(_DeletionFailed value) deletionFailed,
   }) {
     return networkError(this);
   }
@@ -1458,6 +1614,9 @@ class _$NetworkErrorImpl extends _NetworkError {
         accountExistsWithDifferentCredential,
     TResult? Function(_Unknown value)? unknown,
     TResult? Function(_ProfileCreateFailed value)? profileCreateFailed,
+    TResult? Function(_RequiresRecentLogin value)? requiresRecentLogin,
+    TResult? Function(_ReAuthFailed value)? reAuthFailed,
+    TResult? Function(_DeletionFailed value)? deletionFailed,
   }) {
     return networkError?.call(this);
   }
@@ -1478,6 +1637,9 @@ class _$NetworkErrorImpl extends _NetworkError {
         accountExistsWithDifferentCredential,
     TResult Function(_Unknown value)? unknown,
     TResult Function(_ProfileCreateFailed value)? profileCreateFailed,
+    TResult Function(_RequiresRecentLogin value)? requiresRecentLogin,
+    TResult Function(_ReAuthFailed value)? reAuthFailed,
+    TResult Function(_DeletionFailed value)? deletionFailed,
     required TResult orElse(),
   }) {
     if (networkError != null) {
@@ -1545,6 +1707,9 @@ class _$SignInCancelledImpl extends _SignInCancelled {
     required TResult Function() accountExistsWithDifferentCredential,
     required TResult Function(String code) unknown,
     required TResult Function(Object? cause) profileCreateFailed,
+    required TResult Function() requiresRecentLogin,
+    required TResult Function(String? provider) reAuthFailed,
+    required TResult Function(Object? cause) deletionFailed,
   }) {
     return signInCancelled();
   }
@@ -1564,6 +1729,9 @@ class _$SignInCancelledImpl extends _SignInCancelled {
     TResult? Function()? accountExistsWithDifferentCredential,
     TResult? Function(String code)? unknown,
     TResult? Function(Object? cause)? profileCreateFailed,
+    TResult? Function()? requiresRecentLogin,
+    TResult? Function(String? provider)? reAuthFailed,
+    TResult? Function(Object? cause)? deletionFailed,
   }) {
     return signInCancelled?.call();
   }
@@ -1583,6 +1751,9 @@ class _$SignInCancelledImpl extends _SignInCancelled {
     TResult Function()? accountExistsWithDifferentCredential,
     TResult Function(String code)? unknown,
     TResult Function(Object? cause)? profileCreateFailed,
+    TResult Function()? requiresRecentLogin,
+    TResult Function(String? provider)? reAuthFailed,
+    TResult Function(Object? cause)? deletionFailed,
     required TResult orElse(),
   }) {
     if (signInCancelled != null) {
@@ -1607,6 +1778,9 @@ class _$SignInCancelledImpl extends _SignInCancelled {
         accountExistsWithDifferentCredential,
     required TResult Function(_Unknown value) unknown,
     required TResult Function(_ProfileCreateFailed value) profileCreateFailed,
+    required TResult Function(_RequiresRecentLogin value) requiresRecentLogin,
+    required TResult Function(_ReAuthFailed value) reAuthFailed,
+    required TResult Function(_DeletionFailed value) deletionFailed,
   }) {
     return signInCancelled(this);
   }
@@ -1627,6 +1801,9 @@ class _$SignInCancelledImpl extends _SignInCancelled {
         accountExistsWithDifferentCredential,
     TResult? Function(_Unknown value)? unknown,
     TResult? Function(_ProfileCreateFailed value)? profileCreateFailed,
+    TResult? Function(_RequiresRecentLogin value)? requiresRecentLogin,
+    TResult? Function(_ReAuthFailed value)? reAuthFailed,
+    TResult? Function(_DeletionFailed value)? deletionFailed,
   }) {
     return signInCancelled?.call(this);
   }
@@ -1647,6 +1824,9 @@ class _$SignInCancelledImpl extends _SignInCancelled {
         accountExistsWithDifferentCredential,
     TResult Function(_Unknown value)? unknown,
     TResult Function(_ProfileCreateFailed value)? profileCreateFailed,
+    TResult Function(_RequiresRecentLogin value)? requiresRecentLogin,
+    TResult Function(_ReAuthFailed value)? reAuthFailed,
+    TResult Function(_DeletionFailed value)? deletionFailed,
     required TResult orElse(),
   }) {
     if (signInCancelled != null) {
@@ -1719,6 +1899,9 @@ class _$AccountExistsWithDifferentCredentialImpl
     required TResult Function() accountExistsWithDifferentCredential,
     required TResult Function(String code) unknown,
     required TResult Function(Object? cause) profileCreateFailed,
+    required TResult Function() requiresRecentLogin,
+    required TResult Function(String? provider) reAuthFailed,
+    required TResult Function(Object? cause) deletionFailed,
   }) {
     return accountExistsWithDifferentCredential();
   }
@@ -1738,6 +1921,9 @@ class _$AccountExistsWithDifferentCredentialImpl
     TResult? Function()? accountExistsWithDifferentCredential,
     TResult? Function(String code)? unknown,
     TResult? Function(Object? cause)? profileCreateFailed,
+    TResult? Function()? requiresRecentLogin,
+    TResult? Function(String? provider)? reAuthFailed,
+    TResult? Function(Object? cause)? deletionFailed,
   }) {
     return accountExistsWithDifferentCredential?.call();
   }
@@ -1757,6 +1943,9 @@ class _$AccountExistsWithDifferentCredentialImpl
     TResult Function()? accountExistsWithDifferentCredential,
     TResult Function(String code)? unknown,
     TResult Function(Object? cause)? profileCreateFailed,
+    TResult Function()? requiresRecentLogin,
+    TResult Function(String? provider)? reAuthFailed,
+    TResult Function(Object? cause)? deletionFailed,
     required TResult orElse(),
   }) {
     if (accountExistsWithDifferentCredential != null) {
@@ -1781,6 +1970,9 @@ class _$AccountExistsWithDifferentCredentialImpl
         accountExistsWithDifferentCredential,
     required TResult Function(_Unknown value) unknown,
     required TResult Function(_ProfileCreateFailed value) profileCreateFailed,
+    required TResult Function(_RequiresRecentLogin value) requiresRecentLogin,
+    required TResult Function(_ReAuthFailed value) reAuthFailed,
+    required TResult Function(_DeletionFailed value) deletionFailed,
   }) {
     return accountExistsWithDifferentCredential(this);
   }
@@ -1801,6 +1993,9 @@ class _$AccountExistsWithDifferentCredentialImpl
         accountExistsWithDifferentCredential,
     TResult? Function(_Unknown value)? unknown,
     TResult? Function(_ProfileCreateFailed value)? profileCreateFailed,
+    TResult? Function(_RequiresRecentLogin value)? requiresRecentLogin,
+    TResult? Function(_ReAuthFailed value)? reAuthFailed,
+    TResult? Function(_DeletionFailed value)? deletionFailed,
   }) {
     return accountExistsWithDifferentCredential?.call(this);
   }
@@ -1821,6 +2016,9 @@ class _$AccountExistsWithDifferentCredentialImpl
         accountExistsWithDifferentCredential,
     TResult Function(_Unknown value)? unknown,
     TResult Function(_ProfileCreateFailed value)? profileCreateFailed,
+    TResult Function(_RequiresRecentLogin value)? requiresRecentLogin,
+    TResult Function(_ReAuthFailed value)? reAuthFailed,
+    TResult Function(_DeletionFailed value)? deletionFailed,
     required TResult orElse(),
   }) {
     if (accountExistsWithDifferentCredential != null) {
@@ -1916,6 +2114,9 @@ class _$UnknownImpl extends _Unknown {
     required TResult Function() accountExistsWithDifferentCredential,
     required TResult Function(String code) unknown,
     required TResult Function(Object? cause) profileCreateFailed,
+    required TResult Function() requiresRecentLogin,
+    required TResult Function(String? provider) reAuthFailed,
+    required TResult Function(Object? cause) deletionFailed,
   }) {
     return unknown(code);
   }
@@ -1935,6 +2136,9 @@ class _$UnknownImpl extends _Unknown {
     TResult? Function()? accountExistsWithDifferentCredential,
     TResult? Function(String code)? unknown,
     TResult? Function(Object? cause)? profileCreateFailed,
+    TResult? Function()? requiresRecentLogin,
+    TResult? Function(String? provider)? reAuthFailed,
+    TResult? Function(Object? cause)? deletionFailed,
   }) {
     return unknown?.call(code);
   }
@@ -1954,6 +2158,9 @@ class _$UnknownImpl extends _Unknown {
     TResult Function()? accountExistsWithDifferentCredential,
     TResult Function(String code)? unknown,
     TResult Function(Object? cause)? profileCreateFailed,
+    TResult Function()? requiresRecentLogin,
+    TResult Function(String? provider)? reAuthFailed,
+    TResult Function(Object? cause)? deletionFailed,
     required TResult orElse(),
   }) {
     if (unknown != null) {
@@ -1978,6 +2185,9 @@ class _$UnknownImpl extends _Unknown {
         accountExistsWithDifferentCredential,
     required TResult Function(_Unknown value) unknown,
     required TResult Function(_ProfileCreateFailed value) profileCreateFailed,
+    required TResult Function(_RequiresRecentLogin value) requiresRecentLogin,
+    required TResult Function(_ReAuthFailed value) reAuthFailed,
+    required TResult Function(_DeletionFailed value) deletionFailed,
   }) {
     return unknown(this);
   }
@@ -1998,6 +2208,9 @@ class _$UnknownImpl extends _Unknown {
         accountExistsWithDifferentCredential,
     TResult? Function(_Unknown value)? unknown,
     TResult? Function(_ProfileCreateFailed value)? profileCreateFailed,
+    TResult? Function(_RequiresRecentLogin value)? requiresRecentLogin,
+    TResult? Function(_ReAuthFailed value)? reAuthFailed,
+    TResult? Function(_DeletionFailed value)? deletionFailed,
   }) {
     return unknown?.call(this);
   }
@@ -2018,6 +2231,9 @@ class _$UnknownImpl extends _Unknown {
         accountExistsWithDifferentCredential,
     TResult Function(_Unknown value)? unknown,
     TResult Function(_ProfileCreateFailed value)? profileCreateFailed,
+    TResult Function(_RequiresRecentLogin value)? requiresRecentLogin,
+    TResult Function(_ReAuthFailed value)? reAuthFailed,
+    TResult Function(_DeletionFailed value)? deletionFailed,
     required TResult orElse(),
   }) {
     if (unknown != null) {
@@ -2119,6 +2335,9 @@ class _$ProfileCreateFailedImpl extends _ProfileCreateFailed {
     required TResult Function() accountExistsWithDifferentCredential,
     required TResult Function(String code) unknown,
     required TResult Function(Object? cause) profileCreateFailed,
+    required TResult Function() requiresRecentLogin,
+    required TResult Function(String? provider) reAuthFailed,
+    required TResult Function(Object? cause) deletionFailed,
   }) {
     return profileCreateFailed(cause);
   }
@@ -2138,6 +2357,9 @@ class _$ProfileCreateFailedImpl extends _ProfileCreateFailed {
     TResult? Function()? accountExistsWithDifferentCredential,
     TResult? Function(String code)? unknown,
     TResult? Function(Object? cause)? profileCreateFailed,
+    TResult? Function()? requiresRecentLogin,
+    TResult? Function(String? provider)? reAuthFailed,
+    TResult? Function(Object? cause)? deletionFailed,
   }) {
     return profileCreateFailed?.call(cause);
   }
@@ -2157,6 +2379,9 @@ class _$ProfileCreateFailedImpl extends _ProfileCreateFailed {
     TResult Function()? accountExistsWithDifferentCredential,
     TResult Function(String code)? unknown,
     TResult Function(Object? cause)? profileCreateFailed,
+    TResult Function()? requiresRecentLogin,
+    TResult Function(String? provider)? reAuthFailed,
+    TResult Function(Object? cause)? deletionFailed,
     required TResult orElse(),
   }) {
     if (profileCreateFailed != null) {
@@ -2181,6 +2406,9 @@ class _$ProfileCreateFailedImpl extends _ProfileCreateFailed {
         accountExistsWithDifferentCredential,
     required TResult Function(_Unknown value) unknown,
     required TResult Function(_ProfileCreateFailed value) profileCreateFailed,
+    required TResult Function(_RequiresRecentLogin value) requiresRecentLogin,
+    required TResult Function(_ReAuthFailed value) reAuthFailed,
+    required TResult Function(_DeletionFailed value) deletionFailed,
   }) {
     return profileCreateFailed(this);
   }
@@ -2201,6 +2429,9 @@ class _$ProfileCreateFailedImpl extends _ProfileCreateFailed {
         accountExistsWithDifferentCredential,
     TResult? Function(_Unknown value)? unknown,
     TResult? Function(_ProfileCreateFailed value)? profileCreateFailed,
+    TResult? Function(_RequiresRecentLogin value)? requiresRecentLogin,
+    TResult? Function(_ReAuthFailed value)? reAuthFailed,
+    TResult? Function(_DeletionFailed value)? deletionFailed,
   }) {
     return profileCreateFailed?.call(this);
   }
@@ -2221,6 +2452,9 @@ class _$ProfileCreateFailedImpl extends _ProfileCreateFailed {
         accountExistsWithDifferentCredential,
     TResult Function(_Unknown value)? unknown,
     TResult Function(_ProfileCreateFailed value)? profileCreateFailed,
+    TResult Function(_RequiresRecentLogin value)? requiresRecentLogin,
+    TResult Function(_ReAuthFailed value)? reAuthFailed,
+    TResult Function(_DeletionFailed value)? deletionFailed,
     required TResult orElse(),
   }) {
     if (profileCreateFailed != null) {
@@ -2241,5 +2475,637 @@ abstract class _ProfileCreateFailed extends AuthFailure {
   /// with the given fields replaced by the non-null parameter values.
   @JsonKey(includeFromJson: false, includeToJson: false)
   _$$ProfileCreateFailedImplCopyWith<_$ProfileCreateFailedImpl> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+
+/// @nodoc
+abstract class _$$RequiresRecentLoginImplCopyWith<$Res> {
+  factory _$$RequiresRecentLoginImplCopyWith(_$RequiresRecentLoginImpl value,
+          $Res Function(_$RequiresRecentLoginImpl) then) =
+      __$$RequiresRecentLoginImplCopyWithImpl<$Res>;
+}
+
+/// @nodoc
+class __$$RequiresRecentLoginImplCopyWithImpl<$Res>
+    extends _$AuthFailureCopyWithImpl<$Res, _$RequiresRecentLoginImpl>
+    implements _$$RequiresRecentLoginImplCopyWith<$Res> {
+  __$$RequiresRecentLoginImplCopyWithImpl(_$RequiresRecentLoginImpl _value,
+      $Res Function(_$RequiresRecentLoginImpl) _then)
+      : super(_value, _then);
+
+  /// Create a copy of AuthFailure
+  /// with the given fields replaced by the non-null parameter values.
+}
+
+/// @nodoc
+
+class _$RequiresRecentLoginImpl extends _RequiresRecentLogin {
+  const _$RequiresRecentLoginImpl() : super._();
+
+  @override
+  String toString() {
+    return 'AuthFailure.requiresRecentLogin()';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$RequiresRecentLoginImpl);
+  }
+
+  @override
+  int get hashCode => runtimeType.hashCode;
+
+  @override
+  @optionalTypeArgs
+  TResult when<TResult extends Object?>({
+    required TResult Function() invalidEmail,
+    required TResult Function() userDisabled,
+    required TResult Function() userNotFound,
+    required TResult Function() wrongPassword,
+    required TResult Function() emailAlreadyInUse,
+    required TResult Function() weakPassword,
+    required TResult Function() tooManyRequests,
+    required TResult Function() networkError,
+    required TResult Function() signInCancelled,
+    required TResult Function() accountExistsWithDifferentCredential,
+    required TResult Function(String code) unknown,
+    required TResult Function(Object? cause) profileCreateFailed,
+    required TResult Function() requiresRecentLogin,
+    required TResult Function(String? provider) reAuthFailed,
+    required TResult Function(Object? cause) deletionFailed,
+  }) {
+    return requiresRecentLogin();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? whenOrNull<TResult extends Object?>({
+    TResult? Function()? invalidEmail,
+    TResult? Function()? userDisabled,
+    TResult? Function()? userNotFound,
+    TResult? Function()? wrongPassword,
+    TResult? Function()? emailAlreadyInUse,
+    TResult? Function()? weakPassword,
+    TResult? Function()? tooManyRequests,
+    TResult? Function()? networkError,
+    TResult? Function()? signInCancelled,
+    TResult? Function()? accountExistsWithDifferentCredential,
+    TResult? Function(String code)? unknown,
+    TResult? Function(Object? cause)? profileCreateFailed,
+    TResult? Function()? requiresRecentLogin,
+    TResult? Function(String? provider)? reAuthFailed,
+    TResult? Function(Object? cause)? deletionFailed,
+  }) {
+    return requiresRecentLogin?.call();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeWhen<TResult extends Object?>({
+    TResult Function()? invalidEmail,
+    TResult Function()? userDisabled,
+    TResult Function()? userNotFound,
+    TResult Function()? wrongPassword,
+    TResult Function()? emailAlreadyInUse,
+    TResult Function()? weakPassword,
+    TResult Function()? tooManyRequests,
+    TResult Function()? networkError,
+    TResult Function()? signInCancelled,
+    TResult Function()? accountExistsWithDifferentCredential,
+    TResult Function(String code)? unknown,
+    TResult Function(Object? cause)? profileCreateFailed,
+    TResult Function()? requiresRecentLogin,
+    TResult Function(String? provider)? reAuthFailed,
+    TResult Function(Object? cause)? deletionFailed,
+    required TResult orElse(),
+  }) {
+    if (requiresRecentLogin != null) {
+      return requiresRecentLogin();
+    }
+    return orElse();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult map<TResult extends Object?>({
+    required TResult Function(_InvalidEmail value) invalidEmail,
+    required TResult Function(_UserDisabled value) userDisabled,
+    required TResult Function(_UserNotFound value) userNotFound,
+    required TResult Function(_WrongPassword value) wrongPassword,
+    required TResult Function(_EmailAlreadyInUse value) emailAlreadyInUse,
+    required TResult Function(_WeakPassword value) weakPassword,
+    required TResult Function(_TooManyRequests value) tooManyRequests,
+    required TResult Function(_NetworkError value) networkError,
+    required TResult Function(_SignInCancelled value) signInCancelled,
+    required TResult Function(_AccountExistsWithDifferentCredential value)
+        accountExistsWithDifferentCredential,
+    required TResult Function(_Unknown value) unknown,
+    required TResult Function(_ProfileCreateFailed value) profileCreateFailed,
+    required TResult Function(_RequiresRecentLogin value) requiresRecentLogin,
+    required TResult Function(_ReAuthFailed value) reAuthFailed,
+    required TResult Function(_DeletionFailed value) deletionFailed,
+  }) {
+    return requiresRecentLogin(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? mapOrNull<TResult extends Object?>({
+    TResult? Function(_InvalidEmail value)? invalidEmail,
+    TResult? Function(_UserDisabled value)? userDisabled,
+    TResult? Function(_UserNotFound value)? userNotFound,
+    TResult? Function(_WrongPassword value)? wrongPassword,
+    TResult? Function(_EmailAlreadyInUse value)? emailAlreadyInUse,
+    TResult? Function(_WeakPassword value)? weakPassword,
+    TResult? Function(_TooManyRequests value)? tooManyRequests,
+    TResult? Function(_NetworkError value)? networkError,
+    TResult? Function(_SignInCancelled value)? signInCancelled,
+    TResult? Function(_AccountExistsWithDifferentCredential value)?
+        accountExistsWithDifferentCredential,
+    TResult? Function(_Unknown value)? unknown,
+    TResult? Function(_ProfileCreateFailed value)? profileCreateFailed,
+    TResult? Function(_RequiresRecentLogin value)? requiresRecentLogin,
+    TResult? Function(_ReAuthFailed value)? reAuthFailed,
+    TResult? Function(_DeletionFailed value)? deletionFailed,
+  }) {
+    return requiresRecentLogin?.call(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeMap<TResult extends Object?>({
+    TResult Function(_InvalidEmail value)? invalidEmail,
+    TResult Function(_UserDisabled value)? userDisabled,
+    TResult Function(_UserNotFound value)? userNotFound,
+    TResult Function(_WrongPassword value)? wrongPassword,
+    TResult Function(_EmailAlreadyInUse value)? emailAlreadyInUse,
+    TResult Function(_WeakPassword value)? weakPassword,
+    TResult Function(_TooManyRequests value)? tooManyRequests,
+    TResult Function(_NetworkError value)? networkError,
+    TResult Function(_SignInCancelled value)? signInCancelled,
+    TResult Function(_AccountExistsWithDifferentCredential value)?
+        accountExistsWithDifferentCredential,
+    TResult Function(_Unknown value)? unknown,
+    TResult Function(_ProfileCreateFailed value)? profileCreateFailed,
+    TResult Function(_RequiresRecentLogin value)? requiresRecentLogin,
+    TResult Function(_ReAuthFailed value)? reAuthFailed,
+    TResult Function(_DeletionFailed value)? deletionFailed,
+    required TResult orElse(),
+  }) {
+    if (requiresRecentLogin != null) {
+      return requiresRecentLogin(this);
+    }
+    return orElse();
+  }
+}
+
+abstract class _RequiresRecentLogin extends AuthFailure {
+  const factory _RequiresRecentLogin() = _$RequiresRecentLoginImpl;
+  const _RequiresRecentLogin._() : super._();
+}
+
+/// @nodoc
+abstract class _$$ReAuthFailedImplCopyWith<$Res> {
+  factory _$$ReAuthFailedImplCopyWith(
+          _$ReAuthFailedImpl value, $Res Function(_$ReAuthFailedImpl) then) =
+      __$$ReAuthFailedImplCopyWithImpl<$Res>;
+  @useResult
+  $Res call({String? provider});
+}
+
+/// @nodoc
+class __$$ReAuthFailedImplCopyWithImpl<$Res>
+    extends _$AuthFailureCopyWithImpl<$Res, _$ReAuthFailedImpl>
+    implements _$$ReAuthFailedImplCopyWith<$Res> {
+  __$$ReAuthFailedImplCopyWithImpl(
+      _$ReAuthFailedImpl _value, $Res Function(_$ReAuthFailedImpl) _then)
+      : super(_value, _then);
+
+  /// Create a copy of AuthFailure
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? provider = freezed,
+  }) {
+    return _then(_$ReAuthFailedImpl(
+      provider: freezed == provider
+          ? _value.provider
+          : provider // ignore: cast_nullable_to_non_nullable
+              as String?,
+    ));
+  }
+}
+
+/// @nodoc
+
+class _$ReAuthFailedImpl extends _ReAuthFailed {
+  const _$ReAuthFailedImpl({this.provider}) : super._();
+
+  @override
+  final String? provider;
+
+  @override
+  String toString() {
+    return 'AuthFailure.reAuthFailed(provider: $provider)';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$ReAuthFailedImpl &&
+            (identical(other.provider, provider) ||
+                other.provider == provider));
+  }
+
+  @override
+  int get hashCode => Object.hash(runtimeType, provider);
+
+  /// Create a copy of AuthFailure
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$ReAuthFailedImplCopyWith<_$ReAuthFailedImpl> get copyWith =>
+      __$$ReAuthFailedImplCopyWithImpl<_$ReAuthFailedImpl>(this, _$identity);
+
+  @override
+  @optionalTypeArgs
+  TResult when<TResult extends Object?>({
+    required TResult Function() invalidEmail,
+    required TResult Function() userDisabled,
+    required TResult Function() userNotFound,
+    required TResult Function() wrongPassword,
+    required TResult Function() emailAlreadyInUse,
+    required TResult Function() weakPassword,
+    required TResult Function() tooManyRequests,
+    required TResult Function() networkError,
+    required TResult Function() signInCancelled,
+    required TResult Function() accountExistsWithDifferentCredential,
+    required TResult Function(String code) unknown,
+    required TResult Function(Object? cause) profileCreateFailed,
+    required TResult Function() requiresRecentLogin,
+    required TResult Function(String? provider) reAuthFailed,
+    required TResult Function(Object? cause) deletionFailed,
+  }) {
+    return reAuthFailed(provider);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? whenOrNull<TResult extends Object?>({
+    TResult? Function()? invalidEmail,
+    TResult? Function()? userDisabled,
+    TResult? Function()? userNotFound,
+    TResult? Function()? wrongPassword,
+    TResult? Function()? emailAlreadyInUse,
+    TResult? Function()? weakPassword,
+    TResult? Function()? tooManyRequests,
+    TResult? Function()? networkError,
+    TResult? Function()? signInCancelled,
+    TResult? Function()? accountExistsWithDifferentCredential,
+    TResult? Function(String code)? unknown,
+    TResult? Function(Object? cause)? profileCreateFailed,
+    TResult? Function()? requiresRecentLogin,
+    TResult? Function(String? provider)? reAuthFailed,
+    TResult? Function(Object? cause)? deletionFailed,
+  }) {
+    return reAuthFailed?.call(provider);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeWhen<TResult extends Object?>({
+    TResult Function()? invalidEmail,
+    TResult Function()? userDisabled,
+    TResult Function()? userNotFound,
+    TResult Function()? wrongPassword,
+    TResult Function()? emailAlreadyInUse,
+    TResult Function()? weakPassword,
+    TResult Function()? tooManyRequests,
+    TResult Function()? networkError,
+    TResult Function()? signInCancelled,
+    TResult Function()? accountExistsWithDifferentCredential,
+    TResult Function(String code)? unknown,
+    TResult Function(Object? cause)? profileCreateFailed,
+    TResult Function()? requiresRecentLogin,
+    TResult Function(String? provider)? reAuthFailed,
+    TResult Function(Object? cause)? deletionFailed,
+    required TResult orElse(),
+  }) {
+    if (reAuthFailed != null) {
+      return reAuthFailed(provider);
+    }
+    return orElse();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult map<TResult extends Object?>({
+    required TResult Function(_InvalidEmail value) invalidEmail,
+    required TResult Function(_UserDisabled value) userDisabled,
+    required TResult Function(_UserNotFound value) userNotFound,
+    required TResult Function(_WrongPassword value) wrongPassword,
+    required TResult Function(_EmailAlreadyInUse value) emailAlreadyInUse,
+    required TResult Function(_WeakPassword value) weakPassword,
+    required TResult Function(_TooManyRequests value) tooManyRequests,
+    required TResult Function(_NetworkError value) networkError,
+    required TResult Function(_SignInCancelled value) signInCancelled,
+    required TResult Function(_AccountExistsWithDifferentCredential value)
+        accountExistsWithDifferentCredential,
+    required TResult Function(_Unknown value) unknown,
+    required TResult Function(_ProfileCreateFailed value) profileCreateFailed,
+    required TResult Function(_RequiresRecentLogin value) requiresRecentLogin,
+    required TResult Function(_ReAuthFailed value) reAuthFailed,
+    required TResult Function(_DeletionFailed value) deletionFailed,
+  }) {
+    return reAuthFailed(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? mapOrNull<TResult extends Object?>({
+    TResult? Function(_InvalidEmail value)? invalidEmail,
+    TResult? Function(_UserDisabled value)? userDisabled,
+    TResult? Function(_UserNotFound value)? userNotFound,
+    TResult? Function(_WrongPassword value)? wrongPassword,
+    TResult? Function(_EmailAlreadyInUse value)? emailAlreadyInUse,
+    TResult? Function(_WeakPassword value)? weakPassword,
+    TResult? Function(_TooManyRequests value)? tooManyRequests,
+    TResult? Function(_NetworkError value)? networkError,
+    TResult? Function(_SignInCancelled value)? signInCancelled,
+    TResult? Function(_AccountExistsWithDifferentCredential value)?
+        accountExistsWithDifferentCredential,
+    TResult? Function(_Unknown value)? unknown,
+    TResult? Function(_ProfileCreateFailed value)? profileCreateFailed,
+    TResult? Function(_RequiresRecentLogin value)? requiresRecentLogin,
+    TResult? Function(_ReAuthFailed value)? reAuthFailed,
+    TResult? Function(_DeletionFailed value)? deletionFailed,
+  }) {
+    return reAuthFailed?.call(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeMap<TResult extends Object?>({
+    TResult Function(_InvalidEmail value)? invalidEmail,
+    TResult Function(_UserDisabled value)? userDisabled,
+    TResult Function(_UserNotFound value)? userNotFound,
+    TResult Function(_WrongPassword value)? wrongPassword,
+    TResult Function(_EmailAlreadyInUse value)? emailAlreadyInUse,
+    TResult Function(_WeakPassword value)? weakPassword,
+    TResult Function(_TooManyRequests value)? tooManyRequests,
+    TResult Function(_NetworkError value)? networkError,
+    TResult Function(_SignInCancelled value)? signInCancelled,
+    TResult Function(_AccountExistsWithDifferentCredential value)?
+        accountExistsWithDifferentCredential,
+    TResult Function(_Unknown value)? unknown,
+    TResult Function(_ProfileCreateFailed value)? profileCreateFailed,
+    TResult Function(_RequiresRecentLogin value)? requiresRecentLogin,
+    TResult Function(_ReAuthFailed value)? reAuthFailed,
+    TResult Function(_DeletionFailed value)? deletionFailed,
+    required TResult orElse(),
+  }) {
+    if (reAuthFailed != null) {
+      return reAuthFailed(this);
+    }
+    return orElse();
+  }
+}
+
+abstract class _ReAuthFailed extends AuthFailure {
+  const factory _ReAuthFailed({final String? provider}) = _$ReAuthFailedImpl;
+  const _ReAuthFailed._() : super._();
+
+  String? get provider;
+
+  /// Create a copy of AuthFailure
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$ReAuthFailedImplCopyWith<_$ReAuthFailedImpl> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+
+/// @nodoc
+abstract class _$$DeletionFailedImplCopyWith<$Res> {
+  factory _$$DeletionFailedImplCopyWith(_$DeletionFailedImpl value,
+          $Res Function(_$DeletionFailedImpl) then) =
+      __$$DeletionFailedImplCopyWithImpl<$Res>;
+  @useResult
+  $Res call({Object? cause});
+}
+
+/// @nodoc
+class __$$DeletionFailedImplCopyWithImpl<$Res>
+    extends _$AuthFailureCopyWithImpl<$Res, _$DeletionFailedImpl>
+    implements _$$DeletionFailedImplCopyWith<$Res> {
+  __$$DeletionFailedImplCopyWithImpl(
+      _$DeletionFailedImpl _value, $Res Function(_$DeletionFailedImpl) _then)
+      : super(_value, _then);
+
+  /// Create a copy of AuthFailure
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? cause = freezed,
+  }) {
+    return _then(_$DeletionFailedImpl(
+      cause: freezed == cause ? _value.cause : cause,
+    ));
+  }
+}
+
+/// @nodoc
+
+class _$DeletionFailedImpl extends _DeletionFailed {
+  const _$DeletionFailedImpl({this.cause}) : super._();
+
+  @override
+  final Object? cause;
+
+  @override
+  String toString() {
+    return 'AuthFailure.deletionFailed(cause: $cause)';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$DeletionFailedImpl &&
+            const DeepCollectionEquality().equals(other.cause, cause));
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(runtimeType, const DeepCollectionEquality().hash(cause));
+
+  /// Create a copy of AuthFailure
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$DeletionFailedImplCopyWith<_$DeletionFailedImpl> get copyWith =>
+      __$$DeletionFailedImplCopyWithImpl<_$DeletionFailedImpl>(
+          this, _$identity);
+
+  @override
+  @optionalTypeArgs
+  TResult when<TResult extends Object?>({
+    required TResult Function() invalidEmail,
+    required TResult Function() userDisabled,
+    required TResult Function() userNotFound,
+    required TResult Function() wrongPassword,
+    required TResult Function() emailAlreadyInUse,
+    required TResult Function() weakPassword,
+    required TResult Function() tooManyRequests,
+    required TResult Function() networkError,
+    required TResult Function() signInCancelled,
+    required TResult Function() accountExistsWithDifferentCredential,
+    required TResult Function(String code) unknown,
+    required TResult Function(Object? cause) profileCreateFailed,
+    required TResult Function() requiresRecentLogin,
+    required TResult Function(String? provider) reAuthFailed,
+    required TResult Function(Object? cause) deletionFailed,
+  }) {
+    return deletionFailed(cause);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? whenOrNull<TResult extends Object?>({
+    TResult? Function()? invalidEmail,
+    TResult? Function()? userDisabled,
+    TResult? Function()? userNotFound,
+    TResult? Function()? wrongPassword,
+    TResult? Function()? emailAlreadyInUse,
+    TResult? Function()? weakPassword,
+    TResult? Function()? tooManyRequests,
+    TResult? Function()? networkError,
+    TResult? Function()? signInCancelled,
+    TResult? Function()? accountExistsWithDifferentCredential,
+    TResult? Function(String code)? unknown,
+    TResult? Function(Object? cause)? profileCreateFailed,
+    TResult? Function()? requiresRecentLogin,
+    TResult? Function(String? provider)? reAuthFailed,
+    TResult? Function(Object? cause)? deletionFailed,
+  }) {
+    return deletionFailed?.call(cause);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeWhen<TResult extends Object?>({
+    TResult Function()? invalidEmail,
+    TResult Function()? userDisabled,
+    TResult Function()? userNotFound,
+    TResult Function()? wrongPassword,
+    TResult Function()? emailAlreadyInUse,
+    TResult Function()? weakPassword,
+    TResult Function()? tooManyRequests,
+    TResult Function()? networkError,
+    TResult Function()? signInCancelled,
+    TResult Function()? accountExistsWithDifferentCredential,
+    TResult Function(String code)? unknown,
+    TResult Function(Object? cause)? profileCreateFailed,
+    TResult Function()? requiresRecentLogin,
+    TResult Function(String? provider)? reAuthFailed,
+    TResult Function(Object? cause)? deletionFailed,
+    required TResult orElse(),
+  }) {
+    if (deletionFailed != null) {
+      return deletionFailed(cause);
+    }
+    return orElse();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult map<TResult extends Object?>({
+    required TResult Function(_InvalidEmail value) invalidEmail,
+    required TResult Function(_UserDisabled value) userDisabled,
+    required TResult Function(_UserNotFound value) userNotFound,
+    required TResult Function(_WrongPassword value) wrongPassword,
+    required TResult Function(_EmailAlreadyInUse value) emailAlreadyInUse,
+    required TResult Function(_WeakPassword value) weakPassword,
+    required TResult Function(_TooManyRequests value) tooManyRequests,
+    required TResult Function(_NetworkError value) networkError,
+    required TResult Function(_SignInCancelled value) signInCancelled,
+    required TResult Function(_AccountExistsWithDifferentCredential value)
+        accountExistsWithDifferentCredential,
+    required TResult Function(_Unknown value) unknown,
+    required TResult Function(_ProfileCreateFailed value) profileCreateFailed,
+    required TResult Function(_RequiresRecentLogin value) requiresRecentLogin,
+    required TResult Function(_ReAuthFailed value) reAuthFailed,
+    required TResult Function(_DeletionFailed value) deletionFailed,
+  }) {
+    return deletionFailed(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? mapOrNull<TResult extends Object?>({
+    TResult? Function(_InvalidEmail value)? invalidEmail,
+    TResult? Function(_UserDisabled value)? userDisabled,
+    TResult? Function(_UserNotFound value)? userNotFound,
+    TResult? Function(_WrongPassword value)? wrongPassword,
+    TResult? Function(_EmailAlreadyInUse value)? emailAlreadyInUse,
+    TResult? Function(_WeakPassword value)? weakPassword,
+    TResult? Function(_TooManyRequests value)? tooManyRequests,
+    TResult? Function(_NetworkError value)? networkError,
+    TResult? Function(_SignInCancelled value)? signInCancelled,
+    TResult? Function(_AccountExistsWithDifferentCredential value)?
+        accountExistsWithDifferentCredential,
+    TResult? Function(_Unknown value)? unknown,
+    TResult? Function(_ProfileCreateFailed value)? profileCreateFailed,
+    TResult? Function(_RequiresRecentLogin value)? requiresRecentLogin,
+    TResult? Function(_ReAuthFailed value)? reAuthFailed,
+    TResult? Function(_DeletionFailed value)? deletionFailed,
+  }) {
+    return deletionFailed?.call(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeMap<TResult extends Object?>({
+    TResult Function(_InvalidEmail value)? invalidEmail,
+    TResult Function(_UserDisabled value)? userDisabled,
+    TResult Function(_UserNotFound value)? userNotFound,
+    TResult Function(_WrongPassword value)? wrongPassword,
+    TResult Function(_EmailAlreadyInUse value)? emailAlreadyInUse,
+    TResult Function(_WeakPassword value)? weakPassword,
+    TResult Function(_TooManyRequests value)? tooManyRequests,
+    TResult Function(_NetworkError value)? networkError,
+    TResult Function(_SignInCancelled value)? signInCancelled,
+    TResult Function(_AccountExistsWithDifferentCredential value)?
+        accountExistsWithDifferentCredential,
+    TResult Function(_Unknown value)? unknown,
+    TResult Function(_ProfileCreateFailed value)? profileCreateFailed,
+    TResult Function(_RequiresRecentLogin value)? requiresRecentLogin,
+    TResult Function(_ReAuthFailed value)? reAuthFailed,
+    TResult Function(_DeletionFailed value)? deletionFailed,
+    required TResult orElse(),
+  }) {
+    if (deletionFailed != null) {
+      return deletionFailed(this);
+    }
+    return orElse();
+  }
+}
+
+abstract class _DeletionFailed extends AuthFailure {
+  const factory _DeletionFailed({final Object? cause}) = _$DeletionFailedImpl;
+  const _DeletionFailed._() : super._();
+
+  Object? get cause;
+
+  /// Create a copy of AuthFailure
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$DeletionFailedImplCopyWith<_$DeletionFailedImpl> get copyWith =>
       throw _privateConstructorUsedError;
 }

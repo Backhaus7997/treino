@@ -39,21 +39,16 @@ class TrainersMapBottomSheet extends ConsumerWidget {
       loading: () => const SizedBox.shrink(),
       error: (_, __) => const SizedBox.shrink(),
       data: (trainers) {
-        // Cuando el filtro "Online" está ON, el sheet del mapa queda vacío
-        // — la decisión UX es que online se ve en lista, no en mapa. El
-        // banner del mapa redirige al atleta. El sheet renderea su empty
-        // state ('Sin entrenadores con ubicación en esta zona') que también
-        // aplica acá.
+        // El sheet muestra PFs con AL MENOS UNA ubicación física efectiva
+        // (gym o custom). Los virtuales puros no aparecen acá — no tienen
+        // pin que pueda asociarse al card.
         //
-        // Cuando OFF (default), el sheet muestra PFs con AL MENOS UNA
-        // ubicación física efectiva (gym o custom). Los virtuales puros no
-        // aparecen — no tienen pin que pueda asociarse al card.
-        final virtualOnly = ref.watch(virtualOnlyFilterProvider);
-        final visible = virtualOnly
-            ? const <TrainerPublicProfile>[]
-            : trainers
-                .where((t) => effectiveLocationsOf(t).isNotEmpty)
-                .toList();
+        // El modo "Online" no se chequea: cuando el atleta lo activa, el
+        // screen padre hace auto-switch a LISTA y el toggle MAPA queda
+        // disabled, así que este sheet nunca se rendera con virtualOnly ON.
+        final visible = trainers
+            .where((t) => effectiveLocationsOf(t).isNotEmpty)
+            .toList();
 
         return Container(
           decoration: BoxDecoration(
@@ -94,7 +89,6 @@ class TrainersMapBottomSheet extends ConsumerWidget {
                 child: _Header(
                   count: visible.length,
                   hasLocation: hasLocation,
-                  virtualOnly: virtualOnly,
                 ),
               ),
               const SizedBox(height: 12),
@@ -102,7 +96,7 @@ class TrainersMapBottomSheet extends ConsumerWidget {
               SizedBox(
                 height: 110,
                 child: visible.isEmpty
-                    ? _EmptyState(palette: palette, virtualOnly: virtualOnly)
+                    ? _EmptyState(palette: palette)
                     : ListView.separated(
                         scrollDirection: Axis.horizontal,
                         padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -123,11 +117,7 @@ class TrainersMapBottomSheet extends ConsumerWidget {
 // ── Header ───────────────────────────────────────────────────────────────────
 
 class _Header extends StatelessWidget {
-  const _Header({
-    required this.count,
-    required this.hasLocation,
-    required this.virtualOnly,
-  });
+  const _Header({required this.count, required this.hasLocation});
   final int count;
 
   /// Si el athlete tiene ubicación, el label incluye "CERCA" (proximidad
@@ -135,26 +125,18 @@ class _Header extends StatelessWidget {
   /// qué tan cerca está cada PF).
   final bool hasLocation;
 
-  /// Cuando el filtro "Online" está ON, el header dice "MODO ONLINE" sin
-  /// count — el mapa no es donde se ven los online, eso vive en lista.
-  final bool virtualOnly;
-
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final singular = count == 1;
     final String label;
-    if (virtualOnly) {
-      label = 'MODO ONLINE';
+    if (hasLocation) {
+      label = singular ? 'ENTRENADOR CERCA' : 'ENTRENADORES CERCA';
     } else {
-      final singular = count == 1;
-      if (hasLocation) {
-        label = singular ? 'ENTRENADOR CERCA' : 'ENTRENADORES CERCA';
-      } else {
-        label = singular ? 'ENTRENADOR' : 'ENTRENADORES';
-      }
+      label = singular ? 'ENTRENADOR' : 'ENTRENADORES';
     }
     return Text(
-      virtualOnly ? label : '$count $label',
+      '$count $label',
       style: GoogleFonts.barlowCondensed(
         fontWeight: FontWeight.w700,
         fontSize: 13,
@@ -168,20 +150,16 @@ class _Header extends StatelessWidget {
 // ── Empty state ──────────────────────────────────────────────────────────────
 
 class _EmptyState extends StatelessWidget {
-  const _EmptyState({required this.palette, required this.virtualOnly});
+  const _EmptyState({required this.palette});
   final AppPalette palette;
-  final bool virtualOnly;
 
   @override
   Widget build(BuildContext context) {
-    final message = virtualOnly
-        ? 'Los entrenadores online se ven en lista.'
-        : 'Sin entrenadores con ubicación en esta zona.';
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 24),
         child: Text(
-          message,
+          'Sin entrenadores con ubicación en esta zona.',
           textAlign: TextAlign.center,
           style: GoogleFonts.barlow(
             fontSize: 13,

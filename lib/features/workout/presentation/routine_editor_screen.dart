@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
+import '../../../core/analytics/analytics_service.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../coach/presentation/coach_strings.dart';
 import '../../coach/presentation/widgets/exercise_picker_sheet.dart';
@@ -173,7 +174,13 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
       if (isTemplate) {
         await repo.createTemplate(routine);
       } else {
-        await repo.createAssigned(routine);
+        final created = await repo.createAssigned(routine);
+        // Non-null inside the else branch — isTemplate already gated on this.
+        ref.read(analyticsServiceProvider).logPlanAssigned(
+              routineId: created.id,
+              assignedBy: trainerUid,
+              assignedTo: widget.athleteId!,
+            );
       }
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

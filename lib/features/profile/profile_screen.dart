@@ -8,7 +8,7 @@ import '../auth/application/auth_providers.dart';
 import 'application/profile_stats_providers.dart';
 import 'application/user_providers.dart';
 import 'domain/user_role.dart';
-import 'presentation/widgets/eliminar_cuenta_stub_sheet.dart';
+import 'presentation/widgets/eliminar_cuenta_sheet.dart';
 import 'presentation/widgets/profile_avatar_card.dart';
 import 'presentation/widgets/profile_cuenta_section.dart';
 import 'presentation/widgets/profile_header.dart';
@@ -76,8 +76,8 @@ class _AthleteProfile extends ConsumerWidget {
               shape: const RoundedRectangleBorder(
                 borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
               ),
-              isScrollControlled: false,
-              builder: (_) => const EliminarCuentaStubSheet(),
+              isScrollControlled: true,
+              builder: (_) => const EliminarCuentaSheet(),
             ),
           ),
           const SizedBox(height: 20),
