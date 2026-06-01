@@ -178,6 +178,30 @@ Durante 5.5 quedaron documentadas 3 mejoras para futuros SDDs que toquen Firesto
 - ✅ Etapa 1: colecciones `posts` + `friendships` pobladas via `scripts/seed_posts.js`.
 - ✅ Etapa 5.5: nueva collection `userPublicProfiles` deployada + rules deployadas a `treino-dev`.
 
+### Follow-ups post-cierre (Etapa 7 + 7.1)
+
+Dos SDDs adicionales arrancaron post-cierre de Fase 3 para cerrar gaps no contemplados en el scope original:
+
+| # | SDD | PRs / archive | Console (manual) | Código clave | Owner |
+|---|---|---|---|---|---|
+| 7 | **`profile-screen-rewrite` (Fase 3 Etapa 7)** ✅ | `644b97b` (#95) + `941902a` (#97) + `f377d8d` (#99) + `27a7918` (#101) + archive `8919f42` (2026-05-28) | Storage rule `/avatars/{uid}.{ext}` agregada live en Console durante smoke de PR#2; declarada en repo en PR#2 cascade (`storage.rules`). | Reescritura completa de `ProfileScreen` desde el placeholder Fase 1 hasta mockup parity. 4 PRs chained: scaffold (widgets + router + stub screens), Datos personales edit + avatar upload, Gimnasio change + Mis rutinas list, Settings PIVOT (los tiles "Cerrar sesión" + "Eliminar cuenta" terminan en el body del Profile en vez de pantalla aparte). Sub-fase rename: `Coach IA → Entreno IA` no aplicó acá pero quedó documentado. 4 PRs + 2 housekeeping format commits. SDD en `openspec/changes/archive/2026-05-28-profile-screen-rewrite/`. Decisiones independientes en engram: `profile/mis-rutinas-scope` (trainer-assigned only) y `profile/settings-deferred` (surface de Settings vuelve cuando haya configs reales). | C |
+| 7.1 | **`account-deletion`** ✅ — Eliminar cuenta real end-to-end | `b3c8001` (#103) + `75581f8` (#106) + `9dde7a5` (#112) + archive `f2bc8aa` (2026-06-01) | Blaze plan en `treino-dev`; IAM en compute SA (`Datastore User`, `Firebase Authentication Admin`, `Storage Object Admin`, `Cloud Build Service Account`); Cloud Run `allow public access` en el service `deleteaccount`; deploy de `firebase deploy --only functions,storage,firestore:indexes --project treino-dev`. | Reemplaza el stub `EliminarCuentaStubSheet` shippeado en PR#4 v2 de Etapa 7 por flow real. 3 PRs chained: (1) **Cloud Functions bootstrap from zero** (`functions/` directory + Node 20 + TS + Jest + skeleton `deleteAccount` callable v2 en `southamerica-east1`); (2) **CF full cascade** sobre 8+ collections (friendships, posts anonimizadas, trainer_links terminated, appointments canceladas, user docs recursive, storage avatar) + `storage.rules` declarado en repo (cierra deuda Fase 3 Etapa 7); (3) **Flutter UI** + `AccountDeletionService` + `AccountDeletionNotifier` + `ReAuthBottomSheet` provider-aware (email/Google/Apple) + chat sender fallback "Usuario eliminado". 12 smoke fixes adicionales en PR#3 (root cause: errors parsing como `List<Map>` en vez de `List<String>`). Apple re-auth via `User.reauthenticateWithProvider` + sentinel para dodge del nonce-cache bug. Live smoke iOS device: ✅ los 3 providers. 1372 tests + CF jest 40/40. SDD en `openspec/changes/archive/2026-06-01-account-deletion/` + main spec `openspec/specs/account-deletion/spec.md`. | C |
+
+**Tiempo real**: Etapa 7 cerró 2026-05-28 (~6 días desde arrancar). Etapa 7.1 cerró 2026-06-01 (~4 días, con smoke iterativo intenso por la complejidad del flow OAuth + CF + cascade orderings).
+
+**Lessons learned promovidas a SDD process** (de Etapa 7.1):
+1. **Smoke fix appendix pattern**: cuando un PR tiene smoke iterativo en device real, agregar appendix dedicado en `apply-progress.md` con tabla de commits (SHA + tipo + summary). Aplicado en `account-deletion` PR#3.
+2. **In-flight cascade gate**: para features con cascade deletion (Firestore + Auth + Storage en orden), usar un `StateProvider<bool>` que el router lee para suprimir redirects durante la ventana (`accountDeletionInFlightProvider`). Patrón reusable.
+3. **Apple sentinel pattern**: re-auth con Apple no debe usar el credential manual de `sign_in_with_apple` (nonce-cache bug en iOS). Usar `User.reauthenticateWithProvider(OAuthProvider('apple.com'))` + sentinel credential que el `reauthenticate` short-circuits. Patrón reusable para cualquier OAuth re-auth futuro.
+
+**Follow-ups documentados (no bloqueantes)** de estos 2 SDDs — trackear en próximas etapas:
+- 2 indexes orphan (`routines: assignedBy+source+createdAt`, `commercialPlans: trainerId+createdAt`) en producción pero no en `firestore.indexes.json` — sumar al repo.
+- `gymSearchQueryProvider` no es autoDispose (workaround actual: reset en `initState`).
+- CF runtime SA refactor a `firebase-adminsdk-fbsvc` (cleaner IAM, ahora corre con default compute SA).
+- Node 20 → 22 + firebase-functions upgrade (deprecation warnings al deploy).
+- FirebaseCore init race en cold-start (Google login stuck primera vez si tapeás <2s post-launch).
+- SCENARIO-548 test mejorable (forzar Storage error real para verificar `status=partial`).
+
 ## Fase 4 — desglose en 6 etapas ✅ COMPLETA
 
 Workout++ es donde la app deja de ser exploración read-only y se vuelve **ejecutable**: el alumno arranca un workout, marca sets en tiempo real, ve su progreso a lo largo del tiempo. Cierra los carry-overs visibles de Fases 1-3 (Home "Esta semana", Profile stats, PostCard stats stub, "Compartir post-entreno").
@@ -439,16 +463,16 @@ Producto-ready para beta. Fase 5 dejó el core del producto funcional end-to-end
 2. **Reviews — moderación**: ¿reviews con texto van con moderación previa o post-hoc? Post-hoc es más simple pero permite spam. Para MVP: post-hoc + flag para reportar.
 3. **i18n — alcance del inglés**: ¿shippeamos el inglés en Fase 6 o queda solo el scaffold? Decisión a tomar antes de Etapa 8.
 
-Actualizado a 2026-05-27.
+Actualizado a 2026-06-01.
 
 | Fase | Estado | Estimado original | Real / proyectado |
 |---|---|---|---|
 | Fase 1 (Auth + Firebase + ProfileSetup) | ✅ Cerrada 2026-05-13 | ~2026-05-08 | +5 días (drama Apple Sign-In) |
 | Fase 2 (Home + Rutinas) | ✅ Cerrada ~2026-05-15 | ~2026-05-29 | **Adelantada ~2 semanas** |
-| Fase 3 (Feed + sub-fase 5.5 + Etapa 6 inbox post-cierre) | ✅ Cerrada **inicialmente** 2026-05-19; re-cerrada 2026-05-22 con Etapa 6 (`feed-friend-requests-inbox`, PR #78) | ~2026-06-12 | **Adelantada ~3 semanas** (incluyó sub-fase 5.5 + Etapa 6 imprevistas, ambas con justificación UX) |
+| Fase 3 (Feed + sub-fase 5.5 + Etapa 6 inbox + Etapa 7 profile-rewrite + Etapa 7.1 account-deletion) | ✅ Cerrada **inicialmente** 2026-05-19; re-cerrada 2026-05-22 con Etapa 6 (`feed-friend-requests-inbox`, PR #78); Etapa 7 cerrada 2026-05-28 (`profile-screen-rewrite`, 4 PRs); Etapa 7.1 cerrada 2026-06-01 (`account-deletion`, 3 PRs) | ~2026-06-12 | **Adelantada ~2 semanas** (incluyó sub-fase 5.5 + Etapa 6 + Etapa 7 + 7.1 imprevistas, todas con justificación UX o cierre de stubs) |
 | Fase 4 (Workout++) | ✅ Cerrada 2026-05-21 (Etapa 5 insights el 19; Etapa 6 wire-real-stats el 21) | ~2026-07-03 | **Adelantada ~6 semanas** |
 | Fase 5 (Coach + Excel + Coach Hub web) | ✅ Cerrada 2026-05-26 (8/8 etapas + 2 follow-ups #93 #94) | ~2026-08-07 | **Adelantada ~10 semanas** vs proyección original (pivot Etapa 8 a client-side ahorró tiempo de IAM/GCP setup) |
-| Fase 6 (Producto-ready: trainer UI + push + agenda recurrente + telemetría + reviews + i18n) | ⏳ 8 etapas | ~2026-08-21 | Proyectada ~2026-06-10 |
+| Fase 6 (Producto-ready: trainer UI + push + agenda recurrente + telemetría + reviews + i18n) | 🔄 En curso — Etapa 6 telemetría cerrada (Crashlytics #108, Analytics #109, App Check #110); resto pendiente | ~2026-08-21 | Proyectada ~2026-06-15 |
 | Fase 7 (Monetización + Lanzamiento beta) | ⏳ | — | Proyectada ~2026-06-30 |
 
 **Total**: ~17 semanas full-time originales → al ritmo actual, ~7-8 semanas reales (~1.5-2 meses) para cerrar Fases 6 + 7. El ritmo de Fase 3-5 con 3 devs en paralelo + SDD disciplinado siguió superando las proyecciones.
