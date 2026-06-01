@@ -366,3 +366,51 @@ Blaze plan confirmed active on `treino-dev` (user confirmed prior to apply phase
 - Branch ready: `feat/account-deletion-pr3-flutter-ui`
 - Orchestrator handles: smoke test → push → PR (targeting `main`)
 - After smoke + PR merge: `sdd-verify` → `sdd-archive`
+
+---
+
+## PR#3 — Post-Implementation Smoke Fixes (12 commits)
+
+The PR#3 branch went through an iterative live-device smoke against the deployed CF in `treino-dev` before squash-merging as PR #112. Twelve refinement commits landed on top of the initial T34-T50 GREEN, each targeting a specific defect surfaced by smoke. Listed in order:
+
+| # | SHA | Type | Summary |
+|---|-----|------|---------|
+| 1 | `68614fd` | fix | sheet popping bug — ELIMINAR's onPressed popped the sheet BEFORE the notifier ran, killing the loading overlay + error snackbar listener |
+| 2 | `e325d47` | fix | snackbar UX — hideCurrentSnackBar before show + `behavior: floating`, prevents stacking on Reintentar |
+| 3 | `19b27d9` | fix | added `toString()` to `AccountDeletionFailure$Server/Unknown` for actionable debugPrint output |
+| 4 | `f1d84b1` | fix | region alignment — CF + client both moved to `southamerica-east1` (matched parsePlan convention, fixed `not-found` from default `us-central1` client lookup) |
+| 5 | `1abdb89` | fix | partial-with-auth-deleted = success — when `deletedCollections.contains('users-auth')`, ignore non-fatal cascade errors and complete the deletion (signOut + redirect) |
+| 6 | `2103d4c` | fix | stale-auth escape hatch — `cancelOnboarding` now signs out locally when `user.delete()` returns `user-not-found` / `token-expired` (phantom session recovery) |
+| 7 | `7b71d0b` | fix | signOut BEFORE flag — reordered notifier ops so `accountDeletedFlagProvider=true` fires AFTER auth state is null, preventing the `/welcome → /home → /profile-setup` detour |
+| 8 | `e4b63a9` | fix | invalidate `profile_setup_notifier` post-deletion — prevents the deleted user's draft from appearing if the user re-signs-up |
+| 9 | `6c4a914` | fix | **ROOT CAUSE** — CF returns `errors: List<String>` not `List<Map<String, dynamic>>`. The mis-parse threw before the partial-classification check could run, leaving the entire flow in a corrupted state. This single fix explained the snackbar-stuck, the partial-as-failure, AND the /profile-setup flash. |
+| 10 | `e037e51` | fix | declared 2 missing Firestore indexes (`trainer_links: athleteId+status`, `appointments: athleteId+scheduledAt`) + added `accountDeletionInFlightProvider` to suppress router redirects during the cascade window |
+| 11 | `dbdc65f` | fix | Google re-auth single dialog — removed `authorizationClient.authorizeScopes(['email'])` from `getGoogleCredential` since re-auth only needs the idToken; eliminates the second iOS "treino quiere utilizar google.com" sheet |
+| 12 | `67b62c9` | fix | Apple re-auth via `User.reauthenticateWithProvider(OAuthProvider('apple.com'))` — bypasses the iOS `sign_in_with_apple` nonce-cache bug that returned cached identityTokens whose embedded nonce no longer matched the fresh rawNonce. Uses a sentinel `providerId` so `reauthenticate(credential)` short-circuits cleanly. |
+
+### Refinement vs Design
+
+Most fixes are bug repairs of the original implementation. Two are formal refinements of the design:
+
+- **ADR-ACCDEL-009 refinement** (commit 12): Apple re-auth path no longer follows the credential-fetch-then-reauthenticate shape of email/Google. Firebase's `reauthenticateWithProvider` handles the OAuth dance internally to dodge the nonce-cache bug, and `getAppleCredential` returns a sentinel credential that the existing `reauthenticate` method short-circuits on. The notifier and sheet contracts are unchanged.
+
+- **New runtime concern** (commit 10): The router's `loggedIn && profile==null → /profile-setup` redirect now defers via `accountDeletionInFlightProvider` while the cascade is running. This was not anticipated in the design — the cascade ordering (Firestore profile deleted before Auth user) creates a 1-2s window where loggedIn=true + profile=null, which the original redirect logic would have caught.
+
+### Live Smoke Confirmation
+
+Owner verified on iOS real device against `treino-dev`:
+
+- ✅ email/password → tile → ELIMINAR → password re-auth → loading → /welcome + snackbar; account gone from Auth + Firestore + Storage
+- ✅ Google → tile → ELIMINAR → "Continuar con Google" → single OAuth dialog → /welcome + snackbar
+- ✅ Apple → tile → ELIMINAR → "Continuar con Apple" → Firebase-driven OAuth → /welcome + snackbar
+
+### Quality Gates (final, post smoke fixes)
+
+| Gate | Result |
+|------|--------|
+| flutter analyze | ✅ PASS — 0 issues |
+| dart format (account-deletion scope) | ✅ PASS — 0 changed |
+| flutter test | ✅ PASS — 1372/1372 |
+| CF tsc | ✅ PASS |
+| CF eslint | ✅ PASS |
+| CF jest | ✅ PASS — 40/40 |
