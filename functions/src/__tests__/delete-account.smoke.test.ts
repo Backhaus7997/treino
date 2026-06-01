@@ -31,6 +31,20 @@ process.env.FUNCTIONS_EMULATOR = "true";
 
 import { wrapV2 } from "firebase-functions-test/lib/v2";
 import { CallableRequest } from "firebase-functions/v2/https";
+
+// Mock the storage cascade module with a passthrough factory: by default,
+// delegates to the real implementation (so all existing tests keep using real
+// emulator-backed Storage). Individual tests can override per-call via
+// mockRejectedValueOnce to simulate cascade failures (SCENARIO-548).
+jest.mock("../cascade/storage", () => {
+  const actual = jest.requireActual("../cascade/storage");
+  return {
+    ...actual,
+    deleteAvatar: jest.fn(actual.deleteAvatar),
+  };
+});
+
+import * as storageCascade from "../cascade/storage";
 import { deleteAccountHandler, runDeleteAccount } from "../delete-account";
 import { DeleteAccountRequest, DeleteAccountResponse } from "../types";
 
@@ -363,24 +377,74 @@ describe("SCENARIO-550: idempotent re-run completes cleanly", () => {
 });
 
 describe("SCENARIO-548: audit log partial status when a cascade step errors", () => {
-  // This test verifies that if we inject a bad scenario, partial is reported.
-  // We test the orchestrator's error accumulation by directly reading the audit log
-  // after a run that produces errors (storage file not found is handled as no-op,
-  // so we verify 'partial' is set when errors array is non-empty via a unit-level
-  // check of the audit log shape rather than forcing production failures).
+  // Strong version: force the storage cascade module to throw via the
+  // jest.mock factory at the top of this file. Verifies the orchestrator
+  // really does:
+  //   - accumulate the error into errors[]
+  //   - set final response.status to 'partial' (not 'success')
+  //   - continue with subsequent steps (deletedCollections still has
+  //     users + userPublicProfiles + users-auth — the user IS gone)
+  //   - mirror the same partial+errors shape in audit_log/{uid}
+  //
+  // The previous version of this test was vacuous: it asserted
+  // `status in ['success', 'partial']` which is always true. Surfaced
+  // during sdd-verify of the account-deletion change.
   const uid = "smoke-partial-548";
 
   beforeEach(() => createTestUser(uid));
   afterEach(() => cleanupUser(uid));
 
-  it("SCENARIO-548: response.status is success when no cascade errors occurred", async () => {
-    // With all data absent (empty athlete), we expect success (not partial)
+  it("returns status='partial' and accumulates errors when a cascade step throws", async () => {
+    // Force the storage cascade step to fail on this single invocation.
+    (storageCascade.deleteAvatar as jest.Mock).mockRejectedValueOnce(
+      new Error("simulated storage failure")
+    );
+
     const result = (await runDeleteAccount(
       smokeApp,
       uid,
       "password"
     )) as DeleteAccountResponse;
-    // Clean athlete with no extra data — should succeed cleanly
-    expect(["success", "partial"]).toContain(result.status);
+
+    // Orchestrator reports partial — at least one cascade step failed.
+    expect(result.status).toBe("partial");
+
+    // errors[] contains the storage failure with module prefix and message.
+    expect(result.errors.length).toBeGreaterThan(0);
+    expect(result.errors.some((e) => e.startsWith("storage:"))).toBe(true);
+    expect(result.errors.some((e) => e.includes("simulated storage failure"))).toBe(true);
+
+    // The auth user must still be deleted — the rest of the cascade ran.
+    expect(result.deletedCollections).toContain("users-auth");
+    expect(result.deletedCollections).toContain("users");
+
+    // And: 'storage' is NOT in deletedCollections (the failing step
+    // never gets pushed to the success list).
+    expect(result.deletedCollections).not.toContain("storage");
+
+    // The audit_log/{uid} doc mirrors the response shape.
+    const auditDoc = await admin
+      .firestore(smokeApp)
+      .collection("audit_log")
+      .doc(uid)
+      .get();
+    expect(auditDoc.exists).toBe(true);
+    const audit = auditDoc.data();
+    expect(audit?.status).toBe("partial");
+    expect(audit?.errors).toEqual(result.errors);
+  });
+
+  it("returns status='success' on a clean run (no cascade errors injected)", async () => {
+    // Sanity baseline: with no mock injection, an empty-data athlete deletes
+    // cleanly with status=success and empty errors[].
+    const result = (await runDeleteAccount(
+      smokeApp,
+      uid,
+      "password"
+    )) as DeleteAccountResponse;
+
+    expect(result.status).toBe("success");
+    expect(result.errors).toEqual([]);
+    expect(result.deletedCollections).toContain("users-auth");
   });
 });
