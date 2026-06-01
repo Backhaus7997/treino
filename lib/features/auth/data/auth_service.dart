@@ -276,7 +276,19 @@ class AuthService {
   /// Throws [AuthFailure.userNotFound] when there is no signed-in user.
   /// Throws [AuthFailure.reAuthFailed] on wrong-password / invalid-credential.
   /// Throws [AuthFailure.fromFirebase] for any other FirebaseAuthException.
+  /// Sentinel providerId used by [getAppleCredential] to signal that the
+  /// re-authentication was already performed by Firebase's
+  /// `reauthenticateWithProvider` flow (which bypasses the nonce-cache
+  /// quirks of sign_in_with_apple's native iOS sheet on re-auth). When
+  /// [reauthenticate] sees this providerId, it short-circuits since the
+  /// re-auth has already happened server-side.
+  static const String _appleReauthDoneSentinelProviderId =
+      '__apple_reauth_done_sentinel__';
+
   Future<void> reauthenticate(AuthCredential credential) async {
+    // Apple re-auth already completed by getAppleCredential. See sentinel doc.
+    if (credential.providerId == _appleReauthDoneSentinelProviderId) return;
+
     final user = _auth.currentUser;
     if (user == null) throw const AuthFailure.userNotFound();
     try {
@@ -338,24 +350,42 @@ class AuthService {
     );
   }
 
-  /// Triggers Apple Sign-In and returns an [OAuthProvider] credential
-  /// suitable for re-authentication.
+  /// Triggers Apple re-authentication via Firebase's
+  /// `reauthenticateWithProvider` flow. Returns a SENTINEL credential that
+  /// [reauthenticate] recognizes as "already done, skip" — because the
+  /// actual re-auth is performed server-side by Firebase inside this method,
+  /// not separately as in the email/password / Google paths.
+  ///
+  /// Why not the same shape as [signInWithApple] / [getGoogleCredential]?
+  /// On iOS, `sign_in_with_apple`'s native sheet on RE-auth (after a prior
+  /// successful Apple sign-in) tends to return a cached identityToken whose
+  /// embedded nonce no longer matches the fresh rawNonce we generate, and
+  /// Firebase rejects the credential with `missing-or-invalid-nonce`.
+  /// Firebase's `reauthenticateWithProvider(OAuthProvider('apple.com'))`
+  /// drives the OAuth dance internally and handles the nonce correctly.
   ///
   /// Throws [AuthFailure.signInCancelled] on user-cancel.
   /// Throws [AuthFailure.reAuthFailed] on other Apple errors.
   // i18n: Fase 6 Etapa 3
   Future<AuthCredential> getAppleCredential() async {
-    final rawNonce = generateNonce();
-    final hashedNonce = sha256OfString(rawNonce);
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw const AuthFailure.userNotFound();
+    }
 
-    final AuthorizationCredentialAppleID appleCred;
     try {
-      appleCred = await _appleGateway.getAppleIDCredential(
-        scopes: const [AppleIDAuthorizationScopes.email],
-        nonce: hashedNonce,
-      );
-    } on SignInWithAppleAuthorizationException catch (e) {
-      if (e.code == AuthorizationErrorCode.canceled) {
+      await user.reauthenticateWithProvider(OAuthProvider('apple.com'));
+    } on FirebaseAuthException catch (e) {
+      // iOS surfaces user-cancel via several codes depending on iOS version
+      // and which native sheet was active.
+      const cancelCodes = {
+        'cancelled-popup-request',
+        'web-context-cancelled',
+        'web-context-canceled',
+        'user-cancelled',
+        'popup-closed-by-user',
+      };
+      if (cancelCodes.contains(e.code)) {
         throw const AuthFailure.signInCancelled();
       }
       throw const AuthFailure.reAuthFailed(provider: 'apple.com');
@@ -363,11 +393,9 @@ class AuthService {
       throw const AuthFailure.reAuthFailed(provider: 'apple.com');
     }
 
-    return OAuthProvider('apple.com').credential(
-      idToken: appleCred.identityToken,
-      rawNonce: rawNonce,
-      accessToken: appleCred.authorizationCode,
-    );
+    // Sentinel — reauthenticate() short-circuits on this providerId.
+    return OAuthProvider(_appleReauthDoneSentinelProviderId)
+        .credential(accessToken: 'sentinel');
   }
 
   // ── End re-auth helpers ────────────────────────────────────────────────────

@@ -27,12 +27,18 @@ class MockGoogleSignInAuthorizationClient extends Mock
 
 class MockAppleSignInGateway extends Mock implements AppleSignInGateway {}
 
-class FakeAuthCredential extends Fake implements AuthCredential {}
+class FakeAuthCredential extends Fake implements AuthCredential {
+  // Stubbed for the Apple-sentinel short-circuit check in reauthenticate.
+  // A non-sentinel providerId routes the call down the normal path.
+  @override
+  String get providerId => 'password';
+}
 
 void main() {
   setUpAll(() {
     registerFallbackValue(FakeAuthCredential());
     registerFallbackValue(<AppleIDAuthorizationScopes>[]);
+    registerFallbackValue(OAuthProvider('apple.com'));
   });
 
   late MockFirebaseAuth fbAuth;
@@ -201,46 +207,36 @@ void main() {
   });
 
   group('AuthService.getAppleCredential', () {
+    // The Apple re-auth path was refactored 2026-06-01 to delegate to
+    // Firebase's `User.reauthenticateWithProvider(OAuthProvider('apple.com'))`
+    // because sign_in_with_apple's native iOS sheet returns a cached
+    // identityToken on re-auth whose nonce no longer matches our fresh
+    // rawNonce, causing Firebase to reject with `missing-or-invalid-nonce`.
+    // getAppleCredential now performs the reauth internally and returns a
+    // sentinel credential that reauthenticate() short-circuits on.
+
     test(
-        'triggers sign_in_with_apple flow and returns OAuthProvider credential',
-        () async {
-      when(
-        () => appleGateway.getAppleIDCredential(
-          scopes: any(named: 'scopes'),
-          nonce: any(named: 'nonce'),
-        ),
-      ).thenAnswer(
-        (_) async => const AuthorizationCredentialAppleID(
-          userIdentifier: 'apple-uid',
-          givenName: null,
-          familyName: null,
-          email: null,
-          identityToken: 'apple-id-token',
-          authorizationCode: 'apple-auth-code',
-          state: null,
-        ),
-      );
+        'reauths via Firebase reauthenticateWithProvider and returns sentinel '
+        'credential', () async {
+      final mockUserCred = MockUserCredential();
+      when(() => fbAuth.currentUser).thenReturn(user);
+      when(() => user.reauthenticateWithProvider(any()))
+          .thenAnswer((_) async => mockUserCred);
 
       final credential = await sut.getAppleCredential();
 
       expect(credential, isA<AuthCredential>());
-      verify(
-        () => appleGateway.getAppleIDCredential(
-          scopes: any(named: 'scopes'),
-          nonce: any(named: 'nonce'),
-        ),
-      ).called(1);
+      // The sentinel providerId signals reauthenticate() to skip the
+      // redundant reauthenticateWithCredential call.
+      expect(credential.providerId, '__apple_reauth_done_sentinel__');
+      verify(() => user.reauthenticateWithProvider(any())).called(1);
     });
 
     test('user cancels → throws AuthFailure.signInCancelled', () async {
-      when(
-        () => appleGateway.getAppleIDCredential(
-          scopes: any(named: 'scopes'),
-          nonce: any(named: 'nonce'),
-        ),
-      ).thenThrow(
-        const SignInWithAppleAuthorizationException(
-          code: AuthorizationErrorCode.canceled,
+      when(() => fbAuth.currentUser).thenReturn(user);
+      when(() => user.reauthenticateWithProvider(any())).thenThrow(
+        FirebaseAuthException(
+          code: 'web-context-cancelled',
           message: 'cancelled',
         ),
       );
@@ -249,6 +245,26 @@ void main() {
         () => sut.getAppleCredential(),
         throwsA(const AuthFailure.signInCancelled()),
       );
+    });
+
+    test('reauthenticate short-circuits on the Apple sentinel credential',
+        () async {
+      // Build a sentinel credential by running getAppleCredential, then pass
+      // it through reauthenticate — it must NOT call reauthenticateWithCredential.
+      final mockUserCred = MockUserCredential();
+      when(() => fbAuth.currentUser).thenReturn(user);
+      when(() => user.reauthenticateWithProvider(any()))
+          .thenAnswer((_) async => mockUserCred);
+
+      final sentinel = await sut.getAppleCredential();
+
+      // Reset mocks: any subsequent call would now fail if reauthenticate
+      // dispatched it down the credential path.
+      reset(user);
+
+      await sut.reauthenticate(sentinel);
+
+      verifyNever(() => user.reauthenticateWithCredential(any()));
     });
   });
 }
