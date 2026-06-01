@@ -310,6 +310,15 @@ class AuthService {
   /// Triggers the Google sign-in flow and returns a [GoogleAuthProvider]
   /// credential suitable for re-authentication.
   ///
+  /// Unlike [signInWithGoogle], this re-auth helper does NOT call
+  /// `authorizationClient.authorizeScopes(...)`. On iOS each OAuth-style
+  /// call opens its own ASWebAuthenticationSession, which surfaces the
+  /// system "treino quiere utilizar google.com" sheet — so requesting
+  /// scopes in addition to authenticate() would surface that sheet TWICE
+  /// in a row (poor UX during a deletion confirmation). Firebase's
+  /// `reauthenticateWithCredential` only needs the `idToken` to verify
+  /// identity; the accessToken is optional and unused for re-auth.
+  ///
   /// Throws [AuthFailure.signInCancelled] on user-cancel.
   /// Throws [AuthFailure.reAuthFailed] on other Google errors.
   // i18n: Fase 6 Etapa 3
@@ -324,20 +333,8 @@ class AuthService {
       throw const AuthFailure.reAuthFailed(provider: 'google.com');
     }
 
-    final GoogleSignInClientAuthorization authorization;
-    try {
-      authorization = await googleUser.authorizationClient
-          .authorizeScopes(const <String>['email']);
-    } on GoogleSignInException catch (e) {
-      if (e.code == GoogleSignInExceptionCode.canceled) {
-        throw const AuthFailure.signInCancelled();
-      }
-      throw const AuthFailure.reAuthFailed(provider: 'google.com');
-    }
-
     return GoogleAuthProvider.credential(
       idToken: googleUser.authentication.idToken,
-      accessToken: authorization.accessToken,
     );
   }
 
