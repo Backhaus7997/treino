@@ -12,6 +12,7 @@ import 'presentation/widgets/eliminar_cuenta_sheet.dart';
 import 'presentation/widgets/profile_avatar_card.dart';
 import 'presentation/widgets/profile_cuenta_section.dart';
 import 'presentation/widgets/profile_header.dart';
+import 'presentation/widgets/profile_section_group.dart';
 import 'presentation/widgets/profile_section_tile.dart';
 import 'presentation/widgets/profile_trainer_section.dart';
 import 'trainer_profile_view.dart';
@@ -59,28 +60,36 @@ class _AthleteProfile extends ConsumerWidget {
           // role == trainer. Tile que abre /profile/edit-trainer para
           // editar perfil público multi-location (Fase 6 Etapa 0 PR#3).
           const ProfileTrainerSection(),
-          // ── Account actions — PR#4 v2 pivot 2026-05-28 ───────────────────
-          // Sign-out and account deletion tiles live here directly.
-          // Settings as a surface deferred to a future SDD (notifications,
-          // theme, language). Per PR#4 pivot decision.
-          ProfileSectionTile(
-            icon: TreinoIcon.signOut,
-            title: 'Cerrar sesión', // i18n: Fase 6 Etapa 3
-            onTap: () => ref.read(authNotifierProvider.notifier).signOut(),
-          ),
-          ProfileSectionTile(
-            icon: TreinoIcon.trash,
-            title: 'Eliminar cuenta', // i18n: Fase 6 Etapa 3
-            destructive: true,
-            onTap: () => showModalBottomSheet<void>(
-              context: context,
-              backgroundColor: palette.bgCard,
-              shape: const RoundedRectangleBorder(
-                borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+          // ── Sesión section — PR#4 v2 pivot 2026-05-28 ────────────────────
+          // Sign-out + account deletion grouped in one boxed section, mockup
+          // parity polish 2026-06-01. Settings as a dedicated surface stays
+          // deferred to a future SDD (notifications, theme, language).
+          ProfileSectionGroup(
+            title: 'SESIÓN', // i18n: Fase 6 Etapa 3
+            tiles: [
+              ProfileSectionTile(
+                icon: TreinoIcon.signOut,
+                title: 'Cerrar sesión', // i18n: Fase 6 Etapa 3
+                inGroup: true,
+                onTap: () => ref.read(authNotifierProvider.notifier).signOut(),
               ),
-              isScrollControlled: true,
-              builder: (_) => const EliminarCuentaSheet(),
-            ),
+              ProfileSectionTile(
+                icon: TreinoIcon.trash,
+                title: 'Eliminar cuenta', // i18n: Fase 6 Etapa 3
+                destructive: true,
+                inGroup: true,
+                onTap: () => showModalBottomSheet<void>(
+                  context: context,
+                  backgroundColor: palette.bgCard,
+                  shape: const RoundedRectangleBorder(
+                    borderRadius:
+                        BorderRadius.vertical(top: Radius.circular(18)),
+                  ),
+                  isScrollControlled: true,
+                  builder: (_) => const EliminarCuentaSheet(),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 20),
         ],

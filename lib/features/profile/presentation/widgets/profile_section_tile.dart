@@ -19,6 +19,7 @@ class ProfileSectionTile extends StatelessWidget {
     this.subtitle,
     this.trailing,
     this.destructive = false,
+    this.inGroup = false,
     required this.onTap,
   });
 
@@ -32,6 +33,12 @@ class ProfileSectionTile extends StatelessWidget {
   /// When [true], tints the icon and title in [AppPalette.danger].
   final bool destructive;
 
+  /// When [true], the tile renders WITHOUT its own outer padding, border, and
+  /// background. Used by [ProfileSectionGroup] to render multiple tiles inside
+  /// a single shared container with dividers between (mockup parity 2026-06-01).
+  /// Defaults to [false] for standalone use.
+  final bool inGroup;
+
   final VoidCallback onTap;
 
   @override
@@ -40,73 +47,80 @@ class ProfileSectionTile extends StatelessWidget {
     final iconColor = destructive ? palette.danger : palette.accent;
     final titleColor = destructive ? palette.danger : palette.textPrimary;
 
-    // Mockup parity 2026-06-01 polish pass:
-    //   - Tighter vertical gap between tiles (4 vs 6)
-    //   - Icon wrapped in a soft circular background (subtle accent-tinted
-    //     circle, mirrors the mockup's icon treatment)
-    //   - Internal vertical padding nudged down to keep tiles more compact
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-      child: GestureDetector(
-        onTap: onTap,
-        behavior: HitTestBehavior.opaque,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          decoration: BoxDecoration(
-            color: palette.bgCard,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: palette.textMuted.withValues(alpha: 0.12),
-            ),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: iconColor.withValues(alpha: 0.12),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(icon, size: 18, color: iconColor),
+    final row = GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: EdgeInsets.symmetric(
+          horizontal: inGroup ? 14 : 12,
+          vertical: inGroup ? 12 : 10,
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: iconColor.withValues(alpha: 0.12),
+                shape: BoxShape.circle,
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
+              child: Icon(icon, size: 18, color: iconColor),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    title, // i18n: Fase 6 Etapa 3
+                    style: GoogleFonts.barlowCondensed(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 16,
+                      color: titleColor,
+                    ),
+                  ),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 2),
                     Text(
-                      title, // i18n: Fase 6 Etapa 3
-                      style: GoogleFonts.barlowCondensed(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 16,
-                        color: titleColor,
+                      subtitle!, // i18n: Fase 6 Etapa 3
+                      style: GoogleFonts.barlow(
+                        fontWeight: FontWeight.w400,
+                        fontSize: 12,
+                        color: palette.textMuted,
                       ),
                     ),
-                    if (subtitle != null) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        subtitle!, // i18n: Fase 6 Etapa 3
-                        style: GoogleFonts.barlow(
-                          fontWeight: FontWeight.w400,
-                          fontSize: 12,
-                          color: palette.textMuted,
-                        ),
-                      ),
-                    ],
                   ],
-                ),
+                ],
               ),
-              trailing ??
-                  Icon(
-                    TreinoIcon.chevronRight,
-                    size: 16,
-                    color: palette.textMuted,
-                  ),
-            ],
+            ),
+            trailing ??
+                Icon(
+                  TreinoIcon.chevronRight,
+                  size: 16,
+                  color: palette.textMuted,
+                ),
+          ],
+        ),
+      ),
+    );
+
+    // In-group mode: parent (ProfileSectionGroup) owns the container border +
+    // dividers. Return the bare row.
+    if (inGroup) return row;
+
+    // Standalone mode: own card container + outer horizontal padding.
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: palette.bgCard,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: palette.textMuted.withValues(alpha: 0.12),
           ),
         ),
+        child: row,
       ),
     );
   }
