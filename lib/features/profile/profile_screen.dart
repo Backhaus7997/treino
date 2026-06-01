@@ -50,8 +50,10 @@ class _AthleteProfile extends ConsumerWidget {
       child: Column(
         children: [
           const ProfileHeader(),
-          _OwnProfileStatsRow(palette: palette, theme: theme),
+          // Avatar card BEFORE stats — mockup parity 2026-06-01 polish pass.
+          // Visual hierarchy: header → identity (who I am) → stats (what I did).
           const ProfileAvatarCard(),
+          _OwnProfileStatsRow(palette: palette, theme: theme),
           const ProfileCuentaSection(),
           // Sección "ENTRENADOR" condicional — solo visible cuando
           // role == trainer. Tile que abre /profile/edit-trainer para
@@ -102,45 +104,77 @@ class _OwnProfileStatsRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final statsAsync = ref.watch(userSessionStatsProvider);
 
+    // Mockup parity 2026-06-01 polish: wrap in a card with light border +
+    // vertical dividers between the 3 stats. Numbers prominent, label small
+    // beneath (was the inverse in the pre-polish layout).
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-      child: Row(
-        children: [
-          _StatTile(
-            label: 'SESIONES', // i18n: Fase 6 Etapa 3
-            value: statsAsync.when(
-              data: (s) => s.totalSessions.toString(),
-              loading: () => '--',
-              error: (_, __) => '--',
-            ),
-            valueColor: palette.accent,
-            theme: theme,
-            palette: palette,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      child: Container(
+        decoration: BoxDecoration(
+          color: palette.bgCard,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: palette.textMuted.withValues(alpha: 0.12),
           ),
-          _StatTile(
-            label: 'VOLUMEN KG', // i18n: Fase 6 Etapa 3
-            value: statsAsync.when(
-              data: (s) => kFormat(s.totalVolumeKg),
-              loading: () => '--',
-              error: (_, __) => '--',
-            ),
-            valueColor: palette.accent,
-            theme: theme,
-            palette: palette,
+        ),
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        child: IntrinsicHeight(
+          child: Row(
+            children: [
+              _StatTile(
+                label: 'SESIONES', // i18n: Fase 6 Etapa 3
+                value: statsAsync.when(
+                  data: (s) => s.totalSessions.toString(),
+                  loading: () => '--',
+                  error: (_, __) => '--',
+                ),
+                valueColor: palette.accent,
+                theme: theme,
+                palette: palette,
+              ),
+              _StatDivider(palette: palette),
+              _StatTile(
+                label: 'VOLUMEN KG', // i18n: Fase 6 Etapa 3
+                value: statsAsync.when(
+                  data: (s) => kFormat(s.totalVolumeKg),
+                  loading: () => '--',
+                  error: (_, __) => '--',
+                ),
+                valueColor: palette.accent,
+                theme: theme,
+                palette: palette,
+              ),
+              _StatDivider(palette: palette),
+              _StatTile(
+                label: 'RACHA', // i18n: Fase 6 Etapa 3
+                value: statsAsync.when(
+                  data: (s) => s.streak.toString(),
+                  loading: () => '--',
+                  error: (_, __) => '--',
+                ),
+                valueColor: palette.highlight,
+                theme: theme,
+                palette: palette,
+              ),
+            ],
           ),
-          _StatTile(
-            label: 'RACHA', // i18n: Fase 6 Etapa 3
-            value: statsAsync.when(
-              data: (s) => s.streak.toString(),
-              loading: () => '--',
-              error: (_, __) => '--',
-            ),
-            valueColor: palette.highlight,
-            theme: theme,
-            palette: palette,
-          ),
-        ],
+        ),
       ),
+    );
+  }
+}
+
+class _StatDivider extends StatelessWidget {
+  const _StatDivider({required this.palette});
+
+  final AppPalette palette;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 1,
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      color: palette.textMuted.withValues(alpha: 0.18),
     );
   }
 }
@@ -162,23 +196,26 @@ class _StatTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Mockup parity 2026-06-01: number prominent ON TOP, label small below
+    // (previous order was inverted). Value font bumped to headlineMedium for
+    // the visual weight the mockup uses (143 / 92k / 12 read first).
     return Expanded(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
+            value,
+            style: theme.textTheme.headlineMedium?.copyWith(
+              color: valueColor,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
             label,
             style: theme.textTheme.labelSmall?.copyWith(
               color: palette.textMuted,
               letterSpacing: 1.2,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: theme.textTheme.headlineSmall?.copyWith(
-              color: valueColor,
-              fontWeight: FontWeight.w700,
             ),
           ),
         ],

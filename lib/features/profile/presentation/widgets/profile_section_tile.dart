@@ -40,13 +40,18 @@ class ProfileSectionTile extends StatelessWidget {
     final iconColor = destructive ? palette.danger : palette.accent;
     final titleColor = destructive ? palette.danger : palette.textPrimary;
 
+    // Mockup parity 2026-06-01 polish pass:
+    //   - Tighter vertical gap between tiles (4 vs 6)
+    //   - Icon wrapped in a soft circular background (subtle accent-tinted
+    //     circle, mirrors the mockup's icon treatment)
+    //   - Internal vertical padding nudged down to keep tiles more compact
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
       child: GestureDetector(
         onTap: onTap,
         behavior: HitTestBehavior.opaque,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
             color: palette.bgCard,
             borderRadius: BorderRadius.circular(14),
@@ -56,8 +61,16 @@ class ProfileSectionTile extends StatelessWidget {
           ),
           child: Row(
             children: [
-              Icon(icon, size: 20, color: iconColor),
-              const SizedBox(width: 14),
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: iconColor.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, size: 18, color: iconColor),
+              ),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
