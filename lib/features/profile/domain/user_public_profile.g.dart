@@ -18,6 +18,8 @@ _$UserPublicProfileImpl _$$UserPublicProfileImplFromJson(
       racha: (json['racha'] as num?)?.toInt(),
       followersCount: (json['followersCount'] as num?)?.toInt(),
       followingCount: (json['followingCount'] as num?)?.toInt(),
+      sharedTemplatesWithAthletes:
+          json['sharedTemplatesWithAthletes'] as bool? ?? false,
     );
 
 Map<String, dynamic> _$$UserPublicProfileImplToJson(
@@ -32,4 +34,5 @@ Map<String, dynamic> _$$UserPublicProfileImplToJson(
       'racha': instance.racha,
       'followersCount': instance.followersCount,
       'followingCount': instance.followingCount,
+      'sharedTemplatesWithAthletes': instance.sharedTemplatesWithAthletes,
     };

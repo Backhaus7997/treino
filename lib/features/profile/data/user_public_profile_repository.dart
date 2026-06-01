@@ -57,6 +57,18 @@ class UserPublicProfileRepository {
     await _col.doc(uid).set(fields, SetOptions(merge: true));
   }
 
+  /// Flips the trainer's `sharedTemplatesWithAthletes` flag. When `true`,
+  /// the Firestore rule on `routines` lets any authenticated user read this
+  /// trainer's `trainer-template` docs — the athlete client filters them by
+  /// linked-trainer-uid for the visible list. When `false`, only the
+  /// trainer themselves can read their templates (existing behaviour).
+  Future<void> setSharedTemplatesWithAthletes(String uid, bool value) async {
+    await _col.doc(uid).set(
+      {'sharedTemplatesWithAthletes': value},
+      SetOptions(merge: true),
+    );
+  }
+
   /// Returns up to [limit] profiles whose `displayNameLowercase` starts with
   /// the trimmed lowercase [query]. Returns an empty list when [query] is
   /// blank after trimming. No Firestore call is issued in that case.

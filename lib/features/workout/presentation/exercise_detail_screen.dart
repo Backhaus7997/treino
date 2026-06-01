@@ -38,17 +38,30 @@ String _muscleEs(String raw) =>
 String _categoryEsOf(String raw) =>
     _categoryEs[raw.toLowerCase()] ?? raw.toUpperCase();
 
-/// ExerciseDetailScreen — ConsumerWidget that observes exerciseByIdProvider.
+/// ExerciseDetailScreen — ConsumerWidget that observes slotExerciseProvider
+/// (which falls back to the trainer's customExercises subcollection when
+/// `ownerId` is supplied and the id isn't in the public catalogue).
 /// No Scaffold, AppBackground, or SafeArea — those are provided by
 /// _ShellScaffold in router.dart (REQ-RDT-019).
 class ExerciseDetailScreen extends ConsumerWidget {
-  const ExerciseDetailScreen({super.key, required this.exerciseId});
+  const ExerciseDetailScreen({
+    super.key,
+    required this.exerciseId,
+    this.ownerId,
+  });
 
   final String exerciseId;
 
+  /// Trainer uid that owns the routine the slot belongs to. When non-null
+  /// and the public catalogue lookup misses, the provider tries
+  /// `users/{ownerId}/customExercises/{exerciseId}`.
+  final String? ownerId;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final exerciseAsync = ref.watch(exerciseByIdProvider(exerciseId));
+    final exerciseAsync = ref.watch(
+      slotExerciseProvider((exerciseId: exerciseId, ownerId: ownerId)),
+    );
 
     // Stack so the hero photo extends edge-to-edge from the top of the safe
     // area while the back button floats over it. Non-data states still render
@@ -63,7 +76,11 @@ class ExerciseDetailScreen extends ConsumerWidget {
             loading: () => const _ExerciseLoadingSkeleton(),
             error: (_, __) => _ErrorState(
               message: 'No pudimos cargar el ejercicio.',
-              onRetry: () => ref.invalidate(exerciseByIdProvider(exerciseId)),
+              onRetry: () => ref.invalidate(
+                slotExerciseProvider(
+                  (exerciseId: exerciseId, ownerId: ownerId),
+                ),
+              ),
             ),
           ),
         ),
@@ -114,15 +131,26 @@ class _ExerciseDetailContent extends StatelessWidget {
     final badgeText =
         '${_muscleEs(exercise.muscleGroup)} · ${_categoryEsOf(exercise.category)}';
 
+    // Trainer-defined exercises (category == 'custom') don't have an asset
+    // in `assets/exercises/`, so the regular hero falls back to the green
+    // gradient — which reads as broken for what's actually a personalized
+    // plan. Swap to a compact header that skips the photo slot entirely.
+    final isCustom = exercise.category.toLowerCase() == 'custom';
+
     return CustomScrollView(
       slivers: [
         SliverToBoxAdapter(
-          child: _HeroStrip(
-            exerciseId: exercise.id,
-            muscleGroup: exercise.muscleGroup,
-            badgeText: badgeText,
-            titleText: exercise.name.toUpperCase(),
-          ),
+          child: isCustom
+              ? _CompactHeader(
+                  badgeText: badgeText,
+                  titleText: exercise.name.toUpperCase(),
+                )
+              : _HeroStrip(
+                  exerciseId: exercise.id,
+                  muscleGroup: exercise.muscleGroup,
+                  badgeText: badgeText,
+                  titleText: exercise.name.toUpperCase(),
+                ),
         ),
         SliverPadding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -168,6 +196,34 @@ class _ExerciseDetailContent extends StatelessWidget {
 // ---------------------------------------------------------------------------
 // Private widgets
 // ---------------------------------------------------------------------------
+
+/// Photo-less header for trainer-defined exercises. Sits flush at the top
+/// with bg-color so the floating back button stays legible, then shows just
+/// the breadcrumb badge and the exercise title. No image, no gradient,
+/// no green fallback.
+class _CompactHeader extends StatelessWidget {
+  const _CompactHeader({required this.badgeText, required this.titleText});
+
+  final String badgeText;
+  final String titleText;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    return Container(
+      color: palette.bg,
+      padding: const EdgeInsets.fromLTRB(20, 80, 20, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _Breadcrumb(text: badgeText),
+          const SizedBox(height: 10),
+          _ExerciseTitle(text: titleText),
+        ],
+      ),
+    );
+  }
+}
 
 class _HeroStrip extends StatelessWidget {
   const _HeroStrip({
