@@ -46,9 +46,8 @@ class TrainersMapBottomSheet extends ConsumerWidget {
         // El modo "Online" no se chequea: cuando el atleta lo activa, el
         // screen padre hace auto-switch a LISTA y el toggle MAPA queda
         // disabled, así que este sheet nunca se rendera con virtualOnly ON.
-        final visible = trainers
-            .where((t) => effectiveLocationsOf(t).isNotEmpty)
-            .toList();
+        final visible =
+            trainers.where((t) => effectiveLocationsOf(t).isNotEmpty).toList();
 
         return Container(
           decoration: BoxDecoration(

@@ -73,8 +73,7 @@ void main() {
   group('TrainersListScreen — auto-switch a LISTA al activar Online', () {
     testWidgets(
         'tap tab ONLINE cuando MAPA está activo → mapModeProvider queda false '
-        'Y virtualOnlyFilterProvider queda true',
-        (tester) async {
+        'Y virtualOnlyFilterProvider queda true', (tester) async {
       late ProviderContainer container;
       await tester.pumpWidget(
         ProviderScope(
@@ -117,8 +116,7 @@ void main() {
 
     testWidgets(
         'tap tab PRESENCIAL viniendo de ONLINE → mapModeProvider queda true '
-        '(auto-switch simétrico)',
-        (tester) async {
+        '(auto-switch simétrico)', (tester) async {
       late ProviderContainer container;
       await tester.pumpWidget(
         ProviderScope(
@@ -197,8 +195,7 @@ void main() {
 
     testWidgets(
         'cuando virtualOnly:true → tap pill MAPA NO cambia mapModeProvider '
-        '(disabled)',
-        (tester) async {
+        '(disabled)', (tester) async {
       late ProviderContainer container;
       await tester.pumpWidget(
         ProviderScope(
