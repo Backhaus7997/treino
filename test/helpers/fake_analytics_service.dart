@@ -30,10 +30,13 @@ class FakeAnalyticsService implements AnalyticsService {
     String? routineName,
   }) async {
     events.add('routine_started');
-    calls.add((name: 'routine_started', params: {
-      'routine_id': routineId,
-      if (routineName != null) 'routine_name': routineName,
-    }));
+    calls.add((
+      name: 'routine_started',
+      params: {
+        'routine_id': routineId,
+        if (routineName != null) 'routine_name': routineName,
+      }
+    ));
   }
 
   @override
@@ -43,11 +46,14 @@ class FakeAnalyticsService implements AnalyticsService {
     required int durationSeconds,
   }) async {
     events.add('routine_finished');
-    calls.add((name: 'routine_finished', params: {
-      'routine_id': routineId,
-      'session_id': sessionId,
-      'duration_seconds': durationSeconds,
-    }));
+    calls.add((
+      name: 'routine_finished',
+      params: {
+        'routine_id': routineId,
+        'session_id': sessionId,
+        'duration_seconds': durationSeconds,
+      }
+    ));
   }
 
   @override
@@ -57,11 +63,14 @@ class FakeAnalyticsService implements AnalyticsService {
     required String assignedTo,
   }) async {
     events.add('plan_assigned');
-    calls.add((name: 'plan_assigned', params: {
-      'routine_id': routineId,
-      'assigned_by': assignedBy,
-      'assigned_to': assignedTo,
-    }));
+    calls.add((
+      name: 'plan_assigned',
+      params: {
+        'routine_id': routineId,
+        'assigned_by': assignedBy,
+        'assigned_to': assignedTo,
+      }
+    ));
   }
 
   @override
@@ -70,10 +79,13 @@ class FakeAnalyticsService implements AnalyticsService {
     required String athleteId,
   }) async {
     events.add('link_requested');
-    calls.add((name: 'link_requested', params: {
-      'trainer_id': trainerId,
-      'athlete_id': athleteId,
-    }));
+    calls.add((
+      name: 'link_requested',
+      params: {
+        'trainer_id': trainerId,
+        'athlete_id': athleteId,
+      }
+    ));
   }
 
   @override
@@ -88,10 +100,13 @@ class FakeAnalyticsService implements AnalyticsService {
     required String senderId,
   }) async {
     events.add('chat_message_sent');
-    calls.add((name: 'chat_message_sent', params: {
-      'chat_id': chatId,
-      'sender_id': senderId,
-    }));
+    calls.add((
+      name: 'chat_message_sent',
+      params: {
+        'chat_id': chatId,
+        'sender_id': senderId,
+      }
+    ));
   }
 
   @override
@@ -101,10 +116,13 @@ class FakeAnalyticsService implements AnalyticsService {
     required String athleteId,
   }) async {
     events.add('appointment_created');
-    calls.add((name: 'appointment_created', params: {
-      'appointment_id': appointmentId,
-      'trainer_id': trainerId,
-      'athlete_id': athleteId,
-    }));
+    calls.add((
+      name: 'appointment_created',
+      params: {
+        'appointment_id': appointmentId,
+        'trainer_id': trainerId,
+        'athlete_id': athleteId,
+      }
+    ));
   }
 }

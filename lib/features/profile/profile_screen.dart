@@ -12,6 +12,7 @@ import 'presentation/widgets/eliminar_cuenta_sheet.dart';
 import 'presentation/widgets/profile_avatar_card.dart';
 import 'presentation/widgets/profile_cuenta_section.dart';
 import 'presentation/widgets/profile_header.dart';
+import 'presentation/widgets/profile_section_group.dart';
 import 'presentation/widgets/profile_section_tile.dart';
 import 'presentation/widgets/profile_trainer_section.dart';
 import 'trainer_profile_view.dart';
@@ -50,35 +51,45 @@ class _AthleteProfile extends ConsumerWidget {
       child: Column(
         children: [
           const ProfileHeader(),
-          _OwnProfileStatsRow(palette: palette, theme: theme),
+          // Avatar card BEFORE stats — mockup parity 2026-06-01 polish pass.
+          // Visual hierarchy: header → identity (who I am) → stats (what I did).
           const ProfileAvatarCard(),
+          _OwnProfileStatsRow(palette: palette, theme: theme),
           const ProfileCuentaSection(),
           // Sección "ENTRENADOR" condicional — solo visible cuando
           // role == trainer. Tile que abre /profile/edit-trainer para
           // editar perfil público multi-location (Fase 6 Etapa 0 PR#3).
           const ProfileTrainerSection(),
-          // ── Account actions — PR#4 v2 pivot 2026-05-28 ───────────────────
-          // Sign-out and account deletion tiles live here directly.
-          // Settings as a surface deferred to a future SDD (notifications,
-          // theme, language). Per PR#4 pivot decision.
-          ProfileSectionTile(
-            icon: TreinoIcon.signOut,
-            title: 'Cerrar sesión', // i18n: Fase 6 Etapa 3
-            onTap: () => ref.read(authNotifierProvider.notifier).signOut(),
-          ),
-          ProfileSectionTile(
-            icon: TreinoIcon.trash,
-            title: 'Eliminar cuenta', // i18n: Fase 6 Etapa 3
-            destructive: true,
-            onTap: () => showModalBottomSheet<void>(
-              context: context,
-              backgroundColor: palette.bgCard,
-              shape: const RoundedRectangleBorder(
-                borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+          // ── Sesión section — PR#4 v2 pivot 2026-05-28 ────────────────────
+          // Sign-out + account deletion grouped in one boxed section, mockup
+          // parity polish 2026-06-01. Settings as a dedicated surface stays
+          // deferred to a future SDD (notifications, theme, language).
+          ProfileSectionGroup(
+            title: 'SESIÓN', // i18n: Fase 6 Etapa 3
+            tiles: [
+              ProfileSectionTile(
+                icon: TreinoIcon.signOut,
+                title: 'Cerrar sesión', // i18n: Fase 6 Etapa 3
+                inGroup: true,
+                onTap: () => ref.read(authNotifierProvider.notifier).signOut(),
               ),
-              isScrollControlled: true,
-              builder: (_) => const EliminarCuentaSheet(),
-            ),
+              ProfileSectionTile(
+                icon: TreinoIcon.trash,
+                title: 'Eliminar cuenta', // i18n: Fase 6 Etapa 3
+                destructive: true,
+                inGroup: true,
+                onTap: () => showModalBottomSheet<void>(
+                  context: context,
+                  backgroundColor: palette.bgCard,
+                  shape: const RoundedRectangleBorder(
+                    borderRadius:
+                        BorderRadius.vertical(top: Radius.circular(18)),
+                  ),
+                  isScrollControlled: true,
+                  builder: (_) => const EliminarCuentaSheet(),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 20),
         ],
@@ -102,45 +113,77 @@ class _OwnProfileStatsRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final statsAsync = ref.watch(userSessionStatsProvider);
 
+    // Mockup parity 2026-06-01 polish: wrap in a card with light border +
+    // vertical dividers between the 3 stats. Numbers prominent, label small
+    // beneath (was the inverse in the pre-polish layout).
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-      child: Row(
-        children: [
-          _StatTile(
-            label: 'SESIONES', // i18n: Fase 6 Etapa 3
-            value: statsAsync.when(
-              data: (s) => s.totalSessions.toString(),
-              loading: () => '--',
-              error: (_, __) => '--',
-            ),
-            valueColor: palette.accent,
-            theme: theme,
-            palette: palette,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      child: Container(
+        decoration: BoxDecoration(
+          color: palette.bgCard,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: palette.textMuted.withValues(alpha: 0.12),
           ),
-          _StatTile(
-            label: 'VOLUMEN KG', // i18n: Fase 6 Etapa 3
-            value: statsAsync.when(
-              data: (s) => kFormat(s.totalVolumeKg),
-              loading: () => '--',
-              error: (_, __) => '--',
-            ),
-            valueColor: palette.accent,
-            theme: theme,
-            palette: palette,
+        ),
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        child: IntrinsicHeight(
+          child: Row(
+            children: [
+              _StatTile(
+                label: 'SESIONES', // i18n: Fase 6 Etapa 3
+                value: statsAsync.when(
+                  data: (s) => s.totalSessions.toString(),
+                  loading: () => '--',
+                  error: (_, __) => '--',
+                ),
+                valueColor: palette.accent,
+                theme: theme,
+                palette: palette,
+              ),
+              _StatDivider(palette: palette),
+              _StatTile(
+                label: 'VOLUMEN KG', // i18n: Fase 6 Etapa 3
+                value: statsAsync.when(
+                  data: (s) => kFormat(s.totalVolumeKg),
+                  loading: () => '--',
+                  error: (_, __) => '--',
+                ),
+                valueColor: palette.accent,
+                theme: theme,
+                palette: palette,
+              ),
+              _StatDivider(palette: palette),
+              _StatTile(
+                label: 'RACHA', // i18n: Fase 6 Etapa 3
+                value: statsAsync.when(
+                  data: (s) => s.streak.toString(),
+                  loading: () => '--',
+                  error: (_, __) => '--',
+                ),
+                valueColor: palette.highlight,
+                theme: theme,
+                palette: palette,
+              ),
+            ],
           ),
-          _StatTile(
-            label: 'RACHA', // i18n: Fase 6 Etapa 3
-            value: statsAsync.when(
-              data: (s) => s.streak.toString(),
-              loading: () => '--',
-              error: (_, __) => '--',
-            ),
-            valueColor: palette.highlight,
-            theme: theme,
-            palette: palette,
-          ),
-        ],
+        ),
       ),
+    );
+  }
+}
+
+class _StatDivider extends StatelessWidget {
+  const _StatDivider({required this.palette});
+
+  final AppPalette palette;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 1,
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      color: palette.textMuted.withValues(alpha: 0.18),
     );
   }
 }
@@ -162,23 +205,26 @@ class _StatTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Mockup parity 2026-06-01: number prominent ON TOP, label small below
+    // (previous order was inverted). Value font bumped to headlineMedium for
+    // the visual weight the mockup uses (143 / 92k / 12 read first).
     return Expanded(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
+            value,
+            style: theme.textTheme.headlineMedium?.copyWith(
+              color: valueColor,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
             label,
             style: theme.textTheme.labelSmall?.copyWith(
               color: palette.textMuted,
               letterSpacing: 1.2,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: theme.textTheme.headlineSmall?.copyWith(
-              color: valueColor,
-              fontWeight: FontWeight.w700,
             ),
           ),
         ],

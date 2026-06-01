@@ -36,6 +36,9 @@ mixin _$Routine {
   String? get assignedTo =>
       throw _privateConstructorUsedError; // athleteId — solo en planes privados asignados
   RoutineVisibility get visibility => throw _privateConstructorUsedError;
+  String? get createdBy =>
+      throw _privateConstructorUsedError; // uid del atleta que creó la rutina; null para system/trainer-assigned
+  RoutineStatus get status => throw _privateConstructorUsedError;
 
   /// Serializes this Routine to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -62,7 +65,9 @@ abstract class $RoutineCopyWith<$Res> {
       RoutineSource source,
       String? assignedBy,
       String? assignedTo,
-      RoutineVisibility visibility});
+      RoutineVisibility visibility,
+      String? createdBy,
+      RoutineStatus status});
 }
 
 /// @nodoc
@@ -91,6 +96,8 @@ class _$RoutineCopyWithImpl<$Res, $Val extends Routine>
     Object? assignedBy = freezed,
     Object? assignedTo = freezed,
     Object? visibility = null,
+    Object? createdBy = freezed,
+    Object? status = null,
   }) {
     return _then(_value.copyWith(
       id: null == id
@@ -137,6 +144,14 @@ class _$RoutineCopyWithImpl<$Res, $Val extends Routine>
           ? _value.visibility
           : visibility // ignore: cast_nullable_to_non_nullable
               as RoutineVisibility,
+      createdBy: freezed == createdBy
+          ? _value.createdBy
+          : createdBy // ignore: cast_nullable_to_non_nullable
+              as String?,
+      status: null == status
+          ? _value.status
+          : status // ignore: cast_nullable_to_non_nullable
+              as RoutineStatus,
     ) as $Val);
   }
 }
@@ -159,7 +174,9 @@ abstract class _$$RoutineImplCopyWith<$Res> implements $RoutineCopyWith<$Res> {
       RoutineSource source,
       String? assignedBy,
       String? assignedTo,
-      RoutineVisibility visibility});
+      RoutineVisibility visibility,
+      String? createdBy,
+      RoutineStatus status});
 }
 
 /// @nodoc
@@ -186,6 +203,8 @@ class __$$RoutineImplCopyWithImpl<$Res>
     Object? assignedBy = freezed,
     Object? assignedTo = freezed,
     Object? visibility = null,
+    Object? createdBy = freezed,
+    Object? status = null,
   }) {
     return _then(_$RoutineImpl(
       id: null == id
@@ -232,6 +251,14 @@ class __$$RoutineImplCopyWithImpl<$Res>
           ? _value.visibility
           : visibility // ignore: cast_nullable_to_non_nullable
               as RoutineVisibility,
+      createdBy: freezed == createdBy
+          ? _value.createdBy
+          : createdBy // ignore: cast_nullable_to_non_nullable
+              as String?,
+      status: null == status
+          ? _value.status
+          : status // ignore: cast_nullable_to_non_nullable
+              as RoutineStatus,
     ));
   }
 }
@@ -250,7 +277,9 @@ class _$RoutineImpl implements _Routine {
       this.source = RoutineSource.system,
       this.assignedBy,
       this.assignedTo,
-      this.visibility = RoutineVisibility.public})
+      this.visibility = RoutineVisibility.public,
+      this.createdBy,
+      this.status = RoutineStatus.active})
       : _days = days;
 
   factory _$RoutineImpl.fromJson(Map<String, dynamic> json) =>
@@ -291,10 +320,16 @@ class _$RoutineImpl implements _Routine {
   @override
   @JsonKey()
   final RoutineVisibility visibility;
+  @override
+  final String? createdBy;
+// uid del atleta que creó la rutina; null para system/trainer-assigned
+  @override
+  @JsonKey()
+  final RoutineStatus status;
 
   @override
   String toString() {
-    return 'Routine(id: $id, name: $name, split: $split, level: $level, days: $days, estimatedMinutesPerDay: $estimatedMinutesPerDay, imageUrl: $imageUrl, source: $source, assignedBy: $assignedBy, assignedTo: $assignedTo, visibility: $visibility)';
+    return 'Routine(id: $id, name: $name, split: $split, level: $level, days: $days, estimatedMinutesPerDay: $estimatedMinutesPerDay, imageUrl: $imageUrl, source: $source, assignedBy: $assignedBy, assignedTo: $assignedTo, visibility: $visibility, createdBy: $createdBy, status: $status)';
   }
 
   @override
@@ -317,7 +352,10 @@ class _$RoutineImpl implements _Routine {
             (identical(other.assignedTo, assignedTo) ||
                 other.assignedTo == assignedTo) &&
             (identical(other.visibility, visibility) ||
-                other.visibility == visibility));
+                other.visibility == visibility) &&
+            (identical(other.createdBy, createdBy) ||
+                other.createdBy == createdBy) &&
+            (identical(other.status, status) || other.status == status));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -334,7 +372,9 @@ class _$RoutineImpl implements _Routine {
       source,
       assignedBy,
       assignedTo,
-      visibility);
+      visibility,
+      createdBy,
+      status);
 
   /// Create a copy of Routine
   /// with the given fields replaced by the non-null parameter values.
@@ -364,7 +404,9 @@ abstract class _Routine implements Routine {
       final RoutineSource source,
       final String? assignedBy,
       final String? assignedTo,
-      final RoutineVisibility visibility}) = _$RoutineImpl;
+      final RoutineVisibility visibility,
+      final String? createdBy,
+      final RoutineStatus status}) = _$RoutineImpl;
 
   factory _Routine.fromJson(Map<String, dynamic> json) = _$RoutineImpl.fromJson;
 
@@ -390,6 +432,11 @@ abstract class _Routine implements Routine {
   String? get assignedTo; // athleteId — solo en planes privados asignados
   @override
   RoutineVisibility get visibility;
+  @override
+  String?
+      get createdBy; // uid del atleta que creó la rutina; null para system/trainer-assigned
+  @override
+  RoutineStatus get status;
 
   /// Create a copy of Routine
   /// with the given fields replaced by the non-null parameter values.

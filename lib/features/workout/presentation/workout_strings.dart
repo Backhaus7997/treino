@@ -59,4 +59,16 @@ abstract final class WorkoutStrings {
   static const detailStatVolume = 'VOLUMEN';
   static const detailStatPrsToday = 'PRS HOY';
   static const detailPrBadge = 'PR';
+
+  // ── MIS RUTINAS — self-creating editor (REQ-USR-011, Design §es-AR strings) ─
+  static const selfEditorTitle = 'Nueva rutina';
+  static const selfEditorSubmitLabel = 'CREAR RUTINA';
+  static const selfEditorSuccess = 'Rutina creada';
+  static const selfEditorError = 'No pudimos crear la rutina. Reintentá.';
+  static const selfEditorPermissionDenied =
+      'No tenés permisos para hacer esto. Recargá la app.';
+  static const editStubToast =
+      'Pronto vas a poder editar el contenido. Por ahora podés archivar y crear de nuevo.';
+  static const selfEditorCapReached =
+      'Llegaste al máximo de 10 rutinas activas.';
 }

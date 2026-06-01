@@ -3,6 +3,7 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 import '../../profile/domain/experience_level.dart';
 import 'routine_day.dart';
 import 'routine_source.dart';
+import 'routine_status.dart';
 import 'routine_visibility.dart';
 
 part 'routine.freezed.dart';
@@ -14,6 +15,10 @@ class Routine with _$Routine {
   /// en Fase 5 Etapa 1 (foundations). Defaults `system` + `public` mantienen
   /// retro-compat con las plantillas seedeadas en Fase 2 que no tienen estos
   /// fields en sus docs Firestore.
+  ///
+  /// `createdBy` y `status` se agregaron en Fase 6 Etapa 1.5
+  /// (athlete-self-routines). `createdBy` es null para plantillas del sistema
+  /// y planes asignados por PF. `status` default = `active` para retro-compat.
   const factory Routine({
     required String id,
     required String name,
@@ -27,6 +32,10 @@ class Routine with _$Routine {
     String? assignedBy, // trainerId — solo cuando source == trainerAssigned
     String? assignedTo, // athleteId — solo en planes privados asignados
     @Default(RoutineVisibility.public) RoutineVisibility visibility,
+    String?
+        createdBy, // uid del atleta que creó la rutina; null para system/trainer-assigned
+    @Default(RoutineStatus.active)
+    RoutineStatus status, // default active — retro-compat
   }) = _Routine;
 
   factory Routine.fromJson(Map<String, Object?> json) =>

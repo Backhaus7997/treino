@@ -20,6 +20,7 @@ import '../features/workout/application/session_providers.dart'
     show currentUidProvider;
 import '../features/workout/presentation/custom_exercise_editor_screen.dart';
 import '../features/workout/presentation/my_exercises_screen.dart';
+import '../features/workout/presentation/routine_editor_mode.dart';
 import '../features/workout/presentation/routine_editor_screen.dart';
 import '../features/workout/application/session_init.dart';
 import '../features/workout/presentation/exercise_detail_screen.dart';
@@ -253,16 +254,28 @@ GoRouter buildRouter({
                 path: 'routine-editor/:athleteId',
                 pageBuilder: (context, state) {
                   final athleteId = state.pathParameters['athleteId']!;
-                  return _noAnim(RoutineEditorScreen(athleteId: athleteId));
+                  return _noAnim(RoutineEditorScreen(
+                    mode: TrainerAssigning(athleteId: athleteId),
+                  ));
                 },
               ),
-              // Template editor: same RoutineEditorScreen with athleteId
-              // null. Used by the trainer's "NUEVA PLANTILLA" CTA in
+              // Template editor: same RoutineEditorScreen in TrainerTemplating
+              // mode. Used by the trainer's "NUEVA PLANTILLA" CTA in
               // TrainerWorkoutView.
               GoRoute(
                 path: 'template-editor',
-                pageBuilder: (_, __) =>
-                    _noAnim(const RoutineEditorScreen()),
+                pageBuilder: (_, __) => _noAnim(
+                  const RoutineEditorScreen(mode: TrainerTemplating()),
+                ),
+              ),
+              // Self-creating editor: athlete builds their own routine
+              // (REQ-USR-009, ADR-USR-01). PR2 of athlete-self-routines —
+              // route exists; user-facing CTA wire comes in PR3.
+              GoRoute(
+                path: 'my-routine-editor',
+                pageBuilder: (_, __) => _noAnim(
+                  const RoutineEditorScreen(mode: SelfCreating()),
+                ),
               ),
             ],
           ),

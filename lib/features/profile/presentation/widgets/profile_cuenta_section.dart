@@ -1,15 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 
-import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/treino_icon.dart';
 import '../../../auth/application/auth_providers.dart';
 import '../../../feed/application/friendship_providers.dart';
 import '../../../feed/domain/gym_name.dart';
 import '../../application/assigned_routines_providers.dart';
 import '../../application/user_providers.dart';
+import 'profile_section_group.dart';
 import 'profile_section_tile.dart';
 
 /// The "CUENTA" section of [ProfileScreen].
@@ -27,7 +26,6 @@ class ProfileCuentaSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final palette = AppPalette.of(context);
     final myUid = ref.watch(authStateChangesProvider).valueOrNull?.uid;
     final profileAsync = ref.watch(userProfileProvider);
     final requestCount = ref.watch(pendingRequestCountProvider(myUid ?? ''));
@@ -45,59 +43,45 @@ class ProfileCuentaSection extends ConsumerWidget {
         ? 'Sin gym' // i18n: Fase 6 Etapa 3
         : gymNameFromId(gymId);
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(0, 18, 0, 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Text(
-              'CUENTA', // i18n: Fase 6 Etapa 3
-              style: GoogleFonts.barlowCondensed(
-                fontWeight: FontWeight.w700,
-                fontSize: 12,
-                letterSpacing: 1.4,
-                color: palette.textMuted,
-              ),
-            ),
-          ),
-          const SizedBox(height: 6),
+    return ProfileSectionGroup(
+      title: 'CUENTA', // i18n: Fase 6 Etapa 3
+      tiles: [
+        // 1. Solicitudes de amistad
+        ProfileSectionTile(
+          icon: TreinoIcon.users,
+          title: 'Solicitudes de amistad', // i18n: Fase 6 Etapa 3
+          subtitle: solicitudesSubtitle,
+          inGroup: true,
+          onTap: () => context.push('/profile/friend-requests'),
+        ),
 
-          // 1. Solicitudes de amistad
-          ProfileSectionTile(
-            icon: TreinoIcon.users,
-            title: 'Solicitudes de amistad', // i18n: Fase 6 Etapa 3
-            subtitle: solicitudesSubtitle,
-            onTap: () => context.push('/profile/friend-requests'),
-          ),
+        // 2. Datos personales
+        ProfileSectionTile(
+          icon: TreinoIcon.edit,
+          title: 'Datos personales', // i18n: Fase 6 Etapa 3
+          subtitle: 'Editá tu info', // i18n: Fase 6 Etapa 3
+          inGroup: true,
+          onTap: () => context.push('/profile/edit-personal'),
+        ),
 
-          // 2. Datos personales
-          ProfileSectionTile(
-            icon: TreinoIcon.edit,
-            title: 'Datos personales', // i18n: Fase 6 Etapa 3
-            subtitle: 'Editá tu info', // i18n: Fase 6 Etapa 3
-            onTap: () => context.push('/profile/edit-personal'),
-          ),
+        // 3. Gimnasio
+        ProfileSectionTile(
+          icon: TreinoIcon.gym,
+          title: 'Gimnasio', // i18n: Fase 6 Etapa 3
+          subtitle: gymSubtitle,
+          inGroup: true,
+          onTap: () => context.push('/profile/gym'),
+        ),
 
-          // 3. Gimnasio
-          ProfileSectionTile(
-            icon: TreinoIcon.gym,
-            title: 'Gimnasio', // i18n: Fase 6 Etapa 3
-            subtitle: gymSubtitle,
-            onTap: () => context.push('/profile/gym'),
-          ),
-
-          // 4. Mis rutinas
-          ProfileSectionTile(
-            icon: TreinoIcon.dumbbell,
-            title: 'Mis rutinas', // i18n: Fase 6 Etapa 3
-            subtitle: '$routinesCount activas', // i18n: Fase 6 Etapa 3
-            onTap: () => context.push('/profile/routines'),
-          ),
-        ],
-      ),
+        // 4. Mis rutinas
+        ProfileSectionTile(
+          icon: TreinoIcon.dumbbell,
+          title: 'Mis rutinas', // i18n: Fase 6 Etapa 3
+          subtitle: '$routinesCount activas', // i18n: Fase 6 Etapa 3
+          inGroup: true,
+          onTap: () => context.push('/profile/routines'),
+        ),
+      ],
     );
   }
 }

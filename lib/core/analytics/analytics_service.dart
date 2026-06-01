@@ -120,8 +120,7 @@ class FirebaseAnalyticsService implements AnalyticsService {
       );
 
   @override
-  Future<void> logLinkAccepted({required String linkId}) =>
-      _analytics.logEvent(
+  Future<void> logLinkAccepted({required String linkId}) => _analytics.logEvent(
         name: 'link_accepted',
         parameters: {'link_id': linkId},
       );

@@ -73,7 +73,10 @@ class _CardBody extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    displayName ?? 'Sin nombre', // i18n: Fase 6 Etapa 3
+                    // Uppercase per mockup parity 2026-06-01 polish pass —
+                    // matches "ANA NÚÑEZ" treatment in the design comp.
+                    (displayName ?? 'Sin nombre')
+                        .toUpperCase(), // i18n: Fase 6 Etapa 3
                     style: GoogleFonts.barlowCondensed(
                       fontWeight: FontWeight.w700,
                       fontSize: 20,

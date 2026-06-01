@@ -1,5 +1,5 @@
-// Tests for RoutineEditorScreen — SCENARIO-457..463
-// REQ-COACH-PLANS-023..028
+// Tests for RoutineEditorScreen — SCENARIO-457..463, SCENARIO-616..619
+// REQ-COACH-PLANS-023..028 · REQ-USR-011
 
 import 'dart:async';
 
@@ -17,13 +17,19 @@ import 'package:treino/features/workout/application/routine_providers.dart'
     show routineRepositoryProvider;
 import 'package:treino/features/workout/application/session_providers.dart'
     show currentUidProvider;
+import 'package:treino/features/workout/application/user_routines_providers.dart'
+    show userCreatedRoutinesProvider;
 import 'package:treino/features/workout/data/routine_repository.dart';
 import 'package:treino/features/workout/domain/custom_exercise.dart';
 import 'package:treino/features/workout/domain/exercise.dart';
 import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/profile/domain/experience_level.dart';
 import 'package:treino/features/workout/domain/routine_source.dart';
+import 'package:treino/features/workout/domain/routine_status.dart';
+import 'package:treino/features/workout/domain/routine_visibility.dart';
+import 'package:treino/features/workout/presentation/routine_editor_mode.dart';
 import 'package:treino/features/workout/presentation/routine_editor_screen.dart';
+import 'package:treino/features/workout/presentation/workout_strings.dart';
 
 import '../../../helpers/fake_analytics_service.dart';
 
@@ -48,15 +54,34 @@ const _kExercises = [
   ),
 ];
 
+// ── Fixtures ─────────────────────────────────────────────────────────────────
+
+Routine userCreatedRoutineFixture({
+  String id = 'r1',
+  String createdBy = 'athlete-1',
+  RoutineStatus status = RoutineStatus.active,
+}) =>
+    Routine(
+      id: id,
+      name: 'Mi rutina',
+      split: 'Full Body',
+      level: ExperienceLevel.beginner,
+      days: const [],
+      source: RoutineSource.userCreated,
+      visibility: RoutineVisibility.private,
+      createdBy: createdBy,
+      status: status,
+    );
+
 // ── Helper ────────────────────────────────────────────────────────────────────
 
-Future<void> _pumpEditor(
+Future<void> _pumpEditorWithMode(
   WidgetTester tester, {
-  required String athleteId,
+  required RoutineEditorMode mode,
   required List<Override> overrides,
 }) async {
   final router = GoRouter(
-    initialLocation: '/workout/routine-editor/$athleteId',
+    initialLocation: '/workout/editor',
     routes: [
       ShellRoute(
         builder: (context, state, child) => Scaffold(
@@ -65,15 +90,18 @@ Future<void> _pumpEditor(
         ),
         routes: [
           GoRoute(
-            path: '/workout/routine-editor/:athleteId',
-            builder: (context, state) => RoutineEditorScreen(
-              athleteId: state.pathParameters['athleteId']!,
-            ),
+            path: '/workout/editor',
+            builder: (context, state) => RoutineEditorScreen(mode: mode),
           ),
           GoRoute(
             path: '/coach',
             builder: (_, __) =>
                 const Scaffold(body: Center(child: Text('CoachHome'))),
+          ),
+          GoRoute(
+            path: '/workout',
+            builder: (_, __) =>
+                const Scaffold(body: Center(child: Text('WorkoutHome'))),
           ),
         ],
       ),
@@ -90,6 +118,17 @@ Future<void> _pumpEditor(
     ),
   );
 }
+
+Future<void> _pumpEditor(
+  WidgetTester tester, {
+  required String athleteId,
+  required List<Override> overrides,
+}) =>
+    _pumpEditorWithMode(
+      tester,
+      mode: TrainerAssigning(athleteId: athleteId),
+      overrides: overrides,
+    );
 
 List<Override> _baseOverrides({
   RoutineRepository? repo,
@@ -291,7 +330,9 @@ void main() {
               GoRoute(
                 path: '/workout/routine-editor/:athleteId',
                 builder: (context, state) => RoutineEditorScreen(
-                  athleteId: state.pathParameters['athleteId']!,
+                  mode: TrainerAssigning(
+                    athleteId: state.pathParameters['athleteId']!,
+                  ),
                 ),
               ),
               GoRoute(
@@ -380,6 +421,168 @@ void main() {
         find.widgetWithText(ElevatedButton, CoachStrings.editorSubmit),
       );
       expect(submitButton.onPressed, isNotNull);
+    });
+  });
+
+  // ── SCENARIO-616..619: RoutineEditorMode parametrization (T-USR-023) ─────────
+
+  group('RoutineEditorScreen — mode parametrization', () {
+    List<Override> selfCreatingOverrides({
+      RoutineRepository? repo,
+      String uid = 'athlete-1',
+      List<Routine> userRoutines = const [],
+    }) {
+      final mockRepo = repo ?? _MockRoutineRepository();
+      return [
+        currentUidProvider.overrideWithValue(uid),
+        routineRepositoryProvider.overrideWithValue(mockRepo),
+        exercisesProvider.overrideWith((ref) async => _kExercises),
+        customExercisesForTrainerStreamProvider(uid).overrideWith(
+          (ref) => Stream<List<CustomExercise>>.value(const <CustomExercise>[]),
+        ),
+        analyticsServiceProvider.overrideWithValue(FakeAnalyticsService()),
+        userCreatedRoutinesProvider(uid).overrideWith(
+          (ref) => Stream.value(userRoutines),
+        ),
+      ];
+    }
+
+    testWidgets(
+        'SCENARIO-616: TrainerAssigning mode calls createAssigned (regression)',
+        (tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.createAssigned(any())).thenAnswer((inv) async {
+        final r = inv.positionalArguments[0] as Routine;
+        return r.copyWith(id: 'gen-id');
+      });
+
+      await _pumpEditorWithMode(
+        tester,
+        mode: const TrainerAssigning(athleteId: 'athlete-1'),
+        overrides: _baseOverrides(repo: repo),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+          find.byKey(const Key('editor_name_field')), 'Plan Test');
+      await tester.enterText(
+          find.byKey(const Key('editor_split_field')), 'PPL');
+      await tester.tap(find.text(CoachStrings.editorAddSlot));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(CoachStrings.exercisePicker));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Sentadilla'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text(CoachStrings.editorSubmit));
+      await tester.pumpAndSettle();
+
+      verify(() => repo.createAssigned(any())).called(1);
+      verifyNever(() => repo.createUserOwned(
+            uid: any(named: 'uid'),
+            draft: any(named: 'draft'),
+          ));
+    });
+
+    testWidgets(
+        'SCENARIO-617: SelfCreating mode calls createUserOwned with current uid',
+        (tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.createUserOwned(
+            uid: any(named: 'uid'),
+            draft: any(named: 'draft'),
+          )).thenAnswer((inv) async {
+        final draft = inv.namedArguments[const Symbol('draft')] as Routine;
+        return draft.copyWith(id: 'user-gen-id');
+      });
+
+      await _pumpEditorWithMode(
+        tester,
+        mode: const SelfCreating(),
+        overrides: selfCreatingOverrides(repo: repo),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+          find.byKey(const Key('editor_name_field')), 'Mi Rutina');
+      await tester.enterText(
+          find.byKey(const Key('editor_split_field')), 'Full Body');
+      await tester.tap(find.text(CoachStrings.editorAddSlot));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(CoachStrings.exercisePicker));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Sentadilla'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text(WorkoutStrings.selfEditorSubmitLabel));
+      await tester.pumpAndSettle();
+
+      verify(() => repo.createUserOwned(
+            uid: 'athlete-1',
+            draft: any(named: 'draft'),
+          )).called(1);
+      verifyNever(() => repo.createAssigned(any()));
+    });
+
+    testWidgets(
+        'SCENARIO-618: SelfCreating header shows selfEditorTitle; submit shows selfEditorSubmitLabel',
+        (tester) async {
+      await _pumpEditorWithMode(
+        tester,
+        mode: const SelfCreating(),
+        overrides: selfCreatingOverrides(),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text(WorkoutStrings.selfEditorTitle), findsOneWidget);
+      expect(find.text(WorkoutStrings.selfEditorSubmitLabel), findsOneWidget);
+      // TrainerAssigning title must NOT appear
+      expect(find.text(CoachStrings.editorTitle), findsNothing);
+      // TrainerAssigning submit label must NOT appear
+      expect(find.text(CoachStrings.editorSubmit), findsNothing);
+    });
+
+    testWidgets(
+        'SCENARIO-616 (title regression): TrainerAssigning header shows editorTitle',
+        (tester) async {
+      await _pumpEditorWithMode(
+        tester,
+        mode: const TrainerAssigning(athleteId: 'athlete-1'),
+        overrides: _baseOverrides(),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text(CoachStrings.editorTitle), findsOneWidget);
+      expect(find.text(CoachStrings.editorSubmit), findsOneWidget);
+      // SelfCreating strings must NOT appear
+      expect(find.text(WorkoutStrings.selfEditorTitle), findsNothing);
+    });
+
+    testWidgets(
+        'SCENARIO-619: SelfCreating with existingRoutineId surfaces stub toast',
+        (tester) async {
+      await _pumpEditorWithMode(
+        tester,
+        mode: const SelfCreating(existingRoutineId: 'existing-r1'),
+        overrides: selfCreatingOverrides(),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+          find.byKey(const Key('editor_name_field')), 'Mi Rutina');
+      await tester.enterText(
+          find.byKey(const Key('editor_split_field')), 'Full Body');
+      await tester.tap(find.text(CoachStrings.editorAddSlot));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(CoachStrings.exercisePicker));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Sentadilla'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text(WorkoutStrings.selfEditorSubmitLabel));
+      await tester.pumpAndSettle();
+
+      expect(find.text(WorkoutStrings.editStubToast), findsOneWidget);
     });
   });
 }

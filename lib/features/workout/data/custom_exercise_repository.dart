@@ -107,7 +107,7 @@ class CustomExerciseRepository {
   /// Single-doc fetch for a routine slot whose exercise lives in this
   /// trainer's personal library. Returns null if the doc is missing — the
   /// detail screen handles that as a "no encontrado" state instead of
-  /// crashing. Reads are gated by storage.rules: any authenticated user
+  /// crashing. Reads are gated by firestore.rules: any authenticated user
   /// can read any trainer's customExercises so athletes can open the
   /// detail screen for a custom exercise referenced from a routine.
   Future<CustomExercise?> getById({

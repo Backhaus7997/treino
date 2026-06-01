@@ -62,11 +62,11 @@ Future<void> main() async {
       // a true para que los crashes lleguen al dashboard durante dev.
       // Trade-off aceptado: dashboard con noise de dev runs hasta que el
       // producto justifique filtrar por build flavor (Fase 7).
-      await FirebaseCrashlytics.instance
-          .setCrashlyticsCollectionEnabled(true);
+      await FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(true);
 
       // Errores sync del framework (build/layout/paint).
-      FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
+      FlutterError.onError =
+          FirebaseCrashlytics.instance.recordFlutterFatalError;
 
       // Errores que escapan al engine (handlers nativos, gestos, etc.).
       PlatformDispatcher.instance.onError = (error, stack) {

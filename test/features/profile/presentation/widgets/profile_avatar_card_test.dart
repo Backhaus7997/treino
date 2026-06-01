@@ -71,7 +71,10 @@ void main() {
       await tester.pumpWidget(_buildCard(profile: _profile()));
       await tester.pumpAndSettle();
 
-      expect(find.text('Maria Gomez'), findsOneWidget);
+      // Display name is uppercased on render (mockup parity 2026-06-01 polish).
+      // The @handle derivation still operates on the raw displayName, so the
+      // handle stays lowercase.
+      expect(find.text('MARIA GOMEZ'), findsOneWidget);
       expect(find.text('@maria.gomez'), findsOneWidget);
     });
 
@@ -83,7 +86,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Ana Núñez'), findsOneWidget);
+      // Display name uppercased; handle derivation preserves accents.
+      expect(find.text('ANA NÚÑEZ'), findsOneWidget);
       expect(find.text('@ana.núñez'), findsOneWidget);
     });
 

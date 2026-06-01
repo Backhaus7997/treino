@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart'
 
 import '../domain/routine.dart';
 import '../domain/routine_source.dart';
+import '../domain/routine_status.dart';
 import '../domain/routine_visibility.dart';
 
 class RoutineRepository {
@@ -14,22 +15,99 @@ class RoutineRepository {
   CollectionReference<Map<String, Object?>> get _collection =>
       _firestore.collection('routines');
 
-  /// Lists every public routine in the catalogue. Used by the Plantillas
-  /// screen to render seed plans.
+  /// Returns only system-seeded template routines (source == 'system').
   ///
-  /// The `where('visibility', isEqualTo: 'public')` filter is REQUIRED by
-  /// firestore.rules: the read rule on `routines` checks
-  /// `resource.data.visibility` per doc, so Firestore rejects list queries
-  /// that don't constrain that field. Trainer-assigned (`private`) plans
-  /// are fetched per-athlete via [listAssignedTo]; `shared` plans are
-  /// explicitly excluded from Plantillas by design.
+  /// Renamed from [listAll] per REQ-USR-015 / ADR-USR-05. The added
+  /// `source == 'system'` filter closes the latent contamination risk: any
+  /// future user-created routine accidentally flipped to `visibility=public`
+  /// would no longer surface in the Plantillas screen.
   ///
-  /// Legacy seed routines that pre-date the visibility field are reconciled
-  /// by `scripts/backfill_routines_source_visibility.js`.
-  Future<List<Routine>> listAll() async {
-    final snap =
-        await _collection.where('visibility', isEqualTo: 'public').get();
+  /// Used by [routinesProvider] (Plantillas section).
+  Future<List<Routine>> listSystemTemplates() async {
+    final snap = await _collection
+        .where('source', isEqualTo: 'system')
+        .where('visibility', isEqualTo: 'public')
+        .get();
     return snap.docs.map(_fromDoc).whereType<Routine>().toList();
+  }
+
+  /// Creates a new routine owned by [uid] (athlete self-authored).
+  ///
+  /// Enforces defensive invariants client-side before write (Firestore rules
+  /// enforce the same constraints server-side):
+  /// - [uid] must be non-empty.
+  /// - [draft] must not carry `assignedBy` or `assignedTo`.
+  ///
+  /// Forces `source=user-created`, `createdBy=uid`, `visibility=private`,
+  /// `status=active`, and `createdAt=FieldValue.serverTimestamp()`.
+  ///
+  /// REQ-USR-004, SCENARIO-USR-005..007, ADR-USR-03.
+  Future<Routine> createUserOwned({
+    required String uid,
+    required Routine draft,
+  }) async {
+    if (uid.isEmpty) {
+      throw ArgumentError.value(uid, 'uid', 'must be non-empty');
+    }
+    if (draft.assignedBy != null) {
+      throw ArgumentError(
+        'user-created routines must not carry assignedBy',
+      );
+    }
+    if (draft.assignedTo != null) {
+      throw ArgumentError(
+        'user-created routines must not carry assignedTo',
+      );
+    }
+
+    final json = draft.toJson()
+      ..remove('id')
+      ..['source'] = 'user-created'
+      ..['createdBy'] = uid
+      ..['visibility'] = 'private'
+      ..['status'] = 'active'
+      ..['createdAt'] = FieldValue.serverTimestamp();
+
+    final ref = await _collection.add(json);
+    return draft.copyWith(
+      id: ref.id,
+      source: RoutineSource.userCreated,
+      createdBy: uid,
+      visibility: RoutineVisibility.private,
+      status: RoutineStatus.active,
+    );
+  }
+
+  /// Returns a live stream of the athlete's own active routines, ordered
+  /// newest first.
+  ///
+  /// Returns [Stream.value] of an empty list when [uid] is empty (safe guard
+  /// for unauthenticated widget state).
+  ///
+  /// Requires the composite index on `(createdBy, source, status, createdAt)`
+  /// declared in `firestore.indexes.json` (REQ-USR-017 / ADR-USR-03).
+  ///
+  /// REQ-USR-007, SCENARIO-USR-015, ADR-FRI-013.
+  Stream<List<Routine>> listUserCreated(String uid) {
+    if (uid.isEmpty) return Stream.value(const []);
+    return _collection
+        .where('createdBy', isEqualTo: uid)
+        .where('source', isEqualTo: 'user-created')
+        .where('status', isEqualTo: 'active')
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snap) => snap.docs.map(_fromDoc).whereType<Routine>().toList());
+  }
+
+  /// Soft-deletes a routine by flipping its `status` to `archived`.
+  ///
+  /// The document is preserved so that historical workout session references
+  /// remain intact (ADR-USR-04). Only the `status` field is mutated,
+  /// matching the narrow Firestore update rule (REQ-USR-013).
+  ///
+  /// REQ-USR-006, SCENARIO-USR-010..011.
+  Future<void> archive(String routineId) async {
+    await _collection.doc(routineId).update({'status': 'archived'});
   }
 
   Future<Routine?> getById(String id) async {
