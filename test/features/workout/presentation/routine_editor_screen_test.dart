@@ -10,12 +10,14 @@ import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/coach/presentation/coach_strings.dart';
+import 'package:treino/features/workout/application/custom_exercise_providers.dart';
 import 'package:treino/features/workout/application/exercise_providers.dart';
 import 'package:treino/features/workout/application/routine_providers.dart'
     show routineRepositoryProvider;
 import 'package:treino/features/workout/application/session_providers.dart'
     show currentUidProvider;
 import 'package:treino/features/workout/data/routine_repository.dart';
+import 'package:treino/features/workout/domain/custom_exercise.dart';
 import 'package:treino/features/workout/domain/exercise.dart';
 import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/profile/domain/experience_level.dart';
@@ -94,6 +96,11 @@ List<Override> _baseOverrides({
     currentUidProvider.overrideWithValue('trainer-1'),
     routineRepositoryProvider.overrideWithValue(mockRepo),
     exercisesProvider.overrideWith((ref) async => _kExercises),
+    // The picker now ALSO watches the trainer's custom exercises (PR3 item 1).
+    // Provide an empty stream so the tests don't try to hit live Firestore.
+    customExercisesForTrainerStreamProvider('trainer-1').overrideWith(
+      (ref) => Stream<List<CustomExercise>>.value(const <CustomExercise>[]),
+    ),
   ];
 }
 
@@ -298,6 +305,10 @@ void main() {
             currentUidProvider.overrideWithValue('trainer-1'),
             routineRepositoryProvider.overrideWithValue(repo),
             exercisesProvider.overrideWith((ref) async => _kExercises),
+            customExercisesForTrainerStreamProvider('trainer-1').overrideWith(
+              (ref) =>
+                  Stream<List<CustomExercise>>.value(const <CustomExercise>[]),
+            ),
           ],
           child: MaterialApp.router(
             theme: AppTheme.dark(),
