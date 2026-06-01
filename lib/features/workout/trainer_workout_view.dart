@@ -1,25 +1,36 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../app/theme/app_palette.dart';
 import '../../core/widgets/treino_icon.dart';
+import '../coach/presentation/widgets/athlete_picker_sheet.dart';
+import 'application/routine_providers.dart';
+import 'application/session_providers.dart' show currentUidProvider;
+import 'domain/routine.dart';
 
 /// Trainer-specific workout tab — replaces the athlete WORKOUT body (rutina /
 /// plantillas / historial) with a "Crear planes" surface. The trainer should
 /// not see athlete-mode controls (no EMPEZAR, no historial propio); their
 /// workout tab is dedicated to building and assigning routines.
 ///
-/// v1 scope: visual scaffold + explainer + CTA that routes to ALUMNOS. The
-/// trainer's existing assignment flow (`/workout/routine-editor/:athleteId`)
-/// is reached from there. A future iteration can surface the trainer's own
-/// template library directly here.
-class TrainerWorkoutView extends StatelessWidget {
+/// Two side-by-side surfaces:
+///   * **Asignar a un alumno** — quick jump to ALUMNOS to build a plan
+///     directly inside an athlete's profile.
+///   * **Tu biblioteca de plantillas** — reusable plans the PF saves
+///     without assigning to anyone. Each card has an "Asignar a alumno"
+///     CTA that copies the template into a fresh trainer-assigned plan.
+class TrainerWorkoutView extends ConsumerWidget {
   const TrainerWorkoutView({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
+    final uid = ref.watch(currentUidProvider) ?? '';
+    final templatesAsync = uid.isEmpty
+        ? const AsyncValue<List<Routine>>.data(<Routine>[])
+        : ref.watch(trainerTemplatesStreamProvider(uid));
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -48,15 +59,16 @@ class TrainerWorkoutView extends StatelessWidget {
           const SizedBox(height: 20),
           _AssignFromAlumnoCard(palette: palette),
           const SizedBox(height: 12),
-          _TemplateLibraryPlaceholder(palette: palette),
+          _TemplateLibrarySection(
+            palette: palette,
+            templatesAsync: templatesAsync,
+          ),
         ],
       ),
     );
   }
 }
 
-/// Card explaining how to start a plan today (via the alumno selection flow)
-/// + a CTA that jumps to ALUMNOS.
 class _AssignFromAlumnoCard extends StatelessWidget {
   const _AssignFromAlumnoCard({required this.palette});
   final AppPalette palette;
@@ -127,14 +139,17 @@ class _AssignFromAlumnoCard extends StatelessWidget {
   }
 }
 
-/// Visual placeholder for the future template library section. Communicates
-/// intent without committing to a data shape yet.
-class _TemplateLibraryPlaceholder extends StatelessWidget {
-  const _TemplateLibraryPlaceholder({required this.palette});
+class _TemplateLibrarySection extends ConsumerWidget {
+  const _TemplateLibrarySection({
+    required this.palette,
+    required this.templatesAsync,
+  });
+
   final AppPalette palette;
+  final AsyncValue<List<Routine>> templatesAsync;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -145,24 +160,189 @@ class _TemplateLibraryPlaceholder extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'TU BIBLIOTECA DE PLANTILLAS',
-            style: GoogleFonts.barlowCondensed(
-              fontWeight: FontWeight.w700,
-              fontSize: 12,
-              letterSpacing: 1.2,
-              color: palette.textMuted,
-            ),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'TU BIBLIOTECA DE PLANTILLAS',
+                  style: GoogleFonts.barlowCondensed(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                    letterSpacing: 1.2,
+                    color: palette.textMuted,
+                  ),
+                ),
+              ),
+              TextButton.icon(
+                onPressed: () => context.push('/workout/template-editor'),
+                icon: Icon(TreinoIcon.plus,
+                    size: 14, color: palette.accent),
+                label: Text(
+                  'NUEVA',
+                  style: GoogleFonts.barlowCondensed(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                    letterSpacing: 1.0,
+                    color: palette.accent,
+                  ),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 8),
-          Text(
-            'Próximamente vas a poder crear plantillas reutilizables sin asignarlas a un alumno específico — para tu propio catálogo.',
-            style: GoogleFonts.barlow(
-              fontWeight: FontWeight.w400,
-              fontSize: 13,
-              height: 1.4,
-              color: palette.textPrimary,
+          templatesAsync.when(
+            loading: () => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              child: Center(
+                child: SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2.2, color: palette.accent),
+                ),
+              ),
             ),
+            error: (_, __) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: Text(
+                'No pudimos cargar tus plantillas.',
+                style: GoogleFonts.barlow(
+                    color: palette.textMuted, fontSize: 13),
+              ),
+            ),
+            data: (templates) {
+              if (templates.isEmpty) {
+                return Padding(
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 12),
+                  child: Text(
+                    'Todavía no creaste ninguna plantilla. Pegale a NUEVA para armar la primera.',
+                    style: GoogleFonts.barlow(
+                      fontWeight: FontWeight.w400,
+                      fontSize: 13,
+                      height: 1.4,
+                      color: palette.textPrimary,
+                    ),
+                  ),
+                );
+              }
+              return Column(
+                children: [
+                  for (final t in templates) ...[
+                    _TemplateCard(template: t, palette: palette),
+                    const SizedBox(height: 8),
+                  ],
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TemplateCard extends ConsumerStatefulWidget {
+  const _TemplateCard({required this.template, required this.palette});
+
+  final Routine template;
+  final AppPalette palette;
+
+  @override
+  ConsumerState<_TemplateCard> createState() => _TemplateCardState();
+}
+
+class _TemplateCardState extends ConsumerState<_TemplateCard> {
+  bool _assigning = false;
+
+  Future<void> _onAssign(BuildContext context) async {
+    final athleteId = await showAthletePickerSheet(context);
+    if (athleteId == null || !mounted) return;
+    setState(() => _assigning = true);
+    try {
+      await ref
+          .read(routineRepositoryProvider)
+          .assignTemplateToAthlete(
+            template: widget.template,
+            athleteId: athleteId,
+          );
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Plantilla asignada al alumno.')),
+      );
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No pudimos asignar la plantilla.')),
+      );
+    } finally {
+      if (mounted) setState(() => _assigning = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = widget.palette;
+    final t = widget.template;
+    final daysCount = t.days.length;
+    return Container(
+      padding:
+          const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: palette.bg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: palette.border, width: 1),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  t.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.barlow(
+                    color: palette.textPrimary,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '${t.split} · $daysCount día${daysCount == 1 ? '' : 's'}',
+                  style: GoogleFonts.barlow(
+                    color: palette.textMuted,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          TextButton(
+            onPressed: _assigning ? null : () => _onAssign(context),
+            style: TextButton.styleFrom(
+              foregroundColor: palette.accent,
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 12, vertical: 6),
+            ),
+            child: _assigning
+                ? SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: palette.accent),
+                  )
+                : Text(
+                    'ASIGNAR',
+                    style: GoogleFonts.barlowCondensed(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12,
+                      letterSpacing: 0.8,
+                    ),
+                  ),
           ),
         ],
       ),

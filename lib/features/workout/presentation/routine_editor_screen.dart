@@ -42,14 +42,23 @@ class _EditableDay {
 /// Full-screen plan builder for trainers.
 ///
 /// Lives inside the ShellRoute — NO own Scaffold (bottom bar provided by
-/// shell). Uses local StatefulWidget state for the mutable form. Submits via
-/// `RoutineRepository.createAssigned` and pops back on success.
+/// shell). Uses local StatefulWidget state for the mutable form.
+///
+/// Dual-mode:
+///   * `athleteId` non-null → trainer-assigned plan for that athlete.
+///     Submits via `RoutineRepository.createAssigned`.
+///   * `athleteId == null` → reusable template that the PF keeps in their
+///     own library without assigning yet. Submits via
+///     `RoutineRepository.createTemplate`. The PF can later copy it into
+///     a real assigned plan from the TrainerWorkoutView template list.
 ///
 /// REQ-COACH-PLANS-023..028 · SCENARIO-457..463.
 class RoutineEditorScreen extends StatefulWidget {
-  const RoutineEditorScreen({super.key, required this.athleteId});
+  const RoutineEditorScreen({super.key, this.athleteId});
 
-  final String athleteId;
+  final String? athleteId;
+
+  bool get isTemplate => athleteId == null;
 
   @override
   State<RoutineEditorScreen> createState() => _RoutineEditorScreenState();
@@ -128,6 +137,7 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
     setState(() => _submitting = true);
 
     final trainerUid = ref.read(currentUidProvider) ?? '';
+    final isTemplate = widget.isTemplate;
     final routine = Routine(
       id: '',
       name: _name.trim(),
@@ -150,23 +160,49 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
                     .toList(),
               ))
           .toList(),
-      source: RoutineSource.trainerAssigned,
+      source: isTemplate
+          ? RoutineSource.trainerTemplate
+          : RoutineSource.trainerAssigned,
       assignedBy: trainerUid,
-      assignedTo: widget.athleteId,
+      assignedTo: isTemplate ? null : widget.athleteId,
       visibility: RoutineVisibility.private,
     );
 
     try {
-      await ref.read(routineRepositoryProvider).createAssigned(routine);
+      final repo = ref.read(routineRepositoryProvider);
+      if (isTemplate) {
+        await repo.createTemplate(routine);
+      } else {
+        await repo.createAssigned(routine);
+      }
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text(CoachStrings.createPlanSuccess)),
+        SnackBar(
+          content: Text(
+            isTemplate
+                ? 'Plantilla guardada.'
+                : CoachStrings.createPlanSuccess,
+          ),
+        ),
       );
       context.pop();
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
+      // For the new template path we surface the actual error message until
+      // the flow is hardened in real Firestore — `permission-denied` vs
+      // `failed-precondition` vs other tells us immediately what to deploy.
+      // The assigned-plan path keeps the original generic copy so existing
+      // SCENARIO-463 stays valid.
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text(CoachStrings.createPlanError)),
+        SnackBar(
+          content: Text(
+            isTemplate
+                ? 'No pudimos crear la plantilla: $e'
+                : CoachStrings.createPlanError,
+          ),
+          duration:
+              isTemplate ? const Duration(seconds: 6) : const Duration(seconds: 4),
+        ),
       );
       setState(() => _submitting = false);
     }

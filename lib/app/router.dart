@@ -240,6 +240,14 @@ GoRouter buildRouter({
                   return _noAnim(RoutineEditorScreen(athleteId: athleteId));
                 },
               ),
+              // Template editor: same RoutineEditorScreen with athleteId
+              // null. Used by the trainer's "NUEVA PLANTILLA" CTA in
+              // TrainerWorkoutView.
+              GoRoute(
+                path: 'template-editor',
+                pageBuilder: (_, __) =>
+                    _noAnim(const RoutineEditorScreen()),
+              ),
             ],
           ),
           GoRoute(
