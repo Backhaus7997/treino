@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../domain/custom_exercise.dart';
+import 'custom_exercise_video_upload_service.dart';
 
 /// Firestore-backed repository for a trainer's personal exercise library.
 ///
@@ -9,10 +10,14 @@ import '../domain/custom_exercise.dart';
 /// Auto-generated doc IDs; `ownerId` field also stored in the doc body for
 /// convenience when reading via collectionGroup queries in the future.
 class CustomExerciseRepository {
-  CustomExerciseRepository({required FirebaseFirestore firestore})
-      : _firestore = firestore;
+  CustomExerciseRepository({
+    required FirebaseFirestore firestore,
+    required CustomExerciseVideoUploadService videoUploadService,
+  })  : _firestore = firestore,
+        _videoUploadService = videoUploadService;
 
   final FirebaseFirestore _firestore;
+  final CustomExerciseVideoUploadService _videoUploadService;
 
   CollectionReference<Map<String, Object?>> _col(String trainerId) =>
       _firestore.collection('users').doc(trainerId).collection('customExercises');
@@ -61,8 +66,27 @@ class CustomExerciseRepository {
   /// Hard-delete. Custom exercises don't need a soft-delete trail — they're
   /// trainer-private and removing them shouldn't break anything because the
   /// routine slots already denormalize the exercise name/group at assign time.
+  ///
+  /// If the exercise has a Firebase Storage-backed video, the underlying
+  /// object is cleaned up best-effort before the doc is removed. Failures
+  /// on the Storage side don't block the Firestore delete — orphan files
+  /// are tolerable here, broken UI is not.
   Future<void> delete({required String trainerId, required String id}) async {
-    await _col(trainerId).doc(id).delete();
+    final docRef = _col(trainerId).doc(id);
+    try {
+      final snap = await docRef.get();
+      final url = (snap.data()?['videoUrl'] as String?)?.trim();
+      if (url != null && url.isNotEmpty) {
+        try {
+          await _videoUploadService.deleteByDownloadUrl(url);
+        } catch (_) {
+          // Best-effort — proceed with the doc delete.
+        }
+      }
+    } catch (_) {
+      // Read failures still let the delete attempt go through.
+    }
+    await docRef.delete();
   }
 
   // ─── watchForTrainer ───────────────────────────────────────────────────────

@@ -1,93 +1,286 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:youtube_player_iframe/youtube_player_iframe.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:video_player/video_player.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/treino_icon.dart';
 
-/// Embedded YouTube player for an exercise's tutorial video.
+/// Tappable card for an exercise's tutorial video. Dual-mode:
 ///
-/// Plays inline inside the app — never kicks the user out to the YouTube app
-/// or website. Handles three states:
-///   - [videoUrl] is null/empty → renders [_VideoPlaceholder] ("sin video").
-///   - [videoUrl] is not a parseable YouTube URL → renders [_VideoPlaceholder]
-///     with an explanatory note so a bad URL doesn't crash the screen.
-///   - [videoUrl] resolves to a valid video id → renders the inline player
-///     with native controls and a 16:9 aspect ratio.
+///   * Firebase Storage URL (`firebasestorage.googleapis.com`) → renders a
+///     native [VideoPlayer] inline with play/pause controls.
+///   * YouTube URL → renders the YouTube thumbnail with a subtle play
+///     overlay; tap opens youtube.com in a Safari View Controller (iOS) or
+///     Chrome Custom Tab (Android) via `url_launcher`'s `inAppBrowserView`
+///     mode. The user never leaves TREINO — the browser is a modal sheet.
+///   * Null / empty / unparseable URL → renders the empty-state placeholder.
 ///
-/// Accepts the full YouTube URL forms commonly pasted by trainers:
-///   - https://www.youtube.com/watch?v=ID
-///   - https://youtu.be/ID
-///   - https://youtube.com/shorts/ID
-///   - https://www.youtube.com/embed/ID
-class ExerciseVideoPlayer extends StatefulWidget {
+/// Why YouTube isn't embedded inline: every Flutter WebView option we tried
+/// hit YouTube's server-side embed rejection on iOS WKWebView (errors
+/// 152 / 153). Native uploads are the path forward for true in-app
+/// playback.
+class ExerciseVideoPlayer extends StatelessWidget {
   const ExerciseVideoPlayer({super.key, required this.videoUrl});
 
   final String? videoUrl;
 
   @override
-  State<ExerciseVideoPlayer> createState() => _ExerciseVideoPlayerState();
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final url = videoUrl?.trim() ?? '';
+
+    if (url.isEmpty) {
+      return _VideoPlaceholder(palette: palette, urlGiven: null);
+    }
+
+    if (isFirebaseStorageVideo(url)) {
+      return _NativeVideoCard(url: url, palette: palette);
+    }
+
+    final id = parseYoutubeVideoId(url);
+    if (id != null) {
+      return _YoutubeThumbCard(videoId: id, palette: palette);
+    }
+
+    return _VideoPlaceholder(palette: palette, urlGiven: url);
+  }
 }
 
-class _ExerciseVideoPlayerState extends State<ExerciseVideoPlayer> {
-  YoutubePlayerController? _controller;
-  String? _resolvedVideoId;
+/// YouTube thumbnail card. Tap → opens the watch page in an in-app browser
+/// sheet via `url_launcher`. We don't try to embed inline anymore.
+class _YoutubeThumbCard extends StatelessWidget {
+  const _YoutubeThumbCard({required this.videoId, required this.palette});
 
-  @override
-  void initState() {
-    super.initState();
-    _resolveAndInit(widget.videoUrl);
-  }
+  final String videoId;
+  final AppPalette palette;
 
-  @override
-  void didUpdateWidget(covariant ExerciseVideoPlayer oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.videoUrl != widget.videoUrl) {
-      _controller?.close();
-      _controller = null;
-      _resolveAndInit(widget.videoUrl);
-    }
-  }
-
-  void _resolveAndInit(String? url) {
-    final id = parseYoutubeVideoId(url);
-    setState(() => _resolvedVideoId = id);
-    if (id != null) {
-      _controller = YoutubePlayerController.fromVideoId(
-        videoId: id,
-        autoPlay: false,
-        // Tuned to maximize embed compatibility on iOS WKWebView. Default
-        // origin='https://www.youtube.com' already; strictRelatedVideos off
-        // because enforcing it from a non-youtube document caused legit
-        // embed-enabled videos to surface "Video unavailable" here while
-        // playing fine elsewhere.
-        params: const YoutubePlayerParams(
-          showControls: true,
-          showFullscreenButton: true,
-          enableCaption: false,
-          strictRelatedVideos: false,
-        ),
+  Future<void> _open(BuildContext context) async {
+    final uri = Uri.parse('https://www.youtube.com/watch?v=$videoId');
+    try {
+      final ok = await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
+      if (!ok && context.mounted) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No pudimos abrir el video.')),
       );
     }
   }
 
   @override
-  void dispose() {
-    _controller?.close();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-    if (_resolvedVideoId == null || _controller == null) {
-      return _VideoPlaceholder(palette: palette, urlGiven: widget.videoUrl);
-    }
     return ClipRRect(
       borderRadius: BorderRadius.circular(12),
       child: AspectRatio(
         aspectRatio: 16 / 9,
-        child: YoutubePlayer(controller: _controller!),
+        child: Material(
+          color: palette.bgCard,
+          child: InkWell(
+            onTap: () => _open(context),
+            child: Stack(
+              alignment: Alignment.center,
+              fit: StackFit.expand,
+              children: [
+                CachedNetworkImage(
+                  imageUrl:
+                      'https://img.youtube.com/vi/$videoId/hqdefault.jpg',
+                  fit: BoxFit.cover,
+                  placeholder: (context, _) =>
+                      Container(color: palette.bgCard),
+                  errorWidget: (context, _, __) =>
+                      Container(color: palette.bgCard),
+                ),
+                Container(color: Colors.black.withValues(alpha: 0.22)),
+                const _PlayOverlay(),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Subtle, brand-neutral play overlay reused by every video card. Sits
+/// 40×40 in the middle with a soft drop shadow — no big black puck.
+class _PlayOverlay extends StatelessWidget {
+  const _PlayOverlay();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.92),
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.35),
+              blurRadius: 12,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        alignment: Alignment.center,
+        child: const Padding(
+          // Optical centering — play triangles read offset-left without it.
+          padding: EdgeInsets.only(left: 3),
+          child: Icon(
+            TreinoIcon.play,
+            color: Colors.black,
+            size: 20,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Native inline video for trainer uploads stored in Firebase Storage.
+/// Initializes [VideoPlayerController.networkUrl] lazily and disposes it
+/// when the URL changes or the widget is removed.
+class _NativeVideoCard extends StatefulWidget {
+  const _NativeVideoCard({required this.url, required this.palette});
+
+  final String url;
+  final AppPalette palette;
+
+  @override
+  State<_NativeVideoCard> createState() => _NativeVideoCardState();
+}
+
+class _NativeVideoCardState extends State<_NativeVideoCard> {
+  VideoPlayerController? _controller;
+  bool _initFailed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _init();
+  }
+
+  @override
+  void didUpdateWidget(covariant _NativeVideoCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.url != widget.url) {
+      _controller?.dispose();
+      _controller = null;
+      _initFailed = false;
+      _init();
+    }
+  }
+
+  Future<void> _init() async {
+    final c = VideoPlayerController.networkUrl(Uri.parse(widget.url));
+    try {
+      await c.initialize();
+      if (!mounted) {
+        await c.dispose();
+        return;
+      }
+      setState(() => _controller = c);
+    } catch (_) {
+      await c.dispose();
+      if (!mounted) return;
+      setState(() => _initFailed = true);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  void _toggle() {
+    final c = _controller;
+    if (c == null) return;
+    setState(() {
+      c.value.isPlaying ? c.pause() : c.play();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = widget.palette;
+    if (_initFailed) {
+      return _VideoPlaceholder(palette: palette, urlGiven: widget.url);
+    }
+    final c = _controller;
+    if (c == null) {
+      // Loading skeleton.
+      return AspectRatio(
+        aspectRatio: 16 / 9,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            color: palette.bgCard,
+            alignment: Alignment.center,
+            child: SizedBox(
+              width: 22,
+              height: 22,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.2,
+                color: palette.textMuted,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+    final isPlaying = c.value.isPlaying;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: AspectRatio(
+        aspectRatio: 16 / 9,
+        child: GestureDetector(
+          onTap: _toggle,
+          behavior: HitTestBehavior.opaque,
+          child: Stack(
+            alignment: Alignment.center,
+            fit: StackFit.expand,
+            children: [
+              FittedBox(
+                fit: BoxFit.cover,
+                child: SizedBox(
+                  width: c.value.size.width,
+                  height: c.value.size.height,
+                  child: VideoPlayer(c),
+                ),
+              ),
+              AnimatedOpacity(
+                opacity: isPlaying ? 0 : 1,
+                duration: const Duration(milliseconds: 180),
+                child: Container(color: Colors.black.withValues(alpha: 0.22)),
+              ),
+              AnimatedOpacity(
+                opacity: isPlaying ? 0 : 1,
+                duration: const Duration(milliseconds: 180),
+                child: const _PlayOverlay(),
+              ),
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: VideoProgressIndicator(
+                  c,
+                  allowScrubbing: true,
+                  colors: VideoProgressColors(
+                    playedColor: palette.accent,
+                    bufferedColor: Colors.white.withValues(alpha: 0.35),
+                    backgroundColor: Colors.white.withValues(alpha: 0.15),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -137,6 +330,43 @@ class _VideoPlaceholder extends StatelessWidget {
       ),
     );
   }
+}
+
+// ─── URL helpers ─────────────────────────────────────────────────────────────
+
+/// True for Firebase Storage download URLs.
+/// Shape: `https://firebasestorage.googleapis.com/v0/b/{bucket}/o/{path}?...`
+bool isFirebaseStorageVideo(String? raw) {
+  if (raw == null) return false;
+  final url = raw.trim();
+  if (url.isEmpty) return false;
+  Uri? uri;
+  try {
+    uri = Uri.parse(url);
+  } catch (_) {
+    return false;
+  }
+  return uri.host.toLowerCase() == 'firebasestorage.googleapis.com';
+}
+
+/// Extracts the storage object path from a Firebase Storage download URL,
+/// or `null` if [url] is not such a URL. Used to delete the underlying
+/// object when a custom exercise is removed.
+String? extractFirebaseStoragePath(String? raw) {
+  if (raw == null) return null;
+  final url = raw.trim();
+  if (url.isEmpty) return null;
+  Uri? uri;
+  try {
+    uri = Uri.parse(url);
+  } catch (_) {
+    return null;
+  }
+  if (uri.host.toLowerCase() != 'firebasestorage.googleapis.com') return null;
+  final segs = uri.pathSegments;
+  final oIdx = segs.indexOf('o');
+  if (oIdx == -1 || oIdx + 1 >= segs.length) return null;
+  return Uri.decodeComponent(segs[oIdx + 1]);
 }
 
 /// Extracts the 11-char YouTube video id from a URL, or `null` if the URL

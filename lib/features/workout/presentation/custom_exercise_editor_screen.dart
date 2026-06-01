@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/treino_icon.dart';
@@ -35,6 +36,8 @@ class _CustomExerciseEditorScreenState
   bool _saving = false;
   bool _deleting = false;
   String _videoPreviewUrl = '';
+  bool _uploadingVideo = false;
+  double _uploadProgress = 0;
 
   @override
   void dispose() {
@@ -116,17 +119,26 @@ class _CustomExerciseEditorScreenState
                   palette: palette,
                   maxLines: 3),
               const SizedBox(height: 14),
-              _Label('URL de YouTube', palette: palette),
+              _Label('Video del ejercicio', palette: palette),
               const SizedBox(height: 6),
               _Field(
                 controller: _videoCtrl,
-                hint: 'https://youtube.com/watch?v=...',
+                hint: 'Pegá un link de YouTube',
                 palette: palette,
                 onChanged: (v) => setState(() => _videoPreviewUrl = v),
               ),
+              const SizedBox(height: 8),
+              _UploadVideoButton(
+                palette: palette,
+                uploading: _uploadingVideo,
+                progress: _uploadProgress,
+                onTap: _uploadingVideo ? null : () => _onPickAndUpload(context),
+              ),
               const SizedBox(height: 6),
               Text(
-                'Probá si reproduce abajo antes de guardar. Si "Video unavailable", el creador deshabilitó embedding — usá otro link.',
+                isFirebaseStorageVideo(_videoPreviewUrl)
+                    ? 'Video propio. Se reproduce adentro de TREINO.'
+                    : 'YouTube → tu alumno ve el thumbnail; el video se abre en una hoja de Safari sin salir de la app. Subí tu video para que reproduzca inline.',
                 style: GoogleFonts.barlow(
                   fontWeight: FontWeight.w400,
                   fontSize: 11,
@@ -211,6 +223,52 @@ class _CustomExerciseEditorScreenState
     );
   }
 
+  Future<void> _onPickAndUpload(BuildContext context) async {
+    final picker = ImagePicker();
+    final XFile? picked;
+    try {
+      picked = await picker.pickVideo(
+        source: ImageSource.gallery,
+        maxDuration: const Duration(minutes: 3),
+      );
+    } catch (_) {
+      if (!context.mounted) return;
+      _toast(context, 'No pudimos abrir la galería.');
+      return;
+    }
+    if (picked == null) return;
+
+    setState(() {
+      _uploadingVideo = true;
+      _uploadProgress = 0;
+    });
+    try {
+      final service = ref.read(customExerciseVideoUploadServiceProvider);
+      final url = await service.upload(
+        picked.path,
+        onProgress: (fraction) {
+          if (!mounted) return;
+          setState(() => _uploadProgress = fraction);
+        },
+      );
+      if (!mounted) return;
+      setState(() {
+        _videoCtrl.text = url;
+        _videoPreviewUrl = url;
+      });
+    } catch (_) {
+      if (!context.mounted) return;
+      _toast(context, 'No pudimos subir el video.');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _uploadingVideo = false;
+          _uploadProgress = 0;
+        });
+      }
+    }
+  }
+
   Future<void> _onSave(
     BuildContext context,
     WidgetRef ref,
@@ -228,6 +286,7 @@ class _CustomExerciseEditorScreenState
     setState(() => _saving = true);
     try {
       final repo = ref.read(customExerciseRepositoryProvider);
+      CustomExercise? created;
       if (existing != null) {
         await repo.update(existing.copyWith(
           name: name,
@@ -236,7 +295,7 @@ class _CustomExerciseEditorScreenState
           videoUrl: videoUrl.isEmpty ? null : videoUrl,
         ));
       } else {
-        await repo.create(
+        created = await repo.create(
           trainerId: uid,
           name: name,
           muscleGroup: _muscleCtrl.text.trim(),
@@ -245,7 +304,10 @@ class _CustomExerciseEditorScreenState
         );
       }
       if (!context.mounted) return;
-      context.pop();
+      // Return the freshly created exercise so callers like the picker
+      // sheet can auto-select it. Edits still pop with null (no contract
+      // change for the regular library list).
+      Navigator.of(context).pop(created);
     } catch (_) {
       if (!context.mounted) return;
       _toast(context, 'No pudimos guardar el ejercicio.');
@@ -370,6 +432,91 @@ class _Field extends StatelessWidget {
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(color: palette.accent, width: 1.5),
+        ),
+      ),
+    );
+  }
+}
+
+class _UploadVideoButton extends StatelessWidget {
+  const _UploadVideoButton({
+    required this.palette,
+    required this.uploading,
+    required this.progress,
+    required this.onTap,
+  });
+
+  final AppPalette palette;
+  final bool uploading;
+  final double progress;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: palette.bgCard,
+            border: Border.all(color: palette.border, width: 1),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                uploading ? TreinoIcon.play : TreinoIcon.plus,
+                size: 18,
+                color: palette.accent,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      uploading
+                          ? 'Subiendo video — ${(progress * 100).clamp(0, 100).toInt()}%'
+                          : 'Subir mi propio video',
+                      style: GoogleFonts.barlow(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                        color: palette.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      uploading
+                          ? 'No cierres la pantalla'
+                          : 'MP4 / MOV — reproduce inline en TREINO',
+                      style: GoogleFonts.barlow(
+                        fontWeight: FontWeight.w400,
+                        fontSize: 11,
+                        color: palette.textMuted,
+                      ),
+                    ),
+                    if (uploading) ...[
+                      const SizedBox(height: 8),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(4),
+                        child: LinearProgressIndicator(
+                          value: progress > 0 ? progress : null,
+                          minHeight: 4,
+                          backgroundColor:
+                              palette.border.withValues(alpha: 0.6),
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(palette.accent),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
