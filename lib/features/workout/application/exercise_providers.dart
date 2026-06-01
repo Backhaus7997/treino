@@ -4,6 +4,8 @@ import '../../auth/application/auth_providers.dart';
 import '../../profile/application/user_providers.dart' show firestoreProvider;
 import '../data/exercise_repository.dart';
 import '../domain/exercise.dart';
+import 'custom_exercise_providers.dart'
+    show customExerciseRepositoryProvider;
 
 final exerciseRepositoryProvider = Provider<ExerciseRepository>(
   (ref) => ExerciseRepository(firestore: ref.watch(firestoreProvider)),
@@ -34,5 +36,43 @@ final exerciseByIdProvider = FutureProvider.family<Exercise?, String>(
       if (e.id == id) return e;
     }
     return null;
+  },
+);
+
+/// Routine-slot-aware exercise lookup. Tries the public catalogue first; if
+/// the id is unknown there AND an `ownerId` was provided (the routine's
+/// `assignedBy`, i.e. the trainer who built the plan), falls back to that
+/// trainer's `customExercises/{exerciseId}` subcollection so athletes can
+/// open the detail screen for a trainer-defined exercise without
+/// duplicating its content into the routine slot.
+///
+/// CustomExercise is projected into [Exercise] with `category: 'custom'` so
+/// the existing detail screen renders it without branching. `techniqueInstructions`
+/// stays null for now — trainers don't author per-instruction lists yet.
+final slotExerciseProvider = FutureProvider.family<
+    Exercise?, ({String exerciseId, String? ownerId})>(
+  (ref, key) async {
+    final fromCatalogue = await ref.watch(
+      exerciseByIdProvider(key.exerciseId).future,
+    );
+    if (fromCatalogue != null) return fromCatalogue;
+
+    final ownerId = key.ownerId;
+    if (ownerId == null || ownerId.isEmpty) return null;
+
+    final custom = await ref.read(customExerciseRepositoryProvider).getById(
+          trainerId: ownerId,
+          exerciseId: key.exerciseId,
+        );
+    if (custom == null) return null;
+
+    return Exercise(
+      id: custom.id,
+      name: custom.name,
+      muscleGroup: custom.muscleGroup,
+      category: 'custom',
+      videoUrl: custom.videoUrl,
+      defaultRestSeconds: custom.defaultRestSeconds,
+    );
   },
 );

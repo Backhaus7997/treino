@@ -61,8 +61,18 @@ class _RoutineDetailScreenState extends ConsumerState<RoutineDetailScreen> {
                 day: day,
                 selectedDayIndex: dayIndex,
                 onSelectDay: (i) => setState(() => selectedDayIndex = i),
-                onSlotTap: (slot) =>
-                    context.push('/workout/exercise/${slot.exerciseId}'),
+                onSlotTap: (slot) {
+                  // Pass the routine's trainer uid as `ownerId` so the
+                  // detail screen can fall back to that trainer's
+                  // customExercises subcollection when the slot references
+                  // a trainer-defined exercise instead of a public-catalogue
+                  // one (see slotExerciseProvider).
+                  final ownerId = routine.assignedBy;
+                  final target = ownerId != null && ownerId.isNotEmpty
+                      ? '/workout/exercise/${slot.exerciseId}?ownerId=$ownerId'
+                      : '/workout/exercise/${slot.exerciseId}';
+                  context.push(target);
+                },
               );
             },
             loading: () => const _RoutineLoadingSkeleton(),
@@ -216,9 +226,14 @@ class _HeroStrip extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
 
-    // Trainer-assigned plans don't carry a photo asset — render a compact
-    // header with just badges + title, no image / gradient / scrims.
-    if (routine.source == RoutineSource.trainerAssigned) {
+    // Trainer-defined plans (assigned to an athlete OR a reusable template
+    // visible to the trainer's alumnos) don't carry a photo asset — render
+    // a compact header with just badges + title, no image / gradient /
+    // scrims. Only the public seeded catalogue has `assets/routines/{id}.png`.
+    final isTrainerDefined =
+        routine.source == RoutineSource.trainerAssigned ||
+            routine.source == RoutineSource.trainerTemplate;
+    if (isTrainerDefined) {
       return Padding(
         padding: const EdgeInsets.fromLTRB(20, 64, 20, 8),
         child: Column(

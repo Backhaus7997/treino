@@ -236,10 +236,17 @@ GoRouter buildRouter({
                 },
               ),
               GoRoute(
+                // `?ownerId=...` is appended by RoutineDetailScreen when
+                // the slot's exercise might live in a trainer's
+                // customExercises subcollection — see slotExerciseProvider.
                 path: 'exercise/:exerciseId',
                 pageBuilder: (context, state) {
                   final exerciseId = state.pathParameters['exerciseId']!;
-                  return _noAnim(ExerciseDetailScreen(exerciseId: exerciseId));
+                  final ownerId = state.uri.queryParameters['ownerId'];
+                  return _noAnim(ExerciseDetailScreen(
+                    exerciseId: exerciseId,
+                    ownerId: ownerId,
+                  ));
                 },
               ),
               GoRoute(
