@@ -49,8 +49,8 @@ class ReviewCta extends ConsumerWidget {
     // Resolve trainer name for the sheet title.
     final trainerPub =
         ref.watch(userPublicProfileProvider(trainerId)).valueOrNull;
-    final trainerName =
-        trainerPub?.displayName ?? 'tu Personal Trainer'; // i18n: Fase 6 Etapa 7
+    final trainerName = trainerPub?.displayName ??
+        'tu Personal Trainer'; // i18n: Fase 6 Etapa 7
 
     // Determine label based on whether review exists.
     final label = existingReview != null

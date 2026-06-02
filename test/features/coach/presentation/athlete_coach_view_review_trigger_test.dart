@@ -14,7 +14,8 @@ import 'package:treino/features/reviews/application/review_providers.dart';
 import 'package:treino/features/reviews/data/review_repository.dart';
 import 'package:treino/features/reviews/presentation/widgets/review_bottom_sheet.dart';
 
-class _MockTrainerLinkRepository extends Mock implements TrainerLinkRepository {}
+class _MockTrainerLinkRepository extends Mock
+    implements TrainerLinkRepository {}
 
 class _MockReviewRepository extends Mock implements ReviewRepository {}
 
@@ -28,7 +29,7 @@ TrainerLink _makeActiveLink() => TrainerLink(
       sharedWithTrainer: false,
     );
 
-UserPublicProfile _makePub() => UserPublicProfile(
+UserPublicProfile _makePub() => const UserPublicProfile(
       uid: 'trainer-1',
       displayName: 'Coach Ana',
       displayNameLowercase: 'coach ana',

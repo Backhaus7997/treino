@@ -39,7 +39,7 @@ TrainerLink _makeNewLink() => TrainerLink(
       sharedWithTrainer: false,
     );
 
-UserPublicProfile _makePub() => UserPublicProfile(
+UserPublicProfile _makePub() => const UserPublicProfile(
       uid: 'trainer-1',
       displayName: 'Coach Ana',
       displayNameLowercase: 'coach ana',
@@ -96,8 +96,7 @@ void main() {
       expect(find.byType(ReviewBottomSheet), findsOneWidget);
     });
 
-    testWidgets(
-        'SCENARIO-610: prefs key already set → sheet NOT shown',
+    testWidgets('SCENARIO-610: prefs key already set → sheet NOT shown',
         (tester) async {
       SharedPreferences.setMockInitialValues({
         'review_prompt_shown_link-old': true,
@@ -109,8 +108,7 @@ void main() {
       expect(find.byType(ReviewBottomSheet), findsNothing);
     });
 
-    testWidgets(
-        'SCENARIO-610: existing review present → sheet NOT shown',
+    testWidgets('SCENARIO-610: existing review present → sheet NOT shown',
         (tester) async {
       await tester.pumpWidget(_wrap(
         link: _makeOldLink(),
@@ -121,8 +119,7 @@ void main() {
       expect(find.byType(ReviewBottomSheet), findsNothing);
     });
 
-    testWidgets(
-        'SCENARIO-610: acceptedAt < 30 days → sheet NOT shown',
+    testWidgets('SCENARIO-610: acceptedAt < 30 days → sheet NOT shown',
         (tester) async {
       await tester.pumpWidget(_wrap(link: _makeNewLink()));
       await tester.pumpAndSettle();
@@ -130,8 +127,7 @@ void main() {
       expect(find.byType(ReviewBottomSheet), findsNothing);
     });
 
-    testWidgets(
-        'SCENARIO-610: no active link → sheet NOT shown',
+    testWidgets('SCENARIO-610: no active link → sheet NOT shown',
         (tester) async {
       await tester.pumpWidget(_wrap(link: null));
       await tester.pumpAndSettle();

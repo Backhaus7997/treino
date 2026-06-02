@@ -93,8 +93,8 @@ class _AthleteCoachViewState extends ConsumerState<AthleteCoachView> {
 
     final trainerPub =
         ref.read(userPublicProfileProvider(link.trainerId)).valueOrNull;
-    final trainerName =
-        trainerPub?.displayName ?? 'tu Personal Trainer'; // i18n: Fase 6 Etapa 7
+    final trainerName = trainerPub?.displayName ??
+        'tu Personal Trainer'; // i18n: Fase 6 Etapa 7
 
     await showModalBottomSheet<void>(
       context: context,
@@ -119,8 +119,7 @@ class _AthleteCoachViewState extends ConsumerState<AthleteCoachView> {
     // Using ref.listen so we react each time the async value transitions to
     // data. The _promptCheckScheduled guard prevents double-fire within the
     // same widget lifetime. ADR-RV-006.
-    ref.listen<AsyncValue<TrainerLink?>>(currentAthleteLinkProvider,
-        (_, next) {
+    ref.listen<AsyncValue<TrainerLink?>>(currentAthleteLinkProvider, (_, next) {
       if (next is AsyncData) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           _maybeShow30DayPrompt();
@@ -353,11 +352,17 @@ class _ActionRow extends ConsumerWidget {
       '¿Seguro que querés terminar tu vínculo con este Personal Trainer? Podés volver a pedirle vínculo más adelante.',
     );
     if (!confirmed) return;
+    // ignore: use_build_context_synchronously — context is valid here: we
+    // checked `confirmed` (dialog closed with user action) and the widget is
+    // still mounted because the dialog was still open. The container capture
+    // must happen BEFORE the terminate await. ADR-RV-007, ADR-FPS-006.
+    if (!context.mounted) return;
 
     // Capture container + locals BEFORE the async gap (dispose-safe pattern).
     // After terminate(), currentAthleteLinkProvider is invalidated and this
     // widget may be disposed before the await returns. Reading from the
     // container survives disposal. ADR-RV-007, mirrors ADR-FPS-006.
+    // ignore: use_build_context_synchronously
     final container = ProviderScope.containerOf(context, listen: false);
     final linkId = link.id;
     final trainerId = link.trainerId;
@@ -366,8 +371,8 @@ class _ActionRow extends ConsumerWidget {
     // Resolve trainer name from public profile (best-effort, may be null).
     final trainerPub =
         container.read(userPublicProfileProvider(trainerId)).valueOrNull;
-    final trainerName =
-        trainerPub?.displayName ?? 'tu Personal Trainer'; // i18n: Fase 6 Etapa 7
+    final trainerName = trainerPub?.displayName ??
+        'tu Personal Trainer'; // i18n: Fase 6 Etapa 7
 
     // Resolve existing review before await so we have it for the sheet.
     final reviewKey = '$linkId:$athleteId';

@@ -20,7 +20,7 @@ const _trainerUid = 'trainer-1';
 const _athleteId = 'athlete-1';
 const _linkId = 'link-active';
 
-TrainerPublicProfile _makeProfile() => TrainerPublicProfile(
+TrainerPublicProfile _makeProfile() => const TrainerPublicProfile(
       uid: _trainerUid,
       displayName: 'Coach Ana',
       displayNameLowercase: 'coach ana',
@@ -53,7 +53,7 @@ Widget _wrap({
   Review? existingReview,
 }) {
   final mockRepo = _MockReviewRepository();
-  final reviewKey = '$_linkId:$_athleteId';
+  const reviewKey = '$_linkId:$_athleteId';
   return ProviderScope(
     overrides: [
       trainerByIdProvider(_trainerUid)
@@ -66,7 +66,7 @@ Widget _wrap({
     ],
     child: MaterialApp(
       theme: AppTheme.dark(),
-      home: TrainerPublicProfileScreen(uid: _trainerUid),
+      home: const TrainerPublicProfileScreen(uid: _trainerUid),
     ),
   );
 }

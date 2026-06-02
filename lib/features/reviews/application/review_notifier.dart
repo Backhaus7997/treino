@@ -36,8 +36,7 @@ class ReviewNotifierArgs {
 /// Validates input before calling the repository, transitions through
 /// AsyncLoading → AsyncData(null) on success, or AsyncError on failure.
 /// REQ-RV-WRITE-001, REQ-RV-WRITE-002. Fase 6 Etapa 7.
-class ReviewNotifier
-    extends FamilyAsyncNotifier<void, ReviewNotifierArgs> {
+class ReviewNotifier extends FamilyAsyncNotifier<void, ReviewNotifierArgs> {
   late ReviewNotifierArgs _args;
 
   @override

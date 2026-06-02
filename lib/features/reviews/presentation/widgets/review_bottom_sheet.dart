@@ -171,7 +171,8 @@ class _ReviewBottomSheetState extends ConsumerState<ReviewBottomSheet> {
               minLines: 2,
               style: GoogleFonts.barlow(color: palette.textPrimary),
               decoration: InputDecoration(
-                hintText: 'Contanos cómo fue (opcional)', // i18n: Fase 6 Etapa 7
+                hintText:
+                    'Contanos cómo fue (opcional)', // i18n: Fase 6 Etapa 7
                 hintStyle: GoogleFonts.barlow(color: palette.textMuted),
                 enabledBorder: OutlineInputBorder(
                   borderSide: BorderSide(color: palette.border),
@@ -189,7 +190,8 @@ class _ReviewBottomSheetState extends ConsumerState<ReviewBottomSheet> {
               children: [
                 Expanded(
                   child: TextButton(
-                    onPressed: isLoading ? null : () => Navigator.of(context).pop(),
+                    onPressed:
+                        isLoading ? null : () => Navigator.of(context).pop(),
                     child: Text(
                       'CANCELAR', // i18n: Fase 6 Etapa 7
                       style: GoogleFonts.barlowCondensed(
@@ -204,8 +206,7 @@ class _ReviewBottomSheetState extends ConsumerState<ReviewBottomSheet> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: ElevatedButton(
-                    onPressed:
-                        (_rating > 0 && !isLoading) ? _onSubmit : null,
+                    onPressed: (_rating > 0 && !isLoading) ? _onSubmit : null,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: palette.accent,
                       foregroundColor: palette.bg,

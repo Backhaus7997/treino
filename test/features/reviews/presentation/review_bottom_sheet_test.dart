@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
-import 'package:treino/features/reviews/application/review_notifier.dart';
 import 'package:treino/features/reviews/application/review_providers.dart';
 import 'package:treino/features/reviews/data/review_repository.dart';
 import 'package:treino/features/reviews/domain/review.dart';
@@ -56,8 +55,7 @@ Widget _wrapSheet({
 
 void main() {
   group('ReviewBottomSheet', () {
-    testWidgets(
-        'SCENARIO-601: new variant shows title with trainer name',
+    testWidgets('SCENARIO-601: new variant shows title with trainer name',
         (tester) async {
       await tester.pumpWidget(_wrapSheet());
       // i18n: Fase 6 Etapa 7
@@ -68,7 +66,8 @@ void main() {
     testWidgets(
         'SCENARIO-601: 30-day variant shows 30-day title with trainer name',
         (tester) async {
-      await tester.pumpWidget(_wrapSheet(variant: ReviewTriggerVariant.thirtyDay));
+      await tester
+          .pumpWidget(_wrapSheet(variant: ReviewTriggerVariant.thirtyDay));
       // i18n: Fase 6 Etapa 7
       expect(find.textContaining('Ya llevás'), findsOneWidget);
       expect(find.textContaining(_trainerName), findsWidgets);
@@ -84,7 +83,8 @@ void main() {
       // Comment pre-filled
       expect(find.text('Muy buena'), findsOneWidget);
       // 3 filled stars
-      final widget = tester.widget<StarRatingInput>(find.byType(StarRatingInput));
+      final widget =
+          tester.widget<StarRatingInput>(find.byType(StarRatingInput));
       expect(widget.rating, equals(3));
     });
 
@@ -129,7 +129,7 @@ void main() {
                   onPressed: () async {
                     await showModalBottomSheet(
                       context: ctx,
-                      builder: (_) => ReviewBottomSheet(
+                      builder: (_) => const ReviewBottomSheet(
                         linkId: _linkId,
                         trainerId: _trainerId,
                         trainerName: _trainerName,
@@ -154,7 +154,8 @@ void main() {
       expect(popped, isTrue);
     });
 
-    testWidgets('SCENARIO-608: comment field has maxLength 500 and counter visible',
+    testWidgets(
+        'SCENARIO-608: comment field has maxLength 500 and counter visible',
         (tester) async {
       await tester.pumpWidget(_wrapSheet());
       final field = tester.widget<TextField>(find.byType(TextField));

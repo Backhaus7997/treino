@@ -12,9 +12,8 @@ Widget _wrap(Widget child) => MaterialApp(
 void main() {
   group('StarRatingInput', () {
     testWidgets('SCENARIO-600: renders exactly 5 star icons', (tester) async {
-      int? received;
       await tester.pumpWidget(_wrap(
-        StarRatingInput(rating: 0, onRatingChanged: (v) => received = v),
+        StarRatingInput(rating: 0, onRatingChanged: (_) {}),
       ));
 
       // 5 Icon widgets with star-related IconData
@@ -52,7 +51,8 @@ void main() {
       ));
 
       final icons = tester.widgetList<Icon>(find.byType(Icon)).toList();
-      final fillCount = icons.where((i) => i.icon == TreinoIcon.starFill).length;
+      final fillCount =
+          icons.where((i) => i.icon == TreinoIcon.starFill).length;
       expect(fillCount, equals(0));
     });
 
@@ -63,7 +63,8 @@ void main() {
       ));
 
       final icons = tester.widgetList<Icon>(find.byType(Icon)).toList();
-      final fillCount = icons.where((i) => i.icon == TreinoIcon.starFill).length;
+      final fillCount =
+          icons.where((i) => i.icon == TreinoIcon.starFill).length;
       final outlineCount =
           icons.where((i) => i.icon == TreinoIcon.starOutline).length;
       expect(fillCount, equals(4));
