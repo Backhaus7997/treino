@@ -37,7 +37,13 @@ mixin _$TrainerPublicProfile {
   List<TrainerLocation> get trainerLocations =>
       throw _privateConstructorUsedError;
   List<String> get trainerGeohashes => throw _privateConstructorUsedError;
-  bool get trainerOffersOnline => throw _privateConstructorUsedError;
+  bool get trainerOffersOnline =>
+      throw _privateConstructorUsedError; // ── Review aggregate (Fase 6 Etapa 7) ──────────────────────────────────
+// Written exclusively by the reviewAggregate Cloud Function.
+// ADR-RV-004: lives on TrainerPublicProfile for O(1) discovery reads.
+// ADR-RV-005: MUST NOT appear in UserRepository._trainerPublicFields.
+  double? get averageRating => throw _privateConstructorUsedError;
+  int get reviewCount => throw _privateConstructorUsedError;
 
   /// Serializes this TrainerPublicProfile to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -69,7 +75,9 @@ abstract class $TrainerPublicProfileCopyWith<$Res> {
       int? trainerMonthlyRate,
       List<TrainerLocation> trainerLocations,
       List<String> trainerGeohashes,
-      bool trainerOffersOnline});
+      bool trainerOffersOnline,
+      double? averageRating,
+      int reviewCount});
 }
 
 /// @nodoc
@@ -101,6 +109,8 @@ class _$TrainerPublicProfileCopyWithImpl<$Res,
     Object? trainerLocations = null,
     Object? trainerGeohashes = null,
     Object? trainerOffersOnline = null,
+    Object? averageRating = freezed,
+    Object? reviewCount = null,
   }) {
     return _then(_value.copyWith(
       uid: null == uid
@@ -155,6 +165,14 @@ class _$TrainerPublicProfileCopyWithImpl<$Res,
           ? _value.trainerOffersOnline
           : trainerOffersOnline // ignore: cast_nullable_to_non_nullable
               as bool,
+      averageRating: freezed == averageRating
+          ? _value.averageRating
+          : averageRating // ignore: cast_nullable_to_non_nullable
+              as double?,
+      reviewCount: null == reviewCount
+          ? _value.reviewCount
+          : reviewCount // ignore: cast_nullable_to_non_nullable
+              as int,
     ) as $Val);
   }
 }
@@ -181,7 +199,9 @@ abstract class _$$TrainerPublicProfileImplCopyWith<$Res>
       int? trainerMonthlyRate,
       List<TrainerLocation> trainerLocations,
       List<String> trainerGeohashes,
-      bool trainerOffersOnline});
+      bool trainerOffersOnline,
+      double? averageRating,
+      int reviewCount});
 }
 
 /// @nodoc
@@ -210,6 +230,8 @@ class __$$TrainerPublicProfileImplCopyWithImpl<$Res>
     Object? trainerLocations = null,
     Object? trainerGeohashes = null,
     Object? trainerOffersOnline = null,
+    Object? averageRating = freezed,
+    Object? reviewCount = null,
   }) {
     return _then(_$TrainerPublicProfileImpl(
       uid: null == uid
@@ -264,6 +286,14 @@ class __$$TrainerPublicProfileImplCopyWithImpl<$Res>
           ? _value.trainerOffersOnline
           : trainerOffersOnline // ignore: cast_nullable_to_non_nullable
               as bool,
+      averageRating: freezed == averageRating
+          ? _value.averageRating
+          : averageRating // ignore: cast_nullable_to_non_nullable
+              as double?,
+      reviewCount: null == reviewCount
+          ? _value.reviewCount
+          : reviewCount // ignore: cast_nullable_to_non_nullable
+              as int,
     ));
   }
 }
@@ -285,7 +315,9 @@ class _$TrainerPublicProfileImpl implements _TrainerPublicProfile {
       this.trainerMonthlyRate,
       final List<TrainerLocation> trainerLocations = const <TrainerLocation>[],
       final List<String> trainerGeohashes = const <String>[],
-      this.trainerOffersOnline = false})
+      this.trainerOffersOnline = false,
+      this.averageRating,
+      this.reviewCount = 0})
       : _trainerLocations = trainerLocations,
         _trainerGeohashes = trainerGeohashes;
 
@@ -340,10 +372,19 @@ class _$TrainerPublicProfileImpl implements _TrainerPublicProfile {
   @override
   @JsonKey()
   final bool trainerOffersOnline;
+// ── Review aggregate (Fase 6 Etapa 7) ──────────────────────────────────
+// Written exclusively by the reviewAggregate Cloud Function.
+// ADR-RV-004: lives on TrainerPublicProfile for O(1) discovery reads.
+// ADR-RV-005: MUST NOT appear in UserRepository._trainerPublicFields.
+  @override
+  final double? averageRating;
+  @override
+  @JsonKey()
+  final int reviewCount;
 
   @override
   String toString() {
-    return 'TrainerPublicProfile(uid: $uid, displayName: $displayName, displayNameLowercase: $displayNameLowercase, avatarUrl: $avatarUrl, trainerBio: $trainerBio, trainerSpecialty: $trainerSpecialty, trainerGeohash: $trainerGeohash, trainerLatitude: $trainerLatitude, trainerLongitude: $trainerLongitude, trainerMonthlyRate: $trainerMonthlyRate, trainerLocations: $trainerLocations, trainerGeohashes: $trainerGeohashes, trainerOffersOnline: $trainerOffersOnline)';
+    return 'TrainerPublicProfile(uid: $uid, displayName: $displayName, displayNameLowercase: $displayNameLowercase, avatarUrl: $avatarUrl, trainerBio: $trainerBio, trainerSpecialty: $trainerSpecialty, trainerGeohash: $trainerGeohash, trainerLatitude: $trainerLatitude, trainerLongitude: $trainerLongitude, trainerMonthlyRate: $trainerMonthlyRate, trainerLocations: $trainerLocations, trainerGeohashes: $trainerGeohashes, trainerOffersOnline: $trainerOffersOnline, averageRating: $averageRating, reviewCount: $reviewCount)';
   }
 
   @override
@@ -375,7 +416,11 @@ class _$TrainerPublicProfileImpl implements _TrainerPublicProfile {
             const DeepCollectionEquality()
                 .equals(other._trainerGeohashes, _trainerGeohashes) &&
             (identical(other.trainerOffersOnline, trainerOffersOnline) ||
-                other.trainerOffersOnline == trainerOffersOnline));
+                other.trainerOffersOnline == trainerOffersOnline) &&
+            (identical(other.averageRating, averageRating) ||
+                other.averageRating == averageRating) &&
+            (identical(other.reviewCount, reviewCount) ||
+                other.reviewCount == reviewCount));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -394,7 +439,9 @@ class _$TrainerPublicProfileImpl implements _TrainerPublicProfile {
       trainerMonthlyRate,
       const DeepCollectionEquality().hash(_trainerLocations),
       const DeepCollectionEquality().hash(_trainerGeohashes),
-      trainerOffersOnline);
+      trainerOffersOnline,
+      averageRating,
+      reviewCount);
 
   /// Create a copy of TrainerPublicProfile
   /// with the given fields replaced by the non-null parameter values.
@@ -429,7 +476,9 @@ abstract class _TrainerPublicProfile implements TrainerPublicProfile {
       final int? trainerMonthlyRate,
       final List<TrainerLocation> trainerLocations,
       final List<String> trainerGeohashes,
-      final bool trainerOffersOnline}) = _$TrainerPublicProfileImpl;
+      final bool trainerOffersOnline,
+      final double? averageRating,
+      final int reviewCount}) = _$TrainerPublicProfileImpl;
 
   factory _TrainerPublicProfile.fromJson(Map<String, dynamic> json) =
       _$TrainerPublicProfileImpl.fromJson;
@@ -463,7 +512,15 @@ abstract class _TrainerPublicProfile implements TrainerPublicProfile {
   @override
   List<String> get trainerGeohashes;
   @override
-  bool get trainerOffersOnline;
+  bool
+      get trainerOffersOnline; // ── Review aggregate (Fase 6 Etapa 7) ──────────────────────────────────
+// Written exclusively by the reviewAggregate Cloud Function.
+// ADR-RV-004: lives on TrainerPublicProfile for O(1) discovery reads.
+// ADR-RV-005: MUST NOT appear in UserRepository._trainerPublicFields.
+  @override
+  double? get averageRating;
+  @override
+  int get reviewCount;
 
   /// Create a copy of TrainerPublicProfile
   /// with the given fields replaced by the non-null parameter values.
