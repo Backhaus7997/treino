@@ -414,5 +414,46 @@ service cloud.firestore {
     // confusing trainers; pricing now lives ONLY on the trainer's public
     // profile via trainerMonthlyRate. A future subscribe flow may
     // reintroduce a plan catalog with its own rules block.
+
+    // Athlete → trainer reviews (Fase 6 Etapa 7).
+    // Doc id is deterministic: `${linkId}_${athleteId}`.
+    // REQ-RV-DATA-007. SCENARIO-580..585.
+    //
+    // Rules:
+    //   read:   any authenticated user (needed for public profile display).
+    //   create: athlete creates their own review (athleteId == auth.uid);
+    //           rating must be 1..5; comment ≤500 chars.
+    //   update: owner only; may change only rating, comment, updatedAt —
+    //           preventing id/linkId/athleteId/trainerId/createdAt tampering.
+    //   delete: always denied — only account-deletion CF may delete reviews.
+    match /reviews/{reviewId} {
+      allow read: if request.auth != null;
+
+      allow create: if request.auth != null
+                    && request.auth.uid == request.resource.data.athleteId
+                    && request.resource.data.rating >= 1
+                    && request.resource.data.rating <= 5
+                    && (!('comment' in request.resource.data)
+                        || request.resource.data.comment == null
+                        || request.resource.data.comment.size() <= 500);
+
+      allow update: if request.auth != null
+                    && request.auth.uid == resource.data.athleteId
+                    && request.resource.data.keys().hasOnly(
+                        ['id', 'linkId', 'athleteId', 'trainerId',
+                         'rating', 'comment', 'createdAt', 'updatedAt'])
+                    && request.resource.data.id == resource.data.id
+                    && request.resource.data.linkId == resource.data.linkId
+                    && request.resource.data.athleteId == resource.data.athleteId
+                    && request.resource.data.trainerId == resource.data.trainerId
+                    && request.resource.data.createdAt == resource.data.createdAt
+                    && request.resource.data.rating >= 1
+                    && request.resource.data.rating <= 5
+                    && (!('comment' in request.resource.data)
+                        || request.resource.data.comment == null
+                        || request.resource.data.comment.size() <= 500);
+
+      allow delete: if false;
+    }
   }
 }
