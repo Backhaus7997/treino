@@ -38,7 +38,7 @@ Widget _wrap({required List<Review> reviews}) => ProviderScope(
       ],
       child: MaterialApp(
         theme: AppTheme.dark(),
-        home: Scaffold(
+        home: const Scaffold(
           body: SingleChildScrollView(
             child: TrainerReviewsSection(trainerId: _trainerId),
           ),
@@ -66,8 +66,7 @@ void main() {
       expect(find.text('Sin reseñas todavía'), findsOneWidget);
     });
 
-    testWidgets(
-        'SCENARIO-615: non-empty → shows list of ReviewTile widgets',
+    testWidgets('SCENARIO-615: non-empty → shows list of ReviewTile widgets',
         (tester) async {
       final reviews = [_makeReview(), _makeReview()];
       await tester.pumpWidget(_wrap(reviews: reviews));
@@ -77,8 +76,7 @@ void main() {
       expect(find.text('Sin reseñas todavía'), findsNothing);
     });
 
-    testWidgets(
-        'SCENARIO-615: non-empty → "Sin reseñas todavía" is absent',
+    testWidgets('SCENARIO-615: non-empty → "Sin reseñas todavía" is absent',
         (tester) async {
       await tester.pumpWidget(_wrap(reviews: [_makeReview()]));
       await tester.pumpAndSettle();

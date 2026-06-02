@@ -56,7 +56,8 @@ class ReviewTile extends ConsumerWidget {
         // ADR-RV-009: null profile → deleted account fallback.
         // i18n: Fase 6 Etapa 7
         final name = profile?.displayName ?? 'Usuario eliminado';
-        final avatarUrl = profile?.displayName != null ? profile?.avatarUrl : null;
+        final avatarUrl =
+            profile?.displayName != null ? profile?.avatarUrl : null;
 
         return Padding(
           padding: const EdgeInsets.symmetric(vertical: 8),

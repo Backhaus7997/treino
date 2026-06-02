@@ -28,18 +28,17 @@ TrainerPublicProfile _makeProfile({
 
 Widget _wrap({required TrainerPublicProfile profile}) => ProviderScope(
       overrides: [
-        trainerByIdProvider(_trainerUid)
-            .overrideWith((ref) async => profile),
+        trainerByIdProvider(_trainerUid).overrideWith((ref) async => profile),
         currentAthleteLinkProvider.overrideWith((ref) async => null),
         trainerReviewsProvider(_trainerUid)
-            .overrideWith((ref) => Stream.value([])),
+            .overrideWith((ref) => Stream.value(const [])),
         // Fallback profile for any athlete uid queries from ReviewTile
         userPublicProfileProvider(_athleteId)
             .overrideWith((ref) => Stream.value(null)),
       ],
       child: MaterialApp(
         theme: AppTheme.dark(),
-        home: TrainerPublicProfileScreen(uid: _trainerUid),
+        home: const TrainerPublicProfileScreen(uid: _trainerUid),
       ),
     );
 
@@ -76,8 +75,7 @@ void main() {
       expect(find.text('4.2'), findsOneWidget);
     });
 
-    testWidgets(
-        'SCENARIO-618: TrainerStatsRow shows "—" when reviewCount is 0',
+    testWidgets('SCENARIO-618: TrainerStatsRow shows "—" when reviewCount is 0',
         (tester) async {
       await tester.pumpWidget(_wrap(profile: _makeProfile()));
       await tester.pumpAndSettle();

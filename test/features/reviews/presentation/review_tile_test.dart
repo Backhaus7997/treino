@@ -18,9 +18,8 @@ Review _makeReview({Object? comment = _sentinel}) => Review(
       athleteId: _athleteId,
       trainerId: _trainerId,
       rating: 4,
-      comment: comment == _sentinel
-          ? 'Excelente entrenador.'
-          : comment as String?,
+      comment:
+          comment == _sentinel ? 'Excelente entrenador.' : comment as String?,
       createdAt: DateTime.utc(2026, 5, 1),
       updatedAt: DateTime.utc(2026, 5, 1),
     );
@@ -103,8 +102,7 @@ void main() {
       expect(find.text('U'), findsOneWidget);
     });
 
-    testWidgets(
-        'SCENARIO-613: when comment is null → comment row is hidden',
+    testWidgets('SCENARIO-613: when comment is null → comment row is hidden',
         (tester) async {
       final review = _makeReview(comment: null);
       await tester.pumpWidget(_wrap(review: review, profile: _makeProfile()));

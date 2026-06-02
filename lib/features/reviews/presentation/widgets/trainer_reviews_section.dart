@@ -51,9 +51,8 @@ class TrainerReviewsSection extends ConsumerWidget {
               );
             }
             return Column(
-              children: reviews
-                  .map((review) => ReviewTile(review: review))
-                  .toList(),
+              children:
+                  reviews.map((review) => ReviewTile(review: review)).toList(),
             );
           },
         ),

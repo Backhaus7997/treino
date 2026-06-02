@@ -111,8 +111,7 @@ void main() {
   });
 
   group('TrainerListTile — SCENARIO-616 T44/T45 star+count row', () {
-    testWidgets(
-        'SCENARIO-616: reviewCount > 0 → StarRatingDisplay visible',
+    testWidgets('SCENARIO-616: reviewCount > 0 → StarRatingDisplay visible',
         (tester) async {
       await tester.pumpWidget(_wrap(
         TrainerListTile(
@@ -150,8 +149,7 @@ void main() {
       );
     });
 
-    testWidgets(
-        'SCENARIO-616: reviewCount == 1 → singular "1 reseña"',
+    testWidgets('SCENARIO-616: reviewCount == 1 → singular "1 reseña"',
         (tester) async {
       await tester.pumpWidget(_wrap(
         TrainerListTile(
