@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
@@ -56,8 +57,8 @@ class _ExercisePickerSheetContent extends ConsumerStatefulWidget {
 class _ExercisePickerSheetContentState
     extends ConsumerState<_ExercisePickerSheetContent> {
   String _query = '';
-  MuscleGroupDisplay? _muscleFilter;
-  EquipmentType? _equipmentFilter;
+  Set<MuscleGroupDisplay> _muscleFilters = {};
+  Set<EquipmentType> _equipmentFilters = {};
   late Set<String> _selected;
 
   @override
@@ -75,14 +76,16 @@ class _ExercisePickerSheetContentState
       final aliasMatch = e.aliases.any((a) => a.toLowerCase().contains(q));
       if (!nameMatch && !aliasMatch) return false;
     }
-    if (_muscleFilter != null &&
-        e.muscleGroup.toDisplayGroup() != _muscleFilter) {
-      return false;
+    // OR within muscle filter, AND across filter types.
+    if (_muscleFilters.isNotEmpty) {
+      final exerciseGroup = e.muscleGroup.toDisplayGroup();
+      if (!_muscleFilters.contains(exerciseGroup)) return false;
     }
-    // ADR-RER-05: EXCLUDE exercises with null equipment when a filter is active.
-    if (_equipmentFilter != null) {
+    // ADR-RER-05: EXCLUDE exercises with null equipment when ANY equipment
+    // filter is active. OR within equipment filter.
+    if (_equipmentFilters.isNotEmpty) {
       if (e.equipment == null) return false;
-      if (e.equipment != _equipmentFilter) return false;
+      if (!_equipmentFilters.contains(e.equipment)) return false;
     }
     return true;
   }
@@ -100,16 +103,16 @@ class _ExercisePickerSheetContentState
   }
 
   Future<void> _openMuscleSheet(BuildContext ctx) async {
-    final picked = await showMuscleFilterSheet(ctx, current: _muscleFilter);
-    if (!mounted) return;
-    setState(() => _muscleFilter = picked);
+    final picked = await showMuscleFilterSheet(ctx, current: _muscleFilters);
+    if (!mounted || picked == null) return;
+    setState(() => _muscleFilters = picked);
   }
 
   Future<void> _openEquipmentSheet(BuildContext ctx) async {
     final picked =
-        await showEquipmentFilterSheet(ctx, current: _equipmentFilter);
-    if (!mounted) return;
-    setState(() => _equipmentFilter = picked);
+        await showEquipmentFilterSheet(ctx, current: _equipmentFilters);
+    if (!mounted || picked == null) return;
+    setState(() => _equipmentFilters = picked);
   }
 
   void _confirm(
@@ -226,33 +229,33 @@ class _ExercisePickerSheetContentState
                 ),
               ),
 
-              // ── Filter chips row ──────────────────────────────────────────
+              // ── Filter buttons row (more visible than chips) ──────────────
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                 child: Row(
                   children: [
-                    _FilterChip(
-                      label: _muscleFilter != null
-                          ? _muscleFilter!.displayLabel
-                          : WorkoutStrings.pickerMuscleFilter,
-                      active: _muscleFilter != null,
-                      palette: palette,
-                      onTap: () => _openMuscleSheet(sheetCtx),
-                      onClear: _muscleFilter != null
-                          ? () => setState(() => _muscleFilter = null)
-                          : null,
+                    Expanded(
+                      child: _FilterButton(
+                        baseLabel: WorkoutStrings.pickerMuscleFilter,
+                        count: _muscleFilters.length,
+                        palette: palette,
+                        onTap: () => _openMuscleSheet(sheetCtx),
+                        onClear: _muscleFilters.isNotEmpty
+                            ? () => setState(_muscleFilters.clear)
+                            : null,
+                      ),
                     ),
                     const SizedBox(width: 8),
-                    _FilterChip(
-                      label: _equipmentFilter != null
-                          ? _equipmentFilter!.label
-                          : WorkoutStrings.pickerEquipmentFilter,
-                      active: _equipmentFilter != null,
-                      palette: palette,
-                      onTap: () => _openEquipmentSheet(sheetCtx),
-                      onClear: _equipmentFilter != null
-                          ? () => setState(() => _equipmentFilter = null)
-                          : null,
+                    Expanded(
+                      child: _FilterButton(
+                        baseLabel: WorkoutStrings.pickerEquipmentFilter,
+                        count: _equipmentFilters.length,
+                        palette: palette,
+                        onTap: () => _openEquipmentSheet(sheetCtx),
+                        onClear: _equipmentFilters.isNotEmpty
+                            ? () => setState(_equipmentFilters.clear)
+                            : null,
+                      ),
                     ),
                   ],
                 ),
@@ -278,6 +281,7 @@ class _ExercisePickerSheetContentState
                   palette: palette,
                   defaults: defaultsAsync,
                   customs: customsAsync,
+                  uid: uid,
                 ),
               ),
 
@@ -302,6 +306,7 @@ class _ExercisePickerSheetContentState
     required AppPalette palette,
     required AsyncValue<List<Exercise>> defaults,
     required AsyncValue<List<CustomExercise>> customs,
+    required String uid,
   }) {
     if (defaults.isLoading || customs.isLoading) {
       return Center(
@@ -363,6 +368,8 @@ class _ExercisePickerSheetContentState
               name: c.name,
               subtitle: c.muscleGroup.isEmpty ? null : c.muscleGroup,
               badge: 'MÍO',
+              isCustom: true,
+              ownerId: uid,
               selected: _selected.contains(c.id),
               palette: palette,
               onTap: () => _toggle(c.id),
@@ -376,6 +383,8 @@ class _ExercisePickerSheetContentState
               name: e.name,
               subtitle: e.muscleGroup,
               badge: null,
+              isCustom: false,
+              ownerId: null,
               selected: _selected.contains(e.id),
               palette: palette,
               onTap: () => _toggle(e.id),
@@ -388,14 +397,19 @@ class _ExercisePickerSheetContentState
 
 // ── Sub-widgets ───────────────────────────────────────────────────────────────
 
-/// A single exercise row with multi-select visual state.
-/// Selected: blue 3px left border + accent tint + checkmark badge.
+/// A single exercise row with multi-select visual state + illustration + a
+/// detail button (Hevy-style).
+/// Selected: blue 3px left border + accent tint + checkmark overlay on the
+/// illustration. The trailing chartBar IconButton navigates to the exercise
+/// detail screen, independent of the row's tap-to-select behaviour.
 class _ExerciseRow extends StatelessWidget {
   const _ExerciseRow({
     required this.id,
     required this.name,
     required this.subtitle,
     required this.badge,
+    required this.isCustom,
+    required this.ownerId,
     required this.selected,
     required this.palette,
     required this.onTap,
@@ -405,9 +419,20 @@ class _ExerciseRow extends StatelessWidget {
   final String name;
   final String? subtitle;
   final String? badge;
+  final bool isCustom;
+  final String? ownerId;
   final bool selected;
   final AppPalette palette;
   final VoidCallback onTap;
+
+  void _openDetail(BuildContext context) {
+    // ExerciseDetailScreen route accepts an optional ownerId for custom
+    // exercises (their docs live under users/{ownerId}/customExercises/).
+    final query = isCustom && ownerId != null && ownerId!.isNotEmpty
+        ? '?ownerId=$ownerId'
+        : '';
+    context.push('/workout/exercise/$id$query');
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -428,6 +453,14 @@ class _ExerciseRow extends StatelessWidget {
           ),
         ),
         child: ListTile(
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          leading: _ExerciseThumbnail(
+            id: id,
+            isCustom: isCustom,
+            selected: selected,
+            palette: palette,
+          ),
           title: Text(
             name,
             style: GoogleFonts.barlow(
@@ -443,16 +476,106 @@ class _ExerciseRow extends StatelessWidget {
                       color: palette.textMuted, fontSize: 12),
                 )
               : null,
-          trailing: selected
-              ? Icon(
-                  TreinoIcon.checkCircleFill,
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (badge != null) ...[
+                _Badge(label: badge!, palette: palette),
+                const SizedBox(width: 8),
+              ],
+              IconButton(
+                onPressed: () => _openDetail(context),
+                icon: Icon(
+                  TreinoIcon.chartBar,
                   size: 18,
-                  color: palette.accent,
-                )
-              : badge != null
-                  ? _Badge(label: badge!, palette: palette)
-                  : null,
+                  color: palette.textMuted,
+                ),
+                tooltip: 'Ver detalle',
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(
+                  minWidth: 36,
+                  minHeight: 36,
+                ),
+              ),
+            ],
+          ),
         ),
+      ),
+    );
+  }
+}
+
+/// Circular thumbnail for an exercise row. Uses the bundled PNG illustration
+/// from `assets/exercises/{id}.png` when available; falls back to a neutral
+/// icon when the asset is missing (e.g. for custom exercises or unseeded ids).
+/// Adds a small checkmark badge overlay when selected.
+class _ExerciseThumbnail extends StatelessWidget {
+  const _ExerciseThumbnail({
+    required this.id,
+    required this.isCustom,
+    required this.selected,
+    required this.palette,
+  });
+
+  final String id;
+  final bool isCustom;
+  final bool selected;
+  final AppPalette palette;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 44,
+      height: 44,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          ClipOval(
+            child: Container(
+              width: 44,
+              height: 44,
+              color: palette.bgCard,
+              alignment: Alignment.center,
+              child: isCustom
+                  ? Icon(
+                      TreinoIcon.dumbbell,
+                      size: 22,
+                      color: palette.textMuted,
+                    )
+                  : Image.asset(
+                      'assets/exercises/$id.png',
+                      width: 44,
+                      height: 44,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Icon(
+                        TreinoIcon.dumbbell,
+                        size: 22,
+                        color: palette.textMuted,
+                      ),
+                    ),
+            ),
+          ),
+          if (selected)
+            Positioned(
+              right: -2,
+              bottom: -2,
+              child: Container(
+                width: 18,
+                height: 18,
+                decoration: BoxDecoration(
+                  color: palette.accent,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: palette.espresso, width: 2),
+                ),
+                child: Icon(
+                  TreinoIcon.check,
+                  size: 10,
+                  color: palette.bg,
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -530,69 +653,75 @@ class _StickyAddBar extends StatelessWidget {
   }
 }
 
-/// A pill-shaped filter chip. Active state shows accent border + label is the
-/// selected value name. Trailing × clears the filter without opening the sheet.
-class _FilterChip extends StatelessWidget {
-  const _FilterChip({
-    required this.label,
-    required this.active,
+/// Filter button — bigger and more visible than the previous pill-shaped chip.
+/// Width is driven by parent (Expanded). Active state (count > 0) uses
+/// accent border + filled tint + accent text; idle state is bgCard + border.
+/// Label shows count when active, e.g. "Músculos (3)".
+class _FilterButton extends StatelessWidget {
+  const _FilterButton({
+    required this.baseLabel,
+    required this.count,
     required this.palette,
     required this.onTap,
     this.onClear,
   });
 
-  final String label;
-  final bool active;
+  final String baseLabel;
+  final int count;
   final AppPalette palette;
   final VoidCallback onTap;
   final VoidCallback? onClear;
 
   @override
   Widget build(BuildContext context) {
+    final active = count > 0;
+    final label = active ? '$baseLabel ($count)' : baseLabel;
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        height: 32,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
+        height: 44,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: active ? palette.accent : palette.border,
             width: active ? 1.5 : 1,
           ),
           color: active
-              ? palette.accent.withValues(alpha: 0.08)
-              : Colors.transparent,
+              ? palette.accent.withValues(alpha: 0.12)
+              : palette.bgCard,
         ),
         child: Row(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(
-              label,
-              style: GoogleFonts.barlowCondensed(
-                color: active ? palette.accent : palette.textMuted,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
+            Flexible(
+              child: Text(
+                label,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.barlowCondensed(
+                  color: active ? palette.accent : palette.textPrimary,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.8,
+                ),
               ),
             ),
-            if (active && onClear != null) ...[
-              const SizedBox(width: 4),
+            const SizedBox(width: 8),
+            if (active && onClear != null)
               GestureDetector(
                 onTap: onClear,
                 child: Icon(
                   TreinoIcon.close,
-                  size: 12,
+                  size: 14,
                   color: palette.accent,
                 ),
-              ),
-            ] else ...[
-              const SizedBox(width: 4),
+              )
+            else
               Icon(
                 TreinoIcon.chevronDown,
-                size: 12,
-                color: palette.textMuted,
+                size: 14,
+                color: active ? palette.accent : palette.textMuted,
               ),
-            ],
           ],
         ),
       ),

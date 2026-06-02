@@ -6,17 +6,19 @@ import '../../../../core/widgets/treino_icon.dart';
 import '../../../workout/domain/equipment_type.dart';
 import '../../../workout/presentation/workout_strings.dart';
 
-/// Shows a single-select bottom sheet for filtering exercises by equipment type.
+/// Shows a MULTI-select bottom sheet for filtering exercises by equipment.
 ///
-/// Returns the chosen [EquipmentType], or `null` if the user taps
-/// "Todo el equipamiento" (reset) or dismisses the sheet.
+/// Accumulates selections — tap to toggle each type in/out, then tap
+/// "Aplicar" to apply and close. Tap "Limpiar" to reset.
+/// Returns the chosen set of equipment types, or `null` if dismissed.
 ///
-/// REQ-RER-006, REQ-RER-009, ADR-RER-06.
-Future<EquipmentType?> showEquipmentFilterSheet(
+/// REQ-RER-006, REQ-RER-009, ADR-RER-06 (refined for multi-select per user
+/// feedback during PR2 smoke).
+Future<Set<EquipmentType>?> showEquipmentFilterSheet(
   BuildContext context, {
-  EquipmentType? current,
+  Set<EquipmentType> current = const {},
 }) {
-  return showModalBottomSheet<EquipmentType>(
+  return showModalBottomSheet<Set<EquipmentType>>(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
@@ -24,16 +26,41 @@ Future<EquipmentType?> showEquipmentFilterSheet(
   );
 }
 
-class _EquipmentFilterSheetContent extends StatelessWidget {
-  const _EquipmentFilterSheetContent({this.current});
+class _EquipmentFilterSheetContent extends StatefulWidget {
+  const _EquipmentFilterSheetContent({required this.current});
 
-  final EquipmentType? current;
+  final Set<EquipmentType> current;
+
+  @override
+  State<_EquipmentFilterSheetContent> createState() =>
+      _EquipmentFilterSheetContentState();
+}
+
+class _EquipmentFilterSheetContentState
+    extends State<_EquipmentFilterSheetContent> {
+  late Set<EquipmentType> _selected;
+
+  @override
+  void initState() {
+    super.initState();
+    _selected = {...widget.current};
+  }
+
+  void _toggle(EquipmentType type) {
+    setState(() {
+      if (_selected.contains(type)) {
+        _selected.remove(type);
+      } else {
+        _selected.add(type);
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     return DraggableScrollableSheet(
-      initialChildSize: 0.55,
+      initialChildSize: 0.6,
       minChildSize: 0.4,
       maxChildSize: 0.85,
       expand: false,
@@ -58,86 +85,148 @@ class _EquipmentFilterSheetContent extends StatelessWidget {
                   ),
                 ),
               ),
-              // Title
+              // Title row + Limpiar button
               Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                child: Text(
-                  WorkoutStrings.pickerEquipmentSheetTitle,
-                  style: GoogleFonts.barlowCondensed(
-                    color: palette.textPrimary,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 1.4,
-                  ),
+                padding: const EdgeInsets.fromLTRB(20, 4, 12, 8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        WorkoutStrings.pickerEquipmentSheetTitle,
+                        style: GoogleFonts.barlowCondensed(
+                          color: palette.textPrimary,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1.4,
+                        ),
+                      ),
+                    ),
+                    if (_selected.isNotEmpty)
+                      TextButton(
+                        onPressed: () => setState(_selected.clear),
+                        child: Text(
+                          WorkoutStrings.pickerSheetClear,
+                          style: GoogleFonts.barlow(
+                            color: palette.textMuted,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
               Divider(height: 1, color: palette.border),
-              // Scrollable list
+              // Scrollable list of equipment types (multi-select)
               Flexible(
                 child: ListView(
                   controller: scrollController,
                   shrinkWrap: true,
-                  padding: const EdgeInsets.only(bottom: 16),
+                  padding: const EdgeInsets.only(bottom: 12),
                   children: [
-                    // Reset row
-                    ListTile(
-                      leading: Icon(
-                        TreinoIcon.close,
-                        size: 16,
-                        color: palette.textMuted,
-                      ),
-                      title: Text(
-                        WorkoutStrings.pickerEquipmentAll,
-                        style: GoogleFonts.barlow(
-                          color: current == null
-                              ? palette.textPrimary
-                              : palette.textMuted,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      trailing: current == null
-                          ? Icon(
-                              Icons.check,
-                              size: 16,
-                              color: palette.accent,
-                            )
-                          : null,
-                      onTap: () => Navigator.of(context).pop(null),
-                    ),
-                    // One row per EquipmentType value
                     for (final type in EquipmentType.values)
-                      ListTile(
-                        leading: Icon(
-                          _EquipmentIcon.of(type),
-                          size: 24,
-                          color: palette.textPrimary,
-                        ),
-                        title: Text(
-                          type.label,
-                          style: GoogleFonts.barlow(
-                            color: palette.textPrimary,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        trailing: current == type
-                            ? Icon(
-                                Icons.check,
-                                size: 16,
-                                color: palette.accent,
-                              )
-                            : null,
-                        onTap: () => Navigator.of(context).pop(type),
+                      _EquipmentRow(
+                        type: type,
+                        selected: _selected.contains(type),
+                        onTap: () => _toggle(type),
+                        palette: palette,
                       ),
                   ],
+                ),
+              ),
+              // Sticky Aplicar button
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 18),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: palette.accent,
+                      foregroundColor: palette.bg,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    onPressed: () => Navigator.of(context).pop(_selected),
+                    child: Text(
+                      _selected.isEmpty
+                          ? WorkoutStrings.pickerSheetApplyAll
+                          : WorkoutStrings.pickerSheetApply(_selected.length),
+                      style: GoogleFonts.barlowCondensed(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ],
           ),
         );
       },
+    );
+  }
+}
+
+class _EquipmentRow extends StatelessWidget {
+  const _EquipmentRow({
+    required this.type,
+    required this.selected,
+    required this.onTap,
+    required this.palette,
+  });
+
+  final EquipmentType type;
+  final bool selected;
+  final VoidCallback onTap;
+  final AppPalette palette;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: selected
+              ? palette.accent.withValues(alpha: 0.15)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: selected ? palette.accent : Colors.transparent,
+            width: 1.5,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              _EquipmentIcon.of(type),
+              size: 22,
+              color: palette.textPrimary,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                type.label,
+                style: GoogleFonts.barlow(
+                  color: palette.textPrimary,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+            if (selected)
+              Icon(
+                TreinoIcon.check,
+                size: 18,
+                color: palette.accent,
+              ),
+          ],
+        ),
+      ),
     );
   }
 }

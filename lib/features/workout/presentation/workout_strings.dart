@@ -112,4 +112,16 @@ abstract final class WorkoutStrings {
   /// e.g. "Agregar 1 ejercicio" / "Agregar 3 ejercicios".
   static String pickerAddButton(int count) =>
       'Agregar $count ejercicio${count == 1 ? '' : 's'}';
+
+  // ── Filter sheet (multi-select) CTAs — PR2 refinement ────────────────────
+  /// Clears the current filter selection without dismissing the sheet.
+  static const String pickerSheetClear = 'Limpiar';
+
+  /// Label of the sticky Apply button when zero filters are selected
+  /// (semantically equivalent to "match all").
+  static const String pickerSheetApplyAll = 'APLICAR (TODOS)';
+
+  /// Label of the sticky Apply button with N filters selected.
+  /// e.g. "APLICAR (3)".
+  static String pickerSheetApply(int count) => 'APLICAR ($count)';
 }

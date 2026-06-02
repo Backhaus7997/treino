@@ -121,12 +121,6 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
     });
   }
 
-  void _addSlot(int dayIndex) {
-    setState(() {
-      _days[dayIndex].slots = [..._days[dayIndex].slots, _EditableSlot()];
-    });
-  }
-
   void _removeSlot(int dayIndex, int slotIndex) {
     setState(() {
       _days[dayIndex].slots = [
@@ -136,14 +130,29 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
     });
   }
 
-  Future<void> _pickExercise(
-      BuildContext context, int dayIndex, int slotIndex) async {
-    final exercise = await showExercisePicker(context);
-    if (exercise != null && mounted) {
-      setState(() {
-        _days[dayIndex].slots[slotIndex].exercise = exercise;
-      });
-    }
+  /// Opens the multi-select picker for [dayIndex] and appends N new slots.
+  /// Passes [alreadySelectedIds] so the picker pre-marks exercises already in
+  /// the day — the user avoids accidental re-adds. (ADR-RER-01)
+  Future<void> _pickExercisesForDay(
+      BuildContext context, int dayIndex) async {
+    final existingIds = _days[dayIndex]
+        .slots
+        .where((s) => s.exercise != null)
+        .map((s) => s.exercise!.id)
+        .toSet();
+    final picked = await showExercisePicker(
+      context,
+      alreadySelectedIds: existingIds,
+    );
+    if (picked == null || picked.isEmpty || !mounted) return;
+    setState(() {
+      for (final ex in picked) {
+        final slot = _EditableSlot()
+          ..exercise = ex
+          ..restSeconds = ex.defaultRestSeconds ?? 60;
+        _days[dayIndex].slots = [..._days[dayIndex].slots, slot];
+      }
+    });
   }
 
   Future<void> _submit(WidgetRef ref) async {
@@ -422,9 +431,8 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
                     _DayExpansionTile(
                       day: _days[di],
                       palette: palette,
-                      onAddSlot: () => _addSlot(di),
+                      onAddSlot: () => _pickExercisesForDay(context, di),
                       onRemoveSlot: (si) => _removeSlot(di, si),
-                      onPickExercise: (si) => _pickExercise(context, di, si),
                       onRemoveDay:
                           _days.length > 1 ? () => _removeDay(di) : null,
                       onSlotChanged: () => setState(() {}),
@@ -525,7 +533,6 @@ class _DayExpansionTile extends StatefulWidget {
     required this.palette,
     required this.onAddSlot,
     required this.onRemoveSlot,
-    required this.onPickExercise,
     required this.onRemoveDay,
     required this.onSlotChanged,
   });
@@ -534,7 +541,6 @@ class _DayExpansionTile extends StatefulWidget {
   final AppPalette palette;
   final VoidCallback onAddSlot;
   final void Function(int slotIndex) onRemoveSlot;
-  final void Function(int slotIndex) onPickExercise;
   final VoidCallback? onRemoveDay;
   final VoidCallback onSlotChanged;
 
@@ -606,7 +612,6 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
                     _SlotEditor(
                       slot: widget.day.slots[si],
                       palette: palette,
-                      onPickExercise: () => widget.onPickExercise(si),
                       onRemove: () => widget.onRemoveSlot(si),
                       onChanged: widget.onSlotChanged,
                     ),
@@ -645,14 +650,12 @@ class _SlotEditor extends StatelessWidget {
   const _SlotEditor({
     required this.slot,
     required this.palette,
-    required this.onPickExercise,
     required this.onRemove,
     required this.onChanged,
   });
 
   final _EditableSlot slot;
   final AppPalette palette;
-  final VoidCallback onPickExercise;
   final VoidCallback onRemove;
   final VoidCallback onChanged;
 
@@ -671,27 +674,26 @@ class _SlotEditor extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: InkWell(
-                  onTap: onPickExercise,
-                  borderRadius: BorderRadius.circular(6),
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: palette.bgCard,
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: palette.border),
+                child: Container(
+                  // Exercise cell is read-only after PR2 redesign — slots are
+                  // created pre-filled via multi-select picker. To change
+                  // exercise, remove the slot and add again. ADR-RER-01.
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: palette.bgCard,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: palette.border),
+                  ),
+                  child: Text(
+                    slot.exercise?.name ?? CoachStrings.exercisePicker,
+                    style: GoogleFonts.barlow(
+                      fontSize: 13,
+                      color: slot.exercise != null
+                          ? palette.textPrimary
+                          : palette.textMuted,
                     ),
-                    child: Text(
-                      slot.exercise?.name ?? CoachStrings.exercisePicker,
-                      style: GoogleFonts.barlow(
-                        fontSize: 13,
-                        color: slot.exercise != null
-                            ? palette.textPrimary
-                            : palette.textMuted,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ),
