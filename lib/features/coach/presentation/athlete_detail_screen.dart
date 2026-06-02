@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
+import '../../workout/presentation/workout_strings.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../chat/application/chat_providers.dart';
 import '../../profile/application/user_public_profile_providers.dart';
@@ -341,7 +342,7 @@ class _PlanCard extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              '${plan.days.length} ${plan.days.length == 1 ? "día" : "días"} · ${plan.split}',
+              '${plan.days.length} ${plan.days.length == 1 ? "día" : "días"} · ${plan.split ?? WorkoutStrings.splitFallback}',
               style: GoogleFonts.barlow(
                 fontWeight: FontWeight.w400,
                 fontSize: 12,

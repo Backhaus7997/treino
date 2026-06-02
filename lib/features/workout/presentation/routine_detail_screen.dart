@@ -15,6 +15,7 @@ import '../domain/routine_slot.dart';
 import '../domain/routine_source.dart';
 import 'widgets/exercise_slot_row.dart';
 import 'widgets/stat_tile.dart';
+import 'workout_strings.dart';
 
 /// RoutineDetailScreen — ConsumerStatefulWidget that observes routineByIdProvider.
 /// selectedDayIndex is local state (ADR-RD-3).
@@ -147,7 +148,8 @@ class _RoutineDetailContent extends StatelessWidget {
         SliverToBoxAdapter(
           child: _HeroStrip(
             routine: routine,
-            badgeText: '${routine.split.toUpperCase()} · DÍA ${day.dayNumber}',
+            badgeText:
+                '${(routine.split ?? WorkoutStrings.splitFallback).toUpperCase()} · DÍA ${day.dayNumber}',
             titleText: day.name.toUpperCase(),
           ),
         ),

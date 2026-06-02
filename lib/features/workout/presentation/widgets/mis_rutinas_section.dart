@@ -304,7 +304,7 @@ class _UserRoutineCard extends ConsumerWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '${routine.split.toUpperCase()} · ${routine.level.displayNameEs.toUpperCase()}',
+                    '${(routine.split ?? WorkoutStrings.splitFallback).toUpperCase()} · ${routine.level.displayNameEs.toUpperCase()}',
                     style: GoogleFonts.barlow(
                       fontWeight: FontWeight.w400,
                       fontSize: 12,

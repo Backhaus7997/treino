@@ -123,6 +123,11 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
     final routineAsync = routineId != null
         ? ref.watch(routineByIdProvider(routineId))
         : const AsyncLoading<Routine?>();
+    // Routine.split is nullable as of routine-editor-redesign PR1
+    // (athlete-created routines may omit it). Analytics expects a non-null
+    // string; we keep the empty-string fallback here intentionally (do NOT
+    // replace with WorkoutStrings.splitFallback — analytics records the
+    // literal empty value, not the display copy). See ADR-RER-04.
     final routineSplit = routineAsync.valueOrNull?.split ?? '';
 
     return Scaffold(
