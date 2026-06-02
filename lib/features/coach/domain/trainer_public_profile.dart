@@ -38,6 +38,12 @@ class TrainerPublicProfile with _$TrainerPublicProfile {
     @Default(<TrainerLocation>[]) List<TrainerLocation> trainerLocations,
     @Default(<String>[]) List<String> trainerGeohashes,
     @Default(false) bool trainerOffersOnline,
+    // ── Review aggregate (Fase 6 Etapa 7) ──────────────────────────────────
+    // Written exclusively by the reviewAggregate Cloud Function.
+    // ADR-RV-004: lives on TrainerPublicProfile for O(1) discovery reads.
+    // ADR-RV-005: MUST NOT appear in UserRepository._trainerPublicFields.
+    double? averageRating,
+    @Default(0) int reviewCount,
   }) = _TrainerPublicProfile;
 
   factory TrainerPublicProfile.fromJson(Map<String, Object?> json) =>

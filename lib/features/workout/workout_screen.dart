@@ -5,6 +5,7 @@ import '../profile/application/user_providers.dart';
 import '../profile/domain/user_role.dart';
 import 'presentation/widgets/historial_section.dart';
 import 'presentation/widgets/mi_plan_section.dart';
+import 'presentation/widgets/mis_rutinas_section.dart';
 import 'presentation/widgets/plantillas_section.dart';
 import 'presentation/widgets/trainer_templates_section.dart';
 import 'trainer_workout_view.dart';
@@ -53,6 +54,12 @@ class _AthleteWorkout extends StatelessWidget {
           // because conceptually it's still "stuff your trainer made for
           // you", just non-assigned.
           TrainerTemplatesSection(),
+          SizedBox(height: 20),
+          // Athlete-authored routines (athlete-self-routines SDD).
+          // Belongs after TrainerTemplates because both are "my plans"
+          // (trainer-sourced first, then self-made), then the public
+          // catalog Plantillas, then Historial.
+          MisRutinasSection(),
           SizedBox(height: 20),
           PlantillasSection(),
           SizedBox(height: 20),
