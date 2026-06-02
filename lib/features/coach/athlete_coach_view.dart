@@ -99,7 +99,10 @@ class _AthleteCoachViewState extends ConsumerState<AthleteCoachView> {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
+      backgroundColor: AppPalette.of(context).bgCard,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
       builder: (_) => ReviewBottomSheet(
         linkId: link.id,
         trainerId: link.trainerId,
