@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../app/theme/app_palette.dart';
+import 'presentation/workout_strings.dart';
 import '../../core/widgets/treino_icon.dart';
 import '../coach/presentation/widgets/athlete_picker_sheet.dart';
 import '../profile/application/user_public_profile_providers.dart';
@@ -415,7 +416,7 @@ class _TemplateCardState extends ConsumerState<_TemplateCard> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '${t.split} · $daysCount día${daysCount == 1 ? '' : 's'}',
+                  '${t.split ?? WorkoutStrings.splitFallback} · $daysCount día${daysCount == 1 ? '' : 's'}',
                   style: GoogleFonts.barlow(
                     color: palette.textMuted,
                     fontSize: 12,

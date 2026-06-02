@@ -2,9 +2,13 @@ import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 import '../../profile/data/timestamp_converter.dart';
+import 'equipment_type.dart';
 
 part 'custom_exercise.freezed.dart';
 part 'custom_exercise.g.dart';
+
+EquipmentType? _equipmentFromJson(String? raw) => EquipmentType.fromJson(raw);
+String? _equipmentToJson(EquipmentType? v) => v?.jsonValue;
 
 /// A trainer's personal exercise — stored in their own subcollection at
 /// `users/{trainerId}/customExercises/{exId}`. Same shape as the stock
@@ -25,6 +29,10 @@ class CustomExercise with _$CustomExercise {
     @Default('') String description,
     String? videoUrl,
     int? defaultRestSeconds,
+    // ignore: invalid_annotation_target
+    @JsonKey(fromJson: _equipmentFromJson, toJson: _equipmentToJson)
+    EquipmentType?
+        equipment, // REQ-RER-015: nullable; stays null on existing docs (no backfill — ADR-RER-03)
     @TimestampConverter() required DateTime createdAt,
     @TimestampConverter() required DateTime updatedAt,
   }) = _CustomExercise;

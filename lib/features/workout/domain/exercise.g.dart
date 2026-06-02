@@ -21,6 +21,7 @@ _$ExerciseImpl _$$ExerciseImplFromJson(Map<String, dynamic> json) =>
               ?.map((e) => e as String)
               .toList() ??
           const <String>[],
+      equipment: _equipmentFromJson(json['equipment'] as String?),
     );
 
 Map<String, dynamic> _$$ExerciseImplToJson(_$ExerciseImpl instance) =>
@@ -33,4 +34,5 @@ Map<String, dynamic> _$$ExerciseImplToJson(_$ExerciseImpl instance) =>
       'videoUrl': instance.videoUrl,
       'defaultRestSeconds': instance.defaultRestSeconds,
       'aliases': instance.aliases,
+      'equipment': _equipmentToJson(instance.equipment),
     };

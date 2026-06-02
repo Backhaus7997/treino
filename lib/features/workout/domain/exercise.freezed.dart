@@ -29,7 +29,10 @@ mixin _$Exercise {
       throw _privateConstructorUsedError; // null means "not yet authored" (ADR-1)
   String? get videoUrl => throw _privateConstructorUsedError;
   int? get defaultRestSeconds => throw _privateConstructorUsedError;
-  List<String> get aliases => throw _privateConstructorUsedError;
+  List<String> get aliases =>
+      throw _privateConstructorUsedError; // Spanish/jargon synonyms for the Excel importer match
+  @JsonKey(fromJson: _equipmentFromJson, toJson: _equipmentToJson)
+  EquipmentType? get equipment => throw _privateConstructorUsedError;
 
   /// Serializes this Exercise to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -54,7 +57,9 @@ abstract class $ExerciseCopyWith<$Res> {
       List<String>? techniqueInstructions,
       String? videoUrl,
       int? defaultRestSeconds,
-      List<String> aliases});
+      List<String> aliases,
+      @JsonKey(fromJson: _equipmentFromJson, toJson: _equipmentToJson)
+      EquipmentType? equipment});
 }
 
 /// @nodoc
@@ -80,6 +85,7 @@ class _$ExerciseCopyWithImpl<$Res, $Val extends Exercise>
     Object? videoUrl = freezed,
     Object? defaultRestSeconds = freezed,
     Object? aliases = null,
+    Object? equipment = freezed,
   }) {
     return _then(_value.copyWith(
       id: null == id
@@ -114,6 +120,10 @@ class _$ExerciseCopyWithImpl<$Res, $Val extends Exercise>
           ? _value.aliases
           : aliases // ignore: cast_nullable_to_non_nullable
               as List<String>,
+      equipment: freezed == equipment
+          ? _value.equipment
+          : equipment // ignore: cast_nullable_to_non_nullable
+              as EquipmentType?,
     ) as $Val);
   }
 }
@@ -134,7 +144,9 @@ abstract class _$$ExerciseImplCopyWith<$Res>
       List<String>? techniqueInstructions,
       String? videoUrl,
       int? defaultRestSeconds,
-      List<String> aliases});
+      List<String> aliases,
+      @JsonKey(fromJson: _equipmentFromJson, toJson: _equipmentToJson)
+      EquipmentType? equipment});
 }
 
 /// @nodoc
@@ -158,6 +170,7 @@ class __$$ExerciseImplCopyWithImpl<$Res>
     Object? videoUrl = freezed,
     Object? defaultRestSeconds = freezed,
     Object? aliases = null,
+    Object? equipment = freezed,
   }) {
     return _then(_$ExerciseImpl(
       id: null == id
@@ -192,6 +205,10 @@ class __$$ExerciseImplCopyWithImpl<$Res>
           ? _value._aliases
           : aliases // ignore: cast_nullable_to_non_nullable
               as List<String>,
+      equipment: freezed == equipment
+          ? _value.equipment
+          : equipment // ignore: cast_nullable_to_non_nullable
+              as EquipmentType?,
     ));
   }
 }
@@ -207,7 +224,9 @@ class _$ExerciseImpl implements _Exercise {
       final List<String>? techniqueInstructions,
       this.videoUrl,
       this.defaultRestSeconds,
-      final List<String> aliases = const <String>[]})
+      final List<String> aliases = const <String>[],
+      @JsonKey(fromJson: _equipmentFromJson, toJson: _equipmentToJson)
+      this.equipment})
       : _techniqueInstructions = techniqueInstructions,
         _aliases = aliases;
 
@@ -249,9 +268,14 @@ class _$ExerciseImpl implements _Exercise {
     return EqualUnmodifiableListView(_aliases);
   }
 
+// Spanish/jargon synonyms for the Excel importer match
+  @override
+  @JsonKey(fromJson: _equipmentFromJson, toJson: _equipmentToJson)
+  final EquipmentType? equipment;
+
   @override
   String toString() {
-    return 'Exercise(id: $id, name: $name, muscleGroup: $muscleGroup, category: $category, techniqueInstructions: $techniqueInstructions, videoUrl: $videoUrl, defaultRestSeconds: $defaultRestSeconds, aliases: $aliases)';
+    return 'Exercise(id: $id, name: $name, muscleGroup: $muscleGroup, category: $category, techniqueInstructions: $techniqueInstructions, videoUrl: $videoUrl, defaultRestSeconds: $defaultRestSeconds, aliases: $aliases, equipment: $equipment)';
   }
 
   @override
@@ -271,7 +295,9 @@ class _$ExerciseImpl implements _Exercise {
                 other.videoUrl == videoUrl) &&
             (identical(other.defaultRestSeconds, defaultRestSeconds) ||
                 other.defaultRestSeconds == defaultRestSeconds) &&
-            const DeepCollectionEquality().equals(other._aliases, _aliases));
+            const DeepCollectionEquality().equals(other._aliases, _aliases) &&
+            (identical(other.equipment, equipment) ||
+                other.equipment == equipment));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -285,7 +311,8 @@ class _$ExerciseImpl implements _Exercise {
       const DeepCollectionEquality().hash(_techniqueInstructions),
       videoUrl,
       defaultRestSeconds,
-      const DeepCollectionEquality().hash(_aliases));
+      const DeepCollectionEquality().hash(_aliases),
+      equipment);
 
   /// Create a copy of Exercise
   /// with the given fields replaced by the non-null parameter values.
@@ -312,7 +339,9 @@ abstract class _Exercise implements Exercise {
       final List<String>? techniqueInstructions,
       final String? videoUrl,
       final int? defaultRestSeconds,
-      final List<String> aliases}) = _$ExerciseImpl;
+      final List<String> aliases,
+      @JsonKey(fromJson: _equipmentFromJson, toJson: _equipmentToJson)
+      final EquipmentType? equipment}) = _$ExerciseImpl;
 
   factory _Exercise.fromJson(Map<String, dynamic> json) =
       _$ExerciseImpl.fromJson;
@@ -334,7 +363,11 @@ abstract class _Exercise implements Exercise {
   @override
   int? get defaultRestSeconds;
   @override
-  List<String> get aliases;
+  List<String>
+      get aliases; // Spanish/jargon synonyms for the Excel importer match
+  @override
+  @JsonKey(fromJson: _equipmentFromJson, toJson: _equipmentToJson)
+  EquipmentType? get equipment;
 
   /// Create a copy of Exercise
   /// with the given fields replaced by the non-null parameter values.
