@@ -52,6 +52,7 @@ dependencies:
   # server-side "real browser" check.
   url_launcher: ^6.3.0
   video_player: ^2.9.0
+  fl_chart: ^1.2.0
 
 dev_dependencies:
   flutter_test:

@@ -324,10 +324,29 @@ service cloud.firestore {
       }
     }
 
+    // Privacy grant: athlete opts in to share their training history with ONE
+    // trainer. Doc id == athleteId. The sessions rule reads this via get().
+    match /session_shares/{athleteId} {
+      allow read: if request.auth != null
+                  && (request.auth.uid == athleteId
+                      || (resource != null
+                          && request.auth.uid == resource.data.trainerId));
+      // Only the athlete (owner) may create/update/delete their own grant.
+      allow write: if request.auth != null
+                   && request.auth.uid == athleteId
+                   && (request.resource == null
+                       || request.resource.data.trainerId is string);
+    }
+
     // Sessions sub-collection (Fase 4 Etapa 1, REQ-SMS-014).
-    // Owner-only R/W. Setlogs as nested sub-collection.
+    // Owner R/W. Trainer granted via session_shares gets read-only access.
+    // Nested setLogs remain owner-only.
     match /users/{uid}/sessions/{sessionId} {
-      allow read, write: if request.auth != null && request.auth.uid == uid;
+      allow read: if request.auth != null
+                  && (request.auth.uid == uid
+                      || (exists(/databases/$(database)/documents/session_shares/$(uid))
+                          && get(/databases/$(database)/documents/session_shares/$(uid)).data.trainerId == request.auth.uid));
+      allow write: if request.auth != null && request.auth.uid == uid;
 
       match /setLogs/{setLogId} {
         allow read, write: if request.auth != null && request.auth.uid == uid;
@@ -414,6 +433,42 @@ service cloud.firestore {
     // confusing trainers; pricing now lives ONLY on the trainer's public
     // profile via trainerMonthlyRate. A future subscribe flow may
     // reintroduce a plan catalog with its own rules block.
+
+    // Body measurements / anthropometry. Owned by the TRAINER who recorded them
+    // (recordedBy). The athlete gets read-only of their own. No one else.
+    match /measurements/{measurementId} {
+      allow read: if request.auth != null
+                  && (request.auth.uid == resource.data.recordedBy
+                      || request.auth.uid == resource.data.athleteId);
+      allow create: if request.auth != null
+                    && request.resource.data.recordedBy == request.auth.uid
+                    && request.resource.data.athleteId is string
+                    && request.resource.data.athleteId.size() > 0;
+      allow update: if request.auth != null
+                    && resource.data.recordedBy == request.auth.uid
+                    && request.resource.data.recordedBy == resource.data.recordedBy
+                    && request.resource.data.athleteId == resource.data.athleteId;
+      allow delete: if request.auth != null
+                    && resource.data.recordedBy == request.auth.uid;
+    }
+
+    // Performance tests / physical assessments. Owned by the TRAINER who recorded
+    // them (recordedBy). The athlete gets read-only of their own. No one else.
+    match /performance_tests/{testId} {
+      allow read: if request.auth != null
+                  && (request.auth.uid == resource.data.recordedBy
+                      || request.auth.uid == resource.data.athleteId);
+      allow create: if request.auth != null
+                    && request.resource.data.recordedBy == request.auth.uid
+                    && request.resource.data.athleteId is string
+                    && request.resource.data.athleteId.size() > 0;
+      allow update: if request.auth != null
+                    && resource.data.recordedBy == request.auth.uid
+                    && request.resource.data.recordedBy == resource.data.recordedBy
+                    && request.resource.data.athleteId == resource.data.athleteId;
+      allow delete: if request.auth != null
+                    && resource.data.recordedBy == request.auth.uid;
+    }
 
     // Athlete → trainer reviews (Fase 6 Etapa 7).
     // Doc id is deterministic: `${linkId}_${athleteId}`.

@@ -1,3 +1,5 @@
+import 'dart:async' show unawaited;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -205,9 +207,25 @@ class _ShareToggle extends ConsumerWidget {
       );
       if (!confirmed) return;
     }
+    // 1. Update the link flag (Firestore rule validates athlete == caller).
     await ref
         .read(trainerLinkRepositoryProvider)
         .setSharedWithTrainer(link.id, newValue);
+
+    // 2. Keep session_shares/{athleteId} in sync with the toggle.
+    //    Best-effort: we don't block the UX on this write.
+    final shareRepo = ref.read(sessionShareRepositoryProvider);
+    if (newValue) {
+      unawaited(
+        shareRepo.grant(
+          athleteId: link.athleteId,
+          trainerId: link.trainerId,
+        ),
+      );
+    } else {
+      unawaited(shareRepo.revoke(link.athleteId));
+    }
+
     ref.invalidate(currentAthleteLinkProvider);
   }
 
