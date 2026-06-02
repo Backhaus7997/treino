@@ -1,43 +1,53 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/treino_icon.dart';
+import '../../../insights/domain/muscle_group.dart';
 import '../../../workout/application/custom_exercise_providers.dart';
 import '../../../workout/application/exercise_providers.dart';
 import '../../../workout/application/session_providers.dart'
     show currentUidProvider;
 import '../../../workout/domain/custom_exercise.dart';
+import '../../../workout/domain/equipment_type.dart';
 import '../../../workout/domain/exercise.dart';
 import '../../../workout/presentation/custom_exercise_editor_screen.dart';
+import '../../../workout/presentation/workout_strings.dart';
+import 'equipment_filter_sheet.dart';
+import 'muscle_filter_sheet.dart';
 
-/// Shows a modal bottom sheet for picking an exercise.
+/// Shows a modal bottom sheet for picking one or more exercises (multi-select).
 ///
-/// Returns the selected [Exercise], or `null` if dismissed. The picker
-/// merges two sources:
-///   * The trainer's personal `customExercises` subcollection (top of the
-///     list, under a "TUS EJERCICIOS" header).
-///   * The public default catalogue (bottom, under "CATÁLOGO").
+/// Returns the confirmed [List<Exercise>], or `null` if dismissed.
+/// - `null` means the user cancelled (drag-down / tap outside).
+/// - Non-null means confirmed; list always has length >= 1 because the CTA is
+///   disabled at count == 0.
 ///
-/// Custom exercises are converted to the [Exercise] shape on selection so
-/// the caller's contract is unchanged. A pinned "+ Crear ejercicio nuevo"
-/// tile pushes the [CustomExerciseEditorScreen] modally; if the editor
-/// returns a freshly created custom exercise the picker pops with it
-/// immediately so the slot fills without re-opening the sheet.
+/// [alreadySelectedIds] pre-marks exercises that are already in the day so
+/// the user sees existing context when re-opening the picker.
 ///
-/// REQ-COACH-PLANS-024 · SCENARIO-458, 459.
-Future<Exercise?> showExercisePicker(BuildContext context) {
-  return showModalBottomSheet<Exercise>(
+/// ADR-RER-01, REQ-RER-001..004, REQ-RER-017.
+Future<List<Exercise>?> showExercisePicker(
+  BuildContext context, {
+  Set<String> alreadySelectedIds = const {},
+}) {
+  return showModalBottomSheet<List<Exercise>>(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (_) => const _ExercisePickerSheetContent(),
+    builder: (_) =>
+        _ExercisePickerSheetContent(alreadySelectedIds: alreadySelectedIds),
   );
 }
 
+// ── Sheet content ─────────────────────────────────────────────────────────────
+
 class _ExercisePickerSheetContent extends ConsumerStatefulWidget {
-  const _ExercisePickerSheetContent();
+  const _ExercisePickerSheetContent({required this.alreadySelectedIds});
+
+  final Set<String> alreadySelectedIds;
 
   @override
   ConsumerState<_ExercisePickerSheetContent> createState() =>
@@ -47,8 +57,88 @@ class _ExercisePickerSheetContent extends ConsumerStatefulWidget {
 class _ExercisePickerSheetContentState
     extends ConsumerState<_ExercisePickerSheetContent> {
   String _query = '';
+  Set<MuscleGroupDisplay> _muscleFilters = {};
+  Set<EquipmentType> _equipmentFilters = {};
+  late Set<String> _selected;
 
-  Future<void> _openCreateNew(BuildContext sheetContext) async {
+  @override
+  void initState() {
+    super.initState();
+    _selected = {...widget.alreadySelectedIds};
+  }
+
+  // ── Filter predicate ───────────────────────────────────────────────────────
+
+  bool _matches(Exercise e) {
+    final q = _query.toLowerCase().trim();
+    if (q.isNotEmpty) {
+      final nameMatch = e.name.toLowerCase().contains(q);
+      final aliasMatch = e.aliases.any((a) => a.toLowerCase().contains(q));
+      if (!nameMatch && !aliasMatch) return false;
+    }
+    // OR within muscle filter, AND across filter types.
+    if (_muscleFilters.isNotEmpty) {
+      final exerciseGroup = e.muscleGroup.toDisplayGroup();
+      if (!_muscleFilters.contains(exerciseGroup)) return false;
+    }
+    // ADR-RER-05: EXCLUDE exercises with null equipment when ANY equipment
+    // filter is active. OR within equipment filter.
+    if (_equipmentFilters.isNotEmpty) {
+      if (e.equipment == null) return false;
+      if (!_equipmentFilters.contains(e.equipment)) return false;
+    }
+    return true;
+  }
+
+  // ── Actions ────────────────────────────────────────────────────────────────
+
+  void _toggle(String id) {
+    setState(() {
+      if (_selected.contains(id)) {
+        _selected.remove(id);
+      } else {
+        _selected.add(id);
+      }
+    });
+  }
+
+  Future<void> _openMuscleSheet(BuildContext ctx) async {
+    final picked = await showMuscleFilterSheet(ctx, current: _muscleFilters);
+    if (!mounted || picked == null) return;
+    setState(() => _muscleFilters = picked);
+  }
+
+  Future<void> _openEquipmentSheet(BuildContext ctx) async {
+    final picked =
+        await showEquipmentFilterSheet(ctx, current: _equipmentFilters);
+    if (!mounted || picked == null) return;
+    setState(() => _equipmentFilters = picked);
+  }
+
+  void _confirm(
+    List<Exercise> defaults,
+    List<CustomExercise> customs,
+  ) {
+    final result = <Exercise>[];
+    for (final id in _selected) {
+      final fromDefaults = defaults.firstWhereOrNull((e) => e.id == id);
+      if (fromDefaults != null) {
+        result.add(fromDefaults);
+        continue;
+      }
+      final fromCustoms = customs.firstWhereOrNull((c) => c.id == id);
+      if (fromCustoms != null) {
+        result.add(_toExercise(fromCustoms));
+      }
+    }
+    Navigator.of(context).pop(result);
+  }
+
+  Future<void> _openCreateNew(
+    BuildContext sheetContext,
+    List<Exercise> defaults,
+    List<CustomExercise> customs,
+  ) async {
     final created = await Navigator.of(sheetContext).push<CustomExercise?>(
       MaterialPageRoute<CustomExercise?>(
         builder: (_) => Scaffold(
@@ -60,9 +150,11 @@ class _ExercisePickerSheetContentState
       ),
     );
     if (created != null && sheetContext.mounted) {
-      Navigator.of(sheetContext).pop(_toExercise(created));
+      Navigator.of(sheetContext).pop([_toExercise(created)]);
     }
   }
+
+  // ── Build ──────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -78,16 +170,18 @@ class _ExercisePickerSheetContentState
       minChildSize: 0.4,
       maxChildSize: 0.95,
       expand: false,
-      builder: (context, scrollController) {
+      builder: (sheetCtx, scrollController) {
+        final defaults = defaultsAsync.valueOrNull ?? const <Exercise>[];
+        final customs = customsAsync.valueOrNull ?? const <CustomExercise>[];
+
         return Container(
           decoration: BoxDecoration(
             color: palette.espresso,
-            borderRadius:
-                const BorderRadius.vertical(top: Radius.circular(20)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
           ),
           child: Column(
             children: [
-              // Handle
+              // ── Drag handle ───────────────────────────────────────────────
               Padding(
                 padding: const EdgeInsets.only(top: 12, bottom: 8),
                 child: Container(
@@ -100,7 +194,7 @@ class _ExercisePickerSheetContentState
                 ),
               ),
 
-              // Search field
+              // ── Search field ──────────────────────────────────────────────
               Padding(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -135,28 +229,70 @@ class _ExercisePickerSheetContentState
                 ),
               ),
 
-              // Create new CTA
+              // ── Filter buttons row (more visible than chips) ──────────────
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _FilterButton(
+                        baseLabel: WorkoutStrings.pickerMuscleFilter,
+                        count: _muscleFilters.length,
+                        palette: palette,
+                        onTap: () => _openMuscleSheet(sheetCtx),
+                        onClear: _muscleFilters.isNotEmpty
+                            ? () => setState(_muscleFilters.clear)
+                            : null,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _FilterButton(
+                        baseLabel: WorkoutStrings.pickerEquipmentFilter,
+                        count: _equipmentFilters.length,
+                        palette: palette,
+                        onTap: () => _openEquipmentSheet(sheetCtx),
+                        onClear: _equipmentFilters.isNotEmpty
+                            ? () => setState(_equipmentFilters.clear)
+                            : null,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // ── Create new CTA ────────────────────────────────────────────
               Padding(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                 child: _CreateNewTile(
                   palette: palette,
                   enabled: uid.isNotEmpty,
-                  onTap: uid.isEmpty ? null : () => _openCreateNew(context),
+                  onTap: uid.isEmpty
+                      ? null
+                      : () => _openCreateNew(sheetCtx, defaults, customs),
                 ),
               ),
 
-              // Exercise list (customs + defaults)
+              // ── Exercise list ─────────────────────────────────────────────
               Expanded(
                 child: _buildList(
                   scrollController: scrollController,
                   palette: palette,
                   defaults: defaultsAsync,
                   customs: customsAsync,
+                  uid: uid,
                 ),
               ),
 
-              // Safe area padding for home indicator
+              // ── Sticky add CTA ────────────────────────────────────────────
+              if (_selected.isNotEmpty)
+                _StickyAddBar(
+                  count: _selected.length,
+                  palette: palette,
+                  onTap: () => _confirm(defaults, customs),
+                ),
+
               SizedBox(height: MediaQuery.of(context).viewPadding.bottom + 8),
             ],
           ),
@@ -170,6 +306,7 @@ class _ExercisePickerSheetContentState
     required AppPalette palette,
     required AsyncValue<List<Exercise>> defaults,
     required AsyncValue<List<CustomExercise>> customs,
+    required String uid,
   }) {
     if (defaults.isLoading || customs.isLoading) {
       return Center(
@@ -180,32 +317,41 @@ class _ExercisePickerSheetContentState
       return Center(
         child: Text(
           'No pudimos cargar ejercicios.',
-          style:
-              GoogleFonts.barlow(color: palette.textMuted, fontSize: 14),
+          style: GoogleFonts.barlow(color: palette.textMuted, fontSize: 14),
         ),
       );
     }
     final defaultList = defaults.value ?? const <Exercise>[];
     final customList = customs.value ?? const <CustomExercise>[];
 
-    final q = _query.toLowerCase().trim();
-    final filteredCustoms = q.isEmpty
-        ? customList
-        : customList
-            .where((c) => c.name.toLowerCase().contains(q))
-            .toList();
-    final filteredDefaults = q.isEmpty
-        ? defaultList
-        : defaultList
-            .where((e) => e.name.toLowerCase().contains(q))
-            .toList();
+    final filteredCustoms =
+        customList.where((c) => _matches(_toExercise(c))).toList();
+    final filteredDefaults = defaultList.where(_matches).toList();
 
     if (filteredCustoms.isEmpty && filteredDefaults.isEmpty) {
       return Center(
-        child: Text(
-          'Sin resultados.',
-          style:
-              GoogleFonts.barlow(color: palette.textMuted, fontSize: 14),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                WorkoutStrings.pickerEmptyFiltered,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.barlow(
+                    color: palette.textMuted,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                WorkoutStrings.pickerEmptyFilteredHint,
+                textAlign: TextAlign.center,
+                style:
+                    GoogleFonts.barlow(color: palette.textMuted, fontSize: 12),
+              ),
+            ],
+          ),
         ),
       );
     }
@@ -217,64 +363,368 @@ class _ExercisePickerSheetContentState
         if (filteredCustoms.isNotEmpty) ...[
           _SectionHeader('Tus ejercicios', palette: palette),
           for (final c in filteredCustoms)
-            ListTile(
-              title: Text(
-                c.name,
-                style: GoogleFonts.barlow(
-                  color: palette.textPrimary,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              subtitle: c.muscleGroup.isEmpty
-                  ? null
-                  : Text(
-                      c.muscleGroup,
-                      style: GoogleFonts.barlow(
-                          color: palette.textMuted, fontSize: 12),
-                    ),
-              trailing: Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: palette.accent.withValues(alpha: 0.18),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  'MÍO',
-                  style: GoogleFonts.barlowCondensed(
-                    color: palette.accent,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.8,
-                  ),
-                ),
-              ),
-              onTap: () =>
-                  Navigator.of(context).pop(_toExercise(c)),
+            _ExerciseRow(
+              id: c.id,
+              name: c.name,
+              subtitle: c.muscleGroup.isEmpty ? null : c.muscleGroup,
+              badge: 'MÍO',
+              isCustom: true,
+              ownerId: uid,
+              selected: _selected.contains(c.id),
+              palette: palette,
+              onTap: () => _toggle(c.id),
             ),
         ],
         if (filteredDefaults.isNotEmpty) ...[
           _SectionHeader('Catálogo', palette: palette),
           for (final e in filteredDefaults)
-            ListTile(
-              title: Text(
-                e.name,
-                style: GoogleFonts.barlow(
-                  color: palette.textPrimary,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              subtitle: Text(
-                e.muscleGroup,
-                style: GoogleFonts.barlow(
-                    color: palette.textMuted, fontSize: 12),
-              ),
-              onTap: () => Navigator.of(context).pop(e),
+            _ExerciseRow(
+              id: e.id,
+              name: e.name,
+              subtitle: e.muscleGroup,
+              badge: null,
+              isCustom: false,
+              ownerId: null,
+              selected: _selected.contains(e.id),
+              palette: palette,
+              onTap: () => _toggle(e.id),
             ),
         ],
       ],
+    );
+  }
+}
+
+// ── Sub-widgets ───────────────────────────────────────────────────────────────
+
+/// A single exercise row with multi-select visual state + illustration + a
+/// detail button (Hevy-style).
+/// Selected: blue 3px left border + accent tint + checkmark overlay on the
+/// illustration. The trailing chartBar IconButton navigates to the exercise
+/// detail screen, independent of the row's tap-to-select behaviour.
+class _ExerciseRow extends StatelessWidget {
+  const _ExerciseRow({
+    required this.id,
+    required this.name,
+    required this.subtitle,
+    required this.badge,
+    required this.isCustom,
+    required this.ownerId,
+    required this.selected,
+    required this.palette,
+    required this.onTap,
+  });
+
+  final String id;
+  final String name;
+  final String? subtitle;
+  final String? badge;
+  final bool isCustom;
+  final String? ownerId;
+  final bool selected;
+  final AppPalette palette;
+  final VoidCallback onTap;
+
+  void _openDetail(BuildContext context) {
+    // ExerciseDetailScreen route accepts an optional ownerId for custom
+    // exercises (their docs live under users/{ownerId}/customExercises/).
+    final query = isCustom && ownerId != null && ownerId!.isNotEmpty
+        ? '?ownerId=$ownerId'
+        : '';
+    context.push('/workout/exercise/$id$query');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+        decoration: BoxDecoration(
+          color: selected
+              ? palette.accent.withValues(alpha: 0.08)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+          border: Border(
+            left: BorderSide(
+              color: selected ? palette.accent : Colors.transparent,
+              width: 3,
+            ),
+          ),
+        ),
+        child: ListTile(
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          leading: _ExerciseThumbnail(
+            id: id,
+            isCustom: isCustom,
+            selected: selected,
+            palette: palette,
+          ),
+          title: Text(
+            name,
+            style: GoogleFonts.barlow(
+              color: palette.textPrimary,
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          subtitle: subtitle != null && subtitle!.isNotEmpty
+              ? Text(
+                  subtitle!,
+                  style: GoogleFonts.barlow(
+                      color: palette.textMuted, fontSize: 12),
+                )
+              : null,
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (badge != null) ...[
+                _Badge(label: badge!, palette: palette),
+                const SizedBox(width: 8),
+              ],
+              IconButton(
+                onPressed: () => _openDetail(context),
+                icon: Icon(
+                  TreinoIcon.chartBar,
+                  size: 18,
+                  color: palette.textMuted,
+                ),
+                tooltip: 'Ver detalle',
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(
+                  minWidth: 36,
+                  minHeight: 36,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Circular thumbnail for an exercise row. Uses the bundled PNG illustration
+/// from `assets/exercises/{id}.png` when available; falls back to a neutral
+/// icon when the asset is missing (e.g. for custom exercises or unseeded ids).
+/// Adds a small checkmark badge overlay when selected.
+class _ExerciseThumbnail extends StatelessWidget {
+  const _ExerciseThumbnail({
+    required this.id,
+    required this.isCustom,
+    required this.selected,
+    required this.palette,
+  });
+
+  final String id;
+  final bool isCustom;
+  final bool selected;
+  final AppPalette palette;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 44,
+      height: 44,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          ClipOval(
+            child: Container(
+              width: 44,
+              height: 44,
+              color: palette.bgCard,
+              alignment: Alignment.center,
+              child: isCustom
+                  ? Icon(
+                      TreinoIcon.dumbbell,
+                      size: 22,
+                      color: palette.textMuted,
+                    )
+                  : Image.asset(
+                      'assets/exercises/$id.png',
+                      width: 44,
+                      height: 44,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Icon(
+                        TreinoIcon.dumbbell,
+                        size: 22,
+                        color: palette.textMuted,
+                      ),
+                    ),
+            ),
+          ),
+          if (selected)
+            Positioned(
+              right: -2,
+              bottom: -2,
+              child: Container(
+                width: 18,
+                height: 18,
+                decoration: BoxDecoration(
+                  color: palette.accent,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: palette.espresso, width: 2),
+                ),
+                child: Icon(
+                  TreinoIcon.check,
+                  size: 10,
+                  color: palette.bg,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Badge extends StatelessWidget {
+  const _Badge({required this.label, required this.palette});
+  final String label;
+  final AppPalette palette;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: palette.accent.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        label,
+        style: GoogleFonts.barlowCondensed(
+          color: palette.accent,
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.8,
+        ),
+      ),
+    );
+  }
+}
+
+/// Sticky CTA bar pinned at the bottom of the sheet.
+class _StickyAddBar extends StatelessWidget {
+  const _StickyAddBar({
+    required this.count,
+    required this.palette,
+    required this.onTap,
+  });
+
+  final int count;
+  final AppPalette palette;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      decoration: BoxDecoration(
+        color: palette.espresso,
+        border: Border(top: BorderSide(color: palette.border)),
+      ),
+      child: SizedBox(
+        width: double.infinity,
+        height: 48,
+        child: ElevatedButton(
+          onPressed: count > 0 ? onTap : null,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: palette.accent,
+            foregroundColor: palette.bg,
+            disabledBackgroundColor: palette.accent.withAlpha(80),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(9999),
+            ),
+          ),
+          child: Text(
+            WorkoutStrings.pickerAddButton(count),
+            style: GoogleFonts.barlowCondensed(
+              fontWeight: FontWeight.w700,
+              fontSize: 14,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Filter button — bigger and more visible than the previous pill-shaped chip.
+/// Width is driven by parent (Expanded). Active state (count > 0) uses
+/// accent border + filled tint + accent text; idle state is bgCard + border.
+/// Label shows count when active, e.g. "Músculos (3)".
+class _FilterButton extends StatelessWidget {
+  const _FilterButton({
+    required this.baseLabel,
+    required this.count,
+    required this.palette,
+    required this.onTap,
+    this.onClear,
+  });
+
+  final String baseLabel;
+  final int count;
+  final AppPalette palette;
+  final VoidCallback onTap;
+  final VoidCallback? onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    final active = count > 0;
+    final label = active ? '$baseLabel ($count)' : baseLabel;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 44,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: active ? palette.accent : palette.border,
+            width: active ? 1.5 : 1,
+          ),
+          color: active
+              ? palette.accent.withValues(alpha: 0.12)
+              : palette.bgCard,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Flexible(
+              child: Text(
+                label,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.barlowCondensed(
+                  color: active ? palette.accent : palette.textPrimary,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.8,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            if (active && onClear != null)
+              GestureDetector(
+                onTap: onClear,
+                child: Icon(
+                  TreinoIcon.close,
+                  size: 14,
+                  color: palette.accent,
+                ),
+              )
+            else
+              Icon(
+                TreinoIcon.chevronDown,
+                size: 14,
+                color: active ? palette.accent : palette.textMuted,
+              ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -321,8 +771,7 @@ class _CreateNewTile extends StatelessWidget {
         onTap: enabled ? onTap : null,
         borderRadius: BorderRadius.circular(10),
         child: Container(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
             color: palette.bgCard,
             borderRadius: BorderRadius.circular(10),
@@ -343,8 +792,7 @@ class _CreateNewTile extends StatelessWidget {
                 ),
               ),
               Icon(TreinoIcon.chevronRight,
-                  size: 14,
-                  color: palette.accent.withValues(alpha: 0.7)),
+                  size: 14, color: palette.accent.withValues(alpha: 0.7)),
             ],
           ),
         ),
@@ -353,11 +801,8 @@ class _CreateNewTile extends StatelessWidget {
   }
 }
 
-/// Lossy adapter — projects the fields the routine slot needs (id, name,
-/// muscleGroup) and stamps `category: 'custom'` so downstream code can
-/// distinguish trainer-personal exercises from the public catalogue if it
-/// ever needs to. The athlete-side detail screen falls back to the slot's
-/// denormalized name/muscleGroup so it doesn't need a global lookup.
+/// Lossy adapter — projects the fields the routine slot needs and stamps
+/// `category: 'custom'` so downstream code can distinguish custom exercises.
 Exercise _toExercise(CustomExercise c) {
   return Exercise(
     id: c.id,
@@ -367,5 +812,15 @@ Exercise _toExercise(CustomExercise c) {
     techniqueInstructions: null,
     videoUrl: c.videoUrl,
     defaultRestSeconds: c.defaultRestSeconds,
+    equipment: c.equipment,
   );
+}
+
+extension _FirstWhereOrNull<T> on List<T> {
+  T? firstWhereOrNull(bool Function(T) test) {
+    for (final element in this) {
+      if (test(element)) return element;
+    }
+    return null;
+  }
 }

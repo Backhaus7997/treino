@@ -96,4 +96,32 @@ abstract final class WorkoutStrings {
   /// Displayed when [Routine.split] is null. Display sites call `.toUpperCase()`
   /// as needed — this constant is stored in sentence case.
   static const String splitFallback = 'Sin split';
+
+  // ── REQ-RER-005/006: exercise picker filter strings (T-RER-017) ─────────────
+  static const String pickerMuscleFilter = 'Músculos';
+  static const String pickerEquipmentFilter = 'Equipamiento';
+  static const String pickerMuscleSheetTitle = 'Grupo muscular';
+  static const String pickerEquipmentSheetTitle = 'Tipo de equipo';
+  static const String pickerMuscleAll = 'Todos los músculos';
+  static const String pickerEquipmentAll = 'Todo el equipamiento';
+  static const String pickerEmptyFiltered = 'Ningún ejercicio coincide';
+  static const String pickerEmptyFilteredHint =
+      'Probá quitando un filtro o ajustando la búsqueda.';
+
+  /// Builds the sticky CTA label for the multi-select picker.
+  /// e.g. "Agregar 1 ejercicio" / "Agregar 3 ejercicios".
+  static String pickerAddButton(int count) =>
+      'Agregar $count ejercicio${count == 1 ? '' : 's'}';
+
+  // ── Filter sheet (multi-select) CTAs — PR2 refinement ────────────────────
+  /// Clears the current filter selection without dismissing the sheet.
+  static const String pickerSheetClear = 'Limpiar';
+
+  /// Label of the sticky Apply button when zero filters are selected
+  /// (semantically equivalent to "match all").
+  static const String pickerSheetApplyAll = 'APLICAR (TODOS)';
+
+  /// Label of the sticky Apply button with N filters selected.
+  /// e.g. "APLICAR (3)".
+  static String pickerSheetApply(int count) => 'APLICAR ($count)';
 }
