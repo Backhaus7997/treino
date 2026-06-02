@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../app/theme/app_palette.dart';
 import '../../core/widgets/treino_icon.dart';
@@ -9,6 +10,7 @@ import '../chat/application/chat_providers.dart';
 import '../profile/application/user_public_profile_providers.dart';
 import '../profile/domain/user_public_profile.dart';
 import '../reviews/application/review_providers.dart';
+import '../reviews/domain/review.dart';
 import '../reviews/presentation/widgets/review_bottom_sheet.dart';
 import 'application/trainer_link_providers.dart';
 import 'domain/trainer_link.dart';
@@ -22,13 +24,109 @@ import 'presentation/trainers_list_screen.dart';
 ///   busque y elija PF. Es el entry natural al flow de Discovery.
 /// - status pending → card "esperando confirmación" + botón cancelar.
 /// - status active → card con info del PF + botón terminar vínculo.
-class AthleteCoachView extends ConsumerWidget {
+///
+/// Converted to ConsumerStatefulWidget in Fase 6 Etapa 7 to support the
+/// 30-day review prompt (Trigger #2). ADR-RV-006.
+class AthleteCoachView extends ConsumerStatefulWidget {
   const AthleteCoachView({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<AthleteCoachView> createState() => _AthleteCoachViewState();
+}
+
+class _AthleteCoachViewState extends ConsumerState<AthleteCoachView> {
+  /// Guards against the post-frame callback firing more than once within the
+  /// same widget lifetime. Prevents double-fire on rebuilds. ADR-RV-006.
+  bool _promptCheckScheduled = false;
+
+  @override
+  void initState() {
+    super.initState();
+  }
+
+  /// Checks all conditions for showing the 30-day review prompt and shows
+  /// the bottom sheet if they are met.
+  ///
+  /// Conditions (all must be true):
+  /// 1. Active link with non-null acceptedAt.
+  /// 2. Days since acceptedAt ≥ 30.
+  /// 3. No existing review for this link.
+  /// 4. SharedPreferences flag `review_prompt_shown_{linkId}` is not set.
+  ///
+  /// The prefs flag is set BEFORE showing the sheet so that even if the user
+  /// cancels without submitting, the prompt is not shown again. ADR-RV-006.
+  Future<void> _maybeShow30DayPrompt() async {
+    if (_promptCheckScheduled) return;
+    _promptCheckScheduled = true;
+
+    if (!mounted) return;
+
+    final link = ref.read(currentAthleteLinkProvider).valueOrNull;
+    if (link == null || link.status != TrainerLinkStatus.active) return;
+
+    final acceptedAt = link.acceptedAt;
+    if (acceptedAt == null) return;
+    if (DateTime.now().toUtc().difference(acceptedAt).inDays < 30) return;
+
+    final reviewKey = '${link.id}:${link.athleteId}';
+    // Await the first emission from the stream provider.
+    // This is safe because autoDispose keeps the provider alive as long as
+    // there is at least one subscriber. ADR-RV-006.
+    Review? existingReview;
+    try {
+      existingReview =
+          await ref.read(userReviewForLinkProvider(reviewKey).future);
+    } catch (_) {
+      // If the stream errors, skip the prompt.
+      return;
+    }
+    if (existingReview != null) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    final prefKey = 'review_prompt_shown_${link.id}';
+    if (prefs.getBool(prefKey) == true) return;
+
+    // Set flag BEFORE showing the sheet (covers cancel path).
+    await prefs.setBool(prefKey, true);
+
+    if (!mounted) return;
+
+    final trainerPub =
+        ref.read(userPublicProfileProvider(link.trainerId)).valueOrNull;
+    final trainerName =
+        trainerPub?.displayName ?? 'tu Personal Trainer'; // i18n: Fase 6 Etapa 7
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => ReviewBottomSheet(
+        linkId: link.id,
+        trainerId: link.trainerId,
+        trainerName: trainerName,
+        athleteId: link.athleteId,
+        triggerVariant: ReviewTriggerVariant.thirtyDay,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final linkAsync = ref.watch(currentAthleteLinkProvider);
+
+    // Trigger #2: fire 30-day prompt after the link provider resolves.
+    // Using ref.listen so we react each time the async value transitions to
+    // data. The _promptCheckScheduled guard prevents double-fire within the
+    // same widget lifetime. ADR-RV-006.
+    ref.listen<AsyncValue<TrainerLink?>>(currentAthleteLinkProvider,
+        (_, next) {
+      if (next is AsyncData) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _maybeShow30DayPrompt();
+        });
+      }
+    });
 
     return linkAsync.when(
       loading: () => Center(
