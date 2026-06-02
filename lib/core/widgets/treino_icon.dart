@@ -107,4 +107,17 @@ class TreinoIcon {
   static const IconData upload = PhosphorIconsRegular.uploadSimple;
   static const IconData fileXls = PhosphorIconsRegular.fileXls;
   static const IconData warning = PhosphorIconsRegular.warning;
+
+  // Equipment filter aliases (T-RER-016) — used by EquipmentFilterSheet.
+  // equipDumbbell and equipBarbell both alias barbell because Phosphor has no
+  // distinct dumbbell glyph; the row label ("Mancuerna" vs "Barra") disambiguates.
+  static const IconData equipDumbbell = PhosphorIconsRegular.barbell;
+  static const IconData equipBarbell = PhosphorIconsRegular.barbell;
+  static const IconData equipMachine = PhosphorIconsRegular.gearSix;
+  static const IconData equipCable = PhosphorIconsRegular.lightning;
+  static const IconData equipBand = PhosphorIconsRegular.waveTriangle;
+  static const IconData equipBodyweight = PhosphorIconsRegular.personSimple;
+  static const IconData equipCardio = PhosphorIconsRegular.heartbeat;
+  static const IconData equipOther = PhosphorIconsRegular.shapes;
+  static const IconData equipNone = PhosphorIconsRegular.minus;
 }
