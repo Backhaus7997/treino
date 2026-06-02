@@ -1,6 +1,7 @@
 'use strict';
 
 const admin = require('firebase-admin');
+const { equipmentMap } = require('./_equipment_map.js');
 admin.initializeApp(); // uses GOOGLE_APPLICATION_CREDENTIALS env var
 const db = admin.firestore();
 
@@ -706,7 +707,13 @@ const routines = [
 async function seedExercises() {
   console.log(`Seeding ${exercises.length} exercises...`);
   for (const ex of exercises) {
-    await db.collection('exercises').doc(ex.id).set(ex);
+    // Stamp `equipment` from the shared map (REQ-RER-015, ADR-RER-03).
+    // Unmapped exercises stay without the field — filter treats null as
+    // "match all". The map is the single source of truth, shared with
+    // scripts/backfill_exercise_equipment.js.
+    const equipment = equipmentMap[ex.id];
+    const doc = equipment ? { ...ex, equipment } : ex;
+    await db.collection('exercises').doc(ex.id).set(doc);
   }
   console.log('Exercises seeded.');
 }
