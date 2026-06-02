@@ -8,6 +8,8 @@ import '../../core/widgets/treino_icon.dart';
 import '../chat/application/chat_providers.dart';
 import '../profile/application/user_public_profile_providers.dart';
 import '../profile/domain/user_public_profile.dart';
+import '../reviews/application/review_providers.dart';
+import '../reviews/presentation/widgets/review_bottom_sheet.dart';
 import 'application/trainer_link_providers.dart';
 import 'domain/trainer_link.dart';
 import 'domain/trainer_link_status.dart';
@@ -253,10 +255,50 @@ class _ActionRow extends ConsumerWidget {
       '¿Seguro que querés terminar tu vínculo con este Personal Trainer? Podés volver a pedirle vínculo más adelante.',
     );
     if (!confirmed) return;
-    await ref
+
+    // Capture container + locals BEFORE the async gap (dispose-safe pattern).
+    // After terminate(), currentAthleteLinkProvider is invalidated and this
+    // widget may be disposed before the await returns. Reading from the
+    // container survives disposal. ADR-RV-007, mirrors ADR-FPS-006.
+    final container = ProviderScope.containerOf(context, listen: false);
+    final linkId = link.id;
+    final trainerId = link.trainerId;
+    final athleteId = link.athleteId;
+
+    // Resolve trainer name from public profile (best-effort, may be null).
+    final trainerPub =
+        container.read(userPublicProfileProvider(trainerId)).valueOrNull;
+    final trainerName =
+        trainerPub?.displayName ?? 'tu Personal Trainer'; // i18n: Fase 6 Etapa 7
+
+    // Resolve existing review before await so we have it for the sheet.
+    final reviewKey = '$linkId:$athleteId';
+    final existingReview =
+        container.read(userReviewForLinkProvider(reviewKey)).valueOrNull;
+
+    await container
         .read(trainerLinkRepositoryProvider)
-        .terminate(link.id, reason: 'athlete-terminated');
-    ref.invalidate(currentAthleteLinkProvider);
+        .terminate(linkId, reason: 'athlete-terminated');
+
+    container.invalidate(currentAthleteLinkProvider);
+
+    // Show review sheet — context is still valid here because we checked
+    // mounted already and the sheet uses the container, not this widget's ref.
+    if (context.mounted) {
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) => ReviewBottomSheet(
+          linkId: linkId,
+          trainerId: trainerId,
+          trainerName: trainerName,
+          athleteId: athleteId,
+          existing: existingReview,
+          triggerVariant: ReviewTriggerVariant.standard,
+        ),
+      );
+    }
   }
 
   @override
