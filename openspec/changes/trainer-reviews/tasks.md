@@ -160,40 +160,40 @@ Total: ~900 LOC across 3 PRs.
 
 ### Phase 3.1: StarRatingDisplay widget
 
-- [ ] T37 — SETUP: create branch `feat/trainer-reviews-pr3-display` from post-PR#2 `main`; confirm clean rebase.
-- [ ] T38 — RED: create `test/features/reviews/presentation/star_rating_display_test.dart`; failing tests: renders 5 read-only star icons; `rating==4.7` → 4 filled + 1 outline; `rating==null` → all outline or hidden per spec; icons from `TreinoIcon.starFill/starOutline` only. (SCENARIO-612)
-- [ ] T39 — GREEN: create `lib/features/reviews/presentation/widgets/star_rating_display.dart` — `StarRatingDisplay({double? rating, int? count})`; 5 non-interactive icons from `TreinoIcon.starFill/starOutline`; fill threshold `>= i` (1-indexed); colors via `AppPalette.of(context)`; T38 must pass. (SCENARIO-612)
+- [x] T37 — SETUP: create branch `feat/trainer-reviews-pr3-display` from post-PR#2 `main`; confirm clean rebase.
+- [x] T38 — RED: create `test/features/reviews/presentation/star_rating_display_test.dart`; failing tests: renders 5 read-only star icons; `rating==4.7` → 4 filled + 1 outline; `rating==null` → all outline or hidden per spec; icons from `TreinoIcon.starFill/starOutline` only. (SCENARIO-612)
+- [x] T39 — GREEN: create `lib/features/reviews/presentation/widgets/star_rating_display.dart` — `StarRatingDisplay({double? rating, int? count})`; 5 non-interactive icons from `TreinoIcon.starFill/starOutline`; fill threshold `>= i` (1-indexed); colors via `AppPalette.of(context)`; T38 must pass. (SCENARIO-612)
 
 ### Phase 3.2: ReviewTile + deleted-athlete fallback
 
-- [ ] T40 — RED: create `test/features/reviews/presentation/review_tile_test.dart`; failing tests: renders athlete avatar + name + `StarRatingDisplay` + comment + relative date (SCENARIO-613); `userPublicProfileProvider(athleteId)` returns null → renders "Usuario eliminado" + neutral avatar (SCENARIO-614); comment absent → comment row hidden. (SCENARIO-613, 614)
-- [ ] T41 — GREEN: create `lib/features/reviews/presentation/widgets/review_tile.dart` — `ReviewTile({required Review review})`; watches `userPublicProfileProvider(review.athleteId)`; null profile → "Usuario eliminado" fallback (string tagged `// i18n: Fase 6 Etapa 7`); renders `StarRatingDisplay(rating: review.rating.toDouble())`; relative date formatting; T40 must pass. (SCENARIO-613, 614)
+- [x] T40 — RED: create `test/features/reviews/presentation/review_tile_test.dart`; failing tests: renders athlete avatar + name + `StarRatingDisplay` + comment + relative date (SCENARIO-613); `userPublicProfileProvider(athleteId)` returns null → renders "Usuario eliminado" + neutral avatar (SCENARIO-614); comment absent → comment row hidden. (SCENARIO-613, 614)
+- [x] T41 — GREEN: create `lib/features/reviews/presentation/widgets/review_tile.dart` — `ReviewTile({required Review review})`; watches `userPublicProfileProvider(review.athleteId)`; null profile → "Usuario eliminado" fallback (string tagged `// i18n: Fase 6 Etapa 7`); renders `StarRatingDisplay(rating: review.rating.toDouble())`; relative date formatting; T40 must pass. (SCENARIO-613, 614)
 
 ### Phase 3.3: TrainerReviewsSection
 
-- [ ] T42 — RED: create `test/features/reviews/presentation/trainer_reviews_section_test.dart`; failing tests: renders "RESEÑAS" header (SCENARIO-615); `trainerReviewsProvider` empty → renders "Sin reseñas todavía" muted text (SCENARIO-615); non-empty → list of `ReviewTile` widgets ≤10; string constants tagged `// i18n: Fase 6 Etapa 7`. (SCENARIO-615)
-- [ ] T43 — GREEN: create `lib/features/reviews/presentation/widgets/trainer_reviews_section.dart` — `TrainerReviewsSection({required String trainerId})`; watches `trainerReviewsProvider(trainerId)`; header "RESEÑAS"; empty state "Sin reseñas todavía" in muted color via `AppPalette.of(context)`; list of `ReviewTile`; spacing from scale; T42 must pass. (SCENARIO-615)
+- [x] T42 — RED: create `test/features/reviews/presentation/trainer_reviews_section_test.dart`; failing tests: renders "RESEÑAS" header (SCENARIO-615); `trainerReviewsProvider` empty → renders "Sin reseñas todavía" muted text (SCENARIO-615); non-empty → list of `ReviewTile` widgets ≤10; string constants tagged `// i18n: Fase 6 Etapa 7`. (SCENARIO-615)
+- [x] T43 — GREEN: create `lib/features/reviews/presentation/widgets/trainer_reviews_section.dart` — `TrainerReviewsSection({required String trainerId})`; watches `trainerReviewsProvider(trainerId)`; header "RESEÑAS"; empty state "Sin reseñas todavía" in muted color via `AppPalette.of(context)`; list of `ReviewTile`; spacing from scale; T42 must pass. (SCENARIO-615)
 
 ### Phase 3.4: TrainerListTile star + count row
 
-- [ ] T44 — RED: create/extend `test/features/coach/presentation/trainer_list_tile_test.dart`; failing tests: `reviewCount > 0` → star + avg + count row visible with `StarRatingDisplay` (SCENARIO-616); `reviewCount == 0` → star row hidden (SCENARIO-616); count label uses singular/plural copy tagged `// i18n: Fase 6 Etapa 7`. (SCENARIO-616)
-- [ ] T45 — GREEN: edit `lib/features/coach/presentation/widgets/trainer_list_tile.dart` — add conditional row: when `profile.reviewCount > 0` show `StarRatingDisplay(rating: profile.averageRating)` + formatted avg + count label; hidden when `reviewCount == 0` (ADR-RV-010); all strings tagged `// i18n: Fase 6 Etapa 7`; T44 must pass. (SCENARIO-616)
+- [x] T44 — RED: create/extend `test/features/coach/presentation/trainer_list_tile_test.dart`; failing tests: `reviewCount > 0` → star + avg + count row visible with `StarRatingDisplay` (SCENARIO-616); `reviewCount == 0` → star row hidden (SCENARIO-616); count label uses singular/plural copy tagged `// i18n: Fase 6 Etapa 7`. (SCENARIO-616)
+- [x] T45 — GREEN: edit `lib/features/coach/presentation/widgets/trainer_list_tile.dart` — add conditional row: when `profile.reviewCount > 0` show `StarRatingDisplay(rating: profile.averageRating)` + formatted avg + count label; hidden when `reviewCount == 0` (ADR-RV-010); all strings tagged `// i18n: Fase 6 Etapa 7`; T44 must pass. (SCENARIO-616)
 
 ### Phase 3.5: TrainerStatsRow refactor
 
-- [ ] T46 — RED: create/extend `test/features/coach/presentation/trainer_stats_row_test.dart`; failing tests: `reviewCount == 0` → RESEÑAS slot shows "—" placeholder (SCENARIO-617); `averageRating == 4.7` → shows "4.7" formatted to 1 decimal; `reviewCount == 3` → shows "3 reseñas". (SCENARIO-617)
-- [ ] T47 — GREEN: edit `lib/features/coach/presentation/widgets/trainer_stats_row.dart` — accept `TrainerPublicProfile profile` param (or ensure it is already passed); wire RESEÑAS slot to `profile.averageRating?.toStringAsFixed(1) ?? '—'`; T46 must pass. (SCENARIO-617)
+- [x] T46 — RED: create/extend `test/features/coach/presentation/trainer_stats_row_test.dart`; failing tests: `reviewCount == 0` → RESEÑAS slot shows "—" placeholder (SCENARIO-617); `averageRating == 4.7` → shows "4.7" formatted to 1 decimal; `reviewCount == 3` → shows "3 reseñas". (SCENARIO-617)
+- [x] T47 — GREEN: edit `lib/features/coach/presentation/widgets/trainer_stats_row.dart` — accept `TrainerPublicProfile profile` param (or ensure it is already passed); wire RESEÑAS slot to `profile.averageRating?.toStringAsFixed(1) ?? '—'`; T46 must pass. (SCENARIO-617)
 
 ### Phase 3.6: TrainerPublicProfileScreen integration
 
-- [ ] T48 — RED: extend `test/features/coach/presentation/trainer_public_profile_screen_test.dart`; failing test: `TrainerReviewsSection` is present in the widget tree below the CTA area; `TrainerStatsRow` is wired to `TrainerPublicProfile` with reviews data. (SCENARIO-618)
-- [ ] T49 — GREEN: edit `lib/features/coach/presentation/trainer_public_profile_screen.dart` — add `TrainerReviewsSection(trainerId: profile.uid)` below the existing CTA section; ensure `TrainerStatsRow` receives the full `TrainerPublicProfile`; T48 must pass. (SCENARIO-618)
+- [x] T48 — RED: extend `test/features/coach/presentation/trainer_public_profile_screen_test.dart`; failing test: `TrainerReviewsSection` is present in the widget tree below the CTA area; `TrainerStatsRow` is wired to `TrainerPublicProfile` with reviews data. (SCENARIO-618)
+- [x] T49 — GREEN: edit `lib/features/coach/presentation/trainer_public_profile_screen.dart` — add `TrainerReviewsSection(trainerId: profile.uid)` below the existing CTA section; ensure `TrainerStatsRow` receives the full `TrainerPublicProfile`; T48 must pass. (SCENARIO-618)
 
 ### Phase 3.7: PR#3 quality gates
 
-- [ ] T50 — GATE: `flutter analyze` 0 issues; `dart format --output=none --set-exit-if-changed .` 0 changed.
-- [ ] T51 — GATE: `flutter test` — all passing; delta ≥ +25 tests vs PR#2 baseline (covering SCENARIO-612..618).
-- [ ] T52 — VERIFY: 0 hex literals; 0 `PhosphorIcons` direct; all user-facing strings have `// i18n: Fase 6 Etapa 7` marker; `TrainerListTile` star row hidden when `reviewCount == 0`; "Usuario eliminado" fallback present in `ReviewTile`; "Sin reseñas todavía" present in `TrainerReviewsSection`; no `pubspec.yaml` changes; `storage.rules` unchanged; conventional commits only.
+- [x] T50 — GATE: `flutter analyze` 0 issues; `dart format --output=none --set-exit-if-changed .` 0 changed.
+- [x] T51 — GATE: `flutter test` — all passing; delta ≥ +25 tests vs PR#2 baseline (covering SCENARIO-612..618). Delta: +62 (1528 vs 1466).
+- [x] T52 — VERIFY: 0 hex literals; 0 `PhosphorIcons` direct; all user-facing strings have `// i18n: Fase 6 Etapa 7` marker; `TrainerListTile` star row hidden when `reviewCount == 0`; "Usuario eliminado" fallback present in `ReviewTile`; "Sin reseñas todavía" present in `TrainerReviewsSection`; no `pubspec.yaml` changes; `storage.rules` unchanged; conventional commits only.
 
 ---
 
@@ -262,18 +262,18 @@ Total: ~900 LOC across 3 PRs.
 - [x] Conventional commits only; no Co-Authored-By
 
 ### PR#3 — Display
-- [ ] T37..T52 all marked complete
-- [ ] Quality gates T50..T52 passed
-- [ ] Rebase on post-PR#2 main confirmed clean (T37)
-- [ ] `TrainerListTile` star row hidden when `reviewCount == 0` (T45)
-- [ ] "Usuario eliminado" fallback in `ReviewTile` (T41)
-- [ ] "Sin reseñas todavía" empty state in `TrainerReviewsSection` (T43)
-- [ ] `TrainerStatsRow` shows "—" when `reviewCount == 0` (T47)
-- [ ] `TrainerReviewsSection` integrated in `TrainerPublicProfileScreen` (T49)
-- [ ] All user-facing strings tagged `// i18n: Fase 6 Etapa 7`
-- [ ] No `pubspec.yaml` changes
-- [ ] `storage.rules` unchanged
-- [ ] Conventional commits only; no Co-Authored-By
+- [x] T37..T52 all marked complete
+- [x] Quality gates T50..T52 passed
+- [x] Rebase on post-PR#2 main confirmed clean (T37)
+- [x] `TrainerListTile` star row hidden when `reviewCount == 0` (T45)
+- [x] "Usuario eliminado" fallback in `ReviewTile` (T41)
+- [x] "Sin reseñas todavía" empty state in `TrainerReviewsSection` (T43)
+- [x] `TrainerStatsRow` shows "—" when `reviewCount == 0` (T47)
+- [x] `TrainerReviewsSection` integrated in `TrainerPublicProfileScreen` (T49)
+- [x] All user-facing strings tagged `// i18n: Fase 6 Etapa 7`
+- [x] No `pubspec.yaml` changes
+- [x] `storage.rules` unchanged
+- [x] Conventional commits only; no Co-Authored-By
 
 ---
 
