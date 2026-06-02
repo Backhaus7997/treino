@@ -91,4 +91,9 @@ abstract final class WorkoutStrings {
   static const misRutinasArchiveSuccess = 'Rutina archivada';
   static const misRutinasArchiveError =
       'No pudimos archivar la rutina. Reintentá.';
+
+  // ── REQ-RER-014: nullable split fallback (ADR-RER-04) ──────────────────────
+  /// Displayed when [Routine.split] is null. Display sites call `.toUpperCase()`
+  /// as needed — this constant is stored in sentence case.
+  static const String splitFallback = 'Sin split';
 }

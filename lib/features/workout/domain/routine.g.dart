@@ -10,7 +10,7 @@ _$RoutineImpl _$$RoutineImplFromJson(Map<String, dynamic> json) =>
     _$RoutineImpl(
       id: json['id'] as String,
       name: json['name'] as String,
-      split: json['split'] as String,
+      split: json['split'] as String?,
       level: $enumDecode(_$ExperienceLevelEnumMap, json['level']),
       days: (json['days'] as List<dynamic>)
           .map((e) => RoutineDay.fromJson(e as Map<String, dynamic>))
