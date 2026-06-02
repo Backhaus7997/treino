@@ -27,7 +27,6 @@ class Review with _$Review {
     /// Optional freeform comment, max 500 chars.
     /// Validated by [ReviewRepository] and Firestore rules.
     String? comment,
-
     @TimestampConverter() required DateTime createdAt,
     @TimestampConverter() required DateTime updatedAt,
   }) = _Review;
@@ -37,6 +36,5 @@ class Review with _$Review {
   static String idFor(String linkId, String athleteId) =>
       '${linkId}_$athleteId';
 
-  factory Review.fromJson(Map<String, Object?> json) =>
-      _$ReviewFromJson(json);
+  factory Review.fromJson(Map<String, Object?> json) => _$ReviewFromJson(json);
 }

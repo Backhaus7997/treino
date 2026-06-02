@@ -57,9 +57,8 @@ class ReviewRepository {
         .limit(limit)
         .snapshots()
         .map(
-          (snap) => snap.docs
-              .map((doc) => Review.fromJson(doc.data()))
-              .toList(),
+          (snap) =>
+              snap.docs.map((doc) => Review.fromJson(doc.data())).toList(),
         );
   }
 }

@@ -37,7 +37,6 @@ final userReviewForLinkProvider =
 /// REQ-RV-DATA-005, REQ-RV-DISPLAY-002. Fase 6 Etapa 7.
 final trainerReviewsProvider =
     StreamProvider.autoDispose.family<List<Review>, String>(
-  (ref, trainerId) => ref
-      .watch(reviewRepositoryProvider)
-      .watchForTrainer(trainerId, limit: 10),
+  (ref, trainerId) =>
+      ref.watch(reviewRepositoryProvider).watchForTrainer(trainerId, limit: 10),
 );

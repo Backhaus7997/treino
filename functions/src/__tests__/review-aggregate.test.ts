@@ -83,7 +83,11 @@ async function seedTrainerProfile(trainerId: string): Promise<void> {
 }
 
 async function seedReview(review: ReviewData): Promise<void> {
-  await db().collection(COL_REVIEWS).doc(review.id).set(review);
+  // Filter out undefined values — Firestore emulator rejects them
+  const data = Object.fromEntries(
+    Object.entries(review).filter(([, v]) => v !== undefined),
+  );
+  await db().collection(COL_REVIEWS).doc(review.id).set(data);
 }
 
 async function deleteReview(reviewId: string): Promise<void> {

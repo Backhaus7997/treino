@@ -1,6 +1,3 @@
-import 'dart:async';
-
-import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/features/reviews/data/review_repository.dart';
@@ -11,7 +8,6 @@ void main() {
   late ReviewRepository repo;
 
   final now = DateTime.utc(2026, 6, 1, 10, 0);
-  final later = DateTime.utc(2026, 6, 2, 10, 0);
 
   Review buildReview({
     String linkId = 'link1',
@@ -59,7 +55,8 @@ void main() {
       expect(snap.data()!['rating'], 4);
     });
 
-    test('SCENARIO-573: upsert overwrites an existing review (update semantics)',
+    test(
+        'SCENARIO-573: upsert overwrites an existing review (update semantics)',
         () async {
       final original = buildReview(rating: 3, comment: 'OK');
       await repo.upsert(original);
@@ -81,7 +78,8 @@ void main() {
   // ---------------------------------------------------------------------------
   group('ReviewRepository.getForPair', () {
     test('SCENARIO-574: getForPair returns null when doc absent', () async {
-      final result = await repo.getForPair('nonexistent-link', 'nonexistent-athlete');
+      final result =
+          await repo.getForPair('nonexistent-link', 'nonexistent-athlete');
       expect(result, isNull);
     });
 
@@ -153,9 +151,8 @@ void main() {
         await repo.upsert(r);
       }
 
-      final result = await repo
-          .watchForTrainer('trainer-limit', limit: 10)
-          .first;
+      final result =
+          await repo.watchForTrainer('trainer-limit', limit: 10).first;
       expect(result.length, lessThanOrEqualTo(10));
     });
   });
@@ -174,8 +171,7 @@ void main() {
       final review = buildReview();
       await repo.upsert(review);
 
-      final result =
-          await repo.watchForLink('link1', 'athlete1').first;
+      final result = await repo.watchForLink('link1', 'athlete1').first;
       expect(result, isNotNull);
       expect(result!.rating, 4);
     });

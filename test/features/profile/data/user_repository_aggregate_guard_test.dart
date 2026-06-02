@@ -52,10 +52,8 @@ void main() {
         // Update with only averageRating — should not trigger dual-write
         await repo.update(uid, {'averageRating': 4.5});
 
-        final snap = await firestore
-            .collection('trainerPublicProfiles')
-            .doc(uid)
-            .get();
+        final snap =
+            await firestore.collection('trainerPublicProfiles').doc(uid).get();
 
         // trainerPublicProfiles doc must NOT exist (not created by the update)
         expect(
@@ -77,10 +75,8 @@ void main() {
         // Update with only reviewCount — should not trigger dual-write
         await repo.update(uid, {'reviewCount': 3});
 
-        final snap = await firestore
-            .collection('trainerPublicProfiles')
-            .doc(uid)
-            .get();
+        final snap =
+            await firestore.collection('trainerPublicProfiles').doc(uid).get();
 
         expect(
           snap.exists,
@@ -103,10 +99,8 @@ void main() {
           'reviewCount': 7,
         });
 
-        final snap = await firestore
-            .collection('trainerPublicProfiles')
-            .doc(uid)
-            .get();
+        final snap =
+            await firestore.collection('trainerPublicProfiles').doc(uid).get();
 
         expect(snap.exists, isFalse);
       },
