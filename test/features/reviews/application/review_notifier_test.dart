@@ -8,6 +8,12 @@ import 'package:treino/features/reviews/domain/review.dart';
 
 class _MockReviewRepository extends Mock implements ReviewRepository {}
 
+const _args = ReviewNotifierArgs(
+  linkId: 'link-1',
+  trainerId: 'trainer-1',
+  athleteId: 'athlete-1',
+);
+
 /// Builds a container with ReviewNotifier and a mocked repository.
 ProviderContainer _makeContainer(_MockReviewRepository mockRepo) {
   return ProviderContainer(
@@ -40,9 +46,7 @@ void main() {
 
   setUp(() {
     mockRepo = _MockReviewRepository();
-    registerFallbackValue(
-      _makeReview(),
-    );
+    registerFallbackValue(_makeReview());
   });
 
   group('ReviewNotifier', () {
@@ -51,12 +55,13 @@ void main() {
         () async {
       final container = _makeContainer(mockRepo);
       addTearDown(container.dispose);
+      // Prime the notifier so build() runs first.
+      await container.read(reviewNotifierProvider(_args).future);
 
-      final notifier =
-          container.read(reviewNotifierProvider(linkId: 'link-1', trainerId: 'trainer-1', athleteId: 'athlete-1').notifier);
+      final notifier = container.read(reviewNotifierProvider(_args).notifier);
 
       expect(
-        () => notifier.submit(rating: 0, comment: null),
+        () => notifier.submit(rating: 0),
         throwsArgumentError,
       );
       verifyNever(() => mockRepo.upsert(any()));
@@ -67,12 +72,12 @@ void main() {
         () async {
       final container = _makeContainer(mockRepo);
       addTearDown(container.dispose);
+      await container.read(reviewNotifierProvider(_args).future);
 
-      final notifier =
-          container.read(reviewNotifierProvider(linkId: 'link-1', trainerId: 'trainer-1', athleteId: 'athlete-1').notifier);
+      final notifier = container.read(reviewNotifierProvider(_args).notifier);
 
       expect(
-        () => notifier.submit(rating: 6, comment: null),
+        () => notifier.submit(rating: 6),
         throwsArgumentError,
       );
       verifyNever(() => mockRepo.upsert(any()));
@@ -83,9 +88,9 @@ void main() {
         () async {
       final container = _makeContainer(mockRepo);
       addTearDown(container.dispose);
+      await container.read(reviewNotifierProvider(_args).future);
 
-      final notifier =
-          container.read(reviewNotifierProvider(linkId: 'link-1', trainerId: 'trainer-1', athleteId: 'athlete-1').notifier);
+      final notifier = container.read(reviewNotifierProvider(_args).notifier);
 
       expect(
         () => notifier.submit(rating: 4, comment: 'x' * 501),
@@ -101,9 +106,9 @@ void main() {
 
       final container = _makeContainer(mockRepo);
       addTearDown(container.dispose);
+      await container.read(reviewNotifierProvider(_args).future);
 
-      final notifier =
-          container.read(reviewNotifierProvider(linkId: 'link-1', trainerId: 'trainer-1', athleteId: 'athlete-1').notifier);
+      final notifier = container.read(reviewNotifierProvider(_args).notifier);
 
       await notifier.submit(rating: 4, comment: 'Great!');
 
@@ -117,7 +122,7 @@ void main() {
       expect(captured.athleteId, equals('athlete-1'));
       // updatedAt should be recent (within 1 minute of now)
       expect(
-        DateTime.now().difference(captured.updatedAt).inSeconds.abs(),
+        DateTime.now().toUtc().difference(captured.updatedAt).inSeconds.abs(),
         lessThan(60),
       );
     });
@@ -127,14 +132,13 @@ void main() {
 
       final container = _makeContainer(mockRepo);
       addTearDown(container.dispose);
+      await container.read(reviewNotifierProvider(_args).future);
 
-      final notifier =
-          container.read(reviewNotifierProvider(linkId: 'link-1', trainerId: 'trainer-1', athleteId: 'athlete-1').notifier);
+      final notifier = container.read(reviewNotifierProvider(_args).notifier);
 
       await notifier.submit(rating: 5);
 
-      final state =
-          container.read(reviewNotifierProvider(linkId: 'link-1', trainerId: 'trainer-1', athleteId: 'athlete-1'));
+      final state = container.read(reviewNotifierProvider(_args));
       expect(state, equals(const AsyncData<void>(null)));
     });
 
@@ -144,14 +148,13 @@ void main() {
 
       final container = _makeContainer(mockRepo);
       addTearDown(container.dispose);
+      await container.read(reviewNotifierProvider(_args).future);
 
-      final notifier =
-          container.read(reviewNotifierProvider(linkId: 'link-1', trainerId: 'trainer-1', athleteId: 'athlete-1').notifier);
+      final notifier = container.read(reviewNotifierProvider(_args).notifier);
 
       await notifier.submit(rating: 3);
 
-      final state =
-          container.read(reviewNotifierProvider(linkId: 'link-1', trainerId: 'trainer-1', athleteId: 'athlete-1'));
+      final state = container.read(reviewNotifierProvider(_args));
       expect(state, isA<AsyncError>());
     });
   });
