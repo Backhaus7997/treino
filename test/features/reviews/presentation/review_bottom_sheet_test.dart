@@ -90,16 +90,19 @@ void main() {
 
     testWidgets('SCENARIO-603: ENVIAR disabled when rating==0', (tester) async {
       await tester.pumpWidget(_wrapSheet());
+      await tester.pump(); // let notifier build() complete
       // i18n: Fase 6 Etapa 7
-      final button = tester.widget<ElevatedButton>(
-        find.widgetWithText(ElevatedButton, 'ENVIAR'),
-      );
+      // The button text 'ENVIAR' is shown when not loading
+      final enviarFinder = find.widgetWithText(ElevatedButton, 'ENVIAR');
+      expect(enviarFinder, findsOneWidget);
+      final button = tester.widget<ElevatedButton>(enviarFinder);
       expect(button.onPressed, isNull);
     });
 
     testWidgets('SCENARIO-603: ENVIAR enabled after tapping a star',
         (tester) async {
       await tester.pumpWidget(_wrapSheet());
+      await tester.pump(); // let notifier build() complete
       // Tap first star
       final gestures = find.descendant(
         of: find.byType(StarRatingInput),
