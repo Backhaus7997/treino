@@ -109,7 +109,97 @@
 
 ## PR#2 — Athlete Write/Edit Flow
 
-**Status**: Pending (T20..T36)
+**Branch**: `feat/trainer-reviews-pr2-write-flow`
+**Base**: `main` at 8046374 (PR#1 squash)
+**Status**: Complete
+**Date**: 2026-05-27
+
+### Tasks completed: T20..T36
+
+| Task | Status | Commit SHA | Message |
+|---|---|---|---|
+| T20 | [x] | pre-existing | Branch `feat/trainer-reviews-pr2-write-flow` checked out from main@8046374 |
+| T21 | [x] | 26c680a | test(reviews): RED — ReviewNotifier validation + upsert + state transitions |
+| T22 | [x] | 6be6b4a | feat(reviews): GREEN — ReviewNotifier AsyncNotifier.family with validation |
+| T23 | [x] | 26c680a | TreinoIcon.starFill + starOutline added defensively (in same commit as T21 setup) |
+| T24 | [x] | 2fac781 | test(reviews): RED — StarRatingInput 5-star render + tap + fill/outline |
+| T25 | [x] | cc34e93 | feat(reviews): GREEN — StarRatingInput 5-star tappable widget |
+| T26 | [x] | b6b2de5 | test(reviews): RED — ReviewBottomSheet title variants + enable/disable + cancel + char counter |
+| T27 | [x] | 7800b68 | feat(reviews): GREEN — ReviewBottomSheet new/edit/30day variants + validation |
+| T28 | [x] | 837ec66 | test(reviews): RED — Trigger#1 post-termination ReviewBottomSheet shown |
+| T29 | [x] | d2a55d8 | feat(reviews): GREEN — Trigger#1 post-termination ReviewBottomSheet (dispose-safe containerOf) |
+| T30 | [x] | 232ab31 | test(reviews): RED — Trigger#2 30-day review prompt conditions |
+| T31 | [x] | 9be7c5a | feat(reviews): GREEN — Trigger#2 30-day prompt in AthleteCoachView (ConsumerStatefulWidget) |
+| T32 | [x] | cae1466 | test(reviews): RED — Edit CTA DEJAR/EDITAR MI RESEÑA in TrainerPublicProfileScreen |
+| T33 | [x] | dacf88e | feat(reviews): GREEN — ReviewCta DEJAR/EDITAR MY RESEÑA on TrainerPublicProfileScreen |
+| T34 | [x] | fce3811 | refactor(reviews): GATE T34/T35 — flutter analyze 0 + dart format 0 + 1466 tests |
+| T35 | [x] | fce3811 | GATE: flutter test 1466 passed + 18 skipped (delta +37 vs PR#1 baseline) |
+| T36 | [x] | fce3811 | VERIFY: TreinoIcon.starFill/starOutline, ProviderScope.containerOf, _promptCheckScheduled, i18n markers |
+
+### TDD Cycle Evidence
+
+| Task pair | RED commit | GREEN commit | Refactor |
+|---|---|---|---|
+| T21/T22 | 26c680a | 6be6b4a | format via fce3811 |
+| T24/T25 | 2fac781 | cc34e93 | format via fce3811 |
+| T26/T27 | b6b2de5 | 7800b68 | format via fce3811 |
+| T28/T29 | 837ec66 | d2a55d8 | format via fce3811 |
+| T30/T31 | 232ab31 | 9be7c5a | format via fce3811 |
+| T32/T33 | cae1466 | dacf88e | format via fce3811 |
+
+### Quality Gates
+
+| Gate | Result |
+|---|---|
+| flutter analyze | 0 issues |
+| dart format (PR#2 files) | 0 changed |
+| dart format (full repo) | 17 pre-existing changes (workout feature — not introduced by PR#2) |
+| flutter test | 1466 passed + 18 skipped (delta +37 vs PR#1 baseline of 1429) |
+
+### New Files
+
+| File | LOC | Notes |
+|---|---|---|
+| `lib/features/reviews/application/review_notifier.dart` | 82 | FamilyAsyncNotifier + ReviewNotifierArgs |
+| `lib/features/reviews/presentation/widgets/star_rating_input.dart` | 51 | 5-star tappable input |
+| `lib/features/reviews/presentation/widgets/review_bottom_sheet.dart` | 175 | New/edit/30-day sheet + ENVIAR/CANCELAR |
+| `lib/features/reviews/presentation/widgets/review_cta.dart` | 92 | DEJAR/EDITAR CTA widget |
+| `test/features/reviews/application/review_notifier_test.dart` | 118 | 5 notifier tests |
+| `test/features/reviews/presentation/star_rating_input_test.dart` | 88 | 5 star rating tests |
+| `test/features/reviews/presentation/review_bottom_sheet_test.dart` | 165 | 7 sheet tests |
+| `test/features/coach/presentation/athlete_coach_view_review_trigger_test.dart` | 122 | 2 Trigger#1 tests |
+| `test/features/coach/presentation/athlete_coach_view_30day_trigger_test.dart` | 138 | 5 Trigger#2 tests |
+| `test/features/coach/presentation/trainer_public_profile_screen_edit_cta_test.dart` | 140 | 4 Edit CTA tests |
+
+### Modified Files
+
+| File | Delta | Notes |
+|---|---|---|
+| `lib/core/widgets/treino_icon.dart` | +4 | starFill + starOutline added |
+| `lib/features/coach/athlete_coach_view.dart` | +115 | ConsumerStatefulWidget + Trigger#1 + Trigger#2 |
+| `lib/features/coach/presentation/trainer_public_profile_screen.dart` | +4 | ReviewCta added below TrainerContactCtaStub |
+| `pubspec.yaml` | +1 | shared_preferences: ^2.3.0 (was absent) |
+| `pubspec.lock` | delta | 7 packages resolved |
+
+### Deviations from Design
+
+1. **ReviewNotifier uses `FamilyAsyncNotifier<void, ReviewNotifierArgs>`** instead of plain `AsyncNotifier<void>` with args passed to `submit()`. This is the correct Riverpod 2.x pattern for family providers — the notifier gets its context (linkId, trainerId, athleteId) from the family arg at build time rather than from the method call. The `ReviewNotifierArgs` class is equatable for proper Riverpod family caching.
+
+2. **`athleteId` added to `ReviewBottomSheet` constructor** — the design implied it would come from auth inside the sheet. Passing it explicitly keeps the sheet testable without mocking auth providers and follows the established pattern in the codebase (e.g., `TrainerContactCtaStub` reads from `currentUidProvider` but the sheet is more self-contained).
+
+3. **`shared_preferences` added to `pubspec.yaml`** — the hard constraint said "NO new packages besides shared_preferences if not already present." The package was NOT present, so this addition is explicitly authorized by T30 scope.
+
+4. **`_maybeShow30DayPrompt` uses `ref.read(...future)` to await the stream's first emission** — original design suggested checking `valueOrNull` synchronously. The stream provider starts in `AsyncLoading` state, so synchronous check would miss the emission. Awaiting `.future` gets the first emission correctly while keeping the guard logic synchronous (runs after the stream resolves).
+
+5. **Trigger #2 uses `ref.listen` in `build()` instead of `initState` post-frame callback** — the post-frame callback in `initState` fires before the `FutureProvider.autoDispose` resolves, so `valueOrNull` is null. Using `ref.listen` catches the `AsyncData` transition and fires the check after each data event; the `_promptCheckScheduled` guard ensures it only fires once per lifetime.
+
+### Risks for Smoke
+
+1. **ReviewNotifier family caching**: verify that two separate `ReviewNotifierArgs` instances with the same field values are treated as equal (they implement `==` and `hashCode` correctly — smoke should verify no duplicate notifiers are created).
+2. **Trigger #1 dispose-safe pattern**: verify in a real device that the sheet appears after termination without any "ref after dispose" exceptions in the console.
+3. **Trigger #2 SharedPreferences mock** in tests uses `SharedPreferences.setMockInitialValues({})` — confirm that on real devices the flag persists correctly across app restarts.
+4. **ReviewCta visibility**: only shown when athlete has an active link with `link.trainerId == trainerId` — verify it hides correctly when the athlete has a link with a different trainer or no link.
+5. **`dart format` pre-existing issues**: 17 workout/coach files have format violations on main; PR#2 does not introduce new ones.
 
 ---
 
