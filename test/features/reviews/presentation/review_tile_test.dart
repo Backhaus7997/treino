@@ -12,16 +12,21 @@ const _athleteId = 'athlete-1';
 const _trainerId = 'trainer-1';
 const _linkId = 'link-1';
 
-Review _makeReview({String? comment}) => Review(
+Review _makeReview({Object? comment = _sentinel}) => Review(
       id: Review.idFor(_linkId, _athleteId),
       linkId: _linkId,
       athleteId: _athleteId,
       trainerId: _trainerId,
       rating: 4,
-      comment: comment ?? 'Excelente entrenador.',
+      comment: comment == _sentinel
+          ? 'Excelente entrenador.'
+          : comment as String?,
       createdAt: DateTime.utc(2026, 5, 1),
       updatedAt: DateTime.utc(2026, 5, 1),
     );
+
+// Sentinel object to distinguish "not passed" from explicit null.
+const _sentinel = Object();
 
 UserPublicProfile _makeProfile() => const UserPublicProfile(
       uid: _athleteId,
@@ -87,14 +92,15 @@ void main() {
     });
 
     testWidgets(
-        'SCENARIO-614: deleted athlete → neutral avatar initial shows "?"',
+        'SCENARIO-614: deleted athlete → avatar initial shows "U" (first letter of "Usuario eliminado")',
         (tester) async {
       final review = _makeReview();
       await tester.pumpWidget(_wrap(review: review, profile: null));
       await tester.pumpAndSettle();
 
-      // The PostAvatar for "Usuario eliminado" uses '?' as initial
-      expect(find.text('?'), findsOneWidget);
+      // PostAvatar computes initial from first character of displayName.
+      // "Usuario eliminado" → "U". This is the neutral avatar for deleted accounts.
+      expect(find.text('U'), findsOneWidget);
     });
 
     testWidgets(
