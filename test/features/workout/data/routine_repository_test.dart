@@ -267,6 +267,26 @@ void main() {
       expect(snap.exists, isTrue);
     });
 
+    test(
+        'SCENARIO-USR-006b: assignedBy and assignedTo keys are ABSENT from '
+        'written doc (Firestore create rule requires their absence, not '
+        'just null value)', () async {
+      final draft = _minimalDraft();
+
+      final saved = await repo.createUserOwned(uid: 'athlete-a', draft: draft);
+
+      final snap = await firestore.collection('routines').doc(saved.id).get();
+      final data = snap.data()!;
+      // Routine.toJson() emits assignedBy/assignedTo as null literals because
+      // they're nullable freezed fields. The Firestore rule for user-created
+      // create uses `!('assignedBy' in request.resource.data)` — checks KEY
+      // presence, not value. So the repo MUST strip them before write.
+      expect(data.containsKey('assignedBy'), isFalse,
+          reason: 'assignedBy must be absent (not present-with-null)');
+      expect(data.containsKey('assignedTo'), isFalse,
+          reason: 'assignedTo must be absent (not present-with-null)');
+    });
+
     test('SCENARIO-USR-007: rejects empty uid', () async {
       final draft = _minimalDraft();
 

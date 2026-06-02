@@ -60,8 +60,16 @@ class RoutineRepository {
       );
     }
 
+    // Strip trainer-only keys before write — the Firestore create rule for
+    // user-created routines requires that `assignedBy` and `assignedTo` be
+    // ABSENT (not just null). Routine.toJson() emits both as `null` because
+    // they're nullable freezed fields, which would cause permission-denied
+    // even though the values are null. REQ-USR-004 + the rule check
+    // `!('assignedBy' in request.resource.data)`.
     final json = draft.toJson()
       ..remove('id')
+      ..remove('assignedBy')
+      ..remove('assignedTo')
       ..['source'] = 'user-created'
       ..['createdBy'] = uid
       ..['visibility'] = 'private'
