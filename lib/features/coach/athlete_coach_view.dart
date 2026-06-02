@@ -230,49 +230,60 @@ class _TrainerHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final name = pubAsync.valueOrNull?.displayName ?? '...';
-    return Row(
-      children: [
-        Container(
-          width: 56,
-          height: 56,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: palette.bg,
-            border: Border.all(color: palette.border, width: 1),
+    // Tappable to navigate to the trainer's public profile — pre-existing UX
+    // gap (once you have an active link, the discovery flow disappears, so
+    // there was no path to the public profile screen). Surfaced during the
+    // trainer-reviews smoke when the athlete couldn't reach the review CTA.
+    return GestureDetector(
+      onTap: () => context.push('/coach/trainer/${link.trainerId}'),
+      behavior: HitTestBehavior.opaque,
+      child: Row(
+        children: [
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: palette.bg,
+              border: Border.all(color: palette.border, width: 1),
+            ),
+            alignment: Alignment.center,
+            child: Icon(
+              TreinoIcon.tabProfile,
+              size: 28,
+              color: palette.textMuted,
+            ),
           ),
-          alignment: Alignment.center,
-          child:
-              Icon(TreinoIcon.tabProfile, size: 28, color: palette.textMuted),
-        ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                name,
-                style: GoogleFonts.barlow(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 16,
-                  color: palette.textPrimary,
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name,
+                  style: GoogleFonts.barlow(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 16,
+                    color: palette.textPrimary,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                link.status == TrainerLinkStatus.pending
-                    ? 'Esperando confirmación'
-                    : 'Vinculado desde ${_formatDate(link.acceptedAt ?? link.requestedAt)}',
-                style: GoogleFonts.barlow(
-                  fontWeight: FontWeight.w400,
-                  fontSize: 12,
-                  color: palette.textMuted,
+                const SizedBox(height: 4),
+                Text(
+                  link.status == TrainerLinkStatus.pending
+                      ? 'Esperando confirmación'
+                      : 'Vinculado desde ${_formatDate(link.acceptedAt ?? link.requestedAt)}',
+                  style: GoogleFonts.barlow(
+                    fontWeight: FontWeight.w400,
+                    fontSize: 12,
+                    color: palette.textMuted,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
