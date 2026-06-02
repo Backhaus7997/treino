@@ -73,19 +73,26 @@ void main() {
   // ── TrainerStatsRow tests ────────────────────────────────────────────────
 
   group('TrainerStatsRow — T30/T31', () {
+    const stubProfile = TrainerPublicProfile(uid: 'u1');
+
     testWidgets('renders three stat columns: RESEÑAS, AÑOS EXP, ALUMNOS',
         (tester) async {
-      await tester.pumpWidget(_wrap(const TrainerStatsRow()));
+      await tester.pumpWidget(
+        _wrap(const TrainerStatsRow(profile: stubProfile)),
+      );
 
       expect(find.text('RESEÑAS'), findsOneWidget);
       expect(find.text('AÑOS EXP'), findsOneWidget);
       expect(find.text('ALUMNOS'), findsOneWidget);
     });
 
-    testWidgets('all stat values show placeholder "—"', (tester) async {
-      await tester.pumpWidget(_wrap(const TrainerStatsRow()));
+    testWidgets('all stat values show placeholder "—" when reviewCount == 0',
+        (tester) async {
+      await tester.pumpWidget(
+        _wrap(const TrainerStatsRow(profile: stubProfile)),
+      );
 
-      // 3 "—" placeholders
+      // 3 "—" placeholders (RESEÑAS + AÑOS EXP + ALUMNOS all deferred)
       expect(find.text('—'), findsNWidgets(3));
     });
   });

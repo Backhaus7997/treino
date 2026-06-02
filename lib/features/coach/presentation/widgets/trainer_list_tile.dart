@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../feed/presentation/widgets/post_avatar.dart';
+import '../../../reviews/presentation/widgets/star_rating_display.dart';
 import '../../domain/trainer_public_profile.dart';
 import '../../domain/trainer_specialty.dart';
 import '../coach_strings.dart';
@@ -79,6 +80,11 @@ class TrainerListTile extends StatelessWidget {
                     const SizedBox(height: 4),
                     _SpecialtyChip(label: TrainerSpecialtyX.toWire(specialty)),
                   ],
+                  // ADR-RV-010: star row hidden when reviewCount == 0 (clean scanning).
+                  if (profile.reviewCount > 0) ...[
+                    const SizedBox(height: 4),
+                    _StarCountRow(profile: profile),
+                  ],
                 ],
               ),
             ),
@@ -127,6 +133,35 @@ class TrainerListTile extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _StarCountRow extends StatelessWidget {
+  const _StarCountRow({required this.profile});
+
+  final TrainerPublicProfile profile;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final count = profile.reviewCount;
+    // i18n: Fase 6 Etapa 7
+    final countLabel = count == 1 ? '$count reseña' : '$count reseñas';
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        StarRatingDisplay(rating: profile.averageRating),
+        const SizedBox(width: 4),
+        Text(
+          countLabel,
+          style: GoogleFonts.barlow(
+            fontSize: 11,
+            color: palette.textMuted,
+          ),
+        ),
+      ],
     );
   }
 }

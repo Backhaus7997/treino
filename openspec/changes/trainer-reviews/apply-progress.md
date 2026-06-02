@@ -203,6 +203,73 @@
 
 ---
 
-## PR#3 — Display
+## PR#3 — Display Layer
 
-**Status**: Pending (T37..T52)
+**Branch**: `feat/trainer-reviews-pr3-display`
+**Base**: `main` at 207bbcc (PR#2 squash)
+**Status**: Complete
+**Date**: 2026-06-02
+
+### Tasks completed: T37..T52
+
+| Task | Status | Commit SHA | Message |
+|---|---|---|---|
+| T37 | [x] | pre-existing | Branch `feat/trainer-reviews-pr3-display` checked out from main@207bbcc |
+| T38 | [x] | 5665a70 | test(reviews): RED — StarRatingDisplay 5-star render + fill/outline + read-only |
+| T39 | [x] | ff890cc | feat(reviews): GREEN — StarRatingDisplay read-only 5-star widget |
+| T40 | [x] | b7a821a | test(reviews): RED — ReviewTile avatar+name+stars+comment+date + deleted-athlete fallback |
+| T41 | [x] | 0deba25 | feat(reviews): GREEN — ReviewTile widget + deleted-athlete fallback |
+| T42 | [x] | 69249dd | test(reviews): RED — TrainerReviewsSection header + empty state + ReviewTile list |
+| T43 | [x] | df99a02 | feat(reviews): GREEN — TrainerReviewsSection header + empty state + ReviewTile list |
+| T44 | [x] | e2baa94 | test(reviews): RED — TrainerListTile star+avg+count row SCENARIO-616 |
+| T45 | [x] | cac2a3a | feat(reviews): GREEN — TrainerListTile star+avg+count row, hidden when reviewCount==0 |
+| T46 | [x] | 5e379fe | test(reviews): RED — TrainerStatsRow RESEÑAS slot wired to averageRating SCENARIO-617 |
+| T47 | [x] | 3f3368b | feat(reviews): GREEN — TrainerStatsRow accepts TrainerPublicProfile, wires RESEÑAS avg |
+| T48 | [x] | 3cedd78 | test(reviews): RED — TrainerPublicProfileScreen integration: ReviewsSection + StatsRow SCENARIO-618 |
+| T49 | [x] | d9e1735 | feat(reviews): GREEN — TrainerPublicProfileScreen integrates TrainerReviewsSection below CTA |
+| T50 | [x] | 6f868c9 | GATE: flutter analyze 0 issues |
+| T51 | [x] | 6f868c9 | GATE: flutter test 1528 passed + 18 skipped (+62 vs PR#2 baseline 1466) |
+| T52 | [x] | 6f868c9 | VERIFY: 0 hex literals, 0 PhosphorIcons direct, i18n markers, star row hidden, Usuario eliminado fallback, Sin reseñas todavía, no pubspec.yaml changes |
+
+### TDD Cycle Evidence
+
+| Task pair | RED commit | GREEN commit | Refactor |
+|---|---|---|---|
+| T38/T39 | 5665a70 | ff890cc | format via 6f868c9 |
+| T40/T41 | b7a821a | 0deba25 | format via 6f868c9 |
+| T42/T43 | 69249dd | df99a02 | format via 6f868c9 |
+| T44/T45 | e2baa94 | cac2a3a | format via 6f868c9 |
+| T46/T47 | 5e379fe | 3f3368b | format via 6f868c9 |
+| T48/T49 | 3cedd78 | d9e1735 | format via 6f868c9 |
+
+### Quality Gates
+
+| Gate | Result |
+|---|---|
+| flutter analyze | 0 issues |
+| dart format (PR#3 files) | 0 changed |
+| dart format (full repo) | 2 pre-existing changes in workout feature — not introduced by PR#3 |
+| flutter test | 1528 passed + 18 skipped (+62 vs PR#2 baseline 1466) |
+
+### New Files
+
+| File | LOC | Notes |
+|---|---|---|
+| `lib/features/reviews/presentation/widgets/star_rating_display.dart` | 53 | 5 read-only stars |
+| `lib/features/reviews/presentation/widgets/review_tile.dart` | 117 | Avatar + name + stars + comment + relative date + deleted-athlete fallback |
+| `lib/features/reviews/presentation/widgets/trainer_reviews_section.dart` | 63 | RESEÑAS header + empty state + ReviewTile list |
+| `test/features/reviews/presentation/star_rating_display_test.dart` | 98 | 6 tests |
+| `test/features/reviews/presentation/review_tile_test.dart` | 121 | 4 tests |
+| `test/features/reviews/presentation/trainer_reviews_section_test.dart` | 89 | 4 tests |
+| `test/features/coach/presentation/trainer_public_profile_screen_reviews_integration_test.dart` | 99 | 5 integration tests |
+| `test/features/coach/presentation/widgets/trainer_stats_row_test.dart` | 80 | 4 tests |
+
+### Modified Files
+
+| File | Delta | Notes |
+|---|---|---|
+| `lib/features/coach/presentation/widgets/trainer_list_tile.dart` | +35 | _StarCountRow + conditional guard (ADR-RV-010) |
+| `lib/features/coach/presentation/widgets/trainer_stats_row.dart` | +18 | Required profile param, RESEÑAS slot wired |
+| `lib/features/coach/presentation/trainer_public_profile_screen.dart` | +6 | TrainerReviewsSection added below CTA, TrainerStatsRow receives profile |
+| `test/features/coach/presentation/widgets/trainer_list_tile_test.dart` | +77 | Extended with star+count row tests |
+| `test/features/coach/presentation/widgets/trainer_profile_widgets_test.dart` | +6 | Updated TrainerStatsRow tests for required profile param |

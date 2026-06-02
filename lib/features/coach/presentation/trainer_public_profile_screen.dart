@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../reviews/presentation/widgets/review_cta.dart';
+import '../../reviews/presentation/widgets/trainer_reviews_section.dart';
 import '../application/trainer_discovery_providers.dart';
 import 'coach_strings.dart';
 import 'widgets/trainer_contact_cta_stub.dart';
@@ -52,7 +53,7 @@ class TrainerPublicProfileScreen extends ConsumerWidget {
             children: [
               TrainerProfileHero(profile: profile),
               const SizedBox(height: 24),
-              const TrainerStatsRow(),
+              TrainerStatsRow(profile: profile),
               const SizedBox(height: 24),
               Text(
                 profile.trainerBio?.isNotEmpty == true
@@ -85,6 +86,9 @@ class TrainerPublicProfileScreen extends ConsumerWidget {
               TrainerContactCtaStub(trainerId: uid),
               const SizedBox(height: 12),
               ReviewCta(trainerId: uid),
+              const SizedBox(height: 20),
+              TrainerReviewsSection(trainerId: uid),
+              const SizedBox(height: 20),
             ],
           );
         },
