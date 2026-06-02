@@ -71,40 +71,40 @@ Total: ~900 LOC across 3 PRs.
 
 ### Phase 1.1: Review model + freezed
 
-- [ ] T01 — SETUP: create branch `feat/trainer-reviews-pr1-data-cf` from `main`; confirm clean working tree.
-- [ ] T02 — RED: create `test/features/reviews/domain/review_test.dart`; failing tests: `Review` has fields `id, linkId, athleteId, trainerId, rating, comment, createdAt, updatedAt`; `Review.idFor(linkId, athleteId)` returns `'${linkId}_${athleteId}'`; rating 0 and 6 are invalid values per model contract. (SCENARIO-571, 572)
-- [ ] T03 — GREEN: create `lib/features/reviews/domain/review.dart` — Freezed model with all 8 fields (`id String`, `linkId String`, `athleteId String`, `trainerId String`, `rating int` 1..5, `comment String?` ≤500, `createdAt Timestamp`, `updatedAt Timestamp`); static `idFor(linkId, athleteId)` helper; run `dart run build_runner build --delete-conflicting-outputs`; T02 must pass. (SCENARIO-571, 572)
+- [x] T01 — SETUP: create branch `feat/trainer-reviews-pr1-data-cf` from `main`; confirm clean working tree.
+- [x] T02 — RED: create `test/features/reviews/domain/review_test.dart`; failing tests: `Review` has fields `id, linkId, athleteId, trainerId, rating, comment, createdAt, updatedAt`; `Review.idFor(linkId, athleteId)` returns `'${linkId}_${athleteId}'`; rating 0 and 6 are invalid values per model contract. (SCENARIO-571, 572)
+- [x] T03 — GREEN: create `lib/features/reviews/domain/review.dart` — Freezed model with all 8 fields (`id String`, `linkId String`, `athleteId String`, `trainerId String`, `rating int` 1..5, `comment String?` ≤500, `createdAt Timestamp`, `updatedAt Timestamp`); static `idFor(linkId, athleteId)` helper; run `dart run build_runner build --delete-conflicting-outputs`; T02 must pass. (SCENARIO-571, 572)
 
 ### Phase 1.2: ReviewRepository + providers
 
-- [ ] T04 — RED: create `test/features/reviews/data/review_repository_test.dart`; failing tests using `fake_cloud_firestore`: `upsert` writes doc at deterministic id; `getForPair` returns null when absent and `Review` when present; `watchForTrainer` stream emits sorted by `createdAt DESC`; limit=10 respected. (SCENARIO-573, 574, 575, 576)
-- [ ] T05 — GREEN: create `lib/features/reviews/data/review_repository.dart` — `ReviewRepository` with `upsert(Review)` (set, merge=false at `reviews/${id}`), `getForPair(linkId, athleteId) → Future<Review?>`, `watchForLink(linkId, athleteId) → Stream<Review?>`, `watchForTrainer(trainerId, {int limit = 10}) → Stream<List<Review>>`; T04 must pass. (SCENARIO-573..576)
-- [ ] T06 — GREEN: create `lib/features/reviews/application/review_providers.dart` — `reviewRepositoryProvider` (Provider), `userReviewForLinkProvider(linkId)` (StreamProvider.autoDispose.family<Review?, String>), `trainerReviewsProvider(trainerId)` (StreamProvider.autoDispose.family<List<Review>, String> limit 10). (SCENARIO-577)
+- [x] T04 — RED: create `test/features/reviews/data/review_repository_test.dart`; failing tests using `fake_cloud_firestore`: `upsert` writes doc at deterministic id; `getForPair` returns null when absent and `Review` when present; `watchForTrainer` stream emits sorted by `createdAt DESC`; limit=10 respected. (SCENARIO-573, 574, 575, 576)
+- [x] T05 — GREEN: create `lib/features/reviews/data/review_repository.dart` — `ReviewRepository` with `upsert(Review)` (set, merge=false at `reviews/${id}`), `getForPair(linkId, athleteId) → Future<Review?>`, `watchForLink(linkId, athleteId) → Stream<Review?>`, `watchForTrainer(trainerId, {int limit = 10}) → Stream<List<Review>>`; T04 must pass. (SCENARIO-573..576)
+- [x] T06 — GREEN: create `lib/features/reviews/application/review_providers.dart` — `reviewRepositoryProvider` (Provider), `userReviewForLinkProvider(linkId)` (StreamProvider.autoDispose.family<Review?, String>), `trainerReviewsProvider(trainerId)` (StreamProvider.autoDispose.family<List<Review>, String> limit 10). (SCENARIO-577)
 
 ### Phase 1.3: TrainerPublicProfile aggregate fields + dual-write guard
 
-- [ ] T07 — RED: create/extend `test/features/profile/data/user_repository_test.dart`; failing test: `_trainerPublicFields_excludes_aggregates` — assert `averageRating` and `reviewCount` are NOT present in the whitelist set exposed by `UserRepository._trainerPublicFields`. (SCENARIO-578)
-- [ ] T08 — GREEN: edit `lib/features/coach/domain/trainer_public_profile.dart` — add `double? averageRating` and `@Default(0) int reviewCount`; run `dart run build_runner build --delete-conflicting-outputs`; edit `lib/features/profile/data/user_repository.dart` — confirm `_trainerPublicFields` excludes both fields; add inline comment `// ADR-RV-005: CF-write-only — do not add averageRating or reviewCount here`; T07 must pass. (SCENARIO-578, 579)
+- [x] T07 — RED: create/extend `test/features/profile/data/user_repository_test.dart`; failing test: `_trainerPublicFields_excludes_aggregates` — assert `averageRating` and `reviewCount` are NOT present in the whitelist set exposed by `UserRepository._trainerPublicFields`. (SCENARIO-578)
+- [x] T08 — GREEN: edit `lib/features/coach/domain/trainer_public_profile.dart` — add `double? averageRating` and `@Default(0) int reviewCount`; run `dart run build_runner build --delete-conflicting-outputs`; edit `lib/features/profile/data/user_repository.dart` — confirm `_trainerPublicFields` excludes both fields; add inline comment `// ADR-RV-005: CF-write-only — do not add averageRating or reviewCount here`; T07 must pass. (SCENARIO-578, 579)
 
 ### Phase 1.4: Firestore rules + indexes
 
-- [ ] T09 — RED: create `test/firestore/reviews_rules_test.ts` (or extend existing rules tests); failing emulator-backed tests: any authenticated user can read a review doc (SCENARIO-580); athlete can create own review with valid rating 1..5 and comment ≤500 (SCENARIO-581); athlete cannot create review for another athlete (SCENARIO-582); update is allowed for owner on `rating/comment/updatedAt` only (SCENARIO-583); delete is always denied (SCENARIO-584); rating 0 and 6 are rejected by rules (SCENARIO-585).
-- [ ] T10 — GREEN: edit `firestore.rules` — add `/reviews/{reviewId}` block: `allow read: if request.auth != null`; `allow create: if request.auth.uid == request.resource.data.athleteId && request.resource.data.rating >= 1 && request.resource.data.rating <= 5 && request.resource.data.comment.size() <= 500`; `allow update: if request.auth.uid == resource.data.athleteId && request.resource.data.keys().hasOnly(['rating','comment','updatedAt'])`; `allow delete: if false`; T09 must pass. (SCENARIO-580..585)
-- [ ] T11 — GREEN: edit `firestore.indexes.json` — add composite index `collection: reviews, fields: [{trainerId ASC}, {createdAt DESC}]`; no other changes to this file. (SCENARIO-586)
+- [x] T09 — RED: create `test/firestore/reviews_rules_test.ts` (or extend existing rules tests); failing emulator-backed tests: any authenticated user can read a review doc (SCENARIO-580); athlete can create own review with valid rating 1..5 and comment ≤500 (SCENARIO-581); athlete cannot create review for another athlete (SCENARIO-582); update is allowed for owner on `rating/comment/updatedAt` only (SCENARIO-583); delete is always denied (SCENARIO-584); rating 0 and 6 are rejected by rules (SCENARIO-585).
+- [x] T10 — GREEN: edit `firestore.rules` — add `/reviews/{reviewId}` block: `allow read: if request.auth != null`; `allow create: if request.auth.uid == request.resource.data.athleteId && request.resource.data.rating >= 1 && request.resource.data.rating <= 5 && request.resource.data.comment.size() <= 500`; `allow update: if request.auth.uid == resource.data.athleteId && request.resource.data.keys().hasOnly(['rating','comment','updatedAt'])`; `allow delete: if false`; T09 must pass. (SCENARIO-580..585)
+- [x] T11 — GREEN: edit `firestore.indexes.json` — add composite index `collection: reviews, fields: [{trainerId ASC}, {createdAt DESC}]`; no other changes to this file. (SCENARIO-586)
 
 ### Phase 1.5: CF reviewAggregate + emulator tests
 
-- [ ] T12 — RED: create `functions/src/__tests__/review-aggregate.test.ts`; failing emulator-backed jest tests: first review created → `averageRating` updated on `trainerPublicProfiles/{trainerId}` (SCENARIO-587); second review added → average recomputed correctly (SCENARIO-588); review updated with new rating → average recomputed (SCENARIO-589); review deleted, others remain → average recomputed (SCENARIO-590); last review deleted → `averageRating: null, reviewCount: 0` (SCENARIO-591); CF re-fires with same data → idempotent result (SCENARIO-592); `trainerPublicProfiles/{trainerId}` doc missing → warn + no-op, no throw (SCENARIO-593); doc with no `trainerId` field → early return (SCENARIO-594).
-- [ ] T13 — GREEN: create `functions/src/review-aggregate.ts` — export `reviewAggregate` (`onDocumentWritten({ document: 'reviews/{reviewId}', region: 'southamerica-east1' })`): extract `trainerId` from `after ?? before`; if absent → `logger.warn` + return; call `recomputeAggregate(app, trainerId)`; export `recomputeAggregate(app, trainerId)`: query `reviews` where `trainerId == X`, reduce to `count + sumRatings`, build payload (`count==0 → {averageRating: null, reviewCount: 0}`), check profile exists (missing → `logger.warn` + return), `set(merge:true)`; catch all → `logger.error` + no rethrow; T12 must pass. (SCENARIO-587..594)
-- [ ] T14 — GREEN: edit `functions/src/index.ts` — add `export { reviewAggregate } from './review-aggregate';`. (SCENARIO-587)
+- [x] T12 — RED: create `functions/src/__tests__/review-aggregate.test.ts`; failing emulator-backed jest tests: first review created → `averageRating` updated on `trainerPublicProfiles/{trainerId}` (SCENARIO-587); second review added → average recomputed correctly (SCENARIO-588); review updated with new rating → average recomputed (SCENARIO-589); review deleted, others remain → average recomputed (SCENARIO-590); last review deleted → `averageRating: null, reviewCount: 0` (SCENARIO-591); CF re-fires with same data → idempotent result (SCENARIO-592); `trainerPublicProfiles/{trainerId}` doc missing → warn + no-op, no throw (SCENARIO-593); doc with no `trainerId` field → early return (SCENARIO-594).
+- [x] T13 — GREEN: create `functions/src/review-aggregate.ts` — export `reviewAggregate` (`onDocumentWritten({ document: 'reviews/{reviewId}', region: 'southamerica-east1' })`): extract `trainerId` from `after ?? before`; if absent → `logger.warn` + return; call `recomputeAggregate(app, trainerId)`; export `recomputeAggregate(app, trainerId)`: query `reviews` where `trainerId == X`, reduce to `count + sumRatings`, build payload (`count==0 → {averageRating: null, reviewCount: 0}`), check profile exists (missing → `logger.warn` + return), `set(merge:true)`; catch all → `logger.error` + no rethrow; T12 must pass. (SCENARIO-587..594)
+- [x] T14 — GREEN: edit `functions/src/index.ts` — add `export { reviewAggregate } from './review-aggregate';`. (SCENARIO-587)
 
 ### Phase 1.6: PR#1 quality gates
 
-- [ ] T15 — GATE: `npm --prefix functions run build` — TypeScript compilation 0 errors.
-- [ ] T16 — GATE: `npm --prefix functions run lint` — ESLint 0 warnings/errors.
-- [ ] T17 — GATE: `firebase emulators:exec --only firestore,auth "npm --prefix functions test"` — all PR#1 jest tests pass (SCENARIO-587..594 covered).
-- [ ] T18 — GATE: `flutter analyze` 0 issues; `dart format --output=none --set-exit-if-changed .` 0 changed; `flutter test` all passing; delta ≥ +6 tests vs pre-PR#1 baseline.
-- [ ] T19 — VERIFY: `rg "averageRating\|reviewCount" lib/features/profile/data/user_repository.dart` — confirm no occurrence in `_trainerPublicFields` whitelist; `firestore.rules` only contains a new `/reviews/{reviewId}` block (no other blocks modified); `firestore.indexes.json` only adds the `(trainerId, createdAt)` composite; `storage.rules` unchanged; 0 hex literals in new Dart files; all Dart icons via `TreinoIcon.X`.
+- [x] T15 — GATE: `npm --prefix functions run build` — TypeScript compilation 0 errors.
+- [x] T16 — GATE: `npm --prefix functions run lint` — ESLint 0 warnings/errors.
+- [x] T17 — GATE: `firebase emulators:exec --only firestore,auth "npm --prefix functions test"` — all PR#1 jest tests pass (SCENARIO-587..594 covered).
+- [x] T18 — GATE: `flutter analyze` 0 issues; `dart format --output=none --set-exit-if-changed .` 0 changed; `flutter test` all passing; delta ≥ +6 tests vs pre-PR#1 baseline.
+- [x] T19 — VERIFY: `rg "averageRating\|reviewCount" lib/features/profile/data/user_repository.dart` — confirm no occurrence in `_trainerPublicFields` whitelist; `firestore.rules` only contains a new `/reviews/{reviewId}` block (no other blocks modified); `firestore.indexes.json` only adds the `(trainerId, createdAt)` composite; `storage.rules` unchanged; 0 hex literals in new Dart files; all Dart icons via `TreinoIcon.X`.
 
 ---
 
@@ -235,18 +235,18 @@ Total: ~900 LOC across 3 PRs.
 ## Pre-PR Checklist per PR
 
 ### PR#1 — Data + CF + Rules
-- [ ] T01..T19 all marked complete
-- [ ] Quality gates T15..T19 passed
-- [ ] `dart run build_runner build --delete-conflicting-outputs` run after Review + TrainerPublicProfile edits
-- [ ] TypeScript compilation 0 errors (T15)
-- [ ] ESLint 0 warnings/errors (T16)
-- [ ] All 8 jest emulator tests pass (SCENARIO-587..594) (T17)
-- [ ] `_trainerPublicFields_excludes_aggregates` test passing (T07)
-- [ ] `firestore.rules` only adds `/reviews/{reviewId}` block — no other block modified (T19)
-- [ ] `firestore.indexes.json` only adds `(trainerId, createdAt)` composite (T11)
-- [ ] `storage.rules` unchanged
-- [ ] 0 hex literals in new Dart files; all icons via `TreinoIcon.X`
-- [ ] Conventional commits only; no Co-Authored-By
+- [x] T01..T19 all marked complete
+- [x] Quality gates T15..T19 passed
+- [x] `dart run build_runner build --delete-conflicting-outputs` run after Review + TrainerPublicProfile edits
+- [x] TypeScript compilation 0 errors (T15)
+- [x] ESLint 0 warnings/errors (T16)
+- [x] All 8 jest emulator tests pass (SCENARIO-587..594) (T17) — 49/49 total (+8 vs baseline 41)
+- [x] `_trainerPublicFields_excludes_aggregates` test passing (T07)
+- [x] `firestore.rules` only adds `/reviews/{reviewId}` block — no other block modified (T19)
+- [x] `firestore.indexes.json` only adds `(trainerId, createdAt)` composite (T11)
+- [x] `storage.rules` unchanged
+- [x] 0 hex literals in new Dart files; all icons via `TreinoIcon.X` (N/A — no UI in PR#1)
+- [x] Conventional commits only; no Co-Authored-By
 
 ### PR#2 — Athlete Write/Edit Flow
 - [ ] T20..T36 all marked complete
