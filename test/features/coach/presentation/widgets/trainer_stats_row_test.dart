@@ -48,7 +48,7 @@ void main() {
     });
 
     testWidgets(
-        'SCENARIO-617: reviewCount == 3 → "3" shown in the stats area',
+        'SCENARIO-617: reviewCount == 3, averageRating == 4.0 → shows "4.0" in RESEÑAS slot',
         (tester) async {
       await tester.pumpWidget(_wrap(
         TrainerStatsRow(
@@ -56,13 +56,8 @@ void main() {
         ),
       ));
 
-      // The review count value "3" should be visible somewhere in the stats row
-      expect(
-        find.byWidgetPredicate(
-          (w) => w is Text && w.data != null && w.data!.contains('3'),
-        ),
-        findsWidgets,
-      );
+      // The average rating formatted to 1 decimal should be displayed
+      expect(find.text('4.0'), findsOneWidget);
     });
 
     testWidgets(

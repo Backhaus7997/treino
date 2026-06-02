@@ -52,7 +52,7 @@ class TrainerPublicProfileScreen extends ConsumerWidget {
             children: [
               TrainerProfileHero(profile: profile),
               const SizedBox(height: 24),
-              const TrainerStatsRow(),
+              TrainerStatsRow(profile: profile),
               const SizedBox(height: 24),
               Text(
                 profile.trainerBio?.isNotEmpty == true
