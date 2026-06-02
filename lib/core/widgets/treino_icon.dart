@@ -94,6 +94,10 @@ class TreinoIcon {
   static const IconData star = PhosphorIconsRegular.star;
   static const IconData mapToggle = PhosphorIconsRegular.mapTrifold;
 
+  // Reviews — star rating input/display. Fase 6 Etapa 7.
+  static const IconData starFill = PhosphorIconsFill.star;
+  static const IconData starOutline = PhosphorIconsRegular.star;
+
   // Chat
   static const IconData send = PhosphorIconsFill.paperPlaneTilt;
   static const IconData chatEmpty = PhosphorIconsRegular.chatsCircle;

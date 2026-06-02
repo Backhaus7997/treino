@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/treino_icon.dart';
+import '../../reviews/presentation/widgets/review_cta.dart';
 import '../application/trainer_discovery_providers.dart';
 import 'coach_strings.dart';
 import 'widgets/trainer_contact_cta_stub.dart';
@@ -82,6 +83,8 @@ class TrainerPublicProfileScreen extends ConsumerWidget {
                 ),
               const SizedBox(height: 24),
               TrainerContactCtaStub(trainerId: uid),
+              const SizedBox(height: 12),
+              ReviewCta(trainerId: uid),
             ],
           );
         },

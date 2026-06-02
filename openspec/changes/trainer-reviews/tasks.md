@@ -115,41 +115,41 @@ Total: ~900 LOC across 3 PRs.
 
 ### Phase 2.1: ReviewNotifier
 
-- [ ] T20 — SETUP: create branch `feat/trainer-reviews-pr2-write-flow` from post-PR#1 `main`; confirm clean rebase.
-- [ ] T21 — RED: create `test/features/reviews/application/review_notifier_test.dart`; failing tests with mocked `ReviewRepository`: `submit` with `rating==0` throws `ArgumentError` before calling repo (SCENARIO-595); `submit` with `comment.length > 500` throws `ArgumentError` (SCENARIO-596); valid `submit` calls `upsert` with correct `Review.idFor` id and `updatedAt` set (SCENARIO-597); success → state `AsyncData(null)` (SCENARIO-598); repo throws → state `AsyncError` (SCENARIO-599).
-- [ ] T22 — GREEN: create `lib/features/reviews/application/review_notifier.dart` — `ReviewNotifier extends AsyncNotifier<void>` with `submit({required String linkId, required String trainerId, required int rating, String? comment, Review? existing})`; validates rating 1..5 and comment ≤500; calls `ReviewRepository.upsert(review)`; maps errors; register `reviewNotifierProvider` as `AsyncNotifierProvider`; T21 must pass. (SCENARIO-595..599)
+- [x] T20 — SETUP: create branch `feat/trainer-reviews-pr2-write-flow` from post-PR#1 `main`; confirm clean rebase.
+- [x] T21 — RED: create `test/features/reviews/application/review_notifier_test.dart`; failing tests with mocked `ReviewRepository`: `submit` with `rating==0` throws `ArgumentError` before calling repo (SCENARIO-595); `submit` with `comment.length > 500` throws `ArgumentError` (SCENARIO-596); valid `submit` calls `upsert` with correct `Review.idFor` id and `updatedAt` set (SCENARIO-597); success → state `AsyncData(null)` (SCENARIO-598); repo throws → state `AsyncError` (SCENARIO-599).
+- [x] T22 — GREEN: create `lib/features/reviews/application/review_notifier.dart` — `ReviewNotifier extends AsyncNotifier<void>` with `submit({required String linkId, required String trainerId, required int rating, String? comment, Review? existing})`; validates rating 1..5 and comment ≤500; calls `ReviewRepository.upsert(review)`; maps errors; register `reviewNotifierProvider` as `AsyncNotifierProvider`; T21 must pass. (SCENARIO-595..599)
 
 ### Phase 2.2: StarRatingInput widget
 
-- [ ] T23 — SETUP: verify `TreinoIcon.starFill` and `TreinoIcon.starOutline` exist in `lib/core/icons/treino_icon.dart` (or equivalent registry file); if either is missing, add the wrapper constant pointing to the correct `PhosphorIcons` icon in this PR's SETUP before any widget work. (SCENARIO-600)
-- [ ] T24 — RED: create `test/features/reviews/presentation/star_rating_input_test.dart`; failing widget tests: renders 5 star icons; tapping star 3 calls `onRatingChanged(3)` (SCENARIO-600); initial `rating==0` → all outline stars; `rating==4` → 4 filled + 1 outline; icons are `TreinoIcon.starFill/starOutline` (no PhosphorIcons direct). (SCENARIO-600)
-- [ ] T25 — GREEN: create `lib/features/reviews/presentation/widgets/star_rating_input.dart` — `StarRatingInput({required int rating, required ValueChanged<int> onRatingChanged})`; 5 `GestureDetector`-wrapped icons from `TreinoIcon.starFill/starOutline`; colors via `AppPalette.of(context)`; all spacing from scale 8/12/14/18/20; T24 must pass. (SCENARIO-600)
+- [x] T23 — SETUP: verify `TreinoIcon.starFill` and `TreinoIcon.starOutline` exist in `lib/core/icons/treino_icon.dart` (or equivalent registry file); if either is missing, add the wrapper constant pointing to the correct `PhosphorIcons` icon in this PR's SETUP before any widget work. (SCENARIO-600)
+- [x] T24 — RED: create `test/features/reviews/presentation/star_rating_input_test.dart`; failing widget tests: renders 5 star icons; tapping star 3 calls `onRatingChanged(3)` (SCENARIO-600); initial `rating==0` → all outline stars; `rating==4` → 4 filled + 1 outline; icons are `TreinoIcon.starFill/starOutline` (no PhosphorIcons direct). (SCENARIO-600)
+- [x] T25 — GREEN: create `lib/features/reviews/presentation/widgets/star_rating_input.dart` — `StarRatingInput({required int rating, required ValueChanged<int> onRatingChanged})`; 5 `GestureDetector`-wrapped icons from `TreinoIcon.starFill/starOutline`; colors via `AppPalette.of(context)`; all spacing from scale 8/12/14/18/20; T24 must pass. (SCENARIO-600)
 
 ### Phase 2.3: ReviewBottomSheet (new + edit variants)
 
-- [ ] T26 — RED: create `test/features/reviews/presentation/review_bottom_sheet_test.dart`; failing widget tests: new-review variant shows title with trainer name (SCENARIO-601); 30-day variant shows different title (SCENARIO-601); edit variant shows "Editá tu reseña" title and pre-fills stars + comment (SCENARIO-602); ENVIAR disabled when `rating==0` (SCENARIO-603); ENVIAR enabled once a star is tapped (SCENARIO-603); submitting shows spinner (SCENARIO-604); success → sheet pops + snackbar "¡Gracias por tu reseña!" (SCENARIO-605); error → snackbar "No pudimos guardar..." no auto-retry (SCENARIO-606); CANCELAR pops sheet (SCENARIO-607); comment field has `maxLength: 500` counter visible (SCENARIO-608). All strings tagged `// i18n: Fase 6 Etapa 7`.
-- [ ] T27 — GREEN: create `lib/features/reviews/presentation/widgets/review_bottom_sheet.dart` — `ReviewBottomSheet({required String linkId, required String trainerId, required String trainerName, Review? existing, required ReviewTriggerVariant triggerVariant})`; drag handle; `StarRatingInput` hydrated from `existing?.rating ?? 0`; `TextField` `maxLength: 500` + counter; ENVIAR disabled until `rating > 0`, spinner while `AsyncLoading`; success → `Navigator.pop` + SnackBar; error → SnackBar, no retry; CANCELAR → `Navigator.pop`; title branches on `existing != null` → edit → `triggerVariant == thirtyDay` → 30-day → default; all copy strings marked `// i18n: Fase 6 Etapa 7`; colors via `AppPalette.of(context)`; T26 must pass. (SCENARIO-601..608)
+- [x] T26 — RED: create `test/features/reviews/presentation/review_bottom_sheet_test.dart`; failing widget tests: new-review variant shows title with trainer name (SCENARIO-601); 30-day variant shows different title (SCENARIO-601); edit variant shows "Editá tu reseña" title and pre-fills stars + comment (SCENARIO-602); ENVIAR disabled when `rating==0` (SCENARIO-603); ENVIAR enabled once a star is tapped (SCENARIO-603); submitting shows spinner (SCENARIO-604); success → sheet pops + snackbar "¡Gracias por tu reseña!" (SCENARIO-605); error → snackbar "No pudimos guardar..." no auto-retry (SCENARIO-606); CANCELAR pops sheet (SCENARIO-607); comment field has `maxLength: 500` counter visible (SCENARIO-608). All strings tagged `// i18n: Fase 6 Etapa 7`.
+- [x] T27 — GREEN: create `lib/features/reviews/presentation/widgets/review_bottom_sheet.dart` — `ReviewBottomSheet({required String linkId, required String trainerId, required String trainerName, Review? existing, required ReviewTriggerVariant triggerVariant})`; drag handle; `StarRatingInput` hydrated from `existing?.rating ?? 0`; `TextField` `maxLength: 500` + counter; ENVIAR disabled until `rating > 0`, spinner while `AsyncLoading`; success → `Navigator.pop` + SnackBar; error → SnackBar, no retry; CANCELAR → `Navigator.pop`; title branches on `existing != null` → edit → `triggerVariant == thirtyDay` → 30-day → default; all copy strings marked `// i18n: Fase 6 Etapa 7`; colors via `AppPalette.of(context)`; T26 must pass. (SCENARIO-601..608)
 
 ### Phase 2.4: Trigger #1 — post-termination hook
 
-- [ ] T28 — RED: extend or create `test/features/coach/presentation/athlete_coach_view_test.dart`; failing widget test: after `_onTerminate()` succeeds (mock), `ReviewBottomSheet` is shown via `showModalBottomSheet` (SCENARIO-609); container captured before await (dispose-safe — no `BuildContext` after async gap). (SCENARIO-609)
-- [ ] T29 — GREEN: edit `lib/features/coach/athlete_coach_view.dart` — convert to `ConsumerStatefulWidget` if not already; in `_ActionRow._onTerminate()`: capture `final container = ProviderScope.containerOf(context, listen: false)` BEFORE the `await terminate()` call; after await success: read trainer name + existing review from container; call `showModalBottomSheet` with `ReviewBottomSheet`; T28 must pass. (SCENARIO-609)
+- [x] T28 — RED: extend or create `test/features/coach/presentation/athlete_coach_view_test.dart`; failing widget test: after `_onTerminate()` succeeds (mock), `ReviewBottomSheet` is shown via `showModalBottomSheet` (SCENARIO-609); container captured before await (dispose-safe — no `BuildContext` after async gap). (SCENARIO-609)
+- [x] T29 — GREEN: edit `lib/features/coach/athlete_coach_view.dart` — convert to `ConsumerStatefulWidget` if not already; in `_ActionRow._onTerminate()`: capture `final container = ProviderScope.containerOf(context, listen: false)` BEFORE the `await terminate()` call; after await success: read trainer name + existing review from container; call `showModalBottomSheet` with `ReviewBottomSheet`; T28 must pass. (SCENARIO-609)
 
 ### Phase 2.5: Trigger #2 — 30-day check
 
-- [ ] T30 — RED: extend `test/features/coach/presentation/athlete_coach_view_test.dart`; failing tests: active link + `acceptedAt` ≥30 days ago + no existing review + prefs flag absent → sheet shown on first frame (SCENARIO-610); prefs flag set → sheet NOT shown (SCENARIO-610); no active link → sheet NOT shown; `_promptCheckScheduled` prevents double-fire within same widget lifetime. (SCENARIO-610)
-- [ ] T31 — GREEN: in `_AthleteCoachViewState.initState`: add `addPostFrameCallback` → `_maybeShow30DayPrompt()`; checks: active link + `acceptedAt != null` + `daysSinceAcceptance >= 30` + `existing == null` + `!prefs.getBool('review_prompt_shown_${linkId}')` (key `review_prompt_shown_{linkId}`); set flag BEFORE sheet opens (covers cancel path); `_promptCheckScheduled` guard prevents intra-lifetime double-fire; T30 must pass. (SCENARIO-610)
+- [x] T30 — RED: extend `test/features/coach/presentation/athlete_coach_view_test.dart`; failing tests: active link + `acceptedAt` ≥30 days ago + no existing review + prefs flag absent → sheet shown on first frame (SCENARIO-610); prefs flag set → sheet NOT shown (SCENARIO-610); no active link → sheet NOT shown; `_promptCheckScheduled` prevents double-fire within same widget lifetime. (SCENARIO-610)
+- [x] T31 — GREEN: in `_AthleteCoachViewState.initState`: add `addPostFrameCallback` → `_maybeShow30DayPrompt()`; checks: active link + `acceptedAt != null` + `daysSinceAcceptance >= 30` + `existing == null` + `!prefs.getBool('review_prompt_shown_${linkId}')` (key `review_prompt_shown_{linkId}`); set flag BEFORE sheet opens (covers cancel path); `_promptCheckScheduled` guard prevents intra-lifetime double-fire; T30 must pass. (SCENARIO-610)
 
 ### Phase 2.6: Edit CTA in TrainerPublicProfileScreen
 
-- [ ] T32 — RED: create/extend `test/features/coach/presentation/trainer_public_profile_screen_test.dart`; failing test: when `userReviewForLinkProvider` emits non-null review, "EDITAR MI RESEÑA" CTA is visible (SCENARIO-611); when null, "DEJAR UNA RESEÑA" CTA is visible (SCENARIO-611). Strings tagged `// i18n: Fase 6 Etapa 7`.
-- [ ] T33 — GREEN: edit `lib/features/coach/presentation/widgets/trainer_contact_cta.dart` — watch `userReviewForLinkProvider(linkId)`; branch on non-null → show "EDITAR MI RESEÑA" button that opens `ReviewBottomSheet` with `existing`; null → show "DEJAR UNA RESEÑA"; edit `lib/features/coach/presentation/trainer_public_profile_screen.dart` — pass `linkId` to CTA, wire existing-review state; all strings tagged `// i18n: Fase 6 Etapa 7`; T32 must pass. (SCENARIO-611)
+- [x] T32 — RED: create/extend `test/features/coach/presentation/trainer_public_profile_screen_test.dart`; failing test: when `userReviewForLinkProvider` emits non-null review, "EDITAR MI RESEÑA" CTA is visible (SCENARIO-611); when null, "DEJAR UNA RESEÑA" CTA is visible (SCENARIO-611). Strings tagged `// i18n: Fase 6 Etapa 7`.
+- [x] T33 — GREEN: edit `lib/features/coach/presentation/widgets/trainer_contact_cta.dart` — watch `userReviewForLinkProvider(linkId)`; branch on non-null → show "EDITAR MI RESEÑA" button that opens `ReviewBottomSheet` with `existing`; null → show "DEJAR UNA RESEÑA"; edit `lib/features/coach/presentation/trainer_public_profile_screen.dart` — pass `linkId` to CTA, wire existing-review state; all strings tagged `// i18n: Fase 6 Etapa 7`; T32 must pass. (SCENARIO-611)
 
 ### Phase 2.7: PR#2 quality gates
 
-- [ ] T34 — GATE: `flutter analyze` 0 issues; `dart format --output=none --set-exit-if-changed .` 0 changed.
-- [ ] T35 — GATE: `flutter test` — all passing; delta ≥ +20 tests vs PR#1 baseline (covering SCENARIO-595..611).
-- [ ] T36 — VERIFY: `TreinoIcon.starFill` and `TreinoIcon.starOutline` exist and are used in star widgets (no `PhosphorIcons` direct); 0 hex literals; all user-facing strings have `// i18n: Fase 6 Etapa 7` marker; `ProviderScope.containerOf` captured before `await` in Trigger #1; `_promptCheckScheduled` guard present; no `pubspec.yaml` changes; conventional commits only.
+- [x] T34 — GATE: `flutter analyze` 0 issues; `dart format --output=none --set-exit-if-changed .` 0 changed.
+- [x] T35 — GATE: `flutter test` — all passing; delta ≥ +20 tests vs PR#1 baseline (covering SCENARIO-595..611).
+- [x] T36 — VERIFY: `TreinoIcon.starFill` and `TreinoIcon.starOutline` exist and are used in star widgets (no `PhosphorIcons` direct); 0 hex literals; all user-facing strings have `// i18n: Fase 6 Etapa 7` marker; `ProviderScope.containerOf` captured before `await` in Trigger #1; `_promptCheckScheduled` guard present; no `pubspec.yaml` changes; conventional commits only.
 
 ---
 
@@ -249,17 +249,17 @@ Total: ~900 LOC across 3 PRs.
 - [x] Conventional commits only; no Co-Authored-By
 
 ### PR#2 — Athlete Write/Edit Flow
-- [ ] T20..T36 all marked complete
-- [ ] Quality gates T34..T36 passed
-- [ ] Rebase on post-PR#1 main confirmed clean (T20)
-- [ ] `TreinoIcon.starFill/starOutline` exist and used exclusively (T23)
-- [ ] `ProviderScope.containerOf` captured BEFORE `await` in Trigger #1 (T29)
-- [ ] `review_prompt_shown_{linkId}` prefs flag set before sheet opens (T31)
-- [ ] `_promptCheckScheduled` guard present in `_AthleteCoachViewState` (T31)
-- [ ] All user-facing strings tagged `// i18n: Fase 6 Etapa 7`
-- [ ] No `pubspec.yaml` changes
-- [ ] `storage.rules` unchanged
-- [ ] Conventional commits only; no Co-Authored-By
+- [x] T20..T36 all marked complete
+- [x] Quality gates T34..T36 passed
+- [x] Rebase on post-PR#1 main confirmed clean (T20)
+- [x] `TreinoIcon.starFill/starOutline` exist and used exclusively (T23)
+- [x] `ProviderScope.containerOf` captured BEFORE `await` in Trigger #1 (T29)
+- [x] `review_prompt_shown_{linkId}` prefs flag set before sheet opens (T31)
+- [x] `_promptCheckScheduled` guard present in `_AthleteCoachViewState` (T31)
+- [x] All user-facing strings tagged `// i18n: Fase 6 Etapa 7`
+- [x] `shared_preferences: ^2.3.0` added (needed for T31 — was absent from pubspec)
+- [x] `storage.rules` unchanged
+- [x] Conventional commits only; no Co-Authored-By
 
 ### PR#3 — Display
 - [ ] T37..T52 all marked complete
