@@ -71,4 +71,24 @@ abstract final class WorkoutStrings {
       'Pronto vas a poder editar el contenido. Por ahora podés archivar y crear de nuevo.';
   static const selfEditorCapReached =
       'Llegaste al máximo de 10 rutinas activas.';
+
+  // ── MIS RUTINAS — section UI strings (REQ-USR-002..003, Design §es-AR strings) ─
+  static const misRutinasSectionTitle = 'MIS RUTINAS';
+  static const misRutinasCta = '+ CREAR RUTINA';
+  static const misRutinasCtaDisabledTooltip =
+      'Llegaste al máximo de 10 rutinas activas. Archivá una para crear otra.';
+  static const misRutinasEmptyState =
+      'Todavía no creaste ninguna rutina. Tocá CREAR RUTINA para armar la primera.';
+  static const misRutinasError = 'No pudimos cargar tus rutinas.';
+  static const misRutinasErrorRetry = 'Reintentar';
+  static const misRutinasOverflowEdit = 'EDITAR';
+  static const misRutinasOverflowArchive = 'ARCHIVAR';
+  static const misRutinasConfirmTitle = 'Archivar rutina';
+  static const misRutinasConfirmBody =
+      'La rutina dejará de aparecer en MIS RUTINAS. Tu historial se conserva.';
+  static const misRutinasConfirmCancel = 'CANCELAR';
+  static const misRutinasConfirmConfirm = 'ARCHIVAR';
+  static const misRutinasArchiveSuccess = 'Rutina archivada';
+  static const misRutinasArchiveError =
+      'No pudimos archivar la rutina. Reintentá.';
 }
