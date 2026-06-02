@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../profile/application/user_providers.dart' show firestoreProvider;
 import '../../workout/application/session_providers.dart'
     show currentUidProvider;
+import '../data/session_share_repository.dart';
 import '../data/trainer_link_repository.dart';
 import '../domain/trainer_link.dart';
 import '../domain/trainer_link_status.dart';
@@ -51,3 +52,10 @@ final trainerLinksStreamProvider =
   if (uid == null) return const Stream.empty();
   return ref.read(trainerLinkRepositoryProvider).watchForTrainer(uid);
 });
+
+/// Privacy-grant repository — wraps the `session_shares/{athleteId}` doc.
+/// Used by the athlete's "Compartir con mi PF" toggle to keep the Firestore
+/// security grant in sync with `trainer_links.sharedWithTrainer`.
+final sessionShareRepositoryProvider = Provider<SessionShareRepository>(
+  (ref) => SessionShareRepository(firestore: ref.watch(firestoreProvider)),
+);

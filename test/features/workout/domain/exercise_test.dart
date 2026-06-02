@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:treino/features/workout/domain/equipment_type.dart';
 import 'package:treino/features/workout/domain/exercise.dart';
 
 void main() {
@@ -101,6 +102,67 @@ void main() {
         }),
         returnsNormally,
       );
+    });
+
+    // ── REQ-RER-015: equipment field round-trip (T-RER-007) ─────────────────
+
+    test('REQ-RER-015: fromJson with equipment "barra" → EquipmentType.barra',
+        () {
+      final exercise = Exercise.fromJson({
+        'id': 'bench-press',
+        'name': 'Press de banca',
+        'muscleGroup': 'chest',
+        'category': 'compound',
+        'equipment': 'barra',
+      });
+      expect(exercise.equipment, equals(EquipmentType.barra));
+    });
+
+    test('REQ-RER-015: fromJson without equipment key → equipment is null', () {
+      final exercise = Exercise.fromJson({
+        'id': 'bench-press',
+        'name': 'Press de banca',
+        'muscleGroup': 'chest',
+        'category': 'compound',
+      });
+      expect(exercise.equipment, isNull);
+    });
+
+    test('REQ-RER-015: toJson emits equipment jsonValue string for non-null',
+        () {
+      const exercise = Exercise(
+        id: 'bench-press',
+        name: 'Press de banca',
+        muscleGroup: 'chest',
+        category: 'compound',
+        equipment: EquipmentType.barra,
+      );
+      final json = exercise.toJson();
+      expect(json['equipment'], equals('barra'));
+    });
+
+    test('REQ-RER-015: toJson emits null for null equipment', () {
+      const exercise = Exercise(
+        id: 'pull-up',
+        name: 'Dominadas',
+        muscleGroup: 'back',
+        category: 'compound',
+      );
+      final json = exercise.toJson();
+      expect(json['equipment'], isNull);
+    });
+
+    test('REQ-RER-015: full round-trip with equipment pesoCorporal', () {
+      const original = Exercise(
+        id: 'pull-up',
+        name: 'Dominadas',
+        muscleGroup: 'back',
+        category: 'compound',
+        equipment: EquipmentType.pesoCorporal,
+      );
+      final decoded = Exercise.fromJson(original.toJson());
+      expect(decoded.equipment, equals(EquipmentType.pesoCorporal));
+      expect(decoded, equals(original));
     });
   });
 }

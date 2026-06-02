@@ -22,8 +22,8 @@ class Routine with _$Routine {
   const factory Routine({
     required String id,
     required String name,
-    required String
-        split, // 'PPL' | 'Full Body' | 'Upper/Lower' | ... (free-form)
+    String?
+        split, // 'PPL' | 'Full Body' | 'Upper/Lower' | ... (free-form); null for athlete-created routines (REQ-RER-014, ADR-RER-04)
     required ExperienceLevel level,
     required List<RoutineDay> days, // empty list valid (spec SCENARIO-052)
     int? estimatedMinutesPerDay,

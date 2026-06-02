@@ -27,6 +27,9 @@ mixin _$CustomExercise {
   String get description => throw _privateConstructorUsedError;
   String? get videoUrl => throw _privateConstructorUsedError;
   int? get defaultRestSeconds => throw _privateConstructorUsedError;
+  @JsonKey(fromJson: _equipmentFromJson, toJson: _equipmentToJson)
+  EquipmentType? get equipment =>
+      throw _privateConstructorUsedError; // REQ-RER-015: nullable; stays null on existing docs (no backfill — ADR-RER-03)
   @TimestampConverter()
   DateTime get createdAt => throw _privateConstructorUsedError;
   @TimestampConverter()
@@ -56,6 +59,8 @@ abstract class $CustomExerciseCopyWith<$Res> {
       String description,
       String? videoUrl,
       int? defaultRestSeconds,
+      @JsonKey(fromJson: _equipmentFromJson, toJson: _equipmentToJson)
+      EquipmentType? equipment,
       @TimestampConverter() DateTime createdAt,
       @TimestampConverter() DateTime updatedAt});
 }
@@ -82,6 +87,7 @@ class _$CustomExerciseCopyWithImpl<$Res, $Val extends CustomExercise>
     Object? description = null,
     Object? videoUrl = freezed,
     Object? defaultRestSeconds = freezed,
+    Object? equipment = freezed,
     Object? createdAt = null,
     Object? updatedAt = null,
   }) {
@@ -114,6 +120,10 @@ class _$CustomExerciseCopyWithImpl<$Res, $Val extends CustomExercise>
           ? _value.defaultRestSeconds
           : defaultRestSeconds // ignore: cast_nullable_to_non_nullable
               as int?,
+      equipment: freezed == equipment
+          ? _value.equipment
+          : equipment // ignore: cast_nullable_to_non_nullable
+              as EquipmentType?,
       createdAt: null == createdAt
           ? _value.createdAt
           : createdAt // ignore: cast_nullable_to_non_nullable
@@ -142,6 +152,8 @@ abstract class _$$CustomExerciseImplCopyWith<$Res>
       String description,
       String? videoUrl,
       int? defaultRestSeconds,
+      @JsonKey(fromJson: _equipmentFromJson, toJson: _equipmentToJson)
+      EquipmentType? equipment,
       @TimestampConverter() DateTime createdAt,
       @TimestampConverter() DateTime updatedAt});
 }
@@ -166,6 +178,7 @@ class __$$CustomExerciseImplCopyWithImpl<$Res>
     Object? description = null,
     Object? videoUrl = freezed,
     Object? defaultRestSeconds = freezed,
+    Object? equipment = freezed,
     Object? createdAt = null,
     Object? updatedAt = null,
   }) {
@@ -198,6 +211,10 @@ class __$$CustomExerciseImplCopyWithImpl<$Res>
           ? _value.defaultRestSeconds
           : defaultRestSeconds // ignore: cast_nullable_to_non_nullable
               as int?,
+      equipment: freezed == equipment
+          ? _value.equipment
+          : equipment // ignore: cast_nullable_to_non_nullable
+              as EquipmentType?,
       createdAt: null == createdAt
           ? _value.createdAt
           : createdAt // ignore: cast_nullable_to_non_nullable
@@ -221,6 +238,8 @@ class _$CustomExerciseImpl implements _CustomExercise {
       this.description = '',
       this.videoUrl,
       this.defaultRestSeconds,
+      @JsonKey(fromJson: _equipmentFromJson, toJson: _equipmentToJson)
+      this.equipment,
       @TimestampConverter() required this.createdAt,
       @TimestampConverter() required this.updatedAt});
 
@@ -244,6 +263,10 @@ class _$CustomExerciseImpl implements _CustomExercise {
   @override
   final int? defaultRestSeconds;
   @override
+  @JsonKey(fromJson: _equipmentFromJson, toJson: _equipmentToJson)
+  final EquipmentType? equipment;
+// REQ-RER-015: nullable; stays null on existing docs (no backfill — ADR-RER-03)
+  @override
   @TimestampConverter()
   final DateTime createdAt;
   @override
@@ -252,7 +275,7 @@ class _$CustomExerciseImpl implements _CustomExercise {
 
   @override
   String toString() {
-    return 'CustomExercise(id: $id, ownerId: $ownerId, name: $name, muscleGroup: $muscleGroup, description: $description, videoUrl: $videoUrl, defaultRestSeconds: $defaultRestSeconds, createdAt: $createdAt, updatedAt: $updatedAt)';
+    return 'CustomExercise(id: $id, ownerId: $ownerId, name: $name, muscleGroup: $muscleGroup, description: $description, videoUrl: $videoUrl, defaultRestSeconds: $defaultRestSeconds, equipment: $equipment, createdAt: $createdAt, updatedAt: $updatedAt)';
   }
 
   @override
@@ -271,6 +294,8 @@ class _$CustomExerciseImpl implements _CustomExercise {
                 other.videoUrl == videoUrl) &&
             (identical(other.defaultRestSeconds, defaultRestSeconds) ||
                 other.defaultRestSeconds == defaultRestSeconds) &&
+            (identical(other.equipment, equipment) ||
+                other.equipment == equipment) &&
             (identical(other.createdAt, createdAt) ||
                 other.createdAt == createdAt) &&
             (identical(other.updatedAt, updatedAt) ||
@@ -279,8 +304,18 @@ class _$CustomExerciseImpl implements _CustomExercise {
 
   @JsonKey(includeFromJson: false, includeToJson: false)
   @override
-  int get hashCode => Object.hash(runtimeType, id, ownerId, name, muscleGroup,
-      description, videoUrl, defaultRestSeconds, createdAt, updatedAt);
+  int get hashCode => Object.hash(
+      runtimeType,
+      id,
+      ownerId,
+      name,
+      muscleGroup,
+      description,
+      videoUrl,
+      defaultRestSeconds,
+      equipment,
+      createdAt,
+      updatedAt);
 
   /// Create a copy of CustomExercise
   /// with the given fields replaced by the non-null parameter values.
@@ -308,6 +343,8 @@ abstract class _CustomExercise implements CustomExercise {
           final String description,
           final String? videoUrl,
           final int? defaultRestSeconds,
+          @JsonKey(fromJson: _equipmentFromJson, toJson: _equipmentToJson)
+          final EquipmentType? equipment,
           @TimestampConverter() required final DateTime createdAt,
           @TimestampConverter() required final DateTime updatedAt}) =
       _$CustomExerciseImpl;
@@ -329,6 +366,10 @@ abstract class _CustomExercise implements CustomExercise {
   String? get videoUrl;
   @override
   int? get defaultRestSeconds;
+  @override
+  @JsonKey(fromJson: _equipmentFromJson, toJson: _equipmentToJson)
+  EquipmentType?
+      get equipment; // REQ-RER-015: nullable; stays null on existing docs (no backfill — ADR-RER-03)
   @override
   @TimestampConverter()
   DateTime get createdAt;

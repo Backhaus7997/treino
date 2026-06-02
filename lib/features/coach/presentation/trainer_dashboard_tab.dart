@@ -11,8 +11,10 @@ import '../../profile/application/user_public_profile_providers.dart';
 import '../../workout/application/session_providers.dart'
     show currentUidProvider;
 import '../application/agenda_providers.dart';
+import '../application/trained_today_provider.dart';
 import '../application/trainer_link_providers.dart';
 import '../domain/appointment.dart';
+import 'widgets/appointment_detail_sheet.dart';
 import '../domain/trainer_link.dart';
 import '../domain/trainer_link_status.dart';
 
@@ -57,10 +59,7 @@ class TrainerDashboardTab extends ConsumerWidget {
           trailingLabel: 'Dejar feedback',
         ),
         const SizedBox(height: 8),
-        _PlaceholderCard(
-          palette: palette,
-          message: 'Próximamente.',
-        ),
+        const _EntrenaronHoyList(),
         const SizedBox(height: 20),
         const _SectionHeader(
           label: 'ACTIVIDAD RECIENTE',
@@ -621,7 +620,18 @@ class _ProximaSesionRow extends ConsumerWidget {
     final initials = _initials(showName);
 
     return InkWell(
-      onTap: () => context.push('/coach/athlete/${appointment.athleteId}'),
+      onTap: () => showModalBottomSheet(
+        context: context,
+        backgroundColor: AppPalette.of(context).bgCard,
+        isScrollControlled: true,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        builder: (_) => AppointmentDetailSheet(
+          appointment: appointment,
+          trainerId: ref.watch(currentUidProvider) ?? '',
+        ),
+      ),
       borderRadius: BorderRadius.circular(16),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -655,7 +665,7 @@ class _ProximaSesionRow extends ConsumerWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    _formatDateLabel(appointment.startsAt),
+                    '${_formatDateLabel(appointment.startsAt)} · ${appointment.durationMin} min',
                     style: GoogleFonts.barlow(
                       fontWeight: FontWeight.w400,
                       fontSize: 12,
@@ -668,6 +678,124 @@ class _ProximaSesionRow extends ConsumerWidget {
             ),
             const SizedBox(width: 8),
             Icon(TreinoIcon.forward, size: 18, color: palette.textMuted),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Entrenaron hoy list ───────────────────────────────────────────────────────
+
+class _EntrenaronHoyList extends ConsumerWidget {
+  const _EntrenaronHoyList();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final palette = AppPalette.of(context);
+    final todayAsync = ref.watch(trainedTodayProvider);
+
+    if (todayAsync.isLoading && !todayAsync.hasValue) {
+      return _PlaceholderCard(palette: palette, message: 'Cargando…');
+    }
+    if (todayAsync.hasError && !todayAsync.hasValue) {
+      return _PlaceholderCard(
+        palette: palette,
+        message: 'No pudimos cargar la actividad de hoy.',
+      );
+    }
+
+    final entries = todayAsync.valueOrNull ?? const [];
+    if (entries.isEmpty) {
+      return _PlaceholderCard(
+        palette: palette,
+        message: 'Nadie entrenó hoy todavía.',
+      );
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: palette.bgCard,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: palette.border, width: 1),
+      ),
+      child: Column(
+        children: [
+          for (int i = 0; i < entries.length; i++) ...[
+            if (i > 0)
+              Divider(
+                color: palette.border,
+                height: 1,
+                thickness: 1,
+                indent: 14,
+                endIndent: 14,
+              ),
+            _EntrenaronHoyRow(entry: entries[i]),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _EntrenaronHoyRow extends ConsumerWidget {
+  const _EntrenaronHoyRow({required this.entry});
+  final TrainedTodayEntry entry;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final palette = AppPalette.of(context);
+    final profileAsync = ref.watch(userPublicProfileProvider(entry.athleteId));
+    final rawName = profileAsync.valueOrNull?.displayName ?? '';
+    final showName =
+        rawName.isEmpty || _looksLikeUid(rawName) ? 'Alumno' : rawName;
+    final initials = _initials(showName);
+    final session = entry.session;
+
+    return InkWell(
+      onTap: () => context.push('/coach/athlete/${entry.athleteId}'),
+      borderRadius: BorderRadius.circular(16),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Row(
+          children: [
+            _AvatarInitials(initials: initials, palette: palette),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    showName,
+                    style: GoogleFonts.barlow(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                      color: palette.textPrimary,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${session.routineName} · ${_formatTime(session.finishedAt!)}',
+                    style: GoogleFonts.barlow(
+                      fontWeight: FontWeight.w400,
+                      fontSize: 12,
+                      color: palette.textMuted,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              '${session.totalVolumeKg.toStringAsFixed(0)} kg',
+              style: GoogleFonts.barlowCondensed(
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+                color: palette.textMuted,
+              ),
+            ),
           ],
         ),
       ),

@@ -36,6 +36,12 @@ class _CoachHubAppState extends ConsumerState<CoachHubApp> {
       darkTheme: AppTheme.dark(),
       themeMode: ThemeMode.dark,
       routerConfig: _router,
+      // Global: tap outside an input dismisses the keyboard (see TreinoApp).
+      builder: (context, child) => GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+        child: child,
+      ),
     );
   }
 }

@@ -181,7 +181,20 @@ class SessionRepository {
   Session? _sessionFromDoc(DocumentSnapshot<Map<String, Object?>> snap) {
     final data = snap.data();
     if (!snap.exists || data == null) return null;
-    return Session.fromJson(data);
+    try {
+      // Inject the doc id so a doc that didn't persist `id` in its body still
+      // decodes (mirrors AppointmentRepository). Wrapped in try/catch so a
+      // single malformed session doc can't break the whole list — critical for
+      // the trainer dashboard, which reads other users' sessions.
+      return Session.fromJson({...data, 'id': snap.id});
+    } catch (e, st) {
+      developer.log(
+        'SessionRepository: skipped unparseable session ${snap.id}',
+        error: e,
+        stackTrace: st,
+      );
+      return null;
+    }
   }
 
   SetLog? _setLogFromDoc(DocumentSnapshot<Map<String, Object?>> snap) {

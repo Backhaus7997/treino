@@ -32,6 +32,14 @@ class _TreinoAppState extends ConsumerState<TreinoApp> {
       darkTheme: AppTheme.dark(),
       themeMode: ThemeMode.dark,
       routerConfig: _router,
+      // Global: tap anywhere outside an input dismisses the keyboard.
+      // translucent so buttons/scroll still win the tap; only empty-area
+      // taps reach this and unfocus the current field.
+      builder: (context, child) => GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+        child: child,
+      ),
     );
   }
 }

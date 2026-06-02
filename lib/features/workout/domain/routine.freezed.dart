@@ -22,8 +22,8 @@ Routine _$RoutineFromJson(Map<String, dynamic> json) {
 mixin _$Routine {
   String get id => throw _privateConstructorUsedError;
   String get name => throw _privateConstructorUsedError;
-  String get split =>
-      throw _privateConstructorUsedError; // 'PPL' | 'Full Body' | 'Upper/Lower' | ... (free-form)
+  String? get split =>
+      throw _privateConstructorUsedError; // 'PPL' | 'Full Body' | 'Upper/Lower' | ... (free-form); null for athlete-created routines (REQ-RER-014, ADR-RER-04)
   ExperienceLevel get level => throw _privateConstructorUsedError;
   List<RoutineDay> get days =>
       throw _privateConstructorUsedError; // empty list valid (spec SCENARIO-052)
@@ -57,7 +57,7 @@ abstract class $RoutineCopyWith<$Res> {
   $Res call(
       {String id,
       String name,
-      String split,
+      String? split,
       ExperienceLevel level,
       List<RoutineDay> days,
       int? estimatedMinutesPerDay,
@@ -87,7 +87,7 @@ class _$RoutineCopyWithImpl<$Res, $Val extends Routine>
   $Res call({
     Object? id = null,
     Object? name = null,
-    Object? split = null,
+    Object? split = freezed,
     Object? level = null,
     Object? days = null,
     Object? estimatedMinutesPerDay = freezed,
@@ -108,10 +108,10 @@ class _$RoutineCopyWithImpl<$Res, $Val extends Routine>
           ? _value.name
           : name // ignore: cast_nullable_to_non_nullable
               as String,
-      split: null == split
+      split: freezed == split
           ? _value.split
           : split // ignore: cast_nullable_to_non_nullable
-              as String,
+              as String?,
       level: null == level
           ? _value.level
           : level // ignore: cast_nullable_to_non_nullable
@@ -166,7 +166,7 @@ abstract class _$$RoutineImplCopyWith<$Res> implements $RoutineCopyWith<$Res> {
   $Res call(
       {String id,
       String name,
-      String split,
+      String? split,
       ExperienceLevel level,
       List<RoutineDay> days,
       int? estimatedMinutesPerDay,
@@ -194,7 +194,7 @@ class __$$RoutineImplCopyWithImpl<$Res>
   $Res call({
     Object? id = null,
     Object? name = null,
-    Object? split = null,
+    Object? split = freezed,
     Object? level = null,
     Object? days = null,
     Object? estimatedMinutesPerDay = freezed,
@@ -215,10 +215,10 @@ class __$$RoutineImplCopyWithImpl<$Res>
           ? _value.name
           : name // ignore: cast_nullable_to_non_nullable
               as String,
-      split: null == split
+      split: freezed == split
           ? _value.split
           : split // ignore: cast_nullable_to_non_nullable
-              as String,
+              as String?,
       level: null == level
           ? _value.level
           : level // ignore: cast_nullable_to_non_nullable
@@ -269,7 +269,7 @@ class _$RoutineImpl implements _Routine {
   const _$RoutineImpl(
       {required this.id,
       required this.name,
-      required this.split,
+      this.split,
       required this.level,
       required final List<RoutineDay> days,
       this.estimatedMinutesPerDay,
@@ -290,8 +290,8 @@ class _$RoutineImpl implements _Routine {
   @override
   final String name;
   @override
-  final String split;
-// 'PPL' | 'Full Body' | 'Upper/Lower' | ... (free-form)
+  final String? split;
+// 'PPL' | 'Full Body' | 'Upper/Lower' | ... (free-form); null for athlete-created routines (REQ-RER-014, ADR-RER-04)
   @override
   final ExperienceLevel level;
   final List<RoutineDay> _days;
@@ -396,7 +396,7 @@ abstract class _Routine implements Routine {
   const factory _Routine(
       {required final String id,
       required final String name,
-      required final String split,
+      final String? split,
       required final ExperienceLevel level,
       required final List<RoutineDay> days,
       final int? estimatedMinutesPerDay,
@@ -415,7 +415,8 @@ abstract class _Routine implements Routine {
   @override
   String get name;
   @override
-  String get split; // 'PPL' | 'Full Body' | 'Upper/Lower' | ... (free-form)
+  String?
+      get split; // 'PPL' | 'Full Body' | 'Upper/Lower' | ... (free-form); null for athlete-created routines (REQ-RER-014, ADR-RER-04)
   @override
   ExperienceLevel get level;
   @override

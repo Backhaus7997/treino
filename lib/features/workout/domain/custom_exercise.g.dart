@@ -15,6 +15,7 @@ _$CustomExerciseImpl _$$CustomExerciseImplFromJson(Map<String, dynamic> json) =>
       description: json['description'] as String? ?? '',
       videoUrl: json['videoUrl'] as String?,
       defaultRestSeconds: (json['defaultRestSeconds'] as num?)?.toInt(),
+      equipment: _equipmentFromJson(json['equipment'] as String?),
       createdAt:
           const TimestampConverter().fromJson(json['createdAt'] as Timestamp),
       updatedAt:
@@ -31,6 +32,7 @@ Map<String, dynamic> _$$CustomExerciseImplToJson(
       'description': instance.description,
       'videoUrl': instance.videoUrl,
       'defaultRestSeconds': instance.defaultRestSeconds,
+      'equipment': _equipmentToJson(instance.equipment),
       'createdAt': const TimestampConverter().toJson(instance.createdAt),
       'updatedAt': const TimestampConverter().toJson(instance.updatedAt),
     };

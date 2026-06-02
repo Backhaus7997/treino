@@ -340,6 +340,57 @@ void main() {
       final decoded = Routine.fromJson(routine.toJson());
       expect(decoded.status, equals(RoutineStatus.archived));
     });
+
+    // ── REQ-RER-014: Routine.split nullable (T-RER-008) ──────────────────────
+
+    test('REQ-RER-014: fromJson with split: null → Routine(split: null)', () {
+      final rawMap = <String, dynamic>{
+        'id': 'r-athlete',
+        'name': 'Mi rutina',
+        'split': null,
+        'level': 'beginner',
+        'days': <dynamic>[],
+      };
+      final routine = Routine.fromJson(rawMap);
+      expect(routine.split, isNull);
+    });
+
+    test('REQ-RER-014: fromJson with split absent → split is null', () {
+      final rawMap = <String, dynamic>{
+        'id': 'r-athlete',
+        'name': 'Mi rutina',
+        'level': 'beginner',
+        'days': <dynamic>[],
+        // split key intentionally absent
+      };
+      final routine = Routine.fromJson(rawMap);
+      expect(routine.split, isNull);
+    });
+
+    test('REQ-RER-014: toJson round-trips null split correctly', () {
+      const routine = Routine(
+        id: 'r-athlete',
+        name: 'Mi rutina',
+        split: null,
+        level: ExperienceLevel.beginner,
+        days: [],
+      );
+      final decoded = Routine.fromJson(routine.toJson());
+      expect(decoded.split, isNull);
+      expect(decoded, equals(routine));
+    });
+
+    test('REQ-RER-014: existing split "PPL" roundtrip is unchanged', () {
+      const routine = Routine(
+        id: 'r-ppl',
+        name: 'PPL',
+        split: 'PPL',
+        level: ExperienceLevel.beginner,
+        days: [],
+      );
+      final decoded = Routine.fromJson(routine.toJson());
+      expect(decoded.split, equals('PPL'));
+    });
   });
 
   group('RoutineStatus', () {
