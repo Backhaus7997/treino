@@ -48,6 +48,9 @@ class UserRepository {
     'trainerLocations',
     'trainerGeohashes',
     'trainerOffersOnline',
+    // ADR-RV-005: CF-write-only — do not add averageRating or reviewCount here.
+    // Those fields are written exclusively by the reviewAggregate Cloud Function
+    // and must never be propagated by client dual-write.
   };
 
   CollectionReference<Map<String, Object?>> get _users =>

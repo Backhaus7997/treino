@@ -157,6 +157,14 @@
         { "fieldPath": "privacy", "order": "ASCENDING" },
         { "fieldPath": "authorGymId", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "reviews",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "trainerId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []
