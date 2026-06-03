@@ -44,6 +44,7 @@ class UserRepository {
     'trainerLatitude', // DEPRECATED
     'trainerLongitude', // DEPRECATED
     'trainerMonthlyRate',
+    'paymentAlias',
     // Multi-location (Fase 6 Etapa 0)
     'trainerLocations',
     'trainerGeohashes',
@@ -151,6 +152,9 @@ class UserRepository {
     }
     if (partial.containsKey('trainerMonthlyRate')) {
       result['trainerMonthlyRate'] = partial['trainerMonthlyRate'];
+    }
+    if (partial.containsKey('paymentAlias')) {
+      result['paymentAlias'] = partial['paymentAlias'];
     }
     // ── Multi-location (Fase 6 Etapa 0) ──────────────────────────────────
     if (partial.containsKey('trainerLocations')) {

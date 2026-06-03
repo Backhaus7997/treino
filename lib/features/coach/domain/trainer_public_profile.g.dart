@@ -19,6 +19,7 @@ _$TrainerPublicProfileImpl _$$TrainerPublicProfileImplFromJson(
       trainerLatitude: (json['trainerLatitude'] as num?)?.toDouble(),
       trainerLongitude: (json['trainerLongitude'] as num?)?.toDouble(),
       trainerMonthlyRate: (json['trainerMonthlyRate'] as num?)?.toInt(),
+      paymentAlias: json['paymentAlias'] as String?,
       trainerLocations: (json['trainerLocations'] as List<dynamic>?)
               ?.map((e) => TrainerLocation.fromJson(e as Map<String, dynamic>))
               .toList() ??
@@ -45,6 +46,7 @@ Map<String, dynamic> _$$TrainerPublicProfileImplToJson(
       'trainerLatitude': instance.trainerLatitude,
       'trainerLongitude': instance.trainerLongitude,
       'trainerMonthlyRate': instance.trainerMonthlyRate,
+      'paymentAlias': instance.paymentAlias,
       'trainerLocations':
           instance.trainerLocations.map((e) => e.toJson()).toList(),
       'trainerGeohashes': instance.trainerGeohashes,

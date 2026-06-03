@@ -41,6 +41,7 @@ class UserProfile with _$UserProfile {
     String? trainerBio,
     String? trainerSpecialty,
     int? trainerMonthlyRate,
+    String? paymentAlias,
 
     // ── Multi-location (Fase 6 Etapa 0) ────────────────────────────────
     //
