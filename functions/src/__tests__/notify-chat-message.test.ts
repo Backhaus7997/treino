@@ -37,20 +37,14 @@ afterAll(async () => {
 const db = () => admin.firestore(testApp);
 
 /** Minimal mock messaging that tracks sendEachForMulticast calls. */
-function makeMockMessaging(successCount = 1) {
-  const calls: admin.messaging.MulticastMessage[] = [];
-  const mock = {
-    sendEachForMulticast: jest.fn(async (msg: admin.messaging.MulticastMessage) => {
-      calls.push(msg);
-      return {
-        successCount,
-        failureCount: 0,
-        responses: msg.tokens.map(() => ({ success: true, messageId: "id" })),
-      };
-    }),
-    _calls: calls,
-  };
-  return mock;
+function makeMockMessaging(): admin.messaging.Messaging {
+  return {
+    sendEachForMulticast: jest.fn(async (msg: admin.messaging.MulticastMessage) => ({
+      successCount: msg.tokens.length,
+      failureCount: 0,
+      responses: msg.tokens.map(() => ({ success: true, messageId: "id" })),
+    })),
+  } as unknown as admin.messaging.Messaging;
 }
 
 async function seedUser(uid: string, fcmTokens: string[]): Promise<void> {
@@ -97,31 +91,31 @@ describe("SCENARIO-629 + SCENARIO-680: new message → sendFcm called with recip
   });
 
   it("calls sendFcm with uids = [trainerUid] when sender is athleteUid (SCENARIO-629)", async () => {
-    const mock = makeMockMessaging(1);
+    const mock = makeMockMessaging();
     const messageData = {
       senderId: athleteUid,
       text: "Hola entrenador!",
       createdAt: admin.firestore.Timestamp.now(),
     };
 
-    await notifyOnChatMessageHandler(testApp, chatId, messageData, mock as any);
+    await notifyOnChatMessageHandler(testApp, chatId, messageData, mock);
 
-    expect(mock.sendEachForMulticast).toHaveBeenCalledTimes(1);
-    const callArg = mock.sendEachForMulticast.mock.calls[0][0] as admin.messaging.MulticastMessage;
+    expect(mock.sendEachForMulticast as jest.Mock).toHaveBeenCalledTimes(1);
+    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as admin.messaging.MulticastMessage;
     expect(callArg.tokens).toEqual(["trainer-token"]);
   });
 
   it("does NOT include the sender's uid in recipients (SCENARIO-680)", async () => {
-    const mock = makeMockMessaging(1);
+    const mock = makeMockMessaging();
     const messageData = {
       senderId: athleteUid,
       text: "Mensaje de prueba",
       createdAt: admin.firestore.Timestamp.now(),
     };
 
-    await notifyOnChatMessageHandler(testApp, chatId, messageData, mock as any);
+    await notifyOnChatMessageHandler(testApp, chatId, messageData, mock);
 
-    const callArg = mock.sendEachForMulticast.mock.calls[0][0] as admin.messaging.MulticastMessage;
+    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as admin.messaging.MulticastMessage;
     // athlete-token should NOT be in the token list
     expect(callArg.tokens).not.toContain("athlete-token");
   });
@@ -148,7 +142,7 @@ describe("SCENARIO-630 + SCENARIO-666: body truncation at 100 chars, total ≤ 2
   });
 
   it("truncates message text at 100 chars with ellipsis (SCENARIO-630)", async () => {
-    const mock = makeMockMessaging(1);
+    const mock = makeMockMessaging();
     const longText = "A".repeat(150); // 150 chars — must be truncated
     const messageData = {
       senderId: senderUid,
@@ -156,9 +150,9 @@ describe("SCENARIO-630 + SCENARIO-666: body truncation at 100 chars, total ≤ 2
       createdAt: admin.firestore.Timestamp.now(),
     };
 
-    await notifyOnChatMessageHandler(testApp, chatId, messageData, mock as any);
+    await notifyOnChatMessageHandler(testApp, chatId, messageData, mock);
 
-    const callArg = mock.sendEachForMulticast.mock.calls[0][0] as admin.messaging.MulticastMessage;
+    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as admin.messaging.MulticastMessage;
     const body = callArg.notification?.body ?? "";
     // Extract the text portion after "Sender Name: "
     const textPart = body.replace(/^[^:]+: /, "");
@@ -167,7 +161,7 @@ describe("SCENARIO-630 + SCENARIO-666: body truncation at 100 chars, total ≤ 2
   });
 
   it("total body length is ≤ 256 chars (SCENARIO-666)", async () => {
-    const mock = makeMockMessaging(1);
+    const mock = makeMockMessaging();
     const longText = "B".repeat(200);
     const messageData = {
       senderId: senderUid,
@@ -175,9 +169,9 @@ describe("SCENARIO-630 + SCENARIO-666: body truncation at 100 chars, total ≤ 2
       createdAt: admin.firestore.Timestamp.now(),
     };
 
-    await notifyOnChatMessageHandler(testApp, chatId, messageData, mock as any);
+    await notifyOnChatMessageHandler(testApp, chatId, messageData, mock);
 
-    const callArg = mock.sendEachForMulticast.mock.calls[0][0] as admin.messaging.MulticastMessage;
+    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as admin.messaging.MulticastMessage;
     const body = callArg.notification?.body ?? "";
     expect(body.length).toBeLessThanOrEqual(256);
   });
@@ -204,16 +198,16 @@ describe("SCENARIO-631: data.deepLink == /coach/chat/{chatId}?other={senderUid}"
   });
 
   it("sets data.deepLink to /coach/chat/{chatId}?other={senderUid}", async () => {
-    const mock = makeMockMessaging(1);
+    const mock = makeMockMessaging();
     const messageData = {
       senderId: senderUid,
       text: "Mensaje con deeplink",
       createdAt: admin.firestore.Timestamp.now(),
     };
 
-    await notifyOnChatMessageHandler(testApp, chatId, messageData, mock as any);
+    await notifyOnChatMessageHandler(testApp, chatId, messageData, mock);
 
-    const callArg = mock.sendEachForMulticast.mock.calls[0][0] as admin.messaging.MulticastMessage;
+    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as admin.messaging.MulticastMessage;
     expect(callArg.data?.deepLink).toBe(
       `/coach/chat/${chatId}?other=${senderUid}`,
     );
@@ -239,15 +233,15 @@ describe("no-op: message in chat where sender is the only member", () => {
   });
 
   it("does not call sendEachForMulticast when no other members", async () => {
-    const mock = makeMockMessaging(0);
+    const mock = makeMockMessaging();
     const messageData = {
       senderId: senderUid,
       text: "Hola?",
       createdAt: admin.firestore.Timestamp.now(),
     };
 
-    await notifyOnChatMessageHandler(testApp, chatId, messageData, mock as any);
+    await notifyOnChatMessageHandler(testApp, chatId, messageData, mock);
 
-    expect(mock.sendEachForMulticast).not.toHaveBeenCalled();
+    expect(mock.sendEachForMulticast as jest.Mock).not.toHaveBeenCalled();
   });
 });

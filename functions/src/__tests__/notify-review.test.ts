@@ -33,15 +33,14 @@ afterAll(async () => {
 
 const db = () => admin.firestore(testApp);
 
-function makeMockMessaging() {
-  const mock = {
+function makeMockMessaging(): admin.messaging.Messaging {
+  return {
     sendEachForMulticast: jest.fn(async (msg: admin.messaging.MulticastMessage) => ({
       successCount: msg.tokens.length,
       failureCount: 0,
       responses: msg.tokens.map(() => ({ success: true, messageId: "id" })),
     })),
-  };
-  return mock;
+  } as unknown as admin.messaging.Messaging;
 }
 
 async function seedUser(uid: string, fcmTokens: string[]): Promise<void> {
@@ -83,10 +82,10 @@ describe("SCENARIO-642: new review → sendFcm called with trainerId, correct bo
       createdAt: admin.firestore.Timestamp.now(),
     };
 
-    await notifyOnReviewHandler(testApp, reviewData, mock as any);
+    await notifyOnReviewHandler(testApp, reviewData, mock);
 
-    expect(mock.sendEachForMulticast).toHaveBeenCalledTimes(1);
-    const callArg = mock.sendEachForMulticast.mock.calls[0][0] as admin.messaging.MulticastMessage;
+    expect(mock.sendEachForMulticast as jest.Mock).toHaveBeenCalledTimes(1);
+    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as admin.messaging.MulticastMessage;
     expect(callArg.tokens).toContain("trainer-token-642");
     expect(callArg.tokens).not.toContain("athlete-token-642");
   });
@@ -100,9 +99,9 @@ describe("SCENARIO-642: new review → sendFcm called with trainerId, correct bo
       createdAt: admin.firestore.Timestamp.now(),
     };
 
-    await notifyOnReviewHandler(testApp, reviewData, mock as any);
+    await notifyOnReviewHandler(testApp, reviewData, mock);
 
-    const callArg = mock.sendEachForMulticast.mock.calls[0][0] as admin.messaging.MulticastMessage;
+    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as admin.messaging.MulticastMessage;
     expect(callArg.notification?.body).toBe("Juan dejó una reseña de 5⭐");
   });
 
@@ -115,9 +114,9 @@ describe("SCENARIO-642: new review → sendFcm called with trainerId, correct bo
       createdAt: admin.firestore.Timestamp.now(),
     };
 
-    await notifyOnReviewHandler(testApp, reviewData, mock as any);
+    await notifyOnReviewHandler(testApp, reviewData, mock);
 
-    const callArg = mock.sendEachForMulticast.mock.calls[0][0] as admin.messaging.MulticastMessage;
+    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as admin.messaging.MulticastMessage;
     expect(callArg.data?.deepLink).toBe(`/coach/trainer/${trainerId}`);
   });
 
@@ -133,9 +132,9 @@ describe("SCENARIO-642: new review → sendFcm called with trainerId, correct bo
       createdAt: admin.firestore.Timestamp.now(),
     };
 
-    await notifyOnReviewHandler(testApp, reviewData, mock as any);
+    await notifyOnReviewHandler(testApp, reviewData, mock);
 
-    const callArg = mock.sendEachForMulticast.mock.calls[0][0] as admin.messaging.MulticastMessage;
+    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as admin.messaging.MulticastMessage;
     // Fallback is "Un atleta"
     expect(callArg.notification?.body).toBe("Un atleta dejó una reseña de 4⭐");
     await db().collection("users").doc(noProfileAthleteId).delete().catch(() => undefined);
@@ -167,10 +166,10 @@ describe("SCENARIO-681: trainer with empty fcmTokens → sendFcm silently skips"
     };
 
     await expect(
-      notifyOnReviewHandler(testApp, reviewData, mock as any),
+      notifyOnReviewHandler(testApp, reviewData, mock),
     ).resolves.not.toThrow();
 
     // sendEachForMulticast should not be called (sendFcm skips empty token lists)
-    expect(mock.sendEachForMulticast).not.toHaveBeenCalled();
+    expect(mock.sendEachForMulticast as jest.Mock).not.toHaveBeenCalled();
   });
 });

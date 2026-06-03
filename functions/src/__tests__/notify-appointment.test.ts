@@ -36,15 +36,14 @@ afterAll(async () => {
 
 const db = () => admin.firestore(testApp);
 
-function makeMockMessaging() {
-  const mock = {
+function makeMockMessaging(): admin.messaging.Messaging {
+  return {
     sendEachForMulticast: jest.fn(async (msg: admin.messaging.MulticastMessage) => ({
       successCount: msg.tokens.length,
       failureCount: 0,
       responses: msg.tokens.map(() => ({ success: true, messageId: "id" })),
     })),
-  };
-  return mock;
+  } as unknown as admin.messaging.Messaging;
 }
 
 async function seedUser(uid: string, fcmTokens: string[]): Promise<void> {
@@ -80,10 +79,10 @@ describe("SCENARIO-632: new appointment status=requested → notify trainer", ()
       scheduledAt: admin.firestore.Timestamp.now(),
     };
 
-    await notifyOnAppointmentHandler(testApp, undefined, afterData, mock as any);
+    await notifyOnAppointmentHandler(testApp, undefined, afterData, mock);
 
-    expect(mock.sendEachForMulticast).toHaveBeenCalledTimes(1);
-    const callArg = mock.sendEachForMulticast.mock.calls[0][0] as admin.messaging.MulticastMessage;
+    expect(mock.sendEachForMulticast as jest.Mock).toHaveBeenCalledTimes(1);
+    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as admin.messaging.MulticastMessage;
     expect(callArg.tokens).toContain("trainer-token-632");
     expect(callArg.tokens).not.toContain("athlete-token-632");
     expect(callArg.data?.deepLink).toBe("/coach/agenda");
@@ -114,10 +113,10 @@ describe("SCENARIO-633: requested→confirmed → notify athlete", () => {
       scheduledAt: admin.firestore.Timestamp.now(),
     };
 
-    await notifyOnAppointmentHandler(testApp, beforeData, afterData, mock as any);
+    await notifyOnAppointmentHandler(testApp, beforeData, afterData, mock);
 
-    expect(mock.sendEachForMulticast).toHaveBeenCalledTimes(1);
-    const callArg = mock.sendEachForMulticast.mock.calls[0][0] as admin.messaging.MulticastMessage;
+    expect(mock.sendEachForMulticast as jest.Mock).toHaveBeenCalledTimes(1);
+    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as admin.messaging.MulticastMessage;
     expect(callArg.tokens).toContain("athlete-token-633");
     expect(callArg.tokens).not.toContain("trainer-token-633");
     expect(callArg.data?.deepLink).toBe("/coach?tab=agenda");
@@ -149,10 +148,10 @@ describe("SCENARIO-634: confirmed→cancelled, no cancelledBy → notify both pa
       // no cancelledBy field
     };
 
-    await notifyOnAppointmentHandler(testApp, beforeData, afterData, mock as any);
+    await notifyOnAppointmentHandler(testApp, beforeData, afterData, mock);
 
-    expect(mock.sendEachForMulticast).toHaveBeenCalledTimes(1);
-    const callArg = mock.sendEachForMulticast.mock.calls[0][0] as admin.messaging.MulticastMessage;
+    expect(mock.sendEachForMulticast as jest.Mock).toHaveBeenCalledTimes(1);
+    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as admin.messaging.MulticastMessage;
     expect(callArg.tokens).toContain("trainer-token-634");
     expect(callArg.tokens).toContain("athlete-token-634");
   });
@@ -183,9 +182,9 @@ describe("SCENARIO-635: reason=athlete-account-deleted → sendFcm NOT called", 
       scheduledAt: admin.firestore.Timestamp.now(),
     };
 
-    await notifyOnAppointmentHandler(testApp, beforeData, afterData, mock as any);
+    await notifyOnAppointmentHandler(testApp, beforeData, afterData, mock);
 
-    expect(mock.sendEachForMulticast).not.toHaveBeenCalled();
+    expect(mock.sendEachForMulticast as jest.Mock).not.toHaveBeenCalled();
   });
 
   it("resolves without error", async () => {
@@ -197,7 +196,7 @@ describe("SCENARIO-635: reason=athlete-account-deleted → sendFcm NOT called", 
       reason: "athlete-account-deleted",
     };
     await expect(
-      notifyOnAppointmentHandler(testApp, undefined, afterData, mock as any),
+      notifyOnAppointmentHandler(testApp, undefined, afterData, mock),
     ).resolves.not.toThrow();
   });
 });
@@ -226,9 +225,9 @@ describe("SCENARIO-636: before.status === after.status → skip (no-op write)", 
       scheduledAt: admin.firestore.Timestamp.now(),
     };
 
-    await notifyOnAppointmentHandler(testApp, beforeData, afterData, mock as any);
+    await notifyOnAppointmentHandler(testApp, beforeData, afterData, mock);
 
-    expect(mock.sendEachForMulticast).not.toHaveBeenCalled();
+    expect(mock.sendEachForMulticast as jest.Mock).not.toHaveBeenCalled();
   });
 });
 
@@ -239,8 +238,8 @@ describe("no-op: after document missing (delete event)", () => {
   it("resolves cleanly without calling sendFcm", async () => {
     const mock = makeMockMessaging();
     await expect(
-      notifyOnAppointmentHandler(testApp, undefined, undefined, mock as any),
+      notifyOnAppointmentHandler(testApp, undefined, undefined, mock),
     ).resolves.not.toThrow();
-    expect(mock.sendEachForMulticast).not.toHaveBeenCalled();
+    expect(mock.sendEachForMulticast as jest.Mock).not.toHaveBeenCalled();
   });
 });

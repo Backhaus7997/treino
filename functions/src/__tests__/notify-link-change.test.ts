@@ -36,15 +36,14 @@ afterAll(async () => {
 
 const db = () => admin.firestore(testApp);
 
-function makeMockMessaging() {
-  const mock = {
+function makeMockMessaging(): admin.messaging.Messaging {
+  return {
     sendEachForMulticast: jest.fn(async (msg: admin.messaging.MulticastMessage) => ({
       successCount: msg.tokens.length,
       failureCount: 0,
       responses: msg.tokens.map(() => ({ success: true, messageId: "id" })),
     })),
-  };
-  return mock;
+  } as unknown as admin.messaging.Messaging;
 }
 
 async function seedUser(uid: string, fcmTokens: string[]): Promise<void> {
@@ -75,10 +74,10 @@ describe("SCENARIO-637: new link status=pending → notify trainer", () => {
     const mock = makeMockMessaging();
     const afterData = { trainerId, athleteId, status: "pending" };
 
-    await notifyOnLinkChangeHandler(testApp, undefined, afterData, mock as any);
+    await notifyOnLinkChangeHandler(testApp, undefined, afterData, mock);
 
-    expect(mock.sendEachForMulticast).toHaveBeenCalledTimes(1);
-    const callArg = mock.sendEachForMulticast.mock.calls[0][0] as admin.messaging.MulticastMessage;
+    expect(mock.sendEachForMulticast as jest.Mock).toHaveBeenCalledTimes(1);
+    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as admin.messaging.MulticastMessage;
     expect(callArg.tokens).toContain("trainer-token-637");
     expect(callArg.tokens).not.toContain("athlete-token-637");
     expect(callArg.data?.deepLink).toBe("/coach");
@@ -104,10 +103,10 @@ describe("SCENARIO-638: pending→active → notify athlete", () => {
     const beforeData = { trainerId, athleteId, status: "pending" };
     const afterData = { trainerId, athleteId, status: "active" };
 
-    await notifyOnLinkChangeHandler(testApp, beforeData, afterData, mock as any);
+    await notifyOnLinkChangeHandler(testApp, beforeData, afterData, mock);
 
-    expect(mock.sendEachForMulticast).toHaveBeenCalledTimes(1);
-    const callArg = mock.sendEachForMulticast.mock.calls[0][0] as admin.messaging.MulticastMessage;
+    expect(mock.sendEachForMulticast as jest.Mock).toHaveBeenCalledTimes(1);
+    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as admin.messaging.MulticastMessage;
     expect(callArg.tokens).toContain("athlete-token-638");
     expect(callArg.tokens).not.toContain("trainer-token-638");
     expect(callArg.data?.deepLink).toBe("/coach");
@@ -138,10 +137,10 @@ describe("SCENARIO-639: active→terminated, no reason → notify BOTH parties",
       // no reason field
     };
 
-    await notifyOnLinkChangeHandler(testApp, beforeData, afterData, mock as any);
+    await notifyOnLinkChangeHandler(testApp, beforeData, afterData, mock);
 
-    expect(mock.sendEachForMulticast).toHaveBeenCalledTimes(1);
-    const callArg = mock.sendEachForMulticast.mock.calls[0][0] as admin.messaging.MulticastMessage;
+    expect(mock.sendEachForMulticast as jest.Mock).toHaveBeenCalledTimes(1);
+    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as admin.messaging.MulticastMessage;
     expect(callArg.tokens).toContain("trainer-token-639");
     expect(callArg.tokens).toContain("athlete-token-639");
     expect(callArg.data?.deepLink).toBe("/coach");
@@ -172,9 +171,9 @@ describe("SCENARIO-640: reason=account-deleted → sendFcm NOT called", () => {
       reason: "account-deleted",
     };
 
-    await notifyOnLinkChangeHandler(testApp, beforeData, afterData, mock as any);
+    await notifyOnLinkChangeHandler(testApp, beforeData, afterData, mock);
 
-    expect(mock.sendEachForMulticast).not.toHaveBeenCalled();
+    expect(mock.sendEachForMulticast as jest.Mock).not.toHaveBeenCalled();
   });
 
   it("resolves without error", async () => {
@@ -186,7 +185,7 @@ describe("SCENARIO-640: reason=account-deleted → sendFcm NOT called", () => {
       reason: "account-deleted",
     };
     await expect(
-      notifyOnLinkChangeHandler(testApp, undefined, afterData, mock as any),
+      notifyOnLinkChangeHandler(testApp, undefined, afterData, mock),
     ).resolves.not.toThrow();
   });
 });
@@ -210,9 +209,9 @@ describe("SCENARIO-641: before.status === after.status → skip (no-op write)", 
     const beforeData = { trainerId, athleteId, status: "pending" };
     const afterData = { trainerId, athleteId, status: "pending" };
 
-    await notifyOnLinkChangeHandler(testApp, beforeData, afterData, mock as any);
+    await notifyOnLinkChangeHandler(testApp, beforeData, afterData, mock);
 
-    expect(mock.sendEachForMulticast).not.toHaveBeenCalled();
+    expect(mock.sendEachForMulticast as jest.Mock).not.toHaveBeenCalled();
   });
 });
 
@@ -223,8 +222,8 @@ describe("no-op: after document missing (delete event)", () => {
   it("resolves cleanly without calling sendFcm", async () => {
     const mock = makeMockMessaging();
     await expect(
-      notifyOnLinkChangeHandler(testApp, undefined, undefined, mock as any),
+      notifyOnLinkChangeHandler(testApp, undefined, undefined, mock),
     ).resolves.not.toThrow();
-    expect(mock.sendEachForMulticast).not.toHaveBeenCalled();
+    expect(mock.sendEachForMulticast as jest.Mock).not.toHaveBeenCalled();
   });
 });
