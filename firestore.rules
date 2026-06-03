@@ -470,6 +470,35 @@ service cloud.firestore {
                     && resource.data.recordedBy == request.auth.uid;
     }
 
+    // Per-athlete billing config set by the trainer (Pagos P1).
+    // Doc id is deterministic: `${trainerId}_${athleteId}`.
+    match /athlete_billing/{docId} {
+      allow read: if request.auth != null
+                  && (request.auth.uid == resource.data.trainerId
+                      || request.auth.uid == resource.data.athleteId);
+      allow create, update: if request.auth != null
+                  && request.resource.data.trainerId == request.auth.uid
+                  && request.resource.data.athleteId is string
+                  && request.resource.data.athleteId.size() > 0;
+      allow delete: if request.auth != null && resource.data.trainerId == request.auth.uid;
+    }
+
+    // Payment records created by trainers against athletes (Pagos P1).
+    match /payments/{paymentId} {
+      allow read: if request.auth != null
+                  && (request.auth.uid == resource.data.trainerId
+                      || request.auth.uid == resource.data.athleteId);
+      allow create: if request.auth != null
+                  && request.resource.data.trainerId == request.auth.uid
+                  && request.resource.data.athleteId is string
+                  && request.resource.data.athleteId.size() > 0;
+      allow update: if request.auth != null
+                  && resource.data.trainerId == request.auth.uid
+                  && request.resource.data.trainerId == resource.data.trainerId
+                  && request.resource.data.athleteId == resource.data.athleteId;
+      allow delete: if request.auth != null && resource.data.trainerId == request.auth.uid;
+    }
+
     // Athlete → trainer reviews (Fase 6 Etapa 7).
     // Doc id is deterministic: `${linkId}_${athleteId}`.
     // REQ-RV-DATA-007. SCENARIO-580..585.
