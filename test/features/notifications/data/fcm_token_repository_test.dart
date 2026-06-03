@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart' show FieldValue;
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/features/notifications/data/fcm_token_repository.dart';
@@ -30,8 +29,7 @@ void main() {
 
         await repo.saveToken(uid, 'tok-1');
 
-        final snap =
-            await firestore.collection('users').doc(uid).get();
+        final snap = await firestore.collection('users').doc(uid).get();
         final tokens = List<String>.from(
           (snap.data()?['fcmTokens'] as List?) ?? [],
         );
@@ -48,8 +46,7 @@ void main() {
 
         await repo.saveToken(uid, 'tok-1');
 
-        final snap =
-            await firestore.collection('users').doc(uid).get();
+        final snap = await firestore.collection('users').doc(uid).get();
         final tokens = List<String>.from(
           (snap.data()?['fcmTokens'] as List?) ?? [],
         );
@@ -66,8 +63,7 @@ void main() {
 
         await repo.saveToken(uid, 'tok-tablet');
 
-        final snap =
-            await firestore.collection('users').doc(uid).get();
+        final snap = await firestore.collection('users').doc(uid).get();
         final tokens = List<String>.from(
           (snap.data()?['fcmTokens'] as List?) ?? [],
         );
@@ -85,8 +81,7 @@ void main() {
 
         await repo.removeToken(uid, 'tok-1');
 
-        final snap =
-            await firestore.collection('users').doc(uid).get();
+        final snap = await firestore.collection('users').doc(uid).get();
         final tokens = List<String>.from(
           (snap.data()?['fcmTokens'] as List?) ?? [],
         );
@@ -107,8 +102,7 @@ void main() {
         );
         await repo.removeToken(uid, 'tok-999');
 
-        final snap =
-            await firestore.collection('users').doc(uid).get();
+        final snap = await firestore.collection('users').doc(uid).get();
         final tokens = List<String>.from(
           (snap.data()?['fcmTokens'] as List?) ?? [],
         );
@@ -127,8 +121,7 @@ void main() {
         await repo.saveToken(uid, 'tok-a');
         await repo.saveToken(uid, 'tok-b');
 
-        final snap =
-            await firestore.collection('users').doc(uid).get();
+        final snap = await firestore.collection('users').doc(uid).get();
         final tokens = List<String>.from(
           (snap.data()?['fcmTokens'] as List?) ?? [],
         );
@@ -146,8 +139,7 @@ void main() {
 
         await repo.removeToken(uid, 'tok-remove');
 
-        final snap =
-            await firestore.collection('users').doc(uid).get();
+        final snap = await firestore.collection('users').doc(uid).get();
         final tokens = List<String>.from(
           (snap.data()?['fcmTokens'] as List?) ?? [],
         );

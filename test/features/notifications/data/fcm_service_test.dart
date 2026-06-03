@@ -158,8 +158,7 @@ void main() {
       'SCENARIO-649: removeToken throws → error swallowed, no propagation',
       () async {
         const uid = 'user-649';
-        when(() => messaging.getToken())
-            .thenAnswer((_) async => 'tok-current');
+        when(() => messaging.getToken()).thenAnswer((_) async => 'tok-current');
         when(() => messaging.onTokenRefresh)
             .thenAnswer((_) => const Stream.empty());
         when(() => repo.removeToken(any(), any()))
