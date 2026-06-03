@@ -193,6 +193,39 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
     });
   }
 
+  /// Opens the picker and adds the picked exercise(s) into the existing
+  /// superset [groupId] of [dayIndex], inserted right after that group's last
+  /// slot so the superset stays a consecutive run.
+  Future<void> _addExerciseToGroup(
+      BuildContext context, int dayIndex, int groupId) async {
+    final day = _days[dayIndex];
+    final existingIds = day.slots
+        .where((s) => s.exercise != null)
+        .map((s) => s.exercise!.id)
+        .toSet();
+    final picked = await showExercisePicker(context);
+    if (picked == null || picked.isEmpty || !mounted) return;
+    setState(() {
+      final newOnes = picked.where((e) => !existingIds.contains(e.id)).toList();
+      if (newOnes.isEmpty) return;
+      final newSlots = newOnes
+          .map((ex) => _EditableSlot()
+            ..exercise = ex
+            ..restSeconds = ex.defaultRestSeconds ?? 60
+            ..supersetGroup = groupId)
+          .toList();
+      // Insert right after the group's last slot to keep it consecutive.
+      var insertAt = day.slots.length;
+      for (var i = day.slots.length - 1; i >= 0; i--) {
+        if (day.slots[i].supersetGroup == groupId) {
+          insertAt = i + 1;
+          break;
+        }
+      }
+      day.slots = [...day.slots]..insertAll(insertAt, newSlots);
+    });
+  }
+
   Future<void> _submit(WidgetRef ref) async {
     if (!_isValid || _submitting) return;
 
@@ -496,6 +529,7 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
                       onRemoveDay:
                           _days.length > 1 ? () => _removeDay(di) : null,
                       onSlotChanged: () => setState(() {}),
+                      onAddToGroup: (g) => _addExerciseToGroup(context, di, g),
                       allowSuperset: _isTrainerMode,
                       onAddSuperset: _isTrainerMode
                           ? () => _addSupersetForDay(context, di)
@@ -599,6 +633,7 @@ class _DayExpansionTile extends StatefulWidget {
     required this.onRemoveSlot,
     required this.onRemoveDay,
     required this.onSlotChanged,
+    required this.onAddToGroup,
     this.allowSuperset = false,
     this.onAddSuperset,
   });
@@ -611,6 +646,7 @@ class _DayExpansionTile extends StatefulWidget {
   final VoidCallback onSlotChanged;
   final bool allowSuperset;
   final VoidCallback? onAddSuperset;
+  final void Function(int groupId) onAddToGroup;
 
   @override
   State<_DayExpansionTile> createState() => _DayExpansionTileState();
@@ -642,6 +678,7 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
           palette: palette,
           onRemoveSlot: widget.onRemoveSlot,
           onChanged: widget.onSlotChanged,
+          onAddExercise: () => widget.onAddToGroup(group),
         ));
         rows.add(const SizedBox(height: 8));
         si = scan;
@@ -781,12 +818,14 @@ class _SupersetGroupCard extends StatelessWidget {
     required this.palette,
     required this.onRemoveSlot,
     required this.onChanged,
+    required this.onAddExercise,
   });
 
   final List<({int index, _EditableSlot slot})> groupSlots;
   final AppPalette palette;
   final void Function(int slotIndex) onRemoveSlot;
   final VoidCallback onChanged;
+  final VoidCallback onAddExercise;
 
   @override
   Widget build(BuildContext context) {
@@ -828,6 +867,28 @@ class _SupersetGroupCard extends StatelessWidget {
             ),
             if (entry != groupSlots.last) const SizedBox(height: 6),
           ],
+          const SizedBox(height: 4),
+          // Add another exercise into THIS superset block.
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: onAddExercise,
+              icon: Icon(TreinoIcon.plus, size: 14, color: palette.highlight),
+              label: Text(
+                'Agregar ejercicio',
+                style: GoogleFonts.barlowCondensed(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                  color: palette.highlight,
+                ),
+              ),
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+            ),
+          ),
         ],
       ),
     );
