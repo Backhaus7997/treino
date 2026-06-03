@@ -85,6 +85,109 @@ class AppointmentRepository {
     });
   }
 
+  // ─── createByTrainer ────────────────────────────────────────────────────────
+  //
+  // Trainer-driven scheduling (new model 2026-06-03): the trainer registers a
+  // session directly. Uses a Firestore AUTO-ID — NOT the deterministic
+  // `{trainerId}_{startsAtMs}` slot id — so the same time can hold more than one
+  // athlete (overlapping sessions are allowed by design). No race transaction:
+  // there is no contention, the trainer owns the schedule.
+
+  Future<Appointment> createByTrainer({
+    required String trainerId,
+    required String athleteId,
+    required String athleteDisplayName,
+    required DateTime startsAt,
+    required int durationMin,
+    String? noteBefore,
+  }) async {
+    // Minute precision, wall-clock UTC (ADR-7 convention — no toLocal()).
+    final normalized = DateTime.utc(
+      startsAt.year,
+      startsAt.month,
+      startsAt.day,
+      startsAt.hour,
+      startsAt.minute,
+    );
+    final docRef = _appointments.doc(); // auto-id
+    final trimmedNote = noteBefore?.trim();
+    final appt = Appointment(
+      id: docRef.id,
+      trainerId: trainerId,
+      athleteId: athleteId,
+      athleteDisplayName: athleteDisplayName,
+      startsAt: normalized,
+      durationMin: durationMin,
+      status: AppointmentStatus.confirmed,
+      noteBefore:
+          (trimmedNote == null || trimmedNote.isEmpty) ? null : trimmedNote,
+    );
+    await docRef.set(appt.toJson());
+    return appt;
+  }
+
+  // ─── createRecurringByTrainer ─────────────────────────────────────────────────
+  //
+  // Materializes one session per matching weekday within [fromDate]..[untilDate]
+  // (inclusive, date-level), all at [startHour]:[startMinute] for [durationMin].
+  // Occurrences in the past (before "now", wall-clock) are skipped. Each session
+  // gets an auto-id; the whole set is written in a single WriteBatch. Returns how
+  // many sessions were created.
+
+  Future<int> createRecurringByTrainer({
+    required String trainerId,
+    required String athleteId,
+    required String athleteDisplayName,
+    required Set<int> weekdays, // DateTime.weekday: 1=Mon .. 7=Sun
+    required int startHour,
+    required int startMinute,
+    required int durationMin,
+    required DateTime fromDate,
+    required DateTime untilDate,
+    String? noteBefore,
+  }) async {
+    final now = DateTime.now();
+    final nowWall =
+        DateTime.utc(now.year, now.month, now.day, now.hour, now.minute);
+    final trimmedNote = noteBefore?.trim();
+    final note =
+        (trimmedNote == null || trimmedNote.isEmpty) ? null : trimmedNote;
+
+    final batch = _firestore.batch();
+    var count = 0;
+
+    var cursor = DateTime.utc(fromDate.year, fromDate.month, fromDate.day);
+    final end = DateTime.utc(untilDate.year, untilDate.month, untilDate.day);
+
+    while (!cursor.isAfter(end)) {
+      if (weekdays.contains(cursor.weekday)) {
+        final startsAt = DateTime.utc(
+            cursor.year, cursor.month, cursor.day, startHour, startMinute);
+        if (startsAt.isAfter(nowWall)) {
+          final docRef = _appointments.doc(); // auto-id
+          final appt = Appointment(
+            id: docRef.id,
+            trainerId: trainerId,
+            athleteId: athleteId,
+            athleteDisplayName: athleteDisplayName,
+            startsAt: startsAt,
+            durationMin: durationMin,
+            status: AppointmentStatus.confirmed,
+            noteBefore: note,
+          );
+          batch.set(docRef, appt.toJson());
+          count++;
+        }
+      }
+      cursor = cursor.add(const Duration(days: 1));
+    }
+
+    if (count > 0) {
+      await batch.commit();
+    }
+    return count;
+  }
+
   // ─── cancel ───────────────────────────────────────────────────────────────
   //
   // REQ-007: cancellation must be >24h before startsAt.
@@ -114,6 +217,22 @@ class AppointmentRepository {
       'cancelledAt': FieldValue.serverTimestamp(),
       'cancelledBy': actorUid,
       'cancellationLog': FieldValue.arrayUnion([logEntry]),
+    });
+  }
+
+  // ─── updateNotes ──────────────────────────────────────────────────────────
+
+  /// Trainer-only: update the coaching notes on an appointment. Other fields
+  /// stay untouched (Firestore rules enforce status/athleteId/trainerId/startsAt
+  /// immutability for this path).
+  Future<void> updateNotes({
+    required String appointmentId,
+    String? noteBefore,
+    String? noteAfter,
+  }) async {
+    await _appointments.doc(appointmentId).update({
+      'noteBefore': noteBefore,
+      'noteAfter': noteAfter,
     });
   }
 

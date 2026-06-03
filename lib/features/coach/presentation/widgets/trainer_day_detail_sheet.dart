@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -9,11 +8,11 @@ import '../../../../app/theme/app_palette.dart';
 import '../../../profile/application/user_providers.dart'
     show firestoreProvider;
 import '../../application/agenda_providers.dart';
-import '../../domain/agenda_exceptions.dart';
 import '../../domain/appointment.dart';
 import '../../domain/availability_override.dart';
 import '../../domain/compute_free_slots.dart';
 import '../agenda_strings.dart';
+import 'session_detail_sheet.dart';
 
 /// Slot state from the trainer's perspective.
 enum _SlotState { free, booked, blocked }
@@ -148,6 +147,7 @@ class TrainerDayDetailSheet extends ConsumerWidget {
         entries: slotEntries,
         trainerId: trainerId,
         palette: palette,
+        now: DateTime.now().toUtc(),
       ),
     );
   }
@@ -246,31 +246,46 @@ class _SlotList extends StatelessWidget {
     required this.entries,
     required this.trainerId,
     required this.palette,
+    required this.now,
   });
 
   final List<_SlotEntry> entries;
   final String trainerId;
   final AppPalette palette;
 
+  /// Reference instant for the past/upcoming distinction (UTC).
+  final DateTime now;
+
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
+    // Fixed 3-column grid so every slot lines up in even columns regardless
+    // of free (one line) vs booked (time + name). Shrink-wrapped — the sheet
+    // sizes to content.
+    return GridView.count(
+      crossAxisCount: 3,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      mainAxisSpacing: 8,
+      crossAxisSpacing: 8,
+      childAspectRatio: 1.8,
       children: entries.map((entry) => _buildChip(context, entry)).toList(),
     );
   }
 
   Widget _buildChip(BuildContext context, _SlotEntry entry) {
     final timeLabel = AgendaStrings.formatTime(entry.time);
+    // "Past" = the slot's start time is at or before now. Whole past days fall
+    // out of this naturally (every slot that day is before now).
+    final isPast = !entry.time.isAfter(now);
 
     switch (entry.state) {
       case _SlotState.free:
         return _SlotChip(
           label: timeLabel,
-          color: const Color(0xFF2CE5A2), // mint green
-          backgroundColor: const Color(0xFF2CE5A2).withAlpha(30),
-          borderColor: const Color(0xFF2CE5A2),
+          color: isPast ? palette.textMuted : palette.accent,
+          backgroundColor:
+              isPast ? palette.bgCard : palette.accent.withAlpha(30),
+          borderColor: isPast ? palette.border : palette.accent,
         );
 
       case _SlotState.booked:
@@ -281,6 +296,10 @@ class _SlotList extends StatelessWidget {
           appointment: appt,
           trainerId: trainerId,
           palette: palette,
+          // On-brand: reserved = magenta (highlight). Past = muted gray, but
+          // the name/detail stays visible so the trainer keeps the record.
+          accentColor: isPast ? palette.textMuted : palette.highlight,
+          isPast: isPast,
         );
 
       case _SlotState.blocked:
@@ -312,17 +331,19 @@ class _SlotChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      alignment: Alignment.center,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
         color: backgroundColor,
         border: Border.all(color: borderColor),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(10),
       ),
       child: Text(
         label,
+        textAlign: TextAlign.center,
         style: GoogleFonts.barlowCondensed(
           fontWeight: FontWeight.w600,
-          fontSize: 14,
+          fontSize: 15,
           color: color,
         ),
       ),
@@ -339,6 +360,8 @@ class _BookedSlotChip extends ConsumerStatefulWidget {
     required this.appointment,
     required this.trainerId,
     required this.palette,
+    required this.accentColor,
+    required this.isPast,
   });
 
   final String time;
@@ -346,6 +369,11 @@ class _BookedSlotChip extends ConsumerStatefulWidget {
   final Appointment appointment;
   final String trainerId;
   final AppPalette palette;
+
+  /// Reserved chips are magenta (on-brand `highlight`) when upcoming, muted
+  /// gray when the session has already passed.
+  final Color accentColor;
+  final bool isPast;
 
   @override
   ConsumerState<_BookedSlotChip> createState() => _BookedSlotChipState();
@@ -378,31 +406,43 @@ class _BookedSlotChipState extends ConsumerState<_BookedSlotChip> {
 
   @override
   Widget build(BuildContext context) {
-    final appointment = widget.appointment;
-    final canCancel = appointment.startsAt.difference(DateTime.now().toUtc()) >
-        const Duration(hours: 24);
+    final accent = widget.accentColor;
 
     return GestureDetector(
-      onTap: () => _showActionMenu(context, ref, canCancel),
+      onTap: () => showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: AppPalette.of(context).bgCard,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        builder: (_) => SessionDetailSheet(
+          appointment: widget.appointment,
+          trainerId: widget.trainerId,
+          isPast: widget.isPast,
+        ),
+      ),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        alignment: Alignment.center,
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
         decoration: BoxDecoration(
-          color: Colors.blue.withAlpha(30),
-          border: Border.all(color: Colors.blue),
-          borderRadius: BorderRadius.circular(8),
+          color: widget.isPast ? widget.palette.bgCard : accent.withAlpha(30),
+          border: Border.all(color: accent),
+          borderRadius: BorderRadius.circular(10),
         ),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(
               widget.time,
               style: GoogleFonts.barlowCondensed(
                 fontWeight: FontWeight.w700,
-                fontSize: 14,
-                color: Colors.blue,
+                fontSize: 15,
+                color: accent,
               ),
             ),
+            const SizedBox(height: 2),
             StreamBuilder<DocumentSnapshot<Map<String, Object?>>>(
               stream: _profileStream,
               builder: (ctx, snap) {
@@ -410,9 +450,12 @@ class _BookedSlotChipState extends ConsumerState<_BookedSlotChip> {
                 final name = remoteName ?? widget.athleteName;
                 return Text(
                   name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
                   style: GoogleFonts.barlow(
                     fontSize: 11,
-                    color: Colors.blue.withAlpha(200),
+                    color: accent,
                   ),
                 );
               },
@@ -422,163 +465,4 @@ class _BookedSlotChipState extends ConsumerState<_BookedSlotChip> {
       ),
     );
   }
-
-  Future<void> _showActionMenu(
-    BuildContext context,
-    WidgetRef ref,
-    bool canCancel,
-  ) async {
-    final palette = AppPalette.of(context);
-    final action = await showModalBottomSheet<String>(
-      context: context,
-      backgroundColor: palette.bgCard,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              margin: const EdgeInsets.symmetric(vertical: 12),
-              decoration: BoxDecoration(
-                color: palette.border,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            ListTile(
-              leading: Icon(Icons.person_outline, color: palette.textPrimary),
-              title: Text(
-                'Ver alumno',
-                style: GoogleFonts.barlow(color: palette.textPrimary),
-              ),
-              onTap: () => Navigator.of(ctx).pop('ver-alumno'),
-            ),
-            if (canCancel)
-              ListTile(
-                leading: Icon(Icons.cancel_outlined, color: palette.highlight),
-                title: Text(
-                  AgendaStrings.cancellationConfirmCta,
-                  style: GoogleFonts.barlow(color: palette.highlight),
-                ),
-                onTap: () => Navigator.of(ctx).pop('cancelar'),
-              )
-            else
-              ListTile(
-                leading: Icon(Icons.cancel_outlined, color: palette.textMuted),
-                title: Text(
-                  'Cancelar reserva (no disponible — menos de 24h)',
-                  style: GoogleFonts.barlow(color: palette.textMuted),
-                ),
-              ),
-            const SizedBox(height: 8),
-          ],
-        ),
-      ),
-    );
-
-    if (!context.mounted) return;
-    if (action == 'cancelar') {
-      await _cancelAppointment(context, ref);
-    } else if (action == 'ver-alumno') {
-      // Close the day-detail sheet first, then push athlete detail.
-      Navigator.of(context).pop();
-      context.push('/coach/athlete/${widget.appointment.athleteId}');
-    }
-  }
-
-  Future<void> _cancelAppointment(BuildContext context, WidgetRef ref) async {
-    final confirmed = await _confirmDialog(
-      context,
-      title: AgendaStrings.cancellationConfirmTitle,
-      body: AgendaStrings.cancellationConfirmBody,
-      confirmLabel: AgendaStrings.cancellationConfirmCta,
-      cancelLabel: AgendaStrings.cancellationKeep,
-    );
-    if (!confirmed || !context.mounted) return;
-
-    try {
-      await ref.read(appointmentRepositoryProvider).cancel(
-            appointment: widget.appointment,
-            actorUid: widget.trainerId,
-            reason: AgendaStrings.bookingCancelledByCoach,
-          );
-      if (!context.mounted) return;
-      Navigator.of(context).pop(); // close detail sheet
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text(AgendaStrings.cancellationSuccess)),
-      );
-    } on CancellationTooLateException {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text(AgendaStrings.cancellationTooLate)),
-      );
-    } catch (_) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text(AgendaStrings.genericError)),
-      );
-    }
-  }
-}
-
-// ── Dialog helper ─────────────────────────────────────────────────────────────
-
-Future<bool> _confirmDialog(
-  BuildContext context, {
-  required String title,
-  required String body,
-  required String confirmLabel,
-  required String cancelLabel,
-}) async {
-  final palette = AppPalette.of(context);
-  final result = await showDialog<bool>(
-    context: context,
-    builder: (ctx) => AlertDialog(
-      backgroundColor: palette.bgCard,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      title: Text(
-        title,
-        style: GoogleFonts.barlowCondensed(
-          fontWeight: FontWeight.w700,
-          fontSize: 18,
-          color: palette.textPrimary,
-        ),
-      ),
-      content: Text(
-        body,
-        style: GoogleFonts.barlow(fontSize: 14, color: palette.textPrimary),
-      ),
-      actions: [
-        OutlinedButton(
-          onPressed: () => Navigator.of(ctx).pop(false),
-          child: Text(
-            cancelLabel,
-            style: GoogleFonts.barlowCondensed(
-              fontWeight: FontWeight.w700,
-              fontSize: 13,
-              color: palette.textPrimary,
-            ),
-          ),
-        ),
-        ElevatedButton(
-          onPressed: () => Navigator.of(ctx).pop(true),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: palette.highlight,
-            foregroundColor: palette.bg,
-          ),
-          child: Text(
-            confirmLabel,
-            style: GoogleFonts.barlowCondensed(
-              fontWeight: FontWeight.w700,
-              fontSize: 13,
-            ),
-          ),
-        ),
-      ],
-    ),
-  );
-  return result ?? false;
 }

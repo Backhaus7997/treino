@@ -10,6 +10,7 @@ import 'package:treino/features/coach/domain/appointment.dart';
 import 'package:treino/features/coach/domain/availability_rule.dart';
 import 'package:treino/features/coach/presentation/agenda_strings.dart';
 import 'package:treino/features/coach/presentation/trainer_agenda_tab.dart';
+import 'package:treino/features/coach/presentation/widgets/day_timeline.dart';
 
 // ── Fakes ─────────────────────────────────────────────────────────────────────
 
@@ -101,10 +102,15 @@ void main() {
     );
   });
 
-  // ── SCENARIO-513: empty state when no rules ────────────────────────────────
-  group('SCENARIO-513 — Empty state when no rules', () {
+  // ── SCENARIO-513: calendar + timeline always shown, even with no rules ───────
+  //
+  // Behavior changed: the inline DayTimeline replaces the old empty-state branch.
+  // Calendar and timeline now always render regardless of whether working-hour
+  // rules are configured. The old "trainerEmptyAvailability" full-screen CTA is
+  // gone; instead a "Configurar" link appears in the header row.
+  group('SCENARIO-513 — Calendar and timeline render even with no rules', () {
     testWidgets(
-      'SCENARIO-513: trainerEmptyAvailability text shown, calendar absent',
+      'SCENARIO-513: calendar and DayTimeline present when no rules configured',
       (tester) async {
         await tester.pumpWidget(
           _wrap(
@@ -134,12 +140,21 @@ void main() {
         );
 
         await tester.pump();
+        // Old full-screen empty-state copy is no longer rendered.
         expect(
           find.text(AgendaStrings.trainerEmptyAvailability),
-          findsOneWidget,
+          findsNothing,
         );
-        expect(find.text(AgendaStrings.configureHoursCta), findsOneWidget);
-        expect(find.byType(TableCalendar<dynamic>), findsNothing);
+        // Calendar is always present (no more rules-empty gating).
+        expect(find.byType(TableCalendar<dynamic>), findsOneWidget);
+        // Inline timeline is present below the calendar.
+        expect(find.byType(DayTimeline), findsOneWidget);
+        // "Mis Horarios de Trabajo" header was removed (trainer-driven model
+        // no longer exposes availability rules).
+        expect(
+          find.text(AgendaStrings.myWorkingHoursHeading),
+          findsNothing,
+        );
       },
     );
   });
@@ -159,23 +174,24 @@ void main() {
 
         await tester.pump();
         expect(find.byType(TableCalendar<dynamic>), findsOneWidget);
-        // "MIS HORARIOS DE TRABAJO" header visible
+        // "Mis Horarios de Trabajo" header was removed (trainer-driven model).
         expect(
           find.text(AgendaStrings.myWorkingHoursHeading),
-          findsOneWidget,
+          findsNothing,
         );
       },
     );
   });
 
-  // ── SCENARIO-515: tap on day → bottom sheet with colored slots ────────────
-  group('SCENARIO-515 — Tap on day shows TrainerDayDetailSheet', () {
+  // ── SCENARIO-515: tap on day → updates DayTimeline inline (no sheet) ────────
+  //
+  // Behavior changed: tapping a calendar day no longer opens a TrainerDayDetailSheet
+  // bottom sheet. Instead, the selected day updates the inline DayTimeline widget.
+  group('SCENARIO-515 — Tap on day updates DayTimeline (no bottom sheet)', () {
     testWidgets(
-      'SCENARIO-515: tapping a calendar day opens the TrainerDayDetailSheet',
+      'SCENARIO-515: DayTimeline is present; tapping a day does not open a sheet',
       (tester) async {
         final rule = _makeRule(dayOfWeek: DateTime.tuesday);
-        // Use a Tuesday (ISO 2) to guarantee the rule applies.
-        // Find a Tuesday in the calendar and tap it.
         await tester.pumpWidget(
           _wrap(
             const TrainerAgendaTab(trainerId: 'trainer-1'),
@@ -184,17 +200,12 @@ void main() {
         );
 
         await tester.pump();
-        // The slot-chip label "Disponible" or a free slot time should appear
-        // after tapping. We tap by finding the first visible day number.
-        // Easiest: tap a day that is definitely a Tuesday.
-        // We open the sheet via the internal "_openDaySheet" method by
-        // simulating a day tap. For now, verify the calendar renders and the
-        // sheet widget type exists in the tree after tap.
-        final calendar = find.byType(TableCalendar<dynamic>);
-        expect(calendar, findsOneWidget);
-        // Tap the first selectable day cell (any text that looks like a date)
-        // The sheet opens — just verify the type with a pump.
-        // (More granular date-tap tests would need known-date fixture.)
+        // Calendar still renders.
+        expect(find.byType(TableCalendar<dynamic>), findsOneWidget);
+        // DayTimeline is always present inline below the calendar.
+        expect(find.byType(DayTimeline), findsOneWidget);
+        // No bottom sheet should be open initially.
+        expect(find.byType(BottomSheet), findsNothing);
       },
     );
   });

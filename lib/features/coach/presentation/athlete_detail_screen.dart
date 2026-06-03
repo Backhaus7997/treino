@@ -10,6 +10,8 @@ import '../../chat/application/chat_providers.dart';
 import '../../measurements/application/measurement_providers.dart';
 import '../../measurements/presentation/log_measurement_screen.dart';
 import '../../measurements/presentation/widgets/measurement_progress_chart.dart';
+import '../application/athlete_note_providers.dart';
+import '../domain/athlete_note.dart';
 import '../../payments/application/billing_providers.dart';
 import '../../payments/domain/athlete_billing.dart';
 import '../../performance/application/performance_test_providers.dart';
@@ -204,6 +206,10 @@ class _AthleteDetailBody extends ConsumerWidget {
               // ── Cobro section ─────────────────────────────────────────
               const SizedBox(height: 20),
               _CobroSection(athleteId: athleteId),
+
+              // ── Nota del alumno section ───────────────────────────────
+              const SizedBox(height: 20),
+              _NotaSection(athleteId: athleteId, trainerUid: trainerUid),
             ],
           ),
         ),
@@ -1108,6 +1114,270 @@ class _CobroConfigSheetState extends ConsumerState<_CobroConfigSheet> {
                 ),
               );
             }).toList(),
+          ),
+          const SizedBox(height: 20),
+
+          // ── Save button ──────────────────────────────────────────────
+          ElevatedButton(
+            onPressed: _saving ? null : _save,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: palette.accent,
+              foregroundColor: palette.bg,
+              minimumSize: const Size.fromHeight(48),
+              shape: const StadiumBorder(),
+              disabledBackgroundColor: palette.accent.withValues(alpha: 0.3),
+            ),
+            child: _saving
+                ? SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: palette.bg,
+                    ),
+                  )
+                : Text(
+                    'GUARDAR',
+                    style: GoogleFonts.barlowCondensed(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                      letterSpacing: 1.4,
+                    ),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Nota del alumno section ───────────────────────────────────────────────────
+
+class _NotaSection extends ConsumerWidget {
+  const _NotaSection({required this.athleteId, required this.trainerUid});
+
+  final String athleteId;
+  final String trainerUid;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final palette = AppPalette.of(context);
+    final noteAsync = ref.watch(
+      athleteNoteProvider((trainerId: trainerUid, athleteId: athleteId)),
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // ── Section header row ──────────────────────────────────────────
+        Row(
+          children: [
+            Text(
+              'NOTA DEL ALUMNO',
+              style: GoogleFonts.barlowCondensed(
+                fontWeight: FontWeight.w700,
+                fontSize: 12,
+                letterSpacing: 1.2,
+                color: palette.textMuted,
+              ),
+            ),
+            const Spacer(),
+            GestureDetector(
+              onTap: () => _openEditSheet(context, ref, noteAsync.valueOrNull),
+              child: Text(
+                noteAsync.valueOrNull == null ? 'Agregar' : 'Editar',
+                style: GoogleFonts.barlow(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                  color: palette.accent,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+
+        // ── Content ─────────────────────────────────────────────────────
+        noteAsync.when(
+          loading: () => _card(
+            palette: palette,
+            child: Text(
+              'Cargando…',
+              style: GoogleFonts.barlow(fontSize: 13, color: palette.textMuted),
+            ),
+          ),
+          error: (_, __) => _card(
+            palette: palette,
+            child: Text(
+              'No pudimos cargar la nota.',
+              style: GoogleFonts.barlow(fontSize: 13, color: palette.textMuted),
+            ),
+          ),
+          data: (note) => _card(
+            palette: palette,
+            child: note == null || note.note.trim().isEmpty
+                ? Text(
+                    'Sin nota.',
+                    style: GoogleFonts.barlow(
+                        fontSize: 13, color: palette.textMuted),
+                  )
+                : Text(
+                    note.note,
+                    style: GoogleFonts.barlow(
+                      fontSize: 14,
+                      color: palette.textPrimary,
+                    ),
+                  ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _openEditSheet(
+    BuildContext context,
+    WidgetRef ref,
+    AthleteNote? existing,
+  ) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppPalette.of(context).bgCard,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => _NotaEditSheet(
+        athleteId: athleteId,
+        trainerUid: trainerUid,
+        existing: existing,
+      ),
+    );
+  }
+
+  Widget _card({required AppPalette palette, required Widget child}) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: palette.bgCard,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: palette.border),
+      ),
+      child: child,
+    );
+  }
+}
+
+class _NotaEditSheet extends ConsumerStatefulWidget {
+  const _NotaEditSheet({
+    required this.athleteId,
+    required this.trainerUid,
+    required this.existing,
+  });
+
+  final String athleteId;
+  final String trainerUid;
+  final AthleteNote? existing;
+
+  @override
+  ConsumerState<_NotaEditSheet> createState() => _NotaEditSheetState();
+}
+
+class _NotaEditSheetState extends ConsumerState<_NotaEditSheet> {
+  late final TextEditingController _noteController;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _noteController = TextEditingController(text: widget.existing?.note ?? '');
+  }
+
+  @override
+  void dispose() {
+    _noteController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (_saving) return;
+    setState(() => _saving = true);
+    try {
+      await ref.read(athleteNoteRepositoryProvider).setNote(
+            AthleteNote(
+              trainerId: widget.trainerUid,
+              athleteId: widget.athleteId,
+              note: _noteController.text.trim(),
+              updatedAt: DateTime.now().toUtc(),
+            ),
+          );
+      if (!mounted) return;
+      Navigator.of(context).pop();
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No pudimos guardar. Probá de nuevo.')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 20,
+        right: 20,
+        top: 20,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // ── Handle ──────────────────────────────────────────────────
+          Center(
+            child: Container(
+              width: 36,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 14),
+              decoration: BoxDecoration(
+                color: palette.border,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          Text(
+            'NOTA DEL ALUMNO',
+            style: GoogleFonts.barlowCondensed(
+              fontWeight: FontWeight.w700,
+              fontSize: 18,
+              color: palette.textPrimary,
+              letterSpacing: 1.2,
+            ),
+          ),
+          const SizedBox(height: 18),
+
+          // ── Nota field ───────────────────────────────────────────────
+          TextField(
+            controller: _noteController,
+            maxLines: 5,
+            style: TextStyle(color: palette.textPrimary),
+            decoration: InputDecoration(
+              hintText: 'Ej: viene de lesión de rodilla, no cargar piernas…',
+              hintStyle: TextStyle(color: palette.textMuted),
+              filled: true,
+              fillColor: palette.bg,
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide(color: palette.border),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide(color: palette.accent, width: 1.5),
+              ),
+            ),
           ),
           const SizedBox(height: 20),
 
