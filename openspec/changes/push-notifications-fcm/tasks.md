@@ -77,23 +77,23 @@ Chained PRs recommended: Yes. Chain strategy: stacked-to-main. Delivery strategy
 
 ### Phase 1a.1: Branch setup
 
-- [ ] T-PN-001 — SETUP: create branch `feat/push-notifications-pr1a-send-fcm-helper` from `main`; confirm clean working tree; verify `functions/src/index.ts` exports only `deleteAccount` and `reviewAggregate`.
+- [x] T-PN-001 — SETUP: create branch `feat/push-notifications-pr1a-send-fcm-helper` from `main`; confirm clean working tree; verify `functions/src/index.ts` exports only `deleteAccount` and `reviewAggregate`.
 
 ### Phase 1a.2: `sendFcm` helper — signature + token fan-out
 
-- [ ] T-PN-002 — RED: create `functions/src/__tests__/send-fcm.test.ts`; failing tests: empty `uids[]` → no Firestore reads, no `sendEachForMulticast`, no error (SCENARIO-677); single uid with single token → `sendEachForMulticast` called with `[token]` (SCENARIO-625); two uids each with one token → `sendEachForMulticast` called with both tokens flattened (SCENARIO-625); uid with empty/absent `fcmTokens` → skipped silently with a log line (SCENARIO-628).
-- [ ] T-PN-003 — GREEN: create `functions/src/notifications/send-fcm.ts`; export `SendFcmInput` interface `{ uids: string[], notification: { title: string, body: string }, data: Record<string, string> }`; export `SendFcmResult` interface `{ successCount: number, failureCount: number }`; export `async function sendFcm(app, input, messaging?)` — reads `users/{uid}.fcmTokens` per uid via `Promise.all`; logs and skips empty/absent arrays; calls `messaging.sendEachForMulticast({ tokens, notification, data })`; returns aggregated result; T-PN-002 must pass. (SCENARIO-625, 628, 677)
+- [x] T-PN-002 — RED: create `functions/src/__tests__/send-fcm.test.ts`; failing tests: empty `uids[]` → no Firestore reads, no `sendEachForMulticast`, no error (SCENARIO-677); single uid with single token → `sendEachForMulticast` called with `[token]` (SCENARIO-625); two uids each with one token → `sendEachForMulticast` called with both tokens flattened (SCENARIO-625); uid with empty/absent `fcmTokens` → skipped silently with a log line (SCENARIO-628).
+- [x] T-PN-003 — GREEN: create `functions/src/notifications/send-fcm.ts`; export `SendFcmInput` interface `{ uids: string[], notification: { title: string, body: string }, data: Record<string, string> }`; export `SendFcmResult` interface `{ successCount: number, failureCount: number }`; export `async function sendFcm(app, input, messaging?)` — reads `users/{uid}.fcmTokens` per uid via `Promise.all`; logs and skips empty/absent arrays; calls `messaging.sendEachForMulticast({ tokens, notification, data })`; returns aggregated result; T-PN-002 must pass. (SCENARIO-625, 628, 677)
 
 ### Phase 1a.3: `sendFcm` helper — stale token cleanup
 
-- [ ] T-PN-004 — RED: extend `functions/src/__tests__/send-fcm.test.ts`; failing tests: uid with `['tok-valid', 'tok-stale']` where FCM returns `messaging/registration-token-not-registered` for `tok-stale` → `arrayRemove('tok-stale')` called on `users/{uid}.fcmTokens`, `tok-valid` remains (SCENARIO-626); uid with `['tok-invalid']` where FCM returns `messaging/invalid-registration-token` → `arrayRemove('tok-invalid')` called (SCENARIO-627).
-- [ ] T-PN-005 — GREEN: extend `sendFcm` — iterate `BatchResponse.responses[i]`; when `error?.code` is `messaging/registration-token-not-registered` or `messaging/invalid-registration-token`, call `arrayRemove(token)` on that token's owner uid document; healthy tokens not affected; T-PN-004 must pass. (SCENARIO-626, 627)
+- [x] T-PN-004 — RED: extend `functions/src/__tests__/send-fcm.test.ts`; failing tests: uid with `['tok-valid', 'tok-stale']` where FCM returns `messaging/registration-token-not-registered` for `tok-stale` → `arrayRemove('tok-stale')` called on `users/{uid}.fcmTokens`, `tok-valid` remains (SCENARIO-626); uid with `['tok-invalid']` where FCM returns `messaging/invalid-registration-token` → `arrayRemove('tok-invalid')` called (SCENARIO-627).
+- [x] T-PN-005 — GREEN: extend `sendFcm` — iterate `BatchResponse.responses[i]`; when `error?.code` is `messaging/registration-token-not-registered` or `messaging/invalid-registration-token`, call `arrayRemove(token)` on that token's owner uid document; healthy tokens not affected; T-PN-004 must pass. (SCENARIO-626, 627)
 
 ### Phase 1a.4: PR#1a quality gates
 
-- [ ] T-PN-006 — GATE: `npm --prefix functions run build` 0 errors; `npm --prefix functions run lint` 0 warnings/errors.
-- [ ] T-PN-007 — GATE: `firebase emulators:exec --only firestore,auth "npm --prefix functions test"` — all tests pass; delta ≥ +6 tests vs baseline (covering SCENARIO-625..628, 677).
-- [ ] T-PN-008 — VERIFY: no Flutter files changed; no `pubspec.yaml` changes; no `ios/` changes; no `firestore.rules` changes; no `storage.rules` changes; no `firestore.indexes.json` changes; `functions/src/index.ts` NOT yet modified (exports added in PR#1b); conventional commits only; no Co-Authored-By.
+- [x] T-PN-006 — GATE: `npm --prefix functions run build` 0 errors; `npm --prefix functions run lint` 0 warnings/errors.
+- [x] T-PN-007 — GATE: `firebase emulators:exec --only firestore,auth "npm --prefix functions test"` — all tests pass; delta ≥ +6 tests vs baseline (covering SCENARIO-625..628, 677). Actual: 56/56 tests pass, delta +7. Emulators ran separately (Java 21 env note in apply-progress.md).
+- [x] T-PN-008 — VERIFY: no Flutter files changed; no `pubspec.yaml` changes; no `ios/` changes; no `firestore.rules` changes; no `storage.rules` changes; no `firestore.indexes.json` changes; `functions/src/index.ts` NOT yet modified (exports added in PR#1b); conventional commits only; no Co-Authored-By.
 
 ---
 
@@ -264,15 +264,15 @@ Chained PRs recommended: Yes. Chain strategy: stacked-to-main. Delivery strategy
 ## Pre-PR Checklist per PR
 
 ### PR#1a — Send-FCM Helper
-- [ ] T-PN-001 (SETUP) complete
-- [ ] T-PN-002..T-PN-005 RED/GREEN pairs complete
-- [ ] T-PN-006: `npm --prefix functions run build` 0 errors; lint 0 warnings
-- [ ] T-PN-007: all jest emulator tests pass; delta ≥ +6 tests
-- [ ] T-PN-008: no Flutter files, no `pubspec.yaml`, no `ios/`, no rules files, no indexes changed
-- [ ] `functions/src/index.ts` NOT modified (exports come in PR#1b)
-- [ ] All `sendFcm` tests mock `messaging()` injection — no real FCM calls
-- [ ] `fcmTokens` (camelCase) used in all TS code, not `fcm_tokens`
-- [ ] Conventional commits only; no Co-Authored-By
+- [x] T-PN-001 (SETUP) complete
+- [x] T-PN-002..T-PN-005 RED/GREEN pairs complete
+- [x] T-PN-006: `npm --prefix functions run build` 0 errors; lint 0 warnings
+- [x] T-PN-007: all jest emulator tests pass; delta ≥ +6 tests (actual: +7, 56/56)
+- [x] T-PN-008: no Flutter files, no `pubspec.yaml`, no `ios/`, no rules files, no indexes changed
+- [x] `functions/src/index.ts` NOT modified (exports come in PR#1b)
+- [x] All `sendFcm` tests mock `messaging()` injection — no real FCM calls
+- [x] `fcmTokens` (camelCase) used in all TS code, not `fcm_tokens`
+- [x] Conventional commits only; no Co-Authored-By
 
 ### PR#1b — CF Triggers + Info.plist
 - [ ] Rebased cleanly on post-PR#1a `main` (T-PN-009)
