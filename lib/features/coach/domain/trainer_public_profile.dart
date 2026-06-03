@@ -34,6 +34,7 @@ class TrainerPublicProfile with _$TrainerPublicProfile {
     double? trainerLatitude,
     double? trainerLongitude,
     int? trainerMonthlyRate,
+    String? paymentAlias,
     // ── Multi-location (Fase 6 Etapa 0) ────────────────────────────────
     @Default(<TrainerLocation>[]) List<TrainerLocation> trainerLocations,
     @Default(<String>[]) List<String> trainerGeohashes,

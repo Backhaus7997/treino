@@ -45,6 +45,7 @@ class _ProfileEditTrainerScreenState
   final _formKey = GlobalKey<FormState>();
   final _bioController = TextEditingController();
   final _priceController = TextEditingController();
+  final _aliasController = TextEditingController();
   TrainerSpecialty? _specialty;
   final List<TrainerLocation> _locations = [];
   bool _offersOnline = false;
@@ -56,6 +57,7 @@ class _ProfileEditTrainerScreenState
   void dispose() {
     _bioController.dispose();
     _priceController.dispose();
+    _aliasController.dispose();
     super.dispose();
   }
 
@@ -63,6 +65,7 @@ class _ProfileEditTrainerScreenState
     if (_initialized) return;
     _bioController.text = profile.trainerBio ?? '';
     _priceController.text = profile.trainerMonthlyRate?.toString() ?? '';
+    _aliasController.text = profile.paymentAlias ?? '';
     _specialty = trainerSpecialtyFromString(profile.trainerSpecialty);
     _locations
       ..clear()
@@ -162,6 +165,9 @@ class _ProfileEditTrainerScreenState
       'trainerBio': _bioController.text.trim(),
       'trainerSpecialty': TrainerSpecialtyX.toWire(_specialty!),
       'trainerMonthlyRate': int.parse(_priceController.text.trim()),
+      'paymentAlias': _aliasController.text.trim().isEmpty
+          ? null
+          : _aliasController.text.trim(),
       'trainerLocations': _locations.map((l) => l.toJson()).toList(),
       'trainerGeohashes': _locations.map((l) => l.geohash).toSet().toList(),
       'trainerOffersOnline': _offersOnline,
@@ -257,6 +263,18 @@ class _ProfileEditTrainerScreenState
                 if (n > 999999) return 'Máximo \$999999.';
                 return null;
               },
+            ),
+            const SizedBox(height: 14),
+            _SectionLabel(palette: palette, text: 'ALIAS / DATOS DE COBRO'),
+            const SizedBox(height: 8),
+            TextFormField(
+              controller: _aliasController,
+              maxLength: 120,
+              style: TextStyle(color: palette.textPrimary),
+              decoration: _inputDecoration(
+                palette,
+                hint: 'Alias, CBU, CVU o usuario de MercadoPago (opcional).',
+              ),
             ),
             const SizedBox(height: 18),
             _GymsSection(

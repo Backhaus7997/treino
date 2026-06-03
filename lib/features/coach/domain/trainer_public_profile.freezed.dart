@@ -32,7 +32,8 @@ mixin _$TrainerPublicProfile {
   String? get trainerGeohash => throw _privateConstructorUsedError;
   double? get trainerLatitude => throw _privateConstructorUsedError;
   double? get trainerLongitude => throw _privateConstructorUsedError;
-  int? get trainerMonthlyRate =>
+  int? get trainerMonthlyRate => throw _privateConstructorUsedError;
+  String? get paymentAlias =>
       throw _privateConstructorUsedError; // ── Multi-location (Fase 6 Etapa 0) ────────────────────────────────
   List<TrainerLocation> get trainerLocations =>
       throw _privateConstructorUsedError;
@@ -73,6 +74,7 @@ abstract class $TrainerPublicProfileCopyWith<$Res> {
       double? trainerLatitude,
       double? trainerLongitude,
       int? trainerMonthlyRate,
+      String? paymentAlias,
       List<TrainerLocation> trainerLocations,
       List<String> trainerGeohashes,
       bool trainerOffersOnline,
@@ -106,6 +108,7 @@ class _$TrainerPublicProfileCopyWithImpl<$Res,
     Object? trainerLatitude = freezed,
     Object? trainerLongitude = freezed,
     Object? trainerMonthlyRate = freezed,
+    Object? paymentAlias = freezed,
     Object? trainerLocations = null,
     Object? trainerGeohashes = null,
     Object? trainerOffersOnline = null,
@@ -153,6 +156,10 @@ class _$TrainerPublicProfileCopyWithImpl<$Res,
           ? _value.trainerMonthlyRate
           : trainerMonthlyRate // ignore: cast_nullable_to_non_nullable
               as int?,
+      paymentAlias: freezed == paymentAlias
+          ? _value.paymentAlias
+          : paymentAlias // ignore: cast_nullable_to_non_nullable
+              as String?,
       trainerLocations: null == trainerLocations
           ? _value.trainerLocations
           : trainerLocations // ignore: cast_nullable_to_non_nullable
@@ -197,6 +204,7 @@ abstract class _$$TrainerPublicProfileImplCopyWith<$Res>
       double? trainerLatitude,
       double? trainerLongitude,
       int? trainerMonthlyRate,
+      String? paymentAlias,
       List<TrainerLocation> trainerLocations,
       List<String> trainerGeohashes,
       bool trainerOffersOnline,
@@ -227,6 +235,7 @@ class __$$TrainerPublicProfileImplCopyWithImpl<$Res>
     Object? trainerLatitude = freezed,
     Object? trainerLongitude = freezed,
     Object? trainerMonthlyRate = freezed,
+    Object? paymentAlias = freezed,
     Object? trainerLocations = null,
     Object? trainerGeohashes = null,
     Object? trainerOffersOnline = null,
@@ -274,6 +283,10 @@ class __$$TrainerPublicProfileImplCopyWithImpl<$Res>
           ? _value.trainerMonthlyRate
           : trainerMonthlyRate // ignore: cast_nullable_to_non_nullable
               as int?,
+      paymentAlias: freezed == paymentAlias
+          ? _value.paymentAlias
+          : paymentAlias // ignore: cast_nullable_to_non_nullable
+              as String?,
       trainerLocations: null == trainerLocations
           ? _value._trainerLocations
           : trainerLocations // ignore: cast_nullable_to_non_nullable
@@ -313,6 +326,7 @@ class _$TrainerPublicProfileImpl implements _TrainerPublicProfile {
       this.trainerLatitude,
       this.trainerLongitude,
       this.trainerMonthlyRate,
+      this.paymentAlias,
       final List<TrainerLocation> trainerLocations = const <TrainerLocation>[],
       final List<String> trainerGeohashes = const <String>[],
       this.trainerOffersOnline = false,
@@ -347,6 +361,8 @@ class _$TrainerPublicProfileImpl implements _TrainerPublicProfile {
   final double? trainerLongitude;
   @override
   final int? trainerMonthlyRate;
+  @override
+  final String? paymentAlias;
 // ── Multi-location (Fase 6 Etapa 0) ────────────────────────────────
   final List<TrainerLocation> _trainerLocations;
 // ── Multi-location (Fase 6 Etapa 0) ────────────────────────────────
@@ -384,7 +400,7 @@ class _$TrainerPublicProfileImpl implements _TrainerPublicProfile {
 
   @override
   String toString() {
-    return 'TrainerPublicProfile(uid: $uid, displayName: $displayName, displayNameLowercase: $displayNameLowercase, avatarUrl: $avatarUrl, trainerBio: $trainerBio, trainerSpecialty: $trainerSpecialty, trainerGeohash: $trainerGeohash, trainerLatitude: $trainerLatitude, trainerLongitude: $trainerLongitude, trainerMonthlyRate: $trainerMonthlyRate, trainerLocations: $trainerLocations, trainerGeohashes: $trainerGeohashes, trainerOffersOnline: $trainerOffersOnline, averageRating: $averageRating, reviewCount: $reviewCount)';
+    return 'TrainerPublicProfile(uid: $uid, displayName: $displayName, displayNameLowercase: $displayNameLowercase, avatarUrl: $avatarUrl, trainerBio: $trainerBio, trainerSpecialty: $trainerSpecialty, trainerGeohash: $trainerGeohash, trainerLatitude: $trainerLatitude, trainerLongitude: $trainerLongitude, trainerMonthlyRate: $trainerMonthlyRate, paymentAlias: $paymentAlias, trainerLocations: $trainerLocations, trainerGeohashes: $trainerGeohashes, trainerOffersOnline: $trainerOffersOnline, averageRating: $averageRating, reviewCount: $reviewCount)';
   }
 
   @override
@@ -411,6 +427,8 @@ class _$TrainerPublicProfileImpl implements _TrainerPublicProfile {
                 other.trainerLongitude == trainerLongitude) &&
             (identical(other.trainerMonthlyRate, trainerMonthlyRate) ||
                 other.trainerMonthlyRate == trainerMonthlyRate) &&
+            (identical(other.paymentAlias, paymentAlias) ||
+                other.paymentAlias == paymentAlias) &&
             const DeepCollectionEquality()
                 .equals(other._trainerLocations, _trainerLocations) &&
             const DeepCollectionEquality()
@@ -437,6 +455,7 @@ class _$TrainerPublicProfileImpl implements _TrainerPublicProfile {
       trainerLatitude,
       trainerLongitude,
       trainerMonthlyRate,
+      paymentAlias,
       const DeepCollectionEquality().hash(_trainerLocations),
       const DeepCollectionEquality().hash(_trainerGeohashes),
       trainerOffersOnline,
@@ -474,6 +493,7 @@ abstract class _TrainerPublicProfile implements TrainerPublicProfile {
       final double? trainerLatitude,
       final double? trainerLongitude,
       final int? trainerMonthlyRate,
+      final String? paymentAlias,
       final List<TrainerLocation> trainerLocations,
       final List<String> trainerGeohashes,
       final bool trainerOffersOnline,
@@ -505,8 +525,10 @@ abstract class _TrainerPublicProfile implements TrainerPublicProfile {
   @override
   double? get trainerLongitude;
   @override
-  int?
-      get trainerMonthlyRate; // ── Multi-location (Fase 6 Etapa 0) ────────────────────────────────
+  int? get trainerMonthlyRate;
+  @override
+  String?
+      get paymentAlias; // ── Multi-location (Fase 6 Etapa 0) ────────────────────────────────
   @override
   List<TrainerLocation> get trainerLocations;
   @override

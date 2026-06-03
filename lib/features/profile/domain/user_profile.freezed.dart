@@ -39,7 +39,8 @@ mixin _$UserProfile {
       throw _privateConstructorUsedError; // ── Trainer-specific (Fase 5 Etapa 1 foundations) ───────────────────
   String? get trainerBio => throw _privateConstructorUsedError;
   String? get trainerSpecialty => throw _privateConstructorUsedError;
-  int? get trainerMonthlyRate =>
+  int? get trainerMonthlyRate => throw _privateConstructorUsedError;
+  String? get paymentAlias =>
       throw _privateConstructorUsedError; // ── Multi-location (Fase 6 Etapa 0) ────────────────────────────────
 //
 // `trainerLatitude/Longitude/Geohash` (singulares, marcados DEPRECATED)
@@ -105,6 +106,7 @@ abstract class $UserProfileCopyWith<$Res> {
       String? trainerBio,
       String? trainerSpecialty,
       int? trainerMonthlyRate,
+      String? paymentAlias,
       double? trainerLatitude,
       double? trainerLongitude,
       String? trainerGeohash,
@@ -144,6 +146,7 @@ class _$UserProfileCopyWithImpl<$Res, $Val extends UserProfile>
     Object? trainerBio = freezed,
     Object? trainerSpecialty = freezed,
     Object? trainerMonthlyRate = freezed,
+    Object? paymentAlias = freezed,
     Object? trainerLatitude = freezed,
     Object? trainerLongitude = freezed,
     Object? trainerGeohash = freezed,
@@ -216,6 +219,10 @@ class _$UserProfileCopyWithImpl<$Res, $Val extends UserProfile>
           ? _value.trainerMonthlyRate
           : trainerMonthlyRate // ignore: cast_nullable_to_non_nullable
               as int?,
+      paymentAlias: freezed == paymentAlias
+          ? _value.paymentAlias
+          : paymentAlias // ignore: cast_nullable_to_non_nullable
+              as String?,
       trainerLatitude: freezed == trainerLatitude
           ? _value.trainerLatitude
           : trainerLatitude // ignore: cast_nullable_to_non_nullable
@@ -269,6 +276,7 @@ abstract class _$$UserProfileImplCopyWith<$Res>
       String? trainerBio,
       String? trainerSpecialty,
       int? trainerMonthlyRate,
+      String? paymentAlias,
       double? trainerLatitude,
       double? trainerLongitude,
       String? trainerGeohash,
@@ -306,6 +314,7 @@ class __$$UserProfileImplCopyWithImpl<$Res>
     Object? trainerBio = freezed,
     Object? trainerSpecialty = freezed,
     Object? trainerMonthlyRate = freezed,
+    Object? paymentAlias = freezed,
     Object? trainerLatitude = freezed,
     Object? trainerLongitude = freezed,
     Object? trainerGeohash = freezed,
@@ -378,6 +387,10 @@ class __$$UserProfileImplCopyWithImpl<$Res>
           ? _value.trainerMonthlyRate
           : trainerMonthlyRate // ignore: cast_nullable_to_non_nullable
               as int?,
+      paymentAlias: freezed == paymentAlias
+          ? _value.paymentAlias
+          : paymentAlias // ignore: cast_nullable_to_non_nullable
+              as String?,
       trainerLatitude: freezed == trainerLatitude
           ? _value.trainerLatitude
           : trainerLatitude // ignore: cast_nullable_to_non_nullable
@@ -426,6 +439,7 @@ class _$UserProfileImpl implements _UserProfile {
       this.trainerBio,
       this.trainerSpecialty,
       this.trainerMonthlyRate,
+      this.paymentAlias,
       this.trainerLatitude,
       this.trainerLongitude,
       this.trainerGeohash,
@@ -474,6 +488,8 @@ class _$UserProfileImpl implements _UserProfile {
   final String? trainerSpecialty;
   @override
   final int? trainerMonthlyRate;
+  @override
+  final String? paymentAlias;
 // ── Multi-location (Fase 6 Etapa 0) ────────────────────────────────
 //
 // `trainerLatitude/Longitude/Geohash` (singulares, marcados DEPRECATED)
@@ -531,7 +547,7 @@ class _$UserProfileImpl implements _UserProfile {
 
   @override
   String toString() {
-    return 'UserProfile(uid: $uid, email: $email, displayName: $displayName, role: $role, createdAt: $createdAt, updatedAt: $updatedAt, gymId: $gymId, bodyWeightKg: $bodyWeightKg, heightCm: $heightCm, gender: $gender, experienceLevel: $experienceLevel, avatarUrl: $avatarUrl, bornAt: $bornAt, trainerBio: $trainerBio, trainerSpecialty: $trainerSpecialty, trainerMonthlyRate: $trainerMonthlyRate, trainerLatitude: $trainerLatitude, trainerLongitude: $trainerLongitude, trainerGeohash: $trainerGeohash, trainerLocations: $trainerLocations, trainerGeohashes: $trainerGeohashes, trainerOffersOnline: $trainerOffersOnline)';
+    return 'UserProfile(uid: $uid, email: $email, displayName: $displayName, role: $role, createdAt: $createdAt, updatedAt: $updatedAt, gymId: $gymId, bodyWeightKg: $bodyWeightKg, heightCm: $heightCm, gender: $gender, experienceLevel: $experienceLevel, avatarUrl: $avatarUrl, bornAt: $bornAt, trainerBio: $trainerBio, trainerSpecialty: $trainerSpecialty, trainerMonthlyRate: $trainerMonthlyRate, paymentAlias: $paymentAlias, trainerLatitude: $trainerLatitude, trainerLongitude: $trainerLongitude, trainerGeohash: $trainerGeohash, trainerLocations: $trainerLocations, trainerGeohashes: $trainerGeohashes, trainerOffersOnline: $trainerOffersOnline)';
   }
 
   @override
@@ -565,6 +581,8 @@ class _$UserProfileImpl implements _UserProfile {
                 other.trainerSpecialty == trainerSpecialty) &&
             (identical(other.trainerMonthlyRate, trainerMonthlyRate) ||
                 other.trainerMonthlyRate == trainerMonthlyRate) &&
+            (identical(other.paymentAlias, paymentAlias) ||
+                other.paymentAlias == paymentAlias) &&
             (identical(other.trainerLatitude, trainerLatitude) ||
                 other.trainerLatitude == trainerLatitude) &&
             (identical(other.trainerLongitude, trainerLongitude) ||
@@ -599,6 +617,7 @@ class _$UserProfileImpl implements _UserProfile {
         trainerBio,
         trainerSpecialty,
         trainerMonthlyRate,
+        paymentAlias,
         trainerLatitude,
         trainerLongitude,
         trainerGeohash,
@@ -641,6 +660,7 @@ abstract class _UserProfile implements UserProfile {
       final String? trainerBio,
       final String? trainerSpecialty,
       final int? trainerMonthlyRate,
+      final String? paymentAlias,
       final double? trainerLatitude,
       final double? trainerLongitude,
       final String? trainerGeohash,
@@ -686,8 +706,10 @@ abstract class _UserProfile implements UserProfile {
   @override
   String? get trainerSpecialty;
   @override
-  int?
-      get trainerMonthlyRate; // ── Multi-location (Fase 6 Etapa 0) ────────────────────────────────
+  int? get trainerMonthlyRate;
+  @override
+  String?
+      get paymentAlias; // ── Multi-location (Fase 6 Etapa 0) ────────────────────────────────
 //
 // `trainerLatitude/Longitude/Geohash` (singulares, marcados DEPRECATED)
 // se mantienen por backward compat — clientes viejos siguen leyendo el

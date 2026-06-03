@@ -4,27 +4,25 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:table_calendar/table_calendar.dart';
 
 import '../../../app/theme/app_palette.dart';
-import '../../../core/analytics/analytics_service.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../profile/application/user_public_profile_providers.dart';
 import '../application/agenda_providers.dart';
-import '../domain/agenda_exceptions.dart';
 import '../domain/appointment.dart';
-import '../domain/availability_rule.dart';
 import 'agenda_strings.dart';
-import 'widgets/day_slots_sheet.dart';
 
-/// Full-screen route for the athlete's agenda view.
+/// Full-screen route for the athlete's agenda view — READ-ONLY.
+///
+/// The trainer now schedules all sessions; the athlete only views their own.
 ///
 /// Reads:
-/// - [availabilityRulesStreamProvider] — trainer's rules
-/// - [appointmentsForAthleteStreamProvider] — athlete's booked appointments
-/// - [freeSlotsProvider] — derived free slots per selected day
+/// - [appointmentsForAthleteStreamProvider] — athlete's confirmed appointments
 ///
-/// SCENARIO-499: calendar renders with dots on days with free slots
-/// SCENARIO-500: no dots when no rules
-/// SCENARIO-501-507: day sheet + booking + cancellation flows
-/// SCENARIO-511: empty state when no rules
+/// SCENARIO-499: calendar renders with dots on days the athlete has sessions
+/// SCENARIO-500: calendar renders even when athlete has no sessions
+/// SCENARIO-506: past appointments drop off the upcoming list
+/// SCENARIO-507: mixed list renders only upcoming sessions
+/// SCENARIO-510: tapping a day opens a read-only day-sessions sheet
+/// SCENARIO-511: screen renders (calendar always shown)
 class AthleteAgendaScreen extends ConsumerStatefulWidget {
   const AthleteAgendaScreen({
     super.key,
@@ -48,8 +46,6 @@ class _AthleteAgendaScreenState extends ConsumerState<AthleteAgendaScreen> {
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
 
-    final rulesAsync =
-        ref.watch(availabilityRulesStreamProvider(widget.trainerId));
     final appointmentsAsync =
         ref.watch(appointmentsForAthleteStreamProvider(widget.athleteId));
 
@@ -71,12 +67,12 @@ class _AthleteAgendaScreenState extends ConsumerState<AthleteAgendaScreen> {
         ),
       ),
       backgroundColor: palette.bg,
-      body: rulesAsync.when(
+      body: appointmentsAsync.when(
         loading: () => Center(
           child: CircularProgressIndicator(color: palette.accent),
         ),
         error: (_, __) => _errorState(context, palette),
-        data: (rules) => _body(context, palette, rules, appointmentsAsync),
+        data: (appointments) => _body(context, palette, appointments),
       ),
     );
   }
@@ -84,27 +80,20 @@ class _AthleteAgendaScreenState extends ConsumerState<AthleteAgendaScreen> {
   Widget _body(
     BuildContext context,
     AppPalette palette,
-    List<AvailabilityRule> rules,
-    AsyncValue<List<Appointment>> appointmentsAsync,
+    List<Appointment> appointments,
   ) {
-    // REQ-COACH-AGENDA-018 / SCENARIO-511: empty state when no rules
-    if (rules.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 32),
-          child: Text(
-            AgendaStrings.emptyAvailability,
-            style: GoogleFonts.barlow(
-              fontSize: 15,
-              color: palette.textMuted,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ),
-      );
-    }
+    // Only confirmed sessions matter for display purposes.
+    final confirmed = appointments
+        .where((a) => a.status == AppointmentStatus.confirmed)
+        .toList();
 
-    final appointments = appointmentsAsync.valueOrNull ?? const [];
+    // Upcoming list: sessions that have NOT ended yet.
+    final now = DateTime.now().toUtc();
+    final upcoming = confirmed
+        .where((a) =>
+            a.startsAt.add(Duration(minutes: a.durationMin)).isAfter(now))
+        .toList()
+      ..sort((a, b) => a.startsAt.compareTo(b.startsAt));
 
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -113,15 +102,13 @@ class _AthleteAgendaScreenState extends ConsumerState<AthleteAgendaScreen> {
         _AgendaCalendar(
           focusedDay: _focusedDay,
           selectedDay: _selectedDay,
-          trainerId: widget.trainerId,
-          rules: rules,
-          appointments: appointments,
+          appointments: confirmed,
           onDaySelected: (selected, focused) {
             setState(() {
               _selectedDay = selected;
               _focusedDay = focused;
             });
-            _openDaySheet(context, selected, appointments);
+            _openDaySheet(context, selected, confirmed);
           },
           onPageChanged: (focused) {
             setState(() => _focusedDay = focused);
@@ -130,8 +117,8 @@ class _AthleteAgendaScreenState extends ConsumerState<AthleteAgendaScreen> {
 
         const SizedBox(height: 24),
 
-        // ── Appointments list ─────────────────────────────────────────────────
-        if (appointments.isNotEmpty) ...[
+        // ── Upcoming sessions list ────────────────────────────────────────────
+        if (upcoming.isNotEmpty) ...[
           Text(
             AgendaStrings.upcomingAppointmentsHeading,
             style: GoogleFonts.barlowCondensed(
@@ -142,13 +129,10 @@ class _AthleteAgendaScreenState extends ConsumerState<AthleteAgendaScreen> {
             ),
           ),
           const SizedBox(height: 10),
-          ...appointments.map(
+          ...upcoming.map(
             (appt) => AppointmentTile(
               appointment: appt,
-              now: DateTime.now().toUtc(),
-              onCancel: _canCancel(appt)
-                  ? () => _onCancelAppointment(context, appt)
-                  : null,
+              now: now,
             ),
           ),
         ],
@@ -156,37 +140,21 @@ class _AthleteAgendaScreenState extends ConsumerState<AthleteAgendaScreen> {
     );
   }
 
-  bool _canCancel(Appointment appt) =>
-      appt.startsAt.difference(DateTime.now().toUtc()) >
-      const Duration(hours: 24);
-
   void _openDaySheet(
     BuildContext context,
     DateTime day,
-    List<Appointment> allAppointments,
+    List<Appointment> allConfirmed,
   ) {
-    final now = DateTime.now().toUtc();
     final normalizedDay = DateTime.utc(day.year, day.month, day.day);
 
-    // Free slots for this day from the derived provider
-    final fromDate = normalizedDay;
-    final toDate = normalizedDay.add(const Duration(days: 1));
-    final key = FreeSlotsKey(
-      trainerId: widget.trainerId,
-      forDate: normalizedDay,
-      fromDate: fromDate,
-      toDate: toDate,
-    );
-    final slots = ref.read(freeSlotsProvider(key));
-
-    // Athlete's own bookings on this day
-    final dayBookings = allAppointments.where((a) {
+    // Athlete's confirmed sessions on this day.
+    final daySessions = allConfirmed.where((a) {
       final d = a.startsAt.toUtc();
       return d.year == normalizedDay.year &&
           d.month == normalizedDay.month &&
-          d.day == normalizedDay.day &&
-          a.status == AppointmentStatus.confirmed;
-    }).toList();
+          d.day == normalizedDay.day;
+    }).toList()
+      ..sort((a, b) => a.startsAt.compareTo(b.startsAt));
 
     showModalBottomSheet<void>(
       context: context,
@@ -195,101 +163,11 @@ class _AthleteAgendaScreenState extends ConsumerState<AthleteAgendaScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (_) => DaySlotsSheet(
-        slots: slots,
-        existingBookings: dayBookings,
-        now: now,
-        onBookSlot: (slot) => _onBook(context, slot),
-        onCancelAppointment: (appt) => _onCancelAppointment(context, appt),
+      builder: (_) => _DaySessionsSheet(
+        day: day,
+        sessions: daySessions,
       ),
     );
-  }
-
-  Future<void> _onBook(BuildContext context, DateTime slot) async {
-    final repo = ref.read(appointmentRepositoryProvider);
-
-    // Block double-booking on the same day. Athlete can have at most ONE
-    // confirmed appointment per calendar day with their PF.
-    final allMine = ref
-            .read(appointmentsForAthleteStreamProvider(widget.athleteId))
-            .value ??
-        const [];
-    final alreadyBookedSameDay = allMine.any((a) =>
-        a.status == AppointmentStatus.confirmed &&
-        a.startsAt.year == slot.year &&
-        a.startsAt.month == slot.month &&
-        a.startsAt.day == slot.day);
-    if (alreadyBookedSameDay) {
-      if (!context.mounted) return;
-      Navigator.of(context).pop(); // close sheet
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Ya tenés una reserva con tu PF ese día.'),
-        ),
-      );
-      return;
-    }
-
-    // Resolve athlete display name from their public profile so the trainer
-    // sees a name (not a UID) on the booked chip.
-    final profile =
-        await ref.read(userPublicProfileProvider(widget.athleteId).future);
-    final athleteDisplayName = profile?.displayName ?? widget.athleteId;
-    try {
-      final created = await repo.book(
-        trainerId: widget.trainerId,
-        athleteId: widget.athleteId,
-        athleteDisplayName: athleteDisplayName,
-        startsAt: slot,
-        durationMin: 60,
-      );
-      ref.read(analyticsServiceProvider).logAppointmentCreated(
-            appointmentId: created.id,
-            trainerId: widget.trainerId,
-            athleteId: widget.athleteId,
-          );
-      if (!context.mounted) return;
-      Navigator.of(context).pop(); // close sheet
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text(AgendaStrings.bookingSuccess)),
-      );
-    } on SlotAlreadyTakenException {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text(AgendaStrings.bookingRaceError)),
-      );
-    } catch (_) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text(AgendaStrings.genericError)),
-      );
-    }
-  }
-
-  Future<void> _onCancelAppointment(
-      BuildContext context, Appointment appt) async {
-    final repo = ref.read(appointmentRepositoryProvider);
-    try {
-      await repo.cancel(
-        appointment: appt,
-        actorUid: widget.athleteId,
-      );
-      if (!context.mounted) return;
-      Navigator.of(context).pop(); // close sheet if open
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text(AgendaStrings.cancellationSuccess)),
-      );
-    } on CancellationTooLateException {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text(AgendaStrings.cancellationTooLate)),
-      );
-    } catch (_) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text(AgendaStrings.genericError)),
-      );
-    }
   }
 
   Widget _errorState(BuildContext context, AppPalette palette) => Center(
@@ -302,12 +180,10 @@ class _AthleteAgendaScreenState extends ConsumerState<AthleteAgendaScreen> {
 
 // ── Calendar widget ───────────────────────────────────────────────────────────
 
-class _AgendaCalendar extends ConsumerWidget {
+class _AgendaCalendar extends StatelessWidget {
   const _AgendaCalendar({
     required this.focusedDay,
     required this.selectedDay,
-    required this.trainerId,
-    required this.rules,
     required this.appointments,
     required this.onDaySelected,
     required this.onPageChanged,
@@ -315,19 +191,27 @@ class _AgendaCalendar extends ConsumerWidget {
 
   final DateTime focusedDay;
   final DateTime? selectedDay;
-  final String trainerId;
-  final List<AvailabilityRule> rules;
   final List<Appointment> appointments;
   final void Function(DateTime, DateTime) onDaySelected;
   final void Function(DateTime) onPageChanged;
 
-  /// Days of week (ISO 1=Mon) that have rules.
-  Set<int> get _ruleDays => rules.map((r) => r.dayOfWeek).toSet();
+  /// Whether the athlete has at least one confirmed session on [day].
+  bool _hasSession(DateTime day) {
+    return appointments.any((a) {
+      final d = a.startsAt.toUtc();
+      return d.year == day.year && d.month == day.month && d.day == day.day;
+    });
+  }
 
-  bool _hasSlots(DateTime day) => _ruleDays.contains(day.weekday);
+  /// Whether [day] is strictly before today (date-level, local TZ).
+  bool _isDayPast(DateTime day) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    return DateTime(day.year, day.month, day.day).isBefore(today);
+  }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
 
     return TableCalendar<void>(
@@ -339,7 +223,8 @@ class _AgendaCalendar extends ConsumerWidget {
       onDaySelected: onDaySelected,
       onPageChanged: onPageChanged,
       calendarFormat: CalendarFormat.month,
-      eventLoader: (day) => _hasSlots(day) ? [null] : [],
+      eventLoader: (day) =>
+          (_hasSession(day) && !_isDayPast(day)) ? [null] : [],
       calendarStyle: CalendarStyle(
         outsideDaysVisible: false,
         todayDecoration: BoxDecoration(
@@ -387,31 +272,165 @@ class _AgendaCalendar extends ConsumerWidget {
   }
 }
 
+// ── Read-only day-sessions bottom sheet ──────────────────────────────────────
+
+/// Bottom sheet shown when the athlete taps a calendar day.
+///
+/// Lists the athlete's confirmed sessions for that day: time range + trainer
+/// name. No booking or cancel controls. SCENARIO-510.
+class _DaySessionsSheet extends ConsumerWidget {
+  const _DaySessionsSheet({
+    required this.day,
+    required this.sessions,
+  });
+
+  final DateTime day;
+  final List<Appointment> sessions;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final palette = AppPalette.of(context);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Sheet handle
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                color: palette.border,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+
+          // Date heading
+          Text(
+            AgendaStrings.formatDate(
+                DateTime(day.year, day.month, day.day, 12)),
+            style: GoogleFonts.barlowCondensed(
+              fontWeight: FontWeight.w700,
+              fontSize: 17,
+              color: palette.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          if (sessions.isEmpty) ...[
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                child: Text(
+                  'No tenés sesiones este día.',
+                  style: GoogleFonts.barlow(
+                    fontSize: 14,
+                    color: palette.textMuted,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ),
+          ] else ...[
+            ...sessions.map(
+              (appt) => _SessionRow(appointment: appt),
+            ),
+          ],
+
+          const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Single session row inside the day sheet ───────────────────────────────────
+
+class _SessionRow extends ConsumerWidget {
+  const _SessionRow({required this.appointment});
+
+  final Appointment appointment;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final palette = AppPalette.of(context);
+    final trainerAsync =
+        ref.watch(userPublicProfileProvider(appointment.trainerId));
+    final trainerName = trainerAsync.valueOrNull?.displayName ?? 'Tu PF';
+
+    final start = AgendaStrings.formatTime(appointment.startsAt);
+    final end = AgendaStrings.formatTime(
+      appointment.startsAt.add(Duration(minutes: appointment.durationMin)),
+    );
+    final range = '$start – $end · ${appointment.durationMin} min';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: palette.bg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: palette.border),
+      ),
+      child: Row(
+        children: [
+          Icon(TreinoIcon.clock, size: 18, color: palette.accent),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  range,
+                  style: GoogleFonts.barlowCondensed(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                    color: palette.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  trainerName,
+                  style: GoogleFonts.barlow(
+                    fontSize: 13,
+                    color: palette.textMuted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 // ── Appointment tile ──────────────────────────────────────────────────────────
 
-/// Displays a single appointment in the list below the calendar.
+/// Displays a single confirmed appointment in the upcoming list.
 ///
-/// Shows a cancel button (icon) only when [startsAt] is >24h from [now].
-/// SCENARIO-508 / 509.
-class AppointmentTile extends StatelessWidget {
+/// Read-only — no cancel control. SCENARIO-506 / 507.
+class AppointmentTile extends ConsumerWidget {
   const AppointmentTile({
     super.key,
     required this.appointment,
     required this.now,
-    required this.onCancel,
   });
 
   final Appointment appointment;
   final DateTime now;
-  final VoidCallback? onCancel;
-
-  bool get _canCancel =>
-      appointment.startsAt.difference(now) > const Duration(hours: 24);
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
-    final isCancelled = appointment.status == AppointmentStatus.cancelled;
+    final trainerAsync =
+        ref.watch(userPublicProfileProvider(appointment.trainerId));
+    final trainerName = trainerAsync.valueOrNull?.displayName ?? 'Tu PF';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -426,7 +445,7 @@ class AppointmentTile extends StatelessWidget {
           Icon(
             TreinoIcon.calendar,
             size: 20,
-            color: isCancelled ? palette.textMuted : palette.accent,
+            color: palette.accent,
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -438,13 +457,12 @@ class AppointmentTile extends StatelessWidget {
                   style: GoogleFonts.barlowCondensed(
                     fontWeight: FontWeight.w700,
                     fontSize: 15,
-                    color:
-                        isCancelled ? palette.textMuted : palette.textPrimary,
+                    color: palette.textPrimary,
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  AgendaStrings.formatTime(appointment.startsAt),
+                  '${AgendaStrings.formatTime(appointment.startsAt)} · ${appointment.durationMin} min · $trainerName',
                   style: GoogleFonts.barlow(
                     fontSize: 13,
                     color: palette.textMuted,
@@ -453,71 +471,7 @@ class AppointmentTile extends StatelessWidget {
               ],
             ),
           ),
-          if (isCancelled)
-            Text(
-              'Cancelado',
-              style: GoogleFonts.barlow(
-                fontSize: 12,
-                color: palette.textMuted,
-              ),
-            )
-          else if (_canCancel && onCancel != null)
-            IconButton(
-              icon: Icon(Icons.cancel_outlined,
-                  color: palette.highlight, size: 20),
-              onPressed: onCancel,
-              tooltip: AgendaStrings.cancellationConfirmCta,
-            ),
         ],
-      ),
-    );
-  }
-}
-
-// ── Test-only widget for SCENARIO-505 ────────────────────────────────────────
-
-/// @visibleForTesting — rendered only in tests to trigger booking race error.
-class AthleteAgendaScreenTest extends ConsumerWidget {
-  const AthleteAgendaScreenTest({
-    super.key,
-    required this.trainerId,
-    required this.athleteId,
-    required this.raceSlot,
-  });
-
-  final String trainerId;
-  final String athleteId;
-  final DateTime raceSlot;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final palette = AppPalette.of(context);
-    return Scaffold(
-      backgroundColor: palette.bg,
-      body: Center(
-        child: ElevatedButton(
-          key: const Key('trigger-race-booking'),
-          onPressed: () async {
-            final repo = ref.read(appointmentRepositoryProvider);
-            try {
-              await repo.book(
-                trainerId: trainerId,
-                athleteId: athleteId,
-                athleteDisplayName: 'Athlete',
-                startsAt: raceSlot,
-                durationMin: 60,
-              );
-            } on SlotAlreadyTakenException {
-              if (!context.mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text(AgendaStrings.bookingRaceError),
-                ),
-              );
-            }
-          },
-          child: const Text('trigger'),
-        ),
       ),
     );
   }

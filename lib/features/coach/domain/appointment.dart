@@ -48,6 +48,8 @@ class Appointment with _$Appointment {
     @TimestampConverter() DateTime? cancelledAt,
     String? cancelledBy,
     @Default([]) List<CancellationEntry> cancellationLog,
+    String? noteBefore,
+    String? noteAfter,
   }) = _Appointment;
 
   factory Appointment.fromJson(Map<String, Object?> json) =>

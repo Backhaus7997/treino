@@ -40,6 +40,8 @@ _$AppointmentImpl _$$AppointmentImplFromJson(Map<String, dynamic> json) =>
                   (e) => CancellationEntry.fromJson(e as Map<String, dynamic>))
               .toList() ??
           const [],
+      noteBefore: json['noteBefore'] as String?,
+      noteAfter: json['noteAfter'] as String?,
     );
 
 Map<String, dynamic> _$$AppointmentImplToJson(_$AppointmentImpl instance) =>
@@ -56,6 +58,8 @@ Map<String, dynamic> _$$AppointmentImplToJson(_$AppointmentImpl instance) =>
       'cancelledBy': instance.cancelledBy,
       'cancellationLog':
           instance.cancellationLog.map((e) => e.toJson()).toList(),
+      'noteBefore': instance.noteBefore,
+      'noteAfter': instance.noteAfter,
     };
 
 const _$AppointmentStatusEnumMap = {

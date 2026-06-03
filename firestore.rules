@@ -409,11 +409,21 @@ service cloud.firestore {
     //   Path 2 (ADR-1 flip): new athlete flips cancelled → confirmed.
     // Delete: never (audit trail preserved per ADR-1).
     match /appointments/{appointmentId} {
-      allow read: if request.auth != null;
+      // Privacy: a member only reads appointments they are part of — their own
+      // (athleteId) or the ones they run (trainerId). Closes the prior
+      // any-authenticated-user read. Safe now that athlete self-booking (whose
+      // transaction `get` read foreign slots) is removed in the read-only model.
+      allow read: if request.auth != null
+                  && (request.auth.uid == resource.data.athleteId
+                      || request.auth.uid == resource.data.trainerId);
+      // Create: either the athlete books their own slot (legacy self-booking),
+      // or the trainer registers a session (new trainer-driven model 2026-06-03).
       allow create: if request.auth != null
                     && request.resource.data.status == 'confirmed'
-                    && request.resource.data.athleteId == request.auth.uid;
-      // Update has 2 valid paths: cancellation by member, or flip cancelled→confirmed by new athlete.
+                    && (request.resource.data.athleteId == request.auth.uid
+                        || request.resource.data.trainerId == request.auth.uid);
+      // Update has 3 valid paths: cancellation by member, flip cancelled→confirmed,
+      // or trainer edits coaching notes.
       allow update: if request.auth != null && (
         // Path 1: cancellation by member with >24h
         (request.resource.data.status == 'cancelled'
@@ -425,6 +435,14 @@ service cloud.firestore {
         (resource.data.status == 'cancelled'
          && request.resource.data.status == 'confirmed'
          && request.resource.data.athleteId == request.auth.uid)
+        ||
+        // Path 3: trainer edits coaching notes on their own appointment.
+        // status / athleteId / trainerId / startsAt stay immutable.
+        (request.auth.uid == resource.data.trainerId
+         && request.resource.data.status == resource.data.status
+         && request.resource.data.athleteId == resource.data.athleteId
+         && request.resource.data.trainerId == resource.data.trainerId
+         && request.resource.data.startsAt == resource.data.startsAt)
       );
       allow delete: if false;
     }
@@ -468,6 +486,47 @@ service cloud.firestore {
                     && request.resource.data.athleteId == resource.data.athleteId;
       allow delete: if request.auth != null
                     && resource.data.recordedBy == request.auth.uid;
+    }
+
+    // Per-athlete billing config set by the trainer (Pagos P1).
+    // Doc id is deterministic: `${trainerId}_${athleteId}`.
+    match /athlete_billing/{docId} {
+      allow read: if request.auth != null
+                  && (request.auth.uid == resource.data.trainerId
+                      || request.auth.uid == resource.data.athleteId);
+      allow create, update: if request.auth != null
+                  && request.resource.data.trainerId == request.auth.uid
+                  && request.resource.data.athleteId is string
+                  && request.resource.data.athleteId.size() > 0;
+      allow delete: if request.auth != null && resource.data.trainerId == request.auth.uid;
+    }
+
+    // Private per-athlete coaching note written by the trainer. Trainer-only —
+    // the athlete cannot read it.
+    match /athlete_notes/{docId} {
+      allow read: if request.auth != null
+                  && request.auth.uid == resource.data.trainerId;
+      allow create, update: if request.auth != null
+                  && request.resource.data.trainerId == request.auth.uid
+                  && request.resource.data.athleteId is string
+                  && request.resource.data.athleteId.size() > 0;
+      allow delete: if request.auth != null && resource.data.trainerId == request.auth.uid;
+    }
+
+    // Payment records created by trainers against athletes (Pagos P1).
+    match /payments/{paymentId} {
+      allow read: if request.auth != null
+                  && (request.auth.uid == resource.data.trainerId
+                      || request.auth.uid == resource.data.athleteId);
+      allow create: if request.auth != null
+                  && request.resource.data.trainerId == request.auth.uid
+                  && request.resource.data.athleteId is string
+                  && request.resource.data.athleteId.size() > 0;
+      allow update: if request.auth != null
+                  && resource.data.trainerId == request.auth.uid
+                  && request.resource.data.trainerId == resource.data.trainerId
+                  && request.resource.data.athleteId == resource.data.athleteId;
+      allow delete: if request.auth != null && resource.data.trainerId == request.auth.uid;
     }
 
     // Athlete → trainer reviews (Fase 6 Etapa 7).

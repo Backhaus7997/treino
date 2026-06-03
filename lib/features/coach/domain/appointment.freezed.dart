@@ -219,6 +219,8 @@ mixin _$Appointment {
   String? get cancelledBy => throw _privateConstructorUsedError;
   List<CancellationEntry> get cancellationLog =>
       throw _privateConstructorUsedError;
+  String? get noteBefore => throw _privateConstructorUsedError;
+  String? get noteAfter => throw _privateConstructorUsedError;
 
   /// Serializes this Appointment to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -246,7 +248,9 @@ abstract class $AppointmentCopyWith<$Res> {
       AppointmentStatus status,
       @TimestampConverter() DateTime? cancelledAt,
       String? cancelledBy,
-      List<CancellationEntry> cancellationLog});
+      List<CancellationEntry> cancellationLog,
+      String? noteBefore,
+      String? noteAfter});
 }
 
 /// @nodoc
@@ -274,6 +278,8 @@ class _$AppointmentCopyWithImpl<$Res, $Val extends Appointment>
     Object? cancelledAt = freezed,
     Object? cancelledBy = freezed,
     Object? cancellationLog = null,
+    Object? noteBefore = freezed,
+    Object? noteAfter = freezed,
   }) {
     return _then(_value.copyWith(
       id: null == id
@@ -316,6 +322,14 @@ class _$AppointmentCopyWithImpl<$Res, $Val extends Appointment>
           ? _value.cancellationLog
           : cancellationLog // ignore: cast_nullable_to_non_nullable
               as List<CancellationEntry>,
+      noteBefore: freezed == noteBefore
+          ? _value.noteBefore
+          : noteBefore // ignore: cast_nullable_to_non_nullable
+              as String?,
+      noteAfter: freezed == noteAfter
+          ? _value.noteAfter
+          : noteAfter // ignore: cast_nullable_to_non_nullable
+              as String?,
     ) as $Val);
   }
 }
@@ -338,7 +352,9 @@ abstract class _$$AppointmentImplCopyWith<$Res>
       AppointmentStatus status,
       @TimestampConverter() DateTime? cancelledAt,
       String? cancelledBy,
-      List<CancellationEntry> cancellationLog});
+      List<CancellationEntry> cancellationLog,
+      String? noteBefore,
+      String? noteAfter});
 }
 
 /// @nodoc
@@ -364,6 +380,8 @@ class __$$AppointmentImplCopyWithImpl<$Res>
     Object? cancelledAt = freezed,
     Object? cancelledBy = freezed,
     Object? cancellationLog = null,
+    Object? noteBefore = freezed,
+    Object? noteAfter = freezed,
   }) {
     return _then(_$AppointmentImpl(
       id: null == id
@@ -406,6 +424,14 @@ class __$$AppointmentImplCopyWithImpl<$Res>
           ? _value._cancellationLog
           : cancellationLog // ignore: cast_nullable_to_non_nullable
               as List<CancellationEntry>,
+      noteBefore: freezed == noteBefore
+          ? _value.noteBefore
+          : noteBefore // ignore: cast_nullable_to_non_nullable
+              as String?,
+      noteAfter: freezed == noteAfter
+          ? _value.noteAfter
+          : noteAfter // ignore: cast_nullable_to_non_nullable
+              as String?,
     ));
   }
 }
@@ -423,7 +449,9 @@ class _$AppointmentImpl extends _Appointment {
       required this.status,
       @TimestampConverter() this.cancelledAt,
       this.cancelledBy,
-      final List<CancellationEntry> cancellationLog = const []})
+      final List<CancellationEntry> cancellationLog = const [],
+      this.noteBefore,
+      this.noteAfter})
       : _cancellationLog = cancellationLog,
         super._();
 
@@ -460,8 +488,13 @@ class _$AppointmentImpl extends _Appointment {
   }
 
   @override
+  final String? noteBefore;
+  @override
+  final String? noteAfter;
+
+  @override
   String toString() {
-    return 'Appointment(id: $id, trainerId: $trainerId, athleteId: $athleteId, athleteDisplayName: $athleteDisplayName, startsAt: $startsAt, durationMin: $durationMin, status: $status, cancelledAt: $cancelledAt, cancelledBy: $cancelledBy, cancellationLog: $cancellationLog)';
+    return 'Appointment(id: $id, trainerId: $trainerId, athleteId: $athleteId, athleteDisplayName: $athleteDisplayName, startsAt: $startsAt, durationMin: $durationMin, status: $status, cancelledAt: $cancelledAt, cancelledBy: $cancelledBy, cancellationLog: $cancellationLog, noteBefore: $noteBefore, noteAfter: $noteAfter)';
   }
 
   @override
@@ -486,7 +519,11 @@ class _$AppointmentImpl extends _Appointment {
             (identical(other.cancelledBy, cancelledBy) ||
                 other.cancelledBy == cancelledBy) &&
             const DeepCollectionEquality()
-                .equals(other._cancellationLog, _cancellationLog));
+                .equals(other._cancellationLog, _cancellationLog) &&
+            (identical(other.noteBefore, noteBefore) ||
+                other.noteBefore == noteBefore) &&
+            (identical(other.noteAfter, noteAfter) ||
+                other.noteAfter == noteAfter));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -502,7 +539,9 @@ class _$AppointmentImpl extends _Appointment {
       status,
       cancelledAt,
       cancelledBy,
-      const DeepCollectionEquality().hash(_cancellationLog));
+      const DeepCollectionEquality().hash(_cancellationLog),
+      noteBefore,
+      noteAfter);
 
   /// Create a copy of Appointment
   /// with the given fields replaced by the non-null parameter values.
@@ -531,7 +570,9 @@ abstract class _Appointment extends Appointment {
       required final AppointmentStatus status,
       @TimestampConverter() final DateTime? cancelledAt,
       final String? cancelledBy,
-      final List<CancellationEntry> cancellationLog}) = _$AppointmentImpl;
+      final List<CancellationEntry> cancellationLog,
+      final String? noteBefore,
+      final String? noteAfter}) = _$AppointmentImpl;
   const _Appointment._() : super._();
 
   factory _Appointment.fromJson(Map<String, dynamic> json) =
@@ -559,6 +600,10 @@ abstract class _Appointment extends Appointment {
   String? get cancelledBy;
   @override
   List<CancellationEntry> get cancellationLog;
+  @override
+  String? get noteBefore;
+  @override
+  String? get noteAfter;
 
   /// Create a copy of Appointment
   /// with the given fields replaced by the non-null parameter values.

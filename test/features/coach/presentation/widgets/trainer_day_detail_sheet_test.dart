@@ -9,9 +9,11 @@ import 'package:treino/features/coach/data/availability_repository.dart';
 import 'package:treino/features/coach/domain/appointment.dart';
 import 'package:treino/features/coach/domain/availability_override.dart';
 import 'package:treino/features/coach/domain/availability_rule.dart';
+import 'package:treino/features/coach/application/athlete_note_providers.dart';
 import 'package:treino/features/coach/presentation/agenda_strings.dart';
 import 'package:treino/features/coach/presentation/widgets/trainer_day_detail_sheet.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
+import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 
 // ── Fakes ─────────────────────────────────────────────────────────────────────
 
@@ -171,13 +173,15 @@ void main() {
     );
   });
 
-  // ── SCENARIO-522: booked slot tap → action menu with cancel option ────────
-  group('SCENARIO-522 — Booked slot tap shows cancel action', () {
+  // ── SCENARIO-522: booked slot tap → SessionDetailSheet with cancel ────────
+  //
+  // Behavior change: tapping a booked chip now opens the SessionDetailSheet
+  // instead of an action menu. Cancel is still reachable via the sheet's
+  // "CANCELAR RESERVA" button (when >24h ahead).
+  group('SCENARIO-522 — Booked slot tap shows SessionDetailSheet', () {
     testWidgets(
-      'SCENARIO-522: tapping booked chip opens action menu with cancel',
+      'SCENARIO-522: tapping booked chip opens SessionDetailSheet with time and CANCELAR RESERVA for >24h future',
       (tester) async {
-        // ignore: unused_local_variable
-        final rule = _makeRule(dayOfWeek: DateTime.tuesday);
         // Make appointment far in the future so cancel is available (>24h)
         final futureAppt = Appointment(
           id: 'trainer-1_99999999999999',
@@ -225,6 +229,14 @@ void main() {
               fromDate: _kFrom,
               toDate: _kTo,
             )).overrideWith((ref) => Stream.value([futureAppt])),
+            // Stub athlete note stream → no note
+            athleteNoteProvider(
+                    (trainerId: 'trainer-1', athleteId: 'athlete-1'))
+                .overrideWith((ref) => Stream.value(null)),
+            // Stub public profile → null (chip falls back to athleteDisplayName)
+            userPublicProfileProvider('athlete-1').overrideWith((ref) async* {
+              yield null;
+            }),
           ],
         ));
         await tester.pump();
@@ -234,8 +246,17 @@ void main() {
         await tester.tap(find.text('Athlete One'));
         await tester.pumpAndSettle();
 
-        // The action menu should show the cancel option
-        expect(find.text(AgendaStrings.cancellationConfirmCta), findsOneWidget);
+        // The SessionDetailSheet should show the time range (HH:mm – HH:mm · N min)
+        final timeTexts = tester.widgetList<Text>(find.byType(Text));
+        final hasTimeRange = timeTexts.any((t) {
+          final d = t.data ?? '';
+          return RegExp(r'\d{2}:\d{2}\s*–\s*\d{2}:\d{2}').hasMatch(d);
+        });
+        expect(hasTimeRange, isTrue,
+            reason: 'SessionDetailSheet should show a time range header');
+
+        // The CANCELAR RESERVA button should be visible (>24h future)
+        expect(find.text('CANCELAR RESERVA'), findsOneWidget);
       },
     );
   });

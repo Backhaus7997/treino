@@ -8,19 +8,45 @@ import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/coach/application/trainer_discovery_providers.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/athlete_coach_view.dart';
+import 'package:treino/features/coach/data/session_share_repository.dart';
 import 'package:treino/features/coach/data/trainer_link_repository.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach/presentation/trainers_list_screen.dart';
+import 'package:treino/features/payments/application/mi_cuota_provider.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
 
 class _MockTrainerLinkRepository extends Mock
     implements TrainerLinkRepository {}
 
+/// No-op share repo so the toggle's grant/revoke never touches Firestore.
+class _FakeSessionShareRepository implements SessionShareRepository {
+  @override
+  Future<void> grant({
+    required String athleteId,
+    required String trainerId,
+  }) async {}
+
+  @override
+  Future<void> revoke(String athleteId) async {}
+}
+
 Widget _wrap(Widget child, {List<Override> overrides = const []}) =>
     ProviderScope(
-      overrides: overrides,
+      overrides: [
+        // Keep Firestore out of these widget tests. Both the payments "Tu cuota"
+        // section (miCuotaProvider) and the share toggle's grant/revoke
+        // (sessionShareRepositoryProvider) read firestoreProvider, which has no
+        // Firebase app in unit tests. Test-specific overrides below win (last
+        // override for a provider takes precedence).
+        miCuotaProvider.overrideWith(
+          (ref) => const AsyncValue<MiCuotaState?>.data(null),
+        ),
+        sessionShareRepositoryProvider
+            .overrideWithValue(_FakeSessionShareRepository()),
+        ...overrides,
+      ],
       child: MaterialApp(
         theme: AppTheme.dark(),
         home: Scaffold(body: child),
