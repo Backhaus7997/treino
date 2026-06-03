@@ -86,8 +86,17 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
   List<_EditableDay> _days = [_EditableDay(dayNumber: 1, name: 'Día 1')];
   bool _submitting = false;
 
+  /// Whether the editor is in a trainer-creating mode (assigning or
+  /// templating). Athlete (SelfCreating) mode hides trainer-only fields.
+  /// REQ-RER-012, REQ-RER-013, ADR-RER-04.
+  bool get _isTrainerMode =>
+      widget.mode is TrainerAssigning || widget.mode is TrainerTemplating;
+
   bool get _isValid {
-    if (_name.trim().isEmpty || _split.trim().isEmpty) return false;
+    if (_name.trim().isEmpty) return false;
+    // Split is required only in trainer modes (athlete-created routines
+    // submit split: null per ADR-RER-04).
+    if (_isTrainerMode && _split.trim().isEmpty) return false;
     if (_days.isEmpty) return false;
     for (final day in _days) {
       if (day.slots.isEmpty) return false;
@@ -252,11 +261,14 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
             setState(() => _submitting = false);
             return;
           }
+          // ADR-RER-04: athlete-created routines submit split: null and a
+          // fixed beginner level. The form hides those fields in
+          // SelfCreating mode (T-RER-030).
           final draft = Routine(
             id: '',
             name: _name.trim(),
-            split: _split.trim(),
-            level: _level,
+            split: null,
+            level: ExperienceLevel.beginner,
             days: days,
             source: RoutineSource.userCreated,
             visibility: RoutineVisibility.private,
@@ -326,7 +338,9 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
                 children: [
-                  // ── Row: Name + Split (side by side to save vertical space) ─
+                  // ── Name + (Split when trainer mode) ─────────────────────
+                  // T-RER-030: athlete (SelfCreating) form shows only Name +
+                  // Days-of-plan. Trainer modes show all fields.
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -347,44 +361,49 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
                               ),
                               decoration: _inputDecoration(
                                 palette,
-                                hint: 'Ej: Fuerza PPL',
+                                hint: _isTrainerMode
+                                    ? 'Ej: Fuerza PPL'
+                                    : WorkoutStrings.selfEditorNameHint,
                               ),
                               onChanged: (v) => setState(() => _name = v),
                             ),
                           ],
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _SectionLabel(
-                              label: CoachStrings.editorSplitLabel,
-                              palette: palette,
-                            ),
-                            const SizedBox(height: 4),
-                            TextField(
-                              key: const Key('editor_split_field'),
-                              style: GoogleFonts.barlow(
-                                color: palette.textPrimary,
-                                fontSize: 13,
+                      if (_isTrainerMode) ...[
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _SectionLabel(
+                                label: CoachStrings.editorSplitLabel,
+                                palette: palette,
                               ),
-                              decoration: _inputDecoration(
-                                palette,
-                                hint: 'PPL / Full Body',
+                              const SizedBox(height: 4),
+                              TextField(
+                                key: const Key('editor_split_field'),
+                                style: GoogleFonts.barlow(
+                                  color: palette.textPrimary,
+                                  fontSize: 13,
+                                ),
+                                decoration: _inputDecoration(
+                                  palette,
+                                  hint: 'PPL / Full Body',
+                                ),
+                                onChanged: (v) => setState(() => _split = v),
                               ),
-                              onChanged: (v) => setState(() => _split = v),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
+                      ],
                     ],
                   ),
-                  const SizedBox(height: 8),
 
-                  // ── Row: Days/week + Level (side by side) ─────────────────
-                  Row(
+                  // ── Row: Days/week + Level — trainer modes only ──────────
+                  if (_isTrainerMode) ...[
+                    const SizedBox(height: 8),
+                    Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(
@@ -421,6 +440,7 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
                       ),
                     ],
                   ),
+                  ],
                   const SizedBox(height: 12),
 
                   // ── Días del plan ─────────────────────────────────────────
