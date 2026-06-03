@@ -147,5 +147,56 @@ void main() {
         expect(tokens, isNot(contains('tok-remove')));
       },
     );
+
+    // REQ-PN-DATA-001: saveToken creates fcmTokens when the doc exists but
+    // the field is absent.
+    test(
+      'REQ-PN-DATA-001: saveToken creates fcmTokens field when doc has no '
+      'fcmTokens key at all',
+      () async {
+        const uid = 'user-no-field';
+        // Doc exists but has no fcmTokens field.
+        await firestore.collection('users').doc(uid).set({'uid': uid});
+
+        await repo.saveToken(uid, 'tok-new');
+
+        final snap = await firestore.collection('users').doc(uid).get();
+        final tokens = List<String>.from(
+          (snap.data()?['fcmTokens'] as List?) ?? [],
+        );
+        expect(tokens, equals(['tok-new']));
+      },
+    );
+
+    // ADR-PN-001: verify the field name is fcmTokens (camelCase), not
+    // fcm_tokens (snake_case).
+    test(
+      'ADR-PN-001: field name stored is fcmTokens (camelCase), '
+      'not fcm_tokens (snake_case)',
+      () async {
+        const uid = 'user-field-name';
+        await seedDoc(uid);
+
+        await repo.saveToken(uid, 'tok-camel');
+
+        final snap = await firestore.collection('users').doc(uid).get();
+        final data = snap.data() ?? {};
+        expect(data.containsKey('fcmTokens'), isTrue);
+        expect(data.containsKey('fcm_tokens'), isFalse);
+      },
+    );
+
+    // REQ-PN-DATA-003: removeToken on a missing doc is a no-op.
+    test(
+      'REQ-PN-DATA-003: removeToken on non-existent doc is a no-op, no error',
+      () async {
+        const uid = 'user-nonexistent';
+        // Doc was never created — should not throw.
+        await expectLater(
+          () => repo.removeToken(uid, 'tok-ghost'),
+          returnsNormally,
+        );
+      },
+    );
   });
 }
