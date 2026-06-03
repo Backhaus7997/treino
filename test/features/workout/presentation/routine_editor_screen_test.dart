@@ -437,6 +437,60 @@ void main() {
     });
   });
 
+  // ── SCENARIO-SS-001: "+ Superserie" gating ───────────────────────────────────
+
+  group('RoutineEditorScreen — superset gating', () {
+    testWidgets('SCENARIO-SS-001: TrainerAssigning shows "+ Superserie" button',
+        (tester) async {
+      await _pumpEditorWithMode(
+        tester,
+        mode: const TrainerAssigning(athleteId: 'athlete-1'),
+        overrides: _baseOverrides(),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('add_superset_button')), findsOneWidget);
+    });
+
+    testWidgets(
+        'SCENARIO-SS-002: TrainerTemplating shows "+ Superserie" button',
+        (tester) async {
+      await _pumpEditorWithMode(
+        tester,
+        mode: const TrainerTemplating(),
+        overrides: _baseOverrides(),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('add_superset_button')), findsOneWidget);
+    });
+
+    testWidgets(
+        'SCENARIO-SS-003: SelfCreating mode does NOT show "+ Superserie" button',
+        (tester) async {
+      final overrides = [
+        currentUidProvider.overrideWithValue('athlete-1'),
+        routineRepositoryProvider.overrideWithValue(_MockRoutineRepository()),
+        exercisesProvider.overrideWith((ref) async => _kExercises),
+        customExercisesForTrainerStreamProvider('athlete-1').overrideWith(
+          (ref) => Stream<List<CustomExercise>>.value(const <CustomExercise>[]),
+        ),
+        analyticsServiceProvider.overrideWithValue(FakeAnalyticsService()),
+        userCreatedRoutinesProvider('athlete-1').overrideWith(
+          (ref) => Stream.value(<Routine>[]),
+        ),
+      ];
+      await _pumpEditorWithMode(
+        tester,
+        mode: const SelfCreating(),
+        overrides: overrides,
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('add_superset_button')), findsNothing);
+    });
+  });
+
   // ── SCENARIO-616..619: RoutineEditorMode parametrization (T-USR-023) ─────────
 
   group('RoutineEditorScreen — mode parametrization', () {

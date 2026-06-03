@@ -65,6 +65,7 @@ abstract final class CoachStrings {
   static const editorSplitLabel = 'SPLIT (e.g. PPL)';
   static const editorAddDay = 'Agregar día';
   static const editorAddSlot = 'Agregar ejercicio';
+  static const editorAddSuperset = '+ Superserie';
   static const editorSubmit = 'ASIGNAR PLAN';
   static const exercisePicker = 'Buscar ejercicio';
 }

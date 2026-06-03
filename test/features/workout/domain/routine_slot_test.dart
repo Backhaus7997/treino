@@ -71,5 +71,44 @@ void main() {
       expect(slot.notes, isNull);
       expect(slot.exerciseId, equals('deadlift'));
     });
+
+    test('SCENARIO-046: supersetGroup roundtrip preserves value', () {
+      const slot = RoutineSlot(
+        exerciseId: 'pull-up',
+        exerciseName: 'Pull Up',
+        muscleGroup: 'back',
+        targetSets: 3,
+        targetRepsMin: 6,
+        targetRepsMax: 10,
+        restSeconds: 90,
+        supersetGroup: 2,
+      );
+
+      final json = slot.toJson();
+      final decoded = RoutineSlot.fromJson(json);
+
+      expect(decoded.supersetGroup, equals(2));
+      expect(decoded, equals(slot));
+    });
+
+    test(
+        'SCENARIO-047: legacy map without supersetGroup deserializes with null '
+        '(backward-compatible)', () {
+      // Simulates a Firestore doc written before supersetGroup was added.
+      final legacyMap = <String, dynamic>{
+        'exerciseId': 'squat',
+        'exerciseName': 'Squat',
+        'muscleGroup': 'legs',
+        'targetSets': 4,
+        'targetRepsMin': 5,
+        'targetRepsMax': 8,
+        'restSeconds': 150,
+      };
+
+      final slot = RoutineSlot.fromJson(legacyMap);
+
+      expect(slot.supersetGroup, isNull,
+          reason: 'old docs must decode with supersetGroup: null');
+    });
   });
 }

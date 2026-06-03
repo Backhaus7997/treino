@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -30,6 +32,7 @@ class _EditableSlot {
   int targetRepsMin = 8;
   int targetRepsMax = 12;
   int restSeconds = 60;
+  int? supersetGroup;
 
   _EditableSlot();
 }
@@ -142,25 +145,51 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
   /// Opens the multi-select picker for [dayIndex] and appends N new slots.
   /// Passes [alreadySelectedIds] so the picker pre-marks exercises already in
   /// the day — the user avoids accidental re-adds. (ADR-RER-01)
-  Future<void> _pickExercisesForDay(
-      BuildContext context, int dayIndex) async {
+  Future<void> _pickExercisesForDay(BuildContext context, int dayIndex) async {
     final existingIds = _days[dayIndex]
         .slots
         .where((s) => s.exercise != null)
         .map((s) => s.exercise!.id)
         .toSet();
-    final picked = await showExercisePicker(
-      context,
-      alreadySelectedIds: existingIds,
-    );
+    final picked = await showExercisePicker(context);
     if (picked == null || picked.isEmpty || !mounted) return;
     setState(() {
-      for (final ex in picked) {
+      // Only add exercises not already in this day (one instance per day) —
+      // avoids the duplicate-on-reopen issue.
+      for (final ex in picked.where((e) => !existingIds.contains(e.id))) {
         final slot = _EditableSlot()
           ..exercise = ex
           ..restSeconds = ex.defaultRestSeconds ?? 60;
         _days[dayIndex].slots = [..._days[dayIndex].slots, slot];
       }
+    });
+  }
+
+  /// Opens the multi-select picker for [dayIndex] and appends all picked
+  /// exercises as a new superset block (shared non-null [supersetGroup]).
+  /// Trainer mode only — gated at the call site via [allowSuperset].
+  Future<void> _addSupersetForDay(BuildContext context, int dayIndex) async {
+    final existingIds = _days[dayIndex]
+        .slots
+        .where((s) => s.exercise != null)
+        .map((s) => s.exercise!.id)
+        .toSet();
+    final picked = await showExercisePicker(context);
+    if (picked == null || picked.isEmpty || !mounted) return;
+    setState(() {
+      final day = _days[dayIndex];
+      // Skip exercises already in this day (one instance per day).
+      final newOnes = picked.where((e) => !existingIds.contains(e.id)).toList();
+      if (newOnes.isEmpty) return;
+      final nextGroup =
+          (day.slots.map((s) => s.supersetGroup ?? 0).fold(0, max)) + 1;
+      final newSlots = newOnes
+          .map((ex) => _EditableSlot()
+            ..exercise = ex
+            ..restSeconds = ex.defaultRestSeconds ?? 60
+            ..supersetGroup = nextGroup)
+          .toList();
+      day.slots = [...day.slots, ...newSlots];
     });
   }
 
@@ -179,23 +208,36 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
     setState(() => _submitting = true);
     final uid = ref.read(currentUidProvider) ?? '';
 
-    final days = _days
-        .map((d) => RoutineDay(
-              dayNumber: d.dayNumber,
-              name: d.name,
-              slots: d.slots
-                  .map((s) => RoutineSlot(
-                        exerciseId: s.exercise!.id,
-                        exerciseName: s.exercise!.name,
-                        muscleGroup: s.exercise!.muscleGroup,
-                        targetSets: s.targetSets,
-                        targetRepsMin: s.targetRepsMin,
-                        targetRepsMax: s.targetRepsMax,
-                        restSeconds: s.restSeconds,
-                      ))
-                  .toList(),
-            ))
-        .toList();
+    final days = _days.map((d) {
+      // Normalize: a "superset" of 1 slot is just a standalone.
+      final groupCounts = <int, int>{};
+      for (final s in d.slots) {
+        if (s.supersetGroup != null) {
+          groupCounts[s.supersetGroup!] =
+              (groupCounts[s.supersetGroup!] ?? 0) + 1;
+        }
+      }
+      return RoutineDay(
+        dayNumber: d.dayNumber,
+        name: d.name,
+        slots: d.slots.map((s) {
+          final effectiveGroup = (s.supersetGroup != null &&
+                  (groupCounts[s.supersetGroup!] ?? 0) >= 2)
+              ? s.supersetGroup
+              : null;
+          return RoutineSlot(
+            exerciseId: s.exercise!.id,
+            exerciseName: s.exercise!.name,
+            muscleGroup: s.exercise!.muscleGroup,
+            targetSets: s.targetSets,
+            targetRepsMin: s.targetRepsMin,
+            targetRepsMax: s.targetRepsMax,
+            restSeconds: s.restSeconds,
+            supersetGroup: effectiveGroup,
+          );
+        }).toList(),
+      );
+    }).toList();
 
     try {
       final repo = ref.read(routineRepositoryProvider);
@@ -222,8 +264,7 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
               );
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-                content: Text(CoachStrings.createPlanSuccess)),
+            const SnackBar(content: Text(CoachStrings.createPlanSuccess)),
           );
           context.pop();
 
@@ -243,8 +284,7 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
           await repo.createTemplate(routine);
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-                content: Text(CoachStrings.createPlanSuccess)),
+            const SnackBar(content: Text(CoachStrings.createPlanSuccess)),
           );
           context.pop();
 
@@ -276,8 +316,7 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
           await repo.createUserOwned(uid: uid, draft: draft);
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-                content: Text(WorkoutStrings.selfEditorSuccess)),
+            const SnackBar(content: Text(WorkoutStrings.selfEditorSuccess)),
           );
           context.pop();
 
@@ -404,42 +443,43 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
                   if (_isTrainerMode) ...[
                     const SizedBox(height: 8),
                     Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _SectionLabel(label: 'DÍAS/SEM', palette: palette),
-                            const SizedBox(height: 4),
-                            _DaysPerWeekSelector(
-                              value: _daysPerWeek,
-                              palette: palette,
-                              onChanged: (v) =>
-                                  setState(() => _daysPerWeek = v),
-                            ),
-                          ],
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _SectionLabel(
+                                  label: 'DÍAS/SEM', palette: palette),
+                              const SizedBox(height: 4),
+                              _DaysPerWeekSelector(
+                                value: _daysPerWeek,
+                                palette: palette,
+                                onChanged: (v) =>
+                                    setState(() => _daysPerWeek = v),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _SectionLabel(label: 'NIVEL', palette: palette),
-                            const SizedBox(height: 4),
-                            _LevelDropdown(
-                              value: _level,
-                              palette: palette,
-                              onChanged: (v) {
-                                if (v != null) setState(() => _level = v);
-                              },
-                            ),
-                          ],
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _SectionLabel(label: 'NIVEL', palette: palette),
+                              const SizedBox(height: 4),
+                              _LevelDropdown(
+                                value: _level,
+                                palette: palette,
+                                onChanged: (v) {
+                                  if (v != null) setState(() => _level = v);
+                                },
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
+                      ],
+                    ),
                   ],
                   const SizedBox(height: 12),
 
@@ -456,6 +496,10 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
                       onRemoveDay:
                           _days.length > 1 ? () => _removeDay(di) : null,
                       onSlotChanged: () => setState(() {}),
+                      allowSuperset: _isTrainerMode,
+                      onAddSuperset: _isTrainerMode
+                          ? () => _addSupersetForDay(context, di)
+                          : null,
                     ),
                     const SizedBox(height: 6),
                   ],
@@ -555,6 +599,8 @@ class _DayExpansionTile extends StatefulWidget {
     required this.onRemoveSlot,
     required this.onRemoveDay,
     required this.onSlotChanged,
+    this.allowSuperset = false,
+    this.onAddSuperset,
   });
 
   final _EditableDay day;
@@ -563,6 +609,8 @@ class _DayExpansionTile extends StatefulWidget {
   final void Function(int slotIndex) onRemoveSlot;
   final VoidCallback? onRemoveDay;
   final VoidCallback onSlotChanged;
+  final bool allowSuperset;
+  final VoidCallback? onAddSuperset;
 
   @override
   State<_DayExpansionTile> createState() => _DayExpansionTileState();
@@ -570,6 +618,53 @@ class _DayExpansionTile extends StatefulWidget {
 
 class _DayExpansionTileState extends State<_DayExpansionTile> {
   bool _expanded = true;
+
+  /// Walks the slot list and emits either a standalone [_SlotEditor] or a
+  /// "SUPERSERIE" wrapper card for consecutive slots sharing a non-null group.
+  List<Widget> _buildSlotRows(AppPalette palette) {
+    final slots = widget.day.slots;
+    final rows = <Widget>[];
+    int si = 0;
+    while (si < slots.length) {
+      final slot = slots[si];
+      final group = slot.supersetGroup;
+      if (group != null) {
+        // Collect all consecutive slots with the same group id.
+        final groupSlots = <({int index, _EditableSlot slot})>[];
+        int scan = si;
+        while (scan < slots.length && slots[scan].supersetGroup == group) {
+          groupSlots.add((index: scan, slot: slots[scan]));
+          scan++;
+        }
+        // Render superset wrapper card.
+        rows.add(_SupersetGroupCard(
+          groupSlots: groupSlots,
+          palette: palette,
+          onRemoveSlot: widget.onRemoveSlot,
+          onChanged: widget.onSlotChanged,
+        ));
+        rows.add(const SizedBox(height: 8));
+        si = scan;
+      } else {
+        // Standalone slot. Capture the absolute index in a local — the closure
+        // must NOT close over the mutating loop variable `si` (it ends at
+        // slots.length, which silently broke removal). ObjectKey keeps each
+        // row's State bound to its slot so the int fields don't show stale
+        // values after a removal shifts the list.
+        final idx = si;
+        rows.add(_SlotEditor(
+          key: ObjectKey(slot),
+          slot: slot,
+          palette: palette,
+          onRemove: () => widget.onRemoveSlot(idx),
+          onChanged: widget.onSlotChanged,
+        ));
+        rows.add(const SizedBox(height: 8));
+        si++;
+      }
+    }
+    return rows;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -628,15 +723,7 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
               padding: const EdgeInsets.fromLTRB(14, 8, 14, 8),
               child: Column(
                 children: [
-                  for (int si = 0; si < widget.day.slots.length; si++) ...[
-                    _SlotEditor(
-                      slot: widget.day.slots[si],
-                      palette: palette,
-                      onRemove: () => widget.onRemoveSlot(si),
-                      onChanged: widget.onSlotChanged,
-                    ),
-                    const SizedBox(height: 8),
-                  ],
+                  ..._buildSlotRows(palette),
                   // Add slot button
                   SizedBox(
                     width: double.infinity,
@@ -654,9 +741,92 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
                       ),
                     ),
                   ),
+                  // "+ Superserie" button — trainer mode only
+                  if (widget.allowSuperset)
+                    SizedBox(
+                      width: double.infinity,
+                      child: TextButton.icon(
+                        key: const Key('add_superset_button'),
+                        onPressed: widget.onAddSuperset,
+                        icon: Icon(TreinoIcon.streak,
+                            size: 14, color: palette.highlight),
+                        label: Text(
+                          CoachStrings.editorAddSuperset,
+                          style: GoogleFonts.barlowCondensed(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                            color: palette.highlight,
+                          ),
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// ── Superset group card ───────────────────────────────────────────────────────
+
+/// Wrapper card rendered around consecutive slots sharing the same
+/// [supersetGroup]. Shows a "SUPERSERIE" header with a flame icon,
+/// then stacks each slot's [_SlotEditor].
+class _SupersetGroupCard extends StatelessWidget {
+  const _SupersetGroupCard({
+    required this.groupSlots,
+    required this.palette,
+    required this.onRemoveSlot,
+    required this.onChanged,
+  });
+
+  final List<({int index, _EditableSlot slot})> groupSlots;
+  final AppPalette palette;
+  final void Function(int slotIndex) onRemoveSlot;
+  final VoidCallback onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+      decoration: BoxDecoration(
+        color: palette.highlight.withAlpha(15),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: palette.highlight),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header row
+          Row(
+            children: [
+              Icon(TreinoIcon.streak, size: 14, color: palette.highlight),
+              const SizedBox(width: 6),
+              Text(
+                'SUPERSERIE',
+                style: GoogleFonts.barlowCondensed(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12,
+                  letterSpacing: 1.2,
+                  color: palette.highlight,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          // Slot editors stacked
+          for (final entry in groupSlots) ...[
+            _SlotEditor(
+              key: ObjectKey(entry.slot),
+              slot: entry.slot,
+              palette: palette,
+              onRemove: () => onRemoveSlot(entry.index),
+              onChanged: onChanged,
+            ),
+            if (entry != groupSlots.last) const SizedBox(height: 6),
           ],
         ],
       ),
@@ -668,6 +838,7 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
 
 class _SlotEditor extends StatelessWidget {
   const _SlotEditor({
+    super.key,
     required this.slot,
     required this.palette,
     required this.onRemove,
