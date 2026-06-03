@@ -218,3 +218,74 @@ PR#2b tasks: T-PN-034 through T-PN-047 (Flutter handler + UI)
 - **Scope**: 4 CF triggers + index.ts exports + Info.plist + APNs doc. No Flutter, no rules, no indexes.
 - **Quality gates**: build 0 errors, lint 0 warnings, 81/81 tests, delta +25
 - **Next**: Backhaus opens PR manually → PR#1b merges → PR#2a branch created after merge
+
+---
+
+## PR#2a — Flutter Data + Service (~400 LOC) — COMPLETE
+
+**Branch**: `feat/push-notifications-pr2a-flutter-service`
+**Base**: post-PR#1b `main` (commit `4a156c5`)
+**Status**: COMPLETE — branch pushed to remote
+**Date**: 2026-06-02
+
+### TDD Cycle Evidence (PR#2a)
+
+| Task | Test File | RED | GREEN |
+|------|-----------|-----|-------|
+| T-PN-024 | SETUP | N/A | ✅ `firebase_messaging: ^15.0.0` added (resolved to 15.2.10) |
+| T-PN-025 | `fcm_token_repository_test.dart` | ✅ Fails: FcmTokenRepository not found | N/A |
+| T-PN-026 | `fcm_token_repository.dart` | N/A | ✅ 10/10 tests pass |
+| T-PN-027 | `fcm_service_test.dart` | ✅ Fails: FcmService not found | N/A |
+| T-PN-028 | `fcm_service.dart` | N/A | ✅ 7/7 tests pass |
+| T-PN-029 | `fcm_providers_test.dart` | ✅ Fails: notification_providers not found | N/A |
+| T-PN-030 | `notification_providers.dart` | N/A | ✅ 3/3 tests pass |
+| T-PN-031 | Format + analyze | N/A | ✅ 0 issues, 0 changed |
+| T-PN-032 | Full suite | N/A | ✅ 1556 passing, delta +20 (≥ +20 required) |
+| T-PN-033 | VERIFY | N/A | ✅ All scope guards passed |
+
+### Test Summary (PR#2a)
+
+- Tests written: 20 new tests (10 repo + 7 service + 3 providers)
+- Full suite: 1556 passing (baseline 1536, delta +20)
+- Pre-existing failures: 2 (athlete_coach_view_test.dart, pre-existing, unrelated)
+- Covers: SCENARIO-619..623, 645..649, 650, 651, 678, 679, 683
+
+### Files Changed (PR#2a)
+
+| File | Action | What |
+|------|--------|------|
+| `pubspec.yaml` | Modified | +firebase_messaging: ^15.0.0 (resolved to 15.2.10) |
+| `pubspec.lock` | Modified | Auto-updated by flutter pub get |
+| `lib/features/notifications/data/fcm_token_repository.dart` | Created | FcmTokenRepository with arrayUnion/arrayRemove (GREEN) |
+| `lib/features/notifications/data/fcm_service.dart` | Created | FcmService with token lifecycle + refresh sub (GREEN) |
+| `lib/features/notifications/application/notification_providers.dart` | Created | Riverpod providers + fcmLifecycleProvider (GREEN) |
+| `test/features/notifications/data/fcm_token_repository_test.dart` | Created | 10 tests with fake_cloud_firestore (RED+edge cases) |
+| `test/features/notifications/data/fcm_service_test.dart` | Created | 7 tests with mocktail (RED) |
+| `test/features/notifications/application/fcm_providers_test.dart` | Created | 3 tests with mocktail (RED) |
+| `openspec/changes/push-notifications-fcm/tasks.md` | Modified | [x] marks T-PN-024..T-PN-033 |
+| `openspec/changes/push-notifications-fcm/apply-progress.md` | Modified | This file |
+
+### Commits in PR#2a (10 commits)
+
+1. `chore(notifications): add firebase_messaging ^15.x dependency (T-PN-024)`
+2. `test(notifications): RED — failing tests for FcmTokenRepository (T-PN-025, SCENARIO-619..623)`
+3. `feat(notifications): GREEN — FcmTokenRepository with arrayUnion/arrayRemove (T-PN-026, SCENARIO-619..623)`
+4. `test(notifications): RED — failing tests for FcmService (T-PN-027, SCENARIO-645..649, 678, 679)`
+5. `feat(notifications): GREEN — FcmService with token lifecycle, refresh sub, best-effort dispose (T-PN-028, SCENARIO-645..649, 678, 679)`
+6. `test(notifications): RED — failing tests for fcmLifecycleProvider (T-PN-029, SCENARIO-650, 651, 683)`
+7. `feat(notifications): GREEN — Riverpod providers + fcmLifecycleProvider with auth listener (T-PN-030, SCENARIO-650, 651, 683)`
+8. `style(notifications): dart format fixes on notification test files (T-PN-031)`
+9. `test(notifications): add edge case tests for FcmTokenRepository field naming and missing-doc guard (T-PN-032)`
+10. `docs(sdd): mark PR#2a tasks complete (T-PN-024..T-PN-033)`
+
+### Deviations from Design (PR#2a)
+
+- **`onForegroundMessage` static getter**: `FirebaseMessaging.onMessage` is a static getter in firebase_messaging 15.x, not an instance method. `FcmService.onForegroundMessage` and `onMessageOpenedApp` delegate to the static getters. Consistent with the firebase_messaging API.
+- **`fcmLifecycleProvider` wired to `authStateChangesProvider`**: The codebase uses `authStateChangesProvider` (not a generic `authStateProvider`). The lifecycle provider was correctly wired to this existing provider.
+- **Eager-read in TreinoApp.initState**: Per ADR-PN-003, `ref.read(fcmLifecycleProvider)` must be eagerly called in `TreinoApp.initState`. This wiring is **PR#2b scope** — the provider exists and is tested, but connecting it to app.dart is in the next PR.
+
+---
+
+## Remaining Tasks
+
+PR#2b: T-PN-034..T-PN-047 (Flutter handler + UI + app.dart wiring) — await PR#2a merge

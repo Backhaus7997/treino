@@ -150,28 +150,28 @@ Chained PRs recommended: Yes. Chain strategy: stacked-to-main. Delivery strategy
 
 ### Phase 2a.1: Branch setup + dependency
 
-- [ ] T-PN-024 — SETUP: create branch `feat/push-notifications-pr2a-flutter-service` from post-PR#1b `main`; confirm clean rebase; add `firebase_messaging: ^15.x` to `pubspec.yaml` under `dependencies`; run `flutter pub get`; confirm `flutter_local_notifications` is NOT present. (SCENARIO-644, REQ-PN-CLIENT-001, REQ-PN-CX-002)
+- [x] T-PN-024 — SETUP: create branch `feat/push-notifications-pr2a-flutter-service` from post-PR#1b `main`; confirm clean rebase; add `firebase_messaging: ^15.x` to `pubspec.yaml` under `dependencies`; run `flutter pub get`; confirm `flutter_local_notifications` is NOT present. (SCENARIO-644, REQ-PN-CLIENT-001, REQ-PN-CX-002)
 
 ### Phase 2a.2: `FcmTokenRepository`
 
-- [ ] T-PN-025 — RED: create `test/features/notifications/data/fcm_token_repository_test.dart` using `fake_cloud_firestore`; failing tests: `saveToken` on new doc with no `fcmTokens` field → `users/{uid}.fcmTokens == ['tok-1']` (SCENARIO-619); `saveToken` with duplicate token → `fcmTokens` still `['tok-1']` (SCENARIO-620); `saveToken` with second device → `fcmTokens == ['tok-phone', 'tok-tablet']` (SCENARIO-621); `removeToken` → `['tok-2']` (SCENARIO-622); removing absent token → no error, array unchanged (SCENARIO-623); `saveToken` uses `arrayUnion` semantics (SCENARIO-621); `removeToken` uses `arrayRemove` semantics (SCENARIO-622, 623).
-- [ ] T-PN-026 — GREEN: create `lib/features/notifications/data/fcm_token_repository.dart`; class `FcmTokenRepository` with `final FirebaseFirestore _firestore`; `Future<void> saveToken(String uid, String token)` → `_firestore.collection('users').doc(uid).update({'fcmTokens': FieldValue.arrayUnion([token])})` with `SetOptions(merge: true)` fallback for missing doc; `Future<void> removeToken(String uid, String token)` → `_firestore.collection('users').doc(uid).update({'fcmTokens': FieldValue.arrayRemove([token])})` swallowing `not-found`; field name is `fcmTokens` (camelCase, ADR-PN-001); T-PN-025 must pass. (SCENARIO-619..623, REQ-PN-DATA-001..003)
+- [x] T-PN-025 — RED: create `test/features/notifications/data/fcm_token_repository_test.dart` using `fake_cloud_firestore`; failing tests: `saveToken` on new doc with no `fcmTokens` field → `users/{uid}.fcmTokens == ['tok-1']` (SCENARIO-619); `saveToken` with duplicate token → `fcmTokens` still `['tok-1']` (SCENARIO-620); `saveToken` with second device → `fcmTokens == ['tok-phone', 'tok-tablet']` (SCENARIO-621); `removeToken` → `['tok-2']` (SCENARIO-622); removing absent token → no error, array unchanged (SCENARIO-623); `saveToken` uses `arrayUnion` semantics (SCENARIO-621); `removeToken` uses `arrayRemove` semantics (SCENARIO-622, 623).
+- [x] T-PN-026 — GREEN: create `lib/features/notifications/data/fcm_token_repository.dart`; class `FcmTokenRepository` with `final FirebaseFirestore _firestore`; `Future<void> saveToken(String uid, String token)` → `_firestore.collection('users').doc(uid).update({'fcmTokens': FieldValue.arrayUnion([token])})` with `SetOptions(merge: true)` fallback for missing doc; `Future<void> removeToken(String uid, String token)` → `_firestore.collection('users').doc(uid).update({'fcmTokens': FieldValue.arrayRemove([token])})` swallowing `not-found`; field name is `fcmTokens` (camelCase, ADR-PN-001); T-PN-025 must pass. (SCENARIO-619..623, REQ-PN-DATA-001..003)
 
 ### Phase 2a.3: `FcmService`
 
-- [ ] T-PN-027 — RED: create `test/features/notifications/data/fcm_service_test.dart` using `mocktail`; failing tests: `init(uid)` calls `getToken()` once and `saveToken(uid, 'tok-init')` (SCENARIO-645); `init(uid)` does NOT call `requestPermission()` (SCENARIO-647); `onTokenRefresh` emits `'tok-refreshed'` → `saveToken(uid, 'tok-refreshed')` called (SCENARIO-646); `getToken()` returns null → `saveToken` NOT called, no error (SCENARIO-678); `dispose(uid)` → `removeToken(uid, currentToken)` called (SCENARIO-648); `FcmTokenRepository.removeToken` throws → error swallowed, no propagation (SCENARIO-649); `dispose(uid)` cancels `onTokenRefresh` subscription → subsequent refresh events do not trigger `saveToken` (SCENARIO-679).
-- [ ] T-PN-028 — GREEN: create `lib/features/notifications/data/fcm_service.dart`; class `FcmService` with `final FirebaseMessaging _messaging` and `final FcmTokenRepository _repo`; `Future<void> init(String uid)` — calls `getToken()`, calls `saveToken` if non-null, subscribes to `onTokenRefresh` storing the subscription; `Future<void> dispose(String uid)` — calls `getToken()` + `removeToken` in try/catch, cancels refresh subscription; does NOT call `requestPermission()` in `init`; `Stream<RemoteMessage> get onForegroundMessage => _messaging.onMessage`; `Stream<RemoteMessage> get onMessageOpenedApp => FirebaseMessaging.onMessageOpenedApp`; `Future<RemoteMessage?> getInitialMessage() => _messaging.getInitialMessage()`; `Future<void> requestPermission() => _messaging.requestPermission()`; T-PN-027 must pass. (SCENARIO-645..649, 678, 679)
+- [x] T-PN-027 — RED: create `test/features/notifications/data/fcm_service_test.dart` using `mocktail`; failing tests: `init(uid)` calls `getToken()` once and `saveToken(uid, 'tok-init')` (SCENARIO-645); `init(uid)` does NOT call `requestPermission()` (SCENARIO-647); `onTokenRefresh` emits `'tok-refreshed'` → `saveToken(uid, 'tok-refreshed')` called (SCENARIO-646); `getToken()` returns null → `saveToken` NOT called, no error (SCENARIO-678); `dispose(uid)` → `removeToken(uid, currentToken)` called (SCENARIO-648); `FcmTokenRepository.removeToken` throws → error swallowed, no propagation (SCENARIO-649); `dispose(uid)` cancels `onTokenRefresh` subscription → subsequent refresh events do not trigger `saveToken` (SCENARIO-679).
+- [x] T-PN-028 — GREEN: create `lib/features/notifications/data/fcm_service.dart`; class `FcmService` with `final FirebaseMessaging _messaging` and `final FcmTokenRepository _repo`; `Future<void> init(String uid)` — calls `getToken()`, calls `saveToken` if non-null, subscribes to `onTokenRefresh` storing the subscription; `Future<void> dispose(String uid)` — calls `getToken()` + `removeToken` in try/catch, cancels refresh subscription; does NOT call `requestPermission()` in `init`; `Stream<RemoteMessage> get onForegroundMessage => FirebaseMessaging.onMessage`; `Stream<RemoteMessage> get onMessageOpenedApp => FirebaseMessaging.onMessageOpenedApp`; `Future<RemoteMessage?> getInitialMessage() => _messaging.getInitialMessage()`; `Future<NotificationSettings> requestPermission() => _messaging.requestPermission()`; T-PN-027 must pass. (SCENARIO-645..649, 678, 679)
 
 ### Phase 2a.4: Riverpod providers + lifecycle
 
-- [ ] T-PN-029 — RED: create `test/features/notifications/application/fcm_providers_test.dart` using `mocktail`; failing tests: `fcmLifecycleProvider` live + `authStateProvider` emits non-null uid → `FcmService.init(uid)` called (SCENARIO-650); `authStateProvider` emits null after sign-in → `FcmService.dispose(previousUid)` called (SCENARIO-651); foreground handler not attached before user is authenticated → no navigation or SnackBar crash (SCENARIO-683).
-- [ ] T-PN-030 — GREEN: create `lib/features/notifications/application/notification_providers.dart`; `firebaseMessagingProvider` (Provider<FirebaseMessaging> → `FirebaseMessaging.instance`); `fcmTokenRepositoryProvider` (Provider<FcmTokenRepository>); `fcmServiceProvider` (Provider<FcmService>); `fcmLifecycleProvider` (Provider<void>) — uses `ref.listen(authStateProvider, (prev, next) { if next.uid != null → init; else if prev.uid != null → dispose(prev.uid) })`; T-PN-029 must pass. (SCENARIO-650, 651, 683, ADR-PN-003)
+- [x] T-PN-029 — RED: create `test/features/notifications/application/fcm_providers_test.dart` using `mocktail`; failing tests: `fcmLifecycleProvider` live + `authStateProvider` emits non-null uid → `FcmService.init(uid)` called (SCENARIO-650); `authStateProvider` emits null after sign-in → `FcmService.dispose(previousUid)` called (SCENARIO-651); foreground handler not attached before user is authenticated → no navigation or SnackBar crash (SCENARIO-683).
+- [x] T-PN-030 — GREEN: create `lib/features/notifications/application/notification_providers.dart`; `firebaseMessagingProvider` (Provider<FirebaseMessaging> → `FirebaseMessaging.instance`); `fcmTokenRepositoryProvider` (Provider<FcmTokenRepository>); `fcmServiceProvider` (Provider<FcmService>); `fcmLifecycleProvider` (Provider<void>) — uses `ref.listen(authStateChangesProvider, (prev, next) { ... })` dispatching init on non-null and dispose on sign-out; T-PN-029 must pass. (SCENARIO-650, 651, 683, ADR-PN-003)
 
 ### Phase 2a.5: PR#2a quality gates
 
-- [ ] T-PN-031 — GATE: `flutter analyze` 0 issues; `dart format --output=none --set-exit-if-changed .` 0 changed.
-- [ ] T-PN-032 — GATE: `flutter test` — all passing; delta ≥ +20 tests vs PR#1b baseline (covering SCENARIO-619..624, 645..651, 678, 679, 683).
-- [ ] T-PN-033 — VERIFY: `firebase_messaging: ^15.x` present in `pubspec.yaml`; `flutter_local_notifications` absent; `firestore.rules` unchanged; `storage.rules` unchanged; `firestore.indexes.json` unchanged; field name `fcmTokens` (camelCase) used consistently; no HEX literals; no `PhosphorIcons.X` direct; conventional commits only; no Co-Authored-By.
+- [x] T-PN-031 — GATE: `flutter analyze` 0 issues; `dart format --output=none --set-exit-if-changed .` 0 changed.
+- [x] T-PN-032 — GATE: `flutter test` — all passing; delta = +20 tests vs PR#1b baseline of 1536 (total 1556 passing). Covers SCENARIO-619..623, 645..649, 650, 651, 678, 679, 683 plus ADR-PN-001 and REQ-PN-DATA-003 edge cases.
+- [x] T-PN-033 — VERIFY: `firebase_messaging: ^15.x` present in `pubspec.yaml`; `flutter_local_notifications` absent; `firestore.rules` unchanged; `storage.rules` unchanged; `firestore.indexes.json` unchanged; field name `fcmTokens` (camelCase) used consistently; no HEX literals; no `PhosphorIcons.X` direct; conventional commits only; no Co-Authored-By.
 
 ---
 
@@ -290,15 +290,15 @@ Chained PRs recommended: Yes. Chain strategy: stacked-to-main. Delivery strategy
 - [x] No Flutter lib files changed; no `pubspec.yaml` changes
 - [x] Conventional commits only; no Co-Authored-By
 
-### PR#2a — Flutter Data + Service
-- [ ] Rebased cleanly on post-PR#1b `main` (T-PN-024)
-- [ ] `firebase_messaging: ^15.x` added to `pubspec.yaml`; `flutter_local_notifications` absent
-- [ ] T-PN-025..T-PN-030 RED/GREEN pairs complete
-- [ ] T-PN-031: `flutter analyze` 0 issues; `dart format` 0 changed
-- [ ] T-PN-032: `flutter test` all passing; delta ≥ +20 tests
-- [ ] T-PN-033: `fcmTokens` camelCase everywhere; `firestore.rules` unchanged; `storage.rules` unchanged; `firestore.indexes.json` unchanged
-- [ ] No HEX literals; no `PhosphorIcons.X` direct references
-- [ ] Conventional commits only; no Co-Authored-By
+### PR#2a — Flutter Data + Service — COMPLETE
+- [x] Rebased cleanly on post-PR#1b `main` (T-PN-024)
+- [x] `firebase_messaging: ^15.x` added to `pubspec.yaml`; `flutter_local_notifications` absent
+- [x] T-PN-025..T-PN-030 RED/GREEN pairs complete
+- [x] T-PN-031: `flutter analyze` 0 issues; `dart format` 0 changed
+- [x] T-PN-032: `flutter test` 1556 passing (delta +20, ≥ +20 required)
+- [x] T-PN-033: `fcmTokens` camelCase everywhere; `firestore.rules` unchanged; `storage.rules` unchanged; `firestore.indexes.json` unchanged
+- [x] No HEX literals; no `PhosphorIcons.X` direct references
+- [x] Conventional commits only; no Co-Authored-By
 
 ### PR#2b — Flutter Handler + UI
 - [ ] Rebased cleanly on post-PR#2a `main` (T-PN-034)
