@@ -1,0 +1,241 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../coach/application/trainer_link_providers.dart'
+    show trainerLinksStreamProvider;
+import '../../coach/domain/trainer_link_status.dart';
+import '../../workout/application/session_providers.dart'
+    show sessionsByUidProvider;
+import '../../workout/domain/session_status.dart';
+import '../domain/athlete_billing.dart';
+import '../domain/payment.dart';
+import 'billing_providers.dart' show athleteBillingProvider;
+import 'payment_providers.dart' show trainerPaymentsProvider;
+
+// ── ISO week helper ───────────────────────────────────────────────────────────
+
+/// Returns the ISO 8601 week number for [date].
+///
+/// ISO weeks start on Monday. Week 1 is the week containing the first
+/// Thursday of the year (equivalently, the week containing 4 January).
+int _isoWeekNumber(DateTime date) {
+  // Thursday in the same week as [date].
+  final thursday = date.subtract(Duration(days: date.weekday - 4));
+  // Week 1 starts on the Monday of the week that contains 4 January.
+  final jan4 = DateTime.utc(thursday.year, 1, 4);
+  final week1Monday = jan4.subtract(Duration(days: jan4.weekday - 1));
+  return ((thursday.difference(week1Monday).inDays) ~/ 7) + 1;
+}
+
+// ── Spanish month names ───────────────────────────────────────────────────────
+
+const _kMeses = <String>[
+  '',
+  'Enero',
+  'Febrero',
+  'Marzo',
+  'Abril',
+  'Mayo',
+  'Junio',
+  'Julio',
+  'Agosto',
+  'Septiembre',
+  'Octubre',
+  'Noviembre',
+  'Diciembre',
+];
+
+// ── Result type ───────────────────────────────────────────────────────────────
+
+/// One pending charge entry, derived per athlete.
+class CobroPendiente {
+  const CobroPendiente({
+    required this.athleteId,
+    required this.amountArs,
+    required this.cadence,
+    required this.concept,
+    this.sessionsCount,
+    this.pendingPaymentIds = const [],
+  });
+
+  final String athleteId;
+  final int amountArs;
+  final BillingCadence cadence;
+  final String concept;
+
+  /// Non-null only for [BillingCadence.porSesion].
+  final int? sessionsCount;
+
+  /// Non-empty only for [BillingCadence.suelto].
+  final List<String> pendingPaymentIds;
+}
+
+// ── Provider ──────────────────────────────────────────────────────────────────
+
+/// Derives pending charges per active athlete based on their billing cadence.
+///
+/// - Mirrors [trainedTodayProvider]'s AsyncValue-folding pattern.
+/// - Returns loading while any required per-athlete stream is still loading
+///   and no data has arrived yet.
+/// - Skips athletes whose billing is not configured.
+final pagosPorCobrarProvider =
+    Provider.autoDispose<AsyncValue<List<CobroPendiente>>>((ref) {
+  // ── 1. Trainer links ──────────────────────────────────────────────────────
+  final linksAsync = ref.watch(trainerLinksStreamProvider);
+
+  if (linksAsync.isLoading && !linksAsync.hasValue) {
+    return const AsyncValue.loading();
+  }
+  if (linksAsync.hasError && !linksAsync.hasValue) {
+    return AsyncValue.error(linksAsync.error!, linksAsync.stackTrace!);
+  }
+
+  final links = linksAsync.valueOrNull ?? const [];
+
+  final activeLinks =
+      links.where((l) => l.status == TrainerLinkStatus.active).toList();
+
+  if (activeLinks.isEmpty) {
+    return const AsyncValue.data([]);
+  }
+
+  // ── 2. All trainer payments (one stream for all athletes) ─────────────────
+  final paymentsAsync = ref.watch(trainerPaymentsProvider);
+
+  if (paymentsAsync.isLoading && !paymentsAsync.hasValue) {
+    return const AsyncValue.loading();
+  }
+
+  final allPayments = paymentsAsync.valueOrNull ?? const [];
+
+  // ── 3. Compute now once ───────────────────────────────────────────────────
+  final now = DateTime.now().toUtc();
+  final currentYear = now.year;
+  final currentMonth = now.month;
+  final currentWeek = _isoWeekNumber(now);
+
+  final monthKey = '$currentYear-${currentMonth.toString().padLeft(2, '0')}';
+  final weekKey = '$currentYear-W${currentWeek.toString().padLeft(2, '0')}';
+
+  // ── 4. Per-athlete computation ────────────────────────────────────────────
+  final results = <CobroPendiente>[];
+  bool anyLoading = false;
+
+  for (final link in activeLinks) {
+    final athleteId = link.athleteId;
+
+    // Billing config
+    final billingAsync = ref.watch(athleteBillingProvider(athleteId));
+
+    if (billingAsync.isLoading && !billingAsync.hasValue) {
+      anyLoading = true;
+      continue;
+    }
+
+    final billing = billingAsync.valueOrNull;
+    if (billing == null) continue; // no config set — skip
+
+    final athletePayments =
+        allPayments.where((p) => p.athleteId == athleteId).toList();
+
+    switch (billing.cadence) {
+      // ── mensual ─────────────────────────────────────────────────────────
+      case BillingCadence.mensual:
+        final alreadyPaid = athletePayments.any(
+          (p) => p.status == PaymentStatus.paid && p.periodKey == monthKey,
+        );
+        if (!alreadyPaid) {
+          results.add(CobroPendiente(
+            athleteId: athleteId,
+            amountArs: billing.amountArs,
+            cadence: BillingCadence.mensual,
+            concept: 'Mensual ${_kMeses[currentMonth]} $currentYear',
+          ));
+        }
+
+      // ── semanal ─────────────────────────────────────────────────────────
+      case BillingCadence.semanal:
+        final alreadyPaid = athletePayments.any(
+          (p) => p.status == PaymentStatus.paid && p.periodKey == weekKey,
+        );
+        if (!alreadyPaid) {
+          results.add(CobroPendiente(
+            athleteId: athleteId,
+            amountArs: billing.amountArs,
+            cadence: BillingCadence.semanal,
+            concept: 'Semana ${currentWeek.toString().padLeft(2, '0')}',
+          ));
+        }
+
+      // ── porSesion ────────────────────────────────────────────────────────
+      case BillingCadence.porSesion:
+        // Gate: only count sessions if the athlete shared their history.
+        if (!link.sharedWithTrainer) {
+          // Cannot count — skip (not an amount owed, just uncountable)
+          continue;
+        }
+
+        final sessionsAsync = ref.watch(sessionsByUidProvider(athleteId));
+        if (sessionsAsync.isLoading && !sessionsAsync.hasValue) {
+          anyLoading = true;
+          continue;
+        }
+
+        final sessions = sessionsAsync.valueOrNull ?? const [];
+
+        // last payment paidAt for this athlete (or epoch)
+        final epoch = DateTime.utc(1970);
+        DateTime lastPaidAt = epoch;
+        for (final p in athletePayments) {
+          if (p.status == PaymentStatus.paid && p.paidAt != null) {
+            if (p.paidAt!.isAfter(lastPaidAt)) {
+              lastPaidAt = p.paidAt!;
+            }
+          }
+        }
+
+        int count = 0;
+        for (final s in sessions) {
+          if (s.status != SessionStatus.finished) continue;
+          final finished = s.finishedAt;
+          if (finished == null) continue;
+          if (finished.toUtc().isAfter(lastPaidAt)) count++;
+        }
+
+        if (count > 0) {
+          results.add(CobroPendiente(
+            athleteId: athleteId,
+            amountArs: count * billing.amountArs,
+            cadence: BillingCadence.porSesion,
+            concept: '$count ${count == 1 ? 'sesión' : 'sesiones'}',
+            sessionsCount: count,
+          ));
+        }
+
+      // ── suelto ──────────────────────────────────────────────────────────
+      case BillingCadence.suelto:
+        final pending = athletePayments
+            .where((p) => p.status == PaymentStatus.pending)
+            .toList();
+        if (pending.isEmpty) continue;
+
+        final total = pending.fold<int>(0, (sum, p) => sum + p.amountArs);
+        final n = pending.length;
+        results.add(CobroPendiente(
+          athleteId: athleteId,
+          amountArs: total,
+          cadence: BillingCadence.suelto,
+          concept: '$n cobro${n == 1 ? '' : 's'} pendiente${n == 1 ? '' : 's'}',
+          pendingPaymentIds: pending.map((p) => p.id).toList(),
+        ));
+    }
+  }
+
+  if (anyLoading && results.isEmpty) {
+    return const AsyncValue.loading();
+  }
+
+  // Sort by athleteId for stable ordering (names load asynchronously)
+  results.sort((a, b) => a.athleteId.compareTo(b.athleteId));
+
+  return AsyncValue.data(results);
+});

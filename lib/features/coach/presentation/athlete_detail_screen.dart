@@ -10,9 +10,12 @@ import '../../chat/application/chat_providers.dart';
 import '../../measurements/application/measurement_providers.dart';
 import '../../measurements/presentation/log_measurement_screen.dart';
 import '../../measurements/presentation/widgets/measurement_progress_chart.dart';
+import '../../payments/application/billing_providers.dart';
+import '../../payments/domain/athlete_billing.dart';
 import '../../performance/application/performance_test_providers.dart';
 import '../../performance/presentation/log_performance_test_screen.dart';
 import '../../performance/presentation/widgets/performance_progress_chart.dart';
+import '../../profile/application/user_providers.dart' show userProfileProvider;
 import '../../profile/application/user_public_profile_providers.dart';
 import '../../workout/application/assigned_routine_providers.dart';
 import '../../workout/application/session_providers.dart'
@@ -197,6 +200,10 @@ class _AthleteDetailBody extends ConsumerWidget {
               // ── Rendimiento section ──────────────────────────────────
               const SizedBox(height: 20),
               _RendimientoSection(athleteId: athleteId),
+
+              // ── Cobro section ─────────────────────────────────────────
+              const SizedBox(height: 20),
+              _CobroSection(athleteId: athleteId),
             ],
           ),
         ),
@@ -793,6 +800,347 @@ class _RendimientoSection extends ConsumerWidget {
         border: Border.all(color: palette.border),
       ),
       child: child,
+    );
+  }
+}
+
+// ── Cobro section ─────────────────────────────────────────────────────────────
+
+const _kCadenceLabels = {
+  BillingCadence.mensual: 'Mensual',
+  BillingCadence.semanal: 'Semanal',
+  BillingCadence.porSesion: 'Por sesión',
+  BillingCadence.suelto: 'Suelto',
+};
+
+class _CobroSection extends ConsumerWidget {
+  const _CobroSection({required this.athleteId});
+
+  final String athleteId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final palette = AppPalette.of(context);
+    final billingAsync = ref.watch(athleteBillingProvider(athleteId));
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // ── Section header row ──────────────────────────────────────────
+        Row(
+          children: [
+            Text(
+              'COBRO',
+              style: GoogleFonts.barlowCondensed(
+                fontWeight: FontWeight.w700,
+                fontSize: 12,
+                letterSpacing: 1.2,
+                color: palette.textMuted,
+              ),
+            ),
+            const Spacer(),
+            GestureDetector(
+              onTap: () =>
+                  _openConfigSheet(context, ref, billingAsync.valueOrNull),
+              child: Text(
+                billingAsync.valueOrNull == null ? 'Configurar' : 'Editar',
+                style: GoogleFonts.barlow(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                  color: palette.accent,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+
+        // ── Content ─────────────────────────────────────────────────────
+        billingAsync.when(
+          loading: () => _card(
+            palette: palette,
+            child: Text(
+              'Cargando…',
+              style: GoogleFonts.barlow(fontSize: 13, color: palette.textMuted),
+            ),
+          ),
+          error: (_, __) => _card(
+            palette: palette,
+            child: Text(
+              'No pudimos cargar la config de cobro.',
+              style: GoogleFonts.barlow(fontSize: 13, color: palette.textMuted),
+            ),
+          ),
+          data: (billing) => _card(
+            palette: palette,
+            child: billing == null
+                ? Text(
+                    'Sin configurar.',
+                    style: GoogleFonts.barlow(
+                        fontSize: 13, color: palette.textMuted),
+                  )
+                : Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '\$${billing.amountArs} ARS',
+                          style: GoogleFonts.barlow(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 15,
+                            color: palette.textPrimary,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        _kCadenceLabels[billing.cadence] ??
+                            billing.cadence.name,
+                        style: GoogleFonts.barlow(
+                          fontSize: 13,
+                          color: palette.textMuted,
+                        ),
+                      ),
+                    ],
+                  ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _openConfigSheet(
+    BuildContext context,
+    WidgetRef ref,
+    AthleteBilling? existing,
+  ) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppPalette.of(context).bgCard,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => _CobroConfigSheet(
+        athleteId: athleteId,
+        existing: existing,
+        ref: ref,
+      ),
+    );
+  }
+
+  Widget _card({required AppPalette palette, required Widget child}) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: palette.bgCard,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: palette.border),
+      ),
+      child: child,
+    );
+  }
+}
+
+class _CobroConfigSheet extends ConsumerStatefulWidget {
+  const _CobroConfigSheet({
+    required this.athleteId,
+    required this.existing,
+    required this.ref,
+  });
+
+  final String athleteId;
+  final AthleteBilling? existing;
+  final WidgetRef ref;
+
+  @override
+  ConsumerState<_CobroConfigSheet> createState() => _CobroConfigSheetState();
+}
+
+class _CobroConfigSheetState extends ConsumerState<_CobroConfigSheet> {
+  late final TextEditingController _priceController;
+  late BillingCadence _cadence;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final trainerRate =
+        widget.ref.read(userProfileProvider).valueOrNull?.trainerMonthlyRate;
+    final initialAmount = widget.existing?.amountArs ?? trainerRate ?? 0;
+    _priceController =
+        TextEditingController(text: initialAmount > 0 ? '$initialAmount' : '');
+    _cadence = widget.existing?.cadence ?? BillingCadence.mensual;
+  }
+
+  @override
+  void dispose() {
+    _priceController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (_saving) return;
+    final amount = int.tryParse(_priceController.text.trim());
+    if (amount == null || amount <= 0) return;
+
+    final trainerId = ref.read(currentUidProvider);
+    if (trainerId == null) return;
+
+    setState(() => _saving = true);
+    try {
+      await ref.read(billingRepositoryProvider).setConfig(
+            AthleteBilling(
+              trainerId: trainerId,
+              athleteId: widget.athleteId,
+              amountArs: amount,
+              cadence: _cadence,
+              updatedAt: DateTime.now().toUtc(),
+            ),
+          );
+      if (!mounted) return;
+      Navigator.of(context).pop();
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No pudimos guardar. Probá de nuevo.')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 20,
+        right: 20,
+        top: 20,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // ── Handle ──────────────────────────────────────────────────
+          Center(
+            child: Container(
+              width: 36,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 14),
+              decoration: BoxDecoration(
+                color: palette.border,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          Text(
+            'CONFIGURAR COBRO',
+            style: GoogleFonts.barlowCondensed(
+              fontWeight: FontWeight.w700,
+              fontSize: 18,
+              color: palette.textPrimary,
+              letterSpacing: 1.2,
+            ),
+          ),
+          const SizedBox(height: 18),
+
+          // ── Precio ──────────────────────────────────────────────────
+          Text(
+            'PRECIO (ARS)',
+            style: GoogleFonts.barlowCondensed(
+              color: palette.textMuted,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.4,
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _priceController,
+            keyboardType: TextInputType.number,
+            style: TextStyle(color: palette.textPrimary),
+            decoration: InputDecoration(
+              hintText: 'Ej: 7000',
+              hintStyle: TextStyle(color: palette.textMuted),
+              filled: true,
+              fillColor: palette.bg,
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide(color: palette.border),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide(color: palette.accent, width: 1.5),
+              ),
+            ),
+          ),
+          const SizedBox(height: 18),
+
+          // ── Cadencia chips ───────────────────────────────────────────
+          Text(
+            'CADENCIA',
+            style: GoogleFonts.barlowCondensed(
+              color: palette.textMuted,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.4,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: BillingCadence.values.map((c) {
+              final selected = _cadence == c;
+              return ChoiceChip(
+                label: Text(_kCadenceLabels[c] ?? c.name),
+                selected: selected,
+                onSelected: (_) => setState(() => _cadence = c),
+                selectedColor: palette.accent,
+                backgroundColor: palette.bgCard,
+                labelStyle: TextStyle(
+                  color: selected ? palette.bg : palette.textPrimary,
+                  fontWeight: FontWeight.w600,
+                ),
+                side: BorderSide(
+                  color: selected ? palette.accent : palette.border,
+                ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 20),
+
+          // ── Save button ──────────────────────────────────────────────
+          ElevatedButton(
+            onPressed: _saving ? null : _save,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: palette.accent,
+              foregroundColor: palette.bg,
+              minimumSize: const Size.fromHeight(48),
+              shape: const StadiumBorder(),
+              disabledBackgroundColor: palette.accent.withValues(alpha: 0.3),
+            ),
+            child: _saving
+                ? SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: palette.bg,
+                    ),
+                  )
+                : Text(
+                    'GUARDAR',
+                    style: GoogleFonts.barlowCondensed(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                      letterSpacing: 1.4,
+                    ),
+                  ),
+          ),
+        ],
+      ),
     );
   }
 }

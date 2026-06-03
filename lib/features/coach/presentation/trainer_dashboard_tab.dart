@@ -6,6 +6,10 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../app/theme/app_palette.dart';
 import '../../../core/analytics/analytics_service.dart';
 import '../../../core/widgets/treino_icon.dart';
+import '../../payments/application/pagos_por_cobrar_provider.dart';
+import '../../payments/application/payment_providers.dart';
+import '../../payments/domain/athlete_billing.dart';
+import '../../payments/domain/payment.dart';
 import '../../profile/application/user_providers.dart';
 import '../../profile/application/user_public_profile_providers.dart';
 import '../../workout/application/session_providers.dart'
@@ -70,15 +74,7 @@ class TrainerDashboardTab extends ConsumerWidget {
           message: 'Próximamente.',
         ),
         const SizedBox(height: 20),
-        const _SectionHeader(
-          label: 'PAGOS POR COBRAR',
-          trailingLabel: 'Ver',
-        ),
-        const SizedBox(height: 8),
-        _PlaceholderCard(
-          palette: palette,
-          message: 'Próximamente.',
-        ),
+        _PagosPorCobrarSection(palette: palette),
         const SizedBox(height: 20),
         const _BottomActions(),
       ],
@@ -803,6 +799,594 @@ class _EntrenaronHoyRow extends ConsumerWidget {
   }
 }
 
+// ── Pagos por cobrar section ──────────────────────────────────────────────────
+
+class _PagosPorCobrarSection extends ConsumerWidget {
+  const _PagosPorCobrarSection({required this.palette});
+  final AppPalette palette;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final trainerId = ref.watch(currentUidProvider);
+
+    void openAddSueltoSheet() {
+      if (trainerId == null) return;
+      showModalBottomSheet<void>(
+        context: context,
+        backgroundColor: palette.bgCard,
+        isScrollControlled: true,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        builder: (_) => _AddSueltoSheet(
+          trainerId: trainerId,
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _SectionHeader(
+          label: 'PAGOS POR COBRAR',
+          trailingLabel: '+ Cobro',
+          trailingOnTap: openAddSueltoSheet,
+        ),
+        const SizedBox(height: 8),
+        const _PagosPorCobrarList(),
+      ],
+    );
+  }
+}
+
+class _PagosPorCobrarList extends ConsumerWidget {
+  const _PagosPorCobrarList();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final palette = AppPalette.of(context);
+    final cobrosAsync = ref.watch(pagosPorCobrarProvider);
+
+    if (cobrosAsync.isLoading && !cobrosAsync.hasValue) {
+      return _PlaceholderCard(palette: palette, message: 'Cargando…');
+    }
+    if (cobrosAsync.hasError && !cobrosAsync.hasValue) {
+      return _PlaceholderCard(
+        palette: palette,
+        message: 'No pudimos cargar los cobros.',
+      );
+    }
+
+    final cobros = cobrosAsync.valueOrNull ?? const [];
+    if (cobros.isEmpty) {
+      return _PlaceholderCard(
+        palette: palette,
+        message: 'Sin cobros pendientes.',
+      );
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: palette.bgCard,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: palette.border, width: 1),
+      ),
+      child: Column(
+        children: [
+          for (int i = 0; i < cobros.length; i++) ...[
+            if (i > 0)
+              Divider(
+                color: palette.border,
+                height: 1,
+                thickness: 1,
+                indent: 14,
+                endIndent: 14,
+              ),
+            _CobroPendienteRow(cobro: cobros[i]),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _CobroPendienteRow extends ConsumerWidget {
+  const _CobroPendienteRow({required this.cobro});
+  final CobroPendiente cobro;
+
+  static String _cadenceLabel(BillingCadence c) => switch (c) {
+        BillingCadence.mensual => 'Mensual',
+        BillingCadence.semanal => 'Semanal',
+        BillingCadence.porSesion => 'Por sesión',
+        BillingCadence.suelto => 'Suelto',
+      };
+
+  static String _formatAmount(int amount) {
+    // Thousands separator for ARS amounts
+    final s = amount.toString();
+    final buffer = StringBuffer();
+    int offset = s.length % 3;
+    if (offset > 0) buffer.write(s.substring(0, offset));
+    for (int i = offset; i < s.length; i += 3) {
+      if (buffer.isNotEmpty) buffer.write('.');
+      buffer.write(s.substring(i, i + 3));
+    }
+    return buffer.toString();
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final palette = AppPalette.of(context);
+    final profileAsync = ref.watch(userPublicProfileProvider(cobro.athleteId));
+    final rawName = profileAsync.valueOrNull?.displayName ?? '';
+    final showName =
+        rawName.isEmpty || _looksLikeUid(rawName) ? 'Alumno' : rawName;
+    final initials = _initials(showName);
+    final trainerId = ref.watch(currentUidProvider) ?? '';
+
+    Future<void> onCobrado() async {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: palette.bgCard,
+          title: Text(
+            '¿Marcar como cobrado?',
+            style: GoogleFonts.barlowCondensed(
+              fontWeight: FontWeight.w700,
+              fontSize: 18,
+              color: palette.textPrimary,
+            ),
+          ),
+          content: Text(
+            '${cobro.concept} — \$${_formatAmount(cobro.amountArs)}',
+            style: GoogleFonts.barlow(
+              fontSize: 14,
+              color: palette.textMuted,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child:
+                  Text('Cancelar', style: TextStyle(color: palette.textMuted)),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: Text('Cobrado', style: TextStyle(color: palette.accent)),
+            ),
+          ],
+        ),
+      );
+
+      if (confirmed != true || !context.mounted) return;
+
+      final repo = ref.read(paymentRepositoryProvider);
+      final now = DateTime.now().toUtc();
+
+      try {
+        switch (cobro.cadence) {
+          case BillingCadence.mensual:
+          case BillingCadence.semanal:
+            // Derive periodKey from concept cadence
+            final now2 = DateTime.now().toUtc();
+            final periodKey = cobro.cadence == BillingCadence.mensual
+                ? '${now2.year}-${now2.month.toString().padLeft(2, '0')}'
+                : '${now2.year}-W${_isoWeekNumber(now2).toString().padLeft(2, '0')}';
+            await repo.add(Payment(
+              id: '',
+              trainerId: trainerId,
+              athleteId: cobro.athleteId,
+              amountArs: cobro.amountArs,
+              concept: cobro.concept,
+              status: PaymentStatus.paid,
+              periodKey: periodKey,
+              createdAt: now,
+              paidAt: now,
+            ));
+
+          case BillingCadence.porSesion:
+            await repo.add(Payment(
+              id: '',
+              trainerId: trainerId,
+              athleteId: cobro.athleteId,
+              amountArs: cobro.amountArs,
+              concept: cobro.concept,
+              status: PaymentStatus.paid,
+              createdAt: now,
+              paidAt: now,
+            ));
+
+          case BillingCadence.suelto:
+            for (final pid in cobro.pendingPaymentIds) {
+              await repo.markPaid(pid, now);
+            }
+        }
+
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Cobro registrado.')),
+          );
+        }
+      } catch (_) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content:
+                    Text('Error al registrar el cobro. Intentá de nuevo.')),
+          );
+        }
+      }
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      child: Row(
+        children: [
+          _AvatarInitials(initials: initials, palette: palette),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  showName,
+                  style: GoogleFonts.barlow(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                    color: palette.textPrimary,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '${cobro.concept} · ${_cadenceLabel(cobro.cadence)}',
+                  style: GoogleFonts.barlow(
+                    fontWeight: FontWeight.w400,
+                    fontSize: 12,
+                    color: palette.textMuted,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            '\$${_formatAmount(cobro.amountArs)}',
+            style: GoogleFonts.barlowCondensed(
+              fontWeight: FontWeight.w700,
+              fontSize: 14,
+              color: palette.accent,
+            ),
+          ),
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: onCobrado,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: palette.accent.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(9999),
+              ),
+              child: Text(
+                'Cobrado',
+                style: GoogleFonts.barlowCondensed(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12,
+                  color: palette.accent,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Add suelto charge sheet ───────────────────────────────────────────────────
+
+class _AddSueltoSheet extends ConsumerStatefulWidget {
+  const _AddSueltoSheet({required this.trainerId});
+  final String trainerId;
+
+  @override
+  ConsumerState<_AddSueltoSheet> createState() => _AddSueltoSheetState();
+}
+
+class _AddSueltoSheetState extends ConsumerState<_AddSueltoSheet> {
+  String? _selectedAthleteId;
+  final _amountController = TextEditingController();
+  final _conceptController = TextEditingController();
+  bool _saving = false;
+
+  @override
+  void dispose() {
+    _amountController.dispose();
+    _conceptController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final linksAsync = ref.watch(trainerLinksStreamProvider);
+    final activeLinks = (linksAsync.valueOrNull ?? const [])
+        .where((l) => l.status == TrainerLinkStatus.active)
+        .toList();
+
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 20,
+        right: 20,
+        top: 20,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'COBRO SUELTO',
+            style: GoogleFonts.barlowCondensed(
+              fontWeight: FontWeight.w700,
+              fontSize: 18,
+              letterSpacing: 1.2,
+              color: palette.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 18),
+          // Athlete picker
+          Text(
+            'ALUMNO',
+            style: GoogleFonts.barlowCondensed(
+              fontWeight: FontWeight.w700,
+              fontSize: 11,
+              letterSpacing: 1.2,
+              color: palette.textMuted,
+            ),
+          ),
+          const SizedBox(height: 8),
+          if (activeLinks.isEmpty)
+            Text(
+              'No tenés alumnos activos.',
+              style: GoogleFonts.barlow(
+                fontSize: 13,
+                color: palette.textMuted,
+              ),
+            )
+          else
+            _AthleteDropdown(
+              links: activeLinks,
+              selectedId: _selectedAthleteId,
+              palette: palette,
+              onChanged: (id) => setState(() => _selectedAthleteId = id),
+            ),
+          const SizedBox(height: 14),
+          Text(
+            'MONTO (ARS)',
+            style: GoogleFonts.barlowCondensed(
+              fontWeight: FontWeight.w700,
+              fontSize: 11,
+              letterSpacing: 1.2,
+              color: palette.textMuted,
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _amountController,
+            keyboardType: TextInputType.number,
+            style: GoogleFonts.barlow(
+              fontSize: 14,
+              color: palette.textPrimary,
+            ),
+            decoration: InputDecoration(
+              hintText: 'Ej: 5000',
+              hintStyle: GoogleFonts.barlow(
+                fontSize: 14,
+                color: palette.textMuted,
+              ),
+              filled: true,
+              fillColor: palette.bg,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: palette.border),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: palette.border),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: palette.accent, width: 1.5),
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            'CONCEPTO',
+            style: GoogleFonts.barlowCondensed(
+              fontWeight: FontWeight.w700,
+              fontSize: 11,
+              letterSpacing: 1.2,
+              color: palette.textMuted,
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _conceptController,
+            style: GoogleFonts.barlow(
+              fontSize: 14,
+              color: palette.textPrimary,
+            ),
+            decoration: InputDecoration(
+              hintText: 'Ej: Clase de verano',
+              hintStyle: GoogleFonts.barlow(
+                fontSize: 14,
+                color: palette.textMuted,
+              ),
+              filled: true,
+              fillColor: palette.bg,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: palette.border),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: palette.border),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: palette.accent, width: 1.5),
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _saving || activeLinks.isEmpty ? null : _submit,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: palette.accent,
+                foregroundColor: palette.bg,
+                disabledBackgroundColor: palette.border,
+                minimumSize: const Size.fromHeight(48),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(9999),
+                ),
+              ),
+              child: _saving
+                  ? SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        color: palette.bg,
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : Text(
+                      'AGREGAR COBRO',
+                      style: GoogleFonts.barlowCondensed(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _submit() async {
+    final athleteId = _selectedAthleteId;
+    final amountText = _amountController.text.trim();
+    final concept = _conceptController.text.trim();
+
+    if (athleteId == null || amountText.isEmpty || concept.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Completá todos los campos.')),
+      );
+      return;
+    }
+
+    final amount = int.tryParse(amountText);
+    if (amount == null || amount <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Ingresá un monto válido.')),
+      );
+      return;
+    }
+
+    setState(() => _saving = true);
+
+    try {
+      final now = DateTime.now().toUtc();
+      await ref.read(paymentRepositoryProvider).add(Payment(
+            id: '',
+            trainerId: widget.trainerId,
+            athleteId: athleteId,
+            amountArs: amount,
+            concept: concept,
+            status: PaymentStatus.pending,
+            createdAt: now,
+          ));
+
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Cobro suelto agregado.')),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _saving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Error al guardar. Intentá de nuevo.')),
+        );
+      }
+    }
+  }
+}
+
+/// Dropdown widget to pick an active athlete by name.
+class _AthleteDropdown extends ConsumerWidget {
+  const _AthleteDropdown({
+    required this.links,
+    required this.selectedId,
+    required this.palette,
+    required this.onChanged,
+  });
+
+  final List<TrainerLink> links;
+  final String? selectedId;
+  final AppPalette palette;
+  final ValueChanged<String?> onChanged;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return DropdownButtonFormField<String>(
+      initialValue: selectedId,
+      hint: Text(
+        'Seleccioná un alumno',
+        style: GoogleFonts.barlow(fontSize: 14, color: palette.textMuted),
+      ),
+      dropdownColor: palette.bgCard,
+      style: GoogleFonts.barlow(fontSize: 14, color: palette.textPrimary),
+      decoration: InputDecoration(
+        filled: true,
+        fillColor: palette.bg,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: palette.border),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: palette.border),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: palette.accent, width: 1.5),
+        ),
+      ),
+      items: links.map((link) {
+        final profileAsync =
+            ref.watch(userPublicProfileProvider(link.athleteId));
+        final rawName = profileAsync.valueOrNull?.displayName ?? '';
+        final showName = rawName.isEmpty || _looksLikeUid(rawName)
+            ? 'Alumno (${link.athleteId.substring(0, 6)})'
+            : rawName;
+        return DropdownMenuItem<String>(
+          value: link.athleteId,
+          child: Text(showName),
+        );
+      }).toList(),
+      onChanged: onChanged,
+    );
+  }
+}
+
 // ── Placeholder card (for sections not yet wired) ─────────────────────────────
 
 class _PlaceholderCard extends StatelessWidget {
@@ -974,6 +1558,15 @@ bool _looksLikeUid(String s) {
   if (s.contains(' ')) return false;
   final alphaNumeric = RegExp(r'^[a-zA-Z0-9]+$');
   return alphaNumeric.hasMatch(s);
+}
+
+/// ISO 8601 week number (Thursday-based). Used to derive semanal periodKey
+/// when marking a payment as cobrado.
+int _isoWeekNumber(DateTime date) {
+  final thursday = date.subtract(Duration(days: date.weekday - 4));
+  final jan4 = DateTime.utc(thursday.year, 1, 4);
+  final week1Monday = jan4.subtract(Duration(days: jan4.weekday - 1));
+  return ((thursday.difference(week1Monday).inDays) ~/ 7) + 1;
 }
 
 TrainerAppointmentsKey _appointmentsKey(String trainerId) {
