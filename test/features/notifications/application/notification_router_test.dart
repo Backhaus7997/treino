@@ -143,5 +143,98 @@ void main() {
         verifyNever(() => router.go('/coach'));
       },
     );
+
+    // Triangulation: path without leading slash that looks like a host
+    testWidgets(
+      'TRIANGULATE: "coach" (no slash) → fallback /coach + log',
+      (tester) async {
+        await tester.pumpWidget(
+          _withRouter(
+            router,
+            Builder(
+              builder: (ctx) {
+                return TextButton(
+                  onPressed: () => goDeepLink(ctx, 'coach'),
+                  child: const Text('tap'),
+                );
+              },
+            ),
+          ),
+        );
+        await tester.tap(find.text('tap'));
+        verify(() => router.go('/coach')).called(1);
+      },
+    );
+
+    // Triangulation: valid trainer profile deep link
+    testWidgets(
+      'TRIANGULATE: /coach/trainer/uid-1 → context.go exactly',
+      (tester) async {
+        const deepLink = '/coach/trainer/uid-1';
+        await tester.pumpWidget(
+          _withRouter(
+            router,
+            Builder(
+              builder: (ctx) {
+                return TextButton(
+                  onPressed: () => goDeepLink(ctx, deepLink),
+                  child: const Text('tap'),
+                );
+              },
+            ),
+          ),
+        );
+        await tester.tap(find.text('tap'));
+        verify(() => router.go(deepLink)).called(1);
+        verifyNever(() => router.go('/coach'));
+      },
+    );
+
+    // Triangulation: valid agenda deep link
+    testWidgets(
+      'TRIANGULATE: /coach/agenda → context.go exactly',
+      (tester) async {
+        const deepLink = '/coach/agenda';
+        await tester.pumpWidget(
+          _withRouter(
+            router,
+            Builder(
+              builder: (ctx) {
+                return TextButton(
+                  onPressed: () => goDeepLink(ctx, deepLink),
+                  child: const Text('tap'),
+                );
+              },
+            ),
+          ),
+        );
+        await tester.tap(find.text('tap'));
+        verify(() => router.go(deepLink)).called(1);
+        verifyNever(() => router.go('/coach'));
+      },
+    );
+
+    // Triangulation: whitespace-only string → fallback (treated as empty)
+    testWidgets(
+      'TRIANGULATE: whitespace-only deepLink → goes to "/coach"',
+      (tester) async {
+        await tester.pumpWidget(
+          _withRouter(
+            router,
+            Builder(
+              builder: (ctx) {
+                return TextButton(
+                  onPressed: () => goDeepLink(ctx, '   '),
+                  child: const Text('tap'),
+                );
+              },
+            ),
+          ),
+        );
+        await tester.tap(find.text('tap'));
+        // '   ' doesn't start with '/' → logged + falls back
+        verify(() => router.go('/coach')).called(1);
+      },
+    );
   });
 }

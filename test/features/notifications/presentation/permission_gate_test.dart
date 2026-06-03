@@ -62,7 +62,6 @@ UserProfile _profile({String? displayName}) => UserProfile(
 Widget _buildGate({
   required MockFcmService fcmService,
   UserProfile? profile,
-  String? uid,
 }) {
   return ProviderScope(
     overrides: [
@@ -168,6 +167,64 @@ void main() {
         verify(() => fcmService.requestPermission()).called(1);
         // No SnackBar shown on denial
         expect(find.byType(SnackBar), findsNothing);
+      },
+    );
+
+    // TRIANGULATE: null profile (stream not yet resolved) → no call
+    testWidgets(
+      'TRIANGULATE: null profile (not yet loaded) → requestPermission NOT called',
+      (tester) async {
+        await tester.pumpWidget(
+          _buildGate(
+            fcmService: fcmService,
+            profile: null, // stream value is null
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        verifyNever(() => fcmService.requestPermission());
+      },
+    );
+
+    // TRIANGULATE: permission throws → no crash (error is swallowed)
+    testWidgets(
+      'TRIANGULATE: requestPermission throws → no crash, no re-attempt',
+      (tester) async {
+        when(
+          () => fcmService.requestPermission(),
+        ).thenThrow(Exception('platform error'));
+
+        await tester.pumpWidget(
+          _buildGate(
+            fcmService: fcmService,
+            profile: _profile(displayName: 'JuanAthlete'),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // Attempted once despite the throw
+        verify(() => fcmService.requestPermission()).called(1);
+        // App did not crash
+        expect(find.byType(SizedBox), findsWidgets);
+      },
+    );
+
+    // TRIANGULATE: PermissionGate renders SizedBox.shrink — zero layout impact
+    testWidgets(
+      'TRIANGULATE: PermissionGate renders SizedBox.shrink, no visible UI',
+      (tester) async {
+        await tester.pumpWidget(
+          _buildGate(
+            fcmService: fcmService,
+            profile: _profile(displayName: null),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // PermissionGate returns SizedBox.shrink() — renders without error
+        // and produces no visible children (no Text, Button, etc.).
+        expect(find.byType(PermissionGate), findsOneWidget);
+        expect(find.byType(Text), findsNothing);
       },
     );
   });

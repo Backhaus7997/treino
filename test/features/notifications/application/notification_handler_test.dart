@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/features/notifications/application/notification_providers.dart';
+import 'package:treino/features/notifications/application/notification_router.dart';
 import 'package:treino/features/notifications/data/fcm_service.dart';
 
 // ---------------------------------------------------------------------------
@@ -163,6 +164,89 @@ void main() {
         verifyNever(() => router.go(any()));
       },
     );
+
+    // TRIANGULATE: cold-start with invalid deepLink → fallback /coach
+    testWidgets(
+      'TRIANGULATE: cold-start with invalid deepLink → go("/coach")',
+      (tester) async {
+        when(() => fcmService.onMessageOpenedApp)
+            .thenAnswer((_) => const Stream.empty());
+        when(() => fcmService.getInitialMessage()).thenAnswer(
+          (_) async => _message(deepLink: 'no-leading-slash'),
+        );
+
+        await tester.pumpWidget(
+          _buildApp(
+            fcmService: fcmService,
+            router: router,
+            child: _ColdStartListener(fcmService: fcmService),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        verify(() => router.go('/coach')).called(1);
+      },
+    );
+  });
+
+  group('onMessageOpenedApp — triangulation', () {
+    // TRIANGULATE: background tap with invalid deepLink → /coach
+    testWidgets(
+      'TRIANGULATE: onMessageOpenedApp with invalid deepLink → go("/coach")',
+      (tester) async {
+        final controller = StreamController<RemoteMessage>();
+        when(() => fcmService.onMessageOpenedApp)
+            .thenAnswer((_) => controller.stream);
+        when(() => fcmService.getInitialMessage())
+            .thenAnswer((_) async => null);
+
+        await tester.pumpWidget(
+          _buildApp(
+            fcmService: fcmService,
+            router: router,
+            child: _BackgroundTapListener(fcmService: fcmService),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        controller.add(_message(deepLink: 'bad-path'));
+        await tester.pumpAndSettle();
+
+        verify(() => router.go('/coach')).called(1);
+        await controller.close();
+      },
+    );
+
+    // TRIANGULATE: multiple background taps → each navigates independently
+    testWidgets(
+      'TRIANGULATE: two background taps → two separate navigations',
+      (tester) async {
+        final controller = StreamController<RemoteMessage>();
+        when(() => fcmService.onMessageOpenedApp)
+            .thenAnswer((_) => controller.stream);
+        when(() => fcmService.getInitialMessage())
+            .thenAnswer((_) async => null);
+
+        await tester.pumpWidget(
+          _buildApp(
+            fcmService: fcmService,
+            router: router,
+            child: _BackgroundTapListener(fcmService: fcmService),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        controller.add(_message(deepLink: '/coach/trainer/uid-1'));
+        await tester.pumpAndSettle();
+
+        controller.add(_message(deepLink: '/coach?tab=agenda'));
+        await tester.pumpAndSettle();
+
+        verify(() => router.go('/coach/trainer/uid-1')).called(1);
+        verify(() => router.go('/coach?tab=agenda')).called(1);
+        await controller.close();
+      },
+    );
   });
 }
 
@@ -189,7 +273,7 @@ class _BackgroundTapListenerState extends State<_BackgroundTapListener> {
     _sub = widget.fcmService.onMessageOpenedApp.listen((message) {
       if (!mounted) return;
       final deepLink = message.data['deepLink'] as String?;
-      GoRouter.of(context).go(deepLink ?? '/coach');
+      goDeepLink(context, deepLink);
     });
   }
 
@@ -221,7 +305,7 @@ class _ColdStartListenerState extends State<_ColdStartListener> {
       if (message == null) return;
       if (!mounted) return;
       final deepLink = message.data['deepLink'] as String?;
-      GoRouter.of(context).go(deepLink ?? '/coach');
+      goDeepLink(context, deepLink);
     });
   }
 

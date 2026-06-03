@@ -127,7 +127,11 @@ void main() {
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 100));
 
-        await tester.tap(find.text('Ver')); // SnackBar action label
+        // Invoke SnackBar action directly — avoids viewport hit-test bounds.
+        // The SnackBar renders in an overlay that may extend below the default
+        // 800×600 test viewport; direct widget invocation is more reliable.
+        final snackBar = tester.widget<SnackBar>(find.byType(SnackBar));
+        snackBar.action!.onPressed();
         await tester.pumpAndSettle();
 
         verify(() => router.go(deepLink)).called(1);
@@ -157,11 +161,89 @@ void main() {
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 100));
 
-        await tester.tap(find.text('Ver'));
+        // Invoke SnackBar action directly.
+        final snackBar = tester.widget<SnackBar>(find.byType(SnackBar));
+        snackBar.action!.onPressed();
         await tester.pumpAndSettle();
 
         verify(() => router.go('/coach')).called(1);
         await controller.close();
+      },
+    );
+
+    // TRIANGULATE: SnackBar duration is 4 seconds
+    testWidgets(
+      'TRIANGULATE: SnackBar duration is 4 seconds',
+      (tester) async {
+        final controller = StreamController<RemoteMessage>();
+        when(() => fcmService.onForegroundMessage)
+            .thenAnswer((_) => controller.stream);
+
+        await tester.pumpWidget(
+          _buildApp(
+            fcmService: fcmService,
+            router: router,
+            messengerKey: messengerKey,
+          ),
+        );
+        await tester.pump();
+
+        controller.add(_message(title: 'Test', body: 'Body'));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 100));
+
+        final snackBar = tester.widget<SnackBar>(find.byType(SnackBar));
+        expect(snackBar.duration, const Duration(seconds: 4));
+
+        await controller.close();
+      },
+    );
+
+    // TRIANGULATE: SnackBar action label is 'Ver'
+    testWidgets(
+      'TRIANGULATE: SnackBar action label is "Ver"',
+      (tester) async {
+        final controller = StreamController<RemoteMessage>();
+        when(() => fcmService.onForegroundMessage)
+            .thenAnswer((_) => controller.stream);
+
+        await tester.pumpWidget(
+          _buildApp(
+            fcmService: fcmService,
+            router: router,
+            messengerKey: messengerKey,
+          ),
+        );
+        await tester.pump();
+
+        controller.add(_message(title: 'T', body: 'B', deepLink: '/coach'));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 100));
+
+        final snackBar = tester.widget<SnackBar>(find.byType(SnackBar));
+        expect(snackBar.action!.label, 'Ver');
+
+        await controller.close();
+      },
+    );
+
+    // TRIANGULATE: no SnackBar shown when fcmService emits nothing
+    testWidgets(
+      'TRIANGULATE: no SnackBar shown when stream is empty',
+      (tester) async {
+        when(() => fcmService.onForegroundMessage)
+            .thenAnswer((_) => const Stream.empty());
+
+        await tester.pumpWidget(
+          _buildApp(
+            fcmService: fcmService,
+            router: router,
+            messengerKey: messengerKey,
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.byType(SnackBar), findsNothing);
       },
     );
   });
