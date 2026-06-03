@@ -2,6 +2,7 @@
 
 const admin = require('firebase-admin');
 const { equipmentMap } = require('./_equipment_map.js');
+const { videoMap } = require('./_video_map.js');
 admin.initializeApp(); // uses GOOGLE_APPLICATION_CREDENTIALS env var
 const db = admin.firestore();
 
@@ -712,7 +713,15 @@ async function seedExercises() {
     // "match all". The map is the single source of truth, shared with
     // scripts/backfill_exercise_equipment.js.
     const equipment = equipmentMap[ex.id];
-    const doc = equipment ? { ...ex, equipment } : ex;
+    // Stamp `videoUrl` from the shared video map (musclewiki.com URLs).
+    // ExerciseVideoPlayer opens these in an in-app browser. Shared with
+    // scripts/backfill_exercise_videos.js.
+    const videoUrl = videoMap[ex.id];
+    const doc = {
+      ...ex,
+      ...(equipment ? { equipment } : {}),
+      ...(videoUrl ? { videoUrl } : {}),
+    };
     await db.collection('exercises').doc(ex.id).set(doc);
   }
   console.log('Exercises seeded.');
