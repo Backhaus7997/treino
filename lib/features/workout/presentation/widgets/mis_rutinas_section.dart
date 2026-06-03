@@ -51,8 +51,9 @@ class MisRutinasSection extends ConsumerWidget {
               error: (_, __) => const SizedBox.shrink(),
               data: (routines) {
                 final capReached = routines.length >= _kRoutineCap;
-                // When cap-reached, the long message lives only in the sticky
-                // bottom CTA (avoid duplicate rendering — header stays clean).
+                // When cap-reached, the header CTA is hidden and the cap
+                // message is rendered inline below the header (single source
+                // of feedback — no duplicate sticky bottom CTA).
                 if (capReached) return const SizedBox.shrink();
                 return _CtaButton(
                   capReached: false,
@@ -64,6 +65,25 @@ class MisRutinasSection extends ConsumerWidget {
           ],
         ),
         const SizedBox(height: 12),
+        // ── Cap-reached inline message ───────────────────────────────────────
+        // Replaces the bottom sticky CTA that previously hosted this copy.
+        // Renders only when there are 10 active user-created routines.
+        routinesAsync.maybeWhen(
+          data: (routines) {
+            if (routines.length < _kRoutineCap) return const SizedBox.shrink();
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Text(
+                'Llegaste al máximo de $_kRoutineCap rutinas activas. '
+                'Archivá una para crear otra.',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: AppPalette.of(context).textMuted,
+                ),
+              ),
+            );
+          },
+          orElse: () => const SizedBox.shrink(),
+        ),
         // ── Content ───────────────────────────────────────────────────────────
         routinesAsync.when(
           loading: () => const _SectionLoadingState(),
@@ -85,12 +105,6 @@ class MisRutinasSection extends ConsumerWidget {
                     padding: const EdgeInsets.only(bottom: 12),
                     child: _UserRoutineCard(routine: routine),
                   ),
-                // Sticky CTA at the bottom of the list
-                _CtaButton(
-                  capReached: routines.length >= _kRoutineCap,
-                  onPressed: () =>
-                      context.push('/workout/my-routine-editor'),
-                ),
               ],
             );
           },

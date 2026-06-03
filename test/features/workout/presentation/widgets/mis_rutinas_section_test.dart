@@ -126,12 +126,12 @@ void main() {
         findsOneWidget,
       );
       // CTA is present and enabled
-      expect(find.text('+ CREAR RUTINA'), findsOneWidget);
+      expect(find.text('CREAR RUTINA'), findsOneWidget);
       // CTA is NOT disabled
-      final ctaFinder = find.widgetWithText(ElevatedButton, '+ CREAR RUTINA');
+      final ctaFinder = find.widgetWithText(ElevatedButton, 'CREAR RUTINA');
       if (ctaFinder.evaluate().isEmpty) {
         // may be TextButton or OutlinedButton variant
-        expect(find.text('+ CREAR RUTINA'), findsOneWidget);
+        expect(find.text('CREAR RUTINA'), findsOneWidget);
       } else {
         final btn = tester.widget<ElevatedButton>(ctaFinder);
         expect(btn.onPressed, isNotNull);
@@ -178,7 +178,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Find and tap the CTA
-      final cta = find.text('+ CREAR RUTINA');
+      final cta = find.text('CREAR RUTINA');
       expect(cta, findsOneWidget);
       await tester.tap(cta);
       await tester.pumpAndSettle();

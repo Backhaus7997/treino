@@ -74,7 +74,10 @@ abstract final class WorkoutStrings {
 
   // ── MIS RUTINAS — section UI strings (REQ-USR-002..003, Design §es-AR strings) ─
   static const misRutinasSectionTitle = 'MIS RUTINAS';
-  static const misRutinasCta = '+ CREAR RUTINA';
+  // No leading '+' here — the button widget already prepends the
+  // TreinoIcon.plus glyph (avoiding the duplicate '+' that landed in PR3 of
+  // the athlete-self-routines SDD and was flagged in user smoke).
+  static const misRutinasCta = 'CREAR RUTINA';
   static const misRutinasCtaDisabledTooltip =
       'Llegaste al máximo de 10 rutinas activas. Archivá una para crear otra.';
   static const misRutinasEmptyState =
