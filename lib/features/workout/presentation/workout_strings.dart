@@ -113,6 +113,10 @@ abstract final class WorkoutStrings {
   static String pickerAddButton(int count) =>
       'Agregar $count ejercicio${count == 1 ? '' : 's'}';
 
+  // ── PR3 athlete form simplification (T-RER-030) ──────────────────────────
+  /// Athlete-mode name hint, replaces the trainer hint 'Ej: Fuerza PPL'.
+  static const String selfEditorNameHint = 'Mi rutina';
+
   // ── Filter sheet (multi-select) CTAs — PR2 refinement ────────────────────
   /// Clears the current filter selection without dismissing the sheet.
   static const String pickerSheetClear = 'Limpiar';
