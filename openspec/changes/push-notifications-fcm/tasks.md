@@ -104,42 +104,42 @@ Chained PRs recommended: Yes. Chain strategy: stacked-to-main. Delivery strategy
 
 ### Phase 1b.1: Branch setup
 
-- [ ] T-PN-009 — SETUP: create branch `feat/push-notifications-pr1b-cf-triggers` from post-PR#1a `main`; confirm clean rebase; verify `functions/src/notifications/send-fcm.ts` exists from PR#1a.
+- [x] T-PN-009 — SETUP: create branch `feat/push-notifications-pr1b-cf-triggers` from post-PR#1a `main`; confirm clean rebase; verify `functions/src/notifications/send-fcm.ts` exists from PR#1a.
 
 ### Phase 1b.2: `notifyOnChatMessage` trigger
 
-- [ ] T-PN-010 — RED: create `functions/src/__tests__/notify-chat-message.test.ts`; failing tests: new message in chat with `members: ['athlete-uid', 'trainer-uid']` and `senderId: 'athlete-uid'` → `sendFcm` called with `uids: ['trainer-uid']` (SCENARIO-629); sender NOT in uids (SCENARIO-680); body contains sender name + truncated text; text of 150 chars → body text portion ≤ 100 chars (SCENARIO-630); total body ≤ 256 chars (SCENARIO-666); `data.deepLink == "/coach/chat/chat-abc?other=uid-xyz"` (SCENARIO-631).
-- [ ] T-PN-011 — GREEN: create `functions/src/notifications/notify-chat-message.ts`; export `notifyOnChatMessage` via `onDocumentCreated('chats/{chatId}/messages/{messageId}', { region: 'southamerica-east1' })`; reads `chats/{chatId}.members`; `recipients = members.filter(m => m !== msg.senderId)`; reads `userPublicProfiles/{senderId}.displayName ?? 'Alguien'`; body = `"${senderName}: ${truncate(text, 100)}"` with `…` if cut; `deepLink = "/coach/chat/${chatId}?other=${senderId}"`; all string literals tagged `// i18n: Fase 6 Etapa 2`; calls `sendFcm`; T-PN-010 must pass. (SCENARIO-629, 630, 631, 666, 680)
+- [x] T-PN-010 — RED: create `functions/src/__tests__/notify-chat-message.test.ts`; failing tests: new message in chat with `members: ['athlete-uid', 'trainer-uid']` and `senderId: 'athlete-uid'` → `sendFcm` called with `uids: ['trainer-uid']` (SCENARIO-629); sender NOT in uids (SCENARIO-680); body contains sender name + truncated text; text of 150 chars → body text portion ≤ 100 chars (SCENARIO-630); total body ≤ 256 chars (SCENARIO-666); `data.deepLink == "/coach/chat/chat-abc?other=uid-xyz"` (SCENARIO-631).
+- [x] T-PN-011 — GREEN: create `functions/src/notifications/notify-chat-message.ts`; export `notifyOnChatMessage` via `onDocumentCreated('chats/{chatId}/messages/{messageId}', { region: 'southamerica-east1' })`; reads `chats/{chatId}.members`; `recipients = members.filter(m => m !== msg.senderId)`; reads `userPublicProfiles/{senderId}.displayName ?? 'Alguien'`; body = `"${senderName}: ${truncate(text, 100)}"` with `…` if cut; `deepLink = "/coach/chat/${chatId}?other=${senderId}"`; all string literals tagged `// i18n: Fase 6 Etapa 2`; calls `sendFcm`; T-PN-010 must pass. (SCENARIO-629, 630, 631, 666, 680)
 
 ### Phase 1b.3: `notifyOnAppointment` trigger
 
-- [ ] T-PN-012 — RED: create `functions/src/__tests__/notify-appointment.test.ts`; failing tests: new doc with `status: 'requested'` → `sendFcm` called with `uids: [trainerId]`, `data.deepLink == "/coach/agenda"` (SCENARIO-632); `before.status == 'requested'` → `after.status == 'confirmed'` → `sendFcm` called with `uids: [athleteId]`, `data.deepLink == "/coach?tab=agenda"` (SCENARIO-633); `before.status == 'confirmed'` → `after.status == 'cancelled'`, reason absent → `sendFcm` called with other-party uid (SCENARIO-634); `after.reason == 'athlete-account-deleted'` → `sendFcm` NOT called, no error (SCENARIO-635); `before.status == after.status` → `sendFcm` NOT called (SCENARIO-636).
-- [ ] T-PN-013 — GREEN: create `functions/src/notifications/notify-appointment.ts`; export `notifyOnAppointment` via `onDocumentWritten('appointments/{apptId}', { region: 'southamerica-east1' })`; guards: missing `after` → skip; `after.reason === 'athlete-account-deleted'` → skip; `before?.status === after.status` → skip; branch `requested` → notify trainer `"/coach/agenda"`; branch `confirmed` → notify athlete `"/coach?tab=agenda"`; branch `cancelled` → use `after.cancelledBy` if present else notify both (`// TODO: cancelledBy not yet in appointments schema — defaults to both; update when field added`); all strings es-AR tagged `// i18n: Fase 6 Etapa 2`; T-PN-012 must pass. (SCENARIO-632..636)
+- [x] T-PN-012 — RED: create `functions/src/__tests__/notify-appointment.test.ts`; failing tests: new doc with `status: 'requested'` → `sendFcm` called with `uids: [trainerId]`, `data.deepLink == "/coach/agenda"` (SCENARIO-632); `before.status == 'requested'` → `after.status == 'confirmed'` → `sendFcm` called with `uids: [athleteId]`, `data.deepLink == "/coach?tab=agenda"` (SCENARIO-633); `before.status == 'confirmed'` → `after.status == 'cancelled'`, reason absent → `sendFcm` called with other-party uid (SCENARIO-634); `after.reason == 'athlete-account-deleted'` → `sendFcm` NOT called, no error (SCENARIO-635); `before.status == after.status` → `sendFcm` NOT called (SCENARIO-636).
+- [x] T-PN-013 — GREEN: create `functions/src/notifications/notify-appointment.ts`; export `notifyOnAppointment` via `onDocumentWritten('appointments/{apptId}', { region: 'southamerica-east1' })`; guards: missing `after` → skip; `after.reason === 'athlete-account-deleted'` → skip; `before?.status === after.status` → skip; branch `requested` → notify trainer `"/coach/agenda"`; branch `confirmed` → notify athlete `"/coach?tab=agenda"`; branch `cancelled` → use `after.cancelledBy` if present else notify both (`// TODO: cancelledBy not yet in appointments schema — defaults to both; update when field added`); all strings es-AR tagged `// i18n: Fase 6 Etapa 2`; T-PN-012 must pass. (SCENARIO-632..636)
 
 ### Phase 1b.4: `notifyOnLinkChange` trigger
 
-- [ ] T-PN-014 — RED: create `functions/src/__tests__/notify-link-change.test.ts`; failing tests: new doc `status: 'pending'` → `sendFcm` called with `uids: [trainerId]`, `data.deepLink == "/coach"` (SCENARIO-637); `pending → active` → `sendFcm` called with `uids: [athleteId]` (SCENARIO-638); `active → terminated`, reason absent → `sendFcm` called with `uids: [athleteId, trainerId]` (SCENARIO-639); `after.reason == 'account-deleted'` → `sendFcm` NOT called (SCENARIO-640); `before.status == after.status` → `sendFcm` NOT called (SCENARIO-641).
-- [ ] T-PN-015 — GREEN: create `functions/src/notifications/notify-link-change.ts`; export `notifyOnLinkChange` via `onDocumentWritten('trainer_links/{linkId}', { region: 'southamerica-east1' })`; guards: missing `after` → skip; `after.reason === 'account-deleted'` → skip; `before?.status === after.status` → skip; branch `pending` → notify trainer; branch `active` → notify athlete; branch `terminated` → notify BOTH; deepLink `"/coach"` for all; all strings es-AR tagged `// i18n: Fase 6 Etapa 2`; T-PN-014 must pass. (SCENARIO-637..641)
+- [x] T-PN-014 — RED: create `functions/src/__tests__/notify-link-change.test.ts`; failing tests: new doc `status: 'pending'` → `sendFcm` called with `uids: [trainerId]`, `data.deepLink == "/coach"` (SCENARIO-637); `pending → active` → `sendFcm` called with `uids: [athleteId]` (SCENARIO-638); `active → terminated`, reason absent → `sendFcm` called with `uids: [athleteId, trainerId]` (SCENARIO-639); `after.reason == 'account-deleted'` → `sendFcm` NOT called (SCENARIO-640); `before.status == after.status` → `sendFcm` NOT called (SCENARIO-641).
+- [x] T-PN-015 — GREEN: create `functions/src/notifications/notify-link-change.ts`; export `notifyOnLinkChange` via `onDocumentWritten('trainer_links/{linkId}', { region: 'southamerica-east1' })`; guards: missing `after` → skip; `after.reason === 'account-deleted'` → skip; `before?.status === after.status` → skip; branch `pending` → notify trainer; branch `active` → notify athlete; branch `terminated` → notify BOTH; deepLink `"/coach"` for all; all strings es-AR tagged `// i18n: Fase 6 Etapa 2`; T-PN-014 must pass. (SCENARIO-637..641)
 
 ### Phase 1b.5: `notifyOnReview` trigger
 
-- [ ] T-PN-016 — RED: create `functions/src/__tests__/notify-review.test.ts`; failing tests: new review with `trainerId: 'trainer-1'`, `athleteDisplayName: 'Juan'`, `rating: 5` → `sendFcm` called with `uids: ['trainer-1']`, body `"Juan dejó una reseña de 5⭐"`, `data.deepLink == "/coach/trainer/trainer-1"` (SCENARIO-642); trainer with empty `fcmTokens` → `sendFcm` silently skips (SCENARIO-681).
-- [ ] T-PN-017 — GREEN: create `functions/src/notifications/notify-review.ts`; export `notifyOnReview` via `onDocumentCreated('reviews/{reviewId}', { region: 'southamerica-east1' })`; reads `review.trainerId`, `review.athleteId`, `review.rating`; looks up `userPublicProfiles/{athleteId}.displayName ?? 'Un atleta'`; body = `"${athleteName} dejó una reseña de ${rating}⭐"` tagged `// i18n: Fase 6 Etapa 2`; deepLink = `"/coach/trainer/${review.trainerId}"`; calls `sendFcm`; T-PN-016 must pass. (SCENARIO-642, 681)
+- [x] T-PN-016 — RED: create `functions/src/__tests__/notify-review.test.ts`; failing tests: new review with `trainerId: 'trainer-1'`, `athleteDisplayName: 'Juan'`, `rating: 5` → `sendFcm` called with `uids: ['trainer-1']`, body `"Juan dejó una reseña de 5⭐"`, `data.deepLink == "/coach/trainer/trainer-1"` (SCENARIO-642); trainer with empty `fcmTokens` → `sendFcm` silently skips (SCENARIO-681).
+- [x] T-PN-017 — GREEN: create `functions/src/notifications/notify-review.ts`; export `notifyOnReview` via `onDocumentCreated('reviews/{reviewId}', { region: 'southamerica-east1' })`; reads `review.trainerId`, `review.athleteId`, `review.rating`; looks up `userPublicProfiles/{athleteId}.displayName ?? 'Un atleta'`; body = `"${athleteName} dejó una reseña de ${rating}⭐"` tagged `// i18n: Fase 6 Etapa 2`; deepLink = `"/coach/trainer/${review.trainerId}"`; calls `sendFcm`; T-PN-016 must pass. (SCENARIO-642, 681)
 
 ### Phase 1b.6: Export all 4 CFs from `index.ts`
 
-- [ ] T-PN-018 — GREEN: edit `functions/src/index.ts` — append exports for `notifyOnChatMessage`, `notifyOnAppointment`, `notifyOnLinkChange`, `notifyOnReview` alongside existing `deleteAccount` and `reviewAggregate` exports. (SCENARIO-643)
+- [x] T-PN-018 — GREEN: edit `functions/src/index.ts` — append exports for `notifyOnChatMessage`, `notifyOnAppointment`, `notifyOnLinkChange`, `notifyOnReview` alongside existing `deleteAccount` and `reviewAggregate` exports. (SCENARIO-643)
 
 ### Phase 1b.7: iOS `Info.plist` + APNs setup doc
 
-- [ ] T-PN-019 — GREEN: edit `ios/Runner/Info.plist` — add `UIBackgroundModes` array with `fetch` and `remote-notification` entries (pre-verified: key does not currently exist, no merge needed); entry goes adjacent to `UIApplicationSceneManifest`. (SCENARIO-664, REQ-PN-CX-001, ADR-PN-013)
-- [ ] T-PN-020 — GREEN: create `docs/setup/fcm-apns.md` documenting the APNs auth key steps: Apple Developer Console → Certificates, Identifiers & Profiles → Keys → create key with Apple Push Notifications capability → download `.p8`; Firebase Console → Project Settings → Cloud Messaging → iOS app → upload auth key with Key ID and Team ID; note: this is a prerequisite for iOS smoke only, not for code merge. (REQ-PN-CX-011, ADR-PN-013)
+- [x] T-PN-019 — GREEN: edit `ios/Runner/Info.plist` — add `UIBackgroundModes` array with `fetch` and `remote-notification` entries (pre-verified: key does not currently exist, no merge needed); entry goes adjacent to `UIApplicationSceneManifest`. (SCENARIO-664, REQ-PN-CX-001, ADR-PN-013)
+- [x] T-PN-020 — GREEN: create `docs/setup/fcm-apns.md` documenting the APNs auth key steps: Apple Developer Console → Certificates, Identifiers & Profiles → Keys → create key with Apple Push Notifications capability → download `.p8`; Firebase Console → Project Settings → Cloud Messaging → iOS app → upload auth key with Key ID and Team ID; note: this is a prerequisite for iOS smoke only, not for code merge. (REQ-PN-CX-011, ADR-PN-013)
 
 ### Phase 1b.8: PR#1b quality gates
 
-- [ ] T-PN-021 — GATE: `npm --prefix functions run build` 0 errors; `npm --prefix functions run lint` 0 warnings/errors.
-- [ ] T-PN-022 — GATE: `firebase emulators:exec --only firestore,auth "npm --prefix functions test"` — all tests pass; delta ≥ +18 tests vs PR#1a baseline (covering SCENARIO-629..643, 676, 680, 681).
-- [ ] T-PN-023 — VERIFY: no Flutter lib files changed; no `pubspec.yaml` changes; `firestore.rules` unchanged; `storage.rules` unchanged; `firestore.indexes.json` unchanged; `Info.plist` only adds `UIBackgroundModes` block; all CF bodies ≤ 256 chars; all es-AR strings tagged `// i18n: Fase 6 Etapa 2`; `cancelledBy` TODO comment present in `notify-appointment.ts`; conventional commits only; no Co-Authored-By.
+- [x] T-PN-021 — GATE: `npm --prefix functions run build` 0 errors; `npm --prefix functions run lint` 0 warnings/errors.
+- [x] T-PN-022 — GATE: full test suite 81/81 passing; delta +25 tests vs PR#1a baseline (56→81, ≥ +18 required). Covers SCENARIO-629..643, 666, 680, 681.
+- [x] T-PN-023 — VERIFY: no Flutter lib files changed; no `pubspec.yaml` changes; `firestore.rules` unchanged; `storage.rules` unchanged; `firestore.indexes.json` unchanged; `Info.plist` only adds `UIBackgroundModes` block; all CF bodies ≤ 256 chars; all es-AR strings tagged `// i18n: Fase 6 Etapa 2`; `cancelledBy` TODO comment present in `notify-appointment.ts`; conventional commits only; no Co-Authored-By.
 
 ---
 
@@ -274,21 +274,21 @@ Chained PRs recommended: Yes. Chain strategy: stacked-to-main. Delivery strategy
 - [x] `fcmTokens` (camelCase) used in all TS code, not `fcm_tokens`
 - [x] Conventional commits only; no Co-Authored-By
 
-### PR#1b — CF Triggers + Info.plist
-- [ ] Rebased cleanly on post-PR#1a `main` (T-PN-009)
-- [ ] T-PN-010..T-PN-017 RED/GREEN pairs complete
-- [ ] T-PN-018: `index.ts` exports all 4 CFs alongside existing exports
-- [ ] T-PN-019: `UIBackgroundModes` added to `Info.plist` (not overwriting existing)
-- [ ] T-PN-020: `docs/setup/fcm-apns.md` created
-- [ ] T-PN-021: build 0 errors, lint 0 warnings
-- [ ] T-PN-022: all jest emulator tests pass; delta ≥ +18 tests
-- [ ] T-PN-023: `firestore.rules`, `storage.rules`, `firestore.indexes.json` all unchanged
-- [ ] All CF bodies ≤ 256 chars verified
-- [ ] Chat preview truncation at 100 chars verified
-- [ ] `cancelledBy` TODO comment present in `notify-appointment.ts`
-- [ ] All es-AR strings tagged `// i18n: Fase 6 Etapa 2`
-- [ ] No Flutter lib files changed; no `pubspec.yaml` changes
-- [ ] Conventional commits only; no Co-Authored-By
+### PR#1b — CF Triggers + Info.plist — COMPLETE
+- [x] Rebased cleanly on post-PR#1a `main` (T-PN-009)
+- [x] T-PN-010..T-PN-017 RED/GREEN pairs complete
+- [x] T-PN-018: `index.ts` exports all 4 CFs alongside existing exports
+- [x] T-PN-019: `UIBackgroundModes` added to `Info.plist` (not overwriting existing — key was absent)
+- [x] T-PN-020: `docs/setup/fcm-apns.md` created
+- [x] T-PN-021: build 0 errors, lint 0 warnings
+- [x] T-PN-022: 81/81 tests pass; delta +25 (≥ +18 required)
+- [x] T-PN-023: `firestore.rules`, `storage.rules`, `firestore.indexes.json` all unchanged
+- [x] All CF bodies ≤ 256 chars verified
+- [x] Chat preview truncation at 100 chars verified
+- [x] `cancelledBy` TODO comment present in `notify-appointment.ts`
+- [x] All es-AR strings tagged `// i18n: Fase 6 Etapa 2`
+- [x] No Flutter lib files changed; no `pubspec.yaml` changes
+- [x] Conventional commits only; no Co-Authored-By
 
 ### PR#2a — Flutter Data + Service
 - [ ] Rebased cleanly on post-PR#1b `main` (T-PN-024)
