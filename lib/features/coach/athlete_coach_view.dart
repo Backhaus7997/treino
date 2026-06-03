@@ -1,6 +1,7 @@
 import 'dart:async' show unawaited;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -9,11 +10,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../app/theme/app_palette.dart';
 import '../../core/widgets/treino_icon.dart';
 import '../chat/application/chat_providers.dart';
+import '../payments/application/mi_cuota_provider.dart';
+import '../payments/domain/athlete_billing.dart';
 import '../profile/application/user_public_profile_providers.dart';
 import '../profile/domain/user_public_profile.dart';
 import '../reviews/application/review_providers.dart';
 import '../reviews/domain/review.dart';
 import '../reviews/presentation/widgets/review_bottom_sheet.dart';
+import 'application/trainer_discovery_providers.dart' show trainerByIdProvider;
 import 'application/trainer_link_providers.dart';
 import 'domain/trainer_link.dart';
 import 'domain/trainer_link_status.dart';
@@ -205,6 +209,8 @@ class _LinkStateCard extends ConsumerWidget {
                 _ShareToggle(link: link),
                 const SizedBox(height: 12),
                 _AgendaButton(trainerId: link.trainerId),
+                const SizedBox(height: 16),
+                _CuotaSection(link: link),
               ],
               const SizedBox(height: 18),
               _ActionRow(link: link),
@@ -565,6 +571,224 @@ class _AgendaButton extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+// ── Cuota section — what the athlete owes + trainer alias (read-only) ─────────
+//
+// "Solo informativo" model (decided 2026-06-03): the athlete sees what they
+// owe and the alias to transfer to. Money flows offline; the trainer confirms
+// receipt from their dashboard ("Cobrado"). No claim/handshake state.
+
+class _CuotaSection extends ConsumerWidget {
+  const _CuotaSection({required this.link});
+  final TrainerLink link;
+
+  static String _cadenceLabel(BillingCadence c) => switch (c) {
+        BillingCadence.mensual => 'Mensual',
+        BillingCadence.semanal => 'Semanal',
+        BillingCadence.porSesion => 'Por sesión',
+        BillingCadence.suelto => 'Suelto',
+      };
+
+  static String _formatAmount(int amount) {
+    final s = amount.toString();
+    final buffer = StringBuffer();
+    final offset = s.length % 3;
+    if (offset > 0) buffer.write(s.substring(0, offset));
+    for (var i = offset; i < s.length; i += 3) {
+      if (buffer.isNotEmpty) buffer.write('.');
+      buffer.write(s.substring(i, i + 3));
+    }
+    return buffer.toString();
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final palette = AppPalette.of(context);
+    final cuotaAsync = ref.watch(miCuotaProvider);
+    final state = cuotaAsync.valueOrNull;
+
+    // Nothing to show yet (loading) or no active billing context.
+    if (state == null) return const SizedBox.shrink();
+
+    final trainerAsync = ref.watch(trainerByIdProvider(link.trainerId));
+    final rawAlias = trainerAsync.valueOrNull?.paymentAlias?.trim();
+    final alias = (rawAlias == null || rawAlias.isEmpty) ? null : rawAlias;
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: palette.bg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: palette.border, width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'TU CUOTA',
+                  style: GoogleFonts.barlowCondensed(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                    letterSpacing: 1.2,
+                    color: palette.textMuted,
+                  ),
+                ),
+              ),
+              if (!state.isEmpty)
+                Text(
+                  '\$${_formatAmount(state.totalArs)}',
+                  style: GoogleFonts.barlowCondensed(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 16,
+                    color: palette.accent,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          if (state.isEmpty)
+            Row(
+              children: [
+                Icon(TreinoIcon.check, size: 16, color: palette.accent),
+                const SizedBox(width: 8),
+                Text(
+                  'Estás al día.',
+                  style: GoogleFonts.barlow(
+                    fontWeight: FontWeight.w500,
+                    fontSize: 14,
+                    color: palette.textPrimary,
+                  ),
+                ),
+              ],
+            )
+          else ...[
+            for (final item in state.items)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '${item.concept} · ${_cadenceLabel(item.cadence)}',
+                        style: GoogleFonts.barlow(
+                          fontWeight: FontWeight.w400,
+                          fontSize: 13,
+                          color: palette.textPrimary,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '\$${_formatAmount(item.amountArs)}',
+                      style: GoogleFonts.barlow(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                        color: palette.textMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            const SizedBox(height: 6),
+            _AliasRow(alias: alias, palette: palette),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _AliasRow extends StatelessWidget {
+  const _AliasRow({required this.alias, required this.palette});
+  final String? alias;
+  final AppPalette palette;
+
+  @override
+  Widget build(BuildContext context) {
+    if (alias == null) {
+      return Text(
+        'Tu PF todavía no cargó un alias de cobro. Coordiná el pago por mensaje.',
+        style: GoogleFonts.barlow(
+          fontWeight: FontWeight.w400,
+          fontSize: 12,
+          color: palette.textMuted,
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: palette.bgCard,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: palette.border, width: 1),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'ALIAS PARA TRANSFERIR',
+                      style: GoogleFonts.barlowCondensed(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 10,
+                        letterSpacing: 1.0,
+                        color: palette.textMuted,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      alias!,
+                      style: GoogleFonts.barlow(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                        color: palette.textPrimary,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              GestureDetector(
+                onTap: () async {
+                  await Clipboard.setData(ClipboardData(text: alias!));
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Alias copiado.')),
+                    );
+                  }
+                },
+                behavior: HitTestBehavior.opaque,
+                child: Padding(
+                  padding: const EdgeInsets.all(4),
+                  child: Icon(TreinoIcon.copy, size: 18, color: palette.accent),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Transferí al alias y avisale a tu PF. Él confirma el pago.',
+          style: GoogleFonts.barlow(
+            fontWeight: FontWeight.w400,
+            fontSize: 12,
+            color: palette.textMuted,
+          ),
+        ),
+      ],
     );
   }
 }

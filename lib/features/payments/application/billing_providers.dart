@@ -21,3 +21,20 @@ final athleteBillingProvider =
     return ref.watch(billingRepositoryProvider).watch(trainerId, athleteId);
   },
 );
+
+/// Identifies a single (trainer, athlete) billing document. Used by the
+/// athlete-facing read path, where the trainerId comes from the link rather
+/// than from the current uid.
+typedef BillingPair = ({String trainerId, String athleteId});
+
+/// Live stream of the billing config for an explicit (trainer, athlete) pair.
+///
+/// Athlete vantage of [athleteBillingProvider]: the athlete is `auth.uid`
+/// and the trainerId comes from their link. Firestore rules allow the athlete
+/// to read `athlete_billing/{trainerId}_{athleteId}` when athleteId matches.
+final athleteBillingPairProvider =
+    StreamProvider.autoDispose.family<AthleteBilling?, BillingPair>(
+  (ref, pair) => ref
+      .watch(billingRepositoryProvider)
+      .watch(pair.trainerId, pair.athleteId),
+);

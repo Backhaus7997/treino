@@ -42,6 +42,7 @@ class TreinoIcon {
   // Acciones de usuario
   static const IconData chat = PhosphorIconsRegular.chatCircle;
   static const IconData check = PhosphorIconsFill.checkCircle;
+  static const IconData copy = PhosphorIconsRegular.copy;
   static const IconData edit = PhosphorIconsRegular.pencilSimple;
   static const IconData trash = PhosphorIconsRegular.trashSimple;
   static const IconData signOut = PhosphorIconsRegular.signOut;

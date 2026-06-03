@@ -123,7 +123,30 @@ final pagosPorCobrarProvider =
   for (final link in activeLinks) {
     final athleteId = link.athleteId;
 
-    // Billing config
+    final athletePayments =
+        allPayments.where((p) => p.athleteId == athleteId).toList();
+
+    // ── One-off pending charges ───────────────────────────────────────────
+    // Surfaced ALWAYS — these are ad-hoc charges created via "+ Cobro" and
+    // are independent of the athlete's configured cadence (or lack thereof).
+    final pendingOneOff = athletePayments
+        .where((p) => p.status == PaymentStatus.pending)
+        .toList();
+    if (pendingOneOff.isNotEmpty) {
+      final total = pendingOneOff.fold<int>(0, (sum, p) => sum + p.amountArs);
+      final n = pendingOneOff.length;
+      results.add(CobroPendiente(
+        athleteId: athleteId,
+        amountArs: total,
+        cadence: BillingCadence.suelto,
+        concept: n == 1 ? pendingOneOff.first.concept : '$n cobros pendientes',
+        pendingPaymentIds: pendingOneOff.map((p) => p.id).toList(),
+      ));
+    }
+
+    // ── Recurring cadence charge ──────────────────────────────────────────
+    // Only when a billing config exists. A `suelto` config has no recurring
+    // charge — its charges are the one-off pendings handled above.
     final billingAsync = ref.watch(athleteBillingProvider(athleteId));
 
     if (billingAsync.isLoading && !billingAsync.hasValue) {
@@ -132,10 +155,7 @@ final pagosPorCobrarProvider =
     }
 
     final billing = billingAsync.valueOrNull;
-    if (billing == null) continue; // no config set — skip
-
-    final athletePayments =
-        allPayments.where((p) => p.athleteId == athleteId).toList();
+    if (billing == null) continue; // no recurring config — one-offs only
 
     switch (billing.cadence) {
       // ── mensual ─────────────────────────────────────────────────────────
@@ -212,21 +232,10 @@ final pagosPorCobrarProvider =
         }
 
       // ── suelto ──────────────────────────────────────────────────────────
+      // No recurring charge: ad-hoc charges are handled by the one-off block
+      // above (which runs for every athlete regardless of cadence).
       case BillingCadence.suelto:
-        final pending = athletePayments
-            .where((p) => p.status == PaymentStatus.pending)
-            .toList();
-        if (pending.isEmpty) continue;
-
-        final total = pending.fold<int>(0, (sum, p) => sum + p.amountArs);
-        final n = pending.length;
-        results.add(CobroPendiente(
-          athleteId: athleteId,
-          amountArs: total,
-          cadence: BillingCadence.suelto,
-          concept: '$n cobro${n == 1 ? '' : 's'} pendiente${n == 1 ? '' : 's'}',
-          pendingPaymentIds: pending.map((p) => p.id).toList(),
-        ));
+        break;
     }
   }
 
