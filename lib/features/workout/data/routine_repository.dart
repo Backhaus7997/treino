@@ -206,6 +206,17 @@ class RoutineRepository {
     return templateRoutine.copyWith(id: ref.id);
   }
 
+  /// Deletes a routine document by [id]. Used by the trainer to remove a
+  /// template from their library. The UI only exposes this on the trainer's
+  /// own templates; Firestore rules enforce that only the owner
+  /// (`assignedBy == request.auth.uid`) may delete.
+  Future<void> deleteRoutine(String id) async {
+    if (id.isEmpty) {
+      throw ArgumentError.value(id, 'id', 'routine id must be non-empty');
+    }
+    await _collection.doc(id).delete();
+  }
+
   /// Live stream of the trainer's personal templates ordered newest-first.
   ///
   /// Rules: only the owner (`assignedBy == request.auth.uid`) can read
