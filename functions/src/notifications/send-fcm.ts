@@ -94,6 +94,9 @@ export async function sendFcm(
 
   // 3. Dispatch a single multicast call with the flat token list.
   const tokens = entries.map((e) => e.token);
+  logger.info(
+    `sendFcm: dispatching to ${tokens.length} tokens for ${uids.length} uids`,
+  );
   const batchResponse = await msg.sendEachForMulticast({
     tokens,
     notification,
@@ -117,6 +120,13 @@ export async function sendFcm(
           .update({ fcmTokens: FieldValue.arrayRemove(token) })
           .then(() => undefined),
       );
+    } else if (errorCode) {
+      // Non-stale error: log as warn so we can see what FCM rejected.
+      const { ownerUid } = entries[idx];
+      const message = resp.error?.message ?? "<no message>";
+      logger.warn(
+        `sendFcm: non-stale error uid=${ownerUid} code=${errorCode} msg=${message}`,
+      );
     }
   });
 
@@ -124,7 +134,10 @@ export async function sendFcm(
     await Promise.all(staleCleanups);
   }
 
-  // 5. Return aggregated counts.
+  // 5. Log aggregated result then return.
+  logger.info(
+    `sendFcm: result success=${batchResponse.successCount} failure=${batchResponse.failureCount}`,
+  );
   return {
     successCount: batchResponse.successCount,
     failureCount: batchResponse.failureCount,

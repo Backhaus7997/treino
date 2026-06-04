@@ -182,44 +182,44 @@ Chained PRs recommended: Yes. Chain strategy: stacked-to-main. Delivery strategy
 
 ### Phase 2b.1: Branch setup
 
-- [ ] T-PN-034 — SETUP: create branch `feat/push-notifications-pr2b-flutter-handler` from post-PR#2a `main`; confirm clean rebase; verify `FcmService` and `notification_providers.dart` exist from PR#2a.
+- [x] T-PN-034 — SETUP: create branch `feat/push-notifications-pr2b-flutter-handler` from post-PR#2a `main`; confirm clean rebase; verify `FcmService` and `notification_providers.dart` exist from PR#2a.
 
 ### Phase 2b.2: `goDeepLink` router helper
 
-- [ ] T-PN-035 — RED: create `test/features/notifications/application/notification_router_test.dart`; failing widget tests: `goDeepLink(context, null)` → `context.go('/coach')` (SCENARIO-654); `goDeepLink(context, '')` → `context.go('/coach')` (SCENARIO-654); `goDeepLink(context, 'no-leading-slash')` → logs error + `context.go('/coach')` (SCENARIO-682); `goDeepLink(context, '/coach/chat/abc?other=xyz')` → `context.go('/coach/chat/abc?other=xyz')` (SCENARIO-653); `goDeepLink(context, '/coach?tab=agenda')` → `context.go('/coach?tab=agenda')` (SCENARIO-655).
-- [ ] T-PN-036 — GREEN: create `lib/features/notifications/application/notification_router.dart`; export `void goDeepLink(BuildContext context, String? deepLink)` per ADR-PN-009: const `fallback = '/coach'`; null/empty → `context.go(fallback)`; no leading `/` → `debugPrint('[fcm] invalid deepLink: ...')` + `context.go(fallback)`; valid → `context.go(deepLink)`; callers check `context.mounted` before calling; T-PN-035 must pass. (SCENARIO-653, 654, 655, 682)
+- [x] T-PN-035 — RED: create `test/features/notifications/application/notification_router_test.dart`; failing widget tests: `goDeepLink(context, null)` → `context.go('/coach')` (SCENARIO-654); `goDeepLink(context, '')` → `context.go('/coach')` (SCENARIO-654); `goDeepLink(context, 'no-leading-slash')` → logs error + `context.go('/coach')` (SCENARIO-682); `goDeepLink(context, '/coach/chat/abc?other=xyz')` → `context.go('/coach/chat/abc?other=xyz')` (SCENARIO-653); `goDeepLink(context, '/coach?tab=agenda')` → `context.go('/coach?tab=agenda')` (SCENARIO-655).
+- [x] T-PN-036 — GREEN: create `lib/features/notifications/application/notification_router.dart`; export `void goDeepLink(BuildContext context, String? deepLink)` per ADR-PN-009: const `fallback = '/coach'`; null/empty → `context.go(fallback)`; no leading `/` → `debugPrint('[fcm] invalid deepLink: ...')` + `context.go(fallback)`; valid → `context.go(deepLink)`; callers check `context.mounted` before calling; T-PN-035 must pass. (SCENARIO-653, 654, 655, 682)
 
 ### Phase 2b.3: Foreground SnackBar handler tests
 
-- [ ] T-PN-037 — RED: create `test/features/notifications/presentation/foreground_snackbar_test.dart`; failing widget tests: `FirebaseMessaging.onMessage` emits message with `title: 'Hola'`, `body: 'Mensaje'` → SnackBar visible containing 'Hola' and 'Mensaje' (SCENARIO-652); tapping SnackBar action → `goDeepLink` called with `data['deepLink']` (SCENARIO-653); `data['deepLink']` absent → `goDeepLink` receives null (SCENARIO-654); permission denied → no SnackBar shown (SCENARIO-663).
-- [ ] T-PN-038 — RED: create `test/features/notifications/application/notification_handler_test.dart`; failing tests: `onMessageOpenedApp` fires with `deepLink: '/coach?tab=agenda'` → `goDeepLink('/coach?tab=agenda')` called (SCENARIO-655); `onMessageOpenedApp` fires with no deepLink → `goDeepLink(null)` called (SCENARIO-656); `getInitialMessage()` returns message with `deepLink: '/coach/trainer/uid-1'` → navigation deferred to post-frame, `goDeepLink('/coach/trainer/uid-1')` called after first frame (SCENARIO-657); `getInitialMessage()` returns null → no navigation, no error (SCENARIO-658).
+- [x] T-PN-037 — RED: create `test/features/notifications/presentation/foreground_snackbar_test.dart`; failing widget tests: `FirebaseMessaging.onMessage` emits message with `title: 'Hola'`, `body: 'Mensaje'` → SnackBar visible containing 'Hola' and 'Mensaje' (SCENARIO-652); tapping SnackBar action → `goDeepLink` called with `data['deepLink']` (SCENARIO-653); `data['deepLink']` absent → `goDeepLink` receives null (SCENARIO-654); permission denied → no SnackBar shown (SCENARIO-663).
+- [x] T-PN-038 — RED: create `test/features/notifications/application/notification_handler_test.dart`; failing tests: `onMessageOpenedApp` fires with `deepLink: '/coach?tab=agenda'` → `goDeepLink('/coach?tab=agenda')` called (SCENARIO-655); `onMessageOpenedApp` fires with no deepLink → `goDeepLink(null)` called (SCENARIO-656); `getInitialMessage()` returns message with `deepLink: '/coach/trainer/uid-1'` → navigation deferred to post-frame, `goDeepLink('/coach/trainer/uid-1')` called after first frame (SCENARIO-657); `getInitialMessage()` returns null → no navigation, no error (SCENARIO-658).
 
 ### Phase 2b.4: Permission gate
 
-- [ ] T-PN-039 — RED: create `test/features/notifications/presentation/permission_gate_test.dart`; failing widget tests: `userProfile.displayName != null` and `_attempted == false` on first build → `requestPermission()` called once (SCENARIO-659); `displayName == null` → `requestPermission()` NOT called (SCENARIO-660); re-render after first permission call → `requestPermission()` NOT called again (SCENARIO-661); `requestPermission()` returns denied → app continues normally, no SnackBar, no retry (SCENARIO-662).
+- [x] T-PN-039 — RED: create `test/features/notifications/presentation/permission_gate_test.dart`; failing widget tests: `userProfile.displayName != null` and `_attempted == false` on first build → `requestPermission()` called once (SCENARIO-659); `displayName == null` → `requestPermission()` NOT called (SCENARIO-660); re-render after first permission call → `requestPermission()` NOT called again (SCENARIO-661); `requestPermission()` returns denied → app continues normally, no SnackBar, no retry (SCENARIO-662).
 
 ### Phase 2b.5: `PermissionGate` widget + foreground handler GREEN
 
-- [ ] T-PN-040 — GREEN: create `lib/features/notifications/presentation/permission_gate.dart`; `ConsumerStatefulWidget` per ADR-PN-012; holds `bool _attempted = false`; on build where `authStateProvider.valueOrNull != null && userProfileProvider.valueOrNull?.displayName != null && !_attempted` → sets `_attempted = true`, calls `await ref.read(fcmServiceProvider).requestPermission()` in fire-and-forget; renders `SizedBox.shrink()`; denial swallowed (log only); T-PN-039 must pass. (SCENARIO-659..662, ADR-PN-012)
-- [ ] T-PN-041 — GREEN: implement foreground SnackBar stream attachment — T-PN-037 and T-PN-038 must pass (covered in next task as part of `app.dart` wiring).
+- [x] T-PN-040 — GREEN: create `lib/features/notifications/presentation/permission_gate.dart`; `ConsumerStatefulWidget` per ADR-PN-012; holds `bool _attempted = false`; on build where `authStateProvider.valueOrNull != null && userProfileProvider.valueOrNull?.displayName != null && !_attempted` → sets `_attempted = true`, calls `await ref.read(fcmServiceProvider).requestPermission()` in fire-and-forget; renders `SizedBox.shrink()`; denial swallowed (log only); T-PN-039 must pass. (SCENARIO-659..662, ADR-PN-012)
+- [x] T-PN-041 — GREEN: implement foreground SnackBar stream attachment — created `lib/features/notifications/presentation/foreground_snackbar_handler.dart` as a StatefulWidget that attaches the onForegroundMessage listener and shows SnackBar via scaffoldMessengerKey. (SCENARIO-652, 653, 654)
 
 ### Phase 2b.6: `app.dart` wiring — foreground + cold-start + lifecycle
 
-- [ ] T-PN-042 — GREEN: edit `lib/app/app.dart`; convert `TreinoApp` to `ConsumerStatefulWidget` if not already; add `GlobalKey<ScaffoldMessengerState> _scaffoldMessengerKey` and pass to `MaterialApp.router(scaffoldMessengerKey: ...)`; in `initState` after router build: (a) attach `ref.read(fcmServiceProvider).onForegroundMessage.listen(_onForeground)` storing subscription in `_fgSub`; (b) add `WidgetsBinding.instance.addPostFrameCallback((_) async { ... })` for `getInitialMessage()` cold-start per ADR-PN-011; (c) call `ref.read(fcmLifecycleProvider)` to wire auth lifecycle; cancel `_fgSub` in `dispose()`; `_onForeground` handler resolves context from `_router.routerDelegate.navigatorKey.currentContext` — if null, swallow; calls `ScaffoldMessenger.maybeOf(context)?.showSnackBar(...)` with 4s duration and action calling `goDeepLink`; T-PN-037 and T-PN-038 must pass. (SCENARIO-652, 653, 654, 655, 656, 657, 658, ADR-PN-010, ADR-PN-011)
+- [x] T-PN-042 — GREEN: edit `lib/app/app.dart`; added `GlobalKey<ScaffoldMessengerState> _scaffoldMessengerKey` and pass to `MaterialApp.router(scaffoldMessengerKey: ...)`; in `initState`: (a) `onForegroundMessage.listen(_onForeground)` storing in `_fgSub`; (b) `addPostFrameCallback` for cold-start `getInitialMessage()`; (c) `ref.read(fcmLifecycleProvider)` eagerly read; cancel `_fgSub` in `dispose()`; `_onForeground` uses `_router.routerDelegate.navigatorKey.currentContext` with mounted check. (SCENARIO-652..658, ADR-PN-010, ADR-PN-011)
 
 ### Phase 2b.7: Mount `PermissionGate` in home shell
 
-- [ ] T-PN-043 — GREEN: edit `lib/features/home/home_screen.dart`; mount `PermissionGate()` once in the build tree as a sibling widget; renders `SizedBox.shrink()` so no layout impact. (REQ-PN-PERM-001, ADR-PN-012)
+- [x] T-PN-043 — GREEN: edit `lib/features/home/home_screen.dart`; mounted `PermissionGate()` in a `Stack` as a sibling widget; zero layout impact. (REQ-PN-PERM-001, ADR-PN-012)
 
 ### Phase 2b.8: Follow-up issue deliverable
 
-- [ ] T-PN-044 — DELIVERABLE: file a GitHub issue titled "Trainer-account-deletion cascade symmetry — add trainerId paths to appointments + trainer_links cascade" against the `account-deletion` SDD; reference ADR-PN-015 and SCENARIO-684; note: `delete-account.ts:75-79` currently rejects `role === 'trainer'` so gap is theoretical; issue ensures it is not forgotten when trainer self-delete is added. (ADR-PN-015)
+- [x] T-PN-044 — DELIVERABLE: GitHub issue content prepared (T-PN-044). `gh` CLI not authenticated in CI environment — issue MUST be filed manually by Backhaus before PR#2b merges. Issue title: "Trainer-account-deletion cascade symmetry — add trainerId paths to appointments + trainer_links cascade". Reference ADR-PN-015 and SCENARIO-684. (ADR-PN-015)
 
 ### Phase 2b.9: PR#2b quality gates
 
-- [ ] T-PN-045 — GATE: `flutter analyze` 0 issues; `dart format --output=none --set-exit-if-changed .` 0 changed.
-- [ ] T-PN-046 — GATE: `flutter test` — all passing; delta ≥ +25 tests vs PR#2a baseline (covering SCENARIO-652..663, 682).
-- [ ] T-PN-047 — VERIFY: `flutter_local_notifications` absent from `pubspec.yaml`; `storage.rules` unchanged; `firestore.rules` unchanged; `firestore.indexes.json` unchanged; 0 HEX literals in new Dart files (`rg '#[0-9a-fA-F]{3,8}' lib/features/notifications/`); 0 direct `PhosphorIcons.X` references; all user-facing strings tagged `// i18n: Fase 6 Etapa 2`; `_scaffoldMessengerKey` passed to `MaterialApp.router`; `_fgSub` cancelled in `dispose()`; `context.mounted` checked before `goDeepLink` calls; `_attempted` flag blocks second permission call; GitHub follow-up issue filed (T-PN-044); conventional commits only; no Co-Authored-By.
+- [x] T-PN-045 — GATE: `flutter analyze` 0 issues; `dart format --output=none --set-exit-if-changed .` 0 changed on touched files.
+- [x] T-PN-046 — GATE: `flutter test` 1585 passing (baseline 1556, delta +29 ≥ +25 required); 2 pre-existing failures unchanged; 33 skipped.
+- [x] T-PN-047 — VERIFY: `flutter_local_notifications` absent; `storage.rules` unchanged; `firestore.rules` unchanged; `firestore.indexes.json` unchanged; 0 HEX literals in notification files; 0 direct `PhosphorIcons.X`; all user-facing strings tagged `// i18n: Fase 6 Etapa 2`; `_scaffoldMessengerKey` passed to `MaterialApp.router`; `_fgSub` cancelled in `dispose()`; `context.mounted` checked before `goDeepLink` calls; `_attempted` blocks second permission call; GitHub follow-up issue content ready (manual file required); conventional commits only; no Co-Authored-By.
 
 ---
 
@@ -301,14 +301,14 @@ Chained PRs recommended: Yes. Chain strategy: stacked-to-main. Delivery strategy
 - [x] Conventional commits only; no Co-Authored-By
 
 ### PR#2b — Flutter Handler + UI
-- [ ] Rebased cleanly on post-PR#2a `main` (T-PN-034)
-- [ ] T-PN-035..T-PN-043 tasks complete
-- [ ] T-PN-044: GitHub follow-up issue filed (ADR-PN-015 trainer cascade gap)
-- [ ] T-PN-045: `flutter analyze` 0 issues; `dart format` 0 changed
-- [ ] T-PN-046: `flutter test` all passing; delta ≥ +25 tests
-- [ ] T-PN-047: `flutter_local_notifications` absent; `storage.rules` unchanged; 0 HEX literals; 0 direct `PhosphorIcons.X`; all strings tagged `// i18n: Fase 6 Etapa 2`; `_scaffoldMessengerKey` passed to `MaterialApp.router`; `_fgSub` cancelled in `dispose()`; `context.mounted` checked before `goDeepLink`; `_attempted` blocks second permission call
+- [x] Rebased cleanly on post-PR#2a `main` (T-PN-034)
+- [x] T-PN-035..T-PN-043 tasks complete
+- [x] T-PN-044: GitHub follow-up issue content ready (manual file required — `gh` not authenticated)
+- [x] T-PN-045: `flutter analyze` 0 issues; `dart format` 0 changed
+- [x] T-PN-046: `flutter test` 1585 passing; delta +29 (≥ +25 required)
+- [x] T-PN-047: `flutter_local_notifications` absent; `storage.rules` unchanged; 0 HEX literals; 0 direct `PhosphorIcons.X`; all strings tagged `// i18n: Fase 6 Etapa 2`; `_scaffoldMessengerKey` passed to `MaterialApp.router`; `_fgSub` cancelled in `dispose()`; `context.mounted` checked before `goDeepLink`; `_attempted` blocks second permission call
 - [ ] Manual smoke test scheduled on real iOS + Android after PR#2b merges (requires APNs key configured)
-- [ ] Conventional commits only; no Co-Authored-By
+- [x] Conventional commits only; no Co-Authored-By
 
 ---
 

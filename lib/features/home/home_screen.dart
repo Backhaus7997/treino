@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../coach/presentation/trainer_dashboard_tab.dart';
+import '../notifications/presentation/permission_gate.dart';
 import '../profile/application/user_providers.dart';
 import '../profile/domain/user_role.dart';
 import '../workout/application/session_providers.dart';
@@ -34,9 +35,16 @@ class HomeScreen extends ConsumerWidget {
     // confirmation (HomeHeader gracefully handles a null profile). Trainers
     // may see a brief athlete flicker before their dashboard mounts — an
     // acceptable trade for not stalling the 99% common case.
-    return role == UserRole.trainer
-        ? const TrainerDashboardTab()
-        : const _AthleteHome();
+    return Stack(
+      children: [
+        role == UserRole.trainer
+            ? const TrainerDashboardTab()
+            : const _AthleteHome(),
+        // REQ-PN-PERM-001: session-scoped permission prompt.
+        // Renders SizedBox.shrink() — zero layout impact. ADR-PN-012.
+        const PermissionGate(),
+      ],
+    );
   }
 }
 
