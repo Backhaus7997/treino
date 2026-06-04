@@ -220,7 +220,11 @@ mixin _$Appointment {
   List<CancellationEntry> get cancellationLog =>
       throw _privateConstructorUsedError;
   String? get noteBefore => throw _privateConstructorUsedError;
-  String? get noteAfter => throw _privateConstructorUsedError;
+  String? get noteAfter =>
+      throw _privateConstructorUsedError; // non-null → this session belongs to a recurring series created in one
+// shot by the trainer. All occurrences of the same series share this id,
+// enabling "cancel all future" without a separate series document.
+  String? get recurringId => throw _privateConstructorUsedError;
 
   /// Serializes this Appointment to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -250,7 +254,8 @@ abstract class $AppointmentCopyWith<$Res> {
       String? cancelledBy,
       List<CancellationEntry> cancellationLog,
       String? noteBefore,
-      String? noteAfter});
+      String? noteAfter,
+      String? recurringId});
 }
 
 /// @nodoc
@@ -280,6 +285,7 @@ class _$AppointmentCopyWithImpl<$Res, $Val extends Appointment>
     Object? cancellationLog = null,
     Object? noteBefore = freezed,
     Object? noteAfter = freezed,
+    Object? recurringId = freezed,
   }) {
     return _then(_value.copyWith(
       id: null == id
@@ -330,6 +336,10 @@ class _$AppointmentCopyWithImpl<$Res, $Val extends Appointment>
           ? _value.noteAfter
           : noteAfter // ignore: cast_nullable_to_non_nullable
               as String?,
+      recurringId: freezed == recurringId
+          ? _value.recurringId
+          : recurringId // ignore: cast_nullable_to_non_nullable
+              as String?,
     ) as $Val);
   }
 }
@@ -354,7 +364,8 @@ abstract class _$$AppointmentImplCopyWith<$Res>
       String? cancelledBy,
       List<CancellationEntry> cancellationLog,
       String? noteBefore,
-      String? noteAfter});
+      String? noteAfter,
+      String? recurringId});
 }
 
 /// @nodoc
@@ -382,6 +393,7 @@ class __$$AppointmentImplCopyWithImpl<$Res>
     Object? cancellationLog = null,
     Object? noteBefore = freezed,
     Object? noteAfter = freezed,
+    Object? recurringId = freezed,
   }) {
     return _then(_$AppointmentImpl(
       id: null == id
@@ -432,6 +444,10 @@ class __$$AppointmentImplCopyWithImpl<$Res>
           ? _value.noteAfter
           : noteAfter // ignore: cast_nullable_to_non_nullable
               as String?,
+      recurringId: freezed == recurringId
+          ? _value.recurringId
+          : recurringId // ignore: cast_nullable_to_non_nullable
+              as String?,
     ));
   }
 }
@@ -451,7 +467,8 @@ class _$AppointmentImpl extends _Appointment {
       this.cancelledBy,
       final List<CancellationEntry> cancellationLog = const [],
       this.noteBefore,
-      this.noteAfter})
+      this.noteAfter,
+      this.recurringId})
       : _cancellationLog = cancellationLog,
         super._();
 
@@ -491,10 +508,15 @@ class _$AppointmentImpl extends _Appointment {
   final String? noteBefore;
   @override
   final String? noteAfter;
+// non-null → this session belongs to a recurring series created in one
+// shot by the trainer. All occurrences of the same series share this id,
+// enabling "cancel all future" without a separate series document.
+  @override
+  final String? recurringId;
 
   @override
   String toString() {
-    return 'Appointment(id: $id, trainerId: $trainerId, athleteId: $athleteId, athleteDisplayName: $athleteDisplayName, startsAt: $startsAt, durationMin: $durationMin, status: $status, cancelledAt: $cancelledAt, cancelledBy: $cancelledBy, cancellationLog: $cancellationLog, noteBefore: $noteBefore, noteAfter: $noteAfter)';
+    return 'Appointment(id: $id, trainerId: $trainerId, athleteId: $athleteId, athleteDisplayName: $athleteDisplayName, startsAt: $startsAt, durationMin: $durationMin, status: $status, cancelledAt: $cancelledAt, cancelledBy: $cancelledBy, cancellationLog: $cancellationLog, noteBefore: $noteBefore, noteAfter: $noteAfter, recurringId: $recurringId)';
   }
 
   @override
@@ -523,7 +545,9 @@ class _$AppointmentImpl extends _Appointment {
             (identical(other.noteBefore, noteBefore) ||
                 other.noteBefore == noteBefore) &&
             (identical(other.noteAfter, noteAfter) ||
-                other.noteAfter == noteAfter));
+                other.noteAfter == noteAfter) &&
+            (identical(other.recurringId, recurringId) ||
+                other.recurringId == recurringId));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -541,7 +565,8 @@ class _$AppointmentImpl extends _Appointment {
       cancelledBy,
       const DeepCollectionEquality().hash(_cancellationLog),
       noteBefore,
-      noteAfter);
+      noteAfter,
+      recurringId);
 
   /// Create a copy of Appointment
   /// with the given fields replaced by the non-null parameter values.
@@ -572,7 +597,8 @@ abstract class _Appointment extends Appointment {
       final String? cancelledBy,
       final List<CancellationEntry> cancellationLog,
       final String? noteBefore,
-      final String? noteAfter}) = _$AppointmentImpl;
+      final String? noteAfter,
+      final String? recurringId}) = _$AppointmentImpl;
   const _Appointment._() : super._();
 
   factory _Appointment.fromJson(Map<String, dynamic> json) =
@@ -603,7 +629,12 @@ abstract class _Appointment extends Appointment {
   @override
   String? get noteBefore;
   @override
-  String? get noteAfter;
+  String?
+      get noteAfter; // non-null → this session belongs to a recurring series created in one
+// shot by the trainer. All occurrences of the same series share this id,
+// enabling "cancel all future" without a separate series document.
+  @override
+  String? get recurringId;
 
   /// Create a copy of Appointment
   /// with the given fields replaced by the non-null parameter values.

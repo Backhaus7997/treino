@@ -110,6 +110,44 @@ class _SessionDetailSheetState extends ConsumerState<SessionDetailSheet> {
     }
   }
 
+  Future<void> _cancelSeries() async {
+    final palette = AppPalette.of(context);
+    final confirmed = await _localConfirmDialog(
+      context,
+      palette: palette,
+      title: 'Cancelar toda la serie',
+      body:
+          'Se cancelan todas las sesiones futuras de esta serie recurrente (las que faltan más de 24h). No se puede deshacer.',
+      confirmLabel: 'Cancelar serie',
+      cancelLabel: 'No',
+    );
+    if (!confirmed || !mounted) return;
+
+    try {
+      final n =
+          await ref.read(appointmentRepositoryProvider).cancelFutureSeries(
+                recurringId: widget.appointment.recurringId!,
+                trainerId: widget.trainerId,
+                actorUid: widget.trainerId,
+                reason: AgendaStrings.bookingCancelledByCoach,
+              );
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(n == 0
+              ? 'No había sesiones futuras para cancelar.'
+              : 'Se cancelaron $n sesiones de la serie.'),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text(AgendaStrings.genericError)),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
@@ -143,6 +181,7 @@ class _SessionDetailSheetState extends ConsumerState<SessionDetailSheet> {
         appointment.startsAt.difference(DateTime.now().toUtc()) >
             const Duration(hours: 24);
     final isWithin24h = !widget.isPast && !canCancel;
+    final isRecurring = appointment.recurringId != null;
 
     return SafeArea(
       child: Padding(
@@ -179,6 +218,30 @@ class _SessionDetailSheetState extends ConsumerState<SessionDetailSheet> {
                   color: palette.textPrimary,
                 ),
               ),
+              if (isRecurring) ...[
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: palette.highlight.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(9999),
+                      border: Border.all(color: palette.highlight),
+                    ),
+                    child: Text(
+                      'SERIE RECURRENTE',
+                      style: GoogleFonts.barlowCondensed(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 10,
+                        letterSpacing: 1.2,
+                        color: palette.highlight,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
               const SizedBox(height: 16),
 
               // ── Athlete row ────────────────────────────────────────────
@@ -389,6 +452,28 @@ class _SessionDetailSheetState extends ConsumerState<SessionDetailSheet> {
                       ),
                     ),
                   ),
+                // Series teardown — cancels every future occurrence >24h away,
+                // even when this single one is within 24h.
+                if (isRecurring) ...[
+                  const SizedBox(height: 8),
+                  OutlinedButton(
+                    onPressed: _cancelSeries,
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(color: palette.danger),
+                      foregroundColor: palette.danger,
+                      minimumSize: const Size.fromHeight(48),
+                      shape: const StadiumBorder(),
+                    ),
+                    child: Text(
+                      'CANCELAR TODA LA SERIE',
+                      style: GoogleFonts.barlowCondensed(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                        letterSpacing: 1.4,
+                      ),
+                    ),
+                  ),
+                ],
               ],
               const SizedBox(height: 8),
             ],

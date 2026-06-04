@@ -50,6 +50,10 @@ class Appointment with _$Appointment {
     @Default([]) List<CancellationEntry> cancellationLog,
     String? noteBefore,
     String? noteAfter,
+    // non-null → this session belongs to a recurring series created in one
+    // shot by the trainer. All occurrences of the same series share this id,
+    // enabling "cancel all future" without a separate series document.
+    String? recurringId,
   }) = _Appointment;
 
   factory Appointment.fromJson(Map<String, Object?> json) =>
