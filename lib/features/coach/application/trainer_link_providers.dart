@@ -13,6 +13,17 @@ final trainerLinkRepositoryProvider = Provider<TrainerLinkRepository>(
 );
 
 /// Lista de vínculos donde el usuario actuó como PF.
+///
+/// Preferí [trainerLinksStreamProvider] — entrega los mismos datos pero como
+/// stream real-time, lo cual permite que el Coach Hub refleje transiciones
+/// (pause/resume/terminate/accept) sin un `ref.invalidate` manual.
+///
+/// Este provider queda exportado por back-compat de consumidores fuera del
+/// dashboard. Se elimina cuando esos consumidores migren al stream.
+@Deprecated(
+  'Use trainerLinksStreamProvider for real-time updates. '
+  'See ADR-CHLM-03 (coach-hub-link-management).',
+)
 final linksForTrainerProvider =
     FutureProvider.autoDispose.family<List<TrainerLink>, String>(
   (ref, trainerId) async {
