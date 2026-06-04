@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import '../../workout/data/exercise_repository.dart';
 import '../domain/parsed_plan.dart';
+import '../domain/periodized_preview.dart';
 import 'excel_parser.dart';
 import 'exercise_matcher.dart';
 
@@ -59,5 +60,34 @@ class PlanImportRepository {
       days: match.days,
       unmatched: match.unmatched,
     );
+  }
+
+  /// Igual que [parseAndMatch] pero para el formato PERIODIZADO (hoja
+  /// "Programa"). Devuelve un [PeriodizedPreviewPlan] con las semanas matcheadas.
+  Future<PeriodizedPreviewPlan> parseAndMatchPeriodized({
+    required Uint8List bytes,
+  }) async {
+    final RawParsedPeriodizedPlan raw;
+    try {
+      raw = parsePeriodizedExcelBytes(bytes);
+    } on ExcelParseException catch (e) {
+      throw PlanImportException(e.message, code: 'parse-failed');
+    } catch (e) {
+      throw PlanImportException(
+        'No pudimos leer el Excel.',
+        code: 'parse-failed',
+      );
+    }
+
+    final exercises = (await _exerciseRepository.listAll())
+        .map((e) => MatcherExercise(
+              id: e.id,
+              name: e.name,
+              muscleGroup: e.muscleGroup,
+              aliases: e.aliases,
+            ))
+        .toList();
+
+    return matchPeriodized(raw, exercises);
   }
 }

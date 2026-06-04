@@ -1,4 +1,5 @@
 import '../domain/parsed_plan.dart';
+import '../domain/periodized_preview.dart';
 import 'excel_parser.dart';
 
 /// Catálogo mínimo del lado matcher — sólo lo que necesita para mapear.
@@ -151,4 +152,61 @@ MatchResult matchExercises(
   }
 
   return MatchResult(days: days, unmatched: unmatched);
+}
+
+/// Versión periodizada: matchea cada (semana, día, ejercicio) contra el
+/// catálogo y conserva `order` + `block` (superserie). Construye el índice una
+/// sola vez para todas las semanas. Mismo algoritmo de match exacto + fuzzy.
+PeriodizedPreviewPlan matchPeriodized(
+  RawParsedPeriodizedPlan raw,
+  List<MatcherExercise> exercises,
+) {
+  final index = _Index.build(exercises);
+  final unmatched = <PeriodizedUnmatched>[];
+  final weeks = <PeriodizedPreviewWeek>[];
+
+  for (final week in raw.weeks) {
+    final days = <PeriodizedPreviewDay>[];
+    for (final day in week.days) {
+      final items = <PeriodizedPreviewItem>[];
+      for (final item in day.items) {
+        final key = normalize(item.rowName);
+        MatcherExercise? exercise = index.byName[key];
+        exercise ??= _bestFuzzyMatch(key, index);
+
+        if (exercise == null) {
+          unmatched.add(PeriodizedUnmatched(
+            weekNumber: week.weekNumber,
+            dayNumber: day.dayNumber,
+            rowName: item.rowName,
+          ));
+        }
+        items.add(PeriodizedPreviewItem(
+          rowName: item.rowName,
+          sets: item.sets,
+          repsMin: item.repsMin,
+          repsMax: item.repsMax,
+          weightKg: item.weightKg,
+          restSec: item.restSec,
+          notes: item.notes,
+          order: item.order,
+          block: item.block,
+          exerciseId: exercise?.id,
+          exerciseName: exercise?.name ?? item.rowName,
+          muscleGroup: exercise?.muscleGroup,
+        ));
+      }
+      days.add(PeriodizedPreviewDay(dayNumber: day.dayNumber, items: items));
+    }
+    weeks.add(PeriodizedPreviewWeek(weekNumber: week.weekNumber, days: days));
+  }
+
+  return PeriodizedPreviewPlan(
+    name: raw.name,
+    daysPerWeek: raw.daysPerWeek,
+    durationWeeks: raw.durationWeeks,
+    level: raw.level,
+    weeks: weeks,
+    unmatched: unmatched,
+  );
 }

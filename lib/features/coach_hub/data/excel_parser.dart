@@ -44,6 +44,8 @@ class RawParsedItem {
     this.weightKg,
     this.restSec,
     this.notes,
+    this.order,
+    this.block,
   });
 
   final String rowName;
@@ -53,9 +55,45 @@ class RawParsedItem {
   final double? weightKg;
   final int? restSec;
   final String? notes;
+
+  // Solo el formato periodizado (hoja "Programa") los usa. En el formato
+  // simple (hoja "Día N") quedan null: el orden lo da la posición de la fila
+  // y no hay columna de superserie.
+  final int? order;
+
+  /// Letra de superserie tal cual viene del Excel ("A", "B"…); null = suelto.
+  /// El matcher la convierte luego a `RoutineSlot.supersetGroup` (int?).
+  final String? block;
+}
+
+/// Plan periodizado: en lugar de una hoja por día con la misma prescripción
+/// para todas las semanas, lleva la dimensión SEMANA. Una sola hoja "Programa"
+/// donde cada fila es `Semana + Día + Ejercicio + prescripción`, así un mismo
+/// plan progresa semana a semana sin duplicar rutinas.
+class RawParsedPeriodizedPlan {
+  RawParsedPeriodizedPlan({
+    required this.name,
+    required this.daysPerWeek,
+    required this.durationWeeks,
+    required this.level,
+    required this.weeks,
+  });
+
+  final String name;
+  final int daysPerWeek;
+  final int durationWeeks;
+  final ExperienceLevel level;
+  final List<RawParsedWeek> weeks;
+}
+
+class RawParsedWeek {
+  RawParsedWeek({required this.weekNumber, required this.days});
+  final int weekNumber;
+  final List<RawParsedDay> days;
 }
 
 const _planSheet = 'Plan';
+const _programaSheet = 'Programa';
 final _daySheetRegex = RegExp(r'^D[ií]a\s*(\d+)$', caseSensitive: false);
 
 const _levelEsToWire = {
@@ -192,6 +230,17 @@ RawParsedDay _parseDaySheet(Sheet sheet, int dayNumber) {
   return RawParsedDay(dayNumber: dayNumber, items: items);
 }
 
+/// True si el workbook trae el formato PERIODIZADO (hoja "Programa"). Se usa en
+/// el upload para decidir qué parser/preview disparar. Si el archivo no decodea,
+/// devuelve false y el flujo simple emite el error correspondiente.
+bool isPeriodizedWorkbook(Uint8List bytes) {
+  try {
+    return Excel.decodeBytes(bytes).sheets.containsKey(_programaSheet);
+  } catch (_) {
+    return false;
+  }
+}
+
 RawParsedPlan parseExcelBytes(Uint8List bytes) {
   Excel workbook;
   try {
@@ -235,5 +284,109 @@ RawParsedPlan parseExcelBytes(Uint8List bytes) {
     durationWeeks: plan.durationWeeks,
     level: plan.level,
     days: days,
+  );
+}
+
+/// Parsea el formato PERIODIZADO: hoja "Plan" (metadata) + hoja "Programa"
+/// (una fila por ejercicio, con columna Semana). Lector tonto: agrupa por
+/// Semana → Día y ordena por la columna Orden. No exige que estén todas las
+/// semanas cargadas — el PF puede dejar el template con un ejemplo y expandirlo.
+RawParsedPeriodizedPlan parsePeriodizedExcelBytes(Uint8List bytes) {
+  Excel workbook;
+  try {
+    workbook = Excel.decodeBytes(bytes);
+  } catch (_) {
+    throw ExcelParseException('El archivo no es un Excel válido.');
+  }
+
+  final planSheet = workbook.sheets[_planSheet];
+  if (planSheet == null) {
+    throw ExcelParseException('Falta la hoja "Plan".');
+  }
+  final meta = _parsePlanSheet(planSheet);
+
+  final programa = workbook.sheets[_programaSheet];
+  if (programa == null) {
+    throw ExcelParseException('Falta la hoja "Programa".');
+  }
+
+  // Columnas: 0 Semana · 1 Día · 2 Orden · 3 Bloque · 4 Ejercicio · 5 Series ·
+  // 6 Reps Min · 7 Reps Max · 8 Peso Kg · 9 Descanso Seg · 10 Notas.
+  final byWeek = <int, Map<int, List<RawParsedItem>>>{};
+  final maxRow = programa.maxRows;
+  for (var row = 1; row <= maxRow; row++) {
+    final name = _asString(_cell(programa, 4, row));
+    if (name.isEmpty) continue; // fila vacía → se ignora
+
+    final week = _asInt(_cell(programa, 0, row));
+    final day = _asInt(_cell(programa, 1, row));
+    final order = _asInt(_cell(programa, 2, row));
+    final block = _asString(_cell(programa, 3, row));
+    final sets = _asInt(_cell(programa, 5, row));
+    final repsMin = _asInt(_cell(programa, 6, row));
+    final repsMax = _asInt(_cell(programa, 7, row));
+    final weightKg = _asNumber(_cell(programa, 8, row));
+    final restSec = _asInt(_cell(programa, 9, row));
+    final notes = _asString(_cell(programa, 10, row));
+
+    final where = 'Programa, fila ${row + 1}';
+    if (week == null || week < 1 || week > meta.durationWeeks) {
+      throw ExcelParseException(
+        '$where: "Semana" debe estar entre 1 y ${meta.durationWeeks}.',
+      );
+    }
+    if (day == null || day < 1 || day > meta.daysPerWeek) {
+      throw ExcelParseException(
+        '$where: "Día" debe estar entre 1 y ${meta.daysPerWeek}.',
+      );
+    }
+    if (sets == null || sets < 1) {
+      throw ExcelParseException('$where: faltan series.');
+    }
+    if (repsMin == null || repsMin < 1) {
+      throw ExcelParseException('$where: faltan reps mínimas.');
+    }
+    if (repsMax != null && repsMax < repsMin) {
+      throw ExcelParseException('$where: reps máximas < reps mínimas.');
+    }
+
+    byWeek
+        .putIfAbsent(week, () => <int, List<RawParsedItem>>{})
+        .putIfAbsent(day, () => <RawParsedItem>[])
+        .add(RawParsedItem(
+          rowName: name,
+          sets: sets,
+          repsMin: repsMin,
+          repsMax: repsMax ?? repsMin,
+          weightKg: weightKg,
+          restSec: restSec,
+          notes: notes.isEmpty ? null : notes,
+          order: order,
+          block: block.isEmpty ? null : block,
+        ));
+  }
+
+  if (byWeek.isEmpty) {
+    throw ExcelParseException('La hoja "Programa" no tiene ejercicios.');
+  }
+
+  final weeks = <RawParsedWeek>[];
+  for (final w in byWeek.keys.toList()..sort()) {
+    final daysMap = byWeek[w]!;
+    final days = <RawParsedDay>[];
+    for (final d in daysMap.keys.toList()..sort()) {
+      final items = daysMap[d]!
+        ..sort((a, b) => (a.order ?? 0).compareTo(b.order ?? 0));
+      days.add(RawParsedDay(dayNumber: d, items: items));
+    }
+    weeks.add(RawParsedWeek(weekNumber: w, days: days));
+  }
+
+  return RawParsedPeriodizedPlan(
+    name: meta.name,
+    daysPerWeek: meta.daysPerWeek,
+    durationWeeks: meta.durationWeeks,
+    level: meta.level,
+    weeks: weeks,
   );
 }

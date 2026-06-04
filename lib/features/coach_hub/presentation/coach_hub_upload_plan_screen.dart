@@ -9,6 +9,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../application/plan_import_providers.dart';
+import '../data/excel_parser.dart';
+import '../data/periodized_template_builder.dart';
 import '../data/plan_import_repository.dart';
 import '../data/template_builder.dart';
 import '../infrastructure/browser_download.dart';
@@ -31,6 +33,7 @@ class _CoachHubUploadPlanScreenState
   PlatformFile? _pickedFile;
   bool _submitting = false;
   bool _downloadingTemplate = false;
+  bool _downloadingPeriodized = false;
   String? _error;
 
   Future<void> _pickFile() async {
@@ -66,6 +69,28 @@ class _CoachHubUploadPlanScreenState
     }
   }
 
+  Future<void> _downloadPeriodizedTemplate() async {
+    if (_downloadingPeriodized) return;
+    setState(() {
+      _downloadingPeriodized = true;
+      _error = null;
+    });
+
+    try {
+      final bytes = buildPeriodizedTemplateBytes();
+      triggerBrowserDownload(
+        bytes: bytes,
+        filename: 'treino-plan-periodizado.xlsx',
+        mimeType:
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      );
+    } catch (_) {
+      if (mounted) setState(() => _error = 'No pudimos generar el template.');
+    } finally {
+      if (mounted) setState(() => _downloadingPeriodized = false);
+    }
+  }
+
   Future<void> _processFile() async {
     if (_submitting) return;
     final file = _pickedFile;
@@ -82,12 +107,22 @@ class _CoachHubUploadPlanScreenState
     });
 
     try {
-      final parsed = await ref
-          .read(planImportRepositoryProvider)
-          .parseAndMatch(bytes: Uint8List.fromList(bytes));
-      ref.read(parsedPlanProvider.notifier).state = parsed;
-      if (!mounted) return;
-      context.go('/upload-plan/preview');
+      final data = Uint8List.fromList(bytes);
+      final repo = ref.read(planImportRepositoryProvider);
+
+      if (isPeriodizedWorkbook(data)) {
+        final parsed = await repo.parseAndMatchPeriodized(bytes: data);
+        ref.read(parsedPeriodizedPlanProvider.notifier).state = parsed;
+        ref.read(parsedPlanProvider.notifier).state = null;
+        if (!mounted) return;
+        context.go('/upload-plan/preview-periodizado');
+      } else {
+        final parsed = await repo.parseAndMatch(bytes: data);
+        ref.read(parsedPlanProvider.notifier).state = parsed;
+        ref.read(parsedPeriodizedPlanProvider.notifier).state = null;
+        if (!mounted) return;
+        context.go('/upload-plan/preview');
+      }
     } on PlanImportException catch (e) {
       if (!mounted) return;
       setState(() {
@@ -125,6 +160,8 @@ class _CoachHubUploadPlanScreenState
                     palette: palette,
                     onDownload: _downloadTemplate,
                     loading: _downloadingTemplate,
+                    onDownloadPeriodized: _downloadPeriodizedTemplate,
+                    loadingPeriodized: _downloadingPeriodized,
                   ),
                   const SizedBox(height: 18),
                   _UploadCard(
@@ -232,10 +269,14 @@ class _TemplateCard extends StatelessWidget {
     required this.palette,
     required this.onDownload,
     required this.loading,
+    required this.onDownloadPeriodized,
+    required this.loadingPeriodized,
   });
   final AppPalette palette;
   final VoidCallback onDownload;
   final bool loading;
+  final VoidCallback onDownloadPeriodized;
+  final bool loadingPeriodized;
 
   @override
   Widget build(BuildContext context) {
@@ -265,8 +306,9 @@ class _TemplateCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Descargá el Excel base con las hojas y columnas '
-                  'que esperamos: Plan + Día 1, Día 2…',
+                  'Simple: una hoja por día, misma rutina todas las semanas. '
+                  'Periodizado: hoja "Programa" con columna Semana, para que el '
+                  'plan progrese semana a semana.',
                   style: TextStyle(
                     color: palette.textMuted,
                     fontSize: 13,
@@ -274,20 +316,42 @@ class _TemplateCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 12),
-                OutlinedButton(
-                  onPressed: loading ? null : onDownload,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: palette.accent,
-                    side: BorderSide(color: palette.accent),
-                    shape: const StadiumBorder(),
-                  ),
-                  child: loading
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text('Descargar template'),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    OutlinedButton(
+                      onPressed: loading ? null : onDownload,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: palette.accent,
+                        side: BorderSide(color: palette.accent),
+                        shape: const StadiumBorder(),
+                      ),
+                      child: loading
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Text('Template simple'),
+                    ),
+                    OutlinedButton(
+                      onPressed:
+                          loadingPeriodized ? null : onDownloadPeriodized,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: palette.highlight,
+                        side: BorderSide(color: palette.highlight),
+                        shape: const StadiumBorder(),
+                      ),
+                      child: loadingPeriodized
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Text('Template periodizado'),
+                    ),
+                  ],
                 ),
               ],
             ),
