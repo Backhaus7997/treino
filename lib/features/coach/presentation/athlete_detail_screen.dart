@@ -20,6 +20,8 @@ import '../../performance/presentation/widgets/performance_progress_chart.dart';
 import '../../profile/application/user_providers.dart' show userProfileProvider;
 import '../../profile/application/user_public_profile_providers.dart';
 import '../../workout/application/assigned_routine_providers.dart';
+import '../../workout/application/routine_providers.dart'
+    show routineRepositoryProvider;
 import '../../workout/application/session_providers.dart'
     show currentUidProvider;
 import '../../workout/domain/routine.dart';
@@ -191,6 +193,7 @@ class _AthleteDetailBody extends ConsumerWidget {
                   _PlanCard(
                     plan: plan,
                     onTap: () => context.push('/workout/routine/${plan.id}'),
+                    onDelete: () => _onDeletePlan(context, ref, plan),
                   ),
                   const SizedBox(height: 12),
                 ],
@@ -288,6 +291,64 @@ class _AthleteDetailBody extends ConsumerWidget {
         const SnackBar(
           content: Text('No pudimos abrir el chat. Probá de nuevo.'),
         ),
+      );
+    }
+  }
+
+  /// Confirms then deletes a plan the trainer assigned to this athlete, and
+  /// refreshes the list (the provider is a Future, so it needs an explicit
+  /// invalidate — unlike the templates stream).
+  Future<void> _onDeletePlan(
+      BuildContext context, WidgetRef ref, Routine plan) async {
+    final palette = AppPalette.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: palette.bgCard,
+        title: Text(
+          'Eliminar plan',
+          style: GoogleFonts.barlowCondensed(
+            fontWeight: FontWeight.w700,
+            color: palette.textPrimary,
+          ),
+        ),
+        content: Text(
+          '¿Eliminar "${plan.name}" de este alumno? Esta acción no se puede deshacer.',
+          style: GoogleFonts.barlow(fontSize: 13, color: palette.textPrimary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(
+              'Cancelar',
+              style: GoogleFonts.barlowCondensed(color: palette.textMuted),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(
+              'Eliminar',
+              style: GoogleFonts.barlowCondensed(
+                fontWeight: FontWeight.w700,
+                color: palette.danger,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    try {
+      await ref.read(routineRepositoryProvider).deleteRoutine(plan.id);
+      ref.invalidate(assignedRoutinesProvider(athleteId));
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Plan eliminado.')),
+      );
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No pudimos eliminar el plan.')),
       );
     }
   }
@@ -1418,9 +1479,10 @@ class _NotaEditSheetState extends ConsumerState<_NotaEditSheet> {
 // ── Plan card ─────────────────────────────────────────────────────────────────
 
 class _PlanCard extends StatelessWidget {
-  const _PlanCard({required this.plan, this.onTap});
+  const _PlanCard({required this.plan, this.onTap, this.onDelete});
   final Routine plan;
   final VoidCallback? onTap;
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -1435,26 +1497,41 @@ class _PlanCard extends StatelessWidget {
           border: Border.all(color: palette.border, width: 1),
         ),
         padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Row(
           children: [
-            Text(
-              plan.name,
-              style: GoogleFonts.barlow(
-                fontWeight: FontWeight.w600,
-                fontSize: 14,
-                color: palette.textPrimary,
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    plan.name,
+                    style: GoogleFonts.barlow(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                      color: palette.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${plan.days.length} ${plan.days.length == 1 ? "día" : "días"} · ${plan.split ?? WorkoutStrings.splitFallback}',
+                    style: GoogleFonts.barlow(
+                      fontWeight: FontWeight.w400,
+                      fontSize: 12,
+                      color: palette.textMuted,
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 4),
-            Text(
-              '${plan.days.length} ${plan.days.length == 1 ? "día" : "días"} · ${plan.split ?? WorkoutStrings.splitFallback}',
-              style: GoogleFonts.barlow(
-                fontWeight: FontWeight.w400,
-                fontSize: 12,
-                color: palette.textMuted,
+            if (onDelete != null)
+              IconButton(
+                onPressed: onDelete,
+                icon:
+                    Icon(TreinoIcon.trash, size: 18, color: palette.textMuted),
+                tooltip: 'Eliminar plan',
+                constraints: const BoxConstraints(),
+                padding: const EdgeInsets.only(left: 8),
               ),
-            ),
           ],
         ),
       ),

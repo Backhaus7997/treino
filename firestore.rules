@@ -112,7 +112,13 @@ service cloud.firestore {
                          == ['status'].toSet()
                     && request.resource.data.status in ['active', 'archived'];
 
-      allow delete: if false;
+      // DELETE (narrow): the owning trainer may delete their OWN
+      // `trainer-template` docs (library cleanup) and `trainer-assigned`
+      // plans (manually remove a plan from an athlete). User/system routines
+      // remain undeletable, and the athlete (assignedTo) cannot delete.
+      allow delete: if request.auth != null
+                    && resource.data.source in ['trainer-template', 'trainer-assigned']
+                    && request.auth.uid == resource.data.assignedBy;
     }
 
     // Vínculo PF ↔ atleta (Fase 5 Etapa 1, REQ-COACH-FOUNDATIONS-004).

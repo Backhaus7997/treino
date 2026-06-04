@@ -7,7 +7,9 @@ import '../../../app/theme/app_palette.dart';
 import '../../../core/analytics/analytics_service.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../coach/presentation/coach_strings.dart';
+import '../../profile/application/user_providers.dart' show userProfileProvider;
 import '../../profile/application/user_public_profile_providers.dart';
+import '../../profile/domain/user_role.dart';
 import '../application/routine_providers.dart';
 import '../domain/routine.dart';
 import '../domain/routine_day.dart';
@@ -141,6 +143,46 @@ class _RoutineDetailContent extends StatelessWidget {
   String? _minutesValue(RoutineDay d) =>
       d.estimatedMinutes != null ? '${d.estimatedMinutes}' : null;
 
+  /// Walks [day.slots] and emits either a standalone [ExerciseSlotRow] or a
+  /// magenta "SUPERSERIE" block wrapping consecutive slots that share the same
+  /// non-null [RoutineSlot.supersetGroup]. Mirrors the trainer editor's
+  /// `_buildSlotRows` so the athlete sees blocks exactly as they were authored.
+  ///
+  /// Ordinals stay absolute over the whole day (a superset at positions 3–4
+  /// shows "3" and "4"), so the numbering reads as one continuous list. A lone
+  /// tagged slot (run length < 2) renders standalone — no "superset of one".
+  List<Widget> _buildExerciseList() {
+    final slots = day.slots;
+    final widgets = <Widget>[];
+    var i = 0;
+    while (i < slots.length) {
+      final group = slots[i].supersetGroup;
+      if (group != null) {
+        final items = <({int index, RoutineSlot slot})>[];
+        var scan = i;
+        while (scan < slots.length && slots[scan].supersetGroup == group) {
+          items.add((index: scan, slot: slots[scan]));
+          scan++;
+        }
+        if (items.length >= 2) {
+          widgets.add(_SupersetBlock(items: items, onSlotTap: onSlotTap));
+          widgets.add(const SizedBox(height: 12));
+          i = scan;
+          continue;
+        }
+      }
+      final slot = slots[i];
+      widgets.add(ExerciseSlotRow(
+        slot: slot,
+        index: i + 1,
+        onTap: () => onSlotTap(slot),
+      ));
+      widgets.add(const SizedBox(height: 12));
+      i++;
+    }
+    return widgets;
+  }
+
   @override
   Widget build(BuildContext context) {
     return CustomScrollView(
@@ -188,16 +230,7 @@ class _RoutineDetailContent extends StatelessWidget {
               if (day.slots.isEmpty)
                 const _EmptyState(message: 'No hay ejercicios en este día')
               else
-                ...day.slots.asMap().entries.expand(
-                      (entry) => [
-                        ExerciseSlotRow(
-                          slot: entry.value,
-                          index: entry.key + 1,
-                          onTap: () => onSlotTap(entry.value),
-                        ),
-                        const SizedBox(height: 12),
-                      ],
-                    ),
+                ..._buildExerciseList(),
               const SizedBox(height: 20),
               _StartSessionCTABar(routine: routine, day: day),
               const SizedBox(height: 18),
@@ -212,6 +245,62 @@ class _RoutineDetailContent extends StatelessWidget {
 // ---------------------------------------------------------------------------
 // Private widgets
 // ---------------------------------------------------------------------------
+
+/// Read-only counterpart of the trainer editor's `_SupersetGroupCard`: a
+/// magenta-bordered wrapper around the exercises of one superset block, so the
+/// athlete can tell those movements run back-to-back. Inner rows reuse
+/// [ExerciseSlotRow] verbatim — same card, same tap target.
+class _SupersetBlock extends StatelessWidget {
+  const _SupersetBlock({required this.items, required this.onSlotTap});
+
+  final List<({int index, RoutineSlot slot})> items;
+  final ValueChanged<RoutineSlot> onSlotTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    return Container(
+      padding: const EdgeInsets.fromLTRB(10, 10, 10, 12),
+      decoration: BoxDecoration(
+        color: palette.highlight.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: palette.highlight),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 0, 4, 0),
+            child: Row(
+              children: [
+                Icon(TreinoIcon.streak, size: 14, color: palette.highlight),
+                const SizedBox(width: 6),
+                Text(
+                  'SUPERSERIE',
+                  style: GoogleFonts.barlowCondensed(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                    letterSpacing: 1.2,
+                    color: palette.highlight,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+          for (final entry in items) ...[
+            ExerciseSlotRow(
+              slot: entry.slot,
+              index: entry.index + 1,
+              onTap: () => onSlotTap(entry.slot),
+            ),
+            if (entry.index != items.last.index) const SizedBox(height: 8),
+          ],
+        ],
+      ),
+    );
+  }
+}
 
 class _HeroStrip extends ConsumerWidget {
   const _HeroStrip({
@@ -232,9 +321,8 @@ class _HeroStrip extends ConsumerWidget {
     // visible to the trainer's alumnos) don't carry a photo asset — render
     // a compact header with just badges + title, no image / gradient /
     // scrims. Only the public seeded catalogue has `assets/routines/{id}.png`.
-    final isTrainerDefined =
-        routine.source == RoutineSource.trainerAssigned ||
-            routine.source == RoutineSource.trainerTemplate;
+    final isTrainerDefined = routine.source == RoutineSource.trainerAssigned ||
+        routine.source == RoutineSource.trainerTemplate;
     if (isTrainerDefined) {
       return Padding(
         padding: const EdgeInsets.fromLTRB(20, 64, 20, 8),
@@ -533,37 +621,17 @@ class _StartSessionCTABar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Trainers coach — they don't train in-app. Hide "EMPEZAR" for them so the
+    // plan view is read-only; athletes still get the start CTA.
+    final role = ref.watch(
+      userProfileProvider.select((async) => async.valueOrNull?.role),
+    );
+    if (role == UserRole.trainer) return const SizedBox.shrink();
     final palette = AppPalette.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 18),
       child: Row(
         children: [
-          Expanded(
-            // EDITAR sigue stub — habilitar en una etapa futura.
-            child: Opacity(
-              opacity: 0.4,
-              child: OutlinedButton(
-                onPressed: null,
-                style: OutlinedButton.styleFrom(
-                  side: BorderSide(color: palette.border),
-                  minimumSize: const Size.fromHeight(56),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(9999),
-                  ),
-                ),
-                child: Text(
-                  'EDITAR',
-                  style: GoogleFonts.barlowCondensed(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 16,
-                    letterSpacing: 1.0,
-                    color: palette.textPrimary,
-                  ),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
           Expanded(
             child: ElevatedButton(
               onPressed: () {

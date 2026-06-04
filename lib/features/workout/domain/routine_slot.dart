@@ -17,6 +17,7 @@ class RoutineSlot with _$RoutineSlot {
     double?
         targetWeightKg, // null means "user picks" or "no target" (plate math)
     String? notes, // nullable free-form coaching notes
+    int? supersetGroup, // non-null → slot belongs to a superset block
   }) = _RoutineSlot;
 
   factory RoutineSlot.fromJson(Map<String, Object?> json) =>

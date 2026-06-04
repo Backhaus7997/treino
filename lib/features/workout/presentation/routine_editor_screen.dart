@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -30,6 +32,7 @@ class _EditableSlot {
   int targetRepsMin = 8;
   int targetRepsMax = 12;
   int restSeconds = 60;
+  int? supersetGroup;
 
   _EditableSlot();
 }
@@ -81,7 +84,6 @@ String _submitLabelFor(RoutineEditorMode mode) => switch (mode) {
 class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
   String _name = '';
   String _split = '';
-  int _daysPerWeek = 3;
   ExperienceLevel _level = ExperienceLevel.beginner;
   List<_EditableDay> _days = [_EditableDay(dayNumber: 1, name: 'Día 1')];
   bool _submitting = false;
@@ -139,28 +141,94 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
     });
   }
 
+  /// Replaces a day's slot order after a block-level reorder in the tile.
+  void _reorderSlots(int dayIndex, List<_EditableSlot> newOrder) {
+    setState(() {
+      _days[dayIndex].slots = newOrder;
+    });
+  }
+
   /// Opens the multi-select picker for [dayIndex] and appends N new slots.
   /// Passes [alreadySelectedIds] so the picker pre-marks exercises already in
   /// the day — the user avoids accidental re-adds. (ADR-RER-01)
-  Future<void> _pickExercisesForDay(
-      BuildContext context, int dayIndex) async {
+  Future<void> _pickExercisesForDay(BuildContext context, int dayIndex) async {
     final existingIds = _days[dayIndex]
         .slots
         .where((s) => s.exercise != null)
         .map((s) => s.exercise!.id)
         .toSet();
-    final picked = await showExercisePicker(
-      context,
-      alreadySelectedIds: existingIds,
-    );
+    final picked = await showExercisePicker(context);
     if (picked == null || picked.isEmpty || !mounted) return;
     setState(() {
-      for (final ex in picked) {
+      // Only add exercises not already in this day (one instance per day) —
+      // avoids the duplicate-on-reopen issue.
+      for (final ex in picked.where((e) => !existingIds.contains(e.id))) {
         final slot = _EditableSlot()
           ..exercise = ex
           ..restSeconds = ex.defaultRestSeconds ?? 60;
         _days[dayIndex].slots = [..._days[dayIndex].slots, slot];
       }
+    });
+  }
+
+  /// Opens the multi-select picker for [dayIndex] and appends all picked
+  /// exercises as a new superset block (shared non-null [supersetGroup]).
+  /// Trainer mode only — gated at the call site via [allowSuperset].
+  Future<void> _addSupersetForDay(BuildContext context, int dayIndex) async {
+    final existingIds = _days[dayIndex]
+        .slots
+        .where((s) => s.exercise != null)
+        .map((s) => s.exercise!.id)
+        .toSet();
+    final picked = await showExercisePicker(context);
+    if (picked == null || picked.isEmpty || !mounted) return;
+    setState(() {
+      final day = _days[dayIndex];
+      // Skip exercises already in this day (one instance per day).
+      final newOnes = picked.where((e) => !existingIds.contains(e.id)).toList();
+      if (newOnes.isEmpty) return;
+      final nextGroup =
+          (day.slots.map((s) => s.supersetGroup ?? 0).fold(0, max)) + 1;
+      final newSlots = newOnes
+          .map((ex) => _EditableSlot()
+            ..exercise = ex
+            ..restSeconds = ex.defaultRestSeconds ?? 60
+            ..supersetGroup = nextGroup)
+          .toList();
+      day.slots = [...day.slots, ...newSlots];
+    });
+  }
+
+  /// Opens the picker and adds the picked exercise(s) into the existing
+  /// superset [groupId] of [dayIndex], inserted right after that group's last
+  /// slot so the superset stays a consecutive run.
+  Future<void> _addExerciseToGroup(
+      BuildContext context, int dayIndex, int groupId) async {
+    final day = _days[dayIndex];
+    final existingIds = day.slots
+        .where((s) => s.exercise != null)
+        .map((s) => s.exercise!.id)
+        .toSet();
+    final picked = await showExercisePicker(context);
+    if (picked == null || picked.isEmpty || !mounted) return;
+    setState(() {
+      final newOnes = picked.where((e) => !existingIds.contains(e.id)).toList();
+      if (newOnes.isEmpty) return;
+      final newSlots = newOnes
+          .map((ex) => _EditableSlot()
+            ..exercise = ex
+            ..restSeconds = ex.defaultRestSeconds ?? 60
+            ..supersetGroup = groupId)
+          .toList();
+      // Insert right after the group's last slot to keep it consecutive.
+      var insertAt = day.slots.length;
+      for (var i = day.slots.length - 1; i >= 0; i--) {
+        if (day.slots[i].supersetGroup == groupId) {
+          insertAt = i + 1;
+          break;
+        }
+      }
+      day.slots = [...day.slots]..insertAll(insertAt, newSlots);
     });
   }
 
@@ -179,23 +247,36 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
     setState(() => _submitting = true);
     final uid = ref.read(currentUidProvider) ?? '';
 
-    final days = _days
-        .map((d) => RoutineDay(
-              dayNumber: d.dayNumber,
-              name: d.name,
-              slots: d.slots
-                  .map((s) => RoutineSlot(
-                        exerciseId: s.exercise!.id,
-                        exerciseName: s.exercise!.name,
-                        muscleGroup: s.exercise!.muscleGroup,
-                        targetSets: s.targetSets,
-                        targetRepsMin: s.targetRepsMin,
-                        targetRepsMax: s.targetRepsMax,
-                        restSeconds: s.restSeconds,
-                      ))
-                  .toList(),
-            ))
-        .toList();
+    final days = _days.map((d) {
+      // Normalize: a "superset" of 1 slot is just a standalone.
+      final groupCounts = <int, int>{};
+      for (final s in d.slots) {
+        if (s.supersetGroup != null) {
+          groupCounts[s.supersetGroup!] =
+              (groupCounts[s.supersetGroup!] ?? 0) + 1;
+        }
+      }
+      return RoutineDay(
+        dayNumber: d.dayNumber,
+        name: d.name,
+        slots: d.slots.map((s) {
+          final effectiveGroup = (s.supersetGroup != null &&
+                  (groupCounts[s.supersetGroup!] ?? 0) >= 2)
+              ? s.supersetGroup
+              : null;
+          return RoutineSlot(
+            exerciseId: s.exercise!.id,
+            exerciseName: s.exercise!.name,
+            muscleGroup: s.exercise!.muscleGroup,
+            targetSets: s.targetSets,
+            targetRepsMin: s.targetRepsMin,
+            targetRepsMax: s.targetRepsMax,
+            restSeconds: s.restSeconds,
+            supersetGroup: effectiveGroup,
+          );
+        }).toList(),
+      );
+    }).toList();
 
     try {
       final repo = ref.read(routineRepositoryProvider);
@@ -222,8 +303,7 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
               );
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-                content: Text(CoachStrings.createPlanSuccess)),
+            const SnackBar(content: Text(CoachStrings.createPlanSuccess)),
           );
           context.pop();
 
@@ -243,8 +323,7 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
           await repo.createTemplate(routine);
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-                content: Text(CoachStrings.createPlanSuccess)),
+            const SnackBar(content: Text(CoachStrings.createPlanSuccess)),
           );
           context.pop();
 
@@ -276,8 +355,7 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
           await repo.createUserOwned(uid: uid, draft: draft);
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-                content: Text(WorkoutStrings.selfEditorSuccess)),
+            const SnackBar(content: Text(WorkoutStrings.selfEditorSuccess)),
           );
           context.pop();
 
@@ -404,42 +482,26 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
                   if (_isTrainerMode) ...[
                     const SizedBox(height: 8),
                     Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _SectionLabel(label: 'DÍAS/SEM', palette: palette),
-                            const SizedBox(height: 4),
-                            _DaysPerWeekSelector(
-                              value: _daysPerWeek,
-                              palette: palette,
-                              onChanged: (v) =>
-                                  setState(() => _daysPerWeek = v),
-                            ),
-                          ],
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _SectionLabel(label: 'NIVEL', palette: palette),
+                              const SizedBox(height: 4),
+                              _LevelDropdown(
+                                value: _level,
+                                palette: palette,
+                                onChanged: (v) {
+                                  if (v != null) setState(() => _level = v);
+                                },
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _SectionLabel(label: 'NIVEL', palette: palette),
-                            const SizedBox(height: 4),
-                            _LevelDropdown(
-                              value: _level,
-                              palette: palette,
-                              onChanged: (v) {
-                                if (v != null) setState(() => _level = v);
-                              },
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
+                      ],
+                    ),
                   ],
                   const SizedBox(height: 12),
 
@@ -453,9 +515,15 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
                       palette: palette,
                       onAddSlot: () => _pickExercisesForDay(context, di),
                       onRemoveSlot: (si) => _removeSlot(di, si),
+                      onReorderSlots: (newOrder) => _reorderSlots(di, newOrder),
                       onRemoveDay:
                           _days.length > 1 ? () => _removeDay(di) : null,
                       onSlotChanged: () => setState(() {}),
+                      onAddToGroup: (g) => _addExerciseToGroup(context, di, g),
+                      allowSuperset: _isTrainerMode,
+                      onAddSuperset: _isTrainerMode
+                          ? () => _addSupersetForDay(context, di)
+                          : null,
                     ),
                     const SizedBox(height: 6),
                   ],
@@ -553,16 +621,24 @@ class _DayExpansionTile extends StatefulWidget {
     required this.palette,
     required this.onAddSlot,
     required this.onRemoveSlot,
+    required this.onReorderSlots,
     required this.onRemoveDay,
     required this.onSlotChanged,
+    required this.onAddToGroup,
+    this.allowSuperset = false,
+    this.onAddSuperset,
   });
 
   final _EditableDay day;
   final AppPalette palette;
   final VoidCallback onAddSlot;
   final void Function(int slotIndex) onRemoveSlot;
+  final void Function(List<_EditableSlot> newOrder) onReorderSlots;
   final VoidCallback? onRemoveDay;
   final VoidCallback onSlotChanged;
+  final bool allowSuperset;
+  final VoidCallback? onAddSuperset;
+  final void Function(int groupId) onAddToGroup;
 
   @override
   State<_DayExpansionTile> createState() => _DayExpansionTileState();
@@ -570,6 +646,93 @@ class _DayExpansionTile extends StatefulWidget {
 
 class _DayExpansionTileState extends State<_DayExpansionTile> {
   bool _expanded = true;
+
+  /// Walks the slot list and emits either a standalone [_SlotEditor] or a
+  /// "SUPERSERIE" wrapper card for consecutive slots sharing a non-null group.
+  List<Widget> _buildSlotRows(AppPalette palette) {
+    final blocks = _blocks();
+    final rows = <Widget>[];
+    // Running absolute index into the flat slot list — onRemove still expects
+    // the slot's flat position, not the block index.
+    var flatStart = 0;
+    for (var b = 0; b < blocks.length; b++) {
+      final block = blocks[b];
+      final canUp = b > 0;
+      final canDown = b < blocks.length - 1;
+      if (block.length == 1 && block.first.supersetGroup == null) {
+        // Standalone slot. ObjectKey keeps each row's State bound to its slot
+        // so the int fields don't show stale values after the list shifts.
+        final idx = flatStart;
+        final slot = block.first;
+        rows.add(_SlotEditor(
+          key: ObjectKey(slot),
+          slot: slot,
+          palette: palette,
+          onRemove: () => widget.onRemoveSlot(idx),
+          onChanged: widget.onSlotChanged,
+          canMoveUp: canUp,
+          canMoveDown: canDown,
+          onMoveUp: () => _moveBlock(b, -1),
+          onMoveDown: () => _moveBlock(b, 1),
+        ));
+      } else {
+        // Superset block — the whole block moves as one unit.
+        final groupSlots = <({int index, _EditableSlot slot})>[
+          for (var k = 0; k < block.length; k++)
+            (index: flatStart + k, slot: block[k]),
+        ];
+        rows.add(_SupersetGroupCard(
+          groupSlots: groupSlots,
+          palette: palette,
+          onRemoveSlot: widget.onRemoveSlot,
+          onChanged: widget.onSlotChanged,
+          onAddExercise: () => widget.onAddToGroup(block.first.supersetGroup!),
+          canMoveUp: canUp,
+          canMoveDown: canDown,
+          onMoveUp: () => _moveBlock(b, -1),
+          onMoveDown: () => _moveBlock(b, 1),
+        ));
+      }
+      rows.add(const SizedBox(height: 8));
+      flatStart += block.length;
+    }
+    return rows;
+  }
+
+  /// Groups the flat slot list into ordered blocks: a standalone slot is its
+  /// own block; consecutive slots sharing a non-null supersetGroup form one.
+  List<List<_EditableSlot>> _blocks() {
+    final slots = widget.day.slots;
+    final blocks = <List<_EditableSlot>>[];
+    var i = 0;
+    while (i < slots.length) {
+      final group = slots[i].supersetGroup;
+      if (group != null) {
+        final run = <_EditableSlot>[];
+        while (i < slots.length && slots[i].supersetGroup == group) {
+          run.add(slots[i]);
+          i++;
+        }
+        blocks.add(run);
+      } else {
+        blocks.add([slots[i]]);
+        i++;
+      }
+    }
+    return blocks;
+  }
+
+  /// Swaps block [blockIndex] with its neighbour in [dir] (-1 up / +1 down) and
+  /// flattens back to a slot list. No-op at the edges. A whole superset moves
+  /// as a single unit, so a reorder never splits a block.
+  void _moveBlock(int blockIndex, int dir) {
+    final blocks = _blocks();
+    final target = blockIndex + dir;
+    if (target < 0 || target >= blocks.length) return;
+    final moved = blocks.removeAt(blockIndex);
+    blocks.insert(target, moved);
+    widget.onReorderSlots([for (final b in blocks) ...b]);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -628,15 +791,7 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
               padding: const EdgeInsets.fromLTRB(14, 8, 14, 8),
               child: Column(
                 children: [
-                  for (int si = 0; si < widget.day.slots.length; si++) ...[
-                    _SlotEditor(
-                      slot: widget.day.slots[si],
-                      palette: palette,
-                      onRemove: () => widget.onRemoveSlot(si),
-                      onChanged: widget.onSlotChanged,
-                    ),
-                    const SizedBox(height: 8),
-                  ],
+                  ..._buildSlotRows(palette),
                   // Add slot button
                   SizedBox(
                     width: double.infinity,
@@ -654,6 +809,25 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
                       ),
                     ),
                   ),
+                  // "+ Superserie" button — trainer mode only
+                  if (widget.allowSuperset)
+                    SizedBox(
+                      width: double.infinity,
+                      child: TextButton.icon(
+                        key: const Key('add_superset_button'),
+                        onPressed: widget.onAddSuperset,
+                        icon: Icon(TreinoIcon.streak,
+                            size: 14, color: palette.highlight),
+                        label: Text(
+                          CoachStrings.editorAddSuperset,
+                          style: GoogleFonts.barlowCondensed(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                            color: palette.highlight,
+                          ),
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -664,20 +838,182 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
   }
 }
 
+// ── Superset group card ───────────────────────────────────────────────────────
+
+/// Wrapper card rendered around consecutive slots sharing the same
+/// [supersetGroup]. Shows a "SUPERSERIE" header with a flame icon,
+/// then stacks each slot's [_SlotEditor].
+class _SupersetGroupCard extends StatelessWidget {
+  const _SupersetGroupCard({
+    required this.groupSlots,
+    required this.palette,
+    required this.onRemoveSlot,
+    required this.onChanged,
+    required this.onAddExercise,
+    this.canMoveUp = false,
+    this.canMoveDown = false,
+    this.onMoveUp,
+    this.onMoveDown,
+  });
+
+  final List<({int index, _EditableSlot slot})> groupSlots;
+  final AppPalette palette;
+  final void Function(int slotIndex) onRemoveSlot;
+  final VoidCallback onChanged;
+  final VoidCallback onAddExercise;
+
+  /// Block-level reorder controls — the whole superset moves as one unit.
+  final bool canMoveUp;
+  final bool canMoveDown;
+  final VoidCallback? onMoveUp;
+  final VoidCallback? onMoveDown;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+      decoration: BoxDecoration(
+        color: palette.highlight.withAlpha(15),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: palette.highlight),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header row
+          Row(
+            children: [
+              Icon(TreinoIcon.streak, size: 14, color: palette.highlight),
+              const SizedBox(width: 6),
+              Text(
+                'SUPERSERIE',
+                style: GoogleFonts.barlowCondensed(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12,
+                  letterSpacing: 1.2,
+                  color: palette.highlight,
+                ),
+              ),
+              if (onMoveUp != null || onMoveDown != null) ...[
+                const Spacer(),
+                _MoveButtons(
+                  palette: palette,
+                  canMoveUp: canMoveUp,
+                  canMoveDown: canMoveDown,
+                  onMoveUp: onMoveUp,
+                  onMoveDown: onMoveDown,
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 8),
+          // Slot editors stacked
+          for (final entry in groupSlots) ...[
+            _SlotEditor(
+              key: ObjectKey(entry.slot),
+              slot: entry.slot,
+              palette: palette,
+              onRemove: () => onRemoveSlot(entry.index),
+              onChanged: onChanged,
+            ),
+            if (entry != groupSlots.last) const SizedBox(height: 6),
+          ],
+          const SizedBox(height: 4),
+          // Add another exercise into THIS superset block.
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: onAddExercise,
+              icon: Icon(TreinoIcon.plus, size: 14, color: palette.highlight),
+              label: Text(
+                'Agregar ejercicio',
+                style: GoogleFonts.barlowCondensed(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                  color: palette.highlight,
+                ),
+              ),
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Move (reorder) controls ───────────────────────────────────────────────────
+
+/// Compact up/down chevrons used to reorder a block (a standalone slot or a
+/// whole superset) within its day. Edge buttons render disabled.
+class _MoveButtons extends StatelessWidget {
+  const _MoveButtons({
+    required this.palette,
+    required this.canMoveUp,
+    required this.canMoveDown,
+    required this.onMoveUp,
+    required this.onMoveDown,
+  });
+
+  final AppPalette palette;
+  final bool canMoveUp;
+  final bool canMoveDown;
+  final VoidCallback? onMoveUp;
+  final VoidCallback? onMoveDown;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget btn(IconData icon, bool enabled, VoidCallback? cb) => IconButton(
+          icon: Icon(
+            icon,
+            size: 18,
+            color: enabled ? palette.textMuted : palette.border,
+          ),
+          onPressed: enabled ? cb : null,
+          visualDensity: VisualDensity.compact,
+          constraints: const BoxConstraints(),
+          padding: const EdgeInsets.symmetric(horizontal: 3),
+        );
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        btn(TreinoIcon.chevronUp, canMoveUp, onMoveUp),
+        btn(TreinoIcon.chevronDown, canMoveDown, onMoveDown),
+      ],
+    );
+  }
+}
+
 // ── Slot editor row ───────────────────────────────────────────────────────────
 
 class _SlotEditor extends StatelessWidget {
   const _SlotEditor({
+    super.key,
     required this.slot,
     required this.palette,
     required this.onRemove,
     required this.onChanged,
+    this.canMoveUp = false,
+    this.canMoveDown = false,
+    this.onMoveUp,
+    this.onMoveDown,
   });
 
   final _EditableSlot slot;
   final AppPalette palette;
   final VoidCallback onRemove;
   final VoidCallback onChanged;
+
+  /// Reorder controls. When both callbacks are null (e.g. a slot nested inside a
+  /// superset card, which moves as part of its block) no move buttons render.
+  final bool canMoveUp;
+  final bool canMoveDown;
+  final VoidCallback? onMoveUp;
+  final VoidCallback? onMoveDown;
 
   @override
   Widget build(BuildContext context) {
@@ -717,6 +1053,14 @@ class _SlotEditor extends StatelessWidget {
                   ),
                 ),
               ),
+              if (onMoveUp != null || onMoveDown != null)
+                _MoveButtons(
+                  palette: palette,
+                  canMoveUp: canMoveUp,
+                  canMoveDown: canMoveDown,
+                  onMoveUp: onMoveUp,
+                  onMoveDown: onMoveDown,
+                ),
               const SizedBox(width: 6),
               IconButton(
                 icon:
@@ -851,54 +1195,6 @@ class _SmallIntFieldState extends State<_SmallIntField> {
           ),
         ],
       ),
-    );
-  }
-}
-
-// ── Days per week selector ────────────────────────────────────────────────────
-
-class _DaysPerWeekSelector extends StatelessWidget {
-  const _DaysPerWeekSelector({
-    required this.value,
-    required this.palette,
-    required this.onChanged,
-  });
-
-  final int value;
-  final AppPalette palette;
-  final void Function(int) onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 8,
-      children: List.generate(7, (i) {
-        final day = i + 1;
-        final selected = day == value;
-        return GestureDetector(
-          onTap: () => onChanged(day),
-          child: Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: selected ? palette.accent : palette.bgCard,
-              border: Border.all(
-                color: selected ? palette.accent : palette.border,
-              ),
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              '$day',
-              style: GoogleFonts.barlowCondensed(
-                fontWeight: FontWeight.w700,
-                fontSize: 14,
-                color: selected ? palette.bg : palette.textPrimary,
-              ),
-            ),
-          ),
-        );
-      }),
     );
   }
 }

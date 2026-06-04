@@ -35,7 +35,9 @@ class TrainerWorkoutView extends ConsumerWidget {
         : ref.watch(trainerTemplatesStreamProvider(uid));
     final sharedFlag = uid.isEmpty
         ? false
-        : (ref.watch(userPublicProfileProvider(uid)).valueOrNull
+        : (ref
+                .watch(userPublicProfileProvider(uid))
+                .valueOrNull
                 ?.sharedTemplatesWithAthletes ??
             false);
 
@@ -215,8 +217,7 @@ class _TemplateLibrarySection extends ConsumerWidget {
               ),
               TextButton.icon(
                 onPressed: () => context.push('/workout/template-editor'),
-                icon: Icon(TreinoIcon.plus,
-                    size: 14, color: palette.accent),
+                icon: Icon(TreinoIcon.plus, size: 14, color: palette.accent),
                 label: Text(
                   'NUEVA',
                   style: GoogleFonts.barlowCondensed(
@@ -253,15 +254,14 @@ class _TemplateLibrarySection extends ConsumerWidget {
               padding: const EdgeInsets.symmetric(vertical: 16),
               child: Text(
                 'No pudimos cargar tus plantillas.',
-                style: GoogleFonts.barlow(
-                    color: palette.textMuted, fontSize: 13),
+                style:
+                    GoogleFonts.barlow(color: palette.textMuted, fontSize: 13),
               ),
             ),
             data: (templates) {
               if (templates.isEmpty) {
                 return Padding(
-                  padding:
-                      const EdgeInsets.symmetric(vertical: 12),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
                   child: Text(
                     'Todavía no creaste ninguna plantilla. Pegale a NUEVA para armar la primera.',
                     style: GoogleFonts.barlow(
@@ -359,15 +359,76 @@ class _TemplateCard extends ConsumerStatefulWidget {
 
 class _TemplateCardState extends ConsumerState<_TemplateCard> {
   bool _assigning = false;
+  bool _deleting = false;
+
+  Future<void> _onDelete(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: widget.palette.bgCard,
+        title: Text(
+          'Eliminar plantilla',
+          style: GoogleFonts.barlowCondensed(
+            fontWeight: FontWeight.w700,
+            color: widget.palette.textPrimary,
+          ),
+        ),
+        content: Text(
+          '¿Eliminar "${widget.template.name}"? Esta acción no se puede deshacer.',
+          style: GoogleFonts.barlow(
+            fontSize: 13,
+            color: widget.palette.textPrimary,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(
+              'Cancelar',
+              style:
+                  GoogleFonts.barlowCondensed(color: widget.palette.textMuted),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(
+              'Eliminar',
+              style: GoogleFonts.barlowCondensed(
+                fontWeight: FontWeight.w700,
+                color: widget.palette.danger,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _deleting = true);
+    try {
+      await ref
+          .read(routineRepositoryProvider)
+          .deleteRoutine(widget.template.id);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Plantilla eliminada.')),
+      );
+      // The templates stream auto-refreshes from the Firestore snapshot.
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No pudimos eliminar la plantilla.')),
+      );
+    } finally {
+      if (mounted) setState(() => _deleting = false);
+    }
+  }
 
   Future<void> _onAssign(BuildContext context) async {
     final athleteId = await showAthletePickerSheet(context);
     if (athleteId == null || !mounted) return;
     setState(() => _assigning = true);
     try {
-      await ref
-          .read(routineRepositoryProvider)
-          .assignTemplateToAthlete(
+      await ref.read(routineRepositoryProvider).assignTemplateToAthlete(
             template: widget.template,
             athleteId: athleteId,
           );
@@ -391,8 +452,7 @@ class _TemplateCardState extends ConsumerState<_TemplateCard> {
     final t = widget.template;
     final daysCount = t.days.length;
     return Container(
-      padding:
-          const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: palette.bg,
         borderRadius: BorderRadius.circular(14),
@@ -430,8 +490,7 @@ class _TemplateCardState extends ConsumerState<_TemplateCard> {
             onPressed: _assigning ? null : () => _onAssign(context),
             style: TextButton.styleFrom(
               foregroundColor: palette.accent,
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 12, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             ),
             child: _assigning
                 ? SizedBox(
@@ -448,6 +507,21 @@ class _TemplateCardState extends ConsumerState<_TemplateCard> {
                       letterSpacing: 0.8,
                     ),
                   ),
+          ),
+          IconButton(
+            onPressed:
+                (_assigning || _deleting) ? null : () => _onDelete(context),
+            icon: _deleting
+                ? SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: palette.danger),
+                  )
+                : Icon(TreinoIcon.trash, size: 18, color: palette.textMuted),
+            tooltip: 'Eliminar',
+            constraints: const BoxConstraints(),
+            padding: const EdgeInsets.symmetric(horizontal: 8),
           ),
         ],
       ),

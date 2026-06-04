@@ -199,7 +199,7 @@ class _ExercisePickerSheetContentState
                 padding:
                     const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 child: TextField(
-                  autofocus: true,
+                  autofocus: false,
                   style: GoogleFonts.barlow(
                       color: palette.textPrimary, fontSize: 14),
                   decoration: InputDecoration(
@@ -687,9 +687,8 @@ class _FilterButton extends StatelessWidget {
             color: active ? palette.accent : palette.border,
             width: active ? 1.5 : 1,
           ),
-          color: active
-              ? palette.accent.withValues(alpha: 0.12)
-              : palette.bgCard,
+          color:
+              active ? palette.accent.withValues(alpha: 0.12) : palette.bgCard,
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,

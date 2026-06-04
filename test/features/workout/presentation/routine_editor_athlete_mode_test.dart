@@ -173,7 +173,9 @@ void main() {
 
     expect(find.byKey(const Key('editor_name_field')), findsOneWidget);
     expect(find.byKey(const Key('editor_split_field')), findsOneWidget);
-    expect(find.text('DÍAS/SEM'), findsOneWidget);
+    // DÍAS/SEM selector removed — it was a dead control (never persisted,
+    // never created days). Day count is driven only by "DÍAS DEL PLAN".
+    expect(find.text('DÍAS/SEM'), findsNothing);
     expect(find.text('NIVEL'), findsOneWidget);
     expect(find.text('DÍAS DEL PLAN'), findsOneWidget);
   });
@@ -191,7 +193,9 @@ void main() {
 
     expect(find.byKey(const Key('editor_name_field')), findsOneWidget);
     expect(find.byKey(const Key('editor_split_field')), findsOneWidget);
-    expect(find.text('DÍAS/SEM'), findsOneWidget);
+    // DÍAS/SEM selector removed — it was a dead control (never persisted,
+    // never created days). Day count is driven only by "DÍAS DEL PLAN".
+    expect(find.text('DÍAS/SEM'), findsNothing);
     expect(find.text('NIVEL'), findsOneWidget);
     expect(find.text('DÍAS DEL PLAN'), findsOneWidget);
   });

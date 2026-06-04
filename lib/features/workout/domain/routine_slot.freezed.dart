@@ -32,7 +32,9 @@ mixin _$RoutineSlot {
   int get restSeconds => throw _privateConstructorUsedError;
   double? get targetWeightKg =>
       throw _privateConstructorUsedError; // null means "user picks" or "no target" (plate math)
-  String? get notes => throw _privateConstructorUsedError;
+  String? get notes =>
+      throw _privateConstructorUsedError; // nullable free-form coaching notes
+  int? get supersetGroup => throw _privateConstructorUsedError;
 
   /// Serializes this RoutineSlot to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -59,7 +61,8 @@ abstract class $RoutineSlotCopyWith<$Res> {
       int targetRepsMax,
       int restSeconds,
       double? targetWeightKg,
-      String? notes});
+      String? notes,
+      int? supersetGroup});
 }
 
 /// @nodoc
@@ -86,6 +89,7 @@ class _$RoutineSlotCopyWithImpl<$Res, $Val extends RoutineSlot>
     Object? restSeconds = null,
     Object? targetWeightKg = freezed,
     Object? notes = freezed,
+    Object? supersetGroup = freezed,
   }) {
     return _then(_value.copyWith(
       exerciseId: null == exerciseId
@@ -124,6 +128,10 @@ class _$RoutineSlotCopyWithImpl<$Res, $Val extends RoutineSlot>
           ? _value.notes
           : notes // ignore: cast_nullable_to_non_nullable
               as String?,
+      supersetGroup: freezed == supersetGroup
+          ? _value.supersetGroup
+          : supersetGroup // ignore: cast_nullable_to_non_nullable
+              as int?,
     ) as $Val);
   }
 }
@@ -145,7 +153,8 @@ abstract class _$$RoutineSlotImplCopyWith<$Res>
       int targetRepsMax,
       int restSeconds,
       double? targetWeightKg,
-      String? notes});
+      String? notes,
+      int? supersetGroup});
 }
 
 /// @nodoc
@@ -170,6 +179,7 @@ class __$$RoutineSlotImplCopyWithImpl<$Res>
     Object? restSeconds = null,
     Object? targetWeightKg = freezed,
     Object? notes = freezed,
+    Object? supersetGroup = freezed,
   }) {
     return _then(_$RoutineSlotImpl(
       exerciseId: null == exerciseId
@@ -208,6 +218,10 @@ class __$$RoutineSlotImplCopyWithImpl<$Res>
           ? _value.notes
           : notes // ignore: cast_nullable_to_non_nullable
               as String?,
+      supersetGroup: freezed == supersetGroup
+          ? _value.supersetGroup
+          : supersetGroup // ignore: cast_nullable_to_non_nullable
+              as int?,
     ));
   }
 }
@@ -224,7 +238,8 @@ class _$RoutineSlotImpl implements _RoutineSlot {
       required this.targetRepsMax,
       required this.restSeconds,
       this.targetWeightKg,
-      this.notes});
+      this.notes,
+      this.supersetGroup});
 
   factory _$RoutineSlotImpl.fromJson(Map<String, dynamic> json) =>
       _$$RoutineSlotImplFromJson(json);
@@ -251,10 +266,13 @@ class _$RoutineSlotImpl implements _RoutineSlot {
 // null means "user picks" or "no target" (plate math)
   @override
   final String? notes;
+// nullable free-form coaching notes
+  @override
+  final int? supersetGroup;
 
   @override
   String toString() {
-    return 'RoutineSlot(exerciseId: $exerciseId, exerciseName: $exerciseName, muscleGroup: $muscleGroup, targetSets: $targetSets, targetRepsMin: $targetRepsMin, targetRepsMax: $targetRepsMax, restSeconds: $restSeconds, targetWeightKg: $targetWeightKg, notes: $notes)';
+    return 'RoutineSlot(exerciseId: $exerciseId, exerciseName: $exerciseName, muscleGroup: $muscleGroup, targetSets: $targetSets, targetRepsMin: $targetRepsMin, targetRepsMax: $targetRepsMax, restSeconds: $restSeconds, targetWeightKg: $targetWeightKg, notes: $notes, supersetGroup: $supersetGroup)';
   }
 
   @override
@@ -278,7 +296,9 @@ class _$RoutineSlotImpl implements _RoutineSlot {
                 other.restSeconds == restSeconds) &&
             (identical(other.targetWeightKg, targetWeightKg) ||
                 other.targetWeightKg == targetWeightKg) &&
-            (identical(other.notes, notes) || other.notes == notes));
+            (identical(other.notes, notes) || other.notes == notes) &&
+            (identical(other.supersetGroup, supersetGroup) ||
+                other.supersetGroup == supersetGroup));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -293,7 +313,8 @@ class _$RoutineSlotImpl implements _RoutineSlot {
       targetRepsMax,
       restSeconds,
       targetWeightKg,
-      notes);
+      notes,
+      supersetGroup);
 
   /// Create a copy of RoutineSlot
   /// with the given fields replaced by the non-null parameter values.
@@ -321,7 +342,8 @@ abstract class _RoutineSlot implements RoutineSlot {
       required final int targetRepsMax,
       required final int restSeconds,
       final double? targetWeightKg,
-      final String? notes}) = _$RoutineSlotImpl;
+      final String? notes,
+      final int? supersetGroup}) = _$RoutineSlotImpl;
 
   factory _RoutineSlot.fromJson(Map<String, dynamic> json) =
       _$RoutineSlotImpl.fromJson;
@@ -344,7 +366,9 @@ abstract class _RoutineSlot implements RoutineSlot {
   double?
       get targetWeightKg; // null means "user picks" or "no target" (plate math)
   @override
-  String? get notes;
+  String? get notes; // nullable free-form coaching notes
+  @override
+  int? get supersetGroup;
 
   /// Create a copy of RoutineSlot
   /// with the given fields replaced by the non-null parameter values.

@@ -13,6 +13,7 @@ import 'package:treino/features/workout/application/session_init.dart';
 import 'package:treino/features/workout/application/session_notifier.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
 import 'package:treino/features/workout/application/session_state.dart';
+import 'package:treino/features/workout/domain/set_log.dart';
 import 'package:treino/features/workout/presentation/session_player_screen.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
@@ -338,6 +339,86 @@ void main() {
       await tester.pumpAndSettle();
       // El SetEntrySheet NO debe aparecer
       expect(find.text('SQUAT'), findsNothing);
+    });
+  });
+
+  // ── Superserie round-robin (_SupersetSection) ─────────────────────────────
+
+  group('_SupersetSection (round-robin)', () {
+    SessionState supersetState({List<SetLog> logs = const []}) => SessionState(
+          session: makeSession(),
+          day: makeDay(
+            dayNumber: 1,
+            slots: [
+              makeSlot(
+                  exerciseId: 'e1',
+                  exerciseName: 'A',
+                  targetSets: 3,
+                  supersetGroup: 1),
+              makeSlot(
+                  exerciseId: 'e2',
+                  exerciseName: 'B',
+                  targetSets: 3,
+                  supersetGroup: 1),
+            ],
+          ),
+          setLogs: logs,
+          currentExerciseIndex: 0,
+          elapsedSeconds: 0,
+        );
+
+    testWidgets(
+        'SCENARIO-600: consecutive supersetGroup slots render a SUPERSERIE '
+        'block + "VUELTA 1/3" with no logs', (tester) async {
+      await tester.pumpWidget(_wrapProvider(
+        const SessionPlayerScreen(init: _kInit),
+        _stateOverride(supersetState()),
+      ));
+      await tester.pump();
+      expect(find.text('SUPERSERIE'), findsOneWidget);
+      expect(find.text('VUELTA 1/3'), findsOneWidget);
+    });
+
+    testWidgets(
+        'SCENARIO-601: A-1 logged but B-1 pending → still "VUELTA 1/3" '
+        '(round-robin waits for B before A-2)', (tester) async {
+      await tester.pumpWidget(_wrapProvider(
+        const SessionPlayerScreen(init: _kInit),
+        _stateOverride(supersetState(logs: [
+          makeSetLog(exerciseId: 'e1', setNumber: 1, reps: 10, weightKg: 60.0),
+        ])),
+      ));
+      await tester.pump();
+      expect(find.text('VUELTA 1/3'), findsOneWidget);
+    });
+
+    testWidgets('SCENARIO-602: A-1 + B-1 logged → advances to "VUELTA 2/3"',
+        (tester) async {
+      await tester.pumpWidget(_wrapProvider(
+        const SessionPlayerScreen(init: _kInit),
+        _stateOverride(supersetState(logs: [
+          makeSetLog(exerciseId: 'e1', setNumber: 1, reps: 10, weightKg: 60.0),
+          makeSetLog(exerciseId: 'e2', setNumber: 1, reps: 10, weightKg: 60.0),
+        ])),
+      ));
+      await tester.pump();
+      expect(find.text('VUELTA 2/3'), findsOneWidget);
+    });
+
+    testWidgets('SCENARIO-603: every set logged → block shows "COMPLETA"',
+        (tester) async {
+      final logs = [
+        for (final id in ['e1', 'e2'])
+          for (var n = 1; n <= 3; n++)
+            makeSetLog(exerciseId: id, setNumber: n, reps: 10, weightKg: 60.0),
+      ];
+      await tester.pumpWidget(_wrapProvider(
+        const SessionPlayerScreen(init: _kInit),
+        _stateOverride(supersetState(logs: logs)),
+      ));
+      await tester.pump();
+      expect(find.text('COMPLETA'), findsOneWidget);
+      expect(find.text('SUPERSERIE'), findsOneWidget);
     });
   });
 

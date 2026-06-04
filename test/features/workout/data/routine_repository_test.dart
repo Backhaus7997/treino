@@ -474,4 +474,31 @@ void main() {
       expect(after, isEmpty);
     });
   });
+
+  group('deleteRoutine', () {
+    test('removes the routine document by id', () async {
+      await seedRoutine(
+        id: 'tmpl-1',
+        days: const [],
+        source: 'trainer-template',
+        visibility: 'private',
+        assignedBy: 'trainer-1',
+      );
+      expect(
+        (await firestore.collection('routines').doc('tmpl-1').get()).exists,
+        isTrue,
+      );
+
+      await repo.deleteRoutine('tmpl-1');
+
+      expect(
+        (await firestore.collection('routines').doc('tmpl-1').get()).exists,
+        isFalse,
+      );
+    });
+
+    test('rejects empty id', () async {
+      expect(() => repo.deleteRoutine(''), throwsArgumentError);
+    });
+  });
 }
