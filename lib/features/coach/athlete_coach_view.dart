@@ -521,6 +521,35 @@ class _ActionRow extends ConsumerWidget {
         ],
       );
     }
+    // Paused — the PF paused the link from Coach Hub. The athlete keeps
+    // read-only access to the plan; the only action available is to terminate
+    // the relationship (no resume from the athlete side — that's a PF action).
+    // Minimum-viable fix for the dead-end the explorer found at the previous
+    // SizedBox.shrink() below (REQ-CHLM-013, SCEN-CHLM-018, ADR-CHLM-07).
+    if (link.status == TrainerLinkStatus.paused) {
+      return SizedBox(
+        width: double.infinity,
+        child: OutlinedButton(
+          onPressed: () => _onTerminate(context, ref),
+          style: OutlinedButton.styleFrom(
+            side: BorderSide(color: palette.highlight, width: 1),
+            foregroundColor: palette.highlight,
+            minimumSize: const Size.fromHeight(48),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(9999),
+            ),
+          ),
+          child: Text(
+            'TERMINAR VÍNCULO',
+            style: GoogleFonts.barlowCondensed(
+              fontWeight: FontWeight.w700,
+              fontSize: 13,
+              letterSpacing: 0.8,
+            ),
+          ),
+        ),
+      );
+    }
     return const SizedBox.shrink();
   }
 
