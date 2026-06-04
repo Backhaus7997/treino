@@ -67,7 +67,8 @@ class _EquipmentFilterSheetContentState
       builder: (context, scrollController) {
         return Container(
           decoration: BoxDecoration(
-            color: palette.espresso,
+            // Matches the parent exercise picker bg (was espresso).
+            color: palette.bg,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
           ),
           child: Column(
