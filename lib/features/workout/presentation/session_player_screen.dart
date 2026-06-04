@@ -108,6 +108,71 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
     ref.read(sessionNotifierProvider(widget.init).notifier).updateSet(updated);
   }
 
+  /// Builds the exercise list, grouping consecutive slots that share a non-null
+  /// [RoutineSlot.supersetGroup] into a single [_SupersetSection] (round-robin
+  /// gating). Standalone slots render as before via [_ExerciseSection]. A lone
+  /// tagged slot (run length < 2) falls back to standalone — no superset of one.
+  List<Widget> _buildExerciseList(SessionState state) {
+    final slots = state.day.slots;
+    final out = <Widget>[];
+    var i = 0;
+    while (i < slots.length) {
+      final group = slots[i].supersetGroup;
+      if (group != null) {
+        var scan = i;
+        final entries = <_SupersetEntry>[];
+        while (scan < slots.length && slots[scan].supersetGroup == group) {
+          entries.add(_entryFor(state, slots[scan]));
+          scan++;
+        }
+        if (entries.length >= 2) {
+          out.add(_SupersetSection(
+            entries: entries,
+            onSetCheck: _logSet,
+            onSetUpdate: _updateSet,
+          ));
+          out.add(const SizedBox(height: 14));
+          i = scan;
+          continue;
+        }
+      }
+      final entry = _entryFor(state, slots[i]);
+      final loggedCount = entry.logs.length;
+      final isDone = loggedCount >= entry.slot.targetSets;
+      out.add(_ExerciseSection(
+        slot: entry.slot,
+        logsForExercise: entry.logs,
+        currentSetNumber: isDone ? null : loggedCount + 1,
+        techniqueInstructions: entry.technique,
+        videoUrl: entry.videoUrl,
+        onSetCheck: (setNumber, reps, weightKg) =>
+            _logSet(entry.slot, setNumber, reps, weightKg),
+        onSetUpdate: (existing, reps, weightKg) =>
+            _updateSet(existing, reps, weightKg),
+      ));
+      out.add(const SizedBox(height: 14));
+      i++;
+    }
+    return out;
+  }
+
+  /// Gathers everything a section needs for one slot: its logs (sorted ASC) plus
+  /// the async-resolved technique + video. The `ref.watch` lives here (screen
+  /// build, where `ref` is available) so child sections stay plain widgets.
+  _SupersetEntry _entryFor(SessionState state, RoutineSlot slot) {
+    final logs = state.setLogs
+        .where((l) => l.exerciseId == slot.exerciseId)
+        .toList()
+      ..sort((a, b) => a.setNumber.compareTo(b.setNumber));
+    final exerciseAsync = ref.watch(exerciseByIdProvider(slot.exerciseId));
+    return (
+      slot: slot,
+      logs: logs,
+      technique: exerciseAsync.valueOrNull?.techniqueInstructions,
+      videoUrl: exerciseAsync.valueOrNull?.videoUrl,
+    );
+  }
+
   // ── Build ─────────────────────────────────────────────────────────────────
 
   @override
@@ -185,29 +250,7 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
                         const SizedBox(height: 20),
                         const _SectionLabel('EJERCICIOS'),
                         const SizedBox(height: 12),
-                        ...state.day.slots.expand((slot) {
-                          final logsForExercise = state.setLogs
-                              .where((l) => l.exerciseId == slot.exerciseId)
-                              .toList()
-                            ..sort(
-                                (a, b) => a.setNumber.compareTo(b.setNumber));
-                          final exerciseAsync =
-                              ref.watch(exerciseByIdProvider(slot.exerciseId));
-                          return [
-                            _ExerciseSection(
-                              slot: slot,
-                              logsForExercise: logsForExercise,
-                              techniqueInstructions: exerciseAsync
-                                  .valueOrNull?.techniqueInstructions,
-                              videoUrl: exerciseAsync.valueOrNull?.videoUrl,
-                              onSetCheck: (setNumber, reps, weightKg) =>
-                                  _logSet(slot, setNumber, reps, weightKg),
-                              onSetUpdate: (existing, reps, weightKg) =>
-                                  _updateSet(existing, reps, weightKg),
-                            ),
-                            const SizedBox(height: 14),
-                          ];
-                        }),
+                        ..._buildExerciseList(state),
                         const SizedBox(height: 20),
                       ],
                     ),
@@ -469,6 +512,123 @@ class _SectionLabel extends StatelessWidget {
 String _formatWeight(double w) =>
     w == w.truncateToDouble() ? w.toInt().toString() : w.toString();
 
+/// Datos que una sección necesita para un slot: el slot, sus logs (ordenados
+/// ASC) y la técnica/video resueltos en el build del screen.
+typedef _SupersetEntry = ({
+  RoutineSlot slot,
+  List<SetLog> logs,
+  List<String>? technique,
+  String? videoUrl,
+});
+
+/// Envuelve los ejercicios de una superserie en una tarjeta magenta
+/// "SUPERSERIE" y fuerza el orden round-robin: A-1, B-1, A-2, B-2 … Solo la
+/// celda activa (la primera no completada en esa secuencia aplanada) queda
+/// interactiva; el resto se muestra como resumen bloqueado hasta su turno.
+/// Replica visualmente el bloque del editor / vista de plan para que el formato
+/// se lea igual en todos lados.
+class _SupersetSection extends StatelessWidget {
+  const _SupersetSection({
+    required this.entries,
+    required this.onSetCheck,
+    required this.onSetUpdate,
+  });
+
+  final List<_SupersetEntry> entries;
+  final void Function(
+      RoutineSlot slot, int setNumber, int reps, double weightKg) onSetCheck;
+  final void Function(SetLog existing, int reps, double weightKg) onSetUpdate;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+
+    // Vueltas totales = el ejercicio más largo del bloque (banca series
+    // desiguales: los más cortos se saltan en las vueltas finales).
+    final maxRounds = entries.fold<int>(
+        0, (m, e) => e.slot.targetSets > m ? e.slot.targetSets : m);
+
+    // Scan round-robin: la celda activa es el primer par (vuelta, ejercicio)
+    // —ejercicios en orden del bloque— que aún no fue logueado.
+    String? activeId;
+    int? activeSet;
+    var activeRound = 0;
+    outer:
+    for (var round = 1; round <= maxRounds; round++) {
+      for (final e in entries) {
+        if (round > e.slot.targetSets) continue;
+        if (e.logs.length < round) {
+          activeId = e.slot.exerciseId;
+          activeSet = round;
+          activeRound = round;
+          break outer;
+        }
+      }
+    }
+    final blockDone = activeId == null;
+    final displayRound = blockDone ? maxRounds : activeRound;
+
+    final children = <Widget>[];
+    for (var i = 0; i < entries.length; i++) {
+      final e = entries[i];
+      children.add(_ExerciseSection(
+        slot: e.slot,
+        logsForExercise: e.logs,
+        currentSetNumber: e.slot.exerciseId == activeId ? activeSet : null,
+        techniqueInstructions: e.technique,
+        videoUrl: e.videoUrl,
+        onSetCheck: (setNumber, reps, weightKg) =>
+            onSetCheck(e.slot, setNumber, reps, weightKg),
+        onSetUpdate: onSetUpdate,
+      ));
+      if (i != entries.length - 1) children.add(const SizedBox(height: 8));
+    }
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(10, 10, 10, 12),
+      decoration: BoxDecoration(
+        color: palette.highlight.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: palette.highlight),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+            child: Row(
+              children: [
+                Icon(TreinoIcon.streak, size: 14, color: palette.highlight),
+                const SizedBox(width: 6),
+                Text(
+                  'SUPERSERIE',
+                  style: GoogleFonts.barlowCondensed(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                    letterSpacing: 1.2,
+                    color: palette.highlight,
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  blockDone ? 'COMPLETA' : 'VUELTA $displayRound/$maxRounds',
+                  style: GoogleFonts.barlowCondensed(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                    letterSpacing: 0.8,
+                    color: blockDone ? palette.accent : palette.highlight,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          ...children,
+        ],
+      ),
+    );
+  }
+}
+
 /// Sección de un ejercicio. Render condicional por fila:
 /// - Sets ya logueados: fila compacta (tappable para expandir y editar).
 /// - Set actual (siguiente pendiente): fila expandida con steppers.
@@ -477,6 +637,7 @@ class _ExerciseSection extends StatefulWidget {
   const _ExerciseSection({
     required this.slot,
     required this.logsForExercise,
+    required this.currentSetNumber,
     required this.techniqueInstructions,
     required this.videoUrl,
     required this.onSetCheck,
@@ -485,6 +646,12 @@ class _ExerciseSection extends StatefulWidget {
 
   final RoutineSlot slot;
   final List<SetLog> logsForExercise; // ordenados por setNumber ASC
+
+  /// Set (1-based) que debe estar activo (expandido + chequeable). Lo decide el
+  /// padre: para un ejercicio suelto es loggedCount+1; dentro de una superserie
+  /// es la celda activa del round-robin, o null cuando no es su turno (o ya está
+  /// completo). Null ⇒ ningún set de esta sección es el actual.
+  final int? currentSetNumber;
   final List<String>? techniqueInstructions;
   final String? videoUrl;
 
@@ -549,9 +716,10 @@ class _ExerciseSectionState extends State<_ExerciseSection> {
     final isDone = loggedCount >= widget.slot.targetSets;
     final defaults = _defaultsForRow();
 
-    // Índice (1-based) de la siguiente serie pendiente. Si no quedan
-    // pendientes, es null y el ejercicio está completo.
-    final int? nextPendingSetNumber = isDone ? null : loggedCount + 1;
+    // El set "actual" (expandido + chequeable) lo decide el padre vía
+    // currentSetNumber — para un suelto es loggedCount+1, para una superserie es
+    // la celda activa del round-robin (o null si todavía no es su turno).
+    final int? nextPendingSetNumber = widget.currentSetNumber;
 
     // Lista de widgets — TODOS los sets visibles. La fila "actual" (la
     // siguiente pendiente) viene con el panel de steppers desplegado.

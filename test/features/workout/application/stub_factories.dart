@@ -73,6 +73,7 @@ RoutineSlot makeSlot({
   int restSeconds = 90,
   double? targetWeightKg = 60.0,
   String? notes,
+  int? supersetGroup,
 }) =>
     RoutineSlot(
       exerciseId: exerciseId,
@@ -84,6 +85,7 @@ RoutineSlot makeSlot({
       restSeconds: restSeconds,
       targetWeightKg: targetWeightKg,
       notes: notes,
+      supersetGroup: supersetGroup,
     );
 
 // ── RoutineDay ────────────────────────────────────────────────────────────────

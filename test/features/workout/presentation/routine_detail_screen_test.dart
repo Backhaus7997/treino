@@ -17,7 +17,20 @@ import 'package:treino/features/workout/domain/routine_slot.dart';
 import 'package:treino/features/workout/presentation/routine_detail_screen.dart';
 import 'package:treino/features/workout/presentation/widgets/exercise_slot_row.dart';
 import 'package:treino/features/workout/presentation/widgets/stat_tile.dart';
+import 'package:treino/features/profile/application/user_providers.dart'
+    show userProfileProvider;
 import 'package:treino/features/profile/domain/experience_level.dart';
+import 'package:treino/features/profile/domain/user_profile.dart';
+import 'package:treino/features/profile/domain/user_role.dart';
+
+UserProfile _profile(UserRole role) => UserProfile(
+      uid: 'u1',
+      email: 'u1@test.com',
+      displayName: 'U',
+      role: role,
+      createdAt: DateTime.utc(2026, 1, 1),
+      updatedAt: DateTime.utc(2026, 1, 1),
+    );
 
 Widget _wrapWithOverrides(Widget w, List<Override> overrides) => ProviderScope(
       overrides: overrides,
@@ -35,6 +48,7 @@ RoutineSlot _makeSlot({
   int targetRepsMin = 8,
   int targetRepsMax = 12,
   int restSeconds = 90,
+  int? supersetGroup,
 }) =>
     RoutineSlot(
       exerciseId: exerciseId,
@@ -44,6 +58,7 @@ RoutineSlot _makeSlot({
       targetRepsMin: targetRepsMin,
       targetRepsMax: targetRepsMax,
       restSeconds: restSeconds,
+      supersetGroup: supersetGroup,
     );
 
 RoutineDay _makeDay({
@@ -308,43 +323,84 @@ void main() {
       );
     });
 
-    testWidgets('SCENARIO-313: EMPEZAR habilitado, EDITAR sigue deshabilitado',
-        (tester) async {
+    testWidgets(
+        'SCENARIO-560: consecutive slots sharing supersetGroup render a '
+        'SUPERSERIE block (label once, both rows present)', (tester) async {
+      final day = _makeDay(
+        slots: [
+          _makeSlot(exerciseId: 'bench', supersetGroup: 1),
+          _makeSlot(exerciseId: 'fly', supersetGroup: 1),
+        ],
+      );
       await tester.pumpWidget(_wrapWithOverrides(
         const RoutineDetailScreen(routineId: 'test-id'),
         [
           routineByIdProvider('test-id')
-              .overrideWith((ref) async => _makeRoutine()),
+              .overrideWith((ref) async => _makeRoutine(days: [day])),
         ],
       ));
       await tester.pump(const Duration(milliseconds: 50));
-      expect(find.text('EDITAR'), findsOneWidget);
-      expect(find.text('EMPEZAR'), findsOneWidget);
-      final editarBtn = tester.widget<OutlinedButton>(
-          find.widgetWithText(OutlinedButton, 'EDITAR'));
-      final empezarBtn = tester.widget<ElevatedButton>(
-          find.widgetWithText(ElevatedButton, 'EMPEZAR'));
-      expect(editarBtn.onPressed, isNull);
-      expect(empezarBtn.onPressed, isNotNull);
-    });
-
-    testWidgets('SCENARIO-315: tap en EDITAR es no-op (stub, no excepción)',
-        (tester) async {
-      await tester.pumpWidget(_wrapWithOverrides(
-        const RoutineDetailScreen(routineId: 'test-id'),
-        [
-          routineByIdProvider('test-id')
-              .overrideWith((ref) async => _makeRoutine()),
-        ],
-      ));
-      await tester.pump(const Duration(milliseconds: 50));
-      await tester.tap(find.text('EDITAR'), warnIfMissed: false);
-      await tester.pumpAndSettle();
-      expect(tester.takeException(), isNull);
+      // The block header appears exactly once for the two grouped slots.
+      expect(find.text('SUPERSERIE'), findsOneWidget);
+      // Both exercises still render as their normal cards inside the block.
+      expect(
+        find.byType(ExerciseSlotRow, skipOffstage: false),
+        findsNWidgets(2),
+      );
     });
 
     testWidgets(
-        'SCENARIO-092: EDITAR sigue envuelto en Opacity(0.4); EMPEZAR no',
+        'SCENARIO-561: a lone tagged slot (run length 1) does NOT render a '
+        'SUPERSERIE block — no superset of one', (tester) async {
+      final day = _makeDay(
+        slots: [
+          _makeSlot(exerciseId: 'bench', supersetGroup: 1),
+          _makeSlot(exerciseId: 'squat'), // breaks the run
+        ],
+      );
+      await tester.pumpWidget(_wrapWithOverrides(
+        const RoutineDetailScreen(routineId: 'test-id'),
+        [
+          routineByIdProvider('test-id')
+              .overrideWith((ref) async => _makeRoutine(days: [day])),
+        ],
+      ));
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(find.text('SUPERSERIE'), findsNothing);
+      expect(
+        find.byType(ExerciseSlotRow, skipOffstage: false),
+        findsNWidgets(2),
+      );
+    });
+
+    testWidgets(
+        'SCENARIO-562: mixed day (standalone + superset) keeps every slot '
+        'rendered as an ExerciseSlotRow', (tester) async {
+      final day = _makeDay(
+        slots: [
+          _makeSlot(exerciseId: 'warmup'), // standalone #1
+          _makeSlot(exerciseId: 'bench', supersetGroup: 7), // block #2
+          _makeSlot(exerciseId: 'fly', supersetGroup: 7), // block #3
+          _makeSlot(exerciseId: 'cooldown'), // standalone #4
+        ],
+      );
+      await tester.pumpWidget(_wrapWithOverrides(
+        const RoutineDetailScreen(routineId: 'test-id'),
+        [
+          routineByIdProvider('test-id')
+              .overrideWith((ref) async => _makeRoutine(days: [day])),
+        ],
+      ));
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(find.text('SUPERSERIE'), findsOneWidget);
+      expect(
+        find.byType(ExerciseSlotRow, skipOffstage: false),
+        findsNWidgets(4),
+      );
+    });
+
+    testWidgets(
+        'SCENARIO-313 (rev): EMPEZAR habilitado; EDITAR removido del CTA',
         (tester) async {
       await tester.pumpWidget(_wrapWithOverrides(
         const RoutineDetailScreen(routineId: 'test-id'),
@@ -354,11 +410,45 @@ void main() {
         ],
       ));
       await tester.pump(const Duration(milliseconds: 50));
-      final opacityWidgets = tester
-          .widgetList<Opacity>(find.byType(Opacity))
-          .where((o) => (o.opacity - 0.4).abs() < 0.01)
-          .toList();
-      expect(opacityWidgets, isNotEmpty);
+      // EDITAR was a disabled stub — removed (the athlete plan view is
+      // read-only; editing lives on the trainer side).
+      expect(find.text('EDITAR'), findsNothing);
+      expect(find.text('EMPEZAR'), findsOneWidget);
+      final empezarBtn = tester.widget<ElevatedButton>(
+          find.widgetWithText(ElevatedButton, 'EMPEZAR'));
+      expect(empezarBtn.onPressed, isNotNull);
+    });
+
+    testWidgets(
+        'SCENARIO-564: trainer role hides EMPEZAR (plan view is read-only for '
+        'coaches)', (tester) async {
+      await tester.pumpWidget(_wrapWithOverrides(
+        const RoutineDetailScreen(routineId: 'test-id'),
+        [
+          routineByIdProvider('test-id')
+              .overrideWith((ref) async => _makeRoutine()),
+          userProfileProvider
+              .overrideWith((ref) => Stream.value(_profile(UserRole.trainer))),
+        ],
+      ));
+      // Two settles: routine future resolves (CTA mounts + first subscribes to
+      // userProfileProvider), then the role stream emits → CTA rebuilds hidden.
+      await tester.pumpAndSettle();
+      expect(find.text('EMPEZAR'), findsNothing);
+    });
+
+    testWidgets('SCENARIO-565: athlete role shows EMPEZAR', (tester) async {
+      await tester.pumpWidget(_wrapWithOverrides(
+        const RoutineDetailScreen(routineId: 'test-id'),
+        [
+          routineByIdProvider('test-id')
+              .overrideWith((ref) async => _makeRoutine()),
+          userProfileProvider
+              .overrideWith((ref) => Stream.value(_profile(UserRole.athlete))),
+        ],
+      ));
+      await tester.pumpAndSettle();
+      expect(find.text('EMPEZAR'), findsOneWidget);
     });
 
     testWidgets(
