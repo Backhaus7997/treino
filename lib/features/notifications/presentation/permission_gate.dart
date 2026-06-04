@@ -1,7 +1,9 @@
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../application/notification_providers.dart';
+import '../../auth/application/auth_providers.dart';
 import '../../profile/application/user_providers.dart';
 
 /// Invisible widget that requests notification permission exactly once per
@@ -46,10 +48,24 @@ class _PermissionGateState extends ConsumerState<PermissionGate> {
 
   Future<void> _requestPermission() async {
     try {
-      final settings = await ref.read(fcmServiceProvider).requestPermission();
+      final fcm = ref.read(fcmServiceProvider);
+      final settings = await fcm.requestPermission();
       debugPrint(
         '[fcm] permission status: ${settings.authorizationStatus}',
       );
+
+      // Re-trigger init() so the token gets registered now that APNS has
+      // been provisioned. Without this, the initial init() at sign-in
+      // failed silently (no APNS) and the user never receives notifications
+      // until the next sign-in cycle. SCENARIO-687.
+      final status = settings.authorizationStatus;
+      final granted = status == AuthorizationStatus.authorized ||
+          status == AuthorizationStatus.provisional;
+      if (!granted) return;
+
+      final user = await ref.read(authStateChangesProvider.future);
+      if (user == null) return;
+      await fcm.init(user.uid);
     } catch (e) {
       // Swallow errors (e.g. platform exceptions) — denial is graceful.
       // i18n: Fase 6 Etapa 2

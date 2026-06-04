@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:firebase_core/firebase_core.dart' show FirebaseException;
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart' show debugPrint;
 
@@ -27,14 +28,31 @@ class FcmService {
 
   /// Initialises FCM for [uid]:
   /// 1. Calls [getToken] once and persists the result via [FcmTokenRepository].
+  ///    On iOS, [getToken] throws `apns-token-not-set` when APNS isn't
+  ///    provisioned yet (no permission granted, or iOS Simulator). The throw
+  ///    is swallowed here — the caller (lifecycle provider) MUST NOT see it,
+  ///    otherwise the trace propagates to Crashlytics as noise. A later
+  ///    permission grant in [PermissionGate] re-invokes [init] to register
+  ///    the token once APNS provisions. (SCENARIO-685.)
   /// 2. Subscribes to [onTokenRefresh] — each new token is persisted.
+  ///    The subscription is registered EVEN IF [getToken] failed in step 1,
+  ///    so that a later refresh after permission grant still saves a token.
   ///
   /// Does NOT call [requestPermission] (ADR-PN-003).
-  /// REQ-PN-CLIENT-002, SCENARIO-645, 646, 647, 678.
+  /// REQ-PN-CLIENT-002, SCENARIO-645, 646, 647, 678, 685.
   Future<void> init(String uid) async {
-    final token = await _messaging.getToken();
-    if (token != null) {
-      await _repo.saveToken(uid, token);
+    try {
+      final token = await _messaging.getToken();
+      if (token != null) {
+        await _repo.saveToken(uid, token);
+      }
+    } on FirebaseException catch (e) {
+      // Expected on iOS Simulator and on real iOS device pre-permission.
+      // Token will be saved later via onTokenRefresh or the PermissionGate
+      // re-init after grant.
+      debugPrint('[fcm] init: getToken deferred — ${e.code}');
+    } catch (e) {
+      debugPrint('[fcm] init: unexpected getToken error for $uid — $e');
     }
 
     _refreshSub = _messaging.onTokenRefresh.listen((newToken) {
