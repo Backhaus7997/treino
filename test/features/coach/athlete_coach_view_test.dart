@@ -143,6 +143,34 @@ void main() {
       expect(find.text('MENSAJE'), findsNothing);
     });
 
+    // SCEN-CHLM-018 — paused state shows TERMINAR VÍNCULO only.
+    //
+    // Background: before this change, _ActionRow returned SizedBox.shrink()
+    // for the paused case — leaving the athlete with zero affordances when
+    // the PF paused the link from Coach Hub. The minimum fix is one button:
+    // TERMINAR VÍNCULO. Resume is a PF-only action (no button on the
+    // athlete side).
+    testWidgets(
+        'SCEN-CHLM-018: status paused → muestra TERMINAR VÍNCULO y no muestra MENSAJE',
+        (tester) async {
+      await tester.pumpWidget(_wrap(
+        const AthleteCoachView(),
+        overrides: [
+          currentAthleteLinkProvider.overrideWith(
+              (ref) async => _makeLink(status: TrainerLinkStatus.paused)),
+          userPublicProfileProvider('trainer-1')
+              .overrideWith((ref) => Stream.value(_makePub())),
+        ],
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.text('TERMINAR VÍNCULO'), findsOneWidget);
+      // MENSAJE only renders for active; verify it does NOT bleed into paused.
+      expect(find.text('MENSAJE'), findsNothing);
+      // CANCELAR SOLICITUD is pending-only.
+      expect(find.text('CANCELAR SOLICITUD'), findsNothing);
+    });
+
     testWidgets(
         'REQ-COACH-LINK-003: status pending → muestra esperando + cancelar',
         (tester) async {

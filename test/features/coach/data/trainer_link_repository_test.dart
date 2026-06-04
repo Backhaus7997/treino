@@ -296,6 +296,161 @@ void main() {
     );
   });
 
+  // ─── pause ────────────────────────────────────────────────────────────────
+
+  group('pause', () {
+    test(
+      'SCEN-CHLM-001: transiciona active → paused y setea pausedAt',
+      () async {
+        // GIVEN una doc con status == active
+        final link = await repo.request(
+          trainerId: trainerId,
+          athleteId: athleteId,
+        );
+        await repo.accept(link.id);
+
+        // WHEN llamamos pause(linkId)
+        await repo.pause(link.id);
+
+        // THEN status == paused AND pausedAt != null
+        final snap =
+            await firestore.collection('trainer_links').doc(link.id).get();
+        expect(snap.data()!['status'], 'paused');
+        expect(snap.data()!['pausedAt'], isA<Timestamp>());
+      },
+    );
+
+    test(
+      'SCEN-CHLM-002: rechaza pause sobre status paused con StateError',
+      () async {
+        // GIVEN un vínculo ya pausado
+        final link = await repo.request(
+          trainerId: trainerId,
+          athleteId: athleteId,
+        );
+        await repo.accept(link.id);
+        await repo.pause(link.id);
+
+        // WHEN pause se llama de nuevo
+        // THEN lanza StateError y no escribe nada
+        expect(
+          () => repo.pause(link.id),
+          throwsA(isA<StateError>()),
+        );
+      },
+    );
+
+    test(
+      'SCEN-CHLM-003: rechaza pause sobre status terminated con StateError',
+      () async {
+        // GIVEN un vínculo terminado
+        final link = await repo.request(
+          trainerId: trainerId,
+          athleteId: athleteId,
+        );
+        await repo.accept(link.id);
+        await repo.terminate(link.id);
+
+        // WHEN pause se llama sobre terminated
+        // THEN lanza StateError
+        expect(
+          () => repo.pause(link.id),
+          throwsA(isA<StateError>()),
+        );
+      },
+    );
+
+    test('rechaza pause sobre doc inexistente', () async {
+      expect(
+        () => repo.pause('nonexistent'),
+        throwsA(isA<StateError>()),
+      );
+    });
+  });
+
+  // ─── resume ───────────────────────────────────────────────────────────────
+
+  group('resume', () {
+    test(
+      'SCEN-CHLM-004: transiciona paused → active, borra pausedAt, preserva acceptedAt',
+      () async {
+        // GIVEN un vínculo pausado con pausedAt y un acceptedAt específico
+        final link = await repo.request(
+          trainerId: trainerId,
+          athleteId: athleteId,
+        );
+        await repo.accept(link.id);
+
+        // Capture acceptedAt before pause
+        final snapBefore =
+            await firestore.collection('trainer_links').doc(link.id).get();
+        final acceptedAtBefore = snapBefore.data()!['acceptedAt'];
+
+        await repo.pause(link.id);
+
+        // WHEN llamamos resume(linkId)
+        await repo.resume(link.id);
+
+        // THEN status == active
+        final snap =
+            await firestore.collection('trainer_links').doc(link.id).get();
+        expect(snap.data()!['status'], 'active');
+
+        // AND pausedAt ya no existe en el doc
+        expect(snap.data()!.containsKey('pausedAt'), isFalse);
+
+        // AND acceptedAt no cambió
+        expect(snap.data()!['acceptedAt'], acceptedAtBefore);
+      },
+    );
+
+    test(
+      'SCEN-CHLM-005: rechaza resume sobre status active con StateError',
+      () async {
+        // GIVEN un vínculo activo
+        final link = await repo.request(
+          trainerId: trainerId,
+          athleteId: athleteId,
+        );
+        await repo.accept(link.id);
+
+        // WHEN resume se llama sobre active
+        // THEN lanza StateError
+        expect(
+          () => repo.resume(link.id),
+          throwsA(isA<StateError>()),
+        );
+      },
+    );
+
+    test(
+      'rechaza resume sobre status terminated con StateError',
+      () async {
+        // GIVEN un vínculo terminado
+        final link = await repo.request(
+          trainerId: trainerId,
+          athleteId: athleteId,
+        );
+        await repo.accept(link.id);
+        await repo.terminate(link.id);
+
+        // WHEN resume se llama sobre terminated
+        // THEN lanza StateError
+        expect(
+          () => repo.resume(link.id),
+          throwsA(isA<StateError>()),
+        );
+      },
+    );
+
+    test('rechaza resume sobre doc inexistente', () async {
+      expect(
+        () => repo.resume('nonexistent'),
+        throwsA(isA<StateError>()),
+      );
+    });
+  });
+
   // ─── watchForTrainer ──────────────────────────────────────────────────────
 
   group('watchForTrainer', () {

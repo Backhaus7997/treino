@@ -1,5 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart'
-    show CollectionReference, DocumentSnapshot, FirebaseFirestore, Timestamp;
+    show
+        CollectionReference,
+        DocumentSnapshot,
+        FieldValue,
+        FirebaseFirestore,
+        Timestamp;
 
 import '../domain/trainer_link.dart';
 import '../domain/trainer_link_status.dart';
@@ -144,6 +149,59 @@ class TrainerLinkRepository {
       'status': TrainerLinkStatusX(TrainerLinkStatus.terminated).toJson(),
       'terminatedAt': Timestamp.fromDate(DateTime.now().toUtc()),
       if (reason != null) 'terminationReason': reason,
+    });
+  }
+
+  // ─── pause ──────────────────────────────────────────────────────────────
+  //
+  // Transición active → paused. Setea pausedAt: now. Preserva acceptedAt.
+  // Lanza StateError si el doc no existe o el status actual != active.
+
+  Future<void> pause(String linkId) async {
+    final docRef = _links.doc(linkId);
+    final snap = await docRef.get();
+    if (!snap.exists) {
+      throw StateError('Vínculo $linkId no existe');
+    }
+    final current = _fromDoc(snap);
+    if (current == null) {
+      throw StateError('Vínculo $linkId no se pudo deserializar');
+    }
+    if (current.status != TrainerLinkStatus.active) {
+      throw StateError(
+        'pause solo se permite sobre status=active (actual: ${current.status.toJson()})',
+      );
+    }
+    await docRef.update({
+      'status': TrainerLinkStatusX(TrainerLinkStatus.paused).toJson(),
+      'pausedAt': Timestamp.fromDate(DateTime.now().toUtc()),
+    });
+  }
+
+  // ─── resume ─────────────────────────────────────────────────────────────
+  //
+  // Transición paused → active. Limpia pausedAt (FieldValue.delete()).
+  // Preserva acceptedAt — el vínculo NO se considera nuevo.
+  // Lanza StateError si el doc no existe o el status actual != paused.
+
+  Future<void> resume(String linkId) async {
+    final docRef = _links.doc(linkId);
+    final snap = await docRef.get();
+    if (!snap.exists) {
+      throw StateError('Vínculo $linkId no existe');
+    }
+    final current = _fromDoc(snap);
+    if (current == null) {
+      throw StateError('Vínculo $linkId no se pudo deserializar');
+    }
+    if (current.status != TrainerLinkStatus.paused) {
+      throw StateError(
+        'resume solo se permite sobre status=paused (actual: ${current.status.toJson()})',
+      );
+    }
+    await docRef.update({
+      'status': TrainerLinkStatusX(TrainerLinkStatus.active).toJson(),
+      'pausedAt': FieldValue.delete(),
     });
   }
 

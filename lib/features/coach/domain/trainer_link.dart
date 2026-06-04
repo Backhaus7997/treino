@@ -22,6 +22,7 @@ class TrainerLink with _$TrainerLink {
     @TimestampConverter() DateTime? acceptedAt,
     @TimestampConverter() DateTime? terminatedAt,
     String? terminationReason,
+    @TimestampConverter() DateTime? pausedAt,
     // Privacy gate. When `true`, the athlete shares their history
     // (sessions, volume, streak) with their PF. Defaults to `false`
     // so legacy docs without the key decode safely; Etapa 6 will
