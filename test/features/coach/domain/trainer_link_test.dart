@@ -96,6 +96,48 @@ void main() {
   //
   // REQ-COACH-LINK-001 (field contract) and REQ-COACH-LINK-002 (default).
 
+  // ── pausedAt field (REQ-CHLM-005) ────────────────────────────────────────────
+  //
+  // pausedAt is an additive nullable DateTime — legacy docs without the key
+  // MUST deserialize cleanly with pausedAt == null.
+
+  group('pausedAt field', () {
+    test(
+      'SCEN-CHLM-006: fromJson without pausedAt key → pausedAt == null',
+      () {
+        final legacyMap = <String, dynamic>{
+          'id': 'link-paused-001',
+          'trainerId': 'trainer-1',
+          'athleteId': 'athlete-1',
+          'status': 'active',
+          'requestedAt': Timestamp.fromDate(DateTime.utc(2026, 5, 20, 10, 0)),
+          'acceptedAt': Timestamp.fromDate(DateTime.utc(2026, 5, 20, 12, 0)),
+          // no 'pausedAt' key — legacy doc
+        };
+        final decoded = TrainerLink.fromJson(legacyMap);
+        expect(decoded.pausedAt, isNull);
+      },
+    );
+
+    test(
+      'pausedAt round-trips through fromJson/toJson when set',
+      () {
+        final pausedAt = DateTime.utc(2026, 6, 1, 9, 0);
+        final rawMap = <String, dynamic>{
+          'id': 'link-paused-002',
+          'trainerId': 'trainer-1',
+          'athleteId': 'athlete-1',
+          'status': 'paused',
+          'requestedAt': Timestamp.fromDate(DateTime.utc(2026, 5, 20, 10, 0)),
+          'acceptedAt': Timestamp.fromDate(DateTime.utc(2026, 5, 20, 12, 0)),
+          'pausedAt': Timestamp.fromDate(pausedAt),
+        };
+        final decoded = TrainerLink.fromJson(rawMap);
+        expect(decoded.pausedAt, pausedAt);
+      },
+    );
+  });
+
   group('sharedWithTrainer field', () {
     test(
       'SCENARIO-464: round-trip preserves sharedWithTrainer: true and other fields',
