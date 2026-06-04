@@ -176,7 +176,11 @@ class _ExercisePickerSheetContentState
 
         return Container(
           decoration: BoxDecoration(
-            color: palette.espresso,
+            // Was palette.espresso (#3C3534) — too warm, read as gray over
+            // the near-black bg behind it. Using `bg` (#0A0A0A) so the sheet
+            // sits flush in the dark theme; the rounded top + drag handle
+            // mark the sheet edge instead of color contrast.
+            color: palette.bg,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
           ),
           child: Column(
@@ -624,7 +628,9 @@ class _StickyAddBar extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
       decoration: BoxDecoration(
-        color: palette.espresso,
+        // Matches the sheet bg (was espresso). The top border line keeps
+        // the sticky CTA visually separated from the list above it.
+        color: palette.bg,
         border: Border(top: BorderSide(color: palette.border)),
       ),
       child: SizedBox(
