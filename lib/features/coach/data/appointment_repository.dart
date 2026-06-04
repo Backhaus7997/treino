@@ -155,6 +155,9 @@ class AppointmentRepository {
 
     final batch = _firestore.batch();
     var count = 0;
+    // One shared id for every occurrence of this series, so the trainer can
+    // later "cancel all future" without a separate series document.
+    final recurringId = _appointments.doc().id;
 
     var cursor = DateTime.utc(fromDate.year, fromDate.month, fromDate.day);
     final end = DateTime.utc(untilDate.year, untilDate.month, untilDate.day);
@@ -174,6 +177,7 @@ class AppointmentRepository {
             durationMin: durationMin,
             status: AppointmentStatus.confirmed,
             noteBefore: note,
+            recurringId: recurringId,
           );
           batch.set(docRef, appt.toJson());
           count++;
@@ -218,6 +222,63 @@ class AppointmentRepository {
       'cancelledBy': actorUid,
       'cancellationLog': FieldValue.arrayUnion([logEntry]),
     });
+  }
+
+  // ─── cancelFutureSeries ─────────────────────────────────────────────────────
+  //
+  // Cancels every FUTURE confirmed occurrence of the recurring series
+  // [recurringId] owned by [trainerId] that is still >24h away (same gate as the
+  // per-session cancel + Firestore rules Path 1). Occurrences within 24h or
+  // already past are left untouched. Returns how many were cancelled.
+
+  Future<int> cancelFutureSeries({
+    required String recurringId,
+    required String trainerId,
+    required String actorUid,
+    String? reason,
+  }) async {
+    final now = DateTime.now();
+    final nowWall =
+        DateTime.utc(now.year, now.month, now.day, now.hour, now.minute);
+    final realNow = now.toUtc();
+
+    // Reuses the existing (trainerId, status, startsAt) composite index.
+    final snap = await _appointments
+        .where('trainerId', isEqualTo: trainerId)
+        .where('status', isEqualTo: 'confirmed')
+        .where('startsAt', isGreaterThanOrEqualTo: Timestamp.fromDate(nowWall))
+        .get();
+
+    final batch = _firestore.batch();
+    var count = 0;
+    for (final d in snap.docs) {
+      final appt = Appointment.fromJson({...d.data(), 'id': d.id});
+      if (appt.recurringId != recurringId) continue;
+      // Only the occurrences the rule will accept (>24h ahead). The batch is
+      // atomic, so a single <24h write would reject the whole commit — a small
+      // safety margin absorbs the client→server latency near the boundary.
+      if (appt.startsAt.difference(realNow) <=
+          const Duration(hours: 24, minutes: 2)) {
+        continue;
+      }
+      batch.update(d.reference, {
+        'status': 'cancelled',
+        'cancelledAt': FieldValue.serverTimestamp(),
+        'cancelledBy': actorUid,
+        'cancellationLog': FieldValue.arrayUnion([
+          <String, Object?>{
+            'byUid': actorUid,
+            'atMs': realNow.millisecondsSinceEpoch,
+            if (reason != null) 'reason': reason,
+          },
+        ]),
+      });
+      count++;
+    }
+    if (count > 0) {
+      await batch.commit();
+    }
+    return count;
   }
 
   // ─── updateNotes ──────────────────────────────────────────────────────────

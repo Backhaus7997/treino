@@ -229,6 +229,92 @@ void main() {
     );
   });
 
+  group('createRecurringByTrainer() + cancelFutureSeries()', () {
+    // Far-future window so every occurrence is >24h away (cancellable). Using
+    // all weekdays + a 4-day range makes the count deterministic regardless of
+    // which weekday the range starts on: 4 occurrences (Jan 7, 8, 9, 10).
+    final from = DateTime.utc(2030, 1, 7);
+    final until = DateTime.utc(2030, 1, 10);
+    const everyDay = {1, 2, 3, 4, 5, 6, 7};
+
+    Future<int> seedSeries() => repo.createRecurringByTrainer(
+          trainerId: trainerId,
+          athleteId: athleteId,
+          athleteDisplayName: athleteDisplayName,
+          weekdays: everyDay,
+          startHour: 10,
+          startMinute: 0,
+          durationMin: durationMin,
+          fromDate: from,
+          untilDate: until,
+        );
+
+    test(
+        'createRecurringByTrainer stamps ONE shared non-null recurringId on '
+        'every occurrence', () async {
+      final count = await seedSeries();
+      expect(count, 4);
+
+      final snap = await firestore.collection('appointments').get();
+      expect(snap.docs, hasLength(4));
+      final ids =
+          snap.docs.map((d) => d.data()['recurringId'] as String?).toSet();
+      expect(ids, hasLength(1)); // all occurrences share the same series id
+      expect(ids.first, isNotNull);
+    });
+
+    test(
+        'cancelFutureSeries cancels every future occurrence of the series and '
+        'returns the count', () async {
+      await seedSeries();
+      final created = await firestore.collection('appointments').get();
+      final recurringId = created.docs.first.data()['recurringId'] as String;
+
+      final cancelled = await repo.cancelFutureSeries(
+        recurringId: recurringId,
+        trainerId: trainerId,
+        actorUid: trainerId,
+      );
+      expect(cancelled, 4);
+
+      final after = await firestore.collection('appointments').get();
+      expect(
+        after.docs.every((d) => d.data()['status'] == 'cancelled'),
+        isTrue,
+      );
+    });
+
+    test('cancelFutureSeries leaves a single (non-recurring) appointment alone',
+        () async {
+      await seedSeries();
+      final created = await firestore.collection('appointments').get();
+      final recurringId = created.docs.first.data()['recurringId'] as String;
+
+      // A standalone confirmed appointment, far future, no recurringId.
+      final single = Appointment.create(
+        trainerId: trainerId,
+        athleteId: athleteId,
+        athleteDisplayName: athleteDisplayName,
+        startsAt: DateTime.utc(2030, 1, 15, 9, 0),
+        durationMin: durationMin,
+      );
+      await firestore
+          .collection('appointments')
+          .doc(single.id)
+          .set(single.toJson());
+
+      await repo.cancelFutureSeries(
+        recurringId: recurringId,
+        trainerId: trainerId,
+        actorUid: trainerId,
+      );
+
+      final singleSnap =
+          await firestore.collection('appointments').doc(single.id).get();
+      expect(singleSnap.data()!['status'], 'confirmed');
+    });
+  });
+
   group('watchForAthlete()', () {
     // ─── SCENARIO-494: streams confirmed appointments for athleteId ───────
     test(
