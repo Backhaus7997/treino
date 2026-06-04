@@ -252,12 +252,37 @@ class _FilterChipRow extends ConsumerWidget {
   }
 }
 
-// ─── Active students section ─────────────────────────────────────────────────
+// ─── Section header label (shared) ───────────────────────────────────────────
 //
-// Section headers were intentionally omitted — the FilterChip row already
-// labels each section (ACTIVOS / PAUSADOS / HISTORIAL). Duplicating the
-// label as a section header would just add visual noise and made the widget
-// tests have to fight `findsOneWidget` vs `findsNWidgets(2)` matchers.
+// Headers use copy DISTINCT from the FilterChip labels (chips: ACTIVOS /
+// PAUSADOS / HISTORIAL; headers: TUS ALUMNOS / EN PAUSA / VÍNCULOS PASADOS).
+// Two reasons: (1) reviewers and users get a clear section boundary even
+// when the empty state is the only content, (2) widget tests can still
+// assert `findsOneWidget` for the chip labels without duplicate matches.
+
+class _SectionLabel extends StatelessWidget {
+  const _SectionLabel(this.text);
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(top: 14, bottom: 12),
+      child: Text(
+        text,
+        style: GoogleFonts.barlowCondensed(
+          color: palette.textMuted,
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 1.4,
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Active students section ─────────────────────────────────────────────────
 
 class _ActiveStudentsList extends ConsumerWidget {
   const _ActiveStudentsList();
@@ -281,6 +306,7 @@ class _ActiveStudentsList extends ConsumerWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            const _SectionLabel('TUS ALUMNOS'),
             if (active.isEmpty)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 18),
@@ -320,6 +346,7 @@ class _PausedStudentsList extends ConsumerWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            const _SectionLabel('EN PAUSA'),
             if (paused.isEmpty)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 18),
@@ -361,6 +388,7 @@ class _HistorialList extends ConsumerWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            const _SectionLabel('VÍNCULOS PASADOS'),
             if (terminated.isEmpty)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 18),
