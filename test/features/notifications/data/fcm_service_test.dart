@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -130,6 +131,44 @@ void main() {
         );
 
         verifyNever(() => repo.saveToken(any(), any()));
+      },
+    );
+
+    // SCENARIO-685: regression — init swallows apns-token-not-set FirebaseException
+    // (raised when APNS isn't provisioned yet — iOS Simulator, or real device
+    // before requestPermission completes). Caller MUST NOT see the throw, and
+    // the onTokenRefresh subscription MUST still be registered so that a later
+    // permission grant flowing through the refresh stream can save a token.
+    test(
+      'SCENARIO-685: init swallows apns-token-not-set exception, '
+      'subscribes to onTokenRefresh anyway',
+      () async {
+        const uid = 'user-685';
+        final refreshController = StreamController<String>();
+
+        when(() => messaging.getToken()).thenThrow(
+          FirebaseException(
+            plugin: 'firebase_messaging',
+            code: 'apns-token-not-set',
+            message: 'APNS token has not been set yet.',
+          ),
+        );
+        when(() => messaging.onTokenRefresh)
+            .thenAnswer((_) => refreshController.stream);
+
+        await expectLater(service.init(uid), completes);
+
+        // saveToken was not called because getToken failed.
+        verifyNever(() => repo.saveToken(any(), any()));
+
+        // onTokenRefresh subscription is still registered — a later refresh
+        // (e.g. after permission is granted and APNS provisions) triggers
+        // saveToken.
+        refreshController.add('tok-after-permission');
+        await Future<void>.delayed(Duration.zero);
+        verify(() => repo.saveToken(uid, 'tok-after-permission')).called(1);
+
+        await refreshController.close();
       },
     );
   });

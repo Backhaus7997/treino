@@ -1,8 +1,10 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/notifications/application/notification_providers.dart';
 import 'package:treino/features/notifications/data/fcm_service.dart';
 import 'package:treino/features/notifications/presentation/permission_gate.dart';
@@ -15,6 +17,11 @@ import 'package:treino/features/profile/domain/user_role.dart';
 // ---------------------------------------------------------------------------
 
 class MockFcmService extends Mock implements FcmService {}
+
+class _MockUser extends Mock implements User {
+  @override
+  String get uid => 'uid-test';
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -62,12 +69,16 @@ UserProfile _profile({String? displayName}) => UserProfile(
 Widget _buildGate({
   required MockFcmService fcmService,
   UserProfile? profile,
+  User? user,
 }) {
   return ProviderScope(
     overrides: [
       fcmServiceProvider.overrideWithValue(fcmService),
       userProfileProvider.overrideWith(
         (ref) => Stream.value(profile),
+      ),
+      authStateChangesProvider.overrideWith(
+        (ref) => Stream.value(user ?? _MockUser()),
       ),
     ],
     child: const MaterialApp(
@@ -225,6 +236,57 @@ void main() {
         // and produces no visible children (no Text, Button, etc.).
         expect(find.byType(PermissionGate), findsOneWidget);
         expect(find.byType(Text), findsNothing);
+      },
+    );
+
+    // SCENARIO-687: regression — when requestPermission returns
+    // authorized/provisional, FcmService.init(uid) MUST be called so that the
+    // FCM token is registered now that APNS has been provisioned. Without this
+    // re-trigger, the initial init() during sign-in failed silently (no APNS)
+    // and the user never receives notifications until the next sign-in cycle.
+    testWidgets(
+      'SCENARIO-687: requestPermission authorized → init(uid) called to '
+      'register token after APNS provisions',
+      (tester) async {
+        when(() => fcmService.init(any())).thenAnswer((_) async {});
+        when(
+          () => fcmService.requestPermission(),
+        ).thenAnswer((_) async => _authorized());
+
+        await tester.pumpWidget(
+          _buildGate(
+            fcmService: fcmService,
+            profile: _profile(displayName: 'JuanAthlete'),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // Permission requested AND init re-fired after grant
+        verify(() => fcmService.requestPermission()).called(1);
+        verify(() => fcmService.init('uid-test')).called(1);
+      },
+    );
+
+    // SCENARIO-687: regression — denial path MUST NOT call init (no APNS
+    // provisioning happens on denial, so re-init would just fail again).
+    testWidgets(
+      'SCENARIO-687: requestPermission denied → init NOT called',
+      (tester) async {
+        when(() => fcmService.init(any())).thenAnswer((_) async {});
+        when(
+          () => fcmService.requestPermission(),
+        ).thenAnswer((_) async => _denied());
+
+        await tester.pumpWidget(
+          _buildGate(
+            fcmService: fcmService,
+            profile: _profile(displayName: 'JuanAthlete'),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        verify(() => fcmService.requestPermission()).called(1);
+        verifyNever(() => fcmService.init(any()));
       },
     );
   });
