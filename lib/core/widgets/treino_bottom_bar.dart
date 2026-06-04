@@ -174,23 +174,38 @@ class _TabContent extends StatelessWidget {
         fontWeight: FontWeight.w700,
         letterSpacing: 0.8,
       ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 220),
-            switchInCurve: Curves.easeOutCubic,
-            switchOutCurve: Curves.easeInCubic,
-            child: Icon(
-              active ? spec.iconActive : spec.icon,
-              key: ValueKey<bool>(active),
-              color: color,
-              size: 22,
+      // Horizontal padding matches the pill's 8px margin on each side of the
+      // tab (see AnimatedPositioned: left = tabWidth*i + 8, width = tabWidth
+      // - 16). Without this, the label's box is `tabWidth` wide but the pill
+      // is `tabWidth - 16` — so on the active tab, characters that extend
+      // past the pill are rendered in `palette.bg` (near-black) over the
+      // dark navbar bg and read as clipped (ENTRENAR → ENTRENR). Keeping the
+      // label inside the pill box guarantees readable contrast everywhere.
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 220),
+              switchInCurve: Curves.easeOutCubic,
+              switchOutCurve: Curves.easeInCubic,
+              child: Icon(
+                active ? spec.iconActive : spec.icon,
+                key: ValueKey<bool>(active),
+                color: color,
+                size: 22,
+              ),
             ),
-          ),
-          const SizedBox(height: 4),
-          Text(spec.label),
-        ],
+            const SizedBox(height: 4),
+            // FittedBox scales the label down to fit the pill width on
+            // narrow tabs / >100% system text scaling rather than clipping.
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(spec.label),
+            ),
+          ],
+        ),
       ),
     );
   }
