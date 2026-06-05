@@ -145,8 +145,7 @@ void main() {
 
   // ── SCENARIO-RER-021: SelfCreating shows name + days-of-plan ─────────────────
 
-  testWidgets(
-      'SCENARIO-RER-021: SelfCreating shows name field and days editor',
+  testWidgets('SCENARIO-RER-021: SelfCreating shows name field and days editor',
       (tester) async {
     await _pumpEditor(
       tester,
@@ -158,6 +157,22 @@ void main() {
     expect(find.text('DÍAS DEL PLAN'), findsOneWidget);
     // Starts with 1 day
     expect(find.text('Día 1'), findsWidgets);
+  });
+
+  // ── SCENARIO-RER-024: SelfCreating exposes supersets ─────────────────────────
+  // The athlete builds routines with the SAME editor as trainers, including
+  // superset blocks. The "+ Superserie" button is no longer trainer-gated.
+
+  testWidgets('SCENARIO-RER-024: SelfCreating shows the add-superset button',
+      (tester) async {
+    await _pumpEditor(
+      tester,
+      mode: const SelfCreating(),
+      overrides: _overrides(),
+    );
+
+    // Day tile starts expanded → the "+ Superserie" button is reachable.
+    expect(find.byKey(const Key('add_superset_button')), findsOneWidget);
   });
 
   // ── SCENARIO-RER-022: TrainerAssigning shows all fields ───────────────────────
@@ -251,8 +266,7 @@ void main() {
           uid: any(named: 'uid'),
           draft: any(named: 'draft'),
         )).thenAnswer((inv) async {
-      capturedDraft =
-          inv.namedArguments[const Symbol('draft')] as Routine;
+      capturedDraft = inv.namedArguments[const Symbol('draft')] as Routine;
       return capturedDraft!.copyWith(id: 'gen-id');
     });
 
@@ -291,8 +305,8 @@ void main() {
     expect(submitBtn.onPressed, isNotNull,
         reason: 'submit enabled after name + slot');
 
-    await tester.tap(
-        find.widgetWithText(ElevatedButton, WorkoutStrings.selfEditorSubmitLabel));
+    await tester.tap(find.widgetWithText(
+        ElevatedButton, WorkoutStrings.selfEditorSubmitLabel));
     await tester.pumpAndSettle();
 
     verify(() => repo.createUserOwned(
