@@ -25,6 +25,8 @@ const _muscleGroupEs = <String, String>{
   'biceps': 'BÍCEPS',
   'triceps': 'TRÍCEPS',
   'core': 'CORE',
+  'cardio': 'CARDIO',
+  'fullbody': 'CUERPO COMPLETO',
 };
 
 const _categoryEs = <String, String>{
