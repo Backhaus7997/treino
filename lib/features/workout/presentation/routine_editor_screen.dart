@@ -173,7 +173,7 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
 
   /// Opens the multi-select picker for [dayIndex] and appends all picked
   /// exercises as a new superset block (shared non-null [supersetGroup]).
-  /// Trainer mode only — gated at the call site via [allowSuperset].
+  /// Available in every editor mode (trainer + athlete SelfCreating).
   Future<void> _addSupersetForDay(BuildContext context, int dayIndex) async {
     final existingIds = _days[dayIndex]
         .slots
@@ -520,10 +520,10 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
                           _days.length > 1 ? () => _removeDay(di) : null,
                       onSlotChanged: () => setState(() {}),
                       onAddToGroup: (g) => _addExerciseToGroup(context, di, g),
-                      allowSuperset: _isTrainerMode,
-                      onAddSuperset: _isTrainerMode
-                          ? () => _addSupersetForDay(context, di)
-                          : null,
+                      // Supersets available in every mode, including the
+                      // athlete's SelfCreating editor (same builder as trainers).
+                      allowSuperset: true,
+                      onAddSuperset: () => _addSupersetForDay(context, di),
                     ),
                     const SizedBox(height: 6),
                   ],

@@ -466,8 +466,8 @@ void main() {
     });
 
     testWidgets(
-        'SCENARIO-SS-003: SelfCreating mode does NOT show "+ Superserie" button',
-        (tester) async {
+        'SCENARIO-SS-003: SelfCreating mode shows "+ Superserie" button '
+        '(athletes build supersets with the same editor)', (tester) async {
       final overrides = [
         currentUidProvider.overrideWithValue('athlete-1'),
         routineRepositoryProvider.overrideWithValue(_MockRoutineRepository()),
@@ -487,7 +487,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.byKey(const Key('add_superset_button')), findsNothing);
+      expect(find.byKey(const Key('add_superset_button')), findsOneWidget);
     });
   });
 
