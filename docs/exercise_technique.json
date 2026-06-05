@@ -49,7 +49,6 @@
       "Bajá el torso flexionando la cadera con la espalda neutra.",
       "Subí hasta alinear el cuerpo apretando glúteos y lumbares, sin hiperextender."
     ],
-
     "bicep-curl-dumbbell": [
       "Parate con una mancuerna en cada mano, codos pegados al cuerpo.",
       "Flexioná los codos subiendo el peso sin balancear el torso.",
@@ -80,7 +79,6 @@
       "Flexioná los codos subiendo la barra sin balancearte.",
       "Bajá controlado trabajando antebrazo y braquial."
     ],
-
     "standing-calf-raise-machine": [
       "Colocá los hombros bajo las almohadillas y la punta de los pies en la plataforma.",
       "Subí los talones lo más alto posible empujando con la punta del pie.",
@@ -91,7 +89,6 @@
       "Empujá con la punta elevando los talones lo máximo posible.",
       "Bajá controlado hasta estirar bien el gemelo."
     ],
-
     "bench-press-dumbbell": [
       "Acostate en banco plano con una mancuerna en cada mano a la altura del pecho.",
       "Empujá hacia arriba hasta casi juntar las mancuernas, sin trabar los codos.",
@@ -132,7 +129,6 @@
       "Bajá flexionando los codos hasta que el hombro quede a la altura del codo.",
       "Empujá hacia arriba hasta extender los brazos apretando el pecho."
     ],
-
     "sit-up": [
       "Acostate boca arriba con las rodillas flexionadas y los pies apoyados.",
       "Elevá el torso hasta sentarte contrayendo el abdomen, sin tirar del cuello.",
@@ -173,7 +169,6 @@
       "Estirá un brazo y la pierna contraria sin despegar la lumbar.",
       "Volvé y alterná de forma lenta y controlada."
     ],
-
     "burpee": [
       "Desde parado, bajá a cuclillas y apoyá las manos en el piso.",
       "Llevá los pies atrás a plancha y hacé una flexión.",
@@ -204,7 +199,6 @@
       "Elevá las rodillas hasta la altura de la cadera de forma alternada y rápida.",
       "Mantené el torso firme y acompañá con los brazos."
     ],
-
     "hip-thrust-machine": [
       "Acomodate con la espalda alta apoyada y la almohadilla sobre la cadera.",
       "Empujá con los talones elevando la cadera hasta alinear el torso.",
@@ -235,7 +229,6 @@
       "Flexioná la cadera llevando el agarre atrás con la espalda recta.",
       "Empujá la cadera al frente extendiendo y apretando los glúteos."
     ],
-
     "seated-leg-curl-machine": [
       "Sentate con la espalda apoyada y la parte de atrás de los tobillos sobre el rodillo.",
       "Flexioná las rodillas llevando los talones hacia los glúteos.",
@@ -261,7 +254,6 @@
       "Flexioná la cadera bajando el peso pegado a las piernas con la espalda neutra.",
       "Subí extendiendo la cadera apretando isquiotibiales y glúteos."
     ],
-
     "lunge-dumbbell": [
       "Parate con una mancuerna en cada mano, pasos firmes.",
       "Dá un paso al frente y bajá hasta que ambas rodillas queden a ~90°.",
@@ -332,7 +324,6 @@
       "Cerrá las piernas juntándolas contra la resistencia.",
       "Volvé controlado sin dejar que el peso abra de golpe."
     ],
-
     "shoulder-press-dumbbell": [
       "Sentado o parado, sostené una mancuerna a cada lado a la altura de los hombros.",
       "Empujá hacia arriba hasta casi juntar las mancuernas, sin trabar los codos.",
@@ -378,7 +369,6 @@
       "Extendé las piernas con fuerza e impulsá la barra sobre la cabeza.",
       "Bloqueá arriba y bajá controlado a los hombros."
     ],
-
     "triceps-rope-pushdown": [
       "Parate frente a la polea alta con la cuerda, codos pegados al cuerpo.",
       "Empujá hacia abajo extendiendo los codos y abriendo la cuerda al final.",
@@ -413,6 +403,1362 @@
       "En posición de plancha, juntá las manos formando un diamante bajo el pecho.",
       "Bajá el pecho hacia las manos con los codos cerca del cuerpo.",
       "Empujá hasta extender los brazos manteniendo el cuerpo en línea."
+    ],
+    "back-extension-machine": [
+      "Acomodá las caderas en el apoyo y trabá los tobillos en los rodillos.",
+      "Bajá el torso flexionando desde la cadera con la espalda neutra.",
+      "Subí contrayendo los lumbares hasta alinear el torso, sin hiperextender."
+    ],
+    "back-extension-weighted-hyperextension": [
+      "Apoyá las caderas en el banco y trabá los tobillos, sosteniendo el peso contra el pecho.",
+      "Bajá el torso desde la cadera con la espalda neutra y control.",
+      "Subí contrayendo glúteos y lumbares hasta alinear el cuerpo, sin pasarte de rango."
+    ],
+    "bent-over-row-band": [
+      "Pisá la banda y inclinate desde la cadera con la espalda neutra y rodillas flojas.",
+      "Tirá de la banda llevando los codos hacia atrás, juntando los omóplatos.",
+      "Soltá de forma controlada estirando los brazos sin redondear la espalda."
+    ],
+    "bent-over-row-barbell": [
+      "Inclinate desde la cadera con la espalda neutra y la barra colgando de los brazos.",
+      "Tirá la barra hacia el abdomen llevando los codos atrás y juntando los omóplatos.",
+      "Bajá la barra controlando, manteniendo el torso firme y sin redondear."
+    ],
+    "bent-over-row-dumbbell": [
+      "Inclinate desde la cadera con la espalda neutra y una mancuerna en cada mano.",
+      "Tirá las mancuernas hacia las costillas llevando los codos hacia atrás.",
+      "Bajá controlando hasta estirar los brazos, sin perder la postura del torso."
+    ],
+    "chest-supported-incline-row-dumbbell": [
+      "Acostate boca abajo sobre el banco inclinado con una mancuerna en cada mano.",
+      "Tirá las mancuernas hacia las costillas juntando los omóplatos.",
+      "Bajá controlando hasta estirar los brazos, manteniendo el pecho apoyado."
+    ],
+    "chin-up-assisted": [
+      "Agarrá la barra con las palmas hacia vos y apoyá las rodillas o pies en el asiento de asistencia.",
+      "Subí tirando con la espalda hasta llevar el mentón por encima de la barra.",
+      "Bajá controlando hasta estirar los brazos, sin soltarte de golpe."
+    ],
+    "chin-up-weighted": [
+      "Agarrá la barra con las palmas hacia vos y el peso sujeto al cinturón o entre los pies.",
+      "Subí tirando con la espalda hasta pasar el mentón por encima de la barra.",
+      "Bajá de forma controlada hasta estirar los brazos por completo."
+    ],
+    "dead-hang": [
+      "Agarrá la barra con las manos al ancho de los hombros y los brazos estirados.",
+      "Colgate dejando los hombros activos, sin encogerte hacia las orejas.",
+      "Sostené la posición respirando tranquilo y bajá con control al terminar."
+    ],
+    "gorilla-row-kettlebell": [
+      "Colocá una pesa rusa entre los pies e inclinate desde la cadera con la espalda neutra.",
+      "Tirá de una pesa hacia la cadera mientras la otra apoya en el piso.",
+      "Bajá controlando y alterná los lados sin rotar ni redondear el torso."
+    ],
+    "iso-lateral-high-row-machine": [
+      "Sentate en la máquina con el pecho apoyado y agarrá las manijas altas.",
+      "Tirá hacia abajo y atrás llevando los codos a la altura de los hombros.",
+      "Volvé controlando hasta estirar los brazos sin adelantar los hombros."
+    ],
+    "iso-lateral-low-row": [
+      "Sentate con el pecho apoyado y agarrá las manijas a la altura del abdomen.",
+      "Tirá hacia atrás llevando los codos pegados al cuerpo y juntando los omóplatos.",
+      "Volvé controlando hasta estirar los brazos sin redondear la espalda."
+    ],
+    "iso-lateral-row-machine": [
+      "Sentate con el pecho apoyado en la máquina y agarrá una manija en cada mano.",
+      "Tirá hacia atrás llevando los codos cerca del cuerpo y juntando los omóplatos.",
+      "Volvé controlando hasta estirar los brazos, manteniendo el pecho apoyado."
+    ],
+    "kipping-pull-up": [
+      "Agarrá la barra y generá un balanceo controlado desde los hombros y la cadera.",
+      "Usá el impulso de la cadera para llevar el mentón por encima de la barra.",
+      "Bajá reconectando el balanceo con control, sin descontrolar el cuerpo."
+    ],
+    "kneeling-pulldown-band": [
+      "Fijá la banda en alto y arrodillate sujetándola con ambas manos.",
+      "Tirá hacia abajo llevando los codos al costado del cuerpo y juntando los omóplatos.",
+      "Soltá controlando hasta estirar los brazos, manteniendo el torso firme."
+    ],
+    "landmine-row": [
+      "Pará a horcajadas sobre la barra fijada al landmine e inclinate desde la cadera.",
+      "Tirá del extremo de la barra hacia el abdomen llevando los codos atrás.",
+      "Bajá controlando hasta estirar los brazos, manteniendo la espalda neutra."
+    ],
+    "lat-pulldown-band": [
+      "Fijá la banda en alto y agarrala con ambas manos, sentado o de pie firme.",
+      "Tirá hacia el pecho llevando los codos abajo y juntando los omóplatos.",
+      "Soltá controlando hasta estirar los brazos, sin arquear la espalda."
+    ],
+    "lat-pulldown-close-grip-cable": [
+      "Sentate y enganchá el triángulo a la polea, con el torso ligeramente atrás.",
+      "Tirá hacia el pecho llevando los codos abajo y juntando los omóplatos.",
+      "Soltá controlando hasta estirar los brazos sin encoger los hombros."
+    ],
+    "low-row-suspension": [
+      "Agarrá las cintas del TRX e inclinate hacia atrás con el cuerpo recto y firme.",
+      "Tirá del cuerpo hacia las manijas llevando los codos pegados al cuerpo.",
+      "Bajá controlando hasta estirar los brazos, manteniendo el core activo."
+    ],
+    "meadows-rows-barbell": [
+      "Pará perpendicular a la barra del landmine y agarrá el extremo con una mano.",
+      "Inclinate desde la cadera con la espalda neutra y tirá llevando el codo atrás.",
+      "Bajá controlando hasta estirar el brazo sin rotar el torso."
+    ],
+    "negative-pull-up": [
+      "Subí con ayuda o un salto hasta llevar el mentón por encima de la barra.",
+      "Bajá lo más lento posible resistiendo con la espalda y los brazos.",
+      "Llegá a estirar los brazos por completo antes de volver a empezar."
+    ],
+    "pendlay-row-barbell": [
+      "Inclinate desde la cadera con el torso casi paralelo al piso y la barra en el suelo.",
+      "Tirá la barra de forma explosiva hacia el abdomen juntando los omóplatos.",
+      "Apoyá la barra en el piso en cada repetición, manteniendo la espalda neutra."
+    ],
+    "pull-up-assisted": [
+      "Agarrá la barra con las palmas al frente y apoyá rodillas o pies en la asistencia.",
+      "Subí tirando con la espalda hasta pasar el mentón por encima de la barra.",
+      "Bajá controlando hasta estirar los brazos, sin soltarte de golpe."
+    ],
+    "pull-up-band": [
+      "Enganchá la banda en la barra y apoyá un pie o la rodilla en ella.",
+      "Agarrá la barra con las palmas al frente y subí hasta pasar el mentón.",
+      "Bajá controlando hasta estirar los brazos por completo."
+    ],
+    "pull-up-weighted": [
+      "Agarrá la barra con las palmas al frente y el peso sujeto al cinturón.",
+      "Subí tirando con la espalda hasta llevar el mentón por encima de la barra.",
+      "Bajá de forma controlada hasta estirar los brazos por completo."
+    ],
+    "pullover-machine": [
+      "Sentate en la máquina y agarrá la barra o manijas con los brazos arriba.",
+      "Tirá hacia abajo con los brazos casi rectos, llevando el peso hacia el abdomen.",
+      "Volvé controlando hasta arriba sin arquear la espalda baja."
+    ],
+    "rack-pull": [
+      "Colocá la barra en los pines a la altura de las rodillas y agarrala con la espalda neutra.",
+      "Empujá con las piernas y extendé la cadera hasta quedar erguido.",
+      "Bajá la barra a los pines controlando, manteniendo la espalda neutra."
+    ],
+    "renegade-row-dumbbell": [
+      "Ponete en plancha con una mancuerna en cada mano y los pies abiertos.",
+      "Tirá una mancuerna hacia la cadera sin rotar la cadera ni el torso.",
+      "Bajá controlando y alterná los brazos, manteniendo el core firme."
+    ],
+    "reverse-grip-lat-pulldown-cable": [
+      "Sentate y agarrá la barra de la polea con las palmas hacia vos.",
+      "Tirá hacia el pecho llevando los codos abajo y pegados al cuerpo.",
+      "Soltá controlando hasta estirar los brazos sin arquear la espalda."
+    ],
+    "ring-pull-up": [
+      "Agarrá las anillas con los brazos estirados y el cuerpo firme.",
+      "Subí tirando con la espalda hasta llevar el mentón sobre las anillas.",
+      "Bajá controlando hasta estirar los brazos, estabilizando las anillas."
+    ],
+    "rope-straight-arm-pulldown": [
+      "Pará frente a la polea alta y agarrá la cuerda con los brazos casi rectos.",
+      "Tirá la cuerda hacia los muslos manteniendo los brazos extendidos.",
+      "Volvé controlando hasta arriba sin flexionar los codos ni arquear la espalda."
+    ],
+    "scapular-pull-ups": [
+      "Colgate de la barra con los brazos estirados y el cuerpo firme.",
+      "Bajá los hombros juntando los omóplatos sin flexionar los codos.",
+      "Volvé soltando los omóplatos con control, sin balancearte."
+    ],
+    "seated-cable-row-bar-grip": [
+      "Sentate con los pies apoyados, rodillas algo flexionadas y la barra en las manos.",
+      "Tirá hacia el abdomen llevando los codos atrás y juntando los omóplatos.",
+      "Volvé controlando hasta estirar los brazos sin redondear la espalda."
+    ],
+    "seated-cable-row-bar-wide-grip": [
+      "Sentate con los pies apoyados y agarrá la barra ancha con las palmas abajo.",
+      "Tirá hacia el abdomen llevando los codos abiertos y juntando los omóplatos.",
+      "Volvé controlando hasta estirar los brazos, manteniendo el torso firme."
+    ],
+    "shrug-barbell": [
+      "Pará con la barra adelante de los muslos, brazos estirados y espalda neutra.",
+      "Encogé los hombros hacia las orejas sin flexionar los codos.",
+      "Bajá controlando hasta soltar los hombros por completo."
+    ],
+    "shrug-cable": [
+      "Pará frente a la polea baja con la barra o manija, brazos estirados.",
+      "Encogé los hombros hacia las orejas sin doblar los codos.",
+      "Bajá controlando hasta soltar los hombros, manteniendo la espalda neutra."
+    ],
+    "shrug-machine": [
+      "Agarrá las manijas de la máquina con los brazos estirados y la espalda neutra.",
+      "Encogé los hombros hacia las orejas sin flexionar los codos.",
+      "Bajá controlando hasta soltar los hombros por completo."
+    ],
+    "shrug-smith-machine": [
+      "Pará con la barra del multipower adelante de los muslos y brazos estirados.",
+      "Encogé los hombros hacia las orejas sin doblar los codos.",
+      "Bajá controlando hasta soltar los hombros, manteniendo la espalda neutra."
+    ],
+    "single-arm-cable-row": [
+      "Pará o sentate frente a la polea baja agarrando la manija con una mano.",
+      "Tirá hacia la cadera llevando el codo atrás y juntando el omóplato.",
+      "Volvé controlando hasta estirar el brazo sin rotar el torso."
+    ],
+    "single-arm-lat-pulldown": [
+      "Sentate y agarrá la manija de la polea alta con una mano.",
+      "Tirá hacia abajo llevando el codo al costado del cuerpo.",
+      "Soltá controlando hasta estirar el brazo, manteniendo el torso firme."
+    ],
+    "sternum-pull-up-gironda": [
+      "Agarrá la barra y echá el torso hacia atrás formando una curva.",
+      "Subí tirando hasta que la barra toque la parte alta del pecho o el esternón.",
+      "Bajá controlando hasta estirar los brazos, sin balancearte."
+    ],
+    "straight-arm-lat-pulldown-cable": [
+      "Pará frente a la polea alta y agarrá la barra con los brazos casi rectos.",
+      "Tirá la barra hacia los muslos manteniendo los brazos extendidos.",
+      "Volvé controlando hasta arriba sin flexionar los codos ni arquear la espalda."
+    ],
+    "superman": [
+      "Acostate boca abajo con los brazos extendidos al frente y las piernas estiradas.",
+      "Elevá brazos y piernas a la vez contrayendo glúteos y lumbares.",
+      "Bajá controlando hasta apoyar, sin tironear ni hiperextender el cuello."
+    ],
+    "vertical-traction-machine": [
+      "Sentate en la máquina, trabá las piernas y agarrá las manijas arriba.",
+      "Tirá hacia abajo llevando los codos al costado y juntando los omóplatos.",
+      "Volvé controlando hasta estirar los brazos sin encoger los hombros."
+    ],
+    "wide-pull-up": [
+      "Agarrá la barra con las palmas al frente y las manos más anchas que los hombros.",
+      "Subí tirando con la espalda hasta acercar el pecho a la barra.",
+      "Bajá controlando hasta estirar los brazos por completo."
+    ],
+    "behind-the-back-bicep-wrist-curl-barbell": [
+      "Parate erguido con la barra tomada por detrás de los glúteos, palmas hacia atrás y brazos extendidos.",
+      "Flexioná solo las muñecas para elevar la barra, manteniendo los codos quietos pegados al cuerpo.",
+      "Bajá la barra de forma controlada dejando que los dedos se abran apenas al final del recorrido.",
+      "Sostené la espalda neutra y evitá balancear el torso."
+    ],
+    "behind-the-back-curl-cable": [
+      "Ubicá la polea baja detrás tuyo y tomá el agarre con una mano, dando un paso al frente.",
+      "Con el brazo extendido hacia atrás y el codo fijo, flexioná llevando la mano hacia el hombro.",
+      "Bajá controlando la tensión sin dejar que el cable tire del hombro hacia atrás.",
+      "Mantené el torso firme y la espalda neutra durante todo el movimiento."
+    ],
+    "bicep-curl-barbell": [
+      "Parate con los pies al ancho de hombros y tomá la barra con palmas hacia arriba al ancho de hombros.",
+      "Flexioná los codos subiendo la barra hacia el pecho sin mover los codos del costado.",
+      "Bajá de forma controlada hasta extender los brazos por completo.",
+      "Mantené la espalda neutra y evitá balancear con la cintura."
+    ],
+    "bicep-curl-machine": [
+      "Sentate ajustando el asiento para que los codos queden alineados con el eje de la máquina.",
+      "Apoyá los brazos en el soporte y tomá las manijas con palmas hacia arriba.",
+      "Flexioná los codos llevando las manijas hacia vos sin despegar los brazos del apoyo.",
+      "Bajá controlando el peso hasta casi extender los codos, sin soltar la tensión de golpe."
+    ],
+    "bicep-curl-suspension": [
+      "Tomá las manijas del TRX con palmas hacia arriba e incliná el cuerpo hacia atrás con el cuerpo recto.",
+      "Mantené los codos altos y fijos mientras flexionás llevando las manos hacia la frente.",
+      "Extendé los brazos de forma controlada para volver a la posición inclinada.",
+      "Conservá el core firme y la cadera alineada con los hombros."
+    ],
+    "cross-body-hammer-curl": [
+      "Parate con una mancuerna en cada mano, palmas enfrentadas y brazos extendidos al costado.",
+      "Llevá una mancuerna en diagonal cruzando hacia el hombro opuesto, manteniendo el codo pegado al cuerpo.",
+      "Bajá controlando hasta la posición inicial y alterná con el otro brazo.",
+      "Mantené el torso erguido y evitá rotar la cintura."
+    ],
+    "drag-curl": [
+      "Parate con la barra tomada al ancho de hombros y palmas hacia arriba.",
+      "Subí la barra arrastrándola pegada al cuerpo mientras llevás los codos hacia atrás.",
+      "Bajá lento dejando que la barra se deslice cerca del torso hasta extender los brazos.",
+      "Mantené la espalda neutra y sin balanceo."
+    ],
+    "ez-bar-biceps-curl": [
+      "Tomá la barra Z por los ángulos internos con palmas hacia arriba y parate erguido.",
+      "Flexioná los codos subiendo la barra hacia el pecho sin despegar los codos del costado.",
+      "Bajá de forma controlada hasta extender por completo los brazos.",
+      "Mantené las muñecas firmes y la espalda neutra, sin balancear."
+    ],
+    "hammer-curl-band": [
+      "Pisá el centro de la banda y tomá los extremos con palmas enfrentadas, brazos extendidos.",
+      "Flexioná los codos subiendo las manos hacia los hombros manteniendo el agarre neutro.",
+      "Bajá controlando la resistencia de la banda hasta extender los brazos.",
+      "Mantené los codos pegados al cuerpo y la espalda neutra."
+    ],
+    "hammer-curl-cable": [
+      "Enganchá una cuerda en la polea baja y tomá los extremos con palmas enfrentadas.",
+      "Con los codos fijos al costado, flexioná llevando las manos hacia los hombros.",
+      "Bajá de forma controlada sin que el cable arrastre los codos hacia adelante.",
+      "Mantené el torso erguido y la espalda neutra."
+    ],
+    "kettlebell-curl": [
+      "Parate sosteniendo la pesa rusa por el asa con palma hacia arriba y brazo extendido.",
+      "Flexioná el codo subiendo la pesa hacia el hombro, dejando que la masa cuelgue del antebrazo.",
+      "Bajá controlando el peso hasta extender el brazo por completo.",
+      "Mantené la muñeca firme y la espalda neutra, sin balancear."
+    ],
+    "overhead-curl-cable": [
+      "Ubicate entre dos poleas altas y tomá un agarre en cada mano con palmas hacia arriba.",
+      "Abrí los brazos en cruz a la altura de los hombros como punto de partida.",
+      "Flexioná los codos llevando las manos hacia las sienes sin bajar los codos.",
+      "Extendé de forma controlada manteniendo el torso firme y la espalda neutra."
+    ],
+    "pinwheel-curl-dumbbell": [
+      "Parate con una mancuerna en agarre neutro, palma enfrentada al cuerpo y brazo extendido.",
+      "Flexioná el codo subiendo la mancuerna recta hacia el hombro sin rotar la muñeca.",
+      "Bajá controlando hasta extender el brazo y alterná con el otro lado.",
+      "Mantené el codo pegado al cuerpo y la espalda neutra."
+    ],
+    "plate-curl": [
+      "Tomá un disco por los costados con ambas manos y brazos extendidos al frente.",
+      "Flexioná los codos subiendo el disco hacia el pecho sin despegar los codos del cuerpo.",
+      "Bajá de forma controlada hasta extender los brazos por completo.",
+      "Mantené las muñecas firmes y la espalda neutra, sin balanceo."
+    ],
+    "preacher-curl-dumbbell": [
+      "Apoyá el tríceps sobre el banco predicador con una mancuerna en agarre supino.",
+      "Flexioná el codo subiendo la mancuerna sin despegar el brazo del banco.",
+      "Bajá lento hasta casi extender el codo, sin perder la tensión ni rebotar.",
+      "Mantené el hombro estable y la muñeca firme."
+    ],
+    "preacher-curl-machine": [
+      "Ajustá el asiento y apoyá los brazos sobre el cojín con palmas hacia arriba en las manijas.",
+      "Flexioná los codos llevando las manijas hacia vos sin despegar los brazos del apoyo.",
+      "Bajá controlando hasta casi extender los codos, sin soltar la tensión de golpe.",
+      "Mantené los hombros relajados y la espalda apoyada."
+    ],
+    "reverse-curl-cable": [
+      "Enganchá una barra recta en la polea baja y tomala con palmas hacia abajo (agarre pronado).",
+      "Con los codos fijos al costado, flexioná subiendo la barra hacia el pecho.",
+      "Bajá de forma controlada hasta extender los brazos por completo.",
+      "Mantené las muñecas firmes y la espalda neutra, sin balancear."
+    ],
+    "reverse-curl-dumbbell": [
+      "Parate con una mancuerna en cada mano y palmas hacia abajo (agarre pronado), brazos extendidos.",
+      "Flexioná los codos subiendo las mancuernas hacia los hombros sin despegar los codos del cuerpo.",
+      "Bajá controlando hasta extender los brazos por completo.",
+      "Mantené las muñecas firmes y la espalda neutra."
+    ],
+    "reverse-grip-concentration-curl": [
+      "Sentado, apoyá el codo en la cara interna del muslo con una mancuerna en agarre pronado.",
+      "Flexioná el codo subiendo la mancuerna con la palma hacia abajo sin mover el brazo.",
+      "Bajá de forma controlada hasta extender el brazo por completo.",
+      "Mantené el torso ligeramente inclinado y la espalda neutra."
+    ],
+    "rope-cable-curl": [
+      "Enganchá una cuerda en la polea baja y tomá los extremos con palmas enfrentadas.",
+      "Con los codos fijos al costado, flexioná llevando las manos hacia los hombros y abriendo la cuerda arriba.",
+      "Bajá controlando la tensión hasta extender los brazos.",
+      "Mantené el torso erguido y la espalda neutra."
+    ],
+    "seated-palms-up-wrist-curl": [
+      "Sentate apoyando los antebrazos sobre los muslos con las palmas hacia arriba y las muñecas por fuera de las rodillas.",
+      "Dejá caer la barra o mancuerna flexionando las muñecas hacia abajo de forma controlada.",
+      "Subí enrollando las muñecas hacia arriba sin mover los antebrazos.",
+      "Mantené los antebrazos firmes contra los muslos durante todo el movimiento."
+    ],
+    "seated-wrist-extension-barbell": [
+      "Sentate apoyando los antebrazos sobre los muslos con las palmas hacia abajo y las muñecas por fuera de las rodillas.",
+      "Dejá bajar la barra flexionando las muñecas hacia abajo de forma controlada.",
+      "Extendé las muñecas subiendo la barra sin despegar los antebrazos de los muslos.",
+      "Mantené el rango cómodo y los antebrazos firmes."
+    ],
+    "single-arm-curl-cable": [
+      "Ubicá la polea baja y tomá el agarre con una mano, palma hacia arriba y brazo extendido.",
+      "Con el codo fijo al costado, flexioná llevando la mano hacia el hombro.",
+      "Bajá controlando la tensión hasta extender el brazo por completo.",
+      "Mantené el torso firme y la espalda neutra, sin rotar."
+    ],
+    "spider-curl-barbell": [
+      "Recostate boca abajo sobre un banco inclinado dejando los brazos colgar con la barra en agarre supino.",
+      "Flexioná los codos subiendo la barra hacia la frente sin mover los hombros.",
+      "Bajá de forma controlada hasta extender los brazos por completo.",
+      "Mantené el pecho apoyado y las muñecas firmes."
+    ],
+    "spider-curl-dumbbell": [
+      "Recostate boca abajo sobre un banco inclinado con una mancuerna en cada mano y palmas al frente.",
+      "Flexioná los codos subiendo las mancuernas hacia la frente sin mover los hombros.",
+      "Bajá controlando hasta extender los brazos por completo.",
+      "Mantené el pecho apoyado y las muñecas firmes."
+    ],
+    "waiter-curl-dumbbell": [
+      "Sostené una mancuerna en vertical con ambas manos por debajo del disco superior, como llevando una bandeja.",
+      "Flexioná los codos subiendo la mancuerna hacia el mentón con los codos pegados al cuerpo.",
+      "Bajá de forma controlada hasta casi extender los brazos.",
+      "Mantené las muñecas firmes y la espalda neutra, sin balancear."
+    ],
+    "wrist-roller": [
+      "Sostené el rodillo al frente con los brazos extendidos a la altura de los hombros y el peso colgando.",
+      "Enrollá la cuerda girando las muñecas de a una para subir el peso de forma controlada.",
+      "Desenrollá lento invirtiendo el giro hasta que el peso vuelva abajo.",
+      "Mantené los brazos firmes y la espalda neutra durante todo el movimiento."
+    ],
+    "zottman-curl-dumbbell": [
+      "Parate con una mancuerna en cada mano, palmas hacia arriba y brazos extendidos.",
+      "Flexioná los codos subiendo las mancuernas hacia los hombros con agarre supino.",
+      "Arriba, rotá las muñecas a palmas hacia abajo y bajá de forma controlada con agarre pronado.",
+      "Mantené los codos pegados al cuerpo y la espalda neutra."
+    ],
+    "calf-extension-machine": [
+      "Acomodá los pies en la plataforma con la punta apoyada y los talones libres.",
+      "Bajá los talones de forma controlada hasta sentir el estiramiento del gemelo.",
+      "Empujá con la punta de los pies subiendo lo máximo posible y apretá arriba.",
+      "Mantené las rodillas estables y la espalda apoyada en todo el rango."
+    ],
+    "calf-press-machine": [
+      "Sentado en la prensa, apoyá la punta de los pies en el borde de la plataforma.",
+      "Empujá con la punta extendiendo los tobillos sin trabar las rodillas.",
+      "Volvé despacio dejando que los talones bajen hasta estirar el gemelo.",
+      "Mantené las rodillas casi fijas para aislar la pantorrilla."
+    ],
+    "single-leg-standing-calf-raise-barbell": [
+      "Apoyá la barra sobre los trapecios y parate con la punta de un pie en un escalón.",
+      "Bajá el talón de esa pierna de forma controlada hasta estirar el gemelo.",
+      "Elevá empujando con la punta hasta la máxima contracción y apretá arriba.",
+      "Sostenete con una mano para equilibrio y mantené la espalda neutra."
+    ],
+    "single-leg-standing-calf-raise-dumbbell": [
+      "Sostené una mancuerna del lado de la pierna que trabaja y apoyá esa punta en un escalón.",
+      "Bajá el talón despacio hasta sentir el estiramiento del gemelo.",
+      "Subí empujando con la punta hasta arriba y apretá un segundo.",
+      "Agarrate con la otra mano para no perder el equilibrio."
+    ],
+    "single-leg-standing-calf-raise-machine": [
+      "Acomodá el hombro bajo la almohadilla y apoyá la punta de un pie en la plataforma.",
+      "Bajá el talón de forma controlada hasta el estiramiento máximo del gemelo.",
+      "Empujá con la punta subiendo hasta la contracción completa.",
+      "Mantené la rodilla extendida pero sin trabar y el torso erguido."
+    ],
+    "standing-calf-raise-barbell": [
+      "Apoyá la barra sobre los trapecios y parate con las puntas en un escalón.",
+      "Bajá los talones despacio hasta sentir el estiramiento de los gemelos.",
+      "Elevá empujando con las puntas hasta la máxima altura y apretá arriba.",
+      "Mantené las rodillas firmes y la espalda neutra en todo el recorrido."
+    ],
+    "standing-calf-raise-dumbbell": [
+      "Sostené una mancuerna en cada mano con los brazos al costado del cuerpo.",
+      "Apoyá las puntas en un escalón y bajá los talones de forma controlada.",
+      "Subí empujando con las puntas hasta la contracción máxima y apretá.",
+      "Mantené el torso erguido y las rodillas casi fijas."
+    ],
+    "standing-calf-raise-smith": [
+      "Acomodá la barra del multipower sobre los trapecios y apoyá las puntas en un escalón.",
+      "Destrabá la barra y bajá los talones despacio hasta estirar los gemelos.",
+      "Empujá con las puntas subiendo hasta la máxima contracción y apretá arriba.",
+      "Aprovechá la guía del multipower para mantener el equilibrio y la espalda neutra."
+    ],
+    "around-the-world": [
+      "Acostado en el banco con una mancuerna en cada mano y los brazos extendidos a los costados.",
+      "Llevá las mancuernas en arco amplio desde las caderas hasta arriba de la cabeza, manteniendo los codos casi rectos.",
+      "Volvé por el mismo arco de forma controlada, sin perder la curva natural de la espalda.",
+      "Usá poco peso y rango cómodo para cuidar los hombros."
+    ],
+    "bench-press-cable": [
+      "Acostado en el banco entre las poleas, agarrá los manijones a la altura del pecho.",
+      "Empujá las manijas hacia arriba y al frente hasta extender los brazos, sin trabar los codos.",
+      "Bajá controlando la tensión de la polea hasta sentir el pecho estirado.",
+      "Mantené los omóplatos retraídos y la espalda neutra apoyada en el banco."
+    ],
+    "bench-press-smith-machine": [
+      "Acostate alineando la barra del multipower a la altura media del pecho.",
+      "Destrabá la barra, bajá controlado hasta rozar el pecho con los codos a unos 45 grados.",
+      "Empujá hacia arriba siguiendo el riel hasta extender los brazos sin trabar los codos.",
+      "Mantené los omóplatos retraídos y los pies firmes en el piso."
+    ],
+    "bench-press-wide-grip-barbell": [
+      "Acostado, agarrá la barra más abierto que el ancho de hombros.",
+      "Sacá la barra del soporte y bajala controlada hasta el pecho con los codos abiertos.",
+      "Empujá hacia arriba hasta extender los brazos, manteniendo los omóplatos retraídos.",
+      "Cuidá el rango: no bajes más allá de lo cómodo para proteger los hombros."
+    ],
+    "chest-dip-assisted": [
+      "Apoyá las rodillas en la plataforma asistida y agarrá las barras paralelas.",
+      "Incliná levemente el torso hacia adelante y bajá flexionando los codos de forma controlada.",
+      "Empujá para subir hasta extender los brazos sin trabar los codos.",
+      "Evitá bajar demasiado para no forzar los hombros."
+    ],
+    "chest-fly-band": [
+      "Anclá la banda detrás tuyo a la altura del pecho y agarrá un extremo en cada mano.",
+      "Con los brazos casi extendidos y codos levemente flexionados, abrí los brazos al frente.",
+      "Juntá las manos adelante del pecho apretando la zona, y volvé controlando la tensión.",
+      "Mantené el torso firme y la espalda neutra durante todo el movimiento."
+    ],
+    "chest-fly-machine": [
+      "Sentado con la espalda apoyada, agarrá las manijas con los codos levemente flexionados.",
+      "Juntá los brazos al frente apretando el pecho de forma controlada.",
+      "Volvé abriendo despacio hasta sentir el estiramiento, sin pasarte del rango.",
+      "Mantené los omóplatos apoyados y la espalda neutra."
+    ],
+    "chest-fly-suspension": [
+      "Agarrá las manijas del TRX al frente con el cuerpo inclinado y los pies firmes.",
+      "Con los brazos casi extendidos y codos levemente flexionados, abrí los brazos en cruz.",
+      "Juntá las manos al frente apretando el pecho y volvé de forma controlada.",
+      "Mantené el cuerpo recto y el abdomen firme, sin hundir la cadera."
+    ],
+    "chest-press-band": [
+      "Anclá la banda detrás tuyo a la altura del pecho y agarrá un extremo en cada mano.",
+      "Empujá las manos hacia adelante hasta extender los brazos, sin trabar los codos.",
+      "Volvé controlando la tensión de la banda hasta el pecho.",
+      "Mantené el torso firme y la espalda neutra durante todo el recorrido."
+    ],
+    "clap-push-ups": [
+      "Ubicate en posición de flexión con las manos al ancho de los hombros y el cuerpo recto.",
+      "Bajá controlado hasta casi tocar el piso con el pecho.",
+      "Empujá con fuerza explosiva para despegar las manos y dar una palmada en el aire.",
+      "Caé con los codos suaves para amortiguar y mantené el abdomen firme."
+    ],
+    "decline-bench-press-dumbbell": [
+      "Acostate en el banco declinado con los pies trabados y una mancuerna en cada mano.",
+      "Empezá con las mancuernas a la altura del pecho bajo, codos a unos 45 grados.",
+      "Empujá hacia arriba hasta extender los brazos sin chocar las mancuernas.",
+      "Bajá controlado hasta sentir el estiramiento, manteniendo la espalda neutra."
+    ],
+    "decline-bench-press-machine": [
+      "Sentate o acostate en la máquina ajustando el asiento para que las manijas queden a la altura del pecho bajo.",
+      "Agarrá las manijas y empujá al frente hasta extender los brazos sin trabar los codos.",
+      "Volvé controlando hasta sentir el pecho estirado, sin pasarte del rango.",
+      "Mantené la espalda apoyada y los omóplatos retraídos."
+    ],
+    "decline-bench-press-smith-machine": [
+      "Acostate en el banco declinado alineando la barra del multipower con el pecho bajo.",
+      "Destrabá la barra y bajala controlada hasta rozar el pecho, codos a unos 45 grados.",
+      "Empujá siguiendo el riel hasta extender los brazos sin trabar los codos.",
+      "Mantené los pies trabados, los omóplatos retraídos y la espalda neutra."
+    ],
+    "decline-chest-fly-dumbbell": [
+      "Acostate en el banco declinado con los pies trabados y una mancuerna en cada mano arriba del pecho.",
+      "Con los codos levemente flexionados, abrí los brazos en cruz de forma controlada.",
+      "Juntá las mancuernas arriba apretando el pecho y volvé despacio.",
+      "No bajes más allá de lo cómodo para proteger los hombros."
+    ],
+    "decline-push-up": [
+      "Apoyá los pies elevados en un banco y las manos en el piso al ancho de los hombros.",
+      "Mantené el cuerpo recto desde la cabeza a los talones, con el abdomen firme.",
+      "Bajá controlado hasta casi tocar el piso con el pecho, codos a unos 45 grados.",
+      "Empujá para subir hasta extender los brazos sin trabar los codos."
+    ],
+    "dumbbell-squeeze-press": [
+      "Acostado en el banco, juntá dos mancuernas en el centro del pecho presionándolas entre sí.",
+      "Empujá hacia arriba manteniendo las mancuernas pegadas y apretando el pecho.",
+      "Bajá controlado hasta el pecho sin dejar de presionarlas una contra otra.",
+      "Mantené los omóplatos retraídos y la espalda neutra."
+    ],
+    "feet-up-bench-press-barbell": [
+      "Acostado en el banco, levantá los pies y flexioná las rodillas sobre la cadera.",
+      "Sacá la barra del soporte y bajala controlada hasta el pecho, codos a unos 45 grados.",
+      "Empujá hacia arriba hasta extender los brazos sin trabar los codos.",
+      "Mantené el core firme y los omóplatos retraídos para estabilizar sin apoyo de piernas."
+    ],
+    "floor-press-barbell": [
+      "Acostate en el piso bajo la barra con las rodillas flexionadas y los pies apoyados.",
+      "Sacá la barra y bajala controlada hasta que los tríceps toquen el suelo.",
+      "Hacé una breve pausa y empujá hacia arriba hasta extender los brazos.",
+      "Mantené los omóplatos retraídos y la espalda neutra apoyada en el piso."
+    ],
+    "floor-press-dumbbell": [
+      "Acostate en el piso con las rodillas flexionadas y una mancuerna en cada mano arriba del pecho.",
+      "Bajá controlado hasta que los tríceps toquen el suelo, codos a unos 45 grados.",
+      "Hacé una breve pausa y empujá hacia arriba hasta extender los brazos.",
+      "Mantené los omóplatos retraídos y la espalda neutra en el piso."
+    ],
+    "hex-press-dumbbell": [
+      "Acostado en el banco, juntá dos mancuernas hexagonales en el centro del pecho.",
+      "Empujá hacia arriba manteniendo las mancuernas pegadas y apretando el pecho.",
+      "Bajá controlado hasta el pecho sin separar las mancuernas.",
+      "Mantené los omóplatos retraídos y la espalda neutra."
+    ],
+    "incline-bench-press-smith-machine": [
+      "Acostate en el banco inclinado alineando la barra del multipower con la parte alta del pecho.",
+      "Destrabá la barra y bajala controlada hasta rozar el pecho alto, codos a unos 45 grados.",
+      "Empujá siguiendo el riel hasta extender los brazos sin trabar los codos.",
+      "Mantené los omóplatos retraídos y la espalda neutra apoyada."
+    ],
+    "incline-chest-fly-dumbbell": [
+      "Acostate en el banco inclinado con una mancuerna en cada mano arriba del pecho.",
+      "Con los codos levemente flexionados, abrí los brazos en cruz de forma controlada.",
+      "Juntá las mancuernas arriba apretando el pecho y volvé despacio.",
+      "No bajes más allá de lo cómodo para proteger los hombros."
+    ],
+    "incline-chest-press-machine": [
+      "Sentate en la máquina con la espalda apoyada y las manijas a la altura del pecho alto.",
+      "Empujá hacia arriba y al frente hasta extender los brazos sin trabar los codos.",
+      "Volvé controlando hasta sentir el pecho estirado, sin pasarte del rango.",
+      "Mantené los omóplatos retraídos y la espalda neutra."
+    ],
+    "incline-push-ups": [
+      "Apoyá las manos en una superficie elevada al ancho de los hombros y los pies en el piso.",
+      "Mantené el cuerpo recto desde la cabeza a los talones, con el abdomen firme.",
+      "Bajá controlado hasta casi tocar la superficie con el pecho, codos a unos 45 grados.",
+      "Empujá para subir hasta extender los brazos sin trabar los codos."
+    ],
+    "iso-lateral-chest-press-machine": [
+      "Sentate en la máquina con la espalda apoyada y las manijas a la altura del pecho.",
+      "Empujá cada brazo al frente de forma independiente hasta extenderlos sin trabar los codos.",
+      "Volvé controlando hasta sentir el pecho estirado, sin pasarte del rango.",
+      "Mantené los omóplatos retraídos y evitá rotar el torso."
+    ],
+    "kneeling-push-up": [
+      "Apoyá las rodillas en el piso y las manos al ancho de los hombros.",
+      "Mantené el cuerpo recto desde la cabeza a las rodillas, con el abdomen firme.",
+      "Bajá controlado hasta casi tocar el piso con el pecho, codos a unos 45 grados.",
+      "Empujá para subir hasta extender los brazos sin trabar los codos."
+    ],
+    "low-cable-fly-crossovers": [
+      "Parate en el centro con las poleas bajas, agarrá una manija en cada mano y un pie adelante.",
+      "Con los codos levemente flexionados, subí los brazos en arco hasta juntar las manos al frente arriba.",
+      "Apretá el pecho arriba y volvé controlando la tensión hasta sentir el estiramiento.",
+      "Mantené el torso firme y la espalda neutra durante todo el recorrido."
+    ],
+    "one-arm-push-up": [
+      "Ubicate en flexión con los pies bien abiertos y una mano apoyada bajo el pecho.",
+      "Llevá el otro brazo a la espalda y mantené el cuerpo rígido, sin rotar la cadera.",
+      "Bajá controlado flexionando el codo del brazo de apoyo hasta acercar el pecho al piso.",
+      "Empujá para subir manteniendo el abdomen y los glúteos firmes."
+    ],
+    "plank-pushup": [
+      "Empezá en plancha sobre los antebrazos con el cuerpo recto y el abdomen firme.",
+      "Apoyá una mano y luego la otra para subir hasta la posición de flexión con brazos extendidos.",
+      "Volvé bajando a los antebrazos de a un brazo por vez, controlando el movimiento.",
+      "Mantené la cadera estable, sin balancearla de lado a lado."
+    ],
+    "plate-press": [
+      "Acostado en el banco, sostené un disco con ambas manos sobre el centro del pecho.",
+      "Empujá el disco hacia arriba hasta extender los brazos, apretando el pecho.",
+      "Bajá controlado hasta el pecho manteniendo el disco firme entre las manos.",
+      "Mantené los omóplatos retraídos y la espalda neutra."
+    ],
+    "plate-squeeze-svend-press": [
+      "Parado, sostené un disco con ambas palmas presionándolo a la altura del pecho.",
+      "Empujá el disco al frente extendiendo los brazos sin dejar de apretarlo.",
+      "Volvé controlado hacia el pecho manteniendo la presión constante en las palmas.",
+      "Mantené el abdomen firme y la espalda neutra, sin arquear la zona lumbar."
+    ],
+    "push-up-close-grip": [
+      "Ubicate en flexión con las manos juntas debajo del pecho y el cuerpo recto.",
+      "Bajá controlado manteniendo los codos pegados al torso.",
+      "Empujá para subir hasta extender los brazos sin trabar los codos.",
+      "Mantené el abdomen firme y la cadera alineada con el cuerpo."
+    ],
+    "push-up-weighted": [
+      "Ubicate en flexión con un disco o lastre apoyado en la espalda alta y las manos al ancho de los hombros.",
+      "Mantené el cuerpo recto y el abdomen firme para estabilizar la carga.",
+      "Bajá controlado hasta casi tocar el piso con el pecho, codos a unos 45 grados.",
+      "Empujá para subir hasta extender los brazos sin trabar los codos."
+    ],
+    "ring-dips": [
+      "Agarrá las anillas y sostenete con los brazos extendidos y el cuerpo estable.",
+      "Incliná levemente el torso adelante y bajá controlado flexionando los codos.",
+      "Empujá para subir hasta extender los brazos, controlando la oscilación de las anillas.",
+      "Evitá bajar demasiado para no forzar los hombros."
+    ],
+    "ring-push-up": [
+      "Agarrá las anillas cerca del piso y ubicate en flexión con el cuerpo recto.",
+      "Mantené el abdomen firme y controlá la inestabilidad de las anillas.",
+      "Bajá controlado hasta que las anillas queden a los costados del pecho.",
+      "Empujá para subir hasta extender los brazos sin trabar los codos."
+    ],
+    "seated-chest-flys-cable": [
+      "Sentado entre las poleas con la espalda firme, agarrá una manija en cada mano.",
+      "Con los codos levemente flexionados, juntá los brazos al frente apretando el pecho.",
+      "Volvé abriendo despacio hasta sentir el estiramiento, sin pasarte del rango.",
+      "Mantené el torso erguido y la espalda neutra."
+    ],
+    "single-arm-cable-crossover": [
+      "Parate de costado a la polea con un pie adelante y agarrá la manija con la mano más lejana.",
+      "Con el codo levemente flexionado, cruzá el brazo al frente del pecho de forma controlada.",
+      "Apretá el pecho al final y volvé controlando la tensión hasta el estiramiento.",
+      "Mantené el torso firme y la espalda neutra, sin rotar la cadera."
+    ],
+    "ab-scissors": [
+      "Acostate boca arriba con la zona lumbar pegada al piso y las piernas estiradas y elevadas.",
+      "Cruzá una pierna sobre la otra alternando, como tijeras, sin que los talones toquen el suelo.",
+      "Mantené el abdomen contraído y el cuello relajado durante todo el movimiento."
+    ],
+    "bicycle-crunch-raised-legs": [
+      "Acostate boca arriba con las manos detrás de la nuca y las piernas elevadas con rodillas flexionadas.",
+      "Llevá el codo hacia la rodilla contraria mientras estirás la otra pierna.",
+      "Alterná de forma controlada sin tironear del cuello, manteniendo la lumbar pegada al piso."
+    ],
+    "cable-core-palloff-press": [
+      "Parate de costado a la polea a la altura del pecho, con los pies firmes al ancho de hombros.",
+      "Sujetá el agarre con ambas manos cerca del esternón y la espalda neutra.",
+      "Extendé los brazos al frente resistiendo la rotación del torso, y volvé controlado sin girar la cadera."
+    ],
+    "cable-twist-down-to-up": [
+      "Parate de costado a la polea baja con los pies firmes y rodillas levemente flexionadas.",
+      "Tomá el agarre con ambas manos y llevalo en diagonal de abajo hacia arriba rotando el torso.",
+      "Acompañá el giro desde el core y regresá controlado sin forzar la zona lumbar."
+    ],
+    "cable-twist-up-to-down": [
+      "Parate de costado a la polea alta con los pies firmes y el torso erguido.",
+      "Tomá el agarre con ambas manos y llevalo en diagonal de arriba hacia abajo rotando el torso.",
+      "Controlá el regreso usando el abdomen y mantené la columna sin colapsar."
+    ],
+    "crunch-machine": [
+      "Sentate en la máquina con la espalda apoyada y ajustá el respaldo a tu altura.",
+      "Sujetá los agarres y flexioná el tronco hacia adelante contrayendo el abdomen.",
+      "Volvé lento a la posición inicial sin soltar de golpe la carga."
+    ],
+    "crunch-weighted": [
+      "Acostate boca arriba con las rodillas flexionadas y sostené el disco sobre el pecho.",
+      "Despegá los omóplatos del piso flexionando el tronco mientras exhalás.",
+      "Bajá controlado manteniendo la lumbar pegada al suelo y sin tironear del cuello."
+    ],
+    "decline-crunch-weighted": [
+      "Asegurá los pies en el banco declinado y sostené el disco sobre el pecho.",
+      "Elevá el tronco contrayendo el abdomen sin tomar impulso con la cadera.",
+      "Descendé de forma controlada sin dejar caer la espalda de golpe."
+    ],
+    "dragon-flag": [
+      "Acostate en un banco y agarrá firme un soporte detrás de la cabeza.",
+      "Elevá el cuerpo recto apoyándote en los omóplatos, manteniéndolo rígido como una tabla.",
+      "Bajá muy lento controlando el descenso sin arquear la zona lumbar."
+    ],
+    "dragonfly": [
+      "Acostate en un banco y sujetá firme un soporte detrás de la cabeza.",
+      "Llevá las piernas y la cadera hacia arriba manteniendo el cuerpo recto y tenso.",
+      "Descendé despacio resistiendo con el core, sin que la lumbar se despegue ni se arquee."
+    ],
+    "elbow-to-knee": [
+      "Acostate boca arriba con las manos detrás de la nuca y las rodillas flexionadas.",
+      "Llevá un codo hacia la rodilla contraria rotando levemente el torso.",
+      "Volvé controlado y alterná lado a lado sin tironear del cuello."
+    ],
+    "flutter-kicks": [
+      "Acostate boca arriba con la lumbar pegada al piso y las piernas estiradas y elevadas.",
+      "Subí y bajá las piernas alternadamente en un rango corto y controlado.",
+      "Mantené el abdomen activo y evitá que la zona baja de la espalda se arquee."
+    ],
+    "heel-taps": [
+      "Acostate boca arriba con las rodillas flexionadas y los pies apoyados al ancho de cadera.",
+      "Despegá levemente los hombros y tocá con la mano el talón del mismo lado.",
+      "Alterná lado a lado de forma controlada manteniendo el abdomen contraído."
+    ],
+    "hollow-rock": [
+      "Acostate boca arriba, presioná la lumbar contra el piso y elevá piernas y hombros formando un hueco.",
+      "Estirá los brazos por detrás de la cabeza manteniendo el cuerpo tenso y curvado.",
+      "Balanceate adelante y atrás sin perder la forma ni despegar la lumbar del centro."
+    ],
+    "jack-knife-suspension": [
+      "Colocá los pies en las cintas del TRX y posicionate en plancha con las manos bajo los hombros.",
+      "Llevá las rodillas hacia el pecho rodando las cintas, manteniendo la cadera estable.",
+      "Extendé las piernas controlado de vuelta a la plancha sin dejar caer la cadera."
+    ],
+    "jackknife-sit-up": [
+      "Acostate boca arriba con brazos y piernas estirados en línea.",
+      "Subí simultáneamente tronco y piernas buscando tocar los pies con las manos.",
+      "Descendé controlado sin dejar caer la espalda ni las piernas de golpe."
+    ],
+    "knee-raise-parallel-bars": [
+      "Apoyate en las paralelas con los brazos firmes y el cuerpo colgando estable.",
+      "Elevá las rodillas hacia el pecho contrayendo el abdomen, sin balancearte.",
+      "Bajá las piernas lento y controlado manteniendo los hombros bajos y la espalda neutra."
+    ],
+    "l-sit-hold": [
+      "Apoyate sobre las manos en paralelas o en el piso con los brazos extendidos.",
+      "Elevá las piernas estiradas al frente formando una L con el cuerpo.",
+      "Mantené la posición con el abdomen contraído y los hombros deprimidos, respirando parejo."
+    ],
+    "landmine-180": [
+      "Parate firme tomando el extremo de la barra landmine con ambas manos frente al pecho.",
+      "Llevá la barra de un lado al otro en arco rotando el torso y la cadera de forma controlada.",
+      "Acompañá el giro desde el core sin bloquear los codos y mantené la espalda neutra."
+    ],
+    "leg-raise-parallel-bars": [
+      "Apoyate en las paralelas con los brazos firmes y el cuerpo colgando estable.",
+      "Elevá las piernas estiradas hasta la horizontal contrayendo el abdomen, sin impulso.",
+      "Descendé lento y controlado evitando arquear o balancear la zona lumbar."
+    ],
+    "lying-knee-raise": [
+      "Acostate boca arriba con la lumbar pegada al piso y las manos a los costados.",
+      "Llevá las rodillas hacia el pecho contrayendo el abdomen.",
+      "Estirá las piernas controlado sin dejar que la espalda baja se arquee."
+    ],
+    "oblique-crunch": [
+      "Acostate de costado con las piernas flexionadas y la mano de arriba en la nuca.",
+      "Elevá el tronco lateralmente acercando las costillas hacia la cadera.",
+      "Bajá controlado al piso sin tironear del cuello y repetí del otro lado."
+    ],
+    "reverse-plank": [
+      "Sentate con las piernas estiradas y las manos apoyadas atrás bajo los hombros, dedos al frente.",
+      "Elevá la cadera hasta formar una línea recta de hombros a talones.",
+      "Mantené glúteos y abdomen contraídos sin dejar caer la cadera ni hiperextender el cuello."
+    ],
+    "russian-twist-weighted": [
+      "Sentate con el torso inclinado atrás, las rodillas flexionadas y el peso entre las manos.",
+      "Rotá el torso de un lado al otro llevando el peso cerca de la cadera.",
+      "Controlá el giro desde el abdomen y mantené la espalda recta, sin encorvarte."
+    ],
+    "side-bend-dumbbell": [
+      "Parate erguido con una mancuerna en una mano y los pies al ancho de hombros.",
+      "Inclinate lateralmente hacia el lado de la mancuerna sin rotar ni inclinarte adelante.",
+      "Volvé a la vertical contrayendo el oblicuo del lado contrario y repetí del otro lado."
+    ],
+    "sit-up-weighted": [
+      "Acostate boca arriba con las rodillas flexionadas y sostené el disco sobre el pecho.",
+      "Elevá el tronco completo hasta sentarte contrayendo el abdomen.",
+      "Descendé controlado vértebra por vértebra sin dejar caer la espalda de golpe."
+    ],
+    "spiderman": [
+      "Posicionate en plancha alta con las manos bajo los hombros y el cuerpo recto.",
+      "Llevá una rodilla hacia el codo del mismo lado manteniendo la cadera baja y estable.",
+      "Volvé controlado a la plancha y alterná las piernas sin que la cadera se hunda."
+    ],
+    "stretching": [
+      "Elegí el músculo a estirar y llevalo lento hasta sentir tensión leve, sin dolor.",
+      "Mantené la posición respirando parejo sin rebotes ni movimientos bruscos.",
+      "Soltá de forma gradual y repetí del otro lado cuidando una postura neutra."
+    ],
+    "toe-touch": [
+      "Acostate boca arriba con las piernas estiradas y elevadas en vertical.",
+      "Despegá los hombros del piso estirando las manos hacia las puntas de los pies.",
+      "Bajá controlado manteniendo la lumbar pegada al suelo y el cuello relajado."
+    ],
+    "toes-to-bar": [
+      "Colgate de la barra con agarre firme al ancho de hombros y el cuerpo estable.",
+      "Elevá las piernas estiradas llevando las puntas de los pies hacia la barra desde el abdomen.",
+      "Descendé controlado sin balancearte y mantené los hombros activos."
+    ],
+    "torso-rotation": [
+      "Parate erguido con los pies al ancho de hombros y el core activo.",
+      "Rotá el torso de un lado al otro de forma controlada manteniendo la cadera estable.",
+      "Acompañá el movimiento desde el abdomen sin forzar la zona lumbar."
+    ],
+    "v-up": [
+      "Acostate boca arriba con brazos y piernas estirados en línea.",
+      "Subí simultáneamente tronco y piernas formando una V, buscando tocar los pies.",
+      "Descendé controlado sin dejar caer la espalda ni la lumbar de golpe."
+    ],
+    "bird-dog": [
+      "Ponete en cuatro apoyos, con las manos bajo los hombros y las rodillas bajo la cadera.",
+      "Extendé un brazo al frente y la pierna opuesta atrás hasta alinearlos con el torso.",
+      "Mantené la espalda neutra y la cadera estable, sin rotar ni arquear la zona lumbar.",
+      "Volvé al centro de forma controlada y alterná el lado."
+    ],
+    "clamshell": [
+      "Acostate de costado con las rodillas flexionadas a 90 grados y los talones juntos.",
+      "Mantené los pies en contacto y abrí la rodilla de arriba separando las piernas.",
+      "Apretá el glúteo arriba sin dejar que la cadera ruede hacia atrás.",
+      "Bajá la rodilla controlando el movimiento."
+    ],
+    "deadlift-band": [
+      "Pisá el centro de la banda con los pies al ancho de cadera y agarrá los extremos.",
+      "Con la espalda neutra y el pecho alto, llevá la cadera atrás bajando el torso.",
+      "Extendé la cadera empujando con los talones hasta quedar erguido, apretando glúteos arriba.",
+      "Bajá controlando la tensión de la banda sin redondear la espalda."
+    ],
+    "deadlift-dumbbell": [
+      "Parate con los pies al ancho de cadera y una mancuerna en cada mano frente a los muslos.",
+      "Llevá la cadera atrás bajando las mancuernas pegadas a las piernas, con la espalda neutra.",
+      "Empujá con los talones extendiendo la cadera hasta quedar erguido, sin tironear con la lumbar.",
+      "Bajá de forma controlada manteniendo el pecho alto."
+    ],
+    "deadlift-smith-machine": [
+      "Posicioná la barra del multipower a la altura media de la espinilla y agarrá al ancho de hombros.",
+      "Con la espalda neutra y el pecho alto, llevá la cadera atrás y flexioná las rodillas.",
+      "Empujá con los talones siguiendo la guía vertical de la barra hasta extender la cadera.",
+      "Bajá controlado por el riel sin redondear la zona lumbar."
+    ],
+    "deadlift-trap-bar": [
+      "Parate dentro de la barra hexagonal y agarrá los mangos laterales con la espalda neutra.",
+      "Con el pecho alto y la cadera atrás, tomá tensión antes de despegar la barra del piso.",
+      "Empujá con los talones extendiendo caderas y rodillas a la vez hasta quedar erguido.",
+      "Bajá controlando, llevando la cadera atrás y manteniendo la espalda neutra."
+    ],
+    "fire-hydrants": [
+      "Ponete en cuatro apoyos, con las manos bajo los hombros y las rodillas bajo la cadera.",
+      "Manteniendo la rodilla flexionada, abrí la pierna hacia el costado a la altura de la cadera.",
+      "Apretá el glúteo arriba sin rotar el torso ni arquear la lumbar.",
+      "Bajá la pierna de forma controlada y repetí."
+    ],
+    "frog-pumps-dumbbell": [
+      "Acostado boca arriba, juntá las plantas de los pies y abrí las rodillas hacia afuera.",
+      "Apoyá una mancuerna sobre la cadera sosteniéndola con las manos.",
+      "Empujá la cadera hacia arriba apretando los glúteos, sin arquear la lumbar.",
+      "Bajá la cadera de forma controlada manteniendo los pies juntos."
+    ],
+    "glute-kickback-on-floor": [
+      "Ponete en cuatro apoyos, con las manos bajo los hombros y las rodillas bajo la cadera.",
+      "Llevá un talón hacia el techo extendiendo la cadera, manteniendo la rodilla flexionada.",
+      "Apretá el glúteo arriba sin arquear la espalda baja ni rotar la pelvis.",
+      "Bajá la pierna de forma controlada y repetí."
+    ],
+    "hip-thrust-smith-machine": [
+      "Apoyá la parte alta de la espalda en un banco y posicioná la barra del multipower sobre la cadera.",
+      "Plantá los pies firmes al ancho de cadera, con las rodillas alineadas a las puntas.",
+      "Empujá con los talones extendiendo la cadera hasta alinear torso y muslos, apretando glúteos.",
+      "Bajá controlando por la guía sin arquear la zona lumbar."
+    ],
+    "lateral-band-walks": [
+      "Colocá una banda alrededor de las piernas, por encima de las rodillas o en los tobillos.",
+      "Adoptá una semisentadilla con los pies al ancho de cadera y tensión en la banda.",
+      "Da pasos laterales manteniendo la tensión, sin juntar del todo los pies.",
+      "Conservá el torso erguido y las rodillas alineadas durante todo el recorrido."
+    ],
+    "lateral-leg-raises": [
+      "Acostate de costado con el cuerpo alineado y la pierna de abajo levemente flexionada.",
+      "Elevá la pierna de arriba lateralmente de forma controlada, sin rotar la cadera.",
+      "Subí hasta un rango cómodo apretando el glúteo, sin inclinar el torso atrás.",
+      "Bajá la pierna lento sin dejarla caer."
+    ],
+    "partial-glute-bridge-barbell": [
+      "Acostado boca arriba, apoyá la barra sobre la cadera y plantá los pies cerca de los glúteos.",
+      "Empujá con los talones elevando la cadera en un rango parcial, sin llegar a la extensión total.",
+      "Apretá los glúteos arriba manteniendo la lumbar neutra, sin arquearla.",
+      "Bajá la cadera de forma controlada manteniendo la tensión."
+    ],
+    "rear-kick-machine": [
+      "Ajustá la máquina y apoyá el pie sobre la plataforma, sujetándote firme del soporte.",
+      "Con la espalda neutra y el torso estable, empujá la pierna hacia atrás extendiendo la cadera.",
+      "Apretá el glúteo en el final del recorrido sin arquear la lumbar.",
+      "Volvé controlando el peso sin dejar que la máquina te tire."
+    ],
+    "reverse-hyperextension": [
+      "Apoyá el torso sobre el banco con la cadera al borde y las piernas colgando.",
+      "Sujetate firme y elevá las piernas extendiendo la cadera hasta alinearlas con el torso.",
+      "Apretá los glúteos arriba sin hiperextender la zona lumbar.",
+      "Bajá las piernas de forma controlada sin balanceo."
+    ],
+    "single-leg-glute-bridge": [
+      "Acostate boca arriba con una rodilla flexionada y el pie plantado; extendé la otra pierna.",
+      "Empujá con el talón apoyado elevando la cadera, manteniéndola pareja sin que caiga de un lado.",
+      "Apretá el glúteo arriba con la lumbar neutra, sin arquearla.",
+      "Bajá la cadera de forma controlada y completá las repes antes de cambiar de pierna."
+    ],
+    "single-leg-hip-thrust-dumbbell": [
+      "Apoyá la parte alta de la espalda en un banco y sostené una mancuerna sobre la cadera.",
+      "Plantá un pie firme y extendé la otra pierna al frente.",
+      "Empujá con el talón apoyado elevando la cadera, manteniéndola nivelada sin rotar la pelvis.",
+      "Bajá controlando y completá las repes antes de cambiar de lado."
+    ],
+    "standing-cable-glute-kickbacks": [
+      "Colocate el tobillo en la correa de la polea baja y mirá hacia la máquina, sujetándote firme.",
+      "Con el torso levemente inclinado y la espalda neutra, llevá la pierna atrás extendiendo la cadera.",
+      "Apretá el glúteo en el final del recorrido sin arquear la lumbar.",
+      "Volvé controlando la tensión de la polea sin balancear el cuerpo."
+    ],
+    "glute-ham-raise": [
+      "Fijá los tobillos en el apoyo y arrodillate con el cuerpo alineado, cadera neutra.",
+      "Bajá el torso de forma controlada estirando las rodillas, manteniendo la espalda recta.",
+      "Frená antes de quedar horizontal y contraé los isquiotibiales para volver a subir.",
+      "Subí sin arquear la zona lumbar, llevando la cadera a extensión completa."
+    ],
+    "nordic-hamstrings-curls": [
+      "Arrodillate con los tobillos sujetos firmes y el torso erguido, glúteos activos.",
+      "Bajá el cuerpo hacia adelante lo más lento posible resistiendo con los isquiotibiales.",
+      "Mantené la cadera extendida y la espalda neutra durante todo el descenso.",
+      "Apoyá las manos al perder el control y empujá suave para volver al inicio."
+    ],
+    "single-leg-romanian-deadlift-barbell": [
+      "Parate sobre una pierna sosteniendo la barra con agarre firme frente a los muslos.",
+      "Inclinate desde la cadera bajando la barra mientras la pierna libre se extiende atrás.",
+      "Mantené la espalda neutra y la barra pegada al cuerpo hasta sentir el estiramiento.",
+      "Volvé empujando la cadera hacia adelante y contrayendo el glúteo al final."
+    ],
+    "single-leg-romanian-deadlift-dumbbell": [
+      "Parate sobre una pierna con una mancuerna sostenida al frente, leve flexión de rodilla.",
+      "Inclinate desde la cadera bajando la mancuerna mientras la pierna libre se eleva atrás.",
+      "Mantené la espalda neutra y el movimiento controlado hasta el estiramiento del isquio.",
+      "Subí empujando la cadera adelante y apretando el glúteo sin arquear la lumbar."
+    ],
+    "standing-leg-curls": [
+      "Parate firme tomándote de un apoyo, con el almohadillado por detrás del tobillo.",
+      "Flexioná la rodilla llevando el talón hacia el glúteo, sin mover el muslo.",
+      "Contraé el isquiotibial arriba y bajá de forma controlada al rango completo.",
+      "Mantené la cadera estable y la espalda neutra durante toda la repetición."
+    ],
+    "assisted-pistol-squats": [
+      "Sujetá una banda, TRX o el marco de una puerta para asistirte y parate sobre una pierna.",
+      "Bajá flexionando la rodilla de apoyo mientras extendés la otra pierna al frente, usando los brazos para controlar el descenso.",
+      "Mantené el talón firme y la espalda neutra, y empujá para subir sin perder el equilibrio."
+    ],
+    "belt-squat-machine": [
+      "Colocate el cinturón en la cadera y parate sobre la plataforma con los pies al ancho de hombros.",
+      "Bajá flexionando rodillas y cadera hasta que los muslos queden paralelos al piso, con el torso erguido.",
+      "Empujá con los talones para subir manteniendo la espalda neutra y el peso colgando libre."
+    ],
+    "box-squat-barbell": [
+      "Ubicá la barra sobre los trapecios y posicionate frente a un cajón a la altura adecuada.",
+      "Bajá controlando la cadera hacia atrás hasta apoyar suavemente en el cajón, sin dejarte caer.",
+      "Empujá con los talones para subir, manteniendo el pecho alto y la espalda neutra."
+    ],
+    "curtsy-lunge-dumbbell": [
+      "Parate con una mancuerna en cada mano y los pies al ancho de cadera.",
+      "Llevá una pierna cruzada por detrás en diagonal y bajá flexionando ambas rodillas.",
+      "Empujá con el talón delantero para volver al centro, manteniendo el torso erguido y estable."
+    ],
+    "frog-jumps": [
+      "Parate con los pies algo más anchos que los hombros y las puntas levemente abiertas.",
+      "Bajá a una sentadilla profunda llevando la cadera atrás y las manos hacia el piso.",
+      "Saltá hacia arriba con potencia y amortiguá la caída flexionando las rodillas con control."
+    ],
+    "jump-squat": [
+      "Parate con los pies al ancho de hombros y la espalda neutra.",
+      "Bajá a una media sentadilla llevando la cadera hacia atrás.",
+      "Explotá hacia arriba con un salto y aterrizá suave flexionando las rodillas para absorber el impacto."
+    ],
+    "jumping-lunge": [
+      "Adoptá la posición de estocada con una pierna adelante y el torso erguido.",
+      "Saltá con potencia e intercambiá las piernas en el aire para invertir la posición.",
+      "Aterrizá suave flexionando ambas rodillas, manteniendo la rodilla delantera alineada con el pie."
+    ],
+    "lateral-box-jump": [
+      "Parate de costado a un cajón estable, con los pies al ancho de cadera.",
+      "Flexioná rodillas y cadera para cargar el salto, manteniendo la espalda neutra.",
+      "Saltá lateralmente sobre el cajón y aterrizá suave con ambos pies y las rodillas flexionadas."
+    ],
+    "lateral-lunge": [
+      "Parate con los pies juntos y el torso erguido.",
+      "Da un paso amplio hacia el costado y bajá flexionando esa rodilla mientras la otra pierna queda extendida.",
+      "Empujá con el talón de la pierna flexionada para volver al centro, manteniendo la espalda neutra."
+    ],
+    "lateral-squat": [
+      "Parate con los pies bien anchos, más que los hombros, y las puntas al frente.",
+      "Desplazá el peso hacia un lado flexionando esa rodilla mientras mantenés la otra pierna estirada.",
+      "Empujá con el talón para volver al centro y repetí hacia el otro lado, con el torso erguido."
+    ],
+    "lunge-barbell": [
+      "Ubicá la barra sobre los trapecios y parate con los pies al ancho de cadera.",
+      "Da un paso al frente y bajá flexionando ambas rodillas hasta que la trasera casi toque el piso.",
+      "Empujá con el talón delantero para volver, manteniendo el torso erguido y la espalda neutra."
+    ],
+    "overhead-dumbbell-lunge": [
+      "Sostené una mancuerna extendida por encima de la cabeza con el brazo firme y el core activo.",
+      "Da un paso al frente y bajá flexionando ambas rodillas, manteniendo el brazo estable y vertical.",
+      "Empujá con el talón delantero para subir, cuidando la espalda neutra y el equilibrio."
+    ],
+    "pause-squat-barbell": [
+      "Colocá la barra sobre los trapecios y parate con los pies al ancho de hombros.",
+      "Bajá controlado hasta que los muslos queden paralelos al piso y mantené la pausa abajo sin perder tensión.",
+      "Empujá con los talones para subir, manteniendo el pecho alto y la espalda neutra."
+    ],
+    "pendulum-squat-machine": [
+      "Acomodate en la máquina con la espalda apoyada y los pies sobre la plataforma al ancho de hombros.",
+      "Bajá controlando el descenso por la trayectoria de la máquina hasta que los muslos queden paralelos.",
+      "Empujá con los talones para subir, manteniendo la espalda apoyada y el core activo."
+    ],
+    "pistol-squat": [
+      "Parate sobre una pierna con la otra extendida al frente y los brazos adelante para equilibrar.",
+      "Bajá flexionando la rodilla de apoyo de forma controlada, manteniendo el talón firme en el piso.",
+      "Empujá para subir sin perder el equilibrio, cuidando la espalda neutra y la rodilla alineada."
+    ],
+    "reverse-lunge-barbell": [
+      "Ubicá la barra sobre los trapecios y parate con los pies al ancho de cadera.",
+      "Da un paso hacia atrás y bajá flexionando ambas rodillas con control.",
+      "Empujá con el talón de la pierna delantera para volver al centro, con el torso erguido."
+    ],
+    "single-leg-extensions": [
+      "Sentate en la máquina con la espalda apoyada y el rodillo sobre el empeine de una pierna.",
+      "Extendé la rodilla de esa pierna hasta casi estirarla por completo, sin bloquear bruscamente.",
+      "Bajá controlando el peso hasta la posición inicial, manteniendo el muslo y la cadera quietos."
+    ],
+    "single-leg-press-machine": [
+      "Sentate en la prensa y apoyá un solo pie en el centro de la plataforma.",
+      "Bajá flexionando la rodilla de forma controlada hasta un rango cómodo, sin despegar la cadera del asiento.",
+      "Empujá con el talón para extender sin bloquear la rodilla, manteniendo la espalda apoyada."
+    ],
+    "sissy-squat-weighted": [
+      "Sujetá un disco contra el pecho y parate con los talones algo elevados, agarrándote de un soporte si hace falta.",
+      "Inclinate hacia atrás flexionando las rodillas mientras llevás el torso y las caderas en línea hacia abajo.",
+      "Subí de forma controlada contrayendo los cuádriceps, sin forzar las rodillas más allá de un rango cómodo."
+    ],
+    "split-squat-dumbbell": [
+      "Tomá una mancuerna en cada mano y adoptá una posición dividida con una pierna adelante y otra atrás.",
+      "Bajá flexionando ambas rodillas hasta que el muslo delantero quede paralelo al piso.",
+      "Empujá con el talón delantero para subir, manteniendo el torso erguido y la espalda neutra."
+    ],
+    "squat-band": [
+      "Pisá la banda con los pies al ancho de hombros y pasala sobre los hombros sujetándola firme.",
+      "Bajá flexionando rodillas y cadera hasta que los muslos queden paralelos al piso, con el torso erguido.",
+      "Empujá con los talones para subir contra la resistencia de la banda, manteniendo la espalda neutra."
+    ],
+    "squat-bodyweight": [
+      "Parate con los pies al ancho de hombros y las puntas levemente abiertas.",
+      "Bajá llevando la cadera hacia atrás y abajo hasta que los muslos queden paralelos al piso.",
+      "Empujá con los talones para subir, manteniendo el pecho alto y la espalda neutra."
+    ],
+    "squat-smith-machine": [
+      "Posicionate bajo la barra del multipower apoyada en los trapecios, con los pies levemente adelantados.",
+      "Desbloqueá la barra y bajá flexionando rodillas y cadera hasta que los muslos queden paralelos.",
+      "Empujá con los talones para subir por la guía, manteniendo la espalda neutra y el core activo."
+    ],
+    "squat-suspension": [
+      "Tomá las manijas del TRX con los brazos extendidos y los pies al ancho de hombros.",
+      "Bajá llevando la cadera hacia atrás y abajo, usando el TRX para mantener el equilibrio y la postura.",
+      "Empujá con los talones para subir, manteniendo el torso erguido y la espalda neutra."
+    ],
+    "sumo-squat-barbell": [
+      "Colocá la barra sobre los trapecios y parate con los pies bien anchos y las puntas abiertas.",
+      "Bajá flexionando rodillas y cadera, manteniendo las rodillas alineadas con las puntas de los pies.",
+      "Empujá con los talones para subir, con el pecho alto y la espalda neutra."
+    ],
+    "sumo-squat-dumbbell": [
+      "Sostené una mancuerna con ambas manos colgando entre las piernas y parate con los pies bien anchos.",
+      "Bajá flexionando rodillas y cadera, manteniendo las rodillas alineadas con las puntas de los pies.",
+      "Empujá con los talones para subir, manteniendo el torso erguido y la espalda neutra."
+    ],
+    "sumo-squat-kettlebell": [
+      "Sostené una pesa rusa con ambas manos colgando entre las piernas y los pies bien anchos.",
+      "Bajá flexionando rodillas y cadera, manteniendo las rodillas alineadas con las puntas de los pies.",
+      "Empujá con los talones para subir, con el pecho alto y la espalda neutra."
+    ],
+    "zercher-squat": [
+      "Sostené la barra apoyada en el pliegue de los codos, con los brazos cruzados y el core firme.",
+      "Bajá flexionando rodillas y cadera hasta que los muslos queden paralelos, manteniendo el torso erguido.",
+      "Empujá con los talones para subir, cuidando la espalda neutra y los codos altos."
+    ],
+    "band-pullaparts": [
+      "Parado, agarrá la banda con ambas manos al frente, brazos extendidos a la altura del pecho.",
+      "Abrí los brazos hacia los costados estirando la banda, juntando las escápulas.",
+      "Volvé al centro de forma controlada sin perder la tensión, con la espalda neutra."
+    ],
+    "chest-supported-reverse-fly-dumbbell": [
+      "Recostate boca abajo sobre un banco inclinado con el pecho apoyado y una mancuerna en cada mano.",
+      "Abrí los brazos hacia los costados con un leve codo flexionado, juntando los omóplatos.",
+      "Bajá las mancuernas de forma controlada hasta abajo, sin despegar el pecho del banco."
+    ],
+    "chest-supported-y-raise-dumbbell": [
+      "Recostate boca abajo sobre un banco inclinado con el pecho apoyado y una mancuerna en cada mano.",
+      "Subí los brazos formando una Y por encima de la cabeza, con los pulgares apuntando hacia arriba.",
+      "Bajá de forma controlada manteniendo los omóplatos activos y el pecho apoyado."
+    ],
+    "front-raise-band": [
+      "Parado, pisá la banda con los pies y agarrá los extremos con los brazos a los costados.",
+      "Elevá los brazos al frente hasta la altura de los hombros, codos casi extendidos.",
+      "Bajá de forma controlada manteniendo el torso firme y la espalda neutra."
+    ],
+    "front-raise-barbell": [
+      "Parado, agarrá la barra con las palmas hacia abajo y los brazos extendidos al frente.",
+      "Elevá la barra al frente hasta la altura de los hombros sin balancear el cuerpo.",
+      "Bajá de forma controlada manteniendo el core firme y la espalda neutra."
+    ],
+    "front-raise-cable": [
+      "Parado de espaldas o de frente a la polea baja, agarrá el maneral con el brazo extendido.",
+      "Elevá al frente hasta la altura del hombro manteniendo el codo casi recto.",
+      "Bajá de forma controlada acompañando la tensión del cable, sin impulso del torso."
+    ],
+    "front-raise-suspension": [
+      "Parado frente al TRX, agarrá los maneras e inclinate hacia atrás con el cuerpo recto.",
+      "Elevá los brazos al frente extendiendo los codos para llevar el cuerpo hacia arriba.",
+      "Bajá de forma controlada manteniendo el core firme y la espalda neutra."
+    ],
+    "handstand-push-up": [
+      "Colocate en parada de manos contra la pared, con las manos firmes y el cuerpo alineado.",
+      "Bajá flexionando los codos de forma controlada hasta acercar la cabeza al piso.",
+      "Empujá con fuerza para volver a extender los brazos, manteniendo el core activo."
+    ],
+    "kettlebell-around-the-world": [
+      "Parado, sostené la pesa rusa al frente con ambas manos y el torso firme.",
+      "Llevá la pesa alrededor de la cabeza pasándola de mano en mano por detrás.",
+      "Mantené el círculo controlado y el core activo, sin arquear la zona lumbar."
+    ],
+    "kettlebell-halo": [
+      "Parado, sostené la pesa rusa por las astas a la altura del pecho.",
+      "Girá la pesa alrededor de la cabeza en círculo, manteniéndola cerca del cráneo.",
+      "Controlá el movimiento en ambos sentidos sin mover el torso ni arquear la lumbar."
+    ],
+    "kettlebell-shoulder-press": [
+      "Parado, llevá la pesa rusa al hombro con la muñeca firme y el codo abajo.",
+      "Empujá la pesa hacia arriba hasta extender el brazo, sin arquear la espalda.",
+      "Bajá de forma controlada al hombro manteniendo el core firme."
+    ],
+    "lateral-raise-band": [
+      "Parado, pisá la banda y agarrá los extremos con los brazos a los costados.",
+      "Elevá los brazos hacia los costados hasta la altura de los hombros, codos apenas flexionados.",
+      "Bajá de forma controlada manteniendo el torso firme y los hombros bajos."
+    ],
+    "lateral-raise-machine": [
+      "Sentate en la máquina con la espalda apoyada y los antebrazos contra las almohadillas.",
+      "Elevá los brazos hacia los costados hasta la altura de los hombros empujando con los codos.",
+      "Bajá de forma controlada acompañando la resistencia, sin soltar de golpe."
+    ],
+    "lying-neck-curls-weighted": [
+      "Recostate boca arriba en un banco con la cabeza por fuera del borde y un disco liviano sobre la frente.",
+      "Flexioná el cuello llevando el mentón hacia el pecho en un rango corto y controlado.",
+      "Volvé a la posición inicial despacio, sin movimientos bruscos."
+    ],
+    "lying-neck-extension-weighted": [
+      "Recostate boca abajo en un banco con la cabeza por fuera del borde y un disco liviano sobre la nuca.",
+      "Extendé el cuello llevando la cabeza hacia arriba en un rango corto y controlado.",
+      "Bajá despacio a la posición inicial, sin forzar ni rebotar."
+    ],
+    "overhead-plate-raise": [
+      "Parado, sostené el disco con ambas manos a la altura del pecho y el torso firme.",
+      "Elevá el disco al frente y por encima de la cabeza extendiendo los brazos.",
+      "Bajá de forma controlada manteniendo el core activo y la espalda neutra."
+    ],
+    "overhead-press-smith-machine": [
+      "Sentado o parado bajo la barra del multipower, agarrá a la altura de los hombros.",
+      "Empujá la barra guiada hacia arriba hasta extender los brazos, sin arquear la lumbar.",
+      "Bajá de forma controlada hasta la altura de los hombros siguiendo el riel."
+    ],
+    "pike-pushup": [
+      "Colocate en posición de V invertida con las caderas altas y las manos firmes en el piso.",
+      "Bajá flexionando los codos llevando la cabeza hacia el piso de forma controlada.",
+      "Empujá para volver a extender los brazos manteniendo las caderas elevadas y el core activo."
+    ],
+    "plate-front-raise": [
+      "Parado, sostené el disco con ambas manos y los brazos extendidos al frente.",
+      "Elevá el disco al frente hasta la altura de los hombros sin balancear el cuerpo.",
+      "Bajá de forma controlada manteniendo el torso firme y la espalda neutra."
+    ],
+    "rear-delt-reverse-fly-cable": [
+      "Parado entre dos poleas, cruzá los cables y agarrá cada maneral con la mano opuesta.",
+      "Abrí los brazos hacia los costados juntando las escápulas, con los codos apenas flexionados.",
+      "Volvé al centro de forma controlada manteniendo el torso firme y la espalda neutra."
+    ],
+    "rear-delt-reverse-fly-machine": [
+      "Sentate en la máquina de frente al respaldo con el pecho apoyado y agarrá los maneras al frente.",
+      "Abrí los brazos hacia atrás juntando los omóplatos, manteniendo los codos casi extendidos.",
+      "Volvé al frente de forma controlada sin soltar la resistencia de golpe."
+    ],
+    "reverse-fly-single-arm-cable": [
+      "Parado de costado a la polea, agarrá el maneral con la mano más lejana cruzando el cuerpo.",
+      "Abrí el brazo hacia el costado y atrás juntando la escápula, con el codo apenas flexionado.",
+      "Volvé al centro de forma controlada manteniendo el torso firme y la espalda neutra."
+    ],
+    "seated-lateral-raise-dumbbell": [
+      "Sentate en un banco con la espalda erguida y una mancuerna en cada mano a los costados.",
+      "Elevá los brazos hacia los costados hasta la altura de los hombros, codos apenas flexionados.",
+      "Bajá de forma controlada manteniendo los hombros bajos y el torso firme."
+    ],
+    "seated-overhead-press-barbell": [
+      "Sentado con la espalda apoyada, agarrá la barra a la altura de los hombros, palmas al frente.",
+      "Empujá la barra hacia arriba hasta extender los brazos, sin arquear la lumbar.",
+      "Bajá de forma controlada hasta la altura de los hombros, sin trabar los codos de golpe."
+    ],
+    "seated-overhead-press-dumbbell": [
+      "Sentado con la espalda apoyada, sostené una mancuerna en cada mano a la altura de los hombros.",
+      "Empujá las mancuernas hacia arriba hasta extender los brazos, sin arquear la lumbar.",
+      "Bajá de forma controlada hasta la altura de los hombros manteniendo el core firme."
+    ],
+    "seated-shoulder-press-machine": [
+      "Sentate en la máquina con la espalda apoyada y los maneras a la altura de los hombros.",
+      "Empujá hacia arriba hasta extender los brazos siguiendo la trayectoria de la máquina.",
+      "Bajá de forma controlada hasta la altura de los hombros, sin soltar la resistencia."
+    ],
+    "shoulder-press-machine-plates": [
+      "Sentate en la máquina con la espalda apoyada y agarrá los maneras a la altura de los hombros.",
+      "Empujá hacia arriba hasta extender los brazos, manteniendo el core firme.",
+      "Bajá de forma controlada hasta la altura de los hombros, acompañando los discos."
+    ],
+    "shoulder-taps": [
+      "Colocate en plancha con las manos bajo los hombros y el cuerpo recto.",
+      "Tocá un hombro con la mano opuesta sin balancear las caderas, manteniendo el core firme.",
+      "Volvé la mano al piso y alterná, manteniendo la espalda neutra y la cadera estable."
+    ],
+    "single-arm-landmine-press-barbell": [
+      "Parado, sostené la punta de la barra landmine a la altura del hombro con una mano.",
+      "Empujá la barra hacia arriba y adelante extendiendo el brazo, sin arquear la lumbar.",
+      "Bajá de forma controlada hasta el hombro manteniendo el core firme."
+    ],
+    "single-arm-lateral-raise-cable": [
+      "Parado de costado a la polea baja, agarrá el maneral con la mano más lejana.",
+      "Elevá el brazo hacia el costado hasta la altura del hombro, codo apenas flexionado.",
+      "Bajá de forma controlada acompañando el cable, sin impulso del torso."
+    ],
+    "standing-military-press-barbell": [
+      "Parado, agarrá la barra a la altura de los hombros con las palmas al frente y los pies firmes.",
+      "Empujá la barra hacia arriba hasta extender los brazos, apretando los glúteos y el core.",
+      "Bajá de forma controlada hasta la altura de los hombros sin arquear la espalda."
+    ],
+    "upright-row-cable": [
+      "Parado frente a la polea baja, agarrá la barra con las manos al ancho de los hombros.",
+      "Tirá los codos hacia arriba llevando la barra hasta la altura del pecho, codos por encima de las muñecas.",
+      "Bajá de forma controlada sin pasar de la altura de los hombros para cuidar la articulación."
+    ],
+    "upright-row-dumbbell": [
+      "Parado, sostené una mancuerna en cada mano al frente de los muslos, palmas hacia el cuerpo.",
+      "Tirá los codos hacia arriba llevando las mancuernas hasta la altura del pecho.",
+      "Bajá de forma controlada sin superar la altura de los hombros, manteniendo el torso firme."
+    ],
+    "bench-press-close-grip-barbell": [
+      "Acostate en el banco y agarrá la barra con las manos a la anchura de los hombros.",
+      "Bajá la barra hacia el pecho bajo manteniendo los codos cerca del torso.",
+      "Empujá hacia arriba extendiendo los codos sin despegar la espalda del banco."
+    ],
+    "floor-triceps-dip": [
+      "Sentate en el piso con las manos apoyadas atrás, dedos hacia los pies, y las rodillas flexionadas.",
+      "Elevá la cadera y bajá flexionando los codos hacia atrás de forma controlada.",
+      "Empujá con las palmas para extender los codos, manteniendo el torso firme y la espalda neutra."
+    ],
+    "jm-press-barbell": [
+      "Acostado en el banco, sostené la barra sobre el pecho con agarre cerrado.",
+      "Bajá la barra hacia la parte alta del pecho dejando que los codos viajen hacia adelante.",
+      "Empujá extendiendo los codos hasta volver al inicio con control."
+    ],
+    "seated-dip-machine": [
+      "Sentate erguido con la espalda apoyada y agarrá las palancas a la altura del pecho.",
+      "Empujá hacia abajo extendiendo los codos hasta casi bloquearlos.",
+      "Volvé arriba frenando el recorrido, sin dejar que el peso tire de los hombros."
+    ],
+    "seated-triceps-press": [
+      "Sentate erguido y llevá el peso por encima de la cabeza con los codos apuntando al frente.",
+      "Bajá el peso por detrás de la nuca flexionando solo los codos.",
+      "Extendé los codos para subir, manteniendo el torso firme y la espalda neutra."
+    ],
+    "single-arm-tricep-extension-dumbbell": [
+      "Llevá la mancuerna por encima de la cabeza con un brazo, codo apuntando arriba.",
+      "Bajá la mancuerna por detrás de la nuca flexionando solo el codo.",
+      "Extendé el codo para subir de forma controlada, sin mover el resto del brazo."
+    ],
+    "single-arm-triceps-pushdown-cable": [
+      "Parate frente a la polea alta y agarrá el maneral con una mano, codo pegado al costado.",
+      "Empujá hacia abajo extendiendo el codo hasta estirar el brazo.",
+      "Volvé arriba frenando el recorrido, manteniendo el codo fijo al costado."
+    ],
+    "skullcrusher-barbell": [
+      "Acostado en el banco, sostené la barra con los brazos extendidos sobre el pecho.",
+      "Bajá la barra hacia la frente flexionando solo los codos, manteniéndolos quietos.",
+      "Extendé los codos para subir con control, sin arquear la espalda."
+    ],
+    "skullcrusher-dumbbell": [
+      "Acostado en el banco, sostené las mancuernas con los brazos extendidos sobre el pecho.",
+      "Bajá las mancuernas hacia los lados de la cabeza flexionando solo los codos.",
+      "Extendé los codos para subir con control, manteniendo los brazos fijos."
+    ],
+    "triceps-dip-assisted": [
+      "Apoyá las rodillas en el soporte de la máquina y agarrá las barras paralelas con los brazos extendidos.",
+      "Bajá flexionando los codos hasta que queden a unos 90 grados, con el torso ligeramente inclinado.",
+      "Empujá para subir extendiendo los codos, manteniendo los hombros lejos de las orejas."
+    ],
+    "triceps-extension-barbell": [
+      "Parate o sentate y llevá la barra por encima de la cabeza con los brazos extendidos.",
+      "Bajá la barra por detrás de la nuca flexionando solo los codos.",
+      "Extendé los codos para subir, manteniendo el torso firme y la espalda neutra."
+    ],
+    "triceps-extension-cable": [
+      "Parate frente a la polea alta y agarrá la cuerda o barra con ambas manos, codos pegados al cuerpo.",
+      "Empujá hacia abajo extendiendo los codos hasta estirar los brazos.",
+      "Volvé arriba frenando el recorrido, sin despegar los codos del costado."
+    ],
+    "triceps-extension-machine": [
+      "Sentate erguido con la espalda apoyada y agarrá las manijas a la altura indicada.",
+      "Empujá extendiendo los codos hasta estirar los brazos sin bloquearlos de golpe.",
+      "Volvé al inicio frenando el recorrido, manteniendo los codos fijos."
+    ],
+    "triceps-extension-suspension": [
+      "Agarrá las manijas del TRX al frente con los brazos extendidos y el cuerpo inclinado hacia adelante.",
+      "Bajá flexionando solo los codos, llevando las manos hacia la frente y manteniendo el cuerpo recto.",
+      "Extendé los codos para volver, manteniendo el core firme y la espalda neutra."
+    ],
+    "triceps-kickback-cable": [
+      "Inclinate hacia adelante con la espalda neutra y agarrá el maneral de la polea baja, codo pegado al costado.",
+      "Extendé el codo hacia atrás hasta estirar el brazo, sin mover el hombro.",
+      "Volvé al inicio flexionando el codo de forma controlada."
+    ],
+    "triceps-pressdown": [
+      "Parate frente a la polea alta y agarrá la barra con los codos pegados al cuerpo.",
+      "Empujá hacia abajo extendiendo los codos hasta estirar los brazos.",
+      "Volvé arriba frenando el recorrido, manteniendo los codos fijos al costado."
+    ],
+    "triceps-pushdown": [
+      "Parate frente a la polea alta y agarrá el maneral con los codos pegados al torso.",
+      "Empujá hacia abajo extendiendo los codos hasta estirar los brazos.",
+      "Volvé arriba frenando el recorrido, sin balancear el cuerpo ni mover los codos."
+    ],
+    "wide-elbow-triceps-press-dumbbell": [
+      "Acostado en el banco, sostené las mancuernas sobre el pecho con los codos abiertos hacia los lados.",
+      "Bajá las mancuernas flexionando los codos, manteniéndolos abiertos y la espalda apoyada.",
+      "Empujá hacia arriba extendiendo los codos de forma controlada."
     ]
   }
 }
