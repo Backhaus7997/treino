@@ -3,6 +3,7 @@
  * PR#1: exports the deleteAccount callable skeleton.
  * PR#1 (reviews): exports reviewAggregate trigger.
  * PR#1b (notifications): exports 4 FCM trigger functions. Fase 6 Etapa 2.
+ * cleanupAssignedPlansOnUnlink: hard-deletes assigned plans when a link ends.
  */
 
 export { deleteAccountHandler as deleteAccount } from "./delete-account";
@@ -11,3 +12,4 @@ export { notifyOnChatMessage } from "./notifications/notify-chat-message";
 export { notifyOnAppointment } from "./notifications/notify-appointment";
 export { notifyOnLinkChange } from "./notifications/notify-link-change";
 export { notifyOnReview } from "./notifications/notify-review";
+export { cleanupAssignedPlansOnUnlink } from "./cleanup-assigned-plans";
