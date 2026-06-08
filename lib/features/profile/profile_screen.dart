@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../app/theme/app_palette.dart';
 import '../../core/utils/k_formatter.dart';
@@ -60,6 +61,22 @@ class _AthleteProfile extends ConsumerWidget {
           // role == trainer. Tile que abre /profile/edit-trainer para
           // editar perfil público multi-location (Fase 6 Etapa 0 PR#3).
           const ProfileTrainerSection(),
+          // ── Entrenamiento — acceso del alumno a sus ejercicios custom ────
+          // Reusa MyExercisesScreen (/profile/my-exercises) que ya existía
+          // solo para el entrenador. El backend (users/{uid}/customExercises)
+          // es uid-keyed → funciona para el alumno sin cambios.
+          ProfileSectionGroup(
+            title: 'ENTRENAMIENTO',
+            tiles: [
+              ProfileSectionTile(
+                icon: TreinoIcon.sparkle,
+                title: 'Mis ejercicios',
+                inGroup: true,
+                onTap: () => context.push('/profile/my-exercises'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
           // ── Sesión section — PR#4 v2 pivot 2026-05-28 ────────────────────
           // Sign-out + account deletion grouped in one boxed section, mockup
           // parity polish 2026-06-01. Settings as a dedicated surface stays
