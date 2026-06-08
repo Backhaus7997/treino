@@ -1029,9 +1029,13 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
                         CoachStrings.editorAddSlot,
                         style: GoogleFonts.barlowCondensed(
                           fontWeight: FontWeight.w600,
-                          fontSize: 13,
+                          fontSize: 14,
                           color: palette.accent,
                         ),
+                      ),
+                      style: TextButton.styleFrom(
+                        minimumSize: const Size.fromHeight(44),
+                        alignment: Alignment.centerLeft,
                       ),
                     ),
                   ),
@@ -1048,9 +1052,13 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
                           CoachStrings.editorAddSuperset,
                           style: GoogleFonts.barlowCondensed(
                             fontWeight: FontWeight.w600,
-                            fontSize: 13,
+                            fontSize: 14,
                             color: palette.highlight,
                           ),
+                        ),
+                        style: TextButton.styleFrom(
+                          minimumSize: const Size.fromHeight(44),
+                          alignment: Alignment.centerLeft,
                         ),
                       ),
                     ),
@@ -1108,11 +1116,11 @@ class _SupersetGroupCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
       decoration: BoxDecoration(
-        color: palette.highlight.withAlpha(15),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: palette.highlight),
+        color: palette.highlight.withAlpha(12),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: palette.highlight.withAlpha(120)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1120,13 +1128,13 @@ class _SupersetGroupCard extends StatelessWidget {
           // Header row
           Row(
             children: [
-              Icon(TreinoIcon.streak, size: 14, color: palette.highlight),
+              Icon(TreinoIcon.streak, size: 15, color: palette.highlight),
               const SizedBox(width: 6),
               Text(
                 'SUPERSERIE',
                 style: GoogleFonts.barlowCondensed(
                   fontWeight: FontWeight.w700,
-                  fontSize: 12,
+                  fontSize: 13,
                   letterSpacing: 1.2,
                   color: palette.highlight,
                 ),
@@ -1143,7 +1151,7 @@ class _SupersetGroupCard extends StatelessWidget {
               ],
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           // Slot editors stacked
           for (var mi = 0; mi < groupSlots.length; mi++) ...[
             _SlotEditor(
@@ -1162,28 +1170,24 @@ class _SupersetGroupCard extends StatelessWidget {
                   ? () => onMoveSlotInGroup(flatStart + mi, 1)
                   : null,
             ),
-            if (mi < groupSlots.length - 1) const SizedBox(height: 6),
+            if (mi < groupSlots.length - 1) const SizedBox(height: 8),
           ],
           const SizedBox(height: 4),
           // Add another exercise into THIS superset block.
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton.icon(
-              onPressed: onAddExercise,
-              icon: Icon(TreinoIcon.plus, size: 14, color: palette.highlight),
-              label: Text(
-                'Agregar ejercicio',
-                style: GoogleFonts.barlowCondensed(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 12,
-                  color: palette.highlight,
-                ),
+          TextButton.icon(
+            onPressed: onAddExercise,
+            icon: Icon(TreinoIcon.plus, size: 14, color: palette.highlight),
+            label: Text(
+              'Agregar ejercicio',
+              style: GoogleFonts.barlowCondensed(
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+                color: palette.highlight,
               ),
-              style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                minimumSize: Size.zero,
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
+            ),
+            style: TextButton.styleFrom(
+              minimumSize: const Size.fromHeight(44),
+              alignment: Alignment.centerLeft,
             ),
           ),
         ],
@@ -1273,12 +1277,13 @@ class _SlotEditorState extends State<_SlotEditor> {
   Widget build(BuildContext context) {
     final slot = widget.slot;
     final palette = widget.palette;
+    // One light surface per card — no outer border, just a fill + generous
+    // padding. Inner fields are NOT individually boxed.
     return Container(
-      padding: const EdgeInsets.all(10),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
       decoration: BoxDecoration(
-        color: palette.bg,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: palette.border),
+        color: palette.bgCard,
+        borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1294,21 +1299,16 @@ class _SlotEditorState extends State<_SlotEditor> {
                     widget.onReplaceExercise(picked.first);
                   },
                   borderRadius: BorderRadius.circular(6),
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: palette.bgCard,
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: palette.border),
-                    ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
                     child: Row(
                       children: [
                         Expanded(
                           child: Text(
                             slot.exercise?.name ?? CoachStrings.exercisePicker,
                             style: GoogleFonts.barlow(
-                              fontSize: 13,
+                              fontSize: 17,
+                              fontWeight: FontWeight.w600,
                               color: slot.exercise != null
                                   ? palette.textPrimary
                                   : palette.textMuted,
@@ -1316,9 +1316,10 @@ class _SlotEditorState extends State<_SlotEditor> {
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
+                        const SizedBox(width: 6),
                         Icon(
                           TreinoIcon.edit,
-                          size: 14,
+                          size: 15,
                           color: palette.textMuted,
                         ),
                       ],
@@ -1326,7 +1327,7 @@ class _SlotEditorState extends State<_SlotEditor> {
                   ),
                 ),
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 8),
               // ── Exercise mode toggle (#/⏱) ────────────────────────────────
               _ExerciseModeToggle(
                 mode: slot.exerciseMode,
@@ -1344,17 +1345,17 @@ class _SlotEditorState extends State<_SlotEditor> {
                   onMoveUp: widget.onMoveUp,
                   onMoveDown: widget.onMoveDown,
                 ),
-              const SizedBox(width: 2),
+              const SizedBox(width: 4),
               IconButton(
                 icon:
-                    Icon(TreinoIcon.trash, size: 16, color: palette.textMuted),
+                    Icon(TreinoIcon.trash, size: 18, color: palette.textMuted),
                 onPressed: widget.onRemove,
-                constraints: const BoxConstraints(),
+                constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
                 padding: EdgeInsets.zero,
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
 
           // ── Rest duration row ─────────────────────────────────────────────
           Row(
@@ -1369,7 +1370,7 @@ class _SlotEditorState extends State<_SlotEditor> {
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
 
           // ── Set table ─────────────────────────────────────────────────────
           _SetTable(
@@ -1382,7 +1383,7 @@ class _SlotEditorState extends State<_SlotEditor> {
           ),
 
           // ── "+ Agregar set" button ─────────────────────────────────────────
-          const SizedBox(height: 4),
+          const SizedBox(height: 6),
           SizedBox(
             width: double.infinity,
             child: TextButton.icon(
@@ -1396,19 +1397,17 @@ class _SlotEditorState extends State<_SlotEditor> {
                 });
                 widget.onChanged();
               },
-              icon: Icon(TreinoIcon.plus, size: 12, color: palette.accent),
+              icon: Icon(TreinoIcon.plus, size: 14, color: palette.accent),
               label: Text(
                 '+ Agregar set',
                 style: GoogleFonts.barlowCondensed(
                   fontWeight: FontWeight.w600,
-                  fontSize: 12,
+                  fontSize: 14,
                   color: palette.accent,
                 ),
               ),
               style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                minimumSize: Size.zero,
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                minimumSize: const Size.fromHeight(44),
                 alignment: Alignment.centerLeft,
               ),
             ),
@@ -1441,20 +1440,23 @@ class _ExerciseModeToggle extends StatelessWidget {
       child: InkWell(
         onTap: () =>
             onChanged(isDuration ? ExerciseMode.reps : ExerciseMode.duration),
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(8),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
+          constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
           decoration: BoxDecoration(
-            color: palette.bgCard,
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(color: palette.border),
+            color: isDuration
+                ? palette.accent.withAlpha(25)
+                : palette.bg.withAlpha(0),
+            borderRadius: BorderRadius.circular(8),
           ),
           child: Text(
             isDuration ? '⏱' : '#',
             style: GoogleFonts.barlow(
-              fontSize: 13,
+              fontSize: 16,
               color: isDuration ? palette.accent : palette.textMuted,
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ),
@@ -1543,7 +1545,7 @@ class _SetTableState extends State<_SetTable> {
         // ── Set rows ───────────────────────────────────────────────────────
         for (var i = 0; i < slot.sets.length; i++)
           Padding(
-            padding: const EdgeInsets.only(bottom: 4),
+            padding: const EdgeInsets.only(bottom: 6),
             child: _SetRow(
               key: ObjectKey(slot.sets[i]),
               editableSet: slot.sets[i],
@@ -1594,7 +1596,7 @@ class _SetTableHeader extends StatelessWidget {
     final isDuration = slot.exerciseMode == ExerciseMode.duration;
 
     TextStyle headerStyle() => GoogleFonts.barlowCondensed(
-          fontSize: 10,
+          fontSize: 12,
           fontWeight: FontWeight.w700,
           letterSpacing: 0.8,
           color: palette.textMuted,
@@ -1617,7 +1619,7 @@ class _SetTableHeader extends StatelessWidget {
                 text,
                 const SizedBox(width: 3),
                 Icon(TreinoIcon.chevronDown,
-                    size: 10, color: palette.textMuted),
+                    size: 11, color: palette.textMuted),
               ],
             ),
           ),
@@ -1629,7 +1631,7 @@ class _SetTableHeader extends StatelessWidget {
       children: [
         // SET column (fixed narrow width)
         SizedBox(
-          width: 36,
+          width: 44,
           child: Center(
             child: Text('SET', style: headerStyle()),
           ),
@@ -1649,7 +1651,7 @@ class _SetTableHeader extends StatelessWidget {
           ],
         ],
         // Delete icon placeholder (same width as delete button)
-        const SizedBox(width: 32),
+        const SizedBox(width: 40),
       ],
     );
   }
@@ -1752,22 +1754,22 @@ class _SetRowState extends State<_SetRow> {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        // ── Set chip ──────────────────────────────────────────────────────
+        // ── Set chip — 44×44 tap target ───────────────────────────────────
         Builder(
           builder: (ctx) => GestureDetector(
             onTap: () => _pickSetType(ctx),
             child: Container(
-              width: 36,
-              height: 28,
+              width: 44,
+              height: 44,
               alignment: Alignment.center,
               decoration: BoxDecoration(
                 color: _chipColor(s.type, palette),
-                borderRadius: BorderRadius.circular(6),
+                borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
                 label,
                 style: GoogleFonts.barlowCondensed(
-                  fontSize: 12,
+                  fontSize: 15,
                   fontWeight: FontWeight.w700,
                   color: _chipTextColor(s.type, palette),
                 ),
@@ -1775,7 +1777,7 @@ class _SetRowState extends State<_SetRow> {
             ),
           ),
         ),
-        const SizedBox(width: 6),
+        const SizedBox(width: 8),
         // ── Input cells ───────────────────────────────────────────────────
         if (widget.isDuration) ...[
           Expanded(
@@ -1800,7 +1802,7 @@ class _SetRowState extends State<_SetRow> {
               },
             ),
           ),
-          const SizedBox(width: 6),
+          const SizedBox(width: 8),
           if (widget.repMode == RepMode.range) ...[
             // REP MIN
             Expanded(
@@ -1814,7 +1816,7 @@ class _SetRowState extends State<_SetRow> {
                 },
               ),
             ),
-            const SizedBox(width: 6),
+            const SizedBox(width: 8),
             // REP MAX
             Expanded(
               child: _NumberField(
@@ -1842,16 +1844,17 @@ class _SetRowState extends State<_SetRow> {
             ),
           ],
         ],
-        // ── Delete button ─────────────────────────────────────────────────
+        // ── Delete button — 40px wide tap target ──────────────────────────
         SizedBox(
-          width: 32,
+          width: 40,
           child: widget.onRemove != null
               ? IconButton(
                   icon: Icon(TreinoIcon.close,
-                      size: 14, color: palette.textMuted),
+                      size: 16, color: palette.textMuted),
                   onPressed: widget.onRemove,
-                  constraints: const BoxConstraints(),
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  constraints:
+                      const BoxConstraints(minWidth: 40, minHeight: 44),
+                  padding: EdgeInsets.zero,
                 )
               : const SizedBox.shrink(),
         ),
@@ -1899,26 +1902,22 @@ class _NumberField extends StatelessWidget {
     return TextField(
       controller: controller,
       keyboardType: TextInputType.number,
-      style: GoogleFonts.barlow(fontSize: 13, color: palette.textPrimary),
+      style: GoogleFonts.barlow(fontSize: 16, color: palette.textPrimary),
       textAlign: TextAlign.center,
       decoration: InputDecoration(
         isDense: true,
         hintText: hint,
-        hintStyle: GoogleFonts.barlow(fontSize: 11, color: palette.textMuted),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-        filled: true,
-        fillColor: palette.bgCard,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(6),
+        hintStyle: GoogleFonts.barlow(fontSize: 13, color: palette.textMuted),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+        filled: false,
+        border: UnderlineInputBorder(
           borderSide: BorderSide(color: palette.border),
         ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(6),
+        enabledBorder: UnderlineInputBorder(
           borderSide: BorderSide(color: palette.border),
         ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(6),
-          borderSide: BorderSide(color: palette.accent),
+        focusedBorder: UnderlineInputBorder(
+          borderSide: BorderSide(color: palette.accent, width: 2),
         ),
       ),
       onChanged: (v) {

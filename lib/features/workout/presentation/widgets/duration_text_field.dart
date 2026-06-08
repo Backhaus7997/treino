@@ -127,7 +127,7 @@ class _DurationTextFieldState extends State<DurationTextField> {
           if (widget.label != null) ...[
             Text(
               widget.label!,
-              style: GoogleFonts.barlow(fontSize: 10, color: palette.textMuted),
+              style: GoogleFonts.barlow(fontSize: 13, color: palette.textMuted),
             ),
             const SizedBox(height: 2),
           ],
@@ -139,26 +139,22 @@ class _DurationTextFieldState extends State<DurationTextField> {
               _DurationInputFormatter(),
             ],
             style: GoogleFonts.barlow(
-              fontSize: 13,
+              fontSize: 16,
               color: palette.textPrimary,
             ),
             decoration: InputDecoration(
               isDense: true,
               contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-              filled: true,
-              fillColor: palette.bgCard,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(6),
+                  const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+              filled: false,
+              border: UnderlineInputBorder(
                 borderSide: BorderSide(color: palette.border),
               ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(6),
+              enabledBorder: UnderlineInputBorder(
                 borderSide: BorderSide(color: palette.border),
               ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(6),
-                borderSide: BorderSide(color: palette.accent),
+              focusedBorder: UnderlineInputBorder(
+                borderSide: BorderSide(color: palette.accent, width: 2),
               ),
             ),
             onChanged: (raw) {
