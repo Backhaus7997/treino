@@ -227,6 +227,31 @@ GoRouter buildRouter({
         ),
       ),
 
+      // ─── Routine editors — TOP-LEVEL ROUTES (outside ShellRoute) ───────────
+      // Full-screen creation flow: no bottom nav bar, own Scaffold inside the
+      // widget. Moved out of ShellRoute so the editor has the full screen height.
+      GoRoute(
+        path: '/workout/routine-editor/:athleteId',
+        pageBuilder: (context, state) {
+          final athleteId = state.pathParameters['athleteId']!;
+          return _noAnim(RoutineEditorScreen(
+            mode: TrainerAssigning(athleteId: athleteId),
+          ));
+        },
+      ),
+      GoRoute(
+        path: '/workout/template-editor',
+        pageBuilder: (_, __) => _noAnim(
+          const RoutineEditorScreen(mode: TrainerTemplating()),
+        ),
+      ),
+      GoRoute(
+        path: '/workout/my-routine-editor',
+        pageBuilder: (_, __) => _noAnim(
+          const RoutineEditorScreen(mode: SelfCreating()),
+        ),
+      ),
+
       // ShellRoute with the existing 5 tabs.
       // Use `pageBuilder` (not `builder`) so the shell itself uses an
       // instant transition when entered from a top-level route like /splash —
@@ -266,33 +291,9 @@ GoRouter buildRouter({
                   ));
                 },
               ),
-              GoRoute(
-                path: 'routine-editor/:athleteId',
-                pageBuilder: (context, state) {
-                  final athleteId = state.pathParameters['athleteId']!;
-                  return _noAnim(RoutineEditorScreen(
-                    mode: TrainerAssigning(athleteId: athleteId),
-                  ));
-                },
-              ),
-              // Template editor: same RoutineEditorScreen in TrainerTemplating
-              // mode. Used by the trainer's "NUEVA PLANTILLA" CTA in
-              // TrainerWorkoutView.
-              GoRoute(
-                path: 'template-editor',
-                pageBuilder: (_, __) => _noAnim(
-                  const RoutineEditorScreen(mode: TrainerTemplating()),
-                ),
-              ),
-              // Self-creating editor: athlete builds their own routine
-              // (REQ-USR-009, ADR-USR-01). PR2 of athlete-self-routines —
-              // route exists; user-facing CTA wire comes in PR3.
-              GoRoute(
-                path: 'my-routine-editor',
-                pageBuilder: (_, __) => _noAnim(
-                  const RoutineEditorScreen(mode: SelfCreating()),
-                ),
-              ),
+              // NOTE: routine-editor, template-editor, my-routine-editor are
+              // top-level routes (outside ShellRoute) — see above. Full-screen
+              // creation flow with own Scaffold, no bottom nav bar.
             ],
           ),
           GoRoute(

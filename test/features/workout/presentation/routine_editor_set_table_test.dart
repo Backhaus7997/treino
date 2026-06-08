@@ -6,7 +6,6 @@
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/features/workout/domain/set_enums.dart';
-import 'package:treino/features/workout/domain/set_spec.dart';
 import 'package:treino/features/workout/presentation/routine_editor_screen.dart';
 
 void main() {

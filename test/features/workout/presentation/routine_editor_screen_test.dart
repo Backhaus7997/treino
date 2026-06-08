@@ -80,30 +80,28 @@ Future<void> _pumpEditorWithMode(
   required RoutineEditorMode mode,
   required List<Override> overrides,
 }) async {
+  // RoutineEditorScreen is now a top-level route with its own Scaffold —
+  // it lives OUTSIDE the ShellRoute so the bottom nav bar is not shown.
   final router = GoRouter(
     initialLocation: '/workout/editor',
     routes: [
-      ShellRoute(
-        builder: (context, state, child) => Scaffold(
-          body: child,
-          bottomNavigationBar: const SizedBox(),
+      GoRoute(
+        path: '/workout/editor',
+        pageBuilder: (context, state) => NoTransitionPage(
+          child: RoutineEditorScreen(mode: mode),
         ),
-        routes: [
-          GoRoute(
-            path: '/workout/editor',
-            builder: (context, state) => RoutineEditorScreen(mode: mode),
-          ),
-          GoRoute(
-            path: '/coach',
-            builder: (_, __) =>
-                const Scaffold(body: Center(child: Text('CoachHome'))),
-          ),
-          GoRoute(
-            path: '/workout',
-            builder: (_, __) =>
-                const Scaffold(body: Center(child: Text('WorkoutHome'))),
-          ),
-        ],
+      ),
+      GoRoute(
+        path: '/coach',
+        pageBuilder: (_, __) => const NoTransitionPage(
+          child: Scaffold(body: Center(child: Text('CoachHome'))),
+        ),
+      ),
+      GoRoute(
+        path: '/workout',
+        pageBuilder: (_, __) => const NoTransitionPage(
+          child: Scaffold(body: Center(child: Text('WorkoutHome'))),
+        ),
       ),
     ],
   );
@@ -332,27 +330,23 @@ void main() {
       final router = GoRouter(
         initialLocation: '/workout/routine-editor/athlete-1',
         routes: [
-          ShellRoute(
-            builder: (context, state, child) => Scaffold(
-              body: child,
-              bottomNavigationBar: const SizedBox(),
+          GoRoute(
+            path: '/workout/routine-editor/:athleteId',
+            pageBuilder: (context, state) => NoTransitionPage(
+              child: RoutineEditorScreen(
+                mode: TrainerAssigning(
+                  athleteId: state.pathParameters['athleteId']!,
+                ),
+              ),
             ),
-            routes: [
-              GoRoute(
-                path: '/workout/routine-editor/:athleteId',
-                builder: (context, state) => RoutineEditorScreen(
-                  mode: TrainerAssigning(
-                    athleteId: state.pathParameters['athleteId']!,
-                  ),
-                ),
+          ),
+          GoRoute(
+            path: '/coach/athlete/:athleteId',
+            pageBuilder: (_, state) => NoTransitionPage(
+              child: Scaffold(
+                body: Text('Back:${state.pathParameters['athleteId']}'),
               ),
-              GoRoute(
-                path: '/coach/athlete/:athleteId',
-                builder: (_, state) => Scaffold(
-                  body: Text('Back:${state.pathParameters['athleteId']}'),
-                ),
-              ),
-            ],
+            ),
           ),
         ],
       );

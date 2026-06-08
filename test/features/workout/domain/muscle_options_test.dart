@@ -68,8 +68,10 @@ void main() {
     });
 
     test('save mapping: selected muscle → muscleGroup string', () {
-      // On save: _selectedMuscle ?? ''
-      String? selected = 'Glúteos';
+      // On save: _selectedMuscle ?? '' — sel() keeps the static type nullable
+      // so the ?? fallback isn't flagged as dead.
+      String? sel(String v) => v;
+      final selected = sel('Glúteos');
       final muscleGroup = selected ?? '';
       expect(muscleGroup, 'Glúteos');
     });

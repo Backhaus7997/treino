@@ -41,27 +41,28 @@ Future<void> _pumpEditor(
   required RoutineEditorMode mode,
   required List<Override> overrides,
 }) async {
+  // RoutineEditorScreen is now a top-level route with its own Scaffold —
+  // it lives OUTSIDE the ShellRoute so the bottom nav bar is not shown.
   final router = GoRouter(
     initialLocation: '/workout/editor',
     routes: [
-      ShellRoute(
-        builder: (context, state, child) => Scaffold(body: child),
-        routes: [
-          GoRoute(
-            path: '/workout/editor',
-            builder: (context, state) => RoutineEditorScreen(mode: mode),
-          ),
-          GoRoute(
-            path: '/coach',
-            builder: (_, __) =>
-                const Scaffold(body: Center(child: Text('CoachHome'))),
-          ),
-          GoRoute(
-            path: '/workout',
-            builder: (_, __) =>
-                const Scaffold(body: Center(child: Text('WorkoutHome'))),
-          ),
-        ],
+      GoRoute(
+        path: '/workout/editor',
+        pageBuilder: (context, state) => NoTransitionPage(
+          child: RoutineEditorScreen(mode: mode),
+        ),
+      ),
+      GoRoute(
+        path: '/coach',
+        pageBuilder: (_, __) => const NoTransitionPage(
+          child: Scaffold(body: Center(child: Text('CoachHome'))),
+        ),
+      ),
+      GoRoute(
+        path: '/workout',
+        pageBuilder: (_, __) => const NoTransitionPage(
+          child: Scaffold(body: Center(child: Text('WorkoutHome'))),
+        ),
       ),
     ],
   );
