@@ -109,7 +109,8 @@ void main() {
         athleteLocationProvider.overrideWith(
           (_) => AthleteLocationNotifier()..setForTest(null),
         ),
-        selectedSpecialtyProvider.overrideWith((_) => null),
+        selectedSpecialtyProvider
+            .overrideWith((_) => const <TrainerSpecialty>{}),
         trainerPublicProfileRepositoryProvider.overrideWith(
           (_) => _FakeTrainerRepo(all: [trainer1, trainer2]),
         ),
@@ -143,7 +144,8 @@ void main() {
         athleteLocationProvider.overrideWith(
           (_) => AthleteLocationNotifier()..setForTest(pos),
         ),
-        selectedSpecialtyProvider.overrideWith((_) => null),
+        selectedSpecialtyProvider
+            .overrideWith((_) => const <TrainerSpecialty>{}),
         trainerPublicProfileRepositoryProvider.overrideWith(
           (_) => _FakeTrainerRepo(geohash: [near, far]),
         ),
@@ -166,7 +168,7 @@ void main() {
           (_) => AthleteLocationNotifier()..setForTest(null),
         ),
         selectedSpecialtyProvider
-            .overrideWith((_) => TrainerSpecialty.crossfit),
+            .overrideWith((_) => const {TrainerSpecialty.crossfit}),
         trainerPublicProfileRepositoryProvider.overrideWith(
           (_) => _FakeTrainerRepo(all: [t1, t2]),
         ),
@@ -201,7 +203,8 @@ void main() {
         athleteLocationProvider.overrideWith(
           (_) => AthleteLocationNotifier()..setForTest(pos),
         ),
-        selectedSpecialtyProvider.overrideWith((_) => null),
+        selectedSpecialtyProvider
+            .overrideWith((_) => const <TrainerSpecialty>{}),
         virtualOnlyFilterProvider.overrideWith((_) => false),
         trainerPublicProfileRepositoryProvider.overrideWith(
           (_) => _FakeTrainerRepo(
@@ -233,7 +236,8 @@ void main() {
         athleteLocationProvider.overrideWith(
           (_) => AthleteLocationNotifier()..setForTest(pos),
         ),
-        selectedSpecialtyProvider.overrideWith((_) => null),
+        selectedSpecialtyProvider
+            .overrideWith((_) => const <TrainerSpecialty>{}),
         virtualOnlyFilterProvider.overrideWith((_) => false),
         trainerPublicProfileRepositoryProvider.overrideWith(
           (_) => _FakeTrainerRepo(
@@ -268,7 +272,8 @@ void main() {
         athleteLocationProvider.overrideWith(
           (_) => AthleteLocationNotifier()..setForTest(pos),
         ),
-        selectedSpecialtyProvider.overrideWith((_) => null),
+        selectedSpecialtyProvider
+            .overrideWith((_) => const <TrainerSpecialty>{}),
         virtualOnlyFilterProvider.overrideWith((_) => true),
         trainerPublicProfileRepositoryProvider.overrideWith(
           (_) => _FakeTrainerRepo(
