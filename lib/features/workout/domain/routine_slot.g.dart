@@ -23,6 +23,17 @@ _$RoutineSlotImpl _$$RoutineSlotImplFromJson(Map<String, dynamic> json) =>
               .toList() ??
           const <int>[],
       durationSeconds: (json['durationSeconds'] as num?)?.toInt(),
+      exerciseMode: $enumDecodeNullable(
+              _$ExerciseModeEnumMap, json['exerciseMode'],
+              unknownValue: ExerciseMode.reps) ??
+          ExerciseMode.reps,
+      repMode: $enumDecodeNullable(_$RepModeEnumMap, json['repMode'],
+              unknownValue: RepMode.single) ??
+          RepMode.single,
+      sets: (json['sets'] as List<dynamic>?)
+              ?.map((e) => SetSpec.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          const <SetSpec>[],
     );
 
 Map<String, dynamic> _$$RoutineSlotImplToJson(_$RoutineSlotImpl instance) =>
@@ -39,4 +50,17 @@ Map<String, dynamic> _$$RoutineSlotImplToJson(_$RoutineSlotImpl instance) =>
       'supersetGroup': instance.supersetGroup,
       'targetReps': instance.targetReps,
       'durationSeconds': instance.durationSeconds,
+      'exerciseMode': _$ExerciseModeEnumMap[instance.exerciseMode]!,
+      'repMode': _$RepModeEnumMap[instance.repMode]!,
+      'sets': instance.sets.map((e) => e.toJson()).toList(),
     };
+
+const _$ExerciseModeEnumMap = {
+  ExerciseMode.reps: 'reps',
+  ExerciseMode.duration: 'duration',
+};
+
+const _$RepModeEnumMap = {
+  RepMode.single: 'single',
+  RepMode.range: 'range',
+};

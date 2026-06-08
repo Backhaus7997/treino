@@ -105,7 +105,8 @@ Future<void> _pumpSection(
 void main() {
   group('MisRutinasSection', () {
     // SCENARIO-609: empty state renders motivational message + CTA enabled
-    testWidgets('SCENARIO-609: empty state renders motivational message + CTA enabled',
+    testWidgets(
+        'SCENARIO-609: empty state renders motivational message + CTA enabled',
         (tester) async {
       await _pumpSection(
         tester,

@@ -65,8 +65,7 @@ class _CustomExerciseEditorScreenState
 
     CustomExercise? existing;
     if (widget.isEditing && uid.isNotEmpty) {
-      final listAsync =
-          ref.watch(customExercisesForTrainerStreamProvider(uid));
+      final listAsync = ref.watch(customExercisesForTrainerStreamProvider(uid));
       final list = listAsync.valueOrNull ?? const <CustomExercise>[];
       existing = list.where((e) => e.id == widget.exerciseId).firstOrNull;
       if (existing != null) _hydrate(existing);
@@ -81,8 +80,8 @@ class _CustomExerciseEditorScreenState
               GestureDetector(
                 onTap: () => context.pop(),
                 behavior: HitTestBehavior.opaque,
-                child: Icon(TreinoIcon.back,
-                    size: 20, color: palette.textPrimary),
+                child:
+                    Icon(TreinoIcon.back, size: 20, color: palette.textPrimary),
               ),
               const SizedBox(width: 14),
               Text(
@@ -104,12 +103,16 @@ class _CustomExerciseEditorScreenState
               _Label('Nombre', palette: palette),
               const SizedBox(height: 6),
               _Field(
-                  controller: _nameCtrl, hint: 'Ej: Sentadilla búlgara', palette: palette),
+                  controller: _nameCtrl,
+                  hint: 'Ej: Sentadilla búlgara',
+                  palette: palette),
               const SizedBox(height: 14),
               _Label('Grupo muscular', palette: palette),
               const SizedBox(height: 6),
               _Field(
-                  controller: _muscleCtrl, hint: 'Ej: cuádriceps', palette: palette),
+                  controller: _muscleCtrl,
+                  hint: 'Ej: cuádriceps',
+                  palette: palette),
               const SizedBox(height: 14),
               _Label('Descripción / cues', palette: palette),
               const SizedBox(height: 6),
@@ -208,7 +211,9 @@ class _CustomExerciseEditorScreenState
                             strokeWidth: 2.4, color: palette.bg),
                       )
                     : Text(
-                        widget.isEditing ? 'GUARDAR CAMBIOS' : 'GUARDAR EJERCICIO',
+                        widget.isEditing
+                            ? 'GUARDAR CAMBIOS'
+                            : 'GUARDAR EJERCICIO',
                         style: GoogleFonts.barlowCondensed(
                           fontWeight: FontWeight.w700,
                           fontSize: 13,

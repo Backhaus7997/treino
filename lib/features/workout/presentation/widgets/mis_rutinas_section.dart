@@ -5,7 +5,8 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/treino_icon.dart';
-import '../../application/routine_providers.dart' show routineRepositoryProvider;
+import '../../application/routine_providers.dart'
+    show routineRepositoryProvider;
 import '../../application/session_providers.dart' show currentUidProvider;
 import '../../application/user_routines_providers.dart';
 import '../../domain/routine.dart';
@@ -57,8 +58,7 @@ class MisRutinasSection extends ConsumerWidget {
                 if (capReached) return const SizedBox.shrink();
                 return _CtaButton(
                   capReached: false,
-                  onPressed: () =>
-                      context.push('/workout/my-routine-editor'),
+                  onPressed: () => context.push('/workout/my-routine-editor'),
                 );
               },
             ),
@@ -88,8 +88,7 @@ class MisRutinasSection extends ConsumerWidget {
         routinesAsync.when(
           loading: () => const _SectionLoadingState(),
           error: (err, _) => _SectionErrorState(
-            onRetry: () =>
-                ref.invalidate(userCreatedRoutinesProvider(uid)),
+            onRetry: () => ref.invalidate(userCreatedRoutinesProvider(uid)),
           ),
           data: (routines) {
             if (routines.isEmpty) {
@@ -198,8 +197,8 @@ class _SectionErrorState extends StatelessWidget {
         children: [
           Text(
             WorkoutStrings.misRutinasError,
-            style: theme.textTheme.bodyMedium
-                ?.copyWith(color: palette.textMuted),
+            style:
+                theme.textTheme.bodyMedium?.copyWith(color: palette.textMuted),
           ),
           const SizedBox(height: 8),
           TextButton(
@@ -279,8 +278,7 @@ class _UserRoutineCard extends ConsumerWidget {
     } catch (_) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text(WorkoutStrings.misRutinasArchiveError)),
+          const SnackBar(content: Text(WorkoutStrings.misRutinasArchiveError)),
         );
       }
     }
