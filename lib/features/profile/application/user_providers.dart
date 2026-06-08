@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../auth/application/auth_providers.dart';
 import '../data/user_repository.dart';
 import '../domain/user_profile.dart';
+import '../domain/user_profile_trainer_completeness.dart';
 
 final firestoreProvider = Provider<FirebaseFirestore>(
   (ref) => FirebaseFirestore.instance,
@@ -25,4 +26,17 @@ final userProfileProvider = StreamProvider<UserProfile?>((ref) {
     loading: () => const Stream<UserProfile?>.empty(),
     error: (_, __) => Stream<UserProfile?>.value(null),
   );
+});
+
+/// Thin derived provider that exposes trainer profile completeness as a plain
+/// bool for router redirect logic and widget consumers (ADR-TPO-004).
+///
+/// Returns false when the profile is loading or null (e.g. athlete or
+/// unauthenticated user). The source of truth is the extension getter
+/// [UserProfileTrainerCompleteness.trainerProfileComplete].
+///
+/// REQ-TPO-DATA-004.
+final trainerProfileCompleteProvider = Provider<bool>((ref) {
+  final profile = ref.watch(userProfileProvider).valueOrNull;
+  return profile?.trainerProfileComplete ?? false;
 });
