@@ -331,6 +331,7 @@ class _ProfileEditTrainerScreenState
             ],
             const SizedBox(height: 20),
             ElevatedButton(
+              key: const Key('profile_edit_trainer_save_button'),
               onPressed: _saving ? null : () => _save(profile.uid),
               style: ElevatedButton.styleFrom(
                 backgroundColor: palette.accent,

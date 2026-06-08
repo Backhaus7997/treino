@@ -148,10 +148,13 @@ void main() {
 
       // In edit mode, automaticallyImplyLeading is true (default).
       // A back button appears when there is a route to pop to.
-      // We pump within a nested route so there IS a back option.
       // Check that PopScope(canPop: false) is NOT in tree (edit mode = can pop).
-      final popScope = tester.widgetList<PopScope>(find.byType(PopScope));
-      final hasBlockingPopScope = popScope.any((ps) => ps.canPop == false);
+      // Note: Flutter 3.41 uses PopScope<dynamic> — use byWidgetPredicate.
+      final hasBlockingPopScope = tester
+          .widgetList(
+            find.byWidgetPredicate((w) => w is PopScope && w.canPop == false),
+          )
+          .isNotEmpty;
       expect(hasBlockingPopScope, isFalse,
           reason:
               'Edit mode must not have a blocking PopScope — back should be allowed');
@@ -207,8 +210,11 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Tap GUARDAR — form is pre-populated via complete profile so validation passes
-      await tester.tap(find.text('GUARDAR'));
+      // Scroll the button into view and tap it
+      final saveBtn = find.byKey(const Key('profile_edit_trainer_save_button'));
+      await tester.ensureVisible(saveBtn);
+      await tester.pumpAndSettle();
+      await tester.tap(saveBtn);
       await tester.pumpAndSettle();
 
       // In edit mode, save should pop (not go to /home).
