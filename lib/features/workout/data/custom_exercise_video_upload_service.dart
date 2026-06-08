@@ -41,9 +41,8 @@ class CustomExerciseVideoUploadService {
     final ext = _extensionFor(localPath);
     final fileName =
         '${DateTime.now().microsecondsSinceEpoch.toRadixString(36)}.$ext';
-    final ref = _storage
-        .ref()
-        .child('customExerciseVideos/${user.uid}/$fileName');
+    final ref =
+        _storage.ref().child('customExerciseVideos/${user.uid}/$fileName');
     final task = ref.putFile(
       File(localPath),
       SettableMetadata(contentType: _contentTypeFor(ext)),

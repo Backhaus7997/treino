@@ -123,8 +123,7 @@ void main() {
       expect(received!.isEmpty, isTrue);
     });
 
-    testWidgets(
-        'tapping unselected specialty adds it to the set (toggle ON)',
+    testWidgets('tapping unselected specialty adds it to the set (toggle ON)',
         (tester) async {
       Set<TrainerSpecialty>? received;
 

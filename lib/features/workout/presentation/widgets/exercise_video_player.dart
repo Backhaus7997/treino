@@ -86,11 +86,9 @@ class _YoutubeThumbCard extends StatelessWidget {
               fit: StackFit.expand,
               children: [
                 CachedNetworkImage(
-                  imageUrl:
-                      'https://img.youtube.com/vi/$videoId/hqdefault.jpg',
+                  imageUrl: 'https://img.youtube.com/vi/$videoId/hqdefault.jpg',
                   fit: BoxFit.cover,
-                  placeholder: (context, _) =>
-                      Container(color: palette.bgCard),
+                  placeholder: (context, _) => Container(color: palette.bgCard),
                   errorWidget: (context, _, __) =>
                       Container(color: palette.bgCard),
                 ),

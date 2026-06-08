@@ -4,8 +4,7 @@ import '../../auth/application/auth_providers.dart';
 import '../../profile/application/user_providers.dart' show firestoreProvider;
 import '../data/exercise_repository.dart';
 import '../domain/exercise.dart';
-import 'custom_exercise_providers.dart'
-    show customExerciseRepositoryProvider;
+import 'custom_exercise_providers.dart' show customExerciseRepositoryProvider;
 
 final exerciseRepositoryProvider = Provider<ExerciseRepository>(
   (ref) => ExerciseRepository(firestore: ref.watch(firestoreProvider)),
@@ -49,8 +48,8 @@ final exerciseByIdProvider = FutureProvider.family<Exercise?, String>(
 /// CustomExercise is projected into [Exercise] with `category: 'custom'` so
 /// the existing detail screen renders it without branching. `techniqueInstructions`
 /// stays null for now — trainers don't author per-instruction lists yet.
-final slotExerciseProvider = FutureProvider.family<
-    Exercise?, ({String exerciseId, String? ownerId})>(
+final slotExerciseProvider =
+    FutureProvider.family<Exercise?, ({String exerciseId, String? ownerId})>(
   (ref, key) async {
     final fromCatalogue = await ref.watch(
       exerciseByIdProvider(key.exerciseId).future,

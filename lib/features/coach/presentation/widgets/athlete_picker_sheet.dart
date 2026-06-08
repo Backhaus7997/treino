@@ -40,8 +40,7 @@ class _AthletePickerSheetContent extends ConsumerWidget {
         return Container(
           decoration: BoxDecoration(
             color: palette.espresso,
-            borderRadius:
-                const BorderRadius.vertical(top: Radius.circular(20)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
           ),
           child: Column(
             children: [
@@ -71,8 +70,7 @@ class _AthletePickerSheetContent extends ConsumerWidget {
               Expanded(
                 child: linksAsync.when(
                   loading: () => Center(
-                    child:
-                        CircularProgressIndicator(color: palette.accent),
+                    child: CircularProgressIndicator(color: palette.accent),
                   ),
                   error: (_, __) => Center(
                     child: Text(
@@ -83,8 +81,7 @@ class _AthletePickerSheetContent extends ConsumerWidget {
                   ),
                   data: (links) {
                     final active = links
-                        .where(
-                            (l) => l.status == TrainerLinkStatus.active)
+                        .where((l) => l.status == TrainerLinkStatus.active)
                         .toList();
                     if (active.isEmpty) {
                       return _EmptyState(palette: palette);
@@ -93,8 +90,8 @@ class _AthletePickerSheetContent extends ConsumerWidget {
                       controller: scrollController,
                       padding: const EdgeInsets.only(bottom: 16),
                       itemCount: active.length,
-                      separatorBuilder: (_, __) => Divider(
-                          color: palette.border, height: 1),
+                      separatorBuilder: (_, __) =>
+                          Divider(color: palette.border, height: 1),
                       itemBuilder: (context, index) {
                         final link = active[index];
                         return _AthleteTile(
@@ -139,8 +136,7 @@ class _AthleteTile extends ConsumerWidget {
       onTap: onTap,
       leading: CircleAvatar(
         backgroundColor: palette.bgCard,
-        child: Icon(TreinoIcon.tabProfile,
-            size: 18, color: palette.textMuted),
+        child: Icon(TreinoIcon.tabProfile, size: 18, color: palette.textMuted),
       ),
       title: Text(
         displayName,
@@ -150,8 +146,8 @@ class _AthleteTile extends ConsumerWidget {
           fontWeight: FontWeight.w500,
         ),
       ),
-      trailing: Icon(TreinoIcon.chevronRight,
-          size: 14, color: palette.textMuted),
+      trailing:
+          Icon(TreinoIcon.chevronRight, size: 14, color: palette.textMuted),
     );
   }
 }

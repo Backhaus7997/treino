@@ -43,7 +43,8 @@ void main() {
 
         // The sheet should render with a multi-select list. Smoke: assert
         // pre-selected group is visible.
-        expect(find.text(MuscleGroupDisplay.pecho.displayLabel), findsOneWidget);
+        expect(
+            find.text(MuscleGroupDisplay.pecho.displayLabel), findsOneWidget);
         // result is not yet populated (no Aplicar tap) but the variable must
         // be reachable to keep the analyzer happy.
         expect(result, isNull);

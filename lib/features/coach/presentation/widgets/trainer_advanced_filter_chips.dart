@@ -201,8 +201,7 @@ Future<void> showSpecialtyFilterSheet(
                         isSelected: selected.contains(s),
                         palette: palette,
                         onTap: () {
-                          final next =
-                              Set<TrainerSpecialty>.from(selected);
+                          final next = Set<TrainerSpecialty>.from(selected);
                           if (next.contains(s)) {
                             next.remove(s);
                           } else {

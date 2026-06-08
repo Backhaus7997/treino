@@ -24,8 +24,8 @@ final routinesProvider = FutureProvider<List<Routine>>((ref) async {
 /// Live stream of the trainer's own templates (assignedBy == trainerId,
 /// source == trainer-template). Powers the template library section of
 /// `TrainerWorkoutView`.
-final trainerTemplatesStreamProvider = StreamProvider.autoDispose
-    .family<List<Routine>, String>((ref, trainerId) {
+final trainerTemplatesStreamProvider =
+    StreamProvider.autoDispose.family<List<Routine>, String>((ref, trainerId) {
   return ref.read(routineRepositoryProvider).watchTemplatesBy(trainerId);
 });
 

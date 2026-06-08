@@ -51,49 +51,49 @@ class TrainerCompactFilterRow extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-          // ── Distance ─────────────────────────────────────────────────
-          TrainerFilterChip(
-            label: isLoadingLocation && !hasLocation
-                ? 'Buscando ubicación...'
-                : distance.chipLabel,
-            isActive: distance != DistanceFilter.any && hasLocation,
-            disabled: !hasLocation && !isLoadingLocation,
-            isLoading: isLoadingLocation && !hasLocation,
-            palette: palette,
-            onTap: () {
-              if (isLoadingLocation && !hasLocation) return;
-              if (hasLocation) {
-                showDistanceFilterSheet(context, ref, distance);
-              } else {
-                showLocationRequiredFilterSheet(context, ref);
-              }
-            },
-          ),
-          const SizedBox(width: 8),
-          // ── Price ────────────────────────────────────────────────────
-          TrainerFilterChip(
-            label: price.chipLabel,
-            isActive: price != PriceFilter.any,
-            disabled: false,
-            isLoading: false,
-            palette: palette,
-            onTap: () => showPriceFilterSheet(context, ref, price),
-          ),
-          const SizedBox(width: 8),
-          // ── Specialty (multi-select) ─────────────────────────────────
-          TrainerFilterChip(
-            label: specialty.isEmpty
-                ? 'Especialidad'
-                : specialty.length == 1
-                    ? SpecialtyLabels.of(specialty.first)
-                    : 'Especialidad · ${specialty.length}',
-            isActive: specialty.isNotEmpty,
-            disabled: false,
-            isLoading: false,
-            palette: palette,
-            onTap: () => showSpecialtyFilterSheet(context, ref),
-          ),
-        ],
+            // ── Distance ─────────────────────────────────────────────────
+            TrainerFilterChip(
+              label: isLoadingLocation && !hasLocation
+                  ? 'Buscando ubicación...'
+                  : distance.chipLabel,
+              isActive: distance != DistanceFilter.any && hasLocation,
+              disabled: !hasLocation && !isLoadingLocation,
+              isLoading: isLoadingLocation && !hasLocation,
+              palette: palette,
+              onTap: () {
+                if (isLoadingLocation && !hasLocation) return;
+                if (hasLocation) {
+                  showDistanceFilterSheet(context, ref, distance);
+                } else {
+                  showLocationRequiredFilterSheet(context, ref);
+                }
+              },
+            ),
+            const SizedBox(width: 8),
+            // ── Price ────────────────────────────────────────────────────
+            TrainerFilterChip(
+              label: price.chipLabel,
+              isActive: price != PriceFilter.any,
+              disabled: false,
+              isLoading: false,
+              palette: palette,
+              onTap: () => showPriceFilterSheet(context, ref, price),
+            ),
+            const SizedBox(width: 8),
+            // ── Specialty (multi-select) ─────────────────────────────────
+            TrainerFilterChip(
+              label: specialty.isEmpty
+                  ? 'Especialidad'
+                  : specialty.length == 1
+                      ? SpecialtyLabels.of(specialty.first)
+                      : 'Especialidad · ${specialty.length}',
+              isActive: specialty.isNotEmpty,
+              disabled: false,
+              isLoading: false,
+              palette: palette,
+              onTap: () => showSpecialtyFilterSheet(context, ref),
+            ),
+          ],
         ),
       ),
     );

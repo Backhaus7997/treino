@@ -19,8 +19,10 @@ class CustomExerciseRepository {
   final FirebaseFirestore _firestore;
   final CustomExerciseVideoUploadService _videoUploadService;
 
-  CollectionReference<Map<String, Object?>> _col(String trainerId) =>
-      _firestore.collection('users').doc(trainerId).collection('customExercises');
+  CollectionReference<Map<String, Object?>> _col(String trainerId) => _firestore
+      .collection('users')
+      .doc(trainerId)
+      .collection('customExercises');
 
   // ─── create ────────────────────────────────────────────────────────────────
 
@@ -94,12 +96,9 @@ class CustomExerciseRepository {
   /// Live stream of the trainer's custom exercises, ordered by name asc so
   /// the picker shows them alphabetically by default.
   Stream<List<CustomExercise>> watchForTrainer(String trainerId) {
-    return _col(trainerId)
-        .orderBy('name')
-        .snapshots()
-        .map((snap) => snap.docs
-            .map((d) => CustomExercise.fromJson({...d.data(), 'id': d.id}))
-            .toList());
+    return _col(trainerId).orderBy('name').snapshots().map((snap) => snap.docs
+        .map((d) => CustomExercise.fromJson({...d.data(), 'id': d.id}))
+        .toList());
   }
 
   // ─── getById ───────────────────────────────────────────────────────────────

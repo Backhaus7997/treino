@@ -53,7 +53,8 @@ class MyExercisesScreen extends ConsumerWidget {
             error: (_, __) => Center(
               child: Text(
                 'No pudimos cargar tus ejercicios.',
-                style: GoogleFonts.barlow(fontSize: 14, color: palette.textMuted),
+                style:
+                    GoogleFonts.barlow(fontSize: 14, color: palette.textMuted),
               ),
             ),
             data: (items) => items.isEmpty
