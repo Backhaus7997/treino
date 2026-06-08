@@ -178,7 +178,7 @@ void main() {
             routes: [
               GoRoute(
                 path: 'edit-trainer',
-                builder: (context, __) => Scaffold(
+                builder: (context, __) => const Scaffold(
                   body: ProfileEditTrainerScreen(
                       mode: ProfileEditTrainerMode.edit),
                 ),

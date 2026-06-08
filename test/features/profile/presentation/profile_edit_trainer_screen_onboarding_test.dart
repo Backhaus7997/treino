@@ -72,7 +72,7 @@ Widget _buildScreen({
           GoRoute(
             path: 'edit-trainer',
             // No extra Scaffold — screen provides its own.
-            builder: (_, __) => ProfileEditTrainerScreen(
+            builder: (_, __) => const ProfileEditTrainerScreen(
               mode: ProfileEditTrainerMode.onboarding,
             ),
           ),
@@ -220,7 +220,7 @@ void main() {
             routes: [
               GoRoute(
                 path: 'edit-trainer',
-                builder: (_, __) => ProfileEditTrainerScreen(
+                builder: (_, __) => const ProfileEditTrainerScreen(
                   mode: ProfileEditTrainerMode.onboarding,
                 ),
               ),
@@ -286,7 +286,7 @@ void main() {
             routes: [
               GoRoute(
                 path: 'edit-trainer',
-                builder: (_, __) => ProfileEditTrainerScreen(
+                builder: (_, __) => const ProfileEditTrainerScreen(
                   mode: ProfileEditTrainerMode.onboarding,
                 ),
               ),
