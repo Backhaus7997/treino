@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -14,7 +17,9 @@ import '../application/session_providers.dart';
 import '../application/session_state.dart';
 import '../domain/routine.dart';
 import '../domain/routine_slot.dart';
+import '../domain/set_enums.dart';
 import '../domain/set_log.dart';
+import '../domain/set_spec.dart';
 import 'widgets/set_entry_sheet.dart';
 
 // ── Helpers de formato ────────────────────────────────────────────────────────
@@ -24,6 +29,113 @@ String _formatMMSS(int totalSeconds) {
   final m = (totalSeconds ~/ 60).clamp(0, 99).toString().padLeft(2, '0');
   final s = (totalSeconds % 60).toString().padLeft(2, '0');
   return '$m:$s';
+}
+
+String _formatWeight(double w) =>
+    w == w.truncateToDouble() ? w.toInt().toString() : w.toString();
+
+// ── Block gating helpers (top-level, testable) ────────────────────────────────
+
+/// The gating state of a block (standalone exercise or superset group).
+enum BlockStatus {
+  /// All sets in this block are logged.
+  completed,
+
+  /// This is the first non-completed block — fully interactive.
+  current,
+
+  /// This block comes after the current one — locked, dimmed, not interactive.
+  future,
+}
+
+/// A block is either a standalone slot or a list of slots that belong to the
+/// same superset group.
+typedef BlockInfo = ({List<RoutineSlot> slots, bool isSuperset});
+
+/// Splits the day's slots into ordered blocks (standalone or superset groups).
+/// A lone slot tagged with a supersetGroup falls back to standalone.
+List<BlockInfo> buildBlocks(List<RoutineSlot> slots) {
+  final blocks = <BlockInfo>[];
+  var i = 0;
+  while (i < slots.length) {
+    final group = slots[i].supersetGroup;
+    if (group != null) {
+      var scan = i;
+      final members = <RoutineSlot>[];
+      while (scan < slots.length && slots[scan].supersetGroup == group) {
+        members.add(slots[scan]);
+        scan++;
+      }
+      if (members.length >= 2) {
+        blocks.add((slots: members, isSuperset: true));
+        i = scan;
+        continue;
+      }
+    }
+    blocks.add((slots: [slots[i]], isSuperset: false));
+    i++;
+  }
+  return blocks;
+}
+
+/// Returns true if a standalone block (single slot) is fully completed.
+bool isStandaloneBlockComplete(RoutineSlot slot, List<SetLog> allLogs) {
+  final logged = allLogs.where((l) => l.exerciseId == slot.exerciseId).length;
+  return logged >= slot.effectiveSets.length;
+}
+
+/// Returns true if a superset block (round-robin) is fully completed.
+/// Complete = every member has effectiveSets.length logs.
+bool isSupersetBlockComplete(List<RoutineSlot> members, List<SetLog> allLogs) {
+  return members.every((slot) {
+    final logged = allLogs.where((l) => l.exerciseId == slot.exerciseId).length;
+    return logged >= slot.effectiveSets.length;
+  });
+}
+
+/// Determines the [BlockStatus] for each block given the current logs.
+/// The "current" block is the first non-completed one.
+List<BlockStatus> computeBlockStatuses(
+    List<BlockInfo> blocks, List<SetLog> allLogs) {
+  var foundCurrent = false;
+  return blocks.map((block) {
+    final complete = block.isSuperset
+        ? isSupersetBlockComplete(block.slots, allLogs)
+        : isStandaloneBlockComplete(block.slots.first, allLogs);
+    if (complete) return BlockStatus.completed;
+    if (!foundCurrent) {
+      foundCurrent = true;
+      return BlockStatus.current;
+    }
+    return BlockStatus.future;
+  }).toList();
+}
+
+/// Planned reps to log for a SetSpec.
+/// For range sets we use repsMax (the top of the range).
+/// For single sets we use reps.
+/// Document: rep-range logging uses repsMax to represent "aimed for the top".
+int plannedRepsForSpec(SetSpec spec, ExerciseMode mode) {
+  if (mode == ExerciseMode.duration) return 0;
+  if (spec.reps != null) return spec.reps!;
+  if (spec.repsMax != null) return spec.repsMax!;
+  if (spec.repsMin != null) return spec.repsMin!;
+  return 0;
+}
+
+/// Human-readable display for planned reps (e.g. "10" or "8–12").
+String repsDisplayText(SetSpec spec, ExerciseMode mode) {
+  if (mode == ExerciseMode.duration) {
+    final secs = spec.durationSeconds ?? 0;
+    return _formatMMSS(secs);
+  }
+  if (spec.reps != null) return '${spec.reps} reps';
+  final min = spec.repsMin;
+  final max = spec.repsMax;
+  if (min != null && max != null && min != max) return '$min–$max reps';
+  if (max != null) return '$max reps';
+  if (min != null) return '$min reps';
+  return '0 reps';
 }
 
 // ── SessionPlayerScreen ───────────────────────────────────────────────────────
@@ -64,11 +176,6 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
     final notifier = ref.read(sessionNotifierProvider(widget.init).notifier);
     _isFinalizing = true;
     await notifier.abandonSession();
-    // Abandonar = salir, no celebrar. Navegación explícita al tab Workout
-    // (evita revelar rutas residuales como /workout/session-summary del
-    // stack — context.pop() depende del historial y puede caer ahí). La
-    // sesión queda persistida como finished + wasFullyCompleted=false:
-    // sets guardados, no aparece como activa para el resume.
     if (mounted) {
       context.go('/workout');
     }
@@ -85,8 +192,7 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
     }
   }
 
-  /// Loguea un set directamente sin pasar por la sheet. Llamado por el
-  /// botón ☐ inline en cada fila — usa los valores actuales del stepper.
+  /// Loguea un set directamente sin pasar por la sheet.
   void _logSet(RoutineSlot slot, int setNumber, int reps, double weightKg) {
     ref.read(sessionNotifierProvider(widget.init).notifier).logSet(
           SetLog(
@@ -101,64 +207,14 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
         );
   }
 
-  /// Actualiza un set ya logueado con nuevos reps/peso. Llamado por el
-  /// stepper inline cuando el usuario edita una fila done.
+  /// Actualiza un set ya logueado con nuevos valores de peso.
   void _updateSet(SetLog existing, int reps, double weightKg) {
     final updated = existing.copyWith(reps: reps, weightKg: weightKg);
     ref.read(sessionNotifierProvider(widget.init).notifier).updateSet(updated);
   }
 
-  /// Builds the exercise list, grouping consecutive slots that share a non-null
-  /// [RoutineSlot.supersetGroup] into a single [_SupersetSection] (round-robin
-  /// gating). Standalone slots render as before via [_ExerciseSection]. A lone
-  /// tagged slot (run length < 2) falls back to standalone — no superset of one.
-  List<Widget> _buildExerciseList(SessionState state) {
-    final slots = state.day.slots;
-    final out = <Widget>[];
-    var i = 0;
-    while (i < slots.length) {
-      final group = slots[i].supersetGroup;
-      if (group != null) {
-        var scan = i;
-        final entries = <_SupersetEntry>[];
-        while (scan < slots.length && slots[scan].supersetGroup == group) {
-          entries.add(_entryFor(state, slots[scan]));
-          scan++;
-        }
-        if (entries.length >= 2) {
-          out.add(_SupersetSection(
-            entries: entries,
-            onSetCheck: _logSet,
-            onSetUpdate: _updateSet,
-          ));
-          out.add(const SizedBox(height: 14));
-          i = scan;
-          continue;
-        }
-      }
-      final entry = _entryFor(state, slots[i]);
-      final loggedCount = entry.logs.length;
-      final isDone = loggedCount >= entry.slot.targetSets;
-      out.add(_ExerciseSection(
-        slot: entry.slot,
-        logsForExercise: entry.logs,
-        currentSetNumber: isDone ? null : loggedCount + 1,
-        techniqueInstructions: entry.technique,
-        videoUrl: entry.videoUrl,
-        onSetCheck: (setNumber, reps, weightKg) =>
-            _logSet(entry.slot, setNumber, reps, weightKg),
-        onSetUpdate: (existing, reps, weightKg) =>
-            _updateSet(existing, reps, weightKg),
-      ));
-      out.add(const SizedBox(height: 14));
-      i++;
-    }
-    return out;
-  }
-
-  /// Gathers everything a section needs for one slot: its logs (sorted ASC) plus
-  /// the async-resolved technique + video. The `ref.watch` lives here (screen
-  /// build, where `ref` is available) so child sections stay plain widgets.
+  /// Gathers everything a section needs for one slot: its logs (sorted ASC)
+  /// plus the async-resolved technique + video.
   _SupersetEntry _entryFor(SessionState state, RoutineSlot slot) {
     final logs = state.setLogs
         .where((l) => l.exerciseId == slot.exerciseId)
@@ -173,6 +229,41 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
     );
   }
 
+  /// Builds the exercise list with block gating: current block fully expanded,
+  /// completed blocks collapsed to summary, future blocks locked/dimmed.
+  List<Widget> _buildExerciseList(SessionState state) {
+    final blocks = buildBlocks(state.day.slots);
+    final statuses = computeBlockStatuses(blocks, state.setLogs);
+    final out = <Widget>[];
+
+    for (var blockIdx = 0; blockIdx < blocks.length; blockIdx++) {
+      final block = blocks[blockIdx];
+      final status = statuses[blockIdx];
+
+      if (block.isSuperset) {
+        final entries = block.slots.map((s) => _entryFor(state, s)).toList();
+        out.add(_SupersetBlock(
+          entries: entries,
+          status: status,
+          allLogs: state.setLogs,
+          onSetCheck: _logSet,
+          onSetUpdate: _updateSet,
+        ));
+      } else {
+        final entry = _entryFor(state, block.slots.first);
+        out.add(_StandaloneBlock(
+          entry: entry,
+          status: status,
+          onSetCheck: (setNumber, reps, weightKg) =>
+              _logSet(entry.slot, setNumber, reps, weightKg),
+          onSetUpdate: _updateSet,
+        ));
+      }
+      out.add(const SizedBox(height: 14));
+    }
+    return out;
+  }
+
   // ── Build ─────────────────────────────────────────────────────────────────
 
   @override
@@ -180,7 +271,6 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
     final palette = AppPalette.of(context);
     final sessionAsync = ref.watch(sessionNotifierProvider(widget.init));
 
-    // Lookup de la rutina para el header (diseño §9.3).
     final routineId = switch (widget.init) {
       FreshSession(routineId: final rid) => rid,
       ResumeSession() => sessionAsync.value?.session.routineId,
@@ -188,11 +278,6 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
     final routineAsync = routineId != null
         ? ref.watch(routineByIdProvider(routineId))
         : const AsyncLoading<Routine?>();
-    // Routine.split is nullable as of routine-editor-redesign PR1
-    // (athlete-created routines may omit it). Analytics expects a non-null
-    // string; we keep the empty-string fallback here intentionally (do NOT
-    // replace with WorkoutStrings.splitFallback — analytics records the
-    // literal empty value, not the display copy). See ADR-RER-04.
     final routineSplit = routineAsync.valueOrNull?.split ?? '';
 
     return Scaffold(
@@ -228,12 +313,6 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
                   onBack: _showAbandonConfirm,
                 ),
                 Expanded(
-                  // ScrollConfiguration con overscroll: false desactiva el
-                  // StretchingOverscrollIndicator de Android 12+ — el que
-                  // escala visualmente las cards y deforma los steppers
-                  // cuando se llega al borde de la lista. ClampingScrollPhysics
-                  // solo controla el comportamiento del scroll, no el
-                  // indicator visual; los dos son necesarios.
                   child: ScrollConfiguration(
                     behavior: ScrollConfiguration.of(context).copyWith(
                       physics: const ClampingScrollPhysics(),
@@ -294,7 +373,6 @@ class _SessionHeader extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
       child: Row(
         children: [
-          // Botón back — mismo callback que ABANDONAR
           GestureDetector(
             onTap: onBack,
             child: Container(
@@ -320,7 +398,6 @@ class _SessionHeader extends StatelessWidget {
               ),
             ),
           ),
-          // Botón ABANDONAR — pill outlined rojo
           OutlinedButton(
             onPressed: onAbandon,
             style: OutlinedButton.styleFrom(
@@ -351,7 +428,6 @@ class _SessionHeader extends StatelessWidget {
 
 // ── _AttendanceCard ───────────────────────────────────────────────────────────
 
-// Placeholder: real check-in wired in Etapa 6.
 class _AttendanceCard extends ConsumerWidget {
   const _AttendanceCard();
 
@@ -507,13 +583,8 @@ class _SectionLabel extends StatelessWidget {
   }
 }
 
-// ── _ExerciseSection + _SetRow + _StepperCell ────────────────────────────────
+// ── Shared types ──────────────────────────────────────────────────────────────
 
-String _formatWeight(double w) =>
-    w == w.truncateToDouble() ? w.toInt().toString() : w.toString();
-
-/// Datos que una sección necesita para un slot: el slot, sus logs (ordenados
-/// ASC) y la técnica/video resueltos en el build del screen.
 typedef _SupersetEntry = ({
   RoutineSlot slot,
   List<SetLog> logs,
@@ -521,12 +592,311 @@ typedef _SupersetEntry = ({
   String? videoUrl,
 });
 
+// ── _StandaloneBlock ──────────────────────────────────────────────────────────
+
+/// Wraps a single exercise slot with block-gating applied.
+/// - completed → compact summary row with ✓
+/// - current   → full _ExerciseSection
+/// - future    → collapsed, dimmed, locked
+class _StandaloneBlock extends StatelessWidget {
+  const _StandaloneBlock({
+    required this.entry,
+    required this.status,
+    required this.onSetCheck,
+    required this.onSetUpdate,
+  });
+
+  final _SupersetEntry entry;
+  final BlockStatus status;
+  final void Function(int setNumber, int reps, double weightKg) onSetCheck;
+  final void Function(SetLog existing, int reps, double weightKg) onSetUpdate;
+
+  @override
+  Widget build(BuildContext context) {
+    switch (status) {
+      case BlockStatus.completed:
+        return _CompletedBlockSummary(
+          exerciseName: entry.slot.exerciseName,
+          totalSets: entry.slot.effectiveSets.length,
+        );
+      case BlockStatus.future:
+        return _FutureBlockPreview(exerciseName: entry.slot.exerciseName);
+      case BlockStatus.current:
+        final loggedCount = entry.logs.length;
+        final totalSets = entry.slot.effectiveSets.length;
+        final isDone = loggedCount >= totalSets;
+        return _ExerciseSection(
+          slot: entry.slot,
+          logsForExercise: entry.logs,
+          currentSetNumber: isDone ? null : loggedCount + 1,
+          techniqueInstructions: entry.technique,
+          videoUrl: entry.videoUrl,
+          onSetCheck: onSetCheck,
+          onSetUpdate: onSetUpdate,
+        );
+    }
+  }
+}
+
+// ── _SupersetBlock ────────────────────────────────────────────────────────────
+
+/// Wraps a superset group with block-gating applied.
+class _SupersetBlock extends StatelessWidget {
+  const _SupersetBlock({
+    required this.entries,
+    required this.status,
+    required this.allLogs,
+    required this.onSetCheck,
+    required this.onSetUpdate,
+  });
+
+  final List<_SupersetEntry> entries;
+  final BlockStatus status;
+  final List<SetLog> allLogs;
+  final void Function(
+      RoutineSlot slot, int setNumber, int reps, double weightKg) onSetCheck;
+  final void Function(SetLog existing, int reps, double weightKg) onSetUpdate;
+
+  @override
+  Widget build(BuildContext context) {
+    switch (status) {
+      case BlockStatus.completed:
+        return _CompletedSupersetSummary(entries: entries);
+      case BlockStatus.future:
+        return _FutureSupersetPreview(entries: entries);
+      case BlockStatus.current:
+        return _SupersetSection(
+          entries: entries,
+          onSetCheck: onSetCheck,
+          onSetUpdate: onSetUpdate,
+        );
+    }
+  }
+}
+
+// ── _CompletedBlockSummary ────────────────────────────────────────────────────
+
+/// Compact collapsed row for a completed standalone block.
+class _CompletedBlockSummary extends StatelessWidget {
+  const _CompletedBlockSummary({
+    required this.exerciseName,
+    required this.totalSets,
+  });
+
+  final String exerciseName;
+  final int totalSets;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    return Container(
+      decoration: BoxDecoration(
+        color: palette.bgCard,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: palette.accent.withValues(alpha: 0.3),
+          width: 1,
+        ),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      child: Row(
+        children: [
+          Icon(TreinoIcon.checkCircleFill, color: palette.accent, size: 20),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              exerciseName,
+              style: GoogleFonts.barlow(
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+                color: palette.textMuted,
+                decoration: TextDecoration.lineThrough,
+                decorationColor: palette.textMuted,
+              ),
+            ),
+          ),
+          Text(
+            '$totalSets/$totalSets',
+            style: GoogleFonts.barlowCondensed(
+              fontWeight: FontWeight.w700,
+              fontSize: 12,
+              color: palette.accent,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── _CompletedSupersetSummary ─────────────────────────────────────────────────
+
+/// Compact collapsed row for a completed superset block.
+class _CompletedSupersetSummary extends StatelessWidget {
+  const _CompletedSupersetSummary({required this.entries});
+
+  final List<_SupersetEntry> entries;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final names = entries.map((e) => e.slot.exerciseName).join(' · ');
+    return Container(
+      decoration: BoxDecoration(
+        color: palette.highlight.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: palette.accent.withValues(alpha: 0.3),
+          width: 1,
+        ),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      child: Row(
+        children: [
+          Icon(TreinoIcon.checkCircleFill, color: palette.accent, size: 20),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'SUPERSERIE',
+                  style: GoogleFonts.barlowCondensed(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 10,
+                    letterSpacing: 1.0,
+                    color: palette.accent,
+                  ),
+                ),
+                Text(
+                  names,
+                  style: GoogleFonts.barlow(
+                    fontWeight: FontWeight.w500,
+                    fontSize: 13,
+                    color: palette.textMuted,
+                    decoration: TextDecoration.lineThrough,
+                    decorationColor: palette.textMuted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Text(
+            'COMPLETA',
+            style: GoogleFonts.barlowCondensed(
+              fontWeight: FontWeight.w700,
+              fontSize: 11,
+              color: palette.accent,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── _FutureBlockPreview ───────────────────────────────────────────────────────
+
+/// Dimmed, locked row for a future standalone block.
+class _FutureBlockPreview extends StatelessWidget {
+  const _FutureBlockPreview({required this.exerciseName});
+
+  final String exerciseName;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    return Opacity(
+      opacity: 0.4,
+      child: Container(
+        decoration: BoxDecoration(
+          color: palette.bgCard,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Row(
+          children: [
+            Icon(TreinoIcon.lock, color: palette.textMuted, size: 18),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                exerciseName,
+                style: GoogleFonts.barlow(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                  color: palette.textMuted,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── _FutureSupersetPreview ────────────────────────────────────────────────────
+
+/// Dimmed, locked row for a future superset block.
+class _FutureSupersetPreview extends StatelessWidget {
+  const _FutureSupersetPreview({required this.entries});
+
+  final List<_SupersetEntry> entries;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final names = entries.map((e) => e.slot.exerciseName).join(' · ');
+    return Opacity(
+      opacity: 0.4,
+      child: Container(
+        decoration: BoxDecoration(
+          color: palette.highlight.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: palette.highlight),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Row(
+          children: [
+            Icon(TreinoIcon.lock, color: palette.highlight, size: 18),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'SUPERSERIE',
+                    style: GoogleFonts.barlowCondensed(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 10,
+                      letterSpacing: 1.0,
+                      color: palette.highlight,
+                    ),
+                  ),
+                  Text(
+                    names,
+                    style: GoogleFonts.barlow(
+                      fontWeight: FontWeight.w500,
+                      fontSize: 13,
+                      color: palette.textMuted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── _SupersetSection ──────────────────────────────────────────────────────────
+
 /// Envuelve los ejercicios de una superserie en una tarjeta magenta
-/// "SUPERSERIE" y fuerza el orden round-robin: A-1, B-1, A-2, B-2 … Solo la
-/// celda activa (la primera no completada en esa secuencia aplanada) queda
-/// interactiva; el resto se muestra como resumen bloqueado hasta su turno.
-/// Replica visualmente el bloque del editor / vista de plan para que el formato
-/// se lea igual en todos lados.
+/// "SUPERSERIE" y fuerza el orden round-robin: A-1, B-1, A-2, B-2 …
+/// Solo la celda activa (la primera no completada en esa secuencia aplanada)
+/// queda interactiva; el resto se muestra como resumen bloqueado hasta su turno.
 class _SupersetSection extends StatelessWidget {
   const _SupersetSection({
     required this.entries,
@@ -543,20 +913,21 @@ class _SupersetSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
 
-    // Vueltas totales = el ejercicio más largo del bloque (banca series
-    // desiguales: los más cortos se saltan en las vueltas finales).
+    // Vueltas totales = el ejercicio más largo del bloque.
     final maxRounds = entries.fold<int>(
-        0, (m, e) => e.slot.targetSets > m ? e.slot.targetSets : m);
+        0,
+        (m, e) =>
+            e.slot.effectiveSets.length > m ? e.slot.effectiveSets.length : m);
 
     // Scan round-robin: la celda activa es el primer par (vuelta, ejercicio)
-    // —ejercicios en orden del bloque— que aún no fue logueado.
+    // que aún no fue logueado.
     String? activeId;
     int? activeSet;
     var activeRound = 0;
     outer:
     for (var round = 1; round <= maxRounds; round++) {
       for (final e in entries) {
-        if (round > e.slot.targetSets) continue;
+        if (round > e.slot.effectiveSets.length) continue;
         if (e.logs.length < round) {
           activeId = e.slot.exerciseId;
           activeSet = round;
@@ -629,10 +1000,12 @@ class _SupersetSection extends StatelessWidget {
   }
 }
 
+// ── _ExerciseSection ──────────────────────────────────────────────────────────
+
 /// Sección de un ejercicio. Render condicional por fila:
 /// - Sets ya logueados: fila compacta (tappable para expandir y editar).
-/// - Set actual (siguiente pendiente): fila expandida con steppers.
-/// - Sets futuros (pendientes después del actual): NO se muestran.
+/// - Set actual (siguiente pendiente): fila expandida con controles.
+/// - Sets futuros (pendientes después del actual): solo resumen (sin controles).
 class _ExerciseSection extends StatefulWidget {
   const _ExerciseSection({
     required this.slot,
@@ -645,20 +1018,14 @@ class _ExerciseSection extends StatefulWidget {
   });
 
   final RoutineSlot slot;
-  final List<SetLog> logsForExercise; // ordenados por setNumber ASC
+  final List<SetLog> logsForExercise;
 
-  /// Set (1-based) que debe estar activo (expandido + chequeable). Lo decide el
-  /// padre: para un ejercicio suelto es loggedCount+1; dentro de una superserie
-  /// es la celda activa del round-robin, o null cuando no es su turno (o ya está
-  /// completo). Null ⇒ ningún set de esta sección es el actual.
+  /// Set (1-based) que debe estar activo. Null ⇒ ningún set activo.
   final int? currentSetNumber;
   final List<String>? techniqueInstructions;
   final String? videoUrl;
 
-  /// Loguea una fila pendiente con los valores actuales del stepper.
   final void Function(int setNumber, int reps, double weightKg) onSetCheck;
-
-  /// Actualiza una fila ya logueada cuando el usuario cambia el stepper.
   final void Function(SetLog existing, int reps, double weightKg) onSetUpdate;
 
   @override
@@ -677,24 +1044,6 @@ class _ExerciseSectionState extends State<_ExerciseSection> {
         _expandedDoneSets.add(setNumber);
       }
     });
-  }
-
-  /// Defaults para la fila actual (la siguiente pendiente).
-  ({int reps, double weightKg}) _defaultsForRow() {
-    if (widget.logsForExercise.isNotEmpty) {
-      final last = widget.logsForExercise.last;
-      return (reps: last.reps, weightKg: last.weightKg);
-    }
-    // For new-model slots use the first element of targetReps; fall back to
-    // targetRepsMin for legacy docs. Timed slots (targetReps empty) default
-    // to 0 — acceptable until timed-set execution is implemented next round.
-    final defaultReps = widget.slot.targetReps.isNotEmpty
-        ? widget.slot.targetReps.first
-        : widget.slot.targetRepsMin;
-    return (
-      reps: defaultReps,
-      weightKg: widget.slot.targetWeightKg ?? 0.0,
-    );
   }
 
   bool get _hasTechnique =>
@@ -718,21 +1067,18 @@ class _ExerciseSectionState extends State<_ExerciseSection> {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final effectiveSets = widget.slot.effectiveSets;
     final loggedCount = widget.logsForExercise.length;
-    final isDone = loggedCount >= widget.slot.targetSets;
-    final defaults = _defaultsForRow();
+    final totalSets = effectiveSets.length;
+    final isDone = loggedCount >= totalSets;
+    final mode = widget.slot.effectiveExerciseMode;
 
-    // El set "actual" (expandido + chequeable) lo decide el padre vía
-    // currentSetNumber — para un suelto es loggedCount+1, para una superserie es
-    // la celda activa del round-robin (o null si todavía no es su turno).
     final int? nextPendingSetNumber = widget.currentSetNumber;
 
-    // Lista de widgets — TODOS los sets visibles. La fila "actual" (la
-    // siguiente pendiente) viene con el panel de steppers desplegado.
-    // Los done pueden desplegarse manualmente para editar. Los futuros
-    // pendientes muestran solo el resumen (sin steppers).
     final rowWidgets = <Widget>[];
-    for (var setNumber = 1; setNumber <= widget.slot.targetSets; setNumber++) {
+    for (var idx = 0; idx < totalSets; idx++) {
+      final setNumber = idx + 1;
+      final spec = effectiveSets[idx];
       final logged = widget.logsForExercise
           .where((l) => l.setNumber == setNumber)
           .firstOrNull;
@@ -741,31 +1087,49 @@ class _ExerciseSectionState extends State<_ExerciseSection> {
       final isExpanded =
           isCurrent || (isRowDone && _expandedDoneSets.contains(setNumber));
 
-      final initialReps = isRowDone ? logged.reps : defaults.reps;
-      final initialWeight = isRowDone ? logged.weightKg : defaults.weightKg;
+      // For duration sets, the logged weight is 0.
+      // For reps sets, the logged weight comes from the log or planned spec.
+      final plannedWeight = spec.weightKg ?? widget.slot.targetWeightKg ?? 0.0;
+      final initialWeight = isRowDone ? logged.weightKg : plannedWeight;
+      final plannedReps = plannedRepsForSpec(spec, mode);
+
+      final isDurationSet = mode == ExerciseMode.duration ||
+          (spec.durationSeconds != null && spec.durationSeconds! > 0);
+      final targetSeconds = isDurationSet ? (spec.durationSeconds ?? 0) : 0;
 
       rowWidgets.add(
         Padding(
           padding: EdgeInsets.only(top: rowWidgets.isEmpty ? 0 : 8),
-          child: _SetRow(
-            // Key estable para que el state del row sobreviva entre rebuilds
-            // de la sección, pero distinta entre id-de-log distintos (al
-            // pasar de pending a done se monta un row nuevo).
-            key: ValueKey('set-$setNumber-${logged?.id ?? "pending"}'),
-            setNumber: setNumber,
-            initialReps: initialReps,
-            initialWeightKg: initialWeight,
-            isDone: isRowDone,
-            isExpanded: isExpanded,
-            onCheck: isCurrent
-                ? (reps, weightKg) =>
-                    widget.onSetCheck(setNumber, reps, weightKg)
-                : null,
-            onUpdate: isRowDone
-                ? (reps, weightKg) => widget.onSetUpdate(logged, reps, weightKg)
-                : null,
-            onSummaryTap: isRowDone ? () => _toggleDoneRow(setNumber) : null,
-          ),
+          child: isDurationSet
+              ? _DurationSetRow(
+                  key: ValueKey('dur-$setNumber-${logged?.id ?? "pending"}'),
+                  setNumber: setNumber,
+                  targetSeconds: targetSeconds,
+                  isDone: isRowDone,
+                  onDone: isCurrent
+                      ? () => widget.onSetCheck(setNumber, 0, 0.0)
+                      : null,
+                )
+              : _RepsSetRow(
+                  key: ValueKey('set-$setNumber-${logged?.id ?? "pending"}'),
+                  setNumber: setNumber,
+                  spec: spec,
+                  mode: mode,
+                  plannedReps: plannedReps,
+                  initialWeightKg: initialWeight,
+                  isDone: isRowDone,
+                  isExpanded: isExpanded,
+                  onCheck: isCurrent
+                      ? (weightKg) =>
+                          widget.onSetCheck(setNumber, plannedReps, weightKg)
+                      : null,
+                  onWeightUpdate: isRowDone
+                      ? (weightKg) =>
+                          widget.onSetUpdate(logged, plannedReps, weightKg)
+                      : null,
+                  onSummaryTap:
+                      isRowDone ? () => _toggleDoneRow(setNumber) : null,
+                ),
         ),
       );
     }
@@ -831,7 +1195,7 @@ class _ExerciseSectionState extends State<_ExerciseSection> {
                   ),
                 ),
                 child: Text(
-                  '$loggedCount/${widget.slot.targetSets}',
+                  '$loggedCount/$totalSets',
                   style: GoogleFonts.barlowCondensed(
                     fontWeight: FontWeight.w700,
                     fontSize: 12,
@@ -850,80 +1214,89 @@ class _ExerciseSectionState extends State<_ExerciseSection> {
   }
 }
 
-/// Fila de un set individual. Estructura:
-/// - Summary row siempre visible: número + "X reps · Y kg" + status icon.
-/// - Panel de steppers desplegable hacia abajo (AnimatedSize). Se muestra
-///   solo cuando `isExpanded == true` (set actual o set done que el
-///   usuario tocó para editar).
-///
-/// Para sets pending no-actuales (futuros), el row muestra solo el summary
-/// con valores "proyectados" (defaults) — no interactivo hasta que se
-/// vuelva el actual.
-class _SetRow extends StatefulWidget {
-  const _SetRow({
+// ── _RepsSetRow ───────────────────────────────────────────────────────────────
+
+/// Fila de un set basado en reps.
+/// - Reps: texto fijo (no editable). Logged reps = planned (repsMax for ranges).
+/// - Peso: TextField numérico (teclado decimal).
+/// - Check: marca el set como done.
+class _RepsSetRow extends StatefulWidget {
+  const _RepsSetRow({
     super.key,
     required this.setNumber,
-    required this.initialReps,
+    required this.spec,
+    required this.mode,
+    required this.plannedReps,
     required this.initialWeightKg,
     required this.isDone,
     required this.isExpanded,
     required this.onCheck,
-    required this.onUpdate,
+    required this.onWeightUpdate,
     required this.onSummaryTap,
   });
 
   final int setNumber;
-  final int initialReps;
+  final SetSpec spec;
+  final ExerciseMode mode;
+  final int plannedReps;
   final double initialWeightKg;
   final bool isDone;
   final bool isExpanded;
 
-  /// Llamado al tap del ☐ en filas pendientes actuales con (reps, weightKg).
-  final void Function(int reps, double weightKg)? onCheck;
+  /// Called when the ☐ is tapped for a pending current row — (weightKg).
+  final void Function(double weightKg)? onCheck;
 
-  /// Llamado al cambiar el stepper de una fila done — persiste el cambio
-  /// inmediatamente vía notifier.updateSet.
-  final void Function(int reps, double weightKg)? onUpdate;
+  /// Called when weight changes for a done row.
+  final void Function(double weightKg)? onWeightUpdate;
 
-  /// Tap en la summary row — solo activo en filas done para toggle expand.
+  /// Tap on summary row — only active for done rows to toggle expand.
   final VoidCallback? onSummaryTap;
 
   @override
-  State<_SetRow> createState() => _SetRowState();
+  State<_RepsSetRow> createState() => _RepsSetRowState();
 }
 
-class _SetRowState extends State<_SetRow> {
-  late int _reps;
+class _RepsSetRowState extends State<_RepsSetRow> {
+  late TextEditingController _weightController;
   late double _weightKg;
 
   @override
   void initState() {
     super.initState();
-    _reps = widget.initialReps;
     _weightKg = widget.initialWeightKg;
+    _weightController = TextEditingController(
+      text: _weightKg == 0 ? '' : _formatWeight(_weightKg),
+    );
   }
 
-  void _changeReps(int delta) {
-    setState(() => _reps = (_reps + delta).clamp(0, 50));
-    if (widget.isDone) widget.onUpdate?.call(_reps, _weightKg);
+  @override
+  void dispose() {
+    _weightController.dispose();
+    super.dispose();
   }
 
-  void _changeWeight(double delta) {
-    setState(() => _weightKg = (_weightKg + delta).clamp(0.0, 500.0));
-    if (widget.isDone) widget.onUpdate?.call(_reps, _weightKg);
+  void _onWeightChanged(String value) {
+    final parsed = double.tryParse(value.replaceAll(',', '.'));
+    if (parsed != null && parsed >= 0 && parsed <= 500) {
+      _weightKg = parsed;
+      if (widget.isDone) {
+        widget.onWeightUpdate?.call(_weightKg);
+      }
+    }
   }
 
   void _onCheckTap() {
-    widget.onCheck?.call(_reps, _weightKg);
+    widget.onCheck?.call(_weightKg);
   }
+
+  String get _repsDisplayText => repsDisplayText(widget.spec, widget.mode);
 
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final textColor = widget.isDone ? palette.textMuted : palette.textPrimary;
-    final canTapCheck =
-        widget.isDone ? widget.onSummaryTap != null : widget.onCheck != null;
 
+    // Summary row — always visible.
     final summaryRow = GestureDetector(
       onTap: widget.onSummaryTap,
       behavior: HitTestBehavior.opaque,
@@ -944,7 +1317,7 @@ class _SetRowState extends State<_SetRow> {
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              '$_reps reps · ${_formatWeight(_weightKg)} kg',
+              '$_repsDisplayText · ${_formatWeight(_weightKg)} kg',
               style: GoogleFonts.barlow(
                 fontWeight: FontWeight.w500,
                 fontSize: 14,
@@ -953,9 +1326,7 @@ class _SetRowState extends State<_SetRow> {
             ),
           ),
           GestureDetector(
-            onTap: canTapCheck
-                ? (widget.isDone ? widget.onSummaryTap : _onCheckTap)
-                : null,
+            onTap: widget.isDone ? widget.onSummaryTap : _onCheckTap,
             behavior: HitTestBehavior.opaque,
             child: Container(
               width: 32,
@@ -974,32 +1345,42 @@ class _SetRowState extends State<_SetRow> {
       ),
     );
 
-    // Panel de steppers que se despliega hacia abajo cuando isExpanded.
-    final stepperPanel = Padding(
+    // Expanded panel: fixed reps label + weight text field.
+    final expandedPanel = Padding(
       padding: const EdgeInsets.only(top: 10),
       child: Row(
         children: [
-          const SizedBox(width: 32), // alineación con number
+          const SizedBox(width: 32),
+          // Fixed reps display — NOT editable.
           Expanded(
-            child: _StepperCell(
-              value: '$_reps',
-              suffix: 'reps',
-              onDecrement: () => _changeReps(-1),
-              onIncrement: () => _changeReps(1),
-              textColor: textColor,
+            child: Container(
+              alignment: Alignment.center,
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              decoration: BoxDecoration(
+                border: Border(
+                  bottom: BorderSide(color: palette.border),
+                ),
+              ),
+              child: Text(
+                _repsDisplayText,
+                style: GoogleFonts.barlow(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 16,
+                  color: textColor,
+                ),
+              ),
             ),
           ),
           const SizedBox(width: 8),
+          // Editable weight field.
           Expanded(
-            child: _StepperCell(
-              value: _formatWeight(_weightKg),
-              suffix: 'kg',
-              onDecrement: () => _changeWeight(-2.5),
-              onIncrement: () => _changeWeight(2.5),
+            child: _WeightField(
+              controller: _weightController,
               textColor: textColor,
+              onChanged: _onWeightChanged,
             ),
           ),
-          const SizedBox(width: 32), // alineación con check icon
+          const SizedBox(width: 32),
         ],
       ),
     );
@@ -1018,7 +1399,7 @@ class _SetRowState extends State<_SetRow> {
             curve: Curves.easeInOut,
             alignment: Alignment.topCenter,
             child: widget.isExpanded
-                ? stepperPanel
+                ? expandedPanel
                 : const SizedBox(width: double.infinity),
           ),
         ],
@@ -1027,77 +1408,243 @@ class _SetRowState extends State<_SetRow> {
   }
 }
 
-/// Stepper compacto inline: −  valor suffix  +
-class _StepperCell extends StatelessWidget {
-  const _StepperCell({
-    required this.value,
-    required this.suffix,
-    required this.onDecrement,
-    required this.onIncrement,
+// ── _WeightField ──────────────────────────────────────────────────────────────
+
+/// Editable numeric text field for weight input.
+/// Underline style, ~16px font, min 44px tap target.
+class _WeightField extends StatelessWidget {
+  const _WeightField({
+    required this.controller,
     required this.textColor,
+    required this.onChanged,
   });
 
-  final String value;
-  final String suffix;
-  final VoidCallback onDecrement;
-  final VoidCallback onIncrement;
+  final TextEditingController controller;
   final Color textColor;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        _StepperButton(icon: '−', onTap: onDecrement),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            '$value $suffix',
-            textAlign: TextAlign.center,
-            overflow: TextOverflow.ellipsis,
-            style: GoogleFonts.barlow(
-              fontWeight: FontWeight.w600,
-              fontSize: 14,
-              color: textColor,
-            ),
-          ),
-        ),
-        const SizedBox(width: 8),
-        _StepperButton(icon: '+', onTap: onIncrement),
-      ],
-    );
-  }
-}
-
-class _StepperButton extends StatelessWidget {
-  const _StepperButton({required this.icon, required this.onTap});
-
-  final String icon;
-  final VoidCallback onTap;
+  final ValueChanged<String> onChanged;
 
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Container(
-        width: 28,
-        height: 28,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: palette.bgCard,
-          border: Border.all(color: palette.border),
+    return SizedBox(
+      height: 44,
+      child: TextField(
+        controller: controller,
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        inputFormatters: [
+          FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+        ],
+        textAlign: TextAlign.center,
+        style: GoogleFonts.barlow(
+          fontWeight: FontWeight.w600,
+          fontSize: 16,
+          color: textColor,
         ),
-        alignment: Alignment.center,
-        child: Text(
-          icon,
-          style: GoogleFonts.barlowCondensed(
-            fontWeight: FontWeight.w700,
-            fontSize: 18,
-            color: palette.textPrimary,
+        decoration: InputDecoration(
+          hintText: '0 kg',
+          hintStyle: GoogleFonts.barlow(
+            fontWeight: FontWeight.w400,
+            fontSize: 14,
+            color: palette.textMuted,
           ),
+          suffix: Text(
+            'kg',
+            style: GoogleFonts.barlow(
+              fontWeight: FontWeight.w400,
+              fontSize: 13,
+              color: palette.textMuted,
+            ),
+          ),
+          enabledBorder: UnderlineInputBorder(
+            borderSide: BorderSide(color: palette.border),
+          ),
+          focusedBorder: UnderlineInputBorder(
+            borderSide: BorderSide(color: palette.accent, width: 2),
+          ),
+          isDense: true,
+          contentPadding: const EdgeInsets.symmetric(vertical: 8),
         ),
+        onChanged: onChanged,
+      ),
+    );
+  }
+}
+
+// ── _DurationSetRow ───────────────────────────────────────────────────────────
+
+/// Fila de un set basado en duración.
+/// Muestra el tiempo objetivo como MM:SS y un countdown timer.
+/// "Iniciar" arranca el contador; al llegar a 0 (o tap "Listo") marca done.
+class _DurationSetRow extends StatefulWidget {
+  const _DurationSetRow({
+    super.key,
+    required this.setNumber,
+    required this.targetSeconds,
+    required this.isDone,
+    required this.onDone,
+  });
+
+  final int setNumber;
+  final int targetSeconds;
+  final bool isDone;
+
+  /// Called when the set is marked done. Null means not interactive.
+  final VoidCallback? onDone;
+
+  @override
+  State<_DurationSetRow> createState() => _DurationSetRowState();
+}
+
+class _DurationSetRowState extends State<_DurationSetRow> {
+  Timer? _timer;
+  int _remaining = 0;
+  bool _running = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _remaining = widget.targetSeconds;
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  void _startTimer() {
+    if (_running || widget.isDone) return;
+    setState(() => _running = true);
+    _timer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted) {
+        t.cancel();
+        return;
+      }
+      setState(() {
+        if (_remaining > 0) {
+          _remaining--;
+        } else {
+          t.cancel();
+          _running = false;
+          // Auto-mark done when countdown reaches 0.
+          widget.onDone?.call();
+        }
+      });
+    });
+  }
+
+  void _markDone() {
+    _timer?.cancel();
+    _running = false;
+    widget.onDone?.call();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final textColor = widget.isDone ? palette.textMuted : palette.textPrimary;
+    final isInteractive = widget.onDone != null && !widget.isDone;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+      decoration: BoxDecoration(
+        color: palette.bg,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 20,
+            child: Text(
+              '${widget.setNumber}',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.barlowCondensed(
+                fontWeight: FontWeight.w700,
+                fontSize: 14,
+                color: textColor,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          // Timer display.
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _running ||
+                          (!widget.isDone && _remaining < widget.targetSeconds)
+                      ? _formatMMSS(_remaining)
+                      : _formatMMSS(widget.targetSeconds),
+                  style: GoogleFonts.barlowCondensed(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 22,
+                    color: _running ? palette.accent : textColor,
+                  ),
+                ),
+                if (!widget.isDone)
+                  Text(
+                    'objetivo: ${_formatMMSS(widget.targetSeconds)}',
+                    style: GoogleFonts.barlow(
+                      fontWeight: FontWeight.w400,
+                      fontSize: 11,
+                      color: palette.textMuted,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          // Action button.
+          if (widget.isDone)
+            Icon(TreinoIcon.checkCircleFill, color: palette.accent, size: 22)
+          else if (!_running)
+            GestureDetector(
+              onTap: isInteractive ? _startTimer : null,
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: isInteractive
+                      ? palette.accent.withValues(alpha: 0.15)
+                      : palette.bgCard,
+                  borderRadius: BorderRadius.circular(9999),
+                  border: Border.all(
+                    color: isInteractive ? palette.accent : palette.border,
+                  ),
+                ),
+                child: Text(
+                  'Iniciar',
+                  style: GoogleFonts.barlowCondensed(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                    color: isInteractive ? palette.accent : palette.textMuted,
+                  ),
+                ),
+              ),
+            )
+          else
+            GestureDetector(
+              onTap: _markDone,
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: palette.accent.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(9999),
+                  border: Border.all(color: palette.accent),
+                ),
+                child: Text(
+                  'Listo',
+                  style: GoogleFonts.barlowCondensed(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                    color: palette.accent,
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

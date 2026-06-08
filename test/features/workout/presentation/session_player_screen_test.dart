@@ -3,6 +3,9 @@
 // TASK-203a: _AttendanceCard fue incluida en el commit 202b junto con el esqueleto
 // de la pantalla — los tests 277-278 son GREEN desde el primer run (desviación
 // documentada en apply-progress.md).
+//
+// Updated for the 5-change redesign (per-set model, duration timer, weight
+// keyboard, reps non-editable, block gating).
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -13,7 +16,10 @@ import 'package:treino/features/workout/application/session_init.dart';
 import 'package:treino/features/workout/application/session_notifier.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
 import 'package:treino/features/workout/application/session_state.dart';
+import 'package:treino/features/workout/domain/routine_slot.dart';
+import 'package:treino/features/workout/domain/set_enums.dart';
 import 'package:treino/features/workout/domain/set_log.dart';
+import 'package:treino/features/workout/domain/set_spec.dart';
 import 'package:treino/features/workout/presentation/session_player_screen.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
@@ -274,14 +280,12 @@ void main() {
       expect(find.text('0/3'), findsAtLeastNWidgets(1));
     });
 
-    // SCENARIO-285: stepper '+' de reps actualiza el valor mostrado inline.
-    // En el redesign solo se muestra la serie actual expandida (no las
-    // futuras pendientes), así que esperamos exactamente 1 fila con
-    // "8 reps" antes del tap y 1 con "9 reps" después.
+    // SCENARIO-285 (updated): reps son no editables — se muestran como texto
+    // fijo. makeSlot usa targetRepsMin=8, targetRepsMax=12 (range) → "8–12 reps".
     testWidgets(
-        'SCENARIO-285: tap en stepper "+" de reps incrementa el valor inline',
+        'SCENARIO-285: reps no editables — muestra texto fijo de reps planeadas',
         (tester) async {
-      // Sentadilla pending, sin logs → solo se renderiza la serie 1.
+      // Sentadilla pending, sin logs → sección activa visible.
       final slots = [
         makeSlot(exerciseId: 'e2', exerciseName: 'Sentadilla', targetSets: 3),
       ];
@@ -300,16 +304,14 @@ void main() {
         ),
       );
       await tester.pump();
-      // Antes: la única fila expandida muestra "8 reps" (targetRepsMin
-      // default de makeSlot) en el stepper de reps.
-      expect(find.text('8 reps'), findsOneWidget);
-      // Tap en el primer '+' (el '+' del stepper de reps).
-      await tester.ensureVisible(find.text('+').first);
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('+').first);
-      await tester.pump();
-      // Después: el stepper de reps muestra "9 reps".
-      expect(find.text('9 reps'), findsOneWidget);
+      // makeSlot default: targetRepsMin=8, targetRepsMax=12 → efectiveSets
+      // sintetiza SetSpec(repsMin:8, repsMax:12) → "8–12 reps"
+      expect(find.textContaining('8–12 reps'), findsWidgets);
+      // No debe haber stepper de reps (sin botón '+' para reps).
+      // El único '+' que podría estar sería en el stepper de kg — pero
+      // en el nuevo diseño el peso es un TextField, no un stepper, así que
+      // no debe haber ningún botón '+' en pantalla.
+      expect(find.text('+'), findsNothing);
     });
 
     // SCENARIO-286: fila done NO es tappable
@@ -520,6 +522,224 @@ void main() {
       await tester.tap(find.text('TERMINAR SESIÓN'));
       await tester.pumpAndSettle();
       expect(finishCalled, isTrue);
+    });
+  });
+
+  // ── Block gating (pure logic helpers) ────────────────────────────────────
+
+  group('block gating helpers', () {
+    test('buildBlocks: two standalone slots → two blocks', () {
+      final slots = [
+        makeSlot(exerciseId: 'e1'),
+        makeSlot(exerciseId: 'e2', exerciseName: 'Sentadilla'),
+      ];
+      final blocks = buildBlocks(slots);
+      expect(blocks.length, 2);
+      expect(blocks[0].isSuperset, isFalse);
+      expect(blocks[1].isSuperset, isFalse);
+    });
+
+    test('buildBlocks: two superset slots → one superset block', () {
+      final slots = [
+        makeSlot(exerciseId: 'e1', supersetGroup: 1),
+        makeSlot(exerciseId: 'e2', exerciseName: 'B', supersetGroup: 1),
+      ];
+      final blocks = buildBlocks(slots);
+      expect(blocks.length, 1);
+      expect(blocks[0].isSuperset, isTrue);
+      expect(blocks[0].slots.length, 2);
+    });
+
+    test('buildBlocks: lone tagged slot falls back to standalone', () {
+      final slots = [makeSlot(exerciseId: 'e1', supersetGroup: 99)];
+      final blocks = buildBlocks(slots);
+      expect(blocks.length, 1);
+      expect(blocks[0].isSuperset, isFalse);
+    });
+
+    test('computeBlockStatuses: all empty → first is current, rest are future',
+        () {
+      final slots = [
+        makeSlot(exerciseId: 'e1'),
+        makeSlot(exerciseId: 'e2', exerciseName: 'B'),
+        makeSlot(exerciseId: 'e3', exerciseName: 'C'),
+      ];
+      final blocks = buildBlocks(slots);
+      final statuses = computeBlockStatuses(blocks, const []);
+      expect(statuses, [
+        BlockStatus.current,
+        BlockStatus.future,
+        BlockStatus.future,
+      ]);
+    });
+
+    test('computeBlockStatuses: first block complete → second is current', () {
+      final slots = [
+        makeSlot(exerciseId: 'e1', targetSets: 2),
+        makeSlot(exerciseId: 'e2', exerciseName: 'B', targetSets: 2),
+      ];
+      final blocks = buildBlocks(slots);
+      final logs = [
+        makeSetLog(exerciseId: 'e1', setNumber: 1),
+        makeSetLog(exerciseId: 'e1', setNumber: 2),
+      ];
+      final statuses = computeBlockStatuses(blocks, logs);
+      expect(statuses[0], BlockStatus.completed);
+      expect(statuses[1], BlockStatus.current);
+    });
+
+    test('computeBlockStatuses: all blocks complete → all completed', () {
+      final slots = [
+        makeSlot(exerciseId: 'e1', targetSets: 1),
+        makeSlot(exerciseId: 'e2', exerciseName: 'B', targetSets: 1),
+      ];
+      final blocks = buildBlocks(slots);
+      final logs = [
+        makeSetLog(exerciseId: 'e1', setNumber: 1),
+        makeSetLog(exerciseId: 'e2', setNumber: 1),
+      ];
+      final statuses = computeBlockStatuses(blocks, logs);
+      expect(statuses, [BlockStatus.completed, BlockStatus.completed]);
+    });
+
+    test('isStandaloneBlockComplete: logs >= effectiveSets.length → true', () {
+      // makeSlot with targetSets=2, no explicit sets → effectiveSets length=2
+      final slot = makeSlot(exerciseId: 'e1', targetSets: 2);
+      final logs = [
+        makeSetLog(exerciseId: 'e1', setNumber: 1),
+        makeSetLog(exerciseId: 'e1', setNumber: 2),
+      ];
+      expect(isStandaloneBlockComplete(slot, logs), isTrue);
+    });
+
+    test('isStandaloneBlockComplete: partial logs → false', () {
+      final slot = makeSlot(exerciseId: 'e1', targetSets: 3);
+      final logs = [makeSetLog(exerciseId: 'e1', setNumber: 1)];
+      expect(isStandaloneBlockComplete(slot, logs), isFalse);
+    });
+
+    test(
+        'plannedRepsForSpec: single reps → returns reps value, '
+        'range → returns repsMax', () {
+      const single = SetSpec(reps: 10);
+      expect(plannedRepsForSpec(single, ExerciseMode.reps), 10);
+
+      const range = SetSpec(repsMin: 8, repsMax: 12);
+      expect(plannedRepsForSpec(range, ExerciseMode.reps), 12);
+    });
+
+    test('plannedRepsForSpec: duration mode → 0', () {
+      const durSpec = SetSpec(durationSeconds: 30);
+      expect(plannedRepsForSpec(durSpec, ExerciseMode.duration), 0);
+    });
+  });
+
+  // ── Duration set detection ────────────────────────────────────────────────
+
+  group('duration set detection', () {
+    testWidgets(
+        'duration slot shows "Iniciar" button instead of reps stepper or check',
+        (tester) async {
+      // Slot with durationSeconds = 30 → effectiveSets has durationSeconds set.
+      const slot = RoutineSlot(
+        exerciseId: 'ed1',
+        exerciseName: 'Plancha',
+        muscleGroup: 'Core',
+        targetSets: 2,
+        targetRepsMin: 0,
+        targetRepsMax: 0,
+        restSeconds: 60,
+        durationSeconds: 30,
+      );
+      final day = makeDay(dayNumber: 1, slots: [slot]);
+      final state = SessionState(
+        session: makeSession(),
+        day: day,
+        setLogs: const [],
+        currentExerciseIndex: 0,
+        elapsedSeconds: 0,
+      );
+      await tester.pumpWidget(
+        _wrapProvider(
+          const SessionPlayerScreen(init: _kInit),
+          _stateOverride(state),
+        ),
+      );
+      await tester.pump();
+      // Timer target displayed (00:30).
+      expect(find.textContaining('00:30'), findsWidgets);
+      // "Iniciar" button present for duration sets (at least one visible).
+      expect(find.text('Iniciar'), findsWidgets);
+      // No reps stepper — weight is a text field in new design.
+      expect(find.text('+'), findsNothing);
+    });
+  });
+
+  // ── Block gating widget tests ─────────────────────────────────────────────
+
+  group('block gating UI', () {
+    testWidgets(
+        'completed block shows compact summary with checkmark, no interactive rows',
+        (tester) async {
+      // Two blocks: e1 (1 set, completed), e2 (1 set, pending).
+      final slots = [
+        makeSlot(exerciseId: 'e1', exerciseName: 'Press', targetSets: 1),
+        makeSlot(exerciseId: 'e2', exerciseName: 'Curl', targetSets: 1),
+      ];
+      final day = makeDay(dayNumber: 1, slots: slots);
+      final logs = [makeSetLog(exerciseId: 'e1', setNumber: 1)];
+      final state = SessionState(
+        session: makeSession(),
+        day: day,
+        setLogs: logs,
+        currentExerciseIndex: 1,
+        elapsedSeconds: 0,
+      );
+      await tester.pumpWidget(
+        _wrapProvider(
+          const SessionPlayerScreen(init: _kInit),
+          _stateOverride(state),
+        ),
+      );
+      await tester.pump();
+      // Press should be shown with strikethrough (completed summary).
+      final pressText = tester.widget<Text>(find.text('Press'));
+      expect(pressText.style?.decoration, TextDecoration.lineThrough);
+      // Curl should be shown as the current block (no strikethrough).
+      final curlText = tester.widget<Text>(find.text('Curl'));
+      expect(curlText.style?.decoration, isNot(TextDecoration.lineThrough));
+    });
+
+    testWidgets('future block is dimmed (Opacity 0.4)', (tester) async {
+      // Three blocks: e1 pending (current), e2 future, e3 future.
+      final slots = [
+        makeSlot(exerciseId: 'e1', exerciseName: 'A', targetSets: 1),
+        makeSlot(exerciseId: 'e2', exerciseName: 'B', targetSets: 1),
+        makeSlot(exerciseId: 'e3', exerciseName: 'C', targetSets: 1),
+      ];
+      final day = makeDay(dayNumber: 1, slots: slots);
+      final state = SessionState(
+        session: makeSession(),
+        day: day,
+        setLogs: const [],
+        currentExerciseIndex: 0,
+        elapsedSeconds: 0,
+      );
+      await tester.pumpWidget(
+        _wrapProvider(
+          const SessionPlayerScreen(init: _kInit),
+          _stateOverride(state),
+        ),
+      );
+      await tester.pump();
+      // Should have 2 future (dimmed) blocks = 2 Opacity(0.4) widgets for
+      // blocks B and C, plus 1 more for the disabled TERMINAR SESIÓN button.
+      final dimmedOpacities = tester
+          .widgetList<Opacity>(find.byType(Opacity))
+          .where((o) => o.opacity == 0.4)
+          .length;
+      // At minimum 2 future blocks dimmed (B and C).
+      expect(dimmedOpacities, greaterThanOrEqualTo(2));
     });
   });
 

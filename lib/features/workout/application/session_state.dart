@@ -27,10 +27,10 @@ class SessionState {
 
   // ── Getters derivados ────────────────────────────────────────────────────
 
-  /// Verdadero cuando cada slot del día tiene al menos `targetSets` logs.
+  /// Verdadero cuando cada slot del día tiene al menos `effectiveSets.length` logs.
   bool get isFullyCompleted => day.slots.every((slot) {
         final count = setsLoggedFor(slot.exerciseId);
-        return count >= slot.targetSets;
+        return count >= slot.effectiveSets.length;
       });
 
   /// Suma de reps × weightKg sobre todos los setLogs.
@@ -46,7 +46,7 @@ class SessionState {
   /// Verdadero si el ejercicio tiene todos sus sets completados.
   bool isExerciseDone(String exerciseId) {
     final slot = day.slots.firstWhere((s) => s.exerciseId == exerciseId);
-    return setsLoggedFor(exerciseId) >= slot.targetSets;
+    return setsLoggedFor(exerciseId) >= slot.effectiveSets.length;
   }
 
   /// Cantidad de ejercicios del día con todos sus sets completados.
