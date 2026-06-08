@@ -18,6 +18,11 @@ class RoutineSlot with _$RoutineSlot {
         targetWeightKg, // null means "user picks" or "no target" (plate math)
     String? notes, // nullable free-form coaching notes
     int? supersetGroup, // non-null → slot belongs to a superset block
+    // ── New fields (additive — backward-compatible) ──────────────────────────
+    // Per-set reps: [] = none/legacy; [10] = uniform; [6,8,10] = per-set.
+    @Default(<int>[]) List<int> targetReps,
+    // null / 0 = reps-based; > 0 = time-based (seconds per set).
+    int? durationSeconds,
   }) = _RoutineSlot;
 
   factory RoutineSlot.fromJson(Map<String, Object?> json) =>

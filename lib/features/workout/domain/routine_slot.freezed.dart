@@ -34,7 +34,13 @@ mixin _$RoutineSlot {
       throw _privateConstructorUsedError; // null means "user picks" or "no target" (plate math)
   String? get notes =>
       throw _privateConstructorUsedError; // nullable free-form coaching notes
-  int? get supersetGroup => throw _privateConstructorUsedError;
+  int? get supersetGroup =>
+      throw _privateConstructorUsedError; // non-null → slot belongs to a superset block
+// ── New fields (additive — backward-compatible) ──────────────────────────
+// Per-set reps: [] = none/legacy; [10] = uniform; [6,8,10] = per-set.
+  List<int> get targetReps =>
+      throw _privateConstructorUsedError; // null / 0 = reps-based; > 0 = time-based (seconds per set).
+  int? get durationSeconds => throw _privateConstructorUsedError;
 
   /// Serializes this RoutineSlot to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -62,7 +68,9 @@ abstract class $RoutineSlotCopyWith<$Res> {
       int restSeconds,
       double? targetWeightKg,
       String? notes,
-      int? supersetGroup});
+      int? supersetGroup,
+      List<int> targetReps,
+      int? durationSeconds});
 }
 
 /// @nodoc
@@ -90,6 +98,8 @@ class _$RoutineSlotCopyWithImpl<$Res, $Val extends RoutineSlot>
     Object? targetWeightKg = freezed,
     Object? notes = freezed,
     Object? supersetGroup = freezed,
+    Object? targetReps = null,
+    Object? durationSeconds = freezed,
   }) {
     return _then(_value.copyWith(
       exerciseId: null == exerciseId
@@ -132,6 +142,14 @@ class _$RoutineSlotCopyWithImpl<$Res, $Val extends RoutineSlot>
           ? _value.supersetGroup
           : supersetGroup // ignore: cast_nullable_to_non_nullable
               as int?,
+      targetReps: null == targetReps
+          ? _value.targetReps
+          : targetReps // ignore: cast_nullable_to_non_nullable
+              as List<int>,
+      durationSeconds: freezed == durationSeconds
+          ? _value.durationSeconds
+          : durationSeconds // ignore: cast_nullable_to_non_nullable
+              as int?,
     ) as $Val);
   }
 }
@@ -154,7 +172,9 @@ abstract class _$$RoutineSlotImplCopyWith<$Res>
       int restSeconds,
       double? targetWeightKg,
       String? notes,
-      int? supersetGroup});
+      int? supersetGroup,
+      List<int> targetReps,
+      int? durationSeconds});
 }
 
 /// @nodoc
@@ -180,6 +200,8 @@ class __$$RoutineSlotImplCopyWithImpl<$Res>
     Object? targetWeightKg = freezed,
     Object? notes = freezed,
     Object? supersetGroup = freezed,
+    Object? targetReps = null,
+    Object? durationSeconds = freezed,
   }) {
     return _then(_$RoutineSlotImpl(
       exerciseId: null == exerciseId
@@ -222,6 +244,14 @@ class __$$RoutineSlotImplCopyWithImpl<$Res>
           ? _value.supersetGroup
           : supersetGroup // ignore: cast_nullable_to_non_nullable
               as int?,
+      targetReps: null == targetReps
+          ? _value._targetReps
+          : targetReps // ignore: cast_nullable_to_non_nullable
+              as List<int>,
+      durationSeconds: freezed == durationSeconds
+          ? _value.durationSeconds
+          : durationSeconds // ignore: cast_nullable_to_non_nullable
+              as int?,
     ));
   }
 }
@@ -239,7 +269,10 @@ class _$RoutineSlotImpl implements _RoutineSlot {
       required this.restSeconds,
       this.targetWeightKg,
       this.notes,
-      this.supersetGroup});
+      this.supersetGroup,
+      final List<int> targetReps = const <int>[],
+      this.durationSeconds})
+      : _targetReps = targetReps;
 
   factory _$RoutineSlotImpl.fromJson(Map<String, dynamic> json) =>
       _$$RoutineSlotImplFromJson(json);
@@ -269,10 +302,28 @@ class _$RoutineSlotImpl implements _RoutineSlot {
 // nullable free-form coaching notes
   @override
   final int? supersetGroup;
+// non-null → slot belongs to a superset block
+// ── New fields (additive — backward-compatible) ──────────────────────────
+// Per-set reps: [] = none/legacy; [10] = uniform; [6,8,10] = per-set.
+  final List<int> _targetReps;
+// non-null → slot belongs to a superset block
+// ── New fields (additive — backward-compatible) ──────────────────────────
+// Per-set reps: [] = none/legacy; [10] = uniform; [6,8,10] = per-set.
+  @override
+  @JsonKey()
+  List<int> get targetReps {
+    if (_targetReps is EqualUnmodifiableListView) return _targetReps;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(_targetReps);
+  }
+
+// null / 0 = reps-based; > 0 = time-based (seconds per set).
+  @override
+  final int? durationSeconds;
 
   @override
   String toString() {
-    return 'RoutineSlot(exerciseId: $exerciseId, exerciseName: $exerciseName, muscleGroup: $muscleGroup, targetSets: $targetSets, targetRepsMin: $targetRepsMin, targetRepsMax: $targetRepsMax, restSeconds: $restSeconds, targetWeightKg: $targetWeightKg, notes: $notes, supersetGroup: $supersetGroup)';
+    return 'RoutineSlot(exerciseId: $exerciseId, exerciseName: $exerciseName, muscleGroup: $muscleGroup, targetSets: $targetSets, targetRepsMin: $targetRepsMin, targetRepsMax: $targetRepsMax, restSeconds: $restSeconds, targetWeightKg: $targetWeightKg, notes: $notes, supersetGroup: $supersetGroup, targetReps: $targetReps, durationSeconds: $durationSeconds)';
   }
 
   @override
@@ -298,7 +349,11 @@ class _$RoutineSlotImpl implements _RoutineSlot {
                 other.targetWeightKg == targetWeightKg) &&
             (identical(other.notes, notes) || other.notes == notes) &&
             (identical(other.supersetGroup, supersetGroup) ||
-                other.supersetGroup == supersetGroup));
+                other.supersetGroup == supersetGroup) &&
+            const DeepCollectionEquality()
+                .equals(other._targetReps, _targetReps) &&
+            (identical(other.durationSeconds, durationSeconds) ||
+                other.durationSeconds == durationSeconds));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -314,7 +369,9 @@ class _$RoutineSlotImpl implements _RoutineSlot {
       restSeconds,
       targetWeightKg,
       notes,
-      supersetGroup);
+      supersetGroup,
+      const DeepCollectionEquality().hash(_targetReps),
+      durationSeconds);
 
   /// Create a copy of RoutineSlot
   /// with the given fields replaced by the non-null parameter values.
@@ -343,7 +400,9 @@ abstract class _RoutineSlot implements RoutineSlot {
       required final int restSeconds,
       final double? targetWeightKg,
       final String? notes,
-      final int? supersetGroup}) = _$RoutineSlotImpl;
+      final int? supersetGroup,
+      final List<int> targetReps,
+      final int? durationSeconds}) = _$RoutineSlotImpl;
 
   factory _RoutineSlot.fromJson(Map<String, dynamic> json) =
       _$RoutineSlotImpl.fromJson;
@@ -368,7 +427,14 @@ abstract class _RoutineSlot implements RoutineSlot {
   @override
   String? get notes; // nullable free-form coaching notes
   @override
-  int? get supersetGroup;
+  int? get supersetGroup; // non-null → slot belongs to a superset block
+// ── New fields (additive — backward-compatible) ──────────────────────────
+// Per-set reps: [] = none/legacy; [10] = uniform; [6,8,10] = per-set.
+  @override
+  List<int>
+      get targetReps; // null / 0 = reps-based; > 0 = time-based (seconds per set).
+  @override
+  int? get durationSeconds;
 
   /// Create a copy of RoutineSlot
   /// with the given fields replaced by the non-null parameter values.

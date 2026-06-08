@@ -110,5 +110,87 @@ void main() {
       expect(slot.supersetGroup, isNull,
           reason: 'old docs must decode with supersetGroup: null');
     });
+
+    // ── New field round-trips (targetReps + durationSeconds) ─────────────────
+
+    test('SCENARIO-048: targetReps uniform roundtrip', () {
+      const slot = RoutineSlot(
+        exerciseId: 'curl',
+        exerciseName: 'Bicep Curl',
+        muscleGroup: 'biceps',
+        targetSets: 3,
+        targetRepsMin: 10,
+        targetRepsMax: 10,
+        restSeconds: 60,
+        targetReps: [10],
+      );
+
+      final json = slot.toJson();
+      final decoded = RoutineSlot.fromJson(json);
+
+      expect(decoded.targetReps, equals([10]));
+      expect(decoded.durationSeconds, isNull);
+      expect(decoded, equals(slot));
+    });
+
+    test('SCENARIO-049: targetReps per-set sequence roundtrip', () {
+      const slot = RoutineSlot(
+        exerciseId: 'press',
+        exerciseName: 'Bench Press',
+        muscleGroup: 'chest',
+        targetSets: 3,
+        targetRepsMin: 6,
+        targetRepsMax: 10,
+        restSeconds: 90,
+        targetReps: [6, 8, 10],
+      );
+
+      final json = slot.toJson();
+      final decoded = RoutineSlot.fromJson(json);
+
+      expect(decoded.targetReps, equals([6, 8, 10]));
+      expect(decoded, equals(slot));
+    });
+
+    test('SCENARIO-050: durationSeconds roundtrip (time-based exercise)', () {
+      const slot = RoutineSlot(
+        exerciseId: 'plank',
+        exerciseName: 'Plank',
+        muscleGroup: 'core',
+        targetSets: 3,
+        targetRepsMin: 0,
+        targetRepsMax: 0,
+        restSeconds: 30,
+        durationSeconds: 60,
+      );
+
+      final json = slot.toJson();
+      final decoded = RoutineSlot.fromJson(json);
+
+      expect(decoded.durationSeconds, equals(60));
+      expect(decoded.targetReps, equals(<int>[]));
+      expect(decoded, equals(slot));
+    });
+
+    test(
+        'SCENARIO-051: legacy doc without targetReps/durationSeconds deserializes '
+        'to defaults ([] and null)', () {
+      final legacyMap = <String, dynamic>{
+        'exerciseId': 'row',
+        'exerciseName': 'Barbell Row',
+        'muscleGroup': 'back',
+        'targetSets': 4,
+        'targetRepsMin': 6,
+        'targetRepsMax': 10,
+        'restSeconds': 120,
+      };
+
+      final slot = RoutineSlot.fromJson(legacyMap);
+
+      expect(slot.targetReps, equals(<int>[]),
+          reason: 'missing targetReps key → empty list default');
+      expect(slot.durationSeconds, isNull,
+          reason: 'missing durationSeconds key → null default');
+    });
   });
 }

@@ -685,8 +685,14 @@ class _ExerciseSectionState extends State<_ExerciseSection> {
       final last = widget.logsForExercise.last;
       return (reps: last.reps, weightKg: last.weightKg);
     }
+    // For new-model slots use the first element of targetReps; fall back to
+    // targetRepsMin for legacy docs. Timed slots (targetReps empty) default
+    // to 0 — acceptable until timed-set execution is implemented next round.
+    final defaultReps = widget.slot.targetReps.isNotEmpty
+        ? widget.slot.targetReps.first
+        : widget.slot.targetRepsMin;
     return (
-      reps: widget.slot.targetRepsMin,
+      reps: defaultReps,
       weightKg: widget.slot.targetWeightKg ?? 0.0,
     );
   }

@@ -16,12 +16,14 @@ import '../application/session_providers.dart' show currentUidProvider;
 import '../application/user_routines_providers.dart'
     show userCreatedRoutinesProvider;
 import '../domain/exercise.dart';
+import '../domain/reps_format.dart';
 import '../domain/routine.dart';
 import '../domain/routine_day.dart';
 import '../domain/routine_slot.dart';
 import '../domain/routine_source.dart';
 import '../domain/routine_visibility.dart';
 import 'routine_editor_mode.dart';
+import 'widgets/duration_text_field.dart';
 import 'workout_strings.dart';
 
 // ── Mutable local state classes ───────────────────────────────────────────────
@@ -33,6 +35,8 @@ class _EditableSlot {
   int targetRepsMax = 12;
   int restSeconds = 60;
   int? supersetGroup;
+  List<int> targetReps = [];
+  int? durationSeconds;
 
   _EditableSlot();
 }
@@ -82,11 +86,18 @@ String _submitLabelFor(RoutineEditorMode mode) => switch (mode) {
     };
 
 class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
-  String _name = '';
-  String _split = '';
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _splitController = TextEditingController();
   ExperienceLevel _level = ExperienceLevel.beginner;
   List<_EditableDay> _days = [_EditableDay(dayNumber: 1, name: 'Día 1')];
   bool _submitting = false;
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _splitController.dispose();
+    super.dispose();
+  }
 
   /// Whether the editor is in a trainer-creating mode (assigning or
   /// templating). Athlete (SelfCreating) mode hides trainer-only fields.
@@ -95,18 +106,22 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
       widget.mode is TrainerAssigning || widget.mode is TrainerTemplating;
 
   bool get _isValid {
-    if (_name.trim().isEmpty) return false;
+    if (_nameController.text.trim().isEmpty) return false;
     // Split is required only in trainer modes (athlete-created routines
     // submit split: null per ADR-RER-04).
-    if (_isTrainerMode && _split.trim().isEmpty) return false;
+    if (_isTrainerMode && _splitController.text.trim().isEmpty) return false;
     if (_days.isEmpty) return false;
     for (final day in _days) {
       if (day.slots.isEmpty) return false;
       for (final slot in day.slots) {
         if (slot.exercise == null) return false;
         if (slot.targetSets < 1) return false;
-        if (slot.targetRepsMin < 1) return false;
-        if (slot.targetRepsMax < slot.targetRepsMin) return false;
+        // A slot is valid when it has reps OR a duration > 0.
+        final hasReps =
+            slot.targetReps.isNotEmpty && slot.targetReps.every((r) => r > 0);
+        final hasDuration =
+            slot.durationSeconds != null && slot.durationSeconds! > 0;
+        if (!hasReps && !hasDuration) return false;
       }
     }
     return true;
@@ -269,10 +284,13 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
             exerciseName: s.exercise!.name,
             muscleGroup: s.exercise!.muscleGroup,
             targetSets: s.targetSets,
-            targetRepsMin: s.targetRepsMin,
-            targetRepsMax: s.targetRepsMax,
+            // Legacy fields kept populated so older readers don't break.
+            targetRepsMin: s.targetReps.isNotEmpty ? s.targetReps.first : 0,
+            targetRepsMax: s.targetReps.isNotEmpty ? s.targetReps.last : 0,
             restSeconds: s.restSeconds,
             supersetGroup: effectiveGroup,
+            targetReps: s.targetReps,
+            durationSeconds: s.durationSeconds,
           );
         }).toList(),
       );
@@ -286,8 +304,8 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
           // Preserve existing trainer-assigned flow — unchanged behaviour.
           final routine = Routine(
             id: '',
-            name: _name.trim(),
-            split: _split.trim(),
+            name: _nameController.text.trim(),
+            split: _splitController.text.trim(),
             level: _level,
             days: days,
             source: RoutineSource.trainerAssigned,
@@ -312,8 +330,8 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
           // athlete assignment. Mirrors pre-PR2 isTemplate branch.
           final routine = Routine(
             id: '',
-            name: _name.trim(),
-            split: _split.trim(),
+            name: _nameController.text.trim(),
+            split: _splitController.text.trim(),
             level: _level,
             days: days,
             source: RoutineSource.trainerTemplate,
@@ -345,7 +363,7 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
           // SelfCreating mode (T-RER-030).
           final draft = Routine(
             id: '',
-            name: _name.trim(),
+            name: _nameController.text.trim(),
             split: null,
             level: ExperienceLevel.beginner,
             days: days,
@@ -433,6 +451,7 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
                             const SizedBox(height: 4),
                             TextField(
                               key: const Key('editor_name_field'),
+                              controller: _nameController,
                               style: GoogleFonts.barlow(
                                 color: palette.textPrimary,
                                 fontSize: 13,
@@ -443,7 +462,7 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
                                     ? 'Ej: Fuerza PPL'
                                     : WorkoutStrings.selfEditorNameHint,
                               ),
-                              onChanged: (v) => setState(() => _name = v),
+                              onChanged: (_) => setState(() {}),
                             ),
                           ],
                         ),
@@ -461,6 +480,7 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
                               const SizedBox(height: 4),
                               TextField(
                                 key: const Key('editor_split_field'),
+                                controller: _splitController,
                                 style: GoogleFonts.barlow(
                                   color: palette.textPrimary,
                                   fontSize: 13,
@@ -469,7 +489,7 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
                                   palette,
                                   hint: 'PPL / Full Body',
                                 ),
-                                onChanged: (v) => setState(() => _split = v),
+                                onChanged: (_) => setState(() {}),
                               ),
                             ],
                           ),
@@ -990,7 +1010,7 @@ class _MoveButtons extends StatelessWidget {
 
 // ── Slot editor row ───────────────────────────────────────────────────────────
 
-class _SlotEditor extends StatelessWidget {
+class _SlotEditor extends StatefulWidget {
   const _SlotEditor({
     super.key,
     required this.slot,
@@ -1016,7 +1036,30 @@ class _SlotEditor extends StatelessWidget {
   final VoidCallback? onMoveDown;
 
   @override
+  State<_SlotEditor> createState() => _SlotEditorState();
+}
+
+class _SlotEditorState extends State<_SlotEditor> {
+  late final TextEditingController _repsCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _repsCtrl = TextEditingController(
+      text: formatReps(widget.slot.targetReps),
+    );
+  }
+
+  @override
+  void dispose() {
+    _repsCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final slot = widget.slot;
+    final palette = widget.palette;
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
@@ -1053,25 +1096,26 @@ class _SlotEditor extends StatelessWidget {
                   ),
                 ),
               ),
-              if (onMoveUp != null || onMoveDown != null)
+              if (widget.onMoveUp != null || widget.onMoveDown != null)
                 _MoveButtons(
                   palette: palette,
-                  canMoveUp: canMoveUp,
-                  canMoveDown: canMoveDown,
-                  onMoveUp: onMoveUp,
-                  onMoveDown: onMoveDown,
+                  canMoveUp: widget.canMoveUp,
+                  canMoveDown: widget.canMoveDown,
+                  onMoveUp: widget.onMoveUp,
+                  onMoveDown: widget.onMoveDown,
                 ),
               const SizedBox(width: 6),
               IconButton(
                 icon:
                     Icon(TreinoIcon.trash, size: 16, color: palette.textMuted),
-                onPressed: onRemove,
+                onPressed: widget.onRemove,
                 constraints: const BoxConstraints(),
                 padding: EdgeInsets.zero,
               ),
             ],
           ),
           const SizedBox(height: 8),
+          // ── [Series] [Reps] [Min] [Descanso] ──────────────────────────────
           Row(
             children: [
               _SmallIntField(
@@ -1080,37 +1124,72 @@ class _SlotEditor extends StatelessWidget {
                 palette: palette,
                 onChanged: (v) {
                   slot.targetSets = v;
-                  onChanged();
+                  widget.onChanged();
                 },
               ),
               const SizedBox(width: 6),
-              _SmallIntField(
-                label: 'Rep min',
-                value: slot.targetRepsMin,
-                palette: palette,
+              // Reps — free-text: "10" or "6-8-10"
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Reps',
+                      style: GoogleFonts.barlow(
+                          fontSize: 10, color: palette.textMuted),
+                    ),
+                    const SizedBox(height: 2),
+                    TextField(
+                      controller: _repsCtrl,
+                      keyboardType: TextInputType.text,
+                      style: GoogleFonts.barlow(
+                          fontSize: 13, color: palette.textPrimary),
+                      decoration: InputDecoration(
+                        isDense: true,
+                        hintText: '10 o 6-8-10',
+                        hintStyle: GoogleFonts.barlow(
+                            fontSize: 11, color: palette.textMuted),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 6),
+                        filled: true,
+                        fillColor: palette.bgCard,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(6),
+                          borderSide: BorderSide(color: palette.border),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(6),
+                          borderSide: BorderSide(color: palette.border),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(6),
+                          borderSide: BorderSide(color: palette.accent),
+                        ),
+                      ),
+                      onChanged: (v) {
+                        slot.targetReps = parseReps(v);
+                        widget.onChanged();
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 6),
+              DurationTextField(
+                label: 'Min',
+                valueSeconds: slot.durationSeconds ?? 0,
                 onChanged: (v) {
-                  slot.targetRepsMin = v;
-                  onChanged();
+                  slot.durationSeconds = v > 0 ? v : null;
+                  widget.onChanged();
                 },
               ),
               const SizedBox(width: 6),
-              _SmallIntField(
-                label: 'Rep max',
-                value: slot.targetRepsMax,
-                palette: palette,
-                onChanged: (v) {
-                  slot.targetRepsMax = v;
-                  onChanged();
-                },
-              ),
-              const SizedBox(width: 6),
-              _SmallIntField(
+              DurationTextField(
                 label: 'Descanso',
-                value: slot.restSeconds,
-                palette: palette,
+                valueSeconds: slot.restSeconds,
                 onChanged: (v) {
                   slot.restSeconds = v;
-                  onChanged();
+                  widget.onChanged();
                 },
               ),
             ],

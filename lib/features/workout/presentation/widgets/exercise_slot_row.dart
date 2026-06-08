@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/treino_icon.dart';
+import '../../domain/reps_format.dart';
 import '../../domain/routine_slot.dart';
 
 /// Tappeable row that displays one [RoutineSlot] inside [RoutineDetailScreen].
@@ -26,13 +27,45 @@ class ExerciseSlotRow extends StatelessWidget {
   /// null → renders dash inside the ÚLTIMO badge (Fase 2 state).
   final String? lastWeightDisplay;
 
+  /// Builds the sets·reps/duration summary string with new-model-first fallback.
+  ///
+  /// Priority:
+  ///  1. durationSeconds > 0 → "<sets> · MM:SS"
+  ///  2. targetReps non-empty → "<sets> · <formatted reps>"
+  ///  3. Legacy → "<sets> · <min>–<max>"
+  static String _setsRepsSummary(RoutineSlot slot) {
+    if (slot.durationSeconds != null && slot.durationSeconds! > 0) {
+      final total = slot.durationSeconds!;
+      final mm = (total ~/ 60).toString().padLeft(2, '0');
+      final ss = (total % 60).toString().padLeft(2, '0');
+      return '${slot.targetSets} · $mm:$ss';
+    }
+    if (slot.targetReps.isNotEmpty) {
+      return '${slot.targetSets} · ${formatReps(slot.targetReps)}';
+    }
+    // Legacy fallback: min–max reps from old docs.
+    return '${slot.targetSets} · ${slot.targetRepsMin}–${slot.targetRepsMax}';
+  }
+
+  /// Formats rest seconds: "1:30" when >= 60, "45s" when < 60.
+  static String _restDisplay(int restSeconds) {
+    if (restSeconds <= 0) return '0s';
+    if (restSeconds >= 60) {
+      final mm = (restSeconds ~/ 60).toString().padLeft(2, '0');
+      final ss = (restSeconds % 60).toString().padLeft(2, '0');
+      return '$mm:$ss';
+    }
+    return '${restSeconds}s';
+  }
+
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final setsReps = _setsRepsSummary(slot);
+    final restText = _restDisplay(slot.restSeconds);
     return Semantics(
       button: true,
-      label:
-          'Ejercicio ${slot.exerciseName}, ${slot.targetSets} series de ${slot.targetRepsMin} a ${slot.targetRepsMax} repeticiones, descanso ${slot.restSeconds} segundos',
+      label: 'Ejercicio ${slot.exerciseName}, $setsReps, descanso $restText',
       child: Material(
         color: Colors.transparent,
         child: InkWell(
@@ -88,7 +121,7 @@ class ExerciseSlotRow extends StatelessWidget {
                       Row(
                         children: [
                           Text(
-                            '${slot.targetSets} · ${slot.targetRepsMin}–${slot.targetRepsMax}',
+                            setsReps,
                             style: GoogleFonts.barlow(
                               fontWeight: FontWeight.w400,
                               fontSize: 13,
@@ -125,7 +158,7 @@ class ExerciseSlotRow extends StatelessWidget {
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            '${slot.restSeconds}s descanso',
+                            '$restText descanso',
                             style: GoogleFonts.barlow(
                               fontWeight: FontWeight.w400,
                               fontSize: 12,

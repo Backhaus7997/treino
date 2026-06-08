@@ -18,6 +18,11 @@ _$RoutineSlotImpl _$$RoutineSlotImplFromJson(Map<String, dynamic> json) =>
       targetWeightKg: (json['targetWeightKg'] as num?)?.toDouble(),
       notes: json['notes'] as String?,
       supersetGroup: (json['supersetGroup'] as num?)?.toInt(),
+      targetReps: (json['targetReps'] as List<dynamic>?)
+              ?.map((e) => (e as num).toInt())
+              .toList() ??
+          const <int>[],
+      durationSeconds: (json['durationSeconds'] as num?)?.toInt(),
     );
 
 Map<String, dynamic> _$$RoutineSlotImplToJson(_$RoutineSlotImpl instance) =>
@@ -32,4 +37,6 @@ Map<String, dynamic> _$$RoutineSlotImplToJson(_$RoutineSlotImpl instance) =>
       'targetWeightKg': instance.targetWeightKg,
       'notes': instance.notes,
       'supersetGroup': instance.supersetGroup,
+      'targetReps': instance.targetReps,
+      'durationSeconds': instance.durationSeconds,
     };

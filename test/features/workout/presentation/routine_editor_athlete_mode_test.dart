@@ -298,12 +298,26 @@ void main() {
     await tester.tap(find.text(WorkoutStrings.pickerAddButton(1)));
     await tester.pumpAndSettle();
 
+    // New validation requires reps OR duration to be set.
+    // Fill in the Reps field — it is the only TextField whose controller
+    // currently holds an empty string (name has 'Mi rutina', duration fields
+    // show '00:00' because they initialise via secondsToMmss).
+    for (final element in find.byType(TextField).evaluate()) {
+      final widget = element.widget as TextField;
+      final ctrl = widget.controller;
+      if (ctrl != null && ctrl.text.isEmpty) {
+        await tester.enterText(find.byWidget(widget), '10');
+        await tester.pumpAndSettle();
+        break;
+      }
+    }
+
     // Now submit should be enabled
     final submitBtn = tester.widget<ElevatedButton>(
       find.widgetWithText(ElevatedButton, WorkoutStrings.selfEditorSubmitLabel),
     );
     expect(submitBtn.onPressed, isNotNull,
-        reason: 'submit enabled after name + slot');
+        reason: 'submit enabled after name + slot with reps filled');
 
     await tester.tap(find.widgetWithText(
         ElevatedButton, WorkoutStrings.selfEditorSubmitLabel));
