@@ -10,12 +10,12 @@ Widget _wrap(Widget child) => MaterialApp(
     );
 
 void main() {
-  group('TrainerSpecialtyChips — SCENARIO-430/431 T28/T29', () {
+  group('TrainerSpecialtyChips — SCENARIO-430/431 T28/T29 (multi-select)', () {
     testWidgets('SCENARIO-430: renders 11 chips (Todos + 10 specialties)',
         (tester) async {
       await tester.pumpWidget(_wrap(
         TrainerSpecialtyChips(
-          selected: null,
+          selected: const <TrainerSpecialty>{},
           onChanged: (_) {},
         ),
       ));
@@ -35,11 +35,10 @@ void main() {
       expect(find.text('Calistenia'), findsOneWidget);
     });
 
-    testWidgets('"Todos" chip is selected when selected is null',
-        (tester) async {
+    testWidgets('"Todos" chip is selected when set is empty', (tester) async {
       await tester.pumpWidget(_wrap(
         TrainerSpecialtyChips(
-          selected: null,
+          selected: const <TrainerSpecialty>{},
           onChanged: (_) {},
         ),
       ));
@@ -53,11 +52,10 @@ void main() {
       expect(todosChip.selected, isTrue);
     });
 
-    testWidgets('specialty chip is selected when matching selected param',
-        (tester) async {
+    testWidgets('specialty chip is selected when in the set', (tester) async {
       await tester.pumpWidget(_wrap(
         TrainerSpecialtyChips(
-          selected: TrainerSpecialty.crossfit,
+          selected: const {TrainerSpecialty.crossfit},
           onChanged: (_) {},
         ),
       ));
@@ -79,48 +77,101 @@ void main() {
       expect(todosChip.selected, isFalse);
     });
 
-    testWidgets('SCENARIO-431: tapping "Todos" fires onChanged(null)',
+    testWidgets('multiple specialty chips can be selected at once',
         (tester) async {
-      TrainerSpecialty? received = TrainerSpecialty.yoga;
+      await tester.pumpWidget(_wrap(
+        TrainerSpecialtyChips(
+          selected: const {
+            TrainerSpecialty.crossfit,
+            TrainerSpecialty.funcional,
+          },
+          onChanged: (_) {},
+        ),
+      ));
+
+      final crossfit = tester.widget<ChoiceChip>(
+        find.ancestor(
+          of: find.text('CrossFit'),
+          matching: find.byType(ChoiceChip),
+        ),
+      );
+      final funcional = tester.widget<ChoiceChip>(
+        find.ancestor(
+          of: find.text('Funcional'),
+          matching: find.byType(ChoiceChip),
+        ),
+      );
+      expect(crossfit.selected, isTrue);
+      expect(funcional.selected, isTrue);
+    });
+
+    testWidgets('SCENARIO-431: tapping "Todos" fires onChanged(empty set)',
+        (tester) async {
+      Set<TrainerSpecialty>? received;
 
       await tester.pumpWidget(_wrap(
         TrainerSpecialtyChips(
-          selected: TrainerSpecialty.yoga,
-          onChanged: (s) => received = s,
+          selected: const {TrainerSpecialty.yoga},
+          onChanged: (set) => received = set,
         ),
       ));
 
       await tester.tap(find.text('Todos'));
       await tester.pump();
 
-      expect(received, isNull);
+      expect(received, isNotNull);
+      expect(received!.isEmpty, isTrue);
     });
 
-    testWidgets('tapping specialty chip fires onChanged with that specialty',
+    testWidgets(
+        'tapping unselected specialty adds it to the set (toggle ON)',
         (tester) async {
-      TrainerSpecialty? received;
+      Set<TrainerSpecialty>? received;
 
       await tester.pumpWidget(_wrap(
         TrainerSpecialtyChips(
-          selected: null,
-          onChanged: (s) => received = s,
+          selected: const <TrainerSpecialty>{},
+          onChanged: (set) => received = set,
         ),
       ));
 
-      // Scroll to make the chip visible then tap
       await tester.ensureVisible(find.text('Running'));
       await tester.pump();
       await tester.tap(find.text('Running'));
       await tester.pump();
 
-      expect(received, TrainerSpecialty.running);
+      expect(received, {TrainerSpecialty.running});
+    });
+
+    testWidgets(
+        'tapping selected specialty removes it from the set (toggle OFF)',
+        (tester) async {
+      Set<TrainerSpecialty>? received;
+
+      await tester.pumpWidget(_wrap(
+        TrainerSpecialtyChips(
+          selected: const {
+            TrainerSpecialty.running,
+            TrainerSpecialty.crossfit,
+          },
+          onChanged: (set) => received = set,
+        ),
+      ));
+
+      await tester.ensureVisible(find.text('Running'));
+      await tester.pump();
+      await tester.tap(find.text('Running'));
+      await tester.pump();
+
+      // Running toggled OFF, CrossFit stays in the set
+      expect(received, {TrainerSpecialty.crossfit});
     });
 
     testWidgets('widget is scrollable horizontally (SingleChildScrollView)',
         (tester) async {
       await tester.pumpWidget(_wrap(
         TrainerSpecialtyChips(
-          selected: null,
+          selected: const <TrainerSpecialty>{},
           onChanged: (_) {},
         ),
       ));

@@ -29,14 +29,16 @@ abstract final class SpecialtyLabels {
 
 /// Horizontal scrollable row of specialty filter chips.
 ///
-/// First chip is "Todos" (null selection). Then one chip per
+/// First chip is "Todos" (empty set). Then one chip per
 /// [TrainerSpecialty] value in declaration order.
 ///
-/// Single-select: [onChanged] is called with `null` when "Todos" is tapped,
-/// or with the [TrainerSpecialty] when a specialty chip is tapped.
+/// **Multi-select** (cambió de single-select post-Fase 6 polish):
+/// - Tap en "Todos" limpia el set (sin filtro).
+/// - Tap en una specialty toggle in/out del set.
+/// - Multiple specialties pueden estar seleccionadas a la vez.
 ///
 /// Visual: selected chip uses [AppPalette.accent]; unselected uses
-/// [AppPalette.espresso] background.
+/// [AppPalette.bgCard] background.
 ///
 /// Per design D11. REQ-COACH-DISC-UI-007, REQ-COACH-DISC-UI-008.
 /// SCENARIO-430, SCENARIO-431.
@@ -47,11 +49,12 @@ class TrainerSpecialtyChips extends StatelessWidget {
     required this.onChanged,
   });
 
-  /// Currently selected specialty, or null for "Todos".
-  final TrainerSpecialty? selected;
+  /// Currently selected specialties. Empty set = "Todos" (no filter).
+  final Set<TrainerSpecialty> selected;
 
-  /// Called when the user taps a chip. Passes null for "Todos".
-  final ValueChanged<TrainerSpecialty?> onChanged;
+  /// Called when the user taps a chip. Receives the next desired set
+  /// (with the tapped specialty toggled in/out). "Todos" passes empty set.
+  final ValueChanged<Set<TrainerSpecialty>> onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -67,16 +70,24 @@ class TrainerSpecialtyChips extends StatelessWidget {
             context: context,
             palette: palette,
             label: CoachStrings.specialtyAll,
-            isSelected: selected == null,
-            onTap: () => onChanged(null),
+            isSelected: selected.isEmpty,
+            onTap: () => onChanged(const <TrainerSpecialty>{}),
           ),
           ...TrainerSpecialty.values.map(
             (s) => _buildChip(
               context: context,
               palette: palette,
               label: SpecialtyLabels.of(s),
-              isSelected: selected == s,
-              onTap: () => onChanged(s),
+              isSelected: selected.contains(s),
+              onTap: () {
+                final next = Set<TrainerSpecialty>.from(selected);
+                if (next.contains(s)) {
+                  next.remove(s);
+                } else {
+                  next.add(s);
+                }
+                onChanged(next);
+              },
             ),
           ),
         ],
@@ -105,7 +116,7 @@ class TrainerSpecialtyChips extends StatelessWidget {
         ),
         selected: isSelected,
         selectedColor: palette.accent,
-        backgroundColor: palette.espresso,
+        backgroundColor: palette.bgCard,
         side: BorderSide(
           color: isSelected ? palette.accent : palette.border,
         ),

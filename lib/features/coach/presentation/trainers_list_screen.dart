@@ -12,6 +12,7 @@ import '../domain/trainer_location.dart';
 import 'coach_strings.dart';
 import 'widgets/location_permission_rationale_sheet.dart';
 import 'widgets/trainer_advanced_filter_chips.dart';
+import 'widgets/trainer_compact_filter_row.dart';
 import 'widgets/trainer_list_tile.dart';
 import 'widgets/trainer_specialty_chips.dart';
 import 'widgets/trainers_map_view.dart';
@@ -88,28 +89,36 @@ class _TrainersListScreenState extends ConsumerState<TrainersListScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // 1. Modo: Presencial vs Online — decisión más importante.
-          const Padding(
-            padding: EdgeInsets.fromLTRB(16, 12, 16, 8),
-            child: _ModeTabs(),
+          //    En modo MAPA, paddings más chicos para liberar pantalla.
+          Padding(
+            padding:
+                EdgeInsets.fromLTRB(16, showMap ? 8 : 12, 16, showMap ? 4 : 8),
+            child: const _ModeTabs(),
           ),
-          // 2. Especialidad — categórico, multi-uso.
-          _SectionHeader(palette: palette, text: 'ESPECIALIDAD'),
-          const SizedBox(height: 6),
-          TrainerSpecialtyChips(
-            selected: selected,
-            onChanged: (s) =>
-                ref.read(selectedSpecialtyProvider.notifier).state = s,
-          ),
-          // 3. Filtros (distancia + precio) — solo en modo Presencial. En
-          // modo Online no aplica distancia (sin ubicación física) y precio
-          // es info que el atleta puede ver en el card del PF.
-          if (!ref.watch(virtualOnlyFilterProvider)) ...[
-            const SizedBox(height: 12),
-            _SectionHeader(palette: palette, text: 'FILTROS'),
+          // 2. Filtros — en MAPA, una sola row compacta combinando
+          //    distancia + precio + specialty. En LISTA, layout original
+          //    con section headers y filas separadas.
+          if (showMap)
+            const TrainerCompactFilterRow()
+          else ...[
+            _SectionHeader(palette: palette, text: 'ESPECIALIDAD'),
             const SizedBox(height: 6),
-            const TrainerAdvancedFilterChips(),
+            TrainerSpecialtyChips(
+              selected: selected,
+              onChanged: (next) =>
+                  ref.read(selectedSpecialtyProvider.notifier).state = next,
+            ),
+            // 3. Filtros avanzados — solo en modo Presencial. En Online no
+            //    aplica distancia (sin ubicación física) y precio es info
+            //    visible en el card del PF.
+            if (!ref.watch(virtualOnlyFilterProvider)) ...[
+              const SizedBox(height: 12),
+              _SectionHeader(palette: palette, text: 'FILTROS'),
+              const SizedBox(height: 6),
+              const TrainerAdvancedFilterChips(),
+            ],
           ],
-          const SizedBox(height: 8),
+          SizedBox(height: showMap ? 4 : 8),
           Expanded(
             child: IndexedStack(
               index: showMap ? 1 : 0,
