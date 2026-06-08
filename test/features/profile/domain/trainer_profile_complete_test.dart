@@ -1,5 +1,7 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/features/coach/domain/trainer_location.dart';
+import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_profile_trainer_completeness.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
@@ -13,6 +15,11 @@ import 'package:treino/features/profile/domain/user_role.dart';
 /// SCENARIO-698: trainerProfileComplete is true when all fields set and online=true.
 /// SCENARIO-699: trainerProfileComplete is true when all fields set and locations non-empty.
 /// SCENARIO-700: trainerProfileComplete is false when all trainer fields null (fresh trainer).
+///
+/// Provider tests (ADR-TPO-004):
+/// - complete profile → trainerProfileCompleteProvider returns true
+/// - incomplete profile → trainerProfileCompleteProvider returns false
+/// - null profile → trainerProfileCompleteProvider returns false
 ///
 /// REQ-TPO-DATA-004.
 void main() {
@@ -113,5 +120,54 @@ void main() {
         expect(profile.trainerProfileComplete, isFalse);
       },
     );
+  });
+
+  group('trainerProfileCompleteProvider (ADR-TPO-004)', () {
+    UserProfile completeProfile() => baseProfile(
+          trainerOffersOnline: true,
+        );
+
+    UserProfile incompleteProfile() => baseProfile(
+          trainerBio: null,
+        );
+
+    test('complete profile → provider returns true', () async {
+      final container = ProviderContainer(
+        overrides: [
+          userProfileProvider.overrideWith(
+            (ref) => Stream<UserProfile?>.value(completeProfile()),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      await container.read(userProfileProvider.future);
+      expect(container.read(trainerProfileCompleteProvider), isTrue);
+    });
+
+    test('incomplete profile → provider returns false', () async {
+      final container = ProviderContainer(
+        overrides: [
+          userProfileProvider.overrideWith(
+            (ref) => Stream<UserProfile?>.value(incompleteProfile()),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      await container.read(userProfileProvider.future);
+      expect(container.read(trainerProfileCompleteProvider), isFalse);
+    });
+
+    test('null profile → provider returns false', () async {
+      final container = ProviderContainer(
+        overrides: [
+          userProfileProvider.overrideWith(
+            (ref) => Stream<UserProfile?>.value(null),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      await container.read(userProfileProvider.future);
+      expect(container.read(trainerProfileCompleteProvider), isFalse);
+    });
   });
 }
