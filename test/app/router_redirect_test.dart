@@ -301,7 +301,8 @@ void main() {
   // Fixtures for trainer role tests
   // ---------------------------------------------------------------------------
 
-  /// Fixture: trainer with complete profile.
+  /// Fixture: trainer with complete profile — all trainerProfileComplete fields
+  /// set so the ADR-TPO-003 onboarding gate does not fire.
   UserProfile trainerProfile() => UserProfile(
         uid: 'test-trainer-uid',
         email: 'trainer@example.com',
@@ -309,6 +310,10 @@ void main() {
         role: UserRole.trainer,
         createdAt: DateTime.utc(2026, 1, 1),
         updatedAt: DateTime.utc(2026, 1, 1),
+        trainerBio: 'bio text',
+        trainerSpecialty: 'crossfit',
+        trainerMonthlyRate: 50000,
+        trainerOffersOnline: true,
       );
 
   /// Fixture: trainer with incomplete profile (displayName=null).

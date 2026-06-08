@@ -37,6 +37,8 @@ import '../features/feed/presentation/search_users_screen.dart';
 import '../features/home/home_screen.dart';
 import '../features/insights/presentation/insights_screen.dart';
 import '../features/profile/application/user_providers.dart';
+import '../features/profile/domain/user_profile_trainer_completeness.dart';
+import '../features/profile/domain/user_role.dart';
 import '../features/profile/presentation/profile_edit_personal_screen.dart';
 import '../features/profile/presentation/profile_edit_trainer_screen.dart';
 import '../features/profile/presentation/profile_gym_screen.dart';
@@ -123,6 +125,20 @@ String? authRedirect(
     final profile = profileAsync.valueOrNull;
     if (profile == null || profile.displayName == null) {
       return '/profile-setup';
+    }
+
+    // ADR-TPO-003: trainer-incomplete onboarding gate.
+    // Fires AFTER displayName check and BEFORE the public-route → /home redirect.
+    // !isPublic guard ensures public routes (login, register, etc.) remain
+    // accessible without being redirected to onboarding — logged-in users on
+    // public routes are redirected to /home by the existing branch below.
+    // Self-skip via startsWith to prevent redirect loops (covers both
+    // /profile/edit-trainer and /profile/edit-trainer?mode=onboarding).
+    if (!isPublic &&
+        profile.role == UserRole.trainer &&
+        !profile.trainerProfileComplete &&
+        !location.startsWith('/profile/edit-trainer')) {
+      return '/profile/edit-trainer?mode=onboarding';
     }
   }
 
