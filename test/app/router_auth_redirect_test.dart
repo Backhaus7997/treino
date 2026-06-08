@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -7,13 +5,10 @@ import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/router.dart';
 import 'package:treino/features/auth/application/auth_notifier.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
-import 'package:treino/features/coach/domain/trainer_location.dart';
 import 'package:treino/features/profile/application/account_deletion_notifier.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
-
-// ignore_for_file: avoid_dynamic_calls
 
 class MockUser extends Mock implements User {}
 
@@ -35,11 +30,6 @@ class _StubAuthNotifier extends AuthNotifier {
     state = _fixedState;
     return _fixedState.valueOrNull;
   }
-}
-
-class _LoadingAuthNotifier extends AuthNotifier {
-  @override
-  Future<User?> build() => Completer<User?>().future;
 }
 
 // ---------------------------------------------------------------------------
@@ -90,15 +80,6 @@ UserProfile _trainerNoDisplayName() => UserProfile(
       updatedAt: _kDate,
     );
 
-final TrainerLocation _kLocation = TrainerLocation(
-  id: 'loc-1',
-  type: TrainerLocationType.custom,
-  customLabel: 'My Studio',
-  lat: -31.4,
-  lng: -64.1,
-  geohash: 'abc12',
-);
-
 // ---------------------------------------------------------------------------
 // Container factories
 // ---------------------------------------------------------------------------
@@ -126,19 +107,10 @@ ProviderContainer _loggedInContainer({
       userProfileProvider.overrideWith(
         (ref) => Stream<UserProfile?>.value(profile),
       ),
-      accountDeletionInFlightProvider
-          .overrideWith((ref) => deletionInFlight),
+      accountDeletionInFlightProvider.overrideWith((ref) => deletionInFlight),
     ],
   );
 }
-
-ProviderContainer _loadingContainer() => ProviderContainer(
-      overrides: [
-        authNotifierProvider.overrideWith(() => _LoadingAuthNotifier()),
-        userProfileProvider
-            .overrideWith((ref) => Stream<UserProfile?>.value(null)),
-      ],
-    );
 
 // ---------------------------------------------------------------------------
 // Tests

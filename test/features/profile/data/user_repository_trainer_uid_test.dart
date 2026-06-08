@@ -51,10 +51,8 @@ void main() {
           'trainerOffersOnline': true,
         });
 
-        final snap = await firestore
-            .collection('trainerPublicProfiles')
-            .doc(uid)
-            .get();
+        final snap =
+            await firestore.collection('trainerPublicProfiles').doc(uid).get();
 
         expect(snap.exists, isTrue);
         expect(snap.data()!['uid'], equals(uid));
@@ -80,10 +78,8 @@ void main() {
           'trainerOffersOnline': true,
         });
 
-        final snap = await firestore
-            .collection('trainerPublicProfiles')
-            .doc(uid)
-            .get();
+        final snap =
+            await firestore.collection('trainerPublicProfiles').doc(uid).get();
 
         expect(snap.data()!['uid'], equals(uid));
         expect(snap.data()!['trainerBio'], equals('updated'));
@@ -99,10 +95,8 @@ void main() {
 
         await repo.update(uid, {'bodyWeightKg': 70.0});
 
-        final snap = await firestore
-            .collection('trainerPublicProfiles')
-            .doc(uid)
-            .get();
+        final snap =
+            await firestore.collection('trainerPublicProfiles').doc(uid).get();
 
         expect(
           snap.exists,
@@ -127,10 +121,8 @@ void main() {
           'averageRating': 4.5,
         });
 
-        final snap = await firestore
-            .collection('trainerPublicProfiles')
-            .doc(uid)
-            .get();
+        final snap =
+            await firestore.collection('trainerPublicProfiles').doc(uid).get();
 
         expect(snap.exists, isTrue);
         expect(
@@ -158,10 +150,8 @@ void main() {
         );
 
         // trainerPublicProfiles doc must NOT exist
-        final snap = await firestore
-            .collection('trainerPublicProfiles')
-            .doc(uid)
-            .get();
+        final snap =
+            await firestore.collection('trainerPublicProfiles').doc(uid).get();
         expect(snap.exists, isFalse);
       },
     );
@@ -180,10 +170,8 @@ void main() {
           'trainerOffersOnline': true,
         });
 
-        final snap = await firestore
-            .collection('trainerPublicProfiles')
-            .doc(uid)
-            .get();
+        final snap =
+            await firestore.collection('trainerPublicProfiles').doc(uid).get();
         expect(snap.exists, isTrue);
       },
     );

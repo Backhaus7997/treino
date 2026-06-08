@@ -46,7 +46,7 @@ void main() {
         trainerOffersOnline: trainerOffersOnline,
       );
 
-  final TrainerLocation kLocation = TrainerLocation(
+  const TrainerLocation kLocation = TrainerLocation(
     id: 'loc-1',
     type: TrainerLocationType.custom,
     customLabel: 'Parque Sarmiento',
