@@ -1,0 +1,21 @@
+/// Fixed muscle options for custom exercises (Spanish labels, Hevy-style).
+const List<String> kMuscleOptions = [
+  'Pecho',
+  'Espalda alta',
+  'Dorsales',
+  'Hombros',
+  'Bíceps',
+  'Tríceps',
+  'Antebrazos',
+  'Cuádriceps',
+  'Isquiotibiales',
+  'Glúteos',
+  'Gemelos',
+  'Abdominales',
+  'Aductores',
+  'Trapecio',
+  'Cuello',
+  'Cardio',
+  'Cuerpo completo',
+  'Otro',
+];

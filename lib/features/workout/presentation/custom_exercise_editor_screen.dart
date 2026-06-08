@@ -9,6 +9,7 @@ import '../../../core/widgets/treino_icon.dart';
 import '../application/custom_exercise_providers.dart';
 import '../application/session_providers.dart' show currentUidProvider;
 import '../domain/custom_exercise.dart';
+import '../domain/muscle_options.dart';
 import 'widgets/exercise_video_player.dart';
 
 /// Create or edit a trainer's custom exercise. Routed at
@@ -29,7 +30,7 @@ class CustomExerciseEditorScreen extends ConsumerStatefulWidget {
 class _CustomExerciseEditorScreenState
     extends ConsumerState<CustomExerciseEditorScreen> {
   final _nameCtrl = TextEditingController();
-  final _muscleCtrl = TextEditingController();
+  String? _selectedMuscle;
   final _descCtrl = TextEditingController();
   final _videoCtrl = TextEditingController();
   bool _initialized = false;
@@ -42,7 +43,6 @@ class _CustomExerciseEditorScreenState
   @override
   void dispose() {
     _nameCtrl.dispose();
-    _muscleCtrl.dispose();
     _descCtrl.dispose();
     _videoCtrl.dispose();
     super.dispose();
@@ -52,7 +52,10 @@ class _CustomExerciseEditorScreenState
     if (_initialized) return;
     _initialized = true;
     _nameCtrl.text = ex.name;
-    _muscleCtrl.text = ex.muscleGroup;
+    // Pre-select if the stored value is in the fixed list.
+    // Legacy free-text values not in the list → default to null (unselected).
+    _selectedMuscle =
+        kMuscleOptions.contains(ex.muscleGroup) ? ex.muscleGroup : null;
     _descCtrl.text = ex.description;
     _videoCtrl.text = ex.videoUrl ?? '';
     _videoPreviewUrl = ex.videoUrl ?? '';
@@ -109,10 +112,11 @@ class _CustomExerciseEditorScreenState
               const SizedBox(height: 14),
               _Label('Grupo muscular', palette: palette),
               const SizedBox(height: 6),
-              _Field(
-                  controller: _muscleCtrl,
-                  hint: 'Ej: cuádriceps',
-                  palette: palette),
+              _MuscleDropdown(
+                value: _selectedMuscle,
+                palette: palette,
+                onChanged: (v) => setState(() => _selectedMuscle = v),
+              ),
               const SizedBox(height: 14),
               _Label('Descripción / cues', palette: palette),
               const SizedBox(height: 6),
@@ -295,7 +299,7 @@ class _CustomExerciseEditorScreenState
       if (existing != null) {
         await repo.update(existing.copyWith(
           name: name,
-          muscleGroup: _muscleCtrl.text.trim(),
+          muscleGroup: _selectedMuscle ?? '',
           description: _descCtrl.text.trim(),
           videoUrl: videoUrl.isEmpty ? null : videoUrl,
         ));
@@ -303,7 +307,7 @@ class _CustomExerciseEditorScreenState
         created = await repo.create(
           trainerId: uid,
           name: name,
-          muscleGroup: _muscleCtrl.text.trim(),
+          muscleGroup: _selectedMuscle ?? '',
           description: _descCtrl.text.trim(),
           videoUrl: videoUrl.isEmpty ? null : videoUrl,
         );
@@ -437,6 +441,68 @@ class _Field extends StatelessWidget {
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(color: palette.accent, width: 1.5),
+        ),
+      ),
+    );
+  }
+}
+
+class _MuscleDropdown extends StatelessWidget {
+  const _MuscleDropdown({
+    required this.value,
+    required this.palette,
+    required this.onChanged,
+  });
+
+  final String? value;
+  final AppPalette palette;
+  final void Function(String?) onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+      decoration: BoxDecoration(
+        color: palette.bgCard,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: palette.border, width: 1),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: value,
+          isExpanded: true,
+          dropdownColor: palette.bgCard,
+          hint: Text(
+            'Seleccionar…',
+            style: GoogleFonts.barlow(
+              fontWeight: FontWeight.w400,
+              fontSize: 14,
+              color: palette.textMuted,
+            ),
+          ),
+          style: GoogleFonts.barlow(
+            fontWeight: FontWeight.w500,
+            fontSize: 14,
+            color: palette.textPrimary,
+          ),
+          icon:
+              Icon(TreinoIcon.chevronDown, size: 16, color: palette.textMuted),
+          items: kMuscleOptions
+              .map(
+                (m) => DropdownMenuItem(
+                  value: m,
+                  child: Text(
+                    m,
+                    style: GoogleFonts.barlow(
+                      fontWeight: FontWeight.w500,
+                      fontSize: 14,
+                      color: palette.textPrimary,
+                    ),
+                  ),
+                ),
+              )
+              .toList(),
+          onChanged: onChanged,
         ),
       ),
     );
