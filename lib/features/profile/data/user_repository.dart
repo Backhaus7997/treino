@@ -29,14 +29,10 @@ class UserRepository {
   // /profile-setup forever. Discovered 2026-05-21 during wire-real-stats PR#3
   // smoke when creating a second test account.
   //
-  // Trade-off (approach D — minimal hotfix): when a trainer self-edits ONLY
-  // displayName/avatarUrl without touching a trainer-specific field, their
-  // trainerPublicProfiles doc goes stale. Acceptable for now because trainers
-  // are seeded server-side (scripts/seed_trainer_profiles.js) and no trainer
-  // self-edit UI exists yet. When that UI lands, promote to approach E:
-  // pre-fetch role inside update() and gate the trainer write on
-  // role == trainer, plus include `uid` in the trainer subset so the create
-  // rule passes for the first ever trainer-side write.
+  // Approach E (ADR-TPO-001): uid is now threaded into the trainer subset so
+  // the Firestore create rule (request.resource.data.uid == uid) passes on the
+  // first-ever trainer dual-write. SetOptions(merge:true) makes re-writing uid
+  // on existing docs a no-op.
   static const _trainerPublicFields = {
     'trainerBio',
     'trainerSpecialty',
@@ -120,8 +116,9 @@ class UserRepository {
   ///
   /// REQ-COACH-DISC-DUAL-001.
   Map<String, Object?>? _trainerPublicSubsetFromPartial(
-    Map<String, Object?> partial,
-  ) {
+    Map<String, Object?> partial, {
+    required String uid,
+  }) {
     final hasTrainerField =
         partial.keys.any((k) => _trainerPublicFields.contains(k));
     if (!hasTrainerField) return null;
@@ -166,6 +163,9 @@ class UserRepository {
     if (partial.containsKey('trainerOffersOnline')) {
       result['trainerOffersOnline'] = partial['trainerOffersOnline'];
     }
+    // ADR-TPO-001: include uid so the Firestore create rule passes on
+    // the first-ever write. SetOptions(merge:true) makes this idempotent.
+    result['uid'] = uid;
     return result;
   }
 
@@ -283,7 +283,8 @@ class UserRepository {
     )..['updatedAt'] = Timestamp.fromDate(DateTime.now().toUtc());
 
     final publicSubset = _publicSubsetFromPartial(partial);
-    final trainerPublicSubset = _trainerPublicSubsetFromPartial(partial);
+    final trainerPublicSubset =
+        _trainerPublicSubsetFromPartial(partial, uid: uid);
 
     if (publicSubset == null && trainerPublicSubset == null) {
       // No public-relevant fields — single write to users only.
