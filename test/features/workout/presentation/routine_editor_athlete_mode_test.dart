@@ -298,19 +298,23 @@ void main() {
     await tester.tap(find.text(WorkoutStrings.pickerAddButton(1)));
     await tester.pumpAndSettle();
 
-    // New validation requires reps OR duration to be set.
-    // Fill in the Reps field — it is the only TextField whose controller
-    // currently holds an empty string (name has 'Mi rutina', duration fields
-    // show '00:00' because they initialise via secondsToMmss).
-    for (final element in find.byType(TextField).evaluate()) {
-      final widget = element.widget as TextField;
-      final ctrl = widget.controller;
-      if (ctrl != null && ctrl.text.isEmpty) {
-        await tester.enterText(find.byWidget(widget), '10');
-        await tester.pumpAndSettle();
-        break;
-      }
-    }
+    // New per-set table validation: reps must be > 0.
+    // The REPS column field has hint text 'reps' and starts empty.
+    // We find it by locating empty TextFields (KG is also empty but appears
+    // first; we need the second empty field which is the REPS field).
+    // Strategy: collect all empty TextFields and fill the last one that isn't
+    // the name field — in table-single-mode layout the order is: KG, REPS.
+    // Filling the REPS field satisfies validation.
+    final emptyFields = find.byType(TextField).evaluate().where((e) {
+      final w = e.widget as TextField;
+      return w.controller != null && w.controller!.text.isEmpty;
+    }).toList();
+    // emptyFields[0] = KG, emptyFields[1] = REPS (single mode, 1 set)
+    // We need at least 1 empty field; fill the last one (REPS).
+    expect(emptyFields, isNotEmpty, reason: 'expected empty REPS field');
+    final repsField = emptyFields.last.widget as TextField;
+    await tester.enterText(find.byWidget(repsField), '10');
+    await tester.pumpAndSettle();
 
     // Now submit should be enabled
     final submitBtn = tester.widget<ElevatedButton>(

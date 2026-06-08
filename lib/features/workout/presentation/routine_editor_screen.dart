@@ -1,3 +1,4 @@
+// ignore_for_file: library_private_types_in_public_api
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -16,25 +17,72 @@ import '../application/session_providers.dart' show currentUidProvider;
 import '../application/user_routines_providers.dart'
     show userCreatedRoutinesProvider;
 import '../domain/exercise.dart';
-import '../domain/reps_format.dart';
 import '../domain/routine.dart';
 import '../domain/routine_day.dart';
 import '../domain/routine_slot.dart';
 import '../domain/routine_source.dart';
 import '../domain/routine_visibility.dart';
+import '../domain/set_enums.dart';
+import '../domain/set_spec.dart';
 import 'routine_editor_mode.dart';
 import 'widgets/duration_text_field.dart';
 import 'workout_strings.dart';
 
-// ── Mutable local state classes ───────────────────────────────────────────────
+// ── Mutable local state ────────────────────────────────────────────────────────
+
+/// Mutable per-set row in the editor — mirrors [SetSpec] fields.
+class _EditableSet {
+  SetType type;
+  double? weightKg;
+  int? reps;
+  int? repsMin;
+  int? repsMax;
+  int? durationSeconds;
+
+  _EditableSet({
+    this.type = SetType.normal,
+    this.weightKg,
+    this.reps,
+    this.repsMin,
+    this.repsMax,
+    this.durationSeconds,
+  });
+
+  /// Returns a copy with the same values — used when duplicating the last set.
+  _EditableSet clone() => _EditableSet(
+        type: SetType.normal, // new sets are always normal
+        weightKg: weightKg,
+        reps: reps,
+        repsMin: repsMin,
+        repsMax: repsMax,
+        durationSeconds: durationSeconds,
+      );
+
+  SetSpec toSetSpec() => SetSpec(
+        type: type,
+        weightKg: weightKg,
+        reps: reps,
+        repsMin: repsMin,
+        repsMax: repsMax,
+        durationSeconds: durationSeconds,
+      );
+}
 
 class _EditableSlot {
   Exercise? exercise;
-  int targetSets = 3;
-  int targetRepsMin = 8;
-  int targetRepsMax = 12;
+  // ── New per-set model ──────────────────────────────────────────────────────
+  ExerciseMode exerciseMode = ExerciseMode.reps;
+  RepMode repMode = RepMode.single;
+  List<_EditableSet> sets = [_EditableSet()];
   int restSeconds = 60;
   int? supersetGroup;
+
+  // ── Legacy scalar fields — kept for backward compat on submit ──────────────
+  // These are now derived from [sets] in _submit(); callers outside _submit()
+  // should not rely on them being up-to-date.
+  int targetSets = 1;
+  int targetRepsMin = 0;
+  int targetRepsMax = 0;
   List<int> targetReps = [];
   int? durationSeconds;
 
@@ -47,6 +95,97 @@ class _EditableDay {
   List<_EditableSlot> slots = [];
 
   _EditableDay({required this.dayNumber, required this.name});
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────────
+
+/// Returns the display label for a set chip.
+/// Normal sets show their working-set number (count of normal-type sets up to
+/// and including this one). W / D / F show the letter.
+String setChipLabel(List<_EditableSet> sets, int index) {
+  final s = sets[index];
+  if (s.type != SetType.normal) return kSetTypeLabel[s.type]!;
+  // Count normal sets up to and including index.
+  var n = 0;
+  for (var i = 0; i <= index; i++) {
+    if (sets[i].type == SetType.normal) n++;
+  }
+  return n.toString();
+}
+
+/// Validates a single [_EditableSet] given the slot's modes.
+bool isSetValid(_EditableSet s, ExerciseMode exerciseMode, RepMode repMode) {
+  if (exerciseMode == ExerciseMode.duration) {
+    return s.durationSeconds != null && s.durationSeconds! > 0;
+  }
+  if (repMode == RepMode.range) {
+    return s.repsMin != null &&
+        s.repsMin! > 0 &&
+        s.repsMax != null &&
+        s.repsMax! >= s.repsMin!;
+  }
+  return s.reps != null && s.reps! > 0;
+}
+
+/// Builds the [RoutineSlot] from an [_EditableSlot], populating both new
+/// and legacy fields. Extracted top-level so the submit path and tests share
+/// the same derivation logic.
+RoutineSlot buildRoutineSlot(_EditableSlot s, int? effectiveGroup) {
+  final specList = s.sets.map((e) => e.toSetSpec()).toList();
+
+  // ── Legacy field derivation ────────────────────────────────────────────────
+  final targetSets = specList.isNotEmpty ? specList.length : 1;
+
+  int legacyRepsMin = 0;
+  int legacyRepsMax = 0;
+  double? legacyWeightKg;
+  List<int> legacyTargetReps = [];
+  int? legacyDurationSeconds;
+
+  if (s.exerciseMode == ExerciseMode.duration) {
+    legacyDurationSeconds =
+        s.sets.isNotEmpty ? s.sets.first.durationSeconds : null;
+    legacyRepsMin = 0;
+    legacyRepsMax = 0;
+    legacyTargetReps = [];
+  } else {
+    // reps mode
+    legacyWeightKg = s.sets.isNotEmpty ? s.sets.first.weightKg : null;
+    if (s.repMode == RepMode.single) {
+      final repValues = s.sets.map((e) => e.reps ?? 0).toList();
+      legacyTargetReps = repValues;
+      legacyRepsMin =
+          repValues.isNotEmpty ? repValues.reduce((a, b) => a < b ? a : b) : 0;
+      legacyRepsMax =
+          repValues.isNotEmpty ? repValues.reduce((a, b) => a > b ? a : b) : 0;
+    } else {
+      // range
+      legacyRepsMin = s.sets.isNotEmpty
+          ? s.sets.map((e) => e.repsMin ?? 0).reduce((a, b) => a < b ? a : b)
+          : 0;
+      legacyRepsMax = s.sets.isNotEmpty
+          ? s.sets.map((e) => e.repsMax ?? 0).reduce((a, b) => a > b ? a : b)
+          : 0;
+      legacyTargetReps = [];
+    }
+  }
+
+  return RoutineSlot(
+    exerciseId: s.exercise!.id,
+    exerciseName: s.exercise!.name,
+    muscleGroup: s.exercise!.muscleGroup,
+    targetSets: targetSets,
+    targetRepsMin: legacyRepsMin,
+    targetRepsMax: legacyRepsMax,
+    restSeconds: s.restSeconds,
+    targetWeightKg: legacyWeightKg,
+    supersetGroup: effectiveGroup,
+    targetReps: legacyTargetReps,
+    durationSeconds: legacyDurationSeconds,
+    exerciseMode: s.exerciseMode,
+    repMode: s.repMode,
+    sets: specList,
+  );
 }
 
 // ── Screen ────────────────────────────────────────────────────────────────────
@@ -115,13 +254,11 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
       if (day.slots.isEmpty) return false;
       for (final slot in day.slots) {
         if (slot.exercise == null) return false;
-        if (slot.targetSets < 1) return false;
-        // A slot is valid when it has reps OR a duration > 0.
-        final hasReps =
-            slot.targetReps.isNotEmpty && slot.targetReps.every((r) => r > 0);
-        final hasDuration =
-            slot.durationSeconds != null && slot.durationSeconds! > 0;
-        if (!hasReps && !hasDuration) return false;
+        if (slot.sets.isEmpty) return false;
+        // Every set must be valid for its exercise mode + rep mode.
+        final allSetsValid = slot.sets
+            .every((s) => isSetValid(s, slot.exerciseMode, slot.repMode));
+        if (!allSetsValid) return false;
       }
     }
     return true;
@@ -180,7 +317,8 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
       for (final ex in picked.where((e) => !existingIds.contains(e.id))) {
         final slot = _EditableSlot()
           ..exercise = ex
-          ..restSeconds = ex.defaultRestSeconds ?? 60;
+          ..restSeconds = ex.defaultRestSeconds ?? 60
+          ..sets = [_EditableSet()];
         _days[dayIndex].slots = [..._days[dayIndex].slots, slot];
       }
     });
@@ -208,7 +346,8 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
           .map((ex) => _EditableSlot()
             ..exercise = ex
             ..restSeconds = ex.defaultRestSeconds ?? 60
-            ..supersetGroup = nextGroup)
+            ..supersetGroup = nextGroup
+            ..sets = [_EditableSet()])
           .toList();
       day.slots = [...day.slots, ...newSlots];
     });
@@ -233,7 +372,8 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
           .map((ex) => _EditableSlot()
             ..exercise = ex
             ..restSeconds = ex.defaultRestSeconds ?? 60
-            ..supersetGroup = groupId)
+            ..supersetGroup = groupId
+            ..sets = [_EditableSet()])
           .toList();
       // Insert right after the group's last slot to keep it consecutive.
       var insertAt = day.slots.length;
@@ -279,19 +419,7 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
                   (groupCounts[s.supersetGroup!] ?? 0) >= 2)
               ? s.supersetGroup
               : null;
-          return RoutineSlot(
-            exerciseId: s.exercise!.id,
-            exerciseName: s.exercise!.name,
-            muscleGroup: s.exercise!.muscleGroup,
-            targetSets: s.targetSets,
-            // Legacy fields kept populated so older readers don't break.
-            targetRepsMin: s.targetReps.isNotEmpty ? s.targetReps.first : 0,
-            targetRepsMax: s.targetReps.isNotEmpty ? s.targetReps.last : 0,
-            restSeconds: s.restSeconds,
-            supersetGroup: effectiveGroup,
-            targetReps: s.targetReps,
-            durationSeconds: s.durationSeconds,
-          );
+          return buildRoutineSlot(s, effectiveGroup);
         }).toList(),
       );
     }).toList();
@@ -1008,7 +1136,7 @@ class _MoveButtons extends StatelessWidget {
   }
 }
 
-// ── Slot editor row ───────────────────────────────────────────────────────────
+// ── Slot editor — Hevy-style set table ───────────────────────────────────────
 
 class _SlotEditor extends StatefulWidget {
   const _SlotEditor({
@@ -1040,22 +1168,6 @@ class _SlotEditor extends StatefulWidget {
 }
 
 class _SlotEditorState extends State<_SlotEditor> {
-  late final TextEditingController _repsCtrl;
-
-  @override
-  void initState() {
-    super.initState();
-    _repsCtrl = TextEditingController(
-      text: formatReps(widget.slot.targetReps),
-    );
-  }
-
-  @override
-  void dispose() {
-    _repsCtrl.dispose();
-    super.dispose();
-  }
-
   @override
   Widget build(BuildContext context) {
     final slot = widget.slot;
@@ -1070,6 +1182,7 @@ class _SlotEditorState extends State<_SlotEditor> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // ── Header row: exercise name + mode toggle + move + remove ───────
           Row(
             children: [
               Expanded(
@@ -1096,6 +1209,16 @@ class _SlotEditorState extends State<_SlotEditor> {
                   ),
                 ),
               ),
+              const SizedBox(width: 6),
+              // ── Exercise mode toggle (#/⏱) ────────────────────────────────
+              _ExerciseModeToggle(
+                mode: slot.exerciseMode,
+                palette: palette,
+                onChanged: (m) {
+                  setState(() => slot.exerciseMode = m);
+                  widget.onChanged();
+                },
+              ),
               if (widget.onMoveUp != null || widget.onMoveDown != null)
                 _MoveButtons(
                   palette: palette,
@@ -1104,7 +1227,7 @@ class _SlotEditorState extends State<_SlotEditor> {
                   onMoveUp: widget.onMoveUp,
                   onMoveDown: widget.onMoveDown,
                 ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 2),
               IconButton(
                 icon:
                     Icon(TreinoIcon.trash, size: 16, color: palette.textMuted),
@@ -1115,75 +1238,10 @@ class _SlotEditorState extends State<_SlotEditor> {
             ],
           ),
           const SizedBox(height: 8),
-          // ── [Series] [Reps] [Min] [Descanso] ──────────────────────────────
+
+          // ── Rest duration row ─────────────────────────────────────────────
           Row(
             children: [
-              _SmallIntField(
-                label: 'Series',
-                value: slot.targetSets,
-                palette: palette,
-                onChanged: (v) {
-                  slot.targetSets = v;
-                  widget.onChanged();
-                },
-              ),
-              const SizedBox(width: 6),
-              // Reps — free-text: "10" or "6-8-10"
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Reps',
-                      style: GoogleFonts.barlow(
-                          fontSize: 10, color: palette.textMuted),
-                    ),
-                    const SizedBox(height: 2),
-                    TextField(
-                      controller: _repsCtrl,
-                      keyboardType: TextInputType.text,
-                      style: GoogleFonts.barlow(
-                          fontSize: 13, color: palette.textPrimary),
-                      decoration: InputDecoration(
-                        isDense: true,
-                        hintText: '10 o 6-8-10',
-                        hintStyle: GoogleFonts.barlow(
-                            fontSize: 11, color: palette.textMuted),
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 6),
-                        filled: true,
-                        fillColor: palette.bgCard,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(6),
-                          borderSide: BorderSide(color: palette.border),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(6),
-                          borderSide: BorderSide(color: palette.border),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(6),
-                          borderSide: BorderSide(color: palette.accent),
-                        ),
-                      ),
-                      onChanged: (v) {
-                        slot.targetReps = parseReps(v);
-                        widget.onChanged();
-                      },
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 6),
-              DurationTextField(
-                label: 'Min',
-                valueSeconds: slot.durationSeconds ?? 0,
-                onChanged: (v) {
-                  slot.durationSeconds = v > 0 ? v : null;
-                  widget.onChanged();
-                },
-              ),
-              const SizedBox(width: 6),
               DurationTextField(
                 label: 'Descanso',
                 valueSeconds: slot.restSeconds,
@@ -1194,86 +1252,562 @@ class _SlotEditorState extends State<_SlotEditor> {
               ),
             ],
           ),
+          const SizedBox(height: 8),
+
+          // ── Set table ─────────────────────────────────────────────────────
+          _SetTable(
+            slot: slot,
+            palette: palette,
+            onChanged: () {
+              setState(() {}); // redraw chip labels after type change
+              widget.onChanged();
+            },
+          ),
+
+          // ── "+ Agregar set" button ─────────────────────────────────────────
+          const SizedBox(height: 4),
+          SizedBox(
+            width: double.infinity,
+            child: TextButton.icon(
+              key: const Key('add_set_button'),
+              onPressed: () {
+                setState(() {
+                  final template = slot.sets.isNotEmpty
+                      ? slot.sets.last.clone()
+                      : _EditableSet();
+                  slot.sets = [...slot.sets, template];
+                });
+                widget.onChanged();
+              },
+              icon: Icon(TreinoIcon.plus, size: 12, color: palette.accent),
+              label: Text(
+                '+ Agregar set',
+                style: GoogleFonts.barlowCondensed(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                  color: palette.accent,
+                ),
+              ),
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                alignment: Alignment.centerLeft,
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
 }
 
-class _SmallIntField extends StatefulWidget {
-  const _SmallIntField({
-    required this.label,
-    required this.value,
+// ── Exercise mode toggle ──────────────────────────────────────────────────────
+
+/// A small icon button that toggles between reps (#) and duration (⏱) mode.
+class _ExerciseModeToggle extends StatelessWidget {
+  const _ExerciseModeToggle({
+    required this.mode,
     required this.palette,
     required this.onChanged,
   });
 
-  final String label;
-  final int value;
+  final ExerciseMode mode;
   final AppPalette palette;
-  final void Function(int) onChanged;
+  final void Function(ExerciseMode) onChanged;
 
   @override
-  State<_SmallIntField> createState() => _SmallIntFieldState();
+  Widget build(BuildContext context) {
+    final isDuration = mode == ExerciseMode.duration;
+    return Tooltip(
+      message: isDuration ? 'Cambiar a Reps' : 'Cambiar a Tiempo',
+      child: InkWell(
+        onTap: () =>
+            onChanged(isDuration ? ExerciseMode.reps : ExerciseMode.duration),
+        borderRadius: BorderRadius.circular(6),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
+          decoration: BoxDecoration(
+            color: palette.bgCard,
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: palette.border),
+          ),
+          child: Text(
+            isDuration ? '⏱' : '#',
+            style: GoogleFonts.barlow(
+              fontSize: 13,
+              color: isDuration ? palette.accent : palette.textMuted,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
-class _SmallIntFieldState extends State<_SmallIntField> {
-  late final TextEditingController _ctrl;
+// ── Set table ─────────────────────────────────────────────────────────────────
+
+/// Renders the column header and one row per set for a slot.
+class _SetTable extends StatefulWidget {
+  const _SetTable({
+    required this.slot,
+    required this.palette,
+    required this.onChanged,
+  });
+
+  final _EditableSlot slot;
+  final AppPalette palette;
+  final VoidCallback onChanged;
 
   @override
-  void initState() {
-    super.initState();
-    _ctrl = TextEditingController(text: widget.value.toString());
-  }
+  State<_SetTable> createState() => _SetTableState();
+}
 
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
+class _SetTableState extends State<_SetTable> {
+  /// Opens the rep-mode picker popup anchored to the tapped header cell.
+  Future<void> _pickRepMode(BuildContext context, Offset position) async {
+    final renderBox = context.findRenderObject() as RenderBox?;
+    final overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
+    final relativeOffset = renderBox != null
+        ? renderBox.localToGlobal(Offset.zero, ancestor: overlay)
+        : position;
+
+    final result = await showMenu<RepMode>(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        relativeOffset.dx,
+        relativeOffset.dy + (renderBox?.size.height ?? 24),
+        relativeOffset.dx + 120,
+        0,
+      ),
+      color: widget.palette.bgCard,
+      items: [
+        PopupMenuItem(
+          value: RepMode.single,
+          child: Text(
+            'Reps',
+            style: GoogleFonts.barlow(
+                color: widget.palette.textPrimary, fontSize: 13),
+          ),
+        ),
+        PopupMenuItem(
+          value: RepMode.range,
+          child: Text(
+            'Rango',
+            style: GoogleFonts.barlow(
+                color: widget.palette.textPrimary, fontSize: 13),
+          ),
+        ),
+      ],
+    );
+    if (result != null) {
+      setState(() => widget.slot.repMode = result);
+      widget.onChanged();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final slot = widget.slot;
     final palette = widget.palette;
-    return Expanded(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            widget.label,
-            style: GoogleFonts.barlow(fontSize: 10, color: palette.textMuted),
+    final isDuration = slot.exerciseMode == ExerciseMode.duration;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // ── Column headers ─────────────────────────────────────────────────
+        _SetTableHeader(
+          slot: slot,
+          palette: palette,
+          onPickRepMode: _pickRepMode,
+        ),
+        const SizedBox(height: 4),
+        // ── Set rows ───────────────────────────────────────────────────────
+        for (var i = 0; i < slot.sets.length; i++)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: _SetRow(
+              key: ObjectKey(slot.sets[i]),
+              editableSet: slot.sets[i],
+              index: i,
+              allSets: slot.sets,
+              palette: palette,
+              exerciseMode: slot.exerciseMode,
+              repMode: slot.repMode,
+              isDuration: isDuration,
+              onTypeChanged: (type) {
+                setState(() => slot.sets[i].type = type);
+                widget.onChanged();
+              },
+              onRemove: slot.sets.length > 1
+                  ? () {
+                      setState(() {
+                        slot.sets = [
+                          for (var j = 0; j < slot.sets.length; j++)
+                            if (j != i) slot.sets[j],
+                        ];
+                      });
+                      widget.onChanged();
+                    }
+                  : null,
+              onChanged: widget.onChanged,
+            ),
           ),
-          const SizedBox(height: 2),
-          TextField(
-            controller: _ctrl,
-            keyboardType: TextInputType.number,
-            style: GoogleFonts.barlow(fontSize: 13, color: palette.textPrimary),
-            decoration: InputDecoration(
-              isDense: true,
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-              filled: true,
-              fillColor: palette.bgCard,
-              border: OutlineInputBorder(
+      ],
+    );
+  }
+}
+
+// ── Set table header ──────────────────────────────────────────────────────────
+
+class _SetTableHeader extends StatelessWidget {
+  const _SetTableHeader({
+    required this.slot,
+    required this.palette,
+    required this.onPickRepMode,
+  });
+
+  final _EditableSlot slot;
+  final AppPalette palette;
+  final Future<void> Function(BuildContext, Offset) onPickRepMode;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDuration = slot.exerciseMode == ExerciseMode.duration;
+
+    TextStyle headerStyle() => GoogleFonts.barlowCondensed(
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.8,
+          color: palette.textMuted,
+        );
+
+    Widget cell(String label, {bool tappable = false}) {
+      final text = Text(label, style: headerStyle());
+      if (!tappable) {
+        return Expanded(child: Center(child: text));
+      }
+      // Tappable: reps header opens popup to switch repMode.
+      return Expanded(
+        child: Builder(
+          builder: (ctx) => GestureDetector(
+            onTap: () => onPickRepMode(ctx, Offset.zero),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                text,
+                const SizedBox(width: 3),
+                Icon(TreinoIcon.chevronDown,
+                    size: 10, color: palette.textMuted),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Row(
+      children: [
+        // SET column (fixed narrow width)
+        SizedBox(
+          width: 36,
+          child: Center(
+            child: Text('SET', style: headerStyle()),
+          ),
+        ),
+        const SizedBox(width: 6),
+        if (isDuration) ...[
+          cell('TIEMPO'),
+        ] else ...[
+          cell('KG'),
+          const SizedBox(width: 6),
+          if (slot.repMode == RepMode.range) ...[
+            cell('MÍN', tappable: true),
+            const SizedBox(width: 6),
+            cell('MÁX', tappable: true),
+          ] else ...[
+            cell('REPS', tappable: true),
+          ],
+        ],
+        // Delete icon placeholder (same width as delete button)
+        const SizedBox(width: 32),
+      ],
+    );
+  }
+}
+
+// ── Set row ───────────────────────────────────────────────────────────────────
+
+class _SetRow extends StatefulWidget {
+  const _SetRow({
+    super.key,
+    required this.editableSet,
+    required this.index,
+    required this.allSets,
+    required this.palette,
+    required this.exerciseMode,
+    required this.repMode,
+    required this.isDuration,
+    required this.onTypeChanged,
+    required this.onChanged,
+    this.onRemove,
+  });
+
+  final _EditableSet editableSet;
+  final int index;
+  final List<_EditableSet> allSets;
+  final AppPalette palette;
+  final ExerciseMode exerciseMode;
+  final RepMode repMode;
+  final bool isDuration;
+  final void Function(SetType) onTypeChanged;
+  final VoidCallback onChanged;
+  final VoidCallback? onRemove;
+
+  @override
+  State<_SetRow> createState() => _SetRowState();
+}
+
+class _SetRowState extends State<_SetRow> {
+  late final TextEditingController _kgCtrl;
+  late final TextEditingController _repsCtrl;
+  late final TextEditingController _repsMinCtrl;
+  late final TextEditingController _repsMaxCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    final s = widget.editableSet;
+    _kgCtrl = TextEditingController(
+        text: s.weightKg != null ? s.weightKg!.toStringAsFixed(0) : '');
+    _repsCtrl =
+        TextEditingController(text: s.reps != null ? s.reps.toString() : '');
+    _repsMinCtrl = TextEditingController(
+        text: s.repsMin != null ? s.repsMin.toString() : '');
+    _repsMaxCtrl = TextEditingController(
+        text: s.repsMax != null ? s.repsMax.toString() : '');
+  }
+
+  @override
+  void dispose() {
+    _kgCtrl.dispose();
+    _repsCtrl.dispose();
+    _repsMinCtrl.dispose();
+    _repsMaxCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickSetType(BuildContext context) async {
+    final renderBox = context.findRenderObject() as RenderBox?;
+    final overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
+    final offset = renderBox != null
+        ? renderBox.localToGlobal(Offset.zero, ancestor: overlay)
+        : Offset.zero;
+
+    final result = await showMenu<SetType>(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        offset.dx,
+        offset.dy + (renderBox?.size.height ?? 28),
+        offset.dx + 160,
+        0,
+      ),
+      color: widget.palette.bgCard,
+      items: const [
+        PopupMenuItem(value: SetType.normal, child: Text('Normal')),
+        PopupMenuItem(
+            value: SetType.warmup, child: Text('Entrada en calor (W)')),
+        PopupMenuItem(value: SetType.drop, child: Text('Drop (D)')),
+        PopupMenuItem(value: SetType.failure, child: Text('Al fallo (F)')),
+      ],
+    );
+    if (result != null) widget.onTypeChanged(result);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = widget.editableSet;
+    final palette = widget.palette;
+    final label = setChipLabel(widget.allSets, widget.index);
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        // ── Set chip ──────────────────────────────────────────────────────
+        Builder(
+          builder: (ctx) => GestureDetector(
+            onTap: () => _pickSetType(ctx),
+            child: Container(
+              width: 36,
+              height: 28,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: _chipColor(s.type, palette),
                 borderRadius: BorderRadius.circular(6),
-                borderSide: BorderSide(color: palette.border),
               ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(6),
-                borderSide: BorderSide(color: palette.border),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(6),
-                borderSide: BorderSide(color: palette.accent),
+              child: Text(
+                label,
+                style: GoogleFonts.barlowCondensed(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: _chipTextColor(s.type, palette),
+                ),
               ),
             ),
-            onChanged: (v) {
-              final parsed = int.tryParse(v);
-              if (parsed != null) widget.onChanged(parsed);
-            },
           ),
+        ),
+        const SizedBox(width: 6),
+        // ── Input cells ───────────────────────────────────────────────────
+        if (widget.isDuration) ...[
+          Expanded(
+            child: DurationTextField(
+              valueSeconds: s.durationSeconds ?? 0,
+              onChanged: (v) {
+                s.durationSeconds = v > 0 ? v : null;
+                widget.onChanged();
+              },
+            ),
+          ),
+        ] else ...[
+          // KG field
+          Expanded(
+            child: _NumberField(
+              controller: _kgCtrl,
+              palette: palette,
+              hint: 'kg',
+              onChanged: (v) {
+                s.weightKg = v?.toDouble();
+                widget.onChanged();
+              },
+            ),
+          ),
+          const SizedBox(width: 6),
+          if (widget.repMode == RepMode.range) ...[
+            // REP MIN
+            Expanded(
+              child: _NumberField(
+                controller: _repsMinCtrl,
+                palette: palette,
+                hint: 'mín',
+                onChanged: (v) {
+                  s.repsMin = v;
+                  widget.onChanged();
+                },
+              ),
+            ),
+            const SizedBox(width: 6),
+            // REP MAX
+            Expanded(
+              child: _NumberField(
+                controller: _repsMaxCtrl,
+                palette: palette,
+                hint: 'máx',
+                onChanged: (v) {
+                  s.repsMax = v;
+                  widget.onChanged();
+                },
+              ),
+            ),
+          ] else ...[
+            // REPS
+            Expanded(
+              child: _NumberField(
+                controller: _repsCtrl,
+                palette: palette,
+                hint: 'reps',
+                onChanged: (v) {
+                  s.reps = v;
+                  widget.onChanged();
+                },
+              ),
+            ),
+          ],
         ],
+        // ── Delete button ─────────────────────────────────────────────────
+        SizedBox(
+          width: 32,
+          child: widget.onRemove != null
+              ? IconButton(
+                  icon: Icon(TreinoIcon.close,
+                      size: 14, color: palette.textMuted),
+                  onPressed: widget.onRemove,
+                  constraints: const BoxConstraints(),
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                )
+              : const SizedBox.shrink(),
+        ),
+      ],
+    );
+  }
+
+  Color _chipColor(SetType type, AppPalette palette) {
+    return switch (type) {
+      SetType.warmup => palette.accent.withAlpha(30),
+      SetType.drop => palette.highlight.withAlpha(30),
+      SetType.failure => Colors.red.withAlpha(30),
+      SetType.normal => palette.bgCard,
+    };
+  }
+
+  Color _chipTextColor(SetType type, AppPalette palette) {
+    return switch (type) {
+      SetType.warmup => palette.accent,
+      SetType.drop => palette.highlight,
+      SetType.failure => Colors.red,
+      SetType.normal => palette.textMuted,
+    };
+  }
+}
+
+// ── Number input field ────────────────────────────────────────────────────────
+
+/// Compact numeric text field without a label (used inside set rows).
+class _NumberField extends StatelessWidget {
+  const _NumberField({
+    required this.controller,
+    required this.palette,
+    required this.onChanged,
+    this.hint,
+  });
+
+  final TextEditingController controller;
+  final AppPalette palette;
+  final String? hint;
+  final void Function(int?) onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: controller,
+      keyboardType: TextInputType.number,
+      style: GoogleFonts.barlow(fontSize: 13, color: palette.textPrimary),
+      textAlign: TextAlign.center,
+      decoration: InputDecoration(
+        isDense: true,
+        hintText: hint,
+        hintStyle: GoogleFonts.barlow(fontSize: 11, color: palette.textMuted),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+        filled: true,
+        fillColor: palette.bgCard,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(6),
+          borderSide: BorderSide(color: palette.border),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(6),
+          borderSide: BorderSide(color: palette.border),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(6),
+          borderSide: BorderSide(color: palette.accent),
+        ),
       ),
+      onChanged: (v) {
+        final parsed = int.tryParse(v);
+        onChanged(parsed);
+      },
     );
   }
 }
@@ -1320,6 +1854,84 @@ class _LevelDropdown extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+// ── Test bridge ───────────────────────────────────────────────────────────────
+// Exposes internal helpers for unit tests without making the private types
+// themselves public. Only used via test imports; Flutter tree-shakes it in
+// release builds since nothing in the widget tree references it.
+
+/// Static bridge that lets test files exercise [setChipLabel], [isSetValid],
+/// and [buildRoutineSlot] by constructing [_EditableSet]/[_EditableSlot]
+/// instances internally and returning plain Dart values.
+class RoutineEditorTestBridge {
+  RoutineEditorTestBridge._();
+
+  /// Delegates to [isSetValid] after constructing a minimal [_EditableSet].
+  static bool isSetValidBridge({
+    required ExerciseMode exerciseMode,
+    required RepMode repMode,
+    int? reps,
+    int? repsMin,
+    int? repsMax,
+    int? durationSeconds,
+  }) {
+    final s = _EditableSet(
+      reps: reps,
+      repsMin: repsMin,
+      repsMax: repsMax,
+      durationSeconds: durationSeconds,
+    );
+    return isSetValid(s, exerciseMode, repMode);
+  }
+
+  /// Delegates to [buildRoutineSlot] after constructing a minimal
+  /// [_EditableSlot] from the given parameters.
+  static RoutineSlot buildSlotBridge({
+    required ExerciseMode exerciseMode,
+    required RepMode repMode,
+    required List<
+            ({
+              SetType type,
+              double? weightKg,
+              int? reps,
+              int? repsMin,
+              int? repsMax,
+              int? durationSeconds,
+            })>
+        sets,
+  }) {
+    final slot = _EditableSlot()
+      ..exercise = const Exercise(
+        id: 'test-ex',
+        name: 'Test Exercise',
+        muscleGroup: 'chest',
+        category: 'compound',
+      )
+      ..exerciseMode = exerciseMode
+      ..repMode = repMode
+      ..sets = sets
+          .map((r) => _EditableSet(
+                type: r.type,
+                weightKg: r.weightKg,
+                reps: r.reps,
+                repsMin: r.repsMin,
+                repsMax: r.repsMax,
+                durationSeconds: r.durationSeconds,
+              ))
+          .toList();
+    return buildRoutineSlot(slot, null);
+  }
+
+  /// Delegates to [setChipLabel] after constructing a list of [_EditableSet]s
+  /// with the specified types.
+  static String chipLabelBridge({
+    required List<SetType> sets,
+    required int index,
+  }) {
+    final editableSets = sets.map((t) => _EditableSet(type: t)).toList();
+    return setChipLabel(editableSets, index);
   }
 }
 
