@@ -14,6 +14,9 @@ import '../../gyms/domain/gym.dart';
 import '../application/user_providers.dart';
 import '../domain/user_profile.dart';
 
+// ADR-TPO-005: view-only enum co-located with its single screen consumer.
+enum ProfileEditTrainerMode { edit, onboarding }
+
 /// Pantalla de edición del perfil público del PF.
 ///
 /// Modelo multi-location (Fase 6 Etapa 0 PR#3): el PF puede tener una
@@ -33,7 +36,14 @@ import '../domain/user_profile.dart';
 ///
 /// Avatar + displayName se editan desde "Datos personales" — out of scope.
 class ProfileEditTrainerScreen extends ConsumerStatefulWidget {
-  const ProfileEditTrainerScreen({super.key});
+  const ProfileEditTrainerScreen({
+    super.key,
+    this.mode = ProfileEditTrainerMode.edit,
+  });
+
+  // ADR-TPO-005: defaults to edit — any caller that forgets the mode
+  // degrades safely to current edit-mode behavior.
+  final ProfileEditTrainerMode mode;
 
   @override
   ConsumerState<ProfileEditTrainerScreen> createState() =>
@@ -186,7 +196,12 @@ class _ProfileEditTrainerScreenState
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Perfil actualizado.')),
       );
-      context.pop();
+      // ADR-TPO-006: post-save navigation branches on mode.
+      if (widget.mode == ProfileEditTrainerMode.onboarding) {
+        context.go('/home');
+      } else {
+        context.pop();
+      }
     } catch (_) {
       if (!mounted) return;
       setState(() {
@@ -203,19 +218,26 @@ class _ProfileEditTrainerScreenState
     final profile = profileAsync.valueOrNull;
 
     if (profile == null) {
-      return Center(child: CircularProgressIndicator(color: palette.accent));
+      return Scaffold(
+        body: Center(child: CircularProgressIndicator(color: palette.accent)),
+      );
     }
     _initFromProfile(profile);
 
-    return SingleChildScrollView(
+    // ADR-TPO-006: AppBar title derived from mode.
+    final title =
+        widget.mode == ProfileEditTrainerMode.onboarding
+            ? 'Completá tu perfil profesional' // i18n: Fase 6 Etapa 1
+            : 'Editá tu perfil profesional'; // i18n: Fase 6 Etapa 1
+
+    // ADR-TPO-006: in onboarding mode, block back navigation at both levels.
+    final body = SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
       child: Form(
         key: _formKey,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _Header(palette: palette),
-            const SizedBox(height: 20),
             _SectionLabel(palette: palette, text: 'BIO'),
             const SizedBox(height: 8),
             TextFormField(
@@ -345,6 +367,27 @@ class _ProfileEditTrainerScreenState
         ),
       ),
     );
+
+    // ADR-TPO-006: onboarding mode wraps body in PopScope to block OS back
+    // gesture (iOS swipe-back, Android back button).
+    final wrappedBody =
+        widget.mode == ProfileEditTrainerMode.onboarding
+            ? PopScope(
+                canPop: false,
+                onPopInvokedWithResult: (_, __) {},
+                child: body,
+              )
+            : body;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(title),
+        // ADR-TPO-006: in onboarding mode, hide the back arrow entirely.
+        automaticallyImplyLeading:
+            widget.mode != ProfileEditTrainerMode.onboarding,
+      ),
+      body: wrappedBody,
+    );
   }
 
   InputDecoration _inputDecoration(AppPalette palette, {required String hint}) {
@@ -365,33 +408,6 @@ class _ProfileEditTrainerScreenState
         borderRadius: BorderRadius.circular(14),
         borderSide: BorderSide(color: palette.danger),
       ),
-    );
-  }
-}
-
-class _Header extends StatelessWidget {
-  const _Header({required this.palette});
-  final AppPalette palette;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        GestureDetector(
-          onTap: () => context.pop(),
-          behavior: HitTestBehavior.opaque,
-          child: Icon(TreinoIcon.back, size: 20, color: palette.textPrimary),
-        ),
-        const SizedBox(width: 14),
-        Text(
-          'MI PERFIL DE ENTRENADOR',
-          style: GoogleFonts.barlowCondensed(
-            fontWeight: FontWeight.w700,
-            fontSize: 20,
-            color: palette.textPrimary,
-          ),
-        ),
-      ],
     );
   }
 }
