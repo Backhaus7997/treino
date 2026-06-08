@@ -225,10 +225,9 @@ class _ProfileEditTrainerScreenState
     _initFromProfile(profile);
 
     // ADR-TPO-006: AppBar title derived from mode.
-    final title =
-        widget.mode == ProfileEditTrainerMode.onboarding
-            ? 'Completá tu perfil profesional' // i18n: Fase 6 Etapa 1
-            : 'Editá tu perfil profesional'; // i18n: Fase 6 Etapa 1
+    final title = widget.mode == ProfileEditTrainerMode.onboarding
+        ? 'Completá tu perfil profesional' // i18n: Fase 6 Etapa 1
+        : 'Editá tu perfil profesional'; // i18n: Fase 6 Etapa 1
 
     // ADR-TPO-006: in onboarding mode, block back navigation at both levels.
     final body = SingleChildScrollView(
@@ -371,14 +370,13 @@ class _ProfileEditTrainerScreenState
 
     // ADR-TPO-006: onboarding mode wraps body in PopScope to block OS back
     // gesture (iOS swipe-back, Android back button).
-    final wrappedBody =
-        widget.mode == ProfileEditTrainerMode.onboarding
-            ? PopScope(
-                canPop: false,
-                onPopInvokedWithResult: (_, __) {},
-                child: body,
-              )
-            : body;
+    final wrappedBody = widget.mode == ProfileEditTrainerMode.onboarding
+        ? PopScope(
+            canPop: false,
+            onPopInvokedWithResult: (_, __) {},
+            child: body,
+          )
+        : body;
 
     return Scaffold(
       appBar: AppBar(

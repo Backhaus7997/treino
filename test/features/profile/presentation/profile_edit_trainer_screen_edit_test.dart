@@ -129,9 +129,9 @@ void main() {
   });
 
   group('SCENARIO-712: edit mode title', () {
-    testWidgets('edit mode shows "Editá tu perfil profesional"', (tester) async {
-      await tester.pumpWidget(
-          _buildScreen(mode: ProfileEditTrainerMode.edit));
+    testWidgets('edit mode shows "Editá tu perfil profesional"',
+        (tester) async {
+      await tester.pumpWidget(_buildScreen(mode: ProfileEditTrainerMode.edit));
       await tester.pumpAndSettle();
 
       expect(find.text('Editá tu perfil profesional'), findsOneWidget);
@@ -162,7 +162,8 @@ void main() {
   });
 
   group('SCENARIO-717: post-save in edit mode calls context.pop()', () {
-    testWidgets('save success navigates back (pop) in edit mode', (tester) async {
+    testWidgets('save success navigates back (pop) in edit mode',
+        (tester) async {
       String? lastLocation;
       final router = GoRouter(
         initialLocation: '/profile/edit-trainer',
@@ -178,7 +179,8 @@ void main() {
               GoRoute(
                 path: 'edit-trainer',
                 builder: (context, __) => Scaffold(
-                  body: ProfileEditTrainerScreen(mode: ProfileEditTrainerMode.edit),
+                  body: ProfileEditTrainerScreen(
+                      mode: ProfileEditTrainerMode.edit),
                 ),
               ),
             ],

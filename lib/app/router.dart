@@ -393,10 +393,9 @@ GoRouter buildRouter({
               GoRoute(
                 path: 'edit-trainer',
                 pageBuilder: (context, state) {
-                  final mode =
-                      state.uri.queryParameters['mode'] == 'onboarding'
-                          ? ProfileEditTrainerMode.onboarding
-                          : ProfileEditTrainerMode.edit;
+                  final mode = state.uri.queryParameters['mode'] == 'onboarding'
+                      ? ProfileEditTrainerMode.onboarding
+                      : ProfileEditTrainerMode.edit;
                   return _noAnim(ProfileEditTrainerScreen(mode: mode));
                 },
               ),

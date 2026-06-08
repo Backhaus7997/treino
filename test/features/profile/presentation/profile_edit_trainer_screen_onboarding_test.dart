@@ -34,8 +34,7 @@ UserProfile _trainerProfile({bool complete = false}) => UserProfile(
       role: UserRole.trainer,
       createdAt: DateTime.utc(2026),
       updatedAt: DateTime.utc(2026),
-      trainerBio:
-          complete ? 'Bio de al menos 20 caracteres ok' : null,
+      trainerBio: complete ? 'Bio de al menos 20 caracteres ok' : null,
       trainerSpecialty: complete ? 'crossfit' : null,
       trainerMonthlyRate: complete ? 8000 : null,
       trainerOffersOnline: complete ? true : false,
@@ -109,8 +108,7 @@ void main() {
   // ── SCENARIO-710: router resolves onboarding mode from ?mode=onboarding ──
 
   group('SCENARIO-710: router maps ?mode=onboarding to onboarding mode', () {
-    testWidgets(
-        'navigating with ?mode=onboarding shows onboarding title',
+    testWidgets('navigating with ?mode=onboarding shows onboarding title',
         (tester) async {
       // This test verifies the router query-param → mode mapping (ADR-TPO-005).
       // The production GoRoute reads state.uri.queryParameters['mode'].
@@ -128,10 +126,9 @@ void main() {
               GoRoute(
                 path: 'edit-trainer',
                 builder: (context, state) {
-                  final mode =
-                      state.uri.queryParameters['mode'] == 'onboarding'
-                          ? ProfileEditTrainerMode.onboarding
-                          : ProfileEditTrainerMode.edit;
+                  final mode = state.uri.queryParameters['mode'] == 'onboarding'
+                      ? ProfileEditTrainerMode.onboarding
+                      : ProfileEditTrainerMode.edit;
                   return ProfileEditTrainerScreen(mode: mode);
                 },
               ),
@@ -146,8 +143,7 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
-            authStateChangesProvider
-                .overrideWith((_) => Stream.value(null)),
+            authStateChangesProvider.overrideWith((_) => Stream.value(null)),
             userProfileProvider
                 .overrideWith((_) => Stream.value(_trainerProfile())),
             userRepositoryProvider.overrideWithValue(mockRepo),
@@ -180,8 +176,7 @@ void main() {
   // ── SCENARIO-714: back navigation blocked in onboarding mode ────────────
 
   group('SCENARIO-714: back navigation blocked in onboarding mode', () {
-    testWidgets(
-        'no back button in AppBar AND PopScope(canPop: false) in tree',
+    testWidgets('no back button in AppBar AND PopScope(canPop: false) in tree',
         (tester) async {
       await tester.pumpWidget(_buildScreen());
       await tester.pumpAndSettle();
@@ -206,7 +201,8 @@ void main() {
   // ── SCENARIO-716: post-save navigates to /home in onboarding mode ─────────
 
   group('SCENARIO-716: post-save navigates to /home', () {
-    testWidgets('save success in onboarding mode goes to /home', (tester) async {
+    testWidgets('save success in onboarding mode goes to /home',
+        (tester) async {
       bool homePushed = false;
       final router = GoRouter(
         initialLocation: '/profile/edit-trainer',
@@ -241,8 +237,7 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
-            authStateChangesProvider
-                .overrideWith((_) => Stream.value(null)),
+            authStateChangesProvider.overrideWith((_) => Stream.value(null)),
             userProfileProvider.overrideWith((_) => Stream.value(profile)),
             userRepositoryProvider.overrideWithValue(mockRepo),
             gymsProvider.overrideWith((ref) async => const []),
@@ -269,7 +264,8 @@ void main() {
 
   // ── SCENARIO-718: repo exception surfaces, no navigation ─────────────────
 
-  group('SCENARIO-718: repo exception → error shown, no navigation to /home', () {
+  group('SCENARIO-718: repo exception → error shown, no navigation to /home',
+      () {
     testWidgets(
         'when repo.update throws, error message shown and no navigation',
         (tester) async {
@@ -308,8 +304,7 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
-            authStateChangesProvider
-                .overrideWith((_) => Stream.value(null)),
+            authStateChangesProvider.overrideWith((_) => Stream.value(null)),
             userProfileProvider.overrideWith((_) => Stream.value(profile)),
             userRepositoryProvider.overrideWithValue(mockRepo),
             gymsProvider.overrideWith((ref) async => const []),
