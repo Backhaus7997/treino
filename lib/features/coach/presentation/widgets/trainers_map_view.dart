@@ -33,11 +33,21 @@ class TrainersMapView extends ConsumerStatefulWidget {
   static const _initialCenter = LatLng(-31.40, -64.18);
   static const _initialZoom = 13.0;
 
-  /// Tiles dark de CartoDB (free + open data). Coincide visualmente con
-  /// la paleta dark mode del resto de la app. Atribución requerida —
-  /// renderizada como overlay en la esquina inferior derecha.
+  /// Tiles CartoDB "Voyager" — estilo colorido tipo Google Maps con
+  /// agua azul, parques verdes, calles beige/blanco. Reemplazó al
+  /// `dark_all` (calles imperceptibles sobre negro) y al intento de
+  /// Stadia Alidade Smooth Dark (requiere API key, devolvía tiles
+  /// negras en anonymous). Voyager es free, sin API key, y prioriza
+  /// identificación de zonas a primera vista.
+  ///
+  /// Trade-off: rompe la coherencia "dark mode" de la app, pero el
+  /// user explícitamente lo pidió porque el dark dificultaba reconocer
+  /// barrios y calles. Los markers mint/magenta de los PFs igual
+  /// destacan sobre el fondo claro.
+  ///
+  /// Atribución requerida (OSM + CARTO).
   static const _tileUrl =
-      'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+      'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
   static const _tileSubdomains = ['a', 'b', 'c', 'd'];
 
   @override
@@ -47,18 +57,29 @@ class TrainersMapView extends ConsumerStatefulWidget {
 class _TrainersMapViewState extends ConsumerState<TrainersMapView> {
   final _mapController = MapController();
 
+  /// Estado del bottom sheet "entrenadores cerca" — lifted del child para
+  /// que el FAB de centrar pueda adaptar su offset según si el sheet está
+  /// colapsado o expandido (sino el FAB queda tapado o flotando suelto).
+  bool _sheetCollapsed = false;
+
   @override
   void dispose() {
     _mapController.dispose();
     super.dispose();
   }
 
-  /// Centra el mapa en la ubicación actual del atleta, manteniendo el zoom.
+  /// Centra el mapa en la ubicación actual del atleta, manteniendo el zoom
+  /// pero **reseteando la rotación al norte** (0°) — el user puede haber
+  /// rotado el mapa accidentalmente con dos dedos, dejando los textos de
+  /// las calles inclinados. Al tocar "centrar" esperás recuperar el estado
+  /// "default": tu ubicación al centro + mapa derecho con norte arriba.
+  ///
   /// No-op si el atleta no tiene ubicación.
   void _recenterToAthlete(Position pos) {
-    _mapController.move(
+    _mapController.moveAndRotate(
       LatLng(pos.latitude, pos.longitude),
       _mapController.camera.zoom,
+      0, // norte arriba — textos rectos
     );
   }
 
@@ -126,7 +147,12 @@ class _TrainersMapViewState extends ConsumerState<TrainersMapView> {
                 // feo que contrasta con el theme oscuro.
                 backgroundColor: palette.bg,
                 interactionOptions: const InteractionOptions(
-                  flags: InteractiveFlag.all,
+                  // Todos los gestos EXCEPTO rotación. El user la disparaba
+                  // sin querer con pinch-zoom y los textos de las calles
+                  // quedaban inclinados — Google Maps mantiene el norte
+                  // arriba por default y es la convención más esperable.
+                  // `~InteractiveFlag.rotate` aplica máscara de exclusión.
+                  flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
                 ),
               ),
               children: [
@@ -134,7 +160,14 @@ class _TrainersMapViewState extends ConsumerState<TrainersMapView> {
                   urlTemplate: TrainersMapView._tileUrl,
                   subdomains: TrainersMapView._tileSubdomains,
                   userAgentPackageName: 'com.treino.app',
-                  retinaMode: MediaQuery.of(context).devicePixelRatio > 1.5,
+                  // CartoDB Voyager NO tiene tiles @2x retina disponibles
+                  // — solicitar `.../{z}/{x}/{y}@2x.png` devuelve 400.
+                  // Forzamos `retinaMode: false` para usar siempre tiles @1x.
+                  // Trade-off: leve blur en pantallas high-DPI, pero el mapa
+                  // se ve correctamente en lugar de quedar todo negro.
+                  // Para retina real en producción habría que cambiar a un
+                  // tile provider con @2x (Stamen Terrain, Stadia, Mapbox).
+                  retinaMode: false,
                   maxZoom: 19,
                   // Pre-carga tiles vecinas (1 buffer ring) — reduce el flash
                   // cuando se hace pan rápido a una zona no cacheada.
@@ -185,26 +218,34 @@ class _TrainersMapViewState extends ConsumerState<TrainersMapView> {
               child: _AttributionChip(palette: palette),
             ),
             // FAB "Centrar en mi ubicación" — solo aparece si el atleta tiene
-            // location concedida. Ubicado a la derecha, con offset de ~220px
-            // desde el bottom para quedar arriba del bottom sheet collapsed
-            // (drag handle ~28 + header ~24 + carousel 110 + paddings ~40 ≈
-            // 200px) + 20px de aire. Si el sheet se expande, el FAB queda
-            // detrás — aceptable UX, el user quiso ver detalles.
+            // location concedida. AnimatedPositioned para que el offset
+            // bottom se adapte suavemente cuando el sheet expande/colapsa:
+            //   - sheet colapsado (~64px) → FAB en bottom 80
+            //   - sheet expandido (~174px) → FAB en bottom 190
+            // Misma duración + curve que el AnimatedSize del carousel para
+            // que ambas transiciones se sientan sincronizadas.
             if (athletePosition != null)
-              Positioned(
+              AnimatedPositioned(
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeOut,
                 right: 16,
-                bottom: 220,
+                bottom: _sheetCollapsed ? 80 : 190,
                 child: _RecenterFab(
                   palette: palette,
                   onTap: () => _recenterToAthlete(athletePosition),
                 ),
               ),
-            // Bottom sheet con carousel de cards.
-            const Positioned(
+            // Bottom sheet con carousel de cards. State `collapsed` lifted
+            // arriba para que el FAB lo pueda leer.
+            Positioned(
               left: 0,
               right: 0,
               bottom: 0,
-              child: TrainersMapBottomSheet(),
+              child: TrainersMapBottomSheet(
+                collapsed: _sheetCollapsed,
+                onCollapsedChanged: (next) =>
+                    setState(() => _sheetCollapsed = next),
+              ),
             ),
           ],
         );
@@ -230,7 +271,12 @@ class _TrainersMapViewState extends ConsumerState<TrainersMapView> {
     TrainerLocationType type,
   ) {
     final isGym = type == TrainerLocationType.gym;
-    final pillColor = isGym ? palette.accent : palette.highlight;
+    // Custom locations: magenta darkeneado (lerp 35% hacia bg). El
+    // magenta puro de `palette.highlight` se sentía neón sobre tiles
+    // claros tipo Voyager — bajamos saturación manteniendo el tono.
+    final pillColor = isGym
+        ? palette.accent
+        : Color.lerp(palette.highlight, palette.bg, 0.2)!;
     final icon = isGym ? TreinoIcon.dumbbell : TreinoIcon.mapPin;
     final priceLabel = t.trainerMonthlyRate != null
         ? '\$${(t.trainerMonthlyRate! / 1000).toStringAsFixed(0)}k/mes'
@@ -444,7 +490,9 @@ class _ClusterBubble extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: palette.highlight,
+        // Mismo darkened-magenta que el pill marker custom, así cluster +
+        // markers se sienten cohesivos cuando coexisten en pantalla.
+        color: Color.lerp(palette.highlight, palette.bg, 0.2)!,
         border: Border.all(color: palette.bg, width: 2),
         boxShadow: [
           BoxShadow(
