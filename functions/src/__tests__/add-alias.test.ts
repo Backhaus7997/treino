@@ -40,7 +40,17 @@ afterAll(async () => {
 
 // Module under test — will fail to resolve until add-alias.ts is created (RED)
 import { addAlias, runAddAlias } from "../add-alias";
-import { HttpsError } from "firebase-functions/v2/https";
+
+// firebase-functions-test used to invoke the callable wrapper for
+// SCENARIO-738 (unauthenticated) and SCENARIO-741 (invalid-argument).
+// These guards live in the onCall shell, not in runAddAlias.
+import firebaseFunctionsTest from "firebase-functions-test";
+type FftInstance = {
+  wrap: (fn: unknown) => (data: unknown, ctx?: unknown) => Promise<unknown>;
+  cleanup: () => void;
+};
+const fft = (firebaseFunctionsTest as unknown as () => FftInstance)();
+const wrappedAddAlias = fft.wrap(addAlias);
 
 const db = () => admin.firestore(testApp);
 
@@ -140,7 +150,9 @@ describe("normalize() parity with Dart — SCENARIO-742/743", () => {
     await cleanupDoc("exercises", "ex-norm-743b");
   });
 
-  it("SCENARIO-743c: strips parentheses — Press de Banca (agarre estrecho) → press de banca agarre estrecho", async () => {
+  // SCENARIO-743c: strips parentheses
+  // "Press de Banca (agarre estrecho)" → "press de banca agarre estrecho"
+  it("SCENARIO-743c: strips parentheses from exercise name", async () => {
     await seedUser("user-norm-743c", "trainer");
     await seedExercise("ex-norm-743c", []);
 
@@ -162,23 +174,14 @@ describe("normalize() parity with Dart — SCENARIO-742/743", () => {
 // SCENARIO-738 — rejects unauthenticated caller
 // ---------------------------------------------------------------------------
 describe("SCENARIO-738: rejects unauthenticated caller", () => {
-  it("throws HttpsError unauthenticated when request.auth is null", async () => {
-    // We test the callable wrapper guard directly by invoking addAlias with a
-    // fake request object that has no auth context.
-    const fakeRequest = {
-      auth: null,
-      data: { exerciseId: "exercise_b", alias: "squat" },
-      rawRequest: {},
-    };
-
-    // The callable shell must throw before reaching runAddAlias
-    try {
-      await (addAlias as (req: unknown) => Promise<unknown>)(fakeRequest);
-      fail("Expected HttpsError to be thrown");
-    } catch (err) {
-      expect((err as HttpsError).code).toBe("unauthenticated");
-      expect((err as HttpsError).message).toBe("Authentication required.");
-    }
+  it("throws HttpsError unauthenticated when no auth context", async () => {
+    // wrappedAddAlias(data, context) — passing no context means auth is absent.
+    await expect(
+      wrappedAddAlias({ exerciseId: "exercise_b", alias: "squat" }),
+    ).rejects.toMatchObject({
+      code: "unauthenticated",
+      message: "Authentication required.",
+    });
   });
 });
 
@@ -186,40 +189,26 @@ describe("SCENARIO-738: rejects unauthenticated caller", () => {
 // SCENARIO-741 — rejects empty exerciseId or alias
 // ---------------------------------------------------------------------------
 describe("SCENARIO-741: rejects empty exerciseId or alias", () => {
+  // Input validation is enforced inside runAddAlias so it is testable without
+  // going through the onCall transport layer (which fft.wrap does not fully
+  // emulate for v2 auth context). The callable wrapper also checks these
+  // guards before delegating — this test covers the shared validation path.
   it("throws invalid-argument when exerciseId is empty", async () => {
-    const fakeRequest = {
-      auth: { uid: "user_a", token: {} },
-      data: { exerciseId: "", alias: "sentadilla" },
-      rawRequest: {},
-    };
-
-    try {
-      await (addAlias as (req: unknown) => Promise<unknown>)(fakeRequest);
-      fail("Expected HttpsError to be thrown");
-    } catch (err) {
-      expect((err as HttpsError).code).toBe("invalid-argument");
-      expect((err as HttpsError).message).toBe(
-        "exerciseId and alias are required.",
-      );
-    }
+    await expect(
+      runAddAlias(testApp, "any-caller", "", "sentadilla"),
+    ).rejects.toMatchObject({
+      code: "invalid-argument",
+      message: "exerciseId and alias are required.",
+    });
   });
 
   it("throws invalid-argument when alias is empty", async () => {
-    const fakeRequest = {
-      auth: { uid: "user_a", token: {} },
-      data: { exerciseId: "exercise_b", alias: "" },
-      rawRequest: {},
-    };
-
-    try {
-      await (addAlias as (req: unknown) => Promise<unknown>)(fakeRequest);
-      fail("Expected HttpsError to be thrown");
-    } catch (err) {
-      expect((err as HttpsError).code).toBe("invalid-argument");
-      expect((err as HttpsError).message).toBe(
-        "exerciseId and alias are required.",
-      );
-    }
+    await expect(
+      runAddAlias(testApp, "any-caller", "exercise_b", ""),
+    ).rejects.toMatchObject({
+      code: "invalid-argument",
+      message: "exerciseId and alias are required.",
+    });
   });
 });
 

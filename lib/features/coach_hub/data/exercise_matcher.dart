@@ -26,6 +26,7 @@ class MatchResult {
   final List<ParsedPlanUnmatched> unmatched;
 }
 
+// NORMALIZE-PARITY: see ADR-CXP-006 — TS port lives in functions/src/add-alias.ts
 String normalize(String s) {
   return s
       .toLowerCase()
