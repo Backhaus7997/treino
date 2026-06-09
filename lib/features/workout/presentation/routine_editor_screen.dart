@@ -225,37 +225,125 @@ RoutineSlot buildRoutineSlot(_EditableSlot s, int? effectiveGroup) {
 ///   * [TrainerAssigning] — trainer creates a plan for a specific athlete.
 ///     Submits via [RoutineRepository.createAssigned].
 ///   * [SelfCreating] — athlete self-authors a personal routine.
-///     Submits via [RoutineRepository.createUserOwned].
-///     With a non-null existingRoutineId → stub toast (full edit deferred).
+///     - existingRoutineId == null → create via [RoutineRepository.createUserOwned].
+///     - existingRoutineId != null → edit: hydrates from Firestore via
+///       [RoutineRepository.getById], saves via [RoutineRepository.updateUserOwned].
 ///
-/// REQ-COACH-PLANS-023..028 · REQ-USR-011 · SCENARIO-457..463, 616..619.
-class RoutineEditorScreen extends StatefulWidget {
+/// REQ-COACH-PLANS-023..028 · REQ-USR-011 · REQ-USR-018 ·
+/// SCENARIO-457..463, 616..619.
+class RoutineEditorScreen extends ConsumerStatefulWidget {
   const RoutineEditorScreen({super.key, required this.mode});
 
   final RoutineEditorMode mode;
 
   @override
-  State<RoutineEditorScreen> createState() => _RoutineEditorScreenState();
+  ConsumerState<RoutineEditorScreen> createState() =>
+      _RoutineEditorScreenState();
 }
 
 String _titleFor(RoutineEditorMode mode) => switch (mode) {
       TrainerAssigning() => CoachStrings.editorTitle,
       TrainerTemplating() => CoachStrings.editorTitle,
-      SelfCreating() => WorkoutStrings.selfEditorTitle,
+      SelfCreating(existingRoutineId: null) => WorkoutStrings.selfEditorTitle,
+      SelfCreating() => WorkoutStrings.selfEditorEditTitle,
     };
 
 String _submitLabelFor(RoutineEditorMode mode) => switch (mode) {
       TrainerAssigning() => CoachStrings.editorSubmit,
       TrainerTemplating() => CoachStrings.editorSubmit,
-      SelfCreating() => WorkoutStrings.selfEditorSubmitLabel,
+      SelfCreating(existingRoutineId: null) =>
+        WorkoutStrings.selfEditorSubmitLabel,
+      SelfCreating() => WorkoutStrings.selfEditorUpdateLabel,
     };
 
-class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
+class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _splitController = TextEditingController();
   ExperienceLevel _level = ExperienceLevel.beginner;
   List<_EditableDay> _days = [_EditableDay(dayNumber: 1, name: 'Día 1')];
   bool _submitting = false;
+
+  /// True while the existing routine is being fetched from Firestore.
+  /// Only relevant in SelfCreating(existingRoutineId: non-null) mode.
+  bool _loading = false;
+
+  /// Shown when the routine to edit no longer exists in Firestore.
+  bool _loadNotFound = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Hydrate editor when editing an existing routine (REQ-USR-018).
+    final mode = widget.mode;
+    if (mode is SelfCreating && mode.existingRoutineId != null) {
+      _loadExistingRoutine(mode.existingRoutineId!);
+    }
+  }
+
+  /// Fetches the existing routine from Firestore and maps it into editor state.
+  Future<void> _loadExistingRoutine(String id) async {
+    setState(() => _loading = true);
+    try {
+      final routine = await ref.read(routineRepositoryProvider).getById(id);
+      if (!mounted) return;
+      if (routine == null) {
+        setState(() {
+          _loading = false;
+          _loadNotFound = true;
+        });
+        return;
+      }
+      // Map Routine → editor state — inverse of the create path in _submit().
+      _nameController.text = routine.name;
+      _level = routine.level;
+      _days = routine.days.map((day) {
+        final editableDay =
+            _EditableDay(dayNumber: day.dayNumber, name: day.name);
+        editableDay.slots = day.slots.map((slot) {
+          final editableSlot = _EditableSlot()
+            ..exercise = Exercise(
+              id: slot.exerciseId,
+              name: slot.exerciseName,
+              muscleGroup: slot.muscleGroup,
+              category:
+                  'compound', // denormalized — category not stored in slot
+            )
+            ..exerciseMode = slot.effectiveExerciseMode
+            ..repMode = slot.effectiveRepMode
+            ..restSeconds = slot.restSeconds
+            ..supersetGroup = slot.supersetGroup;
+
+          // Map per-set rows (new model) or synthesize from legacy fields.
+          final specList = slot.effectiveSets;
+          editableSlot.sets = specList
+              .map((spec) => _EditableSet(
+                    type: spec.type,
+                    weightKg: spec.weightKg,
+                    reps: spec.reps,
+                    repsMin: spec.repsMin,
+                    repsMax: spec.repsMax,
+                    durationSeconds: spec.durationSeconds,
+                  ))
+              .toList();
+          if (editableSlot.sets.isEmpty) {
+            editableSlot.sets = [_EditableSet()];
+          }
+          return editableSlot;
+        }).toList();
+        return editableDay;
+      }).toList();
+      if (_days.isEmpty) {
+        _days = [_EditableDay(dayNumber: 1, name: 'Día 1')];
+      }
+      setState(() => _loading = false);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _loadNotFound = true;
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -437,22 +525,10 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
     });
   }
 
-  Future<void> _submit(WidgetRef ref) async {
-    if (!_isValid || _submitting) return;
-
-    // SelfCreating with existingRoutineId → stub toast; no network call.
-    if (widget.mode case SelfCreating(existingRoutineId: final id?)
-        when id.isNotEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text(WorkoutStrings.editStubToast)),
-      );
-      return;
-    }
-
-    setState(() => _submitting = true);
-    final uid = ref.read(currentUidProvider) ?? '';
-
-    final days = _days.map((d) {
+  /// Builds [List<RoutineDay>] from the current editor state.
+  /// Used by both the create and update paths to avoid duplication.
+  List<RoutineDay> _buildDays() {
+    return _days.map((d) {
       // Normalize: a "superset" of 1 slot is just a standalone.
       final groupCounts = <int, int>{};
       for (final s in d.slots) {
@@ -473,6 +549,14 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
         }).toList(),
       );
     }).toList();
+  }
+
+  Future<void> _submit() async {
+    if (!_isValid || _submitting) return;
+
+    setState(() => _submitting = true);
+    final uid = ref.read(currentUidProvider) ?? '';
+    final days = _buildDays();
 
     try {
       final repo = ref.read(routineRepositoryProvider);
@@ -555,10 +639,24 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
           );
           context.pop();
 
-        case SelfCreating(existingRoutineId: _):
-          // Non-null existingRoutineId handled above via early return.
-          // This branch is unreachable in practice but exhausts the switch.
-          break;
+        case SelfCreating(existingRoutineId: final existingId?):
+          // Full edit path (REQ-USR-018) — update content in Firestore.
+          final draft = Routine(
+            id: existingId,
+            name: _nameController.text.trim(),
+            split: null,
+            level: ExperienceLevel.beginner,
+            days: days,
+            source: RoutineSource.userCreated,
+            visibility: RoutineVisibility.private,
+          );
+          await repo.updateUserOwned(uid: uid, draft: draft);
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content: Text(WorkoutStrings.selfEditorUpdateSuccess)),
+          );
+          context.pop();
       }
     } catch (e) {
       if (!mounted) return;
@@ -578,48 +676,159 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer(
-      builder: (context, ref, _) {
-        final palette = AppPalette.of(context);
+    final palette = AppPalette.of(context);
 
-        return Scaffold(
-          body: AppBackground(
-            child: SafeArea(
-              child: Column(
-                children: [
-                  // ── Custom header ────────────────────────────────────────
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(8, 8, 20, 0),
-                    child: Row(
-                      children: [
-                        IconButton(
-                          icon:
-                              Icon(TreinoIcon.back, color: palette.textPrimary),
-                          onPressed: () => context.canPop()
-                              ? context.pop()
-                              : context.go('/coach'),
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          _titleFor(widget.mode),
-                          style: GoogleFonts.barlowCondensed(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 20,
-                            color: palette.textPrimary,
-                          ),
-                        ),
-                      ],
+    // Loading state: hydrating from Firestore.
+    if (_loading) {
+      return Scaffold(
+        body: AppBackground(
+          child: Center(
+            child: CircularProgressIndicator(color: palette.accent),
+          ),
+        ),
+      );
+    }
+
+    // Not-found state: routine was deleted before the user opened it.
+    if (_loadNotFound) {
+      return Scaffold(
+        body: AppBackground(
+          child: SafeArea(
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 8, 20, 0),
+                  child: Row(
+                    children: [
+                      IconButton(
+                        icon: Icon(TreinoIcon.back, color: palette.textPrimary),
+                        onPressed: () => context.canPop()
+                            ? context.pop()
+                            : context.go('/workout'),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: Center(
+                    child: Text(
+                      WorkoutStrings.selfEditorNotFound,
+                      style: TextStyle(color: palette.textMuted),
                     ),
                   ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
 
-                  // ── Body ─────────────────────────────────────────────────
-                  Expanded(
-                    child: ListView(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                      children: [
-                        // ── Name + (Split when trainer mode) ───────────────
-                        // T-RER-030: athlete (SelfCreating) form shows only
-                        // Name + Days-of-plan. Trainer modes show all fields.
+    // Normal editor state.
+    {
+      return Scaffold(
+        body: AppBackground(
+          child: SafeArea(
+            child: Column(
+              children: [
+                // ── Custom header ────────────────────────────────────────
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 8, 20, 0),
+                  child: Row(
+                    children: [
+                      IconButton(
+                        icon: Icon(TreinoIcon.back, color: palette.textPrimary),
+                        onPressed: () => context.canPop()
+                            ? context.pop()
+                            : context.go(widget.mode is SelfCreating
+                                ? '/workout'
+                                : '/coach'),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        _titleFor(widget.mode),
+                        style: GoogleFonts.barlowCondensed(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 20,
+                          color: palette.textPrimary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // ── Body ─────────────────────────────────────────────────
+                Expanded(
+                  child: ListView(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                    children: [
+                      // ── Name + (Split when trainer mode) ───────────────
+                      // T-RER-030: athlete (SelfCreating) form shows only
+                      // Name + Days-of-plan. Trainer modes show all fields.
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _SectionLabel(
+                                  label: CoachStrings.editorNameLabel,
+                                  palette: palette,
+                                ),
+                                const SizedBox(height: 4),
+                                TextField(
+                                  key: const Key('editor_name_field'),
+                                  controller: _nameController,
+                                  style: GoogleFonts.barlow(
+                                    color: palette.textPrimary,
+                                    fontSize: 13,
+                                  ),
+                                  decoration: _inputDecoration(
+                                    palette,
+                                    hint: _isTrainerMode
+                                        ? 'Ej: Fuerza PPL'
+                                        : WorkoutStrings.selfEditorNameHint,
+                                  ),
+                                  onChanged: (_) => setState(() {}),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (_isTrainerMode) ...[
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  _SectionLabel(
+                                    label: CoachStrings.editorSplitLabel,
+                                    palette: palette,
+                                  ),
+                                  const SizedBox(height: 4),
+                                  TextField(
+                                    key: const Key('editor_split_field'),
+                                    controller: _splitController,
+                                    style: GoogleFonts.barlow(
+                                      color: palette.textPrimary,
+                                      fontSize: 13,
+                                    ),
+                                    decoration: _inputDecoration(
+                                      palette,
+                                      hint: 'PPL / Full Body',
+                                    ),
+                                    onChanged: (_) => setState(() {}),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+
+                      // ── Row: Level — trainer modes only ─────────────────
+                      if (_isTrainerMode) ...[
+                        const SizedBox(height: 8),
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -628,183 +837,116 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   _SectionLabel(
-                                    label: CoachStrings.editorNameLabel,
-                                    palette: palette,
-                                  ),
+                                      label: 'NIVEL', palette: palette),
                                   const SizedBox(height: 4),
-                                  TextField(
-                                    key: const Key('editor_name_field'),
-                                    controller: _nameController,
-                                    style: GoogleFonts.barlow(
-                                      color: palette.textPrimary,
-                                      fontSize: 13,
-                                    ),
-                                    decoration: _inputDecoration(
-                                      palette,
-                                      hint: _isTrainerMode
-                                          ? 'Ej: Fuerza PPL'
-                                          : WorkoutStrings.selfEditorNameHint,
-                                    ),
-                                    onChanged: (_) => setState(() {}),
+                                  _LevelDropdown(
+                                    value: _level,
+                                    palette: palette,
+                                    onChanged: (v) {
+                                      if (v != null) {
+                                        setState(() => _level = v);
+                                      }
+                                    },
                                   ),
                                 ],
                               ),
                             ),
-                            if (_isTrainerMode) ...[
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    _SectionLabel(
-                                      label: CoachStrings.editorSplitLabel,
-                                      palette: palette,
-                                    ),
-                                    const SizedBox(height: 4),
-                                    TextField(
-                                      key: const Key('editor_split_field'),
-                                      controller: _splitController,
-                                      style: GoogleFonts.barlow(
-                                        color: palette.textPrimary,
-                                        fontSize: 13,
-                                      ),
-                                      decoration: _inputDecoration(
-                                        palette,
-                                        hint: 'PPL / Full Body',
-                                      ),
-                                      onChanged: (_) => setState(() {}),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
                           ],
                         ),
-
-                        // ── Row: Level — trainer modes only ─────────────────
-                        if (_isTrainerMode) ...[
-                          const SizedBox(height: 8),
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    _SectionLabel(
-                                        label: 'NIVEL', palette: palette),
-                                    const SizedBox(height: 4),
-                                    _LevelDropdown(
-                                      value: _level,
-                                      palette: palette,
-                                      onChanged: (v) {
-                                        if (v != null) {
-                                          setState(() => _level = v);
-                                        }
-                                      },
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                        const SizedBox(height: 12),
-
-                        // ── Días del plan ───────────────────────────────────
-                        _SectionLabel(label: 'DÍAS DEL PLAN', palette: palette),
-                        const SizedBox(height: 6),
-
-                        for (int di = 0; di < _days.length; di++) ...[
-                          _DayExpansionTile(
-                            day: _days[di],
-                            palette: palette,
-                            onAddSlot: () => _pickExercisesForDay(context, di),
-                            onRemoveSlot: (si) => _removeSlot(di, si),
-                            onReorderSlots: (newOrder) =>
-                                _reorderSlots(di, newOrder),
-                            onRemoveDay:
-                                _days.length > 1 ? () => _removeDay(di) : null,
-                            onSlotChanged: () => setState(() {}),
-                            onAddToGroup: (g) =>
-                                _addExerciseToGroup(context, di, g),
-                            onReplaceExercise: (slot, ex) =>
-                                _replaceExercise(slot, ex),
-                            onMoveSlotInGroup: (absIndex, dir) =>
-                                _moveSlotWithinGroup(di, absIndex, dir),
-                            // Supersets available in every mode, including the
-                            // athlete's SelfCreating editor.
-                            allowSuperset: true,
-                            onAddSuperset: () =>
-                                _addSupersetForDay(context, di),
-                          ),
-                          const SizedBox(height: 6),
-                        ],
-
-                        // Add day button
-                        TextButton.icon(
-                          onPressed: _addDay,
-                          icon: Icon(TreinoIcon.plus,
-                              size: 14, color: palette.accent),
-                          label: Text(
-                            CoachStrings.editorAddDay,
-                            style: GoogleFonts.barlowCondensed(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 12,
-                              color: palette.accent,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 4),
                       ],
-                    ),
-                  ),
+                      const SizedBox(height: 12),
 
-                  // ── Submit button — pinned outside ListView ───────────────
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-                    child: SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: (_isValid && !_submitting)
-                            ? () => _submit(ref)
-                            : null,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: palette.accent,
-                          foregroundColor: palette.bg,
-                          disabledBackgroundColor: palette.accent.withAlpha(80),
-                          minimumSize: const Size.fromHeight(48),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(9999),
+                      // ── Días del plan ───────────────────────────────────
+                      _SectionLabel(label: 'DÍAS DEL PLAN', palette: palette),
+                      const SizedBox(height: 6),
+
+                      for (int di = 0; di < _days.length; di++) ...[
+                        _DayExpansionTile(
+                          day: _days[di],
+                          palette: palette,
+                          onAddSlot: () => _pickExercisesForDay(context, di),
+                          onRemoveSlot: (si) => _removeSlot(di, si),
+                          onReorderSlots: (newOrder) =>
+                              _reorderSlots(di, newOrder),
+                          onRemoveDay:
+                              _days.length > 1 ? () => _removeDay(di) : null,
+                          onSlotChanged: () => setState(() {}),
+                          onAddToGroup: (g) =>
+                              _addExerciseToGroup(context, di, g),
+                          onReplaceExercise: (slot, ex) =>
+                              _replaceExercise(slot, ex),
+                          onMoveSlotInGroup: (absIndex, dir) =>
+                              _moveSlotWithinGroup(di, absIndex, dir),
+                          // Supersets available in every mode, including the
+                          // athlete's SelfCreating editor.
+                          allowSuperset: true,
+                          onAddSuperset: () => _addSupersetForDay(context, di),
+                        ),
+                        const SizedBox(height: 6),
+                      ],
+
+                      // Add day button
+                      TextButton.icon(
+                        onPressed: _addDay,
+                        icon: Icon(TreinoIcon.plus,
+                            size: 14, color: palette.accent),
+                        label: Text(
+                          CoachStrings.editorAddDay,
+                          style: GoogleFonts.barlowCondensed(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12,
+                            color: palette.accent,
                           ),
                         ),
-                        child: _submitting
-                            ? SizedBox(
-                                height: 20,
-                                width: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: palette.bg,
-                                ),
-                              )
-                            : Text(
-                                _submitLabelFor(widget.mode),
-                                style: GoogleFonts.barlowCondensed(
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 14,
-                                  letterSpacing: 0.8,
-                                ),
-                              ),
                       ),
+                      const SizedBox(height: 4),
+                    ],
+                  ),
+                ),
+
+                // ── Submit button — pinned outside ListView ───────────────
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed:
+                          (_isValid && !_submitting) ? () => _submit() : null,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: palette.accent,
+                        foregroundColor: palette.bg,
+                        disabledBackgroundColor: palette.accent.withAlpha(80),
+                        minimumSize: const Size.fromHeight(48),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(9999),
+                        ),
+                      ),
+                      child: _submitting
+                          ? SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: palette.bg,
+                              ),
+                            )
+                          : Text(
+                              _submitLabelFor(widget.mode),
+                              style: GoogleFonts.barlowCondensed(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14,
+                                letterSpacing: 0.8,
+                              ),
+                            ),
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
-        );
-      },
-    );
+        ),
+      );
+    }
   }
 
   InputDecoration _inputDecoration(AppPalette palette, {String? hint}) {
@@ -1360,13 +1502,15 @@ class _SlotEditorState extends State<_SlotEditor> {
           // ── Rest duration row ─────────────────────────────────────────────
           Row(
             children: [
-              DurationTextField(
-                label: 'Descanso',
-                valueSeconds: slot.restSeconds,
-                onChanged: (v) {
-                  slot.restSeconds = v;
-                  widget.onChanged();
-                },
+              Expanded(
+                child: DurationTextField(
+                  label: 'Descanso',
+                  valueSeconds: slot.restSeconds,
+                  onChanged: (v) {
+                    slot.restSeconds = v;
+                    widget.onChanged();
+                  },
+                ),
               ),
             ],
           ),

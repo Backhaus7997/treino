@@ -102,15 +102,56 @@ service cloud.firestore {
                     && !('assignedTo' in request.resource.data)              // must be absent (REQ-USR-004)
                     && request.resource.data.createdAt is timestamp;
 
-      // UPDATE (NEW, narrow): owner can flip only `status`, nothing else.
+      // UPDATE path 1 (narrow): owner flips only `status` — archive / restore.
       // REQ-USR-013, SCENARIO-607, SCENARIO-608.
-      // DO NOT widen affectedKeys — every additional key requires a new SCENARIO test (ADR-USR-05).
       allow update: if request.auth != null
                     && request.auth.uid == resource.data.createdBy
                     && resource.data.source == 'user-created'
                     && request.resource.data.diff(resource.data).affectedKeys()
                          == ['status'].toSet()
                     && request.resource.data.status in ['active', 'archived'];
+
+      // UPDATE path 2: owner edits content fields (name, level, days).
+      // REQ-USR-018, ADR-USR-03.
+      //
+      // Invariants enforced server-side (mirrors client guards in
+      // RoutineRepository.updateUserOwned and the create rule):
+      //   - Only the owner (createdBy == auth.uid) may update.
+      //   - source must remain 'user-created' (cannot escalate to system/trainer).
+      //   - createdBy must not change (immutable owner identity).
+      //   - visibility must not change (MVP forces private, REQ-USR-012).
+      //   - createdAt must not change (audit field, immutable post-create).
+      //   - assignedBy and assignedTo must be absent — user-created routines
+      //     must never acquire trainer-assignment fields via a client write.
+      //   - Only 'name', 'level', 'days' are the allowed mutable content keys
+      //     (plus any subset). The payload must not contain keys outside the
+      //     full known field set (hasOnly guard).
+      //
+      // ⚠️  COUPLING WARNING — hasOnly field list below:
+      // This list MUST contain every field a user-created routine doc stores.
+      // If you add a field to the Routine model, createUserOwned, or
+      // updateUserOwned, you MUST add it here too — otherwise ALL athlete
+      // routine updates will fail with permission-denied.
+      allow update: if request.auth != null
+                    && request.auth.uid == resource.data.createdBy
+                    && resource.data.source == 'user-created'
+                    // Immutable identity fields must not change.
+                    && request.resource.data.createdBy == resource.data.createdBy
+                    && request.resource.data.source == resource.data.source
+                    && request.resource.data.visibility == resource.data.visibility
+                    && request.resource.data.createdAt == resource.data.createdAt
+                    && request.resource.data.status == resource.data.status
+                    // Trainer-assignment fields must be absent (anti-hijack).
+                    && !('assignedBy' in request.resource.data)
+                    && !('assignedTo' in request.resource.data)
+                    // Only content fields may appear in the written document.
+                    && request.resource.data.keys().hasOnly(
+                         ['name', 'level', 'days',
+                          'source', 'createdBy', 'visibility', 'createdAt', 'status',
+                          'split', 'estimatedMinutesPerDay', 'imageUrl'])
+                    // The diff must touch ONLY content fields (name/level/days).
+                    && request.resource.data.diff(resource.data).affectedKeys()
+                         .hasOnly(['name', 'level', 'days']);
 
       // DELETE (narrow): the owning trainer may delete their OWN
       // `trainer-template` docs (library cleanup) and `trainer-assigned`

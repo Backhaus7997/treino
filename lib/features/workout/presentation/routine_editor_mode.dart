@@ -39,8 +39,9 @@ final class TrainerTemplating extends RoutineEditorMode {
 ///
 /// - [existingRoutineId] == null → create a new routine via
 ///   [RoutineRepository.createUserOwned].
-/// - [existingRoutineId] != null → edit stub (full edit deferred to
-///   follow-up PR; surfaces a "próximamente" toast).
+/// - [existingRoutineId] != null → edit an existing routine: hydrates editor
+///   state from Firestore via [RoutineRepository.getById], then saves updated
+///   content (name, days) via [RoutineRepository.updateUserOwned].
 final class SelfCreating extends RoutineEditorMode {
   const SelfCreating({this.existingRoutineId});
 

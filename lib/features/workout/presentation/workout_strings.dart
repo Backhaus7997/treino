@@ -62,8 +62,13 @@ abstract final class WorkoutStrings {
 
   // ── MIS RUTINAS — self-creating editor (REQ-USR-011, Design §es-AR strings) ─
   static const selfEditorTitle = 'Nueva rutina';
+  static const selfEditorEditTitle = 'Editar rutina';
   static const selfEditorSubmitLabel = 'CREAR RUTINA';
+  static const selfEditorUpdateLabel = 'GUARDAR CAMBIOS';
   static const selfEditorSuccess = 'Rutina creada';
+  static const selfEditorUpdateSuccess = 'Rutina actualizada';
+  static const selfEditorNotFound =
+      'Esta rutina ya no existe. Volvé y actualizá la lista.';
   static const selfEditorError = 'No pudimos crear la rutina. Reintentá.';
   static const selfEditorPermissionDenied =
       'No tenés permisos para hacer esto. Recargá la app.';

@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart'
     show CollectionReference, DocumentSnapshot, FieldValue, FirebaseFirestore;
 
+import '../../profile/domain/experience_level.dart';
 import '../domain/routine.dart';
 import '../domain/routine_source.dart';
 import '../domain/routine_status.dart';
@@ -105,6 +106,60 @@ class RoutineRepository {
         .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snap) => snap.docs.map(_fromDoc).whereType<Routine>().toList());
+  }
+
+  /// Updates the content of an existing athlete-owned routine.
+  ///
+  /// Only mutates content fields (name, days, level). The immutable identity
+  /// fields (createdBy, createdAt, source, visibility, status) are stripped
+  /// from the payload so the Firestore owner-update rule does not see them
+  /// change, matching the `affectedKeys()` guard in firestore.rules.
+  ///
+  /// Enforces defensive invariants client-side before write:
+  /// - [uid] must be non-empty.
+  /// - [draft.id] must be non-empty.
+  /// - [draft.assignedBy] and [draft.assignedTo] must be null.
+  ///
+  /// REQ-USR-018, ADR-USR-03.
+  Future<Routine> updateUserOwned({
+    required String uid,
+    required Routine draft,
+  }) async {
+    if (uid.isEmpty) {
+      throw ArgumentError.value(uid, 'uid', 'must be non-empty');
+    }
+    if (draft.id.isEmpty) {
+      throw ArgumentError.value(draft.id, 'draft.id', 'must be non-empty');
+    }
+    if (draft.assignedBy != null) {
+      throw ArgumentError(
+        'user-created routines must not carry assignedBy',
+      );
+    }
+    if (draft.assignedTo != null) {
+      throw ArgumentError(
+        'user-created routines must not carry assignedTo',
+      );
+    }
+
+    // Build update payload with ONLY the content fields the athlete controls.
+    // Omitting createdBy, createdAt, source, visibility, status, id,
+    // assignedBy, and assignedTo keeps the update within the narrow
+    // owner-update Firestore rule.
+    //
+    // ⚠️  COUPLING WARNING — field list below:
+    // If you add a field to the Routine model that athletes should be able to
+    // edit, add it here AND add it to the hasOnly list in firestore.rules
+    // (UPDATE path 2). Omitting it from either side will either silently drop
+    // data or cause permission-denied on ALL athlete routine updates.
+    final json = <String, Object?>{
+      'name': draft.name,
+      'level': draft.level.toJson(),
+      'days': draft.days.map((d) => d.toJson()).toList(),
+    };
+
+    await _collection.doc(draft.id).update(json);
+    return draft;
   }
 
   /// Soft-deletes a routine by flipping its `status` to `archived`.

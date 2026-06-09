@@ -21,8 +21,13 @@ import 'package:treino/features/workout/application/user_routines_providers.dart
 import 'package:treino/features/workout/data/routine_repository.dart';
 import 'package:treino/features/workout/domain/custom_exercise.dart';
 import 'package:treino/features/workout/domain/routine.dart';
+import 'package:treino/features/workout/domain/routine_day.dart';
+import 'package:treino/features/workout/domain/routine_slot.dart';
+import 'package:treino/features/workout/domain/set_enums.dart';
+import 'package:treino/features/workout/domain/set_spec.dart';
 import 'package:treino/features/profile/domain/experience_level.dart';
 import 'package:treino/features/workout/domain/routine_source.dart';
+import 'package:treino/features/workout/domain/routine_visibility.dart';
 import 'package:treino/features/workout/presentation/routine_editor_mode.dart';
 import 'package:treino/features/workout/presentation/routine_editor_screen.dart';
 import 'package:treino/features/workout/presentation/workout_strings.dart';
@@ -338,5 +343,351 @@ void main() {
         reason: 'SelfCreating must submit split: null');
     expect(capturedDraft!.level, ExperienceLevel.beginner,
         reason: 'SelfCreating uses fixed beginner level');
+  });
+
+  // ── Edit mode (existingRoutineId != null) ────────────────────────────────
+
+  // Routine returned by getById for edit tests.
+  const existingRoutine = Routine(
+    id: 'routine-existing-1',
+    name: 'Rutina Preexistente',
+    split: null,
+    level: ExperienceLevel.beginner,
+    days: [],
+    source: RoutineSource.userCreated,
+    visibility: RoutineVisibility.private,
+  );
+
+  testWidgets(
+      'SCENARIO-RER-EDIT-001: SelfCreating(existingRoutineId) hydrates name '
+      'from getById into the name field', (tester) async {
+    final repo = _MockRoutineRepository();
+    when(() => repo.getById('routine-existing-1'))
+        .thenAnswer((_) async => existingRoutine);
+
+    await _pumpEditor(
+      tester,
+      mode: const SelfCreating(existingRoutineId: 'routine-existing-1'),
+      overrides: _overrides(repo: repo),
+    );
+
+    // Verify getById was called with the correct id.
+    verify(() => repo.getById('routine-existing-1')).called(1);
+
+    // Name field must be populated with the existing routine's name.
+    final nameField = tester.widget<TextField>(
+      find.byKey(const Key('editor_name_field')),
+    );
+    expect(nameField.controller?.text, equals('Rutina Preexistente'));
+  });
+
+  testWidgets(
+      'SCENARIO-RER-EDIT-002: SelfCreating(existingRoutineId) shows '
+      '"Editar rutina" in the header instead of "Nueva rutina"',
+      (tester) async {
+    final repo = _MockRoutineRepository();
+    when(() => repo.getById('routine-existing-1'))
+        .thenAnswer((_) async => existingRoutine);
+
+    await _pumpEditor(
+      tester,
+      mode: const SelfCreating(existingRoutineId: 'routine-existing-1'),
+      overrides: _overrides(repo: repo),
+    );
+
+    expect(find.text(WorkoutStrings.selfEditorEditTitle), findsOneWidget);
+    expect(find.text(WorkoutStrings.selfEditorTitle), findsNothing);
+  });
+
+  testWidgets(
+      'SCENARIO-RER-EDIT-003: SelfCreating(existingRoutineId) submit calls '
+      'updateUserOwned (not createUserOwned)', (tester) async {
+    final repo = _MockRoutineRepository();
+    when(() => repo.getById('routine-existing-1'))
+        .thenAnswer((_) async => existingRoutine);
+    when(() => repo.updateUserOwned(
+          uid: any(named: 'uid'),
+          draft: any(named: 'draft'),
+        )).thenAnswer((inv) async {
+      final draft = inv.namedArguments[const Symbol('draft')] as Routine;
+      return draft;
+    });
+
+    await _pumpEditor(
+      tester,
+      mode: const SelfCreating(existingRoutineId: 'routine-existing-1'),
+      overrides: _overrides(repo: repo),
+    );
+
+    // Name field is hydrated — still need to add a slot for valid form.
+    // Tap + Agregar ejercicio to add a slot.
+    await tester.tap(find.text(CoachStrings.editorAddSlot));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Press de Banca').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(WorkoutStrings.pickerAddButton(1)));
+    await tester.pumpAndSettle();
+
+    // Fill reps.
+    final emptyFields = find.byType(TextField).evaluate().where((e) {
+      final w = e.widget as TextField;
+      return w.controller != null && w.controller!.text.isEmpty;
+    }).toList();
+    expect(emptyFields, isNotEmpty);
+    final repsField = emptyFields.last.widget as TextField;
+    await tester.enterText(find.byWidget(repsField), '8');
+    await tester.pumpAndSettle();
+
+    // Tap GUARDAR CAMBIOS.
+    await tester.tap(find.widgetWithText(
+        ElevatedButton, WorkoutStrings.selfEditorUpdateLabel));
+    await tester.pumpAndSettle();
+
+    // Must call updateUserOwned, not createUserOwned.
+    verify(() => repo.updateUserOwned(
+          uid: 'athlete-1',
+          draft: any(named: 'draft'),
+        )).called(1);
+    verifyNever(() => repo.createUserOwned(
+          uid: any(named: 'uid'),
+          draft: any(named: 'draft'),
+        ));
+  });
+
+  testWidgets(
+      'SCENARIO-RER-EDIT-004: SelfCreating(existingRoutineId) with null '
+      'getById shows not-found message', (tester) async {
+    final repo = _MockRoutineRepository();
+    when(() => repo.getById('gone-routine'))
+        .thenAnswer((_) async => null); // deleted
+
+    await _pumpEditor(
+      tester,
+      mode: const SelfCreating(existingRoutineId: 'gone-routine'),
+      overrides: _overrides(repo: repo),
+    );
+
+    expect(find.text(WorkoutStrings.selfEditorNotFound), findsOneWidget);
+    // Editor form must not be shown.
+    expect(find.byKey(const Key('editor_name_field')), findsNothing);
+  });
+
+  // ── SCENARIO-RER-EDIT-005: round-trip data-loss test ─────────────────────
+  //
+  // Seeds a Routine with a rich day structure covering all SetSpec fields
+  // (reps/range/duration, weightKg, set types, superset groups) and verifies
+  // that hydrate→submit reproduces the EXACT same structure in the draft
+  // passed to updateUserOwned — catching any silent field drops.
+
+  testWidgets(
+      'SCENARIO-RER-EDIT-005: hydrate→submit round-trip preserves full '
+      'day/slot/set structure without data loss', (tester) async {
+    // ── Seeded routine: 1 day, 3 slots ──────────────────────────────────────
+    //
+    // Slot A: reps-based, RepMode.single, 2 sets (warmup + working),
+    //   weightKg on each set, varying reps (6 and 10).
+    //   supersetGroupId = 7 — shares the group with slot C (non-consecutive).
+    //
+    // Slot B: duration-based, ExerciseMode.duration, 1 set with durationSeconds.
+    //   standalone (supersetGroup: null) — sits between A and C so the two
+    //   group-7 slots are NOT consecutive. This is intentional: the _blocks()
+    //   renderer only groups CONSECUTIVE slots, so A and C are treated as
+    //   standalone rows and no _SupersetGroupCard is rendered. The
+    //   _buildDays() normalization counts ALL slots with the same group id
+    //   (including non-consecutive ones), so group:7 SURVIVES in the captured
+    //   draft as long as ≥2 slots share it — which is exactly what the
+    //   round-trip must preserve.
+    //
+    // Slot C: reps-based, RepMode.range, 2 sets (normal + drop set),
+    //   repsMin/repsMax. supersetGroupId = 7 — paired with slot A.
+    //
+    // This seed is rich enough that ANY dropped field changes the captured
+    // draft: reps, repsMin, repsMax, weightKg, durationSeconds, set types
+    // (warmup/normal/drop), ExerciseMode (reps/duration), RepMode
+    // (single/range), and supersetGroup are all covered.
+
+    const supersetGroupId = 7;
+
+    const slotA = RoutineSlot(
+      exerciseId: 'bench-press',
+      exerciseName: 'Press de Banca',
+      muscleGroup: 'chest',
+      targetSets: 2,
+      // targetRepsMin == targetRepsMax so RoutineSlot.effectiveRepMode returns
+      // RepMode.single (not range). If they differ, effectiveRepMode overrides
+      // to range even though repMode is explicitly set to single.
+      targetRepsMin: 10,
+      targetRepsMax: 10,
+      restSeconds: 90,
+      supersetGroup: supersetGroupId,
+      exerciseMode: ExerciseMode.reps,
+      repMode: RepMode.single,
+      sets: [
+        SetSpec(type: SetType.warmup, weightKg: 40.0, reps: 6),
+        SetSpec(type: SetType.normal, weightKg: 80.0, reps: 10),
+      ],
+    );
+
+    // slotB sits between slotA and slotC so A+C are non-consecutive
+    // (prevents _SupersetGroupCard rendering, which has a known layout bug).
+    const slotB = RoutineSlot(
+      exerciseId: 'plank',
+      exerciseName: 'Plancha',
+      muscleGroup: 'core',
+      targetSets: 1,
+      targetRepsMin: 0,
+      targetRepsMax: 0,
+      restSeconds: 45,
+      supersetGroup: null,
+      exerciseMode: ExerciseMode.duration,
+      repMode: RepMode.single,
+      sets: [
+        SetSpec(type: SetType.normal, durationSeconds: 60),
+      ],
+    );
+
+    const slotC = RoutineSlot(
+      exerciseId: 'pull-up',
+      exerciseName: 'Dominadas',
+      muscleGroup: 'back',
+      targetSets: 2,
+      targetRepsMin: 8,
+      targetRepsMax: 12,
+      restSeconds: 60,
+      supersetGroup: supersetGroupId,
+      exerciseMode: ExerciseMode.reps,
+      repMode: RepMode.range,
+      sets: [
+        SetSpec(type: SetType.normal, repsMin: 8, repsMax: 12),
+        SetSpec(type: SetType.drop, repsMin: 6, repsMax: 10),
+      ],
+    );
+
+    const seededRoutine = Routine(
+      id: 'rich-routine-1',
+      name: 'Rutina Compleja',
+      split: null,
+      level: ExperienceLevel.beginner,
+      days: [
+        RoutineDay(
+          dayNumber: 1,
+          name: 'Día 1',
+          // Order: A, B (duration/standalone), C — A and C share group 7
+          // but are non-consecutive so they render as standalone rows.
+          slots: [slotA, slotB, slotC],
+        ),
+      ],
+      source: RoutineSource.userCreated,
+      visibility: RoutineVisibility.private,
+    );
+
+    final repo = _MockRoutineRepository();
+    when(() => repo.getById('rich-routine-1'))
+        .thenAnswer((_) async => seededRoutine);
+
+    Routine? capturedDraft;
+    when(() => repo.updateUserOwned(
+          uid: any(named: 'uid'),
+          draft: any(named: 'draft'),
+        )).thenAnswer((inv) async {
+      capturedDraft = inv.namedArguments[const Symbol('draft')] as Routine;
+      return capturedDraft!;
+    });
+
+    await _pumpEditor(
+      tester,
+      mode: const SelfCreating(existingRoutineId: 'rich-routine-1'),
+      overrides: _overrides(repo: repo),
+    );
+    // Extra pump to ensure all setState callbacks (including the final
+    // _loading = false rebuild) have completed and been laid out.
+    await tester.pump();
+
+    // Hydration complete — form should show the seeded name.
+    final nameField = tester.widget<TextField>(
+      find.byKey(const Key('editor_name_field')),
+    );
+    expect(nameField.controller?.text, equals('Rutina Compleja'),
+        reason: 'hydration must populate the name field');
+
+    // Verify the submit button is enabled before tapping.
+    // This gives a clear diagnostic if _isValid is returning false.
+    final submitBtn = tester.widget<ElevatedButton>(
+      find.widgetWithText(ElevatedButton, WorkoutStrings.selfEditorUpdateLabel),
+    );
+    expect(submitBtn.onPressed, isNotNull,
+        reason: '_isValid must be true after hydrating name + 3 valid slots');
+
+    // Submit — the form is already valid (has name + hydrated slots with
+    // all required fields). If _isValid is somehow false here, the tap will
+    // be a no-op and the verify() below will fail with a clear message.
+    await tester.tap(find.widgetWithText(
+        ElevatedButton, WorkoutStrings.selfEditorUpdateLabel));
+    await tester.pumpAndSettle();
+
+    // updateUserOwned must have been called exactly once.
+    verify(() => repo.updateUserOwned(
+          uid: 'athlete-1',
+          draft: any(named: 'draft'),
+        )).called(1);
+    expect(capturedDraft, isNotNull,
+        reason: 'updateUserOwned must be called with a captured draft');
+
+    // ── Primary assertions: draft.days must faithfully reproduce seeded data ─
+
+    final days = capturedDraft!.days;
+    expect(days, hasLength(1), reason: 'round-trip must preserve day count');
+
+    final slots = days[0].slots;
+    expect(slots, hasLength(3), reason: 'round-trip must preserve slot count');
+
+    // ── Slot 0 (A): bench-press — warmup + working, weightKg, RepMode.single ─
+    final capA = slots[0];
+    expect(capA.exerciseId, equals('bench-press'));
+    expect(capA.exerciseMode, equals(ExerciseMode.reps));
+    expect(capA.repMode, equals(RepMode.single));
+    // supersetGroupId shared with slot C (non-consecutive). _buildDays counts
+    // all slots with group 7 → 2 hits → group preserved in draft.
+    expect(capA.supersetGroup, equals(supersetGroupId),
+        reason: 'supersetGroup must survive (group count ≥2)');
+    expect(capA.sets, hasLength(2), reason: 'slot A must have 2 sets');
+    expect(capA.sets[0].type, equals(SetType.warmup),
+        reason: 'warmup set type must survive round-trip');
+    expect(capA.sets[0].weightKg, equals(40.0),
+        reason: 'weightKg must survive round-trip on warmup set');
+    expect(capA.sets[0].reps, equals(6),
+        reason: 'reps must survive round-trip on warmup set');
+    expect(capA.sets[1].type, equals(SetType.normal));
+    expect(capA.sets[1].weightKg, equals(80.0),
+        reason: 'weightKg must survive round-trip on working set');
+    expect(capA.sets[1].reps, equals(10),
+        reason: 'reps must survive round-trip on working set');
+
+    // ── Slot 1 (B): plank — duration-based, standalone ───────────────────────
+    final capB = slots[1];
+    expect(capB.exerciseId, equals('plank'));
+    expect(capB.exerciseMode, equals(ExerciseMode.duration));
+    expect(capB.supersetGroup, isNull,
+        reason: 'standalone slot must have null supersetGroup');
+    expect(capB.sets, hasLength(1));
+    expect(capB.sets[0].durationSeconds, equals(60),
+        reason: 'durationSeconds must survive round-trip');
+
+    // ── Slot 2 (C): pull-up — RepMode.range, drop set, superset ─────────────
+    final capC = slots[2];
+    expect(capC.exerciseId, equals('pull-up'));
+    expect(capC.exerciseMode, equals(ExerciseMode.reps));
+    expect(capC.repMode, equals(RepMode.range));
+    expect(capC.supersetGroup, equals(supersetGroupId),
+        reason: 'supersetGroup must survive on slot C');
+    expect(capC.sets, hasLength(2));
+    expect(capC.sets[0].repsMin, equals(8),
+        reason: 'repsMin must survive round-trip');
+    expect(capC.sets[0].repsMax, equals(12),
+        reason: 'repsMax must survive round-trip');
+    expect(capC.sets[1].type, equals(SetType.drop),
+        reason: 'drop set type must survive round-trip');
+    expect(capC.sets[1].repsMin, equals(6));
+    expect(capC.sets[1].repsMax, equals(10));
   });
 }

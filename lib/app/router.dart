@@ -247,8 +247,10 @@ GoRouter buildRouter({
       ),
       GoRoute(
         path: '/workout/my-routine-editor',
-        pageBuilder: (_, __) => _noAnim(
-          const RoutineEditorScreen(mode: SelfCreating()),
+        pageBuilder: (context, state) => _noAnim(
+          RoutineEditorScreen(
+            mode: SelfCreating(existingRoutineId: state.extra as String?),
+          ),
         ),
       ),
 

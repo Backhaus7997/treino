@@ -3,6 +3,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/features/profile/domain/experience_level.dart';
 import 'package:treino/features/workout/data/routine_repository.dart';
 import 'package:treino/features/workout/domain/routine.dart';
+import 'package:treino/features/workout/domain/routine_source.dart';
+import 'package:treino/features/workout/domain/routine_visibility.dart';
 
 /// Minimal user-authored draft — id is '' so the repo strips it before write.
 Routine _minimalDraft() => const Routine(
@@ -472,6 +474,158 @@ void main() {
 
       final after = await repo.listUserCreated('athlete-a').first;
       expect(after, isEmpty);
+    });
+  });
+
+  // ── updateUserOwned (REQ-USR-018, ADR-USR-03) ────────────────────────────
+
+  group('updateUserOwned', () {
+    /// Seeds a minimal user-created routine and returns its Firestore id.
+    Future<String> seedUserRoutine({
+      String uid = 'athlete-a',
+      String name = 'Rutina Original',
+      String status = 'active',
+    }) async {
+      final saved = await repo.createUserOwned(
+        uid: uid,
+        draft: const Routine(
+          id: '',
+          name: 'Rutina Original',
+          split: null,
+          level: ExperienceLevel.beginner,
+          days: [],
+        ),
+      );
+      return saved.id;
+    }
+
+    test(
+        'SCENARIO-USR-018a: updates name and days without touching immutable fields',
+        () async {
+      final id = await seedUserRoutine();
+
+      // Verify pre-update state.
+      final before =
+          (await firestore.collection('routines').doc(id).get()).data()!;
+      expect(before['source'], equals('user-created'));
+      expect(before['createdBy'], equals('athlete-a'));
+      expect(before['visibility'], equals('private'));
+      expect(before['status'], equals('active'));
+
+      final updatedDraft = Routine(
+        id: id,
+        name: 'Rutina Editada',
+        split: null,
+        level: ExperienceLevel.beginner,
+        days: const [],
+        source: RoutineSource.userCreated,
+        visibility: RoutineVisibility.private,
+      );
+      final result =
+          await repo.updateUserOwned(uid: 'athlete-a', draft: updatedDraft);
+
+      // Updated doc reflects new name.
+      final after =
+          (await firestore.collection('routines').doc(id).get()).data()!;
+      expect(after['name'], equals('Rutina Editada'));
+
+      // Immutable fields are intact.
+      expect(after['source'], equals('user-created'));
+      expect(after['createdBy'], equals('athlete-a'));
+      expect(after['visibility'], equals('private'));
+      expect(after['status'], equals('active'));
+
+      // Returned routine has the updated name.
+      expect(result.id, equals(id));
+      expect(result.name, equals('Rutina Editada'));
+    });
+
+    test('SCENARIO-USR-018b: payload does NOT include assignedBy or assignedTo',
+        () async {
+      final id = await seedUserRoutine();
+
+      final updatedDraft = Routine(
+        id: id,
+        name: 'Nueva',
+        split: null,
+        level: ExperienceLevel.beginner,
+        days: const [],
+        source: RoutineSource.userCreated,
+        visibility: RoutineVisibility.private,
+      );
+      await repo.updateUserOwned(uid: 'athlete-a', draft: updatedDraft);
+
+      final data =
+          (await firestore.collection('routines').doc(id).get()).data()!;
+      expect(data.containsKey('assignedBy'), isFalse,
+          reason: 'assignedBy must remain absent after update');
+      expect(data.containsKey('assignedTo'), isFalse,
+          reason: 'assignedTo must remain absent after update');
+    });
+
+    test('SCENARIO-USR-018c: rejects empty uid', () async {
+      final id = await seedUserRoutine();
+      expect(
+        () => repo.updateUserOwned(
+          uid: '',
+          draft: Routine(
+            id: id,
+            name: 'X',
+            level: ExperienceLevel.beginner,
+            days: const [],
+          ),
+        ),
+        throwsA(isA<ArgumentError>()),
+      );
+    });
+
+    test('SCENARIO-USR-018d: rejects empty draft.id', () async {
+      expect(
+        () => repo.updateUserOwned(
+          uid: 'athlete-a',
+          draft: const Routine(
+            id: '',
+            name: 'X',
+            level: ExperienceLevel.beginner,
+            days: [],
+          ),
+        ),
+        throwsA(isA<ArgumentError>()),
+      );
+    });
+
+    test('SCENARIO-USR-018e: rejects draft that has assignedBy set', () async {
+      final id = await seedUserRoutine();
+      expect(
+        () => repo.updateUserOwned(
+          uid: 'athlete-a',
+          draft: Routine(
+            id: id,
+            name: 'X',
+            level: ExperienceLevel.beginner,
+            days: const [],
+            assignedBy: 'trainer-x',
+          ),
+        ),
+        throwsA(isA<ArgumentError>()),
+      );
+    });
+
+    test('SCENARIO-USR-018f: rejects draft that has assignedTo set', () async {
+      final id = await seedUserRoutine();
+      expect(
+        () => repo.updateUserOwned(
+          uid: 'athlete-a',
+          draft: Routine(
+            id: id,
+            name: 'X',
+            level: ExperienceLevel.beginner,
+            days: const [],
+            assignedTo: 'athlete-b',
+          ),
+        ),
+        throwsA(isA<ArgumentError>()),
+      );
     });
   });
 

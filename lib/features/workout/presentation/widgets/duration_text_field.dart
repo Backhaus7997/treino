@@ -120,56 +120,56 @@ class _DurationTextFieldState extends State<DurationTextField> {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    return Expanded(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (widget.label != null) ...[
-            Text(
-              widget.label!,
-              style: GoogleFonts.barlow(fontSize: 13, color: palette.textMuted),
-            ),
-            const SizedBox(height: 2),
-          ],
-          TextField(
-            controller: _ctrl,
-            keyboardType: TextInputType.number,
-            inputFormatters: [
-              FilteringTextInputFormatter.digitsOnly,
-              _DurationInputFormatter(),
-            ],
-            style: GoogleFonts.barlow(
-              fontSize: 16,
-              color: palette.textPrimary,
-            ),
-            decoration: InputDecoration(
-              isDense: true,
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
-              filled: false,
-              border: UnderlineInputBorder(
-                borderSide: BorderSide(color: palette.border),
-              ),
-              enabledBorder: UnderlineInputBorder(
-                borderSide: BorderSide(color: palette.border),
-              ),
-              focusedBorder: UnderlineInputBorder(
-                borderSide: BorderSide(color: palette.accent, width: 2),
-              ),
-            ),
-            onChanged: (raw) {
-              // The formatter has already transformed raw into "MM:SS".
-              // Re-parse seconds from the display string.
-              final parts = _ctrl.text.split(':');
-              if (parts.length == 2) {
-                final mm = int.tryParse(parts[0]) ?? 0;
-                final ss = int.tryParse(parts[1]) ?? 0;
-                widget.onChanged(mm * 60 + ss);
-              }
-            },
+    // NOTE: does NOT wrap itself in Expanded — callers that need flex
+    // expansion (e.g. inside a Row) must provide their own Expanded wrapper.
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (widget.label != null) ...[
+          Text(
+            widget.label!,
+            style: GoogleFonts.barlow(fontSize: 13, color: palette.textMuted),
           ),
+          const SizedBox(height: 2),
         ],
-      ),
+        TextField(
+          controller: _ctrl,
+          keyboardType: TextInputType.number,
+          inputFormatters: [
+            FilteringTextInputFormatter.digitsOnly,
+            _DurationInputFormatter(),
+          ],
+          style: GoogleFonts.barlow(
+            fontSize: 16,
+            color: palette.textPrimary,
+          ),
+          decoration: InputDecoration(
+            isDense: true,
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+            filled: false,
+            border: UnderlineInputBorder(
+              borderSide: BorderSide(color: palette.border),
+            ),
+            enabledBorder: UnderlineInputBorder(
+              borderSide: BorderSide(color: palette.border),
+            ),
+            focusedBorder: UnderlineInputBorder(
+              borderSide: BorderSide(color: palette.accent, width: 2),
+            ),
+          ),
+          onChanged: (raw) {
+            // The formatter has already transformed raw into "MM:SS".
+            // Re-parse seconds from the display string.
+            final parts = _ctrl.text.split(':');
+            if (parts.length == 2) {
+              final mm = int.tryParse(parts[0]) ?? 0;
+              final ss = int.tryParse(parts[1]) ?? 0;
+              widget.onChanged(mm * 60 + ss);
+            }
+          },
+        ),
+      ],
     );
   }
 }
