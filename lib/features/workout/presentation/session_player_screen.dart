@@ -701,7 +701,7 @@ class _CompletedBlockSummary extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       child: Row(
         children: [
-          Icon(TreinoIcon.checkCircleFill, color: palette.accent, size: 20),
+          Icon(TreinoIcon.checkBare, color: palette.accent, size: 20),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
@@ -753,7 +753,7 @@ class _CompletedSupersetSummary extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       child: Row(
         children: [
-          Icon(TreinoIcon.checkCircleFill, color: palette.accent, size: 20),
+          Icon(TreinoIcon.checkBare, color: palette.accent, size: 20),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -1097,41 +1097,44 @@ class _ExerciseSectionState extends State<_ExerciseSection> {
           (spec.durationSeconds != null && spec.durationSeconds! > 0);
       final targetSeconds = isDurationSet ? (spec.durationSeconds ?? 0) : 0;
 
-      rowWidgets.add(
-        Padding(
-          padding: EdgeInsets.only(top: rowWidgets.isEmpty ? 0 : 8),
-          child: isDurationSet
-              ? _DurationSetRow(
-                  key: ValueKey('dur-$setNumber-${logged?.id ?? "pending"}'),
-                  setNumber: setNumber,
-                  targetSeconds: targetSeconds,
-                  isDone: isRowDone,
-                  onDone: isCurrent
-                      ? () => widget.onSetCheck(setNumber, 0, 0.0)
-                      : null,
-                )
-              : _RepsSetRow(
-                  key: ValueKey('set-$setNumber-${logged?.id ?? "pending"}'),
-                  setNumber: setNumber,
-                  spec: spec,
-                  mode: mode,
-                  plannedReps: plannedReps,
-                  initialWeightKg: initialWeight,
-                  isDone: isRowDone,
-                  isExpanded: isExpanded,
-                  onCheck: isCurrent
-                      ? (weightKg) =>
-                          widget.onSetCheck(setNumber, plannedReps, weightKg)
-                      : null,
-                  onWeightUpdate: isRowDone
-                      ? (weightKg) =>
-                          widget.onSetUpdate(logged, plannedReps, weightKg)
-                      : null,
-                  onSummaryTap:
-                      isRowDone ? () => _toggleDoneRow(setNumber) : null,
-                ),
-        ),
+      final isFutureSet = !isRowDone && !isCurrent;
+      Widget rowWidget = Padding(
+        padding: EdgeInsets.only(top: rowWidgets.isEmpty ? 0 : 8),
+        child: isDurationSet
+            ? _DurationSetRow(
+                key: ValueKey('dur-$setNumber-${logged?.id ?? "pending"}'),
+                setNumber: setNumber,
+                targetSeconds: targetSeconds,
+                isDone: isRowDone,
+                onDone: isCurrent
+                    ? () => widget.onSetCheck(setNumber, 0, 0.0)
+                    : null,
+              )
+            : _RepsSetRow(
+                key: ValueKey('set-$setNumber-${logged?.id ?? "pending"}'),
+                setNumber: setNumber,
+                spec: spec,
+                mode: mode,
+                plannedReps: plannedReps,
+                initialWeightKg: initialWeight,
+                isDone: isRowDone,
+                isExpanded: isExpanded,
+                onCheck: isCurrent
+                    ? (weightKg) =>
+                        widget.onSetCheck(setNumber, plannedReps, weightKg)
+                    : null,
+                onWeightUpdate: isRowDone
+                    ? (weightKg) =>
+                        widget.onSetUpdate(logged, plannedReps, weightKg)
+                    : null,
+                onSummaryTap:
+                    isRowDone ? () => _toggleDoneRow(setNumber) : null,
+              ),
       );
+      if (isFutureSet) {
+        rowWidget = Opacity(opacity: 0.4, child: rowWidget);
+      }
+      rowWidgets.add(rowWidget);
     }
 
     return Container(
@@ -1143,17 +1146,15 @@ class _ExerciseSectionState extends State<_ExerciseSection> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Header: icono + nombre + ⓘ (opcional) + progreso "X/N"
+          // Header: ✓ (sólo si está hecho) + nombre + ⓘ (opcional) + "X/N".
+          // El ejercicio EN CURSO no lleva ícono a la izquierda: el círculo
+          // hueco parecía un botón apretable. Se distingue por estar expandido.
           Row(
             children: [
-              Icon(
-                isDone
-                    ? TreinoIcon.checkCircleFill
-                    : TreinoIcon.checkCircleEmpty,
-                color: isDone ? palette.accent : palette.textMuted,
-                size: 22,
-              ),
-              const SizedBox(width: 12),
+              if (isDone) ...[
+                Icon(TreinoIcon.checkBare, color: palette.accent, size: 22),
+                const SizedBox(width: 12),
+              ],
               Expanded(
                 child: Text(
                   widget.slot.exerciseName,
@@ -1474,7 +1475,7 @@ class _WeightField extends StatelessWidget {
 
 /// Fila de un set basado en duración.
 /// Muestra el tiempo objetivo como MM:SS y un countdown timer.
-/// "Iniciar" arranca el contador; al llegar a 0 (o tap "Listo") marca done.
+/// "Iniciar" arranca el contador; al llegar a 0 auto-marca done con vibración.
 class _DurationSetRow extends StatefulWidget {
   const _DurationSetRow({
     super.key,
@@ -1526,17 +1527,13 @@ class _DurationSetRowState extends State<_DurationSetRow> {
         } else {
           t.cancel();
           _running = false;
+          // Buzz to alert the user that time is up.
+          HapticFeedback.heavyImpact();
           // Auto-mark done when countdown reaches 0.
           widget.onDone?.call();
         }
       });
     });
-  }
-
-  void _markDone() {
-    _timer?.cancel();
-    _running = false;
-    widget.onDone?.call();
   }
 
   @override
@@ -1624,26 +1621,8 @@ class _DurationSetRowState extends State<_DurationSetRow> {
               ),
             )
           else
-            GestureDetector(
-              onTap: _markDone,
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                decoration: BoxDecoration(
-                  color: palette.accent.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(9999),
-                  border: Border.all(color: palette.accent),
-                ),
-                child: Text(
-                  'Listo',
-                  style: GoogleFonts.barlowCondensed(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13,
-                    color: palette.accent,
-                  ),
-                ),
-              ),
-            ),
+            // Timer running — show countdown-only state, no manual completion.
+            Icon(TreinoIcon.timer, color: palette.accent, size: 22),
         ],
       ),
     );

@@ -89,6 +89,10 @@ class TreinoIcon {
   static const IconData checkCircleFill = PhosphorIconsFill.checkCircle;
   static const IconData checkCircleEmpty = PhosphorIconsRegular.circle;
 
+  /// Plain checkmark (no enclosing circle) — used for done-status indicators
+  /// that should read as a status, not a pressable button.
+  static const IconData checkBare = PhosphorIconsBold.check;
+
   // Coach discovery
   static const IconData specialty = PhosphorIconsRegular.lightning;
   static const IconData money = PhosphorIconsRegular.currencyDollar;

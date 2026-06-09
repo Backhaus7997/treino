@@ -20,6 +20,7 @@ import 'package:treino/features/workout/domain/routine_slot.dart';
 import 'package:treino/features/workout/domain/set_enums.dart';
 import 'package:treino/features/workout/domain/set_log.dart';
 import 'package:treino/features/workout/domain/set_spec.dart';
+import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/workout/presentation/session_player_screen.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
@@ -460,6 +461,9 @@ void main() {
     });
 
     // SCENARIO-288: botón deshabilitado — Opacity(0.4)
+    // Note: future set rows also render Opacity(0.4) per Change-2, so we
+    // assert at least one such widget (the disabled TERMINAR SESIÓN button
+    // is one of them).
     testWidgets('SCENARIO-288: botón deshabilitado tiene Opacity(0.4)',
         (tester) async {
       await tester.pumpWidget(
@@ -472,7 +476,7 @@ void main() {
       expect(find.text('TERMINAR SESIÓN'), findsOneWidget);
       expect(
         find.byWidgetPredicate((w) => w is Opacity && w.opacity == 0.4),
-        findsOneWidget,
+        findsAtLeastNWidgets(1),
       );
     });
 
@@ -673,6 +677,48 @@ void main() {
       // No reps stepper — weight is a text field in new design.
       expect(find.text('+'), findsNothing);
     });
+
+    // Change-1: "Listo" button must NOT exist for duration sets (auto-complete only).
+    testWidgets(
+        'Change-1: duration set has "Iniciar" and no "Listo" button at any point',
+        (tester) async {
+      const slot = RoutineSlot(
+        exerciseId: 'ed2',
+        exerciseName: 'Plancha',
+        muscleGroup: 'Core',
+        targetSets: 1,
+        targetRepsMin: 0,
+        targetRepsMax: 0,
+        restSeconds: 60,
+        durationSeconds: 10,
+      );
+      final day = makeDay(dayNumber: 1, slots: [slot]);
+      final state = SessionState(
+        session: makeSession(),
+        day: day,
+        setLogs: const [],
+        currentExerciseIndex: 0,
+        elapsedSeconds: 0,
+      );
+      await tester.pumpWidget(
+        _wrapProvider(
+          const SessionPlayerScreen(init: _kInit),
+          _stateOverride(state),
+        ),
+      );
+      await tester.pump();
+      // "Iniciar" should be present before the timer starts.
+      expect(find.text('Iniciar'), findsOneWidget);
+      // "Listo" must never appear (manual early completion is removed).
+      expect(find.text('Listo'), findsNothing);
+
+      // Tap "Iniciar" to start the timer.
+      await tester.tap(find.text('Iniciar'));
+      await tester.pump();
+      // After starting, "Iniciar" is gone and "Listo" still must not appear.
+      expect(find.text('Iniciar'), findsNothing);
+      expect(find.text('Listo'), findsNothing);
+    });
   });
 
   // ── Block gating widget tests ─────────────────────────────────────────────
@@ -740,6 +786,128 @@ void main() {
           .length;
       // At minimum 2 future blocks dimmed (B and C).
       expect(dimmedOpacities, greaterThanOrEqualTo(2));
+    });
+  });
+
+  // ── Future-set dimming (Change-2) ────────────────────────────────────────
+
+  group('future set dimming (Change-2)', () {
+    testWidgets(
+        'Change-2: future sets in a multi-set exercise are wrapped in Opacity(0.4)',
+        (tester) async {
+      // Exercise with 3 sets, no logs → set 1 is current, sets 2-3 are future.
+      final slots = [
+        makeSlot(exerciseId: 'e1', exerciseName: 'Press', targetSets: 3),
+      ];
+      final day = makeDay(dayNumber: 1, slots: slots);
+      final state = SessionState(
+        session: makeSession(),
+        day: day,
+        setLogs: const [],
+        currentExerciseIndex: 0,
+        elapsedSeconds: 0,
+      );
+      await tester.pumpWidget(
+        _wrapProvider(
+          const SessionPlayerScreen(init: _kInit),
+          _stateOverride(state),
+        ),
+      );
+      await tester.pump();
+      // Sets 2 and 3 must each be wrapped in Opacity(0.4).
+      // The disabled TERMINAR SESIÓN button also adds one, so total >= 2.
+      final dimmed = tester
+          .widgetList<Opacity>(find.byType(Opacity))
+          .where((o) => o.opacity == 0.4)
+          .length;
+      expect(dimmed, greaterThanOrEqualTo(2));
+    });
+
+    testWidgets(
+        'Change-2: current and done sets are NOT wrapped in Opacity(0.4)',
+        (tester) async {
+      // Exercise with 2 sets, set 1 done → set 1 is done, set 2 is current.
+      final slots = [
+        makeSlot(exerciseId: 'e1', exerciseName: 'Press', targetSets: 2),
+      ];
+      final day = makeDay(dayNumber: 1, slots: slots);
+      final logs = [makeSetLog(exerciseId: 'e1', setNumber: 1)];
+      final state = SessionState(
+        session: makeSession(),
+        day: day,
+        setLogs: logs,
+        currentExerciseIndex: 0,
+        elapsedSeconds: 0,
+      );
+      await tester.pumpWidget(
+        _wrapProvider(
+          const SessionPlayerScreen(init: _kInit),
+          _stateOverride(state),
+        ),
+      );
+      await tester.pump();
+      // No future sets — only the disabled TERMINAR SESIÓN button adds Opacity(0.4).
+      final dimmed = tester
+          .widgetList<Opacity>(find.byType(Opacity))
+          .where((o) => o.opacity == 0.4)
+          .length;
+      // Exactly one Opacity(0.4) for the disabled button; no future set rows.
+      expect(dimmed, equals(1));
+    });
+  });
+
+  // ── Done-indicator icon (Change-3) ────────────────────────────────────────
+
+  group('done indicator icon (Change-3)', () {
+    testWidgets(
+        'Change-3: completed exercise header shows checkBare icon, not checkCircleFill',
+        (tester) async {
+      final slots = [
+        makeSlot(exerciseId: 'e1', exerciseName: 'Squat', targetSets: 2),
+      ];
+      final day = makeDay(dayNumber: 1, slots: slots);
+      final logs = [
+        makeSetLog(exerciseId: 'e1', setNumber: 1),
+        makeSetLog(exerciseId: 'e1', setNumber: 2),
+      ];
+      final state = SessionState(
+        session: makeSession(),
+        day: day,
+        setLogs: logs,
+        currentExerciseIndex: 0,
+        elapsedSeconds: 0,
+      );
+      await tester.pumpWidget(
+        _wrapProvider(
+          const SessionPlayerScreen(init: _kInit),
+          _stateOverride(state),
+        ),
+      );
+      await tester.pump();
+      // The exercise-level done indicator must be the bare checkmark.
+      expect(find.byIcon(TreinoIcon.checkBare), findsAtLeastNWidgets(1));
+      // The filled circle should NOT be used as the exercise-level indicator.
+      // (It may still appear inside per-set done rows — that's acceptable.)
+      // Here all sets are done so there are no current/pending icon circles.
+      expect(find.byIcon(TreinoIcon.checkCircleEmpty), findsNothing);
+    });
+
+    testWidgets(
+        'Change-3: active exercise header has no leading circle; pending set '
+        'buttons still use checkCircleEmpty', (tester) async {
+      await tester.pumpWidget(
+        _wrapProvider(
+          const SessionPlayerScreen(init: _kInit),
+          _stateOverride(_defaultState()),
+        ),
+      );
+      await tester.pump();
+      // No exercise is done in defaultState — the bare check must not appear.
+      expect(find.byIcon(TreinoIcon.checkBare), findsNothing);
+      // The active exercise header no longer renders a leading circle; the
+      // hollow circle now only marks pending per-set "press to complete"
+      // buttons (so it must still be present for the active set rows).
+      expect(find.byIcon(TreinoIcon.checkCircleEmpty), findsAtLeastNWidgets(1));
     });
   });
 
