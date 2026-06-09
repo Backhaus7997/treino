@@ -65,12 +65,15 @@ class _RoutineDetailScreenState extends ConsumerState<RoutineDetailScreen> {
                 selectedDayIndex: dayIndex,
                 onSelectDay: (i) => setState(() => selectedDayIndex = i),
                 onSlotTap: (slot) {
-                  // Pass the routine's trainer uid as `ownerId` so the
-                  // detail screen can fall back to that trainer's
-                  // customExercises subcollection when the slot references
-                  // a trainer-defined exercise instead of a public-catalogue
-                  // one (see slotExerciseProvider).
-                  final ownerId = routine.assignedBy;
+                  // Pass the routine owner's uid as `ownerId` so the detail
+                  // screen can fall back to that owner's customExercises
+                  // subcollection when the slot references a custom exercise
+                  // instead of a public-catalogue one (see slotExerciseProvider).
+                  // Trainer-assigned plans → the trainer (assignedBy); athlete
+                  // self-created routines → the athlete (createdBy). Without the
+                  // createdBy fallback, an athlete's own custom exercise resolves
+                  // to null → "Ejercicio no encontrado".
+                  final ownerId = routine.assignedBy ?? routine.createdBy;
                   final target = ownerId != null && ownerId.isNotEmpty
                       ? '/workout/exercise/${slot.exerciseId}?ownerId=$ownerId'
                       : '/workout/exercise/${slot.exerciseId}';

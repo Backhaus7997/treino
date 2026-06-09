@@ -80,6 +80,8 @@ Routine _makeRoutine({
   String split = 'PPL',
   List<RoutineDay>? days,
   String? imageUrl,
+  String? assignedBy,
+  String? createdBy,
 }) =>
     Routine(
       id: id,
@@ -88,6 +90,8 @@ Routine _makeRoutine({
       level: ExperienceLevel.beginner,
       days: days ?? [_makeDay()],
       imageUrl: imageUrl,
+      assignedBy: assignedBy,
+      createdBy: createdBy,
     );
 
 void main() {
@@ -534,6 +538,55 @@ void main() {
       await tester.tap(find.byType(ExerciseSlotRow).first);
       await tester.pumpAndSettle();
       expect(find.text('EXERCISE'), findsOneWidget);
+    });
+
+    testWidgets(
+        'SCENARIO-093b (router): self-created routine slot tap passes createdBy '
+        'as ownerId so custom exercises resolve (no "Ejercicio no encontrado")',
+        (tester) async {
+      String? capturedOwnerId;
+      final router = GoRouter(
+        initialLocation: '/start',
+        routes: [
+          GoRoute(path: '/start', builder: (_, __) => const Text('START')),
+          GoRoute(
+            path: '/workout/routine/:routineId',
+            builder: (ctx, state) => RoutineDetailScreen(
+              routineId: state.pathParameters['routineId']!,
+            ),
+          ),
+          GoRoute(
+            path: '/workout/exercise/:exerciseId',
+            builder: (ctx, state) {
+              capturedOwnerId = state.uri.queryParameters['ownerId'];
+              return const Text('EXERCISE');
+            },
+          ),
+        ],
+      );
+      await tester.pumpWidget(ProviderScope(
+        overrides: [
+          routineByIdProvider('test-id').overrideWith(
+            (ref) async => _makeRoutine(
+              assignedBy: null,
+              createdBy: 'athlete-123',
+              days: [
+                _makeDay(slots: [_makeSlot(exerciseId: 'my-custom-ex')])
+              ],
+            ),
+          ),
+        ],
+        child: MaterialApp.router(
+          theme: AppTheme.dark(),
+          routerConfig: router,
+        ),
+      ));
+      router.push('/workout/routine/test-id');
+      await tester.pumpAndSettle();
+      await tester.tap(find.byType(ExerciseSlotRow).first);
+      await tester.pumpAndSettle();
+      expect(find.text('EXERCISE'), findsOneWidget);
+      expect(capturedOwnerId, equals('athlete-123'));
     });
 
     testWidgets(
