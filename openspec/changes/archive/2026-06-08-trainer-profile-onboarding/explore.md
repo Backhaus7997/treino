@@ -146,7 +146,7 @@ Main gap. Need:
 
 ## Open Questions for Proposal
 
-### 🔴 Q1 (CRITICAL — changes scope 5x): Role assignment mechanism
+### Q1 (CRITICAL — changes scope 5x): Role assignment mechanism
 
 How does a user get `role: trainer`?
 

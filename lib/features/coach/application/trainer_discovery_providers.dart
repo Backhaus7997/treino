@@ -150,11 +150,18 @@ final athleteLocationProvider =
 
 // ── selectedSpecialtyProvider ─────────────────────────────────────────────
 
-/// Currently selected specialty filter. `null` means "Todos".
+/// Currently selected specialty filter, as a SET (multi-select).
+/// Empty set = "Todos" (no filter, all match). Non-empty = OR-match: a PF
+/// passes if their `trainerSpecialty` is in the set.
+///
+/// Migró de `TrainerSpecialty?` a `Set<TrainerSpecialty>` post-Fase 6
+/// Etapa 3 polish — el user quería filtrar por varias categorías a la vez
+/// (ej. "CrossFit OR Funcional"). Backward compat al nivel de UX: empty set
+/// se mapea visualmente al chip "Todos" igual que antes el `null`.
 ///
 /// Per D11: NOT autoDispose — maintains filter across list↔detail navigation.
-final selectedSpecialtyProvider = StateProvider<TrainerSpecialty?>(
-  (ref) => null,
+final selectedSpecialtyProvider = StateProvider<Set<TrainerSpecialty>>(
+  (ref) => const <TrainerSpecialty>{},
 );
 
 // ── mapModeProvider (private to feature) ─────────────────────────────────
@@ -272,10 +279,15 @@ final trainerDiscoveryProvider =
     trainers = await repo.listAll();
   }
 
-  // Client-side specialty filter (D10)
-  if (selectedSpecialty != null) {
-    trainers =
-        trainers.where((t) => t.trainerSpecialty == selectedSpecialty).toList();
+  // Client-side specialty filter (D10) — multi-select OR semantics.
+  // Empty set = sin filtro (match all). Non-empty = el trainer tiene que
+  // tener trainerSpecialty != null Y estar en el set.
+  if (selectedSpecialty.isNotEmpty) {
+    trainers = trainers
+        .where((t) =>
+            t.trainerSpecialty != null &&
+            selectedSpecialty.contains(t.trainerSpecialty))
+        .toList();
   }
 
   // Distance filter — solo aplica cuando hay location del athlete y NO

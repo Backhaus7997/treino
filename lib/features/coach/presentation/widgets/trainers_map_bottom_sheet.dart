@@ -16,11 +16,39 @@ import '../coach_strings.dart';
 /// del mismo `trainerDiscoveryProvider` que los markers — solo muestra
 /// trainers con lat/lon set (los que tienen pin en el mapa).
 ///
-/// Sin drag real por ahora — el handle visual sugiere la affordance pero
-/// la altura es fija (~190px). Si producto valida que se usa, agregamos
-/// `DraggableScrollableSheet` con snap points en una iteración futura.
+/// **Controlled** — el estado `collapsed` vive en el parent
+/// (`TrainersMapView`) para que el FAB de "Centrar" pueda adaptar su
+/// offset según el sheet esté colapsado o expandido. El sheet expone
+/// tap y vertical drag sobre el handle/header para togglear y avisa al
+/// parent vía `onCollapsedChanged`.
 class TrainersMapBottomSheet extends ConsumerWidget {
-  const TrainersMapBottomSheet({super.key});
+  const TrainersMapBottomSheet({
+    super.key,
+    required this.collapsed,
+    required this.onCollapsedChanged,
+  });
+
+  /// Cuando true: solo handle + count visibles; carousel oculto.
+  final bool collapsed;
+
+  /// Llamado cuando el user tap/drag sobre el header para togglear el
+  /// estado collapse. El parent decide qué hacer (típicamente actualizar
+  /// el bool en su State).
+  final ValueChanged<bool> onCollapsedChanged;
+
+  void _toggle() => onCollapsedChanged(!collapsed);
+
+  /// Drag rápido hacia abajo (>300 px/s) → colapsa. Drag rápido hacia
+  /// arriba → expande. Drags lentos no hacen nada (evita togglear sin
+  /// querer mientras el usuario ajusta el dedo).
+  void _onVerticalDragEnd(DragEndDetails details) {
+    final v = details.velocity.pixelsPerSecond.dy;
+    if (v > 300 && !collapsed) {
+      onCollapsedChanged(true);
+    } else if (v < -300 && collapsed) {
+      onCollapsedChanged(false);
+    }
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -49,7 +77,9 @@ class TrainersMapBottomSheet extends ConsumerWidget {
         final visible =
             trainers.where((t) => effectiveLocationsOf(t).isNotEmpty).toList();
 
-        return Container(
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOut,
           decoration: BoxDecoration(
             color: palette.bgCard,
             borderRadius: const BorderRadius.only(
@@ -65,45 +95,67 @@ class TrainersMapBottomSheet extends ConsumerWidget {
               ),
             ],
           ),
-          padding: const EdgeInsets.fromLTRB(0, 8, 0, 14),
+          // hardEdge clipea el carousel oculto cuando _collapsed=true
+          // así no asoma por debajo del header.
+          clipBehavior: Clip.hardEdge,
+          // Sin padding bottom acá — el bottom inset lo da el sheet del
+          // map view padre. Mantenemos top padding chico.
+          padding: const EdgeInsets.only(bottom: 14),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ── Drag handle visual ────────────────────────────────────────
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: palette.border,
-                    borderRadius: BorderRadius.circular(2),
+              // ── Header zone (handle + count) — interactivo ────────────────
+              // Solo este bloque captura tap/drag. Las cards del carousel
+              // quedan fuera del GestureDetector para que su onTap navegue
+              // normalmente al perfil del PF.
+              GestureDetector(
+                onTap: _toggle,
+                onVerticalDragEnd: _onVerticalDragEnd,
+                behavior: HitTestBehavior.opaque,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: palette.border,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      _Header(
+                        count: visible.length,
+                        hasLocation: hasLocation,
+                      ),
+                    ],
                   ),
                 ),
               ),
-              const SizedBox(height: 12),
-              // ── Header: count ─────────────────────────────────────────────
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: _Header(
-                  count: visible.length,
-                  hasLocation: hasLocation,
+              // ── Carousel (oculto cuando _collapsed=true) ──────────────────
+              AnimatedSize(
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeOut,
+                alignment: Alignment.topCenter,
+                child: SizedBox(
+                  height: collapsed ? 0 : 110,
+                  child: visible.isEmpty
+                      ? _EmptyState(palette: palette)
+                      : ListView.separated(
+                          scrollDirection: Axis.horizontal,
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          itemCount: visible.length,
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(width: 12),
+                          itemBuilder: (_, i) =>
+                              _TrainerMapCard(trainer: visible[i]),
+                        ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              // ── Carousel ──────────────────────────────────────────────────
-              SizedBox(
-                height: 110,
-                child: visible.isEmpty
-                    ? _EmptyState(palette: palette)
-                    : ListView.separated(
-                        scrollDirection: Axis.horizontal,
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        itemCount: visible.length,
-                        separatorBuilder: (_, __) => const SizedBox(width: 12),
-                        itemBuilder: (_, i) =>
-                            _TrainerMapCard(trainer: visible[i]),
-                      ),
               ),
             ],
           ),

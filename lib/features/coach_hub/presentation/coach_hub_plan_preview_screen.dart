@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -20,6 +22,7 @@ import '../../workout/domain/routine_day.dart';
 import '../../workout/domain/routine_slot.dart';
 import '../../workout/domain/routine_source.dart';
 import '../../workout/domain/routine_visibility.dart';
+import '../application/cf_providers.dart';
 import '../application/plan_import_providers.dart';
 import '../domain/parsed_plan.dart';
 
@@ -170,6 +173,24 @@ class _CoachHubPlanPreviewScreenState
       unmatched: updatedUnmatched,
     );
     setState(() => _error = null);
+    // FIRE-AND-FORGET: see ADR-CXP-006 // i18n: Fase 6 Etapa 5
+    unawaited(_addAlias(picked.id, rowName));
+  }
+
+  /// Fire-and-forget side effect: sends the manually mapped alias to
+  /// the addAlias Cloud Function so future imports auto-match.
+  ///
+  /// Silent failure — any exception is swallowed and only logged via
+  /// debugPrint. Never blocks or shows UI feedback. ADR-CXP-009.
+  Future<void> _addAlias(String exerciseId, String rawName) async {
+    try {
+      await ref
+          .read(cloudFunctionsProvider)
+          .httpsCallable('addAlias')
+          .call(<String, dynamic>{'exerciseId': exerciseId, 'alias': rawName});
+    } catch (e) {
+      debugPrint('[addAlias] swallowed: $e');
+    }
   }
 
   Routine _buildRoutine({

@@ -6,6 +6,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../app/theme/app_palette.dart';
 import '../../application/trainer_discovery_providers.dart';
 import '../../domain/discovery_filters.dart';
+import '../../domain/trainer_specialty.dart';
+import 'trainer_specialty_chips.dart' show SpecialtyLabels;
 
 /// Row de chips para filtros avanzados (distance + price) — Fase 2b.
 ///
@@ -43,7 +45,7 @@ class TrainerAdvancedFilterChips extends ConsumerWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12),
       child: Row(
         children: [
-          _FilterChip(
+          TrainerFilterChip(
             label: isLoadingLocation && !hasLocation
                 ? 'Buscando ubicación...'
                 : distance.chipLabel,
@@ -56,20 +58,20 @@ class TrainerAdvancedFilterChips extends ConsumerWidget {
                 return; // no-op mientras carga
               }
               if (hasLocation) {
-                _showDistanceSheet(context, ref, distance);
+                showDistanceFilterSheet(context, ref, distance);
               } else {
-                _showLocationRequiredSheet(context, ref);
+                showLocationRequiredFilterSheet(context, ref);
               }
             },
           ),
           const SizedBox(width: 8),
-          _FilterChip(
+          TrainerFilterChip(
             label: price.chipLabel,
             isActive: price != PriceFilter.any,
             disabled: false,
             isLoading: false,
             palette: palette,
-            onTap: () => _showPriceSheet(context, ref, price),
+            onTap: () => showPriceFilterSheet(context, ref, price),
           ),
           // "Online" se promocionó a tabs Presencial/Online en el header
           // (Fase 6 Etapa 0 PR#3). Ya no vive como chip en esta row.
@@ -77,247 +79,373 @@ class TrainerAdvancedFilterChips extends ConsumerWidget {
       ),
     );
   }
+}
 
-  Future<void> _showDistanceSheet(
-    BuildContext context,
-    WidgetRef ref,
-    DistanceFilter current,
-  ) async {
-    final selected = await _showFilterSheet<DistanceFilter>(
-      context: context,
-      title: 'Distancia',
-      options: DistanceFilter.values,
-      current: current,
-      labelOf: (v) => v.label,
-    );
-    if (selected != null) {
-      ref.read(selectedDistanceFilterProvider.notifier).state = selected;
-    }
+// ── Top-level sheet helpers ──────────────────────────────────────────────────
+// Promovidos de métodos privados de la clase a funciones top-level para que
+// `TrainerCompactFilterRow` (vista MAPA) pueda reusar exactamente el mismo
+// flow sin duplicar código.
+
+Future<void> showDistanceFilterSheet(
+  BuildContext context,
+  WidgetRef ref,
+  DistanceFilter current,
+) async {
+  final selected = await _showFilterSheet<DistanceFilter>(
+    context: context,
+    title: 'Distancia',
+    options: DistanceFilter.values,
+    current: current,
+    labelOf: (v) => v.label,
+  );
+  if (selected != null) {
+    ref.read(selectedDistanceFilterProvider.notifier).state = selected;
   }
+}
 
-  /// Modal explicativo cuando el athlete denegó (o no otorgó) location y
-  /// tocó el chip de distancia. Le explica por qué y le ofrece reintentar
-  /// el permission flow.
-  Future<void> _showLocationRequiredSheet(
-    BuildContext context,
-    WidgetRef ref,
-  ) async {
-    final palette = AppPalette.of(context);
-    await showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: palette.bgCard,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (sheetContext) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 14, 20, 18),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: palette.border,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
+Future<void> showPriceFilterSheet(
+  BuildContext context,
+  WidgetRef ref,
+  PriceFilter current,
+) async {
+  final selected = await _showFilterSheet<PriceFilter>(
+    context: context,
+    title: 'Precio',
+    options: PriceFilter.values,
+    current: current,
+    labelOf: (v) => v.label,
+  );
+  if (selected != null) {
+    ref.read(selectedPriceFilterProvider.notifier).state = selected;
+  }
+}
+
+/// Modal de selección de especialidad — **multi-select**.
+///
+/// "Todos" limpia el set (sin filtro). Tap en cualquier especialidad
+/// toggle in/out del set. Closure del sheet = aplicar (los cambios son
+/// live, no hay botón Aplicar — la próxima rebuild del provider ya
+/// refleja el filtro).
+///
+/// Diferente de `_showFilterSheet<T>` porque (a) el caso "Todos" mapea
+/// a Set vacío en el provider, y (b) cada tap NO cierra el sheet —
+/// queda abierto para tap múltiples antes de cerrar.
+Future<void> showSpecialtyFilterSheet(
+  BuildContext context,
+  WidgetRef ref,
+) async {
+  final palette = AppPalette.of(context);
+  final maxSheetHeight = MediaQuery.of(context).size.height * 0.55;
+  await showModalBottomSheet<void>(
+    context: context,
+    backgroundColor: palette.bgCard,
+    isScrollControlled: true,
+    // Cap a 55% del alto de pantalla. Con 11 opciones (Todos + 10
+    // specialties) el contenido sin cap ocupaba casi full screen. Ahora
+    // el sheet queda ~la mitad y el ListView interno scrollea para
+    // mostrar las opciones que no entran.
+    constraints: BoxConstraints(maxHeight: maxSheetHeight),
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    ),
+    builder: (sheetContext) => SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(0, 14, 0, 18),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: palette.border,
+                  borderRadius: BorderRadius.circular(2),
                 ),
               ),
-              const SizedBox(height: 18),
-              Text(
-                'ACTIVÁ TU UBICACIÓN',
+            ),
+            const SizedBox(height: 14),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Text(
+                'ESPECIALIDAD',
                 style: GoogleFonts.barlowCondensed(
                   fontWeight: FontWeight.w700,
-                  fontSize: 16,
+                  fontSize: 14,
                   letterSpacing: 1.4,
                   color: palette.textPrimary,
                 ),
               ),
-              const SizedBox(height: 12),
-              Text(
-                'Para filtrar entrenadores por distancia necesitamos saber dónde estás. La ubicación se usa solo en tu dispositivo, no la subimos a ningún servidor.',
-                style: GoogleFonts.barlow(
-                  fontSize: 14,
-                  color: palette.textMuted,
-                  height: 1.4,
+            ),
+            const SizedBox(height: 8),
+            // Consumer re-builds este bloque cada vez que el set cambia,
+            // sin cerrar el sheet — multi-select live.
+            Flexible(
+              child: Consumer(builder: (ctx, sheetRef, _) {
+                final selected = sheetRef.watch(selectedSpecialtyProvider);
+                return ListView(
+                  shrinkWrap: true,
+                  children: [
+                    _FilterOptionTile(
+                      label: 'Todos',
+                      isSelected: selected.isEmpty,
+                      palette: palette,
+                      onTap: () => sheetRef
+                          .read(selectedSpecialtyProvider.notifier)
+                          .state = const <TrainerSpecialty>{},
+                    ),
+                    for (final s in TrainerSpecialty.values)
+                      _FilterOptionTile(
+                        label: SpecialtyLabels.of(s),
+                        isSelected: selected.contains(s),
+                        palette: palette,
+                        onTap: () {
+                          final next = Set<TrainerSpecialty>.from(selected);
+                          if (next.contains(s)) {
+                            next.remove(s);
+                          } else {
+                            next.add(s);
+                          }
+                          sheetRef
+                              .read(selectedSpecialtyProvider.notifier)
+                              .state = next;
+                        },
+                      ),
+                  ],
+                );
+              }),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+/// Modal explicativo cuando el athlete denegó (o no otorgó) location y
+/// tocó el chip de distancia. Le explica por qué y le ofrece reintentar
+/// el permission flow.
+Future<void> showLocationRequiredFilterSheet(
+  BuildContext context,
+  WidgetRef ref,
+) async {
+  final palette = AppPalette.of(context);
+  await showModalBottomSheet<void>(
+    context: context,
+    backgroundColor: palette.bgCard,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    ),
+    builder: (sheetContext) => SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 14, 20, 18),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: palette.border,
+                  borderRadius: BorderRadius.circular(2),
                 ),
               ),
-              const SizedBox(height: 18),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.of(sheetContext).pop(),
-                      style: OutlinedButton.styleFrom(
-                        side: BorderSide(color: palette.border),
-                        foregroundColor: palette.textPrimary,
-                        minimumSize: const Size.fromHeight(44),
-                        shape: const StadiumBorder(),
-                      ),
-                      child: Text(
-                        'Ahora no',
-                        style: GoogleFonts.barlowCondensed(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 13,
-                          letterSpacing: 0.6,
-                        ),
+            ),
+            const SizedBox(height: 18),
+            Text(
+              'ACTIVÁ TU UBICACIÓN',
+              style: GoogleFonts.barlowCondensed(
+                fontWeight: FontWeight.w700,
+                fontSize: 16,
+                letterSpacing: 1.4,
+                color: palette.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Para filtrar entrenadores por distancia necesitamos saber dónde estás. La ubicación se usa solo en tu dispositivo, no la subimos a ningún servidor.',
+              style: GoogleFonts.barlow(
+                fontSize: 14,
+                color: palette.textMuted,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 18),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.of(sheetContext).pop(),
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(color: palette.border),
+                      foregroundColor: palette.textPrimary,
+                      minimumSize: const Size.fromHeight(44),
+                      shape: const StadiumBorder(),
+                    ),
+                    child: Text(
+                      'Ahora no',
+                      style: GoogleFonts.barlowCondensed(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                        letterSpacing: 0.6,
                       ),
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () =>
-                          _handleActivatePressed(sheetContext, ref),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: palette.accent,
-                        foregroundColor: palette.bg,
-                        minimumSize: const Size.fromHeight(44),
-                        shape: const StadiumBorder(),
-                      ),
-                      child: Text(
-                        'Activar',
-                        style: GoogleFonts.barlowCondensed(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 13,
-                          letterSpacing: 0.6,
-                        ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () => _handleActivatePressed(sheetContext, ref),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: palette.accent,
+                      foregroundColor: palette.bg,
+                      minimumSize: const Size.fromHeight(44),
+                      shape: const StadiumBorder(),
+                    ),
+                    child: Text(
+                      'Activar',
+                      style: GoogleFonts.barlowCondensed(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                        letterSpacing: 0.6,
                       ),
                     ),
                   ),
-                ],
-              ),
-            ],
-          ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
-  Future<void> _showPriceSheet(
-    BuildContext context,
-    WidgetRef ref,
-    PriceFilter current,
-  ) async {
-    final selected = await _showFilterSheet<PriceFilter>(
-      context: context,
-      title: 'Precio',
-      options: PriceFilter.values,
-      current: current,
-      labelOf: (v) => v.label,
-    );
-    if (selected != null) {
-      ref.read(selectedPriceFilterProvider.notifier).state = selected;
+/// Handler del botón "Activar" del modal de location-required.
+///
+/// Branch según current permission state — necesario para evitar el crash
+/// del geolocator cuando se llama `requestPermission()` sobre estado
+/// `deniedForever` (la app se cierra en algunos Android). Solución:
+/// chequear primero, y si está deniedForever, abrir app settings directo
+/// (el user puede otorgar manualmente desde ahí).
+Future<void> _handleActivatePressed(
+  BuildContext sheetContext,
+  WidgetRef ref,
+) async {
+  Navigator.of(sheetContext).pop();
+  try {
+    final current = await Geolocator.checkPermission();
+    if (current == LocationPermission.deniedForever) {
+      // Sistema ya no nos deja pedir de nuevo — abrir app settings.
+      // NO llamamos `requestPermission()` después porque genera doble
+      // recarga (app background → foreground → otra request). El user
+      // vuelve, toca "Distancia" de nuevo, y ahí refresca via el flow
+      // normal (este mismo handler con checkPermission ya devolviendo
+      // `denied` o `whileInUse`).
+      await Geolocator.openAppSettings();
+    } else if (current == LocationPermission.whileInUse ||
+        current == LocationPermission.always) {
+      // Ya estaba otorgado (caso típico cuando el user volvió de app
+      // settings después de activar manualmente). Solo refrescamos
+      // posición — no re-disparamos diálogo del sistema.
+      await ref.read(athleteLocationProvider.notifier).requestPermission();
+    } else {
+      // Estado `denied` (preguntado y rechazado pero no permanente) o
+      // `unableToDetermine` — pedir permission normalmente. Sistema
+      // muestra diálogo y el user puede aceptar.
+      await ref.read(athleteLocationProvider.notifier).requestPermission();
     }
-  }
-
-  /// Handler del botón "Activar" del modal de location-required.
-  ///
-  /// Branch según current permission state — necesario para evitar el crash
-  /// del geolocator cuando se llama `requestPermission()` sobre estado
-  /// `deniedForever` (la app se cierra en algunos Android). Solución:
-  /// chequear primero, y si está deniedForever, abrir app settings directo
-  /// (el user puede otorgar manualmente desde ahí).
-  Future<void> _handleActivatePressed(
-    BuildContext sheetContext,
-    WidgetRef ref,
-  ) async {
-    Navigator.of(sheetContext).pop();
-    try {
-      final current = await Geolocator.checkPermission();
-      if (current == LocationPermission.deniedForever) {
-        // Sistema ya no nos deja pedir de nuevo — abrir app settings.
-        // NO llamamos `requestPermission()` después porque genera doble
-        // recarga (app background → foreground → otra request). El user
-        // vuelve, toca "Distancia" de nuevo, y ahí refresca via el flow
-        // normal (este mismo handler con checkPermission ya devolviendo
-        // `denied` o `whileInUse`).
-        await Geolocator.openAppSettings();
-      } else if (current == LocationPermission.whileInUse ||
-          current == LocationPermission.always) {
-        // Ya estaba otorgado (caso típico cuando el user volvió de app
-        // settings después de activar manualmente). Solo refrescamos
-        // posición — no re-disparamos diálogo del sistema.
-        await ref.read(athleteLocationProvider.notifier).requestPermission();
-      } else {
-        // Estado `denied` (preguntado y rechazado pero no permanente) o
-        // `unableToDetermine` — pedir permission normalmente. Sistema
-        // muestra diálogo y el user puede aceptar.
-        await ref.read(athleteLocationProvider.notifier).requestPermission();
-      }
-    } catch (_) {
-      // Errores del plugin se tragan silenciosamente — el provider state
-      // ya refleja el estado real y la UI se actualiza acorde.
-    }
-  }
-
-  Future<T?> _showFilterSheet<T>({
-    required BuildContext context,
-    required String title,
-    required List<T> options,
-    required T current,
-    required String Function(T) labelOf,
-  }) {
-    final palette = AppPalette.of(context);
-    return showModalBottomSheet<T>(
-      context: context,
-      backgroundColor: palette.bgCard,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (sheetContext) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(0, 14, 0, 18),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: palette.border,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 14),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Text(
-                  title.toUpperCase(),
-                  style: GoogleFonts.barlowCondensed(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 14,
-                    letterSpacing: 1.4,
-                    color: palette.textPrimary,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8),
-              for (final opt in options)
-                _FilterOptionTile(
-                  label: labelOf(opt),
-                  isSelected: opt == current,
-                  palette: palette,
-                  onTap: () => Navigator.of(sheetContext).pop(opt),
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
+  } catch (_) {
+    // Errores del plugin se tragan silenciosamente — el provider state
+    // ya refleja el estado real y la UI se actualiza acorde.
   }
 }
 
-// ── Chip ──────────────────────────────────────────────────────────────────────
+Future<T?> _showFilterSheet<T>({
+  required BuildContext context,
+  required String title,
+  required List<T> options,
+  required T current,
+  required String Function(T) labelOf,
+}) {
+  final palette = AppPalette.of(context);
+  final maxSheetHeight = MediaQuery.of(context).size.height * 0.55;
+  return showModalBottomSheet<T>(
+    context: context,
+    backgroundColor: palette.bgCard,
+    // isScrollControlled: true permite que el sheet ocupe más de la mitad
+    // de pantalla si hace falta — sin esto la lista de opciones overflowea
+    // en phones chicos cuando hay muchas opciones.
+    isScrollControlled: true,
+    // Mismo cap que el sheet de especialidad — cuando un filtro tenga
+    // muchas opciones futuras, no se come la pantalla entera.
+    constraints: BoxConstraints(maxHeight: maxSheetHeight),
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    ),
+    builder: (sheetContext) => SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(0, 14, 0, 18),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: palette.border,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Text(
+                title.toUpperCase(),
+                style: GoogleFonts.barlowCondensed(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                  letterSpacing: 1.4,
+                  color: palette.textPrimary,
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            // Flexible + ListView para que la lista scrollee si hay más
+            // opciones de las que entran. shrinkWrap: true para que tome
+            // solo la altura necesaria cuando entra todo.
+            Flexible(
+              child: ListView(
+                shrinkWrap: true,
+                children: [
+                  for (final opt in options)
+                    _FilterOptionTile(
+                      label: labelOf(opt),
+                      isSelected: opt == current,
+                      palette: palette,
+                      onTap: () => Navigator.of(sheetContext).pop(opt),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
 
-class _FilterChip extends StatelessWidget {
-  const _FilterChip({
+// ── Chip (público para reuso desde TrainerCompactFilterRow) ─────────────────
+
+class TrainerFilterChip extends StatelessWidget {
+  const TrainerFilterChip({
+    super.key,
     required this.label,
     required this.isActive,
     required this.disabled,
@@ -343,14 +471,14 @@ class _FilterChip extends StatelessWidget {
       // Loading: chip se ve "activo en proceso" — fondo neutral, texto en
       // color primario, sin opacidad reducida. El user ve que estamos
       // trabajando, no que falló.
-      bg = palette.espresso;
+      bg = palette.bgCard;
       fg = palette.textPrimary;
       borderColor = palette.border;
       opacity = 1.0;
     } else if (disabled) {
       // Soft-disabled: background neutral, texto e ícono muted. Tap sigue
       // funcionando (abre el modal explicativo "activar ubicación").
-      bg = palette.espresso;
+      bg = palette.bgCard;
       fg = palette.textMuted;
       borderColor = palette.border;
       opacity = 0.6;
@@ -360,7 +488,7 @@ class _FilterChip extends StatelessWidget {
       borderColor = palette.accent;
       opacity = 1.0;
     } else {
-      bg = palette.espresso;
+      bg = palette.bgCard;
       fg = palette.textPrimary;
       borderColor = palette.border;
       opacity = 1.0;
@@ -374,7 +502,9 @@ class _FilterChip extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
             color: bg,
-            borderRadius: BorderRadius.circular(9999),
+            // Border-radius 10 (era 9999/pill). Look menos "filter pill"
+            // y más "system UI" — el user lo prefirió en feedback de Fase 6.
+            borderRadius: BorderRadius.circular(10),
             border: Border.all(color: borderColor),
           ),
           child: Row(

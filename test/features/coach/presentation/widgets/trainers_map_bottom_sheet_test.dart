@@ -67,7 +67,10 @@ void main() {
     testWidgets('con ubicación: header dice "N ENTRENADORES CERCA" (plural)',
         (tester) async {
       await tester.pumpWidget(_wrap(
-        const TrainersMapBottomSheet(),
+        TrainersMapBottomSheet(
+          collapsed: false,
+          onCollapsedChanged: (_) {},
+        ),
         overrides: [
           _withFakeLocation(),
           trainerDiscoveryProvider.overrideWith((_) async => [
@@ -86,7 +89,10 @@ void main() {
     testWidgets('con ubicación: header singular cuando count == 1',
         (tester) async {
       await tester.pumpWidget(_wrap(
-        const TrainersMapBottomSheet(),
+        TrainersMapBottomSheet(
+          collapsed: false,
+          onCollapsedChanged: (_) {},
+        ),
         overrides: [
           _withFakeLocation(),
           trainerDiscoveryProvider.overrideWith((_) async => [_trainer()]),
@@ -101,7 +107,10 @@ void main() {
         'SIN ubicación: header dice "N ENTRENADORES" (sin CERCA — Fase 2b polish)',
         (tester) async {
       await tester.pumpWidget(_wrap(
-        const TrainersMapBottomSheet(),
+        TrainersMapBottomSheet(
+          collapsed: false,
+          onCollapsedChanged: (_) {},
+        ),
         overrides: [
           // NO override de location → default AsyncData(null) → hasLocation false
           trainerDiscoveryProvider.overrideWith((_) async => [_trainer()]),
@@ -117,7 +126,10 @@ void main() {
     testWidgets('filtra trainers sin lat/lon — solo cuenta los que tienen',
         (tester) async {
       await tester.pumpWidget(_wrap(
-        const TrainersMapBottomSheet(),
+        TrainersMapBottomSheet(
+          collapsed: false,
+          onCollapsedChanged: (_) {},
+        ),
         overrides: [
           _withFakeLocation(),
           trainerDiscoveryProvider.overrideWith((_) async => [
@@ -138,7 +150,10 @@ void main() {
     testWidgets('empty state cuando ningún trainer tiene location',
         (tester) async {
       await tester.pumpWidget(_wrap(
-        const TrainersMapBottomSheet(),
+        TrainersMapBottomSheet(
+          collapsed: false,
+          onCollapsedChanged: (_) {},
+        ),
         overrides: [
           _withFakeLocation(),
           trainerDiscoveryProvider.overrideWith((_) async => [
@@ -157,7 +172,10 @@ void main() {
 
     testWidgets('card muestra nombre + specialty + precio', (tester) async {
       await tester.pumpWidget(_wrap(
-        const TrainersMapBottomSheet(),
+        TrainersMapBottomSheet(
+          collapsed: false,
+          onCollapsedChanged: (_) {},
+        ),
         overrides: [
           trainerDiscoveryProvider.overrideWith((_) async => [
                 _trainer(

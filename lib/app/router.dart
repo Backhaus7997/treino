@@ -400,10 +400,16 @@ GoRouter buildRouter({
                     _noAnim(const ProfileEditPersonalScreen()),
               ),
               // NEW — Fase 6 Etapa 1 (trainer-profile-onboarding)
+              // ADR-TPO-005: reads ?mode=onboarding query param; any other
+              // value (or missing) defaults to edit mode.
               GoRoute(
                 path: 'edit-trainer',
-                pageBuilder: (_, __) =>
-                    _noAnim(const ProfileEditTrainerScreen()),
+                pageBuilder: (context, state) {
+                  final mode = state.uri.queryParameters['mode'] == 'onboarding'
+                      ? ProfileEditTrainerMode.onboarding
+                      : ProfileEditTrainerMode.edit;
+                  return _noAnim(ProfileEditTrainerScreen(mode: mode));
+                },
               ),
               GoRoute(
                 path: 'gym',
