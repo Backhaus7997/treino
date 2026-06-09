@@ -28,7 +28,7 @@
 - [x] T-CXP-011 — GREEN: 14/14 tests pass; `excel_parser.dart` unchanged.
 - [x] T-CXP-012 — GATE: `flutter analyze` 0 issues on touched files; `dart format` 0 changed files on touched paths.
 - [x] T-CXP-013 — GATE: 14 new scenario tests passing (delta > +8 required).
-- [x] T-CXP-014 — VERIFY: `excel_parser.dart` unchanged (no diff). No `pubspec.yaml` changes. `kColumnWidthsDay` + `kColumnWidthsPlan` exported at top-level. Instrucciones copy matches ADR-CXP-012. Conventional commits only.
+- [x] T-CXP-014 — VERIFY: `excel_parser.dart` unchanged (no diff). No `pubspec.yaml` changes. No `firestore.rules`, `storage.rules`, `firestore.indexes.json` changes. No CF changes. `kColumnWidthsDay` + `kColumnWidthsPlan` exported at top-level. Instrucciones copy matches ADR-CXP-012 locked strings verbatim. Conventional commits only, no `Co-Authored-By`.
 
 ### Commits (PR#1)
 
@@ -58,7 +58,7 @@
 **Batch**: PR#2a
 **Date**: 2026-06-02
 **Branch**: `feat/coach-excel-polish-pr2a-add-alias-cf`
-**Status**: PR#2a COMPLETE — branch pushed, ready for PR
+**Status**: PR#2a COMPLETE — merged to main (#143)
 
 ### Normalization Parity Reference (T-CXP-015 READ-FIRST)
 
@@ -151,9 +151,87 @@ String normalize(String s) {
 
 ---
 
-## Remaining Tasks (PR#2b — NOT in scope)
+## PR#2b — Client Wire + Widget Tests (COMPLETE)
 
-- [ ] T-CXP-028..T-CXP-038 — PR#2b: client wire + widget tests
+**Batch**: PR#2b
+**Date**: 2026-06-02
+**Branch**: `feat/coach-excel-polish-pr2b-client-wire`
+**Status**: PR#2b COMPLETE — branch pushed, ready for PR
+
+### Completed Tasks (PR#2b)
+
+- [x] T-CXP-028 — SETUP: branch `feat/coach-excel-polish-pr2b-client-wire` confirmed on correct branch. `cf_providers.dart` absent. `coach_hub_plan_preview_screen_test.dart` absent. `mocktail ^1.0.4` confirmed in pubspec.yaml. `cloud_functions ^5.2.0` confirmed.
+- [x] T-CXP-029 — RED: created `test/features/coach_hub/presentation/coach_hub_plan_preview_screen_test.dart` with all SCENARIO-744..747 tests. Compile error (cf_providers.dart not found = RED). Commit: `3c11953`.
+- [x] T-CXP-030 — GREEN: created `lib/features/coach_hub/application/cf_providers.dart` with `cloudFunctionsProvider = Provider<FirebaseFunctions>((ref) => FirebaseFunctions.instanceFor(region: 'southamerica-east1'))`. SCENARIO-744 passes.
+- [x] T-CXP-031 — RED: SCENARIO-745 (callable invocation args) + SCENARIO-746 (non-blocking) tests in unified RED commit (3c11953).
+- [x] T-CXP-032 — RED: SCENARIO-747 (exception swallow) test in unified RED commit (3c11953).
+- [x] T-CXP-033 — GREEN: edited `coach_hub_plan_preview_screen.dart` — added `import 'dart:async'`, `import '../application/cf_providers.dart'`, `_addAlias()` private method with try/catch swallow + debugPrint. Inserted `// FIRE-AND-FORGET: see ADR-CXP-006 // i18n: Fase 6 Etapa 5` + `unawaited(_addAlias(picked.id, rowName))` AFTER `setState(() => _error = null)` and BEFORE function end. 4/4 tests pass. Commit: `eaf0752`.
+- [x] T-CXP-034 — GATE: `flutter analyze` 0 issues (fixed unnecessary `foundation.dart` import). `dart format` 0 changed files on touched paths.
+- [x] T-CXP-035 — GATE: `flutter test test/features/coach_hub/presentation/coach_hub_plan_preview_screen_test.dart` — 4/4 tests pass. Full coach_hub suite: 54/54 (zero regressions).
+- [x] T-CXP-036 — VERIFY: Screen has NO direct `package:cloud_functions/cloud_functions.dart` import (provider hides it). `unawaited(_addAlias(...))` positioned AFTER `setState(() => _error = null)` with FIRE-AND-FORGET + i18n comment. `// i18n: Fase 6 Etapa 5` present. No `pubspec.yaml` changes. No hex literals. No PhosphorIcons direct refs. Conventional commits, no Co-Authored-By.
+
+### TDD Cycle Evidence (PR#2b)
+
+| Task pair | Layer | RED | GREEN |
+|-----------|-------|-----|-------|
+| T-CXP-029/030 | Provider unit | ✅ Commit 3c11953 (compile: cf_providers.dart not found) | ✅ Commit eaf0752 |
+| T-CXP-031/033 | Widget (SCENARIO-745) | ✅ Commit 3c11953 | ✅ Commit eaf0752 |
+| T-CXP-031/033 | Widget (SCENARIO-746) | ✅ Commit 3c11953 | ✅ Commit eaf0752 |
+| T-CXP-032/033 | Widget (SCENARIO-747) | ✅ Commit 3c11953 | ✅ Commit eaf0752 |
+
+**Batch strategy**: All RED tests in one file-creation commit (same pattern as PR#1/PR#2a — single compilation-failure root cause). All GREEN in one commit.
+
+### R2 Insertion Order (ADR-CXP-006 LOAD-BEARING)
+
+Confirmed in `coach_hub_plan_preview_screen.dart` after implementation:
+1. `ref.read(parsedPlanProvider.notifier).state = ...` (sync state)
+2. `setState(() => _error = null);`
+3. `// FIRE-AND-FORGET: see ADR-CXP-006 // i18n: Fase 6 Etapa 5`
+4. `unawaited(_addAlias(picked.id, rowName));`
+5. `}` (function end — no subsequent awaits)
+
+### Test Summary (PR#2b)
+
+- **Tests written**: 4 (SCENARIO-744..747)
+- **Tests passing**: 4/4
+- **Full coach_hub suite**: 54/54 (zero regressions)
+- **Layers**: ProviderContainer unit test (1), widget tests with mocktail (3)
+
+### Files Changed (PR#2b)
+
+| File | Action | What |
+|------|--------|------|
+| `lib/features/coach_hub/application/cf_providers.dart` | CREATED | `cloudFunctionsProvider` for southamerica-east1 |
+| `lib/features/coach_hub/presentation/coach_hub_plan_preview_screen.dart` | MODIFIED | +`dart:async` import, +`cf_providers.dart` import, +`_addAlias()` helper, +fire-and-forget call with R2 comment |
+| `test/features/coach_hub/presentation/coach_hub_plan_preview_screen_test.dart` | CREATED | 4 widget tests SCENARIO-744..747 |
+| `openspec/changes/coach-excel-polish/tasks.md` | UPDATED | PR#2b tasks [x] |
+| `openspec/changes/coach-excel-polish/apply-progress.md` | UPDATED | PR#2b section added |
+
+**Unchanged** (verified):
+- `pubspec.yaml` — no changes
+- `firestore.rules`, `storage.rules`, `firestore.indexes.json` — no changes
+- No CF files touched
+- No hex color literals, no PhosphorIcons direct refs
+
+### Commits (PR#2b)
+
+| Hash | Type | Description |
+|------|------|-------------|
+| `3c11953` | RED | `test(coach-hub): RED — SCENARIO-744..747 cloudFunctionsProvider + wire widget tests` |
+| `eaf0752` | GREEN | `feat(coach-hub): GREEN — cloudFunctionsProvider + fire-and-forget addAlias wire` |
+| `014b385` | chore | `chore(sdd): mark PR#2b tasks complete in coach-excel-polish tasks.md` |
+
+### Deviations (PR#2b)
+
+1. **Batch approach**: All 4 RED tests in one file-creation commit. Same pattern as PR#1/PR#2a.
+2. **Unnecessary `foundation.dart` import**: Removed during analyze phase — `debugPrint` is already exported by `flutter/material.dart`.
+
+---
+
+## Remaining Tasks
+
+- [ ] T-CXP-037 — POST-DEPLOY: manual smoke after PR#2b merges + CF deploy (out of scope for apply phase)
+- [ ] T-CXP-038 — POST-MERGE: update docs/roadmap.md (out of scope for apply phase)
 
 ---
 
@@ -161,8 +239,8 @@ String normalize(String s) {
 
 - Mode: chained PR slice
 - PR#1: `feat/coach-excel-polish-pr1-template` → merged (#142)
-- PR#2a: `feat/coach-excel-polish-pr2a-add-alias-cf` → pushed, ready for PR
-- PR#2b: `feat/coach-excel-polish-pr2b-client-wire` → pending (after PR#2a merges)
+- PR#2a: `feat/coach-excel-polish-pr2a-add-alias-cf` → merged (#143)
+- PR#2b: `feat/coach-excel-polish-pr2b-client-wire` → pushed, ready for PR
 
 ---
 

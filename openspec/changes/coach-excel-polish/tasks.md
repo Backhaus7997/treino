@@ -164,24 +164,24 @@ Chain strategy: stacked-to-main
 
 ### Phase 3.1: Branch setup
 
-- [ ] T-CXP-028 — SETUP: create branch `feat/coach-excel-polish-pr2b-client-wire` (or continue on `pr2` if single-PR) from `main`; rebase after PR#2a merges if applicable. Confirm `lib/features/coach_hub/application/cf_providers.dart` does NOT exist. Confirm `test/features/coach_hub/presentation/coach_hub_plan_preview_screen_test.dart` does NOT exist (or check if it exists and needs extension). Verify `mocktail` is already a dev dependency in `pubspec.yaml` (confirmed per design ADR-CXP-010).
+- [x] T-CXP-028 — SETUP: create branch `feat/coach-excel-polish-pr2b-client-wire` (or continue on `pr2` if single-PR) from `main`; rebase after PR#2a merges if applicable. Confirm `lib/features/coach_hub/application/cf_providers.dart` does NOT exist. Confirm `test/features/coach_hub/presentation/coach_hub_plan_preview_screen_test.dart` does NOT exist (or check if it exists and needs extension). Verify `mocktail` is already a dev dependency in `pubspec.yaml` (confirmed per design ADR-CXP-010).
 
 ### Phase 3.2: `cloudFunctionsProvider` (ADR-CXP-008)
 
-- [ ] T-CXP-029 — RED: CREATE `test/features/coach_hub/presentation/coach_hub_plan_preview_screen_test.dart`; add failing test `'SCENARIO-744: cloudFunctionsProvider returns FirebaseFunctions for southamerica-east1'` using a `ProviderContainer` with no overrides — attempt to read `cloudFunctionsProvider`; assert it can be overridden with a mock in tests (test verifies the provider exists and is overridable; actual Firebase init is not needed — override with mock `FirebaseFunctions`). Test MUST fail (provider does not exist yet).
-- [ ] T-CXP-030 — GREEN: CREATE `lib/features/coach_hub/application/cf_providers.dart` with `cloudFunctionsProvider = Provider<FirebaseFunctions>((ref) => FirebaseFunctions.instanceFor(region: 'southamerica-east1'))` per ADR-CXP-008 exact implementation; add imports `cloud_functions` and `flutter_riverpod`. SCENARIO-744 must pass.
+- [x] T-CXP-029 — RED: CREATE `test/features/coach_hub/presentation/coach_hub_plan_preview_screen_test.dart`; add failing test `'SCENARIO-744: cloudFunctionsProvider returns FirebaseFunctions for southamerica-east1'` using a `ProviderContainer` with no overrides — attempt to read `cloudFunctionsProvider`; assert it can be overridden with a mock in tests (test verifies the provider exists and is overridable; actual Firebase init is not needed — override with mock `FirebaseFunctions`). Test MUST fail (provider does not exist yet).
+- [x] T-CXP-030 — GREEN: CREATE `lib/features/coach_hub/application/cf_providers.dart` with `cloudFunctionsProvider = Provider<FirebaseFunctions>((ref) => FirebaseFunctions.instanceFor(region: 'southamerica-east1'))` per ADR-CXP-008 exact implementation; add imports `cloud_functions` and `flutter_riverpod`. SCENARIO-744 must pass.
 
 ### Phase 3.3: `_addAlias` helper + screen wire (ADR-CXP-009 R2)
 
-- [ ] T-CXP-031 — RED: in `coach_hub_plan_preview_screen_test.dart` add failing tests — `'SCENARIO-745: _pickExerciseFor triggers addAlias callable with correct args'` overriding `cloudFunctionsProvider` with a mock `FirebaseFunctions` (using `mocktail`); simulating PF completing a manual mapping; asserting `httpsCallable('addAlias').call({'exerciseId': picked.id, 'alias': rowName})` invoked exactly once with correct args; asserting local `parsedPlanProvider` state reflects mapping. Also add `'SCENARIO-746: _pickExerciseFor does not block on hanging CF'` overriding provider with a never-completing mock; asserting UI returns to idle state immediately with no loading indicator. Tests MUST fail (no wire yet).
-- [ ] T-CXP-032 — RED (continued): in same test file add `'SCENARIO-747: _addAlias swallows CF exceptions silently'` overriding `cloudFunctionsProvider` with a mock that throws `FirebaseFunctionsException`; simulating a mapping; asserting no error shown in UI; asserting local mapping state preserved; asserting no exception propagates to widget tree. Test MUST fail.
-- [ ] T-CXP-033 — GREEN: edit `lib/features/coach_hub/presentation/coach_hub_plan_preview_screen.dart` — (1) add `import 'dart:async';` and `import '../application/cf_providers.dart';` (NO direct `cloud_functions` import in screen); (2) add `_addAlias` private method with `try { await ref.read(cloudFunctionsProvider).httpsCallable('addAlias').call(<String,dynamic>{'exerciseId':exerciseId,'alias':rawName}); } catch (e) { debugPrint('addAlias swallowed: $e'); }` per ADR-CXP-009 exact pseudocode; (3) insert `// R2 INSERTION POINT — after sync state, before any further await. Fire-and-forget; failures swallowed in _addAlias. // i18n: Fase 6 Etapa 5` comment followed by `unawaited(_addAlias(picked.id, rowName));` AFTER `setState(() => _error = null)` on the current line 172 and BEFORE any subsequent code. SCENARIO-745, SCENARIO-746, SCENARIO-747 must pass.
+- [x] T-CXP-031 — RED: in `coach_hub_plan_preview_screen_test.dart` add failing tests — `'SCENARIO-745: _pickExerciseFor triggers addAlias callable with correct args'` overriding `cloudFunctionsProvider` with a mock `FirebaseFunctions` (using `mocktail`); simulating PF completing a manual mapping; asserting `httpsCallable('addAlias').call({'exerciseId': picked.id, 'alias': rowName})` invoked exactly once with correct args; asserting local `parsedPlanProvider` state reflects mapping. Also add `'SCENARIO-746: _pickExerciseFor does not block on hanging CF'` overriding provider with a never-completing mock; asserting UI returns to idle state immediately with no loading indicator. Tests MUST fail (no wire yet).
+- [x] T-CXP-032 — RED (continued): in same test file add `'SCENARIO-747: _addAlias swallows CF exceptions silently'` overriding `cloudFunctionsProvider` with a mock that throws `FirebaseFunctionsException`; simulating a mapping; asserting no error shown in UI; asserting local mapping state preserved; asserting no exception propagates to widget tree. Test MUST fail.
+- [x] T-CXP-033 — GREEN: edit `lib/features/coach_hub/presentation/coach_hub_plan_preview_screen.dart` — (1) add `import 'dart:async';` and `import '../application/cf_providers.dart';` (NO direct `cloud_functions` import in screen); (2) add `_addAlias` private method with `try { await ref.read(cloudFunctionsProvider).httpsCallable('addAlias').call(<String,dynamic>{'exerciseId':exerciseId,'alias':rawName}); } catch (e) { debugPrint('addAlias swallowed: $e'); }` per ADR-CXP-009 exact pseudocode; (3) insert `// R2 INSERTION POINT — after sync state, before any further await. Fire-and-forget; failures swallowed in _addAlias. // i18n: Fase 6 Etapa 5` comment followed by `unawaited(_addAlias(picked.id, rowName));` AFTER `setState(() => _error = null)` on the current line 172 and BEFORE any subsequent code. SCENARIO-745, SCENARIO-746, SCENARIO-747 must pass.
 
 ### Phase 3.4: PR#2b quality gates
 
-- [ ] T-CXP-034 — GATE: run `flutter analyze`; confirm 0 issues. Run `dart format --output=none --set-exit-if-changed .`; confirm 0 changed files on touched paths.
-- [ ] T-CXP-035 — GATE: run `flutter test test/features/coach_hub/presentation/coach_hub_plan_preview_screen_test.dart`; all SCENARIO-744..747 tests pass; delta ≥ +4 new widget tests.
-- [ ] T-CXP-036 — VERIFY: `coach_hub_plan_preview_screen.dart` does NOT import `package:cloud_functions/cloud_functions.dart` directly (provider hides it). `unawaited(_addAlias(...))` is positioned AFTER `setState(() => _error = null)` with the R2 comment block. `// i18n: Fase 6 Etapa 5` comment present at insertion point. No `pubspec.yaml` changes. No hex color literals. No `PhosphorIcons.X` direct references. Conventional commits only, no `Co-Authored-By`.
+- [x] T-CXP-034 — GATE: run `flutter analyze`; confirm 0 issues. Run `dart format --output=none --set-exit-if-changed .`; confirm 0 changed files on touched paths.
+- [x] T-CXP-035 — GATE: run `flutter test test/features/coach_hub/presentation/coach_hub_plan_preview_screen_test.dart`; all SCENARIO-744..747 tests pass; delta ≥ +4 new widget tests.
+- [x] T-CXP-036 — VERIFY: `coach_hub_plan_preview_screen.dart` does NOT import `package:cloud_functions/cloud_functions.dart` directly (provider hides it). `unawaited(_addAlias(...))` is positioned AFTER `setState(() => _error = null)` with the R2 comment block. `// i18n: Fase 6 Etapa 5` comment present at insertion point. No `pubspec.yaml` changes. No hex color literals. No `PhosphorIcons.X` direct references. Conventional commits only, no `Co-Authored-By`.
 
 ### Phase 3.5: Post-merge steps
 
@@ -254,17 +254,17 @@ Chain strategy: stacked-to-main
 
 ### PR#2b (Wire)
 
-- [ ] Rebased on `main` after PR#2a merges (if split) or on PR#2 branch (if single)
-- [ ] All 4+ new widget tests pass (`flutter test test/features/coach_hub/presentation/coach_hub_plan_preview_screen_test.dart`)
-- [ ] `flutter analyze` 0 issues
-- [ ] `dart format` 0 changes on touched files
-- [ ] `lib/features/coach_hub/application/cf_providers.dart` created with `cloudFunctionsProvider` only
-- [ ] Screen does NOT import `package:cloud_functions/cloud_functions.dart` directly
-- [ ] `unawaited(_addAlias(...))` positioned AFTER `setState(() => _error = null)` with R2 comment block
-- [ ] `// i18n: Fase 6 Etapa 5` tag present at insertion point comment
-- [ ] No hex color literals; no `PhosphorIcons.X` direct references
-- [ ] No `pubspec.yaml` changes
-- [ ] All commits conventional, no `Co-Authored-By`
+- [x] Rebased on `main` after PR#2a merges (if split) or on PR#2 branch (if single)
+- [x] All 4+ new widget tests pass (`flutter test test/features/coach_hub/presentation/coach_hub_plan_preview_screen_test.dart`)
+- [x] `flutter analyze` 0 issues
+- [x] `dart format` 0 changes on touched files
+- [x] `lib/features/coach_hub/application/cf_providers.dart` created with `cloudFunctionsProvider` only
+- [x] Screen does NOT import `package:cloud_functions/cloud_functions.dart` directly
+- [x] `unawaited(_addAlias(...))` positioned AFTER `setState(() => _error = null)` with R2 comment block
+- [x] `// i18n: Fase 6 Etapa 5` tag present at insertion point comment
+- [x] No hex color literals; no `PhosphorIcons.X` direct references
+- [x] No `pubspec.yaml` changes
+- [x] All commits conventional, no `Co-Authored-By`
 
 ---
 
