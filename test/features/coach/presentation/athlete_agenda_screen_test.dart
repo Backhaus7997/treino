@@ -6,7 +6,6 @@ import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/coach/application/agenda_providers.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/domain/appointment.dart';
-import 'package:treino/features/coach/domain/availability_rule.dart';
 import 'package:treino/features/coach/presentation/agenda_strings.dart';
 import 'package:treino/features/coach/presentation/athlete_agenda_screen.dart';
 import 'package:treino/features/coach/presentation/widgets/day_slots_sheet.dart';
@@ -46,17 +45,6 @@ Appointment _makeAppointment({
       startsAt: startsAt,
       durationMin: 60,
       status: status,
-    );
-
-AvailabilityRule _makeRule({int dayOfWeek = 2}) => AvailabilityRule(
-      id: 'rule-1',
-      trainerId: 'trainer-1',
-      dayOfWeek: dayOfWeek,
-      startHour: 9,
-      startMinute: 0,
-      endHour: 11,
-      endMinute: 0,
-      slotDurationMin: 60,
     );
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
