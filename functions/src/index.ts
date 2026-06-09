@@ -13,3 +13,4 @@ export { notifyOnAppointment } from "./notifications/notify-appointment";
 export { notifyOnLinkChange } from "./notifications/notify-link-change";
 export { notifyOnReview } from "./notifications/notify-review";
 export { cleanupAssignedPlansOnUnlink } from "./cleanup-assigned-plans";
+export { addAlias } from "./add-alias";

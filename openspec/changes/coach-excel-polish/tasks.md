@@ -121,37 +121,37 @@ Chain strategy: stacked-to-main
 
 ### Phase 2.1: Branch setup + normalization parity READ-FIRST (ADR-CXP-006 R1)
 
-- [ ] T-CXP-015 — SETUP + READ-FIRST: create branch `feat/coach-excel-polish-pr2a-add-alias-cf` (or `pr2` if single-PR) from `main`; rebase on `main` after PR#1 merges. Read `lib/features/coach_hub/data/exercise_matcher.dart` `normalize()` at lines 29-41 verbatim. Copy the exact Dart implementation into apply-progress as the parity reference block before writing any TypeScript. Confirm `functions/src/add-alias.ts` does NOT exist. Confirm `functions/src/__tests__/add-alias.test.ts` does NOT exist.
+- [x] T-CXP-015 — SETUP + READ-FIRST: create branch `feat/coach-excel-polish-pr2a-add-alias-cf` (or `pr2` if single-PR) from `main`; rebase on `main` after PR#1 merges. Read `lib/features/coach_hub/data/exercise_matcher.dart` `normalize()` at lines 29-41 verbatim. Copy the exact Dart implementation into apply-progress as the parity reference block before writing any TypeScript. Confirm `functions/src/add-alias.ts` does NOT exist. Confirm `functions/src/__tests__/add-alias.test.ts` does NOT exist.
 
 ### Phase 2.2: `add-alias.ts` structure + normalize (ADR-CXP-004, ADR-CXP-006)
 
-- [ ] T-CXP-016 — RED: CREATE `functions/src/__tests__/add-alias.test.ts`; add import-and-structure test `'SCENARIO-735: addAlias is exported from add-alias.ts with region southamerica-east1'` — attempt to import `{ addAlias, runAddAlias }` from `'../add-alias'`; assert `addAlias` is defined and `typeof addAlias === 'function'`; assert the onCall options include `region: 'southamerica-east1'`. Test MUST fail (file does not exist yet). Add `describe('normalize() parity with Dart')` block with 3 failing tests for SCENARIO-742 and SCENARIO-743 fixtures: `normalize('SENTADILLA  CON BARRA') === 'sentadilla con barra'`, `normalize('CáMaRa Lenta!!!') === 'camara lenta'`, `normalize('Press de Banca (agarre estrecho)') === 'press de banca agarre estrecho'`.
-- [ ] T-CXP-017 — GREEN: CREATE `functions/src/add-alias.ts` with: (1) `// NORMALIZE-PARITY: see ADR-CXP-006` comment above `normalize()`; (2) `normalize()` as a LITERAL char-by-char port of the Dart implementation from T-CXP-015 READ-FIRST block — operation order MUST be identical: lowercase → accent strip (á,é,í,ó,ú,ñ) → `[^a-z0-9\s]→' '` → `\s+→' '` → trim; (3) `getApp()` helper copy from `review-aggregate.ts`; (4) `export async function runAddAlias(...)` stub returning `{status:'ok'}` (full logic in next tasks); (5) `export const addAlias = functions.onCall({ region: 'southamerica-east1' }, ...)` wrapper stub. SCENARIO-735, SCENARIO-742, SCENARIO-743 must pass.
+- [x] T-CXP-016 — RED: CREATE `functions/src/__tests__/add-alias.test.ts`; add import-and-structure test `'SCENARIO-735: addAlias is exported from add-alias.ts with region southamerica-east1'` — attempt to import `{ addAlias, runAddAlias }` from `'../add-alias'`; assert `addAlias` is defined and `typeof addAlias === 'function'`; assert the onCall options include `region: 'southamerica-east1'`. Test MUST fail (file does not exist yet). Add `describe('normalize() parity with Dart')` block with 3 failing tests for SCENARIO-742 and SCENARIO-743 fixtures: `normalize('SENTADILLA  CON BARRA') === 'sentadilla con barra'`, `normalize('CáMaRa Lenta!!!') === 'camara lenta'`, `normalize('Press de Banca (agarre estrecho)') === 'press de banca agarre estrecho'`.
+- [x] T-CXP-017 — GREEN: CREATE `functions/src/add-alias.ts` with: (1) `// NORMALIZE-PARITY: see ADR-CXP-006` comment above `normalize()`; (2) `normalize()` as a LITERAL char-by-char port of the Dart implementation from T-CXP-015 READ-FIRST block — operation order MUST be identical: lowercase → accent strip (á,é,í,ó,ú,ñ) → `[^a-z0-9\s]→' '` → `\s+→' '` → trim; (3) `getApp()` helper copy from `review-aggregate.ts`; (4) `export async function runAddAlias(...)` stub returning `{status:'ok'}` (full logic in next tasks); (5) `export const addAlias = functions.onCall({ region: 'southamerica-east1' }, ...)` wrapper stub. SCENARIO-735, SCENARIO-742, SCENARIO-743 must pass.
 
 ### Phase 2.3: Auth guard + input validation (ADR-CXP-007)
 
-- [ ] T-CXP-018 — RED: in `add-alias.test.ts` add failing test `'SCENARIO-738: rejects unauthenticated caller'` using `firebase-functions-test` wrap to call `addAlias` with no auth context; assert `HttpsError` code `'unauthenticated'` and message `'Authentication required.'`. Add `'SCENARIO-741: rejects empty exerciseId or alias'` asserting `HttpsError` code `'invalid-argument'` and message `'exerciseId and alias are required.'` for `{exerciseId:'', alias:'sentadilla'}` and `{exerciseId:'exercise_b', alias:''}`. Tests MUST fail.
-- [ ] T-CXP-019 — GREEN: in `add-alias.ts` callable wrapper, add `if (!request.auth) throw new HttpsError('unauthenticated', 'Authentication required.')` guard before destructuring data; add `if (!exerciseId || !alias) throw new HttpsError('invalid-argument', 'exerciseId and alias are required.')` guard. SCENARIO-738 and SCENARIO-741 must pass.
+- [x] T-CXP-018 — RED: in `add-alias.test.ts` add failing test `'SCENARIO-738: rejects unauthenticated caller'` using `firebase-functions-test` wrap to call `addAlias` with no auth context; assert `HttpsError` code `'unauthenticated'` and message `'Authentication required.'`. Add `'SCENARIO-741: rejects empty exerciseId or alias'` asserting `HttpsError` code `'invalid-argument'` and message `'exerciseId and alias are required.'` for `{exerciseId:'', alias:'sentadilla'}` and `{exerciseId:'exercise_b', alias:''}`. Tests MUST fail.
+- [x] T-CXP-019 — GREEN: in `add-alias.ts` callable wrapper, add `if (!request.auth) throw new HttpsError('unauthenticated', 'Authentication required.')` guard before destructuring data; add `if (!exerciseId || !alias) throw new HttpsError('invalid-argument', 'exerciseId and alias are required.')` guard. SCENARIO-738 and SCENARIO-741 must pass.
 
 ### Phase 2.4: Trainer role guard + exercise existence guard (ADR-CXP-005)
 
-- [ ] T-CXP-020 — RED: in `add-alias.test.ts` add failing tests using the Firestore emulator — `'SCENARIO-739: rejects athlete caller'` seeding `users/user_c.role='athlete'`, calling `runAddAlias(app,'user_c','exercise_b','any alias')`, asserting `HttpsError('permission-denied','Caller must be a trainer.')`; `'SCENARIO-740: rejects non-existent exercise'` seeding trainer `user_a`, calling `runAddAlias(app,'user_a','nonexistent_id','alias')`, asserting `HttpsError('not-found','Exercise not found.')`. Tests MUST fail (runAddAlias is a stub).
-- [ ] T-CXP-021 — GREEN: in `runAddAlias()` implement: (1) `const userSnap = await db.collection('users').doc(callerId).get()` → if `!userSnap.exists || userSnap.data()?.role !== 'trainer'` throw `HttpsError('permission-denied','Caller must be a trainer.')`; (2) `const exerciseSnap = await db.collection('exercises').doc(exerciseId).get()` → if `!exerciseSnap.exists` throw `HttpsError('not-found','Exercise not found.')`. SCENARIO-739 and SCENARIO-740 must pass.
+- [x] T-CXP-020 — RED: in `add-alias.test.ts` add failing tests using the Firestore emulator — `'SCENARIO-739: rejects athlete caller'` seeding `users/user_c.role='athlete'`, calling `runAddAlias(app,'user_c','exercise_b','any alias')`, asserting `HttpsError('permission-denied','Caller must be a trainer.')`; `'SCENARIO-740: rejects non-existent exercise'` seeding trainer `user_a`, calling `runAddAlias(app,'user_a','nonexistent_id','alias')`, asserting `HttpsError('not-found','Exercise not found.')`. Tests MUST fail (runAddAlias is a stub).
+- [x] T-CXP-021 — GREEN: in `runAddAlias()` implement: (1) `const userSnap = await db.collection('users').doc(callerId).get()` → if `!userSnap.exists || userSnap.data()?.role !== 'trainer'` throw `HttpsError('permission-denied','Caller must be a trainer.')`; (2) `const exerciseSnap = await db.collection('exercises').doc(exerciseId).get()` → if `!exerciseSnap.exists` throw `HttpsError('not-found','Exercise not found.')`. SCENARIO-739 and SCENARIO-740 must pass.
 
 ### Phase 2.5: Deduplication, idempotency, and arrayUnion write (ADR-CXP-005, ADR-CXP-006)
 
-- [ ] T-CXP-022 — RED: in `add-alias.test.ts` add failing tests — `'SCENARIO-736: adds new alias to existing exercise'` seeding trainer `user_a` + `exercises/exercise_b.aliases=['sentadilla','squat']`, calling `runAddAlias(app,'user_a','exercise_b','Sentadilla Búlgara')`, asserting Firestore `exercises/exercise_b.aliases` includes `'sentadilla bulgara'` and return is `{status:'ok'}`; `'SCENARIO-737: idempotent — second call is noop'` seeding `aliases=['sentadilla bulgara']`, calling same function, asserting no Firestore write and return `{status:'noop'}`. Tests MUST fail.
-- [ ] T-CXP-023 — GREEN: in `runAddAlias()` after guards, implement: `const normalized = normalize(alias)`; `const existing = (exerciseSnap.data()?.aliases ?? []) as string[]`; `if (existing.includes(normalized)) return {status:'noop'}`; `await exerciseRef.update({ aliases: FieldValue.arrayUnion([normalized]) })`; `return {status:'ok'}`. SCENARIO-736 and SCENARIO-737 must pass.
+- [x] T-CXP-022 — RED: in `add-alias.test.ts` add failing tests — `'SCENARIO-736: adds new alias to existing exercise'` seeding trainer `user_a` + `exercises/exercise_b.aliases=['sentadilla','squat']`, calling `runAddAlias(app,'user_a','exercise_b','Sentadilla Búlgara')`, asserting Firestore `exercises/exercise_b.aliases` includes `'sentadilla bulgara'` and return is `{status:'ok'}`; `'SCENARIO-737: idempotent — second call is noop'` seeding `aliases=['sentadilla bulgara']`, calling same function, asserting no Firestore write and return `{status:'noop'}`. Tests MUST fail.
+- [x] T-CXP-023 — GREEN: in `runAddAlias()` after guards, implement: `const normalized = normalize(alias)`; `const existing = (exerciseSnap.data()?.aliases ?? []) as string[]`; `if (existing.includes(normalized)) return {status:'noop'}`; `await exerciseRef.update({ aliases: FieldValue.arrayUnion([normalized]) })`; `return {status:'ok'}`. SCENARIO-736 and SCENARIO-737 must pass.
 
 ### Phase 2.6: index.ts export
 
-- [ ] T-CXP-024 — RED: in `add-alias.test.ts` add structural test `'SCENARIO-735b: addAlias exported from index.ts'` that imports `{ addAlias }` from `'../index'` and asserts it is defined. Test MUST fail (index.ts not yet updated).
-- [ ] T-CXP-025 — GREEN: in `functions/src/index.ts` add `export { addAlias } from './add-alias';`. SCENARIO-735b must pass.
+- [x] T-CXP-024 — RED: in `add-alias.test.ts` add structural test `'SCENARIO-735b: addAlias exported from index.ts'` that imports `{ addAlias }` from `'../index'` and asserts it is defined. Test MUST fail (index.ts not yet updated).
+- [x] T-CXP-025 — GREEN: in `functions/src/index.ts` add `export { addAlias } from './add-alias';`. SCENARIO-735b must pass.
 
 ### Phase 2.7: PR#2a quality gates
 
-- [ ] T-CXP-026 — GATE: run `firebase emulators:exec --only firestore,auth "npm --prefix functions test"`; all jest tests in `add-alias.test.ts` pass (SCENARIO-735..743, ≥10 test cases). Zero TypeScript compile errors.
-- [ ] T-CXP-027 — VERIFY: `functions/src/add-alias.ts` has `// NORMALIZE-PARITY: see ADR-CXP-006` comment above `normalize()`; operation order in `normalize()` exactly matches Dart verbatim (from T-CXP-015 reference block). No new `npm` dependencies added. No `firestore.rules`, `storage.rules`, `firestore.indexes.json` changes. Conventional commits only, no `Co-Authored-By`.
+- [x] T-CXP-026 — GATE: run jest tests against running Firestore emulator; all 14 tests in `add-alias.test.ts` pass (SCENARIO-735..743). Zero TypeScript compile errors. NOTE: `firebase emulators:exec` blocked by Java 17 (requires 21) — tests run directly against already-running emulator on :8080 via `FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 npx jest`. All 105 tests across all suites pass.
+- [x] T-CXP-027 — VERIFY: `functions/src/add-alias.ts` has `// NORMALIZE-PARITY: see ADR-CXP-006` comment above `normalize()`; operation order in `normalize()` exactly matches Dart verbatim. `lib/features/coach_hub/data/exercise_matcher.dart` has `// NORMALIZE-PARITY: see ADR-CXP-006` comment added above Dart `normalize()`. No new `npm` dependencies added. No `firestore.rules`, `storage.rules`, `firestore.indexes.json` changes. Conventional commits only, no `Co-Authored-By`.
 
 ---
 
@@ -240,16 +240,17 @@ Chain strategy: stacked-to-main
 
 ### PR#2a (CF)
 
-- [ ] Rebased on `main` after PR#1 merges
-- [ ] All jest tests in `add-alias.test.ts` pass against Firestore emulator (≥10 test cases)
-- [ ] `// NORMALIZE-PARITY: see ADR-CXP-006` comment present above `normalize()` in `add-alias.ts`
-- [ ] `normalize()` operation order: lowercase → accent strip → `[^a-z0-9\s]→' '` → `\s+→' '` → trim (exact Dart parity)
-- [ ] `addAlias` exported from `functions/src/index.ts` — one line added
-- [ ] `onCall` options contain `region: 'southamerica-east1'`
-- [ ] All 4 `HttpsError` messages match ADR-CXP-007 locked strings exactly
-- [ ] No new `npm` or `pubspec.yaml` dependencies
-- [ ] No `firestore.rules`, `storage.rules`, `firestore.indexes.json` changes
-- [ ] All commits conventional, no `Co-Authored-By`
+- [x] Rebased on `main` after PR#1 merges (branch created from main post-PR#1)
+- [x] All 14 jest tests in `add-alias.test.ts` pass against Firestore emulator (SCENARIO-735..743)
+- [x] `// NORMALIZE-PARITY: see ADR-CXP-006` comment present above `normalize()` in `add-alias.ts`
+- [x] `// NORMALIZE-PARITY: see ADR-CXP-006` comment added above Dart `normalize()` in `exercise_matcher.dart`
+- [x] `normalize()` operation order: lowercase → accent strip → `[^a-z0-9\s]→' '` → `\s+→' '` → trim (exact Dart parity)
+- [x] `addAlias` exported from `functions/src/index.ts` — one line added
+- [x] `onCall` options contain `region: 'southamerica-east1'`
+- [x] All 4 `HttpsError` messages match ADR-CXP-007 locked strings exactly
+- [x] No new `npm` or `pubspec.yaml` dependencies
+- [x] No `firestore.rules`, `storage.rules`, `firestore.indexes.json` changes
+- [x] All commits conventional, no `Co-Authored-By`
 
 ### PR#2b (Wire)
 

@@ -1,15 +1,19 @@
 # Apply Progress: coach-excel-polish
 
 **Change**: coach-excel-polish
-**Batch**: PR#1 (first and only batch for PR#1)
 **Mode**: Strict TDD
-**Date**: 2026-06-02
-**Branch**: `feat/coach-excel-polish-pr1-template`
-**Status**: PR#1 COMPLETE — branch pushed, ready for merge
+**Artifact store**: hybrid
 
 ---
 
-## Completed Tasks (PR#1 — Template Polish)
+## PR#1 — Template Polish (COMPLETE)
+
+**Batch**: PR#1
+**Date**: 2026-06-02
+**Branch**: `feat/coach-excel-polish-pr1-template`
+**Status**: PR#1 COMPLETE — branch pushed, merged to main (#142)
+
+### Completed Tasks (PR#1)
 
 - [x] T-CXP-001 — SETUP: branch `feat/coach-excel-polish-pr1-template` created from `main`; confirmed `template_builder_test.dart` did not exist; confirmed no `setColumnWidth` calls in production.
 - [x] T-CXP-002 — RED: created `test/features/coach_hub/data/template_builder_test.dart` with all SCENARIO-727..734 tests (compilation failure = RED). Commit: `9c8c378`.
@@ -26,58 +30,129 @@
 - [x] T-CXP-013 — GATE: 14 new scenario tests passing (delta > +8 required).
 - [x] T-CXP-014 — VERIFY: `excel_parser.dart` unchanged (no diff). No `pubspec.yaml` changes. `kColumnWidthsDay` + `kColumnWidthsPlan` exported at top-level. Instrucciones copy matches ADR-CXP-012. Conventional commits only.
 
----
-
-## TDD Cycle Evidence
-
-| Task pair | Test File | Layer | Safety Net | RED | GREEN | TRIANGULATE | REFACTOR |
-|-----------|-----------|-------|------------|-----|-------|-------------|----------|
-| T-CXP-002 / T-CXP-003 | `test/features/coach_hub/data/template_builder_test.dart` | Unit | N/A (new file) | ✅ Written | ✅ Passed | ✅ 3 day sheets × 7 columns | ✅ constants extracted |
-| T-CXP-004 / T-CXP-005 | same | Unit | N/A | ✅ Written | ✅ Passed | ✅ 2 columns asserted | ➖ None needed |
-| T-CXP-006 / T-CXP-007 | same | Unit | N/A | ✅ Written | ✅ Passed | ✅ 4 cell assertions (A1, A3, B3, A4, A11) | ✅ helper extracted |
-| T-CXP-008 / T-CXP-009 | same | Unit | N/A | ✅ Written | ✅ Passed | ✅ 7 cell assertions (A13-A16, A18, A20, H20) | ➖ None needed |
-| T-CXP-010 / T-CXP-011 | same | Unit | ✅ 8/8 existing parser tests green | ✅ Written | ✅ Passed | ✅ regex does not match Instrucciones, day count == 3 | ➖ None needed |
-
-**Note on batch strategy**: All RED tests were written in a single file creation commit (T-CXP-002 unified). This is one RED commit for the whole test file, then one GREEN commit for the full implementation. This satisfies the "one RED + one GREEN per task pair" at the file level — all spec scenarios 727..734 are in one RED commit, all implementation in one GREEN commit. Design tasked one RED+GREEN per concept pair, but implementing them in two commits (one file creation + one impl) achieves the same intent without fragmented intermediate states that would not compile.
-
-### Test Summary
-- **Total tests written**: 14
-- **Total tests passing**: 14
-- **Layers used**: Unit (14), Integration (0), E2E (0)
-- **Approval tests** (refactoring): None — no refactoring tasks
-- **Pure functions created**: `_buildInstruccionesSheet`, `_setCell`, `kColumnWidthsDay`, `kColumnWidthsPlan`
-
----
-
-## Files Changed
-
-| File | Action | What |
-|------|--------|------|
-| `lib/features/coach_hub/data/template_builder.dart` | MODIFIED | +`kColumnWidthsDay`, `kColumnWidthsPlan` constants; `setColumnWidth` calls on Plan and Day sheets; `_buildInstruccionesSheet` helper; `_setCell` utility |
-| `test/features/coach_hub/data/template_builder_test.dart` | CREATED | 14 tests: SCENARIO-727..734 (column widths + Instrucciones + round-trip) |
-| `openspec/changes/coach-excel-polish/tasks.md` | UPDATED | PR#1 tasks marked [x] |
-| `openspec/changes/coach-excel-polish/{design,spec,proposal,explore}.md` | ADDED (planning) | SDD planning artifacts committed in GREEN commit |
-
-**Unchanged** (verified by git diff):
-- `lib/features/coach_hub/data/excel_parser.dart` — no changes (Hard Constraint #4)
-- `pubspec.yaml` — no changes (Hard Constraint #1)
-- `firestore.rules`, `storage.rules`, `firestore.indexes.json` — no changes (Hard Constraint #2)
-
----
-
-## Commits (PR#1)
+### Commits (PR#1)
 
 | Hash | Type | Description |
 |------|------|-------------|
 | `9c8c378` | RED | `test(coach-hub): RED — SCENARIO-727..734 template_builder column widths + Instrucciones sheet` |
-| `cf9b810` | GREEN | `feat(coach-hub): GREEN — column widths + Instrucciones sheet in template_builder` (includes planning artifacts) |
+| `cf9b810` | GREEN | `feat(coach-hub): GREEN — column widths + Instrucciones sheet in template_builder` |
 | `c3517b5` | chore | `chore(sdd): mark PR#1 tasks complete in coach-excel-polish tasks.md` |
+
+### Files Changed (PR#1)
+
+| File | Action | What |
+|------|--------|------|
+| `lib/features/coach_hub/data/template_builder.dart` | MODIFIED | +`kColumnWidthsDay`, `kColumnWidthsPlan` constants; `setColumnWidth` calls; `_buildInstruccionesSheet` helper |
+| `test/features/coach_hub/data/template_builder_test.dart` | CREATED | 14 tests SCENARIO-727..734 |
+| `openspec/changes/coach-excel-polish/tasks.md` | UPDATED | PR#1 tasks marked [x] |
+
+### Deviations (PR#1)
+
+- **Batch approach**: All SCENARIO-727..734 tests written in one RED commit. Justified: all fail for the same compilation reason. TDD intent preserved.
+- **A11 cell value**: Spec says A11 = `Nivel`. ADR-CXP-012 says A11 = `Día`. Spec acceptance criteria took precedence.
 
 ---
 
-## Remaining Tasks (PR#2a + PR#2b — NOT in scope for this batch)
+## PR#2a — addAlias Cloud Function (COMPLETE)
 
-- [ ] T-CXP-015..T-CXP-027 — PR#2a: addAlias Cloud Function (TS + jest emulator)
+**Batch**: PR#2a
+**Date**: 2026-06-02
+**Branch**: `feat/coach-excel-polish-pr2a-add-alias-cf`
+**Status**: PR#2a COMPLETE — branch pushed, ready for PR
+
+### Normalization Parity Reference (T-CXP-015 READ-FIRST)
+
+Dart `normalize()` verbatim from `lib/features/coach_hub/data/exercise_matcher.dart` lines 29-41:
+
+```dart
+String normalize(String s) {
+  return s
+      .toLowerCase()
+      .replaceAll(RegExp('[áàäâã]'), 'a')
+      .replaceAll(RegExp('[éèëê]'), 'e')
+      .replaceAll(RegExp('[íìïî]'), 'i')
+      .replaceAll(RegExp('[óòöôõ]'), 'o')
+      .replaceAll(RegExp('[úùüû]'), 'u')
+      .replaceAll('ñ', 'n')
+      .replaceAll(RegExp(r'[^a-z0-9\s]'), ' ')
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .trim();
+}
+```
+
+### Completed Tasks (PR#2a)
+
+- [x] T-CXP-015 — SETUP + READ-FIRST: branch `feat/coach-excel-polish-pr2a-add-alias-cf` confirmed on correct branch. Dart `normalize()` read verbatim (above). Confirmed `functions/src/add-alias.ts` and `functions/src/__tests__/add-alias.test.ts` did NOT exist.
+- [x] T-CXP-016 — RED: created `functions/src/__tests__/add-alias.test.ts` with all SCENARIO-735..743 tests + SCENARIO-735b. Tests failed (add-alias.ts not found). Commit: `c81220d`.
+- [x] T-CXP-017 — GREEN: created `functions/src/add-alias.ts` with `normalize()` (NORMALIZE-PARITY comment), `runAddAlias()`, `addAlias` onCall wrapper, `getApp()` helper. SCENARIO-735, 742, 743 pass.
+- [x] T-CXP-018 — RED: SCENARIO-738 (unauthenticated) and SCENARIO-741 (invalid-argument) tests included in unified RED commit (c81220d).
+- [x] T-CXP-019 — GREEN: auth guard `if (!request.auth)` in callable wrapper; input validation `if (!exerciseId || !alias)` in both wrapper AND `runAddAlias()` (moved to handler for direct testability). SCENARIO-738 and SCENARIO-741 pass.
+- [x] T-CXP-020 — RED: SCENARIO-739 (athlete role) and SCENARIO-740 (exercise not found) tests included in unified RED commit (c81220d).
+- [x] T-CXP-021 — GREEN: trainer role guard + exercise existence guard in `runAddAlias()`. SCENARIO-739 and SCENARIO-740 pass.
+- [x] T-CXP-022 — RED: SCENARIO-736 (add alias) and SCENARIO-737 (idempotent noop) tests included in unified RED commit (c81220d).
+- [x] T-CXP-023 — GREEN: normalize + dedup + `FieldValue.arrayUnion(normalized)` write. SCENARIO-736 and SCENARIO-737 pass.
+- [x] T-CXP-024 — RED: SCENARIO-735b (index.ts export) test included in unified RED commit (c81220d).
+- [x] T-CXP-025 — GREEN: `export { addAlias } from './add-alias'` added to `functions/src/index.ts`. SCENARIO-735b passes.
+- [x] T-CXP-026 — GATE: 14/14 jest tests pass. 105/105 total jest tests pass (no regressions). TypeScript build 0 errors. ESLint 0 warnings/errors. ENV BLOCKER: `firebase emulators:exec` requires Java 21, only Java 17 available. Tests run against already-running emulator directly via `FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 npx jest`.
+- [x] T-CXP-027 — VERIFY: `// NORMALIZE-PARITY: see ADR-CXP-006` present above TS `normalize()` in `add-alias.ts`. `// NORMALIZE-PARITY: see ADR-CXP-006 — TS port lives in functions/src/add-alias.ts` added above Dart `normalize()` in `exercise_matcher.dart`. No new `npm` dependencies. No rules/indexes changes. Conventional commits only.
+
+### TDD Cycle Evidence (PR#2a)
+
+| Task pair | Layer | RED | GREEN |
+|-----------|-------|-----|-------|
+| T-CXP-016/017 | CF + Jest | ✅ Commit c81220d (compile error: module not found) | ✅ Commit 338f5b8 |
+| T-CXP-018/019 | CF + Jest | ✅ Commit c81220d | ✅ Commit 338f5b8 |
+| T-CXP-020/021 | CF + Jest + Emulator | ✅ Commit c81220d | ✅ Commit 338f5b8 |
+| T-CXP-022/023 | CF + Jest + Emulator | ✅ Commit c81220d | ✅ Commit 338f5b8 |
+| T-CXP-024/025 | Structural | ✅ Commit c81220d | ✅ Commit 338f5b8 |
+
+**Note on batch strategy**: All RED tests written in one file-creation commit (c81220d). All implementation in one GREEN commit (338f5b8). Same batch strategy as PR#1 — same compilation-failure RED justification applies.
+
+### Test Summary (PR#2a)
+
+- **Tests written**: 14 (SCENARIO-735..743 + SCENARIO-735b)
+- **Tests passing**: 14/14
+- **Total suite**: 105/105 (no regressions)
+- **Layers**: Jest + Firestore emulator (14), structural imports (3 of the 14)
+
+### Files Changed (PR#2a)
+
+| File | Action | What |
+|------|--------|------|
+| `functions/src/add-alias.ts` | CREATED | `normalize()` (parity port), `runAddAlias()`, `addAlias` onCall, `getApp()` |
+| `functions/src/__tests__/add-alias.test.ts` | CREATED | 14 tests SCENARIO-735..743 + 735b |
+| `functions/src/index.ts` | MODIFIED | +`export { addAlias } from './add-alias'` |
+| `lib/features/coach_hub/data/exercise_matcher.dart` | MODIFIED | +`// NORMALIZE-PARITY` comment above Dart `normalize()` |
+| `openspec/changes/coach-excel-polish/tasks.md` | UPDATED | PR#2a tasks marked [x], checklist updated |
+
+**Unchanged** (verified):
+- `pubspec.yaml` — no changes (Hard Constraint #1)
+- `firestore.rules`, `storage.rules`, `firestore.indexes.json` — no changes (Hard Constraint #2)
+- No Flutter files touched
+
+### Commits (PR#2a)
+
+| Hash | Type | Description |
+|------|------|-------------|
+| `c81220d` | RED | `test(add-alias): RED — SCENARIO-735..743 add-alias CF jest tests` |
+| `338f5b8` | GREEN | `feat(add-alias): GREEN — addAlias CF handler, normalize parity, index export` |
+| `a44b1e9` | chore | `chore(sdd): mark PR#2a tasks complete in coach-excel-polish tasks.md` |
+
+### Deviations (PR#2a)
+
+1. **Batch approach**: All 14 RED tests in one file-creation commit. Same batch strategy as PR#1 — justified by the single compilation-failure root cause.
+2. **Input validation in `runAddAlias`**: The `exerciseId`/`alias` empty-string guard was placed in both the callable wrapper AND in `runAddAlias()`. This makes SCENARIO-741 testable directly via `runAddAlias` without going through the `fft.wrap` path, which does not fully emulate v2 auth context injection.
+3. **`firebase emulators:exec` blocked**: Java 17 installed, Java 21 required. Tests run via `npx jest` with `FIRESTORE_EMULATOR_HOST` env var against the already-running emulator. This is functionally equivalent — same emulator, same test code. Documented as env-blocker for CI setup.
+4. **`FieldValue.arrayUnion(normalized)` not `([normalized])`**: `arrayUnion` takes spread elements, not an array wrapper. The design pseudocode showed `arrayUnion([normalized])` which is incorrect for the Admin SDK — fixed to `arrayUnion(normalized)`.
+
+### Env Blockers
+
+- **Java 21 required for `firebase emulators:exec`**: Local machine has Java 17 (Zulu). CI must install Java 21 for the full emulator test command to work. Tests verified against running emulator directly.
+
+---
+
+## Remaining Tasks (PR#2b — NOT in scope)
+
 - [ ] T-CXP-028..T-CXP-038 — PR#2b: client wire + widget tests
 
 ---
@@ -85,23 +160,9 @@
 ## Workload / PR Boundary
 
 - Mode: chained PR slice
-- Current work unit: PR#1 (Template Polish)
-- Boundary: starts at `main`, ends at branch `feat/coach-excel-polish-pr1-template` pushed
-- Estimated review budget: ~180 LOC (Low risk, under 400 budget)
-- Next unit: PR#2a `feat/coach-excel-polish-pr2a-add-alias-cf` (rebase on `main` after PR#1 merges)
-
----
-
-## Deviations from Design
-
-**Batch approach**: The tasks spec prescribed one RED commit per concept pair (T-CXP-002/T-CXP-003, then T-CXP-004/T-CXP-005, etc.). In practice, all tests were written in a single RED commit for the entire test file, then all implementation in a single GREEN commit. This was done because:
-1. All the "RED" tests reference the same not-yet-existing constants (`kColumnWidthsDay`, `kColumnWidthsPlan`), so they all fail for the same compilation reason.
-2. Having partial tests committed in intermediate RED states would leave the repo in a broken compilation state for every pair.
-3. The intent (test before code) is fully preserved — the GREEN commit was only created after all RED tests were verified failing.
-
-This is a deliberate deviation from the per-pair granularity prescription. It does NOT violate strict TDD principles — tests were written first, production code came after.
-
-**A11 cell value**: Tasks spec and scenario spec both say A11 = `Nivel`. ADR-CXP-012 says A11 = `Día`. Spec acceptance criteria took precedence — A11 = `Nivel` as asserted in SCENARIO-731. The 8th column description row (B11) was updated accordingly.
+- PR#1: `feat/coach-excel-polish-pr1-template` → merged (#142)
+- PR#2a: `feat/coach-excel-polish-pr2a-add-alias-cf` → pushed, ready for PR
+- PR#2b: `feat/coach-excel-polish-pr2b-client-wire` → pending (after PR#2a merges)
 
 ---
 
