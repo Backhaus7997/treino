@@ -241,16 +241,28 @@ class RoutineEditorScreen extends ConsumerStatefulWidget {
       _RoutineEditorScreenState();
 }
 
+/// Extracts the existing doc id from any mode that supports editing.
+/// Returns null for create modes.
+String? _existingIdFor(RoutineEditorMode mode) => switch (mode) {
+      SelfCreating(:final existingRoutineId) => existingRoutineId,
+      TrainerAssigning(:final existingPlanId) => existingPlanId,
+      TrainerTemplating(:final existingTemplateId) => existingTemplateId,
+    };
+
 String _titleFor(RoutineEditorMode mode) => switch (mode) {
-      TrainerAssigning() => CoachStrings.editorTitle,
-      TrainerTemplating() => CoachStrings.editorTitle,
+      TrainerAssigning(existingPlanId: null) => CoachStrings.editorTitle,
+      TrainerAssigning() => CoachStrings.editorEditTitle,
+      TrainerTemplating(existingTemplateId: null) => CoachStrings.editorTitle,
+      TrainerTemplating() => CoachStrings.editorEditTitle,
       SelfCreating(existingRoutineId: null) => WorkoutStrings.selfEditorTitle,
       SelfCreating() => WorkoutStrings.selfEditorEditTitle,
     };
 
 String _submitLabelFor(RoutineEditorMode mode) => switch (mode) {
-      TrainerAssigning() => CoachStrings.editorSubmit,
-      TrainerTemplating() => CoachStrings.editorSubmit,
+      TrainerAssigning(existingPlanId: null) => CoachStrings.editorSubmit,
+      TrainerAssigning() => CoachStrings.editorUpdateLabel,
+      TrainerTemplating(existingTemplateId: null) => CoachStrings.editorSubmit,
+      TrainerTemplating() => CoachStrings.editorUpdateLabel,
       SelfCreating(existingRoutineId: null) =>
         WorkoutStrings.selfEditorSubmitLabel,
       SelfCreating() => WorkoutStrings.selfEditorUpdateLabel,
@@ -264,7 +276,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
   bool _submitting = false;
 
   /// True while the existing routine is being fetched from Firestore.
-  /// Only relevant in SelfCreating(existingRoutineId: non-null) mode.
+  /// Relevant in any mode with an existing id (all three edit variants).
   bool _loading = false;
 
   /// Shown when the routine to edit no longer exists in Firestore.
@@ -273,14 +285,16 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
   @override
   void initState() {
     super.initState();
-    // Hydrate editor when editing an existing routine (REQ-USR-018).
-    final mode = widget.mode;
-    if (mode is SelfCreating && mode.existingRoutineId != null) {
-      _loadExistingRoutine(mode.existingRoutineId!);
+    // Hydrate editor when editing an existing routine/plan/template.
+    // Works for all three modes: SelfCreating, TrainerAssigning, TrainerTemplating.
+    final existingId = _existingIdFor(widget.mode);
+    if (existingId != null) {
+      _loadExistingRoutine(existingId);
     }
   }
 
   /// Fetches the existing routine from Firestore and maps it into editor state.
+  /// Mode-agnostic: the hydration mapping is the same for all three edit modes.
   Future<void> _loadExistingRoutine(String id) async {
     setState(() => _loading = true);
     try {
@@ -294,8 +308,13 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
         return;
       }
       // Map Routine → editor state — inverse of the create path in _submit().
+      // Applies equally to SelfCreating / TrainerAssigning / TrainerTemplating.
       _nameController.text = routine.name;
       _level = routine.level;
+      // split is shown in trainer modes — restore it so the field is populated.
+      if (routine.split != null) {
+        _splitController.text = routine.split!;
+      }
       _days = routine.days.map((day) {
         final editableDay =
             _EditableDay(dayNumber: day.dayNumber, name: day.name);
@@ -562,8 +581,28 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
       final repo = ref.read(routineRepositoryProvider);
 
       switch (widget.mode) {
-        case TrainerAssigning(:final athleteId):
-          // Preserve existing trainer-assigned flow — unchanged behaviour.
+        case TrainerAssigning(:final athleteId, existingPlanId: final planId?):
+          // Edit existing trainer-assigned plan.
+          final draft = Routine(
+            id: planId,
+            name: _nameController.text.trim(),
+            split: _splitController.text.trim(),
+            level: _level,
+            days: days,
+            source: RoutineSource.trainerAssigned,
+            assignedBy: uid,
+            assignedTo: athleteId,
+            visibility: RoutineVisibility.private,
+          );
+          await repo.updateAssigned(uid: uid, draft: draft);
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text(CoachStrings.updatePlanSuccess)),
+          );
+          context.pop();
+
+        case TrainerAssigning(:final athleteId, existingPlanId: null):
+          // Create new trainer-assigned plan.
           final routine = Routine(
             id: '',
             name: _nameController.text.trim(),
@@ -587,8 +626,27 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
           );
           context.pop();
 
-        case TrainerTemplating():
-          // Pre-existing trainer template flow — reusable plantilla, no
+        case TrainerTemplating(existingTemplateId: final templateId?):
+          // Edit existing trainer template.
+          final draft = Routine(
+            id: templateId,
+            name: _nameController.text.trim(),
+            split: _splitController.text.trim(),
+            level: _level,
+            days: days,
+            source: RoutineSource.trainerTemplate,
+            assignedBy: uid,
+            visibility: RoutineVisibility.private,
+          );
+          await repo.updateTemplate(uid: uid, draft: draft);
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text(CoachStrings.updatePlanSuccess)),
+          );
+          context.pop();
+
+        case TrainerTemplating(existingTemplateId: null):
+          // Create new trainer template — reusable plantilla, no
           // athlete assignment. Mirrors pre-PR2 isTemplate branch.
           final routine = Routine(
             id: '',
@@ -1415,6 +1473,14 @@ class _SlotEditor extends StatefulWidget {
 }
 
 class _SlotEditorState extends State<_SlotEditor> {
+  /// Opens the exercise picker and, if a replacement is chosen, swaps the
+  /// slot's exercise. Shared by the name tap and the ⋮ "Cambiar ejercicio".
+  Future<void> _replaceExercise() async {
+    final picked = await showExercisePicker(context);
+    if (!mounted || picked == null || picked.isEmpty) return;
+    widget.onReplaceExercise(picked.first);
+  }
+
   @override
   Widget build(BuildContext context) {
     final slot = widget.slot;
@@ -1430,70 +1496,90 @@ class _SlotEditorState extends State<_SlotEditor> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ── Header row: exercise name + mode toggle + move + remove ───────
+          // ── Header row: full-width exercise name + ⋮ overflow menu ────────
+          // The name owns its own row (wraps up to 2 lines) so long names like
+          // "Press de banca con barra" are fully readable — the actions live in
+          // the ⋮ menu instead of competing for width (Hevy-style).
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
                 child: InkWell(
-                  onTap: () async {
-                    final picked = await showExercisePicker(context);
-                    if (picked == null || picked.isEmpty) return;
-                    widget.onReplaceExercise(picked.first);
-                  },
+                  onTap: _replaceExercise,
                   borderRadius: BorderRadius.circular(6),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(vertical: 4),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            slot.exercise?.name ?? CoachStrings.exercisePicker,
-                            style: GoogleFonts.barlow(
-                              fontSize: 17,
-                              fontWeight: FontWeight.w600,
-                              color: slot.exercise != null
-                                  ? palette.textPrimary
-                                  : palette.textMuted,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Icon(
-                          TreinoIcon.edit,
-                          size: 15,
-                          color: palette.textMuted,
-                        ),
-                      ],
+                    child: Text(
+                      slot.exercise?.name ?? CoachStrings.exercisePicker,
+                      style: GoogleFonts.barlow(
+                        fontSize: 19,
+                        height: 1.15,
+                        fontWeight: FontWeight.w700,
+                        color: slot.exercise != null
+                            ? palette.textPrimary
+                            : palette.textMuted,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
-              // ── Exercise mode toggle (#/⏱) ────────────────────────────────
-              _ExerciseModeToggle(
-                mode: slot.exerciseMode,
-                palette: palette,
-                onChanged: (m) {
-                  setState(() => slot.exerciseMode = m);
-                  widget.onChanged();
-                },
-              ),
-              if (widget.onMoveUp != null || widget.onMoveDown != null)
-                _MoveButtons(
-                  palette: palette,
-                  canMoveUp: widget.canMoveUp,
-                  canMoveDown: widget.canMoveDown,
-                  onMoveUp: widget.onMoveUp,
-                  onMoveDown: widget.onMoveDown,
-                ),
               const SizedBox(width: 4),
-              IconButton(
-                icon:
-                    Icon(TreinoIcon.trash, size: 18, color: palette.textMuted),
-                onPressed: widget.onRemove,
-                constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-                padding: EdgeInsets.zero,
+              PopupMenuButton<_SlotAction>(
+                icon: Icon(TreinoIcon.dotsThree,
+                    size: 20, color: palette.textMuted),
+                color: palette.bgCard,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                onSelected: (action) {
+                  switch (action) {
+                    case _SlotAction.replace:
+                      _replaceExercise();
+                    case _SlotAction.moveUp:
+                      widget.onMoveUp?.call();
+                    case _SlotAction.moveDown:
+                      widget.onMoveDown?.call();
+                    case _SlotAction.remove:
+                      widget.onRemove();
+                  }
+                },
+                itemBuilder: (context) {
+                  final showMove =
+                      widget.onMoveUp != null || widget.onMoveDown != null;
+                  return [
+                    _slotMenuItem(
+                      _SlotAction.replace,
+                      TreinoIcon.edit,
+                      'Cambiar ejercicio',
+                      palette,
+                    ),
+                    if (showMove)
+                      _slotMenuItem(
+                        _SlotAction.moveUp,
+                        TreinoIcon.chevronUp,
+                        'Subir',
+                        palette,
+                        enabled: widget.canMoveUp,
+                      ),
+                    if (showMove)
+                      _slotMenuItem(
+                        _SlotAction.moveDown,
+                        TreinoIcon.chevronDown,
+                        'Bajar',
+                        palette,
+                        enabled: widget.canMoveDown,
+                      ),
+                    _slotMenuItem(
+                      _SlotAction.remove,
+                      TreinoIcon.trash,
+                      'Eliminar',
+                      palette,
+                      danger: true,
+                    ),
+                  ];
+                },
               ),
             ],
           ),
@@ -1562,51 +1648,41 @@ class _SlotEditorState extends State<_SlotEditor> {
   }
 }
 
-// ── Exercise mode toggle ──────────────────────────────────────────────────────
+// ── Slot overflow menu (⋮) ────────────────────────────────────────────────────
 
-/// A small icon button that toggles between reps (#) and duration (⏱) mode.
-class _ExerciseModeToggle extends StatelessWidget {
-  const _ExerciseModeToggle({
-    required this.mode,
-    required this.palette,
-    required this.onChanged,
-  });
+/// Actions surfaced from a slot's ⋮ overflow menu.
+enum _SlotAction { replace, moveUp, moveDown, remove }
 
-  final ExerciseMode mode;
-  final AppPalette palette;
-  final void Function(ExerciseMode) onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final isDuration = mode == ExerciseMode.duration;
-    return Tooltip(
-      message: isDuration ? 'Cambiar a Reps' : 'Cambiar a Tiempo',
-      child: InkWell(
-        onTap: () =>
-            onChanged(isDuration ? ExerciseMode.reps : ExerciseMode.duration),
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
-          alignment: Alignment.center,
-          padding: const EdgeInsets.symmetric(horizontal: 10),
-          decoration: BoxDecoration(
-            color: isDuration
-                ? palette.accent.withAlpha(25)
-                : palette.bg.withAlpha(0),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Text(
-            isDuration ? '⏱' : '#',
-            style: GoogleFonts.barlow(
-              fontSize: 16,
-              color: isDuration ? palette.accent : palette.textMuted,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
+/// Builds one styled item for the slot ⋮ menu, matching treino's dark palette.
+/// [enabled] dims the row (used for edge reorder); [danger] tints it red.
+PopupMenuItem<_SlotAction> _slotMenuItem(
+  _SlotAction value,
+  IconData icon,
+  String label,
+  AppPalette palette, {
+  bool enabled = true,
+  bool danger = false,
+}) {
+  final color = !enabled
+      ? palette.border
+      : danger
+          ? palette.danger
+          : palette.textPrimary;
+  return PopupMenuItem<_SlotAction>(
+    value: value,
+    enabled: enabled,
+    height: 44,
+    child: Row(
+      children: [
+        Icon(icon, size: 18, color: color),
+        const SizedBox(width: 12),
+        Text(
+          label,
+          style: GoogleFonts.barlow(fontSize: 14, color: color),
         ),
-      ),
-    );
-  }
+      ],
+    ),
+  );
 }
 
 // ── Set table ─────────────────────────────────────────────────────────────────
@@ -1628,15 +1704,18 @@ class _SetTable extends StatefulWidget {
 }
 
 class _SetTableState extends State<_SetTable> {
-  /// Opens the rep-mode picker popup anchored to the tapped header cell.
-  Future<void> _pickRepMode(BuildContext context, Offset position) async {
+  /// Opens the measure-mode picker (Reps / Tiempo) anchored to the tapped
+  /// header cell. Switches the whole exercise between rep-based and time-based
+  /// sets. Rep ranges were removed from the UI — picking "Reps" normalises any
+  /// legacy range slot back to single reps.
+  Future<void> _pickMeasureMode(BuildContext context, Offset position) async {
     final renderBox = context.findRenderObject() as RenderBox?;
     final overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
     final relativeOffset = renderBox != null
         ? renderBox.localToGlobal(Offset.zero, ancestor: overlay)
         : position;
 
-    final result = await showMenu<RepMode>(
+    final result = await showMenu<ExerciseMode>(
       context: context,
       position: RelativeRect.fromLTRB(
         relativeOffset.dx,
@@ -1647,7 +1726,7 @@ class _SetTableState extends State<_SetTable> {
       color: widget.palette.bgCard,
       items: [
         PopupMenuItem(
-          value: RepMode.single,
+          value: ExerciseMode.reps,
           child: Text(
             'Reps',
             style: GoogleFonts.barlow(
@@ -1655,9 +1734,9 @@ class _SetTableState extends State<_SetTable> {
           ),
         ),
         PopupMenuItem(
-          value: RepMode.range,
+          value: ExerciseMode.duration,
           child: Text(
-            'Rango',
+            'Tiempo',
             style: GoogleFonts.barlow(
                 color: widget.palette.textPrimary, fontSize: 13),
           ),
@@ -1665,7 +1744,12 @@ class _SetTableState extends State<_SetTable> {
       ],
     );
     if (result != null) {
-      setState(() => widget.slot.repMode = result);
+      setState(() {
+        widget.slot.exerciseMode = result;
+        if (result == ExerciseMode.reps) {
+          widget.slot.repMode = RepMode.single;
+        }
+      });
       widget.onChanged();
     }
   }
@@ -1683,7 +1767,7 @@ class _SetTableState extends State<_SetTable> {
         _SetTableHeader(
           slot: slot,
           palette: palette,
-          onPickRepMode: _pickRepMode,
+          onPickMeasureMode: _pickMeasureMode,
         ),
         const SizedBox(height: 4),
         // ── Set rows ───────────────────────────────────────────────────────
@@ -1728,12 +1812,12 @@ class _SetTableHeader extends StatelessWidget {
   const _SetTableHeader({
     required this.slot,
     required this.palette,
-    required this.onPickRepMode,
+    required this.onPickMeasureMode,
   });
 
   final _EditableSlot slot;
   final AppPalette palette;
-  final Future<void> Function(BuildContext, Offset) onPickRepMode;
+  final Future<void> Function(BuildContext, Offset) onPickMeasureMode;
 
   @override
   Widget build(BuildContext context) {
@@ -1751,11 +1835,11 @@ class _SetTableHeader extends StatelessWidget {
       if (!tappable) {
         return Expanded(child: Center(child: text));
       }
-      // Tappable: reps header opens popup to switch repMode.
+      // Tappable: header opens the Reps / Tiempo picker.
       return Expanded(
         child: Builder(
           builder: (ctx) => GestureDetector(
-            onTap: () => onPickRepMode(ctx, Offset.zero),
+            onTap: () => onPickMeasureMode(ctx, Offset.zero),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               mainAxisSize: MainAxisSize.min,
@@ -1782,7 +1866,7 @@ class _SetTableHeader extends StatelessWidget {
         ),
         const SizedBox(width: 6),
         if (isDuration) ...[
-          cell('TIEMPO'),
+          cell('TIEMPO', tappable: true),
         ] else ...[
           cell('KG'),
           const SizedBox(width: 6),

@@ -162,6 +162,94 @@ class RoutineRepository {
     return draft;
   }
 
+  /// Updates the content of an existing trainer-assigned plan.
+  ///
+  /// Only mutates content fields (name, split, level, days). The immutable
+  /// identity fields (assignedBy, assignedTo, source, createdBy, createdAt)
+  /// are stripped from the payload so the Firestore trainer-update rule does
+  /// not see them change, matching the `affectedKeys()` guard in
+  /// firestore.rules.
+  ///
+  /// Enforces defensive invariants client-side before write:
+  /// - [uid] must be non-empty.
+  /// - [draft.id] must be non-empty.
+  ///
+  /// ⚠️  COUPLING WARNING — field list below:
+  /// If you add a field to the Routine model that trainers should be able to
+  /// edit on assigned plans, add it here AND add it to the hasOnly list in
+  /// firestore.rules (trainer-assigned UPDATE path). Omitting it from either
+  /// side will either silently drop data or cause permission-denied on ALL
+  /// trainer plan updates.
+  Future<Routine> updateAssigned({
+    required String uid,
+    required Routine draft,
+  }) async {
+    if (uid.isEmpty) {
+      throw ArgumentError.value(uid, 'uid', 'must be non-empty');
+    }
+    if (draft.id.isEmpty) {
+      throw ArgumentError.value(draft.id, 'draft.id', 'must be non-empty');
+    }
+
+    // Build update payload with ONLY the content fields the trainer controls.
+    // Omitting assignedBy, assignedTo, source, createdBy, createdAt, id,
+    // visibility, and status keeps the update within the narrow
+    // trainer-update Firestore rule.
+    final json = <String, Object?>{
+      'name': draft.name,
+      'split': draft.split,
+      'level': draft.level.toJson(),
+      'days': draft.days.map((d) => d.toJson()).toList(),
+    };
+
+    await _collection.doc(draft.id).update(json);
+    return draft;
+  }
+
+  /// Updates the content of an existing trainer template.
+  ///
+  /// Only mutates content fields (name, split, level, days). The immutable
+  /// identity fields (assignedBy, source, createdBy, createdAt, assignedTo)
+  /// are stripped from the payload so the Firestore trainer-template-update
+  /// rule does not see them change, matching the `affectedKeys()` guard in
+  /// firestore.rules.
+  ///
+  /// Enforces defensive invariants client-side before write:
+  /// - [uid] must be non-empty.
+  /// - [draft.id] must be non-empty.
+  ///
+  /// ⚠️  COUPLING WARNING — field list below:
+  /// If you add a field to the Routine model that trainers should be able to
+  /// edit on templates, add it here AND add it to the hasOnly list in
+  /// firestore.rules (trainer-template UPDATE path). Omitting it from either
+  /// side will either silently drop data or cause permission-denied on ALL
+  /// trainer template updates.
+  Future<Routine> updateTemplate({
+    required String uid,
+    required Routine draft,
+  }) async {
+    if (uid.isEmpty) {
+      throw ArgumentError.value(uid, 'uid', 'must be non-empty');
+    }
+    if (draft.id.isEmpty) {
+      throw ArgumentError.value(draft.id, 'draft.id', 'must be non-empty');
+    }
+
+    // Build update payload with ONLY the content fields the trainer controls.
+    // Omitting assignedBy, source, createdBy, createdAt, assignedTo, id,
+    // visibility, and status keeps the update within the narrow
+    // trainer-template-update Firestore rule.
+    final json = <String, Object?>{
+      'name': draft.name,
+      'split': draft.split,
+      'level': draft.level.toJson(),
+      'days': draft.days.map((d) => d.toJson()).toList(),
+    };
+
+    await _collection.doc(draft.id).update(json);
+    return draft;
+  }
+
   /// Soft-deletes a routine by flipping its `status` to `archived`.
   ///
   /// The document is preserved so that historical workout session references

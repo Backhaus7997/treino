@@ -61,11 +61,14 @@ abstract final class CoachStrings {
   static const createPlanError = 'No pudimos crear el plan. Intentá de nuevo.';
   static const athleteDetailNoPlans = 'Todavía no le asignaste planes.';
   static const editorTitle = 'Crear plan';
+  static const editorEditTitle = 'Editar plan';
   static const editorNameLabel = 'NOMBRE';
   static const editorSplitLabel = 'SPLIT (e.g. PPL)';
   static const editorAddDay = 'Agregar día';
   static const editorAddSlot = 'Agregar ejercicio';
   static const editorAddSuperset = '+ Superserie';
   static const editorSubmit = 'ASIGNAR PLAN';
+  static const editorUpdateLabel = 'GUARDAR CAMBIOS';
+  static const updatePlanSuccess = 'Plan actualizado.';
   static const exercisePicker = 'Buscar ejercicio';
 }

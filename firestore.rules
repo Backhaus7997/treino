@@ -153,6 +153,88 @@ service cloud.firestore {
                     && request.resource.data.diff(resource.data).affectedKeys()
                          .hasOnly(['name', 'level', 'days']);
 
+      // UPDATE path 3: trainer edits content of a trainer-assigned plan.
+      //
+      // Invariants enforced server-side (mirrors client guards in
+      // RoutineRepository.updateAssigned):
+      //   - Only the assigning trainer (assignedBy == auth.uid) may update.
+      //   - source must remain 'trainer-assigned'.
+      //   - assignedBy must not change (immutable trainer identity).
+      //   - assignedTo must not change (immutable athlete assignment).
+      //   - createdBy must not change.
+      //   - createdAt must not change (audit field).
+      //   - Only 'name', 'split', 'level', 'days' are the allowed mutable
+      //     content keys. The diff must touch only those fields.
+      //   - The payload must not contain keys outside the full known field
+      //     set (hasOnly guard).
+      //
+      // ⚠️  COUPLING WARNING — hasOnly field list below:
+      // This list MUST contain every field a trainer-assigned routine doc
+      // stores. If you add a field to the Routine model, createAssigned, or
+      // updateAssigned, you MUST add it here too — otherwise ALL trainer plan
+      // updates will fail with permission-denied.
+      allow update: if request.auth != null
+                    && request.auth.uid == resource.data.assignedBy
+                    && resource.data.source == 'trainer-assigned'
+                    // Immutable identity fields must not change.
+                    && request.resource.data.assignedBy == resource.data.assignedBy
+                    && request.resource.data.assignedTo == resource.data.assignedTo
+                    && request.resource.data.source == resource.data.source
+                    && (!('createdBy' in resource.data)
+                        || request.resource.data.createdBy == resource.data.createdBy)
+                    && (!('createdAt' in resource.data)
+                        || request.resource.data.createdAt == resource.data.createdAt)
+                    // Only content fields may appear in the written document.
+                    && request.resource.data.keys().hasOnly(
+                         ['name', 'split', 'level', 'days',
+                          'source', 'assignedBy', 'assignedTo', 'visibility',
+                          'status', 'createdBy', 'createdAt',
+                          'estimatedMinutesPerDay', 'imageUrl'])
+                    // The diff must touch ONLY content fields.
+                    && request.resource.data.diff(resource.data).affectedKeys()
+                         .hasOnly(['name', 'split', 'level', 'days']);
+
+      // UPDATE path 4: trainer edits content of a trainer template.
+      //
+      // Invariants enforced server-side (mirrors client guards in
+      // RoutineRepository.updateTemplate):
+      //   - Only the owning trainer (assignedBy == auth.uid) may update.
+      //   - source must remain 'trainer-template'.
+      //   - assignedBy must not change (immutable trainer identity).
+      //   - assignedTo must remain null (templates have no assigned athlete).
+      //   - createdBy must not change.
+      //   - createdAt must not change (audit field).
+      //   - Only 'name', 'split', 'level', 'days' are the allowed mutable
+      //     content keys. The diff must touch only those fields.
+      //   - The payload must not contain keys outside the full known field
+      //     set (hasOnly guard).
+      //
+      // ⚠️  COUPLING WARNING — hasOnly field list below:
+      // This list MUST contain every field a trainer-template routine doc
+      // stores. If you add a field to the Routine model, createTemplate, or
+      // updateTemplate, you MUST add it here too — otherwise ALL trainer
+      // template updates will fail with permission-denied.
+      allow update: if request.auth != null
+                    && request.auth.uid == resource.data.assignedBy
+                    && resource.data.source == 'trainer-template'
+                    // Immutable identity fields must not change.
+                    && request.resource.data.assignedBy == resource.data.assignedBy
+                    && request.resource.data.assignedTo == null
+                    && request.resource.data.source == resource.data.source
+                    && (!('createdBy' in resource.data)
+                        || request.resource.data.createdBy == resource.data.createdBy)
+                    && (!('createdAt' in resource.data)
+                        || request.resource.data.createdAt == resource.data.createdAt)
+                    // Only content fields may appear in the written document.
+                    && request.resource.data.keys().hasOnly(
+                         ['name', 'split', 'level', 'days',
+                          'source', 'assignedBy', 'assignedTo', 'visibility',
+                          'status', 'createdBy', 'createdAt',
+                          'estimatedMinutesPerDay', 'imageUrl'])
+                    // The diff must touch ONLY content fields.
+                    && request.resource.data.diff(resource.data).affectedKeys()
+                         .hasOnly(['name', 'split', 'level', 'days']);
+
       // DELETE (narrow): the owning trainer may delete their OWN
       // `trainer-template` docs (library cleanup) and `trainer-assigned`
       // plans (manually remove a plan from an athlete). User/system routines

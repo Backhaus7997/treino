@@ -234,16 +234,25 @@ GoRouter buildRouter({
         path: '/workout/routine-editor/:athleteId',
         pageBuilder: (context, state) {
           final athleteId = state.pathParameters['athleteId']!;
+          // `extra` carries an existing plan id when editing; null = create.
+          final existingPlanId = state.extra as String?;
           return _noAnim(RoutineEditorScreen(
-            mode: TrainerAssigning(athleteId: athleteId),
+            mode: TrainerAssigning(
+              athleteId: athleteId,
+              existingPlanId: existingPlanId,
+            ),
           ));
         },
       ),
       GoRoute(
         path: '/workout/template-editor',
-        pageBuilder: (_, __) => _noAnim(
-          const RoutineEditorScreen(mode: TrainerTemplating()),
-        ),
+        pageBuilder: (context, state) {
+          // `extra` carries an existing template id when editing; null = create.
+          final existingTemplateId = state.extra as String?;
+          return _noAnim(RoutineEditorScreen(
+            mode: TrainerTemplating(existingTemplateId: existingTemplateId),
+          ));
+        },
       ),
       GoRoute(
         path: '/workout/my-routine-editor',

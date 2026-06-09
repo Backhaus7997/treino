@@ -193,6 +193,10 @@ class _AthleteDetailBody extends ConsumerWidget {
                   _PlanCard(
                     plan: plan,
                     onTap: () => context.push('/workout/routine/${plan.id}'),
+                    onEdit: () => context.push(
+                      '/workout/routine-editor/$athleteId',
+                      extra: plan.id,
+                    ),
                     onDelete: () => _onDeletePlan(context, ref, plan),
                   ),
                   const SizedBox(height: 12),
@@ -1479,9 +1483,10 @@ class _NotaEditSheetState extends ConsumerState<_NotaEditSheet> {
 // ── Plan card ─────────────────────────────────────────────────────────────────
 
 class _PlanCard extends StatelessWidget {
-  const _PlanCard({required this.plan, this.onTap, this.onDelete});
+  const _PlanCard({required this.plan, this.onTap, this.onEdit, this.onDelete});
   final Routine plan;
   final VoidCallback? onTap;
+  final VoidCallback? onEdit;
   final VoidCallback? onDelete;
 
   @override
@@ -1523,6 +1528,14 @@ class _PlanCard extends StatelessWidget {
                 ],
               ),
             ),
+            if (onEdit != null)
+              IconButton(
+                onPressed: onEdit,
+                icon: Icon(TreinoIcon.edit, size: 18, color: palette.textMuted),
+                tooltip: 'Editar plan',
+                constraints: const BoxConstraints(),
+                padding: const EdgeInsets.only(left: 8),
+              ),
             if (onDelete != null)
               IconButton(
                 onPressed: onDelete,

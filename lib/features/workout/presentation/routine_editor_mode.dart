@@ -16,23 +16,35 @@ sealed class RoutineEditorMode {
 
 /// Trainer-assigning mode: the trainer builds a plan for [athleteId].
 ///
-/// Submits via [RoutineRepository.createAssigned]. This is the pre-existing
-/// flow — behaviour unchanged by PR2.
+/// - [existingPlanId] == null → create a new plan via
+///   [RoutineRepository.createAssigned].
+/// - [existingPlanId] != null → edit an existing plan: hydrates editor state
+///   from Firestore via [RoutineRepository.getById], then saves updated
+///   content via [RoutineRepository.updateAssigned].
 final class TrainerAssigning extends RoutineEditorMode {
-  const TrainerAssigning({required this.athleteId});
+  const TrainerAssigning({required this.athleteId, this.existingPlanId});
 
   final String athleteId;
+  final String? existingPlanId;
 }
 
 /// Trainer-templating mode: the trainer builds a reusable template, no
-/// athlete assignment yet. Submits via [RoutineRepository.createTemplate].
+/// athlete assignment yet.
+///
+/// - [existingTemplateId] == null → create a new template via
+///   [RoutineRepository.createTemplate].
+/// - [existingTemplateId] != null → edit an existing template: hydrates
+///   editor state from Firestore via [RoutineRepository.getById], then saves
+///   updated content via [RoutineRepository.updateTemplate].
 ///
 /// Sidecar to PR2 scope — the pre-PR2 editor distinguished templates from
 /// assignments via `athleteId == null`. Making `mode` required forced this
 /// case to become its own variant so the trainer's "NUEVA PLANTILLA" CTA
 /// keeps working.
 final class TrainerTemplating extends RoutineEditorMode {
-  const TrainerTemplating();
+  const TrainerTemplating({this.existingTemplateId});
+
+  final String? existingTemplateId;
 }
 
 /// Self-creating mode: an authenticated athlete builds their own routine.

@@ -486,6 +486,18 @@ class _TemplateCardState extends ConsumerState<_TemplateCard> {
             ),
           ),
           const SizedBox(width: 8),
+          IconButton(
+            onPressed: (_assigning || _deleting)
+                ? null
+                : () => context.push(
+                      '/workout/template-editor',
+                      extra: widget.template.id,
+                    ),
+            icon: Icon(TreinoIcon.edit, size: 18, color: palette.textMuted),
+            tooltip: 'Editar',
+            constraints: const BoxConstraints(),
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+          ),
           TextButton(
             onPressed: _assigning ? null : () => _onAssign(context),
             style: TextButton.styleFrom(
