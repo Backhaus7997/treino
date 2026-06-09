@@ -172,8 +172,7 @@ void main() {
   });
 
   group('SCENARIO-746: _pickExerciseFor does not block on hanging CF', () {
-    testWidgets(
-        'UI returns to idle immediately even when CF never completes',
+    testWidgets('UI returns to idle immediately even when CF never completes',
         (tester) async {
       final mockFunctions = MockFirebaseFunctions();
       final mockCallable = MockHttpsCallable();
