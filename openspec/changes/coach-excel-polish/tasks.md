@@ -77,38 +77,38 @@ Chain strategy: stacked-to-main
 
 ### Phase 1.1: Branch setup
 
-- [ ] T-CXP-001 — SETUP: create branch `feat/coach-excel-polish-pr1-template` from `main`; confirm clean working tree; verify `lib/features/coach_hub/data/template_builder.dart` contains no `setColumnWidth` calls and no `Instrucciones` sheet; verify `test/features/coach_hub/data/template_builder_test.dart` does NOT exist.
+- [x] T-CXP-001 — SETUP: create branch `feat/coach-excel-polish-pr1-template` from `main`; confirm clean working tree; verify `lib/features/coach_hub/data/template_builder.dart` contains no `setColumnWidth` calls and no `Instrucciones` sheet; verify `test/features/coach_hub/data/template_builder_test.dart` does NOT exist.
 
 ### Phase 1.2: Day sheet column widths (ADR-CXP-001)
 
-- [ ] T-CXP-002 — RED: CREATE `test/features/coach_hub/data/template_builder_test.dart`; add failing test group `'SCENARIO-727: day sheet Ejercicio column width'` asserting `buildPlanTemplateBytes()` produces a workbook where each Día N sheet `getColumnWidth(0) == 28`; also add `'SCENARIO-728: day sheet all column widths'` asserting widths 28, 10, 12, 12, 12, 16, 22 for columns 0–6 on each of 3 day sheets. Tests MUST fail (no `setColumnWidth` calls yet). No Firebase, no network.
-- [ ] T-CXP-003 — GREEN: edit `lib/features/coach_hub/data/template_builder.dart` — add `const Map<String, double> kColumnWidthsDay` and `const Map<String, double> kColumnWidthsPlan` top-level constants (ADR-CXP-001); apply `sheet.setColumnWidth(i, width)` for each column inside the existing day-sheet loop. SCENARIO-727 and SCENARIO-728 must pass.
+- [x] T-CXP-002 — RED: CREATE `test/features/coach_hub/data/template_builder_test.dart`; add failing test group `'SCENARIO-727: day sheet Ejercicio column width'` asserting `buildPlanTemplateBytes()` produces a workbook where each Día N sheet `getColumnWidth(0) == 28`; also add `'SCENARIO-728: day sheet all column widths'` asserting widths 28, 10, 12, 12, 12, 16, 22 for columns 0–6 on each of 3 day sheets. Tests MUST fail (no `setColumnWidth` calls yet). No Firebase, no network.
+- [x] T-CXP-003 — GREEN: edit `lib/features/coach_hub/data/template_builder.dart` — add `const Map<String, double> kColumnWidthsDay` and `const Map<String, double> kColumnWidthsPlan` top-level constants (ADR-CXP-001); apply `sheet.setColumnWidth(i, width)` for each column inside the existing day-sheet loop. SCENARIO-727 and SCENARIO-728 must pass.
 
 ### Phase 1.3: Plan sheet column widths
 
-- [ ] T-CXP-004 — RED: in `template_builder_test.dart` add failing test `'SCENARIO-729: Plan sheet column widths'` asserting `getColumnWidth(0) == 22` (Campo) and `getColumnWidth(1) == 20` (Valor) on the Plan sheet. Test MUST fail.
-- [ ] T-CXP-005 — GREEN: in `template_builder.dart` apply `plan.setColumnWidth(0, 22)` and `plan.setColumnWidth(1, 20)` after the Plan sheet creation. SCENARIO-729 must pass.
+- [x] T-CXP-004 — RED: in `template_builder_test.dart` add failing test `'SCENARIO-729: Plan sheet column widths'` asserting `getColumnWidth(0) == 22` (Campo) and `getColumnWidth(1) == 20` (Valor) on the Plan sheet. Test MUST fail.
+- [x] T-CXP-005 — GREEN: in `template_builder.dart` apply `plan.setColumnWidth(0, 22)` and `plan.setColumnWidth(1, 20)` after the Plan sheet creation. SCENARIO-729 must pass.
 
 ### Phase 1.4: Instrucciones sheet structure (ADR-CXP-002, ADR-CXP-012)
 
-- [ ] T-CXP-006 — RED: in `template_builder_test.dart` add failing tests — `'SCENARIO-730: Instrucciones sheet exists after Día 3'` asserting `workbook.sheets` contains key `'Instrucciones'` and it appears at index after the last day sheet; `'SCENARIO-731: Instrucciones heading and column meanings'` asserting A1=`'Instrucciones de uso'`, A3=`'Columna'`, B3=`'Descripción'`, A4=`'Ejercicio'`, A11=`'Nivel'`. Tests MUST fail (no `_buildInstruccionesSheet` call yet).
-- [ ] T-CXP-007 — GREEN: in `template_builder.dart` add private helper `void _buildInstruccionesSheet(Excel excel)` implementing all cells per ADR-CXP-012 locked copy (A1, A3/B3, A4..A11/B4..B11, A13..A16, A18, A19..H19, A20..H20, A22); call `_buildInstruccionesSheet(excel)` at end of `buildPlanTemplateBytes()` before `excel.save()`. SCENARIO-730 and SCENARIO-731 must pass.
+- [x] T-CXP-006 — RED: in `template_builder_test.dart` add failing tests — `'SCENARIO-730: Instrucciones sheet exists after Día 3'` asserting `workbook.sheets` contains key `'Instrucciones'` and it appears at index after the last day sheet; `'SCENARIO-731: Instrucciones heading and column meanings'` asserting A1=`'Instrucciones de uso'`, A3=`'Columna'`, B3=`'Descripción'`, A4=`'Ejercicio'`, A11=`'Nivel'`. Tests MUST fail (no `_buildInstruccionesSheet` call yet).
+- [x] T-CXP-007 — GREEN: in `template_builder.dart` add private helper `void _buildInstruccionesSheet(Excel excel)` implementing all cells per ADR-CXP-012 locked copy (A1, A3/B3, A4..A11/B4..B11, A13..A16, A18, A19..H19, A20..H20, A22); call `_buildInstruccionesSheet(excel)` at end of `buildPlanTemplateBytes()` before `excel.save()`. SCENARIO-730 and SCENARIO-731 must pass.
 
 ### Phase 1.5: Instrucciones content cells
 
-- [ ] T-CXP-008 — RED: in `template_builder_test.dart` add failing test `'SCENARIO-732: Instrucciones Nivel values and example row'` asserting A13=`'Valores válidos para Nivel:'`, A14=`'principiante'`, A15=`'intermedio'`, A16=`'avanzado'`, A18=`'Ejemplo:'`, A20=`'Sentadilla con barra'`, H20=`'intermedio'`. Test MUST fail (implementation from T-CXP-007 not yet complete for this specific cell range).
-- [ ] T-CXP-009 — GREEN: ensure `_buildInstruccionesSheet` writes all A13..A16, A18, A19..H19, A20..H20, A22 cells per locked spec. SCENARIO-732 must pass.
+- [x] T-CXP-008 — RED: in `template_builder_test.dart` add failing test `'SCENARIO-732: Instrucciones Nivel values and example row'` asserting A13=`'Valores válidos para Nivel:'`, A14=`'principiante'`, A15=`'intermedio'`, A16=`'avanzado'`, A18=`'Ejemplo:'`, A20=`'Sentadilla con barra'`, H20=`'intermedio'`. Test MUST fail (implementation from T-CXP-007 not yet complete for this specific cell range).
+- [x] T-CXP-009 — GREEN: ensure `_buildInstruccionesSheet` writes all A13..A16, A18, A19..H19, A20..H20, A22 cells per locked spec. SCENARIO-732 must pass.
 
 ### Phase 1.6: Round-trip parse safety net (ADR-CXP-003)
 
-- [ ] T-CXP-010 — RED: in `template_builder_test.dart` add failing test `'SCENARIO-733: parser ignores Instrucciones sheet'` that calls `buildPlanTemplateBytes()`, passes the bytes to `parseExcelPlan()`, and asserts no exception thrown, exactly 3 parsed days, and no exercise rows from `Instrucciones` appear. Also add `'SCENARIO-734: round-trip parse of polished template succeeds'` asserting all existing round-trip assertions pass with zero new failures. Tests MUST fail (Instrucciones sheet not yet producing parseable bytes until T-CXP-009 green).
-- [ ] T-CXP-011 — GREEN: run `flutter test test/features/coach_hub/data/template_builder_test.dart`; all SCENARIO-727..734 tests must pass; no changes to `excel_parser.dart` — parser ignores `Instrucciones` via existing `_daySheetRegex`. REQ-CXP-TEMPLATE-004 and REQ-CXP-TEMPLATE-005 satisfied.
+- [x] T-CXP-010 — RED: in `template_builder_test.dart` add failing test `'SCENARIO-733: parser ignores Instrucciones sheet'` that calls `buildPlanTemplateBytes()`, passes the bytes to `parseExcelPlan()`, and asserts no exception thrown, exactly 3 parsed days, and no exercise rows from `Instrucciones` appear. Also add `'SCENARIO-734: round-trip parse of polished template succeeds'` asserting all existing round-trip assertions pass with zero new failures. Tests MUST fail (Instrucciones sheet not yet producing parseable bytes until T-CXP-009 green).
+- [x] T-CXP-011 — GREEN: run `flutter test test/features/coach_hub/data/template_builder_test.dart`; all SCENARIO-727..734 tests must pass; no changes to `excel_parser.dart` — parser ignores `Instrucciones` via existing `_daySheetRegex`. REQ-CXP-TEMPLATE-004 and REQ-CXP-TEMPLATE-005 satisfied.
 
 ### Phase 1.7: PR#1 quality gates
 
-- [ ] T-CXP-012 — GATE: run `flutter analyze`; confirm 0 issues. Run `dart format --output=none --set-exit-if-changed .`; confirm 0 changed files on touched paths.
-- [ ] T-CXP-013 — GATE: run `flutter test test/features/coach_hub/data/template_builder_test.dart`; all 8 new scenario tests pass; delta ≥ +8 new tests.
-- [ ] T-CXP-014 — VERIFY: `excel_parser.dart` is unchanged (no diff). No `pubspec.yaml` changes. No `firestore.rules`, `storage.rules`, `firestore.indexes.json` changes. No CF changes. `kColumnWidthsDay` and `kColumnWidthsPlan` exported at top-level of `template_builder.dart`. All Instrucciones copy matches ADR-CXP-012 locked strings verbatim. Conventional commits only, no `Co-Authored-By`.
+- [x] T-CXP-012 — GATE: run `flutter analyze`; confirm 0 issues. Run `dart format --output=none --set-exit-if-changed .`; confirm 0 changed files on touched paths.
+- [x] T-CXP-013 — GATE: run `flutter test test/features/coach_hub/data/template_builder_test.dart`; all 8 new scenario tests pass; delta ≥ +8 new tests.
+- [x] T-CXP-014 — VERIFY: `excel_parser.dart` is unchanged (no diff). No `pubspec.yaml` changes. No `firestore.rules`, `storage.rules`, `firestore.indexes.json` changes. No CF changes. `kColumnWidthsDay` and `kColumnWidthsPlan` exported at top-level of `template_builder.dart`. All Instrucciones copy matches ADR-CXP-012 locked strings verbatim. Conventional commits only, no `Co-Authored-By`.
 
 ---
 
@@ -228,15 +228,15 @@ Chain strategy: stacked-to-main
 
 ### PR#1
 
-- [ ] All 8+ new tests pass (`flutter test test/features/coach_hub/data/template_builder_test.dart`)
-- [ ] `flutter analyze` 0 issues
-- [ ] `dart format` 0 changes on touched files
-- [ ] `kColumnWidthsDay` and `kColumnWidthsPlan` exported as `const` at top-level of `template_builder.dart`
-- [ ] `_buildInstruccionesSheet` private helper added at bottom of `template_builder.dart`
-- [ ] All Instrucciones cell content matches ADR-CXP-012 locked strings verbatim
-- [ ] `excel_parser.dart` unchanged — confirmed by `git diff --name-only`
-- [ ] No `pubspec.yaml`, `firestore.rules`, `storage.rules`, `firestore.indexes.json` changes
-- [ ] All commits conventional, no `Co-Authored-By`
+- [x] All 8+ new tests pass (`flutter test test/features/coach_hub/data/template_builder_test.dart`) — 14 tests total
+- [x] `flutter analyze` 0 issues on touched files
+- [x] `dart format` 0 changes on touched files
+- [x] `kColumnWidthsDay` and `kColumnWidthsPlan` exported as `const` at top-level of `template_builder.dart`
+- [x] `_buildInstruccionesSheet` private helper added at bottom of `template_builder.dart`
+- [x] All Instrucciones cell content matches ADR-CXP-012 locked strings verbatim
+- [x] `excel_parser.dart` unchanged — confirmed by `git diff --name-only`
+- [x] No `pubspec.yaml`, `firestore.rules`, `storage.rules`, `firestore.indexes.json` changes
+- [x] All commits conventional, no `Co-Authored-By`
 
 ### PR#2a (CF)
 
