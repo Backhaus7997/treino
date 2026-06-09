@@ -132,28 +132,54 @@ void main() {
       },
     );
 
-    // SCENARIO-661: re-render after first call → requestPermission NOT called again
+    // SCENARIO-661: re-mount within the same app session (ProviderScope) →
+    // NOT called again. Models tab navigation / parent rebuild where the
+    // PermissionGate's State is destroyed and recreated but the root
+    // ProviderScope (and therefore permissionGateAttemptedProvider) survives.
     testWidgets(
-      'SCENARIO-661: re-render after permission called → NOT called again (_attempted guard)',
+      'SCENARIO-661: re-mount within same ProviderScope → NOT called again '
+      '(permissionGateAttemptedProvider guard)',
       (tester) async {
+        when(() => fcmService.init(any())).thenAnswer((_) async {});
+        final container = ProviderContainer(
+          overrides: [
+            fcmServiceProvider.overrideWithValue(fcmService),
+            userProfileProvider.overrideWith(
+              (ref) => Stream.value(_profile(displayName: 'JuanAthlete')),
+            ),
+            authStateChangesProvider.overrideWith(
+              (ref) => Stream.value(_MockUser()),
+            ),
+          ],
+        );
+        addTearDown(container.dispose);
+
+        // First mount → fires once.
         await tester.pumpWidget(
-          _buildGate(
-            fcmService: fcmService,
-            profile: _profile(displayName: 'JuanAthlete'),
+          UncontrolledProviderScope(
+            container: container,
+            child: const MaterialApp(
+              home: Scaffold(body: PermissionGate()),
+            ),
           ),
         );
         await tester.pumpAndSettle();
 
-        // Rebuild widget (simulates parent rebuild)
+        // Replace tree shape to force PermissionGate State to be torn down
+        // and recreated. Same container — provider state persists.
         await tester.pumpWidget(
-          _buildGate(
-            fcmService: fcmService,
-            profile: _profile(displayName: 'JuanAthlete'),
+          UncontrolledProviderScope(
+            container: container,
+            child: const MaterialApp(
+              home: Scaffold(
+                body: Column(children: [PermissionGate()]),
+              ),
+            ),
           ),
         );
         await tester.pumpAndSettle();
 
-        // Should still be exactly 1 — not called again
+        // Should still be exactly 1 — re-mount sees attempted=true.
         verify(() => fcmService.requestPermission()).called(1);
       },
     );

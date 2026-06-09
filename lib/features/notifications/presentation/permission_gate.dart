@@ -6,8 +6,15 @@ import '../application/notification_providers.dart';
 import '../../auth/application/auth_providers.dart';
 import '../../profile/application/user_providers.dart';
 
+/// App-session flag tracking whether the gate has already requested permission.
+/// Lives at the root [ProviderScope] so widget re-mounts (tab nav, hot reload,
+/// HomeScreen rebuilds) don't re-fire the prompt. Resets only on app cold-start
+/// (new ProviderScope). Visible for testing so test setups can reset isolation.
+@visibleForTesting
+final permissionGateAttemptedProvider = StateProvider<bool>((ref) => false);
+
 /// Invisible widget that requests notification permission exactly once per
-/// session, and only after the user has completed profile setup.
+/// app session, and only after the user has completed profile setup.
 ///
 /// Placement: mount as a sibling widget inside the home shell build tree
 /// ([HomeScreen]). It renders [SizedBox.shrink()] — zero layout impact.
@@ -15,7 +22,8 @@ import '../../profile/application/user_providers.dart';
 /// Gate condition (ADR-PN-012): permission is requested when ALL are true:
 /// - User is authenticated (authState non-null).
 /// - `userProfile.displayName != null` (profile setup is complete).
-/// - `_attempted == false` (not yet requested in this session).
+/// - [permissionGateAttemptedProvider] is `false` (not yet requested in this
+///   app session).
 ///
 /// Denial path: the OS prompt result is logged and swallowed — no retry,
 /// no SnackBar, no navigation. REQ-PN-PERM-002.
@@ -29,18 +37,21 @@ class PermissionGate extends ConsumerStatefulWidget {
 }
 
 class _PermissionGateState extends ConsumerState<PermissionGate> {
-  /// Session-scoped flag — resets to false each app launch.
-  bool _attempted = false;
-
   @override
   Widget build(BuildContext context) {
     final profile = ref.watch(userProfileProvider).valueOrNull;
     final setupDone = profile?.displayName != null;
+    final attempted = ref.watch(permissionGateAttemptedProvider);
 
-    if (setupDone && !_attempted) {
-      _attempted = true;
-      // Fire-and-forget — do not await to keep build synchronous.
-      _requestPermission();
+    if (setupDone && !attempted) {
+      // Defer provider mutation + side-effect to after frame: Riverpod
+      // forbids modifying providers from within a build.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        if (ref.read(permissionGateAttemptedProvider)) return;
+        ref.read(permissionGateAttemptedProvider.notifier).state = true;
+        _requestPermission();
+      });
     }
 
     return const SizedBox.shrink();
