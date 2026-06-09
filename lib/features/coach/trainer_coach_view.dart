@@ -108,9 +108,12 @@ class _AlumnosTab extends ConsumerWidget {
         ),
       ),
       data: (links) {
-        final active =
-            links.where((l) => l.status == TrainerLinkStatus.active).toList();
-        if (active.isEmpty) {
+        final visible = links
+            .where((l) =>
+                l.status == TrainerLinkStatus.active ||
+                l.status == TrainerLinkStatus.paused)
+            .toList();
+        if (visible.isEmpty) {
           return Center(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -136,9 +139,9 @@ class _AlumnosTab extends ConsumerWidget {
         return ListView.separated(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
           physics: const ClampingScrollPhysics(),
-          itemCount: active.length,
+          itemCount: visible.length,
           separatorBuilder: (_, __) => const SizedBox(height: 12),
-          itemBuilder: (_, i) => _ActiveAlumnoCard(link: active[i]),
+          itemBuilder: (_, i) => _ActiveAlumnoCard(link: visible[i]),
         );
       },
     );
@@ -151,7 +154,15 @@ class _ActiveAlumnoCard extends ConsumerWidget {
   const _ActiveAlumnoCard({required this.link});
   final TrainerLink link;
 
-  Future<void> _terminate(BuildContext context, WidgetRef ref) async {
+  Future<void> _confirmAndRun(
+    BuildContext context,
+    WidgetRef ref, {
+    required String title,
+    required String body,
+    required String confirmLabel,
+    required Color confirmBg,
+    required Future<void> Function() action,
+  }) async {
     final palette = AppPalette.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
@@ -159,7 +170,7 @@ class _ActiveAlumnoCard extends ConsumerWidget {
         backgroundColor: palette.bgCard,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(
-          'Terminar vínculo',
+          title,
           style: GoogleFonts.barlowCondensed(
             fontWeight: FontWeight.w700,
             fontSize: 18,
@@ -167,7 +178,7 @@ class _ActiveAlumnoCard extends ConsumerWidget {
           ),
         ),
         content: Text(
-          '¿Seguro que querés terminar el vínculo con este alumno?',
+          body,
           style: GoogleFonts.barlow(fontSize: 14, color: palette.textPrimary),
         ),
         actions: [
@@ -185,11 +196,11 @@ class _ActiveAlumnoCard extends ConsumerWidget {
           ElevatedButton(
             onPressed: () => Navigator.of(ctx).pop(true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: palette.highlight,
+              backgroundColor: confirmBg,
               foregroundColor: palette.bg,
             ),
             child: Text(
-              'Terminar',
+              confirmLabel,
               style: GoogleFonts.barlowCondensed(
                 fontWeight: FontWeight.w700,
                 fontSize: 13,
@@ -200,15 +211,14 @@ class _ActiveAlumnoCard extends ConsumerWidget {
       ),
     );
     if (confirmed != true) return;
-    await ref
-        .read(trainerLinkRepositoryProvider)
-        .terminate(link.id, reason: 'trainer-terminated');
+    await action();
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
     final pubAsync = ref.watch(userPublicProfileProvider(link.athleteId));
+    final isPaused = link.status == TrainerLinkStatus.paused;
 
     return InkWell(
       onTap: () => context.push('/coach/athlete/${link.athleteId}'),
@@ -224,13 +234,97 @@ class _ActiveAlumnoCard extends ConsumerWidget {
           children: [
             _UserHeader(
               pubAsync: pubAsync,
-              subtitle: 'Vinculado desde ${_formatAcceptedAt(link)}',
+              subtitle: isPaused
+                  ? 'Vínculo pausado · ${_formatAcceptedAt(link)}'
+                  : 'Vinculado desde ${_formatAcceptedAt(link)}',
+              statusBadge: isPaused
+                  ? _StatusBadge(
+                      label: 'PAUSADO',
+                      color: palette.textMuted,
+                    )
+                  : null,
             ),
             const SizedBox(height: 14),
             SizedBox(
               width: double.infinity,
+              child: isPaused
+                  ? ElevatedButton(
+                      onPressed: () => _confirmAndRun(
+                        context,
+                        ref,
+                        title: 'Reanudar vínculo',
+                        body:
+                            '¿Querés reanudar el vínculo con este alumno? Va a poder ver tus updates de nuevo.',
+                        confirmLabel: 'Reanudar',
+                        confirmBg: palette.accent,
+                        action: () => ref
+                            .read(trainerLinkRepositoryProvider)
+                            .resume(link.id),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: palette.accent,
+                        foregroundColor: palette.bg,
+                        minimumSize: const Size.fromHeight(40),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(9999),
+                        ),
+                      ),
+                      child: Text(
+                        'REANUDAR VÍNCULO',
+                        style: GoogleFonts.barlowCondensed(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 12,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                    )
+                  : OutlinedButton(
+                      onPressed: () => _confirmAndRun(
+                        context,
+                        ref,
+                        title: 'Pausar vínculo',
+                        body:
+                            '¿Querés pausar el vínculo con este alumno? Va a quedar en read-only hasta que reanudes.',
+                        confirmLabel: 'Pausar',
+                        confirmBg: palette.accent,
+                        action: () => ref
+                            .read(trainerLinkRepositoryProvider)
+                            .pause(link.id),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: palette.accent, width: 1),
+                        foregroundColor: palette.accent,
+                        minimumSize: const Size.fromHeight(40),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(9999),
+                        ),
+                      ),
+                      child: Text(
+                        'PAUSAR VÍNCULO',
+                        style: GoogleFonts.barlowCondensed(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 12,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                    ),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
               child: OutlinedButton(
-                onPressed: () => _terminate(context, ref),
+                onPressed: () => _confirmAndRun(
+                  context,
+                  ref,
+                  title: 'Terminar vínculo',
+                  body:
+                      '¿Seguro que querés terminar el vínculo con este alumno?',
+                  confirmLabel: 'Terminar',
+                  confirmBg: palette.highlight,
+                  action: () => ref
+                      .read(trainerLinkRepositoryProvider)
+                      .terminate(link.id, reason: 'trainer-terminated'),
+                ),
                 style: OutlinedButton.styleFrom(
                   side: BorderSide(color: palette.border, width: 1),
                   foregroundColor: palette.textMuted,
@@ -266,9 +360,14 @@ class _ActiveAlumnoCard extends ConsumerWidget {
 // ── Shared sub-widgets ────────────────────────────────────────────────────────
 
 class _UserHeader extends StatelessWidget {
-  const _UserHeader({required this.pubAsync, required this.subtitle});
+  const _UserHeader({
+    required this.pubAsync,
+    required this.subtitle,
+    this.statusBadge,
+  });
   final AsyncValue<UserPublicProfile?> pubAsync;
   final String subtitle;
+  final Widget? statusBadge;
 
   @override
   Widget build(BuildContext context) {
@@ -316,7 +415,37 @@ class _UserHeader extends StatelessWidget {
             ],
           ),
         ),
+        if (statusBadge != null) ...[
+          const SizedBox(width: 8),
+          statusBadge!,
+        ],
       ],
+    );
+  }
+}
+
+class _StatusBadge extends StatelessWidget {
+  const _StatusBadge({required this.label, required this.color});
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(9999),
+        border: Border.all(color: color, width: 1),
+      ),
+      child: Text(
+        label,
+        style: GoogleFonts.barlowCondensed(
+          fontWeight: FontWeight.w700,
+          fontSize: 10,
+          letterSpacing: 0.8,
+          color: color,
+        ),
+      ),
     );
   }
 }

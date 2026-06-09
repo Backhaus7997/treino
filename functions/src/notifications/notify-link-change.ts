@@ -10,7 +10,9 @@
  *     before?.status === after.status → skip (no-op write).
  *   - Branches:
  *       create + pending → notify trainer, deepLink "/coach"
- *       pending → active → notify athlete, deepLink "/coach"
+ *       pending → active → notify athlete (aceptada), deepLink "/coach"
+ *       active → paused → notify athlete (pausada), deepLink "/coach"
+ *       paused → active → notify athlete (reanudada), deepLink "/coach"
  *       * → terminated → notify BOTH, deepLink "/coach"
  *   - All user-facing strings in es-AR.
  *
@@ -92,10 +94,20 @@ export async function notifyOnLinkChangeHandler(
     title = "Nueva solicitud de vinculación"; // i18n: Fase 6 Etapa 2
     body = "Un atleta quiere vincularse contigo."; // i18n: Fase 6 Etapa 2
   } else if (afterStatus === "active") {
-    // Link accepted → notify athlete.
+    // pending → active = accept; paused → active = resume.
     recipientUids = [athleteId];
-    title = "¡Vinculación aceptada!"; // i18n: Fase 6 Etapa 2
-    body = "Tu entrenador aceptó la vinculación."; // i18n: Fase 6 Etapa 2
+    if (beforeStatus === "paused") {
+      title = "Vinculación reanudada"; // i18n: Fase 6 Etapa 3
+      body = "Tu PF reanudó el vínculo."; // i18n: Fase 6 Etapa 3
+    } else {
+      title = "¡Vinculación aceptada!"; // i18n: Fase 6 Etapa 2
+      body = "Tu entrenador aceptó la vinculación."; // i18n: Fase 6 Etapa 2
+    }
+  } else if (afterStatus === "paused") {
+    // active → paused → notify athlete.
+    recipientUids = [athleteId];
+    title = "Vinculación pausada"; // i18n: Fase 6 Etapa 3
+    body = "Tu PF pausó el vínculo."; // i18n: Fase 6 Etapa 3
   } else if (afterStatus === "terminated") {
     // Link terminated → notify BOTH (ADR-PN-007, locked decision #2).
     recipientUids = [athleteId, trainerId];

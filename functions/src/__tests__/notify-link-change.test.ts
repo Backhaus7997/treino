@@ -10,8 +10,10 @@
  *   SCENARIO-639 — active → terminated (no reason) → notify BOTH
  *   SCENARIO-640 — reason === 'account-deleted' → sendFcm NOT called
  *   SCENARIO-641 — before.status === after.status → sendFcm NOT called (no-op)
+ *   SCENARIO-642 — active → paused → notify athlete (pausada)
+ *   SCENARIO-643 — paused → active (resume) → notify athlete (reanudada)
  *
- * REQ-PN-CF-004. Fase 6 Etapa 2.
+ * REQ-PN-CF-004. Fase 6 Etapa 2 + Etapa 3.
  */
 
 import * as admin from "firebase-admin";
@@ -212,6 +214,68 @@ describe("SCENARIO-641: before.status === after.status → skip (no-op write)", 
     await notifyOnLinkChangeHandler(testApp, beforeData, afterData, mock);
 
     expect(mock.sendEachForMulticast as jest.Mock).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// SCENARIO-642 — active → paused → notify athlete (Fase 6 Etapa 3)
+// ---------------------------------------------------------------------------
+describe("SCENARIO-642: active→paused → notify athlete", () => {
+  const trainerId = "trainer-link-642";
+  const athleteId = "athlete-link-642";
+
+  beforeEach(async () => {
+    await seedUser(trainerId, ["trainer-token-642"]);
+    await seedUser(athleteId, ["athlete-token-642"]);
+  });
+
+  afterEach(() => cleanup(trainerId, athleteId));
+
+  it("notifies only the athlete with the pausada copy", async () => {
+    const mock = makeMockMessaging();
+    const beforeData = { trainerId, athleteId, status: "active" };
+    const afterData = { trainerId, athleteId, status: "paused" };
+
+    await notifyOnLinkChangeHandler(testApp, beforeData, afterData, mock);
+
+    expect(mock.sendEachForMulticast as jest.Mock).toHaveBeenCalledTimes(1);
+    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as admin.messaging.MulticastMessage;
+    expect(callArg.tokens).toContain("athlete-token-642");
+    expect(callArg.tokens).not.toContain("trainer-token-642");
+    expect(callArg.notification?.title).toBe("Vinculación pausada");
+    expect(callArg.notification?.body).toBe("Tu PF pausó el vínculo.");
+    expect(callArg.data?.deepLink).toBe("/coach");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// SCENARIO-643 — paused → active (resume) → notify athlete (Fase 6 Etapa 3)
+// ---------------------------------------------------------------------------
+describe("SCENARIO-643: paused→active (resume) → notify athlete", () => {
+  const trainerId = "trainer-link-643";
+  const athleteId = "athlete-link-643";
+
+  beforeEach(async () => {
+    await seedUser(trainerId, ["trainer-token-643"]);
+    await seedUser(athleteId, ["athlete-token-643"]);
+  });
+
+  afterEach(() => cleanup(trainerId, athleteId));
+
+  it("notifies only the athlete with the reanudada copy (not 'aceptada')", async () => {
+    const mock = makeMockMessaging();
+    const beforeData = { trainerId, athleteId, status: "paused" };
+    const afterData = { trainerId, athleteId, status: "active" };
+
+    await notifyOnLinkChangeHandler(testApp, beforeData, afterData, mock);
+
+    expect(mock.sendEachForMulticast as jest.Mock).toHaveBeenCalledTimes(1);
+    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as admin.messaging.MulticastMessage;
+    expect(callArg.tokens).toContain("athlete-token-643");
+    expect(callArg.tokens).not.toContain("trainer-token-643");
+    expect(callArg.notification?.title).toBe("Vinculación reanudada");
+    expect(callArg.notification?.body).toBe("Tu PF reanudó el vínculo.");
+    expect(callArg.data?.deepLink).toBe("/coach");
   });
 });
 
