@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../domain/appointment.dart';
+import '../agenda_formatters.dart';
 import '../agenda_strings.dart';
 
 /// Bottom-sheet content shown when an athlete taps a calendar day.
@@ -122,7 +123,7 @@ class DaySlotsSheet extends StatelessWidget {
                     .map(
                       (slot) => ActionChip(
                         label: Text(
-                          AgendaStrings.formatTime(slot),
+                          AgendaFormatters.formatTime(slot),
                           style: GoogleFonts.barlowCondensed(
                             fontWeight: FontWeight.w600,
                             fontSize: 14,
@@ -203,7 +204,7 @@ class _BookedChip extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            AgendaStrings.formatTime(appointment.startsAt),
+            AgendaFormatters.formatTime(appointment.startsAt),
             style: GoogleFonts.barlowCondensed(
               fontWeight: FontWeight.w600,
               fontSize: 14,

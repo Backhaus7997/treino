@@ -8,6 +8,7 @@ import '../../../app/theme/app_palette.dart';
 import '../application/agenda_providers.dart';
 import '../domain/availability_override.dart';
 import '../domain/availability_rule.dart';
+import 'agenda_formatters.dart';
 import 'agenda_strings.dart';
 
 /// Full-screen editor where the trainer manages their availability rules
@@ -223,7 +224,7 @@ class _RuleTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final dayLabel =
-        AgendaStrings.dayOfWeekLabels[rule.dayOfWeek] ?? '${rule.dayOfWeek}';
+        AgendaFormatters.dayOfWeekLabels[rule.dayOfWeek] ?? '${rule.dayOfWeek}';
     final startStr =
         '${rule.startHour.toString().padLeft(2, '0')}:${rule.startMinute.toString().padLeft(2, '0')}';
     final endStr =
@@ -298,9 +299,9 @@ class _OverrideTile extends StatelessWidget {
     final palette = AppPalette.of(context);
 
     final dateStr = availOverride.when(
-      block: (id, tId, date) => AgendaStrings.formatDate(date),
+      block: (id, tId, date) => AgendaFormatters.formatDate(date),
       extra: (id, tId, date, sh, sm, eh, em, dur) =>
-          AgendaStrings.formatDate(date),
+          AgendaFormatters.formatDate(date),
     );
 
     final typeLabel = availOverride.when(
@@ -625,7 +626,7 @@ class _BlockOverrideFormSheetState
                         size: 18, color: palette.textMuted),
                     const SizedBox(width: 8),
                     Text(
-                      AgendaStrings.formatDate(_date),
+                      AgendaFormatters.formatDate(_date),
                       style: GoogleFonts.barlow(
                         fontSize: 14,
                         color: palette.textPrimary,
@@ -814,7 +815,7 @@ class _DayPicker extends StatelessWidget {
     return Wrap(
       spacing: 6,
       runSpacing: 6,
-      children: AgendaStrings.dayOfWeekLabels.entries.map((entry) {
+      children: AgendaFormatters.dayOfWeekLabels.entries.map((entry) {
         final selected = entry.key == value;
         return ChoiceChip(
           label: Text(
