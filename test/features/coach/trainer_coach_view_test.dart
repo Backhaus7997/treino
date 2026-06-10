@@ -73,7 +73,7 @@ List<Override> _stubLinks(List<TrainerLink> links) => [
 
 void main() {
   group('TrainerCoachView — structure', () {
-    testWidgets('renders 3 sub-tab labels (DASHBOARD moved to HOME tab)',
+    testWidgets('renders 2 sub-tab labels (DASHBOARD moved to HOME tab)',
         (tester) async {
       await tester.pumpWidget(_wrap(
         const TrainerCoachView(),
@@ -82,10 +82,11 @@ void main() {
       await tester.pumpAndSettle();
 
       // DASHBOARD moved to the HOME bottom-bar tab — not present here.
+      // COMUNIDADES removed entirely (2026-06-10).
       expect(find.text('DASHBOARD'), findsNothing);
       expect(find.text('ALUMNOS'), findsWidgets);
       expect(find.text('AGENDA'), findsWidgets);
-      expect(find.text('COMUNIDADES'), findsWidgets);
+      expect(find.text('COMUNIDADES'), findsNothing);
       expect(find.byType(TabBar), findsOneWidget);
     });
 
@@ -107,16 +108,19 @@ void main() {
     });
 
     testWidgets(
-        'COMUNIDADES sigue como placeholder; AGENDA es TrainerAgendaTab',
+        'initialTab="comunidades" (legado, p.ej. deep-link viejo) cae en ALUMNOS',
         (tester) async {
       await tester.pumpWidget(_wrap(
-        const TrainerCoachView(),
+        const TrainerCoachView(initialTab: 'comunidades'),
         overrides: _stubLinks(const []),
       ));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('COMUNIDADES'));
-      await tester.pumpAndSettle();
-      expect(find.text('PRÓXIMAMENTE'), findsOneWidget);
+      await tester.pump();
+
+      final controller =
+          DefaultTabController.of(tester.element(find.byType(TabBar)));
+      expect(controller.index, 0,
+          reason: 'el tab COMUNIDADES fue eliminado — cualquier query param '
+              'desconocido debe caer al default (ALUMNOS)');
     });
   });
 
