@@ -402,7 +402,7 @@ class _ResumenDelDiaCard extends ConsumerWidget {
               _StatColumn(
                 value: '$cancelled',
                 label: 'CANCELADAS',
-                color: palette.highlight,
+                color: palette.danger,
                 palette: palette,
               ),
             ],
