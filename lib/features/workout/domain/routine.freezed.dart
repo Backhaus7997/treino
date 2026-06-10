@@ -38,7 +38,12 @@ mixin _$Routine {
   RoutineVisibility get visibility => throw _privateConstructorUsedError;
   String? get createdBy =>
       throw _privateConstructorUsedError; // uid del atleta que creó la rutina; null para system/trainer-assigned
-  RoutineStatus get status => throw _privateConstructorUsedError;
+  RoutineStatus get status =>
+      throw _privateConstructorUsedError; // default active — retro-compat
+// ── Periodization (Model B) ──────────────────────────────────────────────
+// Number of authored weeks. @Default(1) keeps single-week routines intact
+// and retro-compatible with docs that lack this field.
+  int get numWeeks => throw _privateConstructorUsedError;
 
   /// Serializes this Routine to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -67,7 +72,8 @@ abstract class $RoutineCopyWith<$Res> {
       String? assignedTo,
       RoutineVisibility visibility,
       String? createdBy,
-      RoutineStatus status});
+      RoutineStatus status,
+      int numWeeks});
 }
 
 /// @nodoc
@@ -98,6 +104,7 @@ class _$RoutineCopyWithImpl<$Res, $Val extends Routine>
     Object? visibility = null,
     Object? createdBy = freezed,
     Object? status = null,
+    Object? numWeeks = null,
   }) {
     return _then(_value.copyWith(
       id: null == id
@@ -152,6 +159,10 @@ class _$RoutineCopyWithImpl<$Res, $Val extends Routine>
           ? _value.status
           : status // ignore: cast_nullable_to_non_nullable
               as RoutineStatus,
+      numWeeks: null == numWeeks
+          ? _value.numWeeks
+          : numWeeks // ignore: cast_nullable_to_non_nullable
+              as int,
     ) as $Val);
   }
 }
@@ -176,7 +187,8 @@ abstract class _$$RoutineImplCopyWith<$Res> implements $RoutineCopyWith<$Res> {
       String? assignedTo,
       RoutineVisibility visibility,
       String? createdBy,
-      RoutineStatus status});
+      RoutineStatus status,
+      int numWeeks});
 }
 
 /// @nodoc
@@ -205,6 +217,7 @@ class __$$RoutineImplCopyWithImpl<$Res>
     Object? visibility = null,
     Object? createdBy = freezed,
     Object? status = null,
+    Object? numWeeks = null,
   }) {
     return _then(_$RoutineImpl(
       id: null == id
@@ -259,6 +272,10 @@ class __$$RoutineImplCopyWithImpl<$Res>
           ? _value.status
           : status // ignore: cast_nullable_to_non_nullable
               as RoutineStatus,
+      numWeeks: null == numWeeks
+          ? _value.numWeeks
+          : numWeeks // ignore: cast_nullable_to_non_nullable
+              as int,
     ));
   }
 }
@@ -279,7 +296,8 @@ class _$RoutineImpl implements _Routine {
       this.assignedTo,
       this.visibility = RoutineVisibility.public,
       this.createdBy,
-      this.status = RoutineStatus.active})
+      this.status = RoutineStatus.active,
+      this.numWeeks = 1})
       : _days = days;
 
   factory _$RoutineImpl.fromJson(Map<String, dynamic> json) =>
@@ -326,10 +344,17 @@ class _$RoutineImpl implements _Routine {
   @override
   @JsonKey()
   final RoutineStatus status;
+// default active — retro-compat
+// ── Periodization (Model B) ──────────────────────────────────────────────
+// Number of authored weeks. @Default(1) keeps single-week routines intact
+// and retro-compatible with docs that lack this field.
+  @override
+  @JsonKey()
+  final int numWeeks;
 
   @override
   String toString() {
-    return 'Routine(id: $id, name: $name, split: $split, level: $level, days: $days, estimatedMinutesPerDay: $estimatedMinutesPerDay, imageUrl: $imageUrl, source: $source, assignedBy: $assignedBy, assignedTo: $assignedTo, visibility: $visibility, createdBy: $createdBy, status: $status)';
+    return 'Routine(id: $id, name: $name, split: $split, level: $level, days: $days, estimatedMinutesPerDay: $estimatedMinutesPerDay, imageUrl: $imageUrl, source: $source, assignedBy: $assignedBy, assignedTo: $assignedTo, visibility: $visibility, createdBy: $createdBy, status: $status, numWeeks: $numWeeks)';
   }
 
   @override
@@ -355,7 +380,9 @@ class _$RoutineImpl implements _Routine {
                 other.visibility == visibility) &&
             (identical(other.createdBy, createdBy) ||
                 other.createdBy == createdBy) &&
-            (identical(other.status, status) || other.status == status));
+            (identical(other.status, status) || other.status == status) &&
+            (identical(other.numWeeks, numWeeks) ||
+                other.numWeeks == numWeeks));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -374,7 +401,8 @@ class _$RoutineImpl implements _Routine {
       assignedTo,
       visibility,
       createdBy,
-      status);
+      status,
+      numWeeks);
 
   /// Create a copy of Routine
   /// with the given fields replaced by the non-null parameter values.
@@ -406,7 +434,8 @@ abstract class _Routine implements Routine {
       final String? assignedTo,
       final RoutineVisibility visibility,
       final String? createdBy,
-      final RoutineStatus status}) = _$RoutineImpl;
+      final RoutineStatus status,
+      final int numWeeks}) = _$RoutineImpl;
 
   factory _Routine.fromJson(Map<String, dynamic> json) = _$RoutineImpl.fromJson;
 
@@ -437,7 +466,12 @@ abstract class _Routine implements Routine {
   String?
       get createdBy; // uid del atleta que creó la rutina; null para system/trainer-assigned
   @override
-  RoutineStatus get status;
+  RoutineStatus get status; // default active — retro-compat
+// ── Periodization (Model B) ──────────────────────────────────────────────
+// Number of authored weeks. @Default(1) keeps single-week routines intact
+// and retro-compatible with docs that lack this field.
+  @override
+  int get numWeeks;
 
   /// Create a copy of Routine
   /// with the given fields replaced by the non-null parameter values.

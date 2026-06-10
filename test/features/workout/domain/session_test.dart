@@ -151,5 +151,46 @@ void main() {
 
       expect(decoded.wasFullyCompleted, isFalse);
     });
+
+    // ── Periodización (Fase 1 — REQ-PERIOD-007) ──────────────────────────
+
+    test('SCENARIO-PERIOD-006: weekNumber 2 round-trips via toJson/fromJson',
+        () {
+      final session = Session(
+        id: 'session-008',
+        uid: 'user-abc',
+        routineId: 'routine-ppl',
+        routineName: 'Push Pull Legs',
+        startedAt: DateTime.utc(2026, 5, 18, 10, 0, 0),
+        status: SessionStatus.active,
+        weekNumber: 2,
+      );
+
+      final json = session.toJson();
+      final decoded = Session.fromJson(json);
+
+      expect(decoded.weekNumber, equals(2));
+      expect(decoded, equals(session));
+    });
+
+    test('SCENARIO-PERIOD-006: weekNumber defaults to 0 when absent in JSON',
+        () {
+      final rawMap = <String, dynamic>{
+        'id': 'session-009',
+        'uid': 'user-abc',
+        'routineId': 'routine-ppl',
+        'routineName': 'Push Pull Legs',
+        'startedAt': Timestamp.fromDate(DateTime.utc(2026, 5, 18, 10, 0, 0)),
+        'finishedAt': null,
+        'totalVolumeKg': 0.0,
+        'durationMin': 0,
+        'status': 'active',
+        // weekNumber intentionally absent — legacy doc pre-periodización
+      };
+
+      final decoded = Session.fromJson(rawMap);
+
+      expect(decoded.weekNumber, equals(0));
+    });
   });
 }

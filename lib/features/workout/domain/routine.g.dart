@@ -27,6 +27,7 @@ _$RoutineImpl _$$RoutineImplFromJson(Map<String, dynamic> json) =>
       createdBy: json['createdBy'] as String?,
       status: $enumDecodeNullable(_$RoutineStatusEnumMap, json['status']) ??
           RoutineStatus.active,
+      numWeeks: (json['numWeeks'] as num?)?.toInt() ?? 1,
     );
 
 Map<String, dynamic> _$$RoutineImplToJson(_$RoutineImpl instance) =>
@@ -44,6 +45,7 @@ Map<String, dynamic> _$$RoutineImplToJson(_$RoutineImpl instance) =>
       'visibility': _$RoutineVisibilityEnumMap[instance.visibility]!,
       'createdBy': instance.createdBy,
       'status': _$RoutineStatusEnumMap[instance.status]!,
+      'numWeeks': instance.numWeeks,
     };
 
 const _$ExperienceLevelEnumMap = {

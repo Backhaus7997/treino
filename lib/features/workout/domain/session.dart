@@ -22,6 +22,9 @@ class Session with _$Session {
     required SessionStatus status,
     @Default(1) int dayNumber,
     @Default(false) bool wasFullyCompleted,
+    // Periodization (Model B): 0-based week of the plan this session belongs to.
+    // @Default(0) keeps single-week sessions intact and retro-compatible.
+    @Default(0) int weekNumber,
   }) = _Session;
 
   factory Session.fromJson(Map<String, Object?> json) =>

@@ -434,4 +434,199 @@ void main() {
       expect(slot.effectiveRepMode, equals(RepMode.range));
     });
   });
+
+  // ── Periodization (Model B): effectiveSetsForWeek ─────────────────────────
+
+  group('RoutineSlot.effectiveSetsForWeek', () {
+    // Distinct per-week prescriptions so indexing errors are detectable.
+    const week0Sets = [
+      SetSpec(type: SetType.normal, weightKg: 60.0, reps: 10),
+    ];
+    const week1Sets = [
+      SetSpec(type: SetType.normal, weightKg: 65.0, reps: 8),
+      SetSpec(type: SetType.normal, weightKg: 65.0, reps: 8),
+    ];
+    const week2Sets = [
+      SetSpec(type: SetType.normal, weightKg: 70.0, reps: 6),
+      SetSpec(type: SetType.failure, weightKg: 72.5, reps: 4),
+    ];
+
+    const periodizedSlot = RoutineSlot(
+      exerciseId: 'bench-press',
+      exerciseName: 'Bench Press',
+      muscleGroup: 'chest',
+      targetSets: 3,
+      targetRepsMin: 8,
+      targetRepsMax: 12,
+      restSeconds: 90,
+      weeklySets: [week0Sets, week1Sets, week2Sets],
+    );
+
+    test(
+        'SCENARIO-PERIOD-001: weeklySets populated and week in range returns '
+        'exactly weeklySets[week]', () {
+      // Week 0 — single light set.
+      final w0 = periodizedSlot.effectiveSetsForWeek(0);
+      expect(w0, equals(week0Sets));
+      expect(w0, hasLength(1));
+      expect(w0.first.weightKg, closeTo(60.0, 0.001));
+      expect(w0.first.reps, equals(10));
+
+      // Week 2 — DIFFERENT prescription proves indexing, not just fallback.
+      final w2 = periodizedSlot.effectiveSetsForWeek(2);
+      expect(w2, equals(week2Sets));
+      expect(w2, hasLength(2));
+      expect(w2.first.weightKg, closeTo(70.0, 0.001));
+      expect(w2.first.reps, equals(6));
+      expect(w2.last.type, equals(SetType.failure));
+      expect(w2, isNot(equals(w0)));
+    });
+
+    test(
+        'SCENARIO-PERIOD-002: weeklySets empty falls back to effectiveSets '
+        '(legacy synthesis)', () {
+      const legacySlot = RoutineSlot(
+        exerciseId: 'row',
+        exerciseName: 'Barbell Row',
+        muscleGroup: 'back',
+        targetSets: 3,
+        targetRepsMin: 6,
+        targetRepsMax: 10,
+        restSeconds: 90,
+        targetWeightKg: 70.0,
+      );
+
+      final forWeek = legacySlot.effectiveSetsForWeek(0);
+
+      expect(forWeek, equals(legacySlot.effectiveSets),
+          reason: 'empty weeklySets must defer to legacy synthesis');
+      expect(forWeek, hasLength(3));
+      for (final s in forWeek) {
+        expect(s.repsMin, equals(6));
+        expect(s.repsMax, equals(10));
+        expect(s.weightKg, closeTo(70.0, 0.001));
+      }
+    });
+
+    test(
+        'SCENARIO-PERIOD-003: week >= weeklySets.length falls back to '
+        'effectiveSets without throwing', () {
+      // Explicit "never throws" assertion for out-of-range weeks.
+      expect(() => periodizedSlot.effectiveSetsForWeek(3), returnsNormally);
+      expect(() => periodizedSlot.effectiveSetsForWeek(999), returnsNormally);
+
+      final outOfRange = periodizedSlot.effectiveSetsForWeek(3);
+      expect(outOfRange, equals(periodizedSlot.effectiveSets));
+    });
+
+    test(
+        'SCENARIO-PERIOD-004: negative week falls back to effectiveSets '
+        'without throwing', () {
+      // Explicit "never throws" assertion for negative weeks.
+      expect(() => periodizedSlot.effectiveSetsForWeek(-1), returnsNormally);
+      expect(() => periodizedSlot.effectiveSetsForWeek(-42), returnsNormally);
+
+      final negative = periodizedSlot.effectiveSetsForWeek(-1);
+      expect(negative, equals(periodizedSlot.effectiveSets));
+    });
+  });
+
+  // ── Periodization (Model B): weeklySets serialization ─────────────────────
+
+  group('RoutineSlot — weeklySets serialization', () {
+    test(
+        'SCENARIO-PERIOD-005: empty weeklySets roundtrips to [] and the json '
+        'key is present as an empty list', () {
+      const slot = RoutineSlot(
+        exerciseId: 'curl',
+        exerciseName: 'Bicep Curl',
+        muscleGroup: 'biceps',
+        targetSets: 3,
+        targetRepsMin: 10,
+        targetRepsMax: 10,
+        restSeconds: 60,
+      );
+
+      final json = slot.toJson();
+      expect(json, contains('weeklySets'));
+      expect(json['weeklySets'], isA<List<dynamic>>());
+      expect(json['weeklySets'], isEmpty);
+
+      final decoded = RoutineSlot.fromJson(json);
+      expect(decoded.weeklySets, equals(<List<SetSpec>>[]));
+      expect(decoded, equals(slot));
+    });
+
+    test(
+        'SCENARIO-PERIOD-005: populated weeklySets roundtrips deeply equal '
+        '(per-week, per-set fields)', () {
+      const s1 = SetSpec(
+          type: SetType.warmup, weightKg: 40.0, repsMin: 10, repsMax: 15);
+      const s2 = SetSpec(type: SetType.normal, weightKg: 80.0, reps: 8);
+      const s3 = SetSpec(type: SetType.drop, weightKg: 60.0, reps: 12);
+
+      const slot = RoutineSlot(
+        exerciseId: 'squat',
+        exerciseName: 'Squat',
+        muscleGroup: 'quads',
+        targetSets: 2,
+        targetRepsMin: 8,
+        targetRepsMax: 12,
+        restSeconds: 120,
+        weeklySets: [
+          [s1],
+          [s2, s3],
+        ],
+      );
+
+      final json = slot.toJson();
+      final decoded = RoutineSlot.fromJson(json);
+
+      expect(decoded.weeklySets, hasLength(2));
+
+      // Week 0 — single warmup set.
+      expect(decoded.weeklySets[0], hasLength(1));
+      final d1 = decoded.weeklySets[0][0];
+      expect(d1.type, equals(SetType.warmup));
+      expect(d1.weightKg, closeTo(40.0, 0.001));
+      expect(d1.repsMin, equals(10));
+      expect(d1.repsMax, equals(15));
+      expect(d1, equals(s1));
+
+      // Week 1 — working set + drop set.
+      expect(decoded.weeklySets[1], hasLength(2));
+      final d2 = decoded.weeklySets[1][0];
+      expect(d2.type, equals(SetType.normal));
+      expect(d2.weightKg, closeTo(80.0, 0.001));
+      expect(d2.reps, equals(8));
+      expect(d2, equals(s2));
+      final d3 = decoded.weeklySets[1][1];
+      expect(d3.type, equals(SetType.drop));
+      expect(d3.weightKg, closeTo(60.0, 0.001));
+      expect(d3.reps, equals(12));
+      expect(d3, equals(s3));
+
+      expect(decoded, equals(slot));
+    });
+
+    test(
+        'SCENARIO-PERIOD-005: legacy doc without weeklySets key deserializes '
+        'to [] (backward-compatible)', () {
+      // Simulates a Firestore doc written before weeklySets was added.
+      final legacyMap = <String, dynamic>{
+        'exerciseId': 'deadlift',
+        'exerciseName': 'Deadlift',
+        'muscleGroup': 'back',
+        'targetSets': 4,
+        'targetRepsMin': 3,
+        'targetRepsMax': 5,
+        'restSeconds': 180,
+      };
+
+      final slot = RoutineSlot.fromJson(legacyMap);
+
+      expect(slot.weeklySets, equals(<List<SetSpec>>[]),
+          reason: 'old docs must decode with weeklySets: []');
+    });
+  });
 }

@@ -156,6 +156,8 @@ class RoutineRepository {
       'name': draft.name,
       'level': draft.level.toJson(),
       'days': draft.days.map((d) => d.toJson()).toList(),
+      // Periodization: authored week count (mirror in firestore.rules hasOnly).
+      'numWeeks': draft.numWeeks,
     };
 
     await _collection.doc(draft.id).update(json);
@@ -200,6 +202,8 @@ class RoutineRepository {
       'split': draft.split,
       'level': draft.level.toJson(),
       'days': draft.days.map((d) => d.toJson()).toList(),
+      // Periodization: authored week count (mirror in firestore.rules hasOnly).
+      'numWeeks': draft.numWeeks,
     };
 
     await _collection.doc(draft.id).update(json);
@@ -244,6 +248,8 @@ class RoutineRepository {
       'split': draft.split,
       'level': draft.level.toJson(),
       'days': draft.days.map((d) => d.toJson()).toList(),
+      // Periodization: authored week count (mirror in firestore.rules hasOnly).
+      'numWeeks': draft.numWeeks,
     };
 
     await _collection.doc(draft.id).update(json);

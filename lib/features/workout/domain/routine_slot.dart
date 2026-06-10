@@ -47,6 +47,11 @@ class RoutineSlot with _$RoutineSlot {
     /// The explicit per-set rows for this slot.
     /// Empty list = use legacy fields and synthesize via [effectiveSets].
     @Default(<SetSpec>[]) List<SetSpec> sets,
+
+    /// Periodization (Model B): per-week explicit set rows.
+    /// `weeklySets[w]` holds the prescription for 0-based week `w`.
+    /// Empty = legacy / single-week slot → resolve via [effectiveSets].
+    @Default(<List<SetSpec>>[]) List<List<SetSpec>> weeklySets,
   }) = _RoutineSlot;
 
   factory RoutineSlot.fromJson(Map<String, Object?> json) =>
@@ -100,6 +105,18 @@ class RoutineSlot with _$RoutineSlot {
         weightKg: targetWeightKg,
       ),
     );
+  }
+
+  /// The per-set rows for a specific 0-based [week] of a periodized plan.
+  ///
+  /// Precedence: when [weeklySets] is populated AND [week] is in range, that
+  /// week's rows win. Otherwise falls back to [effectiveSets] (single-week /
+  /// legacy behavior). Out-of-range or negative [week] never throws.
+  List<SetSpec> effectiveSetsForWeek(int week) {
+    if (weeklySets.isNotEmpty && week >= 0 && week < weeklySets.length) {
+      return weeklySets[week];
+    }
+    return effectiveSets;
   }
 
   /// Derives the exercise mode from the new field, falling back to legacy

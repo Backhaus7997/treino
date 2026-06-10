@@ -32,7 +32,10 @@ mixin _$Session {
   int get durationMin => throw _privateConstructorUsedError;
   SessionStatus get status => throw _privateConstructorUsedError;
   int get dayNumber => throw _privateConstructorUsedError;
-  bool get wasFullyCompleted => throw _privateConstructorUsedError;
+  bool get wasFullyCompleted =>
+      throw _privateConstructorUsedError; // Periodization (Model B): 0-based week of the plan this session belongs to.
+// @Default(0) keeps single-week sessions intact and retro-compatible.
+  int get weekNumber => throw _privateConstructorUsedError;
 
   /// Serializes this Session to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -59,7 +62,8 @@ abstract class $SessionCopyWith<$Res> {
       int durationMin,
       SessionStatus status,
       int dayNumber,
-      bool wasFullyCompleted});
+      bool wasFullyCompleted,
+      int weekNumber});
 }
 
 /// @nodoc
@@ -88,6 +92,7 @@ class _$SessionCopyWithImpl<$Res, $Val extends Session>
     Object? status = null,
     Object? dayNumber = null,
     Object? wasFullyCompleted = null,
+    Object? weekNumber = null,
   }) {
     return _then(_value.copyWith(
       id: null == id
@@ -134,6 +139,10 @@ class _$SessionCopyWithImpl<$Res, $Val extends Session>
           ? _value.wasFullyCompleted
           : wasFullyCompleted // ignore: cast_nullable_to_non_nullable
               as bool,
+      weekNumber: null == weekNumber
+          ? _value.weekNumber
+          : weekNumber // ignore: cast_nullable_to_non_nullable
+              as int,
     ) as $Val);
   }
 }
@@ -156,7 +165,8 @@ abstract class _$$SessionImplCopyWith<$Res> implements $SessionCopyWith<$Res> {
       int durationMin,
       SessionStatus status,
       int dayNumber,
-      bool wasFullyCompleted});
+      bool wasFullyCompleted,
+      int weekNumber});
 }
 
 /// @nodoc
@@ -183,6 +193,7 @@ class __$$SessionImplCopyWithImpl<$Res>
     Object? status = null,
     Object? dayNumber = null,
     Object? wasFullyCompleted = null,
+    Object? weekNumber = null,
   }) {
     return _then(_$SessionImpl(
       id: null == id
@@ -229,6 +240,10 @@ class __$$SessionImplCopyWithImpl<$Res>
           ? _value.wasFullyCompleted
           : wasFullyCompleted // ignore: cast_nullable_to_non_nullable
               as bool,
+      weekNumber: null == weekNumber
+          ? _value.weekNumber
+          : weekNumber // ignore: cast_nullable_to_non_nullable
+              as int,
     ));
   }
 }
@@ -247,7 +262,8 @@ class _$SessionImpl implements _Session {
       this.durationMin = 0,
       required this.status,
       this.dayNumber = 1,
-      this.wasFullyCompleted = false});
+      this.wasFullyCompleted = false,
+      this.weekNumber = 0});
 
   factory _$SessionImpl.fromJson(Map<String, dynamic> json) =>
       _$$SessionImplFromJson(json);
@@ -280,10 +296,15 @@ class _$SessionImpl implements _Session {
   @override
   @JsonKey()
   final bool wasFullyCompleted;
+// Periodization (Model B): 0-based week of the plan this session belongs to.
+// @Default(0) keeps single-week sessions intact and retro-compatible.
+  @override
+  @JsonKey()
+  final int weekNumber;
 
   @override
   String toString() {
-    return 'Session(id: $id, uid: $uid, routineId: $routineId, routineName: $routineName, startedAt: $startedAt, finishedAt: $finishedAt, totalVolumeKg: $totalVolumeKg, durationMin: $durationMin, status: $status, dayNumber: $dayNumber, wasFullyCompleted: $wasFullyCompleted)';
+    return 'Session(id: $id, uid: $uid, routineId: $routineId, routineName: $routineName, startedAt: $startedAt, finishedAt: $finishedAt, totalVolumeKg: $totalVolumeKg, durationMin: $durationMin, status: $status, dayNumber: $dayNumber, wasFullyCompleted: $wasFullyCompleted, weekNumber: $weekNumber)';
   }
 
   @override
@@ -309,7 +330,9 @@ class _$SessionImpl implements _Session {
             (identical(other.dayNumber, dayNumber) ||
                 other.dayNumber == dayNumber) &&
             (identical(other.wasFullyCompleted, wasFullyCompleted) ||
-                other.wasFullyCompleted == wasFullyCompleted));
+                other.wasFullyCompleted == wasFullyCompleted) &&
+            (identical(other.weekNumber, weekNumber) ||
+                other.weekNumber == weekNumber));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -326,7 +349,8 @@ class _$SessionImpl implements _Session {
       durationMin,
       status,
       dayNumber,
-      wasFullyCompleted);
+      wasFullyCompleted,
+      weekNumber);
 
   /// Create a copy of Session
   /// with the given fields replaced by the non-null parameter values.
@@ -356,7 +380,8 @@ abstract class _Session implements Session {
       final int durationMin,
       required final SessionStatus status,
       final int dayNumber,
-      final bool wasFullyCompleted}) = _$SessionImpl;
+      final bool wasFullyCompleted,
+      final int weekNumber}) = _$SessionImpl;
 
   factory _Session.fromJson(Map<String, dynamic> json) = _$SessionImpl.fromJson;
 
@@ -383,7 +408,11 @@ abstract class _Session implements Session {
   @override
   int get dayNumber;
   @override
-  bool get wasFullyCompleted;
+  bool
+      get wasFullyCompleted; // Periodization (Model B): 0-based week of the plan this session belongs to.
+// @Default(0) keeps single-week sessions intact and retro-compatible.
+  @override
+  int get weekNumber;
 
   /// Create a copy of Session
   /// with the given fields replaced by the non-null parameter values.

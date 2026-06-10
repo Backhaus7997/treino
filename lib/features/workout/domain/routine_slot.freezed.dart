@@ -56,6 +56,11 @@ mixin _$RoutineSlot {
   /// Empty list = use legacy fields and synthesize via [effectiveSets].
   List<SetSpec> get sets => throw _privateConstructorUsedError;
 
+  /// Periodization (Model B): per-week explicit set rows.
+  /// `weeklySets[w]` holds the prescription for 0-based week `w`.
+  /// Empty = legacy / single-week slot → resolve via [effectiveSets].
+  List<List<SetSpec>> get weeklySets => throw _privateConstructorUsedError;
+
   /// Serializes this RoutineSlot to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
 
@@ -87,7 +92,8 @@ abstract class $RoutineSlotCopyWith<$Res> {
       int? durationSeconds,
       @JsonKey(unknownEnumValue: ExerciseMode.reps) ExerciseMode exerciseMode,
       @JsonKey(unknownEnumValue: RepMode.single) RepMode repMode,
-      List<SetSpec> sets});
+      List<SetSpec> sets,
+      List<List<SetSpec>> weeklySets});
 }
 
 /// @nodoc
@@ -120,6 +126,7 @@ class _$RoutineSlotCopyWithImpl<$Res, $Val extends RoutineSlot>
     Object? exerciseMode = null,
     Object? repMode = null,
     Object? sets = null,
+    Object? weeklySets = null,
   }) {
     return _then(_value.copyWith(
       exerciseId: null == exerciseId
@@ -182,6 +189,10 @@ class _$RoutineSlotCopyWithImpl<$Res, $Val extends RoutineSlot>
           ? _value.sets
           : sets // ignore: cast_nullable_to_non_nullable
               as List<SetSpec>,
+      weeklySets: null == weeklySets
+          ? _value.weeklySets
+          : weeklySets // ignore: cast_nullable_to_non_nullable
+              as List<List<SetSpec>>,
     ) as $Val);
   }
 }
@@ -209,7 +220,8 @@ abstract class _$$RoutineSlotImplCopyWith<$Res>
       int? durationSeconds,
       @JsonKey(unknownEnumValue: ExerciseMode.reps) ExerciseMode exerciseMode,
       @JsonKey(unknownEnumValue: RepMode.single) RepMode repMode,
-      List<SetSpec> sets});
+      List<SetSpec> sets,
+      List<List<SetSpec>> weeklySets});
 }
 
 /// @nodoc
@@ -240,6 +252,7 @@ class __$$RoutineSlotImplCopyWithImpl<$Res>
     Object? exerciseMode = null,
     Object? repMode = null,
     Object? sets = null,
+    Object? weeklySets = null,
   }) {
     return _then(_$RoutineSlotImpl(
       exerciseId: null == exerciseId
@@ -302,6 +315,10 @@ class __$$RoutineSlotImplCopyWithImpl<$Res>
           ? _value._sets
           : sets // ignore: cast_nullable_to_non_nullable
               as List<SetSpec>,
+      weeklySets: null == weeklySets
+          ? _value._weeklySets
+          : weeklySets // ignore: cast_nullable_to_non_nullable
+              as List<List<SetSpec>>,
     ));
   }
 }
@@ -325,9 +342,11 @@ class _$RoutineSlotImpl extends _RoutineSlot {
       @JsonKey(unknownEnumValue: ExerciseMode.reps)
       this.exerciseMode = ExerciseMode.reps,
       @JsonKey(unknownEnumValue: RepMode.single) this.repMode = RepMode.single,
-      final List<SetSpec> sets = const <SetSpec>[]})
+      final List<SetSpec> sets = const <SetSpec>[],
+      final List<List<SetSpec>> weeklySets = const <List<SetSpec>>[]})
       : _targetReps = targetReps,
         _sets = sets,
+        _weeklySets = weeklySets,
         super._();
 
   factory _$RoutineSlotImpl.fromJson(Map<String, dynamic> json) =>
@@ -403,9 +422,25 @@ class _$RoutineSlotImpl extends _RoutineSlot {
     return EqualUnmodifiableListView(_sets);
   }
 
+  /// Periodization (Model B): per-week explicit set rows.
+  /// `weeklySets[w]` holds the prescription for 0-based week `w`.
+  /// Empty = legacy / single-week slot → resolve via [effectiveSets].
+  final List<List<SetSpec>> _weeklySets;
+
+  /// Periodization (Model B): per-week explicit set rows.
+  /// `weeklySets[w]` holds the prescription for 0-based week `w`.
+  /// Empty = legacy / single-week slot → resolve via [effectiveSets].
+  @override
+  @JsonKey()
+  List<List<SetSpec>> get weeklySets {
+    if (_weeklySets is EqualUnmodifiableListView) return _weeklySets;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(_weeklySets);
+  }
+
   @override
   String toString() {
-    return 'RoutineSlot(exerciseId: $exerciseId, exerciseName: $exerciseName, muscleGroup: $muscleGroup, targetSets: $targetSets, targetRepsMin: $targetRepsMin, targetRepsMax: $targetRepsMax, restSeconds: $restSeconds, targetWeightKg: $targetWeightKg, notes: $notes, supersetGroup: $supersetGroup, targetReps: $targetReps, durationSeconds: $durationSeconds, exerciseMode: $exerciseMode, repMode: $repMode, sets: $sets)';
+    return 'RoutineSlot(exerciseId: $exerciseId, exerciseName: $exerciseName, muscleGroup: $muscleGroup, targetSets: $targetSets, targetRepsMin: $targetRepsMin, targetRepsMax: $targetRepsMax, restSeconds: $restSeconds, targetWeightKg: $targetWeightKg, notes: $notes, supersetGroup: $supersetGroup, targetReps: $targetReps, durationSeconds: $durationSeconds, exerciseMode: $exerciseMode, repMode: $repMode, sets: $sets, weeklySets: $weeklySets)';
   }
 
   @override
@@ -439,7 +474,9 @@ class _$RoutineSlotImpl extends _RoutineSlot {
             (identical(other.exerciseMode, exerciseMode) ||
                 other.exerciseMode == exerciseMode) &&
             (identical(other.repMode, repMode) || other.repMode == repMode) &&
-            const DeepCollectionEquality().equals(other._sets, _sets));
+            const DeepCollectionEquality().equals(other._sets, _sets) &&
+            const DeepCollectionEquality()
+                .equals(other._weeklySets, _weeklySets));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -460,7 +497,8 @@ class _$RoutineSlotImpl extends _RoutineSlot {
       durationSeconds,
       exerciseMode,
       repMode,
-      const DeepCollectionEquality().hash(_sets));
+      const DeepCollectionEquality().hash(_sets),
+      const DeepCollectionEquality().hash(_weeklySets));
 
   /// Create a copy of RoutineSlot
   /// with the given fields replaced by the non-null parameter values.
@@ -495,7 +533,8 @@ abstract class _RoutineSlot extends RoutineSlot {
       @JsonKey(unknownEnumValue: ExerciseMode.reps)
       final ExerciseMode exerciseMode,
       @JsonKey(unknownEnumValue: RepMode.single) final RepMode repMode,
-      final List<SetSpec> sets}) = _$RoutineSlotImpl;
+      final List<SetSpec> sets,
+      final List<List<SetSpec>> weeklySets}) = _$RoutineSlotImpl;
   const _RoutineSlot._() : super._();
 
   factory _RoutineSlot.fromJson(Map<String, dynamic> json) =
@@ -546,6 +585,12 @@ abstract class _RoutineSlot extends RoutineSlot {
   /// Empty list = use legacy fields and synthesize via [effectiveSets].
   @override
   List<SetSpec> get sets;
+
+  /// Periodization (Model B): per-week explicit set rows.
+  /// `weeklySets[w]` holds the prescription for 0-based week `w`.
+  /// Empty = legacy / single-week slot → resolve via [effectiveSets].
+  @override
+  List<List<SetSpec>> get weeklySets;
 
   /// Create a copy of RoutineSlot
   /// with the given fields replaced by the non-null parameter values.

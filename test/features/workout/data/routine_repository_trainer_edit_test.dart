@@ -11,6 +11,8 @@
 //                          createdAt/assignedTo in the payload.
 //   SCENARIO-TRN-REPO-007: updateTemplate rejects empty uid.
 //   SCENARIO-TRN-REPO-008: updateTemplate rejects empty draft.id.
+//   SCENARIO-PERIOD-050: updateAssigned / updateTemplate persist numWeeks in
+//                        the written doc (REQ-PERIOD-054).
 
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -184,6 +186,30 @@ void main() {
         throwsA(isA<ArgumentError>()),
       );
     });
+
+    test(
+        'SCENARIO-PERIOD-050: persists numWeeks in the written doc '
+        '(REQ-PERIOD-054)', () async {
+      final id = await seedAssignedPlan();
+
+      final updatedDraft = Routine(
+        id: id,
+        name: 'Plan Periodizado',
+        split: 'PPL',
+        level: ExperienceLevel.beginner,
+        days: const [],
+        source: RoutineSource.trainerAssigned,
+        assignedBy: 'trainer-a',
+        assignedTo: 'athlete-b',
+        visibility: RoutineVisibility.private,
+        numWeeks: 4,
+      );
+      await repo.updateAssigned(uid: 'trainer-a', draft: updatedDraft);
+
+      final data =
+          (await firestore.collection('routines').doc(id).get()).data()!;
+      expect(data['numWeeks'], equals(4));
+    });
   });
 
   // ── updateTemplate ────────────────────────────────────────────────────────
@@ -283,6 +309,29 @@ void main() {
         ),
         throwsA(isA<ArgumentError>()),
       );
+    });
+
+    test(
+        'SCENARIO-PERIOD-050: persists numWeeks in the written doc '
+        '(REQ-PERIOD-054)', () async {
+      final id = await seedTemplate();
+
+      final updatedDraft = Routine(
+        id: id,
+        name: 'Plantilla Periodizada',
+        split: 'Full Body',
+        level: ExperienceLevel.beginner,
+        days: const [],
+        source: RoutineSource.trainerTemplate,
+        assignedBy: 'trainer-a',
+        visibility: RoutineVisibility.private,
+        numWeeks: 4,
+      );
+      await repo.updateTemplate(uid: 'trainer-a', draft: updatedDraft);
+
+      final data =
+          (await firestore.collection('routines').doc(id).get()).data()!;
+      expect(data['numWeeks'], equals(4));
     });
   });
 }

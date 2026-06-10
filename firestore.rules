@@ -146,12 +146,14 @@ service cloud.firestore {
                     && !('assignedTo' in request.resource.data)
                     // Only content fields may appear in the written document.
                     && request.resource.data.keys().hasOnly(
+                         // + numWeeks (periodization, Model B) — mirror RoutineRepository.
                          ['name', 'level', 'days',
                           'source', 'createdBy', 'visibility', 'createdAt', 'status',
-                          'split', 'estimatedMinutesPerDay', 'imageUrl'])
+                          'split', 'estimatedMinutesPerDay', 'imageUrl', 'numWeeks'])
                     // The diff must touch ONLY content fields (name/level/days).
                     && request.resource.data.diff(resource.data).affectedKeys()
-                         .hasOnly(['name', 'level', 'days']);
+                         // + numWeeks (periodization) — repo always sends it.
+                         .hasOnly(['name', 'level', 'days', 'numWeeks']);
 
       // UPDATE path 3: trainer edits content of a trainer-assigned plan.
       //
@@ -186,13 +188,15 @@ service cloud.firestore {
                         || request.resource.data.createdAt == resource.data.createdAt)
                     // Only content fields may appear in the written document.
                     && request.resource.data.keys().hasOnly(
+                         // + numWeeks (periodization, Model B) — mirror RoutineRepository.
                          ['name', 'split', 'level', 'days',
                           'source', 'assignedBy', 'assignedTo', 'visibility',
                           'status', 'createdBy', 'createdAt',
-                          'estimatedMinutesPerDay', 'imageUrl'])
+                          'estimatedMinutesPerDay', 'imageUrl', 'numWeeks'])
                     // The diff must touch ONLY content fields.
                     && request.resource.data.diff(resource.data).affectedKeys()
-                         .hasOnly(['name', 'split', 'level', 'days']);
+                         // + numWeeks (periodization) — repo always sends it.
+                         .hasOnly(['name', 'split', 'level', 'days', 'numWeeks']);
 
       // UPDATE path 4: trainer edits content of a trainer template.
       //
@@ -227,13 +231,15 @@ service cloud.firestore {
                         || request.resource.data.createdAt == resource.data.createdAt)
                     // Only content fields may appear in the written document.
                     && request.resource.data.keys().hasOnly(
+                         // + numWeeks (periodization, Model B) — mirror RoutineRepository.
                          ['name', 'split', 'level', 'days',
                           'source', 'assignedBy', 'assignedTo', 'visibility',
                           'status', 'createdBy', 'createdAt',
-                          'estimatedMinutesPerDay', 'imageUrl'])
+                          'estimatedMinutesPerDay', 'imageUrl', 'numWeeks'])
                     // The diff must touch ONLY content fields.
                     && request.resource.data.diff(resource.data).affectedKeys()
-                         .hasOnly(['name', 'split', 'level', 'days']);
+                         // + numWeeks (periodization) — repo always sends it.
+                         .hasOnly(['name', 'split', 'level', 'days', 'numWeeks']);
 
       // DELETE (narrow): the owning trainer may delete their OWN
       // `trainer-template` docs (library cleanup) and `trainer-assigned`

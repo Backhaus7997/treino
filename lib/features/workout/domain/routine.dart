@@ -36,6 +36,10 @@ class Routine with _$Routine {
         createdBy, // uid del atleta que creó la rutina; null para system/trainer-assigned
     @Default(RoutineStatus.active)
     RoutineStatus status, // default active — retro-compat
+    // ── Periodization (Model B) ──────────────────────────────────────────────
+    // Number of authored weeks. @Default(1) keeps single-week routines intact
+    // and retro-compatible with docs that lack this field.
+    @Default(1) int numWeeks,
   }) = _Routine;
 
   factory Routine.fromJson(Map<String, Object?> json) =>
