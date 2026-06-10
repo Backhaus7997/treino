@@ -70,6 +70,7 @@ dev_dependencies:
   fake_cloud_firestore: ^3.0.3
 
 flutter:
+  generate: true
   uses-material-design: true
   assets:
     - assets/logo/
