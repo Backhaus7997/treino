@@ -42,7 +42,11 @@ class TrainerDashboardTab extends ConsumerWidget {
     final palette = AppPalette.of(context);
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
+      // Explicit padding overrides the ambient MediaQuery inset, so the
+      // floating bar's height must be added back — otherwise the last row
+      // (CTA buttons) can never scroll out from behind the translucent bar.
+      padding: EdgeInsets.fromLTRB(
+          20, 14, 20, 24 + MediaQuery.paddingOf(context).bottom),
       physics: const ClampingScrollPhysics(),
       children: [
         const _DashboardHeader(),

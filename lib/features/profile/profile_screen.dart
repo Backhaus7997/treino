@@ -49,6 +49,9 @@ class _AthleteProfile extends ConsumerWidget {
     final theme = Theme.of(context);
 
     return SingleChildScrollView(
+      // SingleChildScrollView does NOT inherit the ambient MediaQuery inset —
+      // pad the bottom so content can scroll out from behind the floating bar.
+      padding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom),
       child: Column(
         children: [
           const ProfileHeader(),
