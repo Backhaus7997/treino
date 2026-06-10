@@ -315,7 +315,14 @@ class UserRepository {
   }
 
   Stream<UserProfile?> watch(String uid) {
-    return _users.doc(uid).snapshots().map((snap) {
+    return _users
+        .doc(uid)
+        .snapshots()
+        // A cold local cache yields a first snapshot with exists=false BEFORE
+        // the network confirms — emitting null here sends an existing user to
+        // /profile-setup. Only a server-confirmed snapshot may report absence.
+        .where((snap) => snap.exists || !snap.metadata.isFromCache)
+        .map((snap) {
       final data = snap.data();
       if (!snap.exists || data == null) return null;
       return UserProfile.fromJson(data);
