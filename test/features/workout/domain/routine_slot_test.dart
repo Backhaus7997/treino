@@ -529,6 +529,30 @@ void main() {
       final negative = periodizedSlot.effectiveSetsForWeek(-1);
       expect(negative, equals(periodizedSlot.effectiveSets));
     });
+
+    test(
+        'SCENARIO-PERIOD-008: an in-range authored-EMPTY week returns [] '
+        'as-is (deload/rest week) — no fallback to effectiveSets', () {
+      const slotWithRestWeek = RoutineSlot(
+        exerciseId: 'bench-press',
+        exerciseName: 'Bench Press',
+        muscleGroup: 'chest',
+        targetSets: 3,
+        targetRepsMin: 8,
+        targetRepsMax: 12,
+        restSeconds: 90,
+        weeklySets: [week0Sets, <SetSpec>[], week2Sets],
+      );
+
+      final restWeek = slotWithRestWeek.effectiveSetsForWeek(1);
+      expect(restWeek, isEmpty,
+          reason: 'an authored-empty week is intentional (deload/rest) and '
+              'must NOT fall back to the legacy synthesis');
+
+      // Neighboring weeks unaffected.
+      expect(slotWithRestWeek.effectiveSetsForWeek(0), equals(week0Sets));
+      expect(slotWithRestWeek.effectiveSetsForWeek(2), equals(week2Sets));
+    });
   });
 
   // ── Periodization (Model B): weeklySets serialization ─────────────────────
@@ -607,6 +631,42 @@ void main() {
       expect(d3, equals(s3));
 
       expect(decoded, equals(slot));
+    });
+
+    test(
+        'SCENARIO-PERIOD-007: wire format is Firestore-safe — weeks are '
+        'map-wrapped, NO nested arrays anywhere', () {
+      // Firestore rejects an array whose direct element is another array
+      // ("Nested arrays are not supported"). WeeklySetsConverter must wrap
+      // each week in a map: [{'sets': [...]}, ...].
+      const slot = RoutineSlot(
+        exerciseId: 'squat',
+        exerciseName: 'Squat',
+        muscleGroup: 'quads',
+        targetSets: 2,
+        targetRepsMin: 8,
+        targetRepsMax: 12,
+        restSeconds: 120,
+        weeklySets: [
+          [SetSpec(reps: 10)],
+          [SetSpec(reps: 8), SetSpec(reps: 6)],
+        ],
+      );
+
+      final wire = slot.toJson()['weeklySets'] as List<dynamic>;
+      expect(wire, hasLength(2));
+      for (final week in wire) {
+        expect(week, isA<Map<dynamic, dynamic>>(),
+            reason: 'each week must be map-wrapped — a List here would be '
+                'rejected by Firestore as a nested array');
+        final sets = (week as Map)['sets'] as List<dynamic>;
+        for (final s in sets) {
+          expect(s, isA<Map<dynamic, dynamic>>());
+        }
+      }
+
+      // And the map-wrapped wire still round-trips.
+      expect(RoutineSlot.fromJson(slot.toJson()), equals(slot));
     });
 
     test(

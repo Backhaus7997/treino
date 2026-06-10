@@ -6,6 +6,27 @@ import 'set_spec.dart';
 part 'routine_slot.freezed.dart';
 part 'routine_slot.g.dart';
 
+/// Firestore cannot store nested arrays (an array element must not be
+/// another array), so `List<List<SetSpec>>` is unpersistable as-is. On the
+/// wire each week is wrapped in a map: `[{'sets': [...]}, {'sets': [...]}]`.
+/// The domain type stays `List<List<SetSpec>>` — only the JSON shape changes.
+class WeeklySetsConverter
+    implements JsonConverter<List<List<SetSpec>>, List<dynamic>> {
+  const WeeklySetsConverter();
+
+  @override
+  List<List<SetSpec>> fromJson(List<dynamic> json) => json
+      .map((week) => ((week as Map)['sets'] as List<dynamic>? ?? const [])
+          .map((s) => SetSpec.fromJson(Map<String, Object?>.from(s as Map)))
+          .toList())
+      .toList();
+
+  @override
+  List<dynamic> toJson(List<List<SetSpec>> weeks) => weeks
+      .map((week) => {'sets': week.map((s) => s.toJson()).toList()})
+      .toList();
+}
+
 @freezed
 class RoutineSlot with _$RoutineSlot {
   // Private constructor required for custom getters in freezed classes.
@@ -50,8 +71,14 @@ class RoutineSlot with _$RoutineSlot {
 
     /// Periodization (Model B): per-week explicit set rows.
     /// `weeklySets[w]` holds the prescription for 0-based week `w`.
-    /// Empty = legacy / single-week slot → resolve via [effectiveSets].
-    @Default(<List<SetSpec>>[]) List<List<SetSpec>> weeklySets,
+    /// Empty OUTER list = legacy / single-week slot → resolve via
+    /// [effectiveSets]. An in-range EMPTY inner list is an authored-empty
+    /// week (e.g. deload/rest) and is returned as-is — no fallback.
+    /// Wire format via [WeeklySetsConverter] — Firestore rejects nested
+    /// arrays, so weeks are map-wrapped on the wire.
+    @Default(<List<SetSpec>>[])
+    @WeeklySetsConverter()
+    List<List<SetSpec>> weeklySets,
   }) = _RoutineSlot;
 
   factory RoutineSlot.fromJson(Map<String, Object?> json) =>
@@ -110,8 +137,10 @@ class RoutineSlot with _$RoutineSlot {
   /// The per-set rows for a specific 0-based [week] of a periodized plan.
   ///
   /// Precedence: when [weeklySets] is populated AND [week] is in range, that
-  /// week's rows win. Otherwise falls back to [effectiveSets] (single-week /
-  /// legacy behavior). Out-of-range or negative [week] never throws.
+  /// week's rows win — INCLUDING an authored-empty week (`[]`, e.g. a
+  /// deload/rest week), which is returned as-is with no fallback. Only an
+  /// empty OUTER [weeklySets] or an out-of-range/negative [week] falls back
+  /// to [effectiveSets] (single-week / legacy behavior). Never throws.
   List<SetSpec> effectiveSetsForWeek(int week) {
     if (weeklySets.isNotEmpty && week >= 0 && week < weeklySets.length) {
       return weeklySets[week];
