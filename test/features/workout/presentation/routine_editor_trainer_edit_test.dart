@@ -392,8 +392,7 @@ void main() {
 
     await tester.enterText(
         find.byKey(const Key('editor_name_field')), 'Nuevo Plan');
-    await tester.enterText(
-        find.byKey(const Key('editor_split_field')), 'PPL');
+    await tester.enterText(find.byKey(const Key('editor_split_field')), 'PPL');
     await tester.pumpAndSettle();
 
     await tester.tap(find.text(CoachStrings.editorAddSlot));
@@ -412,8 +411,8 @@ void main() {
     await tester.enterText(find.byWidget(repsField), '8');
     await tester.pumpAndSettle();
 
-    await tester.tap(
-        find.widgetWithText(ElevatedButton, CoachStrings.editorSubmit));
+    await tester
+        .tap(find.widgetWithText(ElevatedButton, CoachStrings.editorSubmit));
     await tester.pumpAndSettle();
 
     verify(() => repo.createAssigned(any())).called(1);
