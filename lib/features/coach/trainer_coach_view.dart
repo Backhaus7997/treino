@@ -16,19 +16,17 @@ import 'presentation/trainer_agenda_tab.dart';
 class TrainerCoachView extends StatelessWidget {
   const TrainerCoachView({super.key, this.initialTab});
 
-  /// Optional initial sub-tab — accepts `'alumnos'`, `'agenda'`, or
-  /// `'comunidades'`. Read from the `?tab=` query param by [CoachScreen]
+  /// Optional initial sub-tab — accepts `'alumnos'` or `'agenda'`.
+  /// Read from the `?tab=` query param by [CoachScreen]
   /// so deep links from the trainer dashboard land on the right tab.
   final String? initialTab;
 
-  static const _labels = <String>['ALUMNOS', 'AGENDA', 'COMUNIDADES'];
+  static const _labels = <String>['ALUMNOS', 'AGENDA'];
 
   static int _resolveInitialIndex(String? tab) {
     switch (tab) {
       case 'agenda':
         return 1;
-      case 'comunidades':
-        return 2;
       case 'alumnos':
       default:
         return 0;
@@ -77,7 +75,6 @@ class TrainerCoachView extends StatelessWidget {
                     return TrainerAgendaTab(trainerId: uid);
                   },
                 ),
-                const _SubTabPlaceholder(label: 'COMUNIDADES'),
               ],
             ),
           ),
@@ -445,43 +442,6 @@ class _StatusBadge extends StatelessWidget {
           letterSpacing: 0.8,
           color: color,
         ),
-      ),
-    );
-  }
-}
-
-// ── Placeholder sub-tab (AGENDA, COMUNIDADES) ────────────────────────────────
-
-class _SubTabPlaceholder extends StatelessWidget {
-  const _SubTabPlaceholder({required this.label});
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            label,
-            style: GoogleFonts.barlowCondensed(
-              fontWeight: FontWeight.w700,
-              fontSize: 28,
-              color: palette.highlight,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'PRÓXIMAMENTE',
-            style: GoogleFonts.barlowCondensed(
-              fontWeight: FontWeight.w700,
-              fontSize: 12,
-              letterSpacing: 1.2,
-              color: palette.textMuted,
-            ),
-          ),
-        ],
       ),
     );
   }
