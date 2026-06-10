@@ -54,52 +54,67 @@ class TreinoBottomBar extends StatelessWidget {
     return SafeArea(
       top: false,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(36),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-            child: Container(
-              height: 72,
-              decoration: BoxDecoration(
-                color: palette.bgCard.withValues(alpha: 0.72),
-                borderRadius: BorderRadius.circular(36),
-                border: Border.all(color: palette.border),
+        // Generous side/bottom margins lift the pill off the edges
+        // (WhatsApp-style floating bar) — content scrolls visibly around it.
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 18),
+        child: DecoratedBox(
+          // Shadow lives OUTSIDE the ClipRRect — inside it gets clipped away.
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(36),
+            boxShadow: [
+              BoxShadow(
+                color: palette.bg.withValues(alpha: 0.45),
+                blurRadius: 24,
+                offset: const Offset(0, 10),
               ),
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final tabWidth = constraints.maxWidth / _items.length;
-                  return Stack(
-                    children: [
-                      AnimatedPositioned(
-                        duration: const Duration(milliseconds: 320),
-                        curve: Curves.easeOutCubic,
-                        left: tabWidth * currentIndex + 8,
-                        top: 8,
-                        bottom: 8,
-                        width: tabWidth - 16,
-                        child: _PillHighlight(palette: palette),
-                      ),
-                      Row(
-                        children: List.generate(_items.length, (i) {
-                          final item = _items[i];
-                          final active = i == currentIndex;
-                          return Expanded(
-                            child: GestureDetector(
-                              behavior: HitTestBehavior.opaque,
-                              onTap: () => onTap(i),
-                              child: _TabContent(
-                                spec: item,
-                                active: active,
-                                palette: palette,
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(36),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+              child: Container(
+                height: 72,
+                decoration: BoxDecoration(
+                  color: palette.bgCard.withValues(alpha: 0.72),
+                  borderRadius: BorderRadius.circular(36),
+                  border: Border.all(color: palette.border),
+                ),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final tabWidth = constraints.maxWidth / _items.length;
+                    return Stack(
+                      children: [
+                        AnimatedPositioned(
+                          duration: const Duration(milliseconds: 320),
+                          curve: Curves.easeOutCubic,
+                          left: tabWidth * currentIndex + 8,
+                          top: 8,
+                          bottom: 8,
+                          width: tabWidth - 16,
+                          child: _PillHighlight(palette: palette),
+                        ),
+                        Row(
+                          children: List.generate(_items.length, (i) {
+                            final item = _items[i];
+                            final active = i == currentIndex;
+                            return Expanded(
+                              child: GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                onTap: () => onTap(i),
+                                child: _TabContent(
+                                  spec: item,
+                                  active: active,
+                                  palette: palette,
+                                ),
                               ),
-                            ),
-                          );
-                        }),
-                      ),
-                    ],
-                  );
-                },
+                            );
+                          }),
+                        ),
+                      ],
+                    );
+                  },
+                ),
               ),
             ),
           ),
