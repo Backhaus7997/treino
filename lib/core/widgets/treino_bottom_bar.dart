@@ -56,7 +56,7 @@ class TreinoBottomBar extends StatelessWidget {
       child: Padding(
         // Generous side/bottom margins lift the pill off the edges
         // (WhatsApp-style floating bar) — content scrolls visibly around it.
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 18),
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 10),
         child: DecoratedBox(
           // Shadow lives OUTSIDE the ClipRRect — inside it gets clipped away.
           decoration: BoxDecoration(
