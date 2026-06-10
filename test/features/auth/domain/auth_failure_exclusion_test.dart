@@ -33,7 +33,8 @@ void main() {
     });
 
     // SCENARIO-769: existing userMessage values are verbatim es-AR, unchanged.
-    test('invalidEmail userMessage is hardcoded es-AR (not routed through ARB)', () {
+    test('invalidEmail userMessage is hardcoded es-AR (not routed through ARB)',
+        () {
       const failure = AuthFailure.invalidEmail();
       expect(failure.userMessage, 'El email no es válido');
     });

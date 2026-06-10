@@ -119,7 +119,8 @@ void main() {
 
     testWidgets('authLoginTrainerCardSubtitle verbatim', (tester) async {
       final l10n = await _pumpAndGetL10n(tester);
-      expect(l10n.authLoginTrainerCardSubtitle, 'Pedí tu alta al equipo TREINO');
+      expect(
+          l10n.authLoginTrainerCardSubtitle, 'Pedí tu alta al equipo TREINO');
     });
 
     // --- Register ---
@@ -265,7 +266,8 @@ void main() {
 
     testWidgets('authValidationPasswordMismatch verbatim', (tester) async {
       final l10n = await _pumpAndGetL10n(tester);
-      expect(l10n.authValidationPasswordMismatch, 'Las contraseñas no coinciden');
+      expect(
+          l10n.authValidationPasswordMismatch, 'Las contraseñas no coinciden');
     });
 
     // --- Profile ---
