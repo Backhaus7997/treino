@@ -8,6 +8,8 @@ import 'package:go_router/go_router.dart';
 import '../features/auth/application/auth_providers.dart';
 import '../features/notifications/application/notification_providers.dart';
 import '../features/notifications/application/notification_router.dart';
+import '../l10n/app_l10n.dart';
+import 'locale_resolver.dart';
 import 'router.dart';
 import 'theme/app_theme.dart';
 
@@ -110,6 +112,11 @@ class _TreinoAppState extends ConsumerState<TreinoApp> {
       darkTheme: AppTheme.dark(),
       themeMode: ThemeMode.dark,
       routerConfig: _router,
+      // i18n — ADR-I18N-004, ADR-I18N-005
+      localizationsDelegates: AppL10n.localizationsDelegates,
+      supportedLocales: AppL10n.supportedLocales,
+      localeResolutionCallback: (locale, supported) =>
+          resolveLocale(locale ?? const Locale('es', 'AR'), supported),
       // Root ScaffoldMessenger key for foreground push SnackBars. (ADR-PN-010)
       scaffoldMessengerKey: _scaffoldMessengerKey,
       // Global: tap anywhere outside an input dismisses the keyboard.

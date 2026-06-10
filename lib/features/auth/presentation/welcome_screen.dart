@@ -8,8 +8,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../app/theme/app_background.dart';
 import '../../../app/theme/app_palette.dart';
 import '../application/auth_providers.dart';
+import '../../../l10n/app_l10n.dart';
 import '../../profile/application/account_deletion_notifier.dart';
-import 'auth_strings.dart';
 import 'widgets/auth_pill_button.dart';
 import 'widgets/auth_secondary_button.dart';
 import 'widgets/treino_logo.dart';
@@ -20,6 +20,7 @@ class WelcomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     final isLoading = ref.watch(authNotifierProvider).isLoading;
 
     // Show "Tu cuenta fue eliminada" SnackBar when the deletion flag is set.
@@ -69,7 +70,7 @@ class WelcomeScreen extends ConsumerWidget {
                               ),
                               const SizedBox(width: 8),
                               Text(
-                                AuthStrings.welcomeEyebrow,
+                                l10n.authWelcomeEyebrow,
                                 style: GoogleFonts.barlowCondensed(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w600,
@@ -112,7 +113,7 @@ class WelcomeScreen extends ConsumerWidget {
                           ),
                           const SizedBox(height: 14),
                           Text(
-                            AuthStrings.welcomeBody,
+                            l10n.authWelcomeBody,
                             style: GoogleFonts.barlow(
                               fontSize: 14,
                               fontWeight: FontWeight.w400,
@@ -124,7 +125,7 @@ class WelcomeScreen extends ConsumerWidget {
                           const Spacer(flex: 3),
                           // ── Bottom block: CTA + social + sign-in link ────
                           AuthPillButton(
-                            label: AuthStrings.welcomeCta,
+                            label: l10n.authWelcomeCta,
                             onPressed: () => context.push('/register'),
                             showArrow: false,
                           ),
@@ -139,7 +140,7 @@ class WelcomeScreen extends ConsumerWidget {
                                     width: 18,
                                     height: 18,
                                   ),
-                                  label: AuthStrings.googleLabel,
+                                  label: l10n.authGoogleLabel,
                                   onPressed: isLoading
                                       ? null
                                       : () => _signInWithGoogle(context, ref),
@@ -149,7 +150,7 @@ class WelcomeScreen extends ConsumerWidget {
                               Expanded(
                                 child: AuthSecondaryButton(
                                   icon: FontAwesomeIcons.apple,
-                                  label: AuthStrings.appleLabel,
+                                  label: l10n.authAppleLabel,
                                   onPressed: isLoading
                                       ? null
                                       : () => _signInWithApple(context, ref),
@@ -163,7 +164,7 @@ class WelcomeScreen extends ConsumerWidget {
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Text(
-                                  '${AuthStrings.welcomeHaveAccount} · ',
+                                  '${l10n.authWelcomeHaveAccount} · ',
                                   style: GoogleFonts.barlow(
                                     fontSize: 14,
                                     color: palette.textMuted,
@@ -172,7 +173,7 @@ class WelcomeScreen extends ConsumerWidget {
                                 GestureDetector(
                                   onTap: () => context.push('/login'),
                                   child: Text(
-                                    AuthStrings.welcomeSignIn,
+                                    l10n.authWelcomeSignIn,
                                     style: GoogleFonts.barlow(
                                       fontSize: 14,
                                       fontWeight: FontWeight.w600,

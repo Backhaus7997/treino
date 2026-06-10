@@ -3,7 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/treino_icon.dart';
-import '../auth_strings.dart';
+import '../../../../l10n/app_l10n.dart';
 
 /// Card shown at the bottom of LoginScreen for trainer access inquiry.
 /// Tapping opens an AlertDialog with the team email.
@@ -13,6 +13,7 @@ class TrainerInquiryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
 
     return GestureDetector(
       onTap: () => _showDialog(context, palette),
@@ -49,7 +50,7 @@ class TrainerInquiryCard extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    AuthStrings.loginTrainerCardTitle,
+                    l10n.authLoginTrainerCardTitle,
                     style: GoogleFonts.barlow(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
@@ -58,7 +59,7 @@ class TrainerInquiryCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    AuthStrings.loginTrainerCardSubtitle,
+                    l10n.authLoginTrainerCardSubtitle,
                     style: GoogleFonts.barlow(
                       fontSize: 12,
                       fontWeight: FontWeight.w400,
@@ -80,24 +81,25 @@ class TrainerInquiryCard extends StatelessWidget {
   }
 
   void _showDialog(BuildContext context, AppPalette palette) {
+    final l10n = AppL10n.of(context);
     showDialog<void>(
       context: context,
       builder: (_) => AlertDialog(
         title: Text(
-          AuthStrings.trainerInquiryDialogTitle,
+          l10n.authTrainerInquiryDialogTitle,
           style: GoogleFonts.barlowCondensed(
             fontWeight: FontWeight.w700,
             fontSize: 18,
           ),
         ),
         content: Text(
-          AuthStrings.trainerInquiryDialogBody,
+          l10n.authTrainerInquiryDialogBody,
           style: GoogleFonts.barlow(fontSize: 14),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text(AuthStrings.trainerInquiryDialogClose),
+            child: Text(l10n.authTrainerInquiryDialogClose),
           ),
         ],
       ),

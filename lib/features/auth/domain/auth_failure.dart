@@ -3,6 +3,12 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 
 part 'auth_failure.freezed.dart';
 
+// i18n: intentional exclusion — domain layer cannot receive BuildContext.
+// Per ADR-I18N-002: AuthFailure.userMessage stays hardcoded es-AR permanently.
+// Trade-off: these strings are es-AR-only forever. Tests: auth_failure_test.dart.
+const kAuthFailureI18nExclusionNote =
+    'intentional exclusion — domain layer cannot receive BuildContext';
+
 @freezed
 sealed class AuthFailure with _$AuthFailure implements Exception {
   const AuthFailure._();
