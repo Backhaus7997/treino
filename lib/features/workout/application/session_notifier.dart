@@ -60,6 +60,13 @@ class SessionNotifier
       ),
     );
 
+    // Clamp weekNumber into [0, numWeeks-1] so a malformed URL like
+    // ?week=99 on a 2-week plan or ?week=-1 never persists an out-of-range
+    // value to Firestore. The upper bound is floored at 0 because a corrupt
+    // doc with numWeeks <= 0 would otherwise make clamp() throw (upper < lower).
+    final maxWeek = routine.numWeeks > 1 ? routine.numWeeks - 1 : 0;
+    final clampedWeek = weekNumber.clamp(0, maxWeek);
+
     final repo = ref.read(sessionRepositoryProvider);
     final uid = ref.read(currentUidProvider);
     if (uid == null) {
@@ -71,7 +78,7 @@ class SessionNotifier
       routineName: routine.name,
       startedAt: DateTime.now(),
       dayNumber: dayNumber,
-      weekNumber: weekNumber,
+      weekNumber: clampedWeek,
     );
 
     return SessionState(

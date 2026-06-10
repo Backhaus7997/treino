@@ -753,12 +753,6 @@ class _PeriodizedCTABar extends ConsumerWidget {
         }
 
         final viewedDay = day.dayNumber;
-        final startable = isStartable(
-          viewedWeek,
-          viewedDay,
-          progress.completed,
-          dayNumbers,
-        );
         final weekLocked = !isWeekUnlocked(
           viewedWeek,
           progress.completed,
@@ -844,17 +838,17 @@ class _PeriodizedCTABar extends ConsumerWidget {
             children: [
               Expanded(
                 child: ElevatedButton(
-                  onPressed: startable
-                      ? () {
-                          ref.read(analyticsServiceProvider).logRoutineStarted(
-                                routineId: routine.id,
-                                routineName: routine.name,
-                              );
-                          context.push(
-                            '/workout/session/${routine.id}/${day.dayNumber}?week=$viewedWeek',
-                          );
-                        }
-                      : null,
+                  // By this point alreadyDone, weekLocked, and dayLocked have
+                  // all early-returned above, so this day is always startable.
+                  onPressed: () {
+                    ref.read(analyticsServiceProvider).logRoutineStarted(
+                          routineId: routine.id,
+                          routineName: routine.name,
+                        );
+                    context.push(
+                      '/workout/session/${routine.id}/${day.dayNumber}?week=$viewedWeek',
+                    );
+                  },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: palette.accent,
                     minimumSize: const Size.fromHeight(56),

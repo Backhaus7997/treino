@@ -580,6 +580,71 @@ void main() {
     });
   });
 
+  // ── Fix 1 clamp tests — negative / out-of-range weekNumber ──────────────
+
+  group('weekNumber clamping in _buildFresh', () {
+    Future<int> capturedWeek({
+      required int requestedWeek,
+      required int numWeeks,
+    }) async {
+      final repo = MockSessionRepository();
+      final routine = makeRoutine(numWeeks: numWeeks);
+      final session = makeSession(weekNumber: 0); // return value irrelevant
+
+      when(() => repo.create(
+            uid: any(named: 'uid'),
+            routineId: any(named: 'routineId'),
+            routineName: any(named: 'routineName'),
+            startedAt: any(named: 'startedAt'),
+            dayNumber: any(named: 'dayNumber'),
+            weekNumber: any(named: 'weekNumber'),
+          )).thenAnswer((_) async => session);
+
+      final container = _makeContainer(
+        repo: repo,
+        uid: 'u1',
+        routine: routine,
+      );
+      addTearDown(container.dispose);
+
+      final init = FreshSession(
+        routineId: routine.id,
+        dayNumber: 1,
+        weekNumber: requestedWeek,
+      );
+      await container.read(sessionNotifierProvider(init).future);
+
+      final captured = verify(() => repo.create(
+            uid: any(named: 'uid'),
+            routineId: any(named: 'routineId'),
+            routineName: any(named: 'routineName'),
+            startedAt: any(named: 'startedAt'),
+            dayNumber: any(named: 'dayNumber'),
+            weekNumber: captureAny(named: 'weekNumber'),
+          )).captured;
+      return captured.last as int;
+    }
+
+    test('weekNumber=-1 is clamped to 0 before persisting', () async {
+      final persisted = await capturedWeek(requestedWeek: -1, numWeeks: 1);
+      expect(persisted, equals(0));
+    });
+
+    test('weekNumber=99 on a 2-week plan is clamped to 1 (numWeeks-1)',
+        () async {
+      final persisted = await capturedWeek(requestedWeek: 99, numWeeks: 2);
+      expect(persisted, equals(1));
+    });
+
+    test('numWeeks=0 (corrupt doc): upper bound floored at 0, no throw',
+        () async {
+      // clamp(0, numWeeks - 1) with numWeeks=0 would be clamp(0, -1), which
+      // throws ArgumentError in Dart. The floor guard must prevent that.
+      final persisted = await capturedWeek(requestedWeek: 5, numWeeks: 0);
+      expect(persisted, equals(0));
+    });
+  });
+
   // ── SCENARIO-037-notifier: _nextIncompleteIndex on periodized plan ────────
 
   group(

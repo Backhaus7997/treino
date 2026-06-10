@@ -215,6 +215,40 @@ void main() {
       await _settle(tester);
       expect(find.byType(ExerciseSlotRow), findsNWidgets(2));
     });
+
+    // Fix 3 — REQ-PERIOD-042 "ANY day startable" on single-week plan
+    testWidgets(
+        'SCENARIO-038 fix: DÍA 2 tap on single-week routine → EMPEZAR enabled, no lock affordance',
+        (tester) async {
+      // _singleWeekRoutine() has 2 days (day 1 + day 2).
+      final routine = _singleWeekRoutine();
+      await tester.pumpWidget(_wrap(
+        RoutineDetailScreen(routineId: routine.id),
+        routine: routine,
+      ));
+      await _settle(tester);
+
+      // Tap the second day chip; chips may be below the fold.
+      await tester.tap(find.text('DÍA 2', skipOffstage: false));
+      await _settle(tester);
+
+      // EMPEZAR must be present and its button enabled (onPressed != null).
+      expect(find.text('EMPEZAR', skipOffstage: false), findsOneWidget);
+      final btn = tester.widget<ElevatedButton>(
+          find.widgetWithText(ElevatedButton, 'EMPEZAR', skipOffstage: false));
+      expect(btn.onPressed, isNotNull,
+          reason: 'Day 2 on a single-week plan must be startable');
+
+      // No lock affordances.
+      expect(
+        find.textContaining('BLOQUEADO', skipOffstage: false),
+        findsNothing,
+      );
+      expect(
+        find.textContaining('SEMANA BLOQUEADA', skipOffstage: false),
+        findsNothing,
+      );
+    });
   });
 
   // ── Tests 3.15/3.16 — Periodized plan affordances ───────────────────────

@@ -125,6 +125,7 @@ Routine makeRoutine({
   List<RoutineDay>? days,
   int? estimatedMinutesPerDay,
   String? imageUrl,
+  int numWeeks = 1,
 }) =>
     Routine(
       id: id,
@@ -134,4 +135,5 @@ Routine makeRoutine({
       days: days ?? [makeDay()],
       estimatedMinutesPerDay: estimatedMinutesPerDay,
       imageUrl: imageUrl,
+      numWeeks: numWeeks,
     );

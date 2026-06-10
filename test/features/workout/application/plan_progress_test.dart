@@ -106,5 +106,18 @@ void main() {
       expect(result.activeDay, equals(1));
       expect(result.planComplete, isFalse);
     });
+
+    // ── Fix 2: numWeeks <= 0 runtime guard ──────────────────────────────────
+    test(
+        'numWeeks=0 (corrupt Firestore doc): treated as 1 → activeWeek=0, planComplete=false',
+        () {
+      // A Firestore doc with an explicit "numWeeks": 0 bypasses the ?? 1
+      // default in the generated fromJson. Without the guard, numWeeks=0
+      // causes the loop to never run and returns planComplete=true / activeWeek=-1.
+      final result = derivePlanProgress({}, [1, 2, 3], 0);
+      expect(result.activeWeek, equals(0));
+      expect(result.activeDay, equals(1));
+      expect(result.planComplete, isFalse);
+    });
   });
 }

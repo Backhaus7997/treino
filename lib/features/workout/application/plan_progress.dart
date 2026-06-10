@@ -41,6 +41,13 @@ PlanProgress derivePlanProgress(
   List<int> dayNumbers,
   int numWeeks,
 ) {
+  // Runtime guard: corrupt Firestore docs with numWeeks==0 (an explicit 0
+  // bypasses the ?? 1 in generated fromJson) would otherwise produce an
+  // infinite loop or wrong planComplete=true result. Treat as 1.
+  // Guard runs BEFORE the assert so tests that exercise the corrupt-doc path
+  // are not rejected by the assert in debug mode.
+  // ignore: parameter_assignments
+  if (numWeeks <= 0) numWeeks = 1;
   assert(numWeeks >= 1, 'numWeeks must be >= 1');
 
   if (dayNumbers.isEmpty) {
