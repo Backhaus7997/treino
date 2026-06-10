@@ -43,25 +43,45 @@ class TrainerCoachView extends StatelessWidget {
       initialIndex: _resolveInitialIndex(initialTab),
       child: Column(
         children: [
-          TabBar(
-            isScrollable: true,
-            indicatorColor: palette.accent,
-            labelColor: palette.textPrimary,
-            unselectedLabelColor: palette.textMuted,
-            labelPadding: const EdgeInsets.symmetric(horizontal: 12),
-            labelStyle: theme.textTheme.labelLarge?.copyWith(
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.5,
+          // Segmented pill control, centered — matches the app's chip
+          // language (week tabs, bottom-bar pill) now that only two
+          // sub-tabs remain. No full-width underline divider.
+          Container(
+            margin: const EdgeInsets.fromLTRB(20, 10, 20, 0),
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: palette.bgCard,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: palette.textMuted.withValues(alpha: 0.12),
+              ),
             ),
-            tabs: [for (final l in _labels) Tab(text: l)],
-            // Close any open popup (e.g. agenda day sheet) when the trainer
-            // switches sub-tabs. Pop both navigators because showModalBottomSheet
-            // defaults to useRootNavigator: false (local navigator).
-            onTap: (_) {
-              Navigator.of(context).popUntil((route) => route is! PopupRoute);
-              Navigator.of(context, rootNavigator: true)
-                  .popUntil((route) => route is! PopupRoute);
-            },
+            child: TabBar(
+              dividerColor: Colors.transparent,
+              indicatorSize: TabBarIndicatorSize.tab,
+              indicator: BoxDecoration(
+                color: palette.accent,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              splashBorderRadius: BorderRadius.circular(20),
+              labelColor: palette.bg,
+              unselectedLabelColor: palette.textMuted,
+              labelStyle: theme.textTheme.labelLarge?.copyWith(
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.5,
+              ),
+              tabs: [
+                for (final l in _labels) Tab(text: l, height: 40),
+              ],
+              // Close any open popup (e.g. agenda day sheet) when the trainer
+              // switches sub-tabs. Pop both navigators because showModalBottomSheet
+              // defaults to useRootNavigator: false (local navigator).
+              onTap: (_) {
+                Navigator.of(context).popUntil((route) => route is! PopupRoute);
+                Navigator.of(context, rootNavigator: true)
+                    .popUntil((route) => route is! PopupRoute);
+              },
+            ),
           ),
           const SizedBox(height: 8),
           Expanded(
