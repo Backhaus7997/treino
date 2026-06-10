@@ -1,8 +1,10 @@
 // Tests para SessionState — SCENARIO-250..255 + copyWith smoke.
+// SCENARIO-037: activeWeek getter + effectiveSetsForWeek on periodized session.
 // RED: el archivo de producción no existe todavía.
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/features/workout/application/session_state.dart';
+import 'package:treino/features/workout/domain/set_spec.dart';
 
 import 'stub_factories.dart';
 
@@ -168,6 +170,111 @@ void main() {
       );
       expect(a, equals(b));
       expect(a.hashCode, equals(b.hashCode));
+    });
+
+    // ── SCENARIO-037: activeWeek + effectiveSetsForWeek en sesión periodizada ──
+
+    test(
+        'SCENARIO-037a: activeWeek returns session.weekNumber (0 for single-week)',
+        () {
+      final state = SessionState(
+        session: makeSession(weekNumber: 0),
+        day: makeDay(),
+        setLogs: const [],
+        currentExerciseIndex: 0,
+        elapsedSeconds: 0,
+      );
+      expect(state.activeWeek, equals(0));
+    });
+
+    test('SCENARIO-037b: activeWeek returns session.weekNumber (1 for week 2)',
+        () {
+      final state = SessionState(
+        session: makeSession(weekNumber: 1),
+        day: makeDay(),
+        setLogs: const [],
+        currentExerciseIndex: 0,
+        elapsedSeconds: 0,
+      );
+      expect(state.activeWeek, equals(1));
+    });
+
+    test(
+        'SCENARIO-037c: isFullyCompleted uses effectiveSetsForWeek — '
+        'week 1 prescription (2 sets) satisfied by 2 logs even though '
+        'legacy targetSets = 3', () {
+      // Slot with weeklySets: week0=[3 sets], week1=[2 sets].
+      // Session weekNumber=1 → only 2 logs needed.
+      final slot = makeSlot(
+        exerciseId: 'e1',
+        targetSets: 3, // legacy fallback — must NOT be used
+        weeklySets: [
+          const [SetSpec(reps: 10), SetSpec(reps: 10), SetSpec(reps: 10)],
+          const [SetSpec(reps: 8), SetSpec(reps: 8)],
+        ],
+      );
+      final day = makeDay(slots: [slot]);
+      final logs = [
+        makeSetLog(exerciseId: 'e1', setNumber: 1),
+        makeSetLog(exerciseId: 'e1', setNumber: 2, id: 'sl2'),
+      ];
+      final state = SessionState(
+        session: makeSession(weekNumber: 1),
+        day: day,
+        setLogs: logs,
+        currentExerciseIndex: 0,
+        elapsedSeconds: 0,
+      );
+      // Week 1 has 2 sets; 2 logs → fully completed.
+      expect(state.isFullyCompleted, isTrue);
+    });
+
+    test(
+        'SCENARIO-037d: isFullyCompleted = false for single-week (week 0) '
+        'session when logs are insufficient (backward-compat invariant)', () {
+      // Legacy slot — weeklySets empty → falls back to effectiveSets (3 sets).
+      final slot = makeSlot(exerciseId: 'e1', targetSets: 3);
+      final day = makeDay(slots: [slot]);
+      final logs = [makeSetLog(exerciseId: 'e1', setNumber: 1)];
+      final state = SessionState(
+        session: makeSession(weekNumber: 0),
+        day: day,
+        setLogs: logs,
+        currentExerciseIndex: 0,
+        elapsedSeconds: 0,
+      );
+      expect(state.isFullyCompleted, isFalse);
+    });
+
+    test(
+        'SCENARIO-037e: isExerciseDone uses week 1 prescription — '
+        '2 logs completes week-1 slot (2 sets)', () {
+      final slot = makeSlot(
+        exerciseId: 'e1',
+        targetSets: 4,
+        weeklySets: [
+          const [
+            SetSpec(reps: 10),
+            SetSpec(reps: 10),
+            SetSpec(reps: 10),
+            SetSpec(reps: 10)
+          ],
+          const [SetSpec(reps: 8), SetSpec(reps: 8)],
+        ],
+      );
+      final day = makeDay(slots: [slot]);
+      final logs = [
+        makeSetLog(exerciseId: 'e1', setNumber: 1),
+        makeSetLog(exerciseId: 'e1', setNumber: 2, id: 'sl2'),
+      ];
+      final state = SessionState(
+        session: makeSession(weekNumber: 1),
+        day: day,
+        setLogs: logs,
+        currentExerciseIndex: 0,
+        elapsedSeconds: 0,
+      );
+      expect(state.isExerciseDone('e1'), isTrue);
     });
   });
 }

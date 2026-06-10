@@ -79,29 +79,35 @@ List<BlockInfo> buildBlocks(List<RoutineSlot> slots) {
 }
 
 /// Returns true if a standalone block (single slot) is fully completed.
-bool isStandaloneBlockComplete(RoutineSlot slot, List<SetLog> allLogs) {
+/// [week] is the 0-based active week (from [SessionState.activeWeek]).
+/// Single-week sessions pass 0; effectiveSetsForWeek(0) falls back to
+/// effectiveSets semantics. (REQ-PERIOD-040)
+bool isStandaloneBlockComplete(
+    RoutineSlot slot, List<SetLog> allLogs, int week) {
   final logged = allLogs.where((l) => l.exerciseId == slot.exerciseId).length;
-  return logged >= slot.effectiveSets.length;
+  return logged >= slot.effectiveSetsForWeek(week).length;
 }
 
 /// Returns true if a superset block (round-robin) is fully completed.
-/// Complete = every member has effectiveSets.length logs.
-bool isSupersetBlockComplete(List<RoutineSlot> members, List<SetLog> allLogs) {
+/// Complete = every member has effectiveSetsForWeek(week).length logs.
+bool isSupersetBlockComplete(
+    List<RoutineSlot> members, List<SetLog> allLogs, int week) {
   return members.every((slot) {
     final logged = allLogs.where((l) => l.exerciseId == slot.exerciseId).length;
-    return logged >= slot.effectiveSets.length;
+    return logged >= slot.effectiveSetsForWeek(week).length;
   });
 }
 
 /// Determines the [BlockStatus] for each block given the current logs.
 /// The "current" block is the first non-completed one.
+/// [week] threads through to the slot-complete helpers. (REQ-PERIOD-040)
 List<BlockStatus> computeBlockStatuses(
-    List<BlockInfo> blocks, List<SetLog> allLogs) {
+    List<BlockInfo> blocks, List<SetLog> allLogs, int week) {
   var foundCurrent = false;
   return blocks.map((block) {
     final complete = block.isSuperset
-        ? isSupersetBlockComplete(block.slots, allLogs)
-        : isStandaloneBlockComplete(block.slots.first, allLogs);
+        ? isSupersetBlockComplete(block.slots, allLogs, week)
+        : isStandaloneBlockComplete(block.slots.first, allLogs, week);
     if (complete) return BlockStatus.completed;
     if (!foundCurrent) {
       foundCurrent = true;
@@ -232,8 +238,11 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
   /// Builds the exercise list with block gating: current block fully expanded,
   /// completed blocks collapsed to summary, future blocks locked/dimmed.
   List<Widget> _buildExerciseList(SessionState state) {
+    // Source week ONCE here and thread down — single-week sessions use 0
+    // so effectiveSetsForWeek(0) falls back to effectiveSets (REQ-PERIOD-042).
+    final week = state.session.weekNumber;
     final blocks = buildBlocks(state.day.slots);
-    final statuses = computeBlockStatuses(blocks, state.setLogs);
+    final statuses = computeBlockStatuses(blocks, state.setLogs, week);
     final out = <Widget>[];
 
     for (var blockIdx = 0; blockIdx < blocks.length; blockIdx++) {
@@ -246,6 +255,7 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
           entries: entries,
           status: status,
           allLogs: state.setLogs,
+          week: week,
           onSetCheck: _logSet,
           onSetUpdate: _updateSet,
         ));
@@ -254,6 +264,7 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
         out.add(_StandaloneBlock(
           entry: entry,
           status: status,
+          week: week,
           onSetCheck: (setNumber, reps, weightKg) =>
               _logSet(entry.slot, setNumber, reps, weightKg),
           onSetUpdate: _updateSet,
@@ -602,12 +613,16 @@ class _StandaloneBlock extends StatelessWidget {
   const _StandaloneBlock({
     required this.entry,
     required this.status,
+    required this.week,
     required this.onSetCheck,
     required this.onSetUpdate,
   });
 
   final _SupersetEntry entry;
   final BlockStatus status;
+
+  /// 0-based active week; single-week sessions use 0. (REQ-PERIOD-040)
+  final int week;
   final void Function(int setNumber, int reps, double weightKg) onSetCheck;
   final void Function(SetLog existing, int reps, double weightKg) onSetUpdate;
 
@@ -617,18 +632,19 @@ class _StandaloneBlock extends StatelessWidget {
       case BlockStatus.completed:
         return _CompletedBlockSummary(
           exerciseName: entry.slot.exerciseName,
-          totalSets: entry.slot.effectiveSets.length,
+          totalSets: entry.slot.effectiveSetsForWeek(week).length,
         );
       case BlockStatus.future:
         return _FutureBlockPreview(exerciseName: entry.slot.exerciseName);
       case BlockStatus.current:
         final loggedCount = entry.logs.length;
-        final totalSets = entry.slot.effectiveSets.length;
+        final totalSets = entry.slot.effectiveSetsForWeek(week).length;
         final isDone = loggedCount >= totalSets;
         return _ExerciseSection(
           slot: entry.slot,
           logsForExercise: entry.logs,
           currentSetNumber: isDone ? null : loggedCount + 1,
+          week: week,
           techniqueInstructions: entry.technique,
           videoUrl: entry.videoUrl,
           onSetCheck: onSetCheck,
@@ -646,6 +662,7 @@ class _SupersetBlock extends StatelessWidget {
     required this.entries,
     required this.status,
     required this.allLogs,
+    required this.week,
     required this.onSetCheck,
     required this.onSetUpdate,
   });
@@ -653,6 +670,9 @@ class _SupersetBlock extends StatelessWidget {
   final List<_SupersetEntry> entries;
   final BlockStatus status;
   final List<SetLog> allLogs;
+
+  /// 0-based active week; single-week sessions use 0. (REQ-PERIOD-040)
+  final int week;
   final void Function(
       RoutineSlot slot, int setNumber, int reps, double weightKg) onSetCheck;
   final void Function(SetLog existing, int reps, double weightKg) onSetUpdate;
@@ -667,6 +687,7 @@ class _SupersetBlock extends StatelessWidget {
       case BlockStatus.current:
         return _SupersetSection(
           entries: entries,
+          week: week,
           onSetCheck: onSetCheck,
           onSetUpdate: onSetUpdate,
         );
@@ -900,11 +921,15 @@ class _FutureSupersetPreview extends StatelessWidget {
 class _SupersetSection extends StatelessWidget {
   const _SupersetSection({
     required this.entries,
+    required this.week,
     required this.onSetCheck,
     required this.onSetUpdate,
   });
 
   final List<_SupersetEntry> entries;
+
+  /// 0-based active week; single-week sessions use 0. (REQ-PERIOD-040)
+  final int week;
   final void Function(
       RoutineSlot slot, int setNumber, int reps, double weightKg) onSetCheck;
   final void Function(SetLog existing, int reps, double weightKg) onSetUpdate;
@@ -916,8 +941,9 @@ class _SupersetSection extends StatelessWidget {
     // Vueltas totales = el ejercicio más largo del bloque.
     final maxRounds = entries.fold<int>(
         0,
-        (m, e) =>
-            e.slot.effectiveSets.length > m ? e.slot.effectiveSets.length : m);
+        (m, e) => e.slot.effectiveSetsForWeek(week).length > m
+            ? e.slot.effectiveSetsForWeek(week).length
+            : m);
 
     // Scan round-robin: la celda activa es el primer par (vuelta, ejercicio)
     // que aún no fue logueado.
@@ -927,7 +953,7 @@ class _SupersetSection extends StatelessWidget {
     outer:
     for (var round = 1; round <= maxRounds; round++) {
       for (final e in entries) {
-        if (round > e.slot.effectiveSets.length) continue;
+        if (round > e.slot.effectiveSetsForWeek(week).length) continue;
         if (e.logs.length < round) {
           activeId = e.slot.exerciseId;
           activeSet = round;
@@ -946,6 +972,7 @@ class _SupersetSection extends StatelessWidget {
         slot: e.slot,
         logsForExercise: e.logs,
         currentSetNumber: e.slot.exerciseId == activeId ? activeSet : null,
+        week: week,
         techniqueInstructions: e.technique,
         videoUrl: e.videoUrl,
         onSetCheck: (setNumber, reps, weightKg) =>
@@ -1011,6 +1038,7 @@ class _ExerciseSection extends StatefulWidget {
     required this.slot,
     required this.logsForExercise,
     required this.currentSetNumber,
+    required this.week,
     required this.techniqueInstructions,
     required this.videoUrl,
     required this.onSetCheck,
@@ -1022,6 +1050,9 @@ class _ExerciseSection extends StatefulWidget {
 
   /// Set (1-based) que debe estar activo. Null ⇒ ningún set activo.
   final int? currentSetNumber;
+
+  /// 0-based active week; single-week sessions use 0. (REQ-PERIOD-040)
+  final int week;
   final List<String>? techniqueInstructions;
   final String? videoUrl;
 
@@ -1067,7 +1098,7 @@ class _ExerciseSectionState extends State<_ExerciseSection> {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    final effectiveSets = widget.slot.effectiveSets;
+    final effectiveSets = widget.slot.effectiveSetsForWeek(widget.week);
     final loggedCount = widget.logsForExercise.length;
     final totalSets = effectiveSets.length;
     final isDone = loggedCount >= totalSets;

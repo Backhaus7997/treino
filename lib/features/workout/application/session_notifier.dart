@@ -121,7 +121,8 @@ class SessionNotifier
       ),
     );
 
-    final currentIndex = _nextIncompleteIndex(day, recoveredLogs);
+    final currentIndex =
+        _nextIncompleteIndex(day, recoveredLogs, session.weekNumber);
     final elapsed = DateTime.now()
         .difference(session.startedAt)
         .inSeconds
@@ -156,7 +157,8 @@ class SessionNotifier
     );
 
     final newLogs = [...current.setLogs, persisted];
-    final newIndex = _nextIncompleteIndex(current.day, newLogs);
+    final newIndex =
+        _nextIncompleteIndex(current.day, newLogs, current.session.weekNumber);
 
     state = AsyncData(current.copyWith(
       setLogs: newLogs,
@@ -264,11 +266,16 @@ class SessionNotifier
     _timer = null;
   }
 
-  int _nextIncompleteIndex(RoutineDay day, List<SetLog> logs) {
+  /// Returns the index of the first slot that still needs sets logged.
+  /// Uses [slot.effectiveSetsForWeek(weekNumber).length] so periodized plans
+  /// respect the correct week's prescription. (REQ-PERIOD-040)
+  /// Single-week sessions pass weekNumber=0; effectiveSetsForWeek(0) falls
+  /// back to effectiveSets semantics (REQ-PERIOD-042 backward-compat).
+  int _nextIncompleteIndex(RoutineDay day, List<SetLog> logs, int weekNumber) {
     for (var i = 0; i < day.slots.length; i++) {
       final slot = day.slots[i];
       final count = logs.where((l) => l.exerciseId == slot.exerciseId).length;
-      if (count < slot.targetSets) return i;
+      if (count < slot.effectiveSetsForWeek(weekNumber).length) return i;
     }
     return day.slots.length - 1;
   }
