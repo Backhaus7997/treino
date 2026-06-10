@@ -9,8 +9,8 @@ import '../../../app/theme/app_background.dart';
 import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../application/auth_providers.dart';
+import '../../../l10n/app_l10n.dart';
 import '../domain/auth_failure.dart';
-import 'auth_strings.dart';
 import 'widgets/auth_failure_banner.dart';
 import 'widgets/auth_input.dart';
 import 'widgets/auth_pill_button.dart';
@@ -90,6 +90,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         : null;
 
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
 
     return Scaffold(
       backgroundColor: palette.bg,
@@ -119,7 +120,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   const SizedBox(height: 20),
                   // Headline
                   Text(
-                    AuthStrings.loginTitle,
+                    l10n.authLoginTitle,
                     style: GoogleFonts.spaceGrotesk(
                       fontSize: 28,
                       fontWeight: FontWeight.w900,
@@ -131,7 +132,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   const SizedBox(height: 8),
                   // Subtitle
                   Text(
-                    AuthStrings.loginSubtitle,
+                    l10n.authLoginSubtitle,
                     style: GoogleFonts.barlow(
                       fontSize: 15,
                       color: palette.textMuted,
@@ -141,7 +142,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   // Email field — no label per mockup (icon-only)
                   AuthInput(
                     controller: _emailCtrl,
-                    hint: AuthStrings.loginEmailHint,
+                    hint: l10n.authLoginEmailHint,
                     leadingIcon: TreinoIcon.mail,
                     keyboardType: TextInputType.emailAddress,
                     textInputAction: TextInputAction.next,
@@ -167,7 +168,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     child: TextButton(
                       onPressed: () => context.push('/forgot-password'),
                       child: Text(
-                        AuthStrings.loginForgot,
+                        l10n.authLoginForgot,
                         style: GoogleFonts.barlow(
                           fontSize: 14,
                           color: palette.accent,
@@ -182,7 +183,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ],
                   // CTA
                   AuthPillButton(
-                    label: AuthStrings.loginCta,
+                    label: l10n.authLoginCta,
                     onPressed: _fieldsEmpty ? null : _submit,
                     isLoading: isLoading,
                   ),
@@ -194,7 +195,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 12),
                         child: Text(
-                          AuthStrings.loginContinueWith,
+                          l10n.authLoginContinueWith,
                           style: GoogleFonts.barlowCondensed(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
@@ -218,7 +219,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             width: 18,
                             height: 18,
                           ),
-                          label: AuthStrings.googleLabel,
+                          label: l10n.authGoogleLabel,
                           onPressed: isLoading ? null : _signInWithGoogle,
                         ),
                       ),
@@ -226,7 +227,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       Expanded(
                         child: AuthSecondaryButton(
                           icon: FontAwesomeIcons.apple,
-                          label: AuthStrings.appleLabel,
+                          label: l10n.authAppleLabel,
                           onPressed: isLoading ? null : _signInWithApple,
                         ),
                       ),
@@ -239,7 +240,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          '${AuthStrings.loginNoAccount} ',
+                          '${l10n.authLoginNoAccount} ',
                           style: GoogleFonts.barlow(
                             fontSize: 14,
                             color: palette.textMuted,
@@ -248,7 +249,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         GestureDetector(
                           onTap: () => context.push('/register'),
                           child: Text(
-                            AuthStrings.loginRegisterLink,
+                            l10n.authLoginRegisterLink,
                             style: GoogleFonts.barlow(
                               fontSize: 14,
                               fontWeight: FontWeight.w600,

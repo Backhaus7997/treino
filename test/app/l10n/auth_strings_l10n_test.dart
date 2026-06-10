@@ -17,6 +17,7 @@ Future<AppL10n> _pumpAndGetL10n(WidgetTester tester) async {
       localizationsDelegates: const [
         AppL10n.delegate,
         GlobalMaterialLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
       ],
       supportedLocales: AppL10n.supportedLocales,

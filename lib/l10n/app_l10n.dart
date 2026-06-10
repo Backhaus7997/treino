@@ -97,6 +97,258 @@ abstract class AppL10n {
     Locale('es'),
     Locale('es', 'AR')
   ];
+
+  /// No description provided for @authSplashTagline.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ENTRENÁ. COMPARTÍ. CRECÉ.'**
+  String get authSplashTagline;
+
+  /// No description provided for @authWelcomeEyebrow.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ENTRENAMIENTO · GYM · COACH'**
+  String get authWelcomeEyebrow;
+
+  /// No description provided for @authWelcomeBody.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cargá tu rutina, ejecutá los sets, seguí a tus pibes y encontrá un coach cerca tuyo.'**
+  String get authWelcomeBody;
+
+  /// No description provided for @authWelcomeCta.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'EMPEZAR'**
+  String get authWelcomeCta;
+
+  /// No description provided for @authWelcomeHaveAccount.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ya tengo cuenta'**
+  String get authWelcomeHaveAccount;
+
+  /// No description provided for @authWelcomeSignIn.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Iniciar sesión'**
+  String get authWelcomeSignIn;
+
+  /// No description provided for @authLoginTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'BIENVENIDO'**
+  String get authLoginTitle;
+
+  /// No description provided for @authLoginSubtitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Entrá para seguir tu rutina'**
+  String get authLoginSubtitle;
+
+  /// No description provided for @authLoginEmailHint.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'tu@email.com'**
+  String get authLoginEmailHint;
+
+  /// No description provided for @authLoginForgot.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Olvidé la contraseña'**
+  String get authLoginForgot;
+
+  /// No description provided for @authLoginCta.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ENTRAR'**
+  String get authLoginCta;
+
+  /// No description provided for @authLoginContinueWith.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'O CONTINUÁ CON'**
+  String get authLoginContinueWith;
+
+  /// No description provided for @authLoginNoAccount.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿No tenés cuenta?'**
+  String get authLoginNoAccount;
+
+  /// No description provided for @authLoginRegisterLink.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Registrate'**
+  String get authLoginRegisterLink;
+
+  /// No description provided for @authLoginTrainerCardTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Sos entrenador?'**
+  String get authLoginTrainerCardTitle;
+
+  /// No description provided for @authLoginTrainerCardSubtitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Pedí tu alta al equipo TREINO'**
+  String get authLoginTrainerCardSubtitle;
+
+  /// No description provided for @authRegisterAppbar.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CREAR CUENTA'**
+  String get authRegisterAppbar;
+
+  /// No description provided for @authRegisterTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'SUMATE A'**
+  String get authRegisterTitle;
+
+  /// No description provided for @authRegisterSubtitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Es gratis. En 30 segundos estás adentro.'**
+  String get authRegisterSubtitle;
+
+  /// No description provided for @authRegisterEmailLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'EMAIL'**
+  String get authRegisterEmailLabel;
+
+  /// No description provided for @authRegisterPasswordLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CONTRASEÑA'**
+  String get authRegisterPasswordLabel;
+
+  /// No description provided for @authRegisterConfirmPasswordLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CONFIRMAR CONTRASEÑA'**
+  String get authRegisterConfirmPasswordLabel;
+
+  /// No description provided for @authRegisterCta.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CREAR CUENTA'**
+  String get authRegisterCta;
+
+  /// No description provided for @authRegisterDividerOr.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'O'**
+  String get authRegisterDividerOr;
+
+  /// No description provided for @authForgotTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'RECUPERAR\nACCESO'**
+  String get authForgotTitle;
+
+  /// No description provided for @authForgotBody.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ingresá tu email y te enviamos un link para resetear la contraseña.'**
+  String get authForgotBody;
+
+  /// No description provided for @authForgotEmailLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'EMAIL'**
+  String get authForgotEmailLabel;
+
+  /// No description provided for @authForgotEmailHint.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'tu@email.com'**
+  String get authForgotEmailHint;
+
+  /// No description provided for @authForgotCta.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ENVIAR LINK'**
+  String get authForgotCta;
+
+  /// No description provided for @authForgotSuccess.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Si tu email está registrado, te enviamos un link para resetear la contraseña.'**
+  String get authForgotSuccess;
+
+  /// No description provided for @authForgotBackToLogin.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Volver al login'**
+  String get authForgotBackToLogin;
+
+  /// No description provided for @authTrainerInquiryDialogTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Acceso de entrenador'**
+  String get authTrainerInquiryDialogTitle;
+
+  /// No description provided for @authTrainerInquiryDialogBody.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Para alta de entrenador, escribinos a equipo@treino.app'**
+  String get authTrainerInquiryDialogBody;
+
+  /// No description provided for @authTrainerInquiryDialogClose.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cerrar'**
+  String get authTrainerInquiryDialogClose;
+
+  /// No description provided for @authTermsPlaceholder.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Próximamente'**
+  String get authTermsPlaceholder;
+
+  /// No description provided for @authGoogleLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'GOOGLE'**
+  String get authGoogleLabel;
+
+  /// No description provided for @authAppleLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'APPLE'**
+  String get authAppleLabel;
+
+  /// No description provided for @authComingSoonTooltip.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Próximamente'**
+  String get authComingSoonTooltip;
+
+  /// No description provided for @authValidationEmailInvalid.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'El email no es válido'**
+  String get authValidationEmailInvalid;
+
+  /// No description provided for @authValidationPasswordRules.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'La contraseña debe tener al menos 8 caracteres, una letra y un número'**
+  String get authValidationPasswordRules;
+
+  /// No description provided for @authValidationPasswordMismatch.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Las contraseñas no coinciden'**
+  String get authValidationPasswordMismatch;
+
+  /// No description provided for @authProfileSignOut.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cerrar sesión'**
+  String get authProfileSignOut;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {
