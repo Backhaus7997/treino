@@ -22,6 +22,8 @@
 //                            across N weeks and keeps legacy `sets` populated
 //                            from week 0. (task 2.17)
 
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -327,6 +329,256 @@ void main() {
     await _tapByKey(tester, 'week_tab_0');
     expect(find.text('8'), findsOneWidget);
     expect(find.text('10'), findsNothing);
+  });
+
+  // ── Device-repro: duplicate then edit the copy via its TextField ──────────
+
+  testWidgets(
+      'REPRO: after "Duplicar semana", typing reps in week 2 must NOT leak '
+      'into week 1 (real device flow)', (tester) async {
+    await _pumpEditor(
+      tester,
+      mode: const SelfCreating(),
+      overrides: _overrides(),
+    );
+
+    // Week 1: add exercise, set reps = 8.
+    await _addBenchPress(tester);
+    await _fillVisibleReps(tester, '8');
+
+    // Add an empty week (jumps to week 2) and duplicate week 1 into it.
+    await _tapByKey(tester, 'add_week_button');
+    await _tapByKey(tester, 'duplicate_week_button');
+    expect(find.text('8'), findsOneWidget,
+        reason: 'duplicate must seed week 2 with week 1\'s reps');
+
+    // Bounce between tabs BEFORE editing — this is what the coach does on the
+    // device and it exercises the late-final controller + ObjectKey State path.
+    await _tapByKey(tester, 'week_tab_0');
+    await _tapByKey(tester, 'week_tab_1');
+
+    // Now edit week 2's reps via the actual TextField (enterText), 8 -> 12.
+    await _replaceFieldText(tester, '8', '12');
+
+    // Week 1 MUST still read 8 — the edit belongs to week 2 only.
+    await _tapByKey(tester, 'week_tab_0');
+    expect(find.text('8'), findsOneWidget,
+        reason: 'editing week 2 leaked into week 1 — periodization broken');
+    expect(find.text('12'), findsNothing,
+        reason: 'week 1 must not show week 2\'s value');
+
+    // And week 2 keeps the edit.
+    await _tapByKey(tester, 'week_tab_1');
+    expect(find.text('12'), findsOneWidget);
+    expect(find.text('8'), findsNothing);
+  });
+
+  testWidgets(
+      'REPRO 2: save a duplicated 2-week plan, reload it, then editing week 2 '
+      'reps must NOT change week 1 (post-hydration aliasing)', (tester) async {
+    final repo = _MockRoutineRepository();
+    Routine? captured;
+    when(() => repo.createAssigned(any())).thenAnswer((inv) async {
+      captured = inv.positionalArguments.first as Routine;
+      return captured!.copyWith(id: 'plan-dup');
+    });
+
+    await _pumpEditor(
+      tester,
+      mode: const TrainerAssigning(athleteId: 'athlete-x'),
+      overrides: _overrides(repo: repo, uid: 'trainer-1'),
+    );
+
+    await tester.enterText(
+        find.byKey(const Key('editor_name_field')), 'Plan Dup');
+    await tester.enterText(find.byKey(const Key('editor_split_field')), 'PPL');
+    await tester.pumpAndSettle();
+
+    await _addBenchPress(tester);
+    await _fillVisibleReps(tester, '8');
+    await _tapByKey(tester, 'add_week_button');
+    await _tapByKey(tester, 'duplicate_week_button');
+
+    await tester
+        .tap(find.widgetWithText(ElevatedButton, CoachStrings.editorSubmit));
+    await tester.pumpAndSettle();
+    expect(captured, isNotNull);
+
+    // Reload the saved plan.
+    final saved = captured!.copyWith(id: 'plan-dup');
+    when(() => repo.getById('plan-dup')).thenAnswer((_) async => saved);
+
+    await _pumpEditor(
+      tester,
+      mode: const TrainerAssigning(
+        athleteId: 'athlete-x',
+        existingPlanId: 'plan-dup',
+      ),
+      overrides: _overrides(repo: repo, uid: 'trainer-1'),
+    );
+
+    expect(find.byKey(const Key('week_tab_1')), findsOneWidget);
+    expect(find.text('8'), findsOneWidget); // week 0
+
+    // Edit week 2 to 20 and verify isolation after reload.
+    await _tapByKey(tester, 'week_tab_1');
+    await _replaceFieldText(tester, '8', '20');
+    await _tapByKey(tester, 'week_tab_0');
+    expect(find.text('8'), findsOneWidget,
+        reason: 'reloaded week 1 must keep 8 after editing week 2');
+    expect(find.text('20'), findsNothing);
+  });
+
+  testWidgets(
+      'REPRO 3: multi-set slot — editing one set in week 2 must not touch '
+      'week 1 sets', (tester) async {
+    await _pumpEditor(
+      tester,
+      mode: const SelfCreating(),
+      overrides: _overrides(),
+    );
+
+    await _addBenchPress(tester);
+    await _fillVisibleReps(tester, '8');
+    // Add a second set in week 1 (clones last -> reps 8).
+    await _tapByKey(tester, 'add_set_button');
+    expect(find.text('8'), findsNWidgets(2));
+
+    await _tapByKey(tester, 'add_week_button');
+    await _tapByKey(tester, 'duplicate_week_button');
+    expect(find.text('8'), findsNWidgets(2),
+        reason: 'duplicate copies both sets');
+
+    // Change the FIRST set of week 2 to 5.
+    await _replaceFieldText(tester, '8', '5');
+
+    await _tapByKey(tester, 'week_tab_0');
+    expect(find.text('8'), findsNWidgets(2),
+        reason: 'week 1 keeps both original sets at 8');
+    expect(find.text('5'), findsNothing);
+  });
+
+  testWidgets(
+      'REPRO 4: after duplicating, editing WEEK 1 must not change week 2 '
+      '(inverse flow)', (tester) async {
+    await _pumpEditor(
+      tester,
+      mode: const SelfCreating(),
+      overrides: _overrides(),
+    );
+
+    await _addBenchPress(tester);
+    await _fillVisibleReps(tester, '8');
+    await _tapByKey(tester, 'add_week_button');
+    await _tapByKey(tester, 'duplicate_week_button');
+
+    // Go back to week 1 and change it to 3.
+    await _tapByKey(tester, 'week_tab_0');
+    await _replaceFieldText(tester, '8', '3');
+
+    // Week 2 must still be 8.
+    await _tapByKey(tester, 'week_tab_1');
+    expect(find.text('8'), findsOneWidget,
+        reason: 'editing week 1 leaked into the duplicated week 2');
+    expect(find.text('3'), findsNothing);
+  });
+
+  testWidgets(
+      'REPRO 5: full editor → REAL JSON round-trip (encode/decode through '
+      'WeeklySetsConverter) → rehydrate; per-week reps survive the wire and '
+      'editing week 2 does not leak into week 1', (tester) async {
+    final repo = _MockRoutineRepository();
+    Routine? captured;
+    when(() => repo.createAssigned(any())).thenAnswer((inv) async {
+      captured = inv.positionalArguments.first as Routine;
+      return captured!.copyWith(id: 'plan-json');
+    });
+
+    await _pumpEditor(
+      tester,
+      mode: const TrainerAssigning(athleteId: 'athlete-x'),
+      overrides: _overrides(repo: repo, uid: 'trainer-1'),
+    );
+
+    await tester.enterText(
+        find.byKey(const Key('editor_name_field')), 'Plan JSON');
+    await tester.enterText(find.byKey(const Key('editor_split_field')), 'PPL');
+    await tester.pumpAndSettle();
+
+    // Week 1 = 8 reps; add an empty week, duplicate week 1 into it (8), then
+    // edit week 2 to 12 — the exact device flow that produced the bug report.
+    await _addBenchPress(tester);
+    await _fillVisibleReps(tester, '8');
+    await _tapByKey(tester, 'add_week_button');
+    await _tapByKey(tester, 'duplicate_week_button');
+    await _replaceFieldText(tester, '8', '12');
+
+    await tester
+        .tap(find.widgetWithText(ElevatedButton, CoachStrings.editorSubmit));
+    await tester.pumpAndSettle();
+    expect(captured, isNotNull,
+        reason: 'editor must hand a Routine to the repo on save');
+
+    // ── REAL serialization round-trip (exactly what Firestore does) ─────────
+    final wireJson = captured!.toJson();
+    final encoded = jsonEncode(wireJson);
+    final decoded = jsonDecode(encoded) as Map<String, Object?>;
+    final roundTripped = Routine.fromJson(decoded);
+
+    // ── BONUS: direct asserts on the intermediate JSON wire shape ──────────
+    final daysJson = (decoded['days'] as List).cast<Map<String, Object?>>();
+    final slotJson =
+        ((daysJson.first['slots'] as List).first) as Map<String, Object?>;
+    final weeklySetsJson = slotJson['weeklySets'] as List;
+    expect(weeklySetsJson, hasLength(2),
+        reason: 'two weeks must reach the wire');
+    // Each week is a MAP {'sets': [...]} — never a bare list (Firestore rejects
+    // nested arrays, hence WeeklySetsConverter wraps every week).
+    for (final week in weeklySetsJson) {
+      expect(week, isA<Map>(),
+          reason: 'each weeklySets entry must be a map, not a list of lists');
+      expect((week as Map)['sets'], isA<List>(),
+          reason: "each week map must carry a 'sets' list");
+    }
+    int wireReps(int weekIdx) {
+      final sets = ((weeklySetsJson[weekIdx] as Map)['sets'] as List)
+          .cast<Map<String, Object?>>();
+      return sets.first['reps'] as int;
+    }
+
+    expect(wireReps(0), equals(8), reason: 'week 1 reps on the wire');
+    expect(wireReps(1), equals(12), reason: 'week 2 reps on the wire');
+    expect(wireReps(0), isNot(equals(wireReps(1))),
+        reason: 'the two weeks must carry DISTINCT reps on the wire — '
+            'aliasing here means the bug is in serialization');
+
+    // ── Rehydrate the editor from the DESERIALIZED routine ─────────────────
+    when(() => repo.getById('plan-json'))
+        .thenAnswer((_) async => roundTripped.copyWith(id: 'plan-json'));
+
+    await _pumpEditor(
+      tester,
+      mode: const TrainerAssigning(
+        athleteId: 'athlete-x',
+        existingPlanId: 'plan-json',
+      ),
+      overrides: _overrides(repo: repo, uid: 'trainer-1'),
+    );
+
+    expect(find.byKey(const Key('week_tab_1')), findsOneWidget);
+    expect(find.text('8'), findsOneWidget); // week 0 on load
+    expect(find.text('12'), findsNothing);
+
+    await _tapByKey(tester, 'week_tab_1');
+    expect(find.text('12'), findsOneWidget);
+    expect(find.text('8'), findsNothing);
+
+    // Editing the deserialized week 2 must not leak into week 1.
+    await _replaceFieldText(tester, '12', '20');
+    await _tapByKey(tester, 'week_tab_0');
+    expect(find.text('8'), findsOneWidget,
+        reason: 'after a real round-trip, editing week 2 leaked into week 1');
+    expect(find.text('20'), findsNothing);
   });
 
   // ── Task 2.13 — week isolation while editing ──────────────────────────────
