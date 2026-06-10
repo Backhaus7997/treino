@@ -9,6 +9,7 @@ Estado de las fases y desglose detallado de Fases 5 (✅) y 6 (en curso).
 - [x] **Fase 2** — Home (paridad con mockup Mobile Home) + Rutinas básicas read-only. ✅ **COMPLETA** — 5/5 etapas mergeadas. Cerró ~2026-05-15 con Wire Home → Plantillas (PR #18).
 - [x] **Fase 3** — Feed social (amigos · mi gym · público) + perfiles públicos. ✅ **COMPLETA** — 6/6 etapas + sub-fase 5.5 (`user-public-profiles`) mergeadas. Cerró 2026-05-22 con Etapa 6 (feed-friend-requests-inbox, PR #78).
 - [x] **Fase 4** — Workout++ (session tracking, sesión activa, post-entreno, historial, insights, wire de stats). ✅ **COMPLETA** — 6/6 etapas mergeadas. Cerró 2026-05-21 con Etapa 6 (wire-real-stats, 4 PRs #56/#57/#65/#67 + archive #69) tras Etapa 5 (insights, PR #51, mergeada 2026-05-19). IA buscador y videos quedaron deferrables a Fase 4.5.
+- [x] **Fase 4.5 parcial — Hevy editor rewrite** ✅ **shipped 2026-06-09 (retro)** — extensión del modelo `Routine` a per-set explícito + editor estilo Hevy + reproductor adaptado + edición simétrica trainer/alumno. 12 commits secuenciales (`24806e9..9987816`). IA buscador (Gemini) y videos en ejercicios siguen deferrables.
 - [x] **Fase 5** — Coach / Personal Trainer (discovery con geohash, chat, agenda, planes asignados, importación de planes Excel + Coach Hub web). ✅ **COMPLETA** — 8/8 etapas + sub-fase `shared-with-trainer` ✅ + 2 follow-ups (#93 badge "ACTUAL", #94 accept links desde web) mergeados. Cerró 2026-05-26 con Etapa 8 (Excel import client-side, PR #92).
 - [ ] **Fase 6** — Producto-ready para beta. 🔄 **8 etapas planeadas + 1 emergente (athlete-self-routines)**: **Trainer profile UI ✅** · **Push notifications ✅** · **Coach Hub polish ✅** · **Recurring appointments ✅** · **Excel polish + aliases dinámicos ✅** (catalog import + Excel template polish + addAlias CF mergeados) · App Check + Crashlytics + Analytics ✅ · **Reviews/ratings de PFs ✅** · i18n (es-AR oficial + scaffold inglés) · **Athlete self-routines ✅** (+ supersets en self-create #137).
 - [ ] **Fase 7** — Monetización + Lanzamiento (TestFlight + Play Internal). Pagos (Mercado Pago/Stripe), verificación profesional automatizada, deep links, app icon final, screenshots para stores, AI Excel con Gemini (cuando GCP esté activo), group chats, video calls.
@@ -215,9 +216,9 @@ Workout++ es donde la app deja de ser exploración read-only y se vuelve **ejecu
 - Wire de data atrasada: Home "Esta semana" con streak/muscle map/stats reales, Profile stats reales, check-in básico.
 
 **Out of scope** (deferrables a Fase 4.5):
-- IA buscador de ejercicios (Gemini).
-- Videos en ejercicios (asset pipeline + Firebase Storage para video).
-- Bloques y super series complejos en la rutina (extensión del modelo `Routine`).
+- IA buscador de ejercicios (Gemini). — ⏳ aún diferido
+- Videos en ejercicios (asset pipeline + Firebase Storage para video). — ⏳ aún diferido
+- ~~Bloques y super series complejos en la rutina (extensión del modelo `Routine`).~~ — ✅ **shipped 2026-06-09** vía Hevy editor rewrite (ver § Fase 4.5).
 
 | # | Etapa | PR / branch | Console (manual) | Código clave | Owner |
 |---|---|---|---|---|---|
@@ -264,6 +265,51 @@ Etapas 1-4 de Fase 4 corrieron en paralelo con las últimas etapas de Fase 3 (in
 
 - ✅ Etapa 1: opcional poblar `users/{uid}/sessions` para testing visual de historial e insights — script disponible.
 - (Etapas 2-6 no requieren acción en console.)
+
+## Fase 4.5 — Hevy editor rewrite (retro, shipped 2026-06-09)
+
+Cierre retroactivo del tercer deferrable de Fase 4 ("bloques y super series complejos en la rutina"). 12 commits secuenciales mergeados a `main` el 2026-06-09 reescriben el editor de rutinas al modelo per-set explícito estilo Hevy, adaptan el reproductor, y dan simetría de edición entre trainer y alumno. **Shipped en silencio sin SDD ni entrada previa en roadmap** — documentado acá vía audit el 2026-06-10.
+
+**Scope entregado**:
+
+- **Modelo per-set explícito** — nueva freezed class `SetSpec` (`type/weightKg/reps/repsMin/repsMax/durationSeconds`) + enums `ExerciseMode` (reps/duration) · `RepMode` (single/range) · `SetType` (warmup/normal/drop/failure). `RoutineSlot` gana `exerciseMode`/`repMode`/`sets[]` con `@Default` para zero-migration; getter `effectiveSets` sintetiza rows desde los scalars legacy (`targetSets/targetReps/durationSeconds`) cuando `sets[]` está vacío. Dual-write: el editor escribe nuevo + legacy en simultáneo (`buildRoutineSlot` helper) para no romper clientes viejos.
+- **Editor estilo Hevy** — `routine_editor_screen.dart` reescrito a tabla de sets (`_SetTable` inline widget): header tappable Reps/Tiempo, chip de SetType por row (W/#/D/F), `DurationTextField` con digit-fill MM:SS, "+ Agregar set" clona el último, nombre del ejercicio full-width multi-line con menú ⋮ (Cambiar/Subir/Bajar/Eliminar). Movido a `GoRoute` top-level (full-screen, sin bottom nav). Reorder de members dentro de superserie via chevrons.
+- **Reproductor adaptado** — `session_player_screen.dart` consume `effectiveSets`. Sets por tiempo se auto-completan al expirar el `Timer.periodic` con `HapticFeedback.heavyImpact()` (sin botón "Listo"). Sets futuros atenuados (`Opacity 0.4`). Indicador de ejercicio terminado pasa de círculo verde a `TreinoIcon.checkBare` (parecía botón antes).
+- **Edición simétrica trainer ↔ alumno** — `TrainerAssigning` + `TrainerTemplating` ganan `existingPlanId`/`existingTemplateId`. `RoutineRepository.updateAssigned` + `updateTemplate` (solo mutan contenido; congelan identity fields). Entry points: botón editar en cada plan del alumno (`athlete_detail_screen`) y en cada plantilla (`trainer_workout_view`). `firestore.rules` gana 82 LOC con 2 nuevos `allow update` paths (trainer-assigned + trainer-template) con guards `hasOnly` sobre lista cerrada de fields (incluye `COUPLING WARNING` comment — agregar campo nuevo al modelo sin actualizar rules rompe writes con permission-denied).
+- **Custom exercises** — dropdown de músculo granular (`kMuscleOptions` 18 valores es-AR estilo Hevy en lugar de free-text). Entry point "Mis ejercicios" desde el perfil del alumno (`profile_screen.dart` → `/profile/my-exercises`, screen ya existía para trainers).
+- **Fix bug pre-existente** — `routine_detail_screen` pasaba `assignedBy` (null en rutinas userCreated) como `ownerId`, así que `slotExerciseProvider` no resolvía ejercicios custom del alumno. Fix: `assignedBy ?? createdBy`.
+
+**Commits** (cronológico, oldest first):
+
+| Commit | Scope |
+|---|---|
+| `24806e9` | Fase 1 — modelo per-set (SetSpec freezed + RoutineSlot extension) |
+| `e63cd31` | Fase 2 — editor con tabla de sets |
+| `c37f2bb` | Dropdown de músculo en ejercicio custom |
+| `1345ade` | Acceso a "Mis Ejercicios" desde perfil del alumno |
+| `dd69e4d` | Creación de rutina full-screen + editar ejercicio + reorder en superserie |
+| `295eeba` | Editor más grande y con menos cajas |
+| `53c2d94` | Rediseño de campos del editor + fix guardado |
+| `8c3a43e` | Reproductor adaptado al modelo nuevo |
+| `c0bc7cd` | Editar rutina propia del alumno (hidratar + guardar) |
+| `5703f4e` | Fix: detalle de ejercicio custom abre en rutina propia |
+| `318629a` | UX reproductor: tiempo, bloqueo de sets, check pelado |
+| `9987816` | Editor + edición de planes y plantillas del coach (rules + repo) |
+
+**Test coverage agregada** (~10 archivos nuevos, +2K LOC):
+- `domain/set_spec_test.dart` (111) · `domain/routine_slot_test.dart` (241) · `domain/muscle_options_test.dart` (83)
+- `presentation/routine_editor_set_table_test.dart` (401) · `routine_editor_features_test.dart` (128) · `routine_editor_trainer_edit_test.dart` (425)
+- `presentation/widgets/duration_text_field_test.dart` (49)
+- `data/routine_repository_trainer_edit_test.dart` (288) · `data/routine_rules_test.dart` (103, emulator-deferred)
+- `presentation/session_player_screen_test.dart` (+170 LOC) — block-gating + future-set dimming + duration detection
+
+**Sin SDD formal**: scope grande pero el patrón shipped-without-SDD se está volviendo recurrente en este proyecto (Coach Hub Etapa 3, catalog #136, ahora Fase 4.5). Documentado acá para no acumular más deuda de roadmap.
+
+**Open questions (no bloqueantes)**:
+- Tests de rules emulator-deferred — ¿corren en CI o están skipped? Si están skipped, Paths 3/4 del `allow update` no tienen cobertura automatizada.
+- `SetType.warmup/drop/failure` se renderizan pero el insights/volumen no los distingue de `normal` — ¿intencional por ahora?
+- Legacy scalar fields (`targetSets/targetRepsMin/Max/targetWeightKg/targetReps[]/durationSeconds`) siguen siendo dual-write — ¿hay plan de removerlos eventualmente?
+- `kMuscleOptions` es es-AR; catalog usa keys en inglés — ¿partición bilingüe en `muscleGroup` que el insights tenga que normalizar?
 
 ## Fase 5 — desglose en 8 etapas ✅ COMPLETA
 
