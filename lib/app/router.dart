@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -525,71 +524,41 @@ class _ShellScaffold extends StatefulWidget {
 }
 
 class _ShellScaffoldState extends State<_ShellScaffold> {
-  /// Scroll-driven visibility: scrolling down hides the floating bar,
-  /// scrolling up (or switching tabs) brings it back — the bar reacts to the
-  /// main content scroll instead of sitting as a fixed block.
-  bool _barVisible = true;
-
   int get _currentIndex {
     final i = _kTabs.indexWhere((t) => widget.location.startsWith(t));
     return i < 0 ? 2 : i;
   }
 
   @override
-  void didUpdateWidget(_ShellScaffold oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    // Landing on another tab always restores the bar.
-    if (oldWidget.location != widget.location && !_barVisible) {
-      _barVisible = true;
-    }
-  }
-
-  bool _onUserScroll(UserScrollNotification n) {
-    // Ignore horizontal scrollables (week chips, carousels).
-    if (n.metrics.axis != Axis.vertical) return false;
-    switch (n.direction) {
-      case ScrollDirection.reverse:
-        if (_barVisible) setState(() => _barVisible = false);
-      case ScrollDirection.forward:
-        if (!_barVisible) setState(() => _barVisible = true);
-      case ScrollDirection.idle:
-        break;
-    }
-    return false; // keep the notification bubbling
-  }
-
-  @override
   Widget build(BuildContext context) {
     return Scaffold(
       extendBody: true,
-      body: NotificationListener<UserScrollNotification>(
-        onNotification: _onUserScroll,
-        child: AppBackground(child: SafeArea(child: widget.child)),
+      // bottom: false — the body must reach the physical bottom edge so the
+      // main content visibly scrolls BEHIND the floating translucent bar
+      // (WhatsApp-style). Scaffold still publishes the bar's height through
+      // MediaQuery.padding.bottom, so scrollables without an explicit
+      // padding inset their last items above the bar automatically.
+      body: AppBackground(
+        child: SafeArea(bottom: false, child: widget.child),
       ),
-      bottomNavigationBar: AnimatedSlide(
-        duration: const Duration(milliseconds: 260),
-        curve: Curves.easeOutCubic,
-        // 1.5x its height pushes the pill fully past the bottom safe area.
-        offset: _barVisible ? Offset.zero : const Offset(0, 1.5),
-        child: TreinoBottomBar(
-          currentIndex: _currentIndex,
-          onTap: (i) {
-            // Pop any open popup (modal bottom sheet, dialog) on the SHELL
-            // navigator so it animates closed when the user switches tabs —
-            // mirrors the auto-dismiss behavior the user expects from the
-            // athlete agenda. We MUST use the shell navigator key here:
-            // showModalBottomSheet defaults to useRootNavigator: false, so
-            // the modal lives on the shell nav, which is BELOW _ShellScaffold
-            // in the tree — unreachable via Navigator.of(context).
-            _shellNavigatorKey.currentState
-                ?.popUntil((route) => route is! PopupRoute);
-            // Defensive: also pop popups on the root navigator (dialogs that
-            // explicitly opted into useRootNavigator: true).
-            Navigator.of(context, rootNavigator: true)
-                .popUntil((route) => route is! PopupRoute);
-            context.go(_kTabs[i]);
-          },
-        ),
+      bottomNavigationBar: TreinoBottomBar(
+        currentIndex: _currentIndex,
+        onTap: (i) {
+          // Pop any open popup (modal bottom sheet, dialog) on the SHELL
+          // navigator so it animates closed when the user switches tabs —
+          // mirrors the auto-dismiss behavior the user expects from the
+          // athlete agenda. We MUST use the shell navigator key here:
+          // showModalBottomSheet defaults to useRootNavigator: false, so
+          // the modal lives on the shell nav, which is BELOW _ShellScaffold
+          // in the tree — unreachable via Navigator.of(context).
+          _shellNavigatorKey.currentState
+              ?.popUntil((route) => route is! PopupRoute);
+          // Defensive: also pop popups on the root navigator (dialogs that
+          // explicitly opted into useRootNavigator: true).
+          Navigator.of(context, rootNavigator: true)
+              .popUntil((route) => route is! PopupRoute);
+          context.go(_kTabs[i]);
+        },
       ),
     );
   }
