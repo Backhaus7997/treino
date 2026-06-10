@@ -27,10 +27,15 @@ class SessionState {
 
   // ── Getters derivados ────────────────────────────────────────────────────
 
-  /// Verdadero cuando cada slot del día tiene al menos `effectiveSets.length` logs.
+  /// 0-based week number active in this session (from [session.weekNumber]).
+  /// Single-week sessions use 0; effectiveSetsForWeek(0) falls back to
+  /// effectiveSets semantics, keeping behavior identical. (REQ-PERIOD-040)
+  int get activeWeek => session.weekNumber;
+
+  /// Verdadero cuando cada slot del día tiene al menos `effectiveSetsForWeek.length` logs.
   bool get isFullyCompleted => day.slots.every((slot) {
         final count = setsLoggedFor(slot.exerciseId);
-        return count >= slot.effectiveSets.length;
+        return count >= slot.effectiveSetsForWeek(session.weekNumber).length;
       });
 
   /// Suma de reps × weightKg sobre todos los setLogs.
@@ -46,7 +51,8 @@ class SessionState {
   /// Verdadero si el ejercicio tiene todos sus sets completados.
   bool isExerciseDone(String exerciseId) {
     final slot = day.slots.firstWhere((s) => s.exerciseId == exerciseId);
-    return setsLoggedFor(exerciseId) >= slot.effectiveSets.length;
+    return setsLoggedFor(exerciseId) >=
+        slot.effectiveSetsForWeek(session.weekNumber).length;
   }
 
   /// Cantidad de ejercicios del día con todos sus sets completados.

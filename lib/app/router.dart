@@ -203,8 +203,19 @@ GoRouter buildRouter({
           final routineId = state.pathParameters['routineId']!;
           final dayNumber =
               int.tryParse(state.pathParameters['dayNumber'] ?? '') ?? 1;
+          // ADR-PB-05: week passed via query param so single-week URLs are
+          // identical (?week absent → default 0, backward-compat).
+          // Clamp to >= 0: int.tryParse('-1') returns -1, which would persist
+          // a negative weekNumber to Firestore and break derivePlanProgress.
+          final weekNumber =
+              (int.tryParse(state.uri.queryParameters['week'] ?? '') ?? 0)
+                  .clamp(0, 1 << 31);
           return _noAnim(SessionPlayerScreen(
-            init: FreshSession(routineId: routineId, dayNumber: dayNumber),
+            init: FreshSession(
+              routineId: routineId,
+              dayNumber: dayNumber,
+              weekNumber: weekNumber,
+            ),
           ));
         },
       ),

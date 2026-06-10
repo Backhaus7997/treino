@@ -22,8 +22,12 @@ class SessionNotifier
   @override
   Future<SessionState> build(SessionInit arg) async {
     final state = switch (arg) {
-      FreshSession(routineId: final rid, dayNumber: final dn) =>
-        await _buildFresh(rid, dn),
+      FreshSession(
+        routineId: final rid,
+        dayNumber: final dn,
+        weekNumber: final wn,
+      ) =>
+        await _buildFresh(rid, dn, wn),
       ResumeSession(sessionId: final sid) => await _buildResume(sid),
     };
 
@@ -40,7 +44,11 @@ class SessionNotifier
 
   // ── Path A — Sesión nueva ─────────────────────────────────────────────────
 
-  Future<SessionState> _buildFresh(String routineId, int dayNumber) async {
+  Future<SessionState> _buildFresh(
+    String routineId,
+    int dayNumber,
+    int weekNumber,
+  ) async {
     final routine = await ref.read(routineByIdProvider(routineId).future);
     if (routine == null) {
       throw StateError('Rutina $routineId no encontrada');
@@ -51,6 +59,13 @@ class SessionNotifier
         'Día $dayNumber no encontrado en rutina $routineId',
       ),
     );
+
+    // Clamp weekNumber into [0, numWeeks-1] so a malformed URL like
+    // ?week=99 on a 2-week plan or ?week=-1 never persists an out-of-range
+    // value to Firestore. The upper bound is floored at 0 because a corrupt
+    // doc with numWeeks <= 0 would otherwise make clamp() throw (upper < lower).
+    final maxWeek = routine.numWeeks > 1 ? routine.numWeeks - 1 : 0;
+    final clampedWeek = weekNumber.clamp(0, maxWeek);
 
     final repo = ref.read(sessionRepositoryProvider);
     final uid = ref.read(currentUidProvider);
@@ -63,6 +78,7 @@ class SessionNotifier
       routineName: routine.name,
       startedAt: DateTime.now(),
       dayNumber: dayNumber,
+      weekNumber: clampedWeek,
     );
 
     return SessionState(
@@ -112,7 +128,8 @@ class SessionNotifier
       ),
     );
 
-    final currentIndex = _nextIncompleteIndex(day, recoveredLogs);
+    final currentIndex =
+        _nextIncompleteIndex(day, recoveredLogs, session.weekNumber);
     final elapsed = DateTime.now()
         .difference(session.startedAt)
         .inSeconds
@@ -147,7 +164,8 @@ class SessionNotifier
     );
 
     final newLogs = [...current.setLogs, persisted];
-    final newIndex = _nextIncompleteIndex(current.day, newLogs);
+    final newIndex =
+        _nextIncompleteIndex(current.day, newLogs, current.session.weekNumber);
 
     state = AsyncData(current.copyWith(
       setLogs: newLogs,
@@ -255,11 +273,16 @@ class SessionNotifier
     _timer = null;
   }
 
-  int _nextIncompleteIndex(RoutineDay day, List<SetLog> logs) {
+  /// Returns the index of the first slot that still needs sets logged.
+  /// Uses [slot.effectiveSetsForWeek(weekNumber).length] so periodized plans
+  /// respect the correct week's prescription. (REQ-PERIOD-040)
+  /// Single-week sessions pass weekNumber=0; effectiveSetsForWeek(0) falls
+  /// back to effectiveSets semantics (REQ-PERIOD-042 backward-compat).
+  int _nextIncompleteIndex(RoutineDay day, List<SetLog> logs, int weekNumber) {
     for (var i = 0; i < day.slots.length; i++) {
       final slot = day.slots[i];
       final count = logs.where((l) => l.exerciseId == slot.exerciseId).length;
-      if (count < slot.targetSets) return i;
+      if (count < slot.effectiveSetsForWeek(weekNumber).length) return i;
     }
     return day.slots.length - 1;
   }

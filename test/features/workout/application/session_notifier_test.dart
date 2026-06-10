@@ -1,5 +1,7 @@
 // Tests para SessionNotifier — Path A (SCENARIO-256..258), Path B (SCENARIO-318..321),
 // mutaciones (SCENARIO-259..268).
+// SCENARIO-037-notifier: _nextIncompleteIndex uses effectiveSetsForWeek on
+// periodized plans (week 1 needs fewer sets to advance than legacy targetSets).
 // La implementación ya existe (fue necesaria para compilar session_providers.dart),
 // por lo que este archivo actúa como GREEN desde el principio.
 // Desviación documentada en apply-progress.md.
@@ -13,6 +15,7 @@ import 'package:treino/features/workout/application/session_providers.dart';
 import 'package:treino/features/workout/application/routine_providers.dart';
 import 'package:treino/features/workout/data/session_repository.dart';
 import 'package:treino/features/workout/domain/routine.dart';
+import 'package:treino/features/workout/domain/set_spec.dart';
 
 import '../../../helpers/fake_analytics_service.dart';
 import 'stub_factories.dart';
@@ -574,6 +577,150 @@ void main() {
             .finishSession(),
         throwsA(isA<StateError>()),
       );
+    });
+  });
+
+  // ── Fix 1 clamp tests — negative / out-of-range weekNumber ──────────────
+
+  group('weekNumber clamping in _buildFresh', () {
+    Future<int> capturedWeek({
+      required int requestedWeek,
+      required int numWeeks,
+    }) async {
+      final repo = MockSessionRepository();
+      final routine = makeRoutine(numWeeks: numWeeks);
+      final session = makeSession(weekNumber: 0); // return value irrelevant
+
+      when(() => repo.create(
+            uid: any(named: 'uid'),
+            routineId: any(named: 'routineId'),
+            routineName: any(named: 'routineName'),
+            startedAt: any(named: 'startedAt'),
+            dayNumber: any(named: 'dayNumber'),
+            weekNumber: any(named: 'weekNumber'),
+          )).thenAnswer((_) async => session);
+
+      final container = _makeContainer(
+        repo: repo,
+        uid: 'u1',
+        routine: routine,
+      );
+      addTearDown(container.dispose);
+
+      final init = FreshSession(
+        routineId: routine.id,
+        dayNumber: 1,
+        weekNumber: requestedWeek,
+      );
+      await container.read(sessionNotifierProvider(init).future);
+
+      final captured = verify(() => repo.create(
+            uid: any(named: 'uid'),
+            routineId: any(named: 'routineId'),
+            routineName: any(named: 'routineName'),
+            startedAt: any(named: 'startedAt'),
+            dayNumber: any(named: 'dayNumber'),
+            weekNumber: captureAny(named: 'weekNumber'),
+          )).captured;
+      return captured.last as int;
+    }
+
+    test('weekNumber=-1 is clamped to 0 before persisting', () async {
+      final persisted = await capturedWeek(requestedWeek: -1, numWeeks: 1);
+      expect(persisted, equals(0));
+    });
+
+    test('weekNumber=99 on a 2-week plan is clamped to 1 (numWeeks-1)',
+        () async {
+      final persisted = await capturedWeek(requestedWeek: 99, numWeeks: 2);
+      expect(persisted, equals(1));
+    });
+
+    test('numWeeks=0 (corrupt doc): upper bound floored at 0, no throw',
+        () async {
+      // clamp(0, numWeeks - 1) with numWeeks=0 would be clamp(0, -1), which
+      // throws ArgumentError in Dart. The floor guard must prevent that.
+      final persisted = await capturedWeek(requestedWeek: 5, numWeeks: 0);
+      expect(persisted, equals(0));
+    });
+  });
+
+  // ── SCENARIO-037-notifier: _nextIncompleteIndex on periodized plan ────────
+
+  group(
+      'SCENARIO-037-notifier: _nextIncompleteIndex honors effectiveSetsForWeek',
+      () {
+    test(
+        'SCENARIO-037-notifier: logSet advances to next exercise after completing '
+        'week-1 prescription (2 sets), not legacy targetSets (4)', () async {
+      final repo = MockSessionRepository();
+
+      // Routine with 2 exercises:
+      //   e1 — weeklySets: week0=[4 sets], week1=[2 sets]; targetSets=4 (legacy)
+      //   e2 — single-week, targetSets=3
+      final periodizedSlot = makeSlot(
+        exerciseId: 'e1',
+        targetSets: 4, // legacy — must NOT drive advancement in week 1
+        weeklySets: const [
+          // week 0
+          [
+            SetSpec(reps: 5),
+            SetSpec(reps: 5),
+            SetSpec(reps: 5),
+            SetSpec(reps: 5)
+          ],
+          // week 1
+          [SetSpec(reps: 8), SetSpec(reps: 8)],
+        ],
+      );
+      final routine = makeRoutine(
+        days: [
+          makeDay(slots: [
+            periodizedSlot,
+            makeSlot(exerciseId: 'e2', exerciseName: 'Curl', targetSets: 3),
+          ])
+        ],
+      );
+
+      // The created session must carry weekNumber=1 so _nextIncompleteIndex
+      // calls effectiveSetsForWeek(1) → length 2 for e1.
+      final sessionWeek1 = makeSession(weekNumber: 1);
+
+      when(() => repo.create(
+            uid: any(named: 'uid'),
+            routineId: any(named: 'routineId'),
+            routineName: any(named: 'routineName'),
+            startedAt: any(named: 'startedAt'),
+            dayNumber: any(named: 'dayNumber'),
+            weekNumber: any(named: 'weekNumber'),
+          )).thenAnswer((_) async => sessionWeek1);
+
+      when(() => repo.addSetLog(
+            uid: any(named: 'uid'),
+            sessionId: any(named: 'sessionId'),
+            setLog: any(named: 'setLog'),
+          )).thenAnswer(
+        (inv) async => inv.namedArguments[const Symbol('setLog')] as dynamic,
+      );
+
+      final container = _makeContainer(repo: repo, uid: 'u1', routine: routine);
+      addTearDown(container.dispose);
+
+      final init =
+          FreshSession(routineId: routine.id, dayNumber: 1, weekNumber: 1);
+      await container.read(sessionNotifierProvider(init).future);
+
+      final notifier = container.read(sessionNotifierProvider(init).notifier);
+
+      // Log 2 sets for e1 — week-1 prescription is 2 sets → should advance.
+      await notifier.logSet(makeSetLog(exerciseId: 'e1', setNumber: 1));
+      await notifier
+          .logSet(makeSetLog(exerciseId: 'e1', setNumber: 2, id: 'sl2'));
+
+      final state = container.read(sessionNotifierProvider(init)).value!;
+      // Index must be 1 (e2), proving _nextIncompleteIndex used week-1 (2 sets),
+      // not the legacy targetSets=4 which would keep index at 0.
+      expect(state.currentExerciseIndex, equals(1));
     });
   });
 }

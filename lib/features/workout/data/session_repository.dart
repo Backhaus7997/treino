@@ -36,6 +36,7 @@ class SessionRepository {
     required String routineName,
     required DateTime startedAt,
     int dayNumber = 1,
+    int weekNumber = 0,
   }) async {
     final ref = _sessions(uid).doc();
     final session = Session(
@@ -49,6 +50,7 @@ class SessionRepository {
       durationMin: 0,
       status: SessionStatus.active,
       dayNumber: dayNumber,
+      weekNumber: weekNumber,
     );
     await ref.set(session.toJson());
     return session;
