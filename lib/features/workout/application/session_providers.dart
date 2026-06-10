@@ -4,7 +4,10 @@ import '../../auth/application/auth_providers.dart';
 import '../../profile/application/user_providers.dart' show firestoreProvider;
 import '../data/session_repository.dart';
 import '../domain/session.dart';
+import '../domain/session_status.dart';
 import '../domain/set_log.dart';
+import 'plan_progress.dart';
+import 'routine_providers.dart' show routineByIdProvider;
 import 'session_init.dart';
 import 'session_notifier.dart';
 import 'session_state.dart';
@@ -64,6 +67,46 @@ final sessionSummaryProvider = FutureProvider.autoDispose.family<
     session: results[0] as Session?,
     setLogs: results[1] as List<SetLog>,
   );
+});
+
+// ─── Periodization (Model B) — plan progress provider ────────────────────────
+
+/// Family key for [planProgressProvider].
+///
+/// Uses only String fields for structural equality via Dart's record ==.
+/// - [uid]       the athlete's Firebase uid.
+/// - [routineId] the routine being tracked.
+///
+/// dayNumbers and numWeeks are resolved inside the provider via
+/// [routineByIdProvider] to avoid List<int> equality issues.
+typedef PlanProgressKey = ({String uid, String routineId});
+
+/// Derives the athlete's current progress in a periodized plan.
+///
+/// Reads [sessionsByUidProvider] (filtered by routineId + finished +
+/// wasFullyCompleted) and [routineByIdProvider] (for dayNumbers + numWeeks),
+/// then calls [derivePlanProgress].
+///
+/// autoDispose: refreshes automatically when the screen is re-mounted
+/// (e.g. after returning from the player). family key is [PlanProgressKey].
+final planProgressProvider = FutureProvider.autoDispose
+    .family<PlanProgress, PlanProgressKey>((ref, key) async {
+  final sessions = await ref.watch(sessionsByUidProvider(key.uid).future);
+  final routine = await ref.watch(routineByIdProvider(key.routineId).future);
+  if (routine == null) {
+    return derivePlanProgress({}, const [], 1);
+  }
+  final dayNumbers = routine.days.map((d) => d.dayNumber).toList();
+  final completed = sessions
+      .where(
+        (s) =>
+            s.routineId == key.routineId &&
+            s.status == SessionStatus.finished &&
+            s.wasFullyCompleted,
+      )
+      .map((s) => (week: s.weekNumber, day: s.dayNumber))
+      .toSet();
+  return derivePlanProgress(completed, dayNumbers, routine.numWeeks);
 });
 
 /// Chequeo de sesión activa al abrir /home (Decision 12).

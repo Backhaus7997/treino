@@ -11,20 +11,29 @@ sealed class SessionInit {
 
 /// Inicia una sesión nueva para la rutina y día dados.
 final class FreshSession extends SessionInit {
-  const FreshSession({required this.routineId, required this.dayNumber});
+  const FreshSession({
+    required this.routineId,
+    required this.dayNumber,
+    this.weekNumber = 0,
+  });
 
   final String routineId;
   final int dayNumber;
+
+  /// 0-based week of the plan this session belongs to.
+  /// Default 0 keeps single-week backward-compat (REQ-PERIOD-038).
+  final int weekNumber;
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is FreshSession &&
           other.routineId == routineId &&
-          other.dayNumber == dayNumber;
+          other.dayNumber == dayNumber &&
+          other.weekNumber == weekNumber;
 
   @override
-  int get hashCode => Object.hash(routineId, dayNumber);
+  int get hashCode => Object.hash(routineId, dayNumber, weekNumber);
 }
 
 /// Retoma una sesión activa existente por su id.

@@ -203,8 +203,16 @@ GoRouter buildRouter({
           final routineId = state.pathParameters['routineId']!;
           final dayNumber =
               int.tryParse(state.pathParameters['dayNumber'] ?? '') ?? 1;
+          // ADR-PB-05: week passed via query param so single-week URLs are
+          // identical (?week absent → default 0, backward-compat).
+          final weekNumber =
+              int.tryParse(state.uri.queryParameters['week'] ?? '') ?? 0;
           return _noAnim(SessionPlayerScreen(
-            init: FreshSession(routineId: routineId, dayNumber: dayNumber),
+            init: FreshSession(
+              routineId: routineId,
+              dayNumber: dayNumber,
+              weekNumber: weekNumber,
+            ),
           ));
         },
       ),

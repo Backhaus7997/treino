@@ -22,8 +22,12 @@ class SessionNotifier
   @override
   Future<SessionState> build(SessionInit arg) async {
     final state = switch (arg) {
-      FreshSession(routineId: final rid, dayNumber: final dn) =>
-        await _buildFresh(rid, dn),
+      FreshSession(
+        routineId: final rid,
+        dayNumber: final dn,
+        weekNumber: final wn,
+      ) =>
+        await _buildFresh(rid, dn, wn),
       ResumeSession(sessionId: final sid) => await _buildResume(sid),
     };
 
@@ -40,7 +44,11 @@ class SessionNotifier
 
   // ── Path A — Sesión nueva ─────────────────────────────────────────────────
 
-  Future<SessionState> _buildFresh(String routineId, int dayNumber) async {
+  Future<SessionState> _buildFresh(
+    String routineId,
+    int dayNumber,
+    int weekNumber,
+  ) async {
     final routine = await ref.read(routineByIdProvider(routineId).future);
     if (routine == null) {
       throw StateError('Rutina $routineId no encontrada');
@@ -63,6 +71,7 @@ class SessionNotifier
       routineName: routine.name,
       startedAt: DateTime.now(),
       dayNumber: dayNumber,
+      weekNumber: weekNumber,
     );
 
     return SessionState(
