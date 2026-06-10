@@ -527,6 +527,7 @@ class _ShellScaffold extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      extendBody: true,
       body: AppBackground(child: SafeArea(child: child)),
       bottomNavigationBar: TreinoBottomBar(
         currentIndex: _currentIndex,
