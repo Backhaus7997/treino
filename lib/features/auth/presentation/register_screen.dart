@@ -9,9 +9,9 @@ import '../../../app/theme/app_background.dart';
 import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../application/auth_providers.dart';
+import '../../../l10n/app_l10n.dart';
 import '../domain/auth_failure.dart';
 import '../domain/email_password_validator.dart';
-import 'auth_strings.dart';
 import 'widgets/auth_failure_banner.dart';
 import 'widgets/auth_input.dart';
 import 'widgets/auth_pill_button.dart';
@@ -132,6 +132,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         : null;
 
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
 
     return Scaffold(
       backgroundColor: palette.bg,
@@ -159,7 +160,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   // Headline: "SUMATE A" + TREINO brand logo below.
                   // Space Grotesk for the prose, brand SVG for the wordmark.
                   Text(
-                    AuthStrings.registerTitle,
+                    l10n.authRegisterTitle,
                     style: GoogleFonts.spaceGrotesk(
                       fontSize: 28,
                       fontWeight: FontWeight.w900,
@@ -172,7 +173,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   const TreinoLogo(size: 44),
                   const SizedBox(height: 14),
                   Text(
-                    AuthStrings.registerSubtitle,
+                    l10n.authRegisterSubtitle,
                     style: GoogleFonts.barlow(
                       fontSize: 15,
                       color: palette.textMuted,
@@ -182,7 +183,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   // Email field (no display name field — ProfileSetup owns it).
                   AuthInput(
                     controller: _emailCtrl,
-                    label: AuthStrings.registerEmailLabel,
+                    label: l10n.authRegisterEmailLabel,
                     leadingIcon: TreinoIcon.mail,
                     keyboardType: TextInputType.emailAddress,
                     textInputAction: TextInputAction.next,
@@ -195,7 +196,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   // Password field
                   AuthInput(
                     controller: _passwordCtrl,
-                    label: AuthStrings.registerPasswordLabel,
+                    label: l10n.authRegisterPasswordLabel,
                     leadingIcon: TreinoIcon.lock,
                     obscureText: true,
                     suffixToggle: true,
@@ -216,7 +217,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   // Confirm password field
                   AuthInput(
                     controller: _confirmPasswordCtrl,
-                    label: AuthStrings.registerConfirmPasswordLabel,
+                    label: l10n.authRegisterConfirmPasswordLabel,
                     leadingIcon: TreinoIcon.lock,
                     obscureText: true,
                     suffixToggle: true,
@@ -243,7 +244,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   ],
                   // CTA
                   AuthPillButton(
-                    label: AuthStrings.registerCta,
+                    label: l10n.authRegisterCta,
                     onPressed: _canSubmit ? _submit : null,
                     isLoading: isLoading,
                   ),
@@ -255,7 +256,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 12),
                         child: Text(
-                          AuthStrings.registerDividerOr,
+                          l10n.authRegisterDividerOr,
                           style: GoogleFonts.barlowCondensed(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
@@ -283,7 +284,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                             width: 18,
                             height: 18,
                           ),
-                          label: AuthStrings.googleLabel,
+                          label: l10n.authGoogleLabel,
                           onPressed: isLoading ? null : _signInWithGoogle,
                         ),
                       ),
@@ -291,7 +292,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       Expanded(
                         child: AuthSecondaryButton(
                           icon: FontAwesomeIcons.apple,
-                          label: AuthStrings.appleLabel,
+                          label: l10n.authAppleLabel,
                           onPressed: isLoading ? null : _signInWithApple,
                         ),
                       ),

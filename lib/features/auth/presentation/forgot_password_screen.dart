@@ -7,8 +7,8 @@ import '../../../app/theme/app_background.dart';
 import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../application/auth_providers.dart';
+import '../../../l10n/app_l10n.dart';
 import '../domain/auth_failure.dart';
-import 'auth_strings.dart';
 import 'widgets/auth_circle_back_button.dart';
 import 'widgets/auth_failure_banner.dart';
 import 'widgets/auth_input.dart';
@@ -80,6 +80,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
 
     return Scaffold(
       backgroundColor: palette.bg,
@@ -98,7 +99,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                 const SizedBox(height: 24),
                 // Headline
                 Text(
-                  AuthStrings.forgotTitle,
+                  l10n.authForgotTitle,
                   style: GoogleFonts.spaceGrotesk(
                     fontSize: 40,
                     fontWeight: FontWeight.w900,
@@ -110,7 +111,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                 const SizedBox(height: 12),
                 // Body
                 Text(
-                  AuthStrings.forgotBody,
+                  l10n.authForgotBody,
                   style: GoogleFonts.barlow(
                     fontSize: 15,
                     color: palette.textMuted,
@@ -121,7 +122,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                 if (_sent) ...[
                   // Success state
                   Text(
-                    AuthStrings.forgotSuccess,
+                    l10n.authForgotSuccess,
                     style: GoogleFonts.barlow(
                       fontSize: 15,
                       color: palette.accent,
@@ -132,8 +133,8 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                   // Field shown as read-only after success
                   AuthInput(
                     controller: _emailCtrl,
-                    label: AuthStrings.forgotEmailLabel,
-                    hint: AuthStrings.forgotEmailHint,
+                    label: l10n.authForgotEmailLabel,
+                    hint: l10n.authForgotEmailHint,
                     leadingIcon: TreinoIcon.mail,
                     keyboardType: TextInputType.emailAddress,
                     enabled: false,
@@ -142,7 +143,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                   TextButton(
                     onPressed: () => context.go('/login'),
                     child: Text(
-                      AuthStrings.forgotBackToLogin,
+                      l10n.authForgotBackToLogin,
                       style: GoogleFonts.barlow(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
@@ -154,8 +155,8 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                   // Form state
                   AuthInput(
                     controller: _emailCtrl,
-                    label: AuthStrings.forgotEmailLabel,
-                    hint: AuthStrings.forgotEmailHint,
+                    label: l10n.authForgotEmailLabel,
+                    hint: l10n.authForgotEmailHint,
                     leadingIcon: TreinoIcon.mail,
                     keyboardType: TextInputType.emailAddress,
                     textInputAction: TextInputAction.done,
@@ -169,7 +170,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                     const SizedBox(height: 12),
                   ],
                   AuthPillButton(
-                    label: AuthStrings.forgotCta,
+                    label: l10n.authForgotCta,
                     onPressed: _emailCtrl.text.trim().isEmpty ? null : _submit,
                     isLoading: _isLoading,
                     showArrow: false,

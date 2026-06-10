@@ -7,6 +7,7 @@ import 'package:treino/features/auth/presentation/welcome_screen.dart';
 import 'package:treino/features/auth/presentation/widgets/auth_pill_button.dart';
 import 'package:treino/features/auth/presentation/widgets/auth_secondary_button.dart';
 import 'package:treino/features/auth/presentation/widgets/treino_logo.dart';
+import 'package:treino/l10n/app_l10n.dart';
 
 GoRouter _makeRouter(Widget home) => GoRouter(
       initialLocation: '/welcome',
@@ -26,7 +27,14 @@ GoRouter _makeRouter(Widget home) => GoRouter(
 Widget _buildApp() {
   const screen = WelcomeScreen();
   final router = _makeRouter(screen);
-  return ProviderScope(child: MaterialApp.router(routerConfig: router));
+  return ProviderScope(
+    child: MaterialApp.router(
+      routerConfig: router,
+      localizationsDelegates: AppL10n.localizationsDelegates,
+      supportedLocales: AppL10n.supportedLocales,
+      locale: const Locale('es', 'AR'),
+    ),
+  );
 }
 
 void main() {

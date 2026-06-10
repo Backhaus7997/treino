@@ -2,9 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/auth/presentation/widgets/trainer_inquiry_card.dart';
+import 'package:treino/l10n/app_l10n.dart';
 
 Widget _wrap(Widget child) => MaterialApp(
       theme: AppTheme.dark(),
+      localizationsDelegates: AppL10n.localizationsDelegates,
+      supportedLocales: AppL10n.supportedLocales,
+      locale: const Locale('es', 'AR'),
       home: Scaffold(
           body: Padding(padding: const EdgeInsets.all(20), child: child)),
     );
