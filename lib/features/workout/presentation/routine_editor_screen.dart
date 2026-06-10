@@ -494,6 +494,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
   /// (ADR-PB-04). SCENARIO-PERIOD-010/011.
   void _addWeek() {
     if (_numWeeks >= _kMaxWeeks) return;
+    FocusManager.instance.primaryFocus?.unfocus();
     setState(() {
       _numWeeks++;
       for (final day in _days) {
@@ -509,6 +510,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
   /// week (REQ-PERIOD-012, SCENARIO-PERIOD-012/013).
   void _removeLastWeek() {
     if (_numWeeks <= 1) return;
+    FocusManager.instance.primaryFocus?.unfocus();
     setState(() {
       _numWeeks--;
       for (final day in _days) {
@@ -527,6 +529,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
   /// [_EditableSet.copy] so set types survive the duplication.
   void _duplicateWeek() {
     if (_selectedWeek == 0) return;
+    FocusManager.instance.primaryFocus?.unfocus();
     setState(() {
       for (final day in _days) {
         for (final slot in day.slots) {
@@ -1079,7 +1082,15 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                         maxWeeks: _kMaxWeeks,
                         warningWeeks: hiddenInvalidWeeks.toSet(),
                         palette: palette,
-                        onSelectWeek: (w) => setState(() => _selectedWeek = w),
+                        onSelectWeek: (w) {
+                          // Drop focus BEFORE swapping the week's field tree:
+                          // on-device the iOS IME can restore its editing
+                          // session into the replacement TextField and bleed
+                          // the previous week's value into the new week
+                          // (not reproducible in widget tests — no real IME).
+                          FocusManager.instance.primaryFocus?.unfocus();
+                          setState(() => _selectedWeek = w);
+                        },
                         onAddWeek: _addWeek,
                         onRemoveLastWeek: _removeLastWeek,
                         onDuplicateWeek: _duplicateWeek,
