@@ -18,7 +18,7 @@
 
 ### T-I18N-001 — Add flutter_localizations + intl dependencies
 
-- **Status**: [ ]
+- **Status**: [x] DONE — intl ^0.20.0 (table_calendar requires ^0.20.0)
 - **PR**: #1
 - **Files**: `pubspec.yaml`
 - **Acceptance criteria**: `flutter pub get` exits 0; `flutter_localizations` and `intl: ^0.19.0` appear in pubspec.lock without version conflict
@@ -30,7 +30,7 @@
 
 ### T-I18N-002 — Create l10n.yaml at repo root
 
-- **Status**: [ ]
+- **Status**: [x] DONE — synthetic-package removed (deprecated), generate: true added
 - **PR**: #1
 - **Files**: `l10n.yaml`
 - **Acceptance criteria**: File contains exactly `arb-dir: lib/l10n`, `template-arb-file: intl_es_AR.arb`, `output-localization-file: app_l10n.dart`, `output-class: AppL10n`, `nullable-getter: false`, `synthetic-package: false`; `flutter gen-l10n` exits 0
@@ -43,7 +43,7 @@
 
 ### T-I18N-003 — Create ARB skeleton files
 
-- **Status**: [ ]
+- **Status**: [x] DONE — intl_es.arb added as required base locale fallback
 - **PR**: #1
 - **Files**: `lib/l10n/intl_es_AR.arb`, `lib/l10n/intl_en.arb`
 - **Acceptance criteria**: Both files contain only `@@locale` header (`"@@locale": "es_AR"` and `"@@locale": "en"` respectively); `flutter gen-l10n` exits 0 and produces `lib/l10n/app_l10n.dart`; `AppL10n` class is importable; `AppL10n.supportedLocales` contains both `Locale('es','AR')` and `Locale('en')`
@@ -55,7 +55,7 @@
 
 ### T-I18N-004 — RED: locale resolution widget test
 
-- **Status**: [ ]
+- **Status**: [x] DONE
 - **PR**: #1
 - **Files**: `test/l10n/locale_resolution_test.dart` (new)
 - **Acceptance criteria**: Test file added; `flutter test test/l10n/locale_resolution_test.dart` FAILS (AppL10n not wired to MaterialApp yet). Test covers: es-AR device → es-AR strings (SCENARIO-755), fr-FR device → falls back to es-AR (SCENARIO-756)
@@ -68,7 +68,7 @@
 
 ### T-I18N-005 — GREEN: Wire MaterialApp with AppL10n delegates + localeResolutionCallback
 
-- **Status**: [ ]
+- **Status**: [x] DONE — locale_resolver.dart pure function extracted for testability
 - **PR**: #1
 - **Dependencies**: T-I18N-004 must be RED first
 - **Files**: `lib/app/app.dart` (or wherever `MaterialApp` lives)
@@ -82,7 +82,7 @@
 
 ### T-I18N-006 — RED: AuthStrings call sites test
 
-- **Status**: [ ]
+- **Status**: [x] DONE
 - **PR**: #1
 - **Dependencies**: T-I18N-005 must be GREEN
 - **Files**: `test/features/auth/auth_strings_migration_test.dart` (new)
@@ -96,7 +96,7 @@
 
 ### T-I18N-007 — GREEN: Migrate AuthStrings to ARB + update call sites + delete file
 
-- **Status**: [ ]
+- **Status**: [x] DONE — 42 keys migrated, auth_strings.dart deleted, existing tests updated with AppL10n delegates
 - **PR**: #1
 - **Dependencies**: T-I18N-006 must be RED first
 - **Files**: `lib/l10n/intl_es_AR.arb` (add auth keys), `lib/l10n/intl_en.arb` (add empty scaffold keys), `lib/features/auth/presentation/**` (all call sites), `lib/features/auth/presentation/auth_strings.dart` (DELETE)
@@ -110,7 +110,7 @@
 
 ### T-I18N-008 — RED: AuthFailure.userMessage exclusion test
 
-- **Status**: [ ]
+- **Status**: [x] DONE — kAuthFailureI18nExclusionNote sentinel makes exclusion testable
 - **PR**: #1
 - **Dependencies**: T-I18N-007 must be GREEN
 - **Files**: `test/features/auth/auth_failure_exclusion_test.dart` (new, or assert within existing login_screen_test.dart review)
@@ -124,7 +124,7 @@
 
 ### T-I18N-009 — GREEN: Add AuthFailure.userMessage exclusion comment
 
-- **Status**: [ ]
+- **Status**: [x] DONE
 - **PR**: #1
 - **Dependencies**: T-I18N-008 must be RED first
 - **Files**: `lib/features/auth/domain/auth_failure.dart`
