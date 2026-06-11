@@ -125,7 +125,9 @@ class _EditableSlot {
   List<List<_EditableSet>> weeklySets = [
     [_EditableSet()],
   ];
-  int restSeconds = 60;
+  // Rest starts at 0 by default — the trainer/athlete sets it per exercise
+  // (device feedback 2026-06-11). Was 60.
+  int restSeconds = 0;
   int? supersetGroup;
 
   /// The active week's set list — same object as `weeklySets[w]`, so in-place
@@ -866,7 +868,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
       for (final ex in picked.where((e) => !existingIds.contains(e.id))) {
         final slot = _EditableSlot()
           ..exercise = ex
-          ..restSeconds = ex.defaultRestSeconds ?? 60
+          ..restSeconds = 0
           ..weeklySets = List.generate(_numWeeks, (_) => [_EditableSet()])
           ..activeWeeks =
               scope == _AddScope.thisWeek ? {_selectedWeek} : <int>{};
@@ -902,7 +904,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
       final newSlots = newOnes
           .map((ex) => _EditableSlot()
             ..exercise = ex
-            ..restSeconds = ex.defaultRestSeconds ?? 60
+            ..restSeconds = 0
             ..supersetGroup = nextGroup
             ..weeklySets = List.generate(_numWeeks, (_) => [_EditableSet()])
             ..activeWeeks =
@@ -936,7 +938,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
       final newSlots = newOnes
           .map((ex) => _EditableSlot()
             ..exercise = ex
-            ..restSeconds = ex.defaultRestSeconds ?? 60
+            ..restSeconds = 0
             ..supersetGroup = groupId
             ..weeklySets = List.generate(_numWeeks, (_) => [_EditableSet()])
             ..activeWeeks =

@@ -411,13 +411,13 @@ class _HeroStrip extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
 
-    // Trainer-defined plans (assigned to an athlete OR a reusable template
-    // visible to the trainer's alumnos) don't carry a photo asset — render
-    // a compact header with just badges + title, no image / gradient /
-    // scrims. Only the public seeded catalogue has `assets/routines/{id}.png`.
-    final isTrainerDefined = routine.source == RoutineSource.trainerAssigned ||
-        routine.source == RoutineSource.trainerTemplate;
-    if (isTrainerDefined) {
+    // Only the public seeded catalogue ships a photo asset
+    // (`assets/routines/{id}.png`). Trainer-defined plans AND athlete-created
+    // routines have none — render a compact header (badges + title, no image
+    // / 320px gradient / scrims) instead of the green gradient block the
+    // missing-asset errorBuilder used to paint (device feedback 2026-06-11).
+    final hasHeroPhoto = routine.source == RoutineSource.system;
+    if (!hasHeroPhoto) {
       return Padding(
         padding: const EdgeInsets.fromLTRB(20, 64, 20, 8),
         child: Column(
