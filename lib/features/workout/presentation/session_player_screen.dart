@@ -130,7 +130,9 @@ int plannedRepsForSpec(SetSpec spec, ExerciseMode mode) {
 }
 
 /// Human-readable display for planned reps (e.g. "10" or "8–12").
+/// Failure sets ([SetType.failure]) display "Al fallo" regardless of mode.
 String repsDisplayText(SetSpec spec, ExerciseMode mode) {
+  if (spec.type == SetType.failure) return 'Al fallo';
   if (mode == ExerciseMode.duration) {
     final secs = spec.durationSeconds ?? 0;
     return _formatMMSS(secs);

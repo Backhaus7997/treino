@@ -1,11 +1,13 @@
 // Tests 3.19
 // SCENARIO-039: ExerciseSlotRow shows week 1 prescription when viewedWeek=1
 // SCENARIO-040: ExerciseSlotRow shows fallback for single-week slot (weeklySets empty)
+// SCENARIO-F01..F04: failure set display in _setsRepsSummary
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/workout/domain/routine_slot.dart';
+import 'package:treino/features/workout/domain/set_enums.dart';
 import 'package:treino/features/workout/domain/set_spec.dart';
 import 'package:treino/features/workout/presentation/widgets/exercise_slot_row.dart';
 
@@ -122,6 +124,105 @@ void main() {
       expect(tester.takeException(), isNull);
       // Should render something meaningful (legacy fallback)
       expect(find.byType(ExerciseSlotRow), findsOneWidget);
+    });
+  });
+
+  // ── Failure set display (SCENARIO-F01..F04) ────────────────────────────────
+
+  group('ExerciseSlotRow — failure set summary', () {
+    RoutineSlot makeFailureSlot({int failureSets = 3}) => RoutineSlot(
+          exerciseId: 'pull-up',
+          exerciseName: 'Dominadas',
+          muscleGroup: 'Espalda',
+          targetSets: failureSets,
+          targetRepsMin: 4,
+          targetRepsMax: 10,
+          restSeconds: 90,
+          weeklySets: [
+            List.generate(
+              failureSets,
+              (_) => const SetSpec(type: SetType.failure),
+            ),
+          ],
+        );
+
+    RoutineSlot makeMixedSlot() => const RoutineSlot(
+          exerciseId: 'pull-up',
+          exerciseName: 'Dominadas',
+          muscleGroup: 'Espalda',
+          targetSets: 3,
+          targetRepsMin: 8,
+          targetRepsMax: 10,
+          restSeconds: 90,
+          weeklySets: [
+            [
+              SetSpec(reps: 8),
+              SetSpec(reps: 8),
+              SetSpec(type: SetType.failure),
+            ],
+          ],
+        );
+
+    testWidgets('SCENARIO-F01: all-failure slot shows "<N> · Al fallo"',
+        (tester) async {
+      await tester.pumpWidget(_wrap(
+        ExerciseSlotRow(
+          slot: makeFailureSlot(failureSets: 3),
+          index: 1,
+          onTap: () {},
+        ),
+      ));
+      expect(find.text('3 · Al fallo'), findsOneWidget);
+    });
+
+    testWidgets('SCENARIO-F02: single failure set shows "1 · Al fallo"',
+        (tester) async {
+      await tester.pumpWidget(_wrap(
+        ExerciseSlotRow(
+          slot: makeFailureSlot(failureSets: 1),
+          index: 1,
+          onTap: () {},
+        ),
+      ));
+      expect(find.text('1 · Al fallo'), findsOneWidget);
+    });
+
+    testWidgets(
+        'SCENARIO-F03: mixed sets show normal sets + failure count separated by " + "',
+        (tester) async {
+      await tester.pumpWidget(_wrap(
+        ExerciseSlotRow(
+          slot: makeMixedSlot(),
+          index: 1,
+          onTap: () {},
+        ),
+      ));
+      // 2 normal sets of 8 + 1 failure
+      expect(find.text('2 · 8 + 1 · Al fallo'), findsOneWidget);
+    });
+
+    testWidgets(
+        'SCENARIO-F04: legacy slot with targetRepsMin/Max ignores failure type '
+        '(no weeklySets — legacy path unaffected)', (tester) async {
+      // Legacy slot: no weeklySets, no sets — falls back to targetRepsMin/Max.
+      // The legacy path doesn't have SetType info, so it renders the range.
+      const legacySlot = RoutineSlot(
+        exerciseId: 'pull-up',
+        exerciseName: 'Dominadas',
+        muscleGroup: 'Espalda',
+        targetSets: 4,
+        targetRepsMin: 4,
+        targetRepsMax: 10,
+        restSeconds: 90,
+      );
+      await tester.pumpWidget(_wrap(
+        ExerciseSlotRow(
+          slot: legacySlot,
+          index: 1,
+          onTap: () {},
+        ),
+      ));
+      expect(find.text('4 · 4–10'), findsOneWidget);
     });
   });
 }
