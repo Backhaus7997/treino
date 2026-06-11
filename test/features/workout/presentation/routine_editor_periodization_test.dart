@@ -953,7 +953,14 @@ void main() {
     await tester.tap(find.text('Solo esta semana'));
     await tester.pumpAndSettle();
 
-    // Slot is still present (not removed structurally)
+    // The masked-out slot disappears from THIS week's view — this is the
+    // user-visible effect of "solo esta semana" (device bug 2026-06-11: the
+    // mask updated but the render did not filter, so it looked broken).
+    expect(find.text('Press de Banca'), findsNothing,
+        reason: 'masked-out slot must be hidden in the viewed week');
+
+    // ...but it was NOT structurally removed: other weeks still render it.
+    await _tapByKey(tester, 'week_tab_0');
     expect(find.text('Press de Banca'), findsOneWidget,
         reason: 'slot must remain in the plan for other weeks');
 

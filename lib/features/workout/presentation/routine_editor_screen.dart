@@ -1673,18 +1673,25 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
   List<Widget> _buildSlotRows(AppPalette palette) {
     final blocks = _blocks();
     final rows = <Widget>[];
-    // Running absolute index into the flat slot list — onRemove still expects
-    // the slot's flat position, not the block index.
-    var flatStart = 0;
     for (var b = 0; b < blocks.length; b++) {
       final block = blocks[b];
+      // Presence filter (REQ-WPRES render): a slot deleted "solo de esta
+      // semana" must disappear from this week's view — and one added "solo
+      // esta semana" must only appear here. Callbacks keep the ORIGINAL flat
+      // indices carried by each record, so delete/move still target the
+      // right slot in the unfiltered day list.
+      final visible = [
+        for (final r in block)
+          if (r.slot.isPresentInWeek(widget.week)) r,
+      ];
+      if (visible.isEmpty) continue;
       final canUp = b > 0;
       final canDown = b < blocks.length - 1;
-      if (block.length == 1 && block.first.supersetGroup == null) {
+      if (block.length == 1 && block.first.slot.supersetGroup == null) {
         // Standalone slot. ObjectKey keeps each row's State bound to its slot
         // so the int fields don't show stale values after the list shifts.
-        final idx = flatStart;
-        final slot = block.first;
+        final idx = visible.first.index;
+        final slot = visible.first.slot;
         rows.add(_SlotEditor(
           key: ObjectKey(slot),
           slot: slot,
@@ -1700,21 +1707,18 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
           onMoveDown: () => _moveBlock(b, 1),
         ));
       } else {
-        // Superset block — the whole block moves as one unit.
-        final groupSlots = <({int index, _EditableSlot slot})>[
-          for (var k = 0; k < block.length; k++)
-            (index: flatStart + k, slot: block[k]),
-        ];
+        // Superset block — the whole block moves as one unit. Only the
+        // members present in the viewed week are rendered.
         rows.add(_SupersetGroupCard(
-          groupSlots: groupSlots,
+          groupSlots: visible,
           week: widget.week,
           palette: palette,
           onRemoveSlot: widget.onRemoveSlot,
           onChanged: widget.onSlotChanged,
-          onAddExercise: () => widget.onAddToGroup(block.first.supersetGroup!),
+          onAddExercise: () =>
+              widget.onAddToGroup(block.first.slot.supersetGroup!),
           onReplaceExercise: widget.onReplaceExercise,
           onMoveSlotInGroup: widget.onMoveSlotInGroup,
-          flatStart: flatStart,
           canMoveUp: canUp,
           canMoveDown: canDown,
           onMoveUp: () => _moveBlock(b, -1),
@@ -1722,28 +1726,29 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
         ));
       }
       rows.add(const SizedBox(height: 8));
-      flatStart += block.length;
     }
     return rows;
   }
 
   /// Groups the flat slot list into ordered blocks: a standalone slot is its
   /// own block; consecutive slots sharing a non-null supersetGroup form one.
-  List<List<_EditableSlot>> _blocks() {
+  /// Each entry carries its ORIGINAL flat index — the render filters absent
+  /// slots per week, so positions can no longer be derived from block order.
+  List<List<({int index, _EditableSlot slot})>> _blocks() {
     final slots = widget.day.slots;
-    final blocks = <List<_EditableSlot>>[];
+    final blocks = <List<({int index, _EditableSlot slot})>>[];
     var i = 0;
     while (i < slots.length) {
       final group = slots[i].supersetGroup;
       if (group != null) {
-        final run = <_EditableSlot>[];
+        final run = <({int index, _EditableSlot slot})>[];
         while (i < slots.length && slots[i].supersetGroup == group) {
-          run.add(slots[i]);
+          run.add((index: i, slot: slots[i]));
           i++;
         }
         blocks.add(run);
       } else {
-        blocks.add([slots[i]]);
+        blocks.add([(index: i, slot: slots[i])]);
         i++;
       }
     }
@@ -1754,12 +1759,16 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
   /// flattens back to a slot list. No-op at the edges. A whole superset moves
   /// as a single unit, so a reorder never splits a block.
   void _moveBlock(int blockIndex, int dir) {
+    // Operates on the UNFILTERED block list — flattening a presence-filtered
+    // list would silently drop the slots absent in the viewed week.
     final blocks = _blocks();
     final target = blockIndex + dir;
     if (target < 0 || target >= blocks.length) return;
     final moved = blocks.removeAt(blockIndex);
     blocks.insert(target, moved);
-    widget.onReorderSlots([for (final b in blocks) ...b]);
+    widget.onReorderSlots([
+      for (final b in blocks) ...b.map((r) => r.slot),
+    ]);
   }
 
   @override
@@ -1889,7 +1898,6 @@ class _SupersetGroupCard extends StatelessWidget {
     required this.onAddExercise,
     required this.onReplaceExercise,
     required this.onMoveSlotInGroup,
-    required this.flatStart,
     this.canMoveUp = false,
     this.canMoveDown = false,
     this.onMoveUp,
@@ -1907,11 +1915,6 @@ class _SupersetGroupCard extends StatelessWidget {
   final void Function(_EditableSlot slot, Exercise newExercise)
       onReplaceExercise;
   final void Function(int absIndex, int dir) onMoveSlotInGroup;
-
-  /// Absolute index of the first slot in this superset within the day's flat
-  /// slot list. Used to compute per-member absolute indices for intra-group
-  /// reorder.
-  final int flatStart;
 
   /// Block-level reorder controls — the whole superset moves as one unit.
   final bool canMoveUp;
@@ -1971,10 +1974,13 @@ class _SupersetGroupCard extends StatelessWidget {
                   onReplaceExercise(groupSlots[mi].slot, ex),
               canMoveUp: mi > 0,
               canMoveDown: mi < groupSlots.length - 1,
-              onMoveUp:
-                  mi > 0 ? () => onMoveSlotInGroup(flatStart + mi, -1) : null,
+              // Each record carries its ORIGINAL flat index — required now
+              // that absent-in-week members are filtered out of groupSlots.
+              onMoveUp: mi > 0
+                  ? () => onMoveSlotInGroup(groupSlots[mi].index, -1)
+                  : null,
               onMoveDown: mi < groupSlots.length - 1
-                  ? () => onMoveSlotInGroup(flatStart + mi, 1)
+                  ? () => onMoveSlotInGroup(groupSlots[mi].index, 1)
                   : null,
             ),
             if (mi < groupSlots.length - 1) const SizedBox(height: 8),
