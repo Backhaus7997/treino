@@ -1,14 +1,12 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../app/theme/app_palette.dart';
 import 'treino_icon.dart';
 
-/// Bottom bar de TREINO inspirada en una navbar de iOS 26 con liquid glass:
-/// container frosted con blur, pill de gradient que se desliza al tab activo,
-/// íconos `TreinoIcon` + labels Barlow Condensed.
+/// Bottom bar de TREINO: pill flotante translúcida (fill de alta opacidad,
+/// SIN blur — ver nota en el build), pill de gradient que se desliza al tab
+/// activo, íconos `TreinoIcon` + labels Barlow Condensed.
 class TreinoBottomBar extends StatelessWidget {
   const TreinoBottomBar({
     super.key,
@@ -71,54 +69,51 @@ class TreinoBottomBar extends StatelessWidget {
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(36),
-            child: BackdropFilter(
-              // Blur cost scales with sigma and is re-sampled EVERY frame the
-              // content scrolls behind the bar (extendBody) — sigma 18 caused
-              // visible frame drops on device. 8 + higher fill opacity reads
-              // nearly identical on the dark theme at a fraction of the cost.
-              filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-              child: Container(
-                height: 72,
-                decoration: BoxDecoration(
-                  color: palette.bgCard.withValues(alpha: 0.82),
-                  borderRadius: BorderRadius.circular(36),
-                  border: Border.all(color: palette.border),
-                ),
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final tabWidth = constraints.maxWidth / _items.length;
-                    return Stack(
-                      children: [
-                        AnimatedPositioned(
-                          duration: const Duration(milliseconds: 320),
-                          curve: Curves.easeOutCubic,
-                          left: tabWidth * currentIndex + 8,
-                          top: 8,
-                          bottom: 8,
-                          width: tabWidth - 16,
-                          child: _PillHighlight(palette: palette),
-                        ),
-                        Row(
-                          children: List.generate(_items.length, (i) {
-                            final item = _items[i];
-                            final active = i == currentIndex;
-                            return Expanded(
-                              child: GestureDetector(
-                                behavior: HitTestBehavior.opaque,
-                                onTap: () => onTap(i),
-                                child: _TabContent(
-                                  spec: item,
-                                  active: active,
-                                  palette: palette,
-                                ),
+            // NO BackdropFilter: blur re-samples on every frame content moves
+            // behind the bar (extendBody) and dropped frames on device even at
+            // sigma 8 (2026-06-11). A high-opacity fill keeps the translucent
+            // floating look on the dark theme at zero per-frame cost.
+            child: Container(
+              height: 72,
+              decoration: BoxDecoration(
+                color: palette.bgCard.withValues(alpha: 0.93),
+                borderRadius: BorderRadius.circular(36),
+                border: Border.all(color: palette.border),
+              ),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final tabWidth = constraints.maxWidth / _items.length;
+                  return Stack(
+                    children: [
+                      AnimatedPositioned(
+                        duration: const Duration(milliseconds: 320),
+                        curve: Curves.easeOutCubic,
+                        left: tabWidth * currentIndex + 8,
+                        top: 8,
+                        bottom: 8,
+                        width: tabWidth - 16,
+                        child: _PillHighlight(palette: palette),
+                      ),
+                      Row(
+                        children: List.generate(_items.length, (i) {
+                          final item = _items[i];
+                          final active = i == currentIndex;
+                          return Expanded(
+                            child: GestureDetector(
+                              behavior: HitTestBehavior.opaque,
+                              onTap: () => onTap(i),
+                              child: _TabContent(
+                                spec: item,
+                                active: active,
+                                palette: palette,
                               ),
-                            );
-                          }),
-                        ),
-                      ],
-                    );
-                  },
-                ),
+                            ),
+                          );
+                        }),
+                      ),
+                    ],
+                  );
+                },
               ),
             ),
           ),
