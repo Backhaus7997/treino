@@ -307,21 +307,23 @@ GoRouter buildRouter({
           ),
         ),
         routes: [
-          // Tab roots use _noAnim so switching tabs has no slide transition.
-          // Sub-routes (pushed screens) use `builder` so go_router picks the
-          // platform default page: CupertinoPageRoute on iOS (native slide +
-          // interactive-pop gesture), MaterialPageRoute on Android (predictive
-          // back / edge swipe). iOS swipe-back cannot be tested via widget tests
-          // — it is exercised on device only (see commit message).
+          // Tab roots use _noAnim. SHELL SUB-ROUTES also use pageBuilder +
+          // _noAnim: a `builder` (→ CupertinoPageRoute on iOS) renders BLACK
+          // on device when these screens — which intentionally have no
+          // Scaffold/AppBackground of their own (provided by _ShellScaffold)
+          // — are pushed from a top-level route via a modal sheet (the
+          // exercise picker). Reverted from 5e2c506. The iOS swipe-back stays
+          // on TOP-LEVEL routes (editors/player/historial) which DO own a
+          // Scaffold and were confirmed working on device.
           GoRoute(
             path: '/workout',
             pageBuilder: (_, __) => _noAnim(const WorkoutScreen()),
             routes: [
               GoRoute(
                 path: 'routine/:routineId',
-                builder: (context, state) {
+                pageBuilder: (context, state) {
                   final routineId = state.pathParameters['routineId']!;
-                  return RoutineDetailScreen(routineId: routineId);
+                  return _noAnim(RoutineDetailScreen(routineId: routineId));
                 },
               ),
               GoRoute(
@@ -329,13 +331,13 @@ GoRouter buildRouter({
                 // the slot's exercise might live in a trainer's
                 // customExercises subcollection — see slotExerciseProvider.
                 path: 'exercise/:exerciseId',
-                builder: (context, state) {
+                pageBuilder: (context, state) {
                   final exerciseId = state.pathParameters['exerciseId']!;
                   final ownerId = state.uri.queryParameters['ownerId'];
-                  return ExerciseDetailScreen(
+                  return _noAnim(ExerciseDetailScreen(
                     exerciseId: exerciseId,
                     ownerId: ownerId,
-                  );
+                  ));
                 },
               ),
               // NOTE: routine-editor, template-editor, my-routine-editor are
