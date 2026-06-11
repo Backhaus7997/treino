@@ -72,11 +72,15 @@ class TreinoBottomBar extends StatelessWidget {
           child: ClipRRect(
             borderRadius: BorderRadius.circular(36),
             child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+              // Blur cost scales with sigma and is re-sampled EVERY frame the
+              // content scrolls behind the bar (extendBody) — sigma 18 caused
+              // visible frame drops on device. 8 + higher fill opacity reads
+              // nearly identical on the dark theme at a fraction of the cost.
+              filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
               child: Container(
                 height: 72,
                 decoration: BoxDecoration(
-                  color: palette.bgCard.withValues(alpha: 0.72),
+                  color: palette.bgCard.withValues(alpha: 0.82),
                   borderRadius: BorderRadius.circular(36),
                   border: Border.all(color: palette.border),
                 ),
