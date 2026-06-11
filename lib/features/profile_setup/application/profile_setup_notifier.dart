@@ -98,22 +98,32 @@ class ProfileSetupNotifier extends Notifier<ProfileSetupState> {
 
   // ---------- Submit ----------
 
-  /// Persiste el draft a Firestore via `UserRepository.update`. El doc ya
-  /// existe (creado por `AuthService.signUpWithEmail` al hacer signup via
-  /// `getOrCreate`), así que sólo seteamos los campos completados acá.
+  /// Persiste el draft a Firestore via `UserRepository.update`.
+  ///
+  /// Normalmente el doc `users/{uid}` ya existe (lo crea
+  /// `AuthService.signUpWithEmail` via `getOrCreate`). Pero una sesión
+  /// restaurada (la app reabre con login cacheado) NUNCA corre
+  /// `createIfAbsent` — sólo lo hace un sign-in/sign-up explícito — así que una
+  /// cuenta cuyos docs nunca se crearon, o se borraron (típico en dev), llega
+  /// acá sin `users/{uid}`. En ese caso `update()` hace un merge que, sobre el
+  /// doc inexistente, se evalúa como CREATE y las firestore.rules lo deniegan
+  /// (el partial sanitizado no lleva `uid`/`role`). Por eso garantizamos el doc
+  /// base ANTES del update con `createIfAbsent` (idempotente: corta solo si ya
+  /// existe).
   ///
   /// Si hay avatar local, lo subimos primero a Firebase Storage y guardamos
   /// la URL resultante. Si el upload falla (ej. bucket no creado en Console
   /// todavía), persistimos el resto del perfil y dejamos avatarUrl null — el
   /// atleta puede reintentar desde Perfil → Ajustes más adelante.
   Future<void> submit() async {
-    final uid = ref.read(firebaseAuthProvider).currentUser?.uid;
-    if (uid == null) {
+    final user = ref.read(firebaseAuthProvider).currentUser;
+    if (user == null) {
       state = state.copyWith(
         submitError: StateError('No authenticated user'),
       );
       return;
     }
+    final uid = user.uid;
     state = state.copyWith(isSubmitting: true, clearSubmitError: true);
 
     String? avatarUrl;
@@ -130,6 +140,11 @@ class ProfileSetupNotifier extends Notifier<ProfileSetupState> {
     }
 
     try {
+      final repo = ref.read(userRepositoryProvider);
+      // Self-heal: garantiza que users/{uid} + userPublicProfiles/{uid} existan
+      // antes del update parcial (ver doc de submit). Idempotente.
+      await repo.createIfAbsent(uid: uid, email: user.email ?? '');
+
       final draft = state.draft;
       final partial = <String, Object?>{
         'displayName': draft.username?.trim(),
@@ -140,7 +155,7 @@ class ProfileSetupNotifier extends Notifier<ProfileSetupState> {
         'heightCm': draft.heightCm,
         if (avatarUrl != null) 'avatarUrl': avatarUrl,
       };
-      await ref.read(userRepositoryProvider).update(uid, partial);
+      await repo.update(uid, partial);
       state = state.copyWith(isSubmitting: false);
     } catch (e) {
       state = state.copyWith(isSubmitting: false, submitError: e);

@@ -212,6 +212,29 @@ void main() {
     });
 
     test(
+        'SCENARIO-261b: update creates userPublicProfiles WITH uid when the '
+        'public doc does not exist yet (satisfies create rule)', () async {
+      // users/{uid} exists (seedDoc) but the public profile doc does NOT —
+      // this is the real-world state of accounts whose users doc predates the
+      // dual-write: createIfAbsent early-returns on existing users and never
+      // backfills the public doc. The ProfileSetup submit then hits a
+      // merge-as-create on userPublicProfiles.
+      await seedDoc('u3b');
+
+      await repo.update('u3b', {'displayName': 'Tincho'});
+
+      final pubSnap =
+          await firestore.collection('userPublicProfiles').doc('u3b').get();
+      expect(pubSnap.exists, isTrue);
+      // uid MUST be present: firestore.rules create rule requires
+      // request.resource.data.uid == uid. Without it the first-ever write is
+      // denied (permission-denied) and the athlete is stranded on onboarding.
+      expect(pubSnap.data()!['uid'], equals('u3b'));
+      expect(pubSnap.data()!['displayName'], equals('Tincho'));
+      expect(pubSnap.data()!['displayNameLowercase'], equals('tincho'));
+    });
+
+    test(
         'SCENARIO-262: update without displayName/avatarUrl/gymId does NOT '
         'touch userPublicProfiles', () async {
       await seedDoc('u4');
