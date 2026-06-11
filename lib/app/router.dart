@@ -142,6 +142,26 @@ String? authRedirect(
     }
   }
 
+  // Onboarding-complete gate — saca al atleta de /profile-setup una vez que el
+  // submit persiste el displayName. El bloque de completitud de arriba se
+  // SALTEA cuando isProfileSetup es true, así que sin esta regla no hay ningún
+  // camino que abandone el flow de setup: el `context.go('/home')` manual de
+  // ProfileSetupFlow corre una carrera contra el stream de userProfileProvider
+  // (que todavía emite displayName==null al momento de navegar) y rebota
+  // directo de vuelta acá → el usuario queda atrapado en el último step.
+  //
+  // Manejar la salida desde el dato real del perfil, vía RouterRefreshNotifier
+  // (que ya re-dispara este redirect cuando el snapshot del profile llega),
+  // elimina la carrera. Para un trainer recién salido del setup, /home reaplica
+  // de inmediato el gate trainer-incompleto de arriba → /profile/edit-trainer.
+  if (loggedIn && isProfileSetup) {
+    final profileAsync = read(userProfileProvider);
+    if (!profileAsync.isLoading &&
+        profileAsync.valueOrNull?.displayName != null) {
+      return '/home';
+    }
+  }
+
   // Authenticated on a public route (except /splash) → /home.
   if (loggedIn && isPublic && !location.startsWith('/splash')) return '/home';
   return null;

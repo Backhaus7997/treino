@@ -32,6 +32,7 @@ void main() {
     mockUser = _MockUser();
 
     when(() => mockUser.uid).thenReturn('u1');
+    when(() => mockUser.email).thenReturn('test@test.com');
     when(() => mockAuth.currentUser).thenReturn(mockUser);
   });
 
@@ -99,6 +100,42 @@ void main() {
     final pubSnap =
         await firestore.collection('userPublicProfiles').doc('u1').get();
     expect(pubSnap.data()!['displayNameLowercase'], equals('carlos'));
+  });
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // SCENARIO-268: submit self-heals when the base docs do not exist yet.
+  // Repro del bug real: una sesión restaurada (login cacheado) nunca corre
+  // createIfAbsent, así que una cuenta sin users/{uid} llegaba al submit y el
+  // update() era un CREATE denegado por las rules (sin uid/role).
+  // ──────────────────────────────────────────────────────────────────────────
+  test(
+      'SCENARIO-268: submit creates users + userPublicProfiles when neither '
+      'exists yet (self-heal de sesión restaurada / datos borrados)', () async {
+    // Intencionalmente NO seedeamos el doc — simula la cuenta autenticada cuyos
+    // docs nunca se crearon o se borraron en dev.
+    final container = makeContainer();
+    addTearDown(container.dispose);
+
+    final notifier = container.read(profileSetupNotifierProvider.notifier);
+    notifier.updateUsername('Carlos');
+
+    await notifier.submit();
+
+    final usersSnap = await firestore.collection('users').doc('u1').get();
+    final pubSnap =
+        await firestore.collection('userPublicProfiles').doc('u1').get();
+
+    expect(usersSnap.exists, isTrue);
+    // uid + role sólo los aporta createIfAbsent: el partial sanitizado de
+    // update() los filtra. Si el self-heal no corriera, faltarían y la regla
+    // de create los rechazaría.
+    expect(usersSnap.data()!['uid'], equals('u1'));
+    expect(usersSnap.data()!['role'], equals('athlete'));
+    expect(usersSnap.data()!['displayName'], equals('Carlos'));
+
+    expect(pubSnap.exists, isTrue);
+    expect(pubSnap.data()!['uid'], equals('u1'));
+    expect(pubSnap.data()!['displayName'], equals('Carlos'));
   });
 
   // TODO: SCENARIO-267 — submit failure leaves both docs unchanged.
