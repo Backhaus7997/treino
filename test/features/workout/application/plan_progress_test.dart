@@ -4,6 +4,9 @@
 // SCENARIO-033: all days of week 0 done → activeWeek=1
 // SCENARIO-034: week partially done → still week 0
 // SCENARIO-036: all weeks done → planComplete=true
+//
+// Phase 3 additions (SCENARIO-WPRES-031..032):
+// REQ-WPRES-022 — empty-presence day auto-satisfied via requiredPairs param
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/features/workout/application/plan_progress.dart';
@@ -117,6 +120,86 @@ void main() {
       final result = derivePlanProgress({}, [1, 2, 3], 0);
       expect(result.activeWeek, equals(0));
       expect(result.activeDay, equals(1));
+      expect(result.planComplete, isFalse);
+    });
+  });
+
+  // ── Phase 3 — REQ-WPRES-022: requiredPairs auto-satisfaction ──────────────
+
+  group('derivePlanProgress with requiredPairs (REQ-WPRES-022)', () {
+    // SCENARIO-WPRES-031: a week with 3 days, day 2 has zero present slots
+    // (not in requiredPairs) → treated as auto-satisfied → week can complete.
+    test(
+        'SCENARIO-WPRES-031: day with zero present slots is auto-satisfied '
+        '— does not block week completion', () {
+      // Week 0 has 3 days. Day 2 is absent (not in requiredPairs).
+      // Days 1 and 3 are completed → week 0 is done (day 2 auto-satisfied).
+      const dayNumbers = [1, 2, 3];
+      final completed = <CompletedKey>{
+        (week: 0, day: 1),
+        (week: 0, day: 3),
+        // (week: 0, day: 2) intentionally missing — absent day
+      };
+      // requiredPairs includes only days 1 and 3 for week 0
+      final requiredPairs = <CompletedKey>{
+        (week: 0, day: 1),
+        (week: 0, day: 3),
+        (week: 1, day: 1),
+        (week: 1, day: 2),
+        (week: 1, day: 3),
+      };
+      final result = derivePlanProgress(
+        completed,
+        dayNumbers,
+        2,
+        requiredPairs: requiredPairs,
+      );
+      // Week 0 should be considered done (day 2 is auto-satisfied).
+      // activeWeek should advance to week 1.
+      expect(result.activeWeek, equals(1),
+          reason: 'Week 0 done (day 2 auto-satisfied) → advance to week 1');
+      expect(result.planComplete, isFalse);
+    });
+
+    test(
+        'SCENARIO-WPRES-032: back-compat — full requiredPairs (all days required) '
+        'behaves identically to original logic', () {
+      // When requiredPairs contains every (week, day) combination, the behavior
+      // must be byte-identical to the original derivePlanProgress.
+      const dayNumbers = [1, 2, 3];
+      final completed = <CompletedKey>{
+        (week: 0, day: 1),
+        (week: 0, day: 2),
+        (week: 0, day: 3),
+      };
+      // All pairs required — no auto-satisfaction
+      final requiredPairs = <CompletedKey>{
+        for (var w = 0; w < 2; w++)
+          for (final d in dayNumbers) (week: w, day: d),
+      };
+      final result = derivePlanProgress(
+        completed,
+        dayNumbers,
+        2,
+        requiredPairs: requiredPairs,
+      );
+      // Identical to legacy: week 0 done → activeWeek=1
+      expect(result.activeWeek, equals(1));
+      expect(result.planComplete, isFalse);
+    });
+
+    test(
+        'back-compat: omitting requiredPairs behaves identically to all-required',
+        () {
+      const dayNumbers = [1, 2, 3];
+      final completed = <CompletedKey>{
+        (week: 0, day: 1),
+        (week: 0, day: 2),
+        (week: 0, day: 3),
+      };
+      // No requiredPairs arg → same as all required
+      final result = derivePlanProgress(completed, dayNumbers, 2);
+      expect(result.activeWeek, equals(1));
       expect(result.planComplete, isFalse);
     });
   });
