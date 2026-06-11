@@ -37,7 +37,6 @@ import 'package:treino/features/workout/domain/routine_source.dart';
 import 'package:treino/features/workout/domain/routine_visibility.dart';
 import 'package:treino/features/workout/presentation/routine_editor_mode.dart';
 import 'package:treino/features/workout/presentation/routine_editor_screen.dart';
-import 'package:treino/features/workout/presentation/workout_strings.dart';
 
 import '../../../helpers/fake_analytics_service.dart';
 import '../../../fixtures/exercises.dart';
@@ -238,7 +237,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Press de Banca').first);
     await tester.pumpAndSettle();
-    await tester.tap(find.text(WorkoutStrings.pickerAddButton(1)));
+    await tester.tap(find.text('Agregar 1 ejercicio'));
     await tester.pumpAndSettle();
 
     // Fill reps field.
@@ -278,7 +277,7 @@ void main() {
       overrides: _overrides(repo: repo),
     );
 
-    expect(find.text(WorkoutStrings.selfEditorNotFound), findsOneWidget);
+    expect(find.text('Esta rutina ya no existe. Volvé y actualizá la lista.'), findsOneWidget);
     expect(find.byKey(const Key('editor_name_field')), findsNothing);
   });
 
@@ -353,7 +352,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Press de Banca').first);
     await tester.pumpAndSettle();
-    await tester.tap(find.text(WorkoutStrings.pickerAddButton(1)));
+    await tester.tap(find.text('Agregar 1 ejercicio'));
     await tester.pumpAndSettle();
 
     final emptyFields = find.byType(TextField).evaluate().where((e) {
@@ -403,7 +402,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Press de Banca').first);
     await tester.pumpAndSettle();
-    await tester.tap(find.text(WorkoutStrings.pickerAddButton(1)));
+    await tester.tap(find.text('Agregar 1 ejercicio'));
     await tester.pumpAndSettle();
 
     final emptyFields = find.byType(TextField).evaluate().where((e) {

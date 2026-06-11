@@ -13,7 +13,7 @@ import 'package:treino/features/workout/application/session_providers.dart';
 import 'package:treino/features/workout/domain/session.dart';
 import 'package:treino/features/workout/domain/session_status.dart';
 import 'package:treino/features/workout/presentation/widgets/historial_section.dart';
-import 'package:treino/features/workout/presentation/workout_strings.dart';
+import 'package:treino/l10n/app_l10n.dart';
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -86,6 +86,9 @@ Future<void> _pumpHistorialSection(
       child: MaterialApp.router(
         theme: AppTheme.dark(),
         routerConfig: router,
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+        locale: const Locale('es', 'AR'),
       ),
     ),
   );
@@ -160,7 +163,7 @@ void main() {
       await _pumpHistorialSection(tester, sessions: [active]);
       await tester.pumpAndSettle();
 
-      expect(find.text(WorkoutStrings.historialEmptyMessage), findsOneWidget);
+      expect(find.text('Todavía no entrenaste.'), findsOneWidget);
     });
 
     // SCENARIO-359: card renders routineName + formatted date + kg + min
@@ -209,8 +212,8 @@ void main() {
       await _pumpHistorialSection(tester, sessions: []);
       await tester.pumpAndSettle();
 
-      expect(find.text(WorkoutStrings.historialEmptyMessage), findsOneWidget);
-      expect(find.text(WorkoutStrings.historialEmptyCta), findsOneWidget);
+      expect(find.text('Todavía no entrenaste.'), findsOneWidget);
+      expect(find.text('Empezar entrenamiento'), findsOneWidget);
     });
 
     // SCENARIO-362: tapping CTA goes to /workout
@@ -220,7 +223,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // After tap on CTA, router stays at /workout (context.go('/workout'))
-      await tester.tap(find.text(WorkoutStrings.historialEmptyCta));
+      await tester.tap(find.text('Empezar entrenamiento'));
       await tester.pumpAndSettle();
 
       // The workout page is still visible (go to same route)
@@ -245,8 +248,8 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 50));
 
-      expect(find.text(WorkoutStrings.historialErrorMessage), findsOneWidget);
-      expect(find.text(WorkoutStrings.historialErrorRetry), findsOneWidget);
+      expect(find.text('No pudimos cargar tu historial.'), findsOneWidget);
+      expect(find.text('Reintentar'), findsOneWidget);
     });
 
     // SCENARIO-365: card tap navigates to /workout/historial/:sessionId
@@ -293,7 +296,7 @@ void main() {
       }
       // "Ver más (3)" toggle button is visible
       expect(
-        find.text(WorkoutStrings.historialShowMore(3)),
+        find.text('Ver más (3)'),
         findsOneWidget,
       );
     });
@@ -305,7 +308,7 @@ void main() {
       await _pumpHistorialSection(tester, sessions: manySessions(8));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text(WorkoutStrings.historialShowMore(3)));
+      await tester.tap(find.text('Ver más (3)'));
       await tester.pumpAndSettle();
 
       // All 8 cards visible
@@ -313,7 +316,7 @@ void main() {
         expect(find.text('Rutina $i'), findsOneWidget);
       }
       // Button now says "Ver menos"
-      expect(find.text(WorkoutStrings.historialShowLess), findsOneWidget);
+      expect(find.text('Ver menos'), findsOneWidget);
     });
 
     // SCENARIO-369: tap "Ver menos" collapses back to 5
@@ -323,11 +326,11 @@ void main() {
       await tester.pumpAndSettle();
 
       // Expand
-      await tester.tap(find.text(WorkoutStrings.historialShowMore(3)));
+      await tester.tap(find.text('Ver más (3)'));
       await tester.pumpAndSettle();
 
       // Collapse
-      await tester.tap(find.text(WorkoutStrings.historialShowLess));
+      await tester.tap(find.text('Ver menos'));
       await tester.pumpAndSettle();
 
       // Back to first 5 visible
@@ -352,7 +355,7 @@ void main() {
       }
       // No "Ver más" / "Ver menos" anywhere
       expect(find.textContaining('Ver más'), findsNothing);
-      expect(find.text(WorkoutStrings.historialShowLess), findsNothing);
+      expect(find.text('Ver menos'), findsNothing);
     });
 
     // SCENARIO-371: with 3 sessions (under limit), no toggle is rendered

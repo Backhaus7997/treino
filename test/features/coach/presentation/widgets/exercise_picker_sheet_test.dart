@@ -12,6 +12,7 @@ import 'package:treino/features/workout/application/session_providers.dart'
     show currentUidProvider;
 import 'package:treino/features/workout/domain/custom_exercise.dart';
 import 'package:treino/features/workout/domain/exercise.dart';
+import 'package:treino/l10n/app_l10n.dart';
 
 import '../../../../fixtures/exercises.dart';
 
@@ -42,6 +43,9 @@ Future<void> _openPicker(
       overrides: _overrides(exercises: exercises),
       child: MaterialApp(
         theme: AppTheme.dark(),
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+        locale: const Locale('es', 'AR'),
         home: Scaffold(
           body: Builder(
             builder: (ctx) => ElevatedButton(

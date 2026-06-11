@@ -12,7 +12,6 @@ import 'package:treino/features/profile/domain/user_role.dart';
 import 'package:treino/features/workout/application/post_workout_notifier.dart';
 import 'package:treino/features/workout/domain/session.dart';
 import 'package:treino/features/workout/domain/session_status.dart';
-import 'package:treino/features/workout/presentation/workout_strings.dart';
 
 // ── Fake PostRepository ───────────────────────────────────────────────────────
 
@@ -140,7 +139,7 @@ void main() {
     // ── SCENARIO-341: postAutoCompleteText ───────────────────────────────
 
     test(
-        'SCENARIO-341: shareWorkout sets post text to WorkoutStrings.postAutoCompleteText',
+        'SCENARIO-341: shareWorkout sets post text to the autocomplete text',
         () async {
       final container = makeContainer();
       addTearDown(container.dispose);
@@ -150,7 +149,7 @@ void main() {
 
       expect(fakeRepo.capturedPost, isNotNull);
       expect(fakeRepo.capturedPost!.text,
-          equals(WorkoutStrings.postAutoCompleteText));
+          equals('¡Terminé mi entreno! 💪'));
     });
 
     // ── SCENARIO-340: rethrows when PostRepository fails ─────────────────
@@ -193,7 +192,7 @@ class _FakeNotifier extends PostWorkoutNotifier {
         authorDisplayName: profile?.displayName ?? '',
         authorAvatarUrl: profile?.avatarUrl,
         authorGymId: profile?.gymId,
-        text: WorkoutStrings.postAutoCompleteText,
+        text: '¡Terminé mi entreno! 💪',
         routineTag: RoutineTag(
           routineId: session.routineId,
           routineName: session.routineName,

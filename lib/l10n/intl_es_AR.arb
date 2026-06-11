@@ -132,5 +132,92 @@
     "placeholders": {
       "athleteName": { "type": "String" }
     }
+  },
+
+  "workoutSummaryHeaderCompleted": "BUEN ENTRENO",
+  "workoutSummaryHeaderAbandoned": "SESIÓN INTERRUMPIDA",
+  "workoutStatDuration": "DURACIÓN",
+  "workoutStatVolume": "VOLUMEN",
+  "workoutStatSets": "SETS",
+  "workoutStatPrsToday": "PRs HOY",
+  "workoutStatPrsTodayStub": "—",
+  "workoutPrsSectionTitle": "PRS DE LA SESIÓN",
+  "workoutPrsPlaceholder": "Próximamente",
+  "workoutButtonDone": "LISTO",
+  "workoutButtonShare": "COMPARTIR",
+  "workoutButtonRetry": "Reintentar",
+  "workoutButtonBackToWorkout": "Volver a Entrenar",
+  "workoutNotFoundTitle": "Sesión no encontrada",
+  "workoutErrorTitle": "No pudimos cargar tu sesión",
+  "workoutSnackShareSuccess": "¡Post compartido!",
+  "workoutSnackShareError": "No pudimos compartir tu post. Intentá de nuevo.",
+  "workoutPostAutoCompleteText": "¡Terminé mi entreno! 💪",
+  "workoutHistorialHeading": "HISTORIAL",
+  "workoutHistorialEmptyMessage": "Todavía no entrenaste.",
+  "workoutHistorialEmptyCta": "Empezar entrenamiento",
+  "workoutHistorialErrorMessage": "No pudimos cargar tu historial.",
+  "workoutHistorialErrorRetry": "Reintentar",
+  "workoutHistorialCardKgSuffix": " kg",
+  "workoutHistorialCardMinSuffix": " min",
+  "workoutHistorialShowLess": "Ver menos",
+  "workoutHistorialShowMore": "Ver más ({n})",
+  "@workoutHistorialShowMore": {
+    "placeholders": {
+      "n": { "type": "int" }
+    }
+  },
+  "workoutDetailStatDuration": "DURACIÓN",
+  "workoutDetailStatSets": "SETS",
+  "workoutDetailStatVolume": "VOLUMEN",
+  "workoutDetailStatPrsToday": "PRS HOY",
+  "workoutDetailPrBadge": "PR",
+  "workoutSelfEditorTitle": "Nueva rutina",
+  "workoutSelfEditorEditTitle": "Editar rutina",
+  "workoutSelfEditorSubmitLabel": "CREAR RUTINA",
+  "workoutSelfEditorUpdateLabel": "GUARDAR CAMBIOS",
+  "workoutSelfEditorSuccess": "Rutina creada",
+  "workoutSelfEditorUpdateSuccess": "Rutina actualizada",
+  "workoutSelfEditorNotFound": "Esta rutina ya no existe. Volvé y actualizá la lista.",
+  "workoutSelfEditorError": "No pudimos crear la rutina. Reintentá.",
+  "workoutSelfEditorPermissionDenied": "No tenés permisos para hacer esto. Recargá la app.",
+  "workoutEditStubToast": "Pronto vas a poder editar el contenido. Por ahora podés archivar y crear de nuevo.",
+  "workoutSelfEditorCapReached": "Llegaste al máximo de 10 rutinas activas.",
+  "workoutMisRutinasSectionTitle": "MIS RUTINAS",
+  "workoutMisRutinasCta": "CREAR RUTINA",
+  "workoutMisRutinasCtaDisabledTooltip": "Llegaste al máximo de 10 rutinas activas. Archivá una para crear otra.",
+  "workoutMisRutinasEmptyState": "Todavía no creaste ninguna rutina. Tocá CREAR RUTINA para armar la primera.",
+  "workoutMisRutinasError": "No pudimos cargar tus rutinas.",
+  "workoutMisRutinasErrorRetry": "Reintentar",
+  "workoutMisRutinasOverflowEdit": "EDITAR",
+  "workoutMisRutinasOverflowArchive": "ARCHIVAR",
+  "workoutMisRutinasConfirmTitle": "Archivar rutina",
+  "workoutMisRutinasConfirmBody": "La rutina dejará de aparecer en MIS RUTINAS. Tu historial se conserva.",
+  "workoutMisRutinasConfirmCancel": "CANCELAR",
+  "workoutMisRutinasConfirmConfirm": "ARCHIVAR",
+  "workoutMisRutinasArchiveSuccess": "Rutina archivada",
+  "workoutMisRutinasArchiveError": "No pudimos archivar la rutina. Reintentá.",
+  "workoutSplitFallback": "Sin split",
+  "workoutPickerMuscleFilter": "Músculos",
+  "workoutPickerEquipmentFilter": "Equipamiento",
+  "workoutPickerMuscleSheetTitle": "Grupo muscular",
+  "workoutPickerEquipmentSheetTitle": "Tipo de equipo",
+  "workoutPickerMuscleAll": "Todos los músculos",
+  "workoutPickerEquipmentAll": "Todo el equipamiento",
+  "workoutPickerEmptyFiltered": "Ningún ejercicio coincide",
+  "workoutPickerEmptyFilteredHint": "Probá quitando un filtro o ajustando la búsqueda.",
+  "workoutPickerAddButton": "Agregar {count} {count, plural, =1{ejercicio} other{ejercicios}}",
+  "@workoutPickerAddButton": {
+    "placeholders": {
+      "count": { "type": "int", "format": "decimalPattern" }
+    }
+  },
+  "workoutSelfEditorNameHint": "Mi rutina",
+  "workoutPickerSheetClear": "Limpiar",
+  "workoutPickerSheetApplyAll": "APLICAR (TODOS)",
+  "workoutPickerSheetApply": "APLICAR ({count})",
+  "@workoutPickerSheetApply": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
   }
 }

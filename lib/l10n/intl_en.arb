@@ -132,5 +132,92 @@
     "placeholders": {
       "athleteName": { "type": "String" }
     }
+  },
+
+  "workoutSummaryHeaderCompleted": "",
+  "workoutSummaryHeaderAbandoned": "",
+  "workoutStatDuration": "",
+  "workoutStatVolume": "",
+  "workoutStatSets": "",
+  "workoutStatPrsToday": "",
+  "workoutStatPrsTodayStub": "",
+  "workoutPrsSectionTitle": "",
+  "workoutPrsPlaceholder": "",
+  "workoutButtonDone": "",
+  "workoutButtonShare": "",
+  "workoutButtonRetry": "",
+  "workoutButtonBackToWorkout": "",
+  "workoutNotFoundTitle": "",
+  "workoutErrorTitle": "",
+  "workoutSnackShareSuccess": "",
+  "workoutSnackShareError": "",
+  "workoutPostAutoCompleteText": "",
+  "workoutHistorialHeading": "",
+  "workoutHistorialEmptyMessage": "",
+  "workoutHistorialEmptyCta": "",
+  "workoutHistorialErrorMessage": "",
+  "workoutHistorialErrorRetry": "",
+  "workoutHistorialCardKgSuffix": "",
+  "workoutHistorialCardMinSuffix": "",
+  "workoutHistorialShowLess": "",
+  "workoutHistorialShowMore": "",
+  "@workoutHistorialShowMore": {
+    "placeholders": {
+      "n": { "type": "int" }
+    }
+  },
+  "workoutDetailStatDuration": "",
+  "workoutDetailStatSets": "",
+  "workoutDetailStatVolume": "",
+  "workoutDetailStatPrsToday": "",
+  "workoutDetailPrBadge": "",
+  "workoutSelfEditorTitle": "",
+  "workoutSelfEditorEditTitle": "",
+  "workoutSelfEditorSubmitLabel": "",
+  "workoutSelfEditorUpdateLabel": "",
+  "workoutSelfEditorSuccess": "",
+  "workoutSelfEditorUpdateSuccess": "",
+  "workoutSelfEditorNotFound": "",
+  "workoutSelfEditorError": "",
+  "workoutSelfEditorPermissionDenied": "",
+  "workoutEditStubToast": "",
+  "workoutSelfEditorCapReached": "",
+  "workoutMisRutinasSectionTitle": "",
+  "workoutMisRutinasCta": "",
+  "workoutMisRutinasCtaDisabledTooltip": "",
+  "workoutMisRutinasEmptyState": "",
+  "workoutMisRutinasError": "",
+  "workoutMisRutinasErrorRetry": "",
+  "workoutMisRutinasOverflowEdit": "",
+  "workoutMisRutinasOverflowArchive": "",
+  "workoutMisRutinasConfirmTitle": "",
+  "workoutMisRutinasConfirmBody": "",
+  "workoutMisRutinasConfirmCancel": "",
+  "workoutMisRutinasConfirmConfirm": "",
+  "workoutMisRutinasArchiveSuccess": "",
+  "workoutMisRutinasArchiveError": "",
+  "workoutSplitFallback": "",
+  "workoutPickerMuscleFilter": "",
+  "workoutPickerEquipmentFilter": "",
+  "workoutPickerMuscleSheetTitle": "",
+  "workoutPickerEquipmentSheetTitle": "",
+  "workoutPickerMuscleAll": "",
+  "workoutPickerEquipmentAll": "",
+  "workoutPickerEmptyFiltered": "",
+  "workoutPickerEmptyFilteredHint": "",
+  "workoutPickerAddButton": "",
+  "@workoutPickerAddButton": {
+    "placeholders": {
+      "count": { "type": "int", "format": "decimalPattern" }
+    }
+  },
+  "workoutSelfEditorNameHint": "",
+  "workoutPickerSheetClear": "",
+  "workoutPickerSheetApplyAll": "",
+  "workoutPickerSheetApply": "",
+  "@workoutPickerSheetApply": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
   }
 }

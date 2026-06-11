@@ -27,7 +27,6 @@ import '../domain/set_enums.dart';
 import '../domain/set_spec.dart';
 import 'routine_editor_mode.dart';
 import 'widgets/duration_text_field.dart';
-import 'workout_strings.dart';
 
 // ── Testable helpers ──────────────────────────────────────────────────────────
 
@@ -254,8 +253,8 @@ String _titleFor(RoutineEditorMode mode, AppL10n l10n) => switch (mode) {
       TrainerAssigning() => l10n.coachEditorEditTitle,
       TrainerTemplating(existingTemplateId: null) => l10n.coachEditorTitle,
       TrainerTemplating() => l10n.coachEditorEditTitle,
-      SelfCreating(existingRoutineId: null) => WorkoutStrings.selfEditorTitle,
-      SelfCreating() => WorkoutStrings.selfEditorEditTitle,
+      SelfCreating(existingRoutineId: null) => l10n.workoutSelfEditorTitle,
+      SelfCreating() => l10n.workoutSelfEditorEditTitle,
     };
 
 String _submitLabelFor(RoutineEditorMode mode, AppL10n l10n) => switch (mode) {
@@ -264,8 +263,8 @@ String _submitLabelFor(RoutineEditorMode mode, AppL10n l10n) => switch (mode) {
       TrainerTemplating(existingTemplateId: null) => l10n.coachEditorSubmit,
       TrainerTemplating() => l10n.coachEditorUpdateLabel,
       SelfCreating(existingRoutineId: null) =>
-        WorkoutStrings.selfEditorSubmitLabel,
-      SelfCreating() => WorkoutStrings.selfEditorUpdateLabel,
+        l10n.workoutSelfEditorSubmitLabel,
+      SelfCreating() => l10n.workoutSelfEditorUpdateLabel,
     };
 
 class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
@@ -674,8 +673,8 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
           if (userRoutines.length >= 10) {
             if (!mounted) return;
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                  content: Text(WorkoutStrings.selfEditorCapReached)),
+              SnackBar(
+                  content: Text(l10n.workoutSelfEditorCapReached)),
             );
             setState(() => _submitting = false);
             return;
@@ -695,7 +694,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
           await repo.createUserOwned(uid: uid, draft: draft);
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text(WorkoutStrings.selfEditorSuccess)),
+            SnackBar(content: Text(l10n.workoutSelfEditorSuccess)),
           );
           context.pop();
 
@@ -713,8 +712,8 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
           await repo.updateUserOwned(uid: uid, draft: draft);
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-                content: Text(WorkoutStrings.selfEditorUpdateSuccess)),
+            SnackBar(
+                content: Text(l10n.workoutSelfEditorUpdateSuccess)),
           );
           context.pop();
       }
@@ -724,8 +723,8 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
         TrainerAssigning() => l10n.coachCreatePlanError,
         TrainerTemplating() => l10n.coachCreatePlanError,
         SelfCreating() => e.toString().contains('permission-denied')
-            ? WorkoutStrings.selfEditorPermissionDenied
-            : WorkoutStrings.selfEditorError,
+            ? l10n.workoutSelfEditorPermissionDenied
+            : l10n.workoutSelfEditorError,
       };
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(errorText)),
@@ -773,7 +772,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                 Expanded(
                   child: Center(
                     child: Text(
-                      WorkoutStrings.selfEditorNotFound,
+                      l10n.workoutSelfEditorNotFound,
                       style: TextStyle(color: palette.textMuted),
                     ),
                   ),
@@ -849,7 +848,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                                     palette,
                                     hint: _isTrainerMode
                                         ? 'Ej: Fuerza PPL'
-                                        : WorkoutStrings.selfEditorNameHint,
+                                        : l10n.workoutSelfEditorNameHint,
                                   ),
                                   onChanged: (_) => setState(() {}),
                                 ),

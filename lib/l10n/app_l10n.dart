@@ -811,6 +811,432 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Reservado por {athleteName}'**
   String agendaSlotBookedByLabel(String athleteName);
+
+  /// No description provided for @workoutSummaryHeaderCompleted.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'BUEN ENTRENO'**
+  String get workoutSummaryHeaderCompleted;
+
+  /// No description provided for @workoutSummaryHeaderAbandoned.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'SESIÓN INTERRUMPIDA'**
+  String get workoutSummaryHeaderAbandoned;
+
+  /// No description provided for @workoutStatDuration.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'DURACIÓN'**
+  String get workoutStatDuration;
+
+  /// No description provided for @workoutStatVolume.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'VOLUMEN'**
+  String get workoutStatVolume;
+
+  /// No description provided for @workoutStatSets.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'SETS'**
+  String get workoutStatSets;
+
+  /// No description provided for @workoutStatPrsToday.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'PRs HOY'**
+  String get workoutStatPrsToday;
+
+  /// No description provided for @workoutStatPrsTodayStub.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'—'**
+  String get workoutStatPrsTodayStub;
+
+  /// No description provided for @workoutPrsSectionTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'PRS DE LA SESIÓN'**
+  String get workoutPrsSectionTitle;
+
+  /// No description provided for @workoutPrsPlaceholder.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Próximamente'**
+  String get workoutPrsPlaceholder;
+
+  /// No description provided for @workoutButtonDone.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'LISTO'**
+  String get workoutButtonDone;
+
+  /// No description provided for @workoutButtonShare.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'COMPARTIR'**
+  String get workoutButtonShare;
+
+  /// No description provided for @workoutButtonRetry.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Reintentar'**
+  String get workoutButtonRetry;
+
+  /// No description provided for @workoutButtonBackToWorkout.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Volver a Entrenar'**
+  String get workoutButtonBackToWorkout;
+
+  /// No description provided for @workoutNotFoundTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Sesión no encontrada'**
+  String get workoutNotFoundTitle;
+
+  /// No description provided for @workoutErrorTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cargar tu sesión'**
+  String get workoutErrorTitle;
+
+  /// No description provided for @workoutSnackShareSuccess.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¡Post compartido!'**
+  String get workoutSnackShareSuccess;
+
+  /// No description provided for @workoutSnackShareError.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos compartir tu post. Intentá de nuevo.'**
+  String get workoutSnackShareError;
+
+  /// No description provided for @workoutPostAutoCompleteText.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¡Terminé mi entreno! 💪'**
+  String get workoutPostAutoCompleteText;
+
+  /// No description provided for @workoutHistorialHeading.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'HISTORIAL'**
+  String get workoutHistorialHeading;
+
+  /// No description provided for @workoutHistorialEmptyMessage.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Todavía no entrenaste.'**
+  String get workoutHistorialEmptyMessage;
+
+  /// No description provided for @workoutHistorialEmptyCta.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Empezar entrenamiento'**
+  String get workoutHistorialEmptyCta;
+
+  /// No description provided for @workoutHistorialErrorMessage.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cargar tu historial.'**
+  String get workoutHistorialErrorMessage;
+
+  /// No description provided for @workoutHistorialErrorRetry.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Reintentar'**
+  String get workoutHistorialErrorRetry;
+
+  /// No description provided for @workoutHistorialCardKgSuffix.
+  ///
+  /// In es_AR, this message translates to:
+  /// **' kg'**
+  String get workoutHistorialCardKgSuffix;
+
+  /// No description provided for @workoutHistorialCardMinSuffix.
+  ///
+  /// In es_AR, this message translates to:
+  /// **' min'**
+  String get workoutHistorialCardMinSuffix;
+
+  /// No description provided for @workoutHistorialShowLess.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ver menos'**
+  String get workoutHistorialShowLess;
+
+  /// No description provided for @workoutHistorialShowMore.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ver más ({n})'**
+  String workoutHistorialShowMore(int n);
+
+  /// No description provided for @workoutDetailStatDuration.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'DURACIÓN'**
+  String get workoutDetailStatDuration;
+
+  /// No description provided for @workoutDetailStatSets.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'SETS'**
+  String get workoutDetailStatSets;
+
+  /// No description provided for @workoutDetailStatVolume.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'VOLUMEN'**
+  String get workoutDetailStatVolume;
+
+  /// No description provided for @workoutDetailStatPrsToday.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'PRS HOY'**
+  String get workoutDetailStatPrsToday;
+
+  /// No description provided for @workoutDetailPrBadge.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'PR'**
+  String get workoutDetailPrBadge;
+
+  /// No description provided for @workoutSelfEditorTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Nueva rutina'**
+  String get workoutSelfEditorTitle;
+
+  /// No description provided for @workoutSelfEditorEditTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Editar rutina'**
+  String get workoutSelfEditorEditTitle;
+
+  /// No description provided for @workoutSelfEditorSubmitLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CREAR RUTINA'**
+  String get workoutSelfEditorSubmitLabel;
+
+  /// No description provided for @workoutSelfEditorUpdateLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'GUARDAR CAMBIOS'**
+  String get workoutSelfEditorUpdateLabel;
+
+  /// No description provided for @workoutSelfEditorSuccess.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Rutina creada'**
+  String get workoutSelfEditorSuccess;
+
+  /// No description provided for @workoutSelfEditorUpdateSuccess.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Rutina actualizada'**
+  String get workoutSelfEditorUpdateSuccess;
+
+  /// No description provided for @workoutSelfEditorNotFound.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Esta rutina ya no existe. Volvé y actualizá la lista.'**
+  String get workoutSelfEditorNotFound;
+
+  /// No description provided for @workoutSelfEditorError.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos crear la rutina. Reintentá.'**
+  String get workoutSelfEditorError;
+
+  /// No description provided for @workoutSelfEditorPermissionDenied.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No tenés permisos para hacer esto. Recargá la app.'**
+  String get workoutSelfEditorPermissionDenied;
+
+  /// No description provided for @workoutEditStubToast.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Pronto vas a poder editar el contenido. Por ahora podés archivar y crear de nuevo.'**
+  String get workoutEditStubToast;
+
+  /// No description provided for @workoutSelfEditorCapReached.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Llegaste al máximo de 10 rutinas activas.'**
+  String get workoutSelfEditorCapReached;
+
+  /// No description provided for @workoutMisRutinasSectionTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'MIS RUTINAS'**
+  String get workoutMisRutinasSectionTitle;
+
+  /// No description provided for @workoutMisRutinasCta.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CREAR RUTINA'**
+  String get workoutMisRutinasCta;
+
+  /// No description provided for @workoutMisRutinasCtaDisabledTooltip.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Llegaste al máximo de 10 rutinas activas. Archivá una para crear otra.'**
+  String get workoutMisRutinasCtaDisabledTooltip;
+
+  /// No description provided for @workoutMisRutinasEmptyState.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Todavía no creaste ninguna rutina. Tocá CREAR RUTINA para armar la primera.'**
+  String get workoutMisRutinasEmptyState;
+
+  /// No description provided for @workoutMisRutinasError.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cargar tus rutinas.'**
+  String get workoutMisRutinasError;
+
+  /// No description provided for @workoutMisRutinasErrorRetry.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Reintentar'**
+  String get workoutMisRutinasErrorRetry;
+
+  /// No description provided for @workoutMisRutinasOverflowEdit.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'EDITAR'**
+  String get workoutMisRutinasOverflowEdit;
+
+  /// No description provided for @workoutMisRutinasOverflowArchive.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ARCHIVAR'**
+  String get workoutMisRutinasOverflowArchive;
+
+  /// No description provided for @workoutMisRutinasConfirmTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Archivar rutina'**
+  String get workoutMisRutinasConfirmTitle;
+
+  /// No description provided for @workoutMisRutinasConfirmBody.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'La rutina dejará de aparecer en MIS RUTINAS. Tu historial se conserva.'**
+  String get workoutMisRutinasConfirmBody;
+
+  /// No description provided for @workoutMisRutinasConfirmCancel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CANCELAR'**
+  String get workoutMisRutinasConfirmCancel;
+
+  /// No description provided for @workoutMisRutinasConfirmConfirm.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ARCHIVAR'**
+  String get workoutMisRutinasConfirmConfirm;
+
+  /// No description provided for @workoutMisRutinasArchiveSuccess.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Rutina archivada'**
+  String get workoutMisRutinasArchiveSuccess;
+
+  /// No description provided for @workoutMisRutinasArchiveError.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos archivar la rutina. Reintentá.'**
+  String get workoutMisRutinasArchiveError;
+
+  /// No description provided for @workoutSplitFallback.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Sin split'**
+  String get workoutSplitFallback;
+
+  /// No description provided for @workoutPickerMuscleFilter.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Músculos'**
+  String get workoutPickerMuscleFilter;
+
+  /// No description provided for @workoutPickerEquipmentFilter.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Equipamiento'**
+  String get workoutPickerEquipmentFilter;
+
+  /// No description provided for @workoutPickerMuscleSheetTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Grupo muscular'**
+  String get workoutPickerMuscleSheetTitle;
+
+  /// No description provided for @workoutPickerEquipmentSheetTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tipo de equipo'**
+  String get workoutPickerEquipmentSheetTitle;
+
+  /// No description provided for @workoutPickerMuscleAll.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Todos los músculos'**
+  String get workoutPickerMuscleAll;
+
+  /// No description provided for @workoutPickerEquipmentAll.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Todo el equipamiento'**
+  String get workoutPickerEquipmentAll;
+
+  /// No description provided for @workoutPickerEmptyFiltered.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ningún ejercicio coincide'**
+  String get workoutPickerEmptyFiltered;
+
+  /// No description provided for @workoutPickerEmptyFilteredHint.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Probá quitando un filtro o ajustando la búsqueda.'**
+  String get workoutPickerEmptyFilteredHint;
+
+  /// No description provided for @workoutPickerAddButton.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Agregar {count} {count, plural, =1{ejercicio} other{ejercicios}}'**
+  String workoutPickerAddButton(int count);
+
+  /// No description provided for @workoutSelfEditorNameHint.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Mi rutina'**
+  String get workoutSelfEditorNameHint;
+
+  /// No description provided for @workoutPickerSheetClear.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Limpiar'**
+  String get workoutPickerSheetClear;
+
+  /// No description provided for @workoutPickerSheetApplyAll.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'APLICAR (TODOS)'**
+  String get workoutPickerSheetApplyAll;
+
+  /// No description provided for @workoutPickerSheetApply.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'APLICAR ({count})'**
+  String workoutPickerSheetApply(int count);
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

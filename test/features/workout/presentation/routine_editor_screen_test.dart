@@ -29,7 +29,6 @@ import 'package:treino/features/workout/domain/routine_status.dart';
 import 'package:treino/features/workout/domain/routine_visibility.dart';
 import 'package:treino/features/workout/presentation/routine_editor_mode.dart';
 import 'package:treino/features/workout/presentation/routine_editor_screen.dart';
-import 'package:treino/features/workout/presentation/workout_strings.dart';
 
 import '../../../helpers/fake_analytics_service.dart';
 
@@ -585,7 +584,7 @@ void main() {
       await tester.tap(find.text('Sentadilla'));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text(WorkoutStrings.selfEditorSubmitLabel));
+      await tester.tap(find.text('CREAR RUTINA'));
       await tester.pumpAndSettle();
 
       verify(() => repo.createUserOwned(
@@ -605,8 +604,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text(WorkoutStrings.selfEditorTitle), findsOneWidget);
-      expect(find.text(WorkoutStrings.selfEditorSubmitLabel), findsOneWidget);
+      expect(find.text('Nueva rutina'), findsOneWidget);
+      expect(find.text('CREAR RUTINA'), findsOneWidget);
       // TrainerAssigning title must NOT appear
       expect(find.text('Crear plan'), findsNothing);
       // TrainerAssigning submit label must NOT appear
@@ -626,7 +625,7 @@ void main() {
       expect(find.text('Crear plan'), findsOneWidget);
       expect(find.text('ASIGNAR PLAN'), findsOneWidget);
       // SelfCreating strings must NOT appear
-      expect(find.text(WorkoutStrings.selfEditorTitle), findsNothing);
+      expect(find.text('Nueva rutina'), findsNothing);
     });
 
     // TODO PR2-followup: rewrite for multi-select picker flow.
@@ -652,10 +651,10 @@ void main() {
       await tester.tap(find.text('Sentadilla'));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text(WorkoutStrings.selfEditorSubmitLabel));
+      await tester.tap(find.text('CREAR RUTINA'));
       await tester.pumpAndSettle();
 
-      expect(find.text(WorkoutStrings.editStubToast), findsOneWidget);
+      expect(find.text('Pronto vas a poder editar el contenido. Por ahora podés archivar y crear de nuevo.'), findsOneWidget);
     });
   });
 }

@@ -20,7 +20,6 @@ import 'package:treino/features/workout/presentation/routine_detail_screen.dart'
 import 'package:treino/features/workout/presentation/widgets/historial_section.dart';
 import 'package:treino/features/workout/presentation/widgets/mi_plan_section.dart';
 import 'package:treino/features/workout/presentation/widgets/plantillas_section.dart';
-import 'package:treino/features/workout/presentation/workout_strings.dart';
 import 'package:treino/features/workout/workout_screen.dart';
 
 class _MockUser extends Mock implements User {}
@@ -262,7 +261,7 @@ void main() {
       expect(find.byType(HistorialSection), findsOneWidget);
       // Empty state message from WorkoutStrings
       expect(
-        find.text(WorkoutStrings.historialEmptyMessage),
+        find.text('Todavía no entrenaste.'),
         findsOneWidget,
       );
     });

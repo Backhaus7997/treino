@@ -375,6 +375,245 @@ class AppL10nEs extends AppL10n {
   String agendaSlotBookedByLabel(String athleteName) {
     return 'Reservado por $athleteName';
   }
+
+  @override
+  String get workoutSummaryHeaderCompleted => 'BUEN ENTRENO';
+
+  @override
+  String get workoutSummaryHeaderAbandoned => 'SESIÓN INTERRUMPIDA';
+
+  @override
+  String get workoutStatDuration => 'DURACIÓN';
+
+  @override
+  String get workoutStatVolume => 'VOLUMEN';
+
+  @override
+  String get workoutStatSets => 'SETS';
+
+  @override
+  String get workoutStatPrsToday => 'PRs HOY';
+
+  @override
+  String get workoutStatPrsTodayStub => '—';
+
+  @override
+  String get workoutPrsSectionTitle => 'PRS DE LA SESIÓN';
+
+  @override
+  String get workoutPrsPlaceholder => 'Próximamente';
+
+  @override
+  String get workoutButtonDone => 'LISTO';
+
+  @override
+  String get workoutButtonShare => 'COMPARTIR';
+
+  @override
+  String get workoutButtonRetry => 'Reintentar';
+
+  @override
+  String get workoutButtonBackToWorkout => 'Volver a Entrenar';
+
+  @override
+  String get workoutNotFoundTitle => 'Sesión no encontrada';
+
+  @override
+  String get workoutErrorTitle => 'No pudimos cargar tu sesión';
+
+  @override
+  String get workoutSnackShareSuccess => '¡Post compartido!';
+
+  @override
+  String get workoutSnackShareError =>
+      'No pudimos compartir tu post. Intentá de nuevo.';
+
+  @override
+  String get workoutPostAutoCompleteText => '¡Terminé mi entreno! 💪';
+
+  @override
+  String get workoutHistorialHeading => 'HISTORIAL';
+
+  @override
+  String get workoutHistorialEmptyMessage => 'Todavía no entrenaste.';
+
+  @override
+  String get workoutHistorialEmptyCta => 'Empezar entrenamiento';
+
+  @override
+  String get workoutHistorialErrorMessage => 'No pudimos cargar tu historial.';
+
+  @override
+  String get workoutHistorialErrorRetry => 'Reintentar';
+
+  @override
+  String get workoutHistorialCardKgSuffix => ' kg';
+
+  @override
+  String get workoutHistorialCardMinSuffix => ' min';
+
+  @override
+  String get workoutHistorialShowLess => 'Ver menos';
+
+  @override
+  String workoutHistorialShowMore(int n) {
+    return 'Ver más ($n)';
+  }
+
+  @override
+  String get workoutDetailStatDuration => 'DURACIÓN';
+
+  @override
+  String get workoutDetailStatSets => 'SETS';
+
+  @override
+  String get workoutDetailStatVolume => 'VOLUMEN';
+
+  @override
+  String get workoutDetailStatPrsToday => 'PRS HOY';
+
+  @override
+  String get workoutDetailPrBadge => 'PR';
+
+  @override
+  String get workoutSelfEditorTitle => 'Nueva rutina';
+
+  @override
+  String get workoutSelfEditorEditTitle => 'Editar rutina';
+
+  @override
+  String get workoutSelfEditorSubmitLabel => 'CREAR RUTINA';
+
+  @override
+  String get workoutSelfEditorUpdateLabel => 'GUARDAR CAMBIOS';
+
+  @override
+  String get workoutSelfEditorSuccess => 'Rutina creada';
+
+  @override
+  String get workoutSelfEditorUpdateSuccess => 'Rutina actualizada';
+
+  @override
+  String get workoutSelfEditorNotFound =>
+      'Esta rutina ya no existe. Volvé y actualizá la lista.';
+
+  @override
+  String get workoutSelfEditorError => 'No pudimos crear la rutina. Reintentá.';
+
+  @override
+  String get workoutSelfEditorPermissionDenied =>
+      'No tenés permisos para hacer esto. Recargá la app.';
+
+  @override
+  String get workoutEditStubToast =>
+      'Pronto vas a poder editar el contenido. Por ahora podés archivar y crear de nuevo.';
+
+  @override
+  String get workoutSelfEditorCapReached =>
+      'Llegaste al máximo de 10 rutinas activas.';
+
+  @override
+  String get workoutMisRutinasSectionTitle => 'MIS RUTINAS';
+
+  @override
+  String get workoutMisRutinasCta => 'CREAR RUTINA';
+
+  @override
+  String get workoutMisRutinasCtaDisabledTooltip =>
+      'Llegaste al máximo de 10 rutinas activas. Archivá una para crear otra.';
+
+  @override
+  String get workoutMisRutinasEmptyState =>
+      'Todavía no creaste ninguna rutina. Tocá CREAR RUTINA para armar la primera.';
+
+  @override
+  String get workoutMisRutinasError => 'No pudimos cargar tus rutinas.';
+
+  @override
+  String get workoutMisRutinasErrorRetry => 'Reintentar';
+
+  @override
+  String get workoutMisRutinasOverflowEdit => 'EDITAR';
+
+  @override
+  String get workoutMisRutinasOverflowArchive => 'ARCHIVAR';
+
+  @override
+  String get workoutMisRutinasConfirmTitle => 'Archivar rutina';
+
+  @override
+  String get workoutMisRutinasConfirmBody =>
+      'La rutina dejará de aparecer en MIS RUTINAS. Tu historial se conserva.';
+
+  @override
+  String get workoutMisRutinasConfirmCancel => 'CANCELAR';
+
+  @override
+  String get workoutMisRutinasConfirmConfirm => 'ARCHIVAR';
+
+  @override
+  String get workoutMisRutinasArchiveSuccess => 'Rutina archivada';
+
+  @override
+  String get workoutMisRutinasArchiveError =>
+      'No pudimos archivar la rutina. Reintentá.';
+
+  @override
+  String get workoutSplitFallback => 'Sin split';
+
+  @override
+  String get workoutPickerMuscleFilter => 'Músculos';
+
+  @override
+  String get workoutPickerEquipmentFilter => 'Equipamiento';
+
+  @override
+  String get workoutPickerMuscleSheetTitle => 'Grupo muscular';
+
+  @override
+  String get workoutPickerEquipmentSheetTitle => 'Tipo de equipo';
+
+  @override
+  String get workoutPickerMuscleAll => 'Todos los músculos';
+
+  @override
+  String get workoutPickerEquipmentAll => 'Todo el equipamiento';
+
+  @override
+  String get workoutPickerEmptyFiltered => 'Ningún ejercicio coincide';
+
+  @override
+  String get workoutPickerEmptyFilteredHint =>
+      'Probá quitando un filtro o ajustando la búsqueda.';
+
+  @override
+  String workoutPickerAddButton(int count) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'ejercicios',
+      one: 'ejercicio',
+    );
+    return 'Agregar $countString $_temp0';
+  }
+
+  @override
+  String get workoutSelfEditorNameHint => 'Mi rutina';
+
+  @override
+  String get workoutPickerSheetClear => 'Limpiar';
+
+  @override
+  String get workoutPickerSheetApplyAll => 'APLICAR (TODOS)';
+
+  @override
+  String workoutPickerSheetApply(int count) {
+    return 'APLICAR ($count)';
+  }
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -752,5 +991,244 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String agendaSlotBookedByLabel(String athleteName) {
     return 'Reservado por $athleteName';
+  }
+
+  @override
+  String get workoutSummaryHeaderCompleted => 'BUEN ENTRENO';
+
+  @override
+  String get workoutSummaryHeaderAbandoned => 'SESIÓN INTERRUMPIDA';
+
+  @override
+  String get workoutStatDuration => 'DURACIÓN';
+
+  @override
+  String get workoutStatVolume => 'VOLUMEN';
+
+  @override
+  String get workoutStatSets => 'SETS';
+
+  @override
+  String get workoutStatPrsToday => 'PRs HOY';
+
+  @override
+  String get workoutStatPrsTodayStub => '—';
+
+  @override
+  String get workoutPrsSectionTitle => 'PRS DE LA SESIÓN';
+
+  @override
+  String get workoutPrsPlaceholder => 'Próximamente';
+
+  @override
+  String get workoutButtonDone => 'LISTO';
+
+  @override
+  String get workoutButtonShare => 'COMPARTIR';
+
+  @override
+  String get workoutButtonRetry => 'Reintentar';
+
+  @override
+  String get workoutButtonBackToWorkout => 'Volver a Entrenar';
+
+  @override
+  String get workoutNotFoundTitle => 'Sesión no encontrada';
+
+  @override
+  String get workoutErrorTitle => 'No pudimos cargar tu sesión';
+
+  @override
+  String get workoutSnackShareSuccess => '¡Post compartido!';
+
+  @override
+  String get workoutSnackShareError =>
+      'No pudimos compartir tu post. Intentá de nuevo.';
+
+  @override
+  String get workoutPostAutoCompleteText => '¡Terminé mi entreno! 💪';
+
+  @override
+  String get workoutHistorialHeading => 'HISTORIAL';
+
+  @override
+  String get workoutHistorialEmptyMessage => 'Todavía no entrenaste.';
+
+  @override
+  String get workoutHistorialEmptyCta => 'Empezar entrenamiento';
+
+  @override
+  String get workoutHistorialErrorMessage => 'No pudimos cargar tu historial.';
+
+  @override
+  String get workoutHistorialErrorRetry => 'Reintentar';
+
+  @override
+  String get workoutHistorialCardKgSuffix => ' kg';
+
+  @override
+  String get workoutHistorialCardMinSuffix => ' min';
+
+  @override
+  String get workoutHistorialShowLess => 'Ver menos';
+
+  @override
+  String workoutHistorialShowMore(int n) {
+    return 'Ver más ($n)';
+  }
+
+  @override
+  String get workoutDetailStatDuration => 'DURACIÓN';
+
+  @override
+  String get workoutDetailStatSets => 'SETS';
+
+  @override
+  String get workoutDetailStatVolume => 'VOLUMEN';
+
+  @override
+  String get workoutDetailStatPrsToday => 'PRS HOY';
+
+  @override
+  String get workoutDetailPrBadge => 'PR';
+
+  @override
+  String get workoutSelfEditorTitle => 'Nueva rutina';
+
+  @override
+  String get workoutSelfEditorEditTitle => 'Editar rutina';
+
+  @override
+  String get workoutSelfEditorSubmitLabel => 'CREAR RUTINA';
+
+  @override
+  String get workoutSelfEditorUpdateLabel => 'GUARDAR CAMBIOS';
+
+  @override
+  String get workoutSelfEditorSuccess => 'Rutina creada';
+
+  @override
+  String get workoutSelfEditorUpdateSuccess => 'Rutina actualizada';
+
+  @override
+  String get workoutSelfEditorNotFound =>
+      'Esta rutina ya no existe. Volvé y actualizá la lista.';
+
+  @override
+  String get workoutSelfEditorError => 'No pudimos crear la rutina. Reintentá.';
+
+  @override
+  String get workoutSelfEditorPermissionDenied =>
+      'No tenés permisos para hacer esto. Recargá la app.';
+
+  @override
+  String get workoutEditStubToast =>
+      'Pronto vas a poder editar el contenido. Por ahora podés archivar y crear de nuevo.';
+
+  @override
+  String get workoutSelfEditorCapReached =>
+      'Llegaste al máximo de 10 rutinas activas.';
+
+  @override
+  String get workoutMisRutinasSectionTitle => 'MIS RUTINAS';
+
+  @override
+  String get workoutMisRutinasCta => 'CREAR RUTINA';
+
+  @override
+  String get workoutMisRutinasCtaDisabledTooltip =>
+      'Llegaste al máximo de 10 rutinas activas. Archivá una para crear otra.';
+
+  @override
+  String get workoutMisRutinasEmptyState =>
+      'Todavía no creaste ninguna rutina. Tocá CREAR RUTINA para armar la primera.';
+
+  @override
+  String get workoutMisRutinasError => 'No pudimos cargar tus rutinas.';
+
+  @override
+  String get workoutMisRutinasErrorRetry => 'Reintentar';
+
+  @override
+  String get workoutMisRutinasOverflowEdit => 'EDITAR';
+
+  @override
+  String get workoutMisRutinasOverflowArchive => 'ARCHIVAR';
+
+  @override
+  String get workoutMisRutinasConfirmTitle => 'Archivar rutina';
+
+  @override
+  String get workoutMisRutinasConfirmBody =>
+      'La rutina dejará de aparecer en MIS RUTINAS. Tu historial se conserva.';
+
+  @override
+  String get workoutMisRutinasConfirmCancel => 'CANCELAR';
+
+  @override
+  String get workoutMisRutinasConfirmConfirm => 'ARCHIVAR';
+
+  @override
+  String get workoutMisRutinasArchiveSuccess => 'Rutina archivada';
+
+  @override
+  String get workoutMisRutinasArchiveError =>
+      'No pudimos archivar la rutina. Reintentá.';
+
+  @override
+  String get workoutSplitFallback => 'Sin split';
+
+  @override
+  String get workoutPickerMuscleFilter => 'Músculos';
+
+  @override
+  String get workoutPickerEquipmentFilter => 'Equipamiento';
+
+  @override
+  String get workoutPickerMuscleSheetTitle => 'Grupo muscular';
+
+  @override
+  String get workoutPickerEquipmentSheetTitle => 'Tipo de equipo';
+
+  @override
+  String get workoutPickerMuscleAll => 'Todos los músculos';
+
+  @override
+  String get workoutPickerEquipmentAll => 'Todo el equipamiento';
+
+  @override
+  String get workoutPickerEmptyFiltered => 'Ningún ejercicio coincide';
+
+  @override
+  String get workoutPickerEmptyFilteredHint =>
+      'Probá quitando un filtro o ajustando la búsqueda.';
+
+  @override
+  String workoutPickerAddButton(int count) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'ejercicios',
+      one: 'ejercicio',
+    );
+    return 'Agregar $countString $_temp0';
+  }
+
+  @override
+  String get workoutSelfEditorNameHint => 'Mi rutina';
+
+  @override
+  String get workoutPickerSheetClear => 'Limpiar';
+
+  @override
+  String get workoutPickerSheetApplyAll => 'APLICAR (TODOS)';
+
+  @override
+  String workoutPickerSheetApply(int count) {
+    return 'APLICAR ($count)';
   }
 }

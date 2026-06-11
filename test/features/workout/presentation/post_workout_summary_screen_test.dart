@@ -14,7 +14,7 @@ import 'package:treino/features/workout/domain/session.dart';
 import 'package:treino/features/workout/domain/session_status.dart';
 import 'package:treino/features/workout/domain/set_log.dart';
 import 'package:treino/features/workout/presentation/post_workout_summary_screen.dart';
-import 'package:treino/features/workout/presentation/workout_strings.dart';
+import 'package:treino/l10n/app_l10n.dart';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -91,6 +91,9 @@ Widget _buildWithRouter({
     child: MaterialApp.router(
       theme: AppTheme.dark(),
       routerConfig: router,
+      localizationsDelegates: AppL10n.localizationsDelegates,
+      supportedLocales: AppL10n.supportedLocales,
+      locale: const Locale('es', 'AR'),
     ),
   );
 }
@@ -123,7 +126,7 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    expect(find.text(WorkoutStrings.summaryHeaderCompleted), findsOneWidget);
+    expect(find.text('BUEN ENTRENO'), findsOneWidget);
     expect(find.text('Push'), findsOneWidget);
   });
 
@@ -138,7 +141,7 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    expect(find.text(WorkoutStrings.summaryHeaderAbandoned), findsOneWidget);
+    expect(find.text('SESIÓN INTERRUMPIDA'), findsOneWidget);
     expect(find.text('Push'), findsOneWidget);
   });
 
@@ -159,7 +162,7 @@ void main() {
     expect(find.text('52'), findsOneWidget);
     expect(find.text('3.2'), findsOneWidget);
     expect(find.text('22'), findsOneWidget);
-    expect(find.text(WorkoutStrings.statPrsTodayStub), findsWidgets);
+    expect(find.text('—'), findsWidgets);
   });
 
   testWidgets('SCENARIO-346: SETS stat uses count from setLogs',
@@ -186,7 +189,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-      find.textContaining(WorkoutStrings.prsPlaceholder),
+      find.textContaining('Próximamente'),
       findsOneWidget,
     );
   });
@@ -222,9 +225,9 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    await tester.ensureVisible(find.text(WorkoutStrings.buttonDone));
+    await tester.ensureVisible(find.text('LISTO'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text(WorkoutStrings.buttonDone));
+    await tester.tap(find.text('LISTO'));
     await tester.pumpAndSettle();
 
     expect(find.text('workout-home'), findsOneWidget);
@@ -244,9 +247,9 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    await tester.ensureVisible(find.text(WorkoutStrings.buttonShare));
+    await tester.ensureVisible(find.text('COMPARTIR'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text(WorkoutStrings.buttonShare));
+    await tester.tap(find.text('COMPARTIR'));
     await tester.pumpAndSettle();
 
     expect(shareCalled, isTrue);
@@ -263,12 +266,12 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    await tester.ensureVisible(find.text(WorkoutStrings.buttonShare));
+    await tester.ensureVisible(find.text('COMPARTIR'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text(WorkoutStrings.buttonShare));
+    await tester.tap(find.text('COMPARTIR'));
     await tester.pumpAndSettle();
 
-    expect(find.text(WorkoutStrings.snackShareSuccess), findsOneWidget);
+    expect(find.text('¡Post compartido!'), findsOneWidget);
     expect(find.text('workout-home'), findsOneWidget);
   });
 
@@ -281,12 +284,12 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    await tester.ensureVisible(find.text(WorkoutStrings.buttonShare));
+    await tester.ensureVisible(find.text('COMPARTIR'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text(WorkoutStrings.buttonShare));
+    await tester.tap(find.text('COMPARTIR'));
     await tester.pumpAndSettle();
 
-    expect(find.text(WorkoutStrings.snackShareError), findsOneWidget);
+    expect(find.text('No pudimos compartir tu post. Intentá de nuevo.'), findsOneWidget);
     expect(find.text('workout-home'), findsNothing);
   });
 
@@ -299,9 +302,9 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    expect(find.text(WorkoutStrings.notFoundTitle), findsOneWidget);
+    expect(find.text('Sesión no encontrada'), findsOneWidget);
 
-    await tester.tap(find.text(WorkoutStrings.buttonBackToWorkout));
+    await tester.tap(find.text('Volver a Entrenar'));
     await tester.pumpAndSettle();
 
     expect(find.text('workout-home'), findsOneWidget);
