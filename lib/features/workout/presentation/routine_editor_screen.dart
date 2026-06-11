@@ -162,6 +162,12 @@ class _EditableDay {
   String name;
   List<_EditableSlot> slots = [];
 
+  /// Collapsed/expanded state lives HERE (on the model that persists in the
+  /// editor's _days list), not in the tile's State — the ListView recycles
+  /// off-screen tiles, so a tile-local flag reset to `true` every time the
+  /// day scrolled back into view (device bug 2026-06-11).
+  bool expanded = true;
+
   _EditableDay({required this.dayNumber, required this.name});
 }
 
@@ -1715,7 +1721,10 @@ class _DayExpansionTile extends StatefulWidget {
 }
 
 class _DayExpansionTileState extends State<_DayExpansionTile> {
-  bool _expanded = true;
+  // Reads/writes widget.day.expanded so the collapse survives the ListView
+  // recycling the tile off-screen.
+  bool get _expanded => widget.day.expanded;
+  set _expanded(bool v) => widget.day.expanded = v;
 
   /// Walks the slot list and emits either a standalone [_SlotEditor] or a
   /// "SUPERSERIE" wrapper card for consecutive slots sharing a non-null group.
