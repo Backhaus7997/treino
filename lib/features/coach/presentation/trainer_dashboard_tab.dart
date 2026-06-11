@@ -47,7 +47,7 @@ class TrainerDashboardTab extends ConsumerWidget {
       // (CTA buttons) can never scroll out from behind the translucent bar.
       padding: EdgeInsets.fromLTRB(
           20, 14, 20, 24 + MediaQuery.paddingOf(context).bottom),
-      physics: const ClampingScrollPhysics(),
+      physics: const AlwaysScrollableScrollPhysics(),
       children: [
         const _DashboardHeader(),
         const SizedBox(height: 18),

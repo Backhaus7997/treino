@@ -61,7 +61,7 @@ class MyExercisesScreen extends ConsumerWidget {
                 ? _EmptyState(palette: palette)
                 : ListView.separated(
                     padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
-                    physics: const ClampingScrollPhysics(),
+                    physics: const AlwaysScrollableScrollPhysics(),
                     itemCount: items.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 10),
                     itemBuilder: (_, i) =>

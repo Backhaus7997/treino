@@ -155,7 +155,7 @@ class _AlumnosTab extends ConsumerWidget {
         }
         return ListView.separated(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-          physics: const ClampingScrollPhysics(),
+          physics: const AlwaysScrollableScrollPhysics(),
           itemCount: visible.length,
           separatorBuilder: (_, __) => const SizedBox(height: 12),
           itemBuilder: (_, i) => _ActiveAlumnoCard(link: visible[i]),

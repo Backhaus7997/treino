@@ -66,7 +66,7 @@ class FriendRequestsInboxScreen extends ConsumerWidget {
                 );
               }
               return ListView.separated(
-                physics: const ClampingScrollPhysics(),
+                physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 itemCount: list.length,
                 separatorBuilder: (_, __) => const SizedBox(height: 8),
