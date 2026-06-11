@@ -31,7 +31,6 @@ mixin _$Exercise {
   int? get defaultRestSeconds => throw _privateConstructorUsedError;
   List<String> get aliases =>
       throw _privateConstructorUsedError; // Spanish/jargon synonyms for the Excel importer match
-// ignore: invalid_annotation_target
   @JsonKey(fromJson: _equipmentFromJson, toJson: _equipmentToJson)
   EquipmentType? get equipment => throw _privateConstructorUsedError;
 
@@ -270,7 +269,6 @@ class _$ExerciseImpl implements _Exercise {
   }
 
 // Spanish/jargon synonyms for the Excel importer match
-// ignore: invalid_annotation_target
   @override
   @JsonKey(fromJson: _equipmentFromJson, toJson: _equipmentToJson)
   final EquipmentType? equipment;
@@ -367,7 +365,6 @@ abstract class _Exercise implements Exercise {
   @override
   List<String>
       get aliases; // Spanish/jargon synonyms for the Excel importer match
-// ignore: invalid_annotation_target
   @override
   @JsonKey(fromJson: _equipmentFromJson, toJson: _equipmentToJson)
   EquipmentType? get equipment;
