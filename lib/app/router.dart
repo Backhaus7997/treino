@@ -188,18 +188,21 @@ GoRouter buildRouter({
       // ─── Session player — TOP-LEVEL ROUTES (outside ShellRoute) ───────────
       // El player es immersive: oculta la bottom bar durante el entrenamiento.
       // Diseño §9.1. Las 3 rutas son auth-gated via authRedirect.
+      // `builder` (not pageBuilder + _noAnim) so go_router uses the platform
+      // default page type (CupertinoPageRoute on iOS → native slide + swipe-back
+      // gesture; MaterialPageRoute on Android → back button / edge swipe).
       GoRoute(
         path: '/workout/session/resume/:sessionId',
-        pageBuilder: (context, state) {
+        builder: (context, state) {
           final sessionId = state.pathParameters['sessionId']!;
-          return _noAnim(SessionPlayerScreen(
+          return SessionPlayerScreen(
             init: ResumeSession(sessionId: sessionId),
-          ));
+          );
         },
       ),
       GoRoute(
         path: '/workout/session/:routineId/:dayNumber',
-        pageBuilder: (context, state) {
+        builder: (context, state) {
           final routineId = state.pathParameters['routineId']!;
           final dayNumber =
               int.tryParse(state.pathParameters['dayNumber'] ?? '') ?? 1;
@@ -210,20 +213,20 @@ GoRouter buildRouter({
           final weekNumber =
               (int.tryParse(state.uri.queryParameters['week'] ?? '') ?? 0)
                   .clamp(0, 1 << 31);
-          return _noAnim(SessionPlayerScreen(
+          return SessionPlayerScreen(
             init: FreshSession(
               routineId: routineId,
               dayNumber: dayNumber,
               weekNumber: weekNumber,
             ),
-          ));
+          );
         },
       ),
       GoRoute(
         path: '/workout/session-summary/:sessionId',
-        pageBuilder: (context, state) {
+        builder: (context, state) {
           final sessionId = state.pathParameters['sessionId']!;
-          return _noAnim(PostWorkoutSummaryScreen(sessionId: sessionId));
+          return PostWorkoutSummaryScreen(sessionId: sessionId);
         },
       ),
 
@@ -231,10 +234,8 @@ GoRouter buildRouter({
       // Immersive: oculta la bottom bar. Design §11-12.
       GoRoute(
         path: '/workout/historial/:sessionId',
-        pageBuilder: (context, state) => _noAnim(
-          SessionDetailScreen(
-            sessionId: state.pathParameters['sessionId']!,
-          ),
+        builder: (context, state) => SessionDetailScreen(
+          sessionId: state.pathParameters['sessionId']!,
         ),
       ),
 
@@ -243,34 +244,32 @@ GoRouter buildRouter({
       // widget. Moved out of ShellRoute so the editor has the full screen height.
       GoRoute(
         path: '/workout/routine-editor/:athleteId',
-        pageBuilder: (context, state) {
+        builder: (context, state) {
           final athleteId = state.pathParameters['athleteId']!;
           // `extra` carries an existing plan id when editing; null = create.
           final existingPlanId = state.extra as String?;
-          return _noAnim(RoutineEditorScreen(
+          return RoutineEditorScreen(
             mode: TrainerAssigning(
               athleteId: athleteId,
               existingPlanId: existingPlanId,
             ),
-          ));
+          );
         },
       ),
       GoRoute(
         path: '/workout/template-editor',
-        pageBuilder: (context, state) {
+        builder: (context, state) {
           // `extra` carries an existing template id when editing; null = create.
           final existingTemplateId = state.extra as String?;
-          return _noAnim(RoutineEditorScreen(
+          return RoutineEditorScreen(
             mode: TrainerTemplating(existingTemplateId: existingTemplateId),
-          ));
+          );
         },
       ),
       GoRoute(
         path: '/workout/my-routine-editor',
-        pageBuilder: (context, state) => _noAnim(
-          RoutineEditorScreen(
-            mode: SelfCreating(existingRoutineId: state.extra as String?),
-          ),
+        builder: (context, state) => RoutineEditorScreen(
+          mode: SelfCreating(existingRoutineId: state.extra as String?),
         ),
       ),
 
@@ -288,15 +287,21 @@ GoRouter buildRouter({
           ),
         ),
         routes: [
+          // Tab roots use _noAnim so switching tabs has no slide transition.
+          // Sub-routes (pushed screens) use `builder` so go_router picks the
+          // platform default page: CupertinoPageRoute on iOS (native slide +
+          // interactive-pop gesture), MaterialPageRoute on Android (predictive
+          // back / edge swipe). iOS swipe-back cannot be tested via widget tests
+          // — it is exercised on device only (see commit message).
           GoRoute(
             path: '/workout',
             pageBuilder: (_, __) => _noAnim(const WorkoutScreen()),
             routes: [
               GoRoute(
                 path: 'routine/:routineId',
-                pageBuilder: (context, state) {
+                builder: (context, state) {
                   final routineId = state.pathParameters['routineId']!;
-                  return _noAnim(RoutineDetailScreen(routineId: routineId));
+                  return RoutineDetailScreen(routineId: routineId);
                 },
               ),
               GoRoute(
@@ -304,13 +309,13 @@ GoRouter buildRouter({
                 // the slot's exercise might live in a trainer's
                 // customExercises subcollection — see slotExerciseProvider.
                 path: 'exercise/:exerciseId',
-                pageBuilder: (context, state) {
+                builder: (context, state) {
                   final exerciseId = state.pathParameters['exerciseId']!;
                   final ownerId = state.uri.queryParameters['ownerId'];
-                  return _noAnim(ExerciseDetailScreen(
+                  return ExerciseDetailScreen(
                     exerciseId: exerciseId,
                     ownerId: ownerId,
-                  ));
+                  );
                 },
               ),
               // NOTE: routine-editor, template-editor, my-routine-editor are
@@ -324,18 +329,18 @@ GoRouter buildRouter({
             routes: [
               GoRoute(
                 path: 'create',
-                pageBuilder: (_, __) => _noAnim(const CreatePostScreen()),
+                builder: (_, __) => const CreatePostScreen(),
               ),
               GoRoute(
                 path: 'profile/:uid',
-                pageBuilder: (context, state) {
+                builder: (context, state) {
                   final uid = state.pathParameters['uid']!;
-                  return _noAnim(PublicProfileScreen(targetUid: uid));
+                  return PublicProfileScreen(targetUid: uid);
                 },
               ),
               GoRoute(
                 path: 'search',
-                pageBuilder: (_, __) => _noAnim(const SearchUsersScreen()),
+                builder: (_, __) => const SearchUsersScreen(),
               ),
             ],
           ),
@@ -345,7 +350,7 @@ GoRouter buildRouter({
             routes: [
               GoRoute(
                 path: 'insights',
-                pageBuilder: (_, __) => _noAnim(const InsightsScreen()),
+                builder: (_, __) => const InsightsScreen(),
               ),
             ],
           ),
@@ -358,38 +363,35 @@ GoRouter buildRouter({
             routes: [
               GoRoute(
                 path: 'trainer/:uid',
-                pageBuilder: (context, state) {
+                builder: (context, state) {
                   final uid = state.pathParameters['uid']!;
-                  return _noAnim(TrainerPublicProfileScreen(uid: uid));
+                  return TrainerPublicProfileScreen(uid: uid);
                 },
               ),
               GoRoute(
                 path: 'athlete/:athleteId',
-                pageBuilder: (context, state) {
+                builder: (context, state) {
                   final athleteId = state.pathParameters['athleteId']!;
-                  return _noAnim(AthleteDetailScreen(athleteId: athleteId));
+                  return AthleteDetailScreen(athleteId: athleteId);
                 },
               ),
               GoRoute(
                 path: 'chat/:chatId',
-                pageBuilder: (context, state) {
+                builder: (context, state) {
                   final chatId = state.pathParameters['chatId']!;
                   final otherUid = state.uri.queryParameters['other'] ?? '';
-                  return _noAnim(
-                    ChatScreen(chatId: chatId, otherUid: otherUid),
-                  );
+                  return ChatScreen(chatId: chatId, otherUid: otherUid);
                 },
               ),
               GoRoute(
                 path: 'agenda',
-                pageBuilder: (_, __) =>
-                    _noAnim(const _AthleteAgendaRouteHost()),
+                builder: (_, __) => const _AthleteAgendaRouteHost(),
               ),
               GoRoute(
                 path: 'availability-editor',
-                pageBuilder: (context, state) {
+                builder: (context, state) {
                   final uid = state.uri.queryParameters['trainerId'] ?? '';
-                  return _noAnim(AvailabilityEditorScreen(trainerId: uid));
+                  return AvailabilityEditorScreen(trainerId: uid);
                 },
               ),
             ],
@@ -401,34 +403,32 @@ GoRouter buildRouter({
               // Existing — Fase 3 Etapa 6
               GoRoute(
                 path: 'friend-requests',
-                pageBuilder: (_, __) =>
-                    _noAnim(const FriendRequestsInboxScreen()),
+                builder: (_, __) => const FriendRequestsInboxScreen(),
               ),
               // NEW — Fase 3 Etapa 7 (profile-screen-rewrite)
               GoRoute(
                 path: 'edit-personal',
-                pageBuilder: (_, __) =>
-                    _noAnim(const ProfileEditPersonalScreen()),
+                builder: (_, __) => const ProfileEditPersonalScreen(),
               ),
               // NEW — Fase 6 Etapa 1 (trainer-profile-onboarding)
               // ADR-TPO-005: reads ?mode=onboarding query param; any other
               // value (or missing) defaults to edit mode.
               GoRoute(
                 path: 'edit-trainer',
-                pageBuilder: (context, state) {
+                builder: (context, state) {
                   final mode = state.uri.queryParameters['mode'] == 'onboarding'
                       ? ProfileEditTrainerMode.onboarding
                       : ProfileEditTrainerMode.edit;
-                  return _noAnim(ProfileEditTrainerScreen(mode: mode));
+                  return ProfileEditTrainerScreen(mode: mode);
                 },
               ),
               GoRoute(
                 path: 'gym',
-                pageBuilder: (_, __) => _noAnim(const ProfileGymScreen()),
+                builder: (_, __) => const ProfileGymScreen(),
               ),
               GoRoute(
                 path: 'routines',
-                pageBuilder: (_, __) => _noAnim(const ProfileRoutinesScreen()),
+                builder: (_, __) => const ProfileRoutinesScreen(),
               ),
               // /profile/settings GoRoute REMOVED 2026-05-28 — PR#4 pivot.
               // Sign-out and eliminar-cuenta tiles now live directly in
@@ -444,15 +444,13 @@ GoRouter buildRouter({
               // Trainer custom exercise library — list + create/edit form.
               GoRoute(
                 path: 'my-exercises',
-                pageBuilder: (_, __) => _noAnim(const MyExercisesScreen()),
+                builder: (_, __) => const MyExercisesScreen(),
                 routes: [
                   GoRoute(
                     path: ':exId',
-                    pageBuilder: (context, state) {
+                    builder: (context, state) {
                       final exId = state.pathParameters['exId'];
-                      return _noAnim(
-                        CustomExerciseEditorScreen(exerciseId: exId),
-                      );
+                      return CustomExerciseEditorScreen(exerciseId: exId);
                     },
                   ),
                 ],
