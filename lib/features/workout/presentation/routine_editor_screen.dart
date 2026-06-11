@@ -581,14 +581,57 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     });
   }
 
-  /// Replaces the selected week's sets with a deep copy of the previous
-  /// week's, slot by slot (REQ-PERIOD-014, SCENARIO-PERIOD-015/016). Uses
-  /// [_EditableSet.copy] so set types survive the duplication.
+  /// Shows a confirmation dialog and, if confirmed, replaces the selected
+  /// week's sets with a deep copy of the previous week's, slot by slot
+  /// (REQ-PERIOD-014, SCENARIO-PERIOD-015/016). Uses [_EditableSet.copy] so
+  /// set types survive the duplication.
   /// Also copies presence: a slot present in `_selectedWeek - 1` becomes
   /// present in `_selectedWeek` too (ADR-WPRES-06, SCENARIO-WPRES-020).
-  void _duplicateWeek() {
+  ///
+  /// The [FocusManager.instance.unfocus()] is called BEFORE the dialog to
+  /// dismiss the IME and avoid keyboard-related assertion errors on iOS.
+  Future<void> _duplicateWeek() async {
     if (_selectedWeek == 0) return;
+    // Dismiss IME before showing dialog — avoids on-device IME state leaks.
     FocusManager.instance.primaryFocus?.unfocus();
+
+    final sourceWeekDisplay =
+        _selectedWeek; // 1-based (selectedWeek is 0-based)
+    final targetWeekDisplay = _selectedWeek + 1;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        final palette = AppPalette.of(ctx);
+        return AlertDialog(
+          backgroundColor: palette.bgCard,
+          title: Text(
+            'Duplicar semana',
+            style: TextStyle(color: palette.textPrimary),
+          ),
+          content: Text(
+            'Se copiará la Semana $sourceWeekDisplay en la Semana $targetWeekDisplay.',
+            style: TextStyle(color: palette.textMuted, fontSize: 14),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child:
+                  Text('Cancelar', style: TextStyle(color: palette.textMuted)),
+            ),
+            TextButton(
+              key: const Key('duplicate_week_confirm_button'),
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: Text('Confirmar', style: TextStyle(color: palette.accent)),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) return;
+    if (!mounted) return;
+
     setState(() {
       final sourceWeek = _selectedWeek - 1;
       final targetWeek = _selectedWeek;
@@ -1317,7 +1360,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                         },
                         onAddWeek: _addWeek,
                         onRemoveLastWeek: _removeLastWeek,
-                        onDuplicateWeek: _duplicateWeek,
+                        onDuplicateWeek: () => _duplicateWeek(),
                       ),
                       if (hiddenInvalidWeeks.isNotEmpty) ...[
                         const SizedBox(height: 4),

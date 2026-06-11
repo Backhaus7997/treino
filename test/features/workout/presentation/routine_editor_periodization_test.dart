@@ -194,6 +194,16 @@ Future<void> _tapByKey(WidgetTester tester, String key) async {
   await tester.pumpAndSettle();
 }
 
+/// Taps "Duplicar semana" and confirms the dialog that follows.
+/// Replaces every raw `_tapByKey(tester, 'duplicate_week_button')` call so
+/// tests go through the confirmation step (Tarea 3).
+Future<void> _tapDuplicateWeek(WidgetTester tester) async {
+  await _tapByKey(tester, 'duplicate_week_button');
+  // The dialog is now open — tap Confirmar.
+  await tester.tap(find.byKey(const Key('duplicate_week_confirm_button')));
+  await tester.pumpAndSettle();
+}
+
 bool _textButtonEnabled(WidgetTester tester, String key) =>
     tester.widget<TextButton>(find.byKey(Key(key))).onPressed != null;
 
@@ -334,7 +344,7 @@ void main() {
     await _tapByKey(tester, 'add_week_button');
     expect(find.text('8'), findsNothing);
 
-    await _tapByKey(tester, 'duplicate_week_button');
+    await _tapDuplicateWeek(tester);
     expect(find.text('8'), findsOneWidget,
         reason: 'duplicating week 2 must copy week 1\'s prescription');
 
@@ -343,6 +353,54 @@ void main() {
     await _tapByKey(tester, 'week_tab_0');
     expect(find.text('8'), findsOneWidget);
     expect(find.text('10'), findsNothing);
+  });
+
+  // ── Tarea 3: confirmación dialog de duplicar ────────────────────────────────
+
+  testWidgets(
+      'SCENARIO-DUP-CONFIRM-01: "Duplicar semana" shows dialog with correct '
+      'week numbers and cancelling aborts the duplication', (tester) async {
+    await _pumpEditor(
+      tester,
+      mode: const SelfCreating(),
+      overrides: _overrides(),
+    );
+
+    await _addBenchPress(tester);
+    await _fillVisibleReps(tester, '8');
+    await _tapByKey(tester, 'add_week_button');
+    // At week 2 (0-based index 1): dialog should say "Semana 1 → Semana 2".
+    await _tapByKey(tester, 'duplicate_week_button');
+
+    // Dialog is shown.
+    expect(find.text('Se copiará la Semana 1 en la Semana 2.'), findsOneWidget);
+
+    // Cancel — week 2 must remain empty (no "8" visible).
+    await tester.tap(find.text('Cancelar'));
+    await tester.pumpAndSettle();
+    expect(find.text('8'), findsNothing,
+        reason: 'cancel must not copy the prescription');
+  });
+
+  testWidgets(
+      'SCENARIO-DUP-CONFIRM-02: confirming the dialog executes the duplication',
+      (tester) async {
+    await _pumpEditor(
+      tester,
+      mode: const SelfCreating(),
+      overrides: _overrides(),
+    );
+
+    await _addBenchPress(tester);
+    await _fillVisibleReps(tester, '8');
+    await _tapByKey(tester, 'add_week_button');
+    // Tap button → dialog → confirm.
+    await _tapByKey(tester, 'duplicate_week_button');
+    expect(find.text('Se copiará la Semana 1 en la Semana 2.'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('duplicate_week_confirm_button')));
+    await tester.pumpAndSettle();
+    expect(find.text('8'), findsOneWidget,
+        reason: 'confirming must copy week 1 prescription into week 2');
   });
 
   // ── Device-repro: duplicate then edit the copy via its TextField ──────────
@@ -362,7 +420,7 @@ void main() {
 
     // Add an empty week (jumps to week 2) and duplicate week 1 into it.
     await _tapByKey(tester, 'add_week_button');
-    await _tapByKey(tester, 'duplicate_week_button');
+    await _tapDuplicateWeek(tester);
     expect(find.text('8'), findsOneWidget,
         reason: 'duplicate must seed week 2 with week 1\'s reps');
 
@@ -411,7 +469,7 @@ void main() {
     await _addBenchPress(tester);
     await _fillVisibleReps(tester, '8');
     await _tapByKey(tester, 'add_week_button');
-    await _tapByKey(tester, 'duplicate_week_button');
+    await _tapDuplicateWeek(tester);
 
     await tester
         .tap(find.widgetWithText(ElevatedButton, CoachStrings.editorSubmit));
@@ -459,7 +517,7 @@ void main() {
     expect(find.text('8'), findsNWidgets(2));
 
     await _tapByKey(tester, 'add_week_button');
-    await _tapByKey(tester, 'duplicate_week_button');
+    await _tapDuplicateWeek(tester);
     expect(find.text('8'), findsNWidgets(2),
         reason: 'duplicate copies both sets');
 
@@ -484,7 +542,7 @@ void main() {
     await _addBenchPress(tester);
     await _fillVisibleReps(tester, '8');
     await _tapByKey(tester, 'add_week_button');
-    await _tapByKey(tester, 'duplicate_week_button');
+    await _tapDuplicateWeek(tester);
 
     // Go back to week 1 and change it to 3.
     await _tapByKey(tester, 'week_tab_0');
@@ -524,7 +582,7 @@ void main() {
     await _addBenchPress(tester);
     await _fillVisibleReps(tester, '8');
     await _tapByKey(tester, 'add_week_button');
-    await _tapByKey(tester, 'duplicate_week_button');
+    await _tapDuplicateWeek(tester);
     await _replaceFieldText(tester, '8', '12');
 
     await tester
