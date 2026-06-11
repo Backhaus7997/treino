@@ -11,6 +11,7 @@ import '../../profile/application/user_providers.dart' show userProfileProvider;
 import '../../profile/application/user_public_profile_providers.dart';
 import '../../profile/domain/user_role.dart';
 import '../application/plan_gating.dart';
+import '../application/plan_progress.dart' show CompletedKey;
 import '../application/routine_providers.dart';
 import '../application/session_providers.dart'
     show currentUidProvider, planProgressProvider;
@@ -172,8 +173,21 @@ class _RoutineDetailContent extends ConsumerWidget {
   ///
   /// [viewedWeek] is passed down to ExerciseSlotRow for week-aware prescription
   /// display (REQ-PERIOD-041).
-  List<Widget> _buildExerciseList(int viewedWeek) {
-    final slots = day.slots;
+  ///
+  /// When [isPeriodized] is true, slots are pre-filtered by
+  /// `isPresentInWeek(viewedWeek)` before grouping (ADR-WPRES-07, REQ-WPRES-020).
+  /// Absent superset members are naturally excluded; a group reduced to 1 member
+  /// falls back to a standalone ExerciseSlotRow (existing run-length < 2 path).
+  List<Widget> _buildExerciseList(int viewedWeek, {bool isPeriodized = false}) {
+    // REQ-WPRES-020: filter by presence when numWeeks > 1.
+    // REQ-WPRES-015: numWeeks==1 → isPeriodized is false → no filter applied.
+    final slots = isPeriodized
+        ? [
+            for (final s in day.slots)
+              if (s.isPresentInWeek(viewedWeek)) s
+          ]
+        : day.slots;
+
     final widgets = <Widget>[];
     var i = 0;
     while (i < slots.length) {
@@ -207,6 +221,25 @@ class _RoutineDetailContent extends ConsumerWidget {
       i++;
     }
     return widgets;
+  }
+
+  /// Returns the exercise list widgets, or an informational "no exercises this
+  /// week" message when all slots are filtered out by presence.
+  ///
+  /// REQ-WPRES-028: zero present slots in [viewedWeek] → show info, not a lock.
+  /// REQ-WPRES-015: [isPeriodized] is false for single-week plans → no filter.
+  List<Widget> _buildPresenceFilteredSection(
+    int viewedWeek,
+    bool isPeriodized,
+  ) {
+    // Build the list (filtering applied inside _buildExerciseList when needed).
+    final exerciseWidgets =
+        _buildExerciseList(viewedWeek, isPeriodized: isPeriodized);
+    if (isPeriodized && exerciseWidgets.isEmpty) {
+      // All slots absent for this week → informational message (not a lock).
+      return const [_EmptyState(message: 'Sin ejercicios esta semana')];
+    }
+    return exerciseWidgets;
   }
 
   @override
@@ -272,7 +305,9 @@ class _RoutineDetailContent extends ConsumerWidget {
               if (day.slots.isEmpty)
                 const _EmptyState(message: 'No hay ejercicios en este día')
               else
-                ..._buildExerciseList(viewedWeek),
+                // REQ-WPRES-020: filter by presence when periodized.
+                // REQ-WPRES-028: zero present slots → show info message.
+                ..._buildPresenceFilteredSection(viewedWeek, isPeriodized),
               const SizedBox(height: 20),
               // CTA bar — periodized vs single-week
               if (isPeriodized)
@@ -752,17 +787,33 @@ class _PeriodizedCTABar extends ConsumerWidget {
           );
         }
 
+        // REQ-WPRES-022: compute requiredPairs so gating functions know which
+        // (week, day) combos have zero present slots (auto-satisfied).
+        // Mirrors planProgressProvider's requiredPairs computation so gating
+        // here stays consistent with the progress derivation.
+        final requiredPairs = <CompletedKey>{};
+        for (var w = 0; w < routine.numWeeks; w++) {
+          for (final d in routine.days) {
+            final hasPresent = d.slots.any((s) => s.isPresentInWeek(w));
+            if (hasPresent) {
+              requiredPairs.add((week: w, day: d.dayNumber));
+            }
+          }
+        }
+
         final viewedDay = day.dayNumber;
         final weekLocked = !isWeekUnlocked(
           viewedWeek,
           progress.completed,
           dayNumbers,
+          requiredPairs: requiredPairs,
         );
         final dayLocked = !isDayUnlocked(
           viewedWeek,
           viewedDay,
           progress.completed,
           dayNumbers,
+          requiredPairs: requiredPairs,
         );
         final alreadyDone =
             progress.completed.contains((week: viewedWeek, day: viewedDay));

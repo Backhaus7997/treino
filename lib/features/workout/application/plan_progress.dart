@@ -24,23 +24,31 @@ typedef PlanProgress = ({
 /// Derives a [PlanProgress] snapshot from finished sessions.
 ///
 /// Parameters:
-/// - [completed]   set of `(week, day)` pairs that have at least one finished,
-///                 fully-completed session (pre-filtered by caller).
-/// - [dayNumbers]  the 1-based dayNumbers defined in the routine's days, in
-///                 their canonical order.
-/// - [numWeeks]    total number of weeks in the plan (>= 1).
+/// - [completed]     set of `(week, day)` pairs that have at least one
+///                   finished, fully-completed session (pre-filtered by caller).
+/// - [dayNumbers]    the 1-based dayNumbers defined in the routine's days, in
+///                   their canonical order.
+/// - [numWeeks]      total number of weeks in the plan (>= 1).
+/// - [requiredPairs] optional per-week required-day grid (REQ-WPRES-022). When
+///                   provided, a `(week, day)` pair NOT in [requiredPairs] is
+///                   treated as auto-satisfied (zero present slots → nothing
+///                   to complete). When null, ALL (week, day) combinations are
+///                   required — identical to the original behavior, ensuring
+///                   full back-compat for single-week and legacy plans.
 ///
 /// Algorithm (REQ-PERIOD-031, REQ-PERIOD-032):
-/// - activeWeek = first week w in 0..numWeeks−1 where NOT all dayNumbers have
-///   a (w, day) entry in [completed]. If none found → planComplete=true,
-///   activeWeek clamped to numWeeks−1.
-/// - activeDay  = within activeWeek, first dayNumber not in completed for that
+/// - A (week, day) is "satisfied" iff `completed.contains` OR
+///   `requiredPairs != null && !requiredPairs.contains`.
+/// - activeWeek = first week w in 0..numWeeks−1 where NOT all dayNumbers are
+///   satisfied for w.
+/// - activeDay  = within activeWeek, first dayNumber not satisfied for that
 ///   week. Falls back to first dayNumber when all are done (plan-complete path).
 PlanProgress derivePlanProgress(
   Set<CompletedKey> completed,
   List<int> dayNumbers,
-  int numWeeks,
-) {
+  int numWeeks, {
+  Set<CompletedKey>? requiredPairs,
+}) {
   // Runtime guard: corrupt Firestore docs with numWeeks==0 (an explicit 0
   // bypasses the ?? 1 in generated fromJson) would otherwise produce an
   // infinite loop or wrong planComplete=true result. Treat as 1.
@@ -59,10 +67,21 @@ PlanProgress derivePlanProgress(
     );
   }
 
+  // A (week, day) is "satisfied" iff it was completed OR it is not required
+  // (absent day with zero present slots → auto-satisfied per REQ-WPRES-022).
+  // When requiredPairs is null, every pair is implicitly required (back-compat).
+  bool isSatisfied(int w, int day) {
+    if (completed.contains((week: w, day: day))) return true;
+    if (requiredPairs != null && !requiredPairs.contains((week: w, day: day))) {
+      return true; // auto-satisfied: day has zero present slots this week
+    }
+    return false;
+  }
+
   for (var w = 0; w < numWeeks; w++) {
-    // Find the first dayNumber in this week that is NOT yet completed.
+    // Find the first dayNumber in this week that is NOT yet satisfied.
     for (final day in dayNumbers) {
-      if (!completed.contains((week: w, day: day))) {
+      if (!isSatisfied(w, day)) {
         return (
           activeWeek: w,
           activeDay: day,
@@ -71,7 +90,7 @@ PlanProgress derivePlanProgress(
         );
       }
     }
-    // All days of week w are done → continue to next week.
+    // All days of week w are satisfied → continue to next week.
   }
 
   // All weeks and days are done.

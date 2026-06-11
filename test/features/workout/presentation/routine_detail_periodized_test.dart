@@ -7,6 +7,10 @@
 //
 // Strategy: override sessionsByUidProvider (String key → structural equality)
 // so planProgressProvider can compute naturally without key equality issues.
+//
+// Phase 3 additions (SCENARIO-WPRES-024..028):
+// REQ-WPRES-020 — filter slots by isPresentInWeek(viewedWeek) in detail screen
+// REQ-WPRES-015 — numWeeks==1 invariant: no filtering applied
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -358,6 +362,160 @@ void main() {
       // Day 1 is done → COMPLETADO (not EMPEZAR). CTA is below the fold.
       expect(find.text('COMPLETADO', skipOffstage: false), findsOneWidget);
       expect(find.text('EMPEZAR', skipOffstage: false), findsNothing);
+    });
+  });
+
+  // ── Phase 3: REQ-WPRES-015 / REQ-WPRES-020 — presence filter in detail ─────
+
+  group('SCENARIO-WPRES-024 — numWeeks==1 no presence filter applied', () {
+    testWidgets(
+        'SCENARIO-WPRES-024: single-week plan renders all slots, no filtering',
+        (tester) async {
+      // Slot with activeWeeks=[] (present everywhere, but single-week: must not filter)
+      final slotA = _slot(exerciseId: 'benchA', exerciseName: 'Press Banca');
+      final slotB = _slot(exerciseId: 'squat', exerciseName: 'Sentadilla');
+      final routine = _singleWeekRoutine(
+        days: [
+          _day(1, slots: [slotA, slotB])
+        ],
+      );
+      await tester.pumpWidget(_wrap(
+        RoutineDetailScreen(routineId: routine.id),
+        routine: routine,
+      ));
+      await _settle(tester);
+
+      // Both slots must render — no filtering on single-week plan
+      expect(find.byType(ExerciseSlotRow), findsNWidgets(2));
+    });
+  });
+
+  group('SCENARIO-WPRES-026..028 — presence filter in multi-week detail', () {
+    // A slot with activeWeeks == [] is present in ALL weeks (empty = all).
+    // A slot with activeWeeks == [2] is present ONLY in week index 2.
+    RoutineSlot slotPresentAllWeeks({required String exerciseId}) =>
+        RoutineSlot(
+          exerciseId: exerciseId,
+          exerciseName: 'Ejercicio $exerciseId',
+          muscleGroup: 'Pecho',
+          targetSets: 3,
+          targetRepsMin: 8,
+          targetRepsMax: 12,
+          restSeconds: 90,
+          // activeWeeks: [] (default) → present in all weeks
+        );
+
+    RoutineSlot slotPresentOnlyWeek2({required String exerciseId}) =>
+        RoutineSlot(
+          exerciseId: exerciseId,
+          exerciseName: 'Ejercicio $exerciseId',
+          muscleGroup: 'Espalda',
+          targetSets: 3,
+          targetRepsMin: 8,
+          targetRepsMax: 12,
+          restSeconds: 90,
+          activeWeeks: const [2], // only week index 2
+        );
+
+    testWidgets(
+        'SCENARIO-WPRES-026: detail shows only present slots for viewed week 0',
+        (tester) async {
+      final slotA = slotPresentAllWeeks(exerciseId: 'slotA');
+      final slotB = slotPresentOnlyWeek2(exerciseId: 'slotB');
+      // 3-week plan, day with both slots
+      final routine = Routine(
+        id: 'routine-3w-026',
+        name: 'Plan 3 semanas',
+        level: ExperienceLevel.intermediate,
+        days: [
+          RoutineDay(
+            dayNumber: 1,
+            name: 'Push',
+            slots: [slotA, slotB],
+          )
+        ],
+        numWeeks: 3,
+      );
+      await tester.pumpWidget(_wrap(
+        RoutineDetailScreen(routineId: routine.id),
+        routine: routine,
+      ));
+      await _settle(tester);
+
+      // Week 0 is selected by default. slotA (activeWeeks=[]) is present.
+      // slotB (activeWeeks=[2]) is NOT present in week 0 → must not render.
+      expect(find.byType(ExerciseSlotRow), findsOneWidget,
+          reason: 'Only slotA visible on week 0');
+    });
+
+    testWidgets('SCENARIO-WPRES-027: switching to week 2 shows both slots',
+        (tester) async {
+      final slotA = slotPresentAllWeeks(exerciseId: 'slotA');
+      final slotB = slotPresentOnlyWeek2(exerciseId: 'slotB');
+      // Use a distinct id from WPRES-026 to avoid provider cache overlap.
+      final routine = Routine(
+        id: 'routine-3w-027',
+        name: 'Plan 3 semanas',
+        level: ExperienceLevel.intermediate,
+        days: [
+          RoutineDay(
+            dayNumber: 1,
+            name: 'Push',
+            slots: [slotA, slotB],
+          )
+        ],
+        numWeeks: 3,
+      );
+      await tester.pumpWidget(_wrap(
+        RoutineDetailScreen(routineId: routine.id),
+        routine: routine,
+      ));
+      await _settle(tester);
+
+      // Scroll to and tap "SEM 3" (index 2) to switch to week 2.
+      final sem3Finder = find.text('SEM 3', skipOffstage: false);
+      await tester.ensureVisible(sem3Finder);
+      await tester.tap(sem3Finder);
+      // One pump for setState + one settle for providers.
+      await tester.pump();
+      await _settle(tester);
+
+      // Week 2 selected: both slots present (slotA=[], slotB=[2])
+      expect(find.byType(ExerciseSlotRow), findsNWidgets(2),
+          reason: 'Both slots visible on week 2');
+    });
+
+    testWidgets(
+        'SCENARIO-WPRES-028: day where all slots excluded shows info message',
+        (tester) async {
+      // A slot present ONLY in week 2
+      final slotOnlyWeek2 = slotPresentOnlyWeek2(exerciseId: 'slotOnlyW2');
+      final routine = Routine(
+        id: 'routine-3w-empty',
+        name: 'Plan 3 semanas',
+        level: ExperienceLevel.intermediate,
+        days: [
+          RoutineDay(
+            dayNumber: 1,
+            name: 'Push',
+            slots: [slotOnlyWeek2],
+          )
+        ],
+        numWeeks: 3,
+      );
+      await tester.pumpWidget(_wrap(
+        RoutineDetailScreen(routineId: routine.id),
+        routine: routine,
+      ));
+      await _settle(tester);
+
+      // Week 0 selected by default. slotOnlyWeek2 is NOT present in week 0.
+      // Filtered list is empty → must show "Sin ejercicios esta semana" message.
+      expect(find.textContaining('Sin ejercicios', skipOffstage: false),
+          findsOneWidget,
+          reason: 'Info message shown when no slots present in this week');
+      expect(find.byType(ExerciseSlotRow), findsNothing,
+          reason: 'No ExerciseSlotRow when day has zero present slots');
     });
   });
 }

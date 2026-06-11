@@ -81,9 +81,20 @@ class SessionNotifier
       weekNumber: clampedWeek,
     );
 
+    // REQ-WPRES-021 (ADR-WPRES-09): filter slots by presence BEFORE building
+    // session state so buildBlocks, isFullyCompleted, _nextIncompleteIndex,
+    // and completedExerciseCount all see only the present slots. Filtering
+    // here — not in the render — prevents completion deadlocks for absent slots.
+    // numWeeks==1 → all masks empty → presentSlots == day.slots (invariant).
+    final presentSlots = [
+      for (final s in day.slots)
+        if (s.isPresentInWeek(clampedWeek)) s
+    ];
+    final sessionDay = day.copyWith(slots: presentSlots);
+
     return SessionState(
       session: session,
-      day: day,
+      day: sessionDay,
       setLogs: const [],
       currentExerciseIndex: 0,
       elapsedSeconds: 0,
@@ -128,8 +139,16 @@ class SessionNotifier
       ),
     );
 
+    // REQ-WPRES-021 (ADR-WPRES-09): apply the same presence filter as _buildFresh
+    // so resumed sessions also see only slots present in session.weekNumber.
+    final presentSlots = [
+      for (final s in day.slots)
+        if (s.isPresentInWeek(session.weekNumber)) s
+    ];
+    final sessionDay = day.copyWith(slots: presentSlots);
+
     final currentIndex =
-        _nextIncompleteIndex(day, recoveredLogs, session.weekNumber);
+        _nextIncompleteIndex(sessionDay, recoveredLogs, session.weekNumber);
     final elapsed = DateTime.now()
         .difference(session.startedAt)
         .inSeconds
@@ -137,7 +156,7 @@ class SessionNotifier
 
     return SessionState(
       session: session,
-      day: day,
+      day: sessionDay,
       setLogs: List<SetLog>.unmodifiable(recoveredLogs),
       currentExerciseIndex: currentIndex,
       elapsedSeconds: elapsed,

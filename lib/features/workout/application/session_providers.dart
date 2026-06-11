@@ -106,7 +106,28 @@ final planProgressProvider = FutureProvider.autoDispose
       )
       .map((s) => (week: s.weekNumber, day: s.dayNumber))
       .toSet();
-  return derivePlanProgress(completed, dayNumbers, routine.numWeeks);
+
+  // REQ-WPRES-022 (ADR-WPRES-10): compute the per-week required-day grid.
+  // A (week, day) is required iff the day has ≥1 slot present in that week.
+  // An absent day (zero present slots) is NOT in requiredPairs → auto-satisfied
+  // by derivePlanProgress and the gating functions.
+  // numWeeks==1 / all-empty-mask plans → every pair is included → back-compat.
+  final requiredPairs = <CompletedKey>{};
+  for (var w = 0; w < routine.numWeeks; w++) {
+    for (final d in routine.days) {
+      final hasPresent = d.slots.any((s) => s.isPresentInWeek(w));
+      if (hasPresent) {
+        requiredPairs.add((week: w, day: d.dayNumber));
+      }
+    }
+  }
+
+  return derivePlanProgress(
+    completed,
+    dayNumbers,
+    routine.numWeeks,
+    requiredPairs: requiredPairs,
+  );
 });
 
 /// Chequeo de sesión activa al abrir /home (Decision 12).

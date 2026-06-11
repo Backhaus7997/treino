@@ -15,6 +15,7 @@ import 'package:treino/features/workout/application/session_providers.dart';
 import 'package:treino/features/workout/application/routine_providers.dart';
 import 'package:treino/features/workout/data/session_repository.dart';
 import 'package:treino/features/workout/domain/routine.dart';
+import 'package:treino/features/workout/domain/routine_slot.dart';
 import 'package:treino/features/workout/domain/set_spec.dart';
 
 import '../../../helpers/fake_analytics_service.dart';
@@ -642,6 +643,107 @@ void main() {
       // throws ArgumentError in Dart. The floor guard must prevent that.
       final persisted = await capturedWeek(requestedWeek: 5, numWeeks: 0);
       expect(persisted, equals(0));
+    });
+  });
+
+  // ── SCENARIO-WPRES-029..030: player filters by weekNumber (REQ-WPRES-021) ──
+
+  group(
+      'SCENARIO-WPRES-029..030: SessionNotifier filters slots by isPresentInWeek',
+      () {
+    test(
+        'SCENARIO-WPRES-029: _buildFresh filters out absent slot — '
+        'day.slots contains only present slot for session weekNumber',
+        () async {
+      final repo = MockSessionRepository();
+
+      // slotA: activeWeeks=[] → present in all weeks
+      // slotB: activeWeeks=[0] → present only in week 0
+      // Session is built for weekNumber=1 → slotB must be filtered out.
+      final slotA = makeSlot(exerciseId: 'slotA', targetSets: 2);
+      const slotAbsent = RoutineSlot(
+        exerciseId: 'slotB',
+        exerciseName: 'Slot Absent',
+        muscleGroup: 'Piernas',
+        targetSets: 2,
+        targetRepsMin: 8,
+        targetRepsMax: 12,
+        restSeconds: 60,
+        activeWeeks: [0], // only week 0
+      );
+      final routine = makeRoutine(
+        days: [
+          makeDay(slots: [slotA, slotAbsent])
+        ],
+        numWeeks: 2,
+      );
+      // Session with weekNumber=1
+      final session = makeSession(weekNumber: 1);
+
+      when(() => repo.create(
+            uid: any(named: 'uid'),
+            routineId: any(named: 'routineId'),
+            routineName: any(named: 'routineName'),
+            startedAt: any(named: 'startedAt'),
+            dayNumber: any(named: 'dayNumber'),
+            weekNumber: any(named: 'weekNumber'),
+          )).thenAnswer((_) async => session);
+
+      final container = _makeContainer(repo: repo, uid: 'u1', routine: routine);
+      addTearDown(container.dispose);
+
+      final init = FreshSession(
+        routineId: routine.id,
+        dayNumber: 1,
+        weekNumber: 1,
+      );
+      final state = await container.read(sessionNotifierProvider(init).future);
+
+      // Only slotA (present in week 1) must be in state.day.slots.
+      expect(state.day.slots.length, equals(1),
+          reason: 'slotB (activeWeeks=[0]) must be filtered out for week 1');
+      expect(state.day.slots.first.exerciseId, equals('slotA'));
+    });
+
+    test(
+        'SCENARIO-WPRES-030: _buildFresh with all-empty-mask passes all slots through unchanged',
+        () async {
+      final repo = MockSessionRepository();
+
+      // Both slots have activeWeeks=[] → present everywhere → no filtering
+      final slotA = makeSlot(exerciseId: 'slotA', targetSets: 2);
+      final slotB =
+          makeSlot(exerciseId: 'slotB', exerciseName: 'Curl', targetSets: 3);
+      final routine = makeRoutine(
+        days: [
+          makeDay(slots: [slotA, slotB])
+        ],
+        numWeeks: 2,
+      );
+      final session = makeSession(weekNumber: 1);
+
+      when(() => repo.create(
+            uid: any(named: 'uid'),
+            routineId: any(named: 'routineId'),
+            routineName: any(named: 'routineName'),
+            startedAt: any(named: 'startedAt'),
+            dayNumber: any(named: 'dayNumber'),
+            weekNumber: any(named: 'weekNumber'),
+          )).thenAnswer((_) async => session);
+
+      final container = _makeContainer(repo: repo, uid: 'u1', routine: routine);
+      addTearDown(container.dispose);
+
+      final init = FreshSession(
+        routineId: routine.id,
+        dayNumber: 1,
+        weekNumber: 1,
+      );
+      final state = await container.read(sessionNotifierProvider(init).future);
+
+      // Both slots have empty activeWeeks → both must be present
+      expect(state.day.slots.length, equals(2),
+          reason: 'All-empty-mask slots must all pass through');
     });
   });
 
