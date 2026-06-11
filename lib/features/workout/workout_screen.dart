@@ -50,22 +50,22 @@ class _AthleteWorkout extends StatelessWidget {
         physics: const AlwaysScrollableScrollPhysics(),
         children: const [
           MiPlanSection(),
-          SizedBox(height: 20),
+          SizedBox(height: 12),
           // Trainer-shared templates surface — invisible if the athlete has
           // no active link or the trainer hasn't opted in. Sits between
           // "Mi plan" (their assigned routine) and "Plantillas" (catalog)
           // because conceptually it's still "stuff your trainer made for
           // you", just non-assigned.
           TrainerTemplatesSection(),
-          SizedBox(height: 20),
+          SizedBox(height: 12),
           // Athlete-authored routines (athlete-self-routines SDD).
           // Belongs after TrainerTemplates because both are "my plans"
           // (trainer-sourced first, then self-made), then the public
           // catalog Plantillas, then Historial.
           MisRutinasSection(),
-          SizedBox(height: 20),
+          SizedBox(height: 12),
           PlantillasSection(),
-          SizedBox(height: 20),
+          SizedBox(height: 12),
           HistorialSection(),
         ],
       ),
