@@ -191,6 +191,10 @@ _EditableSet _editableSetFromSpec(SetSpec spec) => _EditableSet(
 
 /// Validates a single [_EditableSet] given the slot's modes.
 bool isSetValid(_EditableSet s, ExerciseMode exerciseMode, RepMode repMode) {
+  // A failure set ("al fallo") has no countable target by definition — the
+  // athlete works until failure. Reps/duration are an optional reference,
+  // never a requirement.
+  if (s.type == SetType.failure) return true;
   if (exerciseMode == ExerciseMode.duration) {
     return s.durationSeconds != null && s.durationSeconds! > 0;
   }
@@ -2847,12 +2851,14 @@ class RoutineEditorTestBridge {
   static bool isSetValidBridge({
     required ExerciseMode exerciseMode,
     required RepMode repMode,
+    SetType type = SetType.normal,
     int? reps,
     int? repsMin,
     int? repsMax,
     int? durationSeconds,
   }) {
     final s = _EditableSet(
+      type: type,
       reps: reps,
       repsMin: repsMin,
       repsMax: repsMax,
