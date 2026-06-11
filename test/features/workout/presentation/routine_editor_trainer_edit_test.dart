@@ -20,7 +20,7 @@ import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/analytics/analytics_service.dart';
-import 'package:treino/features/coach/presentation/coach_strings.dart';
+import 'package:treino/l10n/app_l10n.dart';
 import 'package:treino/features/workout/application/custom_exercise_providers.dart';
 import 'package:treino/features/workout/application/exercise_providers.dart';
 import 'package:treino/features/workout/application/routine_providers.dart'
@@ -82,6 +82,9 @@ Future<void> _pumpEditor(
       overrides: overrides,
       child: MaterialApp.router(
         theme: AppTheme.dark(),
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+        locale: const Locale('es', 'AR'),
         routerConfig: router,
       ),
     ),
@@ -200,8 +203,8 @@ void main() {
       overrides: _overrides(repo: repo),
     );
 
-    expect(find.text(CoachStrings.editorEditTitle), findsOneWidget);
-    expect(find.text(CoachStrings.editorTitle), findsNothing);
+    expect(find.text('Editar plan'), findsOneWidget);
+    expect(find.text('Crear plan'), findsNothing);
   });
 
   testWidgets(
@@ -231,7 +234,7 @@ void main() {
 
     // The form is valid: name is hydrated, split is hydrated, days is empty
     // but in trainer mode days must be non-empty. Add one slot via the CTA.
-    await tester.tap(find.text(CoachStrings.editorAddSlot));
+    await tester.tap(find.text('Agregar ejercicio'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Press de Banca').first);
     await tester.pumpAndSettle();
@@ -250,7 +253,7 @@ void main() {
 
     // Tap GUARDAR CAMBIOS.
     await tester.tap(
-        find.widgetWithText(ElevatedButton, CoachStrings.editorUpdateLabel));
+        find.widgetWithText(ElevatedButton, 'GUARDAR CAMBIOS'));
     await tester.pumpAndSettle();
 
     verify(() => repo.updateAssigned(
@@ -320,8 +323,8 @@ void main() {
       overrides: _overrides(repo: repo),
     );
 
-    expect(find.text(CoachStrings.editorEditTitle), findsOneWidget);
-    expect(find.text(CoachStrings.editorTitle), findsNothing);
+    expect(find.text('Editar plan'), findsOneWidget);
+    expect(find.text('Crear plan'), findsNothing);
   });
 
   testWidgets(
@@ -346,7 +349,7 @@ void main() {
     await tester.pump();
 
     // Add a slot so the form is valid.
-    await tester.tap(find.text(CoachStrings.editorAddSlot));
+    await tester.tap(find.text('Agregar ejercicio'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Press de Banca').first);
     await tester.pumpAndSettle();
@@ -363,7 +366,7 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.tap(
-        find.widgetWithText(ElevatedButton, CoachStrings.editorUpdateLabel));
+        find.widgetWithText(ElevatedButton, 'GUARDAR CAMBIOS'));
     await tester.pumpAndSettle();
 
     verify(() => repo.updateTemplate(
@@ -396,7 +399,7 @@ void main() {
         find.byKey(const Key('editor_split_field')), 'PPL');
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text(CoachStrings.editorAddSlot));
+    await tester.tap(find.text('Agregar ejercicio'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Press de Banca').first);
     await tester.pumpAndSettle();
@@ -413,7 +416,7 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.tap(
-        find.widgetWithText(ElevatedButton, CoachStrings.editorSubmit));
+        find.widgetWithText(ElevatedButton, 'ASIGNAR PLAN'));
     await tester.pumpAndSettle();
 
     verify(() => repo.createAssigned(any())).called(1);

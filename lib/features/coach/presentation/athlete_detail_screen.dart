@@ -25,7 +25,7 @@ import '../../workout/application/routine_providers.dart'
 import '../../workout/application/session_providers.dart'
     show currentUidProvider;
 import '../../workout/domain/routine.dart';
-import 'coach_strings.dart';
+import '../../../l10n/app_l10n.dart';
 
 /// Trainer's drill-down view for a specific athlete.
 ///
@@ -181,7 +181,7 @@ class _AthleteDetailBody extends ConsumerWidget {
               const SizedBox(height: 12),
               if (myPlans.isEmpty)
                 Text(
-                  CoachStrings.athleteDetailNoPlans,
+                  AppL10n.of(context).coachAthleteDetailNoPlans,
                   style: GoogleFonts.barlow(
                     fontWeight: FontWeight.w400,
                     fontSize: 14,
@@ -264,7 +264,7 @@ class _AthleteDetailBody extends ConsumerWidget {
                     ),
                   ),
                   child: Text(
-                    CoachStrings.createPlanCta,
+                    AppL10n.of(context).coachCreatePlanCta,
                     style: GoogleFonts.barlowCondensed(
                       fontWeight: FontWeight.w700,
                       fontSize: 14,

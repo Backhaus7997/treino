@@ -3,7 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../domain/trainer_specialty.dart';
-import '../coach_strings.dart';
+import '../../../../l10n/app_l10n.dart';
 
 /// Spanish UI labels for each [TrainerSpecialty].
 ///
@@ -59,6 +59,7 @@ class TrainerSpecialtyChips extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
@@ -69,7 +70,7 @@ class TrainerSpecialtyChips extends StatelessWidget {
           _buildChip(
             context: context,
             palette: palette,
-            label: CoachStrings.specialtyAll,
+            label: l10n.coachSpecialtyAll,
             isSelected: selected.isEmpty,
             onTap: () => onChanged(const <TrainerSpecialty>{}),
           ),

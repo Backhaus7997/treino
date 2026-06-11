@@ -2,10 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/coach/presentation/widgets/location_permission_rationale_sheet.dart';
+import 'package:treino/l10n/app_l10n.dart';
 
 Widget _wrapWithScaffold({required Future<bool> Function()? onShow}) {
   return MaterialApp(
     theme: AppTheme.dark(),
+    localizationsDelegates: AppL10n.localizationsDelegates,
+    supportedLocales: AppL10n.supportedLocales,
+    locale: const Locale('es', 'AR'),
     home: Builder(
       builder: (context) => Scaffold(
         body: Center(
@@ -67,6 +71,9 @@ void main() {
 
       await tester.pumpWidget(MaterialApp(
         theme: AppTheme.dark(),
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+        locale: const Locale('es', 'AR'),
         home: Builder(
           builder: (context) => Scaffold(
             body: ElevatedButton(
@@ -93,6 +100,9 @@ void main() {
 
       await tester.pumpWidget(MaterialApp(
         theme: AppTheme.dark(),
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+        locale: const Locale('es', 'AR'),
         home: Builder(
           builder: (context) => Scaffold(
             body: ElevatedButton(

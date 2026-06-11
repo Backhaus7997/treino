@@ -3,9 +3,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/coach/domain/trainer_public_profile.dart';
 import 'package:treino/features/coach/presentation/widgets/trainer_stats_row.dart';
+import 'package:treino/l10n/app_l10n.dart';
 
 Widget _wrap(Widget child) => MaterialApp(
       theme: AppTheme.dark(),
+      localizationsDelegates: AppL10n.localizationsDelegates,
+      supportedLocales: AppL10n.supportedLocales,
+      locale: const Locale('es', 'AR'),
       home: Scaffold(body: child),
     );
 

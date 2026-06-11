@@ -4,10 +4,10 @@ import 'package:go_router/go_router.dart';
 
 import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/treino_icon.dart';
+import '../../../l10n/app_l10n.dart';
 import '../../reviews/presentation/widgets/review_cta.dart';
 import '../../reviews/presentation/widgets/trainer_reviews_section.dart';
 import '../application/trainer_discovery_providers.dart';
-import 'coach_strings.dart';
 import 'widgets/trainer_contact_cta_stub.dart';
 import 'widgets/trainer_profile_hero.dart';
 import 'widgets/trainer_stats_row.dart';
@@ -24,6 +24,7 @@ class TrainerPublicProfileScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     final async = ref.watch(trainerByIdProvider(uid));
 
     return Scaffold(
@@ -58,7 +59,7 @@ class TrainerPublicProfileScreen extends ConsumerWidget {
               Text(
                 profile.trainerBio?.isNotEmpty == true
                     ? profile.trainerBio!
-                    : CoachStrings.profileBioEmpty,
+                    : l10n.coachProfileBioEmpty,
                 style: TextStyle(color: palette.textPrimary, fontSize: 14),
               ),
               const SizedBox(height: 16),
@@ -66,7 +67,7 @@ class TrainerPublicProfileScreen extends ConsumerWidget {
                 Row(
                   children: [
                     Text(
-                      CoachStrings.profileRateLabel,
+                      l10n.coachProfileRateLabel,
                       style: TextStyle(
                         color: palette.textMuted,
                         fontWeight: FontWeight.w600,
@@ -74,7 +75,7 @@ class TrainerPublicProfileScreen extends ConsumerWidget {
                     ),
                     const Spacer(),
                     Text(
-                      '\$${profile.trainerMonthlyRate}${CoachStrings.monthlyRateUnit}',
+                      '\$${profile.trainerMonthlyRate}${l10n.coachMonthlyRateUnit}',
                       style: TextStyle(
                         color: palette.textPrimary,
                         fontWeight: FontWeight.w700,
@@ -101,6 +102,7 @@ class _NotFoundState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     return Padding(
       padding: const EdgeInsets.all(24),
       child: Center(
@@ -108,7 +110,7 @@ class _NotFoundState extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              CoachStrings.profileNotFoundLabel,
+              l10n.coachProfileNotFoundLabel,
               style: TextStyle(color: palette.textMuted),
             ),
             const SizedBox(height: 12),
@@ -130,6 +132,7 @@ class _ErrorState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     return Padding(
       padding: const EdgeInsets.all(24),
       child: Center(
@@ -137,13 +140,13 @@ class _ErrorState extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              CoachStrings.profileErrorLabel,
+              l10n.coachProfileErrorLabel,
               style: TextStyle(color: palette.textMuted),
             ),
             const SizedBox(height: 12),
             TextButton(
               onPressed: onRetry,
-              child: const Text(CoachStrings.retryLabel),
+              child: Text(l10n.coachRetryLabel),
             ),
           ],
         ),

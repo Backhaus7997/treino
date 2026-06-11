@@ -349,6 +349,294 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Cerrar sesión'**
   String get authProfileSignOut;
+
+  /// No description provided for @coachAppBarTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Entrenadores'**
+  String get coachAppBarTitle;
+
+  /// No description provided for @coachLoadingLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cargando entrenadores…'**
+  String get coachLoadingLabel;
+
+  /// No description provided for @coachErrorLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cargar los entrenadores.'**
+  String get coachErrorLabel;
+
+  /// No description provided for @coachRetryLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Reintentar'**
+  String get coachRetryLabel;
+
+  /// No description provided for @coachEmptyLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No encontramos entrenadores en tu zona.'**
+  String get coachEmptyLabel;
+
+  /// No description provided for @coachMapToggleLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Mapa'**
+  String get coachMapToggleLabel;
+
+  /// No description provided for @coachMapProximamente.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Próximamente'**
+  String get coachMapProximamente;
+
+  /// No description provided for @coachDistanceUnknown.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'—'**
+  String get coachDistanceUnknown;
+
+  /// No description provided for @coachMonthlyRateUnit.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'/mes'**
+  String get coachMonthlyRateUnit;
+
+  /// No description provided for @coachSpecialtyAll.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Todos'**
+  String get coachSpecialtyAll;
+
+  /// No description provided for @coachStatsReviewsLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'RESEÑAS'**
+  String get coachStatsReviewsLabel;
+
+  /// No description provided for @coachStatsExperienceLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'AÑOS EXP'**
+  String get coachStatsExperienceLabel;
+
+  /// No description provided for @coachStatsStudentsLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ALUMNOS'**
+  String get coachStatsStudentsLabel;
+
+  /// No description provided for @coachStatsPlaceholder.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'—'**
+  String get coachStatsPlaceholder;
+
+  /// No description provided for @coachProfileLoadingLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cargando perfil…'**
+  String get coachProfileLoadingLabel;
+
+  /// No description provided for @coachProfileErrorLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cargar este perfil.'**
+  String get coachProfileErrorLabel;
+
+  /// No description provided for @coachProfileNotFoundLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Entrenador no encontrado.'**
+  String get coachProfileNotFoundLabel;
+
+  /// No description provided for @coachProfileBioEmpty.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Sin descripción.'**
+  String get coachProfileBioEmpty;
+
+  /// No description provided for @coachProfileRateLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tarifa mensual'**
+  String get coachProfileRateLabel;
+
+  /// No description provided for @coachCtaLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'PEDIR VÍNCULO'**
+  String get coachCtaLabel;
+
+  /// No description provided for @coachCtaProximamente.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Próximamente — Etapa 3'**
+  String get coachCtaProximamente;
+
+  /// No description provided for @coachLocationSheetTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Permitir ubicación'**
+  String get coachLocationSheetTitle;
+
+  /// No description provided for @coachLocationSheetBody.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'TREINO usa tu ubicación para mostrarte entrenadores cerca tuyo. Tu ubicación no es visible para otros usuarios.'**
+  String get coachLocationSheetBody;
+
+  /// No description provided for @coachLocationSheetAccept.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ACEPTAR'**
+  String get coachLocationSheetAccept;
+
+  /// No description provided for @coachLocationSheetDeny.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ahora no'**
+  String get coachLocationSheetDeny;
+
+  /// No description provided for @coachMiPlanTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'MI PLAN'**
+  String get coachMiPlanTitle;
+
+  /// No description provided for @coachMiPlanEmpty.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No tenés rutina asignada todavía.'**
+  String get coachMiPlanEmpty;
+
+  /// No description provided for @coachMiPlanError.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Error al cargar tu plan.'**
+  String get coachMiPlanError;
+
+  /// No description provided for @coachMiPlanFinalizado.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Plan finalizado'**
+  String get coachMiPlanFinalizado;
+
+  /// No description provided for @coachMiPlanCurrent.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Actual'**
+  String get coachMiPlanCurrent;
+
+  /// No description provided for @coachAssignedByPrefix.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Asignado por '**
+  String get coachAssignedByPrefix;
+
+  /// No description provided for @coachAssignedByLoading.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Asignado por …'**
+  String get coachAssignedByLoading;
+
+  /// No description provided for @coachAssignedByError.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Asignado por un PF'**
+  String get coachAssignedByError;
+
+  /// No description provided for @coachCreatePlanCta.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CREAR PLAN'**
+  String get coachCreatePlanCta;
+
+  /// No description provided for @coachCreatePlanSuccess.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Plan creado y asignado.'**
+  String get coachCreatePlanSuccess;
+
+  /// No description provided for @coachCreatePlanError.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos crear el plan. Intentá de nuevo.'**
+  String get coachCreatePlanError;
+
+  /// No description provided for @coachAthleteDetailNoPlans.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Todavía no le asignaste planes.'**
+  String get coachAthleteDetailNoPlans;
+
+  /// No description provided for @coachEditorTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Crear plan'**
+  String get coachEditorTitle;
+
+  /// No description provided for @coachEditorEditTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Editar plan'**
+  String get coachEditorEditTitle;
+
+  /// No description provided for @coachEditorNameLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'NOMBRE'**
+  String get coachEditorNameLabel;
+
+  /// No description provided for @coachEditorSplitLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'SPLIT (e.g. PPL)'**
+  String get coachEditorSplitLabel;
+
+  /// No description provided for @coachEditorAddDay.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Agregar día'**
+  String get coachEditorAddDay;
+
+  /// No description provided for @coachEditorAddSlot.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Agregar ejercicio'**
+  String get coachEditorAddSlot;
+
+  /// No description provided for @coachEditorAddSuperset.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'+ Superserie'**
+  String get coachEditorAddSuperset;
+
+  /// No description provided for @coachEditorSubmit.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ASIGNAR PLAN'**
+  String get coachEditorSubmit;
+
+  /// No description provided for @coachEditorUpdateLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'GUARDAR CAMBIOS'**
+  String get coachEditorUpdateLabel;
+
+  /// No description provided for @coachUpdatePlanSuccess.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Plan actualizado.'**
+  String get coachUpdatePlanSuccess;
+
+  /// No description provided for @coachExercisePicker.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Buscar ejercicio'**
+  String get coachExercisePicker;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

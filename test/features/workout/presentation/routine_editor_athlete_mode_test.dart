@@ -9,7 +9,7 @@ import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/analytics/analytics_service.dart';
-import 'package:treino/features/coach/presentation/coach_strings.dart';
+import 'package:treino/l10n/app_l10n.dart';
 import 'package:treino/features/workout/application/custom_exercise_providers.dart';
 import 'package:treino/features/workout/application/exercise_providers.dart';
 import 'package:treino/features/workout/application/routine_providers.dart'
@@ -77,6 +77,9 @@ Future<void> _pumpEditor(
       overrides: overrides,
       child: MaterialApp.router(
         theme: AppTheme.dark(),
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+        locale: const Locale('es', 'AR'),
         routerConfig: router,
       ),
     ),
@@ -288,7 +291,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // Add exercises via the add-slot button in Day 1
-    await tester.tap(find.text(CoachStrings.editorAddSlot));
+    await tester.tap(find.text('Agregar ejercicio'));
     await tester.pumpAndSettle();
 
     // Picker should have opened — tap on first exercise then the CTA
@@ -421,7 +424,7 @@ void main() {
 
     // Name field is hydrated — still need to add a slot for valid form.
     // Tap + Agregar ejercicio to add a slot.
-    await tester.tap(find.text(CoachStrings.editorAddSlot));
+    await tester.tap(find.text('Agregar ejercicio'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Press de Banca').first);
     await tester.pumpAndSettle();

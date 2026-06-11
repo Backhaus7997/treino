@@ -8,7 +8,7 @@ import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/widgets/treino_bottom_bar.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
-import 'package:treino/features/coach/presentation/coach_strings.dart';
+import 'package:treino/l10n/app_l10n.dart';
 import 'package:treino/features/profile/domain/experience_level.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
@@ -71,6 +71,9 @@ Widget _wrapWorkout(Widget w, {List<Override> overrides = const []}) =>
       ],
       child: MaterialApp(
         theme: AppTheme.dark(),
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+        locale: const Locale('es', 'AR'),
         home: Scaffold(
           body: SizedBox(
             height: 800,
@@ -233,7 +236,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 50));
 
       expect(
-        find.text(CoachStrings.miPlanEmpty),
+        find.text('No tenés rutina asignada todavía.'),
         findsOneWidget,
       );
     });

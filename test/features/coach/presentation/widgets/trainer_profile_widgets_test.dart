@@ -9,12 +9,16 @@ import 'package:treino/features/coach/presentation/widgets/trainer_contact_cta_s
 import 'package:treino/features/coach/presentation/widgets/trainer_profile_hero.dart';
 import 'package:treino/features/coach/presentation/widgets/trainer_stats_row.dart';
 import 'package:treino/features/feed/presentation/widgets/post_avatar.dart';
+import 'package:treino/l10n/app_l10n.dart';
 
 Widget _wrap(Widget child, {List<Override> overrides = const []}) =>
     ProviderScope(
       overrides: overrides,
       child: MaterialApp(
         theme: AppTheme.dark(),
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+        locale: const Locale('es', 'AR'),
         home: Scaffold(body: child),
       ),
     );
