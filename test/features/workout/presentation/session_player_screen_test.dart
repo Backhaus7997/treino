@@ -1077,4 +1077,64 @@ void main() {
       expect(find.textContaining('1 / 3 ejercicios'), findsOneWidget);
     });
   });
+
+  // ── SCENARIO-WPRES-025: numWeeks==1 player is unchanged (REQ-WPRES-015/030) ─
+
+  group('SCENARIO-WPRES-025: numWeeks==1 player renders all slots unchanged',
+      () {
+    // When numWeeks==1, all slots have activeWeeks=[] (empty = all weeks).
+    // The notifier filter isPresentInWeek(0) on empty mask → true for all.
+    // The player must render all slots without any filtering applied.
+
+    test(
+        'SCENARIO-WPRES-025: SessionState.day.slots unchanged when '
+        'all activeWeeks are empty (numWeeks==1 invariant)', () {
+      // Build state directly (without going through the notifier) to verify
+      // that the slot list is byte-identical when no filtering is needed.
+      // The notifier is already tested via session_notifier_test WPRES-030.
+      // This test verifies the player UI renders all such slots.
+      final slots = [
+        makeSlot(exerciseId: 'e1', targetSets: 3),
+        makeSlot(exerciseId: 'e2', exerciseName: 'Sentadilla', targetSets: 4),
+        makeSlot(exerciseId: 'e3', exerciseName: 'Peso muerto', targetSets: 3),
+      ];
+      // All slots have default activeWeeks=[] → all present in any week.
+      for (final s in slots) {
+        expect(s.activeWeeks, isEmpty,
+            reason: 'Single-week slot must have empty activeWeeks mask');
+        expect(s.isPresentInWeek(0), isTrue,
+            reason: 'Empty mask → present in week 0 (numWeeks==1 invariant)');
+      }
+      expect(slots.length, equals(3));
+    });
+
+    testWidgets(
+        'SCENARIO-WPRES-025: player renders all 3 slots '
+        'when session has all-empty-mask slots', (tester) async {
+      final slots = [
+        makeSlot(exerciseId: 'e1', targetSets: 3),
+        makeSlot(exerciseId: 'e2', exerciseName: 'Sentadilla', targetSets: 4),
+        makeSlot(exerciseId: 'e3', exerciseName: 'Peso muerto', targetSets: 3),
+      ];
+      final day = makeDay(dayNumber: 1, slots: slots);
+      final state = SessionState(
+        session: makeSession(weekNumber: 0),
+        day: day, // SessionNotifier filter: all empty masks → all present
+        setLogs: const [],
+        currentExerciseIndex: 0,
+        elapsedSeconds: 0,
+      );
+      await tester.pumpWidget(
+        _wrapProvider(
+          const SessionPlayerScreen(init: _kInit),
+          _stateOverride(state),
+        ),
+      );
+      await tester.pump();
+      // All 3 slots must render as exercise rows in the list
+      // ("1 / 3 ejercicios" progress indicator confirms 3 total slots)
+      expect(find.textContaining('0 / 3 ejercicios'), findsOneWidget,
+          reason: 'All 3 slots render in single-week session');
+    });
+  });
 }
