@@ -159,8 +159,25 @@ class _RoutineDetailContent extends ConsumerWidget {
   int _totalSets(RoutineDay d) =>
       d.slots.fold(0, (sum, s) => sum + s.targetSets);
 
-  String? _minutesValue(RoutineDay d) =>
-      d.estimatedMinutes != null ? '${d.estimatedMinutes}' : null;
+  /// Authored estimate when present; otherwise a rough computed one so the
+  /// stat isn't a dead "—" for athlete/trainer routines (device feedback
+  /// 2026-06-11). Per set: work time (duration as-is, or ~3s/rep for rep
+  /// sets) + the slot's rest. Prefixed "~" to read as an estimate.
+  String _minutesValue(RoutineDay d, int week) {
+    if (d.estimatedMinutes != null) return '${d.estimatedMinutes}';
+    var seconds = 0;
+    for (final slot in d.slots) {
+      if (!slot.isPresentInWeek(week)) continue;
+      for (final s in slot.effectiveSetsForWeek(week)) {
+        final work = (s.durationSeconds != null && s.durationSeconds! > 0)
+            ? s.durationSeconds!
+            : (s.reps ?? s.repsMax ?? s.repsMin ?? 12) * 3;
+        seconds += work + slot.restSeconds;
+      }
+    }
+    if (seconds <= 0) return '—';
+    return '~${(seconds / 60).round()}';
+  }
 
   /// Walks [day.slots] and emits either a standalone [ExerciseSlotRow] or a
   /// magenta "SUPERSERIE" block wrapping consecutive slots that share the same
@@ -279,7 +296,7 @@ class _RoutineDetailContent extends ConsumerWidget {
                   ),
                   StatTile(
                     label: 'MINUTOS',
-                    value: _minutesValue(day),
+                    value: _minutesValue(day, selectedWeekIndex),
                   ),
                 ],
               ),

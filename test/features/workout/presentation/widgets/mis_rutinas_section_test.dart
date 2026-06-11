@@ -238,16 +238,16 @@ void main() {
       await tester.pumpAndSettle();
 
       // Tap ARCHIVAR
-      final archiveItem = find.text('ARCHIVAR');
+      final archiveItem = find.text('ELIMINAR');
       expect(archiveItem, findsOneWidget);
       await tester.tap(archiveItem);
       await tester.pumpAndSettle();
 
       // Confirmation dialog appears
-      expect(find.text('Archivar rutina'), findsOneWidget);
+      expect(find.text('Eliminar rutina'), findsOneWidget);
 
       // Tap confirm ARCHIVAR in dialog
-      final confirmButton = find.widgetWithText(TextButton, 'ARCHIVAR');
+      final confirmButton = find.widgetWithText(TextButton, 'ELIMINAR');
       expect(confirmButton, findsOneWidget);
       await tester.tap(confirmButton);
       await tester.pumpAndSettle();
@@ -281,12 +281,12 @@ void main() {
       await tester.tap(moreButton);
       await tester.pumpAndSettle();
 
-      final archiveItem = find.text('ARCHIVAR');
+      final archiveItem = find.text('ELIMINAR');
       expect(archiveItem, findsOneWidget);
       await tester.tap(archiveItem);
       await tester.pumpAndSettle();
 
-      expect(find.text('Archivar rutina'), findsOneWidget);
+      expect(find.text('Eliminar rutina'), findsOneWidget);
 
       // Tap CANCELAR
       final cancelButton = find.widgetWithText(TextButton, 'CANCELAR');

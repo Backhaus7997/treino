@@ -90,15 +90,17 @@ abstract final class WorkoutStrings {
   static const misRutinasError = 'No pudimos cargar tus rutinas.';
   static const misRutinasErrorRetry = 'Reintentar';
   static const misRutinasOverflowEdit = 'EDITAR';
-  static const misRutinasOverflowArchive = 'ARCHIVAR';
-  static const misRutinasConfirmTitle = 'Archivar rutina';
+  // "Eliminar" en la UI; por debajo sigue siendo un soft-delete (archive)
+  // para preservar las referencias del historial de sesiones (ADR-USR-04).
+  static const misRutinasOverflowArchive = 'ELIMINAR';
+  static const misRutinasConfirmTitle = 'Eliminar rutina';
   static const misRutinasConfirmBody =
       'La rutina dejará de aparecer en MIS RUTINAS. Tu historial se conserva.';
   static const misRutinasConfirmCancel = 'CANCELAR';
-  static const misRutinasConfirmConfirm = 'ARCHIVAR';
-  static const misRutinasArchiveSuccess = 'Rutina archivada';
+  static const misRutinasConfirmConfirm = 'ELIMINAR';
+  static const misRutinasArchiveSuccess = 'Rutina eliminada';
   static const misRutinasArchiveError =
-      'No pudimos archivar la rutina. Reintentá.';
+      'No pudimos eliminar la rutina. Reintentá.';
 
   // ── REQ-RER-014: nullable split fallback (ADR-RER-04) ──────────────────────
   /// Displayed when [Routine.split] is null. Display sites call `.toUpperCase()`

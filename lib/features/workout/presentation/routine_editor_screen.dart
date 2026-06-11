@@ -1217,108 +1217,54 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
       final hiddenInvalidWeeks =
           invalidWeeks.keys.where((w) => w != _selectedWeek).toList()..sort();
       return Scaffold(
-        body: AppBackground(
-          child: SafeArea(
-            child: Column(
-              children: [
-                // ── Custom header ────────────────────────────────────────
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(8, 8, 20, 0),
-                  child: Row(
-                    children: [
-                      IconButton(
-                        icon: Icon(TreinoIcon.back, color: palette.textPrimary),
-                        onPressed: () => context.canPop()
-                            ? context.pop()
-                            : context.go(widget.mode is SelfCreating
-                                ? '/workout'
-                                : '/coach'),
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        _titleFor(widget.mode),
-                        style: GoogleFonts.barlowCondensed(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 20,
-                          color: palette.textPrimary,
+        // Tapping anywhere outside a field dismisses the keyboard (device UX
+        // 2026-06-11). translucent → child widgets still receive their taps.
+        body: GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+          child: AppBackground(
+            child: SafeArea(
+              child: Column(
+                children: [
+                  // ── Custom header ────────────────────────────────────────
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(8, 8, 20, 0),
+                    child: Row(
+                      children: [
+                        IconButton(
+                          icon:
+                              Icon(TreinoIcon.back, color: palette.textPrimary),
+                          onPressed: () => context.canPop()
+                              ? context.pop()
+                              : context.go(widget.mode is SelfCreating
+                                  ? '/workout'
+                                  : '/coach'),
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // ── Body ─────────────────────────────────────────────────
-                Expanded(
-                  child: ListView(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                    children: [
-                      // ── Name + (Split when trainer mode) ───────────────
-                      // T-RER-030: athlete (SelfCreating) form shows only
-                      // Name + Days-of-plan. Trainer modes show all fields.
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                _SectionLabel(
-                                  label: CoachStrings.editorNameLabel,
-                                  palette: palette,
-                                ),
-                                const SizedBox(height: 4),
-                                TextField(
-                                  key: const Key('editor_name_field'),
-                                  controller: _nameController,
-                                  style: GoogleFonts.barlow(
-                                    color: palette.textPrimary,
-                                    fontSize: 13,
-                                  ),
-                                  decoration: _inputDecoration(
-                                    palette,
-                                    hint: _isTrainerMode
-                                        ? 'Ej: Fuerza PPL'
-                                        : WorkoutStrings.selfEditorNameHint,
-                                  ),
-                                  onChanged: (_) => setState(() {}),
-                                ),
-                              ],
-                            ),
+                        const SizedBox(width: 4),
+                        Text(
+                          _titleFor(widget.mode),
+                          style: GoogleFonts.barlowCondensed(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 20,
+                            color: palette.textPrimary,
                           ),
-                          if (_isTrainerMode) ...[
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  _SectionLabel(
-                                    label: CoachStrings.editorSplitLabel,
-                                    palette: palette,
-                                  ),
-                                  const SizedBox(height: 4),
-                                  TextField(
-                                    key: const Key('editor_split_field'),
-                                    controller: _splitController,
-                                    style: GoogleFonts.barlow(
-                                      color: palette.textPrimary,
-                                      fontSize: 13,
-                                    ),
-                                    decoration: _inputDecoration(
-                                      palette,
-                                      hint: 'PPL / Full Body',
-                                    ),
-                                    onChanged: (_) => setState(() {}),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
+                        ),
+                      ],
+                    ),
+                  ),
 
-                      // ── Row: Level — trainer modes only ─────────────────
-                      if (_isTrainerMode) ...[
-                        const SizedBox(height: 8),
+                  // ── Body ─────────────────────────────────────────────────
+                  Expanded(
+                    child: ListView(
+                      // Dragging the list dismisses the keyboard (device UX
+                      // 2026-06-11).
+                      keyboardDismissBehavior:
+                          ScrollViewKeyboardDismissBehavior.onDrag,
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                      children: [
+                        // ── Name + (Split when trainer mode) ───────────────
+                        // T-RER-030: athlete (SelfCreating) form shows only
+                        // Name + Days-of-plan. Trainer modes show all fields.
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -1327,151 +1273,218 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   _SectionLabel(
-                                      label: 'NIVEL', palette: palette),
-                                  const SizedBox(height: 4),
-                                  _LevelDropdown(
-                                    value: _level,
+                                    label: CoachStrings.editorNameLabel,
                                     palette: palette,
-                                    onChanged: (v) {
-                                      if (v != null) {
-                                        setState(() => _level = v);
-                                      }
-                                    },
+                                  ),
+                                  const SizedBox(height: 4),
+                                  TextField(
+                                    key: const Key('editor_name_field'),
+                                    controller: _nameController,
+                                    style: GoogleFonts.barlow(
+                                      color: palette.textPrimary,
+                                      fontSize: 13,
+                                    ),
+                                    decoration: _inputDecoration(
+                                      palette,
+                                      hint: _isTrainerMode
+                                          ? 'Ej: Fuerza PPL'
+                                          : WorkoutStrings.selfEditorNameHint,
+                                    ),
+                                    onChanged: (_) => setState(() {}),
                                   ),
                                 ],
                               ),
                             ),
+                            if (_isTrainerMode) ...[
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    _SectionLabel(
+                                      label: CoachStrings.editorSplitLabel,
+                                      palette: palette,
+                                    ),
+                                    const SizedBox(height: 4),
+                                    TextField(
+                                      key: const Key('editor_split_field'),
+                                      controller: _splitController,
+                                      style: GoogleFonts.barlow(
+                                        color: palette.textPrimary,
+                                        fontSize: 13,
+                                      ),
+                                      decoration: _inputDecoration(
+                                        palette,
+                                        hint: 'PPL / Full Body',
+                                      ),
+                                      onChanged: (_) => setState(() {}),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ],
                         ),
-                      ],
-                      const SizedBox(height: 12),
 
-                      // ── Semanas del plan ────────────────────────────────
-                      // Week state machine — REQ-PERIOD-010..014. The chips
-                      // switch the week every slot editor renders (live-view).
-                      _SectionLabel(label: 'SEMANAS', palette: palette),
-                      const SizedBox(height: 6),
-                      _WeekTabBar(
-                        numWeeks: _numWeeks,
-                        selectedWeek: _selectedWeek,
-                        maxWeeks: _kMaxWeeks,
-                        warningWeeks: hiddenInvalidWeeks.toSet(),
-                        palette: palette,
-                        onSelectWeek: (w) {
-                          // Drop focus BEFORE swapping the week's field tree:
-                          // on-device the iOS IME can restore its editing
-                          // session into the replacement TextField and bleed
-                          // the previous week's value into the new week
-                          // (not reproducible in widget tests — no real IME).
-                          FocusManager.instance.primaryFocus?.unfocus();
-                          setState(() => _selectedWeek = w);
-                        },
-                        onAddWeek: _addWeek,
-                        onRemoveLastWeek: _removeLastWeek,
-                        onDuplicateWeek: () => _duplicateWeek(),
-                      ),
-                      if (hiddenInvalidWeeks.isNotEmpty) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          'Sets incompletos en Sem '
-                          '${hiddenInvalidWeeks.first + 1} · Día '
-                          '${invalidWeeks[hiddenInvalidWeeks.first]}',
-                          key: const Key('invalid_week_hint'),
-                          style: GoogleFonts.barlow(
-                            fontSize: 11,
-                            color: palette.danger,
+                        // ── Row: Level — trainer modes only ─────────────────
+                        if (_isTrainerMode) ...[
+                          const SizedBox(height: 8),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    _SectionLabel(
+                                        label: 'NIVEL', palette: palette),
+                                    const SizedBox(height: 4),
+                                    _LevelDropdown(
+                                      value: _level,
+                                      palette: palette,
+                                      onChanged: (v) {
+                                        if (v != null) {
+                                          setState(() => _level = v);
+                                        }
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                      ],
-                      const SizedBox(height: 12),
+                        ],
+                        const SizedBox(height: 12),
 
-                      // ── Días del plan ───────────────────────────────────
-                      _SectionLabel(label: 'DÍAS DEL PLAN', palette: palette),
-                      const SizedBox(height: 6),
-
-                      for (int di = 0; di < _days.length; di++) ...[
-                        _DayExpansionTile(
-                          day: _days[di],
-                          week: _selectedWeek,
-                          palette: palette,
-                          onAddSlot: () => _pickExercisesForDay(context, di),
-                          onRemoveSlot: (si) => _onDeleteSlot(context, di, si),
-                          onReorderSlots: (newOrder) =>
-                              _reorderSlots(di, newOrder),
-                          onRemoveDay:
-                              _days.length > 1 ? () => _removeDay(di) : null,
-                          onSlotChanged: () => setState(() {}),
-                          onAddToGroup: (g) =>
-                              _addExerciseToGroup(context, di, g),
-                          onReplaceExercise: (slot, ex) =>
-                              _replaceExercise(slot, ex),
-                          onMoveSlotInGroup: (absIndex, dir) =>
-                              _moveSlotWithinGroup(di, absIndex, dir),
-                          // Supersets available in every mode, including the
-                          // athlete's SelfCreating editor.
-                          allowSuperset: true,
-                          onAddSuperset: () => _addSupersetForDay(context, di),
-                        ),
+                        // ── Semanas del plan ────────────────────────────────
+                        // Week state machine — REQ-PERIOD-010..014. The chips
+                        // switch the week every slot editor renders (live-view).
+                        _SectionLabel(label: 'SEMANAS', palette: palette),
                         const SizedBox(height: 6),
-                      ],
+                        _WeekTabBar(
+                          numWeeks: _numWeeks,
+                          selectedWeek: _selectedWeek,
+                          maxWeeks: _kMaxWeeks,
+                          warningWeeks: hiddenInvalidWeeks.toSet(),
+                          palette: palette,
+                          onSelectWeek: (w) {
+                            // Drop focus BEFORE swapping the week's field tree:
+                            // on-device the iOS IME can restore its editing
+                            // session into the replacement TextField and bleed
+                            // the previous week's value into the new week
+                            // (not reproducible in widget tests — no real IME).
+                            FocusManager.instance.primaryFocus?.unfocus();
+                            setState(() => _selectedWeek = w);
+                          },
+                          onAddWeek: _addWeek,
+                          onRemoveLastWeek: _removeLastWeek,
+                          onDuplicateWeek: () => _duplicateWeek(),
+                        ),
+                        if (hiddenInvalidWeeks.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            'Sets incompletos en Sem '
+                            '${hiddenInvalidWeeks.first + 1} · Día '
+                            '${invalidWeeks[hiddenInvalidWeeks.first]}',
+                            key: const Key('invalid_week_hint'),
+                            style: GoogleFonts.barlow(
+                              fontSize: 11,
+                              color: palette.danger,
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 12),
 
-                      // Add day button
-                      TextButton.icon(
-                        onPressed: _addDay,
-                        icon: Icon(TreinoIcon.plus,
-                            size: 14, color: palette.accent),
-                        label: Text(
-                          CoachStrings.editorAddDay,
-                          style: GoogleFonts.barlowCondensed(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 12,
-                            color: palette.accent,
+                        // ── Días del plan ───────────────────────────────────
+                        _SectionLabel(label: 'DÍAS DEL PLAN', palette: palette),
+                        const SizedBox(height: 6),
+
+                        for (int di = 0; di < _days.length; di++) ...[
+                          _DayExpansionTile(
+                            day: _days[di],
+                            week: _selectedWeek,
+                            palette: palette,
+                            onAddSlot: () => _pickExercisesForDay(context, di),
+                            onRemoveSlot: (si) =>
+                                _onDeleteSlot(context, di, si),
+                            onReorderSlots: (newOrder) =>
+                                _reorderSlots(di, newOrder),
+                            onRemoveDay:
+                                _days.length > 1 ? () => _removeDay(di) : null,
+                            onSlotChanged: () => setState(() {}),
+                            onAddToGroup: (g) =>
+                                _addExerciseToGroup(context, di, g),
+                            onReplaceExercise: (slot, ex) =>
+                                _replaceExercise(slot, ex),
+                            onMoveSlotInGroup: (absIndex, dir) =>
+                                _moveSlotWithinGroup(di, absIndex, dir),
+                            // Supersets available in every mode, including the
+                            // athlete's SelfCreating editor.
+                            allowSuperset: true,
+                            onAddSuperset: () =>
+                                _addSupersetForDay(context, di),
+                          ),
+                          const SizedBox(height: 6),
+                        ],
+
+                        // Add day button
+                        TextButton.icon(
+                          onPressed: _addDay,
+                          icon: Icon(TreinoIcon.plus,
+                              size: 14, color: palette.accent),
+                          label: Text(
+                            CoachStrings.editorAddDay,
+                            style: GoogleFonts.barlowCondensed(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 12,
+                              color: palette.accent,
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 4),
-                    ],
-                  ),
-                ),
-
-                // ── Submit button — pinned outside ListView ───────────────
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed:
-                          (_isValid && !_submitting) ? () => _submit() : null,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: palette.accent,
-                        foregroundColor: palette.bg,
-                        disabledBackgroundColor: palette.accent.withAlpha(80),
-                        minimumSize: const Size.fromHeight(48),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(9999),
-                        ),
-                      ),
-                      child: _submitting
-                          ? SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: palette.bg,
-                              ),
-                            )
-                          : Text(
-                              _submitLabelFor(widget.mode),
-                              style: GoogleFonts.barlowCondensed(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 14,
-                                letterSpacing: 0.8,
-                              ),
-                            ),
+                        const SizedBox(height: 4),
+                      ],
                     ),
                   ),
-                ),
-              ],
+
+                  // ── Submit button — pinned outside ListView ───────────────
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed:
+                            (_isValid && !_submitting) ? () => _submit() : null,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: palette.accent,
+                          foregroundColor: palette.bg,
+                          disabledBackgroundColor: palette.accent.withAlpha(80),
+                          minimumSize: const Size.fromHeight(48),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(9999),
+                          ),
+                        ),
+                        child: _submitting
+                            ? SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: palette.bg,
+                                ),
+                              )
+                            : Text(
+                                _submitLabelFor(widget.mode),
+                                style: GoogleFonts.barlowCondensed(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14,
+                                  letterSpacing: 0.8,
+                                ),
+                              ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

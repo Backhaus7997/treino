@@ -115,4 +115,69 @@ void main() {
     expect(find.text('BENCH PRESS'), findsWidgets,
         reason: 'screen content must be visible after the push');
   });
+
+  testWidgets(
+      'iOS: pushing /workout/exercise/:id FROM a top-level editor route '
+      'renders content (device black-screen repro)', (tester) async {
+    // The device repro: open the exercise detail from the picker sheet inside
+    // the routine editor — a TOP-LEVEL route outside the ShellRoute. Pushing a
+    // shell sub-route from there mounts the shell (_noAnim) while the child
+    // page runs a Cupertino transition with no /workout page beneath it.
+    final container = ProviderContainer(
+      overrides: [
+        authNotifierProvider.overrideWith(
+          () => _StubAuthNotifier(AsyncData(_MockUser())),
+        ),
+        userProfileProvider.overrideWith(
+          (ref) => Stream<UserProfile?>.value(_athleteProfile()),
+        ),
+        authStateChangesProvider.overrideWith((_) => Stream.value(null)),
+        exercisesProvider.overrideWith(
+          (_) async => const [
+            Exercise(
+              id: 'bench-press',
+              name: 'Bench Press',
+              muscleGroup: 'chest',
+              category: 'compound',
+            ),
+          ],
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+    await container.read(authNotifierProvider.future);
+    await container.read(userProfileProvider.future);
+
+    final router = buildRouter(
+      refreshListenable: ValueNotifier<int>(0),
+      read: container.read,
+    );
+    // Start on the TOP-LEVEL editor route (outside the shell), like the video.
+    router.go('/workout/my-routine-editor');
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp.router(
+          theme: AppTheme.dark().copyWith(platform: TargetPlatform.iOS),
+          localizationsDelegates: AppL10n.localizationsDelegates,
+          supportedLocales: AppL10n.supportedLocales,
+          routerConfig: router,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    router.push('/workout/exercise/bench-press');
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull,
+        reason: 'pushing from a top-level route must not throw');
+    expect(find.byType(ExerciseDetailScreen), findsOneWidget,
+        reason: 'the detail screen must mount when pushed from the editor');
+    expect(find.text('BENCH PRESS'), findsWidgets,
+        reason: 'detail content must be visible — not a black screen');
+  });
 }
