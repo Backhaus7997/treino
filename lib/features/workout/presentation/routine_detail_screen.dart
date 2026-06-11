@@ -262,7 +262,8 @@ class _RoutineDetailContent extends ConsumerWidget {
           ),
         ),
         SliverPadding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
+          padding: EdgeInsets.fromLTRB(
+              20, 0, 20, MediaQuery.paddingOf(context).bottom),
           sliver: SliverList(
             delegate: SliverChildListDelegate([
               const SizedBox(height: 20),

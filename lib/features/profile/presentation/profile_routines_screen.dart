@@ -92,10 +92,8 @@ class ProfileRoutinesScreen extends ConsumerWidget {
               }
 
               return ListView.separated(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 14,
-                ),
+                padding: EdgeInsets.fromLTRB(
+                    20, 14, 20, 14 + MediaQuery.paddingOf(context).bottom),
                 itemCount: routines.length,
                 separatorBuilder: (_, __) => const SizedBox(height: 12),
                 itemBuilder: (_, i) => RoutineCard(routine: routines[i]),

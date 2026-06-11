@@ -110,7 +110,8 @@ class _ProfileGymScreenState extends ConsumerState<ProfileGymScreen> {
         // Gym list
         Expanded(
           child: ListView.separated(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
+            padding: EdgeInsets.fromLTRB(
+                20, 0, 20, MediaQuery.paddingOf(context).bottom),
             itemCount: gyms.length + 1, // +1 for "OTRO GYM / SIN GYM"
             separatorBuilder: (_, __) => const SizedBox(height: 12),
             itemBuilder: (_, i) {
