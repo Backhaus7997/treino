@@ -26,7 +26,8 @@ mixin _$CustomExercise {
   String get muscleGroup => throw _privateConstructorUsedError;
   String get description => throw _privateConstructorUsedError;
   String? get videoUrl => throw _privateConstructorUsedError;
-  int? get defaultRestSeconds => throw _privateConstructorUsedError;
+  int? get defaultRestSeconds =>
+      throw _privateConstructorUsedError; // ignore: invalid_annotation_target
   @JsonKey(fromJson: _equipmentFromJson, toJson: _equipmentToJson)
   EquipmentType? get equipment =>
       throw _privateConstructorUsedError; // REQ-RER-015: nullable; stays null on existing docs (no backfill — ADR-RER-03)
@@ -262,6 +263,7 @@ class _$CustomExerciseImpl implements _CustomExercise {
   final String? videoUrl;
   @override
   final int? defaultRestSeconds;
+// ignore: invalid_annotation_target
   @override
   @JsonKey(fromJson: _equipmentFromJson, toJson: _equipmentToJson)
   final EquipmentType? equipment;
@@ -365,7 +367,7 @@ abstract class _CustomExercise implements CustomExercise {
   @override
   String? get videoUrl;
   @override
-  int? get defaultRestSeconds;
+  int? get defaultRestSeconds; // ignore: invalid_annotation_target
   @override
   @JsonKey(fromJson: _equipmentFromJson, toJson: _equipmentToJson)
   EquipmentType?

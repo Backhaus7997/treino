@@ -156,4 +156,50 @@ void main() {
       skip: 'emulator required — run with firebase emulators:exec',
     );
   });
+
+  /// Per-week presence (periodization-week-presence) — REQ-WPRES-005.
+  ///
+  /// `activeWeeks` serializes INSIDE days[].slots[] (a nested field), NOT as
+  /// a new top-level Routine key. The existing Firestore hasOnly guard on
+  /// `days` already covers any nested mutation — verified (not assumed) by the
+  /// executable Jest tests SCENARIO-WPRES-RULES-01/02 in
+  /// scripts/rules_test/rules.test.js.
+  ///
+  ///   SCENARIO-WPRES-RULES-01: owner update adding activeWeeks inside a slot
+  ///     (nested in days) is ALLOWED without any rules change.
+  ///   SCENARIO-WPRES-RULES-02: same update PLUS a bogus top-level key is
+  ///     DENIED — the guard still bites; nothing was loosened.
+  group('routines week-presence rules (emulator required)', () {
+    test(
+      'SCENARIO-WPRES-RULES-01: owner update adding activeWeeks inside a slot '
+      '(nested in days) is allowed — existing hasOnly guard covers it',
+      () {
+        // Requires Firebase Emulator. Executable version: rules.test.js
+        // SCENARIO-WPRES-RULES-01.
+        //
+        // GIVEN: owner's user-created routine seeded in the emulator.
+        // WHEN:  owner sends update({ days: [...slot with activeWeeks: [0]], numWeeks: 2 }).
+        // THEN:  assertSucceeds() — the write is permitted because activeWeeks
+        //        is nested inside days, which is already in the hasOnly list.
+        //        No rules change is required.
+      },
+      skip: 'emulator required — run via bash scripts/test_rules.sh',
+    );
+
+    test(
+      'SCENARIO-WPRES-RULES-02: same update plus a bogus top-level key is '
+      'denied — hasOnly guard still bites',
+      () {
+        // Requires Firebase Emulator. Executable version: rules.test.js
+        // SCENARIO-WPRES-RULES-02.
+        //
+        // GIVEN: owner's user-created routine seeded in the emulator.
+        // WHEN:  owner sends update({ days: [...slot with activeWeeks: [0]],
+        //          numWeeks: 2, bogusField: 'x' }).
+        // THEN:  assertFails() — the bogus top-level key violates hasOnly.
+        //        Verifies the guard was NOT loosened by our changes.
+      },
+      skip: 'emulator required — run via bash scripts/test_rules.sh',
+    );
+  });
 }

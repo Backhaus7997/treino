@@ -555,6 +555,170 @@ void main() {
     });
   });
 
+  // ── Periodization (Model B): activeWeeks presence mask ───────────────────
+
+  group('RoutineSlot — activeWeeks field (Phase 1: WPRES)', () {
+    // ── SCENARIO-WPRES-001 — Legacy doc deserializes with empty activeWeeks ──
+    test(
+        'SCENARIO-WPRES-001: legacy doc (no activeWeeks key) deserializes with '
+        'activeWeeks == [] and isPresentInWeek(0) returns true', () {
+      final legacyMap = <String, dynamic>{
+        'exerciseId': 'bench-press',
+        'exerciseName': 'Bench Press',
+        'muscleGroup': 'chest',
+        'targetSets': 3,
+        'targetRepsMin': 8,
+        'targetRepsMax': 12,
+        'restSeconds': 90,
+      };
+
+      final slot = RoutineSlot.fromJson(legacyMap);
+
+      expect(slot.activeWeeks, equals(<int>[]),
+          reason: 'missing activeWeeks key → empty list default');
+      expect(slot.isPresentInWeek(0), isTrue,
+          reason: 'empty mask means present in ALL weeks');
+    });
+
+    // ── SCENARIO-WPRES-002 — Slot with explicit mask deserializes correctly ──
+    test(
+        'SCENARIO-WPRES-002: doc with activeWeeks: [0, 2] deserializes correctly',
+        () {
+      final docMap = <String, dynamic>{
+        'exerciseId': 'squat',
+        'exerciseName': 'Squat',
+        'muscleGroup': 'quads',
+        'targetSets': 4,
+        'targetRepsMin': 5,
+        'targetRepsMax': 8,
+        'restSeconds': 120,
+        'activeWeeks': [0, 2],
+      };
+
+      final slot = RoutineSlot.fromJson(docMap);
+
+      expect(slot.activeWeeks, equals([0, 2]));
+    });
+
+    // ── SCENARIO-WPRES-003 — Empty mask → present in all weeks ───────────────
+    test(
+        'SCENARIO-WPRES-003: empty mask → isPresentInWeek returns true for any '
+        'week index', () {
+      const slot = RoutineSlot(
+        exerciseId: 'row',
+        exerciseName: 'Barbell Row',
+        muscleGroup: 'back',
+        targetSets: 3,
+        targetRepsMin: 6,
+        targetRepsMax: 10,
+        restSeconds: 90,
+        // activeWeeks defaults to []
+      );
+
+      expect(slot.isPresentInWeek(0), isTrue,
+          reason: 'empty mask → present in week 0');
+      expect(slot.isPresentInWeek(1), isTrue,
+          reason: 'empty mask → present in week 1');
+      expect(slot.isPresentInWeek(5), isTrue,
+          reason: 'empty mask → present in week 5');
+    });
+
+    // ── SCENARIO-WPRES-004 — Non-empty mask → present only in listed weeks ───
+    test(
+        'SCENARIO-WPRES-004: non-empty mask [1, 3] → isPresentInWeek returns '
+        'true only for weeks 1 and 3', () {
+      const slot = RoutineSlot(
+        exerciseId: 'deadlift',
+        exerciseName: 'Deadlift',
+        muscleGroup: 'back',
+        targetSets: 4,
+        targetRepsMin: 3,
+        targetRepsMax: 5,
+        restSeconds: 180,
+        activeWeeks: [1, 3],
+      );
+
+      expect(slot.isPresentInWeek(0), isFalse,
+          reason: 'week 0 not in mask [1,3]');
+      expect(slot.isPresentInWeek(1), isTrue,
+          reason: 'week 1 is in mask [1,3]');
+      expect(slot.isPresentInWeek(3), isTrue,
+          reason: 'week 3 is in mask [1,3]');
+      expect(slot.isPresentInWeek(4), isFalse,
+          reason: 'week 4 not in mask [1,3]');
+    });
+
+    // ── SCENARIO-WPRES-007 — Round-trip with populated mask ──────────────────
+    test(
+        'SCENARIO-WPRES-007: round-trip with activeWeeks == [0, 2] preserves '
+        'the list deeply equal', () {
+      const slot = RoutineSlot(
+        exerciseId: 'press',
+        exerciseName: 'Bench Press',
+        muscleGroup: 'chest',
+        targetSets: 3,
+        targetRepsMin: 8,
+        targetRepsMax: 12,
+        restSeconds: 90,
+        activeWeeks: [0, 2],
+      );
+
+      final json = slot.toJson();
+      final decoded = RoutineSlot.fromJson(json);
+
+      expect(decoded.activeWeeks, equals([0, 2]),
+          reason: 'order preserved, deeply equal');
+      expect(decoded, equals(slot));
+    });
+
+    // ── SCENARIO-WPRES-008 — Round-trip with empty mask ──────────────────────
+    test('SCENARIO-WPRES-008: round-trip with activeWeeks == [] stays empty',
+        () {
+      const slot = RoutineSlot(
+        exerciseId: 'pull-up',
+        exerciseName: 'Pull Up',
+        muscleGroup: 'back',
+        targetSets: 3,
+        targetRepsMin: 6,
+        targetRepsMax: 10,
+        restSeconds: 90,
+        // activeWeeks defaults to []
+      );
+
+      final json = slot.toJson();
+      final decoded = RoutineSlot.fromJson(json);
+
+      expect(decoded.activeWeeks, equals(<int>[]));
+      expect(decoded, equals(slot));
+    });
+
+    // ── Wire shape: activeWeeks is a flat int array (NOT map-wrapped) ─────────
+    test(
+        'SCENARIO-WPRES-007 wire: activeWeeks serializes as a flat int array '
+        '(no map-wrapping, Firestore-safe)', () {
+      const slot = RoutineSlot(
+        exerciseId: 'squat',
+        exerciseName: 'Squat',
+        muscleGroup: 'quads',
+        targetSets: 3,
+        targetRepsMin: 8,
+        targetRepsMax: 12,
+        restSeconds: 90,
+        activeWeeks: [0, 1, 2],
+      );
+
+      final wire = slot.toJson()['activeWeeks'];
+
+      expect(wire, isA<List<dynamic>>());
+      final list = wire as List<dynamic>;
+      expect(list, hasLength(3));
+      for (final element in list) {
+        expect(element, isA<int>(),
+            reason: 'each element must be a plain int, NOT a map');
+      }
+    });
+  });
+
   // ── Periodization (Model B): weeklySets serialization ─────────────────────
 
   group('RoutineSlot — weeklySets serialization', () {

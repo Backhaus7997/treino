@@ -541,3 +541,109 @@ test('SCENARIO-PERIOD-054: owner create with numWeeks present succeeds', async (
     }),
   );
 });
+
+// ---------------------------------------------------------------------------
+// per-week presence (periodization-week-presence) — SCENARIO-WPRES-RULES-01/02
+// REQ-WPRES-005: activeWeeks is nested inside days[].slots[], NOT top-level.
+// The existing hasOnly guard on `days` already covers nested mutations.
+// VERIFY-don't-assume: these tests confirm no rules change is required.
+// ---------------------------------------------------------------------------
+
+// SCENARIO-WPRES-RULES-01: owner update adding activeWeeks inside a slot
+// (nested in days) is ALLOWED — existing rules already cover it.
+test('SCENARIO-WPRES-RULES-01: owner update adding activeWeeks inside a slot is allowed', async () => {
+  // Seed a routine without activeWeeks — simulates a pre-change doc.
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await ctx.firestore().collection('routines').doc('r-wpres-01').set({
+      ...validUserCreated('athlete-a'),
+      numWeeks: 2,
+      days: [
+        {
+          dayNumber: 1,
+          name: 'Day 1',
+          slots: [
+            {
+              exerciseId: 'bench-press',
+              exerciseName: 'Bench Press',
+              muscleGroup: 'chest',
+              targetSets: 3,
+              targetRepsMin: 8,
+              targetRepsMax: 12,
+              restSeconds: 90,
+              // No activeWeeks — simulates legacy doc
+            },
+          ],
+        },
+      ],
+    });
+  });
+
+  const athleteA = testEnv.authenticatedContext('athlete-a');
+  // Update: add activeWeeks inside a slot nested in days.
+  // activeWeeks is NOT a new top-level key — it lives inside days[].slots[].
+  // The hasOnly guard checks top-level keys only; days is already allowed.
+  await assertSucceeds(
+    athleteA.firestore().collection('routines').doc('r-wpres-01').update({
+      numWeeks: 2,
+      days: [
+        {
+          dayNumber: 1,
+          name: 'Day 1',
+          slots: [
+            {
+              exerciseId: 'bench-press',
+              exerciseName: 'Bench Press',
+              muscleGroup: 'chest',
+              targetSets: 3,
+              targetRepsMin: 8,
+              targetRepsMax: 12,
+              restSeconds: 90,
+              activeWeeks: [0], // NEW: presence mask — nested in days, not top-level
+            },
+          ],
+        },
+      ],
+    }),
+  );
+});
+
+// SCENARIO-WPRES-RULES-02 (negative control): same update PLUS a bogus
+// top-level key is DENIED — hasOnly guard still bites; nothing was loosened.
+test('SCENARIO-WPRES-RULES-02: update with bogus top-level key is denied (guard still works)', async () => {
+  // Seed a routine.
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await ctx.firestore().collection('routines').doc('r-wpres-02').set({
+      ...validUserCreated('athlete-a'),
+      numWeeks: 2,
+      days: [],
+    });
+  });
+
+  const athleteA = testEnv.authenticatedContext('athlete-a');
+  // Same slot-level activeWeeks mutation PLUS a bogus top-level field.
+  // The bogus key is not in hasOnly → must be DENIED.
+  await assertFails(
+    athleteA.firestore().collection('routines').doc('r-wpres-02').update({
+      numWeeks: 2,
+      days: [
+        {
+          dayNumber: 1,
+          name: 'Day 1',
+          slots: [
+            {
+              exerciseId: 'bench-press',
+              exerciseName: 'Bench Press',
+              muscleGroup: 'chest',
+              targetSets: 3,
+              targetRepsMin: 8,
+              targetRepsMax: 12,
+              restSeconds: 90,
+              activeWeeks: [0],
+            },
+          ],
+        },
+      ],
+      bogusTopLevelField: 'this should not be allowed', // NOT in hasOnly
+    }),
+  );
+});

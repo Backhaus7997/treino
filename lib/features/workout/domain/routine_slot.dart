@@ -79,6 +79,13 @@ class RoutineSlot with _$RoutineSlot {
     @Default(<List<SetSpec>>[])
     @WeeklySetsConverter()
     List<List<SetSpec>> weeklySets,
+
+    /// Periodization presence MASK (Option A). 0-based week indices in which
+    /// this slot is PRESENT. Empty = present in ALL weeks (hard back-compat:
+    /// every legacy/single-week doc has no field → empty → present everywhere).
+    /// ORTHOGONAL to [weeklySets] (prescription). A flat List<int> — Firestore
+    /// stores it natively, NO converter needed (mirrors [targetReps]).
+    @Default(<int>[]) List<int> activeWeeks,
   }) = _RoutineSlot;
 
   factory RoutineSlot.fromJson(Map<String, Object?> json) =>
@@ -147,6 +154,17 @@ class RoutineSlot with _$RoutineSlot {
     }
     return effectiveSets;
   }
+
+  /// Whether this slot is present in 0-based [week].
+  ///
+  /// Rule: `activeWeeks.isEmpty || activeWeeks.contains(week)`.
+  /// An empty mask returns `true` for any week index (back-compat: every
+  /// legacy/single-week doc has no field → empty → present everywhere).
+  /// A non-empty mask returns `true` only when [week] is listed.
+  /// A negative or out-of-range [week] is false for a non-empty mask,
+  /// true for an empty mask. Never throws.
+  bool isPresentInWeek(int week) =>
+      activeWeeks.isEmpty || activeWeeks.contains(week);
 
   /// Derives the exercise mode from the new field, falling back to legacy
   /// signals (durationSeconds > 0 → [ExerciseMode.duration]).

@@ -37,6 +37,10 @@ _$RoutineSlotImpl _$$RoutineSlotImplFromJson(Map<String, dynamic> json) =>
       weeklySets: json['weeklySets'] == null
           ? const <List<SetSpec>>[]
           : const WeeklySetsConverter().fromJson(json['weeklySets'] as List),
+      activeWeeks: (json['activeWeeks'] as List<dynamic>?)
+              ?.map((e) => (e as num).toInt())
+              .toList() ??
+          const <int>[],
     );
 
 Map<String, dynamic> _$$RoutineSlotImplToJson(_$RoutineSlotImpl instance) =>
@@ -57,6 +61,7 @@ Map<String, dynamic> _$$RoutineSlotImplToJson(_$RoutineSlotImpl instance) =>
       'repMode': _$RepModeEnumMap[instance.repMode]!,
       'sets': instance.sets.map((e) => e.toJson()).toList(),
       'weeklySets': const WeeklySetsConverter().toJson(instance.weeklySets),
+      'activeWeeks': instance.activeWeeks,
     };
 
 const _$ExerciseModeEnumMap = {
