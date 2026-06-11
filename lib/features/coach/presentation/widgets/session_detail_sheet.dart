@@ -10,6 +10,7 @@ import '../../application/agenda_providers.dart';
 import '../../application/athlete_note_providers.dart';
 import '../../domain/agenda_exceptions.dart';
 import '../../domain/appointment.dart';
+import '../agenda_formatters.dart';
 import '../agenda_strings.dart';
 
 class SessionDetailSheet extends ConsumerStatefulWidget {
@@ -156,7 +157,7 @@ class _SessionDetailSheetState extends ConsumerState<SessionDetailSheet> {
     final end =
         appointment.startsAt.add(Duration(minutes: appointment.durationMin));
     final timeLabel =
-        '${AgendaStrings.formatTime(appointment.startsAt)} – ${AgendaStrings.formatTime(end)} · ${appointment.durationMin} min';
+        '${AgendaFormatters.formatTime(appointment.startsAt)} – ${AgendaFormatters.formatTime(end)} · ${appointment.durationMin} min';
 
     final profileAsync =
         ref.watch(userPublicProfileProvider(appointment.athleteId));

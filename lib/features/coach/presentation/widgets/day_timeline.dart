@@ -8,7 +8,7 @@ import '../../../../app/theme/app_palette.dart';
 import '../../../profile/application/user_public_profile_providers.dart';
 import '../../application/agenda_providers.dart';
 import '../../domain/appointment.dart';
-import '../agenda_strings.dart';
+import '../agenda_formatters.dart';
 import 'new_session_sheet.dart';
 import 'session_detail_sheet.dart';
 
@@ -376,7 +376,7 @@ class _DayTimelineState extends ConsumerState<DayTimeline> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          AgendaStrings.formatTime(appt.startsAt),
+                          AgendaFormatters.formatTime(appt.startsAt),
                           style: GoogleFonts.barlowCondensed(
                             fontWeight: FontWeight.w700,
                             fontSize: 12,

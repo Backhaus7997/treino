@@ -44,16 +44,30 @@ class _ProfileSetupFlowState extends ConsumerState<ProfileSetupFlow> {
   Future<void> _onPrimary() async {
     final state = ref.read(profileSetupNotifierProvider);
     final notifier = ref.read(profileSetupNotifierProvider.notifier);
-    if (state.isLastStep) {
-      // Submit final — stub hasta Etapa 3 (UserRepository).
-      // TODO(etapa3): cuando UserRepository exista, llamar
-      // `notifier.submit()` que mapea el draft a UserProfile y lo
-      // persiste en Firestore + uploadea avatar a Storage.
-      await notifier.submit();
-      if (mounted) context.go('/home');
+    if (!state.isLastStep) {
+      notifier.goNext();
       return;
     }
-    notifier.goNext();
+
+    // Submit final: persiste el draft a Firestore. La navegación a /home la
+    // resuelve el redirect del router en cuanto el stream de userProfileProvider
+    // emite el perfil completo (ver authRedirect → onboarding-complete gate).
+    // El `context.go('/home')` se mantiene como fast-path de intención; si el
+    // stream todavía no actualizó, el redirect rebota a /profile-setup y la
+    // misma regla nos lleva a /home apenas llega el snapshot.
+    try {
+      await notifier.submit();
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No pudimos guardar tu perfil. Probá de nuevo.'),
+          duration: Duration(seconds: 3),
+        ),
+      );
+      return;
+    }
+    if (mounted) context.go('/home');
   }
 
   void _onBack() {
@@ -178,6 +192,7 @@ class _ProfileSetupFlowState extends ConsumerState<ProfileSetupFlow> {
                   onBack: state.currentStep == 0 ? null : _onBack,
                   onPrimary: state.canGoNext ? _onPrimary : null,
                   primaryLabel: state.isLastStep ? 'EMPEZAR' : null,
+                  primaryLoading: state.isSubmitting,
                 ),
               ],
             ),

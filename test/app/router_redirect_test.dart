@@ -253,6 +253,19 @@ void main() {
       expect(callRedirect(c, '/profile-setup'), isNull);
     });
 
+    // Onboarding-complete gate: una vez que el submit persiste el displayName,
+    // el atleta TIENE que salir de /profile-setup. Sin esta regla quedaba
+    // atrapado en el último step (el botón EMPEZAR "no hacía nada"), porque el
+    // gate de completitud se saltea cuando estás en /profile-setup y no había
+    // ningún redirect que sacara al usuario una vez completo.
+    test('complete + /profile-setup → /home (sale del onboarding)', () async {
+      final c = loggedInContainer(profile: _completeProfile());
+      addTearDown(c.dispose);
+      await c.read(authNotifierProvider.future);
+      await c.read(userProfileProvider.future);
+      expect(callRedirect(c, '/profile-setup'), '/home');
+    });
+
     test('no profile doc yet → /profile-setup (treat as incomplete)', () async {
       // Inline en vez de loggedInContainer() porque el helper tiene un
       // default a _completeProfile() para el caso común; acá queremos

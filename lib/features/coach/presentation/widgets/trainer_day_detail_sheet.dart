@@ -11,6 +11,7 @@ import '../../application/agenda_providers.dart';
 import '../../domain/appointment.dart';
 import '../../domain/availability_override.dart';
 import '../../domain/compute_free_slots.dart';
+import '../agenda_formatters.dart';
 import '../agenda_strings.dart';
 import 'session_detail_sheet.dart';
 
@@ -180,7 +181,7 @@ class TrainerDayDetailSheet extends ConsumerWidget {
             ),
             // Day label
             Text(
-              AgendaStrings.formatDate(day),
+              AgendaFormatters.formatDate(day),
               style: GoogleFonts.barlowCondensed(
                 fontWeight: FontWeight.w700,
                 fontSize: 18,
@@ -273,7 +274,7 @@ class _SlotList extends StatelessWidget {
   }
 
   Widget _buildChip(BuildContext context, _SlotEntry entry) {
-    final timeLabel = AgendaStrings.formatTime(entry.time);
+    final timeLabel = AgendaFormatters.formatTime(entry.time);
     // "Past" = the slot's start time is at or before now. Whole past days fall
     // out of this naturally (every slot that day is before now).
     final isPast = !entry.time.isAfter(now);

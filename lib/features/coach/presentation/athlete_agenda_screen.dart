@@ -8,6 +8,7 @@ import '../../../core/widgets/treino_icon.dart';
 import '../../profile/application/user_public_profile_providers.dart';
 import '../application/agenda_providers.dart';
 import '../domain/appointment.dart';
+import 'agenda_formatters.dart';
 import 'agenda_strings.dart';
 
 /// Full-screen route for the athlete's agenda view — READ-ONLY.
@@ -312,7 +313,7 @@ class _DaySessionsSheet extends ConsumerWidget {
 
           // Date heading
           Text(
-            AgendaStrings.formatDate(
+            AgendaFormatters.formatDate(
                 DateTime(day.year, day.month, day.day, 12)),
             style: GoogleFonts.barlowCondensed(
               fontWeight: FontWeight.w700,
@@ -363,8 +364,8 @@ class _SessionRow extends ConsumerWidget {
         ref.watch(userPublicProfileProvider(appointment.trainerId));
     final trainerName = trainerAsync.valueOrNull?.displayName ?? 'Tu PF';
 
-    final start = AgendaStrings.formatTime(appointment.startsAt);
-    final end = AgendaStrings.formatTime(
+    final start = AgendaFormatters.formatTime(appointment.startsAt);
+    final end = AgendaFormatters.formatTime(
       appointment.startsAt.add(Duration(minutes: appointment.durationMin)),
     );
     final range = '$start – $end · ${appointment.durationMin} min';
@@ -453,7 +454,7 @@ class AppointmentTile extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  AgendaStrings.formatDate(appointment.startsAt),
+                  AgendaFormatters.formatDate(appointment.startsAt),
                   style: GoogleFonts.barlowCondensed(
                     fontWeight: FontWeight.w700,
                     fontSize: 15,
@@ -462,7 +463,7 @@ class AppointmentTile extends ConsumerWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '${AgendaStrings.formatTime(appointment.startsAt)} · ${appointment.durationMin} min · $trainerName',
+                  '${AgendaFormatters.formatTime(appointment.startsAt)} · ${appointment.durationMin} min · $trainerName',
                   style: GoogleFonts.barlow(
                     fontSize: 13,
                     color: palette.textMuted,
