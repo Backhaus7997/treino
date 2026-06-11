@@ -669,7 +669,12 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     });
   }
 
+  /// A week has at most 7 days, so a plan can't have more (device feedback
+  /// 2026-06-11).
+  static const int _kMaxDays = 7;
+
   void _addDay() {
+    if (_days.length >= _kMaxDays) return;
     setState(() {
       final n = _days.length + 1;
       _days = [..._days, _EditableDay(dayNumber: n, name: 'Día $n')];
@@ -682,9 +687,15 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
         for (int i = 0; i < _days.length; i++)
           if (i != index) _days[i],
       ];
-      // Re-number
+      // Re-number — keep the default "Día N" name in sync with the new
+      // position (so deleting Día 1 makes Día 2 become Día 1); preserve any
+      // custom name the user typed.
       for (int i = 0; i < _days.length; i++) {
-        _days[i].dayNumber = i + 1;
+        final newNumber = i + 1;
+        if (_days[i].name == 'Día ${_days[i].dayNumber}') {
+          _days[i].name = 'Día $newNumber';
+        }
+        _days[i].dayNumber = newNumber;
       }
     });
   }
@@ -1427,17 +1438,22 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                           const SizedBox(height: 6),
                         ],
 
-                        // Add day button
+                        // Add day button — disabled at the 7-day cap.
                         TextButton.icon(
-                          onPressed: _addDay,
+                          onPressed: _days.length < _kMaxDays ? _addDay : null,
                           icon: Icon(TreinoIcon.plus,
-                              size: 14, color: palette.accent),
+                              size: 14,
+                              color: _days.length < _kMaxDays
+                                  ? palette.accent
+                                  : palette.textMuted),
                           label: Text(
                             CoachStrings.editorAddDay,
                             style: GoogleFonts.barlowCondensed(
                               fontWeight: FontWeight.w600,
                               fontSize: 12,
-                              color: palette.accent,
+                              color: _days.length < _kMaxDays
+                                  ? palette.accent
+                                  : palette.textMuted,
                             ),
                           ),
                         ),
