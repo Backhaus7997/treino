@@ -13,6 +13,7 @@ import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/features/reviews/application/review_providers.dart';
 import 'package:treino/features/reviews/data/review_repository.dart';
 import 'package:treino/features/reviews/presentation/widgets/review_bottom_sheet.dart';
+import 'package:treino/l10n/app_l10n.dart';
 
 class _MockTrainerLinkRepository extends Mock
     implements TrainerLinkRepository {}
@@ -39,6 +40,9 @@ Widget _wrap(List<Override> overrides) => ProviderScope(
       overrides: overrides,
       child: MaterialApp(
         theme: AppTheme.dark(),
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+        locale: const Locale('es', 'AR'),
         home: const Scaffold(body: AthleteCoachViewTestHarness()),
       ),
     );

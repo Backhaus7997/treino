@@ -277,4 +277,95 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get coachExercisePicker => '';
+
+  @override
+  String get agendaButtonLabel => '';
+
+  @override
+  String get agendaScreenTitle => '';
+
+  @override
+  String get agendaEmptyAvailability => '';
+
+  @override
+  String get agendaBookingConfirmTitle => '';
+
+  @override
+  String agendaBookingConfirmBody(String date, String time) {
+    return '';
+  }
+
+  @override
+  String get agendaBookingConfirmCta => '';
+
+  @override
+  String get agendaBookingCancel => '';
+
+  @override
+  String get agendaBookingSuccess => '';
+
+  @override
+  String get agendaBookingRaceError => '';
+
+  @override
+  String get agendaCancellationConfirmTitle => '';
+
+  @override
+  String get agendaCancellationConfirmBody => '';
+
+  @override
+  String get agendaCancellationConfirmCta => '';
+
+  @override
+  String get agendaCancellationKeep => '';
+
+  @override
+  String get agendaCancellationSuccess => '';
+
+  @override
+  String get agendaCancellationTooLate => '';
+
+  @override
+  String get agendaUpcomingAppointmentsHeading => '';
+
+  @override
+  String get agendaPastAppointmentsHeading => '';
+
+  @override
+  String get agendaGenericError => '';
+
+  @override
+  String get agendaTrainerEmptyAvailability => '';
+
+  @override
+  String get agendaConfigureHoursCta => '';
+
+  @override
+  String get agendaMyWorkingHoursHeading => '';
+
+  @override
+  String get agendaAddRuleCta => '';
+
+  @override
+  String get agendaBlockDayCta => '';
+
+  @override
+  String get agendaEditorTitle => '';
+
+  @override
+  String get agendaRuleDeleteConfirm => '';
+
+  @override
+  String get agendaBookingCancelledByCoach => '';
+
+  @override
+  String get agendaSlotFreeLabel => '';
+
+  @override
+  String get agendaSlotBlockedLabel => '';
+
+  @override
+  String agendaSlotBookedByLabel(String athleteName) {
+    return '';
+  }
 }

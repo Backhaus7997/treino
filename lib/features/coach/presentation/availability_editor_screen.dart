@@ -8,8 +8,8 @@ import '../../../app/theme/app_palette.dart';
 import '../application/agenda_providers.dart';
 import '../domain/availability_override.dart';
 import '../domain/availability_rule.dart';
+import '../../../l10n/app_l10n.dart';
 import 'agenda_formatters.dart';
-import 'agenda_strings.dart';
 
 /// Full-screen editor where the trainer manages their availability rules
 /// and date overrides.
@@ -44,7 +44,7 @@ class AvailabilityEditorScreen extends ConsumerWidget {
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: Text(
-          AgendaStrings.editorTitle,
+          AppL10n.of(context).agendaEditorTitle,
           style: GoogleFonts.barlowCondensed(
             fontWeight: FontWeight.w700,
             fontSize: 20,
@@ -99,7 +99,7 @@ class _EditorBody extends ConsumerWidget {
             ),
         const SizedBox(height: 16),
         _AddButton(
-          label: AgendaStrings.addRuleCta,
+          label: AppL10n.of(context).agendaAddRuleCta,
           onTap: () => _openRuleForm(context, ref),
         ),
 
@@ -117,7 +117,7 @@ class _EditorBody extends ConsumerWidget {
           ),
         const SizedBox(height: 16),
         _AddButton(
-          label: AgendaStrings.blockDayCta,
+          label: AppL10n.of(context).agendaBlockDayCta,
           onTap: () => _openBlockOverrideForm(context, ref),
         ),
       ],
@@ -150,14 +150,15 @@ class _EditorBody extends ConsumerWidget {
     WidgetRef ref,
     AvailabilityRule rule,
   ) async {
+    final l10n = AppL10n.of(context);
     final palette = AppPalette.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => _ConfirmDialog(
         palette: palette,
-        body: AgendaStrings.ruleDeleteConfirm,
-        confirmLabel: AgendaStrings.bookingConfirmCta,
-        cancelLabel: AgendaStrings.bookingCancel,
+        body: l10n.agendaRuleDeleteConfirm,
+        confirmLabel: l10n.agendaBookingConfirmCta,
+        cancelLabel: l10n.agendaBookingCancel,
       ),
     );
     if (confirmed != true || !context.mounted) return;
@@ -188,14 +189,15 @@ class _EditorBody extends ConsumerWidget {
     WidgetRef ref,
     AvailabilityOverride override,
   ) async {
+    final l10n = AppL10n.of(context);
     final palette = AppPalette.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => _ConfirmDialog(
         palette: palette,
         body: '¿Eliminar esta excepción?',
-        confirmLabel: AgendaStrings.bookingConfirmCta,
-        cancelLabel: AgendaStrings.bookingCancel,
+        confirmLabel: l10n.agendaBookingConfirmCta,
+        cancelLabel: l10n.agendaBookingCancel,
       ),
     );
     if (confirmed != true || !context.mounted) return;
@@ -305,7 +307,7 @@ class _OverrideTile extends StatelessWidget {
     );
 
     final typeLabel = availOverride.when(
-      block: (_, __, ___) => AgendaStrings.slotBlockedLabel,
+      block: (_, __, ___) => AppL10n.of(context).agendaSlotBlockedLabel,
       extra: (_, __, date, sh, sm, eh, em, dur) =>
           'Extra ${sh.toString().padLeft(2, '0')}:${sm.toString().padLeft(2, '0')} – ${eh.toString().padLeft(2, '0')}:${em.toString().padLeft(2, '0')}',
     );
@@ -393,6 +395,7 @@ class _RuleFormSheetState extends ConsumerState<_RuleFormSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppL10n.of(context);
     final palette = AppPalette.of(context);
     return SafeArea(
       child: Padding(
@@ -419,7 +422,7 @@ class _RuleFormSheetState extends ConsumerState<_RuleFormSheet> {
             ),
             Text(
               widget.existing == null
-                  ? AgendaStrings.addRuleCta
+                  ? l10n.agendaAddRuleCta
                   : 'Editar horario',
               style: GoogleFonts.barlowCondensed(
                 fontWeight: FontWeight.w700,
@@ -508,7 +511,7 @@ class _RuleFormSheetState extends ConsumerState<_RuleFormSheet> {
                   ),
                 ),
                 child: Text(
-                  AgendaStrings.bookingConfirmCta,
+                  l10n.agendaBookingConfirmCta,
                   style: GoogleFonts.barlowCondensed(
                     fontWeight: FontWeight.w700,
                     fontSize: 14,
@@ -576,6 +579,7 @@ class _BlockOverrideFormSheetState
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppL10n.of(context);
     final palette = AppPalette.of(context);
     return SafeArea(
       child: Padding(
@@ -601,7 +605,7 @@ class _BlockOverrideFormSheetState
               ),
             ),
             Text(
-              AgendaStrings.blockDayCta,
+              l10n.agendaBlockDayCta,
               style: GoogleFonts.barlowCondensed(
                 fontWeight: FontWeight.w700,
                 fontSize: 18,
@@ -650,7 +654,7 @@ class _BlockOverrideFormSheetState
                   ),
                 ),
                 child: Text(
-                  AgendaStrings.bookingConfirmCta,
+                  l10n.agendaBookingConfirmCta,
                   style: GoogleFonts.barlowCondensed(
                     fontWeight: FontWeight.w700,
                     fontSize: 14,

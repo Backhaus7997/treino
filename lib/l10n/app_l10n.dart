@@ -637,6 +637,180 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Buscar ejercicio'**
   String get coachExercisePicker;
+
+  /// No description provided for @agendaButtonLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'VER AGENDA DEL PF'**
+  String get agendaButtonLabel;
+
+  /// No description provided for @agendaScreenTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Agenda'**
+  String get agendaScreenTitle;
+
+  /// No description provided for @agendaEmptyAvailability.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tu PF todavía no configuró horarios.'**
+  String get agendaEmptyAvailability;
+
+  /// No description provided for @agendaBookingConfirmTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Confirmar reserva'**
+  String get agendaBookingConfirmTitle;
+
+  /// No description provided for @agendaBookingConfirmBody.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Confirmar reserva el {date} a las {time}?'**
+  String agendaBookingConfirmBody(String date, String time);
+
+  /// No description provided for @agendaBookingConfirmCta.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Confirmar'**
+  String get agendaBookingConfirmCta;
+
+  /// No description provided for @agendaBookingCancel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cancelar'**
+  String get agendaBookingCancel;
+
+  /// No description provided for @agendaBookingSuccess.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Reserva confirmada.'**
+  String get agendaBookingSuccess;
+
+  /// No description provided for @agendaBookingRaceError.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ese horario fue reservado justo ahora. Probá con otro.'**
+  String get agendaBookingRaceError;
+
+  /// No description provided for @agendaCancellationConfirmTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cancelar reserva'**
+  String get agendaCancellationConfirmTitle;
+
+  /// No description provided for @agendaCancellationConfirmBody.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Cancelar esta reserva?'**
+  String get agendaCancellationConfirmBody;
+
+  /// No description provided for @agendaCancellationConfirmCta.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Sí, cancelar'**
+  String get agendaCancellationConfirmCta;
+
+  /// No description provided for @agendaCancellationKeep.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No, mantener'**
+  String get agendaCancellationKeep;
+
+  /// No description provided for @agendaCancellationSuccess.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Reserva cancelada.'**
+  String get agendaCancellationSuccess;
+
+  /// No description provided for @agendaCancellationTooLate.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No podés cancelar con menos de 24h de anticipación.'**
+  String get agendaCancellationTooLate;
+
+  /// No description provided for @agendaUpcomingAppointmentsHeading.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'TUS PRÓXIMAS RESERVAS'**
+  String get agendaUpcomingAppointmentsHeading;
+
+  /// No description provided for @agendaPastAppointmentsHeading.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'TURNOS PASADOS'**
+  String get agendaPastAppointmentsHeading;
+
+  /// No description provided for @agendaGenericError.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Hubo un problema. Intentá de nuevo.'**
+  String get agendaGenericError;
+
+  /// No description provided for @agendaTrainerEmptyAvailability.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Todavía no configuraste tus horarios de trabajo. Agregá uno para que tus alumnos puedan reservar.'**
+  String get agendaTrainerEmptyAvailability;
+
+  /// No description provided for @agendaConfigureHoursCta.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CONFIGURAR HORARIOS'**
+  String get agendaConfigureHoursCta;
+
+  /// No description provided for @agendaMyWorkingHoursHeading.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'MIS HORARIOS DE TRABAJO'**
+  String get agendaMyWorkingHoursHeading;
+
+  /// No description provided for @agendaAddRuleCta.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'AGREGAR HORARIO'**
+  String get agendaAddRuleCta;
+
+  /// No description provided for @agendaBlockDayCta.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'BLOQUEAR UN DÍA'**
+  String get agendaBlockDayCta;
+
+  /// No description provided for @agendaEditorTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Mis horarios'**
+  String get agendaEditorTitle;
+
+  /// No description provided for @agendaRuleDeleteConfirm.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Borrar este horario? Las reservas existentes se mantienen.'**
+  String get agendaRuleDeleteConfirm;
+
+  /// No description provided for @agendaBookingCancelledByCoach.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Reserva cancelada por el entrenador.'**
+  String get agendaBookingCancelledByCoach;
+
+  /// No description provided for @agendaSlotFreeLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Disponible'**
+  String get agendaSlotFreeLabel;
+
+  /// No description provided for @agendaSlotBlockedLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Bloqueado'**
+  String get agendaSlotBlockedLabel;
+
+  /// No description provided for @agendaSlotBookedByLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Reservado por {athleteName}'**
+  String agendaSlotBookedByLabel(String athleteName);
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

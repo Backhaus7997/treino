@@ -10,8 +10,8 @@ import 'package:treino/features/coach/domain/appointment.dart';
 import 'package:treino/features/coach/domain/availability_override.dart';
 import 'package:treino/features/coach/domain/availability_rule.dart';
 import 'package:treino/features/coach/application/athlete_note_providers.dart';
-import 'package:treino/features/coach/presentation/agenda_strings.dart';
 import 'package:treino/features/coach/presentation/widgets/trainer_day_detail_sheet.dart';
+import 'package:treino/l10n/app_l10n.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 
@@ -76,6 +76,9 @@ Widget _wrap(Widget child, {List<Override> overrides = const []}) {
     ],
     child: MaterialApp(
       theme: AppTheme.dark(),
+      localizationsDelegates: AppL10n.localizationsDelegates,
+      supportedLocales: AppL10n.supportedLocales,
+      locale: const Locale('es', 'AR'),
       home: Scaffold(body: child),
     ),
   );
@@ -278,7 +281,7 @@ void main() {
         // Free slots should not show
         expect(find.text('09:00'), findsNothing);
         // Blocked chip should show
-        expect(find.text(AgendaStrings.slotBlockedLabel), findsOneWidget);
+        expect(find.text('Bloqueado'), findsOneWidget);
       },
     );
   });

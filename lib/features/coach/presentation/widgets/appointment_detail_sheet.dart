@@ -10,7 +10,7 @@ import '../../../profile/application/user_providers.dart'
 import '../../application/agenda_providers.dart';
 import '../../domain/agenda_exceptions.dart';
 import '../../domain/appointment.dart';
-import '../agenda_strings.dart';
+import '../../../../l10n/app_l10n.dart';
 
 /// Bottom-sheet content showing the full detail of a single [Appointment].
 ///
@@ -226,12 +226,13 @@ class _AppointmentDetailSheetState
   }
 
   Future<void> _cancelAppointment(BuildContext context, WidgetRef ref) async {
+    final l10n = AppL10n.of(context);
     final confirmed = await _confirmDialog(
       context,
-      title: AgendaStrings.cancellationConfirmTitle,
-      body: AgendaStrings.cancellationConfirmBody,
-      confirmLabel: AgendaStrings.cancellationConfirmCta,
-      cancelLabel: AgendaStrings.cancellationKeep,
+      title: l10n.agendaCancellationConfirmTitle,
+      body: l10n.agendaCancellationConfirmBody,
+      confirmLabel: l10n.agendaCancellationConfirmCta,
+      cancelLabel: l10n.agendaCancellationKeep,
     );
     if (!confirmed || !context.mounted) return;
 
@@ -239,22 +240,22 @@ class _AppointmentDetailSheetState
       await ref.read(appointmentRepositoryProvider).cancel(
             appointment: widget.appointment,
             actorUid: widget.trainerId,
-            reason: AgendaStrings.bookingCancelledByCoach,
+            reason: l10n.agendaBookingCancelledByCoach,
           );
       if (!context.mounted) return;
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text(AgendaStrings.cancellationSuccess)),
+        SnackBar(content: Text(l10n.agendaCancellationSuccess)),
       );
     } on CancellationTooLateException {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text(AgendaStrings.cancellationTooLate)),
+        SnackBar(content: Text(l10n.agendaCancellationTooLate)),
       );
     } catch (_) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text(AgendaStrings.genericError)),
+        SnackBar(content: Text(l10n.agendaGenericError)),
       );
     }
   }

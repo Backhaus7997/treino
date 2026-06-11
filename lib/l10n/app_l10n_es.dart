@@ -279,6 +279,102 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get coachExercisePicker => 'Buscar ejercicio';
+
+  @override
+  String get agendaButtonLabel => 'VER AGENDA DEL PF';
+
+  @override
+  String get agendaScreenTitle => 'Agenda';
+
+  @override
+  String get agendaEmptyAvailability => 'Tu PF todavía no configuró horarios.';
+
+  @override
+  String get agendaBookingConfirmTitle => 'Confirmar reserva';
+
+  @override
+  String agendaBookingConfirmBody(String date, String time) {
+    return '¿Confirmar reserva el $date a las $time?';
+  }
+
+  @override
+  String get agendaBookingConfirmCta => 'Confirmar';
+
+  @override
+  String get agendaBookingCancel => 'Cancelar';
+
+  @override
+  String get agendaBookingSuccess => 'Reserva confirmada.';
+
+  @override
+  String get agendaBookingRaceError =>
+      'Ese horario fue reservado justo ahora. Probá con otro.';
+
+  @override
+  String get agendaCancellationConfirmTitle => 'Cancelar reserva';
+
+  @override
+  String get agendaCancellationConfirmBody => '¿Cancelar esta reserva?';
+
+  @override
+  String get agendaCancellationConfirmCta => 'Sí, cancelar';
+
+  @override
+  String get agendaCancellationKeep => 'No, mantener';
+
+  @override
+  String get agendaCancellationSuccess => 'Reserva cancelada.';
+
+  @override
+  String get agendaCancellationTooLate =>
+      'No podés cancelar con menos de 24h de anticipación.';
+
+  @override
+  String get agendaUpcomingAppointmentsHeading => 'TUS PRÓXIMAS RESERVAS';
+
+  @override
+  String get agendaPastAppointmentsHeading => 'TURNOS PASADOS';
+
+  @override
+  String get agendaGenericError => 'Hubo un problema. Intentá de nuevo.';
+
+  @override
+  String get agendaTrainerEmptyAvailability =>
+      'Todavía no configuraste tus horarios de trabajo. Agregá uno para que tus alumnos puedan reservar.';
+
+  @override
+  String get agendaConfigureHoursCta => 'CONFIGURAR HORARIOS';
+
+  @override
+  String get agendaMyWorkingHoursHeading => 'MIS HORARIOS DE TRABAJO';
+
+  @override
+  String get agendaAddRuleCta => 'AGREGAR HORARIO';
+
+  @override
+  String get agendaBlockDayCta => 'BLOQUEAR UN DÍA';
+
+  @override
+  String get agendaEditorTitle => 'Mis horarios';
+
+  @override
+  String get agendaRuleDeleteConfirm =>
+      '¿Borrar este horario? Las reservas existentes se mantienen.';
+
+  @override
+  String get agendaBookingCancelledByCoach =>
+      'Reserva cancelada por el entrenador.';
+
+  @override
+  String get agendaSlotFreeLabel => 'Disponible';
+
+  @override
+  String get agendaSlotBlockedLabel => 'Bloqueado';
+
+  @override
+  String agendaSlotBookedByLabel(String athleteName) {
+    return 'Reservado por $athleteName';
+  }
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -561,4 +657,100 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get coachExercisePicker => 'Buscar ejercicio';
+
+  @override
+  String get agendaButtonLabel => 'VER AGENDA DEL PF';
+
+  @override
+  String get agendaScreenTitle => 'Agenda';
+
+  @override
+  String get agendaEmptyAvailability => 'Tu PF todavía no configuró horarios.';
+
+  @override
+  String get agendaBookingConfirmTitle => 'Confirmar reserva';
+
+  @override
+  String agendaBookingConfirmBody(String date, String time) {
+    return '¿Confirmar reserva el $date a las $time?';
+  }
+
+  @override
+  String get agendaBookingConfirmCta => 'Confirmar';
+
+  @override
+  String get agendaBookingCancel => 'Cancelar';
+
+  @override
+  String get agendaBookingSuccess => 'Reserva confirmada.';
+
+  @override
+  String get agendaBookingRaceError =>
+      'Ese horario fue reservado justo ahora. Probá con otro.';
+
+  @override
+  String get agendaCancellationConfirmTitle => 'Cancelar reserva';
+
+  @override
+  String get agendaCancellationConfirmBody => '¿Cancelar esta reserva?';
+
+  @override
+  String get agendaCancellationConfirmCta => 'Sí, cancelar';
+
+  @override
+  String get agendaCancellationKeep => 'No, mantener';
+
+  @override
+  String get agendaCancellationSuccess => 'Reserva cancelada.';
+
+  @override
+  String get agendaCancellationTooLate =>
+      'No podés cancelar con menos de 24h de anticipación.';
+
+  @override
+  String get agendaUpcomingAppointmentsHeading => 'TUS PRÓXIMAS RESERVAS';
+
+  @override
+  String get agendaPastAppointmentsHeading => 'TURNOS PASADOS';
+
+  @override
+  String get agendaGenericError => 'Hubo un problema. Intentá de nuevo.';
+
+  @override
+  String get agendaTrainerEmptyAvailability =>
+      'Todavía no configuraste tus horarios de trabajo. Agregá uno para que tus alumnos puedan reservar.';
+
+  @override
+  String get agendaConfigureHoursCta => 'CONFIGURAR HORARIOS';
+
+  @override
+  String get agendaMyWorkingHoursHeading => 'MIS HORARIOS DE TRABAJO';
+
+  @override
+  String get agendaAddRuleCta => 'AGREGAR HORARIO';
+
+  @override
+  String get agendaBlockDayCta => 'BLOQUEAR UN DÍA';
+
+  @override
+  String get agendaEditorTitle => 'Mis horarios';
+
+  @override
+  String get agendaRuleDeleteConfirm =>
+      '¿Borrar este horario? Las reservas existentes se mantienen.';
+
+  @override
+  String get agendaBookingCancelledByCoach =>
+      'Reserva cancelada por el entrenador.';
+
+  @override
+  String get agendaSlotFreeLabel => 'Disponible';
+
+  @override
+  String get agendaSlotBlockedLabel => 'Bloqueado';
+
+  @override
+  String agendaSlotBookedByLabel(String athleteName) {
+    return 'Reservado por $athleteName';
+  }
 }

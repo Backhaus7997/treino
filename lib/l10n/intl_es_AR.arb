@@ -91,5 +91,46 @@
   "coachEditorSubmit": "ASIGNAR PLAN",
   "coachEditorUpdateLabel": "GUARDAR CAMBIOS",
   "coachUpdatePlanSuccess": "Plan actualizado.",
-  "coachExercisePicker": "Buscar ejercicio"
+  "coachExercisePicker": "Buscar ejercicio",
+
+  "agendaButtonLabel": "VER AGENDA DEL PF",
+  "agendaScreenTitle": "Agenda",
+  "agendaEmptyAvailability": "Tu PF todavía no configuró horarios.",
+  "agendaBookingConfirmTitle": "Confirmar reserva",
+  "agendaBookingConfirmBody": "¿Confirmar reserva el {date} a las {time}?",
+  "@agendaBookingConfirmBody": {
+    "placeholders": {
+      "date": { "type": "String" },
+      "time": { "type": "String" }
+    }
+  },
+  "agendaBookingConfirmCta": "Confirmar",
+  "agendaBookingCancel": "Cancelar",
+  "agendaBookingSuccess": "Reserva confirmada.",
+  "agendaBookingRaceError": "Ese horario fue reservado justo ahora. Probá con otro.",
+  "agendaCancellationConfirmTitle": "Cancelar reserva",
+  "agendaCancellationConfirmBody": "¿Cancelar esta reserva?",
+  "agendaCancellationConfirmCta": "Sí, cancelar",
+  "agendaCancellationKeep": "No, mantener",
+  "agendaCancellationSuccess": "Reserva cancelada.",
+  "agendaCancellationTooLate": "No podés cancelar con menos de 24h de anticipación.",
+  "agendaUpcomingAppointmentsHeading": "TUS PRÓXIMAS RESERVAS",
+  "agendaPastAppointmentsHeading": "TURNOS PASADOS",
+  "agendaGenericError": "Hubo un problema. Intentá de nuevo.",
+  "agendaTrainerEmptyAvailability": "Todavía no configuraste tus horarios de trabajo. Agregá uno para que tus alumnos puedan reservar.",
+  "agendaConfigureHoursCta": "CONFIGURAR HORARIOS",
+  "agendaMyWorkingHoursHeading": "MIS HORARIOS DE TRABAJO",
+  "agendaAddRuleCta": "AGREGAR HORARIO",
+  "agendaBlockDayCta": "BLOQUEAR UN DÍA",
+  "agendaEditorTitle": "Mis horarios",
+  "agendaRuleDeleteConfirm": "¿Borrar este horario? Las reservas existentes se mantienen.",
+  "agendaBookingCancelledByCoach": "Reserva cancelada por el entrenador.",
+  "agendaSlotFreeLabel": "Disponible",
+  "agendaSlotBlockedLabel": "Bloqueado",
+  "agendaSlotBookedByLabel": "Reservado por {athleteName}",
+  "@agendaSlotBookedByLabel": {
+    "placeholders": {
+      "athleteName": { "type": "String" }
+    }
+  }
 }

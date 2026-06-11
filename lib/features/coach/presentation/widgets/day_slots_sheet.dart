@@ -3,8 +3,8 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../domain/appointment.dart';
+import '../../../../l10n/app_l10n.dart';
 import '../agenda_formatters.dart';
-import '../agenda_strings.dart';
 
 /// Bottom-sheet content shown when an athlete taps a calendar day.
 ///
@@ -68,7 +68,7 @@ class DaySlotsSheet extends StatelessWidget {
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 24),
                 child: Text(
-                  AgendaStrings.emptyAvailability,
+                  AppL10n.of(context).agendaEmptyAvailability,
                   style: GoogleFonts.barlow(
                     fontSize: 14,
                     color: palette.textMuted,
@@ -150,24 +150,29 @@ class DaySlotsSheet extends StatelessWidget {
   }
 
   Future<void> _onSlotTap(BuildContext context, DateTime slot) async {
+    final l10n = AppL10n.of(context);
     final confirmed = await _confirmDialog(
       context,
-      title: AgendaStrings.bookingConfirmTitle,
-      body: AgendaStrings.bookingConfirmBody(slot),
-      confirmLabel: AgendaStrings.bookingConfirmCta,
-      cancelLabel: AgendaStrings.bookingCancel,
+      title: l10n.agendaBookingConfirmTitle,
+      body: l10n.agendaBookingConfirmBody(
+        AgendaFormatters.formatDate(slot),
+        AgendaFormatters.formatTime(slot),
+      ),
+      confirmLabel: l10n.agendaBookingConfirmCta,
+      cancelLabel: l10n.agendaBookingCancel,
     );
     if (!confirmed) return;
     await onBookSlot(slot);
   }
 
   Future<void> _onCancelTap(BuildContext context, Appointment appt) async {
+    final l10n = AppL10n.of(context);
     final confirmed = await _confirmDialog(
       context,
-      title: AgendaStrings.cancellationConfirmTitle,
-      body: AgendaStrings.cancellationConfirmBody,
-      confirmLabel: AgendaStrings.cancellationConfirmCta,
-      cancelLabel: AgendaStrings.cancellationKeep,
+      title: l10n.agendaCancellationConfirmTitle,
+      body: l10n.agendaCancellationConfirmBody,
+      confirmLabel: l10n.agendaCancellationConfirmCta,
+      cancelLabel: l10n.agendaCancellationKeep,
     );
     if (!confirmed) return;
     await onCancelAppointment(appt);
