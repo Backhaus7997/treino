@@ -38,9 +38,9 @@ class _PlantillasSectionState extends ConsumerState<PlantillasSection> {
             color: palette.textPrimary,
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 10),
         const LevelFilterPills(),
-        const SizedBox(height: 14),
+        const SizedBox(height: 10),
         filteredAsync.when(
           data: (routines) {
             if (routines.isEmpty) {
@@ -73,7 +73,9 @@ class _PlantillasSectionState extends ConsumerState<PlantillasSection> {
                 crossAxisCount: 2,
                 crossAxisSpacing: 12,
                 mainAxisSpacing: 12,
-                childAspectRatio: 0.95,
+                // Flatter cards (was 0.95, near-square) → the catalogue block
+                // is shorter so HISTORIAL sits higher (device feedback).
+                childAspectRatio: 1.25,
               ),
               itemCount: itemCount,
               itemBuilder: (context, i) {
