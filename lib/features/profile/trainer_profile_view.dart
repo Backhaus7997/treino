@@ -60,7 +60,7 @@ class TrainerProfileView extends ConsumerWidget {
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 28),
-      physics: const ClampingScrollPhysics(),
+      physics: const AlwaysScrollableScrollPhysics(),
       children: [
         // Header — TU CUENTA / YO
         Text(

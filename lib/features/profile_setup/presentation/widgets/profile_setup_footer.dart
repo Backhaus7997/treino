@@ -12,6 +12,7 @@ class ProfileSetupFooter extends StatelessWidget {
     required this.onPrimary,
     this.onBack,
     this.primaryLabel,
+    this.primaryLoading = false,
   });
 
   /// `null` deshabilita el botón primario (step incompleto).
@@ -22,6 +23,10 @@ class ProfileSetupFooter extends StatelessWidget {
 
   /// Texto del CTA principal. En step 4 vale 'EMPEZAR' (cierra el flow).
   final String? primaryLabel;
+
+  /// `true` muestra el spinner en el CTA y lo deshabilita (submit en vuelo).
+  /// Evita doble-tap mientras el perfil se persiste en Firestore.
+  final bool primaryLoading;
 
   @override
   Widget build(BuildContext context) {
@@ -58,6 +63,7 @@ class ProfileSetupFooter extends StatelessWidget {
           child: AuthPillButton(
             label: primaryLabel ?? 'SIGUIENTE',
             onPressed: onPrimary,
+            isLoading: primaryLoading,
             showArrow: false,
           ),
         ),

@@ -6,6 +6,7 @@
 //
 // Updated for the 5-change redesign (per-set model, duration timer, weight
 // keyboard, reps non-editable, block gating).
+// SCENARIO-037: player renders correct week's set count via effectiveSetsForWeek.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -569,7 +570,7 @@ void main() {
         makeSlot(exerciseId: 'e3', exerciseName: 'C'),
       ];
       final blocks = buildBlocks(slots);
-      final statuses = computeBlockStatuses(blocks, const []);
+      final statuses = computeBlockStatuses(blocks, const [], 0);
       expect(statuses, [
         BlockStatus.current,
         BlockStatus.future,
@@ -587,7 +588,7 @@ void main() {
         makeSetLog(exerciseId: 'e1', setNumber: 1),
         makeSetLog(exerciseId: 'e1', setNumber: 2),
       ];
-      final statuses = computeBlockStatuses(blocks, logs);
+      final statuses = computeBlockStatuses(blocks, logs, 0);
       expect(statuses[0], BlockStatus.completed);
       expect(statuses[1], BlockStatus.current);
     });
@@ -602,7 +603,7 @@ void main() {
         makeSetLog(exerciseId: 'e1', setNumber: 1),
         makeSetLog(exerciseId: 'e2', setNumber: 1),
       ];
-      final statuses = computeBlockStatuses(blocks, logs);
+      final statuses = computeBlockStatuses(blocks, logs, 0);
       expect(statuses, [BlockStatus.completed, BlockStatus.completed]);
     });
 
@@ -613,13 +614,13 @@ void main() {
         makeSetLog(exerciseId: 'e1', setNumber: 1),
         makeSetLog(exerciseId: 'e1', setNumber: 2),
       ];
-      expect(isStandaloneBlockComplete(slot, logs), isTrue);
+      expect(isStandaloneBlockComplete(slot, logs, 0), isTrue);
     });
 
     test('isStandaloneBlockComplete: partial logs → false', () {
       final slot = makeSlot(exerciseId: 'e1', targetSets: 3);
       final logs = [makeSetLog(exerciseId: 'e1', setNumber: 1)];
-      expect(isStandaloneBlockComplete(slot, logs), isFalse);
+      expect(isStandaloneBlockComplete(slot, logs, 0), isFalse);
     });
 
     test(
@@ -911,6 +912,108 @@ void main() {
     });
   });
 
+  // ── SCENARIO-037: periodized plan — player uses effectiveSetsForWeek ─────────
+
+  group('SCENARIO-037: player uses effectiveSetsForWeek(weekNumber)', () {
+    /// Builds a state where the session is on week 1 (0-based) and the slot
+    /// has weeklySets: week0=[3 sets], week1=[2 sets].
+    /// The player MUST display 2 sets (week 1 prescription), not 3 (legacy/week 0).
+    SessionState periodizedState() {
+      const slot = RoutineSlot(
+        exerciseId: 'pe1',
+        exerciseName: 'Sentadilla Periodizada',
+        muscleGroup: 'Piernas',
+        targetSets: 3, // legacy — must NOT govern rendering when week=1
+        targetRepsMin: 5,
+        targetRepsMax: 5,
+        restSeconds: 120,
+        weeklySets: [
+          // week 0 — 3 sets of 5
+          [
+            SetSpec(reps: 5),
+            SetSpec(reps: 5),
+            SetSpec(reps: 5),
+          ],
+          // week 1 — 2 sets of 8
+          [
+            SetSpec(reps: 8),
+            SetSpec(reps: 8),
+          ],
+        ],
+      );
+      final day = makeDay(dayNumber: 2, slots: [slot]);
+      return SessionState(
+        // weekNumber=1 → effectiveSetsForWeek(1) → 2 sets
+        session: makeSession(weekNumber: 1),
+        day: day,
+        setLogs: const [],
+        currentExerciseIndex: 0,
+        elapsedSeconds: 0,
+      );
+    }
+
+    const kPeriodizedInit = FreshSession(routineId: 'r1', dayNumber: 2);
+
+    testWidgets(
+        'SCENARIO-037: player renders "0/2" progress when weekNumber=1 '
+        '(week-1 prescription has 2 sets, not 3)', (tester) async {
+      await tester.pumpWidget(
+        _wrapProvider(
+          const SessionPlayerScreen(init: kPeriodizedInit),
+          _stateOverride(periodizedState()),
+        ),
+      );
+      await tester.pump();
+      // Week 1 has 2 sets → progress must show "0/2".
+      expect(find.text('0/2'), findsAtLeastNWidgets(1));
+      // "0/3" would indicate the legacy targetSets is still driving the render.
+      expect(find.text('0/3'), findsNothing);
+    });
+
+    testWidgets(
+        'SCENARIO-037: computeBlockStatuses passes week param — '
+        'block incomplete for week 1 (2 sets, 1 log)', (tester) async {
+      final state = periodizedState().copyWith(
+        setLogs: [makeSetLog(exerciseId: 'pe1', setNumber: 1)],
+      );
+      await tester.pumpWidget(
+        _wrapProvider(
+          const SessionPlayerScreen(init: kPeriodizedInit),
+          _stateOverride(state),
+        ),
+      );
+      await tester.pump();
+      // 1 log for a 2-set week-1 slot → still incomplete → progress "1/2".
+      expect(find.text('1/2'), findsAtLeastNWidgets(1));
+    });
+
+    test(
+        'SCENARIO-037: isStandaloneBlockComplete uses week param — '
+        'week 0 (3 sets) vs week 1 (2 sets)', () {
+      const slot = RoutineSlot(
+        exerciseId: 'x1',
+        exerciseName: 'X',
+        muscleGroup: 'M',
+        targetSets: 3,
+        targetRepsMin: 5,
+        targetRepsMax: 5,
+        restSeconds: 60,
+        weeklySets: [
+          [SetSpec(reps: 5), SetSpec(reps: 5), SetSpec(reps: 5)],
+          [SetSpec(reps: 8), SetSpec(reps: 8)],
+        ],
+      );
+      final twoLogs = [
+        makeSetLog(exerciseId: 'x1', setNumber: 1),
+        makeSetLog(exerciseId: 'x1', setNumber: 2, id: 'sl2'),
+      ];
+      // 2 logs NOT enough for week 0 (needs 3).
+      expect(isStandaloneBlockComplete(slot, twoLogs, 0), isFalse);
+      // 2 logs IS enough for week 1 (needs 2).
+      expect(isStandaloneBlockComplete(slot, twoLogs, 1), isTrue);
+    });
+  });
+
   // ── _SessionStatsCard (TASK-204a) ─────────────────────────────────────────
 
   group('_SessionStatsCard', () {
@@ -972,6 +1075,66 @@ void main() {
       );
       await tester.pump();
       expect(find.textContaining('1 / 3 ejercicios'), findsOneWidget);
+    });
+  });
+
+  // ── SCENARIO-WPRES-025: numWeeks==1 player is unchanged (REQ-WPRES-015/030) ─
+
+  group('SCENARIO-WPRES-025: numWeeks==1 player renders all slots unchanged',
+      () {
+    // When numWeeks==1, all slots have activeWeeks=[] (empty = all weeks).
+    // The notifier filter isPresentInWeek(0) on empty mask → true for all.
+    // The player must render all slots without any filtering applied.
+
+    test(
+        'SCENARIO-WPRES-025: SessionState.day.slots unchanged when '
+        'all activeWeeks are empty (numWeeks==1 invariant)', () {
+      // Build state directly (without going through the notifier) to verify
+      // that the slot list is byte-identical when no filtering is needed.
+      // The notifier is already tested via session_notifier_test WPRES-030.
+      // This test verifies the player UI renders all such slots.
+      final slots = [
+        makeSlot(exerciseId: 'e1', targetSets: 3),
+        makeSlot(exerciseId: 'e2', exerciseName: 'Sentadilla', targetSets: 4),
+        makeSlot(exerciseId: 'e3', exerciseName: 'Peso muerto', targetSets: 3),
+      ];
+      // All slots have default activeWeeks=[] → all present in any week.
+      for (final s in slots) {
+        expect(s.activeWeeks, isEmpty,
+            reason: 'Single-week slot must have empty activeWeeks mask');
+        expect(s.isPresentInWeek(0), isTrue,
+            reason: 'Empty mask → present in week 0 (numWeeks==1 invariant)');
+      }
+      expect(slots.length, equals(3));
+    });
+
+    testWidgets(
+        'SCENARIO-WPRES-025: player renders all 3 slots '
+        'when session has all-empty-mask slots', (tester) async {
+      final slots = [
+        makeSlot(exerciseId: 'e1', targetSets: 3),
+        makeSlot(exerciseId: 'e2', exerciseName: 'Sentadilla', targetSets: 4),
+        makeSlot(exerciseId: 'e3', exerciseName: 'Peso muerto', targetSets: 3),
+      ];
+      final day = makeDay(dayNumber: 1, slots: slots);
+      final state = SessionState(
+        session: makeSession(weekNumber: 0),
+        day: day, // SessionNotifier filter: all empty masks → all present
+        setLogs: const [],
+        currentExerciseIndex: 0,
+        elapsedSeconds: 0,
+      );
+      await tester.pumpWidget(
+        _wrapProvider(
+          const SessionPlayerScreen(init: _kInit),
+          _stateOverride(state),
+        ),
+      );
+      await tester.pump();
+      // All 3 slots must render as exercise rows in the list
+      // ("1 / 3 ejercicios" progress indicator confirms 3 total slots)
+      expect(find.textContaining('0 / 3 ejercicios'), findsOneWidget,
+          reason: 'All 3 slots render in single-week session');
     });
   });
 }

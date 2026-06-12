@@ -638,4 +638,85 @@ void main() {
       expect(find.text('PPL · DÍA 1'), findsOneWidget);
     });
   });
+
+  // ── SCENARIO-WPRES-035 — single-week plan regression (REQ-WPRES-030) ───────
+
+  group('SCENARIO-WPRES-035 — single-week plan edit/save round-trip unchanged',
+      () {
+    // Verifies the REQ-WPRES-030 hard invariant: single-week routines must
+    // produce no behavioral change — no filtering, no "Sin ejercicios" message,
+    // all slots rendered identically to pre-change behavior.
+
+    testWidgets(
+        'SCENARIO-WPRES-035a: single-week routine renders all slots (no presence filter)',
+        (tester) async {
+      // Slots with explicitly empty activeWeeks (as serialized by a round-trip)
+      const slotA = RoutineSlot(
+        exerciseId: 'bench',
+        exerciseName: 'Press Banca',
+        muscleGroup: 'Pecho',
+        targetSets: 4,
+        targetRepsMin: 8,
+        targetRepsMax: 12,
+        restSeconds: 90,
+        // activeWeeks: [] default — identical to pre-change
+      );
+      const slotB = RoutineSlot(
+        exerciseId: 'squat',
+        exerciseName: 'Sentadilla',
+        muscleGroup: 'Piernas',
+        targetSets: 4,
+        targetRepsMin: 6,
+        targetRepsMax: 10,
+        restSeconds: 120,
+        // activeWeeks: [] default — identical to pre-change
+      );
+      const routine = Routine(
+        id: 'single-week-rt',
+        name: 'Plan Simple',
+        level: ExperienceLevel.beginner,
+        days: [
+          RoutineDay(dayNumber: 1, name: 'Push', slots: [slotA, slotB])
+        ],
+        numWeeks: 1, // single-week plan
+      );
+      await tester.pumpWidget(_wrapWithOverrides(
+        RoutineDetailScreen(routineId: routine.id),
+        [
+          routineByIdProvider(routine.id).overrideWith((ref) async => routine),
+        ],
+      ));
+      await tester.pump(const Duration(milliseconds: 50));
+
+      // Both slots must render — no filtering on single-week plan
+      expect(find.byType(ExerciseSlotRow), findsNWidgets(2),
+          reason: 'Single-week plan: all slots rendered, no filter');
+      // No "Sin ejercicios" message (that is only for multi-week empty days)
+      expect(
+        find.textContaining('Sin ejercicios', skipOffstage: false),
+        findsNothing,
+        reason: 'No "Sin ejercicios" message on single-week plan',
+      );
+    });
+
+    testWidgets(
+        'SCENARIO-WPRES-035b: activeWeeks stays empty in domain object after round-trip',
+        (tester) async {
+      // Verifies the domain invariant: single-week slots always have
+      // activeWeeks == [] so the presence filter is a no-op.
+      const slot = RoutineSlot(
+        exerciseId: 'bench',
+        exerciseName: 'Press Banca',
+        muscleGroup: 'Pecho',
+        targetSets: 3,
+        targetRepsMin: 8,
+        targetRepsMax: 12,
+        restSeconds: 90,
+      );
+      expect(slot.activeWeeks, isEmpty,
+          reason: 'Default slot has empty activeWeeks (single-week invariant)');
+      expect(slot.isPresentInWeek(0), isTrue,
+          reason: 'Empty mask → present in week 0');
+    });
+  });
 }

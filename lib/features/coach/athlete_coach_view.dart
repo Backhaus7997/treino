@@ -178,8 +178,11 @@ class _LinkStateCard extends ConsumerWidget {
     final pubAsync = ref.watch(userPublicProfileProvider(link.trainerId));
 
     return ListView(
-      padding: const EdgeInsets.symmetric(vertical: 20),
-      physics: const ClampingScrollPhysics(),
+      // + bottom inset: the floating bar overlays the body (extendBody),
+      // so the last item needs room to scroll out from behind it.
+      padding: EdgeInsets.fromLTRB(
+          0, 20, 0, 20 + MediaQuery.paddingOf(context).bottom),
+      physics: const AlwaysScrollableScrollPhysics(),
       children: [
         Container(
           decoration: BoxDecoration(

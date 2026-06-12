@@ -10,7 +10,11 @@ import '../../../l10n/app_l10n.dart';
 import '../../profile/application/user_providers.dart' show userProfileProvider;
 import '../../profile/application/user_public_profile_providers.dart';
 import '../../profile/domain/user_role.dart';
+import '../application/plan_gating.dart';
+import '../application/plan_progress.dart' show CompletedKey;
 import '../application/routine_providers.dart';
+import '../application/session_providers.dart'
+    show currentUidProvider, planProgressProvider;
 import '../domain/routine.dart';
 import '../domain/routine_day.dart';
 import '../domain/routine_slot.dart';
@@ -33,6 +37,9 @@ class RoutineDetailScreen extends ConsumerStatefulWidget {
 
 class _RoutineDetailScreenState extends ConsumerState<RoutineDetailScreen> {
   int selectedDayIndex = 0;
+
+  /// 0-based selected week index. Only used when routine.numWeeks > 1.
+  int selectedWeekIndex = 0;
 
   @override
   Widget build(BuildContext context) {
@@ -62,7 +69,9 @@ class _RoutineDetailScreenState extends ConsumerState<RoutineDetailScreen> {
                 routine: routine,
                 day: day,
                 selectedDayIndex: dayIndex,
+                selectedWeekIndex: selectedWeekIndex,
                 onSelectDay: (i) => setState(() => selectedDayIndex = i),
+                onSelectWeek: (i) => setState(() => selectedWeekIndex = i),
                 onSlotTap: (slot) {
                   // Pass the routine owner's uid as `ownerId` so the detail
                   // screen can fall back to that owner's customExercises
@@ -124,19 +133,26 @@ class _BackBar extends StatelessWidget {
 // Happy-path content
 // ---------------------------------------------------------------------------
 
-class _RoutineDetailContent extends StatelessWidget {
+class _RoutineDetailContent extends ConsumerWidget {
   const _RoutineDetailContent({
     required this.routine,
     required this.day,
     required this.selectedDayIndex,
+    required this.selectedWeekIndex,
     required this.onSelectDay,
+    required this.onSelectWeek,
     required this.onSlotTap,
   });
 
   final Routine routine;
   final RoutineDay day;
   final int selectedDayIndex;
+
+  /// 0-based week index. Ignored when routine.numWeeks == 1.
+  final int selectedWeekIndex;
+
   final ValueChanged<int> onSelectDay;
+  final ValueChanged<int> onSelectWeek;
   final ValueChanged<RoutineSlot> onSlotTap;
 
   int _totalSets(RoutineDay d) =>
@@ -153,8 +169,24 @@ class _RoutineDetailContent extends StatelessWidget {
   /// Ordinals stay absolute over the whole day (a superset at positions 3–4
   /// shows "3" and "4"), so the numbering reads as one continuous list. A lone
   /// tagged slot (run length < 2) renders standalone — no "superset of one".
-  List<Widget> _buildExerciseList() {
-    final slots = day.slots;
+  ///
+  /// [viewedWeek] is passed down to ExerciseSlotRow for week-aware prescription
+  /// display (REQ-PERIOD-041).
+  ///
+  /// When [isPeriodized] is true, slots are pre-filtered by
+  /// `isPresentInWeek(viewedWeek)` before grouping (ADR-WPRES-07, REQ-WPRES-020).
+  /// Absent superset members are naturally excluded; a group reduced to 1 member
+  /// falls back to a standalone ExerciseSlotRow (existing run-length < 2 path).
+  List<Widget> _buildExerciseList(int viewedWeek, {bool isPeriodized = false}) {
+    // REQ-WPRES-020: filter by presence when numWeeks > 1.
+    // REQ-WPRES-015: numWeeks==1 → isPeriodized is false → no filter applied.
+    final slots = isPeriodized
+        ? [
+            for (final s in day.slots)
+              if (s.isPresentInWeek(viewedWeek)) s
+          ]
+        : day.slots;
+
     final widgets = <Widget>[];
     var i = 0;
     while (i < slots.length) {
@@ -167,7 +199,11 @@ class _RoutineDetailContent extends StatelessWidget {
           scan++;
         }
         if (items.length >= 2) {
-          widgets.add(_SupersetBlock(items: items, onSlotTap: onSlotTap));
+          widgets.add(_SupersetBlock(
+            items: items,
+            onSlotTap: onSlotTap,
+            viewedWeek: viewedWeek,
+          ));
           widgets.add(const SizedBox(height: 12));
           i = scan;
           continue;
@@ -177,6 +213,7 @@ class _RoutineDetailContent extends StatelessWidget {
       widgets.add(ExerciseSlotRow(
         slot: slot,
         index: i + 1,
+        week: viewedWeek,
         onTap: () => onSlotTap(slot),
       ));
       widgets.add(const SizedBox(height: 12));
@@ -185,8 +222,34 @@ class _RoutineDetailContent extends StatelessWidget {
     return widgets;
   }
 
+  /// Returns the exercise list widgets, or an informational "no exercises this
+  /// week" message when all slots are filtered out by presence.
+  ///
+  /// REQ-WPRES-028: zero present slots in [viewedWeek] → show info, not a lock.
+  /// REQ-WPRES-015: [isPeriodized] is false for single-week plans → no filter.
+  List<Widget> _buildPresenceFilteredSection(
+    int viewedWeek,
+    bool isPeriodized,
+  ) {
+    // Build the list (filtering applied inside _buildExerciseList when needed).
+    final exerciseWidgets =
+        _buildExerciseList(viewedWeek, isPeriodized: isPeriodized);
+    if (isPeriodized && exerciseWidgets.isEmpty) {
+      // All slots absent for this week → informational message (not a lock).
+      return const [_EmptyState(message: 'Sin ejercicios esta semana')];
+    }
+    return exerciseWidgets;
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // REQ-PERIOD-042 HARD INVARIANT: when numWeeks == 1, render the
+    // single-week path untouched — no week selector, no locks, all days free.
+    final isPeriodized = routine.numWeeks > 1;
+
+    // For single-week plans the viewed week is always 0.
+    final viewedWeek = isPeriodized ? selectedWeekIndex : 0;
+
     return CustomScrollView(
       slivers: [
         SliverToBoxAdapter(
@@ -198,7 +261,8 @@ class _RoutineDetailContent extends StatelessWidget {
           ),
         ),
         SliverPadding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
+          padding: EdgeInsets.fromLTRB(
+              20, 0, 20, MediaQuery.paddingOf(context).bottom),
           sliver: SliverList(
             delegate: SliverChildListDelegate([
               const SizedBox(height: 20),
@@ -219,6 +283,15 @@ class _RoutineDetailContent extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 18),
+              // ── Periodized: week selector above the day selector ────────────
+              if (isPeriodized) ...[
+                _WeekSelector(
+                  numWeeks: routine.numWeeks,
+                  selectedIndex: viewedWeek,
+                  onSelect: onSelectWeek,
+                ),
+                const SizedBox(height: 12),
+              ],
               if (routine.days.length > 1) ...[
                 _DaySelector(
                   days: routine.days,
@@ -232,9 +305,19 @@ class _RoutineDetailContent extends StatelessWidget {
               if (day.slots.isEmpty)
                 const _EmptyState(message: 'No hay ejercicios en este día')
               else
-                ..._buildExerciseList(),
+                // REQ-WPRES-020: filter by presence when periodized.
+                // REQ-WPRES-028: zero present slots → show info message.
+                ..._buildPresenceFilteredSection(viewedWeek, isPeriodized),
               const SizedBox(height: 20),
-              _StartSessionCTABar(routine: routine, day: day),
+              // CTA bar — periodized vs single-week
+              if (isPeriodized)
+                _PeriodizedCTABar(
+                  routine: routine,
+                  day: day,
+                  viewedWeek: viewedWeek,
+                )
+              else
+                _StartSessionCTABar(routine: routine, day: day),
               const SizedBox(height: 18),
             ]),
           ),
@@ -253,10 +336,17 @@ class _RoutineDetailContent extends StatelessWidget {
 /// athlete can tell those movements run back-to-back. Inner rows reuse
 /// [ExerciseSlotRow] verbatim — same card, same tap target.
 class _SupersetBlock extends StatelessWidget {
-  const _SupersetBlock({required this.items, required this.onSlotTap});
+  const _SupersetBlock({
+    required this.items,
+    required this.onSlotTap,
+    this.viewedWeek = 0,
+  });
 
   final List<({int index, RoutineSlot slot})> items;
   final ValueChanged<RoutineSlot> onSlotTap;
+
+  /// 0-based week for week-aware prescription display (REQ-PERIOD-041).
+  final int viewedWeek;
 
   @override
   Widget build(BuildContext context) {
@@ -294,6 +384,7 @@ class _SupersetBlock extends StatelessWidget {
             ExerciseSlotRow(
               slot: entry.slot,
               index: entry.index + 1,
+              week: viewedWeek,
               onTap: () => onSlotTap(entry.slot),
             ),
             if (entry.index != items.last.index) const SizedBox(height: 8),
@@ -573,6 +664,265 @@ class _DaySelector extends StatelessWidget {
           );
         }),
       ),
+    );
+  }
+}
+
+/// Week selector chips for periodized plans. Displays "SEM N" (1-based) for
+/// each week. Viewing any week is always free (REQ-PERIOD-035).
+class _WeekSelector extends StatelessWidget {
+  const _WeekSelector({
+    required this.numWeeks,
+    required this.selectedIndex,
+    required this.onSelect,
+  });
+
+  final int numWeeks;
+  final int selectedIndex;
+  final ValueChanged<int> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: List.generate(numWeeks, (i) {
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: ChoiceChip(
+              label: Text(
+                'SEM ${i + 1}',
+                style: GoogleFonts.barlowCondensed(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 11,
+                  letterSpacing: 1.2,
+                  color: i == selectedIndex ? palette.bg : palette.textMuted,
+                ),
+              ),
+              selected: i == selectedIndex,
+              onSelected: (_) => onSelect(i),
+              selectedColor: palette.accent,
+              backgroundColor: palette.bgCard,
+              side: BorderSide(color: palette.border),
+              showCheckmark: false,
+            ),
+          );
+        }),
+      ),
+    );
+  }
+}
+
+/// Start CTA for periodized plans (numWeeks > 1). Reads [planProgressProvider]
+/// to determine the active (week, day) and to show gating affordances for the
+/// currently viewed (week, day) combination.
+///
+/// REQ-PERIOD-033/034/035/036/037/042.
+class _PeriodizedCTABar extends ConsumerWidget {
+  const _PeriodizedCTABar({
+    required this.routine,
+    required this.day,
+    required this.viewedWeek,
+  });
+
+  final Routine routine;
+  final RoutineDay day;
+
+  /// 0-based week currently displayed by the parent screen.
+  final int viewedWeek;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Trainers coach — read-only view.
+    final role = ref.watch(
+      userProfileProvider.select((async) => async.valueOrNull?.role),
+    );
+    if (role == UserRole.trainer) return const SizedBox.shrink();
+
+    final uid = ref.watch(currentUidProvider) ?? '';
+    // dayNumbers is kept locally for gating function calls below.
+    // planProgressProvider resolves dayNumbers/numWeeks internally via
+    // routineByIdProvider — key uses only String fields for structural equality.
+    final dayNumbers =
+        routine.days.map((d) => d.dayNumber).toList(growable: false);
+    final progressAsync = ref.watch(planProgressProvider((
+      uid: uid,
+      routineId: routine.id,
+    )));
+
+    return progressAsync.when(
+      loading: () => const SizedBox(height: 56),
+      error: (_, __) => const SizedBox.shrink(),
+      data: (progress) {
+        final palette = AppPalette.of(context);
+
+        // Plan-complete banner (REQ-PERIOD-037, SCENARIO-036).
+        if (progress.planComplete) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 18),
+            child: Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: palette.accent.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: palette.accent),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(TreinoIcon.check, size: 20, color: palette.accent),
+                  const SizedBox(width: 10),
+                  Text(
+                    'PLAN COMPLETADO',
+                    style: GoogleFonts.barlowCondensed(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 16,
+                      letterSpacing: 1.2,
+                      color: palette.accent,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        // REQ-WPRES-022: compute requiredPairs so gating functions know which
+        // (week, day) combos have zero present slots (auto-satisfied).
+        // Mirrors planProgressProvider's requiredPairs computation so gating
+        // here stays consistent with the progress derivation.
+        final requiredPairs = <CompletedKey>{};
+        for (var w = 0; w < routine.numWeeks; w++) {
+          for (final d in routine.days) {
+            final hasPresent = d.slots.any((s) => s.isPresentInWeek(w));
+            if (hasPresent) {
+              requiredPairs.add((week: w, day: d.dayNumber));
+            }
+          }
+        }
+
+        final viewedDay = day.dayNumber;
+        final weekLocked = !isWeekUnlocked(
+          viewedWeek,
+          progress.completed,
+          dayNumbers,
+          requiredPairs: requiredPairs,
+        );
+        final dayLocked = !isDayUnlocked(
+          viewedWeek,
+          viewedDay,
+          progress.completed,
+          dayNumbers,
+          requiredPairs: requiredPairs,
+        );
+        final alreadyDone =
+            progress.completed.contains((week: viewedWeek, day: viewedDay));
+
+        // Already completed this (week, day).
+        if (alreadyDone) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 18),
+            child: Container(
+              height: 56,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: palette.bgCard,
+                borderRadius: BorderRadius.circular(9999),
+                border: Border.all(color: palette.border),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(TreinoIcon.check, size: 16, color: palette.accent),
+                  const SizedBox(width: 8),
+                  Text(
+                    'COMPLETADO',
+                    style: GoogleFonts.barlowCondensed(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                      letterSpacing: 1.2,
+                      color: palette.accent,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        // Locked (week or day not yet unlocked).
+        if (weekLocked || dayLocked) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 18),
+            child: Container(
+              height: 56,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: palette.bgCard,
+                borderRadius: BorderRadius.circular(9999),
+                border: Border.all(color: palette.border),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(TreinoIcon.lock, size: 16, color: palette.textMuted),
+                  const SizedBox(width: 8),
+                  Text(
+                    weekLocked ? 'SEMANA BLOQUEADA' : 'DÍA BLOQUEADO',
+                    style: GoogleFonts.barlowCondensed(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                      letterSpacing: 1.2,
+                      color: palette.textMuted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        // Startable — show active CTA with the correct week.
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 18),
+          child: Row(
+            children: [
+              Expanded(
+                child: ElevatedButton(
+                  // By this point alreadyDone, weekLocked, and dayLocked have
+                  // all early-returned above, so this day is always startable.
+                  onPressed: () {
+                    ref.read(analyticsServiceProvider).logRoutineStarted(
+                          routineId: routine.id,
+                          routineName: routine.name,
+                        );
+                    context.push(
+                      '/workout/session/${routine.id}/${day.dayNumber}?week=$viewedWeek',
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: palette.accent,
+                    minimumSize: const Size.fromHeight(56),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(9999),
+                    ),
+                  ),
+                  child: Text(
+                    'EMPEZAR',
+                    style: GoogleFonts.barlowCondensed(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 16,
+                      letterSpacing: 1.0,
+                      color: palette.bg,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

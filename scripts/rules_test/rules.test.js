@@ -467,3 +467,183 @@ test('SCENARIO-608b: non-owner cannot update status of another user\'s routine',
     }),
   );
 });
+
+// ---------------------------------------------------------------------------
+// routines periodization — SCENARIO-PERIOD-050..054
+// REQ-PERIOD-050, REQ-PERIOD-052, REQ-PERIOD-054, REQ-PERIOD-064.
+// numWeeks was added to BOTH hasOnly clauses of the three routine UPDATE
+// paths (user-owned / trainer-assigned / trainer-template). Executable
+// versions of the emulator-deferred Dart stubs in
+// test/features/workout/data/routine_rules_test.dart.
+// ---------------------------------------------------------------------------
+
+// SCENARIO-PERIOD-050: owner content-update INCLUDING numWeeks is allowed.
+test('SCENARIO-PERIOD-050: owner can update content fields including numWeeks', async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await ctx.firestore().collection('routines').doc('r-p050').set({
+      ...validUserCreated('athlete-a'),
+      numWeeks: 1,
+    });
+  });
+
+  const athleteA = testEnv.authenticatedContext('athlete-a');
+  await assertSucceeds(
+    athleteA.firestore().collection('routines').doc('r-p050').update({
+      name: 'Plan periodizado',
+      numWeeks: 4,
+    }),
+  );
+});
+
+// SCENARIO-PERIOD-051: the affectedKeys trap — a LEGACY doc (no numWeeks
+// field) updated by a new client that always sends numWeeks. The key APPEARS
+// in the diff, so it counts as affected even at the semantic default 1.
+test('SCENARIO-PERIOD-051: numWeeks-only diff on a legacy doc is allowed (affectedKeys trap)', async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    // Seeded WITHOUT numWeeks — simulates every pre-periodization doc.
+    await ctx.firestore().collection('routines').doc('r-p051').set(
+      validUserCreated('athlete-a'),
+    );
+  });
+
+  const athleteA = testEnv.authenticatedContext('athlete-a');
+  await assertSucceeds(
+    athleteA.firestore().collection('routines').doc('r-p051').update({
+      numWeeks: 1,
+    }),
+  );
+});
+
+// SCENARIO-PERIOD-052: non-owner touching numWeeks is denied.
+test('SCENARIO-PERIOD-052: non-owner cannot update numWeeks', async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await ctx.firestore().collection('routines').doc('r-p052').set(
+      validUserCreated('athlete-a'),
+    );
+  });
+
+  const athleteB = testEnv.authenticatedContext('athlete-b');
+  await assertFails(
+    athleteB.firestore().collection('routines').doc('r-p052').update({
+      numWeeks: 4,
+    }),
+  );
+});
+
+// SCENARIO-PERIOD-054: a NEW client creates a routine with numWeeks present
+// (Routine.toJson() always serializes it) — the create rule must accept it.
+test('SCENARIO-PERIOD-054: owner create with numWeeks present succeeds', async () => {
+  const athleteA = testEnv.authenticatedContext('athlete-a');
+  await assertSucceeds(
+    athleteA.firestore().collection('routines').doc('r-p054').set({
+      ...validUserCreated('athlete-a'),
+      numWeeks: 4,
+    }),
+  );
+});
+
+// ---------------------------------------------------------------------------
+// per-week presence (periodization-week-presence) — SCENARIO-WPRES-RULES-01/02
+// REQ-WPRES-005: activeWeeks is nested inside days[].slots[], NOT top-level.
+// The existing hasOnly guard on `days` already covers nested mutations.
+// VERIFY-don't-assume: these tests confirm no rules change is required.
+// ---------------------------------------------------------------------------
+
+// SCENARIO-WPRES-RULES-01: owner update adding activeWeeks inside a slot
+// (nested in days) is ALLOWED — existing rules already cover it.
+test('SCENARIO-WPRES-RULES-01: owner update adding activeWeeks inside a slot is allowed', async () => {
+  // Seed a routine without activeWeeks — simulates a pre-change doc.
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await ctx.firestore().collection('routines').doc('r-wpres-01').set({
+      ...validUserCreated('athlete-a'),
+      numWeeks: 2,
+      days: [
+        {
+          dayNumber: 1,
+          name: 'Day 1',
+          slots: [
+            {
+              exerciseId: 'bench-press',
+              exerciseName: 'Bench Press',
+              muscleGroup: 'chest',
+              targetSets: 3,
+              targetRepsMin: 8,
+              targetRepsMax: 12,
+              restSeconds: 90,
+              // No activeWeeks — simulates legacy doc
+            },
+          ],
+        },
+      ],
+    });
+  });
+
+  const athleteA = testEnv.authenticatedContext('athlete-a');
+  // Update: add activeWeeks inside a slot nested in days.
+  // activeWeeks is NOT a new top-level key — it lives inside days[].slots[].
+  // The hasOnly guard checks top-level keys only; days is already allowed.
+  await assertSucceeds(
+    athleteA.firestore().collection('routines').doc('r-wpres-01').update({
+      numWeeks: 2,
+      days: [
+        {
+          dayNumber: 1,
+          name: 'Day 1',
+          slots: [
+            {
+              exerciseId: 'bench-press',
+              exerciseName: 'Bench Press',
+              muscleGroup: 'chest',
+              targetSets: 3,
+              targetRepsMin: 8,
+              targetRepsMax: 12,
+              restSeconds: 90,
+              activeWeeks: [0], // NEW: presence mask — nested in days, not top-level
+            },
+          ],
+        },
+      ],
+    }),
+  );
+});
+
+// SCENARIO-WPRES-RULES-02 (negative control): same update PLUS a bogus
+// top-level key is DENIED — hasOnly guard still bites; nothing was loosened.
+test('SCENARIO-WPRES-RULES-02: update with bogus top-level key is denied (guard still works)', async () => {
+  // Seed a routine.
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await ctx.firestore().collection('routines').doc('r-wpres-02').set({
+      ...validUserCreated('athlete-a'),
+      numWeeks: 2,
+      days: [],
+    });
+  });
+
+  const athleteA = testEnv.authenticatedContext('athlete-a');
+  // Same slot-level activeWeeks mutation PLUS a bogus top-level field.
+  // The bogus key is not in hasOnly → must be DENIED.
+  await assertFails(
+    athleteA.firestore().collection('routines').doc('r-wpres-02').update({
+      numWeeks: 2,
+      days: [
+        {
+          dayNumber: 1,
+          name: 'Day 1',
+          slots: [
+            {
+              exerciseId: 'bench-press',
+              exerciseName: 'Bench Press',
+              muscleGroup: 'chest',
+              targetSets: 3,
+              targetRepsMin: 8,
+              targetRepsMax: 12,
+              restSeconds: 90,
+              activeWeeks: [0],
+            },
+          ],
+        },
+      ],
+      bogusTopLevelField: 'this should not be allowed', // NOT in hasOnly
+    }),
+  );
+});

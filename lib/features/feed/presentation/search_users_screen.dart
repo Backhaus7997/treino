@@ -259,8 +259,9 @@ class _SearchBody extends ConsumerWidget {
           );
         }
         return ListView.separated(
-          physics: const ClampingScrollPhysics(),
-          padding: const EdgeInsets.symmetric(horizontal: 20),
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: EdgeInsets.fromLTRB(
+              20, 0, 20, MediaQuery.paddingOf(context).bottom),
           itemCount: users.length,
           separatorBuilder: (_, __) => const SizedBox(height: 8),
           itemBuilder: (_, i) {

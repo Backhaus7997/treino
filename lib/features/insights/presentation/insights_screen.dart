@@ -26,47 +26,42 @@ class InsightsScreen extends ConsumerWidget {
       children: [
         _InsightsHeader(),
         Expanded(
-          child: ScrollConfiguration(
-            behavior: ScrollConfiguration.of(context).copyWith(
-              physics: const ClampingScrollPhysics(),
-              overscroll: false,
+          child: async.when(
+            loading: () => Center(
+              child: CircularProgressIndicator(color: palette.accent),
             ),
-            child: async.when(
-              loading: () => Center(
-                child: CircularProgressIndicator(color: palette.accent),
-              ),
-              error: (_, __) => Center(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Text(
-                    'No pudimos cargar tus insights.',
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.barlow(
-                      fontSize: 14,
-                      color: palette.textMuted,
-                    ),
+            error: (_, __) => Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Text(
+                  'No pudimos cargar tus insights.',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.barlow(
+                    fontSize: 14,
+                    color: palette.textMuted,
                   ),
                 ),
               ),
-              data: (insights) {
-                if (insights == null || insights.sessionsCount == 0) {
-                  return const _EmptyState();
-                }
-                return ListView(
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-                  physics: const ClampingScrollPhysics(),
-                  children: [
-                    _WeekStripCard(insights: insights),
-                    const SizedBox(height: 14),
-                    _MusclesCard(insights: insights),
-                    const SizedBox(height: 14),
-                    _VolumeBarCard(insights: insights),
-                    const SizedBox(height: 20),
-                    _VolverButton(),
-                  ],
-                );
-              },
             ),
+            data: (insights) {
+              if (insights == null || insights.sessionsCount == 0) {
+                return const _EmptyState();
+              }
+              return ListView(
+                padding: EdgeInsets.fromLTRB(
+                    20, 12, 20, 20 + MediaQuery.paddingOf(context).bottom),
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: [
+                  _WeekStripCard(insights: insights),
+                  const SizedBox(height: 14),
+                  _MusclesCard(insights: insights),
+                  const SizedBox(height: 14),
+                  _VolumeBarCard(insights: insights),
+                  const SizedBox(height: 20),
+                  _VolverButton(),
+                ],
+              );
+            },
           ),
         ),
       ],

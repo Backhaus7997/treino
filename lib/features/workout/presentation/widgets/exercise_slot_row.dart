@@ -5,6 +5,8 @@ import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/treino_icon.dart';
 import '../../domain/reps_format.dart';
 import '../../domain/routine_slot.dart';
+import '../../domain/set_enums.dart';
+import '../../domain/set_spec.dart';
 
 /// Tappeable row that displays one [RoutineSlot] inside [RoutineDetailScreen].
 /// Receives all data by constructor — no ref.watch / ref.read.
@@ -15,6 +17,7 @@ class ExerciseSlotRow extends StatelessWidget {
     required this.index,
     required this.onTap,
     this.lastWeightDisplay,
+    this.week = 0,
   });
 
   final RoutineSlot slot;
@@ -27,13 +30,73 @@ class ExerciseSlotRow extends StatelessWidget {
   /// null → renders dash inside the ÚLTIMO badge (Fase 2 state).
   final String? lastWeightDisplay;
 
-  /// Builds the sets·reps/duration summary string with new-model-first fallback.
+  /// 0-based week index for week-aware prescription display (REQ-PERIOD-041).
+  /// Default 0 keeps single-week callers unchanged (backward-compat).
+  final int week;
+
+  /// Builds the sets·reps/duration summary string for the given [week].
   ///
-  /// Priority:
-  ///  1. durationSeconds > 0 → "<sets> · MM:SS"
-  ///  2. targetReps non-empty → "<sets> · <formatted reps>"
-  ///  3. Legacy → "<sets> · <min>–<max>"
-  static String _setsRepsSummary(RoutineSlot slot) {
+  /// Uses [slot.effectiveSetsForWeek(week)] when [slot.weeklySets] is
+  /// populated; falls back to legacy scalar fields for single-week slots.
+  ///
+  /// Failure sets ([SetType.failure]) render as "Al fallo" instead of a rep
+  /// count. Mixed sets (some failure, some normal) combine the parts with " + "
+  /// so the athlete gets a legible summary, e.g. "2 · 8 + 1 · Al fallo".
+  ///
+  /// Priority for week-aware path:
+  ///  1. All failure → "<count> · Al fallo"
+  ///  2. Duration-based spec (durationSeconds > 0) → "<count> · MM:SS"
+  ///  3. Reps spec → "<count> · <formatted reps>"
+  ///  4. Range spec (repsMin / repsMax) → "<count> · <min>–<max>"
+  ///
+  /// Fallback (weeklySets empty):
+  ///  1. durationSeconds > 0 → "<targetSets> · MM:SS"
+  ///  2. targetReps non-empty → "<targetSets> · <formatted reps>"
+  ///  3. Legacy → "<targetSets> · <min>–<max>"
+  static String _setsRepsSummary(RoutineSlot slot, int week) {
+    // Week-aware path: resolve from weeklySets when available.
+    if (slot.weeklySets.isNotEmpty) {
+      final specs = slot.effectiveSetsForWeek(week);
+      final count = specs.length;
+      if (specs.isNotEmpty) {
+        // Separate failure sets from normal sets.
+        final failureCount =
+            specs.where((s) => s.type == SetType.failure).length;
+        final normalSpecs =
+            specs.where((s) => s.type != SetType.failure).toList();
+
+        if (failureCount == count) {
+          // All sets are failure sets.
+          return '$count · Al fallo';
+        }
+        if (failureCount > 0) {
+          // Mixed: describe normal sets first, then failure count.
+          final normalPart = _describeNormalSpecs(normalSpecs);
+          return '$normalPart + $failureCount · Al fallo';
+        }
+
+        // No failure sets — original logic.
+        final first = specs.first;
+        if (first.durationSeconds != null && first.durationSeconds! > 0) {
+          final total = first.durationSeconds!;
+          final mm = (total ~/ 60).toString().padLeft(2, '0');
+          final ss = (total % 60).toString().padLeft(2, '0');
+          return '$count · $mm:$ss';
+        }
+        if (first.reps != null) {
+          // Homogeneous per-set reps list.
+          final allSame = specs.every((s) => s.reps == first.reps);
+          if (allSame) return '$count · ${first.reps}';
+          return '$count · ${formatReps(specs.map((s) => s.reps ?? 0).toList())}';
+        }
+        if (first.repsMin != null && first.repsMax != null) {
+          return '$count · ${first.repsMin}–${first.repsMax}';
+        }
+      }
+      return '$count sets';
+    }
+
+    // Legacy fallback (weeklySets empty — single-week slot).
     if (slot.durationSeconds != null && slot.durationSeconds! > 0) {
       final total = slot.durationSeconds!;
       final mm = (total ~/ 60).toString().padLeft(2, '0');
@@ -45,6 +108,28 @@ class ExerciseSlotRow extends StatelessWidget {
     }
     // Legacy fallback: min–max reps from old docs.
     return '${slot.targetSets} · ${slot.targetRepsMin}–${slot.targetRepsMax}';
+  }
+
+  /// Summarizes a list of non-failure [SetSpec]s as "<count> · <target>".
+  static String _describeNormalSpecs(List<SetSpec> specs) {
+    if (specs.isEmpty) return '';
+    final count = specs.length;
+    final first = specs.first;
+    if (first.durationSeconds != null && first.durationSeconds! > 0) {
+      final total = first.durationSeconds!;
+      final mm = (total ~/ 60).toString().padLeft(2, '0');
+      final ss = (total % 60).toString().padLeft(2, '0');
+      return '$count · $mm:$ss';
+    }
+    if (first.reps != null) {
+      final allSame = specs.every((s) => s.reps == first.reps);
+      if (allSame) return '$count · ${first.reps}';
+      return '$count · ${formatReps(specs.map((s) => s.reps ?? 0).toList())}';
+    }
+    if (first.repsMin != null && first.repsMax != null) {
+      return '$count · ${first.repsMin}–${first.repsMax}';
+    }
+    return '$count sets';
   }
 
   /// Formats rest seconds: "1:30" when >= 60, "45s" when < 60.
@@ -61,7 +146,7 @@ class ExerciseSlotRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    final setsReps = _setsRepsSummary(slot);
+    final setsReps = _setsRepsSummary(slot, week);
     final restText = _restDisplay(slot.restSeconds);
     return Semantics(
       button: true,

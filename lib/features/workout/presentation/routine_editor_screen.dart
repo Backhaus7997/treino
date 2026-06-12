@@ -28,6 +28,14 @@ import '../domain/set_spec.dart';
 import 'routine_editor_mode.dart';
 import 'widgets/duration_text_field.dart';
 
+// ── Presence-aware delete / add scope enums ───────────────────────────────────
+
+/// Choice from the "¿Eliminar ejercicio?" dialog.
+enum _DeleteScope { thisWeek, allWeeks }
+
+/// Choice from the "¿En qué semanas agregar?" dialog.
+enum _AddScope { thisWeek, allWeeks }
+
 // ── Testable helpers ──────────────────────────────────────────────────────────
 
 /// Swaps element at [index] with its neighbour in direction [dir] (-1 up,
@@ -82,6 +90,18 @@ class _EditableSet {
         durationSeconds: durationSeconds,
       );
 
+  /// True deep copy preserving [type] — "Duplicar semana" must replicate the
+  /// previous week exactly, W/D/F sets included (REQ-PERIOD-014). [clone]
+  /// intentionally resets the type for the "+ Agregar set" template flow.
+  _EditableSet copy() => _EditableSet(
+        type: type,
+        weightKg: weightKg,
+        reps: reps,
+        repsMin: repsMin,
+        repsMax: repsMax,
+        durationSeconds: durationSeconds,
+      );
+
   SetSpec toSetSpec() => SetSpec(
         type: type,
         weightKg: weightKg,
@@ -97,13 +117,34 @@ class _EditableSlot {
   // ── New per-set model ──────────────────────────────────────────────────────
   ExerciseMode exerciseMode = ExerciseMode.reps;
   RepMode repMode = RepMode.single;
-  List<_EditableSet> sets = [_EditableSet()];
+
+  /// One inner list of sets per plan week — outer index is the 0-based week.
+  /// Invariant: every slot keeps exactly `_numWeeks` inner lists (week
+  /// add/remove operations resize all slots together). REQ-PERIOD-013/015.
+  List<List<_EditableSet>> weeklySets = [
+    [_EditableSet()],
+  ];
   int restSeconds = 60;
   int? supersetGroup;
 
+  /// The active week's set list — same object as `weeklySets[w]`, so in-place
+  /// mutations are visible to the single source of truth (ADR-PB-02).
+  List<_EditableSet> setsForWeek(int w) => weeklySets[w];
+
+  // ── Presence mask (REQ-WPRES-001, ADR-WPRES-01) ────────────────────────────
+  /// 0-based weeks in which this slot is present. Empty = present in ALL weeks
+  /// (backward-compatible default — legacy single-week docs have no mask).
+  /// A `Set<int>` in-editor for cheap add/remove; converted to a sorted
+  /// `List<int>` at [buildRoutineSlot]. Mirrors [RoutineSlot.activeWeeks].
+  Set<int> activeWeeks = <int>{};
+
+  /// Whether this slot is present in 0-based [week].
+  /// Rule: `activeWeeks.isEmpty || activeWeeks.contains(week)`.
+  bool isPresentInWeek(int w) => activeWeeks.isEmpty || activeWeeks.contains(w);
+
   // ── Legacy scalar fields — kept for backward compat on submit ──────────────
-  // These are now derived from [sets] in _submit(); callers outside _submit()
-  // should not rely on them being up-to-date.
+  // These are now derived from [weeklySets] in _submit(); callers outside
+  // _submit() should not rely on them being up-to-date.
   int targetSets = 1;
   int targetRepsMin = 0;
   int targetRepsMax = 0;
@@ -137,8 +178,22 @@ String setChipLabel(List<_EditableSet> sets, int index) {
   return n.toString();
 }
 
+/// Maps a persisted [SetSpec] into its mutable editor row.
+_EditableSet _editableSetFromSpec(SetSpec spec) => _EditableSet(
+      type: spec.type,
+      weightKg: spec.weightKg,
+      reps: spec.reps,
+      repsMin: spec.repsMin,
+      repsMax: spec.repsMax,
+      durationSeconds: spec.durationSeconds,
+    );
+
 /// Validates a single [_EditableSet] given the slot's modes.
 bool isSetValid(_EditableSet s, ExerciseMode exerciseMode, RepMode repMode) {
+  // A failure set ("al fallo") has no countable target by definition — the
+  // athlete works until failure. Reps/duration are an optional reference,
+  // never a requirement.
+  if (s.type == SetType.failure) return true;
   if (exerciseMode == ExerciseMode.duration) {
     return s.durationSeconds != null && s.durationSeconds! > 0;
   }
@@ -155,7 +210,11 @@ bool isSetValid(_EditableSet s, ExerciseMode exerciseMode, RepMode repMode) {
 /// and legacy fields. Extracted top-level so the submit path and tests share
 /// the same derivation logic.
 RoutineSlot buildRoutineSlot(_EditableSlot s, int? effectiveGroup) {
-  final specList = s.sets.map((e) => e.toSetSpec()).toList();
+  // Legacy fields and the `sets:` list stay derived from WEEK 0, so every
+  // non-week-aware consumer keeps reading the first week's prescription
+  // (REQ-PERIOD-017, ADR-PB-03).
+  final week0 = s.weeklySets.first;
+  final specList = week0.map((e) => e.toSetSpec()).toList();
 
   // ── Legacy field derivation ────────────────────────────────────────────────
   final targetSets = specList.isNotEmpty ? specList.length : 1;
@@ -168,15 +227,15 @@ RoutineSlot buildRoutineSlot(_EditableSlot s, int? effectiveGroup) {
 
   if (s.exerciseMode == ExerciseMode.duration) {
     legacyDurationSeconds =
-        s.sets.isNotEmpty ? s.sets.first.durationSeconds : null;
+        week0.isNotEmpty ? week0.first.durationSeconds : null;
     legacyRepsMin = 0;
     legacyRepsMax = 0;
     legacyTargetReps = [];
   } else {
     // reps mode
-    legacyWeightKg = s.sets.isNotEmpty ? s.sets.first.weightKg : null;
+    legacyWeightKg = week0.isNotEmpty ? week0.first.weightKg : null;
     if (s.repMode == RepMode.single) {
-      final repValues = s.sets.map((e) => e.reps ?? 0).toList();
+      final repValues = week0.map((e) => e.reps ?? 0).toList();
       legacyTargetReps = repValues;
       legacyRepsMin =
           repValues.isNotEmpty ? repValues.reduce((a, b) => a < b ? a : b) : 0;
@@ -184,11 +243,11 @@ RoutineSlot buildRoutineSlot(_EditableSlot s, int? effectiveGroup) {
           repValues.isNotEmpty ? repValues.reduce((a, b) => a > b ? a : b) : 0;
     } else {
       // range
-      legacyRepsMin = s.sets.isNotEmpty
-          ? s.sets.map((e) => e.repsMin ?? 0).reduce((a, b) => a < b ? a : b)
+      legacyRepsMin = week0.isNotEmpty
+          ? week0.map((e) => e.repsMin ?? 0).reduce((a, b) => a < b ? a : b)
           : 0;
-      legacyRepsMax = s.sets.isNotEmpty
-          ? s.sets.map((e) => e.repsMax ?? 0).reduce((a, b) => a > b ? a : b)
+      legacyRepsMax = week0.isNotEmpty
+          ? week0.map((e) => e.repsMax ?? 0).reduce((a, b) => a > b ? a : b)
           : 0;
       legacyTargetReps = [];
     }
@@ -209,6 +268,15 @@ RoutineSlot buildRoutineSlot(_EditableSlot s, int? effectiveGroup) {
     exerciseMode: s.exerciseMode,
     repMode: s.repMode,
     sets: specList,
+    // Full per-week prescription. Single-week plans write one entry
+    // ([[week0]]) so re-editing and effectiveSetsForWeek(0) stay branch-free
+    // (ADR-PB-03); `sets:` above keeps old readers on week 0.
+    weeklySets: s.weeklySets
+        .map((wk) => wk.map((e) => e.toSetSpec()).toList())
+        .toList(),
+    // Presence mask: sorted for deterministic wire output (ADR-WPRES-07).
+    // Empty set → empty list → present in all weeks (backward compat).
+    activeWeeks: (s.activeWeeks.toList()..sort()),
   );
 }
 
@@ -272,6 +340,14 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
   final TextEditingController _splitController = TextEditingController();
   ExperienceLevel _level = ExperienceLevel.beginner;
   List<_EditableDay> _days = [_EditableDay(dayNumber: 1, name: 'Día 1')];
+
+  /// 0-based week shown in the editor. Display is 1-based ("Sem 1").
+  int _selectedWeek = 0;
+
+  /// Plan length in weeks. Every slot's `weeklySets` holds exactly this many
+  /// inner lists (REQ-PERIOD-013). Capped at 16 (REQ-PERIOD-011).
+  int _numWeeks = 1;
+
   bool _submitting = false;
 
   /// True while the existing routine is being fetched from Firestore.
@@ -292,6 +368,27 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     }
   }
 
+  /// Pads/truncates [slot]'s weeklySets to exactly `_numWeeks` inner lists
+  /// and guarantees the one-placeholder-set minimum per week — defensive
+  /// against docs whose slots disagree with `numWeeks` (REQ-PERIOD-018).
+  /// Also clamps the presence mask: any index outside [0 .. _numWeeks-1] is
+  /// dropped so a hand-edited doc can't carry dangling indices (ADR-WPRES-06).
+  void _normalizeSlotWeeks(_EditableSlot slot) {
+    while (slot.weeklySets.length < _numWeeks) {
+      slot.weeklySets.add([_EditableSet()]);
+    }
+    if (slot.weeklySets.length > _numWeeks) {
+      slot.weeklySets.removeRange(_numWeeks, slot.weeklySets.length);
+    }
+    for (var w = 0; w < slot.weeklySets.length; w++) {
+      if (slot.weeklySets[w].isEmpty) {
+        slot.weeklySets[w] = [_EditableSet()];
+      }
+    }
+    // Clamp presence mask to valid week range.
+    slot.activeWeeks.removeWhere((w) => w < 0 || w >= _numWeeks);
+  }
+
   /// Fetches the existing routine from Firestore and maps it into editor state.
   /// Mode-agnostic: the hydration mapping is the same for all three edit modes.
   Future<void> _loadExistingRoutine(String id) async {
@@ -310,6 +407,9 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
       // Applies equally to SelfCreating / TrainerAssigning / TrainerTemplating.
       _nameController.text = routine.name;
       _level = routine.level;
+      // Defensive clamp — a hand-edited doc can't exceed the editor cap nor
+      // drop below one week (REQ-PERIOD-011/018).
+      _numWeeks = routine.numWeeks.clamp(1, _kMaxWeeks);
       // split is shown in trainer modes — restore it so the field is populated.
       if (routine.split != null) {
         _splitController.text = routine.split!;
@@ -329,23 +429,24 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
             ..exerciseMode = slot.effectiveExerciseMode
             ..repMode = slot.effectiveRepMode
             ..restSeconds = slot.restSeconds
-            ..supersetGroup = slot.supersetGroup;
+            ..supersetGroup = slot.supersetGroup
+            // Hydrate presence mask from the domain slot (REQ-WPRES-001).
+            // Legacy docs have empty activeWeeks → empty set → all weeks.
+            ..activeWeeks = slot.activeWeeks.toSet();
 
-          // Map per-set rows (new model) or synthesize from legacy fields.
-          final specList = slot.effectiveSets;
-          editableSlot.sets = specList
-              .map((spec) => _EditableSet(
-                    type: spec.type,
-                    weightKg: spec.weightKg,
-                    reps: spec.reps,
-                    repsMin: spec.repsMin,
-                    repsMax: spec.repsMax,
-                    durationSeconds: spec.durationSeconds,
-                  ))
-              .toList();
-          if (editableSlot.sets.isEmpty) {
-            editableSlot.sets = [_EditableSet()];
+          // Periodized docs hydrate every week from weeklySets; legacy docs
+          // hydrate week 0 from effectiveSets so the original prescription
+          // survives intact (REQ-PERIOD-018/019, SCENARIO-PERIOD-018/019).
+          if (slot.weeklySets.isNotEmpty) {
+            editableSlot.weeklySets = slot.weeklySets
+                .map((wk) => wk.map(_editableSetFromSpec).toList())
+                .toList();
+          } else {
+            editableSlot.weeklySets = [
+              slot.effectiveSets.map(_editableSetFromSpec).toList(),
+            ];
           }
+          _normalizeSlotWeeks(editableSlot);
           return editableSlot;
         }).toList();
         return editableDay;
@@ -376,6 +477,43 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
   bool get _isTrainerMode =>
       widget.mode is TrainerAssigning || widget.mode is TrainerTemplating;
 
+  /// Per-week validation across ALL weeks — maps each invalid week (0-based)
+  /// to the first day number that fails on it. Empty when every week is
+  /// valid. Drives both the save gate and the per-tab warning affordance
+  /// (REQ-PERIOD-016, SCENARIO-PERIOD-020).
+  ///
+  /// Presence-aware: a slot absent in week [w] (non-empty mask not containing
+  /// [w]) is skipped for that week's validation — it contributes no sets to
+  /// that week and its placeholder sets must not block save.
+  Map<int, int> get _invalidWeekFirstDay {
+    final result = <int, int>{};
+    for (final day in _days) {
+      for (final slot in day.slots) {
+        for (var w = 0; w < slot.weeklySets.length; w++) {
+          if (result.containsKey(w)) continue;
+          // Skip validation for weeks where this slot is absent.
+          if (!slot.isPresentInWeek(w)) continue;
+          final weekSets = slot.weeklySets[w];
+          final weekValid = weekSets.isNotEmpty &&
+              weekSets
+                  .every((s) => isSetValid(s, slot.exerciseMode, slot.repMode));
+          if (!weekValid) result[w] = day.dayNumber;
+        }
+      }
+    }
+    return result;
+  }
+
+  /// Returns true when [activeWeeks] is a valid presence mask for a plan
+  /// with [numWeeks] weeks. A mask is valid when it is empty (all weeks) OR
+  /// all its indices fall within [0 .. numWeeks-1] (at least one in-range
+  /// week). An all-out-of-range non-empty mask would create a ghost slot that
+  /// is invisible everywhere (ADR-WPRES-03, REQ-WPRES-014).
+  static bool _isPresenceMaskValid(Set<int> activeWeeks, int numWeeks) {
+    if (activeWeeks.isEmpty) return true;
+    return activeWeeks.any((w) => w >= 0 && w < numWeeks);
+  }
+
   bool get _isValid {
     if (_nameController.text.trim().isEmpty) return false;
     // Split is required only in trainer modes (athlete-created routines
@@ -386,14 +524,140 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
       if (day.slots.isEmpty) return false;
       for (final slot in day.slots) {
         if (slot.exercise == null) return false;
-        if (slot.sets.isEmpty) return false;
-        // Every set must be valid for its exercise mode + rep mode.
-        final allSetsValid = slot.sets
-            .every((s) => isSetValid(s, slot.exerciseMode, slot.repMode));
-        if (!allSetsValid) return false;
+        // Zero-presence guard (ADR-WPRES-03, REQ-WPRES-014): a non-empty mask
+        // that excludes every valid week would create an invisible ghost slot.
+        if (!_isPresenceMaskValid(slot.activeWeeks, _numWeeks)) return false;
       }
     }
-    return true;
+    // Every week of every slot must have at least one valid set
+    // (REQ-PERIOD-016).
+    return _invalidWeekFirstDay.isEmpty;
+  }
+
+  // ── Week operations — keep every slot at exactly `_numWeeks` inner lists ──
+
+  /// Hard cap on plan length (REQ-PERIOD-011) — also bounds Firestore doc
+  /// size since weeklySets duplicates per-week set data.
+  static const int _kMaxWeeks = 16;
+
+  /// Appends an EMPTY week (one placeholder set per slot) and jumps to it.
+  /// Empty by design — "Duplicar semana" is the explicit copy affordance
+  /// (ADR-PB-04). SCENARIO-PERIOD-010/011.
+  void _addWeek() {
+    if (_numWeeks >= _kMaxWeeks) return;
+    FocusManager.instance.primaryFocus?.unfocus();
+    setState(() {
+      _numWeeks++;
+      for (final day in _days) {
+        for (final slot in day.slots) {
+          slot.weeklySets.add([_EditableSet()]);
+        }
+      }
+      _selectedWeek = _numWeeks - 1;
+    });
+  }
+
+  /// Drops the last week and its data from every slot, clamping the selected
+  /// week (REQ-PERIOD-012, SCENARIO-PERIOD-012/013).
+  void _removeLastWeek() {
+    if (_numWeeks <= 1) return;
+    FocusManager.instance.primaryFocus?.unfocus();
+    setState(() {
+      final removedIndex = _numWeeks - 1; // the index being removed
+      _numWeeks--;
+      for (final day in _days) {
+        for (final slot in day.slots) {
+          slot.weeklySets.removeLast();
+          // Drop the removed week's index from the presence mask
+          // (ADR-WPRES-05). If this empties a non-empty mask, the slot falls
+          // back to all-weeks (empty = all) rather than becoming a ghost.
+          slot.activeWeeks.remove(removedIndex);
+        }
+      }
+      if (_selectedWeek > _numWeeks - 1) {
+        _selectedWeek = _numWeeks - 1;
+      }
+    });
+  }
+
+  /// Shows a confirmation dialog and, if confirmed, replaces the selected
+  /// week's sets with a deep copy of the previous week's, slot by slot
+  /// (REQ-PERIOD-014, SCENARIO-PERIOD-015/016). Uses [_EditableSet.copy] so
+  /// set types survive the duplication.
+  /// Also copies presence: a slot present in `_selectedWeek - 1` becomes
+  /// present in `_selectedWeek` too (ADR-WPRES-06, SCENARIO-WPRES-020).
+  ///
+  /// The [FocusManager.instance.unfocus()] is called BEFORE the dialog to
+  /// dismiss the IME and avoid keyboard-related assertion errors on iOS.
+  Future<void> _duplicateWeek() async {
+    if (_selectedWeek == 0) return;
+    // Dismiss IME before showing dialog — avoids on-device IME state leaks.
+    FocusManager.instance.primaryFocus?.unfocus();
+
+    final sourceWeekDisplay =
+        _selectedWeek; // 1-based (selectedWeek is 0-based)
+    final targetWeekDisplay = _selectedWeek + 1;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        final palette = AppPalette.of(ctx);
+        return AlertDialog(
+          backgroundColor: palette.bgCard,
+          title: Text(
+            'Duplicar semana',
+            style: TextStyle(color: palette.textPrimary),
+          ),
+          content: Text(
+            'Se copiará la Semana $sourceWeekDisplay en la Semana $targetWeekDisplay.',
+            style: TextStyle(color: palette.textMuted, fontSize: 14),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child:
+                  Text('Cancelar', style: TextStyle(color: palette.textMuted)),
+            ),
+            TextButton(
+              key: const Key('duplicate_week_confirm_button'),
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: Text('Confirmar', style: TextStyle(color: palette.accent)),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) return;
+    if (!mounted) return;
+
+    setState(() {
+      final sourceWeek = _selectedWeek - 1;
+      final targetWeek = _selectedWeek;
+      for (final day in _days) {
+        for (final slot in day.slots) {
+          // Duplicate prescription (REQ-PERIOD-014).
+          slot.weeklySets[targetWeek] =
+              slot.weeklySets[sourceWeek].map((e) => e.copy()).toList();
+
+          // Duplicate presence (ADR-WPRES-06, SCENARIO-WPRES-020):
+          // Only act when the source mask is non-empty; an empty mask means
+          // "present in all weeks" — target inherits this transitively, so no
+          // materialization is needed.
+          if (slot.activeWeeks.isNotEmpty) {
+            if (slot.isPresentInWeek(sourceWeek)) {
+              // Source present → add target week to the mask.
+              slot.activeWeeks = Set<int>.from(slot.activeWeeks)
+                ..add(targetWeek);
+            } else {
+              // Source absent → ensure target is also absent.
+              slot.activeWeeks = Set<int>.from(slot.activeWeeks)
+                ..remove(targetWeek);
+            }
+          }
+        }
+      }
+    });
   }
 
   void _addDay() {
@@ -423,6 +687,127 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
           if (i != slotIndex) _days[dayIndex].slots[i],
       ];
     });
+  }
+
+  /// Routes the delete action for a slot through presence-aware logic.
+  ///
+  /// - `_numWeeks == 1` → structural delete immediately (HARD INVARIANT, ADR-WPRES-02).
+  /// - `_numWeeks > 1` → show dialog: "Solo esta semana" or "Todas las semanas".
+  ///   "Solo esta semana": materializes mask and removes current week. If the
+  ///   resulting mask is empty (last-present-week case), routes to structural
+  ///   delete (ADR-WPRES-03, SCENARIO-WPRES-015).
+  Future<void> _onDeleteSlot(
+      BuildContext context, int dayIndex, int slotIndex) async {
+    if (_numWeeks <= 1) {
+      // Single-week path: structural delete, no dialog (REQ-WPRES-015).
+      _removeSlot(dayIndex, slotIndex);
+      return;
+    }
+
+    // Multi-week path: show the delete scope dialog (REQ-WPRES-010).
+    final choice = await showDialog<_DeleteScope>(
+      context: context,
+      builder: (ctx) {
+        final palette = AppPalette.of(ctx);
+        return SimpleDialog(
+          backgroundColor: palette.bgCard,
+          title: Text(
+            '¿Eliminar ejercicio?',
+            style: TextStyle(color: palette.textPrimary),
+          ),
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
+              child: Text(
+                '¿Eliminar solo de esta semana o de todas?',
+                style: TextStyle(color: palette.textMuted, fontSize: 13),
+              ),
+            ),
+            SimpleDialogOption(
+              onPressed: () => Navigator.of(ctx).pop(_DeleteScope.thisWeek),
+              child: Text('Solo esta semana',
+                  style: TextStyle(color: palette.accent)),
+            ),
+            SimpleDialogOption(
+              onPressed: () => Navigator.of(ctx).pop(_DeleteScope.allWeeks),
+              child: Text('Todas las semanas',
+                  style: TextStyle(color: palette.danger)),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (choice == null || !mounted) return;
+
+    if (choice == _DeleteScope.allWeeks) {
+      _removeSlot(dayIndex, slotIndex);
+      return;
+    }
+
+    // "Solo esta semana" — materialize mask and remove _selectedWeek.
+    final slot = _days[dayIndex].slots[slotIndex];
+    final Set<int> newMask;
+    if (slot.activeWeeks.isEmpty) {
+      // Empty = all weeks → materialize to all weeks except current.
+      newMask = {
+        for (var w = 0; w < _numWeeks; w++)
+          if (w != _selectedWeek) w,
+      };
+    } else {
+      newMask = Set<int>.from(slot.activeWeeks)..remove(_selectedWeek);
+    }
+
+    // ADR-WPRES-03: if removing _selectedWeek empties the mask, route to
+    // structural delete (zero-presence ghost is forbidden).
+    if (newMask.isEmpty) {
+      _removeSlot(dayIndex, slotIndex);
+      return;
+    }
+
+    setState(() => slot.activeWeeks = newMask);
+  }
+
+  /// Shows a scope chooser for the "add exercise" action when
+  /// `_numWeeks > 1 && _selectedWeek > 0` (ADR-WPRES-04).
+  ///
+  /// Returns [_AddScope.allWeeks] (empty mask) or [_AddScope.thisWeek]
+  /// ({_selectedWeek}), or `null` if the user dismissed the dialog.
+  Future<_AddScope?> _promptAddScope(BuildContext context) async {
+    if (_numWeeks <= 1 || _selectedWeek == 0) {
+      // Week 1 (index 0) or single-week plan: always add to all weeks.
+      return _AddScope.allWeeks;
+    }
+    final palette = AppPalette.of(context);
+    return showDialog<_AddScope>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        backgroundColor: palette.bgCard,
+        title: Text(
+          '¿En qué semanas agregar?',
+          style: TextStyle(color: palette.textPrimary),
+        ),
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
+            child: Text(
+              '¿Agregar el ejercicio solo en esta semana o en todas?',
+              style: TextStyle(color: palette.textMuted, fontSize: 13),
+            ),
+          ),
+          SimpleDialogOption(
+            onPressed: () => Navigator.of(ctx).pop(_AddScope.thisWeek),
+            child: Text('Agregar solo en esta semana',
+                style: TextStyle(color: palette.accent)),
+          ),
+          SimpleDialogOption(
+            onPressed: () => Navigator.of(ctx).pop(_AddScope.allWeeks),
+            child: Text('Agregar en todas las semanas',
+                style: TextStyle(color: palette.textMuted)),
+          ),
+        ],
+      ),
+    );
   }
 
   /// Replaces a day's slot order after a block-level reorder in the tile.
@@ -467,6 +852,13 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
         .toSet();
     final picked = await showExercisePicker(context);
     if (picked == null || picked.isEmpty || !mounted) return;
+
+    // Determine presence scope for the new slots (ADR-WPRES-04).
+    // Prompt only when multi-week AND viewing week ≥ 2 (index ≥ 1).
+    // ignore: use_build_context_synchronously
+    final scope = await _promptAddScope(context);
+    if (scope == null || !mounted) return;
+
     setState(() {
       // Only add exercises not already in this day (one instance per day) —
       // avoids the duplicate-on-reopen issue.
@@ -474,7 +866,9 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
         final slot = _EditableSlot()
           ..exercise = ex
           ..restSeconds = ex.defaultRestSeconds ?? 60
-          ..sets = [_EditableSet()];
+          ..weeklySets = List.generate(_numWeeks, (_) => [_EditableSet()])
+          ..activeWeeks =
+              scope == _AddScope.thisWeek ? {_selectedWeek} : <int>{};
         _days[dayIndex].slots = [..._days[dayIndex].slots, slot];
       }
     });
@@ -491,6 +885,12 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
         .toSet();
     final picked = await showExercisePicker(context);
     if (picked == null || picked.isEmpty || !mounted) return;
+
+    // Determine presence scope for the new slots (ADR-WPRES-04).
+    // ignore: use_build_context_synchronously
+    final scope = await _promptAddScope(context);
+    if (scope == null || !mounted) return;
+
     setState(() {
       final day = _days[dayIndex];
       // Skip exercises already in this day (one instance per day).
@@ -503,7 +903,9 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
             ..exercise = ex
             ..restSeconds = ex.defaultRestSeconds ?? 60
             ..supersetGroup = nextGroup
-            ..sets = [_EditableSet()])
+            ..weeklySets = List.generate(_numWeeks, (_) => [_EditableSet()])
+            ..activeWeeks =
+                scope == _AddScope.thisWeek ? {_selectedWeek} : <int>{})
           .toList();
       day.slots = [...day.slots, ...newSlots];
     });
@@ -521,6 +923,12 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
         .toSet();
     final picked = await showExercisePicker(context);
     if (picked == null || picked.isEmpty || !mounted) return;
+
+    // Determine presence scope for the new slots (ADR-WPRES-04).
+    // ignore: use_build_context_synchronously
+    final scope = await _promptAddScope(context);
+    if (scope == null || !mounted) return;
+
     setState(() {
       final newOnes = picked.where((e) => !existingIds.contains(e.id)).toList();
       if (newOnes.isEmpty) return;
@@ -529,7 +937,9 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
             ..exercise = ex
             ..restSeconds = ex.defaultRestSeconds ?? 60
             ..supersetGroup = groupId
-            ..sets = [_EditableSet()])
+            ..weeklySets = List.generate(_numWeeks, (_) => [_EditableSet()])
+            ..activeWeeks =
+                scope == _AddScope.thisWeek ? {_selectedWeek} : <int>{})
           .toList();
       // Insert right after the group's last slot to keep it consecutive.
       var insertAt = day.slots.length;
@@ -594,6 +1004,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
             assignedBy: uid,
             assignedTo: athleteId,
             visibility: RoutineVisibility.private,
+            numWeeks: _numWeeks,
           );
           await repo.updateAssigned(uid: uid, draft: draft);
           if (!mounted) return;
@@ -614,6 +1025,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
             assignedBy: uid,
             assignedTo: athleteId,
             visibility: RoutineVisibility.private,
+            numWeeks: _numWeeks,
           );
           final created = await repo.createAssigned(routine);
           ref.read(analyticsServiceProvider).logPlanAssigned(
@@ -638,6 +1050,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
             source: RoutineSource.trainerTemplate,
             assignedBy: uid,
             visibility: RoutineVisibility.private,
+            numWeeks: _numWeeks,
           );
           await repo.updateTemplate(uid: uid, draft: draft);
           if (!mounted) return;
@@ -658,6 +1071,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
             source: RoutineSource.trainerTemplate,
             assignedBy: uid,
             visibility: RoutineVisibility.private,
+            numWeeks: _numWeeks,
           );
           await repo.createTemplate(routine);
           if (!mounted) return;
@@ -690,6 +1104,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
             days: days,
             source: RoutineSource.userCreated,
             visibility: RoutineVisibility.private,
+            numWeeks: _numWeeks,
           );
           await repo.createUserOwned(uid: uid, draft: draft);
           if (!mounted) return;
@@ -708,6 +1123,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
             days: days,
             source: RoutineSource.userCreated,
             visibility: RoutineVisibility.private,
+            numWeeks: _numWeeks,
           );
           await repo.updateUserOwned(uid: uid, draft: draft);
           if (!mounted) return;
@@ -786,6 +1202,14 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
 
     // Normal editor state.
     {
+      // Cross-week validation state for the tab bar (SCENARIO-PERIOD-020).
+      // The SELECTED week never shows a badge: its invalid sets are already
+      // visible on screen — and with numWeeks == 1 (week 0 always selected)
+      // this keeps the single-week editor visually identical to before
+      // (REQ-PERIOD-062).
+      final invalidWeeks = _invalidWeekFirstDay;
+      final hiddenInvalidWeeks =
+          invalidWeeks.keys.where((w) => w != _selectedWeek).toList()..sort();
       return Scaffold(
         body: AppBackground(
           child: SafeArea(
@@ -916,6 +1340,45 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                       ],
                       const SizedBox(height: 12),
 
+                      // ── Semanas del plan ────────────────────────────────
+                      // Week state machine — REQ-PERIOD-010..014. The chips
+                      // switch the week every slot editor renders (live-view).
+                      _SectionLabel(label: 'SEMANAS', palette: palette),
+                      const SizedBox(height: 6),
+                      _WeekTabBar(
+                        numWeeks: _numWeeks,
+                        selectedWeek: _selectedWeek,
+                        maxWeeks: _kMaxWeeks,
+                        warningWeeks: hiddenInvalidWeeks.toSet(),
+                        palette: palette,
+                        onSelectWeek: (w) {
+                          // Drop focus BEFORE swapping the week's field tree:
+                          // on-device the iOS IME can restore its editing
+                          // session into the replacement TextField and bleed
+                          // the previous week's value into the new week
+                          // (not reproducible in widget tests — no real IME).
+                          FocusManager.instance.primaryFocus?.unfocus();
+                          setState(() => _selectedWeek = w);
+                        },
+                        onAddWeek: _addWeek,
+                        onRemoveLastWeek: _removeLastWeek,
+                        onDuplicateWeek: () => _duplicateWeek(),
+                      ),
+                      if (hiddenInvalidWeeks.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          'Sets incompletos en Sem '
+                          '${hiddenInvalidWeeks.first + 1} · Día '
+                          '${invalidWeeks[hiddenInvalidWeeks.first]}',
+                          key: const Key('invalid_week_hint'),
+                          style: GoogleFonts.barlow(
+                            fontSize: 11,
+                            color: palette.danger,
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 12),
+
                       // ── Días del plan ───────────────────────────────────
                       _SectionLabel(label: 'DÍAS DEL PLAN', palette: palette),
                       const SizedBox(height: 6),
@@ -923,9 +1386,10 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                       for (int di = 0; di < _days.length; di++) ...[
                         _DayExpansionTile(
                           day: _days[di],
+                          week: _selectedWeek,
                           palette: palette,
                           onAddSlot: () => _pickExercisesForDay(context, di),
-                          onRemoveSlot: (si) => _removeSlot(di, si),
+                          onRemoveSlot: (si) => _onDeleteSlot(context, di, si),
                           onReorderSlots: (newOrder) =>
                               _reorderSlots(di, newOrder),
                           onRemoveDay:
@@ -1032,11 +1496,190 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
   }
 }
 
+// ── Week tab bar ──────────────────────────────────────────────────────────────
+
+/// Plan-level week navigation rendered above the DÍAS DEL PLAN section:
+/// one chip per week ("Sem 1".."Sem N"), an "+ Semana" control disabled at
+/// [maxWeeks], plus "Quitar última" (disabled at 1 week) and "Duplicar
+/// semana" (disabled on week 0). REQ-PERIOD-010/011/012/014.
+class _WeekTabBar extends StatelessWidget {
+  const _WeekTabBar({
+    required this.numWeeks,
+    required this.selectedWeek,
+    required this.maxWeeks,
+    required this.warningWeeks,
+    required this.palette,
+    required this.onSelectWeek,
+    required this.onAddWeek,
+    required this.onRemoveLastWeek,
+    required this.onDuplicateWeek,
+  });
+
+  final int numWeeks;
+  final int selectedWeek;
+  final int maxWeeks;
+
+  /// 0-based weeks that render a danger dot on their chip — weeks failing
+  /// validation other than the selected one (SCENARIO-PERIOD-020).
+  final Set<int> warningWeeks;
+  final AppPalette palette;
+  final void Function(int week) onSelectWeek;
+  final VoidCallback onAddWeek;
+  final VoidCallback onRemoveLastWeek;
+  final VoidCallback onDuplicateWeek;
+
+  @override
+  Widget build(BuildContext context) {
+    final canAdd = numWeeks < maxWeeks;
+    final canRemove = numWeeks > 1;
+    final canDuplicate = selectedWeek > 0;
+
+    TextStyle actionStyle(bool enabled) => GoogleFonts.barlowCondensed(
+          fontWeight: FontWeight.w600,
+          fontSize: 12,
+          color: enabled ? palette.accent : palette.border,
+        );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Week chips + add control — scrolls horizontally once chips overflow.
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              for (var w = 0; w < numWeeks; w++) ...[
+                _WeekChip(
+                  key: Key('week_tab_$w'),
+                  index: w,
+                  selected: w == selectedWeek,
+                  warning: warningWeeks.contains(w),
+                  palette: palette,
+                  onTap: () => onSelectWeek(w),
+                ),
+                const SizedBox(width: 6),
+              ],
+              TextButton.icon(
+                key: const Key('add_week_button'),
+                onPressed: canAdd ? onAddWeek : null,
+                icon: Icon(
+                  TreinoIcon.plus,
+                  size: 14,
+                  color: canAdd ? palette.accent : palette.border,
+                ),
+                label: Text('Semana', style: actionStyle(canAdd)),
+              ),
+            ],
+          ),
+        ),
+        // Week actions — always rendered, disabled when not applicable.
+        Row(
+          children: [
+            TextButton.icon(
+              key: const Key('remove_week_button'),
+              onPressed: canRemove ? onRemoveLastWeek : null,
+              icon: Icon(
+                TreinoIcon.trash,
+                size: 14,
+                color: canRemove ? palette.textMuted : palette.border,
+              ),
+              label: Text(
+                'Quitar última',
+                style: GoogleFonts.barlowCondensed(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                  color: canRemove ? palette.textMuted : palette.border,
+                ),
+              ),
+            ),
+            const SizedBox(width: 4),
+            TextButton.icon(
+              key: const Key('duplicate_week_button'),
+              onPressed: canDuplicate ? onDuplicateWeek : null,
+              icon: Icon(
+                TreinoIcon.copy,
+                size: 14,
+                color: canDuplicate ? palette.accent : palette.border,
+              ),
+              label: Text('Duplicar semana', style: actionStyle(canDuplicate)),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+/// One selectable week pill — accent-filled when [selected]; shows a danger
+/// dot when [warning] (the week fails validation while not on screen).
+class _WeekChip extends StatelessWidget {
+  const _WeekChip({
+    super.key,
+    required this.index,
+    required this.selected,
+    required this.warning,
+    required this.palette,
+    required this.onTap,
+  });
+
+  /// 0-based week — rendered 1-based ("Sem 1").
+  final int index;
+  final bool selected;
+  final bool warning;
+  final AppPalette palette;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(9999),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+        decoration: BoxDecoration(
+          color: selected ? palette.accent : palette.bgCard,
+          borderRadius: BorderRadius.circular(9999),
+          border: Border.all(
+            color: selected ? palette.accent : palette.border,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Sem ${index + 1}',
+              style: GoogleFonts.barlowCondensed(
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+                letterSpacing: 0.5,
+                color: selected ? palette.bg : palette.textMuted,
+              ),
+            ),
+            if (warning) ...[
+              const SizedBox(width: 5),
+              Container(
+                key: Key('week_tab_warning_$index'),
+                width: 6,
+                height: 6,
+                decoration: BoxDecoration(
+                  color: palette.danger,
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 // ── Day expansion tile ────────────────────────────────────────────────────────
 
 class _DayExpansionTile extends StatefulWidget {
   const _DayExpansionTile({
     required this.day,
+    required this.week,
     required this.palette,
     required this.onAddSlot,
     required this.onRemoveSlot,
@@ -1051,6 +1694,9 @@ class _DayExpansionTile extends StatefulWidget {
   });
 
   final _EditableDay day;
+
+  /// 0-based week whose sets the slot editors render (ADR-PB-02 live-view).
+  final int week;
   final AppPalette palette;
   final VoidCallback onAddSlot;
   final void Function(int slotIndex) onRemoveSlot;
@@ -1076,45 +1722,52 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
   List<Widget> _buildSlotRows(AppPalette palette) {
     final blocks = _blocks();
     final rows = <Widget>[];
-    // Running absolute index into the flat slot list — onRemove still expects
-    // the slot's flat position, not the block index.
-    var flatStart = 0;
     for (var b = 0; b < blocks.length; b++) {
       final block = blocks[b];
+      // Presence filter (REQ-WPRES render): a slot deleted "solo de esta
+      // semana" must disappear from this week's view — and one added "solo
+      // esta semana" must only appear here. Callbacks keep the ORIGINAL flat
+      // indices carried by each record, so delete/move still target the
+      // right slot in the unfiltered day list.
+      final visible = [
+        for (final r in block)
+          if (r.slot.isPresentInWeek(widget.week)) r,
+      ];
+      if (visible.isEmpty) continue;
       final canUp = b > 0;
       final canDown = b < blocks.length - 1;
-      if (block.length == 1 && block.first.supersetGroup == null) {
+      if (block.length == 1 && block.first.slot.supersetGroup == null) {
         // Standalone slot. ObjectKey keeps each row's State bound to its slot
         // so the int fields don't show stale values after the list shifts.
-        final idx = flatStart;
-        final slot = block.first;
+        final idx = visible.first.index;
+        final slot = visible.first.slot;
         rows.add(_SlotEditor(
           key: ObjectKey(slot),
           slot: slot,
+          week: widget.week,
           palette: palette,
           onRemove: () => widget.onRemoveSlot(idx),
           onChanged: widget.onSlotChanged,
           onReplaceExercise: (ex) => widget.onReplaceExercise(slot, ex),
+          slotIndex: idx,
           canMoveUp: canUp,
           canMoveDown: canDown,
           onMoveUp: () => _moveBlock(b, -1),
           onMoveDown: () => _moveBlock(b, 1),
         ));
       } else {
-        // Superset block — the whole block moves as one unit.
-        final groupSlots = <({int index, _EditableSlot slot})>[
-          for (var k = 0; k < block.length; k++)
-            (index: flatStart + k, slot: block[k]),
-        ];
+        // Superset block — the whole block moves as one unit. Only the
+        // members present in the viewed week are rendered.
         rows.add(_SupersetGroupCard(
-          groupSlots: groupSlots,
+          groupSlots: visible,
+          week: widget.week,
           palette: palette,
           onRemoveSlot: widget.onRemoveSlot,
           onChanged: widget.onSlotChanged,
-          onAddExercise: () => widget.onAddToGroup(block.first.supersetGroup!),
+          onAddExercise: () =>
+              widget.onAddToGroup(block.first.slot.supersetGroup!),
           onReplaceExercise: widget.onReplaceExercise,
           onMoveSlotInGroup: widget.onMoveSlotInGroup,
-          flatStart: flatStart,
           canMoveUp: canUp,
           canMoveDown: canDown,
           onMoveUp: () => _moveBlock(b, -1),
@@ -1122,28 +1775,29 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
         ));
       }
       rows.add(const SizedBox(height: 8));
-      flatStart += block.length;
     }
     return rows;
   }
 
   /// Groups the flat slot list into ordered blocks: a standalone slot is its
   /// own block; consecutive slots sharing a non-null supersetGroup form one.
-  List<List<_EditableSlot>> _blocks() {
+  /// Each entry carries its ORIGINAL flat index — the render filters absent
+  /// slots per week, so positions can no longer be derived from block order.
+  List<List<({int index, _EditableSlot slot})>> _blocks() {
     final slots = widget.day.slots;
-    final blocks = <List<_EditableSlot>>[];
+    final blocks = <List<({int index, _EditableSlot slot})>>[];
     var i = 0;
     while (i < slots.length) {
       final group = slots[i].supersetGroup;
       if (group != null) {
-        final run = <_EditableSlot>[];
+        final run = <({int index, _EditableSlot slot})>[];
         while (i < slots.length && slots[i].supersetGroup == group) {
-          run.add(slots[i]);
+          run.add((index: i, slot: slots[i]));
           i++;
         }
         blocks.add(run);
       } else {
-        blocks.add([slots[i]]);
+        blocks.add([(index: i, slot: slots[i])]);
         i++;
       }
     }
@@ -1154,12 +1808,16 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
   /// flattens back to a slot list. No-op at the edges. A whole superset moves
   /// as a single unit, so a reorder never splits a block.
   void _moveBlock(int blockIndex, int dir) {
+    // Operates on the UNFILTERED block list — flattening a presence-filtered
+    // list would silently drop the slots absent in the viewed week.
     final blocks = _blocks();
     final target = blockIndex + dir;
     if (target < 0 || target >= blocks.length) return;
     final moved = blocks.removeAt(blockIndex);
     blocks.insert(target, moved);
-    widget.onReorderSlots([for (final b in blocks) ...b]);
+    widget.onReorderSlots([
+      for (final b in blocks) ...b.map((r) => r.slot),
+    ]);
   }
 
   @override
@@ -1283,13 +1941,13 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
 class _SupersetGroupCard extends StatelessWidget {
   const _SupersetGroupCard({
     required this.groupSlots,
+    required this.week,
     required this.palette,
     required this.onRemoveSlot,
     required this.onChanged,
     required this.onAddExercise,
     required this.onReplaceExercise,
     required this.onMoveSlotInGroup,
-    required this.flatStart,
     this.canMoveUp = false,
     this.canMoveDown = false,
     this.onMoveUp,
@@ -1297,6 +1955,9 @@ class _SupersetGroupCard extends StatelessWidget {
   });
 
   final List<({int index, _EditableSlot slot})> groupSlots;
+
+  /// 0-based week whose sets the member slot editors render.
+  final int week;
   final AppPalette palette;
   final void Function(int slotIndex) onRemoveSlot;
   final VoidCallback onChanged;
@@ -1304,11 +1965,6 @@ class _SupersetGroupCard extends StatelessWidget {
   final void Function(_EditableSlot slot, Exercise newExercise)
       onReplaceExercise;
   final void Function(int absIndex, int dir) onMoveSlotInGroup;
-
-  /// Absolute index of the first slot in this superset within the day's flat
-  /// slot list. Used to compute per-member absolute indices for intra-group
-  /// reorder.
-  final int flatStart;
 
   /// Block-level reorder controls — the whole superset moves as one unit.
   final bool canMoveUp;
@@ -1360,6 +2016,7 @@ class _SupersetGroupCard extends StatelessWidget {
             _SlotEditor(
               key: ObjectKey(groupSlots[mi].slot),
               slot: groupSlots[mi].slot,
+              week: week,
               palette: palette,
               onRemove: () => onRemoveSlot(groupSlots[mi].index),
               onChanged: onChanged,
@@ -1367,10 +2024,13 @@ class _SupersetGroupCard extends StatelessWidget {
                   onReplaceExercise(groupSlots[mi].slot, ex),
               canMoveUp: mi > 0,
               canMoveDown: mi < groupSlots.length - 1,
-              onMoveUp:
-                  mi > 0 ? () => onMoveSlotInGroup(flatStart + mi, -1) : null,
+              // Each record carries its ORIGINAL flat index — required now
+              // that absent-in-week members are filtered out of groupSlots.
+              onMoveUp: mi > 0
+                  ? () => onMoveSlotInGroup(groupSlots[mi].index, -1)
+                  : null,
               onMoveDown: mi < groupSlots.length - 1
-                  ? () => onMoveSlotInGroup(flatStart + mi, 1)
+                  ? () => onMoveSlotInGroup(groupSlots[mi].index, 1)
                   : null,
             ),
             if (mi < groupSlots.length - 1) const SizedBox(height: 8),
@@ -1447,10 +2107,12 @@ class _SlotEditor extends StatefulWidget {
   const _SlotEditor({
     super.key,
     required this.slot,
+    required this.week,
     required this.palette,
     required this.onRemove,
     required this.onChanged,
     required this.onReplaceExercise,
+    this.slotIndex,
     this.canMoveUp = false,
     this.canMoveDown = false,
     this.onMoveUp,
@@ -1458,12 +2120,19 @@ class _SlotEditor extends StatefulWidget {
   });
 
   final _EditableSlot slot;
+
+  /// 0-based week whose set list this editor renders and mutates.
+  final int week;
   final AppPalette palette;
   final VoidCallback onRemove;
   final VoidCallback onChanged;
 
   /// Called when the user picks a replacement exercise via the tappable cell.
   final void Function(Exercise newExercise) onReplaceExercise;
+
+  /// Flat index of this slot in its day — used to key the menu button so
+  /// tests can find it via `Key('slot_menu_button_$slotIndex')`.
+  final int? slotIndex;
 
   /// Reorder controls. When both callbacks are null no move buttons render.
   final bool canMoveUp;
@@ -1489,6 +2158,9 @@ class _SlotEditorState extends State<_SlotEditor> {
     final l10n = AppL10n.of(context);
     final slot = widget.slot;
     final palette = widget.palette;
+    // Active week's list — the same object as weeklySets[week], so in-place
+    // mutations below stay visible to the single source of truth.
+    final sets = slot.setsForWeek(widget.week);
     // One light surface per card — no outer border, just a fill + generous
     // padding. Inner fields are NOT individually boxed.
     return Container(
@@ -1531,6 +2203,9 @@ class _SlotEditorState extends State<_SlotEditor> {
               ),
               const SizedBox(width: 4),
               PopupMenuButton<_SlotAction>(
+                key: widget.slotIndex != null
+                    ? Key('slot_menu_button_${widget.slotIndex}')
+                    : null,
                 icon: Icon(TreinoIcon.dotsThree,
                     size: 20, color: palette.textMuted),
                 color: palette.bgCard,
@@ -1609,6 +2284,7 @@ class _SlotEditorState extends State<_SlotEditor> {
           // ── Set table ─────────────────────────────────────────────────────
           _SetTable(
             slot: slot,
+            sets: sets,
             palette: palette,
             onChanged: () {
               setState(() {}); // redraw chip labels after type change
@@ -1624,10 +2300,9 @@ class _SlotEditorState extends State<_SlotEditor> {
               key: const Key('add_set_button'),
               onPressed: () {
                 setState(() {
-                  final template = slot.sets.isNotEmpty
-                      ? slot.sets.last.clone()
-                      : _EditableSet();
-                  slot.sets = [...slot.sets, template];
+                  final template =
+                      sets.isNotEmpty ? sets.last.clone() : _EditableSet();
+                  sets.add(template);
                 });
                 widget.onChanged();
               },
@@ -1680,9 +2355,11 @@ PopupMenuItem<_SlotAction> _slotMenuItem(
       children: [
         Icon(icon, size: 18, color: color),
         const SizedBox(width: 12),
-        Text(
-          label,
-          style: GoogleFonts.barlow(fontSize: 14, color: color),
+        Flexible(
+          child: Text(
+            label,
+            style: GoogleFonts.barlow(fontSize: 14, color: color),
+          ),
         ),
       ],
     ),
@@ -1695,11 +2372,16 @@ PopupMenuItem<_SlotAction> _slotMenuItem(
 class _SetTable extends StatefulWidget {
   const _SetTable({
     required this.slot,
+    required this.sets,
     required this.palette,
     required this.onChanged,
   });
 
   final _EditableSlot slot;
+
+  /// The active week's set list (same object as `slot.weeklySets[w]`) — the
+  /// table needs no week knowledge, it renders and mutates this list in place.
+  final List<_EditableSet> sets;
   final AppPalette palette;
   final VoidCallback onChanged;
 
@@ -1761,6 +2443,7 @@ class _SetTableState extends State<_SetTable> {
   @override
   Widget build(BuildContext context) {
     final slot = widget.slot;
+    final sets = widget.sets;
     final palette = widget.palette;
     final isDuration = slot.exerciseMode == ExerciseMode.duration;
 
@@ -1775,30 +2458,25 @@ class _SetTableState extends State<_SetTable> {
         ),
         const SizedBox(height: 4),
         // ── Set rows ───────────────────────────────────────────────────────
-        for (var i = 0; i < slot.sets.length; i++)
+        for (var i = 0; i < sets.length; i++)
           Padding(
             padding: const EdgeInsets.only(bottom: 6),
             child: _SetRow(
-              key: ObjectKey(slot.sets[i]),
-              editableSet: slot.sets[i],
+              key: ObjectKey(sets[i]),
+              editableSet: sets[i],
               index: i,
-              allSets: slot.sets,
+              allSets: sets,
               palette: palette,
               exerciseMode: slot.exerciseMode,
               repMode: slot.repMode,
               isDuration: isDuration,
               onTypeChanged: (type) {
-                setState(() => slot.sets[i].type = type);
+                setState(() => sets[i].type = type);
                 widget.onChanged();
               },
-              onRemove: slot.sets.length > 1
+              onRemove: sets.length > 1
                   ? () {
-                      setState(() {
-                        slot.sets = [
-                          for (var j = 0; j < slot.sets.length; j++)
-                            if (j != i) slot.sets[j],
-                        ];
-                      });
+                      setState(() => sets.removeAt(i));
                       widget.onChanged();
                     }
                   : null,
@@ -2220,12 +2898,14 @@ class RoutineEditorTestBridge {
   static bool isSetValidBridge({
     required ExerciseMode exerciseMode,
     required RepMode repMode,
+    SetType type = SetType.normal,
     int? reps,
     int? repsMin,
     int? repsMax,
     int? durationSeconds,
   }) {
     final s = _EditableSet(
+      type: type,
       reps: reps,
       repsMin: repsMin,
       repsMax: repsMax,
@@ -2259,16 +2939,18 @@ class RoutineEditorTestBridge {
       )
       ..exerciseMode = exerciseMode
       ..repMode = repMode
-      ..sets = sets
-          .map((r) => _EditableSet(
-                type: r.type,
-                weightKg: r.weightKg,
-                reps: r.reps,
-                repsMin: r.repsMin,
-                repsMax: r.repsMax,
-                durationSeconds: r.durationSeconds,
-              ))
-          .toList();
+      ..weeklySets = [
+        sets
+            .map((r) => _EditableSet(
+                  type: r.type,
+                  weightKg: r.weightKg,
+                  reps: r.reps,
+                  repsMin: r.repsMin,
+                  repsMax: r.repsMax,
+                  durationSeconds: r.durationSeconds,
+                ))
+            .toList(),
+      ];
     return buildRoutineSlot(slot, null);
   }
 
@@ -2280,6 +2962,168 @@ class RoutineEditorTestBridge {
   }) {
     final editableSets = sets.map((t) => _EditableSet(type: t)).toList();
     return setChipLabel(editableSets, index);
+  }
+
+  /// Like [buildSlotBridge] but with one set list PER WEEK — lets unit tests
+  /// assert the multi-week `weeklySets` derivation and the week-0 legacy
+  /// fields (REQ-PERIOD-017).
+  static RoutineSlot buildSlotBridgeWeekly({
+    required ExerciseMode exerciseMode,
+    required RepMode repMode,
+    required List<
+            List<
+                ({
+                  SetType type,
+                  double? weightKg,
+                  int? reps,
+                  int? repsMin,
+                  int? repsMax,
+                  int? durationSeconds,
+                })>>
+        weeklySets,
+  }) {
+    final slot = _EditableSlot()
+      ..exercise = const Exercise(
+        id: 'test-ex',
+        name: 'Test Exercise',
+        muscleGroup: 'chest',
+        category: 'compound',
+      )
+      ..exerciseMode = exerciseMode
+      ..repMode = repMode
+      ..weeklySets = weeklySets
+          .map((wk) => wk
+              .map((r) => _EditableSet(
+                    type: r.type,
+                    weightKg: r.weightKg,
+                    reps: r.reps,
+                    repsMin: r.repsMin,
+                    repsMax: r.repsMax,
+                    durationSeconds: r.durationSeconds,
+                  ))
+              .toList())
+          .toList();
+    return buildRoutineSlot(slot, null);
+  }
+
+  /// Like [buildSlotBridgeWeekly] but also accepts a presence mask
+  /// [activeWeeks] — lets unit tests assert that [buildRoutineSlot] emits the
+  /// correct sorted [RoutineSlot.activeWeeks] (REQ-WPRES-013).
+  static RoutineSlot buildSlotBridgeWithPresence({
+    required ExerciseMode exerciseMode,
+    required RepMode repMode,
+    required List<
+            List<
+                ({
+                  SetType type,
+                  double? weightKg,
+                  int? reps,
+                  int? repsMin,
+                  int? repsMax,
+                  int? durationSeconds,
+                })>>
+        weeklySets,
+    required Set<int> activeWeeks,
+  }) {
+    final slot = _EditableSlot()
+      ..exercise = const Exercise(
+        id: 'test-ex',
+        name: 'Test Exercise',
+        muscleGroup: 'chest',
+        category: 'compound',
+      )
+      ..exerciseMode = exerciseMode
+      ..repMode = repMode
+      ..weeklySets = weeklySets
+          .map((wk) => wk
+              .map((r) => _EditableSet(
+                    type: r.type,
+                    weightKg: r.weightKg,
+                    reps: r.reps,
+                    repsMin: r.repsMin,
+                    repsMax: r.repsMax,
+                    durationSeconds: r.durationSeconds,
+                  ))
+              .toList())
+          .toList()
+      ..activeWeeks = activeWeeks;
+    return buildRoutineSlot(slot, null);
+  }
+
+  /// Validates that [activeWeeks] is a valid presence mask for [numWeeks]
+  /// weeks. Bridges [_RoutineEditorScreenState._isPresenceMaskValid] for unit
+  /// tests (REQ-WPRES-014, SCENARIO-WPRES-022/023).
+  static bool isPresenceMaskValidBridge({
+    required int numWeeks,
+    required Set<int> activeWeeks,
+  }) =>
+      _RoutineEditorScreenState._isPresenceMaskValid(activeWeeks, numWeeks);
+
+  /// Simulates the [_duplicateWeek] presence-copy logic for a set of slots
+  /// defined by [slots] records. Returns the resulting [activeWeeks] masks (as
+  /// `Set<int>`) in slot order, after copying presence from [sourceWeek] to
+  /// [targetWeek] in a [numWeeks]-week plan.
+  ///
+  /// Used by SCENARIO-WPRES-020/021 unit tests to assert the duplication
+  /// logic without a full widget pump (REQ-WPRES-013, ADR-WPRES-06).
+  static List<Set<int>> duplicateWeekPresence({
+    required int numWeeks,
+    required int sourceWeek,
+    required int targetWeek,
+    required List<
+            ({
+              Set<int> activeWeeks,
+              List<
+                  List<
+                      ({
+                        SetType type,
+                        double? weightKg,
+                        int? reps,
+                        int? repsMin,
+                        int? repsMax,
+                        int? durationSeconds,
+                      })>> weekSets,
+            })>
+        slots,
+  }) {
+    // Build mutable _EditableSlots.
+    final editableSlots = slots.map((s) {
+      final slot = _EditableSlot()
+        ..exercise = const Exercise(
+          id: 'test-ex',
+          name: 'Test Exercise',
+          muscleGroup: 'chest',
+          category: 'compound',
+        )
+        ..activeWeeks = Set<int>.from(s.activeWeeks)
+        ..weeklySets = s.weekSets
+            .map((wk) => wk
+                .map((r) => _EditableSet(
+                      type: r.type,
+                      weightKg: r.weightKg,
+                      reps: r.reps,
+                      repsMin: r.repsMin,
+                      repsMax: r.repsMax,
+                      durationSeconds: r.durationSeconds,
+                    ))
+                .toList())
+            .toList();
+      return slot;
+    }).toList();
+
+    // Simulate the _duplicateWeek presence logic (ADR-WPRES-06).
+    for (final slot in editableSlots) {
+      if (slot.activeWeeks.isNotEmpty) {
+        if (slot.isPresentInWeek(sourceWeek)) {
+          slot.activeWeeks = Set<int>.from(slot.activeWeeks)..add(targetWeek);
+        } else {
+          slot.activeWeeks = Set<int>.from(slot.activeWeeks)
+            ..remove(targetWeek);
+        }
+      }
+    }
+
+    return editableSlots.map((s) => s.activeWeeks).toList();
   }
 }
 

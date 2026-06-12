@@ -4,7 +4,10 @@ import '../../auth/application/auth_providers.dart';
 import '../../profile/application/user_providers.dart' show firestoreProvider;
 import '../data/session_repository.dart';
 import '../domain/session.dart';
+import '../domain/session_status.dart';
 import '../domain/set_log.dart';
+import 'plan_progress.dart';
+import 'routine_providers.dart' show routineByIdProvider;
 import 'session_init.dart';
 import 'session_notifier.dart';
 import 'session_state.dart';
@@ -63,6 +66,67 @@ final sessionSummaryProvider = FutureProvider.autoDispose.family<
   return (
     session: results[0] as Session?,
     setLogs: results[1] as List<SetLog>,
+  );
+});
+
+// ─── Periodization (Model B) — plan progress provider ────────────────────────
+
+/// Family key for [planProgressProvider].
+///
+/// Uses only String fields for structural equality via Dart's record ==.
+/// - [uid]       the athlete's Firebase uid.
+/// - [routineId] the routine being tracked.
+///
+/// dayNumbers and numWeeks are resolved inside the provider via
+/// [routineByIdProvider] to avoid List<int> equality issues.
+typedef PlanProgressKey = ({String uid, String routineId});
+
+/// Derives the athlete's current progress in a periodized plan.
+///
+/// Reads [sessionsByUidProvider] (filtered by routineId + finished +
+/// wasFullyCompleted) and [routineByIdProvider] (for dayNumbers + numWeeks),
+/// then calls [derivePlanProgress].
+///
+/// autoDispose: refreshes automatically when the screen is re-mounted
+/// (e.g. after returning from the player). family key is [PlanProgressKey].
+final planProgressProvider = FutureProvider.autoDispose
+    .family<PlanProgress, PlanProgressKey>((ref, key) async {
+  final sessions = await ref.watch(sessionsByUidProvider(key.uid).future);
+  final routine = await ref.watch(routineByIdProvider(key.routineId).future);
+  if (routine == null) {
+    return derivePlanProgress({}, const [], 1);
+  }
+  final dayNumbers = routine.days.map((d) => d.dayNumber).toList();
+  final completed = sessions
+      .where(
+        (s) =>
+            s.routineId == key.routineId &&
+            s.status == SessionStatus.finished &&
+            s.wasFullyCompleted,
+      )
+      .map((s) => (week: s.weekNumber, day: s.dayNumber))
+      .toSet();
+
+  // REQ-WPRES-022 (ADR-WPRES-10): compute the per-week required-day grid.
+  // A (week, day) is required iff the day has ≥1 slot present in that week.
+  // An absent day (zero present slots) is NOT in requiredPairs → auto-satisfied
+  // by derivePlanProgress and the gating functions.
+  // numWeeks==1 / all-empty-mask plans → every pair is included → back-compat.
+  final requiredPairs = <CompletedKey>{};
+  for (var w = 0; w < routine.numWeeks; w++) {
+    for (final d in routine.days) {
+      final hasPresent = d.slots.any((s) => s.isPresentInWeek(w));
+      if (hasPresent) {
+        requiredPairs.add((week: w, day: d.dayNumber));
+      }
+    }
+  }
+
+  return derivePlanProgress(
+    completed,
+    dayNumbers,
+    routine.numWeeks,
+    requiredPairs: requiredPairs,
   );
 });
 

@@ -627,6 +627,28 @@ void main() {
         throwsA(isA<ArgumentError>()),
       );
     });
+
+    test(
+        'SCENARIO-PERIOD-050: persists numWeeks in the written doc '
+        '(REQ-PERIOD-054)', () async {
+      final id = await seedUserRoutine();
+
+      final updatedDraft = Routine(
+        id: id,
+        name: 'Rutina Periodizada',
+        split: null,
+        level: ExperienceLevel.beginner,
+        days: const [],
+        source: RoutineSource.userCreated,
+        visibility: RoutineVisibility.private,
+        numWeeks: 4,
+      );
+      await repo.updateUserOwned(uid: 'athlete-a', draft: updatedDraft);
+
+      final data =
+          (await firestore.collection('routines').doc(id).get()).data()!;
+      expect(data['numWeeks'], equals(4));
+    });
   });
 
   group('deleteRoutine', () {

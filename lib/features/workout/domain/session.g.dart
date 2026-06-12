@@ -21,6 +21,7 @@ _$SessionImpl _$$SessionImplFromJson(Map<String, dynamic> json) =>
       status: $enumDecode(_$SessionStatusEnumMap, json['status']),
       dayNumber: (json['dayNumber'] as num?)?.toInt() ?? 1,
       wasFullyCompleted: json['wasFullyCompleted'] as bool? ?? false,
+      weekNumber: (json['weekNumber'] as num?)?.toInt() ?? 0,
     );
 
 Map<String, dynamic> _$$SessionImplToJson(_$SessionImpl instance) =>
@@ -37,6 +38,7 @@ Map<String, dynamic> _$$SessionImplToJson(_$SessionImpl instance) =>
       'status': _$SessionStatusEnumMap[instance.status]!,
       'dayNumber': instance.dayNumber,
       'wasFullyCompleted': instance.wasFullyCompleted,
+      'weekNumber': instance.weekNumber,
     };
 
 Value? _$JsonConverterFromJson<Json, Value>(

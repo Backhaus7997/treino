@@ -6,6 +6,27 @@ import 'set_spec.dart';
 part 'routine_slot.freezed.dart';
 part 'routine_slot.g.dart';
 
+/// Firestore cannot store nested arrays (an array element must not be
+/// another array), so `List<List<SetSpec>>` is unpersistable as-is. On the
+/// wire each week is wrapped in a map: `[{'sets': [...]}, {'sets': [...]}]`.
+/// The domain type stays `List<List<SetSpec>>` — only the JSON shape changes.
+class WeeklySetsConverter
+    implements JsonConverter<List<List<SetSpec>>, List<dynamic>> {
+  const WeeklySetsConverter();
+
+  @override
+  List<List<SetSpec>> fromJson(List<dynamic> json) => json
+      .map((week) => ((week as Map)['sets'] as List<dynamic>? ?? const [])
+          .map((s) => SetSpec.fromJson(Map<String, Object?>.from(s as Map)))
+          .toList())
+      .toList();
+
+  @override
+  List<dynamic> toJson(List<List<SetSpec>> weeks) => weeks
+      .map((week) => {'sets': week.map((s) => s.toJson()).toList()})
+      .toList();
+}
+
 @freezed
 class RoutineSlot with _$RoutineSlot {
   // Private constructor required for custom getters in freezed classes.
@@ -47,6 +68,24 @@ class RoutineSlot with _$RoutineSlot {
     /// The explicit per-set rows for this slot.
     /// Empty list = use legacy fields and synthesize via [effectiveSets].
     @Default(<SetSpec>[]) List<SetSpec> sets,
+
+    /// Periodization (Model B): per-week explicit set rows.
+    /// `weeklySets[w]` holds the prescription for 0-based week `w`.
+    /// Empty OUTER list = legacy / single-week slot → resolve via
+    /// [effectiveSets]. An in-range EMPTY inner list is an authored-empty
+    /// week (e.g. deload/rest) and is returned as-is — no fallback.
+    /// Wire format via [WeeklySetsConverter] — Firestore rejects nested
+    /// arrays, so weeks are map-wrapped on the wire.
+    @Default(<List<SetSpec>>[])
+    @WeeklySetsConverter()
+    List<List<SetSpec>> weeklySets,
+
+    /// Periodization presence MASK (Option A). 0-based week indices in which
+    /// this slot is PRESENT. Empty = present in ALL weeks (hard back-compat:
+    /// every legacy/single-week doc has no field → empty → present everywhere).
+    /// ORTHOGONAL to [weeklySets] (prescription). A flat List<int> — Firestore
+    /// stores it natively, NO converter needed (mirrors [targetReps]).
+    @Default(<int>[]) List<int> activeWeeks,
   }) = _RoutineSlot;
 
   factory RoutineSlot.fromJson(Map<String, Object?> json) =>
@@ -101,6 +140,31 @@ class RoutineSlot with _$RoutineSlot {
       ),
     );
   }
+
+  /// The per-set rows for a specific 0-based [week] of a periodized plan.
+  ///
+  /// Precedence: when [weeklySets] is populated AND [week] is in range, that
+  /// week's rows win — INCLUDING an authored-empty week (`[]`, e.g. a
+  /// deload/rest week), which is returned as-is with no fallback. Only an
+  /// empty OUTER [weeklySets] or an out-of-range/negative [week] falls back
+  /// to [effectiveSets] (single-week / legacy behavior). Never throws.
+  List<SetSpec> effectiveSetsForWeek(int week) {
+    if (weeklySets.isNotEmpty && week >= 0 && week < weeklySets.length) {
+      return weeklySets[week];
+    }
+    return effectiveSets;
+  }
+
+  /// Whether this slot is present in 0-based [week].
+  ///
+  /// Rule: `activeWeeks.isEmpty || activeWeeks.contains(week)`.
+  /// An empty mask returns `true` for any week index (back-compat: every
+  /// legacy/single-week doc has no field → empty → present everywhere).
+  /// A non-empty mask returns `true` only when [week] is listed.
+  /// A negative or out-of-range [week] is false for a non-empty mask,
+  /// true for an empty mask. Never throws.
+  bool isPresentInWeek(int week) =>
+      activeWeeks.isEmpty || activeWeeks.contains(week);
 
   /// Derives the exercise mode from the new field, falling back to legacy
   /// signals (durationSeconds > 0 → [ExerciseMode.duration]).

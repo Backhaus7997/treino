@@ -7,6 +7,7 @@ import 'package:treino/features/workout/domain/routine_slot.dart';
 import 'package:treino/features/workout/domain/session.dart';
 import 'package:treino/features/workout/domain/session_status.dart';
 import 'package:treino/features/workout/domain/set_log.dart';
+import 'package:treino/features/workout/domain/set_spec.dart';
 import 'package:treino/features/profile/domain/experience_level.dart';
 
 // ── Session ──────────────────────────────────────────────────────────────────
@@ -23,6 +24,7 @@ Session makeSession({
   SessionStatus status = SessionStatus.active,
   int dayNumber = 1,
   bool wasFullyCompleted = false,
+  int weekNumber = 0,
 }) =>
     Session(
       id: id,
@@ -36,6 +38,7 @@ Session makeSession({
       status: status,
       dayNumber: dayNumber,
       wasFullyCompleted: wasFullyCompleted,
+      weekNumber: weekNumber,
     );
 
 // ── SetLog ───────────────────────────────────────────────────────────────────
@@ -74,6 +77,8 @@ RoutineSlot makeSlot({
   double? targetWeightKg = 60.0,
   String? notes,
   int? supersetGroup,
+  List<List<SetSpec>>? weeklySets,
+  int? durationSeconds,
 }) =>
     RoutineSlot(
       exerciseId: exerciseId,
@@ -86,6 +91,8 @@ RoutineSlot makeSlot({
       targetWeightKg: targetWeightKg,
       notes: notes,
       supersetGroup: supersetGroup,
+      weeklySets: weeklySets ?? const [],
+      durationSeconds: durationSeconds,
     );
 
 // ── RoutineDay ────────────────────────────────────────────────────────────────
@@ -118,6 +125,7 @@ Routine makeRoutine({
   List<RoutineDay>? days,
   int? estimatedMinutesPerDay,
   String? imageUrl,
+  int numWeeks = 1,
 }) =>
     Routine(
       id: id,
@@ -127,4 +135,5 @@ Routine makeRoutine({
       days: days ?? [makeDay()],
       estimatedMinutesPerDay: estimatedMinutesPerDay,
       imageUrl: imageUrl,
+      numWeeks: numWeeks,
     );

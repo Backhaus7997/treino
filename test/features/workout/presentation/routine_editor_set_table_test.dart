@@ -54,6 +54,73 @@ void main() {
     });
   });
 
+  // ── isSetValid — failure sets (al fallo) ───────────────────────────────────
+  // A failure set has no countable target by definition — the athlete works
+  // to failure. Requiring reps/duration for it was a conceptual bug
+  // (device finding 2026-06-11).
+  group('isSetValid — failure sets (al fallo)', () {
+    test('failure set with null reps → valid (no target required)', () {
+      expect(
+        RoutineEditorTestBridge.isSetValidBridge(
+          exerciseMode: ExerciseMode.reps,
+          repMode: RepMode.single,
+          type: SetType.failure,
+          reps: null,
+        ),
+        isTrue,
+      );
+    });
+
+    test('failure set in range mode with null min/max → valid', () {
+      expect(
+        RoutineEditorTestBridge.isSetValidBridge(
+          exerciseMode: ExerciseMode.reps,
+          repMode: RepMode.range,
+          type: SetType.failure,
+          repsMin: null,
+          repsMax: null,
+        ),
+        isTrue,
+      );
+    });
+
+    test('failure set in duration mode with null duration → valid', () {
+      expect(
+        RoutineEditorTestBridge.isSetValidBridge(
+          exerciseMode: ExerciseMode.duration,
+          repMode: RepMode.single,
+          type: SetType.failure,
+          durationSeconds: null,
+        ),
+        isTrue,
+      );
+    });
+
+    test('failure set with reps typed as optional reference → still valid', () {
+      expect(
+        RoutineEditorTestBridge.isSetValidBridge(
+          exerciseMode: ExerciseMode.reps,
+          repMode: RepMode.single,
+          type: SetType.failure,
+          reps: 8,
+        ),
+        isTrue,
+      );
+    });
+
+    test('NORMAL set with null reps remains invalid (guard)', () {
+      expect(
+        RoutineEditorTestBridge.isSetValidBridge(
+          exerciseMode: ExerciseMode.reps,
+          repMode: RepMode.single,
+          type: SetType.normal,
+          reps: null,
+        ),
+        isFalse,
+      );
+    });
+  });
+
   // ── isSetValid — reps single mode ──────────────────────────────────────────
   group('isSetValid — reps single mode', () {
     test('null reps → invalid', () {

@@ -42,8 +42,12 @@ class TrainerDashboardTab extends ConsumerWidget {
     final palette = AppPalette.of(context);
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
-      physics: const ClampingScrollPhysics(),
+      // Explicit padding overrides the ambient MediaQuery inset, so the
+      // floating bar's height must be added back — otherwise the last row
+      // (CTA buttons) can never scroll out from behind the translucent bar.
+      padding: EdgeInsets.fromLTRB(
+          20, 14, 20, 24 + MediaQuery.paddingOf(context).bottom),
+      physics: const AlwaysScrollableScrollPhysics(),
       children: [
         const _DashboardHeader(),
         const SizedBox(height: 18),
@@ -402,7 +406,7 @@ class _ResumenDelDiaCard extends ConsumerWidget {
               _StatColumn(
                 value: '$cancelled',
                 label: 'CANCELADAS',
-                color: palette.highlight,
+                color: palette.danger,
                 palette: palette,
               ),
             ],

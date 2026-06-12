@@ -394,8 +394,7 @@ void main() {
 
     await tester.enterText(
         find.byKey(const Key('editor_name_field')), 'Nuevo Plan');
-    await tester.enterText(
-        find.byKey(const Key('editor_split_field')), 'PPL');
+    await tester.enterText(find.byKey(const Key('editor_split_field')), 'PPL');
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Agregar ejercicio'));
@@ -414,8 +413,13 @@ void main() {
     await tester.enterText(find.byWidget(repsField), '8');
     await tester.pumpAndSettle();
 
+<<<<<<< feat/i18n-pr2b-coach-agenda-workout
     await tester.tap(
         find.widgetWithText(ElevatedButton, 'ASIGNAR PLAN'));
+=======
+    await tester
+        .tap(find.widgetWithText(ElevatedButton, CoachStrings.editorSubmit));
+>>>>>>> main
     await tester.pumpAndSettle();
 
     verify(() => repo.createAssigned(any())).called(1);

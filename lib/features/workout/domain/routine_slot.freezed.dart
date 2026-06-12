@@ -56,6 +56,23 @@ mixin _$RoutineSlot {
   /// Empty list = use legacy fields and synthesize via [effectiveSets].
   List<SetSpec> get sets => throw _privateConstructorUsedError;
 
+  /// Periodization (Model B): per-week explicit set rows.
+  /// `weeklySets[w]` holds the prescription for 0-based week `w`.
+  /// Empty OUTER list = legacy / single-week slot → resolve via
+  /// [effectiveSets]. An in-range EMPTY inner list is an authored-empty
+  /// week (e.g. deload/rest) and is returned as-is — no fallback.
+  /// Wire format via [WeeklySetsConverter] — Firestore rejects nested
+  /// arrays, so weeks are map-wrapped on the wire.
+  @WeeklySetsConverter()
+  List<List<SetSpec>> get weeklySets => throw _privateConstructorUsedError;
+
+  /// Periodization presence MASK (Option A). 0-based week indices in which
+  /// this slot is PRESENT. Empty = present in ALL weeks (hard back-compat:
+  /// every legacy/single-week doc has no field → empty → present everywhere).
+  /// ORTHOGONAL to [weeklySets] (prescription). A flat List<int> — Firestore
+  /// stores it natively, NO converter needed (mirrors [targetReps]).
+  List<int> get activeWeeks => throw _privateConstructorUsedError;
+
   /// Serializes this RoutineSlot to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
 
@@ -87,7 +104,9 @@ abstract class $RoutineSlotCopyWith<$Res> {
       int? durationSeconds,
       @JsonKey(unknownEnumValue: ExerciseMode.reps) ExerciseMode exerciseMode,
       @JsonKey(unknownEnumValue: RepMode.single) RepMode repMode,
-      List<SetSpec> sets});
+      List<SetSpec> sets,
+      @WeeklySetsConverter() List<List<SetSpec>> weeklySets,
+      List<int> activeWeeks});
 }
 
 /// @nodoc
@@ -120,6 +139,8 @@ class _$RoutineSlotCopyWithImpl<$Res, $Val extends RoutineSlot>
     Object? exerciseMode = null,
     Object? repMode = null,
     Object? sets = null,
+    Object? weeklySets = null,
+    Object? activeWeeks = null,
   }) {
     return _then(_value.copyWith(
       exerciseId: null == exerciseId
@@ -182,6 +203,14 @@ class _$RoutineSlotCopyWithImpl<$Res, $Val extends RoutineSlot>
           ? _value.sets
           : sets // ignore: cast_nullable_to_non_nullable
               as List<SetSpec>,
+      weeklySets: null == weeklySets
+          ? _value.weeklySets
+          : weeklySets // ignore: cast_nullable_to_non_nullable
+              as List<List<SetSpec>>,
+      activeWeeks: null == activeWeeks
+          ? _value.activeWeeks
+          : activeWeeks // ignore: cast_nullable_to_non_nullable
+              as List<int>,
     ) as $Val);
   }
 }
@@ -209,7 +238,9 @@ abstract class _$$RoutineSlotImplCopyWith<$Res>
       int? durationSeconds,
       @JsonKey(unknownEnumValue: ExerciseMode.reps) ExerciseMode exerciseMode,
       @JsonKey(unknownEnumValue: RepMode.single) RepMode repMode,
-      List<SetSpec> sets});
+      List<SetSpec> sets,
+      @WeeklySetsConverter() List<List<SetSpec>> weeklySets,
+      List<int> activeWeeks});
 }
 
 /// @nodoc
@@ -240,6 +271,8 @@ class __$$RoutineSlotImplCopyWithImpl<$Res>
     Object? exerciseMode = null,
     Object? repMode = null,
     Object? sets = null,
+    Object? weeklySets = null,
+    Object? activeWeeks = null,
   }) {
     return _then(_$RoutineSlotImpl(
       exerciseId: null == exerciseId
@@ -302,6 +335,14 @@ class __$$RoutineSlotImplCopyWithImpl<$Res>
           ? _value._sets
           : sets // ignore: cast_nullable_to_non_nullable
               as List<SetSpec>,
+      weeklySets: null == weeklySets
+          ? _value._weeklySets
+          : weeklySets // ignore: cast_nullable_to_non_nullable
+              as List<List<SetSpec>>,
+      activeWeeks: null == activeWeeks
+          ? _value._activeWeeks
+          : activeWeeks // ignore: cast_nullable_to_non_nullable
+              as List<int>,
     ));
   }
 }
@@ -325,9 +366,14 @@ class _$RoutineSlotImpl extends _RoutineSlot {
       @JsonKey(unknownEnumValue: ExerciseMode.reps)
       this.exerciseMode = ExerciseMode.reps,
       @JsonKey(unknownEnumValue: RepMode.single) this.repMode = RepMode.single,
-      final List<SetSpec> sets = const <SetSpec>[]})
+      final List<SetSpec> sets = const <SetSpec>[],
+      @WeeklySetsConverter()
+      final List<List<SetSpec>> weeklySets = const <List<SetSpec>>[],
+      final List<int> activeWeeks = const <int>[]})
       : _targetReps = targetReps,
         _sets = sets,
+        _weeklySets = weeklySets,
+        _activeWeeks = activeWeeks,
         super._();
 
   factory _$RoutineSlotImpl.fromJson(Map<String, dynamic> json) =>
@@ -403,9 +449,54 @@ class _$RoutineSlotImpl extends _RoutineSlot {
     return EqualUnmodifiableListView(_sets);
   }
 
+  /// Periodization (Model B): per-week explicit set rows.
+  /// `weeklySets[w]` holds the prescription for 0-based week `w`.
+  /// Empty OUTER list = legacy / single-week slot → resolve via
+  /// [effectiveSets]. An in-range EMPTY inner list is an authored-empty
+  /// week (e.g. deload/rest) and is returned as-is — no fallback.
+  /// Wire format via [WeeklySetsConverter] — Firestore rejects nested
+  /// arrays, so weeks are map-wrapped on the wire.
+  final List<List<SetSpec>> _weeklySets;
+
+  /// Periodization (Model B): per-week explicit set rows.
+  /// `weeklySets[w]` holds the prescription for 0-based week `w`.
+  /// Empty OUTER list = legacy / single-week slot → resolve via
+  /// [effectiveSets]. An in-range EMPTY inner list is an authored-empty
+  /// week (e.g. deload/rest) and is returned as-is — no fallback.
+  /// Wire format via [WeeklySetsConverter] — Firestore rejects nested
+  /// arrays, so weeks are map-wrapped on the wire.
+  @override
+  @JsonKey()
+  @WeeklySetsConverter()
+  List<List<SetSpec>> get weeklySets {
+    if (_weeklySets is EqualUnmodifiableListView) return _weeklySets;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(_weeklySets);
+  }
+
+  /// Periodization presence MASK (Option A). 0-based week indices in which
+  /// this slot is PRESENT. Empty = present in ALL weeks (hard back-compat:
+  /// every legacy/single-week doc has no field → empty → present everywhere).
+  /// ORTHOGONAL to [weeklySets] (prescription). A flat List<int> — Firestore
+  /// stores it natively, NO converter needed (mirrors [targetReps]).
+  final List<int> _activeWeeks;
+
+  /// Periodization presence MASK (Option A). 0-based week indices in which
+  /// this slot is PRESENT. Empty = present in ALL weeks (hard back-compat:
+  /// every legacy/single-week doc has no field → empty → present everywhere).
+  /// ORTHOGONAL to [weeklySets] (prescription). A flat List<int> — Firestore
+  /// stores it natively, NO converter needed (mirrors [targetReps]).
+  @override
+  @JsonKey()
+  List<int> get activeWeeks {
+    if (_activeWeeks is EqualUnmodifiableListView) return _activeWeeks;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(_activeWeeks);
+  }
+
   @override
   String toString() {
-    return 'RoutineSlot(exerciseId: $exerciseId, exerciseName: $exerciseName, muscleGroup: $muscleGroup, targetSets: $targetSets, targetRepsMin: $targetRepsMin, targetRepsMax: $targetRepsMax, restSeconds: $restSeconds, targetWeightKg: $targetWeightKg, notes: $notes, supersetGroup: $supersetGroup, targetReps: $targetReps, durationSeconds: $durationSeconds, exerciseMode: $exerciseMode, repMode: $repMode, sets: $sets)';
+    return 'RoutineSlot(exerciseId: $exerciseId, exerciseName: $exerciseName, muscleGroup: $muscleGroup, targetSets: $targetSets, targetRepsMin: $targetRepsMin, targetRepsMax: $targetRepsMax, restSeconds: $restSeconds, targetWeightKg: $targetWeightKg, notes: $notes, supersetGroup: $supersetGroup, targetReps: $targetReps, durationSeconds: $durationSeconds, exerciseMode: $exerciseMode, repMode: $repMode, sets: $sets, weeklySets: $weeklySets, activeWeeks: $activeWeeks)';
   }
 
   @override
@@ -439,7 +530,11 @@ class _$RoutineSlotImpl extends _RoutineSlot {
             (identical(other.exerciseMode, exerciseMode) ||
                 other.exerciseMode == exerciseMode) &&
             (identical(other.repMode, repMode) || other.repMode == repMode) &&
-            const DeepCollectionEquality().equals(other._sets, _sets));
+            const DeepCollectionEquality().equals(other._sets, _sets) &&
+            const DeepCollectionEquality()
+                .equals(other._weeklySets, _weeklySets) &&
+            const DeepCollectionEquality()
+                .equals(other._activeWeeks, _activeWeeks));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -460,7 +555,9 @@ class _$RoutineSlotImpl extends _RoutineSlot {
       durationSeconds,
       exerciseMode,
       repMode,
-      const DeepCollectionEquality().hash(_sets));
+      const DeepCollectionEquality().hash(_sets),
+      const DeepCollectionEquality().hash(_weeklySets),
+      const DeepCollectionEquality().hash(_activeWeeks));
 
   /// Create a copy of RoutineSlot
   /// with the given fields replaced by the non-null parameter values.
@@ -495,7 +592,9 @@ abstract class _RoutineSlot extends RoutineSlot {
       @JsonKey(unknownEnumValue: ExerciseMode.reps)
       final ExerciseMode exerciseMode,
       @JsonKey(unknownEnumValue: RepMode.single) final RepMode repMode,
-      final List<SetSpec> sets}) = _$RoutineSlotImpl;
+      final List<SetSpec> sets,
+      @WeeklySetsConverter() final List<List<SetSpec>> weeklySets,
+      final List<int> activeWeeks}) = _$RoutineSlotImpl;
   const _RoutineSlot._() : super._();
 
   factory _RoutineSlot.fromJson(Map<String, dynamic> json) =
@@ -546,6 +645,25 @@ abstract class _RoutineSlot extends RoutineSlot {
   /// Empty list = use legacy fields and synthesize via [effectiveSets].
   @override
   List<SetSpec> get sets;
+
+  /// Periodization (Model B): per-week explicit set rows.
+  /// `weeklySets[w]` holds the prescription for 0-based week `w`.
+  /// Empty OUTER list = legacy / single-week slot → resolve via
+  /// [effectiveSets]. An in-range EMPTY inner list is an authored-empty
+  /// week (e.g. deload/rest) and is returned as-is — no fallback.
+  /// Wire format via [WeeklySetsConverter] — Firestore rejects nested
+  /// arrays, so weeks are map-wrapped on the wire.
+  @override
+  @WeeklySetsConverter()
+  List<List<SetSpec>> get weeklySets;
+
+  /// Periodization presence MASK (Option A). 0-based week indices in which
+  /// this slot is PRESENT. Empty = present in ALL weeks (hard back-compat:
+  /// every legacy/single-week doc has no field → empty → present everywhere).
+  /// ORTHOGONAL to [weeklySets] (prescription). A flat List<int> — Firestore
+  /// stores it natively, NO converter needed (mirrors [targetReps]).
+  @override
+  List<int> get activeWeeks;
 
   /// Create a copy of RoutineSlot
   /// with the given fields replaced by the non-null parameter values.

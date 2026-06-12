@@ -80,9 +80,20 @@ class UserRepository {
   /// `displayNameLowercase` when `displayName` is present. Returns `null` when
   /// no public-relevant fields (`displayName`, `avatarUrl`, `gymId`) are in
   /// [partial] — callers must skip the public write in that case.
+  ///
+  /// `uid` is always folded in so the write satisfies the userPublicProfiles
+  /// CREATE rule (`request.resource.data.uid == uid`) on a FIRST-EVER write.
+  /// `createIfAbsent` only backfills the public doc when `users/{uid}` is also
+  /// absent, so accounts whose `users` doc predates the dual-write never got a
+  /// public doc — their ProfileSetup submit hit a merge-as-create on
+  /// userPublicProfiles and was denied → permission-denied → batch rollback →
+  /// the athlete was stranded on the onboarding screen. SetOptions(merge:true)
+  /// makes re-writing uid on an existing doc a no-op. Mirrors the same fix
+  /// already applied to [_trainerPublicSubsetFromPartial] (ADR-TPO-001).
   Map<String, Object?>? _publicSubsetFromPartial(
-    Map<String, Object?> partial,
-  ) {
+    Map<String, Object?> partial, {
+    required String uid,
+  }) {
     final hasPublicField = partial.keys.any((k) => _publicFields.contains(k));
     if (!hasPublicField) return null;
 
@@ -98,6 +109,8 @@ class UserRepository {
     if (partial.containsKey('gymId')) {
       result['gymId'] = partial['gymId'];
     }
+    // Always include uid — required by the create rule on the first write.
+    result['uid'] = uid;
     return result;
   }
 
@@ -282,7 +295,7 @@ class UserRepository {
       partial.entries.where((e) => !_immutableFields.contains(e.key)),
     )..['updatedAt'] = Timestamp.fromDate(DateTime.now().toUtc());
 
-    final publicSubset = _publicSubsetFromPartial(partial);
+    final publicSubset = _publicSubsetFromPartial(partial, uid: uid);
     final trainerPublicSubset =
         _trainerPublicSubsetFromPartial(partial, uid: uid);
 
@@ -315,7 +328,14 @@ class UserRepository {
   }
 
   Stream<UserProfile?> watch(String uid) {
-    return _users.doc(uid).snapshots().map((snap) {
+    return _users
+        .doc(uid)
+        .snapshots()
+        // A cold local cache yields a first snapshot with exists=false BEFORE
+        // the network confirms — emitting null here sends an existing user to
+        // /profile-setup. Only a server-confirmed snapshot may report absence.
+        .where((snap) => snap.exists || !snap.metadata.isFromCache)
+        .map((snap) {
       final data = snap.data();
       if (!snap.exists || data == null) return null;
       return UserProfile.fromJson(data);

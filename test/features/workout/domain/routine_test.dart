@@ -391,6 +391,36 @@ void main() {
       final decoded = Routine.fromJson(routine.toJson());
       expect(decoded.split, equals('PPL'));
     });
+
+    // ── Periodización (Fase 1 — REQ-PERIOD-006) ──────────────────────────────
+
+    test('SCENARIO-PERIOD-005: numWeeks 4 round-trips via toJson/fromJson', () {
+      const routine = Routine(
+        id: 'r-period',
+        name: 'Mesociclo 4 semanas',
+        split: 'PPL',
+        level: ExperienceLevel.intermediate,
+        days: [],
+        numWeeks: 4,
+      );
+      final decoded = Routine.fromJson(routine.toJson());
+      expect(decoded.numWeeks, equals(4));
+      expect(decoded, equals(routine));
+    });
+
+    test('SCENARIO-PERIOD-005: numWeeks defaults to 1 when absent in raw doc',
+        () {
+      final rawMap = <String, dynamic>{
+        'id': 'legacy-routine',
+        'name': 'Legacy',
+        'split': 'PPL',
+        'level': 'beginner',
+        'days': <dynamic>[],
+        // numWeeks intentionally absent — legacy doc pre-periodización
+      };
+      final routine = Routine.fromJson(rawMap);
+      expect(routine.numWeeks, equals(1));
+    });
   });
 
   group('RoutineStatus', () {
