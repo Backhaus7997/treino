@@ -58,6 +58,12 @@ class ProfileSetupHeader extends StatelessWidget {
         const SizedBox(height: 8),
         Text(
           title,
+          // Clamp to 2 lines + ellipsis so a long title (or large OS text
+          // scaling) wraps gracefully instead of pushing the PageView body off
+          // screen (audit F4). The engine handles wrapping — no hardcoded `\n`.
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          softWrap: true,
           style: GoogleFonts.barlowCondensed(
             color: palette.textPrimary,
             fontSize: 32,

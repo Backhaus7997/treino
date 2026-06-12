@@ -22,11 +22,12 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
   }
 
   Future<void> _navigate() async {
-    // Await both: minimum 1500ms AND auth state resolved.
-    await Future.wait([
-      Future<void>.delayed(const Duration(milliseconds: 1500)),
-      ref.read(authNotifierProvider.future).then<void>((_) {}),
-    ]);
+    // Wait only for auth to resolve — no artificial minimum delay (audit Q8:
+    // the 1500ms was an accidental placeholder, not a brand requirement). The
+    // router's authRedirect does NOT move users off /splash (it is a public
+    // route with no redirect rule for it), so this manual navigation is
+    // load-bearing — without it the splash would never hand off.
+    await ref.read(authNotifierProvider.future);
     if (!mounted) return;
 
     final user = ref.read(authNotifierProvider).valueOrNull;

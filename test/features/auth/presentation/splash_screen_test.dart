@@ -45,13 +45,14 @@ Widget _buildApp({required _TestAuthNotifier notifier}) {
 
 void main() {
   // ---------------------------------------------------------------------------
-  // B01: Renders TreinoLogo and tagline
+  // Renders the brand visual on the first frame (while auth is still loading).
   // ---------------------------------------------------------------------------
-  testWidgets('renders TreinoLogo and brand headline', (tester) async {
+  testWidgets('renders TreinoLogo and brand headline on first frame',
+      (tester) async {
     final notifier = _TestAuthNotifier();
 
     await tester.pumpWidget(_buildApp(notifier: notifier));
-    await tester.pump(); // first frame — splash renders before timer fires
+    await tester.pump(); // first frame — auth still loading, splash visible
 
     expect(find.byType(TreinoLogo), findsOneWidget);
     // Brand headline lives in a RichText with TextSpans — extract plain text.
@@ -62,40 +63,40 @@ void main() {
     expect(headlineText, contains('MOVÉS'));
     expect(headlineText, contains('EL RESTO.'));
 
-    // Drain the pending 1500ms timer so the test can close cleanly.
-    await tester.pump(const Duration(milliseconds: 1600));
     await tester.pumpAndSettle();
   });
 
   // ---------------------------------------------------------------------------
-  // B01: Anonymous user → /welcome after delay + auth resolved
+  // Anonymous user → /welcome as soon as auth resolves. The old 1500ms minimum
+  // delay was an accidental placeholder (audit Q8) — navigation must NOT wait
+  // for it, so we advance only 100ms (far below 1500ms) and assert we already
+  // left the splash.
   // ---------------------------------------------------------------------------
-  testWidgets('anonymous user navigates to /welcome', (tester) async {
+  testWidgets('anonymous user navigates to /welcome without artificial delay',
+      (tester) async {
     final notifier = _TestAuthNotifier(initialUser: null);
 
     await tester.pumpWidget(_buildApp(notifier: notifier));
     await tester.pump(); // first frame
-
-    // Wait for the 1500ms minimum delay + auth resolution
-    await tester.pump(const Duration(milliseconds: 1600));
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 100)); // well below 1500ms
+    await tester.pump(); // reflect the navigation frame
 
     expect(find.text('WELCOME'), findsOneWidget);
   });
 
   // ---------------------------------------------------------------------------
-  // B01: Authenticated user → / after delay
+  // Authenticated user → /home as soon as auth resolves, no artificial delay.
   // ---------------------------------------------------------------------------
-  testWidgets('authenticated user navigates to /', (tester) async {
+  testWidgets('authenticated user navigates to /home without artificial delay',
+      (tester) async {
     final mockUser = MockUser();
     when(() => mockUser.emailVerified).thenReturn(true);
     final notifier = _TestAuthNotifier(initialUser: mockUser);
 
     await tester.pumpWidget(_buildApp(notifier: notifier));
     await tester.pump(); // first frame
-
-    await tester.pump(const Duration(milliseconds: 1600));
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 100)); // well below 1500ms
+    await tester.pump(); // reflect the navigation frame
 
     expect(find.text('HOME'), findsOneWidget);
   });
