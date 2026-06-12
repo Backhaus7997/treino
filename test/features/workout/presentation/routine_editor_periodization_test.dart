@@ -114,9 +114,6 @@ Future<void> _pumpEditor(
         supportedLocales: AppL10n.supportedLocales,
         locale: const Locale('es', 'AR'),
         routerConfig: router,
-        localizationsDelegates: AppL10n.localizationsDelegates,
-        supportedLocales: AppL10n.supportedLocales,
-        locale: const Locale('es', 'AR'),
       ),
     ),
   );
