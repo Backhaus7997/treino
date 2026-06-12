@@ -89,14 +89,48 @@ void main() {
         reason: 'NOSOTROS must be textPrimary (white), not accent');
   });
 
-  testWidgets('vertical accent line decorator is present', (tester) async {
+  testWidgets('uses a left-border accent bar, no IntrinsicHeight (F2)',
+      (tester) async {
     await tester.pumpWidget(_buildApp());
     await tester.pumpAndSettle();
 
-    // At least one IntrinsicHeight wraps the line+headline row.
-    // The screen also uses an outer IntrinsicHeight for spacing distribution.
-    expect(find.byType(IntrinsicHeight), findsWidgets);
+    // The old IntrinsicHeight + Spacer anti-pattern is gone entirely.
+    expect(find.byType(IntrinsicHeight), findsNothing);
+
+    // The headline accent bar is now a 3px left BorderSide on a DecoratedBox.
+    final hasAccentBar =
+        tester.widgetList<DecoratedBox>(find.byType(DecoratedBox)).any((d) {
+      final dec = d.decoration;
+      if (dec is! BoxDecoration) return false;
+      final border = dec.border;
+      return border is Border && border.left.width == 3;
+    });
+    expect(hasAccentBar, isTrue,
+        reason: 'headline must keep its 3px left accent bar');
   });
+
+  // ---------------------------------------------------------------------------
+  // F2: no overflow across phone / small-phone / tablet viewports. The content
+  // fills the viewport (CTAs at the bottom) and scrolls instead of overflowing
+  // when it is short.
+  // ---------------------------------------------------------------------------
+  for (final size in const [
+    Size(375, 812), // iPhone
+    Size(360, 640), // small Android
+    Size(768, 1024), // iPad portrait
+  ]) {
+    testWidgets('renders without overflow at ${size.width}x${size.height}',
+        (tester) async {
+      await tester.binding.setSurfaceSize(size);
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      await tester.pumpWidget(_buildApp());
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.byType(IntrinsicHeight), findsNothing);
+    });
+  }
 
   testWidgets('renders body text', (tester) async {
     await tester.pumpWidget(_buildApp());
