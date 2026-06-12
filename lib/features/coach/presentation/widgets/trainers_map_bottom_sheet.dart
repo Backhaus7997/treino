@@ -10,170 +10,151 @@ import '../../domain/trainer_public_profile.dart';
 import '../../domain/trainer_specialty.dart';
 import '../../../../l10n/app_l10n.dart';
 
-/// Bottom sheet con carousel horizontal de trainer cards.
+/// Bottom sheet draggable estilo Google Maps / Uber para la vista MAPA de
+/// Discovery.
 ///
-/// Se overlaya sobre el bottom del `TrainersMapView` (Stack child). Lee
-/// del mismo `trainerDiscoveryProvider` que los markers — solo muestra
-/// trainers con lat/lon set (los que tienen pin en el mapa).
+/// Usa [DraggableScrollableSheet] con snap en 3 alturas:
+///   - colapsado  ~12 %  → solo handle + count
+///   - medio      ~30 %  → header + algunos cards visibles
+///   - expandido  ~85 %  → lista completa scrolleable
 ///
-/// **Controlled** — el estado `collapsed` vive en el parent
-/// (`TrainersMapView`) para que el FAB de "Centrar" pueda adaptar su
-/// offset según el sheet esté colapsado o expandido. El sheet expone
-/// tap y vertical drag sobre el handle/header para togglear y avisa al
-/// parent vía `onCollapsedChanged`.
+/// El parent ([TrainersMapView]) provee el [DraggableScrollableController]
+/// para leer la fracción actual y posicionar el FAB.
+///
+/// El padding inferior suma `MediaQuery.paddingOf(context).bottom` para que
+/// el contenido nunca quede tapado por la navbar flotante del shell.
 class TrainersMapBottomSheet extends ConsumerWidget {
   const TrainersMapBottomSheet({
     super.key,
-    required this.collapsed,
-    required this.onCollapsedChanged,
+    required this.controller,
   });
 
-  /// Cuando true: solo handle + count visibles; carousel oculto.
-  final bool collapsed;
+  /// Controller externo — el parent lo usa para leer la fracción actual del
+  /// sheet y calcular el offset del FAB.
+  final DraggableScrollableController controller;
 
-  /// Llamado cuando el user tap/drag sobre el header para togglear el
-  /// estado collapse. El parent decide qué hacer (típicamente actualizar
-  /// el bool en su State).
-  final ValueChanged<bool> onCollapsedChanged;
-
-  void _toggle() => onCollapsedChanged(!collapsed);
-
-  /// Drag rápido hacia abajo (>300 px/s) → colapsa. Drag rápido hacia
-  /// arriba → expande. Drags lentos no hacen nada (evita togglear sin
-  /// querer mientras el usuario ajusta el dedo).
-  void _onVerticalDragEnd(DragEndDetails details) {
-    final v = details.velocity.pixelsPerSecond.dy;
-    if (v > 300 && !collapsed) {
-      onCollapsedChanged(true);
-    } else if (v < -300 && collapsed) {
-      onCollapsedChanged(false);
-    }
-  }
+  // ── Snap points ────────────────────────────────────────────────────────────
+  static const double minChildSize = 0.12;
+  static const double initialChildSize = 0.30;
+  static const double maxChildSize = 0.85;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
     final discoveryAsync = ref.watch(trainerDiscoveryProvider);
-    // Sin ubicación del athlete, la palabra "CERCA" pierde sentido — no
-    // podemos saber qué tan cerca está cada PF. Cambiamos el label.
-    // Scoped: solo rebuild en cambios reales del Position.
     final hasLocation = ref.watch(
           athleteLocationProvider.select((s) => s.valueOrNull),
         ) !=
         null;
 
     return discoveryAsync.when(
-      // Mientras carga el provider no renderizamos sheet — el mapa solo.
       loading: () => const SizedBox.shrink(),
       error: (_, __) => const SizedBox.shrink(),
       data: (trainers) {
-        // El sheet muestra PFs con AL MENOS UNA ubicación física efectiva
-        // (gym o custom). Los virtuales puros no aparecen acá — no tienen
-        // pin que pueda asociarse al card.
-        //
-        // El modo "Online" no se chequea: cuando el atleta lo activa, el
-        // screen padre hace auto-switch a LISTA y el toggle MAPA queda
-        // disabled, así que este sheet nunca se rendera con virtualOnly ON.
         final visible =
             trainers.where((t) => effectiveLocationsOf(t).isNotEmpty).toList();
 
-        return AnimatedContainer(
-          duration: const Duration(milliseconds: 220),
-          curve: Curves.easeOut,
-          decoration: BoxDecoration(
-            color: palette.bgCard,
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(20),
-              topRight: Radius.circular(20),
-            ),
-            border: Border(top: BorderSide(color: palette.border)),
-            boxShadow: [
-              BoxShadow(
-                color: palette.bg.withValues(alpha: 0.4),
-                blurRadius: 12,
-                offset: const Offset(0, -2),
-              ),
-            ],
-          ),
-          // hardEdge clipea el carousel oculto cuando _collapsed=true
-          // así no asoma por debajo del header.
-          clipBehavior: Clip.hardEdge,
-          // Sin padding bottom acá — el bottom inset lo da el sheet del
-          // map view padre. Mantenemos top padding chico.
-          padding: const EdgeInsets.only(bottom: 14),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // ── Header zone (handle + count) — interactivo ────────────────
-              // Solo este bloque captura tap/drag. Las cards del carousel
-              // quedan fuera del GestureDetector para que su onTap navegue
-              // normalmente al perfil del PF.
-              GestureDetector(
-                onTap: _toggle,
-                onVerticalDragEnd: _onVerticalDragEnd,
-                behavior: HitTestBehavior.opaque,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Center(
-                        child: Container(
-                          width: 40,
-                          height: 4,
-                          decoration: BoxDecoration(
-                            color: palette.border,
-                            borderRadius: BorderRadius.circular(2),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      _Header(
-                        count: visible.length,
-                        hasLocation: hasLocation,
-                      ),
-                    ],
+        return DraggableScrollableSheet(
+          controller: controller,
+          initialChildSize: initialChildSize,
+          minChildSize: minChildSize,
+          maxChildSize: maxChildSize,
+          snap: true,
+          snapSizes: const [minChildSize, initialChildSize, maxChildSize],
+          expand: false,
+          builder: (context, scrollController) {
+            final bottomPad = MediaQuery.paddingOf(context).bottom;
+            return Container(
+              decoration: BoxDecoration(
+                color: palette.bgCard,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(20),
+                  topRight: Radius.circular(20),
+                ),
+                border: Border(top: BorderSide(color: palette.border)),
+                boxShadow: [
+                  BoxShadow(
+                    color: palette.bg.withValues(alpha: 0.4),
+                    blurRadius: 12,
+                    offset: const Offset(0, -2),
                   ),
-                ),
+                ],
               ),
-              // ── Carousel (oculto cuando _collapsed=true) ──────────────────
-              AnimatedSize(
-                duration: const Duration(milliseconds: 220),
-                curve: Curves.easeOut,
-                alignment: Alignment.topCenter,
-                child: SizedBox(
-                  height: collapsed ? 0 : 110,
-                  child: visible.isEmpty
-                      ? _EmptyState(palette: palette)
-                      : ListView.separated(
-                          scrollDirection: Axis.horizontal,
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          itemCount: visible.length,
-                          separatorBuilder: (_, __) =>
-                              const SizedBox(width: 12),
-                          itemBuilder: (_, i) =>
-                              _TrainerMapCard(trainer: visible[i]),
-                        ),
-                ),
+              clipBehavior: Clip.hardEdge,
+              child: CustomScrollView(
+                controller: scrollController,
+                slivers: [
+                  // ── Handle + header ─────────────────────────────────────
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Center(
+                            child: Container(
+                              width: 40,
+                              height: 4,
+                              decoration: BoxDecoration(
+                                color: palette.border,
+                                borderRadius: BorderRadius.circular(2),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          _Header(
+                            count: visible.length,
+                            hasLocation: hasLocation,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  // ── Lista vertical de coaches ────────────────────────────
+                  if (visible.isEmpty)
+                    SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: _EmptyState(palette: palette),
+                    )
+                  else
+                    SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                        (context, i) {
+                          final isLast = i == visible.length - 1;
+                          return Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              _TrainerMapListTile(trainer: visible[i]),
+                              if (!isLast)
+                                Divider(
+                                  height: 1,
+                                  thickness: 1,
+                                  indent: 72,
+                                  endIndent: 16,
+                                  color: palette.border,
+                                ),
+                              if (isLast) SizedBox(height: bottomPad + 8),
+                            ],
+                          );
+                        },
+                        childCount: visible.length,
+                      ),
+                    ),
+                ],
               ),
-            ],
-          ),
+            );
+          },
         );
       },
     );
   }
 }
 
-// ── Header ───────────────────────────────────────────────────────────────────
+// ── Header ────────────────────────────────────────────────────────────────────
 
 class _Header extends StatelessWidget {
   const _Header({required this.count, required this.hasLocation});
   final int count;
-
-  /// Si el athlete tiene ubicación, el label incluye "CERCA" (proximidad
-  /// tiene sentido). Sin ubicación, solo "ENTRENADORES" (no podemos saber
-  /// qué tan cerca está cada PF).
   final bool hasLocation;
 
   @override
@@ -198,7 +179,7 @@ class _Header extends StatelessWidget {
   }
 }
 
-// ── Empty state ──────────────────────────────────────────────────────────────
+// ── Empty state ───────────────────────────────────────────────────────────────
 
 class _EmptyState extends StatelessWidget {
   const _EmptyState({required this.palette});
@@ -222,10 +203,14 @@ class _EmptyState extends StatelessWidget {
   }
 }
 
-// ── Trainer card — usada en el carousel ──────────────────────────────────────
+// ── Trainer list tile — formato vertical full-width ───────────────────────────
+//
+// No se reutiliza `TrainerListTile` del feature lista porque ese tile requiere
+// `distanceKm`, `locationLabel` y `gymsById` que la vista MAPA no calcula.
+// Este tile usa solo los datos disponibles en `TrainerPublicProfile`.
 
-class _TrainerMapCard extends StatelessWidget {
-  const _TrainerMapCard({required this.trainer});
+class _TrainerMapListTile extends StatelessWidget {
+  const _TrainerMapListTile({required this.trainer});
   final TrainerPublicProfile trainer;
 
   @override
@@ -237,68 +222,55 @@ class _TrainerMapCard extends StatelessWidget {
 
     return InkWell(
       onTap: () => context.go('/coach/trainer/${trainer.uid}'),
-      borderRadius: BorderRadius.circular(14),
-      child: Container(
-        width: 220,
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: palette.bg,
-          border: Border.all(color: palette.border),
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
           children: [
-            Row(
-              children: [
-                PostAvatar(
-                  authorDisplayName: trainer.displayName ?? '',
-                  authorAvatarUrl: trainer.avatarUrl,
-                  size: 44,
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        trainer.displayName ?? '',
-                        style: GoogleFonts.barlowCondensed(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 15,
-                          letterSpacing: 0.4,
-                          color: palette.textPrimary,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      if (specialty != null) ...[
-                        const SizedBox(height: 2),
-                        Text(
-                          TrainerSpecialtyX.toWire(specialty),
-                          style: GoogleFonts.barlow(
-                            fontSize: 12,
-                            color: palette.textMuted,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ],
+            PostAvatar(
+              authorDisplayName: trainer.displayName ?? '',
+              authorAvatarUrl: trainer.avatarUrl,
+              size: 48,
             ),
-            const Spacer(),
-            if (rate != null)
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    trainer.displayName ?? '',
+                    style: GoogleFonts.barlowCondensed(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 16,
+                      letterSpacing: 0.5,
+                      color: palette.textPrimary,
+                    ),
+                  ),
+                  if (specialty != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      TrainerSpecialtyX.toWire(specialty),
+                      style: GoogleFonts.barlow(
+                        fontSize: 12,
+                        color: palette.textMuted,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            if (rate != null) ...[
+              const SizedBox(width: 8),
               Text(
                 '\$$rate${l10n.coachMonthlyRateUnit}',
                 style: GoogleFonts.barlowCondensed(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 14,
-                  color: palette.highlight,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                  color: palette.accent,
                 ),
               ),
+            ],
           ],
         ),
       ),

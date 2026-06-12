@@ -57,13 +57,29 @@ class TrainersMapView extends ConsumerStatefulWidget {
 class _TrainersMapViewState extends ConsumerState<TrainersMapView> {
   final _mapController = MapController();
 
-  /// Estado del bottom sheet "entrenadores cerca" — lifted del child para
-  /// que el FAB de centrar pueda adaptar su offset según si el sheet está
-  /// colapsado o expandido (sino el FAB queda tapado o flotando suelto).
-  bool _sheetCollapsed = false;
+  /// Controller del DraggableScrollableSheet — permite leer la fracción
+  /// actual para calcular el offset del FAB y animarlo suavemente.
+  final _sheetController = DraggableScrollableController();
+
+  /// Fracción actual del sheet (0.0–1.0 relativo al alto de la pantalla).
+  /// Se actualiza vía listener para que el FAB se reposicione en cada frame.
+  double _sheetSize = TrainersMapBottomSheet.initialChildSize;
+
+  @override
+  void initState() {
+    super.initState();
+    _sheetController.addListener(_onSheetSizeChanged);
+  }
+
+  void _onSheetSizeChanged() {
+    if (!mounted) return;
+    setState(() => _sheetSize = _sheetController.size);
+  }
 
   @override
   void dispose() {
+    _sheetController.removeListener(_onSheetSizeChanged);
+    _sheetController.dispose();
     _mapController.dispose();
     super.dispose();
   }
@@ -217,34 +233,27 @@ class _TrainersMapViewState extends ConsumerState<TrainersMapView> {
               right: 8,
               child: _AttributionChip(palette: palette),
             ),
-            // FAB "Centrar en mi ubicación" — solo aparece si el atleta tiene
-            // location concedida. AnimatedPositioned para que el offset
-            // bottom se adapte suavemente cuando el sheet expande/colapsa:
-            //   - sheet colapsado (~64px) → FAB en bottom 80
-            //   - sheet expandido (~174px) → FAB en bottom 190
-            // Misma duración + curve que el AnimatedSize del carousel para
-            // que ambas transiciones se sientan sincronizadas.
+            // FAB "Centrar en mi ubicación" — solo aparece si el atleta
+            // tiene location concedida. El offset bottom se calcula a partir
+            // de la fracción actual del sheet:
+            //   fabBottom = screenHeight * _sheetSize + 16
+            // Así el FAB siempre flota 16px por encima del borde superior
+            // del sheet, independientemente de cuánto esté arrastrado.
             if (athletePosition != null)
-              AnimatedPositioned(
-                duration: const Duration(milliseconds: 220),
-                curve: Curves.easeOut,
+              Positioned(
                 right: 16,
-                bottom: _sheetCollapsed ? 80 : 190,
+                bottom: MediaQuery.sizeOf(context).height * _sheetSize + 16,
                 child: _RecenterFab(
                   palette: palette,
                   onTap: () => _recenterToAthlete(athletePosition),
                 ),
               ),
-            // Bottom sheet con carousel de cards. State `collapsed` lifted
-            // arriba para que el FAB lo pueda leer.
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
+            // DraggableScrollableSheet con lista vertical de coaches.
+            // Ocupa todo el Stack (left/top/right/bottom:0) para que el
+            // sheet pueda arrastrarse desde el fondo hasta casi la cima.
+            Positioned.fill(
               child: TrainersMapBottomSheet(
-                collapsed: _sheetCollapsed,
-                onCollapsedChanged: (next) =>
-                    setState(() => _sheetCollapsed = next),
+                controller: _sheetController,
               ),
             ),
           ],
