@@ -122,7 +122,7 @@ class _AthleteDetailBody extends ConsumerWidget {
     if (profileAsync.hasError) {
       return Center(
         child: Text(
-          'No pudimos cargar este perfil.',
+          AppL10n.of(context).athleteDetailProfileLoadError,
           style: GoogleFonts.barlow(color: palette.textMuted, fontSize: 14),
         ),
       );
@@ -169,7 +169,7 @@ class _AthleteDetailBody extends ConsumerWidget {
 
               // ── Planes section ──────────────────────────────────────
               Text(
-                'PLANES ASIGNADOS',
+                AppL10n.of(context).athleteDetailPlansSection,
                 style: GoogleFonts.barlowCondensed(
                   fontWeight: FontWeight.w700,
                   fontSize: 12,
@@ -239,7 +239,7 @@ class _AthleteDetailBody extends ConsumerWidget {
                   ),
                   icon: Icon(TreinoIcon.chat, size: 18, color: palette.accent),
                   label: Text(
-                    'MENSAJE',
+                    AppL10n.of(context).athleteDetailMessageCta,
                     style: GoogleFonts.barlowCondensed(
                       fontWeight: FontWeight.w700,
                       fontSize: 13,
@@ -309,7 +309,7 @@ class _AthleteDetailBody extends ConsumerWidget {
       builder: (ctx) => AlertDialog(
         backgroundColor: palette.bgCard,
         title: Text(
-          'Eliminar plan',
+          AppL10n.of(context).athleteDetailPlanDeleteTitle,
           style: GoogleFonts.barlowCondensed(
             fontWeight: FontWeight.w700,
             color: palette.textPrimary,
@@ -323,14 +323,14 @@ class _AthleteDetailBody extends ConsumerWidget {
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
             child: Text(
-              'Cancelar',
+              AppL10n.of(context).athleteDetailPlanDeleteCancel,
               style: GoogleFonts.barlowCondensed(color: palette.textMuted),
             ),
           ),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(true),
             child: Text(
-              'Eliminar',
+              AppL10n.of(context).athleteDetailPlanDeleteConfirm,
               style: GoogleFonts.barlowCondensed(
                 fontWeight: FontWeight.w700,
                 color: palette.danger,
@@ -346,7 +346,8 @@ class _AthleteDetailBody extends ConsumerWidget {
       ref.invalidate(assignedRoutinesProvider(athleteId));
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Plan eliminado.')),
+        SnackBar(
+            content: Text(AppL10n.of(context).athleteDetailPlanDeleteSuccess)),
       );
     } catch (_) {
       if (!context.mounted) return;

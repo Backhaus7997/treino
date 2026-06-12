@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
 import '../../../core/utils/geohash.dart';
+import '../../../l10n/app_l10n.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../coach/domain/trainer_location.dart';
 import '../../coach/domain/trainer_specialty.dart';
@@ -157,12 +158,13 @@ class _ProfileEditTrainerScreenState
     if (_saving) return;
     if (!_formKey.currentState!.validate()) return;
     if (_specialty == null) {
-      setState(() => _error = 'Elegí una especialidad.');
+      setState(() =>
+          _error = AppL10n.of(context).profileEditTrainerValidationSpecialty);
       return;
     }
     if (_locations.isEmpty && !_offersOnline) {
       setState(() =>
-          _error = 'Agregá al menos una ubicación o activá clases virtuales.');
+          _error = AppL10n.of(context).profileEditTrainerValidationLocation);
       return;
     }
 
@@ -194,7 +196,8 @@ class _ProfileEditTrainerScreenState
       await ref.read(userRepositoryProvider).update(uid, partial);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Perfil actualizado.')),
+        SnackBar(
+            content: Text(AppL10n.of(context).profileEditTrainerSaveSuccess)),
       );
       // ADR-TPO-006: post-save navigation branches on mode.
       if (widget.mode == ProfileEditTrainerMode.onboarding) {
@@ -205,7 +208,7 @@ class _ProfileEditTrainerScreenState
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _error = 'No pudimos guardar. Probá de nuevo.';
+        _error = AppL10n.of(context).profileEditTrainerSaveError;
         _saving = false;
       });
     }
@@ -225,9 +228,10 @@ class _ProfileEditTrainerScreenState
     _initFromProfile(profile);
 
     // ADR-TPO-006: AppBar title derived from mode.
+    final l10n = AppL10n.of(context);
     final title = widget.mode == ProfileEditTrainerMode.onboarding
-        ? 'Completá tu perfil profesional' // i18n: Fase 6 Etapa 1
-        : 'Editá tu perfil profesional'; // i18n: Fase 6 Etapa 1
+        ? l10n.profileEditTrainerTitleOnboarding
+        : l10n.profileEditTrainerTitleEdit;
 
     // ADR-TPO-006: in onboarding mode, block back navigation at both levels.
     final body = SingleChildScrollView(

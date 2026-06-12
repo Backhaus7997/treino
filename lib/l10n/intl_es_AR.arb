@@ -257,5 +257,49 @@
   "profileSetupSaveError": "No pudimos guardar tu perfil. Probá de nuevo.",
   "profileSetupCancelDialogTitle": "¿Cancelar la creación de tu cuenta?",
   "profileSetupCancelDialogBody": "Vamos a borrar tu cuenta. Esta acción no se puede deshacer.",
-  "profileSetupCancelAccountError": "No pudimos cancelar la cuenta. Probá de nuevo."
+  "profileSetupCancelAccountError": "No pudimos cancelar la cuenta. Probá de nuevo.",
+
+  "reAuthPasswordLabel": "Contraseña",
+
+  "profileGymSearchHint": "Buscar gym",
+
+  "profileEditTrainerTitleEdit": "Editá tu perfil profesional",
+  "profileEditTrainerTitleOnboarding": "Completá tu perfil profesional",
+  "profileEditTrainerSaveSuccess": "Perfil actualizado.",
+  "profileEditTrainerSaveError": "No pudimos guardar. Probá de nuevo.",
+  "profileEditTrainerValidationSpecialty": "Elegí una especialidad.",
+  "profileEditTrainerValidationLocation": "Agregá al menos una ubicación o activá clases virtuales.",
+
+  "athleteDetailPlansSection": "PLANES ASIGNADOS",
+  "athleteDetailProfileLoadError": "No pudimos cargar este perfil.",
+  "athleteDetailPlanDeleteTitle": "Eliminar plan",
+  "athleteDetailPlanDeleteCancel": "Cancelar",
+  "athleteDetailPlanDeleteConfirm": "Eliminar",
+  "athleteDetailPlanDeleteSuccess": "Plan eliminado.",
+  "athleteDetailMessageCta": "MENSAJE",
+
+  "newSessionSheetTitle": "NUEVA SESIÓN",
+  "newSessionSheetAlumnoLabel": "ALUMNO",
+  "newSessionSheetFechaLabel": "FECHA",
+  "newSessionSheetHoraLabel": "HORA DE INICIO",
+  "newSessionSheetDuracionLabel": "DURACIÓN (MIN)",
+  "newSessionSheetNotaLabel": "NOTA PREVIA (OPCIONAL)",
+  "newSessionSheetSubmitSingle": "REGISTRAR SESIÓN",
+  "newSessionSheetSubmitRecurring": "REGISTRAR SERIE",
+  "newSessionSheetDurationError": "Ingresá una duración válida (5–480 min).",
+  "newSessionSheetNoActiveAthletes": "No tenés alumnos activos.",
+
+  "athleteCoachViewTrainerFallbackName": "tu Personal Trainer",
+  "athleteCoachViewLinkError": "No pudimos cargar tu vínculo.",
+
+  "checkInHeader": "¿ESTÁS EN EL GYM HOY?",
+  "checkInNeutralSubtext": "Confirma tu entrenamiento de hoy",
+  "checkInNoButton": "NO",
+  "checkInSiButton": "SÍ, ENTRÉ",
+  "checkInGymSubtext": "{gymName} · ¡Detectamos que podés estar entrenando!",
+  "@checkInGymSubtext": {
+    "placeholders": {
+      "gymName": { "type": "String" }
+    }
+  }
 }

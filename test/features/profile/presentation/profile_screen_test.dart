@@ -17,6 +17,7 @@ import 'package:treino/features/profile/presentation/widgets/profile_avatar_card
 import 'package:treino/features/profile/presentation/widgets/profile_cuenta_section.dart';
 import 'package:treino/features/profile/presentation/widgets/profile_header.dart';
 import 'package:treino/features/profile/profile_screen.dart';
+import 'package:treino/l10n/app_l10n.dart';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -107,6 +108,9 @@ Widget _buildProfileScreen() {
     child: MaterialApp.router(
       theme: AppTheme.dark(),
       routerConfig: router,
+      localizationsDelegates: AppL10n.localizationsDelegates,
+      supportedLocales: AppL10n.supportedLocales,
+      locale: const Locale('es', 'AR'),
     ),
   );
 }

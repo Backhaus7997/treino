@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/auth/domain/auth_failure.dart';
+import 'package:treino/l10n/app_l10n.dart';
 
 /// Provider-aware re-authentication bottom sheet (Fase 6 Etapa 3).
 ///
@@ -173,7 +174,7 @@ class _PasswordReAuthBodyState extends ConsumerState<_PasswordReAuthBody> {
           obscureText: true,
           style: TextStyle(color: widget.palette.textPrimary),
           decoration: InputDecoration(
-            labelText: 'Contraseña', // i18n: Fase 6 Etapa 3
+            labelText: AppL10n.of(context).reAuthPasswordLabel,
             labelStyle: TextStyle(color: widget.palette.textMuted),
             enabledBorder: UnderlineInputBorder(
               borderSide: BorderSide(color: widget.palette.border),

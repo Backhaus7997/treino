@@ -5,6 +5,7 @@ import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/check_in/application/check_in_providers.dart';
 import 'package:treino/features/check_in/domain/check_in.dart';
 import 'package:treino/features/check_in/presentation/check_in_dialog.dart';
+import 'package:treino/l10n/app_l10n.dart';
 
 class MockCheckInNotifier extends AsyncNotifier<CheckIn?>
     implements CheckInNotifier {
@@ -23,6 +24,9 @@ Widget _wrap({
     overrides: overrides,
     child: MaterialApp(
       theme: AppTheme.dark(),
+      localizationsDelegates: AppL10n.localizationsDelegates,
+      supportedLocales: AppL10n.supportedLocales,
+      locale: const Locale('es', 'AR'),
       home: Scaffold(body: child),
     ),
   );

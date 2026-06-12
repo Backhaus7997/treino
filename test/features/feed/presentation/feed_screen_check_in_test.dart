@@ -16,6 +16,7 @@ import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
+import 'package:treino/l10n/app_l10n.dart';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -58,6 +59,9 @@ Widget _wrapFeed(List<Override> overrides) => ProviderScope(
       overrides: overrides,
       child: MaterialApp(
         theme: AppTheme.dark(),
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+        locale: const Locale('es', 'AR'),
         home: const Scaffold(body: FeedScreen()),
       ),
     );
@@ -124,13 +128,15 @@ void main() {
             container: container,
             child: MaterialApp(
               theme: AppTheme.dark(),
+              localizationsDelegates: AppL10n.localizationsDelegates,
+              supportedLocales: AppL10n.supportedLocales,
+              locale: const Locale('es', 'AR'),
               home: const Scaffold(body: FeedScreen()),
             ),
           );
 
       // First mount — dialog should appear
       await tester.pumpWidget(buildFeed());
-      await tester.pump();
       await tester.pumpAndSettle();
 
       expect(find.byType(CheckInDialog), findsOneWidget);
@@ -143,7 +149,6 @@ void main() {
 
       // Remount FeedScreen (simulates tab switch) — dialog should NOT appear again
       await tester.pumpWidget(buildFeed());
-      await tester.pump();
       await tester.pumpAndSettle();
 
       expect(find.byType(CheckInDialog), findsNothing);

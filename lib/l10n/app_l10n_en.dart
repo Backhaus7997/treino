@@ -694,4 +694,106 @@ class AppL10nEn extends AppL10n {
   @override
   String get profileSetupCancelAccountError =>
       'No pudimos cancelar la cuenta. Probá de nuevo.';
+
+  @override
+  String get reAuthPasswordLabel => 'Contraseña';
+
+  @override
+  String get profileGymSearchHint => 'Buscar gym';
+
+  @override
+  String get profileEditTrainerTitleEdit => 'Editá tu perfil profesional';
+
+  @override
+  String get profileEditTrainerTitleOnboarding =>
+      'Completá tu perfil profesional';
+
+  @override
+  String get profileEditTrainerSaveSuccess => 'Perfil actualizado.';
+
+  @override
+  String get profileEditTrainerSaveError =>
+      'No pudimos guardar. Probá de nuevo.';
+
+  @override
+  String get profileEditTrainerValidationSpecialty => 'Elegí una especialidad.';
+
+  @override
+  String get profileEditTrainerValidationLocation =>
+      'Agregá al menos una ubicación o activá clases virtuales.';
+
+  @override
+  String get athleteDetailPlansSection => 'PLANES ASIGNADOS';
+
+  @override
+  String get athleteDetailProfileLoadError => 'No pudimos cargar este perfil.';
+
+  @override
+  String get athleteDetailPlanDeleteTitle => 'Eliminar plan';
+
+  @override
+  String get athleteDetailPlanDeleteCancel => 'Cancelar';
+
+  @override
+  String get athleteDetailPlanDeleteConfirm => 'Eliminar';
+
+  @override
+  String get athleteDetailPlanDeleteSuccess => 'Plan eliminado.';
+
+  @override
+  String get athleteDetailMessageCta => 'MENSAJE';
+
+  @override
+  String get newSessionSheetTitle => 'NUEVA SESIÓN';
+
+  @override
+  String get newSessionSheetAlumnoLabel => 'ALUMNO';
+
+  @override
+  String get newSessionSheetFechaLabel => 'FECHA';
+
+  @override
+  String get newSessionSheetHoraLabel => 'HORA DE INICIO';
+
+  @override
+  String get newSessionSheetDuracionLabel => 'DURACIÓN (MIN)';
+
+  @override
+  String get newSessionSheetNotaLabel => 'NOTA PREVIA (OPCIONAL)';
+
+  @override
+  String get newSessionSheetSubmitSingle => 'REGISTRAR SESIÓN';
+
+  @override
+  String get newSessionSheetSubmitRecurring => 'REGISTRAR SERIE';
+
+  @override
+  String get newSessionSheetDurationError =>
+      'Ingresá una duración válida (5–480 min).';
+
+  @override
+  String get newSessionSheetNoActiveAthletes => 'No tenés alumnos activos.';
+
+  @override
+  String get athleteCoachViewTrainerFallbackName => 'tu Personal Trainer';
+
+  @override
+  String get athleteCoachViewLinkError => 'No pudimos cargar tu vínculo.';
+
+  @override
+  String get checkInHeader => '¿ESTÁS EN EL GYM HOY?';
+
+  @override
+  String get checkInNeutralSubtext => 'Confirma tu entrenamiento de hoy';
+
+  @override
+  String get checkInNoButton => 'NO';
+
+  @override
+  String get checkInSiButton => 'SÍ, ENTRÉ';
+
+  @override
+  String checkInGymSubtext(String gymName) {
+    return '$gymName · ¡Detectamos que podés estar entrenando!';
+  }
 }
