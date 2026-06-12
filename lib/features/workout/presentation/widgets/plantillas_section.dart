@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../app/theme/app_palette.dart';
+import '../../../../l10n/app_l10n.dart';
 import '../../application/routine_providers.dart';
 import 'level_filter_pills.dart';
 import 'routine_card.dart';
@@ -110,7 +111,7 @@ class _PlantillasSectionState extends ConsumerState<PlantillasSection> {
                 const SizedBox(height: 8),
                 TextButton(
                   onPressed: () => ref.invalidate(routinesProvider),
-                  child: const Text('Reintentar'),
+                  child: Text(AppL10n.of(context).plantillasRetryLabel),
                 ),
               ],
             ),

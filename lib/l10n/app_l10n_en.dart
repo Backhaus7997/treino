@@ -591,4 +591,240 @@ class AppL10nEn extends AppL10n {
   String workoutPickerSheetApply(int count) {
     return '';
   }
+
+  @override
+  String get appFcmSnackBarActionLabel => 'Ver';
+
+  @override
+  String get profileEditPersonalNameRequired => 'Ingresá un nombre';
+
+  @override
+  String get profileEditPersonalNameMaxLength => 'Máximo 50 caracteres';
+
+  @override
+  String get profileEditPersonalWeightInvalidNumber =>
+      'Ingresá un número válido';
+
+  @override
+  String get profileEditPersonalWeightOutOfRange =>
+      'Ingresá un peso entre 30 y 300 kg';
+
+  @override
+  String get profileEditPersonalHeightOutOfRange =>
+      'Ingresá una altura entre 120 y 230 cm';
+
+  @override
+  String get eliminarCuentaSheetTitle => 'Eliminar cuenta';
+
+  @override
+  String get eliminarCuentaSheetBodyPrefix => 'Esta acción es ';
+
+  @override
+  String get eliminarCuentaSheetBodyBold => 'irreversible';
+
+  @override
+  String get eliminarCuentaSheetBodySuffix =>
+      '. Vamos a eliminar tu cuenta, tu perfil, tu historial de entrenamientos y tu foto. Tus posts van a quedar como \"Usuario eliminado\".';
+
+  @override
+  String get eliminarCuentaSheetDeleteCta => 'ELIMINAR';
+
+  @override
+  String get eliminarCuentaSheetCancelCta => 'CANCELAR';
+
+  @override
+  String get eliminarCuentaSheetLoadingLabel => 'Eliminando tu cuenta...';
+
+  @override
+  String get eliminarCuentaSheetLoadingSubtitle =>
+      'Esto puede tardar unos segundos.';
+
+  @override
+  String get eliminarCuentaSheetErrorFallback =>
+      'No pudimos eliminar tu cuenta. Probá de nuevo.';
+
+  @override
+  String get eliminarCuentaSheetRetryLabel => 'Reintentar';
+
+  @override
+  String get dashboardResumenDelDiaTitle => 'RESUMEN DEL DÍA';
+
+  @override
+  String get dashboardStatPendientes => 'PENDIENTES';
+
+  @override
+  String get dashboardStatCompletadas => 'COMPLETADAS';
+
+  @override
+  String get dashboardStatCanceladas => 'CANCELADAS';
+
+  @override
+  String get dashboardProximasSesionesSectionLabel => 'PRÓXIMAS SESIONES';
+
+  @override
+  String get dashboardAgendaTrailingLabel => 'Agenda';
+
+  @override
+  String get dashboardEntrenaronHoySectionLabel => 'ENTRENARON HOY';
+
+  @override
+  String get dashboardDejarFeedbackLabel => 'Dejar feedback';
+
+  @override
+  String get dashboardActividadRecienteSectionLabel => 'ACTIVIDAD RECIENTE';
+
+  @override
+  String get reviewSnackBarSuccess => '¡Gracias por tu reseña!';
+
+  @override
+  String get plantillasRetryLabel => 'Reintentar';
+
+  @override
+  String get profileSetupSaveError =>
+      'No pudimos guardar tu perfil. Probá de nuevo.';
+
+  @override
+  String get profileSetupCancelDialogTitle =>
+      '¿Cancelar la creación de tu cuenta?';
+
+  @override
+  String get profileSetupCancelDialogBody =>
+      'Vamos a borrar tu cuenta. Esta acción no se puede deshacer.';
+
+  @override
+  String get profileSetupCancelAccountError =>
+      'No pudimos cancelar la cuenta. Probá de nuevo.';
+
+  @override
+  String get reAuthPasswordLabel => 'Contraseña';
+
+  @override
+  String get profileGymSearchHint => 'Buscar gym';
+
+  @override
+  String get profileEditTrainerTitleEdit => 'Editá tu perfil profesional';
+
+  @override
+  String get profileEditTrainerTitleOnboarding =>
+      'Completá tu perfil profesional';
+
+  @override
+  String get profileEditTrainerSaveSuccess => 'Perfil actualizado.';
+
+  @override
+  String get profileEditTrainerSaveError =>
+      'No pudimos guardar. Probá de nuevo.';
+
+  @override
+  String get profileEditTrainerValidationSpecialty => 'Elegí una especialidad.';
+
+  @override
+  String get profileEditTrainerValidationLocation =>
+      'Agregá al menos una ubicación o activá clases virtuales.';
+
+  @override
+  String get athleteDetailPlansSection => 'PLANES ASIGNADOS';
+
+  @override
+  String get athleteDetailProfileLoadError => 'No pudimos cargar este perfil.';
+
+  @override
+  String get athleteDetailPlanDeleteTitle => 'Eliminar plan';
+
+  @override
+  String get athleteDetailPlanDeleteCancel => 'Cancelar';
+
+  @override
+  String get athleteDetailPlanDeleteConfirm => 'Eliminar';
+
+  @override
+  String get athleteDetailPlanDeleteSuccess => 'Plan eliminado.';
+
+  @override
+  String get athleteDetailMessageCta => 'MENSAJE';
+
+  @override
+  String get newSessionSheetTitle => 'NUEVA SESIÓN';
+
+  @override
+  String get newSessionSheetAlumnoLabel => 'ALUMNO';
+
+  @override
+  String get newSessionSheetFechaLabel => 'FECHA';
+
+  @override
+  String get newSessionSheetHoraLabel => 'HORA DE INICIO';
+
+  @override
+  String get newSessionSheetDuracionLabel => 'DURACIÓN (MIN)';
+
+  @override
+  String get newSessionSheetNotaLabel => 'NOTA PREVIA (OPCIONAL)';
+
+  @override
+  String get newSessionSheetSubmitSingle => 'REGISTRAR SESIÓN';
+
+  @override
+  String get newSessionSheetSubmitRecurring => 'REGISTRAR SERIE';
+
+  @override
+  String get newSessionSheetDurationError =>
+      'Ingresá una duración válida (5–480 min).';
+
+  @override
+  String get newSessionSheetNoActiveAthletes => 'No tenés alumnos activos.';
+
+  @override
+  String get athleteCoachViewTrainerFallbackName => 'tu Personal Trainer';
+
+  @override
+  String get athleteCoachViewLinkError => 'No pudimos cargar tu vínculo.';
+
+  @override
+  String get checkInHeader => '¿ESTÁS EN EL GYM HOY?';
+
+  @override
+  String get checkInNeutralSubtext => 'Confirma tu entrenamiento de hoy';
+
+  @override
+  String get checkInNoButton => 'NO';
+
+  @override
+  String get checkInSiButton => 'SÍ, ENTRÉ';
+
+  @override
+  String checkInGymSubtext(String gymName) {
+    return '$gymName · ¡Detectamos que podés estar entrenando!';
+  }
+
+  @override
+  String get profileCuentaTitle => 'CUENTA';
+
+  @override
+  String get profileCuentaSolicitudesTitle => 'Solicitudes de amistad';
+
+  @override
+  String profileCuentaSolicitudesSubtitle(int count) {
+    return '$count nuevas';
+  }
+
+  @override
+  String get profileCuentaDatosPersonalesTitle => 'Datos personales';
+
+  @override
+  String get profileCuentaDatosPersonalesSubtitle => 'Editá tu info';
+
+  @override
+  String get profileCuentaGimnasioTitle => 'Gimnasio';
+
+  @override
+  String get profileCuentaNoGym => 'Sin gym';
+
+  @override
+  String get profileCuentaMisRutinasTitle => 'Mis rutinas';
+
+  @override
+  String profileCuentaRutinasSubtitle(int count) {
+    return '$count activas';
+  }
 }

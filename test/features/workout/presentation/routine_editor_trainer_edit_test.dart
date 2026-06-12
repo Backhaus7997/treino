@@ -20,6 +20,7 @@ import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/analytics/analytics_service.dart';
+import 'package:treino/features/coach/presentation/coach_strings.dart';
 import 'package:treino/l10n/app_l10n.dart';
 import 'package:treino/features/workout/application/custom_exercise_providers.dart';
 import 'package:treino/features/workout/application/exercise_providers.dart';

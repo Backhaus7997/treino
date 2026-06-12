@@ -1237,6 +1237,438 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'APLICAR ({count})'**
   String workoutPickerSheetApply(int count);
+
+  /// No description provided for @appFcmSnackBarActionLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ver'**
+  String get appFcmSnackBarActionLabel;
+
+  /// No description provided for @profileEditPersonalNameRequired.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ingresá un nombre'**
+  String get profileEditPersonalNameRequired;
+
+  /// No description provided for @profileEditPersonalNameMaxLength.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Máximo 50 caracteres'**
+  String get profileEditPersonalNameMaxLength;
+
+  /// No description provided for @profileEditPersonalWeightInvalidNumber.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ingresá un número válido'**
+  String get profileEditPersonalWeightInvalidNumber;
+
+  /// No description provided for @profileEditPersonalWeightOutOfRange.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ingresá un peso entre 30 y 300 kg'**
+  String get profileEditPersonalWeightOutOfRange;
+
+  /// No description provided for @profileEditPersonalHeightOutOfRange.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ingresá una altura entre 120 y 230 cm'**
+  String get profileEditPersonalHeightOutOfRange;
+
+  /// No description provided for @eliminarCuentaSheetTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Eliminar cuenta'**
+  String get eliminarCuentaSheetTitle;
+
+  /// No description provided for @eliminarCuentaSheetBodyPrefix.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Esta acción es '**
+  String get eliminarCuentaSheetBodyPrefix;
+
+  /// No description provided for @eliminarCuentaSheetBodyBold.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'irreversible'**
+  String get eliminarCuentaSheetBodyBold;
+
+  /// No description provided for @eliminarCuentaSheetBodySuffix.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'. Vamos a eliminar tu cuenta, tu perfil, tu historial de entrenamientos y tu foto. Tus posts van a quedar como \"Usuario eliminado\".'**
+  String get eliminarCuentaSheetBodySuffix;
+
+  /// No description provided for @eliminarCuentaSheetDeleteCta.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ELIMINAR'**
+  String get eliminarCuentaSheetDeleteCta;
+
+  /// No description provided for @eliminarCuentaSheetCancelCta.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CANCELAR'**
+  String get eliminarCuentaSheetCancelCta;
+
+  /// No description provided for @eliminarCuentaSheetLoadingLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Eliminando tu cuenta...'**
+  String get eliminarCuentaSheetLoadingLabel;
+
+  /// No description provided for @eliminarCuentaSheetLoadingSubtitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Esto puede tardar unos segundos.'**
+  String get eliminarCuentaSheetLoadingSubtitle;
+
+  /// No description provided for @eliminarCuentaSheetErrorFallback.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos eliminar tu cuenta. Probá de nuevo.'**
+  String get eliminarCuentaSheetErrorFallback;
+
+  /// No description provided for @eliminarCuentaSheetRetryLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Reintentar'**
+  String get eliminarCuentaSheetRetryLabel;
+
+  /// No description provided for @dashboardResumenDelDiaTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'RESUMEN DEL DÍA'**
+  String get dashboardResumenDelDiaTitle;
+
+  /// No description provided for @dashboardStatPendientes.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'PENDIENTES'**
+  String get dashboardStatPendientes;
+
+  /// No description provided for @dashboardStatCompletadas.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'COMPLETADAS'**
+  String get dashboardStatCompletadas;
+
+  /// No description provided for @dashboardStatCanceladas.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CANCELADAS'**
+  String get dashboardStatCanceladas;
+
+  /// No description provided for @dashboardProximasSesionesSectionLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'PRÓXIMAS SESIONES'**
+  String get dashboardProximasSesionesSectionLabel;
+
+  /// No description provided for @dashboardAgendaTrailingLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Agenda'**
+  String get dashboardAgendaTrailingLabel;
+
+  /// No description provided for @dashboardEntrenaronHoySectionLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ENTRENARON HOY'**
+  String get dashboardEntrenaronHoySectionLabel;
+
+  /// No description provided for @dashboardDejarFeedbackLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Dejar feedback'**
+  String get dashboardDejarFeedbackLabel;
+
+  /// No description provided for @dashboardActividadRecienteSectionLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ACTIVIDAD RECIENTE'**
+  String get dashboardActividadRecienteSectionLabel;
+
+  /// No description provided for @reviewSnackBarSuccess.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¡Gracias por tu reseña!'**
+  String get reviewSnackBarSuccess;
+
+  /// No description provided for @plantillasRetryLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Reintentar'**
+  String get plantillasRetryLabel;
+
+  /// No description provided for @profileSetupSaveError.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos guardar tu perfil. Probá de nuevo.'**
+  String get profileSetupSaveError;
+
+  /// No description provided for @profileSetupCancelDialogTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Cancelar la creación de tu cuenta?'**
+  String get profileSetupCancelDialogTitle;
+
+  /// No description provided for @profileSetupCancelDialogBody.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Vamos a borrar tu cuenta. Esta acción no se puede deshacer.'**
+  String get profileSetupCancelDialogBody;
+
+  /// No description provided for @profileSetupCancelAccountError.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cancelar la cuenta. Probá de nuevo.'**
+  String get profileSetupCancelAccountError;
+
+  /// No description provided for @reAuthPasswordLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Contraseña'**
+  String get reAuthPasswordLabel;
+
+  /// No description provided for @profileGymSearchHint.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Buscar gym'**
+  String get profileGymSearchHint;
+
+  /// No description provided for @profileEditTrainerTitleEdit.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Editá tu perfil profesional'**
+  String get profileEditTrainerTitleEdit;
+
+  /// No description provided for @profileEditTrainerTitleOnboarding.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Completá tu perfil profesional'**
+  String get profileEditTrainerTitleOnboarding;
+
+  /// No description provided for @profileEditTrainerSaveSuccess.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Perfil actualizado.'**
+  String get profileEditTrainerSaveSuccess;
+
+  /// No description provided for @profileEditTrainerSaveError.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos guardar. Probá de nuevo.'**
+  String get profileEditTrainerSaveError;
+
+  /// No description provided for @profileEditTrainerValidationSpecialty.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Elegí una especialidad.'**
+  String get profileEditTrainerValidationSpecialty;
+
+  /// No description provided for @profileEditTrainerValidationLocation.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Agregá al menos una ubicación o activá clases virtuales.'**
+  String get profileEditTrainerValidationLocation;
+
+  /// No description provided for @athleteDetailPlansSection.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'PLANES ASIGNADOS'**
+  String get athleteDetailPlansSection;
+
+  /// No description provided for @athleteDetailProfileLoadError.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cargar este perfil.'**
+  String get athleteDetailProfileLoadError;
+
+  /// No description provided for @athleteDetailPlanDeleteTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Eliminar plan'**
+  String get athleteDetailPlanDeleteTitle;
+
+  /// No description provided for @athleteDetailPlanDeleteCancel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cancelar'**
+  String get athleteDetailPlanDeleteCancel;
+
+  /// No description provided for @athleteDetailPlanDeleteConfirm.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Eliminar'**
+  String get athleteDetailPlanDeleteConfirm;
+
+  /// No description provided for @athleteDetailPlanDeleteSuccess.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Plan eliminado.'**
+  String get athleteDetailPlanDeleteSuccess;
+
+  /// No description provided for @athleteDetailMessageCta.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'MENSAJE'**
+  String get athleteDetailMessageCta;
+
+  /// No description provided for @newSessionSheetTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'NUEVA SESIÓN'**
+  String get newSessionSheetTitle;
+
+  /// No description provided for @newSessionSheetAlumnoLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ALUMNO'**
+  String get newSessionSheetAlumnoLabel;
+
+  /// No description provided for @newSessionSheetFechaLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'FECHA'**
+  String get newSessionSheetFechaLabel;
+
+  /// No description provided for @newSessionSheetHoraLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'HORA DE INICIO'**
+  String get newSessionSheetHoraLabel;
+
+  /// No description provided for @newSessionSheetDuracionLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'DURACIÓN (MIN)'**
+  String get newSessionSheetDuracionLabel;
+
+  /// No description provided for @newSessionSheetNotaLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'NOTA PREVIA (OPCIONAL)'**
+  String get newSessionSheetNotaLabel;
+
+  /// No description provided for @newSessionSheetSubmitSingle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'REGISTRAR SESIÓN'**
+  String get newSessionSheetSubmitSingle;
+
+  /// No description provided for @newSessionSheetSubmitRecurring.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'REGISTRAR SERIE'**
+  String get newSessionSheetSubmitRecurring;
+
+  /// No description provided for @newSessionSheetDurationError.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ingresá una duración válida (5–480 min).'**
+  String get newSessionSheetDurationError;
+
+  /// No description provided for @newSessionSheetNoActiveAthletes.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No tenés alumnos activos.'**
+  String get newSessionSheetNoActiveAthletes;
+
+  /// No description provided for @athleteCoachViewTrainerFallbackName.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'tu Personal Trainer'**
+  String get athleteCoachViewTrainerFallbackName;
+
+  /// No description provided for @athleteCoachViewLinkError.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cargar tu vínculo.'**
+  String get athleteCoachViewLinkError;
+
+  /// No description provided for @checkInHeader.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿ESTÁS EN EL GYM HOY?'**
+  String get checkInHeader;
+
+  /// No description provided for @checkInNeutralSubtext.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Confirma tu entrenamiento de hoy'**
+  String get checkInNeutralSubtext;
+
+  /// No description provided for @checkInNoButton.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'NO'**
+  String get checkInNoButton;
+
+  /// No description provided for @checkInSiButton.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'SÍ, ENTRÉ'**
+  String get checkInSiButton;
+
+  /// No description provided for @checkInGymSubtext.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{gymName} · ¡Detectamos que podés estar entrenando!'**
+  String checkInGymSubtext(String gymName);
+
+  /// No description provided for @profileCuentaTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CUENTA'**
+  String get profileCuentaTitle;
+
+  /// No description provided for @profileCuentaSolicitudesTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Solicitudes de amistad'**
+  String get profileCuentaSolicitudesTitle;
+
+  /// No description provided for @profileCuentaSolicitudesSubtitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{count} nuevas'**
+  String profileCuentaSolicitudesSubtitle(int count);
+
+  /// No description provided for @profileCuentaDatosPersonalesTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Datos personales'**
+  String get profileCuentaDatosPersonalesTitle;
+
+  /// No description provided for @profileCuentaDatosPersonalesSubtitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Editá tu info'**
+  String get profileCuentaDatosPersonalesSubtitle;
+
+  /// No description provided for @profileCuentaGimnasioTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Gimnasio'**
+  String get profileCuentaGimnasioTitle;
+
+  /// No description provided for @profileCuentaNoGym.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Sin gym'**
+  String get profileCuentaNoGym;
+
+  /// No description provided for @profileCuentaMisRutinasTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Mis rutinas'**
+  String get profileCuentaMisRutinasTitle;
+
+  /// No description provided for @profileCuentaRutinasSubtitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{count} activas'**
+  String profileCuentaRutinasSubtitle(int count);
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

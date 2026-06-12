@@ -16,6 +16,7 @@ import 'package:treino/features/profile/data/user_repository.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
 import 'package:treino/features/profile/presentation/profile_edit_trainer_screen.dart';
+import 'package:treino/l10n/app_l10n.dart';
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -91,6 +92,9 @@ Widget _buildScreen({
     child: MaterialApp.router(
       theme: AppTheme.dark(),
       routerConfig: router,
+      localizationsDelegates: AppL10n.localizationsDelegates,
+      supportedLocales: AppL10n.supportedLocales,
+      locale: const Locale('es', 'AR'),
     ),
   );
 }
@@ -152,6 +156,9 @@ void main() {
           child: MaterialApp.router(
             theme: AppTheme.dark(),
             routerConfig: router,
+            localizationsDelegates: AppL10n.localizationsDelegates,
+            supportedLocales: AppL10n.supportedLocales,
+            locale: const Locale('es', 'AR'),
           ),
         ),
       );
@@ -245,6 +252,9 @@ void main() {
           child: MaterialApp.router(
             theme: AppTheme.dark(),
             routerConfig: router,
+            localizationsDelegates: AppL10n.localizationsDelegates,
+            supportedLocales: AppL10n.supportedLocales,
+            locale: const Locale('es', 'AR'),
           ),
         ),
       );
@@ -312,6 +322,9 @@ void main() {
           child: MaterialApp.router(
             theme: AppTheme.dark(),
             routerConfig: router,
+            localizationsDelegates: AppL10n.localizationsDelegates,
+            supportedLocales: AppL10n.supportedLocales,
+            locale: const Locale('es', 'AR'),
           ),
         ),
       );

@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/treino_icon.dart';
+import '../../../../l10n/app_l10n.dart';
 import '../../../profile/application/user_public_profile_providers.dart';
 import '../../../workout/application/session_providers.dart'
     show currentUidProvider;
@@ -73,8 +74,8 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
     final val = int.tryParse(_durationController.text.trim());
     if (val == null || val < 5 || val > 480) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Ingresá una duración válida (5–480 min).'),
+        SnackBar(
+          content: Text(AppL10n.of(context).newSessionSheetDurationError),
         ),
       );
       return null;
@@ -122,7 +123,7 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
                   children: [
                     // ── Title ─────────────────────────────────────────────
                     Text(
-                      'NUEVA SESIÓN',
+                      AppL10n.of(context).newSessionSheetTitle,
                       style: GoogleFonts.barlowCondensed(
                         fontWeight: FontWeight.w700,
                         fontSize: 18,
@@ -141,11 +142,13 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
                     const SizedBox(height: 18),
 
                     // ── Athlete picker ────────────────────────────────────────────
-                    _FieldLabel(label: 'ALUMNO', palette: palette),
+                    _FieldLabel(
+                        label: AppL10n.of(context).newSessionSheetAlumnoLabel,
+                        palette: palette),
                     const SizedBox(height: 8),
                     if (activeLinks.isEmpty)
                       Text(
-                        'No tenés alumnos activos.',
+                        AppL10n.of(context).newSessionSheetNoActiveAthletes,
                         style: GoogleFonts.barlow(
                           fontSize: 13,
                           color: palette.textMuted,
@@ -164,7 +167,9 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
                     // ── Per-mode fields ───────────────────────────────────────────
                     if (!_recurring) ...[
                       // SINGLE: date picker
-                      _FieldLabel(label: 'FECHA', palette: palette),
+                      _FieldLabel(
+                          label: AppL10n.of(context).newSessionSheetFechaLabel,
+                          palette: palette),
                       const SizedBox(height: 8),
                       _TappableField(
                         palette: palette,
@@ -202,7 +207,9 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
                     ],
 
                     // ── Time ──────────────────────────────────────────────────────
-                    _FieldLabel(label: 'HORA DE INICIO', palette: palette),
+                    _FieldLabel(
+                        label: AppL10n.of(context).newSessionSheetHoraLabel,
+                        palette: palette),
                     const SizedBox(height: 8),
                     _TappableField(
                       palette: palette,
@@ -213,7 +220,9 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
                     const SizedBox(height: 14),
 
                     // ── Duration ─────────────────────────────────────────────────
-                    _FieldLabel(label: 'DURACIÓN (MIN)', palette: palette),
+                    _FieldLabel(
+                        label: AppL10n.of(context).newSessionSheetDuracionLabel,
+                        palette: palette),
                     const SizedBox(height: 8),
                     _DurationSection(
                       controller: _durationController,
@@ -226,7 +235,8 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
 
                     // ── Note ──────────────────────────────────────────────────────
                     _FieldLabel(
-                        label: 'NOTA PREVIA (OPCIONAL)', palette: palette),
+                        label: AppL10n.of(context).newSessionSheetNotaLabel,
+                        palette: palette),
                     const SizedBox(height: 8),
                     TextField(
                       controller: _noteController,
@@ -287,8 +297,10 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
                               )
                             : Text(
                                 _recurring
-                                    ? 'REGISTRAR SERIE'
-                                    : 'REGISTRAR SESIÓN',
+                                    ? AppL10n.of(context)
+                                        .newSessionSheetSubmitRecurring
+                                    : AppL10n.of(context)
+                                        .newSessionSheetSubmitSingle,
                                 style: GoogleFonts.barlowCondensed(
                                   fontWeight: FontWeight.w700,
                                   fontSize: 13,

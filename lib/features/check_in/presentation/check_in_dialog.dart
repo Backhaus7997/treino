@@ -4,8 +4,8 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/treino_icon.dart';
+import '../../../l10n/app_l10n.dart';
 import '../application/check_in_providers.dart';
-import 'check_in_strings.dart';
 
 /// Full-screen dialog shown on FeedScreen mount once per session when the user
 /// has not yet checked in today. REQ-WRC-005.
@@ -29,9 +29,10 @@ class CheckInDialog extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
 
+    final l10n = AppL10n.of(context);
     final subtext = (gymId != null && gymName != null && gymName!.isNotEmpty)
-        ? CheckInStrings.gymSubtext(gymName!)
-        : CheckInStrings.neutralSubtext;
+        ? l10n.checkInGymSubtext(gymName!)
+        : l10n.checkInNeutralSubtext;
 
     return Dialog(
       backgroundColor: palette.bgCard,
@@ -44,7 +45,7 @@ class CheckInDialog extends ConsumerWidget {
             Icon(TreinoIcon.mapPin, color: palette.accent, size: 48),
             const SizedBox(height: 18),
             Text(
-              CheckInStrings.header,
+              l10n.checkInHeader,
               style: GoogleFonts.barlowCondensed(
                 fontWeight: FontWeight.w700,
                 fontSize: 18,
@@ -104,7 +105,7 @@ class _NoButton extends StatelessWidget {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
       child: Text(
-        CheckInStrings.noButton,
+        AppL10n.of(context).checkInNoButton,
         style: GoogleFonts.barlowCondensed(
           fontWeight: FontWeight.w700,
           fontSize: 16,
@@ -141,7 +142,7 @@ class _SiButton extends ConsumerWidget {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
       child: Text(
-        CheckInStrings.siButton,
+        AppL10n.of(context).checkInSiButton,
         style: GoogleFonts.barlowCondensed(
           fontWeight: FontWeight.w700,
           fontSize: 16,

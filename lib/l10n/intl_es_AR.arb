@@ -219,5 +219,122 @@
     "placeholders": {
       "count": { "type": "int" }
     }
+  },
+
+  "appFcmSnackBarActionLabel": "Ver",
+
+  "profileEditPersonalNameRequired": "Ingresá un nombre",
+  "profileEditPersonalNameMaxLength": "Máximo 50 caracteres",
+  "profileEditPersonalWeightInvalidNumber": "Ingresá un número válido",
+  "profileEditPersonalWeightOutOfRange": "Ingresá un peso entre 30 y 300 kg",
+  "profileEditPersonalHeightOutOfRange": "Ingresá una altura entre 120 y 230 cm",
+
+  "eliminarCuentaSheetTitle": "Eliminar cuenta",
+  "eliminarCuentaSheetBodyPrefix": "Esta acción es ",
+  "eliminarCuentaSheetBodyBold": "irreversible",
+  "eliminarCuentaSheetBodySuffix": ". Vamos a eliminar tu cuenta, tu perfil, tu historial de entrenamientos y tu foto. Tus posts van a quedar como \"Usuario eliminado\".",
+  "eliminarCuentaSheetDeleteCta": "ELIMINAR",
+  "eliminarCuentaSheetCancelCta": "CANCELAR",
+  "eliminarCuentaSheetLoadingLabel": "Eliminando tu cuenta...",
+  "eliminarCuentaSheetLoadingSubtitle": "Esto puede tardar unos segundos.",
+  "eliminarCuentaSheetErrorFallback": "No pudimos eliminar tu cuenta. Probá de nuevo.",
+  "eliminarCuentaSheetRetryLabel": "Reintentar",
+
+  "dashboardResumenDelDiaTitle": "RESUMEN DEL DÍA",
+  "dashboardStatPendientes": "PENDIENTES",
+  "dashboardStatCompletadas": "COMPLETADAS",
+  "dashboardStatCanceladas": "CANCELADAS",
+  "dashboardProximasSesionesSectionLabel": "PRÓXIMAS SESIONES",
+  "dashboardAgendaTrailingLabel": "Agenda",
+  "dashboardEntrenaronHoySectionLabel": "ENTRENARON HOY",
+  "dashboardDejarFeedbackLabel": "Dejar feedback",
+  "dashboardActividadRecienteSectionLabel": "ACTIVIDAD RECIENTE",
+
+  "reviewSnackBarSuccess": "¡Gracias por tu reseña!",
+
+  "plantillasRetryLabel": "Reintentar",
+
+  "profileSetupSaveError": "No pudimos guardar tu perfil. Probá de nuevo.",
+  "profileSetupCancelDialogTitle": "¿Cancelar la creación de tu cuenta?",
+  "profileSetupCancelDialogBody": "Vamos a borrar tu cuenta. Esta acción no se puede deshacer.",
+  "profileSetupCancelAccountError": "No pudimos cancelar la cuenta. Probá de nuevo.",
+
+  "reAuthPasswordLabel": "Contraseña",
+
+  "profileGymSearchHint": "Buscar gym",
+
+  "profileEditTrainerTitleEdit": "Editá tu perfil profesional",
+  "profileEditTrainerTitleOnboarding": "Completá tu perfil profesional",
+  "profileEditTrainerSaveSuccess": "Perfil actualizado.",
+  "profileEditTrainerSaveError": "No pudimos guardar. Probá de nuevo.",
+  "profileEditTrainerValidationSpecialty": "Elegí una especialidad.",
+  "profileEditTrainerValidationLocation": "Agregá al menos una ubicación o activá clases virtuales.",
+
+  "athleteDetailPlansSection": "PLANES ASIGNADOS",
+  "athleteDetailProfileLoadError": "No pudimos cargar este perfil.",
+  "athleteDetailPlanDeleteTitle": "Eliminar plan",
+  "athleteDetailPlanDeleteCancel": "Cancelar",
+  "athleteDetailPlanDeleteConfirm": "Eliminar",
+  "athleteDetailPlanDeleteSuccess": "Plan eliminado.",
+  "athleteDetailMessageCta": "MENSAJE",
+
+  "newSessionSheetTitle": "NUEVA SESIÓN",
+  "newSessionSheetAlumnoLabel": "ALUMNO",
+  "newSessionSheetFechaLabel": "FECHA",
+  "newSessionSheetHoraLabel": "HORA DE INICIO",
+  "newSessionSheetDuracionLabel": "DURACIÓN (MIN)",
+  "newSessionSheetNotaLabel": "NOTA PREVIA (OPCIONAL)",
+  "newSessionSheetSubmitSingle": "REGISTRAR SESIÓN",
+  "newSessionSheetSubmitRecurring": "REGISTRAR SERIE",
+  "newSessionSheetDurationError": "Ingresá una duración válida (5–480 min).",
+  "newSessionSheetNoActiveAthletes": "No tenés alumnos activos.",
+
+  "athleteCoachViewTrainerFallbackName": "tu Personal Trainer",
+  "athleteCoachViewLinkError": "No pudimos cargar tu vínculo.",
+
+  "checkInHeader": "¿ESTÁS EN EL GYM HOY?",
+  "checkInNeutralSubtext": "Confirma tu entrenamiento de hoy",
+  "checkInNoButton": "NO",
+  "checkInSiButton": "SÍ, ENTRÉ",
+  "checkInGymSubtext": "{gymName} · ¡Detectamos que podés estar entrenando!",
+  "@checkInGymSubtext": {
+    "placeholders": {
+      "gymName": { "type": "String" }
+    }
+  },
+
+  "profileCuentaTitle": "CUENTA",
+  "@profileCuentaTitle": {},
+
+  "profileCuentaSolicitudesTitle": "Solicitudes de amistad",
+  "@profileCuentaSolicitudesTitle": {},
+
+  "profileCuentaSolicitudesSubtitle": "{count} nuevas",
+  "@profileCuentaSolicitudesSubtitle": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+
+  "profileCuentaDatosPersonalesTitle": "Datos personales",
+  "@profileCuentaDatosPersonalesTitle": {},
+
+  "profileCuentaDatosPersonalesSubtitle": "Editá tu info",
+  "@profileCuentaDatosPersonalesSubtitle": {},
+
+  "profileCuentaGimnasioTitle": "Gimnasio",
+  "@profileCuentaGimnasioTitle": {},
+
+  "profileCuentaNoGym": "Sin gym",
+  "@profileCuentaNoGym": {},
+
+  "profileCuentaMisRutinasTitle": "Mis rutinas",
+  "@profileCuentaMisRutinasTitle": {},
+
+  "profileCuentaRutinasSubtitle": "{count} activas",
+  "@profileCuentaRutinasSubtitle": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
   }
 }

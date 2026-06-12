@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/treino_icon.dart';
+import '../../../l10n/app_l10n.dart';
 import '../../auth/application/auth_providers.dart';
 import '../../profile_setup/application/profile_setup_providers.dart';
 import '../../profile_setup/domain/gym.dart';
@@ -94,7 +95,7 @@ class _ProfileGymScreenState extends ConsumerState<ProfileGymScreen> {
               fontSize: 14,
             ),
             decoration: InputDecoration(
-              hintText: 'Buscar gym', // i18n: Fase 6 Etapa 3
+              hintText: AppL10n.of(context).profileGymSearchHint,
               prefixIcon: Icon(
                 TreinoIcon.search,
                 color: palette.textMuted,

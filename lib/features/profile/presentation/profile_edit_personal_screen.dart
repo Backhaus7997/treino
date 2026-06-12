@@ -8,6 +8,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/treino_icon.dart';
+import '../../../l10n/app_l10n.dart';
 import '../../auth/application/auth_providers.dart';
 import '../../profile_setup/application/profile_setup_providers.dart';
 import '../application/user_providers.dart';
@@ -17,37 +18,9 @@ import '../domain/user_profile.dart';
 
 // ---------------------------------------------------------------------------
 // Validators (inline per design §4.2 — NOT shared from auth)
+// Moved to instance methods on _ProfileEditPersonalScreenState so they can
+// access AppL10n.of(context).
 // ---------------------------------------------------------------------------
-
-String? _validateDisplayName(String? value) {
-  if (value == null || value.trim().isEmpty) {
-    return 'Ingresá un nombre'; // i18n: Fase 6 Etapa 3
-  }
-  if (value.trim().length > 50) {
-    return 'Máximo 50 caracteres'; // i18n: Fase 6 Etapa 3
-  }
-  return null;
-}
-
-String? _validateBodyWeightKg(String? value) {
-  if (value == null || value.trim().isEmpty) return null; // nullable field
-  final n = double.tryParse(value.replaceAll(',', '.'));
-  if (n == null) return 'Ingresá un número válido'; // i18n: Fase 6 Etapa 3
-  if (n < 30 || n > 300) {
-    return 'Ingresá un peso entre 30 y 300 kg'; // i18n: Fase 6 Etapa 3
-  }
-  return null;
-}
-
-String? _validateHeightCm(String? value) {
-  if (value == null || value.trim().isEmpty) return null; // nullable field
-  final n = int.tryParse(value.trim());
-  if (n == null) return 'Ingresá un número válido'; // i18n: Fase 6 Etapa 3
-  if (n < 120 || n > 230) {
-    return 'Ingresá una altura entre 120 y 230 cm'; // i18n: Fase 6 Etapa 3
-  }
-  return null;
-}
 
 // ---------------------------------------------------------------------------
 // Save state
@@ -130,6 +103,41 @@ class _ProfileEditPersonalScreenState
     _heightCtrl.dispose();
     _saveState.dispose();
     super.dispose();
+  }
+
+  // ── Validators (inline per design §4.2 — NOT shared from auth) ──────────
+
+  String? _validateDisplayName(String? value) {
+    final l10n = AppL10n.of(context);
+    if (value == null || value.trim().isEmpty) {
+      return l10n.profileEditPersonalNameRequired;
+    }
+    if (value.trim().length > 50) {
+      return l10n.profileEditPersonalNameMaxLength;
+    }
+    return null;
+  }
+
+  String? _validateBodyWeightKg(String? value) {
+    if (value == null || value.trim().isEmpty) return null; // nullable field
+    final l10n = AppL10n.of(context);
+    final n = double.tryParse(value.replaceAll(',', '.'));
+    if (n == null) return l10n.profileEditPersonalWeightInvalidNumber;
+    if (n < 30 || n > 300) {
+      return l10n.profileEditPersonalWeightOutOfRange;
+    }
+    return null;
+  }
+
+  String? _validateHeightCm(String? value) {
+    if (value == null || value.trim().isEmpty) return null; // nullable field
+    final l10n = AppL10n.of(context);
+    final n = int.tryParse(value.trim());
+    if (n == null) return l10n.profileEditPersonalWeightInvalidNumber;
+    if (n < 120 || n > 230) {
+      return l10n.profileEditPersonalHeightOutOfRange;
+    }
+    return null;
   }
 
   // ── Avatar pick ──────────────────────────────────────────────────────────

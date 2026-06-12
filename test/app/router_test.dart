@@ -14,6 +14,7 @@ import 'package:treino/features/profile/domain/user_session_stats.dart';
 import 'package:treino/features/profile/presentation/profile_edit_personal_screen.dart';
 import 'package:treino/features/profile/presentation/profile_gym_screen.dart';
 import 'package:treino/features/profile/presentation/profile_routines_screen.dart';
+import 'package:treino/l10n/app_l10n.dart';
 // ProfileSettingsScreen import REMOVED 2026-05-28 — /profile/settings route
 // was removed as part of the PR#4 pivot. The SCENARIO-507d test that asserted
 // the route existed has been removed accordingly.
@@ -86,6 +87,9 @@ void main() {
           child: MaterialApp.router(
             theme: AppTheme.dark(),
             routerConfig: router,
+            localizationsDelegates: AppL10n.localizationsDelegates,
+            supportedLocales: AppL10n.supportedLocales,
+            locale: const Locale('es', 'AR'),
           ),
         ),
       );
@@ -116,6 +120,9 @@ void main() {
           child: MaterialApp.router(
             theme: AppTheme.dark(),
             routerConfig: router,
+            localizationsDelegates: AppL10n.localizationsDelegates,
+            supportedLocales: AppL10n.supportedLocales,
+            locale: const Locale('es', 'AR'),
           ),
         ),
       );
@@ -138,6 +145,9 @@ void main() {
           child: MaterialApp.router(
             theme: AppTheme.dark(),
             routerConfig: router,
+            localizationsDelegates: AppL10n.localizationsDelegates,
+            supportedLocales: AppL10n.supportedLocales,
+            locale: const Locale('es', 'AR'),
           ),
         ),
       );
@@ -161,6 +171,9 @@ void main() {
           child: MaterialApp.router(
             theme: AppTheme.dark(),
             routerConfig: router,
+            localizationsDelegates: AppL10n.localizationsDelegates,
+            supportedLocales: AppL10n.supportedLocales,
+            locale: const Locale('es', 'AR'),
           ),
         ),
       );
@@ -195,6 +208,9 @@ void main() {
           child: MaterialApp.router(
             theme: AppTheme.dark(),
             routerConfig: router,
+            localizationsDelegates: AppL10n.localizationsDelegates,
+            supportedLocales: AppL10n.supportedLocales,
+            locale: const Locale('es', 'AR'),
           ),
         ),
       );
