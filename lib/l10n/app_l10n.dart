@@ -1669,6 +1669,144 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'{count} activas'**
   String profileCuentaRutinasSubtitle(int count);
+
+  /// No description provided for @routineEditorDuplicateWeekTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Duplicar semana'**
+  String get routineEditorDuplicateWeekTitle;
+
+  /// No description provided for @routineEditorDuplicateWeekBody.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Se copiará la Semana {sourceWeek} en la Semana {targetWeek}.'**
+  String routineEditorDuplicateWeekBody(int sourceWeek, int targetWeek);
+
+  /// No description provided for @routineEditorDialogCancel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cancelar'**
+  String get routineEditorDialogCancel;
+
+  /// No description provided for @routineEditorDialogConfirm.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Confirmar'**
+  String get routineEditorDialogConfirm;
+
+  /// No description provided for @routineEditorDeleteScopeTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Eliminar solo de esta semana o de todas?'**
+  String get routineEditorDeleteScopeTitle;
+
+  /// No description provided for @routineEditorScopeOnlyThisWeek.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Solo esta semana'**
+  String get routineEditorScopeOnlyThisWeek;
+
+  /// No description provided for @routineEditorScopeAllWeeks.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Todas las semanas'**
+  String get routineEditorScopeAllWeeks;
+
+  /// No description provided for @routineEditorAddScopeTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿En qué semanas agregar?'**
+  String get routineEditorAddScopeTitle;
+
+  /// No description provided for @routineEditorAddScopeBody.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Agregar el ejercicio solo en esta semana o en todas?'**
+  String get routineEditorAddScopeBody;
+
+  /// No description provided for @routineEditorAddOnlyThisWeek.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Agregar solo en esta semana'**
+  String get routineEditorAddOnlyThisWeek;
+
+  /// No description provided for @routineEditorAddAllWeeks.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Agregar en todas las semanas'**
+  String get routineEditorAddAllWeeks;
+
+  /// No description provided for @routineEditorWeekLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Semana'**
+  String get routineEditorWeekLabel;
+
+  /// No description provided for @routineEditorRemoveLastWeek.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Quitar última'**
+  String get routineEditorRemoveLastWeek;
+
+  /// No description provided for @routineEditorLevelSection.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'NIVEL'**
+  String get routineEditorLevelSection;
+
+  /// No description provided for @routineEditorWeeksSection.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'SEMANAS'**
+  String get routineEditorWeeksSection;
+
+  /// No description provided for @routineEditorDaysSection.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'DÍAS DEL PLAN'**
+  String get routineEditorDaysSection;
+
+  /// No description provided for @routineEditorNameHint.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ej: Fuerza PPL'**
+  String get routineEditorNameHint;
+
+  /// No description provided for @routineEditorSplitHint.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'PPL / Full Body'**
+  String get routineEditorSplitHint;
+
+  /// No description provided for @routineEditorIncompleteSetsLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Sets incompletos en Sem {weekNumber}'**
+  String routineEditorIncompleteSetsLabel(int weekNumber);
+
+  /// No description provided for @routineEditorSetTypeNormal.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Normal'**
+  String get routineEditorSetTypeNormal;
+
+  /// No description provided for @routineEditorSetTypeWarmup.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Entrada en calor (W)'**
+  String get routineEditorSetTypeWarmup;
+
+  /// No description provided for @routineEditorSetTypeDrop.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Drop (D)'**
+  String get routineEditorSetTypeDrop;
+
+  /// No description provided for @routineEditorSetTypeFailure.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Al fallo (F)'**
+  String get routineEditorSetTypeFailure;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

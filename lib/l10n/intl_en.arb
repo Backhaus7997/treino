@@ -220,5 +220,40 @@
     "placeholders": {
       "count": { "type": "int" }
     }
-  }
+  },
+
+  "routineEditorDuplicateWeekTitle": "",
+  "routineEditorDuplicateWeekBody": "",
+  "@routineEditorDuplicateWeekBody": {
+    "placeholders": {
+      "sourceWeek": { "type": "int" },
+      "targetWeek": { "type": "int" }
+    }
+  },
+  "routineEditorDialogCancel": "",
+  "routineEditorDialogConfirm": "",
+  "routineEditorDeleteScopeTitle": "",
+  "routineEditorScopeOnlyThisWeek": "",
+  "routineEditorScopeAllWeeks": "",
+  "routineEditorAddScopeTitle": "",
+  "routineEditorAddScopeBody": "",
+  "routineEditorAddOnlyThisWeek": "",
+  "routineEditorAddAllWeeks": "",
+  "routineEditorWeekLabel": "",
+  "routineEditorRemoveLastWeek": "",
+  "routineEditorLevelSection": "",
+  "routineEditorWeeksSection": "",
+  "routineEditorDaysSection": "",
+  "routineEditorNameHint": "",
+  "routineEditorSplitHint": "",
+  "routineEditorIncompleteSetsLabel": "",
+  "@routineEditorIncompleteSetsLabel": {
+    "placeholders": {
+      "weekNumber": { "type": "int" }
+    }
+  },
+  "routineEditorSetTypeNormal": "",
+  "routineEditorSetTypeWarmup": "",
+  "routineEditorSetTypeDrop": "",
+  "routineEditorSetTypeFailure": ""
 }

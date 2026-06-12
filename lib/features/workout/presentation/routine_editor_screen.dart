@@ -602,6 +602,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     // Dismiss IME before showing dialog — avoids on-device IME state leaks.
     FocusManager.instance.primaryFocus?.unfocus();
 
+    final l10n = AppL10n.of(context);
     final sourceWeekDisplay =
         _selectedWeek; // 1-based (selectedWeek is 0-based)
     final targetWeekDisplay = _selectedWeek + 1;
@@ -613,23 +614,25 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
         return AlertDialog(
           backgroundColor: palette.bgCard,
           title: Text(
-            'Duplicar semana',
+            l10n.routineEditorDuplicateWeekTitle,
             style: TextStyle(color: palette.textPrimary),
           ),
           content: Text(
-            'Se copiará la Semana $sourceWeekDisplay en la Semana $targetWeekDisplay.',
+            l10n.routineEditorDuplicateWeekBody(
+                sourceWeekDisplay, targetWeekDisplay),
             style: TextStyle(color: palette.textMuted, fontSize: 14),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(false),
-              child:
-                  Text('Cancelar', style: TextStyle(color: palette.textMuted)),
+              child: Text(l10n.routineEditorDialogCancel,
+                  style: TextStyle(color: palette.textMuted)),
             ),
             TextButton(
               key: const Key('duplicate_week_confirm_button'),
               onPressed: () => Navigator.of(ctx).pop(true),
-              child: Text('Confirmar', style: TextStyle(color: palette.accent)),
+              child: Text(l10n.routineEditorDialogConfirm,
+                  style: TextStyle(color: palette.accent)),
             ),
           ],
         );
@@ -724,6 +727,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     }
 
     // Multi-week path: show the delete scope dialog (REQ-WPRES-010).
+    final l10n = AppL10n.of(context);
     final choice = await showDialog<_DeleteScope>(
       context: context,
       builder: (ctx) {
@@ -738,18 +742,18 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
               child: Text(
-                '¿Eliminar solo de esta semana o de todas?',
+                l10n.routineEditorDeleteScopeTitle,
                 style: TextStyle(color: palette.textMuted, fontSize: 13),
               ),
             ),
             SimpleDialogOption(
               onPressed: () => Navigator.of(ctx).pop(_DeleteScope.thisWeek),
-              child: Text('Solo esta semana',
+              child: Text(l10n.routineEditorScopeOnlyThisWeek,
                   style: TextStyle(color: palette.accent)),
             ),
             SimpleDialogOption(
               onPressed: () => Navigator.of(ctx).pop(_DeleteScope.allWeeks),
-              child: Text('Todas las semanas',
+              child: Text(l10n.routineEditorScopeAllWeeks,
                   style: TextStyle(color: palette.danger)),
             ),
           ],
@@ -798,30 +802,31 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
       return _AddScope.allWeeks;
     }
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     return showDialog<_AddScope>(
       context: context,
       builder: (ctx) => SimpleDialog(
         backgroundColor: palette.bgCard,
         title: Text(
-          '¿En qué semanas agregar?',
+          l10n.routineEditorAddScopeTitle,
           style: TextStyle(color: palette.textPrimary),
         ),
         children: [
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
             child: Text(
-              '¿Agregar el ejercicio solo en esta semana o en todas?',
+              l10n.routineEditorAddScopeBody,
               style: TextStyle(color: palette.textMuted, fontSize: 13),
             ),
           ),
           SimpleDialogOption(
             onPressed: () => Navigator.of(ctx).pop(_AddScope.thisWeek),
-            child: Text('Agregar solo en esta semana',
+            child: Text(l10n.routineEditorAddOnlyThisWeek,
                 style: TextStyle(color: palette.accent)),
           ),
           SimpleDialogOption(
             onPressed: () => Navigator.of(ctx).pop(_AddScope.allWeeks),
-            child: Text('Agregar en todas las semanas',
+            child: Text(l10n.routineEditorAddAllWeeks,
                 style: TextStyle(color: palette.textMuted)),
           ),
         ],
@@ -1300,7 +1305,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                                     decoration: _inputDecoration(
                                       palette,
                                       hint: _isTrainerMode
-                                          ? 'Ej: Fuerza PPL'
+                                          ? l10n.routineEditorNameHint
                                           : l10n.workoutSelfEditorNameHint,
                                     ),
                                     onChanged: (_) => setState(() {}),
@@ -1328,7 +1333,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                                       ),
                                       decoration: _inputDecoration(
                                         palette,
-                                        hint: 'PPL / Full Body',
+                                        hint: l10n.routineEditorSplitHint,
                                       ),
                                       onChanged: (_) => setState(() {}),
                                     ),
@@ -1350,7 +1355,8 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     _SectionLabel(
-                                        label: 'NIVEL', palette: palette),
+                                        label: l10n.routineEditorLevelSection,
+                                        palette: palette),
                                     const SizedBox(height: 4),
                                     _LevelDropdown(
                                       value: _level,
@@ -1372,7 +1378,9 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                         // ── Semanas del plan ────────────────────────────────
                         // Week state machine — REQ-PERIOD-010..014. The chips
                         // switch the week every slot editor renders (live-view).
-                        _SectionLabel(label: 'SEMANAS', palette: palette),
+                        _SectionLabel(
+                            label: l10n.routineEditorWeeksSection,
+                            palette: palette),
                         const SizedBox(height: 6),
                         _WeekTabBar(
                           numWeeks: _numWeeks,
@@ -1396,8 +1404,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                         if (hiddenInvalidWeeks.isNotEmpty) ...[
                           const SizedBox(height: 4),
                           Text(
-                            'Sets incompletos en Sem '
-                            '${hiddenInvalidWeeks.first + 1} · Día '
+                            '${l10n.routineEditorIncompleteSetsLabel(hiddenInvalidWeeks.first + 1)} · Día '
                             '${invalidWeeks[hiddenInvalidWeeks.first]}',
                             key: const Key('invalid_week_hint'),
                             style: GoogleFonts.barlow(
@@ -1409,7 +1416,9 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                         const SizedBox(height: 12),
 
                         // ── Días del plan ───────────────────────────────────
-                        _SectionLabel(label: 'DÍAS DEL PLAN', palette: palette),
+                        _SectionLabel(
+                            label: l10n.routineEditorDaysSection,
+                            palette: palette),
                         const SizedBox(height: 6),
 
                         for (int di = 0; di < _days.length; di++) ...[
@@ -1567,6 +1576,7 @@ class _WeekTabBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppL10n.of(context);
     final canAdd = numWeeks < maxWeeks;
     final canRemove = numWeeks > 1;
     final canDuplicate = selectedWeek > 0;
@@ -1604,7 +1614,8 @@ class _WeekTabBar extends StatelessWidget {
                   size: 14,
                   color: canAdd ? palette.accent : palette.border,
                 ),
-                label: Text('Semana', style: actionStyle(canAdd)),
+                label: Text(l10n.routineEditorWeekLabel,
+                    style: actionStyle(canAdd)),
               ),
             ],
           ),
@@ -1621,7 +1632,7 @@ class _WeekTabBar extends StatelessWidget {
                 color: canRemove ? palette.textMuted : palette.border,
               ),
               label: Text(
-                'Quitar última',
+                l10n.routineEditorRemoveLastWeek,
                 style: GoogleFonts.barlowCondensed(
                   fontWeight: FontWeight.w600,
                   fontSize: 12,
@@ -1638,7 +1649,8 @@ class _WeekTabBar extends StatelessWidget {
                 size: 14,
                 color: canDuplicate ? palette.accent : palette.border,
               ),
-              label: Text('Duplicar semana', style: actionStyle(canDuplicate)),
+              label: Text(l10n.routineEditorDuplicateWeekTitle,
+                  style: actionStyle(canDuplicate)),
             ),
           ],
         ),
@@ -2675,6 +2687,7 @@ class _SetRowState extends State<_SetRow> {
         ? renderBox.localToGlobal(Offset.zero, ancestor: overlay)
         : Offset.zero;
 
+    final l10n = AppL10n.of(context);
     final result = await showMenu<SetType>(
       context: context,
       position: RelativeRect.fromLTRB(
@@ -2684,12 +2697,18 @@ class _SetRowState extends State<_SetRow> {
         0,
       ),
       color: widget.palette.bgCard,
-      items: const [
-        PopupMenuItem(value: SetType.normal, child: Text('Normal')),
+      items: [
         PopupMenuItem(
-            value: SetType.warmup, child: Text('Entrada en calor (W)')),
-        PopupMenuItem(value: SetType.drop, child: Text('Drop (D)')),
-        PopupMenuItem(value: SetType.failure, child: Text('Al fallo (F)')),
+            value: SetType.normal,
+            child: Text(l10n.routineEditorSetTypeNormal)),
+        PopupMenuItem(
+            value: SetType.warmup,
+            child: Text(l10n.routineEditorSetTypeWarmup)),
+        PopupMenuItem(
+            value: SetType.drop, child: Text(l10n.routineEditorSetTypeDrop)),
+        PopupMenuItem(
+            value: SetType.failure,
+            child: Text(l10n.routineEditorSetTypeFailure)),
       ],
     );
     if (result != null) widget.onTypeChanged(result);

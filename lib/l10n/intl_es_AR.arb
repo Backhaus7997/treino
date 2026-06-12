@@ -336,5 +336,83 @@
     "placeholders": {
       "count": { "type": "int" }
     }
-  }
+  },
+
+  "routineEditorDuplicateWeekTitle": "Duplicar semana",
+  "@routineEditorDuplicateWeekTitle": {},
+
+  "routineEditorDuplicateWeekBody": "Se copiará la Semana {sourceWeek} en la Semana {targetWeek}.",
+  "@routineEditorDuplicateWeekBody": {
+    "placeholders": {
+      "sourceWeek": { "type": "int" },
+      "targetWeek": { "type": "int" }
+    }
+  },
+
+  "routineEditorDialogCancel": "Cancelar",
+  "@routineEditorDialogCancel": {},
+
+  "routineEditorDialogConfirm": "Confirmar",
+  "@routineEditorDialogConfirm": {},
+
+  "routineEditorDeleteScopeTitle": "¿Eliminar solo de esta semana o de todas?",
+  "@routineEditorDeleteScopeTitle": {},
+
+  "routineEditorScopeOnlyThisWeek": "Solo esta semana",
+  "@routineEditorScopeOnlyThisWeek": {},
+
+  "routineEditorScopeAllWeeks": "Todas las semanas",
+  "@routineEditorScopeAllWeeks": {},
+
+  "routineEditorAddScopeTitle": "¿En qué semanas agregar?",
+  "@routineEditorAddScopeTitle": {},
+
+  "routineEditorAddScopeBody": "¿Agregar el ejercicio solo en esta semana o en todas?",
+  "@routineEditorAddScopeBody": {},
+
+  "routineEditorAddOnlyThisWeek": "Agregar solo en esta semana",
+  "@routineEditorAddOnlyThisWeek": {},
+
+  "routineEditorAddAllWeeks": "Agregar en todas las semanas",
+  "@routineEditorAddAllWeeks": {},
+
+  "routineEditorWeekLabel": "Semana",
+  "@routineEditorWeekLabel": {},
+
+  "routineEditorRemoveLastWeek": "Quitar última",
+  "@routineEditorRemoveLastWeek": {},
+
+  "routineEditorLevelSection": "NIVEL",
+  "@routineEditorLevelSection": {},
+
+  "routineEditorWeeksSection": "SEMANAS",
+  "@routineEditorWeeksSection": {},
+
+  "routineEditorDaysSection": "DÍAS DEL PLAN",
+  "@routineEditorDaysSection": {},
+
+  "routineEditorNameHint": "Ej: Fuerza PPL",
+  "@routineEditorNameHint": {},
+
+  "routineEditorSplitHint": "PPL / Full Body",
+  "@routineEditorSplitHint": {},
+
+  "routineEditorIncompleteSetsLabel": "Sets incompletos en Sem {weekNumber}",
+  "@routineEditorIncompleteSetsLabel": {
+    "placeholders": {
+      "weekNumber": { "type": "int" }
+    }
+  },
+
+  "routineEditorSetTypeNormal": "Normal",
+  "@routineEditorSetTypeNormal": {},
+
+  "routineEditorSetTypeWarmup": "Entrada en calor (W)",
+  "@routineEditorSetTypeWarmup": {},
+
+  "routineEditorSetTypeDrop": "Drop (D)",
+  "@routineEditorSetTypeDrop": {},
+
+  "routineEditorSetTypeFailure": "Al fallo (F)",
+  "@routineEditorSetTypeFailure": {}
 }

@@ -43,5 +43,40 @@
   "authValidationEmailInvalid": "El email no es válido",
   "authValidationPasswordRules": "La contraseña debe tener al menos 8 caracteres, una letra y un número",
   "authValidationPasswordMismatch": "Las contraseñas no coinciden",
-  "authProfileSignOut": "Cerrar sesión"
+  "authProfileSignOut": "Cerrar sesión",
+
+  "routineEditorDuplicateWeekTitle": "",
+  "routineEditorDuplicateWeekBody": "",
+  "@routineEditorDuplicateWeekBody": {
+    "placeholders": {
+      "sourceWeek": { "type": "int" },
+      "targetWeek": { "type": "int" }
+    }
+  },
+  "routineEditorDialogCancel": "",
+  "routineEditorDialogConfirm": "",
+  "routineEditorDeleteScopeTitle": "",
+  "routineEditorScopeOnlyThisWeek": "",
+  "routineEditorScopeAllWeeks": "",
+  "routineEditorAddScopeTitle": "",
+  "routineEditorAddScopeBody": "",
+  "routineEditorAddOnlyThisWeek": "",
+  "routineEditorAddAllWeeks": "",
+  "routineEditorWeekLabel": "",
+  "routineEditorRemoveLastWeek": "",
+  "routineEditorLevelSection": "",
+  "routineEditorWeeksSection": "",
+  "routineEditorDaysSection": "",
+  "routineEditorNameHint": "",
+  "routineEditorSplitHint": "",
+  "routineEditorIncompleteSetsLabel": "",
+  "@routineEditorIncompleteSetsLabel": {
+    "placeholders": {
+      "weekNumber": { "type": "int" }
+    }
+  },
+  "routineEditorSetTypeNormal": "",
+  "routineEditorSetTypeWarmup": "",
+  "routineEditorSetTypeDrop": "",
+  "routineEditorSetTypeFailure": ""
 }
