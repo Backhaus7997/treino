@@ -165,31 +165,56 @@ class SessionNotifier
 
   // ── Mutaciones públicas ───────────────────────────────────────────────────
 
+  /// Guard anti doble-tap: mientras un logSet está persistiendo en Firestore
+  /// (~300ms), ignora taps adicionales. Sin esto, cada tap extra creaba un doc
+  /// nuevo → sets duplicados masivamente en el historial (device feedback
+  /// 2026-06-12).
+  bool _isLoggingSet = false;
+
   Future<void> logSet(SetLog setLog) async {
     final current = state.value;
-    if (current == null || _finalized) return;
+    if (current == null || _finalized || _isLoggingSet) return;
 
-    final repo = ref.read(sessionRepositoryProvider);
+    // Idempotencia por identidad lógica del set (exerciseId + setNumber): si esa
+    // serie de ese ejercicio ya quedó logueada, no la dupliques. Cubre también
+    // taps secuenciales sobre un set ya marcado, no solo la race del doble-tap.
+    final alreadyLogged = current.setLogs.any(
+      (l) =>
+          l.exerciseId == setLog.exerciseId && l.setNumber == setLog.setNumber,
+    );
+    if (alreadyLogged) return;
+
     final uid = ref.read(currentUidProvider);
     if (uid == null) return;
 
-    // El repo asigna el id de Firestore al doc y devuelve el SetLog
-    // persisted — usamos ese para que `updateSet` futuro pueda referirse
-    // por id (sino el log local quedaría con id=''').
-    final persisted = await repo.addSetLog(
-      uid: uid,
-      sessionId: current.session.id,
-      setLog: setLog,
-    );
+    _isLoggingSet = true;
+    try {
+      final repo = ref.read(sessionRepositoryProvider);
+      // El repo asigna el id de Firestore al doc y devuelve el SetLog
+      // persisted — usamos ese para que `updateSet` futuro pueda referirse
+      // por id (sino el log local quedaría con id='').
+      final persisted = await repo.addSetLog(
+        uid: uid,
+        sessionId: current.session.id,
+        setLog: setLog,
+      );
 
-    final newLogs = [...current.setLogs, persisted];
-    final newIndex =
-        _nextIncompleteIndex(current.day, newLogs, current.session.weekNumber);
+      // Re-leemos el estado: pudo cambiar durante el await.
+      final latest = state.value ?? current;
+      final newLogs = [...latest.setLogs, persisted];
+      final newIndex = _nextIncompleteIndex(
+        latest.day,
+        newLogs,
+        latest.session.weekNumber,
+      );
 
-    state = AsyncData(current.copyWith(
-      setLogs: newLogs,
-      currentExerciseIndex: newIndex,
-    ));
+      state = AsyncData(latest.copyWith(
+        setLogs: newLogs,
+        currentExerciseIndex: newIndex,
+      ));
+    } finally {
+      _isLoggingSet = false;
+    }
   }
 
   /// Actualiza un set ya logueado con nuevos reps/peso. Llamado por el
