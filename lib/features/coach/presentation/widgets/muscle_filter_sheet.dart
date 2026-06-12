@@ -21,6 +21,7 @@ Future<Set<MuscleGroupDisplay>?> showMuscleFilterSheet(
 }) {
   return showModalBottomSheet<Set<MuscleGroupDisplay>>(
     context: context,
+    useRootNavigator: true,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
     builder: (_) => _MuscleFilterSheetContent(current: current),

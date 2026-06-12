@@ -162,6 +162,7 @@ class AccountDeletionNotifier extends AsyncNotifier<void> {
 
     return showModalBottomSheet<AuthCredential?>(
       context: context,
+      useRootNavigator: true,
       isScrollControlled: true,
       builder: (_) => ReAuthBottomSheet(providerId: providerId),
     );

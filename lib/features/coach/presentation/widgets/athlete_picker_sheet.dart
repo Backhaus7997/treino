@@ -17,6 +17,7 @@ import '../../domain/trainer_link_status.dart';
 Future<String?> showAthletePickerSheet(BuildContext context) {
   return showModalBottomSheet<String>(
     context: context,
+    useRootNavigator: true,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
     builder: (_) => const _AthletePickerSheetContent(),

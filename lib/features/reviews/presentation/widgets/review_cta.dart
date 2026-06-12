@@ -63,6 +63,7 @@ class ReviewCta extends ConsumerWidget {
         onPressed: () {
           showModalBottomSheet<void>(
             context: context,
+            useRootNavigator: true,
             isScrollControlled: true,
             backgroundColor: AppPalette.of(context).bgCard,
             shape: const RoundedRectangleBorder(

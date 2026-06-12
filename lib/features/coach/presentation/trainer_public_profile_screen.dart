@@ -50,7 +50,12 @@ class TrainerPublicProfileScreen extends ConsumerWidget {
             return _NotFoundState();
           }
           return ListView(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+            padding: EdgeInsets.fromLTRB(
+              20,
+              8,
+              20,
+              8 + MediaQuery.paddingOf(context).bottom,
+            ),
             children: [
               TrainerProfileHero(profile: profile),
               const SizedBox(height: 24),

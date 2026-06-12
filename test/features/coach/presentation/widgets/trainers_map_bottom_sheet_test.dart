@@ -60,21 +60,28 @@ Widget _wrap(Widget child, {List<Override> overrides = const []}) =>
         localizationsDelegates: AppL10n.localizationsDelegates,
         supportedLocales: AppL10n.supportedLocales,
         locale: const Locale('es', 'AR'),
+        // SizedBox.expand para que DraggableScrollableSheet calcule bien
+        // su altura (necesita constraints no-zero del parent).
         home: Scaffold(
-          body: SizedBox(height: 200, child: child),
+          body: SizedBox.expand(child: child),
         ),
       ),
     );
+
+/// Crea el widget con su propio [DraggableScrollableController].
+Widget _sheet({List<Override> overrides = const []}) {
+  final controller = DraggableScrollableController();
+  return _wrap(
+    TrainersMapBottomSheet(controller: controller),
+    overrides: overrides,
+  );
+}
 
 void main() {
   group('TrainersMapBottomSheet', () {
     testWidgets('con ubicación: header dice "N ENTRENADORES CERCA" (plural)',
         (tester) async {
-      await tester.pumpWidget(_wrap(
-        TrainersMapBottomSheet(
-          collapsed: false,
-          onCollapsedChanged: (_) {},
-        ),
+      await tester.pumpWidget(_sheet(
         overrides: [
           _withFakeLocation(),
           trainerDiscoveryProvider.overrideWith((_) async => [
@@ -92,11 +99,7 @@ void main() {
 
     testWidgets('con ubicación: header singular cuando count == 1',
         (tester) async {
-      await tester.pumpWidget(_wrap(
-        TrainersMapBottomSheet(
-          collapsed: false,
-          onCollapsedChanged: (_) {},
-        ),
+      await tester.pumpWidget(_sheet(
         overrides: [
           _withFakeLocation(),
           trainerDiscoveryProvider.overrideWith((_) async => [_trainer()]),
@@ -110,11 +113,7 @@ void main() {
     testWidgets(
         'SIN ubicación: header dice "N ENTRENADORES" (sin CERCA — Fase 2b polish)',
         (tester) async {
-      await tester.pumpWidget(_wrap(
-        TrainersMapBottomSheet(
-          collapsed: false,
-          onCollapsedChanged: (_) {},
-        ),
+      await tester.pumpWidget(_sheet(
         overrides: [
           // NO override de location → default AsyncData(null) → hasLocation false
           trainerDiscoveryProvider.overrideWith((_) async => [_trainer()]),
@@ -129,11 +128,7 @@ void main() {
 
     testWidgets('filtra trainers sin lat/lon — solo cuenta los que tienen',
         (tester) async {
-      await tester.pumpWidget(_wrap(
-        TrainersMapBottomSheet(
-          collapsed: false,
-          onCollapsedChanged: (_) {},
-        ),
+      await tester.pumpWidget(_sheet(
         overrides: [
           _withFakeLocation(),
           trainerDiscoveryProvider.overrideWith((_) async => [
@@ -153,11 +148,7 @@ void main() {
 
     testWidgets('empty state cuando ningún trainer tiene location',
         (tester) async {
-      await tester.pumpWidget(_wrap(
-        TrainersMapBottomSheet(
-          collapsed: false,
-          onCollapsedChanged: (_) {},
-        ),
+      await tester.pumpWidget(_sheet(
         overrides: [
           _withFakeLocation(),
           trainerDiscoveryProvider.overrideWith((_) async => [
@@ -174,12 +165,8 @@ void main() {
       );
     });
 
-    testWidgets('card muestra nombre + specialty + precio', (tester) async {
-      await tester.pumpWidget(_wrap(
-        TrainersMapBottomSheet(
-          collapsed: false,
-          onCollapsedChanged: (_) {},
-        ),
+    testWidgets('tile muestra nombre + specialty + precio', (tester) async {
+      await tester.pumpWidget(_sheet(
         overrides: [
           trainerDiscoveryProvider.overrideWith((_) async => [
                 _trainer(
@@ -197,9 +184,8 @@ void main() {
       expect(find.textContaining('7500'), findsOneWidget);
     });
 
-    // NOTA: loading state ("provider en AsyncLoading → sheet renderiza nada")
-    // no se testea aquí por problemas de leaked timers — el comportamiento
-    // está implementado como SizedBox.shrink() default y es trivial de
-    // verificar visualmente. Empty + data states sí cubren los casos reales.
+    // NOTA: loading state no se testea aquí por problemas de leaked timers —
+    // el comportamiento está implementado como SizedBox.shrink() y es trivial
+    // de verificar visualmente.
   });
 }

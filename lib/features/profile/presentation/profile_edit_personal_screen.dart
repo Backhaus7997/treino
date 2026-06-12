@@ -375,7 +375,7 @@ class _ProfileEditPersonalScreenState
         // ── Form ────────────────────────────────────────────────────────────
         Expanded(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+            padding: EdgeInsets.fromLTRB(20, 8, 20, 20 + MediaQuery.paddingOf(context).bottom),
             child: Form(
               key: _formKey,
               child: Column(

@@ -100,6 +100,7 @@ class _AthleteProfile extends ConsumerWidget {
                 inGroup: true,
                 onTap: () => showModalBottomSheet<void>(
                   context: context,
+                  useRootNavigator: true,
                   backgroundColor: palette.bgCard,
                   shape: const RoundedRectangleBorder(
                     borderRadius:

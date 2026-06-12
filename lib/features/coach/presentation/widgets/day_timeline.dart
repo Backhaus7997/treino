@@ -337,6 +337,7 @@ class _DayTimelineState extends ConsumerState<DayTimeline> {
         child: GestureDetector(
           onTap: () => showModalBottomSheet<void>(
             context: context,
+            useRootNavigator: true,
             isScrollControlled: true,
             backgroundColor: AppPalette.of(context).bgCard,
             shape: const RoundedRectangleBorder(
@@ -461,6 +462,7 @@ class _DayTimelineState extends ConsumerState<DayTimeline> {
   void _openNewSessionSheet(BuildContext context, TimeOfDay initialTime) {
     showModalBottomSheet<void>(
       context: context,
+      useRootNavigator: true,
       isScrollControlled: true,
       backgroundColor: AppPalette.of(context).bgCard,
       shape: const RoundedRectangleBorder(
