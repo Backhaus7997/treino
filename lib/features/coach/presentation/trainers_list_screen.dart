@@ -314,7 +314,7 @@ class _ListContent extends ConsumerWidget {
           return const _EmptyState();
         }
         return ListView.builder(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: EdgeInsets.fromLTRB(16, 0, 16, MediaQuery.paddingOf(context).bottom),
           itemCount: trainers.length,
           itemBuilder: (context, i) {
             final t = trainers[i];

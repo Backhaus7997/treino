@@ -35,6 +35,7 @@ Future<List<Exercise>?> showExercisePicker(
 }) {
   return showModalBottomSheet<List<Exercise>>(
     context: context,
+    useRootNavigator: true,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
     builder: (_) =>

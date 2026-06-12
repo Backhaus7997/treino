@@ -138,6 +138,7 @@ Future<void> showSpecialtyFilterSheet(
   final maxSheetHeight = MediaQuery.of(context).size.height * 0.55;
   await showModalBottomSheet<void>(
     context: context,
+    useRootNavigator: true,
     backgroundColor: palette.bgCard,
     isScrollControlled: true,
     // Cap a 55% del alto de pantalla. Con 11 opciones (Todos + 10
@@ -233,6 +234,7 @@ Future<void> showLocationRequiredFilterSheet(
   final palette = AppPalette.of(context);
   await showModalBottomSheet<void>(
     context: context,
+    useRootNavigator: true,
     backgroundColor: palette.bgCard,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -375,6 +377,7 @@ Future<T?> _showFilterSheet<T>({
   final maxSheetHeight = MediaQuery.of(context).size.height * 0.55;
   return showModalBottomSheet<T>(
     context: context,
+    useRootNavigator: true,
     backgroundColor: palette.bgCard,
     // isScrollControlled: true permite que el sheet ocupe más de la mitad
     // de pantalla si hace falta — sin esto la lista de opciones overflowea

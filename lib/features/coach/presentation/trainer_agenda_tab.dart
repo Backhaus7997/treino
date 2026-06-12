@@ -134,6 +134,7 @@ class _TrainerAgendaTabState extends ConsumerState<TrainerAgendaTab> {
   void _openNewSessionSheet(BuildContext context) {
     showModalBottomSheet<void>(
       context: context,
+      useRootNavigator: true,
       isScrollControlled: true,
       backgroundColor: AppPalette.of(context).bgCard,
       shape: const RoundedRectangleBorder(
