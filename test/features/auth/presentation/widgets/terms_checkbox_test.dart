@@ -1,39 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/features/auth/presentation/legal/legal_document_screen.dart';
 import 'package:treino/features/auth/presentation/widgets/terms_checkbox.dart';
 
 void main() {
-  const channel = MethodChannel('plugins.flutter.io/url_launcher');
-  final launched = <String>[];
-
-  setUp(() {
-    launched.clear();
-    // Mock the url_launcher platform channel: canLaunch → true, and record the
-    // URL passed to launch/launchUrl so we can assert which page was opened.
-    TestWidgetsFlutterBinding.ensureInitialized()
-        .defaultBinaryMessenger
-        .setMockMethodCallHandler(channel, (call) async {
-      switch (call.method) {
-        case 'canLaunch':
-          return true;
-        case 'launch':
-        case 'launchUrl':
-          launched.add((call.arguments as Map)['url'] as String);
-          return true;
-        default:
-          return null;
-      }
-    });
-  });
-
-  tearDown(() {
-    TestWidgetsFlutterBinding.ensureInitialized()
-        .defaultBinaryMessenger
-        .setMockMethodCallHandler(channel, null);
-  });
-
   Widget wrap(Widget child) => MaterialApp(
         theme: AppTheme.dark(),
         home: Scaffold(
@@ -72,7 +43,7 @@ void main() {
       expect(changed, isTrue);
     });
 
-    testWidgets('tapping Términos opens the terms URL, no SnackBar',
+    testWidgets('tapping Términos opens the in-app Terms screen, no SnackBar',
         (tester) async {
       await tester.pumpWidget(wrap(
         TermsCheckbox(value: false, onChanged: (_) {}),
@@ -82,13 +53,14 @@ void main() {
       await tester.tapOnText(find.textRange.ofSubstring('Términos'));
       await tester.pumpAndSettle();
 
-      expect(launched, isNotEmpty);
-      expect(launched.first, contains('notion'));
+      expect(find.byType(LegalDocumentScreen), findsOneWidget);
+      expect(find.text('Términos y Condiciones'), findsOneWidget);
       // The old dead-end SnackBar must be gone — users can now actually read it.
       expect(find.text('Próximamente'), findsNothing);
     });
 
-    testWidgets('tapping Política de Privacidad opens the privacy URL',
+    testWidgets(
+        'tapping Política de Privacidad opens the in-app Privacy screen',
         (tester) async {
       await tester.pumpWidget(wrap(
         TermsCheckbox(value: false, onChanged: (_) {}),
@@ -99,8 +71,8 @@ void main() {
           .tapOnText(find.textRange.ofSubstring('Política de Privacidad'));
       await tester.pumpAndSettle();
 
-      expect(launched, isNotEmpty);
-      expect(launched.first, contains('notion'));
+      expect(find.byType(LegalDocumentScreen), findsOneWidget);
+      expect(find.text('Política de Privacidad'), findsOneWidget);
     });
   });
 }

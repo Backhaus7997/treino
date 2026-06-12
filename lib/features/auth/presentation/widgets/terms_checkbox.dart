@@ -1,17 +1,17 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../app/theme/app_palette.dart';
+import '../legal/legal_content.dart';
+import '../legal/legal_document_screen.dart';
 
 /// T&C checkbox with tappable "Términos" and "Política de Privacidad" links.
 ///
 /// Rendered as a single [Text.rich] so the links stay tappable even when the
-/// line wraps — the old `Wrap` of sibling `GestureDetector`s left the second
-/// wrapped line completely dead (audit F5). Tapping each opens the matching
-/// Notion page in an external browser, so the user can actually READ what they
-/// are accepting (GDPR / Ley 25.326).
+/// line wraps. Tapping each opens the matching in-app document
+/// ([LegalDocumentScreen]) so the user can actually READ what they accept
+/// (Ley 25.326) — without depending on external URLs.
 class TermsCheckbox extends StatefulWidget {
   const TermsCheckbox({
     super.key,
@@ -27,20 +27,14 @@ class TermsCheckbox extends StatefulWidget {
 }
 
 class _TermsCheckboxState extends State<TermsCheckbox> {
-  // TODO(onboarding): reemplazar por las URLs públicas REALES de Notion antes
-  // de mergear (audit Q2). Los placeholders apuntan a notion.so pero todavía
-  // no abren páginas reales.
-  static const _termsUrl = 'https://www.notion.so/treino-terminos';
-  static const _privacyUrl = 'https://www.notion.so/treino-privacidad';
-
   late final TapGestureRecognizer _termsTap;
   late final TapGestureRecognizer _privacyTap;
 
   @override
   void initState() {
     super.initState();
-    _termsTap = TapGestureRecognizer()..onTap = () => _open(_termsUrl);
-    _privacyTap = TapGestureRecognizer()..onTap = () => _open(_privacyUrl);
+    _termsTap = TapGestureRecognizer()..onTap = _openTerms;
+    _privacyTap = TapGestureRecognizer()..onTap = _openPrivacy;
   }
 
   @override
@@ -50,11 +44,16 @@ class _TermsCheckboxState extends State<TermsCheckbox> {
     super.dispose();
   }
 
-  Future<void> _open(String url) async {
-    final uri = Uri.parse(url);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    }
+  void _openTerms() => _openDoc('Términos y Condiciones', kTermsSections);
+
+  void _openPrivacy() => _openDoc('Política de Privacidad', kPrivacySections);
+
+  void _openDoc(String title, List<LegalSection> sections) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => LegalDocumentScreen(title: title, sections: sections),
+      ),
+    );
   }
 
   @override
