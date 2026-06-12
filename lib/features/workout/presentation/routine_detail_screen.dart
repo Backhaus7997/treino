@@ -14,7 +14,7 @@ import '../application/plan_gating.dart';
 import '../application/plan_progress.dart' show CompletedKey;
 import '../application/routine_providers.dart';
 import '../application/session_providers.dart'
-    show currentUidProvider, planProgressProvider;
+    show currentUidProvider, lastWeightByExerciseProvider, planProgressProvider;
 import '../domain/routine.dart';
 import '../domain/routine_day.dart';
 import '../domain/routine_slot.dart';
@@ -158,8 +158,25 @@ class _RoutineDetailContent extends ConsumerWidget {
   int _totalSets(RoutineDay d) =>
       d.slots.fold(0, (sum, s) => sum + s.targetSets);
 
-  String? _minutesValue(RoutineDay d) =>
-      d.estimatedMinutes != null ? '${d.estimatedMinutes}' : null;
+  /// Authored estimate when present; otherwise a rough computed one so the
+  /// stat isn't a dead "—" for athlete/trainer routines (device feedback
+  /// 2026-06-11). Per set: work time (duration as-is, or ~3s/rep for rep
+  /// sets) + the slot's rest. Prefixed "~" to read as an estimate.
+  String _minutesValue(RoutineDay d, int week) {
+    if (d.estimatedMinutes != null) return '${d.estimatedMinutes}';
+    var seconds = 0;
+    for (final slot in d.slots) {
+      if (!slot.isPresentInWeek(week)) continue;
+      for (final s in slot.effectiveSetsForWeek(week)) {
+        final work = (s.durationSeconds != null && s.durationSeconds! > 0)
+            ? s.durationSeconds!
+            : (s.reps ?? s.repsMax ?? s.repsMin ?? 12) * 3;
+        seconds += work + slot.restSeconds;
+      }
+    }
+    if (seconds <= 0) return '—';
+    return '~${(seconds / 60).round()}';
+  }
 
   /// Walks [day.slots] and emits either a standalone [ExerciseSlotRow] or a
   /// magenta "SUPERSERIE" block wrapping consecutive slots that share the same
@@ -210,7 +227,7 @@ class _RoutineDetailContent extends ConsumerWidget {
         }
       }
       final slot = slots[i];
-      widgets.add(ExerciseSlotRow(
+      widgets.add(_SlotRowWithLastWeight(
         slot: slot,
         index: i + 1,
         week: viewedWeek,
@@ -278,7 +295,7 @@ class _RoutineDetailContent extends ConsumerWidget {
                   ),
                   StatTile(
                     label: 'MINUTOS',
-                    value: _minutesValue(day),
+                    value: _minutesValue(day, selectedWeekIndex),
                   ),
                 ],
               ),
@@ -381,7 +398,7 @@ class _SupersetBlock extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           for (final entry in items) ...[
-            ExerciseSlotRow(
+            _SlotRowWithLastWeight(
               slot: entry.slot,
               index: entry.index + 1,
               week: viewedWeek,
@@ -393,6 +410,46 @@ class _SupersetBlock extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Wraps [ExerciseSlotRow] to resolve the athlete's last logged weight for the
+/// slot's exercise (badge "ÚLTIMO"). Kept separate so ExerciseSlotRow stays a
+/// pure StatelessWidget. Reads the shared [lastWeightByExerciseProvider] —
+/// cached per uid, so every row shares a single computation.
+class _SlotRowWithLastWeight extends ConsumerWidget {
+  const _SlotRowWithLastWeight({
+    required this.slot,
+    required this.index,
+    required this.week,
+    required this.onTap,
+  });
+
+  final RoutineSlot slot;
+  final int index;
+  final int week;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final uid = ref.watch(currentUidProvider) ?? '';
+    final kg = ref
+        .watch(lastWeightByExerciseProvider(uid))
+        .valueOrNull?[slot.exerciseId];
+    return ExerciseSlotRow(
+      slot: slot,
+      index: index,
+      week: week,
+      onTap: onTap,
+      // 0 kg (movilidad / peso corporal) se muestra como "—": no aporta.
+      lastWeightDisplay: (kg == null || kg == 0) ? null : _formatWeight(kg),
+    );
+  }
+}
+
+/// "15 kg" para enteros, "17.5 kg" para fraccionarios.
+String _formatWeight(double kg) {
+  final text = kg == kg.roundToDouble() ? kg.toStringAsFixed(0) : kg.toString();
+  return '$text kg';
 }
 
 class _HeroStrip extends ConsumerWidget {
@@ -410,13 +467,13 @@ class _HeroStrip extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
 
-    // Trainer-defined plans (assigned to an athlete OR a reusable template
-    // visible to the trainer's alumnos) don't carry a photo asset — render
-    // a compact header with just badges + title, no image / gradient /
-    // scrims. Only the public seeded catalogue has `assets/routines/{id}.png`.
-    final isTrainerDefined = routine.source == RoutineSource.trainerAssigned ||
-        routine.source == RoutineSource.trainerTemplate;
-    if (isTrainerDefined) {
+    // Only the public seeded catalogue ships a photo asset
+    // (`assets/routines/{id}.png`). Trainer-defined plans AND athlete-created
+    // routines have none — render a compact header (badges + title, no image
+    // / 320px gradient / scrims) instead of the green gradient block the
+    // missing-asset errorBuilder used to paint (device feedback 2026-06-11).
+    final hasHeroPhoto = routine.source == RoutineSource.system;
+    if (!hasHeroPhoto) {
       return Padding(
         padding: const EdgeInsets.fromLTRB(20, 64, 20, 8),
         child: Column(

@@ -69,6 +69,56 @@ final sessionSummaryProvider = FutureProvider.autoDispose.family<
   );
 });
 
+// ─── Último peso por ejercicio (preview de rutina) ───────────────────────────
+
+/// Cuántas sesiones recientes se escanean para derivar el último peso. Acota
+/// las lecturas de Firestore; cubre de sobra el uso habitual (más reciente
+/// primero).
+const int _lastWeightSessionScan = 15;
+
+/// Map `exerciseId → último peso usado (kg)`, derivado de las sesiones del
+/// usuario (más reciente primero). Lo consume el badge "ÚLTIMO" del preview de
+/// rutina. Indexado por ejercicio (no por rutina), así sobrevive cambios de
+/// rutina y ejercicios repetidos (device feedback 2026-06-12).
+///
+/// Deriva del historial existente (no persiste un índice aparte) para que
+/// funcione de inmediato con las sesiones ya guardadas. Si el volumen de
+/// sesiones crece mucho, migrar a un doc índice `exerciseStats/{exerciseId}`
+/// actualizado al finalizar la sesión.
+final lastWeightByExerciseProvider =
+    FutureProvider.autoDispose.family<Map<String, double>, String>(
+  (ref, uid) async {
+    if (uid.isEmpty) return const {};
+    final sessions = await ref.watch(sessionsByUidProvider(uid).future);
+    final repo = ref.read(sessionRepositoryProvider);
+
+    final scanned = sessions.take(_lastWeightSessionScan).toList();
+    // setLogs de cada sesión en paralelo, preservando el orden (más reciente
+    // primero) que devuelve sessionsByUidProvider.
+    final logsPerSession = await Future.wait(
+      scanned.map((s) => repo.listSetLogs(uid: uid, sessionId: s.id)),
+    );
+
+    final result = <String, double>{};
+    for (final logs in logsPerSession) {
+      // Dentro de la sesión, el peso del último set (mayor setNumber) de cada
+      // ejercicio.
+      final lastSetPerExercise = <String, SetLog>{};
+      for (final log in logs) {
+        final existing = lastSetPerExercise[log.exerciseId];
+        if (existing == null || log.setNumber > existing.setNumber) {
+          lastSetPerExercise[log.exerciseId] = log;
+        }
+      }
+      // La primera sesión (más reciente) que tiene el ejercicio define el valor.
+      for (final entry in lastSetPerExercise.entries) {
+        result.putIfAbsent(entry.key, () => entry.value.weightKg);
+      }
+    }
+    return result;
+  },
+);
+
 // ─── Periodization (Model B) — plan progress provider ────────────────────────
 
 /// Family key for [planProgressProvider].

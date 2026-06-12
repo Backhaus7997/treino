@@ -101,6 +101,7 @@ class _ProfileEditTrainerScreenState
 
     final picked = await showModalBottomSheet<Gym>(
       context: context,
+      useRootNavigator: true,
       isScrollControlled: true,
       backgroundColor: AppPalette.of(context).bgCard,
       shape: const RoundedRectangleBorder(
@@ -126,6 +127,7 @@ class _ProfileEditTrainerScreenState
     final palette = AppPalette.of(context);
     final result = await showModalBottomSheet<_CustomLocationDraft>(
       context: context,
+      useRootNavigator: true,
       isScrollControlled: true,
       backgroundColor: palette.bgCard,
       shape: const RoundedRectangleBorder(
@@ -235,7 +237,7 @@ class _ProfileEditTrainerScreenState
 
     // ADR-TPO-006: in onboarding mode, block back navigation at both levels.
     final body = SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+      padding: EdgeInsets.fromLTRB(20, 18, 20, 20 + MediaQuery.paddingOf(context).bottom),
       child: Form(
         key: _formKey,
         child: Column(

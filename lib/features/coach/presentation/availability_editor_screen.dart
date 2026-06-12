@@ -133,6 +133,7 @@ class _EditorBody extends ConsumerWidget {
   }) async {
     await showModalBottomSheet<void>(
       context: context,
+      useRootNavigator: true,
       isScrollControlled: true,
       backgroundColor: AppPalette.of(context).bgCard,
       shape: const RoundedRectangleBorder(
@@ -175,6 +176,7 @@ class _EditorBody extends ConsumerWidget {
   ) async {
     await showModalBottomSheet<void>(
       context: context,
+      useRootNavigator: true,
       isScrollControlled: true,
       backgroundColor: AppPalette.of(context).bgCard,
       shape: const RoundedRectangleBorder(

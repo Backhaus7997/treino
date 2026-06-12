@@ -412,6 +412,7 @@ class _BookedSlotChipState extends ConsumerState<_BookedSlotChip> {
     return GestureDetector(
       onTap: () => showModalBottomSheet<void>(
         context: context,
+        useRootNavigator: true,
         isScrollControlled: true,
         backgroundColor: AppPalette.of(context).bgCard,
         shape: const RoundedRectangleBorder(

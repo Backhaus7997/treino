@@ -20,6 +20,7 @@ Future<Set<EquipmentType>?> showEquipmentFilterSheet(
 }) {
   return showModalBottomSheet<Set<EquipmentType>>(
     context: context,
+    useRootNavigator: true,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
     builder: (_) => _EquipmentFilterSheetContent(current: current),

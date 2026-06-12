@@ -104,6 +104,7 @@ class _AthleteCoachViewState extends ConsumerState<AthleteCoachView> {
 
     await showModalBottomSheet<void>(
       context: context,
+      useRootNavigator: true,
       isScrollControlled: true,
       backgroundColor: AppPalette.of(context).bgCard,
       shape: const RoundedRectangleBorder(
@@ -431,6 +432,7 @@ class _ActionRow extends ConsumerWidget {
     if (context.mounted) {
       await showModalBottomSheet<void>(
         context: context,
+        useRootNavigator: true,
         isScrollControlled: true,
         backgroundColor: Colors.transparent,
         builder: (_) => ReviewBottomSheet(

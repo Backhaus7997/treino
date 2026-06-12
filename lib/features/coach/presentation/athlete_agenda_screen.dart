@@ -160,6 +160,7 @@ class _AthleteAgendaScreenState extends ConsumerState<AthleteAgendaScreen> {
 
     showModalBottomSheet<void>(
       context: context,
+      useRootNavigator: true,
       isScrollControlled: true,
       backgroundColor: AppPalette.of(context).bgCard,
       shape: const RoundedRectangleBorder(

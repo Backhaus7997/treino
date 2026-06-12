@@ -16,6 +16,7 @@ import '../../../../l10n/app_l10n.dart';
 Future<bool> showLocationPermissionRationaleSheet(BuildContext context) async {
   final result = await showModalBottomSheet<bool>(
     context: context,
+    useRootNavigator: true,
     backgroundColor: Colors.transparent,
     isScrollControlled: true,
     builder: (ctx) => const _LocationRationaleSheet(),

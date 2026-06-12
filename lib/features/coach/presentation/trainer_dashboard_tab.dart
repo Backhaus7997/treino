@@ -623,6 +623,7 @@ class _ProximaSesionRow extends ConsumerWidget {
     return InkWell(
       onTap: () => showModalBottomSheet(
         context: context,
+        useRootNavigator: true,
         backgroundColor: AppPalette.of(context).bgCard,
         isScrollControlled: true,
         shape: const RoundedRectangleBorder(
@@ -818,6 +819,7 @@ class _PagosPorCobrarSection extends ConsumerWidget {
       if (trainerId == null) return;
       showModalBottomSheet<void>(
         context: context,
+        useRootNavigator: true,
         backgroundColor: palette.bgCard,
         isScrollControlled: true,
         shape: const RoundedRectangleBorder(

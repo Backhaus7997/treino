@@ -216,7 +216,7 @@ void main() {
 
     // SCENARIO-613: archive action calls repo.archive on confirm
     testWidgets(
-        'SCENARIO-613: overflow ARCHIVAR → confirm → repo.archive called',
+        'SCENARIO-613: overflow ELIMINAR → confirm → repo.archive called',
         (tester) async {
       final mockRepo = _MockRoutineRepository();
       when(() => mockRepo.archive(any())).thenAnswer((_) async {});
@@ -241,17 +241,17 @@ void main() {
       await tester.tap(moreButton);
       await tester.pumpAndSettle();
 
-      // Tap ARCHIVAR
-      final archiveItem = find.text('ARCHIVAR');
+      // Tap ELIMINAR
+      final archiveItem = find.text('ELIMINAR');
       expect(archiveItem, findsOneWidget);
       await tester.tap(archiveItem);
       await tester.pumpAndSettle();
 
       // Confirmation dialog appears
-      expect(find.text('Archivar rutina'), findsOneWidget);
+      expect(find.text('Eliminar rutina'), findsOneWidget);
 
-      // Tap confirm ARCHIVAR in dialog
-      final confirmButton = find.widgetWithText(TextButton, 'ARCHIVAR');
+      // Tap confirm ELIMINAR in dialog
+      final confirmButton = find.widgetWithText(TextButton, 'ELIMINAR');
       expect(confirmButton, findsOneWidget);
       await tester.tap(confirmButton);
       await tester.pumpAndSettle();
@@ -262,7 +262,7 @@ void main() {
 
     // SCENARIO-614: CANCELAR in archive dialog does NOT call repo
     testWidgets(
-        'SCENARIO-614: overflow ARCHIVAR → CANCELAR → repo.archive NOT called',
+        'SCENARIO-614: overflow ELIMINAR → CANCELAR → repo.archive NOT called',
         (tester) async {
       final mockRepo = _MockRoutineRepository();
 
@@ -285,12 +285,12 @@ void main() {
       await tester.tap(moreButton);
       await tester.pumpAndSettle();
 
-      final archiveItem = find.text('ARCHIVAR');
+      final archiveItem = find.text('ELIMINAR');
       expect(archiveItem, findsOneWidget);
       await tester.tap(archiveItem);
       await tester.pumpAndSettle();
 
-      expect(find.text('Archivar rutina'), findsOneWidget);
+      expect(find.text('Eliminar rutina'), findsOneWidget);
 
       // Tap CANCELAR
       final cancelButton = find.widgetWithText(TextButton, 'CANCELAR');

@@ -406,6 +406,68 @@ void main() {
             setLog: any(named: 'setLog'),
           ));
     });
+
+    test(
+        'SCENARIO-260b: logSet es idempotente — taps repetidos del mismo set '
+        '(exerciseId+setNumber) loguean una sola vez (anti-duplicación)',
+        () async {
+      final repo = MockSessionRepository();
+      when(() => repo.addSetLog(
+            uid: any(named: 'uid'),
+            sessionId: any(named: 'sessionId'),
+            setLog: any(named: 'setLog'),
+          )).thenAnswer(
+        (inv) async => inv.namedArguments[const Symbol('setLog')] as dynamic,
+      );
+
+      final (:container, :init) = await setupFresh(repo: repo);
+      addTearDown(container.dispose);
+
+      final notifier = container.read(sessionNotifierProvider(init).notifier);
+
+      // Mismo set (e1, setNumber 1) marcado dos veces de forma secuencial.
+      await notifier.logSet(makeSetLog(exerciseId: 'e1', setNumber: 1));
+      await notifier.logSet(makeSetLog(exerciseId: 'e1', setNumber: 1));
+
+      final state = container.read(sessionNotifierProvider(init)).value!;
+      expect(state.setLogs, hasLength(1),
+          reason: 'el segundo tap del mismo set no debe duplicar');
+      verify(() => repo.addSetLog(
+            uid: any(named: 'uid'),
+            sessionId: any(named: 'sessionId'),
+            setLog: any(named: 'setLog'),
+          )).called(1);
+    });
+
+    test(
+        'SCENARIO-260c: dos taps concurrentes del mismo set loguean una sola '
+        'vez (lock _isLoggingSet durante el await)', () async {
+      final repo = MockSessionRepository();
+      when(() => repo.addSetLog(
+            uid: any(named: 'uid'),
+            sessionId: any(named: 'sessionId'),
+            setLog: any(named: 'setLog'),
+          )).thenAnswer(
+        (inv) async => inv.namedArguments[const Symbol('setLog')] as dynamic,
+      );
+
+      final (:container, :init) = await setupFresh(repo: repo);
+      addTearDown(container.dispose);
+
+      final notifier = container.read(sessionNotifierProvider(init).notifier);
+
+      // Disparados sin await entre medio → el segundo entra mientras el primero
+      // está persistiendo; el lock debe descartarlo.
+      final f1 = notifier.logSet(makeSetLog(exerciseId: 'e1', setNumber: 1));
+      final f2 = notifier.logSet(makeSetLog(exerciseId: 'e1', setNumber: 1));
+      await Future.wait([f1, f2]);
+
+      verify(() => repo.addSetLog(
+            uid: any(named: 'uid'),
+            sessionId: any(named: 'sessionId'),
+            setLog: any(named: 'setLog'),
+          )).called(1);
+    });
   });
 
   // ── abandonSession (SCENARIO-265..266) ───────────────────────────────────

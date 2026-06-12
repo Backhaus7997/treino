@@ -344,13 +344,13 @@ void main() {
     testWidgets('workoutMisRutinasOverflowArchive', (t) async {
       await t.pumpWidget(_harness());
       await t.pumpAndSettle();
-      expect(_l10n(t).workoutMisRutinasOverflowArchive, 'ARCHIVAR');
+      expect(_l10n(t).workoutMisRutinasOverflowArchive, 'ELIMINAR');
     });
 
     testWidgets('workoutMisRutinasConfirmTitle', (t) async {
       await t.pumpWidget(_harness());
       await t.pumpAndSettle();
-      expect(_l10n(t).workoutMisRutinasConfirmTitle, 'Archivar rutina');
+      expect(_l10n(t).workoutMisRutinasConfirmTitle, 'Eliminar rutina');
     });
 
     testWidgets('workoutMisRutinasConfirmBody', (t) async {
@@ -369,20 +369,20 @@ void main() {
     testWidgets('workoutMisRutinasConfirmConfirm', (t) async {
       await t.pumpWidget(_harness());
       await t.pumpAndSettle();
-      expect(_l10n(t).workoutMisRutinasConfirmConfirm, 'ARCHIVAR');
+      expect(_l10n(t).workoutMisRutinasConfirmConfirm, 'ELIMINAR');
     });
 
     testWidgets('workoutMisRutinasArchiveSuccess', (t) async {
       await t.pumpWidget(_harness());
       await t.pumpAndSettle();
-      expect(_l10n(t).workoutMisRutinasArchiveSuccess, 'Rutina archivada');
+      expect(_l10n(t).workoutMisRutinasArchiveSuccess, 'Rutina eliminada');
     });
 
     testWidgets('workoutMisRutinasArchiveError', (t) async {
       await t.pumpWidget(_harness());
       await t.pumpAndSettle();
       expect(_l10n(t).workoutMisRutinasArchiveError,
-          'No pudimos archivar la rutina. Reintentá.');
+          'No pudimos eliminar la rutina. Reintentá.');
     });
 
     // ── Split fallback ────────────────────────────────────────────────────

@@ -541,10 +541,10 @@ class AppL10nEs extends AppL10n {
   String get workoutMisRutinasOverflowEdit => 'EDITAR';
 
   @override
-  String get workoutMisRutinasOverflowArchive => 'ARCHIVAR';
+  String get workoutMisRutinasOverflowArchive => 'ELIMINAR';
 
   @override
-  String get workoutMisRutinasConfirmTitle => 'Archivar rutina';
+  String get workoutMisRutinasConfirmTitle => 'Eliminar rutina';
 
   @override
   String get workoutMisRutinasConfirmBody =>
@@ -554,14 +554,14 @@ class AppL10nEs extends AppL10n {
   String get workoutMisRutinasConfirmCancel => 'CANCELAR';
 
   @override
-  String get workoutMisRutinasConfirmConfirm => 'ARCHIVAR';
+  String get workoutMisRutinasConfirmConfirm => 'ELIMINAR';
 
   @override
-  String get workoutMisRutinasArchiveSuccess => 'Rutina archivada';
+  String get workoutMisRutinasArchiveSuccess => 'Rutina eliminada';
 
   @override
   String get workoutMisRutinasArchiveError =>
-      'No pudimos archivar la rutina. Reintentá.';
+      'No pudimos eliminar la rutina. Reintentá.';
 
   @override
   String get workoutSplitFallback => 'Sin split';
@@ -1467,10 +1467,10 @@ class AppL10nEsAr extends AppL10nEs {
   String get workoutMisRutinasOverflowEdit => 'EDITAR';
 
   @override
-  String get workoutMisRutinasOverflowArchive => 'ARCHIVAR';
+  String get workoutMisRutinasOverflowArchive => 'ELIMINAR';
 
   @override
-  String get workoutMisRutinasConfirmTitle => 'Archivar rutina';
+  String get workoutMisRutinasConfirmTitle => 'Eliminar rutina';
 
   @override
   String get workoutMisRutinasConfirmBody =>
@@ -1480,14 +1480,14 @@ class AppL10nEsAr extends AppL10nEs {
   String get workoutMisRutinasConfirmCancel => 'CANCELAR';
 
   @override
-  String get workoutMisRutinasConfirmConfirm => 'ARCHIVAR';
+  String get workoutMisRutinasConfirmConfirm => 'ELIMINAR';
 
   @override
-  String get workoutMisRutinasArchiveSuccess => 'Rutina archivada';
+  String get workoutMisRutinasArchiveSuccess => 'Rutina eliminada';
 
   @override
   String get workoutMisRutinasArchiveError =>
-      'No pudimos archivar la rutina. Reintentá.';
+      'No pudimos eliminar la rutina. Reintentá.';
 
   @override
   String get workoutSplitFallback => 'Sin split';
