@@ -10,6 +10,7 @@ import 'package:treino/features/coach/trainer_coach_view.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
+import 'package:treino/l10n/app_l10n.dart';
 
 UserProfile _athleteProfile() => UserProfile(
       uid: 'athlete-uid',
@@ -57,6 +58,9 @@ Widget _wrap(ProviderContainer container) => UncontrolledProviderScope(
       container: container,
       child: MaterialApp(
         theme: AppTheme.dark(),
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+        locale: const Locale('es', 'AR'),
         home: const Scaffold(body: CoachScreen()),
       ),
     );

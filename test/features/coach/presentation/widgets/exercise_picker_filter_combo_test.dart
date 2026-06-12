@@ -13,7 +13,7 @@ import 'package:treino/features/workout/application/session_providers.dart'
 import 'package:treino/features/workout/domain/custom_exercise.dart';
 import 'package:treino/features/workout/domain/equipment_type.dart';
 import 'package:treino/features/workout/domain/exercise.dart';
-import 'package:treino/features/workout/presentation/workout_strings.dart';
+import 'package:treino/l10n/app_l10n.dart';
 
 import '../../../../fixtures/exercises.dart';
 
@@ -43,6 +43,9 @@ Future<void> _openPicker(
       overrides: _overrides(exercises: exercises),
       child: MaterialApp(
         theme: AppTheme.dark(),
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+        locale: const Locale('es', 'AR'),
         home: Scaffold(
           body: Builder(
             builder: (ctx) => ElevatedButton(
@@ -72,7 +75,7 @@ void main() {
       await _openPicker(tester);
 
       // Open muscle filter sheet via "Músculos" chip
-      await tester.tap(find.text(WorkoutStrings.pickerMuscleFilter));
+      await tester.tap(find.text('Músculos'));
       await tester.pumpAndSettle();
 
       // Select PECHO in the sheet
@@ -90,7 +93,7 @@ void main() {
     testWidgets('equipment filter narrows the list', (tester) async {
       await _openPicker(tester);
 
-      await tester.tap(find.text(WorkoutStrings.pickerEquipmentFilter));
+      await tester.tap(find.text('Equipamiento'));
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('Barra'));
@@ -110,7 +113,7 @@ void main() {
       await _openPicker(tester);
 
       // Set muscle = PECHO
-      await tester.tap(find.text(WorkoutStrings.pickerMuscleFilter));
+      await tester.tap(find.text('Músculos'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('PECHO'));
       await tester.pumpAndSettle();
@@ -128,16 +131,16 @@ void main() {
       await _openPicker(tester);
 
       // Open muscle sheet
-      await tester.tap(find.text(WorkoutStrings.pickerMuscleFilter));
+      await tester.tap(find.text('Músculos'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('PECHO'));
       await tester.pumpAndSettle();
 
       // Active chip now shows 'PECHO' — equipment chip still shows 'Equipamiento'
-      expect(find.text(WorkoutStrings.pickerEquipmentFilter), findsOneWidget);
+      expect(find.text('Equipamiento'), findsOneWidget);
 
       // Open equipment sheet
-      await tester.tap(find.text(WorkoutStrings.pickerEquipmentFilter));
+      await tester.tap(find.text('Equipamiento'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Barra'));
       await tester.pumpAndSettle();
@@ -172,7 +175,7 @@ void main() {
       expect(find.text('Press con Barra'), findsOneWidget);
 
       // Apply barra filter
-      await tester.tap(find.text(WorkoutStrings.pickerEquipmentFilter));
+      await tester.tap(find.text('Equipamiento'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Barra'));
       await tester.pumpAndSettle();
@@ -185,20 +188,20 @@ void main() {
     testWidgets('active chip shows selected label', (tester) async {
       await _openPicker(tester);
 
-      await tester.tap(find.text(WorkoutStrings.pickerMuscleFilter));
+      await tester.tap(find.text('Músculos'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('ESPALDA'));
       await tester.pumpAndSettle();
 
       // Chip now shows the selected group label, not the generic label
       expect(find.text('ESPALDA'), findsOneWidget);
-      expect(find.text(WorkoutStrings.pickerMuscleFilter), findsNothing);
+      expect(find.text('Músculos'), findsNothing);
     });
 
     testWidgets('tapping × on active chip clears the filter', (tester) async {
       await _openPicker(tester);
 
-      await tester.tap(find.text(WorkoutStrings.pickerEquipmentFilter));
+      await tester.tap(find.text('Equipamiento'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Cable'));
       await tester.pumpAndSettle();
@@ -218,29 +221,29 @@ void main() {
 
       // Filter cleared — non-cable exercises visible again
       expect(find.text('Peso Muerto'), findsOneWidget);
-      expect(find.text(WorkoutStrings.pickerEquipmentFilter), findsOneWidget);
+      expect(find.text('Equipamiento'), findsOneWidget);
     });
 
     testWidgets('zero-result state shows empty state message', (tester) async {
       // core + mancuerna combination has no match in the seed
       await _openPicker(tester);
 
-      await tester.tap(find.text(WorkoutStrings.pickerMuscleFilter));
+      await tester.tap(find.text('Músculos'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('CORE'));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text(WorkoutStrings.pickerEquipmentFilter));
+      await tester.tap(find.text('Equipamiento'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Mancuerna'));
       await tester.pumpAndSettle();
 
       expect(
-        find.text(WorkoutStrings.pickerEmptyFiltered),
+        find.text('Ningún ejercicio coincide'),
         findsOneWidget,
       );
       expect(
-        find.text(WorkoutStrings.pickerEmptyFilteredHint),
+        find.text('Probá quitando un filtro o ajustando la búsqueda.'),
         findsOneWidget,
       );
     });

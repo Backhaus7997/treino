@@ -11,7 +11,7 @@ import '../application/session_providers.dart';
 import '../domain/session.dart';
 import '../domain/set_log.dart';
 import 'widgets/stat_tile.dart';
-import 'workout_strings.dart';
+import '../../../l10n/app_l10n.dart';
 
 class PostWorkoutSummaryScreen extends ConsumerWidget {
   const PostWorkoutSummaryScreen({super.key, required this.sessionId});
@@ -45,19 +45,20 @@ class PostWorkoutSummaryScreen extends ConsumerWidget {
                 setLogs: data.setLogs,
                 onShare: () async {
                   final messenger = ScaffoldMessenger.of(context);
+                  final l10n = AppL10n.of(context);
                   try {
                     await ref
                         .read(postWorkoutNotifierProvider.notifier)
                         .shareWorkout(session);
                     if (!context.mounted) return;
-                    messenger.showSnackBar(const SnackBar(
-                      content: Text(WorkoutStrings.snackShareSuccess),
+                    messenger.showSnackBar(SnackBar(
+                      content: Text(l10n.workoutSnackShareSuccess),
                     ));
                     context.go('/workout');
                   } catch (_) {
                     if (!context.mounted) return;
-                    messenger.showSnackBar(const SnackBar(
-                      content: Text(WorkoutStrings.snackShareError),
+                    messenger.showSnackBar(SnackBar(
+                      content: Text(l10n.workoutSnackShareError),
                     ));
                   }
                 },
@@ -86,6 +87,7 @@ class _LoadedBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -104,8 +106,8 @@ class _LoadedBody extends StatelessWidget {
           // Header
           Text(
             session.wasFullyCompleted
-                ? WorkoutStrings.summaryHeaderCompleted
-                : WorkoutStrings.summaryHeaderAbandoned,
+                ? l10n.workoutSummaryHeaderCompleted
+                : l10n.workoutSummaryHeaderAbandoned,
             textAlign: TextAlign.center,
             style: GoogleFonts.barlowCondensed(
               fontWeight: FontWeight.w800,
@@ -136,20 +138,20 @@ class _LoadedBody extends StatelessWidget {
             childAspectRatio: 2,
             children: [
               StatTile(
-                label: WorkoutStrings.statDuration,
+                label: l10n.workoutStatDuration,
                 value: session.durationMin.toString(),
               ),
               StatTile(
-                label: WorkoutStrings.statVolume,
+                label: l10n.workoutStatVolume,
                 value: session.totalVolumeKg.toString(),
               ),
               StatTile(
-                label: WorkoutStrings.statSets,
+                label: l10n.workoutStatSets,
                 value: setLogs.length.toString(),
               ),
-              const StatTile(
-                label: WorkoutStrings.statPrsToday,
-                value: WorkoutStrings.statPrsTodayStub,
+              StatTile(
+                label: l10n.workoutStatPrsToday,
+                value: l10n.workoutStatPrsTodayStub,
               ),
             ],
           ),
@@ -157,7 +159,7 @@ class _LoadedBody extends StatelessWidget {
 
           // PRs section (stub)
           Text(
-            WorkoutStrings.prsSectionTitle,
+            l10n.workoutPrsSectionTitle,
             style: GoogleFonts.barlowCondensed(
               fontWeight: FontWeight.w700,
               fontSize: 16,
@@ -167,7 +169,7 @@ class _LoadedBody extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            WorkoutStrings.prsPlaceholder,
+            l10n.workoutPrsPlaceholder,
             style: TextStyle(color: palette.textMuted),
           ),
           const SizedBox(height: 32),
@@ -188,14 +190,14 @@ class _LoadedBody extends StatelessWidget {
           // LISTO button (filled)
           FilledButton(
             onPressed: () => context.go('/workout'),
-            child: const Text(WorkoutStrings.buttonDone),
+            child: Text(l10n.workoutButtonDone),
           ),
           const SizedBox(height: 12),
 
           // COMPARTIR button (outlined)
           OutlinedButton(
             onPressed: onShare,
-            child: const Text(WorkoutStrings.buttonShare),
+            child: Text(l10n.workoutButtonShare),
           ),
         ],
       ),
@@ -210,15 +212,16 @@ class _NotFoundState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppL10n.of(context);
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text(WorkoutStrings.notFoundTitle),
+          Text(l10n.workoutNotFoundTitle),
           const SizedBox(height: 16),
           FilledButton(
             onPressed: () => context.go('/workout'),
-            child: const Text(WorkoutStrings.buttonBackToWorkout),
+            child: Text(l10n.workoutButtonBackToWorkout),
           ),
         ],
       ),
@@ -234,15 +237,16 @@ class _ErrorState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppL10n.of(context);
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text(WorkoutStrings.errorTitle),
+          Text(l10n.workoutErrorTitle),
           const SizedBox(height: 16),
           FilledButton(
             onPressed: onRetry,
-            child: const Text(WorkoutStrings.buttonRetry),
+            child: Text(l10n.workoutButtonRetry),
           ),
         ],
       ),

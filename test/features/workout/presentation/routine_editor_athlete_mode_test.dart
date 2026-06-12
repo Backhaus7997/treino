@@ -9,7 +9,7 @@ import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/analytics/analytics_service.dart';
-import 'package:treino/features/coach/presentation/coach_strings.dart';
+import 'package:treino/l10n/app_l10n.dart';
 import 'package:treino/features/workout/application/custom_exercise_providers.dart';
 import 'package:treino/features/workout/application/exercise_providers.dart';
 import 'package:treino/features/workout/application/routine_providers.dart'
@@ -30,7 +30,6 @@ import 'package:treino/features/workout/domain/routine_source.dart';
 import 'package:treino/features/workout/domain/routine_visibility.dart';
 import 'package:treino/features/workout/presentation/routine_editor_mode.dart';
 import 'package:treino/features/workout/presentation/routine_editor_screen.dart';
-import 'package:treino/features/workout/presentation/workout_strings.dart';
 
 import '../../../helpers/fake_analytics_service.dart';
 import '../../../fixtures/exercises.dart';
@@ -77,6 +76,9 @@ Future<void> _pumpEditor(
       overrides: overrides,
       child: MaterialApp.router(
         theme: AppTheme.dark(),
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+        locale: const Locale('es', 'AR'),
         routerConfig: router,
       ),
     ),
@@ -243,7 +245,7 @@ void main() {
 
     // Submit should be disabled (empty name)
     final submitDisabled = tester.widget<ElevatedButton>(
-      find.widgetWithText(ElevatedButton, WorkoutStrings.selfEditorSubmitLabel),
+      find.widgetWithText(ElevatedButton, 'CREAR RUTINA'),
     );
     expect(submitDisabled.onPressed, isNull,
         reason: 'submit disabled when name is empty');
@@ -255,7 +257,7 @@ void main() {
 
     // Submit still disabled — no slots yet
     final submitNoSlots = tester.widget<ElevatedButton>(
-      find.widgetWithText(ElevatedButton, WorkoutStrings.selfEditorSubmitLabel),
+      find.widgetWithText(ElevatedButton, 'CREAR RUTINA'),
     );
     expect(submitNoSlots.onPressed, isNull,
         reason: 'submit disabled when no slots');
@@ -288,7 +290,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // Add exercises via the add-slot button in Day 1
-    await tester.tap(find.text(CoachStrings.editorAddSlot));
+    await tester.tap(find.text('Agregar ejercicio'));
     await tester.pumpAndSettle();
 
     // Picker should have opened — tap on first exercise then the CTA
@@ -298,10 +300,10 @@ void main() {
 
     // Tap the sticky "Agregar 1 ejercicio" CTA
     expect(
-      find.text(WorkoutStrings.pickerAddButton(1)),
+      find.text('Agregar 1 ejercicio'),
       findsOneWidget,
     );
-    await tester.tap(find.text(WorkoutStrings.pickerAddButton(1)));
+    await tester.tap(find.text('Agregar 1 ejercicio'));
     await tester.pumpAndSettle();
 
     // New per-set table validation: reps must be > 0.
@@ -324,13 +326,13 @@ void main() {
 
     // Now submit should be enabled
     final submitBtn = tester.widget<ElevatedButton>(
-      find.widgetWithText(ElevatedButton, WorkoutStrings.selfEditorSubmitLabel),
+      find.widgetWithText(ElevatedButton, 'CREAR RUTINA'),
     );
     expect(submitBtn.onPressed, isNotNull,
         reason: 'submit enabled after name + slot with reps filled');
 
     await tester.tap(find.widgetWithText(
-        ElevatedButton, WorkoutStrings.selfEditorSubmitLabel));
+        ElevatedButton, 'CREAR RUTINA'));
     await tester.pumpAndSettle();
 
     verify(() => repo.createUserOwned(
@@ -395,8 +397,8 @@ void main() {
       overrides: _overrides(repo: repo),
     );
 
-    expect(find.text(WorkoutStrings.selfEditorEditTitle), findsOneWidget);
-    expect(find.text(WorkoutStrings.selfEditorTitle), findsNothing);
+    expect(find.text('Editar rutina'), findsOneWidget);
+    expect(find.text('Nueva rutina'), findsNothing);
   });
 
   testWidgets(
@@ -421,11 +423,11 @@ void main() {
 
     // Name field is hydrated — still need to add a slot for valid form.
     // Tap + Agregar ejercicio to add a slot.
-    await tester.tap(find.text(CoachStrings.editorAddSlot));
+    await tester.tap(find.text('Agregar ejercicio'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Press de Banca').first);
     await tester.pumpAndSettle();
-    await tester.tap(find.text(WorkoutStrings.pickerAddButton(1)));
+    await tester.tap(find.text('Agregar 1 ejercicio'));
     await tester.pumpAndSettle();
 
     // Fill reps.
@@ -440,7 +442,7 @@ void main() {
 
     // Tap GUARDAR CAMBIOS.
     await tester.tap(find.widgetWithText(
-        ElevatedButton, WorkoutStrings.selfEditorUpdateLabel));
+        ElevatedButton, 'GUARDAR CAMBIOS'));
     await tester.pumpAndSettle();
 
     // Must call updateUserOwned, not createUserOwned.
@@ -467,7 +469,7 @@ void main() {
       overrides: _overrides(repo: repo),
     );
 
-    expect(find.text(WorkoutStrings.selfEditorNotFound), findsOneWidget);
+    expect(find.text('Esta rutina ya no existe. Volvé y actualizá la lista.'), findsOneWidget);
     // Editor form must not be shown.
     expect(find.byKey(const Key('editor_name_field')), findsNothing);
   });
@@ -613,7 +615,7 @@ void main() {
     // Verify the submit button is enabled before tapping.
     // This gives a clear diagnostic if _isValid is returning false.
     final submitBtn = tester.widget<ElevatedButton>(
-      find.widgetWithText(ElevatedButton, WorkoutStrings.selfEditorUpdateLabel),
+      find.widgetWithText(ElevatedButton, 'GUARDAR CAMBIOS'),
     );
     expect(submitBtn.onPressed, isNotNull,
         reason: '_isValid must be true after hydrating name + 3 valid slots');
@@ -622,7 +624,7 @@ void main() {
     // all required fields). If _isValid is somehow false here, the tap will
     // be a no-op and the verify() below will fail with a clear message.
     await tester.tap(find.widgetWithText(
-        ElevatedButton, WorkoutStrings.selfEditorUpdateLabel));
+        ElevatedButton, 'GUARDAR CAMBIOS'));
     await tester.pumpAndSettle();
 
     // updateUserOwned must have been called exactly once.

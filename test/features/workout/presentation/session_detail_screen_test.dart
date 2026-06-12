@@ -13,7 +13,7 @@ import 'package:treino/features/workout/domain/session.dart';
 import 'package:treino/features/workout/domain/session_status.dart';
 import 'package:treino/features/workout/domain/set_log.dart';
 import 'package:treino/features/workout/presentation/session_detail_screen.dart';
-import 'package:treino/features/workout/presentation/workout_strings.dart';
+import 'package:treino/l10n/app_l10n.dart';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -106,6 +106,9 @@ Widget _pumpDetailScreen({
     child: MaterialApp.router(
       theme: AppTheme.dark(),
       routerConfig: router,
+      localizationsDelegates: AppL10n.localizationsDelegates,
+      supportedLocales: AppL10n.supportedLocales,
+      locale: const Locale('es', 'AR'),
     ),
   );
 }
@@ -156,10 +159,10 @@ void main() {
     expect(find.text('Push'), findsOneWidget);
 
     // 4 StatTiles — labels
-    expect(find.text(WorkoutStrings.detailStatDuration), findsOneWidget);
-    expect(find.text(WorkoutStrings.detailStatSets), findsOneWidget);
-    expect(find.text(WorkoutStrings.detailStatVolume), findsOneWidget);
-    expect(find.text(WorkoutStrings.detailStatPrsToday), findsOneWidget);
+    expect(find.text('DURACIÓN'), findsOneWidget);
+    expect(find.text('SETS'), findsOneWidget);
+    expect(find.text('VOLUMEN'), findsOneWidget);
+    expect(find.text('PRS HOY'), findsOneWidget);
 
     // Stat values: duration=45, sets=3 (count of setLogs), volume=1800
     expect(find.text('45'), findsOneWidget);
@@ -223,7 +226,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // PR badge stub shows "PR" text on every row — 3 set rows = 3 PR chips
-    expect(find.text(WorkoutStrings.detailPrBadge), findsNWidgets(3));
+    expect(find.text('PR'), findsNWidgets(3));
   });
 
   // SCENARIO-376: not-found state when session is null
@@ -235,7 +238,7 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    expect(find.text(WorkoutStrings.notFoundTitle), findsOneWidget);
+    expect(find.text('Sesión no encontrada'), findsOneWidget);
   });
 
   // SCENARIO-377: error state renders message + retry button
@@ -248,8 +251,8 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    expect(find.text(WorkoutStrings.errorTitle), findsOneWidget);
-    expect(find.text(WorkoutStrings.buttonRetry), findsOneWidget);
+    expect(find.text('No pudimos cargar tu sesión'), findsOneWidget);
+    expect(find.text('Reintentar'), findsOneWidget);
   });
 
   // SCENARIO-378: back button navigates correctly
@@ -307,6 +310,9 @@ void main() {
         child: MaterialApp.router(
           theme: AppTheme.dark(),
           routerConfig: router,
+          localizationsDelegates: AppL10n.localizationsDelegates,
+          supportedLocales: AppL10n.supportedLocales,
+          locale: const Locale('es', 'AR'),
         ),
       ),
     );

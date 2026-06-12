@@ -22,6 +22,7 @@ import 'package:treino/features/workout/domain/routine_source.dart';
 import 'package:treino/features/workout/domain/routine_status.dart';
 import 'package:treino/features/workout/domain/routine_visibility.dart';
 import 'package:treino/features/workout/presentation/widgets/mis_rutinas_section.dart';
+import 'package:treino/l10n/app_l10n.dart';
 import 'package:firebase_auth/firebase_auth.dart' show User;
 
 // ── Fixtures ───────────────────────────────────────────────────────────────────
@@ -95,6 +96,9 @@ Future<void> _pumpSection(
       child: MaterialApp.router(
         theme: AppTheme.dark(),
         routerConfig: router,
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+        locale: const Locale('es', 'AR'),
       ),
     ),
   );

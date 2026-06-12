@@ -4,7 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/treino_icon.dart';
 import '../../../insights/domain/muscle_group.dart';
-import '../../../workout/presentation/workout_strings.dart';
+import '../../../../l10n/app_l10n.dart';
 
 /// Shows a MULTI-select bottom sheet for filtering exercises by muscle group.
 ///
@@ -59,6 +59,7 @@ class _MuscleFilterSheetContentState extends State<_MuscleFilterSheetContent> {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     return DraggableScrollableSheet(
       initialChildSize: 0.6,
       minChildSize: 0.4,
@@ -93,7 +94,7 @@ class _MuscleFilterSheetContentState extends State<_MuscleFilterSheetContent> {
                   children: [
                     Expanded(
                       child: Text(
-                        WorkoutStrings.pickerMuscleSheetTitle,
+                        l10n.workoutPickerMuscleSheetTitle,
                         style: GoogleFonts.barlowCondensed(
                           color: palette.textPrimary,
                           fontSize: 14,
@@ -106,7 +107,7 @@ class _MuscleFilterSheetContentState extends State<_MuscleFilterSheetContent> {
                       TextButton(
                         onPressed: () => setState(_selected.clear),
                         child: Text(
-                          WorkoutStrings.pickerSheetClear,
+                          l10n.workoutPickerSheetClear,
                           style: GoogleFonts.barlow(
                             color: palette.textMuted,
                             fontSize: 13,
@@ -152,8 +153,8 @@ class _MuscleFilterSheetContentState extends State<_MuscleFilterSheetContent> {
                     onPressed: () => Navigator.of(context).pop(_selected),
                     child: Text(
                       _selected.isEmpty
-                          ? WorkoutStrings.pickerSheetApplyAll
-                          : WorkoutStrings.pickerSheetApply(_selected.length),
+                          ? l10n.workoutPickerSheetApplyAll
+                          : l10n.workoutPickerSheetApply(_selected.length),
                       style: GoogleFonts.barlowCondensed(
                         fontSize: 14,
                         fontWeight: FontWeight.w700,

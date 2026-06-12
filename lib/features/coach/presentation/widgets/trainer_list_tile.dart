@@ -6,7 +6,7 @@ import '../../../feed/presentation/widgets/post_avatar.dart';
 import '../../../reviews/presentation/widgets/star_rating_display.dart';
 import '../../domain/trainer_public_profile.dart';
 import '../../domain/trainer_specialty.dart';
-import '../coach_strings.dart';
+import '../../../../l10n/app_l10n.dart';
 
 /// A list tile for a single trainer in the discovery list.
 ///
@@ -38,9 +38,9 @@ class TrainerListTile extends StatelessWidget {
   /// no tiene ninguna ubicación física pero ofrece online.
   final bool isVirtualOnly;
 
-  String _formatDistance() {
+  String _formatDistance(String unknownLabel) {
     final d = distanceKm;
-    if (d == null) return CoachStrings.distanceUnknown;
+    if (d == null) return unknownLabel;
     if (d < 10) return '${d.toStringAsFixed(1)} km';
     return '${d.round()} km';
   }
@@ -48,6 +48,7 @@ class TrainerListTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     final specialty = profile.trainerSpecialty;
     final rate = profile.trainerMonthlyRate;
 
@@ -94,7 +95,7 @@ class TrainerListTile extends StatelessWidget {
               children: [
                 if (rate != null)
                   Text(
-                    '\$$rate${CoachStrings.monthlyRateUnit}',
+                    '\$$rate${l10n.coachMonthlyRateUnit}',
                     style: GoogleFonts.barlowCondensed(
                       fontWeight: FontWeight.w600,
                       fontSize: 13,
@@ -106,7 +107,7 @@ class TrainerListTile extends StatelessWidget {
                   _VirtualBadge()
                 else
                   Text(
-                    _formatDistance(),
+                    _formatDistance(l10n.coachDistanceUnknown),
                     style: GoogleFonts.barlow(
                       fontSize: 12,
                       color: palette.textMuted,

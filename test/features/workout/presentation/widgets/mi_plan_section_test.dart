@@ -12,7 +12,7 @@ import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
-import 'package:treino/features/coach/presentation/coach_strings.dart';
+import 'package:treino/l10n/app_l10n.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/features/workout/application/assigned_routine_providers.dart';
@@ -102,6 +102,9 @@ Future<void> _pumpMiPlanSection(
       overrides: overrides,
       child: MaterialApp.router(
         theme: AppTheme.dark(),
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+        locale: const Locale('es', 'AR'),
         routerConfig: router,
       ),
     ),
@@ -154,7 +157,7 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      expect(find.text(CoachStrings.miPlanError), findsOneWidget);
+      expect(find.text('Error al cargar tu plan.'), findsOneWidget);
       expect(find.byKey(const Key('mi_plan_card')), findsNothing);
     });
 
@@ -172,7 +175,7 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      expect(find.text(CoachStrings.miPlanEmpty), findsOneWidget);
+      expect(find.text('No tenés rutina asignada todavía.'), findsOneWidget);
       expect(find.byKey(const Key('mi_plan_card')), findsNothing);
     });
 
@@ -274,7 +277,7 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      expect(find.text(CoachStrings.miPlanFinalizado), findsOneWidget);
+      expect(find.text('Plan finalizado'), findsOneWidget);
       // Card should still be tappable
       expect(find.byKey(const Key('mi_plan_card')), findsOneWidget);
     });
@@ -329,7 +332,7 @@ void main() {
       // Exactly one "Actual" chip, sitting next to the newest plan.
       expect(find.byKey(const Key('mi_plan_current_chip')), findsOneWidget);
       expect(
-          find.text(CoachStrings.miPlanCurrent.toUpperCase()), findsOneWidget);
+          find.text('ACTUAL'), findsOneWidget);
     });
 
     testWidgets('SCENARIO-451: no badge when link is active', (tester) async {
@@ -352,7 +355,7 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      expect(find.text(CoachStrings.miPlanFinalizado), findsNothing);
+      expect(find.text('Plan finalizado'), findsNothing);
     });
   });
 }

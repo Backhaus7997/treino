@@ -10,7 +10,7 @@ import '../../../app/theme/app_background.dart';
 import '../../../app/theme/app_palette.dart';
 import '../../../core/analytics/analytics_service.dart';
 import '../../../core/widgets/treino_icon.dart';
-import '../../coach/presentation/coach_strings.dart';
+import '../../../l10n/app_l10n.dart';
 import '../../coach/presentation/widgets/exercise_picker_sheet.dart';
 import '../../profile/domain/experience_level.dart';
 import '../application/routine_providers.dart' show routineRepositoryProvider;
@@ -27,7 +27,6 @@ import '../domain/set_enums.dart';
 import '../domain/set_spec.dart';
 import 'routine_editor_mode.dart';
 import 'widgets/duration_text_field.dart';
-import 'workout_strings.dart';
 
 // ── Presence-aware delete / add scope enums ───────────────────────────────────
 
@@ -317,23 +316,23 @@ String? _existingIdFor(RoutineEditorMode mode) => switch (mode) {
       TrainerTemplating(:final existingTemplateId) => existingTemplateId,
     };
 
-String _titleFor(RoutineEditorMode mode) => switch (mode) {
-      TrainerAssigning(existingPlanId: null) => CoachStrings.editorTitle,
-      TrainerAssigning() => CoachStrings.editorEditTitle,
-      TrainerTemplating(existingTemplateId: null) => CoachStrings.editorTitle,
-      TrainerTemplating() => CoachStrings.editorEditTitle,
-      SelfCreating(existingRoutineId: null) => WorkoutStrings.selfEditorTitle,
-      SelfCreating() => WorkoutStrings.selfEditorEditTitle,
+String _titleFor(RoutineEditorMode mode, AppL10n l10n) => switch (mode) {
+      TrainerAssigning(existingPlanId: null) => l10n.coachEditorTitle,
+      TrainerAssigning() => l10n.coachEditorEditTitle,
+      TrainerTemplating(existingTemplateId: null) => l10n.coachEditorTitle,
+      TrainerTemplating() => l10n.coachEditorEditTitle,
+      SelfCreating(existingRoutineId: null) => l10n.workoutSelfEditorTitle,
+      SelfCreating() => l10n.workoutSelfEditorEditTitle,
     };
 
-String _submitLabelFor(RoutineEditorMode mode) => switch (mode) {
-      TrainerAssigning(existingPlanId: null) => CoachStrings.editorSubmit,
-      TrainerAssigning() => CoachStrings.editorUpdateLabel,
-      TrainerTemplating(existingTemplateId: null) => CoachStrings.editorSubmit,
-      TrainerTemplating() => CoachStrings.editorUpdateLabel,
+String _submitLabelFor(RoutineEditorMode mode, AppL10n l10n) => switch (mode) {
+      TrainerAssigning(existingPlanId: null) => l10n.coachEditorSubmit,
+      TrainerAssigning() => l10n.coachEditorUpdateLabel,
+      TrainerTemplating(existingTemplateId: null) => l10n.coachEditorSubmit,
+      TrainerTemplating() => l10n.coachEditorUpdateLabel,
       SelfCreating(existingRoutineId: null) =>
-        WorkoutStrings.selfEditorSubmitLabel,
-      SelfCreating() => WorkoutStrings.selfEditorUpdateLabel,
+        l10n.workoutSelfEditorSubmitLabel,
+      SelfCreating() => l10n.workoutSelfEditorUpdateLabel,
     };
 
 class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
@@ -986,6 +985,8 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     setState(() => _submitting = true);
     final uid = ref.read(currentUidProvider) ?? '';
     final days = _buildDays();
+    // Capture l10n before async gap (context may be stale after await).
+    final l10n = AppL10n.of(context);
 
     try {
       final repo = ref.read(routineRepositoryProvider);
@@ -1008,7 +1009,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
           await repo.updateAssigned(uid: uid, draft: draft);
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text(CoachStrings.updatePlanSuccess)),
+            SnackBar(content: Text(l10n.coachUpdatePlanSuccess)),
           );
           context.pop();
 
@@ -1034,7 +1035,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
               );
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text(CoachStrings.createPlanSuccess)),
+            SnackBar(content: Text(l10n.coachCreatePlanSuccess)),
           );
           context.pop();
 
@@ -1054,7 +1055,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
           await repo.updateTemplate(uid: uid, draft: draft);
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text(CoachStrings.updatePlanSuccess)),
+            SnackBar(content: Text(l10n.coachUpdatePlanSuccess)),
           );
           context.pop();
 
@@ -1075,7 +1076,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
           await repo.createTemplate(routine);
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text(CoachStrings.createPlanSuccess)),
+            SnackBar(content: Text(l10n.coachCreatePlanSuccess)),
           );
           context.pop();
 
@@ -1086,8 +1087,8 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
           if (userRoutines.length >= 10) {
             if (!mounted) return;
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                  content: Text(WorkoutStrings.selfEditorCapReached)),
+              SnackBar(
+                  content: Text(l10n.workoutSelfEditorCapReached)),
             );
             setState(() => _submitting = false);
             return;
@@ -1108,7 +1109,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
           await repo.createUserOwned(uid: uid, draft: draft);
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text(WorkoutStrings.selfEditorSuccess)),
+            SnackBar(content: Text(l10n.workoutSelfEditorSuccess)),
           );
           context.pop();
 
@@ -1127,19 +1128,19 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
           await repo.updateUserOwned(uid: uid, draft: draft);
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-                content: Text(WorkoutStrings.selfEditorUpdateSuccess)),
+            SnackBar(
+                content: Text(l10n.workoutSelfEditorUpdateSuccess)),
           );
           context.pop();
       }
     } catch (e) {
       if (!mounted) return;
       final errorText = switch (widget.mode) {
-        TrainerAssigning() => CoachStrings.createPlanError,
-        TrainerTemplating() => CoachStrings.createPlanError,
+        TrainerAssigning() => l10n.coachCreatePlanError,
+        TrainerTemplating() => l10n.coachCreatePlanError,
         SelfCreating() => e.toString().contains('permission-denied')
-            ? WorkoutStrings.selfEditorPermissionDenied
-            : WorkoutStrings.selfEditorError,
+            ? l10n.workoutSelfEditorPermissionDenied
+            : l10n.workoutSelfEditorError,
       };
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(errorText)),
@@ -1151,6 +1152,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
 
     // Loading state: hydrating from Firestore.
     if (_loading) {
@@ -1186,7 +1188,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                 Expanded(
                   child: Center(
                     child: Text(
-                      WorkoutStrings.selfEditorNotFound,
+                      l10n.workoutSelfEditorNotFound,
                       style: TextStyle(color: palette.textMuted),
                     ),
                   ),
@@ -1228,7 +1230,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        _titleFor(widget.mode),
+                        _titleFor(widget.mode, l10n),
                         style: GoogleFonts.barlowCondensed(
                           fontWeight: FontWeight.w700,
                           fontSize: 20,
@@ -1255,7 +1257,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 _SectionLabel(
-                                  label: CoachStrings.editorNameLabel,
+                                  label: l10n.coachEditorNameLabel,
                                   palette: palette,
                                 ),
                                 const SizedBox(height: 4),
@@ -1270,7 +1272,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                                     palette,
                                     hint: _isTrainerMode
                                         ? 'Ej: Fuerza PPL'
-                                        : WorkoutStrings.selfEditorNameHint,
+                                        : l10n.workoutSelfEditorNameHint,
                                   ),
                                   onChanged: (_) => setState(() {}),
                                 ),
@@ -1284,7 +1286,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   _SectionLabel(
-                                    label: CoachStrings.editorSplitLabel,
+                                    label: l10n.coachEditorSplitLabel,
                                     palette: palette,
                                   ),
                                   const SizedBox(height: 4),
@@ -1413,7 +1415,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                         icon: Icon(TreinoIcon.plus,
                             size: 14, color: palette.accent),
                         label: Text(
-                          CoachStrings.editorAddDay,
+                          l10n.coachEditorAddDay,
                           style: GoogleFonts.barlowCondensed(
                             fontWeight: FontWeight.w600,
                             fontSize: 12,
@@ -1453,7 +1455,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                               ),
                             )
                           : Text(
-                              _submitLabelFor(widget.mode),
+                              _submitLabelFor(widget.mode, l10n),
                               style: GoogleFonts.barlowCondensed(
                                 fontWeight: FontWeight.w700,
                                 fontSize: 14,
@@ -1820,6 +1822,7 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppL10n.of(context);
     final palette = widget.palette;
     return Container(
       decoration: BoxDecoration(
@@ -1884,7 +1887,7 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
                       icon: Icon(TreinoIcon.plus,
                           size: 14, color: palette.accent),
                       label: Text(
-                        CoachStrings.editorAddSlot,
+                        l10n.coachEditorAddSlot,
                         style: GoogleFonts.barlowCondensed(
                           fontWeight: FontWeight.w600,
                           fontSize: 14,
@@ -1907,7 +1910,7 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
                         icon: Icon(TreinoIcon.streak,
                             size: 14, color: palette.highlight),
                         label: Text(
-                          CoachStrings.editorAddSuperset,
+                          l10n.coachEditorAddSuperset,
                           style: GoogleFonts.barlowCondensed(
                             fontWeight: FontWeight.w600,
                             fontSize: 14,
@@ -2152,6 +2155,7 @@ class _SlotEditorState extends State<_SlotEditor> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppL10n.of(context);
     final slot = widget.slot;
     final palette = widget.palette;
     // Active week's list — the same object as weeklySets[week], so in-place
@@ -2182,7 +2186,7 @@ class _SlotEditorState extends State<_SlotEditor> {
                   child: Padding(
                     padding: const EdgeInsets.symmetric(vertical: 4),
                     child: Text(
-                      slot.exercise?.name ?? CoachStrings.exercisePicker,
+                      slot.exercise?.name ?? l10n.coachExercisePicker,
                       style: GoogleFonts.barlow(
                         fontSize: 19,
                         height: 1.15,

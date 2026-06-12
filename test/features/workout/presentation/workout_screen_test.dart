@@ -8,7 +8,7 @@ import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/widgets/treino_bottom_bar.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
-import 'package:treino/features/coach/presentation/coach_strings.dart';
+import 'package:treino/l10n/app_l10n.dart';
 import 'package:treino/features/profile/domain/experience_level.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
@@ -20,7 +20,6 @@ import 'package:treino/features/workout/presentation/routine_detail_screen.dart'
 import 'package:treino/features/workout/presentation/widgets/historial_section.dart';
 import 'package:treino/features/workout/presentation/widgets/mi_plan_section.dart';
 import 'package:treino/features/workout/presentation/widgets/plantillas_section.dart';
-import 'package:treino/features/workout/presentation/workout_strings.dart';
 import 'package:treino/features/workout/workout_screen.dart';
 
 class _MockUser extends Mock implements User {}
@@ -71,6 +70,9 @@ Widget _wrapWorkout(Widget w, {List<Override> overrides = const []}) =>
       ],
       child: MaterialApp(
         theme: AppTheme.dark(),
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+        locale: const Locale('es', 'AR'),
         home: Scaffold(
           body: SizedBox(
             height: 800,
@@ -233,7 +235,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 50));
 
       expect(
-        find.text(CoachStrings.miPlanEmpty),
+        find.text('No tenés rutina asignada todavía.'),
         findsOneWidget,
       );
     });
@@ -259,7 +261,7 @@ void main() {
       expect(find.byType(HistorialSection), findsOneWidget);
       // Empty state message from WorkoutStrings
       expect(
-        find.text(WorkoutStrings.historialEmptyMessage),
+        find.text('Todavía no entrenaste.'),
         findsOneWidget,
       );
     });

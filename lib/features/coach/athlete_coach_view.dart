@@ -18,10 +18,10 @@ import '../reviews/application/review_providers.dart';
 import '../reviews/domain/review.dart';
 import '../reviews/presentation/widgets/review_bottom_sheet.dart';
 import 'application/trainer_discovery_providers.dart' show trainerByIdProvider;
+import '../../l10n/app_l10n.dart';
 import 'application/trainer_link_providers.dart';
 import 'domain/trainer_link.dart';
 import 'domain/trainer_link_status.dart';
-import 'presentation/agenda_strings.dart';
 import 'presentation/trainers_list_screen.dart';
 
 /// Tab Coach del atleta. Combina la discovery (Dev A, Etapa 2) con el
@@ -580,6 +580,7 @@ class _AgendaButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppL10n.of(context);
     final palette = AppPalette.of(context);
     return SizedBox(
       width: double.infinity,
@@ -595,7 +596,7 @@ class _AgendaButton extends StatelessWidget {
         ),
         icon: Icon(TreinoIcon.tabWorkout, size: 18, color: palette.accent),
         label: Text(
-          AgendaStrings.agendaButtonLabel,
+          l10n.agendaButtonLabel,
           style: GoogleFonts.barlowCondensed(
             fontWeight: FontWeight.w700,
             fontSize: 13,

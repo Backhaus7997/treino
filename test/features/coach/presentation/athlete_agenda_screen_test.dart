@@ -6,8 +6,8 @@ import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/coach/application/agenda_providers.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/domain/appointment.dart';
-import 'package:treino/features/coach/presentation/agenda_strings.dart';
 import 'package:treino/features/coach/presentation/athlete_agenda_screen.dart';
+import 'package:treino/l10n/app_l10n.dart';
 import 'package:treino/features/coach/presentation/widgets/day_slots_sheet.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
@@ -74,6 +74,9 @@ void main() {
             ],
             child: MaterialApp(
               theme: AppTheme.dark(),
+              localizationsDelegates: AppL10n.localizationsDelegates,
+              supportedLocales: AppL10n.supportedLocales,
+              locale: const Locale('es', 'AR'),
               home: const AthleteAgendaScreen(
                 trainerId: 'trainer-1',
                 athleteId: 'athlete-1',
@@ -86,7 +89,7 @@ void main() {
         // The read-only screen always shows the calendar.
         expect(find.byType(TableCalendar<void>), findsOneWidget);
         // The old "trainer has no availability" empty state is no longer shown.
-        expect(find.text(AgendaStrings.emptyAvailability), findsNothing);
+        expect(find.text('Tu PF todavía no configuró horarios.'), findsNothing);
       },
     );
   });
@@ -114,6 +117,9 @@ void main() {
             ],
             child: MaterialApp(
               theme: AppTheme.dark(),
+              localizationsDelegates: AppL10n.localizationsDelegates,
+              supportedLocales: AppL10n.supportedLocales,
+              locale: const Locale('es', 'AR'),
               home: const AthleteAgendaScreen(
                 trainerId: 'trainer-1',
                 athleteId: 'athlete-1',
@@ -126,7 +132,7 @@ void main() {
         // Calendar is shown
         expect(find.byType(TableCalendar<void>), findsOneWidget);
         // Old availability-empty-state not shown
-        expect(find.text(AgendaStrings.emptyAvailability), findsNothing);
+        expect(find.text('Tu PF todavía no configuró horarios.'), findsNothing);
       },
     );
   });
@@ -174,6 +180,9 @@ void main() {
             ],
             child: MaterialApp(
               theme: AppTheme.dark(),
+              localizationsDelegates: AppL10n.localizationsDelegates,
+              supportedLocales: AppL10n.supportedLocales,
+              locale: const Locale('es', 'AR'),
               home: const AthleteAgendaScreen(
                 trainerId: 'trainer-1',
                 athleteId: 'athlete-1',
@@ -186,7 +195,7 @@ void main() {
         // No upcoming sessions → no tiles, and the heading is hidden.
         expect(find.byType(AppointmentTile), findsNothing);
         expect(
-          find.text(AgendaStrings.upcomingAppointmentsHeading),
+          find.text('TUS PRÓXIMAS RESERVAS'),
           findsNothing,
         );
       },
@@ -228,6 +237,9 @@ void main() {
             ],
             child: MaterialApp(
               theme: AppTheme.dark(),
+              localizationsDelegates: AppL10n.localizationsDelegates,
+              supportedLocales: AppL10n.supportedLocales,
+              locale: const Locale('es', 'AR'),
               home: const AthleteAgendaScreen(
                 trainerId: 'trainer-1',
                 athleteId: 'athlete-1',
@@ -240,7 +252,7 @@ void main() {
         // Only the 3 future sessions render; the 5 past ones drop off.
         expect(find.byType(AppointmentTile), findsNWidgets(3));
         expect(
-          find.text(AgendaStrings.upcomingAppointmentsHeading),
+          find.text('TUS PRÓXIMAS RESERVAS'),
           findsOneWidget,
         );
       },
@@ -278,6 +290,9 @@ void main() {
             ],
             child: MaterialApp(
               theme: AppTheme.dark(),
+              localizationsDelegates: AppL10n.localizationsDelegates,
+              supportedLocales: AppL10n.supportedLocales,
+              locale: const Locale('es', 'AR'),
               home: const AthleteAgendaScreen(
                 trainerId: 'trainer-1',
                 athleteId: 'athlete-1',
@@ -293,8 +308,8 @@ void main() {
         await tester.pumpAndSettle();
 
         // Sheet is open — no book button, no cancel button.
-        expect(find.text(AgendaStrings.bookingConfirmCta), findsNothing);
-        expect(find.text(AgendaStrings.cancellationConfirmCta), findsNothing);
+        expect(find.text('Confirmar'), findsNothing);
+        expect(find.text('Sí, cancelar'), findsNothing);
         expect(find.byIcon(Icons.cancel_outlined), findsNothing);
         // The read-only "no sessions" copy is NOT shown (we have a session).
         expect(find.text('No tenés sesiones este día.'), findsNothing);
@@ -317,6 +332,9 @@ void main() {
             ],
             child: MaterialApp(
               theme: AppTheme.dark(),
+              localizationsDelegates: AppL10n.localizationsDelegates,
+              supportedLocales: AppL10n.supportedLocales,
+              locale: const Locale('es', 'AR'),
               home: const AthleteAgendaScreen(
                 trainerId: 'trainer-1',
                 athleteId: 'athlete-1',
@@ -333,7 +351,7 @@ void main() {
 
         // Sheet shows the no-sessions empty copy.
         expect(find.text('No tenés sesiones este día.'), findsOneWidget);
-        expect(find.text(AgendaStrings.bookingConfirmCta), findsNothing);
+        expect(find.text('Confirmar'), findsNothing);
         expect(find.byIcon(Icons.cancel_outlined), findsNothing);
       },
     );
@@ -361,6 +379,9 @@ void main() {
             overrides: const [],
             child: MaterialApp(
               theme: AppTheme.dark(),
+              localizationsDelegates: AppL10n.localizationsDelegates,
+              supportedLocales: AppL10n.supportedLocales,
+              locale: const Locale('es', 'AR'),
               home: Scaffold(
                 body: DaySlotsSheet(
                   slots: [slot1, slot2],
@@ -388,6 +409,9 @@ void main() {
             overrides: const [],
             child: MaterialApp(
               theme: AppTheme.dark(),
+              localizationsDelegates: AppL10n.localizationsDelegates,
+              supportedLocales: AppL10n.supportedLocales,
+              locale: const Locale('es', 'AR'),
               home: Scaffold(
                 body: DaySlotsSheet(
                   slots: const [],
@@ -402,7 +426,7 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        expect(find.text(AgendaStrings.emptyAvailability), findsOneWidget);
+        expect(find.text('Tu PF todavía no configuró horarios.'), findsOneWidget);
       },
     );
   });
@@ -424,6 +448,9 @@ void main() {
             overrides: const [],
             child: MaterialApp(
               theme: AppTheme.dark(),
+              localizationsDelegates: AppL10n.localizationsDelegates,
+              supportedLocales: AppL10n.supportedLocales,
+              locale: const Locale('es', 'AR'),
               home: Scaffold(
                 body: DaySlotsSheet(
                   slots: [slot],
@@ -445,7 +472,7 @@ void main() {
         await tester.pumpAndSettle();
 
         // Confirmation dialog title should appear
-        expect(find.text(AgendaStrings.bookingConfirmTitle), findsOneWidget);
+        expect(find.text('Confirmar reserva'), findsOneWidget);
         // Book not called yet (confirmation pending)
         expect(bookCalled, isFalse);
       },
@@ -465,6 +492,9 @@ void main() {
             overrides: const [],
             child: MaterialApp(
               theme: AppTheme.dark(),
+              localizationsDelegates: AppL10n.localizationsDelegates,
+              supportedLocales: AppL10n.supportedLocales,
+              locale: const Locale('es', 'AR'),
               home: Scaffold(
                 body: DaySlotsSheet(
                   slots: [slot],
@@ -486,7 +516,7 @@ void main() {
 
         // Confirm in dialog
         await tester.tap(find.widgetWithText(
-            ElevatedButton, AgendaStrings.bookingConfirmCta));
+            ElevatedButton, 'Confirmar'));
         await tester.pumpAndSettle();
 
         expect(bookedSlot, equals(slot));
@@ -517,6 +547,9 @@ void main() {
             overrides: const [],
             child: MaterialApp(
               theme: AppTheme.dark(),
+              localizationsDelegates: AppL10n.localizationsDelegates,
+              supportedLocales: AppL10n.supportedLocales,
+              locale: const Locale('es', 'AR'),
               home: Scaffold(
                 body: DaySlotsSheet(
                   slots: const [],

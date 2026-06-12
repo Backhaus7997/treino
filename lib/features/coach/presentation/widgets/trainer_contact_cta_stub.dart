@@ -9,7 +9,7 @@ import '../../../workout/application/session_providers.dart'
 import '../../application/trainer_link_providers.dart';
 import '../../domain/trainer_link.dart';
 import '../../domain/trainer_link_status.dart';
-import '../coach_strings.dart';
+import '../../../../l10n/app_l10n.dart';
 
 /// CTA "PEDIR VÍNCULO" en el TrainerPublicProfile. Crea un doc en
 /// `trainer_links` con status pending. Disabled si el athlete ya tiene
@@ -83,7 +83,7 @@ class _TrainerContactCtaStubState extends ConsumerState<TrainerContactCtaStub> {
 
     final label = hasActiveOrPending
         ? _existingLinkLabel(linkAsync.valueOrNull!)
-        : CoachStrings.ctaLabel;
+        : AppL10n.of(context).coachCtaLabel;
 
     return OutlinedButton(
       onPressed: disabled ? null : _onPressed,

@@ -7,6 +7,7 @@ import 'package:treino/features/coach/application/trainer_discovery_providers.da
 import 'package:treino/features/coach/domain/trainer_public_profile.dart';
 import 'package:treino/features/coach/domain/trainer_specialty.dart';
 import 'package:treino/features/coach/presentation/widgets/trainers_map_bottom_sheet.dart';
+import 'package:treino/l10n/app_l10n.dart';
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -56,6 +57,9 @@ Widget _wrap(Widget child, {List<Override> overrides = const []}) =>
       overrides: overrides,
       child: MaterialApp(
         theme: AppTheme.dark(),
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+        locale: const Locale('es', 'AR'),
         home: Scaffold(
           body: SizedBox(height: 200, child: child),
         ),
