@@ -827,4 +827,77 @@ class AppL10nEn extends AppL10n {
   String profileCuentaRutinasSubtitle(int count) {
     return '$count activas';
   }
+
+  @override
+  String get routineEditorDuplicateWeekTitle => '';
+
+  @override
+  String routineEditorDuplicateWeekBody(int sourceWeek, int targetWeek) {
+    return '';
+  }
+
+  @override
+  String get routineEditorDialogCancel => '';
+
+  @override
+  String get routineEditorDialogConfirm => '';
+
+  @override
+  String get routineEditorDeleteScopeTitle => '';
+
+  @override
+  String get routineEditorScopeOnlyThisWeek => '';
+
+  @override
+  String get routineEditorScopeAllWeeks => '';
+
+  @override
+  String get routineEditorAddScopeTitle => '';
+
+  @override
+  String get routineEditorAddScopeBody => '';
+
+  @override
+  String get routineEditorAddOnlyThisWeek => '';
+
+  @override
+  String get routineEditorAddAllWeeks => '';
+
+  @override
+  String get routineEditorWeekLabel => '';
+
+  @override
+  String get routineEditorRemoveLastWeek => '';
+
+  @override
+  String get routineEditorLevelSection => '';
+
+  @override
+  String get routineEditorWeeksSection => '';
+
+  @override
+  String get routineEditorDaysSection => '';
+
+  @override
+  String get routineEditorNameHint => '';
+
+  @override
+  String get routineEditorSplitHint => '';
+
+  @override
+  String routineEditorIncompleteSetsLabel(int weekNumber) {
+    return '';
+  }
+
+  @override
+  String get routineEditorSetTypeNormal => '';
+
+  @override
+  String get routineEditorSetTypeWarmup => '';
+
+  @override
+  String get routineEditorSetTypeDrop => '';
+
+  @override
+  String get routineEditorSetTypeFailure => '';
 }

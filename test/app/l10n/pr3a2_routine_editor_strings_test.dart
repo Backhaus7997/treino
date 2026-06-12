@@ -44,7 +44,7 @@ void main() {
         (tester) async {
       final l10n = await _pumpAndGetL10n(tester);
       expect(
-        l10n.routineEditorDuplicateWeekBody(sourceWeek: 1, targetWeek: 2),
+        l10n.routineEditorDuplicateWeekBody(1, 2),
         'Se copiará la Semana 1 en la Semana 2.',
       );
     });
@@ -151,7 +151,7 @@ void main() {
         (tester) async {
       final l10n = await _pumpAndGetL10n(tester);
       expect(
-        l10n.routineEditorIncompleteSetsLabel(weekNumber: 3),
+        l10n.routineEditorIncompleteSetsLabel(3),
         'Sets incompletos en Sem 3',
       );
     });

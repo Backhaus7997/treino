@@ -850,6 +850,79 @@ class AppL10nEs extends AppL10n {
   String profileCuentaRutinasSubtitle(int count) {
     return '$count activas';
   }
+
+  @override
+  String get routineEditorDuplicateWeekTitle => '';
+
+  @override
+  String routineEditorDuplicateWeekBody(int sourceWeek, int targetWeek) {
+    return '';
+  }
+
+  @override
+  String get routineEditorDialogCancel => '';
+
+  @override
+  String get routineEditorDialogConfirm => '';
+
+  @override
+  String get routineEditorDeleteScopeTitle => '';
+
+  @override
+  String get routineEditorScopeOnlyThisWeek => '';
+
+  @override
+  String get routineEditorScopeAllWeeks => '';
+
+  @override
+  String get routineEditorAddScopeTitle => '';
+
+  @override
+  String get routineEditorAddScopeBody => '';
+
+  @override
+  String get routineEditorAddOnlyThisWeek => '';
+
+  @override
+  String get routineEditorAddAllWeeks => '';
+
+  @override
+  String get routineEditorWeekLabel => '';
+
+  @override
+  String get routineEditorRemoveLastWeek => '';
+
+  @override
+  String get routineEditorLevelSection => '';
+
+  @override
+  String get routineEditorWeeksSection => '';
+
+  @override
+  String get routineEditorDaysSection => '';
+
+  @override
+  String get routineEditorNameHint => '';
+
+  @override
+  String get routineEditorSplitHint => '';
+
+  @override
+  String routineEditorIncompleteSetsLabel(int weekNumber) {
+    return '';
+  }
+
+  @override
+  String get routineEditorSetTypeNormal => '';
+
+  @override
+  String get routineEditorSetTypeWarmup => '';
+
+  @override
+  String get routineEditorSetTypeDrop => '';
+
+  @override
+  String get routineEditorSetTypeFailure => '';
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -1703,4 +1776,79 @@ class AppL10nEsAr extends AppL10nEs {
   String profileCuentaRutinasSubtitle(int count) {
     return '$count activas';
   }
+
+  @override
+  String get routineEditorDuplicateWeekTitle => 'Duplicar semana';
+
+  @override
+  String routineEditorDuplicateWeekBody(int sourceWeek, int targetWeek) {
+    return 'Se copiará la Semana $sourceWeek en la Semana $targetWeek.';
+  }
+
+  @override
+  String get routineEditorDialogCancel => 'Cancelar';
+
+  @override
+  String get routineEditorDialogConfirm => 'Confirmar';
+
+  @override
+  String get routineEditorDeleteScopeTitle =>
+      '¿Eliminar solo de esta semana o de todas?';
+
+  @override
+  String get routineEditorScopeOnlyThisWeek => 'Solo esta semana';
+
+  @override
+  String get routineEditorScopeAllWeeks => 'Todas las semanas';
+
+  @override
+  String get routineEditorAddScopeTitle => '¿En qué semanas agregar?';
+
+  @override
+  String get routineEditorAddScopeBody =>
+      '¿Agregar el ejercicio solo en esta semana o en todas?';
+
+  @override
+  String get routineEditorAddOnlyThisWeek => 'Agregar solo en esta semana';
+
+  @override
+  String get routineEditorAddAllWeeks => 'Agregar en todas las semanas';
+
+  @override
+  String get routineEditorWeekLabel => 'Semana';
+
+  @override
+  String get routineEditorRemoveLastWeek => 'Quitar última';
+
+  @override
+  String get routineEditorLevelSection => 'NIVEL';
+
+  @override
+  String get routineEditorWeeksSection => 'SEMANAS';
+
+  @override
+  String get routineEditorDaysSection => 'DÍAS DEL PLAN';
+
+  @override
+  String get routineEditorNameHint => 'Ej: Fuerza PPL';
+
+  @override
+  String get routineEditorSplitHint => 'PPL / Full Body';
+
+  @override
+  String routineEditorIncompleteSetsLabel(int weekNumber) {
+    return 'Sets incompletos en Sem $weekNumber';
+  }
+
+  @override
+  String get routineEditorSetTypeNormal => 'Normal';
+
+  @override
+  String get routineEditorSetTypeWarmup => 'Entrada en calor (W)';
+
+  @override
+  String get routineEditorSetTypeDrop => 'Drop (D)';
+
+  @override
+  String get routineEditorSetTypeFailure => 'Al fallo (F)';
 }
