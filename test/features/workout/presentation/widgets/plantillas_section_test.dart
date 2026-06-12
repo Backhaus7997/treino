@@ -212,15 +212,13 @@ void main() {
     });
 
     testWidgets(
-        'GridView uses shrinkWrap + NeverScrollableScrollPhysics (no overflow)',
+        'catálogo en filas tamaño-contenido (sin GridView anidado ni overflow)',
         (tester) async {
       final routines = List.generate(
         4,
         (i) => makeRoutine(id: 'r$i', name: 'Routine $i'),
       );
 
-      // Wrap in a ListView so that the Column inside PlantillasSection
-      // has a bounded vertical parent — this mirrors the real WorkoutScreen.
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
@@ -242,12 +240,13 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 50));
 
-      // No RenderFlex overflow errors
+      // Sin RenderFlex overflow.
       expect(tester.takeException(), isNull);
-      // GridView has shrinkWrap and NeverScrollableScrollPhysics
-      final grid = tester.widget<GridView>(find.byType(GridView));
-      expect(grid.shrinkWrap, isTrue);
-      expect(grid.physics, isA<NeverScrollableScrollPhysics>());
+      // El GridView anidado (reservaba alto fantasma que empujaba HISTORIAL)
+      // fue reemplazado por filas de a dos tamaño-contenido.
+      expect(find.byType(GridView), findsNothing);
+      // 4 rutinas → 3 cards visibles (cap colapsado) + celda "Ver más".
+      expect(find.byType(RoutineCard), findsNWidgets(3));
     });
 
     testWidgets('LevelFilterPills widget is present', (tester) async {

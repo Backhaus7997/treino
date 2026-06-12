@@ -64,13 +64,11 @@ class _HistorialSectionState extends ConsumerState<HistorialSection> {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                ListView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: visible.length,
-                  itemBuilder: (context, i) =>
-                      _HistorialCard(session: visible[i]),
-                ),
+                // Plain Column + for instead of a nested ListView.builder. The
+                // nested scroll view reserved phantom vertical height that
+                // dropped "Ver más" toward the navbar; MisRutinas already uses
+                // this content-sized pattern with no gap.
+                for (final session in visible) _HistorialCard(session: session),
                 if (overflow)
                   _ExpandToggle(
                     expanded: _expanded,
