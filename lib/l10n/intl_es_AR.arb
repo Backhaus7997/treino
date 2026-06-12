@@ -301,5 +301,40 @@
     "placeholders": {
       "gymName": { "type": "String" }
     }
+  },
+
+  "profileCuentaTitle": "CUENTA",
+  "@profileCuentaTitle": {},
+
+  "profileCuentaSolicitudesTitle": "Solicitudes de amistad",
+  "@profileCuentaSolicitudesTitle": {},
+
+  "profileCuentaSolicitudesSubtitle": "{count} nuevas",
+  "@profileCuentaSolicitudesSubtitle": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+
+  "profileCuentaDatosPersonalesTitle": "Datos personales",
+  "@profileCuentaDatosPersonalesTitle": {},
+
+  "profileCuentaDatosPersonalesSubtitle": "Editá tu info",
+  "@profileCuentaDatosPersonalesSubtitle": {},
+
+  "profileCuentaGimnasioTitle": "Gimnasio",
+  "@profileCuentaGimnasioTitle": {},
+
+  "profileCuentaNoGym": "Sin gym",
+  "@profileCuentaNoGym": {},
+
+  "profileCuentaMisRutinasTitle": "Mis rutinas",
+  "@profileCuentaMisRutinasTitle": {},
+
+  "profileCuentaRutinasSubtitle": "{count} activas",
+  "@profileCuentaRutinasSubtitle": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
   }
 }

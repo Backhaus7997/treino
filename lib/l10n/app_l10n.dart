@@ -1615,6 +1615,60 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'{gymName} · ¡Detectamos que podés estar entrenando!'**
   String checkInGymSubtext(String gymName);
+
+  /// No description provided for @profileCuentaTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CUENTA'**
+  String get profileCuentaTitle;
+
+  /// No description provided for @profileCuentaSolicitudesTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Solicitudes de amistad'**
+  String get profileCuentaSolicitudesTitle;
+
+  /// No description provided for @profileCuentaSolicitudesSubtitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{count} nuevas'**
+  String profileCuentaSolicitudesSubtitle(int count);
+
+  /// No description provided for @profileCuentaDatosPersonalesTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Datos personales'**
+  String get profileCuentaDatosPersonalesTitle;
+
+  /// No description provided for @profileCuentaDatosPersonalesSubtitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Editá tu info'**
+  String get profileCuentaDatosPersonalesSubtitle;
+
+  /// No description provided for @profileCuentaGimnasioTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Gimnasio'**
+  String get profileCuentaGimnasioTitle;
+
+  /// No description provided for @profileCuentaNoGym.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Sin gym'**
+  String get profileCuentaNoGym;
+
+  /// No description provided for @profileCuentaMisRutinasTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Mis rutinas'**
+  String get profileCuentaMisRutinasTitle;
+
+  /// No description provided for @profileCuentaRutinasSubtitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{count} activas'**
+  String profileCuentaRutinasSubtitle(int count);
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

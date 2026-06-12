@@ -796,4 +796,35 @@ class AppL10nEn extends AppL10n {
   String checkInGymSubtext(String gymName) {
     return '$gymName · ¡Detectamos que podés estar entrenando!';
   }
+
+  @override
+  String get profileCuentaTitle => 'CUENTA';
+
+  @override
+  String get profileCuentaSolicitudesTitle => 'Solicitudes de amistad';
+
+  @override
+  String profileCuentaSolicitudesSubtitle(int count) {
+    return '$count nuevas';
+  }
+
+  @override
+  String get profileCuentaDatosPersonalesTitle => 'Datos personales';
+
+  @override
+  String get profileCuentaDatosPersonalesSubtitle => 'Editá tu info';
+
+  @override
+  String get profileCuentaGimnasioTitle => 'Gimnasio';
+
+  @override
+  String get profileCuentaNoGym => 'Sin gym';
+
+  @override
+  String get profileCuentaMisRutinasTitle => 'Mis rutinas';
+
+  @override
+  String profileCuentaRutinasSubtitle(int count) {
+    return '$count activas';
+  }
 }

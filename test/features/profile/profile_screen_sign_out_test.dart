@@ -14,6 +14,7 @@ import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
 import 'package:treino/features/profile/domain/user_session_stats.dart';
 import 'package:treino/features/profile/profile_screen.dart';
+import 'package:treino/l10n/app_l10n.dart';
 
 class MockUser extends Mock implements User {}
 
@@ -97,6 +98,9 @@ void main() {
         child: MaterialApp.router(
           theme: AppTheme.dark(),
           routerConfig: router,
+          localizationsDelegates: AppL10n.localizationsDelegates,
+          supportedLocales: AppL10n.supportedLocales,
+          locale: const Locale('es', 'AR'),
         ),
       ),
     );
