@@ -3,7 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/treino_icon.dart';
-import '../coach_strings.dart';
+import '../../../../l10n/app_l10n.dart';
 
 /// Shows a modal bottom sheet explaining why location permission is needed.
 ///
@@ -38,6 +38,7 @@ class _LocationRationaleSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
 
     return Container(
       decoration: BoxDecoration(
@@ -61,7 +62,7 @@ class _LocationRationaleSheet extends StatelessWidget {
           Icon(TreinoIcon.mapPin, size: 48, color: palette.accent),
           const SizedBox(height: 16),
           Text(
-            CoachStrings.locationSheetTitle,
+            l10n.coachLocationSheetTitle,
             style: GoogleFonts.barlowCondensed(
               fontWeight: FontWeight.w700,
               fontSize: 22,
@@ -70,7 +71,7 @@ class _LocationRationaleSheet extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            CoachStrings.locationSheetBody,
+            l10n.coachLocationSheetBody,
             textAlign: TextAlign.center,
             style: GoogleFonts.barlow(
               fontSize: 14,
@@ -89,7 +90,7 @@ class _LocationRationaleSheet extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(vertical: 14),
               ),
               child: Text(
-                CoachStrings.locationSheetAccept,
+                l10n.coachLocationSheetAccept,
                 style: GoogleFonts.barlowCondensed(
                   fontWeight: FontWeight.w700,
                   fontSize: 15,
@@ -102,7 +103,7 @@ class _LocationRationaleSheet extends StatelessWidget {
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
             child: Text(
-              CoachStrings.locationSheetDeny,
+              l10n.coachLocationSheetDeny,
               style: GoogleFonts.barlow(
                 fontSize: 14,
                 color: palette.textMuted,

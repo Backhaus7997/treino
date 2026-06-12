@@ -14,7 +14,7 @@ import '../../../workout/domain/custom_exercise.dart';
 import '../../../workout/domain/equipment_type.dart';
 import '../../../workout/domain/exercise.dart';
 import '../../../workout/presentation/custom_exercise_editor_screen.dart';
-import '../../../workout/presentation/workout_strings.dart';
+import '../../../../l10n/app_l10n.dart';
 import 'equipment_filter_sheet.dart';
 import 'muscle_filter_sheet.dart';
 
@@ -159,6 +159,7 @@ class _ExercisePickerSheetContentState
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     final uid = ref.watch(currentUidProvider) ?? '';
     final defaultsAsync = ref.watch(exercisesProvider);
     final customsAsync = uid.isEmpty
@@ -240,7 +241,7 @@ class _ExercisePickerSheetContentState
                   children: [
                     Expanded(
                       child: _FilterButton(
-                        baseLabel: WorkoutStrings.pickerMuscleFilter,
+                        baseLabel: l10n.workoutPickerMuscleFilter,
                         count: _muscleFilters.length,
                         palette: palette,
                         onTap: () => _openMuscleSheet(sheetCtx),
@@ -252,7 +253,7 @@ class _ExercisePickerSheetContentState
                     const SizedBox(width: 8),
                     Expanded(
                       child: _FilterButton(
-                        baseLabel: WorkoutStrings.pickerEquipmentFilter,
+                        baseLabel: l10n.workoutPickerEquipmentFilter,
                         count: _equipmentFilters.length,
                         palette: palette,
                         onTap: () => _openEquipmentSheet(sheetCtx),
@@ -283,6 +284,7 @@ class _ExercisePickerSheetContentState
                 child: _buildList(
                   scrollController: scrollController,
                   palette: palette,
+                  l10n: l10n,
                   defaults: defaultsAsync,
                   customs: customsAsync,
                   uid: uid,
@@ -308,6 +310,7 @@ class _ExercisePickerSheetContentState
   Widget _buildList({
     required ScrollController scrollController,
     required AppPalette palette,
+    required AppL10n l10n,
     required AsyncValue<List<Exercise>> defaults,
     required AsyncValue<List<CustomExercise>> customs,
     required String uid,
@@ -340,7 +343,7 @@ class _ExercisePickerSheetContentState
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                WorkoutStrings.pickerEmptyFiltered,
+                l10n.workoutPickerEmptyFiltered,
                 textAlign: TextAlign.center,
                 style: GoogleFonts.barlow(
                     color: palette.textMuted,
@@ -349,7 +352,7 @@ class _ExercisePickerSheetContentState
               ),
               const SizedBox(height: 4),
               Text(
-                WorkoutStrings.pickerEmptyFilteredHint,
+                l10n.workoutPickerEmptyFilteredHint,
                 textAlign: TextAlign.center,
                 style:
                     GoogleFonts.barlow(color: palette.textMuted, fontSize: 12),
@@ -647,7 +650,7 @@ class _StickyAddBar extends StatelessWidget {
             ),
           ),
           child: Text(
-            WorkoutStrings.pickerAddButton(count),
+            AppL10n.of(context).workoutPickerAddButton(count),
             style: GoogleFonts.barlowCondensed(
               fontWeight: FontWeight.w700,
               fontSize: 14,

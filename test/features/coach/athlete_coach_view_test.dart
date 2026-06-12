@@ -16,6 +16,7 @@ import 'package:treino/features/coach/presentation/trainers_list_screen.dart';
 import 'package:treino/features/payments/application/mi_cuota_provider.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
+import 'package:treino/l10n/app_l10n.dart';
 
 class _MockTrainerLinkRepository extends Mock
     implements TrainerLinkRepository {}
@@ -49,6 +50,9 @@ Widget _wrap(Widget child, {List<Override> overrides = const []}) =>
       ],
       child: MaterialApp(
         theme: AppTheme.dark(),
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+        locale: const Locale('es', 'AR'),
         home: Scaffold(body: child),
       ),
     );

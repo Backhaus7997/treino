@@ -7,8 +7,8 @@ import 'package:treino/features/coach/data/appointment_repository.dart';
 import 'package:treino/features/coach/data/availability_repository.dart';
 import 'package:treino/features/coach/domain/availability_override.dart';
 import 'package:treino/features/coach/domain/availability_rule.dart';
-import 'package:treino/features/coach/presentation/agenda_strings.dart';
 import 'package:treino/features/coach/presentation/availability_editor_screen.dart';
+import 'package:treino/l10n/app_l10n.dart';
 
 // ── Fakes ─────────────────────────────────────────────────────────────────────
 
@@ -135,6 +135,9 @@ Widget _editor({
     ],
     child: MaterialApp(
       theme: AppTheme.dark(),
+      localizationsDelegates: AppL10n.localizationsDelegates,
+      supportedLocales: AppL10n.supportedLocales,
+      locale: const Locale('es', 'AR'),
       home: const AvailabilityEditorScreen(trainerId: 'trainer-1'),
     ),
   );
@@ -151,8 +154,8 @@ void main() {
         await tester.pumpWidget(_editor());
         await tester.pump();
 
-        expect(find.text(AgendaStrings.editorTitle), findsOneWidget);
-        expect(find.text(AgendaStrings.addRuleCta), findsOneWidget);
+        expect(find.text('Mis horarios'), findsOneWidget);
+        expect(find.text('AGREGAR HORARIO'), findsOneWidget);
       },
     );
   });
@@ -167,8 +170,7 @@ void main() {
         await tester.pump();
 
         // Rule row must show the day label
-        expect(find.text(AgendaStrings.dayOfWeekLabels[DateTime.monday]!),
-            findsOneWidget);
+        expect(find.text('Lunes'), findsOneWidget);
       },
     );
   });
@@ -181,11 +183,11 @@ void main() {
         await tester.pumpWidget(_editor());
         await tester.pump();
 
-        await tester.tap(find.text(AgendaStrings.addRuleCta));
+        await tester.tap(find.text('AGREGAR HORARIO'));
         await tester.pumpAndSettle();
 
         // Form sheet must appear with a save/confirm action
-        expect(find.text(AgendaStrings.bookingConfirmCta), findsOneWidget);
+        expect(find.text('Confirmar'), findsOneWidget);
       },
     );
   });
@@ -210,10 +212,10 @@ void main() {
         await tester.pumpAndSettle();
 
         // Confirmation dialog should show
-        expect(find.text(AgendaStrings.ruleDeleteConfirm), findsOneWidget);
+        expect(find.text('¿Borrar este horario? Las reservas existentes se mantienen.'), findsOneWidget);
 
         // Tap the confirm button
-        await tester.tap(find.text(AgendaStrings.bookingConfirmCta));
+        await tester.tap(find.text('Confirmar'));
         await tester.pumpAndSettle();
 
         expect(stubRepo.deletedRuleId, equals('rule-to-delete'));
@@ -229,7 +231,7 @@ void main() {
         await tester.pumpWidget(_editor());
         await tester.pump();
 
-        expect(find.text(AgendaStrings.blockDayCta), findsOneWidget);
+        expect(find.text('BLOQUEAR UN DÍA'), findsOneWidget);
       },
     );
   });
@@ -244,7 +246,7 @@ void main() {
         await tester.pump();
 
         // The override should display its date + "Bloqueado" label
-        expect(find.text(AgendaStrings.slotBlockedLabel), findsOneWidget);
+        expect(find.text('Bloqueado'), findsOneWidget);
       },
     );
   });
@@ -273,6 +275,9 @@ void main() {
           ],
           child: MaterialApp(
             theme: AppTheme.dark(),
+            localizationsDelegates: AppL10n.localizationsDelegates,
+            supportedLocales: AppL10n.supportedLocales,
+            locale: const Locale('es', 'AR'),
             home: const AvailabilityEditorScreen(trainerId: 'trainer-1'),
           ),
         ));
@@ -288,7 +293,7 @@ void main() {
         await tester.pumpAndSettle();
 
         // Confirm deletion
-        await tester.tap(find.text(AgendaStrings.bookingConfirmCta));
+        await tester.tap(find.text('Confirmar'));
         await tester.pumpAndSettle();
 
         expect(stubRepo.deletedOverrideId, equals('override-to-delete'));

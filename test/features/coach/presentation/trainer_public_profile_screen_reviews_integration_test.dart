@@ -10,6 +10,7 @@ import 'package:treino/features/coach/presentation/widgets/trainer_stats_row.dar
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/features/reviews/application/review_providers.dart';
 import 'package:treino/features/reviews/presentation/widgets/trainer_reviews_section.dart';
+import 'package:treino/l10n/app_l10n.dart';
 
 const _trainerUid = 'trainer-reviews-ui';
 const _athleteId = 'athlete-1';
@@ -38,6 +39,9 @@ Widget _wrap({required TrainerPublicProfile profile}) => ProviderScope(
       ],
       child: MaterialApp(
         theme: AppTheme.dark(),
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+        locale: const Locale('es', 'AR'),
         home: const TrainerPublicProfileScreen(uid: _trainerUid),
       ),
     );

@@ -10,8 +10,8 @@ import '../../application/agenda_providers.dart';
 import '../../application/athlete_note_providers.dart';
 import '../../domain/agenda_exceptions.dart';
 import '../../domain/appointment.dart';
+import '../../../../l10n/app_l10n.dart';
 import '../agenda_formatters.dart';
-import '../agenda_strings.dart';
 
 class SessionDetailSheet extends ConsumerStatefulWidget {
   const SessionDetailSheet({
@@ -76,14 +76,15 @@ class _SessionDetailSheetState extends ConsumerState<SessionDetailSheet> {
   }
 
   Future<void> _cancelAppointment() async {
+    final l10n = AppL10n.of(context);
     final palette = AppPalette.of(context);
     final confirmed = await _localConfirmDialog(
       context,
       palette: palette,
-      title: AgendaStrings.cancellationConfirmTitle,
-      body: AgendaStrings.cancellationConfirmBody,
-      confirmLabel: AgendaStrings.cancellationConfirmCta,
-      cancelLabel: AgendaStrings.cancellationKeep,
+      title: l10n.agendaCancellationConfirmTitle,
+      body: l10n.agendaCancellationConfirmBody,
+      confirmLabel: l10n.agendaCancellationConfirmCta,
+      cancelLabel: l10n.agendaCancellationKeep,
     );
     if (!confirmed || !mounted) return;
 
@@ -91,27 +92,28 @@ class _SessionDetailSheetState extends ConsumerState<SessionDetailSheet> {
       await ref.read(appointmentRepositoryProvider).cancel(
             appointment: widget.appointment,
             actorUid: widget.trainerId,
-            reason: AgendaStrings.bookingCancelledByCoach,
+            reason: l10n.agendaBookingCancelledByCoach,
           );
       if (!mounted) return;
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text(AgendaStrings.cancellationSuccess)),
+        SnackBar(content: Text(l10n.agendaCancellationSuccess)),
       );
     } on CancellationTooLateException {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text(AgendaStrings.cancellationTooLate)),
+        SnackBar(content: Text(l10n.agendaCancellationTooLate)),
       );
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text(AgendaStrings.genericError)),
+        SnackBar(content: Text(l10n.agendaGenericError)),
       );
     }
   }
 
   Future<void> _cancelSeries() async {
+    final l10n = AppL10n.of(context);
     final palette = AppPalette.of(context);
     final confirmed = await _localConfirmDialog(
       context,
@@ -130,7 +132,7 @@ class _SessionDetailSheetState extends ConsumerState<SessionDetailSheet> {
                 recurringId: widget.appointment.recurringId!,
                 trainerId: widget.trainerId,
                 actorUid: widget.trainerId,
-                reason: AgendaStrings.bookingCancelledByCoach,
+                reason: l10n.agendaBookingCancelledByCoach,
               );
       if (!mounted) return;
       Navigator.of(context).pop();
@@ -144,7 +146,7 @@ class _SessionDetailSheetState extends ConsumerState<SessionDetailSheet> {
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text(AgendaStrings.genericError)),
+        SnackBar(content: Text(l10n.agendaGenericError)),
       );
     }
   }

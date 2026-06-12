@@ -8,8 +8,8 @@ import 'package:treino/features/coach/data/appointment_repository.dart';
 import 'package:treino/features/coach/data/availability_repository.dart';
 import 'package:treino/features/coach/domain/appointment.dart';
 import 'package:treino/features/coach/domain/availability_rule.dart';
-import 'package:treino/features/coach/presentation/agenda_strings.dart';
 import 'package:treino/features/coach/presentation/trainer_agenda_tab.dart';
+import 'package:treino/l10n/app_l10n.dart';
 import 'package:treino/features/coach/presentation/widgets/day_timeline.dart';
 
 // ── Fakes ─────────────────────────────────────────────────────────────────────
@@ -49,6 +49,9 @@ Widget _wrap(Widget child, {List<Override> overrides = const []}) {
     overrides: overrides,
     child: MaterialApp(
       theme: AppTheme.dark(),
+      localizationsDelegates: AppL10n.localizationsDelegates,
+      supportedLocales: AppL10n.supportedLocales,
+      locale: const Locale('es', 'AR'),
       home: Scaffold(body: child),
     ),
   );
@@ -142,7 +145,7 @@ void main() {
         await tester.pump();
         // Old full-screen empty-state copy is no longer rendered.
         expect(
-          find.text(AgendaStrings.trainerEmptyAvailability),
+          find.text('Todavía no configuraste tus horarios de trabajo. Agregá uno para que tus alumnos puedan reservar.'),
           findsNothing,
         );
         // Calendar is always present (no more rules-empty gating).
@@ -152,7 +155,7 @@ void main() {
         // "Mis Horarios de Trabajo" header was removed (trainer-driven model
         // no longer exposes availability rules).
         expect(
-          find.text(AgendaStrings.myWorkingHoursHeading),
+          find.text('MIS HORARIOS DE TRABAJO'),
           findsNothing,
         );
       },
@@ -176,7 +179,7 @@ void main() {
         expect(find.byType(TableCalendar<dynamic>), findsOneWidget);
         // "Mis Horarios de Trabajo" header was removed (trainer-driven model).
         expect(
-          find.text(AgendaStrings.myWorkingHoursHeading),
+          find.text('MIS HORARIOS DE TRABAJO'),
           findsNothing,
         );
       },

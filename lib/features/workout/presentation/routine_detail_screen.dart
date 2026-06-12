@@ -6,7 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../app/theme/app_palette.dart';
 import '../../../core/analytics/analytics_service.dart';
 import '../../../core/widgets/treino_icon.dart';
-import '../../coach/presentation/coach_strings.dart';
+import '../../../l10n/app_l10n.dart';
 import '../../profile/application/user_providers.dart' show userProfileProvider;
 import '../../profile/application/user_public_profile_providers.dart';
 import '../../profile/domain/user_role.dart';
@@ -21,7 +21,6 @@ import '../domain/routine_slot.dart';
 import '../domain/routine_source.dart';
 import 'widgets/exercise_slot_row.dart';
 import 'widgets/stat_tile.dart';
-import 'workout_strings.dart';
 
 /// RoutineDetailScreen — ConsumerStatefulWidget that observes routineByIdProvider.
 /// selectedDayIndex is local state (ADR-RD-3).
@@ -257,7 +256,7 @@ class _RoutineDetailContent extends ConsumerWidget {
           child: _HeroStrip(
             routine: routine,
             badgeText:
-                '${(routine.split ?? WorkoutStrings.splitFallback).toUpperCase()} · DÍA ${day.dayNumber}',
+                '${(routine.split ?? AppL10n.of(context).workoutSplitFallback).toUpperCase()} · DÍA ${day.dayNumber}',
             titleText: day.name.toUpperCase(),
           ),
         ),
@@ -536,13 +535,14 @@ class _AssignedByChip extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     final profileAsync = ref.watch(userPublicProfileProvider(assignedBy));
 
     final label = profileAsync.when(
       data: (profile) =>
-          '${CoachStrings.assignedByPrefix}${profile?.displayName ?? '?'}',
-      loading: () => CoachStrings.assignedByLoading,
-      error: (_, __) => CoachStrings.assignedByError,
+          '${l10n.coachAssignedByPrefix}${profile?.displayName ?? '?'}',
+      loading: () => l10n.coachAssignedByLoading,
+      error: (_, __) => l10n.coachAssignedByError,
     );
 
     return Container(

@@ -8,7 +8,6 @@ import '../../feed/domain/post_privacy.dart';
 import '../../feed/domain/routine_tag.dart';
 import '../../profile/application/user_providers.dart';
 import '../domain/session.dart';
-import '../presentation/workout_strings.dart';
 
 class PostWorkoutNotifier extends AutoDisposeAsyncNotifier<void> {
   @override
@@ -26,7 +25,7 @@ class PostWorkoutNotifier extends AutoDisposeAsyncNotifier<void> {
         authorDisplayName: profile?.displayName ?? '',
         authorAvatarUrl: profile?.avatarUrl,
         authorGymId: profile?.gymId,
-        text: WorkoutStrings.postAutoCompleteText,
+        text: '¡Terminé mi entreno! 💪',
         routineTag: RoutineTag(
           routineId: session.routineId,
           routineName: session.routineName,

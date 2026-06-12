@@ -17,6 +17,7 @@ import 'package:treino/features/workout/presentation/post_workout_summary_screen
 import 'package:treino/features/workout/presentation/routine_detail_screen.dart';
 import 'package:treino/features/workout/presentation/session_detail_screen.dart';
 import 'package:treino/features/profile/domain/experience_level.dart';
+import 'package:treino/l10n/app_l10n.dart';
 
 // Minimal shell that mirrors _ShellScaffold from router.dart: provides a
 // Scaffold with TreinoBottomBar so SCENARIO-110/111 can assert the bar exists.
@@ -119,6 +120,8 @@ void main() {
           ],
           child: MaterialApp.router(
             theme: AppTheme.dark(),
+            localizationsDelegates: AppL10n.localizationsDelegates,
+            supportedLocales: AppL10n.supportedLocales,
             routerConfig: router,
           ),
         ),
@@ -152,6 +155,8 @@ void main() {
           ],
           child: MaterialApp.router(
             theme: AppTheme.dark(),
+            localizationsDelegates: AppL10n.localizationsDelegates,
+            supportedLocales: AppL10n.supportedLocales,
             routerConfig: router,
           ),
         ),
@@ -199,6 +204,8 @@ void main() {
           ],
           child: MaterialApp.router(
             theme: AppTheme.dark(),
+            localizationsDelegates: AppL10n.localizationsDelegates,
+            supportedLocales: AppL10n.supportedLocales,
             routerConfig: router,
           ),
         ),
@@ -257,6 +264,8 @@ void main() {
           ],
           child: MaterialApp.router(
             theme: AppTheme.dark(),
+            localizationsDelegates: AppL10n.localizationsDelegates,
+            supportedLocales: AppL10n.supportedLocales,
             routerConfig: router,
           ),
         ),
