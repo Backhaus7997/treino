@@ -252,8 +252,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // Tap GUARDAR CAMBIOS.
-    await tester.tap(
-        find.widgetWithText(ElevatedButton, 'GUARDAR CAMBIOS'));
+    await tester.tap(find.widgetWithText(ElevatedButton, 'GUARDAR CAMBIOS'));
     await tester.pumpAndSettle();
 
     verify(() => repo.updateAssigned(
@@ -278,7 +277,8 @@ void main() {
       overrides: _overrides(repo: repo),
     );
 
-    expect(find.text('Esta rutina ya no existe. Volvé y actualizá la lista.'), findsOneWidget);
+    expect(find.text('Esta rutina ya no existe. Volvé y actualizá la lista.'),
+        findsOneWidget);
     expect(find.byKey(const Key('editor_name_field')), findsNothing);
   });
 
@@ -365,8 +365,7 @@ void main() {
     await tester.enterText(find.byWidget(repsField), '10');
     await tester.pumpAndSettle();
 
-    await tester.tap(
-        find.widgetWithText(ElevatedButton, 'GUARDAR CAMBIOS'));
+    await tester.tap(find.widgetWithText(ElevatedButton, 'GUARDAR CAMBIOS'));
     await tester.pumpAndSettle();
 
     verify(() => repo.updateTemplate(
@@ -414,8 +413,7 @@ void main() {
     await tester.enterText(find.byWidget(repsField), '8');
     await tester.pumpAndSettle();
 
-    await tester
-        .tap(find.widgetWithText(ElevatedButton, CoachStrings.editorSubmit));
+    await tester.tap(find.widgetWithText(ElevatedButton, 'ASIGNAR PLAN'));
     await tester.pumpAndSettle();
 
     verify(() => repo.createAssigned(any())).called(1);
