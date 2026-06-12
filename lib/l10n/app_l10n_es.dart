@@ -9,130 +9,135 @@ class AppL10nEs extends AppL10n {
   AppL10nEs([String locale = 'es']) : super(locale);
 
   @override
-  String get authSplashTagline => '';
+  String get authSplashTagline => 'ENTRENÁ. COMPARTÍ. CRECÉ.';
 
   @override
-  String get authWelcomeEyebrow => '';
+  String get authWelcomeEyebrow => 'ENTRENAMIENTO · GYM · COACH';
 
   @override
-  String get authWelcomeBody => '';
+  String get authWelcomeBody =>
+      'Cargá tu rutina, ejecutá los sets, seguí a tus pibes y encontrá un coach cerca tuyo.';
 
   @override
-  String get authWelcomeCta => '';
+  String get authWelcomeCta => 'EMPEZAR';
 
   @override
-  String get authWelcomeHaveAccount => '';
+  String get authWelcomeHaveAccount => 'Ya tengo cuenta';
 
   @override
-  String get authWelcomeSignIn => '';
+  String get authWelcomeSignIn => 'Iniciar sesión';
 
   @override
-  String get authLoginTitle => '';
+  String get authLoginTitle => 'BIENVENIDO';
 
   @override
-  String get authLoginSubtitle => '';
+  String get authLoginSubtitle => 'Entrá para seguir tu rutina';
 
   @override
-  String get authLoginEmailHint => '';
+  String get authLoginEmailHint => 'tu@email.com';
 
   @override
-  String get authLoginForgot => '';
+  String get authLoginForgot => 'Olvidé la contraseña';
 
   @override
-  String get authLoginCta => '';
+  String get authLoginCta => 'ENTRAR';
 
   @override
-  String get authLoginContinueWith => '';
+  String get authLoginContinueWith => 'O CONTINUÁ CON';
 
   @override
-  String get authLoginNoAccount => '';
+  String get authLoginNoAccount => '¿No tenés cuenta?';
 
   @override
-  String get authLoginRegisterLink => '';
+  String get authLoginRegisterLink => 'Registrate';
 
   @override
-  String get authLoginTrainerCardTitle => '';
+  String get authLoginTrainerCardTitle => '¿Sos entrenador?';
 
   @override
-  String get authLoginTrainerCardSubtitle => '';
+  String get authLoginTrainerCardSubtitle => 'Pedí tu alta al equipo TREINO';
 
   @override
-  String get authRegisterAppbar => '';
+  String get authRegisterAppbar => 'CREAR CUENTA';
 
   @override
-  String get authRegisterTitle => '';
+  String get authRegisterTitle => 'SUMATE A';
 
   @override
-  String get authRegisterSubtitle => '';
+  String get authRegisterSubtitle => 'Es gratis. En 30 segundos estás adentro.';
 
   @override
-  String get authRegisterEmailLabel => '';
+  String get authRegisterEmailLabel => 'EMAIL';
 
   @override
-  String get authRegisterPasswordLabel => '';
+  String get authRegisterPasswordLabel => 'CONTRASEÑA';
 
   @override
-  String get authRegisterConfirmPasswordLabel => '';
+  String get authRegisterConfirmPasswordLabel => 'CONFIRMAR CONTRASEÑA';
 
   @override
-  String get authRegisterCta => '';
+  String get authRegisterCta => 'CREAR CUENTA';
 
   @override
-  String get authRegisterDividerOr => '';
+  String get authRegisterDividerOr => 'O';
 
   @override
-  String get authForgotTitle => '';
+  String get authForgotTitle => 'RECUPERAR\nACCESO';
 
   @override
-  String get authForgotBody => '';
+  String get authForgotBody =>
+      'Ingresá tu email y te enviamos un link para resetear la contraseña.';
 
   @override
-  String get authForgotEmailLabel => '';
+  String get authForgotEmailLabel => 'EMAIL';
 
   @override
-  String get authForgotEmailHint => '';
+  String get authForgotEmailHint => 'tu@email.com';
 
   @override
-  String get authForgotCta => '';
+  String get authForgotCta => 'ENVIAR LINK';
 
   @override
-  String get authForgotSuccess => '';
+  String get authForgotSuccess =>
+      'Si tu email está registrado, te enviamos un link para resetear la contraseña.';
 
   @override
-  String get authForgotBackToLogin => '';
+  String get authForgotBackToLogin => 'Volver al login';
 
   @override
-  String get authTrainerInquiryDialogTitle => '';
+  String get authTrainerInquiryDialogTitle => 'Acceso de entrenador';
 
   @override
-  String get authTrainerInquiryDialogBody => '';
+  String get authTrainerInquiryDialogBody =>
+      'Para alta de entrenador, escribinos a equipo@treino.app';
 
   @override
-  String get authTrainerInquiryDialogClose => '';
+  String get authTrainerInquiryDialogClose => 'Cerrar';
 
   @override
-  String get authTermsPlaceholder => '';
+  String get authTermsPlaceholder => 'Próximamente';
 
   @override
-  String get authGoogleLabel => '';
+  String get authGoogleLabel => 'GOOGLE';
 
   @override
-  String get authAppleLabel => '';
+  String get authAppleLabel => 'APPLE';
 
   @override
-  String get authComingSoonTooltip => '';
+  String get authComingSoonTooltip => 'Próximamente';
 
   @override
-  String get authValidationEmailInvalid => '';
+  String get authValidationEmailInvalid => 'El email no es válido';
 
   @override
-  String get authValidationPasswordRules => '';
+  String get authValidationPasswordRules =>
+      'La contraseña debe tener al menos 8 caracteres, una letra y un número';
 
   @override
-  String get authValidationPasswordMismatch => '';
+  String get authValidationPasswordMismatch => 'Las contraseñas no coinciden';
 
   @override
-  String get authProfileSignOut => '';
+  String get authProfileSignOut => 'Cerrar sesión';
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).

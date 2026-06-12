@@ -28,11 +28,13 @@ class ProfileSetupFlow extends ConsumerStatefulWidget {
 class _ProfileSetupFlowState extends ConsumerState<ProfileSetupFlow> {
   final _pageController = PageController();
 
+  // No hardcoded `\n` — the header (maxLines: 2 + softWrap) wraps these for us,
+  // so they stay correct under large OS text scaling and odd viewports (F4).
   static const List<String> _titles = [
-    '¿CÓMO TE\nLLAMÁS?',
-    '¿DÓNDE\nENTRENÁS?',
-    'NIVEL DE\nEXPERIENCIA',
-    'PESO Y\nALTURA',
+    '¿CÓMO TE LLAMÁS?',
+    '¿DÓNDE ENTRENÁS?',
+    'NIVEL DE EXPERIENCIA',
+    'PESO Y ALTURA',
   ];
 
   @override
@@ -49,12 +51,14 @@ class _ProfileSetupFlowState extends ConsumerState<ProfileSetupFlow> {
       return;
     }
 
-    // Submit final: persiste el draft a Firestore. La navegación a /home la
-    // resuelve el redirect del router en cuanto el stream de userProfileProvider
-    // emite el perfil completo (ver authRedirect → onboarding-complete gate).
-    // El `context.go('/home')` se mantiene como fast-path de intención; si el
-    // stream todavía no actualizó, el redirect rebota a /profile-setup y la
-    // misma regla nos lleva a /home apenas llega el snapshot.
+    // Submit final: persiste el draft a Firestore. NO navegamos a mano desde
+    // acá. El redirect del router saca al atleta de /profile-setup en cuanto
+    // userProfileProvider emite el displayName recién guardado: RouterRefreshNotifier
+    // re-dispara authRedirect → onboarding-complete gate → /home (testeado en
+    // router_redirect_test: "complete + /profile-setup → /home"). El viejo
+    // `context.go('/home')` manual corría una carrera contra ese stream —
+    // navegaba ANTES de que el snapshot actualizara, el gate rebotaba a
+    // /profile-setup y recién después volvía a /home: flicker visible (audit F3).
     try {
       await notifier.submit();
     } catch (_) {
@@ -65,9 +69,7 @@ class _ProfileSetupFlowState extends ConsumerState<ProfileSetupFlow> {
           duration: Duration(seconds: 3),
         ),
       );
-      return;
     }
-    if (mounted) context.go('/home');
   }
 
   void _onBack() {
@@ -144,57 +146,67 @@ class _ProfileSetupFlowState extends ConsumerState<ProfileSetupFlow> {
 
     return Scaffold(
       backgroundColor: palette.bg,
-      body: AppBackground(
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            child: Column(
-              children: [
-                // Cancel-onboarding affordance — only visible on step 0.
-                // Tapping triggers a confirmation dialog; on confirm, the
-                // Firebase Auth user and Firestore profile are deleted and
-                // the user lands back on /welcome (REQ: hard cancel).
-                if (state.currentStep == 0) ...[
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: IconButton(
-                      key: const Key('profile_setup_cancel_button'),
-                      padding: EdgeInsets.zero,
-                      icon: Icon(
-                        TreinoIcon.close,
-                        color: palette.textPrimary,
+      body: MediaQuery(
+        // Clamp OS text scaling: huge accessibility settings would otherwise
+        // grow the fixed header into the PageView body and overflow (audit F4).
+        data: MediaQuery.of(context).copyWith(
+          textScaler: MediaQuery.textScalerOf(context).clamp(
+            minScaleFactor: 1.0,
+            maxScaleFactor: 1.3,
+          ),
+        ),
+        child: AppBackground(
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              child: Column(
+                children: [
+                  // Cancel-onboarding affordance — only visible on step 0.
+                  // Tapping triggers a confirmation dialog; on confirm, the
+                  // Firebase Auth user and Firestore profile are deleted and
+                  // the user lands back on /welcome (REQ: hard cancel).
+                  if (state.currentStep == 0) ...[
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: IconButton(
+                        key: const Key('profile_setup_cancel_button'),
+                        padding: EdgeInsets.zero,
+                        icon: Icon(
+                          TreinoIcon.close,
+                          color: palette.textPrimary,
+                        ),
+                        onPressed: _onCancel,
+                        tooltip: 'Cancelar creación de cuenta',
                       ),
-                      onPressed: _onCancel,
-                      tooltip: 'Cancelar creación de cuenta',
+                    ),
+                    const SizedBox(height: 4),
+                  ],
+                  ProfileSetupHeader(
+                    currentStep: state.currentStep,
+                    title: _titles[state.currentStep],
+                  ),
+                  const SizedBox(height: 20),
+                  Expanded(
+                    child: PageView(
+                      controller: _pageController,
+                      physics: const NeverScrollableScrollPhysics(),
+                      children: const [
+                        Step1UsernameAvatar(),
+                        Step2Gym(),
+                        Step3ExperienceGender(),
+                        Step4WeightHeight(),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 4),
-                ],
-                ProfileSetupHeader(
-                  currentStep: state.currentStep,
-                  title: _titles[state.currentStep],
-                ),
-                const SizedBox(height: 20),
-                Expanded(
-                  child: PageView(
-                    controller: _pageController,
-                    physics: const NeverScrollableScrollPhysics(),
-                    children: const [
-                      Step1UsernameAvatar(),
-                      Step2Gym(),
-                      Step3ExperienceGender(),
-                      Step4WeightHeight(),
-                    ],
+                  const SizedBox(height: 12),
+                  ProfileSetupFooter(
+                    onBack: state.currentStep == 0 ? null : _onBack,
+                    onPrimary: state.canGoNext ? _onPrimary : null,
+                    primaryLabel: state.isLastStep ? 'EMPEZAR' : null,
+                    primaryLoading: state.isSubmitting,
                   ),
-                ),
-                const SizedBox(height: 12),
-                ProfileSetupFooter(
-                  onBack: state.currentStep == 0 ? null : _onBack,
-                  onPrimary: state.canGoNext ? _onPrimary : null,
-                  primaryLabel: state.isLastStep ? 'EMPEZAR' : null,
-                  primaryLoading: state.isSubmitting,
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

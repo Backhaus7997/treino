@@ -1,5 +1,6 @@
 {
   "@@locale": "en",
+  "@@x-translation-status": "TODO — EN launch deferred (audit Q4). Strings intentionally empty; locale_resolver.dart locks the app to es-AR so these are never shown. Populate before re-enabling English in the resolver.",
 
   "authSplashTagline": "",
   "authWelcomeEyebrow": "",

@@ -45,19 +45,27 @@ class WelcomeScreen extends ConsumerWidget {
       backgroundColor: palette.bg,
       body: AppBackground(
         child: SafeArea(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              return SingleChildScrollView(
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                  child: IntrinsicHeight(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: Column(
+          // SliverFillRemaining(hasScrollBody: false) sizes the content to fill
+          // the viewport so the CTAs sit at the bottom, but lets it grow and
+          // scroll when the viewport is short or text is scaled up. This is the
+          // safe replacement for the old `IntrinsicHeight + Spacer` pattern,
+          // where the Spacers had no intrinsic height (could throw "RenderBox
+          // was not laid out") and the nested IntrinsicHeight was O(N²) (F2).
+          child: CustomScrollView(
+            slivers: [
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      // ── Top block: eyebrow + logo + headline + body ──────
+                      Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Spacer(flex: 3),
-                          // ── Top block: eyebrow + logo ────────────────────
+                          const SizedBox(height: 48),
                           Row(
                             children: [
                               Container(
@@ -69,13 +77,20 @@ class WelcomeScreen extends ConsumerWidget {
                                 ),
                               ),
                               const SizedBox(width: 8),
-                              Text(
-                                l10n.authWelcomeEyebrow,
-                                style: GoogleFonts.barlowCondensed(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  letterSpacing: 1.5,
-                                  color: palette.accent,
+                              // Flexible + ellipsis so the eyebrow never
+                              // overflows on narrow screens or with large OS
+                              // text scaling.
+                              Flexible(
+                                child: Text(
+                                  l10n.authWelcomeEyebrow,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: GoogleFonts.barlowCondensed(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    letterSpacing: 1.5,
+                                    color: palette.accent,
+                                  ),
                                 ),
                               ),
                             ],
@@ -83,32 +98,34 @@ class WelcomeScreen extends ConsumerWidget {
                           const SizedBox(height: 18),
                           const TreinoLogo(size: 120),
                           const SizedBox(height: 24),
-                          // ── Middle block: headline + body ────────────────
-                          IntrinsicHeight(
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                Container(width: 3, color: palette.accent),
-                                const SizedBox(width: 14),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      _headlineLine(
-                                        palette,
-                                        light: 'MOVÉS ',
-                                        bold: 'EL HIERRO.',
-                                      ),
-                                      _headlineLine(
-                                        palette,
-                                        light: 'NOSOTROS ',
-                                        bold: 'EL RESTO.',
-                                      ),
-                                    ],
+                          // Headline with a left accent bar. A left Border on a
+                          // DecoratedBox spans the child's height automatically
+                          // — no IntrinsicHeight needed (replaces the old nested
+                          // IntrinsicHeight + full-height Container, F2).
+                          DecoratedBox(
+                            decoration: BoxDecoration(
+                              border: Border(
+                                left:
+                                    BorderSide(width: 3, color: palette.accent),
+                              ),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.only(left: 14),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  _headlineLine(
+                                    palette,
+                                    light: 'MOVÉS ',
+                                    bold: 'EL HIERRO.',
                                   ),
-                                ),
-                              ],
+                                  _headlineLine(
+                                    palette,
+                                    light: 'NOSOTROS ',
+                                    bold: 'EL RESTO.',
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                           const SizedBox(height: 14),
@@ -121,9 +138,12 @@ class WelcomeScreen extends ConsumerWidget {
                               height: 1.5,
                             ),
                           ),
-                          // ── Spacer pushes CTAs toward the bottom ─────────
-                          const Spacer(flex: 3),
-                          // ── Bottom block: CTA + social + sign-in link ────
+                        ],
+                      ),
+                      // ── Bottom block: CTA + social + sign-in link ────────
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
                           AuthPillButton(
                             label: l10n.authWelcomeCta,
                             onPressed: () => context.push('/register'),
@@ -159,39 +179,41 @@ class WelcomeScreen extends ConsumerWidget {
                             ],
                           ),
                           const SizedBox(height: 18),
-                          Center(
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  '${l10n.authWelcomeHaveAccount} · ',
+                          // Wrap (not a min-size Row) so the line flows to a
+                          // second line instead of overflowing when the text is
+                          // long, the screen is narrow, or the font is scaled.
+                          Wrap(
+                            alignment: WrapAlignment.center,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              Text(
+                                '${l10n.authWelcomeHaveAccount} · ',
+                                style: GoogleFonts.barlow(
+                                  fontSize: 14,
+                                  color: palette.textMuted,
+                                ),
+                              ),
+                              GestureDetector(
+                                onTap: () => context.push('/login'),
+                                child: Text(
+                                  l10n.authWelcomeSignIn,
                                   style: GoogleFonts.barlow(
                                     fontSize: 14,
-                                    color: palette.textMuted,
+                                    fontWeight: FontWeight.w600,
+                                    color: palette.accent,
                                   ),
                                 ),
-                                GestureDetector(
-                                  onTap: () => context.push('/login'),
-                                  child: Text(
-                                    l10n.authWelcomeSignIn,
-                                    style: GoogleFonts.barlow(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600,
-                                      color: palette.accent,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
                           const SizedBox(height: 20),
                         ],
                       ),
-                    ),
+                    ],
                   ),
                 ),
-              );
-            },
+              ),
+            ],
           ),
         ),
       ),
