@@ -14,7 +14,7 @@ import '../application/plan_gating.dart';
 import '../application/plan_progress.dart' show CompletedKey;
 import '../application/routine_providers.dart';
 import '../application/session_providers.dart'
-    show currentUidProvider, planProgressProvider;
+    show currentUidProvider, lastWeightByExerciseProvider, planProgressProvider;
 import '../domain/routine.dart';
 import '../domain/routine_day.dart';
 import '../domain/routine_slot.dart';
@@ -228,7 +228,7 @@ class _RoutineDetailContent extends ConsumerWidget {
         }
       }
       final slot = slots[i];
-      widgets.add(ExerciseSlotRow(
+      widgets.add(_SlotRowWithLastWeight(
         slot: slot,
         index: i + 1,
         week: viewedWeek,
@@ -399,7 +399,7 @@ class _SupersetBlock extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           for (final entry in items) ...[
-            ExerciseSlotRow(
+            _SlotRowWithLastWeight(
               slot: entry.slot,
               index: entry.index + 1,
               week: viewedWeek,
@@ -411,6 +411,46 @@ class _SupersetBlock extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Wraps [ExerciseSlotRow] to resolve the athlete's last logged weight for the
+/// slot's exercise (badge "ÚLTIMO"). Kept separate so ExerciseSlotRow stays a
+/// pure StatelessWidget. Reads the shared [lastWeightByExerciseProvider] —
+/// cached per uid, so every row shares a single computation.
+class _SlotRowWithLastWeight extends ConsumerWidget {
+  const _SlotRowWithLastWeight({
+    required this.slot,
+    required this.index,
+    required this.week,
+    required this.onTap,
+  });
+
+  final RoutineSlot slot;
+  final int index;
+  final int week;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final uid = ref.watch(currentUidProvider) ?? '';
+    final kg = ref
+        .watch(lastWeightByExerciseProvider(uid))
+        .valueOrNull?[slot.exerciseId];
+    return ExerciseSlotRow(
+      slot: slot,
+      index: index,
+      week: week,
+      onTap: onTap,
+      // 0 kg (movilidad / peso corporal) se muestra como "—": no aporta.
+      lastWeightDisplay: (kg == null || kg == 0) ? null : _formatWeight(kg),
+    );
+  }
+}
+
+/// "15 kg" para enteros, "17.5 kg" para fraccionarios.
+String _formatWeight(double kg) {
+  final text = kg == kg.roundToDouble() ? kg.toStringAsFixed(0) : kg.toString();
+  return '$text kg';
 }
 
 class _HeroStrip extends ConsumerWidget {
