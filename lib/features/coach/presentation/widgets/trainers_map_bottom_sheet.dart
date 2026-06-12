@@ -34,7 +34,9 @@ class TrainersMapBottomSheet extends ConsumerWidget {
   final DraggableScrollableController controller;
 
   // ── Snap points ────────────────────────────────────────────────────────────
-  static const double minChildSize = 0.12;
+  // Piso a 0.22 (no 0.12): a 0.12 el panel bajaba tanto que el header
+  // "X cerca" quedaba pegado a la navbar y era incómodo volver a subirlo.
+  static const double minChildSize = 0.22;
   static const double initialChildSize = 0.30;
   static const double maxChildSize = 0.85;
 
