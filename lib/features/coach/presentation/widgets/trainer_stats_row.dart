@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../../../features/workout/presentation/widgets/stat_tile.dart';
+import '../../../../l10n/app_l10n.dart';
 import '../../../coach/domain/trainer_public_profile.dart';
-import '../coach_strings.dart';
 
 /// Three-column stats row for the trainer public profile screen.
 ///
@@ -20,25 +20,26 @@ class TrainerStatsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppL10n.of(context);
     // ADR-RV-011: formatted to 1 decimal. Null or 0 reviews → "—" placeholder.
     final ratingValue = profile.reviewCount > 0 && profile.averageRating != null
         ? profile.averageRating!.toStringAsFixed(1)
-        : CoachStrings.statsPlaceholder;
+        : l10n.coachStatsPlaceholder;
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
         StatTile(
-          label: CoachStrings.statsReviewsLabel,
+          label: l10n.coachStatsReviewsLabel,
           value: ratingValue,
         ),
-        const StatTile(
-          label: CoachStrings.statsExperienceLabel,
-          value: CoachStrings.statsPlaceholder,
+        StatTile(
+          label: l10n.coachStatsExperienceLabel,
+          value: l10n.coachStatsPlaceholder,
         ),
-        const StatTile(
-          label: CoachStrings.statsStudentsLabel,
-          value: CoachStrings.statsPlaceholder,
+        StatTile(
+          label: l10n.coachStatsStudentsLabel,
+          value: l10n.coachStatsPlaceholder,
         ),
       ],
     );

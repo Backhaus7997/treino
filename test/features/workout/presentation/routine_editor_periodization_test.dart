@@ -44,8 +44,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/l10n/app_l10n.dart';
 import 'package:treino/core/analytics/analytics_service.dart';
-import 'package:treino/features/coach/presentation/coach_strings.dart';
 import 'package:treino/features/profile/domain/experience_level.dart';
 import 'package:treino/features/workout/application/custom_exercise_providers.dart';
 import 'package:treino/features/workout/application/exercise_providers.dart';
@@ -66,7 +66,6 @@ import 'package:treino/features/workout/domain/set_enums.dart';
 import 'package:treino/features/workout/domain/set_spec.dart';
 import 'package:treino/features/workout/presentation/routine_editor_mode.dart';
 import 'package:treino/features/workout/presentation/routine_editor_screen.dart';
-import 'package:treino/features/workout/presentation/workout_strings.dart';
 
 import '../../../fixtures/exercises.dart';
 import '../../../helpers/fake_analytics_service.dart';
@@ -111,6 +110,9 @@ Future<void> _pumpEditor(
       overrides: overrides,
       child: MaterialApp.router(
         theme: AppTheme.dark(),
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+        locale: const Locale('es', 'AR'),
         routerConfig: router,
       ),
     ),
@@ -139,12 +141,12 @@ List<Override> _overrides({
 
 /// Adds "Press de Banca" to the first day via the exercise picker.
 Future<void> _addBenchPress(WidgetTester tester) async {
-  await tester.ensureVisible(find.text(CoachStrings.editorAddSlot));
-  await tester.tap(find.text(CoachStrings.editorAddSlot));
+  await tester.ensureVisible(find.text('Agregar ejercicio'));
+  await tester.tap(find.text('Agregar ejercicio'));
   await tester.pumpAndSettle();
   await tester.tap(find.text('Press de Banca').first);
   await tester.pumpAndSettle();
-  await tester.tap(find.text(WorkoutStrings.pickerAddButton(1)));
+  await tester.tap(find.text('Agregar 1 ejercicio'));
   await tester.pumpAndSettle();
 }
 
@@ -471,8 +473,7 @@ void main() {
     await _tapByKey(tester, 'add_week_button');
     await _tapDuplicateWeek(tester);
 
-    await tester
-        .tap(find.widgetWithText(ElevatedButton, CoachStrings.editorSubmit));
+    await tester.tap(find.widgetWithText(ElevatedButton, 'ASIGNAR PLAN'));
     await tester.pumpAndSettle();
     expect(captured, isNotNull);
 
@@ -585,8 +586,7 @@ void main() {
     await _tapDuplicateWeek(tester);
     await _replaceFieldText(tester, '8', '12');
 
-    await tester
-        .tap(find.widgetWithText(ElevatedButton, CoachStrings.editorSubmit));
+    await tester.tap(find.widgetWithText(ElevatedButton, 'ASIGNAR PLAN'));
     await tester.pumpAndSettle();
     expect(captured, isNotNull,
         reason: 'editor must hand a Routine to the repo on save');
@@ -710,8 +710,7 @@ void main() {
     await _tapByKey(tester, 'add_week_button');
     await _fillVisibleReps(tester, '15');
 
-    await tester
-        .tap(find.widgetWithText(ElevatedButton, CoachStrings.editorSubmit));
+    await tester.tap(find.widgetWithText(ElevatedButton, 'ASIGNAR PLAN'));
     await tester.pumpAndSettle();
 
     // Submitted draft carries the full periodization.
@@ -1023,8 +1022,7 @@ void main() {
         reason: 'slot must remain in the plan for other weeks');
 
     // Save and check the activeWeeks mask
-    await tester
-        .tap(find.widgetWithText(ElevatedButton, CoachStrings.editorSubmit));
+    await tester.tap(find.widgetWithText(ElevatedButton, 'ASIGNAR PLAN'));
     await tester.pumpAndSettle();
     expect(captured, isNotNull);
 
@@ -1153,12 +1151,12 @@ void main() {
     await _tapByKey(tester, 'week_tab_1');
 
     // Add an exercise — scope dialog must appear
-    await tester.ensureVisible(find.text(CoachStrings.editorAddSlot));
-    await tester.tap(find.text(CoachStrings.editorAddSlot));
+    await tester.ensureVisible(find.text('Agregar ejercicio'));
+    await tester.tap(find.text('Agregar ejercicio'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Press de Banca').first);
     await tester.pumpAndSettle();
-    await tester.tap(find.text(WorkoutStrings.pickerAddButton(1)));
+    await tester.tap(find.text('Agregar 1 ejercicio'));
     await tester.pumpAndSettle();
 
     expect(find.text('Agregar solo en esta semana'), findsOneWidget,
@@ -1193,12 +1191,12 @@ void main() {
     await _tapByKey(tester, 'week_tab_1');
 
     // Add exercise, choose "solo en esta semana"
-    await tester.ensureVisible(find.text(CoachStrings.editorAddSlot));
-    await tester.tap(find.text(CoachStrings.editorAddSlot));
+    await tester.ensureVisible(find.text('Agregar ejercicio'));
+    await tester.tap(find.text('Agregar ejercicio'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Press de Banca').first);
     await tester.pumpAndSettle();
-    await tester.tap(find.text(WorkoutStrings.pickerAddButton(1)));
+    await tester.tap(find.text('Agregar 1 ejercicio'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Agregar solo en esta semana'));
     await tester.pumpAndSettle();
@@ -1207,8 +1205,7 @@ void main() {
     // other weeks are skipped by _invalidWeekFirstDay for absent slots).
     await _fillVisibleReps(tester, '8');
 
-    await tester
-        .tap(find.widgetWithText(ElevatedButton, CoachStrings.editorSubmit));
+    await tester.tap(find.widgetWithText(ElevatedButton, 'ASIGNAR PLAN'));
     await tester.pumpAndSettle();
 
     expect(captured, isNotNull);
@@ -1247,12 +1244,12 @@ void main() {
     await _tapByKey(tester, 'week_tab_1');
 
     // Add exercise, choose "todas las semanas"
-    await tester.ensureVisible(find.text(CoachStrings.editorAddSlot));
-    await tester.tap(find.text(CoachStrings.editorAddSlot));
+    await tester.ensureVisible(find.text('Agregar ejercicio'));
+    await tester.tap(find.text('Agregar ejercicio'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Press de Banca').first);
     await tester.pumpAndSettle();
-    await tester.tap(find.text(WorkoutStrings.pickerAddButton(1)));
+    await tester.tap(find.text('Agregar 1 ejercicio'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Agregar en todas las semanas'));
     await tester.pumpAndSettle();
@@ -1264,8 +1261,7 @@ void main() {
     await _tapByKey(tester, 'week_tab_2');
     await _fillVisibleReps(tester, '12');
 
-    await tester
-        .tap(find.widgetWithText(ElevatedButton, CoachStrings.editorSubmit));
+    await tester.tap(find.widgetWithText(ElevatedButton, 'ASIGNAR PLAN'));
     await tester.pumpAndSettle();
 
     expect(captured, isNotNull);

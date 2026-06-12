@@ -22,6 +22,7 @@ import 'package:treino/features/workout/domain/routine_source.dart';
 import 'package:treino/features/workout/domain/routine_status.dart';
 import 'package:treino/features/workout/domain/routine_visibility.dart';
 import 'package:treino/features/workout/presentation/widgets/mis_rutinas_section.dart';
+import 'package:treino/l10n/app_l10n.dart';
 import 'package:firebase_auth/firebase_auth.dart' show User;
 
 // ── Fixtures ───────────────────────────────────────────────────────────────────
@@ -95,6 +96,9 @@ Future<void> _pumpSection(
       child: MaterialApp.router(
         theme: AppTheme.dark(),
         routerConfig: router,
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+        locale: const Locale('es', 'AR'),
       ),
     ),
   );
@@ -212,7 +216,7 @@ void main() {
 
     // SCENARIO-613: archive action calls repo.archive on confirm
     testWidgets(
-        'SCENARIO-613: overflow ARCHIVAR → confirm → repo.archive called',
+        'SCENARIO-613: overflow ELIMINAR → confirm → repo.archive called',
         (tester) async {
       final mockRepo = _MockRoutineRepository();
       when(() => mockRepo.archive(any())).thenAnswer((_) async {});
@@ -237,7 +241,7 @@ void main() {
       await tester.tap(moreButton);
       await tester.pumpAndSettle();
 
-      // Tap ARCHIVAR
+      // Tap ELIMINAR
       final archiveItem = find.text('ELIMINAR');
       expect(archiveItem, findsOneWidget);
       await tester.tap(archiveItem);
@@ -246,7 +250,7 @@ void main() {
       // Confirmation dialog appears
       expect(find.text('Eliminar rutina'), findsOneWidget);
 
-      // Tap confirm ARCHIVAR in dialog
+      // Tap confirm ELIMINAR in dialog
       final confirmButton = find.widgetWithText(TextButton, 'ELIMINAR');
       expect(confirmButton, findsOneWidget);
       await tester.tap(confirmButton);
@@ -258,7 +262,7 @@ void main() {
 
     // SCENARIO-614: CANCELAR in archive dialog does NOT call repo
     testWidgets(
-        'SCENARIO-614: overflow ARCHIVAR → CANCELAR → repo.archive NOT called',
+        'SCENARIO-614: overflow ELIMINAR → CANCELAR → repo.archive NOT called',
         (tester) async {
       final mockRepo = _MockRoutineRepository();
 

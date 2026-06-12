@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_background.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/l10n/app_l10n.dart';
 import 'package:treino/core/analytics/analytics_service.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/workout/application/routine_providers.dart';
@@ -36,6 +37,9 @@ Widget _wrapWithOverrides(Widget w, List<Override> overrides) => ProviderScope(
       overrides: overrides,
       child: MaterialApp(
         theme: AppTheme.dark(),
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+        locale: const Locale('es', 'AR'),
         home: Scaffold(body: w),
       ),
     );
@@ -487,6 +491,9 @@ void main() {
         ],
         child: MaterialApp.router(
           theme: AppTheme.dark(),
+          localizationsDelegates: AppL10n.localizationsDelegates,
+          supportedLocales: AppL10n.supportedLocales,
+          locale: const Locale('es', 'AR'),
           routerConfig: router,
         ),
       ));
@@ -533,6 +540,9 @@ void main() {
         ],
         child: MaterialApp.router(
           theme: AppTheme.dark(),
+          localizationsDelegates: AppL10n.localizationsDelegates,
+          supportedLocales: AppL10n.supportedLocales,
+          locale: const Locale('es', 'AR'),
           routerConfig: router,
         ),
       ));
@@ -581,6 +591,9 @@ void main() {
         ],
         child: MaterialApp.router(
           theme: AppTheme.dark(),
+          localizationsDelegates: AppL10n.localizationsDelegates,
+          supportedLocales: AppL10n.supportedLocales,
+          locale: const Locale('es', 'AR'),
           routerConfig: router,
         ),
       ));
@@ -633,6 +646,9 @@ void main() {
         ],
         child: MaterialApp.router(
           theme: AppTheme.dark(),
+          localizationsDelegates: AppL10n.localizationsDelegates,
+          supportedLocales: AppL10n.supportedLocales,
+          locale: const Locale('es', 'AR'),
           routerConfig: router,
         ),
       ));

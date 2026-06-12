@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/widgets/treino_icon.dart';
+import '../../../../l10n/app_l10n.dart';
 import '../../../auth/application/auth_providers.dart';
 import '../../../feed/application/friendship_providers.dart';
 import '../../../feed/domain/gym_name.dart';
@@ -26,6 +27,7 @@ class ProfileCuentaSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppL10n.of(context);
     final myUid = ref.watch(authStateChangesProvider).valueOrNull?.uid;
     final profileAsync = ref.watch(userProfileProvider);
     final requestCount = ref.watch(pendingRequestCountProvider(myUid ?? ''));
@@ -37,19 +39,18 @@ class ProfileCuentaSection extends ConsumerWidget {
     final routinesCount = ref.watch(assignedRoutinesCountProvider(myUid ?? ''));
 
     final solicitudesSubtitle = requestCount > 0
-        ? '$requestCount nuevas'
-        : null; // i18n: Fase 6 Etapa 3
-    final gymSubtitle = gymId == null
-        ? 'Sin gym' // i18n: Fase 6 Etapa 3
-        : gymNameFromId(gymId);
+        ? l10n.profileCuentaSolicitudesSubtitle(requestCount)
+        : null;
+    final gymSubtitle =
+        gymId == null ? l10n.profileCuentaNoGym : gymNameFromId(gymId);
 
     return ProfileSectionGroup(
-      title: 'CUENTA', // i18n: Fase 6 Etapa 3
+      title: l10n.profileCuentaTitle,
       tiles: [
         // 1. Solicitudes de amistad
         ProfileSectionTile(
           icon: TreinoIcon.users,
-          title: 'Solicitudes de amistad', // i18n: Fase 6 Etapa 3
+          title: l10n.profileCuentaSolicitudesTitle,
           subtitle: solicitudesSubtitle,
           inGroup: true,
           onTap: () => context.push('/profile/friend-requests'),
@@ -58,8 +59,8 @@ class ProfileCuentaSection extends ConsumerWidget {
         // 2. Datos personales
         ProfileSectionTile(
           icon: TreinoIcon.edit,
-          title: 'Datos personales', // i18n: Fase 6 Etapa 3
-          subtitle: 'Editá tu info', // i18n: Fase 6 Etapa 3
+          title: l10n.profileCuentaDatosPersonalesTitle,
+          subtitle: l10n.profileCuentaDatosPersonalesSubtitle,
           inGroup: true,
           onTap: () => context.push('/profile/edit-personal'),
         ),
@@ -67,7 +68,7 @@ class ProfileCuentaSection extends ConsumerWidget {
         // 3. Gimnasio
         ProfileSectionTile(
           icon: TreinoIcon.gym,
-          title: 'Gimnasio', // i18n: Fase 6 Etapa 3
+          title: l10n.profileCuentaGimnasioTitle,
           subtitle: gymSubtitle,
           inGroup: true,
           onTap: () => context.push('/profile/gym'),
@@ -76,8 +77,8 @@ class ProfileCuentaSection extends ConsumerWidget {
         // 4. Mis rutinas
         ProfileSectionTile(
           icon: TreinoIcon.dumbbell,
-          title: 'Mis rutinas', // i18n: Fase 6 Etapa 3
-          subtitle: '$routinesCount activas', // i18n: Fase 6 Etapa 3
+          title: l10n.profileCuentaMisRutinasTitle,
+          subtitle: l10n.profileCuentaRutinasSubtitle(routinesCount),
           inGroup: true,
           onTap: () => context.push('/profile/routines'),
         ),

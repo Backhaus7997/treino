@@ -9,7 +9,7 @@ import '../../gyms/application/gym_providers.dart';
 import '../../gyms/domain/gym.dart';
 import '../application/trainer_discovery_providers.dart';
 import '../domain/trainer_location.dart';
-import 'coach_strings.dart';
+import '../../../l10n/app_l10n.dart';
 import 'widgets/location_permission_rationale_sheet.dart';
 import 'widgets/trainer_advanced_filter_chips.dart';
 import 'widgets/trainer_compact_filter_row.dart';
@@ -362,7 +362,7 @@ class _EmptyState extends StatelessWidget {
       padding: const EdgeInsets.all(24),
       child: Center(
         child: Text(
-          CoachStrings.emptyLabel,
+          AppL10n.of(context).coachEmptyLabel,
           textAlign: TextAlign.center,
           style: TextStyle(color: palette.textMuted),
         ),
@@ -385,14 +385,14 @@ class _ErrorState extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              CoachStrings.errorLabel,
+              AppL10n.of(context).coachErrorLabel,
               textAlign: TextAlign.center,
               style: TextStyle(color: palette.textMuted),
             ),
             const SizedBox(height: 12),
             TextButton(
               onPressed: onRetry,
-              child: const Text(CoachStrings.retryLabel),
+              child: Text(AppL10n.of(context).coachRetryLabel),
             ),
           ],
         ),

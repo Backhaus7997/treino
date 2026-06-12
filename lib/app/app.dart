@@ -93,7 +93,8 @@ class _TreinoAppState extends ConsumerState<TreinoApp> {
         ),
         duration: const Duration(seconds: 4),
         action: SnackBarAction(
-          label: 'Ver', // i18n: Fase 6 Etapa 2
+          label:
+              ctx != null ? AppL10n.of(ctx).appFcmSnackBarActionLabel : 'Ver',
           onPressed: () {
             if (ctx == null || !ctx.mounted) return;
             goDeepLink(ctx, deepLink);

@@ -129,4 +129,28 @@ class TreinoIcon {
   static const IconData equipCardio = PhosphorIconsRegular.heartbeat;
   static const IconData equipOther = PhosphorIconsRegular.shapes;
   static const IconData equipNone = PhosphorIconsRegular.minus;
+
+  // Sidebar — Coach Hub Web (Fase W1). Aliases per ADR-CHW-007. Items que
+  // reusan un alias existente apuntan a la const de esta clase para mantener
+  // una sola fuente de verdad; el resto mapea a su variante phosphor.
+  static const IconData sidebarDashboard = PhosphorIconsRegular.squaresFour;
+  static const IconData sidebarActividad = bell;
+  static const IconData sidebarAgenda = calendar;
+  static const IconData sidebarAlumnos = users;
+  static const IconData sidebarInvitaciones = mail;
+  static const IconData sidebarCuestionario =
+      PhosphorIconsRegular.clipboardText;
+  static const IconData sidebarRutinas = dumbbell;
+  static const IconData sidebarPlanner = PhosphorIconsRegular.calendarBlank;
+  static const IconData sidebarBiblioteca = PhosphorIconsRegular.bookOpen;
+  static const IconData sidebarTemplates = PhosphorIconsRegular.fileText;
+  static const IconData sidebarNutricion = PhosphorIconsRegular.appleLogo;
+  static const IconData sidebarRecetas = PhosphorIconsRegular.cookingPot;
+  static const IconData sidebarSuplementos = PhosphorIconsRegular.pill;
+  static const IconData sidebarHabitos = PhosphorIconsRegular.checkSquare;
+  static const IconData sidebarPagos = PhosphorIconsRegular.creditCard;
+  static const IconData sidebarPlanes = PhosphorIconsRegular.storefront;
+  static const IconData sidebarReportes = PhosphorIconsRegular.chartLine;
+  static const IconData sidebarChat = chat;
+  static const IconData sidebarAjustes = PhosphorIconsRegular.gear;
 }

@@ -7,7 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/coach/presentation/athlete_detail_screen.dart';
-import 'package:treino/features/coach/presentation/coach_strings.dart';
+import 'package:treino/l10n/app_l10n.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/features/workout/application/assigned_routine_providers.dart';
@@ -80,6 +80,9 @@ Future<void> _pumpScreen(
       overrides: overrides,
       child: MaterialApp.router(
         theme: AppTheme.dark(),
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+        locale: const Locale('es', 'AR'),
         routerConfig: router,
       ),
     ),
@@ -112,9 +115,9 @@ void main() {
       // Athlete name in header (appears in AppBar title and in body header)
       expect(find.text('Martín García'), findsWidgets);
       // Empty state text
-      expect(find.text(CoachStrings.athleteDetailNoPlans), findsOneWidget);
+      expect(find.text('Todavía no le asignaste planes.'), findsOneWidget);
       // CREAR PLAN button
-      expect(find.text(CoachStrings.createPlanCta), findsOneWidget);
+      expect(find.text('CREAR PLAN'), findsOneWidget);
     });
 
     testWidgets(
@@ -154,7 +157,7 @@ void main() {
       expect(find.text('Plan Hipertrofia'), findsOneWidget);
       expect(find.text('Plan Otro PF'), findsNothing);
       // No empty state because trainer has plans
-      expect(find.text(CoachStrings.athleteDetailNoPlans), findsNothing);
+      expect(find.text('Todavía no le asignaste planes.'), findsNothing);
     });
 
     testWidgets(
@@ -176,7 +179,7 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text(CoachStrings.createPlanCta));
+      await tester.tap(find.text('CREAR PLAN'));
       await tester.pumpAndSettle();
 
       expect(find.text('RoutineEditor:athlete-1'), findsOneWidget);

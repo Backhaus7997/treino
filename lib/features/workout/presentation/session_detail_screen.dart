@@ -11,7 +11,7 @@ import '../domain/session.dart';
 import '../domain/set_log.dart';
 import 'utils/date_helpers.dart';
 import 'widgets/stat_tile.dart';
-import 'workout_strings.dart';
+import '../../../l10n/app_l10n.dart';
 
 class SessionDetailScreen extends ConsumerWidget {
   const SessionDetailScreen({super.key, required this.sessionId});
@@ -63,6 +63,7 @@ class _DetailLoaded extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
 
     // Group setLogs by exerciseName preserving first-appearance order.
     // Map literal {} creates a LinkedHashMap in Dart — insertion order preserved.
@@ -131,20 +132,20 @@ class _DetailLoaded extends StatelessWidget {
             childAspectRatio: 2,
             children: [
               StatTile(
-                label: WorkoutStrings.detailStatDuration,
+                label: l10n.workoutDetailStatDuration,
                 value: session.durationMin.toString(),
               ),
               StatTile(
-                label: WorkoutStrings.detailStatSets,
+                label: l10n.workoutDetailStatSets,
                 value: setLogs.length.toString(),
               ),
               StatTile(
-                label: WorkoutStrings.detailStatVolume,
+                label: l10n.workoutDetailStatVolume,
                 value: session.totalVolumeKg.toString(),
               ),
-              const StatTile(
-                label: WorkoutStrings.detailStatPrsToday,
-                value: WorkoutStrings.statPrsTodayStub,
+              StatTile(
+                label: l10n.workoutDetailStatPrsToday,
+                value: l10n.workoutStatPrsTodayStub,
               ),
             ],
           ),
@@ -253,7 +254,7 @@ class _PrBadgeStub extends StatelessWidget {
         border: Border.all(color: palette.accent.withValues(alpha: 0.4)),
       ),
       child: Text(
-        WorkoutStrings.detailPrBadge,
+        AppL10n.of(context).workoutDetailPrBadge,
         style: TextStyle(
           fontSize: 10,
           fontWeight: FontWeight.w700,
@@ -272,15 +273,16 @@ class _DetailNotFound extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppL10n.of(context);
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text(WorkoutStrings.notFoundTitle),
+          Text(l10n.workoutNotFoundTitle),
           const SizedBox(height: 16),
           FilledButton(
             onPressed: () => context.go('/workout'),
-            child: const Text(WorkoutStrings.buttonBackToWorkout),
+            child: Text(l10n.workoutButtonBackToWorkout),
           ),
         ],
       ),
@@ -296,15 +298,16 @@ class _DetailError extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppL10n.of(context);
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text(WorkoutStrings.errorTitle),
+          Text(l10n.workoutErrorTitle),
           const SizedBox(height: 16),
           FilledButton(
             onPressed: onRetry,
-            child: const Text(WorkoutStrings.buttonRetry),
+            child: Text(l10n.workoutButtonRetry),
           ),
         ],
       ),

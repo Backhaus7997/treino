@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
+import '../../../../l10n/app_l10n.dart';
 import '../../application/review_notifier.dart';
 import '../../domain/review.dart';
 import 'star_rating_input.dart';
@@ -108,8 +109,8 @@ class _ReviewBottomSheetState extends ConsumerState<ReviewBottomSheet> {
     } else {
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('¡Gracias por tu reseña!'), // i18n: Fase 6 Etapa 7
+        SnackBar(
+          content: Text(AppL10n.of(context).reviewSnackBarSuccess),
         ),
       );
     }

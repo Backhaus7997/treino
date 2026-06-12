@@ -8,7 +8,7 @@ import '../../../feed/presentation/widgets/post_avatar.dart';
 import '../../application/trainer_discovery_providers.dart';
 import '../../domain/trainer_public_profile.dart';
 import '../../domain/trainer_specialty.dart';
-import '../coach_strings.dart';
+import '../../../../l10n/app_l10n.dart';
 
 /// Bottom sheet con carousel horizontal de trainer cards.
 ///
@@ -231,6 +231,7 @@ class _TrainerMapCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     final specialty = trainer.trainerSpecialty;
     final rate = trainer.trainerMonthlyRate;
 
@@ -291,7 +292,7 @@ class _TrainerMapCard extends StatelessWidget {
             const Spacer(),
             if (rate != null)
               Text(
-                '\$$rate${CoachStrings.monthlyRateUnit}',
+                '\$$rate${l10n.coachMonthlyRateUnit}',
                 style: GoogleFonts.barlowCondensed(
                   fontWeight: FontWeight.w700,
                   fontSize: 14,

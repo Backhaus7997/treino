@@ -16,7 +16,7 @@ import 'package:treino/features/workout/domain/routine_source.dart';
 import 'package:treino/features/workout/domain/routine_visibility.dart';
 import 'package:treino/features/workout/presentation/routine_detail_screen.dart';
 import 'package:treino/features/profile/domain/experience_level.dart';
-import 'package:treino/features/coach/presentation/coach_strings.dart';
+import 'package:treino/l10n/app_l10n.dart';
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -74,6 +74,9 @@ Widget _wrapWithOverrides(Widget w, List<Override> overrides) => ProviderScope(
       overrides: overrides,
       child: MaterialApp(
         theme: AppTheme.dark(),
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+        locale: const Locale('es', 'AR'),
         home: Scaffold(body: w),
       ),
     );
@@ -104,7 +107,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        find.text('${CoachStrings.assignedByPrefix}Lucas Pérez'),
+        find.text('${'Asignado por '}Lucas Pérez'),
         findsOneWidget,
       );
     });
@@ -128,7 +131,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        find.textContaining(CoachStrings.assignedByPrefix),
+        find.textContaining('Asignado por '),
         findsNothing,
       );
     });

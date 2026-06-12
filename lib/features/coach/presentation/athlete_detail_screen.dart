@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
-import '../../workout/presentation/workout_strings.dart';
+import '../../../l10n/app_l10n.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../chat/application/chat_providers.dart';
 import '../../measurements/application/measurement_providers.dart';
@@ -25,7 +25,6 @@ import '../../workout/application/routine_providers.dart'
 import '../../workout/application/session_providers.dart'
     show currentUidProvider;
 import '../../workout/domain/routine.dart';
-import 'coach_strings.dart';
 
 /// Trainer's drill-down view for a specific athlete.
 ///
@@ -123,7 +122,7 @@ class _AthleteDetailBody extends ConsumerWidget {
     if (profileAsync.hasError) {
       return Center(
         child: Text(
-          'No pudimos cargar este perfil.',
+          AppL10n.of(context).athleteDetailProfileLoadError,
           style: GoogleFonts.barlow(color: palette.textMuted, fontSize: 14),
         ),
       );
@@ -170,7 +169,7 @@ class _AthleteDetailBody extends ConsumerWidget {
 
               // ── Planes section ──────────────────────────────────────
               Text(
-                'PLANES ASIGNADOS',
+                AppL10n.of(context).athleteDetailPlansSection,
                 style: GoogleFonts.barlowCondensed(
                   fontWeight: FontWeight.w700,
                   fontSize: 12,
@@ -181,7 +180,7 @@ class _AthleteDetailBody extends ConsumerWidget {
               const SizedBox(height: 12),
               if (myPlans.isEmpty)
                 Text(
-                  CoachStrings.athleteDetailNoPlans,
+                  AppL10n.of(context).coachAthleteDetailNoPlans,
                   style: GoogleFonts.barlow(
                     fontWeight: FontWeight.w400,
                     fontSize: 14,
@@ -240,7 +239,7 @@ class _AthleteDetailBody extends ConsumerWidget {
                   ),
                   icon: Icon(TreinoIcon.chat, size: 18, color: palette.accent),
                   label: Text(
-                    'MENSAJE',
+                    AppL10n.of(context).athleteDetailMessageCta,
                     style: GoogleFonts.barlowCondensed(
                       fontWeight: FontWeight.w700,
                       fontSize: 13,
@@ -264,7 +263,7 @@ class _AthleteDetailBody extends ConsumerWidget {
                     ),
                   ),
                   child: Text(
-                    CoachStrings.createPlanCta,
+                    AppL10n.of(context).coachCreatePlanCta,
                     style: GoogleFonts.barlowCondensed(
                       fontWeight: FontWeight.w700,
                       fontSize: 14,
@@ -310,7 +309,7 @@ class _AthleteDetailBody extends ConsumerWidget {
       builder: (ctx) => AlertDialog(
         backgroundColor: palette.bgCard,
         title: Text(
-          'Eliminar plan',
+          AppL10n.of(context).athleteDetailPlanDeleteTitle,
           style: GoogleFonts.barlowCondensed(
             fontWeight: FontWeight.w700,
             color: palette.textPrimary,
@@ -324,14 +323,14 @@ class _AthleteDetailBody extends ConsumerWidget {
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
             child: Text(
-              'Cancelar',
+              AppL10n.of(context).athleteDetailPlanDeleteCancel,
               style: GoogleFonts.barlowCondensed(color: palette.textMuted),
             ),
           ),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(true),
             child: Text(
-              'Eliminar',
+              AppL10n.of(context).athleteDetailPlanDeleteConfirm,
               style: GoogleFonts.barlowCondensed(
                 fontWeight: FontWeight.w700,
                 color: palette.danger,
@@ -347,7 +346,8 @@ class _AthleteDetailBody extends ConsumerWidget {
       ref.invalidate(assignedRoutinesProvider(athleteId));
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Plan eliminado.')),
+        SnackBar(
+            content: Text(AppL10n.of(context).athleteDetailPlanDeleteSuccess)),
       );
     } catch (_) {
       if (!context.mounted) return;
@@ -1518,7 +1518,7 @@ class _PlanCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '${plan.days.length} ${plan.days.length == 1 ? "día" : "días"} · ${plan.split ?? WorkoutStrings.splitFallback}',
+                    '${plan.days.length} ${plan.days.length == 1 ? "día" : "días"} · ${plan.split ?? AppL10n.of(context).workoutSplitFallback}',
                     style: GoogleFonts.barlow(
                       fontWeight: FontWeight.w400,
                       fontSize: 12,

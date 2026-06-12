@@ -7,7 +7,7 @@ import '../../application/session_providers.dart';
 import '../../domain/session.dart';
 import '../../domain/session_status.dart';
 import '../utils/date_helpers.dart';
-import '../workout_strings.dart';
+import '../../../../l10n/app_l10n.dart';
 import '../../../../core/widgets/treino_icon.dart';
 
 /// Displays the list of finished workout sessions for the current user.
@@ -27,6 +27,7 @@ class _HistorialSectionState extends ConsumerState<HistorialSection> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppL10n.of(context);
     final theme = Theme.of(context);
     final uid = ref.watch(currentUidProvider) ?? '';
 
@@ -36,7 +37,7 @@ class _HistorialSectionState extends ConsumerState<HistorialSection> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          WorkoutStrings.historialHeading,
+          l10n.workoutHistorialHeading,
           style: theme.textTheme.titleMedium,
         ),
         const SizedBox(height: 12),
@@ -54,7 +55,7 @@ class _HistorialSectionState extends ConsumerState<HistorialSection> {
               return const _ListEmptyState();
             }
 
-            const limit = WorkoutStrings.historialCollapsedLimit;
+            const limit = 5; // historialCollapsedLimit
             final overflow = completed.length > limit;
             final visible = (overflow && !_expanded)
                 ? completed.take(limit).toList()
@@ -118,7 +119,7 @@ class _ListErrorState extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            WorkoutStrings.historialErrorMessage,
+            AppL10n.of(context).workoutHistorialErrorMessage,
             style: theme.textTheme.bodyMedium?.copyWith(
               color: palette.textMuted,
             ),
@@ -126,7 +127,7 @@ class _ListErrorState extends StatelessWidget {
           const SizedBox(height: 8),
           TextButton(
             onPressed: onRetry,
-            child: const Text(WorkoutStrings.historialErrorRetry),
+            child: Text(AppL10n.of(context).workoutHistorialErrorRetry),
           ),
         ],
       ),
@@ -149,7 +150,7 @@ class _ListEmptyState extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            WorkoutStrings.historialEmptyMessage,
+            AppL10n.of(context).workoutHistorialEmptyMessage,
             style: theme.textTheme.bodyMedium?.copyWith(
               color: palette.textMuted,
             ),
@@ -157,7 +158,7 @@ class _ListEmptyState extends StatelessWidget {
           const SizedBox(height: 8),
           TextButton(
             onPressed: () => context.go('/workout'),
-            child: const Text(WorkoutStrings.historialEmptyCta),
+            child: Text(AppL10n.of(context).workoutHistorialEmptyCta),
           ),
         ],
       ),
@@ -209,14 +210,14 @@ class _HistorialCard extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             Text(
-              '${session.totalVolumeKg}${WorkoutStrings.historialCardKgSuffix}',
+              '${session.totalVolumeKg}${AppL10n.of(context).workoutHistorialCardKgSuffix}',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: palette.textMuted,
               ),
             ),
             const SizedBox(width: 8),
             Text(
-              '${session.durationMin}${WorkoutStrings.historialCardMinSuffix}',
+              '${session.durationMin}${AppL10n.of(context).workoutHistorialCardMinSuffix}',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: palette.textMuted,
               ),
@@ -256,9 +257,10 @@ class _ExpandToggle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     final label = expanded
-        ? WorkoutStrings.historialShowLess
-        : WorkoutStrings.historialShowMore(hiddenCount);
+        ? l10n.workoutHistorialShowLess
+        : l10n.workoutHistorialShowMore(hiddenCount);
     final icon = expanded ? TreinoIcon.chevronUp : TreinoIcon.chevronDown;
 
     return Center(

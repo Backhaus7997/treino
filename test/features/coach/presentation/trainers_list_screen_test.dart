@@ -4,12 +4,16 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/coach/application/trainer_discovery_providers.dart';
 import 'package:treino/features/coach/presentation/trainers_list_screen.dart';
+import 'package:treino/l10n/app_l10n.dart';
 
 Widget _wrap(Widget child, {List<Override> overrides = const []}) =>
     ProviderScope(
       overrides: overrides,
       child: MaterialApp(
         theme: AppTheme.dark(),
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+        locale: const Locale('es', 'AR'),
         home: child,
       ),
     );
@@ -92,6 +96,9 @@ void main() {
             container = ProviderScope.containerOf(ctx);
             return MaterialApp(
               theme: AppTheme.dark(),
+              localizationsDelegates: AppL10n.localizationsDelegates,
+              supportedLocales: AppL10n.supportedLocales,
+              locale: const Locale('es', 'AR'),
               home: const TrainersListScreen(),
             );
           }),
@@ -134,6 +141,9 @@ void main() {
             container = ProviderScope.containerOf(ctx);
             return MaterialApp(
               theme: AppTheme.dark(),
+              localizationsDelegates: AppL10n.localizationsDelegates,
+              supportedLocales: AppL10n.supportedLocales,
+              locale: const Locale('es', 'AR'),
               home: const TrainersListScreen(),
             );
           }),
@@ -173,6 +183,9 @@ void main() {
             container = ProviderScope.containerOf(ctx);
             return MaterialApp(
               theme: AppTheme.dark(),
+              localizationsDelegates: AppL10n.localizationsDelegates,
+              supportedLocales: AppL10n.supportedLocales,
+              locale: const Locale('es', 'AR'),
               home: const TrainersListScreen(),
             );
           }),
@@ -207,6 +220,9 @@ void main() {
             container = ProviderScope.containerOf(ctx);
             return MaterialApp(
               theme: AppTheme.dark(),
+              localizationsDelegates: AppL10n.localizationsDelegates,
+              supportedLocales: AppL10n.supportedLocales,
+              locale: const Locale('es', 'AR'),
               home: const TrainersListScreen(),
             );
           }),

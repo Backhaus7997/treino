@@ -7,7 +7,7 @@ import '../../../../app/theme/app_palette.dart';
 import '../../../coach/application/trainer_link_providers.dart';
 import '../../../coach/domain/trainer_link.dart';
 import '../../../coach/domain/trainer_link_status.dart';
-import '../../../coach/presentation/coach_strings.dart';
+import '../../../../l10n/app_l10n.dart';
 import '../../../profile/application/user_public_profile_providers.dart';
 import '../../application/assigned_routine_providers.dart';
 import '../../application/session_providers.dart' show currentUidProvider;
@@ -34,7 +34,7 @@ class MiPlanSection extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          CoachStrings.miPlanTitle,
+          AppL10n.of(context).coachMiPlanTitle,
           style: theme.textTheme.titleMedium,
         ),
         const SizedBox(height: 12),
@@ -101,6 +101,7 @@ class _SectionErrorState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 12),
@@ -108,7 +109,7 @@ class _SectionErrorState extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            CoachStrings.miPlanError,
+            l10n.coachMiPlanError,
             style: theme.textTheme.bodyMedium?.copyWith(
               color: palette.textMuted,
             ),
@@ -145,11 +146,12 @@ class _SectionEmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 12),
       child: Text(
-        CoachStrings.miPlanEmpty,
+        l10n.coachMiPlanEmpty,
         style: theme.textTheme.bodyMedium?.copyWith(color: palette.textMuted),
       ),
     );
@@ -270,7 +272,7 @@ class _ActualChip extends StatelessWidget {
         border: Border.all(color: palette.accent.withValues(alpha: 0.5)),
       ),
       child: Text(
-        CoachStrings.miPlanCurrent.toUpperCase(),
+        AppL10n.of(context).coachMiPlanCurrent.toUpperCase(),
         style: GoogleFonts.barlowCondensed(
           fontWeight: FontWeight.w700,
           fontSize: 11,
@@ -296,7 +298,7 @@ class _FinalizadoChip extends StatelessWidget {
         border: Border.all(color: palette.highlight.withValues(alpha: 0.4)),
       ),
       child: Text(
-        CoachStrings.miPlanFinalizado,
+        AppL10n.of(context).coachMiPlanFinalizado,
         style: GoogleFonts.barlowCondensed(
           fontWeight: FontWeight.w600,
           fontSize: 11,

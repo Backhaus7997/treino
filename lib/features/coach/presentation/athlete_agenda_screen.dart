@@ -8,8 +8,8 @@ import '../../../core/widgets/treino_icon.dart';
 import '../../profile/application/user_public_profile_providers.dart';
 import '../application/agenda_providers.dart';
 import '../domain/appointment.dart';
+import '../../../l10n/app_l10n.dart';
 import 'agenda_formatters.dart';
-import 'agenda_strings.dart';
 
 /// Full-screen route for the athlete's agenda view — READ-ONLY.
 ///
@@ -45,6 +45,7 @@ class _AthleteAgendaScreenState extends ConsumerState<AthleteAgendaScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppL10n.of(context);
     final palette = AppPalette.of(context);
 
     final appointmentsAsync =
@@ -59,7 +60,7 @@ class _AthleteAgendaScreenState extends ConsumerState<AthleteAgendaScreen> {
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: Text(
-          AgendaStrings.agendaScreenTitle,
+          l10n.agendaScreenTitle,
           style: GoogleFonts.barlowCondensed(
             fontWeight: FontWeight.w700,
             fontSize: 20,
@@ -121,7 +122,7 @@ class _AthleteAgendaScreenState extends ConsumerState<AthleteAgendaScreen> {
         // ── Upcoming sessions list ────────────────────────────────────────────
         if (upcoming.isNotEmpty) ...[
           Text(
-            AgendaStrings.upcomingAppointmentsHeading,
+            AppL10n.of(context).agendaUpcomingAppointmentsHeading,
             style: GoogleFonts.barlowCondensed(
               fontWeight: FontWeight.w700,
               fontSize: 13,
@@ -173,7 +174,7 @@ class _AthleteAgendaScreenState extends ConsumerState<AthleteAgendaScreen> {
 
   Widget _errorState(BuildContext context, AppPalette palette) => Center(
         child: Text(
-          AgendaStrings.genericError,
+          AppL10n.of(context).agendaGenericError,
           style: GoogleFonts.barlow(fontSize: 14, color: palette.textMuted),
         ),
       );

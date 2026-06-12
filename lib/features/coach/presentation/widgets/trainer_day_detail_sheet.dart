@@ -11,8 +11,8 @@ import '../../application/agenda_providers.dart';
 import '../../domain/appointment.dart';
 import '../../domain/availability_override.dart';
 import '../../domain/compute_free_slots.dart';
+import '../../../../l10n/app_l10n.dart';
 import '../agenda_formatters.dart';
-import '../agenda_strings.dart';
 import 'session_detail_sheet.dart';
 
 /// Slot state from the trainer's perspective.
@@ -229,7 +229,7 @@ class _BlockedState extends StatelessWidget {
       child: Row(
         children: [
           _SlotChip(
-            label: AgendaStrings.slotBlockedLabel,
+            label: AppL10n.of(context).agendaSlotBlockedLabel,
             color: palette.textMuted,
             backgroundColor: palette.bgCard,
             borderColor: palette.border,
@@ -305,7 +305,7 @@ class _SlotList extends StatelessWidget {
 
       case _SlotState.blocked:
         return _SlotChip(
-          label: AgendaStrings.slotBlockedLabel,
+          label: AppL10n.of(context).agendaSlotBlockedLabel,
           color: palette.textMuted,
           backgroundColor: palette.bgCard,
           borderColor: palette.border,

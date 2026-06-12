@@ -18,10 +18,10 @@ import '../reviews/application/review_providers.dart';
 import '../reviews/domain/review.dart';
 import '../reviews/presentation/widgets/review_bottom_sheet.dart';
 import 'application/trainer_discovery_providers.dart' show trainerByIdProvider;
+import '../../l10n/app_l10n.dart';
 import 'application/trainer_link_providers.dart';
 import 'domain/trainer_link.dart';
 import 'domain/trainer_link_status.dart';
-import 'presentation/agenda_strings.dart';
 import 'presentation/trainers_list_screen.dart';
 
 /// Tab Coach del atleta. Combina la discovery (Dev A, Etapa 2) con el
@@ -100,7 +100,7 @@ class _AthleteCoachViewState extends ConsumerState<AthleteCoachView> {
     final trainerPub =
         ref.read(userPublicProfileProvider(link.trainerId)).valueOrNull;
     final trainerName = trainerPub?.displayName ??
-        'tu Personal Trainer'; // i18n: Fase 6 Etapa 7
+        AppL10n.of(context).athleteCoachViewTrainerFallbackName;
 
     await showModalBottomSheet<void>(
       context: context,
@@ -144,7 +144,7 @@ class _AthleteCoachViewState extends ConsumerState<AthleteCoachView> {
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Text(
-            'No pudimos cargar tu vínculo.',
+            AppL10n.of(context).athleteCoachViewLinkError,
             style: GoogleFonts.barlow(fontSize: 14, color: palette.textMuted),
             textAlign: TextAlign.center,
           ),
@@ -413,7 +413,7 @@ class _ActionRow extends ConsumerWidget {
     final trainerPub =
         container.read(userPublicProfileProvider(trainerId)).valueOrNull;
     final trainerName = trainerPub?.displayName ??
-        'tu Personal Trainer'; // i18n: Fase 6 Etapa 7
+        AppL10n.of(context).athleteCoachViewTrainerFallbackName;
 
     // Resolve existing review before await so we have it for the sheet.
     final reviewKey = '$linkId:$athleteId';
@@ -580,6 +580,7 @@ class _AgendaButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppL10n.of(context);
     final palette = AppPalette.of(context);
     return SizedBox(
       width: double.infinity,
@@ -595,7 +596,7 @@ class _AgendaButton extends StatelessWidget {
         ),
         icon: Icon(TreinoIcon.tabWorkout, size: 18, color: palette.accent),
         label: Text(
-          AgendaStrings.agendaButtonLabel,
+          l10n.agendaButtonLabel,
           style: GoogleFonts.barlowCondensed(
             fontWeight: FontWeight.w700,
             fontSize: 13,

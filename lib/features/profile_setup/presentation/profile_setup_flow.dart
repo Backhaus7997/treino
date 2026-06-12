@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../app/theme/app_background.dart';
 import '../../../app/theme/app_palette.dart';
+import '../../../l10n/app_l10n.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../auth/application/auth_providers.dart';
 import '../application/profile_setup_notifier.dart';
@@ -60,9 +61,9 @@ class _ProfileSetupFlowState extends ConsumerState<ProfileSetupFlow> {
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No pudimos guardar tu perfil. Probá de nuevo.'),
-          duration: Duration(seconds: 3),
+        SnackBar(
+          content: Text(AppL10n.of(context).profileSetupSaveError),
+          duration: const Duration(seconds: 3),
         ),
       );
       return;
@@ -84,9 +85,9 @@ class _ProfileSetupFlowState extends ConsumerState<ProfileSetupFlow> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: palette.bgCard,
-        title: const Text('¿Cancelar la creación de tu cuenta?'),
-        content: const Text(
-          'Vamos a borrar tu cuenta. Esta acción no se puede deshacer.',
+        title: Text(AppL10n.of(context).profileSetupCancelDialogTitle),
+        content: Text(
+          AppL10n.of(context).profileSetupCancelDialogBody,
         ),
         actions: [
           TextButton(
@@ -113,9 +114,9 @@ class _ProfileSetupFlowState extends ConsumerState<ProfileSetupFlow> {
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No pudimos cancelar la cuenta. Probá de nuevo.'),
-          duration: Duration(seconds: 3),
+        SnackBar(
+          content: Text(AppL10n.of(context).profileSetupCancelAccountError),
+          duration: const Duration(seconds: 3),
         ),
       );
     }

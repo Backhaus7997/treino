@@ -10,6 +10,7 @@ import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/presentation/widgets/level_filter_pills.dart';
 import 'package:treino/features/workout/presentation/widgets/plantillas_section.dart';
 import 'package:treino/features/workout/presentation/widgets/routine_card.dart';
+import 'package:treino/l10n/app_l10n.dart';
 
 Routine makeRoutine({
   String id = 'test-id',
@@ -32,6 +33,9 @@ Widget _wrap(
       overrides: overrides,
       child: MaterialApp(
         theme: AppTheme.dark(),
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+        locale: const Locale('es', 'AR'),
         home: Scaffold(
           body: SizedBox(
             height: 800,

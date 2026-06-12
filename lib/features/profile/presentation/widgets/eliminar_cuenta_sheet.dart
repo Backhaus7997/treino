@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/features/auth/domain/auth_failure.dart';
 import 'package:treino/features/profile/application/account_deletion_notifier.dart';
+import 'package:treino/l10n/app_l10n.dart';
 
 /// Destructive confirmation bottom sheet for account deletion (Fase 6 Etapa 3).
 ///
@@ -46,9 +47,10 @@ class EliminarCuentaSheet extends ConsumerWidget {
 
         next.whenOrNull(
           error: (e, _) {
+            final l10n = AppL10n.of(context);
             final message = e is AuthFailure
                 ? e.userMessage
-                : 'No pudimos eliminar tu cuenta. Probá de nuevo.'; // i18n: Fase 6 Etapa 3
+                : l10n.eliminarCuentaSheetErrorFallback;
 
             final messenger = ScaffoldMessenger.of(context);
             messenger.hideCurrentSnackBar();
@@ -58,7 +60,7 @@ class EliminarCuentaSheet extends ConsumerWidget {
                 behavior: SnackBarBehavior.floating,
                 duration: const Duration(seconds: 6),
                 action: SnackBarAction(
-                  label: 'Reintentar', // i18n: Fase 6 Etapa 3
+                  label: l10n.eliminarCuentaSheetRetryLabel,
                   onPressed: () {
                     messenger.hideCurrentSnackBar();
                     ref
@@ -97,7 +99,7 @@ class EliminarCuentaSheet extends ConsumerWidget {
                 ),
                 const SizedBox(height: 20),
                 Text(
-                  'Eliminar cuenta', // i18n: Fase 6 Etapa 3
+                  AppL10n.of(context).eliminarCuentaSheetTitle,
                   style: GoogleFonts.barlowCondensed(
                     fontWeight: FontWeight.w700,
                     fontSize: 20,
@@ -106,32 +108,28 @@ class EliminarCuentaSheet extends ConsumerWidget {
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 12),
-                RichText(
-                  textAlign: TextAlign.center,
-                  text: TextSpan(
-                    style: GoogleFonts.barlow(
-                      fontWeight: FontWeight.w400,
-                      fontSize: 14,
-                      color: palette.textMuted,
-                    ),
-                    children: const [
-                      TextSpan(
-                        // i18n: Fase 6 Etapa 3
-                        text: 'Esta acción es ',
+                Builder(
+                  builder: (context) {
+                    final l10n = AppL10n.of(context);
+                    return RichText(
+                      textAlign: TextAlign.center,
+                      text: TextSpan(
+                        style: GoogleFonts.barlow(
+                          fontWeight: FontWeight.w400,
+                          fontSize: 14,
+                          color: palette.textMuted,
+                        ),
+                        children: [
+                          TextSpan(text: l10n.eliminarCuentaSheetBodyPrefix),
+                          TextSpan(
+                            text: l10n.eliminarCuentaSheetBodyBold,
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                          TextSpan(text: l10n.eliminarCuentaSheetBodySuffix),
+                        ],
                       ),
-                      TextSpan(
-                        text: 'irreversible', // i18n: Fase 6 Etapa 3
-                        style: TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                      TextSpan(
-                        // i18n: Fase 6 Etapa 3
-                        text:
-                            '. Vamos a eliminar tu cuenta, tu perfil, tu historial '
-                            'de entrenamientos y tu foto. Tus posts van a quedar '
-                            'como "Usuario eliminado".',
-                      ),
-                    ],
-                  ),
+                    );
+                  },
                 ),
                 const SizedBox(height: 20),
                 ElevatedButton(
@@ -149,7 +147,7 @@ class EliminarCuentaSheet extends ConsumerWidget {
                     padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
                   child: Text(
-                    'ELIMINAR', // i18n: Fase 6 Etapa 3
+                    AppL10n.of(context).eliminarCuentaSheetDeleteCta,
                     style: GoogleFonts.barlowCondensed(
                       fontWeight: FontWeight.w700,
                       fontSize: 16,
@@ -162,7 +160,7 @@ class EliminarCuentaSheet extends ConsumerWidget {
                   onPressed:
                       isLoading ? null : () => Navigator.of(context).pop(),
                   child: Text(
-                    'CANCELAR', // i18n: Fase 6 Etapa 3
+                    AppL10n.of(context).eliminarCuentaSheetCancelCta,
                     style: GoogleFonts.barlowCondensed(
                       fontWeight: FontWeight.w700,
                       fontSize: 16,
@@ -186,7 +184,7 @@ class EliminarCuentaSheet extends ConsumerWidget {
                     CircularProgressIndicator(color: palette.accent),
                     const SizedBox(height: 18),
                     Text(
-                      'Eliminando tu cuenta...', // i18n: Fase 6 Etapa 3
+                      AppL10n.of(context).eliminarCuentaSheetLoadingLabel,
                       style: GoogleFonts.barlowCondensed(
                         fontWeight: FontWeight.w700,
                         fontSize: 18,
@@ -195,7 +193,7 @@ class EliminarCuentaSheet extends ConsumerWidget {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Esto puede tardar unos segundos.', // i18n: Fase 6 Etapa 3
+                      AppL10n.of(context).eliminarCuentaSheetLoadingSubtitle,
                       style: TextStyle(
                         fontSize: 14,
                         color: palette.textMuted,

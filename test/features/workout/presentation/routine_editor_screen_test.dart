@@ -10,7 +10,7 @@ import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/analytics/analytics_service.dart';
-import 'package:treino/features/coach/presentation/coach_strings.dart';
+import 'package:treino/l10n/app_l10n.dart';
 import 'package:treino/features/workout/application/custom_exercise_providers.dart';
 import 'package:treino/features/workout/application/exercise_providers.dart';
 import 'package:treino/features/workout/application/routine_providers.dart'
@@ -29,7 +29,6 @@ import 'package:treino/features/workout/domain/routine_status.dart';
 import 'package:treino/features/workout/domain/routine_visibility.dart';
 import 'package:treino/features/workout/presentation/routine_editor_mode.dart';
 import 'package:treino/features/workout/presentation/routine_editor_screen.dart';
-import 'package:treino/features/workout/presentation/workout_strings.dart';
 
 import '../../../helpers/fake_analytics_service.dart';
 
@@ -111,6 +110,9 @@ Future<void> _pumpEditorWithMode(
       overrides: overrides,
       child: MaterialApp.router(
         theme: AppTheme.dark(),
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+        locale: const Locale('es', 'AR'),
         routerConfig: router,
       ),
     ),
@@ -174,13 +176,13 @@ void main() {
       await tester.pumpAndSettle();
 
       // Title
-      expect(find.text(CoachStrings.editorTitle), findsOneWidget);
+      expect(find.text('Crear plan'), findsOneWidget);
       // Name field
-      expect(find.text(CoachStrings.editorNameLabel), findsOneWidget);
+      expect(find.text('NOMBRE'), findsOneWidget);
       // Split field
-      expect(find.text(CoachStrings.editorSplitLabel), findsOneWidget);
+      expect(find.text('SPLIT (e.g. PPL)'), findsOneWidget);
       // Submit button
-      expect(find.text(CoachStrings.editorSubmit), findsOneWidget);
+      expect(find.text('ASIGNAR PLAN'), findsOneWidget);
     });
 
     testWidgets(
@@ -196,7 +198,7 @@ void main() {
       // Starts with 1 day
       expect(find.text('Día 1'), findsWidgets);
       // Add slot button exists
-      expect(find.text(CoachStrings.editorAddSlot), findsOneWidget);
+      expect(find.text('Agregar ejercicio'), findsOneWidget);
     });
 
     testWidgets(
@@ -211,7 +213,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Do NOT fill any field — tap submit
-      await tester.tap(find.text(CoachStrings.editorSubmit));
+      await tester.tap(find.text('ASIGNAR PLAN'));
       await tester.pumpAndSettle();
 
       verifyNever(() => repo.createAssigned(any()));
@@ -234,11 +236,11 @@ void main() {
       await tester.pumpAndSettle();
 
       // Open the picker by tapping the add-slot button (adds a slot first)
-      await tester.tap(find.text(CoachStrings.editorAddSlot));
+      await tester.tap(find.text('Agregar ejercicio'));
       await tester.pumpAndSettle();
 
       // Now tap the exercise picker button in the slot
-      await tester.tap(find.text(CoachStrings.exercisePicker));
+      await tester.tap(find.text('Buscar ejercicio'));
       await tester.pumpAndSettle();
 
       // The bottom sheet should show exercise names
@@ -258,10 +260,10 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text(CoachStrings.editorAddSlot));
+      await tester.tap(find.text('Agregar ejercicio'));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text(CoachStrings.exercisePicker));
+      await tester.tap(find.text('Buscar ejercicio'));
       await tester.pumpAndSettle();
 
       // Select first exercise
@@ -294,20 +296,20 @@ void main() {
       await tester.enterText(
           find.byKey(const Key('editor_split_field')), 'PPL');
       // Add a slot with an exercise
-      await tester.tap(find.text(CoachStrings.editorAddSlot));
+      await tester.tap(find.text('Agregar ejercicio'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text(CoachStrings.exercisePicker));
+      await tester.tap(find.text('Buscar ejercicio'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Sentadilla'));
       await tester.pumpAndSettle();
 
       // Submit
-      await tester.tap(find.text(CoachStrings.editorSubmit));
+      await tester.tap(find.text('ASIGNAR PLAN'));
       await tester.pump(); // single pump — loading state before future resolves
 
       // Submit button should be disabled
       final submitButton = tester.widget<ElevatedButton>(
-        find.widgetWithText(ElevatedButton, CoachStrings.editorSubmit),
+        find.widgetWithText(ElevatedButton, 'ASIGNAR PLAN'),
       );
       expect(submitButton.onPressed, isNull);
 
@@ -366,6 +368,9 @@ void main() {
           ],
           child: MaterialApp.router(
             theme: AppTheme.dark(),
+            localizationsDelegates: AppL10n.localizationsDelegates,
+            supportedLocales: AppL10n.supportedLocales,
+            locale: const Locale('es', 'AR'),
             routerConfig: router,
           ),
         ),
@@ -377,17 +382,17 @@ void main() {
           find.byKey(const Key('editor_name_field')), 'Mi Plan');
       await tester.enterText(
           find.byKey(const Key('editor_split_field')), 'Full Body');
-      await tester.tap(find.text(CoachStrings.editorAddSlot));
+      await tester.tap(find.text('Agregar ejercicio'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text(CoachStrings.exercisePicker));
+      await tester.tap(find.text('Buscar ejercicio'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Sentadilla'));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text(CoachStrings.editorSubmit));
+      await tester.tap(find.text('ASIGNAR PLAN'));
       await tester.pumpAndSettle();
 
-      expect(find.text(CoachStrings.createPlanSuccess), findsOneWidget);
+      expect(find.text('Plan creado y asignado.'), findsOneWidget);
       expect(analytics.events, contains('plan_assigned'));
     });
 
@@ -411,21 +416,21 @@ void main() {
           find.byKey(const Key('editor_name_field')), 'Mi Plan');
       await tester.enterText(
           find.byKey(const Key('editor_split_field')), 'Full Body');
-      await tester.tap(find.text(CoachStrings.editorAddSlot));
+      await tester.tap(find.text('Agregar ejercicio'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text(CoachStrings.exercisePicker));
+      await tester.tap(find.text('Buscar ejercicio'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Sentadilla'));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text(CoachStrings.editorSubmit));
+      await tester.tap(find.text('ASIGNAR PLAN'));
       await tester.pumpAndSettle();
 
-      expect(find.text(CoachStrings.createPlanError), findsOneWidget);
+      expect(find.text('Error al crear el plan.'), findsOneWidget);
 
       // Button re-enabled
       final submitButton = tester.widget<ElevatedButton>(
-        find.widgetWithText(ElevatedButton, CoachStrings.editorSubmit),
+        find.widgetWithText(ElevatedButton, 'ASIGNAR PLAN'),
       );
       expect(submitButton.onPressed, isNotNull);
     });
@@ -530,14 +535,14 @@ void main() {
           find.byKey(const Key('editor_name_field')), 'Plan Test');
       await tester.enterText(
           find.byKey(const Key('editor_split_field')), 'PPL');
-      await tester.tap(find.text(CoachStrings.editorAddSlot));
+      await tester.tap(find.text('Agregar ejercicio'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text(CoachStrings.exercisePicker));
+      await tester.tap(find.text('Buscar ejercicio'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Sentadilla'));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text(CoachStrings.editorSubmit));
+      await tester.tap(find.text('ASIGNAR PLAN'));
       await tester.pumpAndSettle();
 
       verify(() => repo.createAssigned(any())).called(1);
@@ -572,14 +577,14 @@ void main() {
           find.byKey(const Key('editor_name_field')), 'Mi Rutina');
       await tester.enterText(
           find.byKey(const Key('editor_split_field')), 'Full Body');
-      await tester.tap(find.text(CoachStrings.editorAddSlot));
+      await tester.tap(find.text('Agregar ejercicio'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text(CoachStrings.exercisePicker));
+      await tester.tap(find.text('Buscar ejercicio'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Sentadilla'));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text(WorkoutStrings.selfEditorSubmitLabel));
+      await tester.tap(find.text('CREAR RUTINA'));
       await tester.pumpAndSettle();
 
       verify(() => repo.createUserOwned(
@@ -599,12 +604,12 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text(WorkoutStrings.selfEditorTitle), findsOneWidget);
-      expect(find.text(WorkoutStrings.selfEditorSubmitLabel), findsOneWidget);
+      expect(find.text('Nueva rutina'), findsOneWidget);
+      expect(find.text('CREAR RUTINA'), findsOneWidget);
       // TrainerAssigning title must NOT appear
-      expect(find.text(CoachStrings.editorTitle), findsNothing);
+      expect(find.text('Crear plan'), findsNothing);
       // TrainerAssigning submit label must NOT appear
-      expect(find.text(CoachStrings.editorSubmit), findsNothing);
+      expect(find.text('ASIGNAR PLAN'), findsNothing);
     });
 
     testWidgets(
@@ -617,10 +622,10 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text(CoachStrings.editorTitle), findsOneWidget);
-      expect(find.text(CoachStrings.editorSubmit), findsOneWidget);
+      expect(find.text('Crear plan'), findsOneWidget);
+      expect(find.text('ASIGNAR PLAN'), findsOneWidget);
       // SelfCreating strings must NOT appear
-      expect(find.text(WorkoutStrings.selfEditorTitle), findsNothing);
+      expect(find.text('Nueva rutina'), findsNothing);
     });
 
     // TODO PR2-followup: rewrite for multi-select picker flow.
@@ -639,17 +644,17 @@ void main() {
           find.byKey(const Key('editor_name_field')), 'Mi Rutina');
       await tester.enterText(
           find.byKey(const Key('editor_split_field')), 'Full Body');
-      await tester.tap(find.text(CoachStrings.editorAddSlot));
+      await tester.tap(find.text('Agregar ejercicio'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text(CoachStrings.exercisePicker));
+      await tester.tap(find.text('Buscar ejercicio'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Sentadilla'));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text(WorkoutStrings.selfEditorSubmitLabel));
+      await tester.tap(find.text('CREAR RUTINA'));
       await tester.pumpAndSettle();
 
-      expect(find.text(WorkoutStrings.editStubToast), findsOneWidget);
+      expect(find.text('Pronto vas a poder editar el contenido. Por ahora podés archivar y crear de nuevo.'), findsOneWidget);
     });
   });
 }

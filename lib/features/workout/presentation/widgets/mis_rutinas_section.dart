@@ -10,7 +10,7 @@ import '../../application/routine_providers.dart'
 import '../../application/session_providers.dart' show currentUidProvider;
 import '../../application/user_routines_providers.dart';
 import '../../domain/routine.dart';
-import '../workout_strings.dart';
+import '../../../../l10n/app_l10n.dart';
 import '../../../../features/profile/domain/experience_level.dart'
     show ExperienceLevelEs;
 
@@ -34,6 +34,7 @@ class MisRutinasSection extends ConsumerWidget {
 
     final routinesAsync = ref.watch(userCreatedRoutinesProvider(uid));
     final theme = Theme.of(context);
+    final l10n = AppL10n.of(context);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -43,7 +44,7 @@ class MisRutinasSection extends ConsumerWidget {
           children: [
             Expanded(
               child: Text(
-                WorkoutStrings.misRutinasSectionTitle,
+                l10n.workoutMisRutinasSectionTitle,
                 style: theme.textTheme.titleMedium,
               ),
             ),
@@ -132,7 +133,7 @@ class _CtaButton extends StatelessWidget {
       // Parent (Row/Column) decides how to size this — we don't wrap in
       // Flexible/Expanded here because that conflicts with vertical parents.
       return Tooltip(
-        message: WorkoutStrings.misRutinasCtaDisabledTooltip,
+        message: AppL10n.of(context).workoutMisRutinasCtaDisabledTooltip,
         child: Text(
           // Inline cap hint (REQ-USR-005)
           'Llegaste al máximo de $_kRoutineCap rutinas activas. Archivá una para crear otra.',
@@ -148,7 +149,7 @@ class _CtaButton extends StatelessWidget {
       onPressed: onPressed,
       icon: Icon(TreinoIcon.plus, size: 16, color: palette.accent),
       label: Text(
-        WorkoutStrings.misRutinasCta,
+        AppL10n.of(context).workoutMisRutinasCta,
         style: TextStyle(color: palette.accent),
       ),
       style: OutlinedButton.styleFrom(
@@ -196,7 +197,7 @@ class _SectionErrorState extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            WorkoutStrings.misRutinasError,
+            AppL10n.of(context).workoutMisRutinasError,
             style:
                 theme.textTheme.bodyMedium?.copyWith(color: palette.textMuted),
           ),
@@ -204,7 +205,7 @@ class _SectionErrorState extends StatelessWidget {
           TextButton(
             onPressed: onRetry,
             child: Text(
-              WorkoutStrings.misRutinasErrorRetry,
+              AppL10n.of(context).workoutMisRutinasErrorRetry,
               style: TextStyle(color: palette.accent),
             ),
           ),
@@ -228,7 +229,7 @@ class _SectionEmptyState extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 12),
       child: Text(
-        WorkoutStrings.misRutinasEmptyState,
+        AppL10n.of(context).workoutMisRutinasEmptyState,
         style: theme.textTheme.bodyMedium?.copyWith(color: palette.textMuted),
       ),
     );
@@ -246,19 +247,20 @@ class _UserRoutineCard extends ConsumerWidget {
     BuildContext context,
     WidgetRef ref,
   ) async {
+    final l10n = AppL10n.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text(WorkoutStrings.misRutinasConfirmTitle),
-        content: const Text(WorkoutStrings.misRutinasConfirmBody),
+        title: Text(l10n.workoutMisRutinasConfirmTitle),
+        content: Text(l10n.workoutMisRutinasConfirmBody),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text(WorkoutStrings.misRutinasConfirmCancel),
+            child: Text(l10n.workoutMisRutinasConfirmCancel),
           ),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text(WorkoutStrings.misRutinasConfirmConfirm),
+            child: Text(l10n.workoutMisRutinasConfirmConfirm),
           ),
         ],
       ),
@@ -271,14 +273,13 @@ class _UserRoutineCard extends ConsumerWidget {
       await ref.read(routineRepositoryProvider).archive(routine.id);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text(WorkoutStrings.misRutinasArchiveSuccess)),
+          SnackBar(content: Text(l10n.workoutMisRutinasArchiveSuccess)),
         );
       }
     } catch (_) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text(WorkoutStrings.misRutinasArchiveError)),
+          SnackBar(content: Text(l10n.workoutMisRutinasArchiveError)),
         );
       }
     }
@@ -287,6 +288,7 @@ class _UserRoutineCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
 
     return InkWell(
       key: Key('user_routine_card_${routine.id}'),
@@ -316,7 +318,7 @@ class _UserRoutineCard extends ConsumerWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '${(routine.split ?? WorkoutStrings.splitFallback).toUpperCase()} · ${routine.level.displayNameEs.toUpperCase()}',
+                    '${(routine.split ?? l10n.workoutSplitFallback).toUpperCase()} · ${routine.level.displayNameEs.toUpperCase()}',
                     style: GoogleFonts.barlow(
                       fontWeight: FontWeight.w400,
                       fontSize: 12,
@@ -342,13 +344,13 @@ class _UserRoutineCard extends ConsumerWidget {
                 }
               },
               itemBuilder: (_) => [
-                const PopupMenuItem(
+                PopupMenuItem(
                   value: _CardAction.edit,
-                  child: Text(WorkoutStrings.misRutinasOverflowEdit),
+                  child: Text(l10n.workoutMisRutinasOverflowEdit),
                 ),
-                const PopupMenuItem(
+                PopupMenuItem(
                   value: _CardAction.archive,
-                  child: Text(WorkoutStrings.misRutinasOverflowArchive),
+                  child: Text(l10n.workoutMisRutinasOverflowArchive),
                 ),
               ],
             ),
