@@ -1115,13 +1115,13 @@ abstract class AppL10n {
   /// No description provided for @workoutMisRutinasOverflowArchive.
   ///
   /// In es_AR, this message translates to:
-  /// **'ARCHIVAR'**
+  /// **'ELIMINAR'**
   String get workoutMisRutinasOverflowArchive;
 
   /// No description provided for @workoutMisRutinasConfirmTitle.
   ///
   /// In es_AR, this message translates to:
-  /// **'Archivar rutina'**
+  /// **'Eliminar rutina'**
   String get workoutMisRutinasConfirmTitle;
 
   /// No description provided for @workoutMisRutinasConfirmBody.
@@ -1139,19 +1139,19 @@ abstract class AppL10n {
   /// No description provided for @workoutMisRutinasConfirmConfirm.
   ///
   /// In es_AR, this message translates to:
-  /// **'ARCHIVAR'**
+  /// **'ELIMINAR'**
   String get workoutMisRutinasConfirmConfirm;
 
   /// No description provided for @workoutMisRutinasArchiveSuccess.
   ///
   /// In es_AR, this message translates to:
-  /// **'Rutina archivada'**
+  /// **'Rutina eliminada'**
   String get workoutMisRutinasArchiveSuccess;
 
   /// No description provided for @workoutMisRutinasArchiveError.
   ///
   /// In es_AR, this message translates to:
-  /// **'No pudimos archivar la rutina. Reintentá.'**
+  /// **'No pudimos eliminar la rutina. Reintentá.'**
   String get workoutMisRutinasArchiveError;
 
   /// No description provided for @workoutSplitFallback.

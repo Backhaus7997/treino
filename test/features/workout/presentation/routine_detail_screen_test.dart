@@ -240,8 +240,8 @@ void main() {
     });
 
     testWidgets(
-        'SCENARIO-083: estimatedMinutes null → third StatTile shows "—"',
-        (tester) async {
+        'SCENARIO-083: estimatedMinutes null → third StatTile shows a '
+        'computed "~N" estimate (2026-06-11)', (tester) async {
       final day = _makeDay(estimatedMinutes: null);
       await tester.pumpWidget(_wrapWithOverrides(
         const RoutineDetailScreen(routineId: 'test-id'),
@@ -253,7 +253,10 @@ void main() {
       await tester.pump(const Duration(milliseconds: 50));
       final statTiles = tester.widgetList<StatTile>(find.byType(StatTile));
       final values = statTiles.map((t) => t.value).toList();
-      expect(values, contains(null)); // null → StatTile renders "—"
+      // No authored estimate → the screen computes one from the sets and
+      // shows it with a "~" prefix; it is NOT a dead dash.
+      expect(values.any((v) => v != null && v.startsWith('~')), isTrue);
+      expect(values, isNot(contains(null)));
     });
 
     testWidgets('SCENARIO-084: single-day routine — no day selector',

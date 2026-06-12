@@ -39,9 +39,9 @@ class _PlantillasSectionState extends ConsumerState<PlantillasSection> {
             color: palette.textPrimary,
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 10),
         const LevelFilterPills(),
-        const SizedBox(height: 14),
+        const SizedBox(height: 10),
         filteredAsync.when(
           data: (routines) {
             if (routines.isEmpty) {
@@ -65,30 +65,49 @@ class _PlantillasSectionState extends ConsumerState<PlantillasSection> {
             final showVerMas = hasMore && !_expanded;
             final visibleCount =
                 showVerMas ? _kCollapsedLimit : routines.length;
-            final itemCount = showVerMas ? visibleCount + 1 : visibleCount;
+            // Lay the cards out in manual rows of two instead of a GridView.
+            // SliverGridDelegateWithFixedCrossAxisCount forces every cell to a
+            // single hard-coded height (width / childAspectRatio): too short
+            // for the card content — the subtitle overflowed — and it reserved
+            // phantom vertical space that pushed HISTORIAL down. Manual rows
+            // size to their content, like MisRutinas / TrainerTemplates.
+            final cells = <Widget>[
+              for (var i = 0; i < visibleCount; i++)
+                RoutineCard(
+                  routine: routines[i],
+                  variant: routines[i].id.hashCode % 3 == 0
+                      ? RoutineCardVariant.highlight
+                      : RoutineCardVariant.accent,
+                ),
+              if (showVerMas)
+                VerMasCell(onTap: () => setState(() => _expanded = true)),
+            ];
 
-            return GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 12,
-                childAspectRatio: 0.95,
-              ),
-              itemCount: itemCount,
-              itemBuilder: (context, i) {
-                if (showVerMas && i == visibleCount) {
-                  return VerMasCell(
-                    onTap: () => setState(() => _expanded = true),
-                  );
-                }
-                final routine = routines[i];
-                final variant = routine.id.hashCode % 3 == 0
-                    ? RoutineCardVariant.highlight
-                    : RoutineCardVariant.accent;
-                return RoutineCard(routine: routine, variant: variant);
-              },
+            return Column(
+              children: [
+                for (var row = 0; row < cells.length; row += 2)
+                  Padding(
+                    padding: EdgeInsets.only(
+                      bottom: row + 2 < cells.length ? 12 : 0,
+                    ),
+                    // IntrinsicHeight so both cards in a row match the taller
+                    // one's height — keeps the 2-column grid look tidy.
+                    child: IntrinsicHeight(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Expanded(child: cells[row]),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: row + 1 < cells.length
+                                ? cells[row + 1]
+                                : const SizedBox.shrink(),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
             );
           },
           loading: () => Padding(
