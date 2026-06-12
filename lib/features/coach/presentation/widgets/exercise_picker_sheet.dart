@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
@@ -14,6 +13,7 @@ import '../../../workout/domain/custom_exercise.dart';
 import '../../../workout/domain/equipment_type.dart';
 import '../../../workout/domain/exercise.dart';
 import '../../../workout/presentation/custom_exercise_editor_screen.dart';
+import '../../../workout/presentation/exercise_detail_screen.dart';
 import '../../../workout/presentation/workout_strings.dart';
 import 'equipment_filter_sheet.dart';
 import 'muscle_filter_sheet.dart';
@@ -438,12 +438,26 @@ class _ExerciseRow extends StatelessWidget {
   final VoidCallback onTap;
 
   void _openDetail(BuildContext context) {
-    // ExerciseDetailScreen route accepts an optional ownerId for custom
-    // exercises (their docs live under users/{ownerId}/customExercises/).
-    final query = isCustom && ownerId != null && ownerId!.isNotEmpty
-        ? '?ownerId=$ownerId'
-        : '';
-    context.push('/workout/exercise/$id$query');
+    // ExerciseDetailScreen brings no Scaffold/background of its own — those are
+    // provided by _ShellScaffold in the shell flow. Opening it from inside this
+    // modal sheet via go_router's `context.push` mounts it in a context where it
+    // never renders → full black screen (device feedback 2026-06-12). Push it
+    // imperatively with its own Scaffold host instead, mirroring _openCreateNew.
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => Scaffold(
+          backgroundColor: AppPalette.of(context).bg,
+          body: SafeArea(
+            child: ExerciseDetailScreen(
+              exerciseId: id,
+              ownerId: isCustom && ownerId != null && ownerId!.isNotEmpty
+                  ? ownerId
+                  : null,
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   @override
