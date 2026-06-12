@@ -23,6 +23,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
     required this.bg,
     required this.bgCard,
     required this.border,
+    required this.borderHover,
     required this.textPrimary,
     required this.textMuted,
     required this.sage,
@@ -36,6 +37,11 @@ class AppPalette extends ThemeExtension<AppPalette> {
   final Color bg;
   final Color bgCard;
   final Color border;
+
+  /// Border at a brighter alpha for hover states (eg. Coach Hub web sidebar
+  /// rows). Additive over [border]; mobile never references it.
+  final Color borderHover;
+
   final Color textPrimary;
   final Color textMuted;
 
@@ -59,6 +65,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
     bg: AppColors.ink,
     bgCard: Color(0xFF0F1513),
     border: Color(0x1AFFFFFF),
+    borderHover: Color(0x33FFFFFF),
     textPrimary: AppColors.bone,
     textMuted: Color(0x8CFFFFFF),
     sage: AppColors.sage,
@@ -77,6 +84,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
     Color? bg,
     Color? bgCard,
     Color? border,
+    Color? borderHover,
     Color? textPrimary,
     Color? textMuted,
     Color? sage,
@@ -90,6 +98,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
         bg: bg ?? this.bg,
         bgCard: bgCard ?? this.bgCard,
         border: border ?? this.border,
+        borderHover: borderHover ?? this.borderHover,
         textPrimary: textPrimary ?? this.textPrimary,
         textMuted: textMuted ?? this.textMuted,
         sage: sage ?? this.sage,
@@ -107,6 +116,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
       bg: Color.lerp(bg, other.bg, t)!,
       bgCard: Color.lerp(bgCard, other.bgCard, t)!,
       border: Color.lerp(border, other.border, t)!,
+      borderHover: Color.lerp(borderHover, other.borderHover, t)!,
       textPrimary: Color.lerp(textPrimary, other.textPrimary, t)!,
       textMuted: Color.lerp(textMuted, other.textMuted, t)!,
       sage: Color.lerp(sage, other.sage, t)!,
