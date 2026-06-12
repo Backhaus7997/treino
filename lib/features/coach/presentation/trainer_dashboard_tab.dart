@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
 import '../../../core/analytics/analytics_service.dart';
+import '../../../l10n/app_l10n.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../payments/application/pagos_por_cobrar_provider.dart';
 import '../../payments/application/payment_providers.dart';
@@ -55,22 +56,22 @@ class TrainerDashboardTab extends ConsumerWidget {
         const _ResumenDelDiaCard(),
         const SizedBox(height: 20),
         _SectionHeader(
-          label: 'PRÓXIMAS SESIONES',
-          trailingLabel: 'Agenda',
+          label: AppL10n.of(context).dashboardProximasSesionesSectionLabel,
+          trailingLabel: AppL10n.of(context).dashboardAgendaTrailingLabel,
           trailingOnTap: () => context.go('/coach?tab=agenda'),
         ),
         const SizedBox(height: 8),
         const _ProximasSesionesList(),
         const SizedBox(height: 20),
-        const _SectionHeader(
-          label: 'ENTRENARON HOY',
-          trailingLabel: 'Dejar feedback',
+        _SectionHeader(
+          label: AppL10n.of(context).dashboardEntrenaronHoySectionLabel,
+          trailingLabel: AppL10n.of(context).dashboardDejarFeedbackLabel,
         ),
         const SizedBox(height: 8),
         const _EntrenaronHoyList(),
         const SizedBox(height: 20),
-        const _SectionHeader(
-          label: 'ACTIVIDAD RECIENTE',
+        _SectionHeader(
+          label: AppL10n.of(context).dashboardActividadRecienteSectionLabel,
         ),
         const SizedBox(height: 8),
         _PlaceholderCard(
@@ -378,7 +379,7 @@ class _ResumenDelDiaCard extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'RESUMEN DEL DÍA',
+            AppL10n.of(context).dashboardResumenDelDiaTitle,
             style: GoogleFonts.barlowCondensed(
               fontWeight: FontWeight.w700,
               fontSize: 11,
@@ -391,21 +392,21 @@ class _ResumenDelDiaCard extends ConsumerWidget {
             children: [
               _StatColumn(
                 value: '$pending',
-                label: 'PENDIENTES',
+                label: AppL10n.of(context).dashboardStatPendientes,
                 color: palette.accent,
                 palette: palette,
               ),
               _Divider(palette: palette),
               _StatColumn(
                 value: '$done',
-                label: 'COMPLETADAS',
+                label: AppL10n.of(context).dashboardStatCompletadas,
                 color: palette.textPrimary,
                 palette: palette,
               ),
               _Divider(palette: palette),
               _StatColumn(
                 value: '$cancelled',
-                label: 'CANCELADAS',
+                label: AppL10n.of(context).dashboardStatCanceladas,
                 color: palette.danger,
                 palette: palette,
               ),

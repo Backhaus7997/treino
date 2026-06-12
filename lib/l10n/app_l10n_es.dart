@@ -614,6 +614,109 @@ class AppL10nEs extends AppL10n {
   String workoutPickerSheetApply(int count) {
     return 'APLICAR ($count)';
   }
+
+  @override
+  String get appFcmSnackBarActionLabel => 'Ver';
+
+  @override
+  String get profileEditPersonalNameRequired => 'Ingresá un nombre';
+
+  @override
+  String get profileEditPersonalNameMaxLength => 'Máximo 50 caracteres';
+
+  @override
+  String get profileEditPersonalWeightInvalidNumber =>
+      'Ingresá un número válido';
+
+  @override
+  String get profileEditPersonalWeightOutOfRange =>
+      'Ingresá un peso entre 30 y 300 kg';
+
+  @override
+  String get profileEditPersonalHeightOutOfRange =>
+      'Ingresá una altura entre 120 y 230 cm';
+
+  @override
+  String get eliminarCuentaSheetTitle => 'Eliminar cuenta';
+
+  @override
+  String get eliminarCuentaSheetBodyPrefix => 'Esta acción es ';
+
+  @override
+  String get eliminarCuentaSheetBodyBold => 'irreversible';
+
+  @override
+  String get eliminarCuentaSheetBodySuffix =>
+      '. Vamos a eliminar tu cuenta, tu perfil, tu historial de entrenamientos y tu foto. Tus posts van a quedar como \"Usuario eliminado\".';
+
+  @override
+  String get eliminarCuentaSheetDeleteCta => 'ELIMINAR';
+
+  @override
+  String get eliminarCuentaSheetCancelCta => 'CANCELAR';
+
+  @override
+  String get eliminarCuentaSheetLoadingLabel => 'Eliminando tu cuenta...';
+
+  @override
+  String get eliminarCuentaSheetLoadingSubtitle =>
+      'Esto puede tardar unos segundos.';
+
+  @override
+  String get eliminarCuentaSheetErrorFallback =>
+      'No pudimos eliminar tu cuenta. Probá de nuevo.';
+
+  @override
+  String get eliminarCuentaSheetRetryLabel => 'Reintentar';
+
+  @override
+  String get dashboardResumenDelDiaTitle => 'RESUMEN DEL DÍA';
+
+  @override
+  String get dashboardStatPendientes => 'PENDIENTES';
+
+  @override
+  String get dashboardStatCompletadas => 'COMPLETADAS';
+
+  @override
+  String get dashboardStatCanceladas => 'CANCELADAS';
+
+  @override
+  String get dashboardProximasSesionesSectionLabel => 'PRÓXIMAS SESIONES';
+
+  @override
+  String get dashboardAgendaTrailingLabel => 'Agenda';
+
+  @override
+  String get dashboardEntrenaronHoySectionLabel => 'ENTRENARON HOY';
+
+  @override
+  String get dashboardDejarFeedbackLabel => 'Dejar feedback';
+
+  @override
+  String get dashboardActividadRecienteSectionLabel => 'ACTIVIDAD RECIENTE';
+
+  @override
+  String get reviewSnackBarSuccess => '¡Gracias por tu reseña!';
+
+  @override
+  String get plantillasRetryLabel => 'Reintentar';
+
+  @override
+  String get profileSetupSaveError =>
+      'No pudimos guardar tu perfil. Probá de nuevo.';
+
+  @override
+  String get profileSetupCancelDialogTitle =>
+      '¿Cancelar la creación de tu cuenta?';
+
+  @override
+  String get profileSetupCancelDialogBody =>
+      'Vamos a borrar tu cuenta. Esta acción no se puede deshacer.';
+
+  @override
+  String get profileSetupCancelAccountError =>
+      'No pudimos cancelar la cuenta. Probá de nuevo.';
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -1231,4 +1334,107 @@ class AppL10nEsAr extends AppL10nEs {
   String workoutPickerSheetApply(int count) {
     return 'APLICAR ($count)';
   }
+
+  @override
+  String get appFcmSnackBarActionLabel => 'Ver';
+
+  @override
+  String get profileEditPersonalNameRequired => 'Ingresá un nombre';
+
+  @override
+  String get profileEditPersonalNameMaxLength => 'Máximo 50 caracteres';
+
+  @override
+  String get profileEditPersonalWeightInvalidNumber =>
+      'Ingresá un número válido';
+
+  @override
+  String get profileEditPersonalWeightOutOfRange =>
+      'Ingresá un peso entre 30 y 300 kg';
+
+  @override
+  String get profileEditPersonalHeightOutOfRange =>
+      'Ingresá una altura entre 120 y 230 cm';
+
+  @override
+  String get eliminarCuentaSheetTitle => 'Eliminar cuenta';
+
+  @override
+  String get eliminarCuentaSheetBodyPrefix => 'Esta acción es ';
+
+  @override
+  String get eliminarCuentaSheetBodyBold => 'irreversible';
+
+  @override
+  String get eliminarCuentaSheetBodySuffix =>
+      '. Vamos a eliminar tu cuenta, tu perfil, tu historial de entrenamientos y tu foto. Tus posts van a quedar como \"Usuario eliminado\".';
+
+  @override
+  String get eliminarCuentaSheetDeleteCta => 'ELIMINAR';
+
+  @override
+  String get eliminarCuentaSheetCancelCta => 'CANCELAR';
+
+  @override
+  String get eliminarCuentaSheetLoadingLabel => 'Eliminando tu cuenta...';
+
+  @override
+  String get eliminarCuentaSheetLoadingSubtitle =>
+      'Esto puede tardar unos segundos.';
+
+  @override
+  String get eliminarCuentaSheetErrorFallback =>
+      'No pudimos eliminar tu cuenta. Probá de nuevo.';
+
+  @override
+  String get eliminarCuentaSheetRetryLabel => 'Reintentar';
+
+  @override
+  String get dashboardResumenDelDiaTitle => 'RESUMEN DEL DÍA';
+
+  @override
+  String get dashboardStatPendientes => 'PENDIENTES';
+
+  @override
+  String get dashboardStatCompletadas => 'COMPLETADAS';
+
+  @override
+  String get dashboardStatCanceladas => 'CANCELADAS';
+
+  @override
+  String get dashboardProximasSesionesSectionLabel => 'PRÓXIMAS SESIONES';
+
+  @override
+  String get dashboardAgendaTrailingLabel => 'Agenda';
+
+  @override
+  String get dashboardEntrenaronHoySectionLabel => 'ENTRENARON HOY';
+
+  @override
+  String get dashboardDejarFeedbackLabel => 'Dejar feedback';
+
+  @override
+  String get dashboardActividadRecienteSectionLabel => 'ACTIVIDAD RECIENTE';
+
+  @override
+  String get reviewSnackBarSuccess => '¡Gracias por tu reseña!';
+
+  @override
+  String get plantillasRetryLabel => 'Reintentar';
+
+  @override
+  String get profileSetupSaveError =>
+      'No pudimos guardar tu perfil. Probá de nuevo.';
+
+  @override
+  String get profileSetupCancelDialogTitle =>
+      '¿Cancelar la creación de tu cuenta?';
+
+  @override
+  String get profileSetupCancelDialogBody =>
+      'Vamos a borrar tu cuenta. Esta acción no se puede deshacer.';
+
+  @override
+  String get profileSetupCancelAccountError =>
+      'No pudimos cancelar la cuenta. Probá de nuevo.';
 }

@@ -219,5 +219,43 @@
     "placeholders": {
       "count": { "type": "int" }
     }
-  }
+  },
+
+  "appFcmSnackBarActionLabel": "Ver",
+
+  "profileEditPersonalNameRequired": "Ingresá un nombre",
+  "profileEditPersonalNameMaxLength": "Máximo 50 caracteres",
+  "profileEditPersonalWeightInvalidNumber": "Ingresá un número válido",
+  "profileEditPersonalWeightOutOfRange": "Ingresá un peso entre 30 y 300 kg",
+  "profileEditPersonalHeightOutOfRange": "Ingresá una altura entre 120 y 230 cm",
+
+  "eliminarCuentaSheetTitle": "Eliminar cuenta",
+  "eliminarCuentaSheetBodyPrefix": "Esta acción es ",
+  "eliminarCuentaSheetBodyBold": "irreversible",
+  "eliminarCuentaSheetBodySuffix": ". Vamos a eliminar tu cuenta, tu perfil, tu historial de entrenamientos y tu foto. Tus posts van a quedar como \"Usuario eliminado\".",
+  "eliminarCuentaSheetDeleteCta": "ELIMINAR",
+  "eliminarCuentaSheetCancelCta": "CANCELAR",
+  "eliminarCuentaSheetLoadingLabel": "Eliminando tu cuenta...",
+  "eliminarCuentaSheetLoadingSubtitle": "Esto puede tardar unos segundos.",
+  "eliminarCuentaSheetErrorFallback": "No pudimos eliminar tu cuenta. Probá de nuevo.",
+  "eliminarCuentaSheetRetryLabel": "Reintentar",
+
+  "dashboardResumenDelDiaTitle": "RESUMEN DEL DÍA",
+  "dashboardStatPendientes": "PENDIENTES",
+  "dashboardStatCompletadas": "COMPLETADAS",
+  "dashboardStatCanceladas": "CANCELADAS",
+  "dashboardProximasSesionesSectionLabel": "PRÓXIMAS SESIONES",
+  "dashboardAgendaTrailingLabel": "Agenda",
+  "dashboardEntrenaronHoySectionLabel": "ENTRENARON HOY",
+  "dashboardDejarFeedbackLabel": "Dejar feedback",
+  "dashboardActividadRecienteSectionLabel": "ACTIVIDAD RECIENTE",
+
+  "reviewSnackBarSuccess": "¡Gracias por tu reseña!",
+
+  "plantillasRetryLabel": "Reintentar",
+
+  "profileSetupSaveError": "No pudimos guardar tu perfil. Probá de nuevo.",
+  "profileSetupCancelDialogTitle": "¿Cancelar la creación de tu cuenta?",
+  "profileSetupCancelDialogBody": "Vamos a borrar tu cuenta. Esta acción no se puede deshacer.",
+  "profileSetupCancelAccountError": "No pudimos cancelar la cuenta. Probá de nuevo."
 }

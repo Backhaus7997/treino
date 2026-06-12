@@ -45,6 +45,7 @@ import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/analytics/analytics_service.dart';
+import 'package:treino/l10n/app_l10n.dart';
 import 'package:treino/features/coach/presentation/coach_strings.dart';
 import 'package:treino/features/profile/domain/experience_level.dart';
 import 'package:treino/features/workout/application/custom_exercise_providers.dart';
@@ -112,6 +113,9 @@ Future<void> _pumpEditor(
       child: MaterialApp.router(
         theme: AppTheme.dark(),
         routerConfig: router,
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+        locale: const Locale('es', 'AR'),
       ),
     ),
   );

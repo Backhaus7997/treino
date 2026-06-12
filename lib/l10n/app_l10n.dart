@@ -1237,6 +1237,192 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'APLICAR ({count})'**
   String workoutPickerSheetApply(int count);
+
+  /// No description provided for @appFcmSnackBarActionLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ver'**
+  String get appFcmSnackBarActionLabel;
+
+  /// No description provided for @profileEditPersonalNameRequired.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ingresá un nombre'**
+  String get profileEditPersonalNameRequired;
+
+  /// No description provided for @profileEditPersonalNameMaxLength.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Máximo 50 caracteres'**
+  String get profileEditPersonalNameMaxLength;
+
+  /// No description provided for @profileEditPersonalWeightInvalidNumber.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ingresá un número válido'**
+  String get profileEditPersonalWeightInvalidNumber;
+
+  /// No description provided for @profileEditPersonalWeightOutOfRange.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ingresá un peso entre 30 y 300 kg'**
+  String get profileEditPersonalWeightOutOfRange;
+
+  /// No description provided for @profileEditPersonalHeightOutOfRange.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ingresá una altura entre 120 y 230 cm'**
+  String get profileEditPersonalHeightOutOfRange;
+
+  /// No description provided for @eliminarCuentaSheetTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Eliminar cuenta'**
+  String get eliminarCuentaSheetTitle;
+
+  /// No description provided for @eliminarCuentaSheetBodyPrefix.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Esta acción es '**
+  String get eliminarCuentaSheetBodyPrefix;
+
+  /// No description provided for @eliminarCuentaSheetBodyBold.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'irreversible'**
+  String get eliminarCuentaSheetBodyBold;
+
+  /// No description provided for @eliminarCuentaSheetBodySuffix.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'. Vamos a eliminar tu cuenta, tu perfil, tu historial de entrenamientos y tu foto. Tus posts van a quedar como \"Usuario eliminado\".'**
+  String get eliminarCuentaSheetBodySuffix;
+
+  /// No description provided for @eliminarCuentaSheetDeleteCta.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ELIMINAR'**
+  String get eliminarCuentaSheetDeleteCta;
+
+  /// No description provided for @eliminarCuentaSheetCancelCta.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CANCELAR'**
+  String get eliminarCuentaSheetCancelCta;
+
+  /// No description provided for @eliminarCuentaSheetLoadingLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Eliminando tu cuenta...'**
+  String get eliminarCuentaSheetLoadingLabel;
+
+  /// No description provided for @eliminarCuentaSheetLoadingSubtitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Esto puede tardar unos segundos.'**
+  String get eliminarCuentaSheetLoadingSubtitle;
+
+  /// No description provided for @eliminarCuentaSheetErrorFallback.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos eliminar tu cuenta. Probá de nuevo.'**
+  String get eliminarCuentaSheetErrorFallback;
+
+  /// No description provided for @eliminarCuentaSheetRetryLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Reintentar'**
+  String get eliminarCuentaSheetRetryLabel;
+
+  /// No description provided for @dashboardResumenDelDiaTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'RESUMEN DEL DÍA'**
+  String get dashboardResumenDelDiaTitle;
+
+  /// No description provided for @dashboardStatPendientes.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'PENDIENTES'**
+  String get dashboardStatPendientes;
+
+  /// No description provided for @dashboardStatCompletadas.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'COMPLETADAS'**
+  String get dashboardStatCompletadas;
+
+  /// No description provided for @dashboardStatCanceladas.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CANCELADAS'**
+  String get dashboardStatCanceladas;
+
+  /// No description provided for @dashboardProximasSesionesSectionLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'PRÓXIMAS SESIONES'**
+  String get dashboardProximasSesionesSectionLabel;
+
+  /// No description provided for @dashboardAgendaTrailingLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Agenda'**
+  String get dashboardAgendaTrailingLabel;
+
+  /// No description provided for @dashboardEntrenaronHoySectionLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ENTRENARON HOY'**
+  String get dashboardEntrenaronHoySectionLabel;
+
+  /// No description provided for @dashboardDejarFeedbackLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Dejar feedback'**
+  String get dashboardDejarFeedbackLabel;
+
+  /// No description provided for @dashboardActividadRecienteSectionLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ACTIVIDAD RECIENTE'**
+  String get dashboardActividadRecienteSectionLabel;
+
+  /// No description provided for @reviewSnackBarSuccess.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¡Gracias por tu reseña!'**
+  String get reviewSnackBarSuccess;
+
+  /// No description provided for @plantillasRetryLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Reintentar'**
+  String get plantillasRetryLabel;
+
+  /// No description provided for @profileSetupSaveError.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos guardar tu perfil. Probá de nuevo.'**
+  String get profileSetupSaveError;
+
+  /// No description provided for @profileSetupCancelDialogTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Cancelar la creación de tu cuenta?'**
+  String get profileSetupCancelDialogTitle;
+
+  /// No description provided for @profileSetupCancelDialogBody.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Vamos a borrar tu cuenta. Esta acción no se puede deshacer.'**
+  String get profileSetupCancelDialogBody;
+
+  /// No description provided for @profileSetupCancelAccountError.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cancelar la cuenta. Probá de nuevo.'**
+  String get profileSetupCancelAccountError;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

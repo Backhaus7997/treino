@@ -20,6 +20,7 @@ import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/analytics/analytics_service.dart';
+import 'package:treino/features/coach/presentation/coach_strings.dart';
 import 'package:treino/l10n/app_l10n.dart';
 import 'package:treino/features/workout/application/custom_exercise_providers.dart';
 import 'package:treino/features/workout/application/exercise_providers.dart';
@@ -413,13 +414,8 @@ void main() {
     await tester.enterText(find.byWidget(repsField), '8');
     await tester.pumpAndSettle();
 
-<<<<<<< feat/i18n-pr2b-coach-agenda-workout
-    await tester.tap(
-        find.widgetWithText(ElevatedButton, 'ASIGNAR PLAN'));
-=======
     await tester
         .tap(find.widgetWithText(ElevatedButton, CoachStrings.editorSubmit));
->>>>>>> main
     await tester.pumpAndSettle();
 
     verify(() => repo.createAssigned(any())).called(1);
