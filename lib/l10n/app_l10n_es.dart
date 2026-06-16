@@ -1307,7 +1307,7 @@ class AppL10nEs extends AppL10n {
   String get routineEditorAddWeek => 'Semana';
 
   @override
-  String get routineEditorRemoveLastWeek => 'Quitar última';
+  String get routineEditorRemoveLastWeek => '';
 
   @override
   String get routineEditorDuplicateWeek => 'Duplicar semana';
@@ -1323,18 +1323,18 @@ class AppL10nEs extends AppL10n {
   }
 
   @override
-  String get routineEditorDuplicateWeekTitle => 'Duplicar semana';
+  String get routineEditorDuplicateWeekTitle => '';
 
   @override
-  String routineEditorDuplicateWeekBody(int source, int target) {
-    return 'Se copiará la Semana $source en la Semana $target.';
+  String routineEditorDuplicateWeekBody(int sourceWeek, int targetWeek) {
+    return '';
   }
 
   @override
-  String get routineEditorDialogCancel => 'Cancelar';
+  String get routineEditorDialogCancel => '';
 
   @override
-  String get routineEditorDialogConfirm => 'Confirmar';
+  String get routineEditorDialogConfirm => '';
 
   @override
   String get routineEditorSlotMenuReplace => 'Cambiar ejercicio';
@@ -1361,20 +1361,21 @@ class AppL10nEs extends AppL10n {
   String get routineEditorMeasureTime => 'Tiempo';
 
   @override
-  String get routineEditorSetTypeNormal => 'Normal';
+  String get routineEditorSetTypeNormal => '';
 
   @override
-  String get routineEditorSetTypeWarmup => 'Entrada en calor (W)';
+  String get routineEditorSetTypeWarmup => '';
 
   @override
-  String get routineEditorSetTypeDrop => 'Drop (D)';
+  String get routineEditorSetTypeDrop => '';
 
   @override
-  String get routineEditorSetTypeFailure => 'Al fallo (F)';
+  String get routineEditorSetTypeFailure => '';
 
   @override
-  String routineEditorIncompleteSetsFeedback(String exerciseName) =>
-      'Completá los sets de "$exerciseName" antes de guardar.';
+  String routineEditorIncompleteSetsFeedback(String exerciseName) {
+    return 'Completá los sets de \"$exerciseName\" antes de guardar.';
+  }
 
   @override
   String get routineDetailNotFound => 'Rutina no encontrada';
@@ -1428,6 +1429,50 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get routineDetailStart => 'EMPEZAR';
+
+  @override
+  String get routineEditorDeleteScopeTitle => '';
+
+  @override
+  String get routineEditorScopeOnlyThisWeek => '';
+
+  @override
+  String get routineEditorScopeAllWeeks => '';
+
+  @override
+  String get routineEditorAddScopeTitle => '';
+
+  @override
+  String get routineEditorAddScopeBody => '';
+
+  @override
+  String get routineEditorAddOnlyThisWeek => '';
+
+  @override
+  String get routineEditorAddAllWeeks => '';
+
+  @override
+  String get routineEditorWeekLabel => '';
+
+  @override
+  String get routineEditorLevelSection => '';
+
+  @override
+  String get routineEditorWeeksSection => '';
+
+  @override
+  String get routineEditorDaysSection => '';
+
+  @override
+  String get routineEditorNameHint => '';
+
+  @override
+  String get routineEditorSplitHint => '';
+
+  @override
+  String routineEditorIncompleteSetsLabel(int weekNumber) {
+    return '';
+  }
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -2752,8 +2797,8 @@ class AppL10nEsAr extends AppL10nEs {
   String get routineEditorDuplicateWeekTitle => 'Duplicar semana';
 
   @override
-  String routineEditorDuplicateWeekBody(int source, int target) {
-    return 'Se copiará la Semana $source en la Semana $target.';
+  String routineEditorDuplicateWeekBody(int sourceWeek, int targetWeek) {
+    return 'Se copiará la Semana $sourceWeek en la Semana $targetWeek.';
   }
 
   @override
@@ -2799,8 +2844,9 @@ class AppL10nEsAr extends AppL10nEs {
   String get routineEditorSetTypeFailure => 'Al fallo (F)';
 
   @override
-  String routineEditorIncompleteSetsFeedback(String exerciseName) =>
-      'Completá los sets de "$exerciseName" antes de guardar.';
+  String routineEditorIncompleteSetsFeedback(String exerciseName) {
+    return 'Completá los sets de \"$exerciseName\" antes de guardar.';
+  }
 
   @override
   String get routineDetailNotFound => 'Rutina no encontrada';
@@ -2854,4 +2900,50 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get routineDetailStart => 'EMPEZAR';
+
+  @override
+  String get routineEditorDeleteScopeTitle =>
+      '¿Eliminar solo de esta semana o de todas?';
+
+  @override
+  String get routineEditorScopeOnlyThisWeek => 'Solo esta semana';
+
+  @override
+  String get routineEditorScopeAllWeeks => 'Todas las semanas';
+
+  @override
+  String get routineEditorAddScopeTitle => '¿En qué semanas agregar?';
+
+  @override
+  String get routineEditorAddScopeBody =>
+      '¿Agregar el ejercicio solo en esta semana o en todas?';
+
+  @override
+  String get routineEditorAddOnlyThisWeek => 'Agregar solo en esta semana';
+
+  @override
+  String get routineEditorAddAllWeeks => 'Agregar en todas las semanas';
+
+  @override
+  String get routineEditorWeekLabel => 'Semana';
+
+  @override
+  String get routineEditorLevelSection => 'NIVEL';
+
+  @override
+  String get routineEditorWeeksSection => 'SEMANAS';
+
+  @override
+  String get routineEditorDaysSection => 'DÍAS DEL PLAN';
+
+  @override
+  String get routineEditorNameHint => 'Ej: Fuerza PPL';
+
+  @override
+  String get routineEditorSplitHint => 'PPL / Full Body';
+
+  @override
+  String routineEditorIncompleteSetsLabel(int weekNumber) {
+    return 'Sets incompletos en Sem $weekNumber';
+  }
 }

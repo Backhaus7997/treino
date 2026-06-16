@@ -1,6 +1,5 @@
 {
   "@@locale": "es_AR",
-
   "authSplashTagline": "ENTRENÁ. COMPARTÍ. CRECÉ.",
   "authWelcomeEyebrow": "ENTRENAMIENTO · GYM · COACH",
   "authWelcomeBody": "Cargá tu rutina, ejecutá los sets, seguí a tus pibes y encontrá un coach cerca tuyo.",
@@ -43,7 +42,6 @@
   "authValidationPasswordRules": "La contraseña debe tener al menos 8 caracteres, una letra y un número",
   "authValidationPasswordMismatch": "Las contraseñas no coinciden",
   "authProfileSignOut": "Cerrar sesión",
-
   "coachAppBarTitle": "Entrenadores",
   "coachLoadingLabel": "Cargando entrenadores…",
   "coachErrorLabel": "No pudimos cargar los entrenadores.",
@@ -92,7 +90,6 @@
   "coachEditorUpdateLabel": "GUARDAR CAMBIOS",
   "coachUpdatePlanSuccess": "Plan actualizado.",
   "coachExercisePicker": "Buscar ejercicio",
-
   "agendaButtonLabel": "VER AGENDA DEL PF",
   "agendaScreenTitle": "Agenda",
   "agendaEmptyAvailability": "Tu PF todavía no configuró horarios.",
@@ -100,8 +97,12 @@
   "agendaBookingConfirmBody": "¿Confirmar reserva el {date} a las {time}?",
   "@agendaBookingConfirmBody": {
     "placeholders": {
-      "date": { "type": "String" },
-      "time": { "type": "String" }
+      "date": {
+        "type": "String"
+      },
+      "time": {
+        "type": "String"
+      }
     }
   },
   "agendaBookingConfirmCta": "Confirmar",
@@ -131,10 +132,11 @@
   "agendaSlotBookedByLabel": "Reservado por {athleteName}",
   "@agendaSlotBookedByLabel": {
     "placeholders": {
-      "athleteName": { "type": "String" }
+      "athleteName": {
+        "type": "String"
+      }
     }
   },
-
   "workoutSummaryHeaderCompleted": "BUEN ENTRENO",
   "workoutSummaryHeaderAbandoned": "SESIÓN INTERRUMPIDA",
   "workoutStatDuration": "DURACIÓN",
@@ -164,7 +166,9 @@
   "workoutHistorialShowMore": "Ver más ({n})",
   "@workoutHistorialShowMore": {
     "placeholders": {
-      "n": { "type": "int" }
+      "n": {
+        "type": "int"
+      }
     }
   },
   "workoutDetailStatDuration": "DURACIÓN",
@@ -209,7 +213,10 @@
   "workoutPickerAddButton": "Agregar {count} {count, plural, =1{ejercicio} other{ejercicios}}",
   "@workoutPickerAddButton": {
     "placeholders": {
-      "count": { "type": "int", "format": "decimalPattern" }
+      "count": {
+        "type": "int",
+        "format": "decimalPattern"
+      }
     }
   },
   "workoutSelfEditorNameHint": "Mi rutina",
@@ -218,18 +225,17 @@
   "workoutPickerSheetApply": "APLICAR ({count})",
   "@workoutPickerSheetApply": {
     "placeholders": {
-      "count": { "type": "int" }
+      "count": {
+        "type": "int"
+      }
     }
   },
-
   "appFcmSnackBarActionLabel": "Ver",
-
   "profileEditPersonalNameRequired": "Ingresá un nombre",
   "profileEditPersonalNameMaxLength": "Máximo 50 caracteres",
   "profileEditPersonalWeightInvalidNumber": "Ingresá un número válido",
   "profileEditPersonalWeightOutOfRange": "Ingresá un peso entre 30 y 300 kg",
   "profileEditPersonalHeightOutOfRange": "Ingresá una altura entre 120 y 230 cm",
-
   "eliminarCuentaSheetTitle": "Eliminar cuenta",
   "eliminarCuentaSheetBodyPrefix": "Esta acción es ",
   "eliminarCuentaSheetBodyBold": "irreversible",
@@ -240,7 +246,6 @@
   "eliminarCuentaSheetLoadingSubtitle": "Esto puede tardar unos segundos.",
   "eliminarCuentaSheetErrorFallback": "No pudimos eliminar tu cuenta. Probá de nuevo.",
   "eliminarCuentaSheetRetryLabel": "Reintentar",
-
   "dashboardResumenDelDiaTitle": "RESUMEN DEL DÍA",
   "dashboardStatPendientes": "PENDIENTES",
   "dashboardStatCompletadas": "COMPLETADAS",
@@ -250,7 +255,6 @@
   "dashboardEntrenaronHoySectionLabel": "ENTRENARON HOY",
   "dashboardDejarFeedbackLabel": "Dejar feedback",
   "dashboardActividadRecienteSectionLabel": "ACTIVIDAD RECIENTE",
-
   "dashboardWeekday1": "LUNES",
   "dashboardWeekday2": "MARTES",
   "dashboardWeekday3": "MIÉRCOLES",
@@ -313,30 +317,35 @@
   "dashboardHolaSinNombre": "HOLA",
   "dashboardInvitarProximamente": "Invitar alumno — próximamente.",
   "dashboardSolicitudesPendientesTitle": "SOLICITUDES PENDIENTES ({count})",
-  "@dashboardSolicitudesPendientesTitle": { "placeholders": { "count": { "type": "int" } } },
+  "@dashboardSolicitudesPendientesTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "dashboardHolaConNombre": "HOLA, {name}",
-  "@dashboardHolaConNombre": { "placeholders": { "name": { "type": "String" } } },
-
+  "@dashboardHolaConNombre": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "reviewSnackBarSuccess": "¡Gracias por tu reseña!",
-
   "plantillasRetryLabel": "Reintentar",
-
   "profileSetupSaveError": "No pudimos guardar tu perfil. Probá de nuevo.",
   "profileSetupCancelDialogTitle": "¿Cancelar la creación de tu cuenta?",
   "profileSetupCancelDialogBody": "Vamos a borrar tu cuenta. Esta acción no se puede deshacer.",
   "profileSetupCancelAccountError": "No pudimos cancelar la cuenta. Probá de nuevo.",
-
   "reAuthPasswordLabel": "Contraseña",
-
   "profileGymSearchHint": "Buscar gym",
-
   "profileEditTrainerTitleEdit": "Editá tu perfil profesional",
   "profileEditTrainerTitleOnboarding": "Completá tu perfil profesional",
   "profileEditTrainerSaveSuccess": "Perfil actualizado.",
   "profileEditTrainerSaveError": "No pudimos guardar. Probá de nuevo.",
   "profileEditTrainerValidationSpecialty": "Elegí una especialidad.",
   "profileEditTrainerValidationLocation": "Agregá al menos una ubicación o activá clases virtuales.",
-
   "athleteDetailPlansSection": "PLANES ASIGNADOS",
   "athleteDetailProfileLoadError": "No pudimos cargar este perfil.",
   "athleteDetailPlanDeleteTitle": "Eliminar plan",
@@ -344,7 +353,6 @@
   "athleteDetailPlanDeleteConfirm": "Eliminar",
   "athleteDetailPlanDeleteSuccess": "Plan eliminado.",
   "athleteDetailMessageCta": "MENSAJE",
-
   "newSessionSheetTitle": "NUEVA SESIÓN",
   "newSessionSheetAlumnoLabel": "ALUMNO",
   "newSessionSheetFechaLabel": "FECHA",
@@ -355,10 +363,8 @@
   "newSessionSheetSubmitRecurring": "REGISTRAR SERIE",
   "newSessionSheetDurationError": "Ingresá una duración válida (5–480 min).",
   "newSessionSheetNoActiveAthletes": "No tenés alumnos activos.",
-
   "athleteCoachViewTrainerFallbackName": "tu Personal Trainer",
   "athleteCoachViewLinkError": "No pudimos cargar tu vínculo.",
-
   "checkInHeader": "¿ESTÁS EN EL GYM HOY?",
   "checkInNeutralSubtext": "Confirma tu entrenamiento de hoy",
   "checkInNoButton": "NO",
@@ -366,193 +372,150 @@
   "checkInGymSubtext": "{gymName} · ¡Detectamos que podés estar entrenando!",
   "@checkInGymSubtext": {
     "placeholders": {
-      "gymName": { "type": "String" }
+      "gymName": {
+        "type": "String"
+      }
     }
   },
   "checkInError": "No pudimos registrar tu check-in. Probá de nuevo.",
-
   "profileCuentaTitle": "CUENTA",
   "@profileCuentaTitle": {},
-
   "profileCuentaSolicitudesTitle": "Solicitudes de amistad",
   "@profileCuentaSolicitudesTitle": {},
-
   "profileCuentaSolicitudesSubtitle": "{count} nuevas",
   "@profileCuentaSolicitudesSubtitle": {
     "placeholders": {
-      "count": { "type": "int" }
+      "count": {
+        "type": "int"
+      }
     }
   },
-
   "profileCuentaDatosPersonalesTitle": "Datos personales",
   "@profileCuentaDatosPersonalesTitle": {},
-
   "profileCuentaDatosPersonalesSubtitle": "Editá tu info",
   "@profileCuentaDatosPersonalesSubtitle": {},
-
   "profileCuentaGimnasioTitle": "Gimnasio",
   "@profileCuentaGimnasioTitle": {},
-
   "profileCuentaNoGym": "Sin gym",
   "@profileCuentaNoGym": {},
-
   "profileCuentaMisRutinasTitle": "Mis rutinas",
   "@profileCuentaMisRutinasTitle": {},
-
   "profileCuentaRutinasSubtitle": "{count} activas",
   "@profileCuentaRutinasSubtitle": {
     "placeholders": {
-      "count": { "type": "int" }
+      "count": {
+        "type": "int"
+      }
     }
   },
-
   "chatListTitle": "MENSAJES",
   "@chatListTitle": {},
-
   "chatListDeletedUser": "Usuario eliminado",
   "@chatListDeletedUser": {},
-
   "chatListStartConversation": "Iniciá la conversación",
   "@chatListStartConversation": {},
-
   "chatListEmptyTitle": "Sin mensajes todavía",
   "@chatListEmptyTitle": {},
-
   "chatListEmptyBody": "Cuando tengas un vínculo activo con un PF, vas a poder chatear desde acá.",
   "@chatListEmptyBody": {},
-
   "chatListError": "No pudimos cargar tus mensajes.",
   "@chatListError": {},
-
   "chatListRetryLabel": "Reintentar",
   "@chatListRetryLabel": {},
-
   "chatRelativeJustNow": "recién",
   "@chatRelativeJustNow": {},
-
   "chatRelativeMinutes": "hace {minutes}m",
   "@chatRelativeMinutes": {
     "placeholders": {
-      "minutes": { "type": "int" }
+      "minutes": {
+        "type": "int"
+      }
     }
   },
-
   "chatRelativeHours": "hace {hours}h",
   "@chatRelativeHours": {
     "placeholders": {
-      "hours": { "type": "int" }
+      "hours": {
+        "type": "int"
+      }
     }
   },
-
   "chatRelativeDays": "hace {days}d",
   "@chatRelativeDays": {
     "placeholders": {
-      "days": { "type": "int" }
+      "days": {
+        "type": "int"
+      }
     }
   },
-
   "chatScreenTitleFallback": "Usuario",
   "@chatScreenTitleFallback": {},
-
   "chatScreenLoadError": "No pudimos cargar los mensajes.",
   "@chatScreenLoadError": {},
-
   "chatScreenComposerHint": "Escribí un mensaje…",
   "@chatScreenComposerHint": {},
-
   "chatScreenSendLabel": "Enviar",
   "@chatScreenSendLabel": {},
-
   "chatScreenSendError": "No pudimos enviar el mensaje. Probá de nuevo.",
   "@chatScreenSendError": {},
-
   "performanceLogTitle": "Cargar evaluación",
   "@performanceLogTitle": {},
-
   "performanceLogCancel": "Cancelar",
   "@performanceLogCancel": {},
-
   "performanceLogSaveCta": "GUARDAR EVALUACIÓN",
   "@performanceLogSaveCta": {},
-
   "performanceLogNoSession": "No hay sesión activa. No se puede guardar.",
   "@performanceLogNoSession": {},
-
   "performanceLogSaveSuccess": "Evaluación guardada",
   "@performanceLogSaveSuccess": {},
-
   "performanceLogSaveError": "No pudimos guardar la evaluación. Probá de nuevo.",
   "@performanceLogSaveError": {},
-
   "performanceLogNotesHint": "Observaciones del entrenador…",
   "@performanceLogNotesHint": {},
-
   "performanceLogSectionJumps": "SALTOS (cm)",
   "@performanceLogSectionJumps": {},
-
   "performanceLogSectionSpeed": "VELOCIDAD (seg)",
   "@performanceLogSectionSpeed": {},
-
   "performanceLogSectionStrength": "FUERZA 1RM (kg)",
   "@performanceLogSectionStrength": {},
-
   "performanceLogSectionEndurance": "RESISTENCIA / OTROS",
   "@performanceLogSectionEndurance": {},
-
   "performanceLogSectionNotes": "NOTAS",
   "@performanceLogSectionNotes": {},
-
   "performanceLogFieldCmj": "CMJ",
   "@performanceLogFieldCmj": {},
-
   "performanceLogFieldSquatJump": "Squat Jump",
   "@performanceLogFieldSquatJump": {},
-
   "performanceLogFieldAbalakov": "Abalakov",
   "@performanceLogFieldAbalakov": {},
-
   "performanceLogFieldBroadJump": "Salto largo",
   "@performanceLogFieldBroadJump": {},
-
   "performanceLogFieldSprint10": "Sprint 10m",
   "@performanceLogFieldSprint10": {},
-
   "performanceLogFieldSprint20": "20m",
   "@performanceLogFieldSprint20": {},
-
   "performanceLogFieldSprint30": "30m",
   "@performanceLogFieldSprint30": {},
-
   "performanceLogFieldSprint40": "40m",
   "@performanceLogFieldSprint40": {},
-
   "performanceLogFieldSquat1rm": "Sentadilla",
   "@performanceLogFieldSquat1rm": {},
-
   "performanceLogFieldBenchPress": "Press banca",
   "@performanceLogFieldBenchPress": {},
-
   "performanceLogFieldDeadlift": "Peso muerto",
   "@performanceLogFieldDeadlift": {},
-
   "performanceLogFieldOverheadPress": "Press militar",
   "@performanceLogFieldOverheadPress": {},
-
   "performanceLogFieldPullUp": "Dominada lastrada",
   "@performanceLogFieldPullUp": {},
-
   "performanceLogFieldVo2max": "VO2máx",
   "@performanceLogFieldVo2max": {},
-
   "performanceLogFieldCourseNavette": "Course Navette (nivel)",
   "@performanceLogFieldCourseNavette": {},
-
   "performanceLogFieldCooper": "Cooper",
   "@performanceLogFieldCooper": {},
-
   "performanceLogFieldSitAndReach": "Flexibilidad sit-and-reach",
   "@performanceLogFieldSitAndReach": {},
-
   "performanceChartSectionLabel": "PROGRESO",
   "@performanceChartSectionLabel": {},
   "performanceChartEmptyHint": "Cargá otra evaluación para ver el progreso.",
@@ -560,13 +523,17 @@
   "performanceChartSpanDays": "({count} {count, plural, =1{día} other{días}})",
   "@performanceChartSpanDays": {
     "placeholders": {
-      "count": { "type": "int" }
+      "count": {
+        "type": "int"
+      }
     }
   },
   "performanceChartSpanWeeks": "({count} {count, plural, =1{semana} other{semanas}})",
   "@performanceChartSpanWeeks": {
     "placeholders": {
-      "count": { "type": "int" }
+      "count": {
+        "type": "int"
+      }
     }
   },
   "performanceChartMetricCmj": "CMJ",
@@ -603,11 +570,12 @@
   "@performanceChartMetricCooper": {},
   "performanceChartMetricSitAndReach": "Flexibilidad",
   "@performanceChartMetricSitAndReach": {},
-
   "routineEditorDayName": "Día {n}",
   "@routineEditorDayName": {
     "placeholders": {
-      "n": { "type": "int" }
+      "n": {
+        "type": "int"
+      }
     }
   },
   "routineEditorAddExercise": "Agregar ejercicio",
@@ -627,23 +595,33 @@
   "routineEditorWeekShort": "Sem {n}",
   "@routineEditorWeekShort": {
     "placeholders": {
-      "n": { "type": "int" }
+      "n": {
+        "type": "int"
+      }
     }
   },
   "routineEditorInvalidWeekHint": "Sets incompletos en Sem {week} · Día {day}",
   "@routineEditorInvalidWeekHint": {
     "placeholders": {
-      "week": { "type": "int" },
-      "day": { "type": "int" }
+      "week": {
+        "type": "int"
+      },
+      "day": {
+        "type": "int"
+      }
     }
   },
   "routineEditorDuplicateWeekTitle": "Duplicar semana",
   "@routineEditorDuplicateWeekTitle": {},
-  "routineEditorDuplicateWeekBody": "Se copiará la Semana {source} en la Semana {target}.",
+  "routineEditorDuplicateWeekBody": "Se copiará la Semana {sourceWeek} en la Semana {targetWeek}.",
   "@routineEditorDuplicateWeekBody": {
     "placeholders": {
-      "source": { "type": "int" },
-      "target": { "type": "int" }
+      "sourceWeek": {
+        "type": "int"
+      },
+      "targetWeek": {
+        "type": "int"
+      }
     }
   },
   "routineEditorDialogCancel": "Cancelar",
@@ -684,7 +662,6 @@
       }
     }
   },
-
   "routineDetailNotFound": "Rutina no encontrada",
   "@routineDetailNotFound": {},
   "routineDetailNoDaysConfigured": "Esta rutina no tiene días configurados.",
@@ -706,13 +683,17 @@
   "routineDetailDayLabel": "DÍA {day}",
   "@routineDetailDayLabel": {
     "placeholders": {
-      "day": { "type": "int" }
+      "day": {
+        "type": "int"
+      }
     }
   },
   "routineDetailWeekLabel": "SEM {week}",
   "@routineDetailWeekLabel": {
     "placeholders": {
-      "week": { "type": "int" }
+      "week": {
+        "type": "int"
+      }
     }
   },
   "routineDetailPlanComplete": "PLAN COMPLETADO",
@@ -724,5 +705,39 @@
   "routineDetailDayLocked": "DÍA BLOQUEADO",
   "@routineDetailDayLocked": {},
   "routineDetailStart": "EMPEZAR",
-  "@routineDetailStart": {}
+  "@routineDetailStart": {},
+  "routineEditorDeleteScopeTitle": "¿Eliminar solo de esta semana o de todas?",
+  "@routineEditorDeleteScopeTitle": {},
+  "routineEditorScopeOnlyThisWeek": "Solo esta semana",
+  "@routineEditorScopeOnlyThisWeek": {},
+  "routineEditorScopeAllWeeks": "Todas las semanas",
+  "@routineEditorScopeAllWeeks": {},
+  "routineEditorAddScopeTitle": "¿En qué semanas agregar?",
+  "@routineEditorAddScopeTitle": {},
+  "routineEditorAddScopeBody": "¿Agregar el ejercicio solo en esta semana o en todas?",
+  "@routineEditorAddScopeBody": {},
+  "routineEditorAddOnlyThisWeek": "Agregar solo en esta semana",
+  "@routineEditorAddOnlyThisWeek": {},
+  "routineEditorAddAllWeeks": "Agregar en todas las semanas",
+  "@routineEditorAddAllWeeks": {},
+  "routineEditorWeekLabel": "Semana",
+  "@routineEditorWeekLabel": {},
+  "routineEditorLevelSection": "NIVEL",
+  "@routineEditorLevelSection": {},
+  "routineEditorWeeksSection": "SEMANAS",
+  "@routineEditorWeeksSection": {},
+  "routineEditorDaysSection": "DÍAS DEL PLAN",
+  "@routineEditorDaysSection": {},
+  "routineEditorNameHint": "Ej: Fuerza PPL",
+  "@routineEditorNameHint": {},
+  "routineEditorSplitHint": "PPL / Full Body",
+  "@routineEditorSplitHint": {},
+  "routineEditorIncompleteSetsLabel": "Sets incompletos en Sem {weekNumber}",
+  "@routineEditorIncompleteSetsLabel": {
+    "placeholders": {
+      "weekNumber": {
+        "type": "int"
+      }
+    }
+  }
 }

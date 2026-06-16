@@ -2525,8 +2525,8 @@ abstract class AppL10n {
   /// No description provided for @routineEditorDuplicateWeekBody.
   ///
   /// In es_AR, this message translates to:
-  /// **'Se copiará la Semana {source} en la Semana {target}.'**
-  String routineEditorDuplicateWeekBody(int source, int target);
+  /// **'Se copiará la Semana {sourceWeek} en la Semana {targetWeek}.'**
+  String routineEditorDuplicateWeekBody(int sourceWeek, int targetWeek);
 
   /// No description provided for @routineEditorDialogCancel.
   ///
@@ -2615,7 +2615,7 @@ abstract class AppL10n {
   /// SnackBar shown when the user taps save with at least one incomplete set. Names the first offending exercise.
   ///
   /// In es_AR, this message translates to:
-  /// **'Completá los sets de "{exerciseName}" antes de guardar.'**
+  /// **'Completá los sets de \"{exerciseName}\" antes de guardar.'**
   String routineEditorIncompleteSetsFeedback(String exerciseName);
 
   /// No description provided for @routineDetailNotFound.
@@ -2713,6 +2713,90 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'EMPEZAR'**
   String get routineDetailStart;
+
+  /// No description provided for @routineEditorDeleteScopeTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Eliminar solo de esta semana o de todas?'**
+  String get routineEditorDeleteScopeTitle;
+
+  /// No description provided for @routineEditorScopeOnlyThisWeek.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Solo esta semana'**
+  String get routineEditorScopeOnlyThisWeek;
+
+  /// No description provided for @routineEditorScopeAllWeeks.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Todas las semanas'**
+  String get routineEditorScopeAllWeeks;
+
+  /// No description provided for @routineEditorAddScopeTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿En qué semanas agregar?'**
+  String get routineEditorAddScopeTitle;
+
+  /// No description provided for @routineEditorAddScopeBody.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Agregar el ejercicio solo en esta semana o en todas?'**
+  String get routineEditorAddScopeBody;
+
+  /// No description provided for @routineEditorAddOnlyThisWeek.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Agregar solo en esta semana'**
+  String get routineEditorAddOnlyThisWeek;
+
+  /// No description provided for @routineEditorAddAllWeeks.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Agregar en todas las semanas'**
+  String get routineEditorAddAllWeeks;
+
+  /// No description provided for @routineEditorWeekLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Semana'**
+  String get routineEditorWeekLabel;
+
+  /// No description provided for @routineEditorLevelSection.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'NIVEL'**
+  String get routineEditorLevelSection;
+
+  /// No description provided for @routineEditorWeeksSection.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'SEMANAS'**
+  String get routineEditorWeeksSection;
+
+  /// No description provided for @routineEditorDaysSection.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'DÍAS DEL PLAN'**
+  String get routineEditorDaysSection;
+
+  /// No description provided for @routineEditorNameHint.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ej: Fuerza PPL'**
+  String get routineEditorNameHint;
+
+  /// No description provided for @routineEditorSplitHint.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'PPL / Full Body'**
+  String get routineEditorSplitHint;
+
+  /// No description provided for @routineEditorIncompleteSetsLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Sets incompletos en Sem {weekNumber}'**
+  String routineEditorIncompleteSetsLabel(int weekNumber);
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

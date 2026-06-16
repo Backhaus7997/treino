@@ -8,10 +8,13 @@ library;
 /// >= 1280 px: desktop, el sidebar respeta `sidebarCollapsedProvider`.
 const double kDesktopBreakpoint = 1280;
 
-/// 1024–1279 px: compact, el sidebar queda forzado a colapsado (toggle off).
-const double kCompactBreakpoint = 1024;
-
-/// < 768 px: mobile, `MobileBanner` reemplaza el scaffold (W1.3).
+/// < 768 px: mobile, `MobileBanner` reemplaza el scaffold.
+///
+/// El rango `768 … 1279` es **compact** (sidebar forzado a colapsado, toggle
+/// off). No hay constante de piso separada: compact es exactamente
+/// `[kMobileBreakpoint, kDesktopBreakpoint)`. (Decisión 2026-06-16: el piso de
+/// force-collapse es 768, no 1024 — colapsar en tablets es mejor UX que un
+/// sidebar de 264 px comiéndose la pantalla.)
 const double kMobileBreakpoint = 768;
 
 /// Clasificación de viewport derivada del ancho disponible.

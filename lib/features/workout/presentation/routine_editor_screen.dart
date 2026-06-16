@@ -842,6 +842,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     }
 
     // Multi-week path: show the delete scope dialog (REQ-WPRES-010).
+    final l10n = AppL10n.of(context);
     final choice = await showDialog<_DeleteScope>(
       context: context,
       builder: (ctx) {
@@ -856,18 +857,18 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
               child: Text(
-                '¿Eliminar solo de esta semana o de todas?',
+                l10n.routineEditorDeleteScopeTitle,
                 style: TextStyle(color: palette.textMuted, fontSize: 13),
               ),
             ),
             SimpleDialogOption(
               onPressed: () => Navigator.of(ctx).pop(_DeleteScope.thisWeek),
-              child: Text('Solo esta semana',
+              child: Text(l10n.routineEditorScopeOnlyThisWeek,
                   style: TextStyle(color: palette.accent)),
             ),
             SimpleDialogOption(
               onPressed: () => Navigator.of(ctx).pop(_DeleteScope.allWeeks),
-              child: Text('Todas las semanas',
+              child: Text(l10n.routineEditorScopeAllWeeks,
                   style: TextStyle(color: palette.danger)),
             ),
           ],
@@ -916,30 +917,31 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
       return _AddScope.allWeeks;
     }
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     return showDialog<_AddScope>(
       context: context,
       builder: (ctx) => SimpleDialog(
         backgroundColor: palette.bgCard,
         title: Text(
-          '¿En qué semanas agregar?',
+          l10n.routineEditorAddScopeTitle,
           style: TextStyle(color: palette.textPrimary),
         ),
         children: [
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
             child: Text(
-              '¿Agregar el ejercicio solo en esta semana o en todas?',
+              l10n.routineEditorAddScopeBody,
               style: TextStyle(color: palette.textMuted, fontSize: 13),
             ),
           ),
           SimpleDialogOption(
             onPressed: () => Navigator.of(ctx).pop(_AddScope.thisWeek),
-            child: Text('Agregar solo en esta semana',
+            child: Text(l10n.routineEditorAddOnlyThisWeek,
                 style: TextStyle(color: palette.accent)),
           ),
           SimpleDialogOption(
             onPressed: () => Navigator.of(ctx).pop(_AddScope.allWeeks),
-            child: Text('Agregar en todas las semanas',
+            child: Text(l10n.routineEditorAddAllWeeks,
                 style: TextStyle(color: palette.textMuted)),
           ),
         ],
@@ -1257,8 +1259,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
           if (userRoutines.length >= 10) {
             if (!mounted) return;
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                  content: Text(l10n.workoutSelfEditorCapReached)),
+              SnackBar(content: Text(l10n.workoutSelfEditorCapReached)),
             );
             setState(() => _submitting = false);
             return;
@@ -1298,8 +1299,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
           await repo.updateUserOwned(uid: uid, draft: draft);
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-                content: Text(l10n.workoutSelfEditorUpdateSuccess)),
+            SnackBar(content: Text(l10n.workoutSelfEditorUpdateSuccess)),
           );
           context.pop();
       }
@@ -1452,7 +1452,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                                     decoration: _inputDecoration(
                                       palette,
                                       hint: _isTrainerMode
-                                          ? 'Ej: Fuerza PPL'
+                                          ? l10n.routineEditorNameHint
                                           : l10n.workoutSelfEditorNameHint,
                                     ),
                                     onChanged: (_) => setState(() {}),
@@ -1480,7 +1480,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                                       ),
                                       decoration: _inputDecoration(
                                         palette,
-                                        hint: 'PPL / Full Body',
+                                        hint: l10n.routineEditorSplitHint,
                                       ),
                                       onChanged: (_) => setState(() {}),
                                     ),
@@ -1502,7 +1502,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     _SectionLabel(
-                                        label: l10n.routineEditorLevelLabel,
+                                        label: l10n.routineEditorLevelSection,
                                         palette: palette),
                                     const SizedBox(height: 4),
                                     _LevelDropdown(
@@ -1526,7 +1526,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                         // Week state machine — REQ-PERIOD-010..014. The chips
                         // switch the week every slot editor renders (live-view).
                         _SectionLabel(
-                            label: l10n.routineEditorWeeksLabel,
+                            label: l10n.routineEditorWeeksSection,
                             palette: palette),
                         const SizedBox(height: 6),
                         _WeekTabBar(
@@ -1551,10 +1551,8 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                         if (hiddenInvalidWeeks.isNotEmpty) ...[
                           const SizedBox(height: 4),
                           Text(
-                            l10n.routineEditorInvalidWeekHint(
-                              hiddenInvalidWeeks.first + 1,
-                              invalidWeeks[hiddenInvalidWeeks.first]!,
-                            ),
+                            '${l10n.routineEditorIncompleteSetsLabel(hiddenInvalidWeeks.first + 1)} · Día '
+                            '${invalidWeeks[hiddenInvalidWeeks.first]}',
                             key: const Key('invalid_week_hint'),
                             style: GoogleFonts.barlow(
                               fontSize: 11,
@@ -1566,7 +1564,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
 
                         // ── Días del plan ───────────────────────────────────
                         _SectionLabel(
-                            label: l10n.routineEditorDaysLabel,
+                            label: l10n.routineEditorDaysSection,
                             palette: palette),
                         const SizedBox(height: 6),
 
@@ -1773,7 +1771,7 @@ class _WeekTabBar extends StatelessWidget {
                   size: 14,
                   color: canAdd ? palette.accent : palette.border,
                 ),
-                label: Text(l10n.routineEditorAddWeek,
+                label: Text(l10n.routineEditorWeekLabel,
                     style: actionStyle(canAdd)),
               ),
             ],
@@ -1808,7 +1806,7 @@ class _WeekTabBar extends StatelessWidget {
                 size: 14,
                 color: canDuplicate ? palette.accent : palette.border,
               ),
-              label: Text(l10n.routineEditorDuplicateWeek,
+              label: Text(l10n.routineEditorDuplicateWeekTitle,
                   style: actionStyle(canDuplicate)),
             ),
           ],

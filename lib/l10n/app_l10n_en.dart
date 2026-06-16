@@ -1262,7 +1262,7 @@ class AppL10nEn extends AppL10n {
   String get routineEditorAddWeek => 'Week';
 
   @override
-  String get routineEditorRemoveLastWeek => 'Remove last';
+  String get routineEditorRemoveLastWeek => '';
 
   @override
   String get routineEditorDuplicateWeek => 'Duplicate week';
@@ -1281,15 +1281,15 @@ class AppL10nEn extends AppL10n {
   String get routineEditorDuplicateWeekTitle => 'Duplicate week';
 
   @override
-  String routineEditorDuplicateWeekBody(int source, int target) {
-    return 'Week $source will be copied into Week $target.';
+  String routineEditorDuplicateWeekBody(int sourceWeek, int targetWeek) {
+    return '';
   }
 
   @override
-  String get routineEditorDialogCancel => 'Cancel';
+  String get routineEditorDialogCancel => '';
 
   @override
-  String get routineEditorDialogConfirm => 'Confirm';
+  String get routineEditorDialogConfirm => '';
 
   @override
   String get routineEditorSlotMenuReplace => 'Change exercise';
@@ -1316,19 +1316,21 @@ class AppL10nEn extends AppL10n {
   String get routineEditorMeasureTime => 'Time';
 
   @override
-  String get routineEditorSetTypeNormal => 'Normal';
+  String get routineEditorSetTypeNormal => '';
 
   @override
-  String get routineEditorSetTypeWarmup => 'Warm-up (W)';
+  String get routineEditorSetTypeWarmup => '';
 
   @override
-  String get routineEditorSetTypeDrop => 'Drop (D)';
+  String get routineEditorSetTypeDrop => '';
 
   @override
-  String get routineEditorSetTypeFailure => 'To failure (F)';
+  String get routineEditorSetTypeFailure => '';
 
   @override
-  String routineEditorIncompleteSetsFeedback(String exerciseName) => '';
+  String routineEditorIncompleteSetsFeedback(String exerciseName) {
+    return '';
+  }
 
   @override
   String get routineDetailNotFound => '';
@@ -1381,4 +1383,48 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get routineDetailStart => '';
+
+  @override
+  String get routineEditorDeleteScopeTitle => '';
+
+  @override
+  String get routineEditorScopeOnlyThisWeek => '';
+
+  @override
+  String get routineEditorScopeAllWeeks => '';
+
+  @override
+  String get routineEditorAddScopeTitle => '';
+
+  @override
+  String get routineEditorAddScopeBody => '';
+
+  @override
+  String get routineEditorAddOnlyThisWeek => '';
+
+  @override
+  String get routineEditorAddAllWeeks => '';
+
+  @override
+  String get routineEditorWeekLabel => 'Week';
+
+  @override
+  String get routineEditorLevelSection => 'LEVEL';
+
+  @override
+  String get routineEditorWeeksSection => 'WEEKS';
+
+  @override
+  String get routineEditorDaysSection => 'PLAN DAYS';
+
+  @override
+  String get routineEditorNameHint => '';
+
+  @override
+  String get routineEditorSplitHint => '';
+
+  @override
+  String routineEditorIncompleteSetsLabel(int weekNumber) {
+    return '';
+  }
 }

@@ -14,7 +14,13 @@ import 'sidebar_registry.dart';
 /// 264↔72 px. El estado colapsado viene de `sidebarCollapsedProvider`, gateado
 /// por `sharedPreferencesProvider` (optimistic-expanded mientras resuelve).
 class CoachHubSidebar extends ConsumerWidget {
-  const CoachHubSidebar({super.key});
+  const CoachHubSidebar({super.key, this.collapsedOverride});
+
+  /// Si es no-nulo, fuerza el estado colapsado e ignora
+  /// `sidebarCollapsedProvider`. El `CoachHubScaffold` lo pasa en `true` en
+  /// viewport compact (ADR-CHW-004) sin escribir el provider, así el valor
+  /// guardado del usuario se preserva al volver a desktop.
+  final bool? collapsedOverride;
 
   static const double expandedWidth = 264;
   static const double collapsedWidth = 72;
@@ -22,10 +28,11 @@ class CoachHubSidebar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
-    final collapsed = ref.watch(sharedPreferencesProvider).maybeWhen(
+    final bool stored = ref.watch(sharedPreferencesProvider).maybeWhen(
           data: (_) => ref.watch(sidebarCollapsedProvider),
           orElse: () => false,
         );
+    final collapsed = collapsedOverride ?? stored;
     final location = GoRouterState.of(context).uri.toString();
 
     final groups = <SidebarGroup, List<SidebarItem>>{};
@@ -44,6 +51,10 @@ class CoachHubSidebar extends ConsumerWidget {
       width: collapsed ? collapsedWidth : expandedWidth,
       duration: const Duration(milliseconds: 200),
       curve: Curves.easeOut,
+      // Clip durante la animación de ancho: al colapsar/expandir (o al resize
+      // entre desktop y compact) el ancho anima pero el layout de las filas
+      // cambia al instante, así que sin clip las filas desbordarían unos px.
+      clipBehavior: Clip.hardEdge,
       decoration: BoxDecoration(
         color: palette.bg,
         border: Border(right: BorderSide(color: palette.border)),
