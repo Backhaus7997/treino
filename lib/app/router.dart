@@ -307,23 +307,30 @@ GoRouter buildRouter({
           ),
         ),
         routes: [
-          // Tab roots use _noAnim. SHELL SUB-ROUTES also use pageBuilder +
-          // _noAnim: a `builder` (→ CupertinoPageRoute on iOS) renders BLACK
-          // on device when these screens — which intentionally have no
-          // Scaffold/AppBackground of their own (provided by _ShellScaffold)
-          // — are pushed from a top-level route via a modal sheet (the
-          // exercise picker). Reverted from 5e2c506. The iOS swipe-back stays
-          // on TOP-LEVEL routes (editors/player/historial) which DO own a
-          // Scaffold and were confirmed working on device.
+          // Tab roots use pageBuilder + _noAnim (instant transition, no
+          // swipe-back — they are the bottom-nav destinations).
+          //
+          // SHELL SUB-ROUTES use `builder` → CupertinoPageRoute on iOS, which
+          // gives the native slide + edge swipe-back gesture. RoutineDetail /
+          // ExerciseDetail have no Scaffold/AppBackground of their own (provided
+          // by _ShellScaffold) and that is FINE: pushed onto the shell navigator
+          // they composite over _ShellScaffold's AppBackground — exactly like
+          // /coach/athlete and /profile/* sub-routes, which are also bare and
+          // work. The earlier black screen (reverted in aa2855e) was NOT the
+          // missing Scaffold: it was the exercise picker pushing
+          // `/workout/exercise/:id` from a useRootNavigator:true sheet, landing
+          // the page on the ROOT navigator (no AppBackground behind it). Fixed
+          // in 5be5936 — the picker now uses Navigator.push with its own
+          // Scaffold. All remaining callers push from within the shell.
           GoRoute(
             path: '/workout',
             pageBuilder: (_, __) => _noAnim(const WorkoutScreen()),
             routes: [
               GoRoute(
                 path: 'routine/:routineId',
-                pageBuilder: (context, state) {
+                builder: (context, state) {
                   final routineId = state.pathParameters['routineId']!;
-                  return _noAnim(RoutineDetailScreen(routineId: routineId));
+                  return RoutineDetailScreen(routineId: routineId);
                 },
               ),
               GoRoute(
@@ -331,13 +338,13 @@ GoRouter buildRouter({
                 // the slot's exercise might live in a trainer's
                 // customExercises subcollection — see slotExerciseProvider.
                 path: 'exercise/:exerciseId',
-                pageBuilder: (context, state) {
+                builder: (context, state) {
                   final exerciseId = state.pathParameters['exerciseId']!;
                   final ownerId = state.uri.queryParameters['ownerId'];
-                  return _noAnim(ExerciseDetailScreen(
+                  return ExerciseDetailScreen(
                     exerciseId: exerciseId,
                     ownerId: ownerId,
-                  ));
+                  );
                 },
               ),
               // NOTE: routine-editor, template-editor, my-routine-editor are
