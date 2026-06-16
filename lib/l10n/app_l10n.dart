@@ -1761,9 +1761,15 @@ abstract class AppL10n {
   String get dashboardInvitarProximamente;
 
   /// No description provided for @dashboardSolicitudesPendientesTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'SOLICITUDES PENDIENTES ({count})'**
   String dashboardSolicitudesPendientesTitle(int count);
 
   /// No description provided for @dashboardHolaConNombre.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'HOLA, {name}'**
   String dashboardHolaConNombre(String name);
 
   /// No description provided for @reviewSnackBarSuccess.
@@ -2151,90 +2157,177 @@ abstract class AppL10n {
   String get chatScreenSendError;
 
   /// No description provided for @performanceLogTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cargar evaluación'**
   String get performanceLogTitle;
 
   /// No description provided for @performanceLogCancel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cancelar'**
   String get performanceLogCancel;
 
   /// No description provided for @performanceLogSaveCta.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'GUARDAR EVALUACIÓN'**
   String get performanceLogSaveCta;
 
   /// No description provided for @performanceLogNoSession.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No hay sesión activa. No se puede guardar.'**
   String get performanceLogNoSession;
 
   /// No description provided for @performanceLogSaveSuccess.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Evaluación guardada'**
   String get performanceLogSaveSuccess;
 
   /// No description provided for @performanceLogSaveError.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos guardar la evaluación. Probá de nuevo.'**
   String get performanceLogSaveError;
 
   /// No description provided for @performanceLogNotesHint.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Observaciones del entrenador…'**
   String get performanceLogNotesHint;
 
   /// No description provided for @performanceLogSectionJumps.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'SALTOS (cm)'**
   String get performanceLogSectionJumps;
 
   /// No description provided for @performanceLogSectionSpeed.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'VELOCIDAD (seg)'**
   String get performanceLogSectionSpeed;
 
   /// No description provided for @performanceLogSectionStrength.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'FUERZA 1RM (kg)'**
   String get performanceLogSectionStrength;
 
   /// No description provided for @performanceLogSectionEndurance.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'RESISTENCIA / OTROS'**
   String get performanceLogSectionEndurance;
 
   /// No description provided for @performanceLogSectionNotes.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'NOTAS'**
   String get performanceLogSectionNotes;
 
   /// No description provided for @performanceLogFieldCmj.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CMJ'**
   String get performanceLogFieldCmj;
 
   /// No description provided for @performanceLogFieldSquatJump.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Squat Jump'**
   String get performanceLogFieldSquatJump;
 
   /// No description provided for @performanceLogFieldAbalakov.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Abalakov'**
   String get performanceLogFieldAbalakov;
 
   /// No description provided for @performanceLogFieldBroadJump.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Salto largo'**
   String get performanceLogFieldBroadJump;
 
   /// No description provided for @performanceLogFieldSprint10.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Sprint 10m'**
   String get performanceLogFieldSprint10;
 
   /// No description provided for @performanceLogFieldSprint20.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'20m'**
   String get performanceLogFieldSprint20;
 
   /// No description provided for @performanceLogFieldSprint30.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'30m'**
   String get performanceLogFieldSprint30;
 
   /// No description provided for @performanceLogFieldSprint40.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'40m'**
   String get performanceLogFieldSprint40;
 
   /// No description provided for @performanceLogFieldSquat1rm.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Sentadilla'**
   String get performanceLogFieldSquat1rm;
 
   /// No description provided for @performanceLogFieldBenchPress.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Press banca'**
   String get performanceLogFieldBenchPress;
 
   /// No description provided for @performanceLogFieldDeadlift.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Peso muerto'**
   String get performanceLogFieldDeadlift;
 
   /// No description provided for @performanceLogFieldOverheadPress.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Press militar'**
   String get performanceLogFieldOverheadPress;
 
   /// No description provided for @performanceLogFieldPullUp.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Dominada lastrada'**
   String get performanceLogFieldPullUp;
 
   /// No description provided for @performanceLogFieldVo2max.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'VO2máx'**
   String get performanceLogFieldVo2max;
 
   /// No description provided for @performanceLogFieldCourseNavette.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Course Navette (nivel)'**
   String get performanceLogFieldCourseNavette;
 
   /// No description provided for @performanceLogFieldCooper.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cooper'**
   String get performanceLogFieldCooper;
 
   /// No description provided for @performanceLogFieldSitAndReach.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Flexibilidad sit-and-reach'**
   String get performanceLogFieldSitAndReach;
 
   /// No description provided for @performanceChartSectionLabel.
@@ -2432,8 +2525,8 @@ abstract class AppL10n {
   /// No description provided for @routineEditorDuplicateWeekBody.
   ///
   /// In es_AR, this message translates to:
-  /// **'Se copiará la Semana {source} en la Semana {target}.'**
-  String routineEditorDuplicateWeekBody(int source, int target);
+  /// **'Se copiará la Semana {sourceWeek} en la Semana {targetWeek}.'**
+  String routineEditorDuplicateWeekBody(int sourceWeek, int targetWeek);
 
   /// No description provided for @routineEditorDialogCancel.
   ///
@@ -2614,6 +2707,90 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'EMPEZAR'**
   String get routineDetailStart;
+
+  /// No description provided for @routineEditorDeleteScopeTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Eliminar solo de esta semana o de todas?'**
+  String get routineEditorDeleteScopeTitle;
+
+  /// No description provided for @routineEditorScopeOnlyThisWeek.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Solo esta semana'**
+  String get routineEditorScopeOnlyThisWeek;
+
+  /// No description provided for @routineEditorScopeAllWeeks.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Todas las semanas'**
+  String get routineEditorScopeAllWeeks;
+
+  /// No description provided for @routineEditorAddScopeTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿En qué semanas agregar?'**
+  String get routineEditorAddScopeTitle;
+
+  /// No description provided for @routineEditorAddScopeBody.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Agregar el ejercicio solo en esta semana o en todas?'**
+  String get routineEditorAddScopeBody;
+
+  /// No description provided for @routineEditorAddOnlyThisWeek.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Agregar solo en esta semana'**
+  String get routineEditorAddOnlyThisWeek;
+
+  /// No description provided for @routineEditorAddAllWeeks.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Agregar en todas las semanas'**
+  String get routineEditorAddAllWeeks;
+
+  /// No description provided for @routineEditorWeekLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Semana'**
+  String get routineEditorWeekLabel;
+
+  /// No description provided for @routineEditorLevelSection.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'NIVEL'**
+  String get routineEditorLevelSection;
+
+  /// No description provided for @routineEditorWeeksSection.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'SEMANAS'**
+  String get routineEditorWeeksSection;
+
+  /// No description provided for @routineEditorDaysSection.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'DÍAS DEL PLAN'**
+  String get routineEditorDaysSection;
+
+  /// No description provided for @routineEditorNameHint.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ej: Fuerza PPL'**
+  String get routineEditorNameHint;
+
+  /// No description provided for @routineEditorSplitHint.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'PPL / Full Body'**
+  String get routineEditorSplitHint;
+
+  /// No description provided for @routineEditorIncompleteSetsLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Sets incompletos en Sem {weekNumber}'**
+  String routineEditorIncompleteSetsLabel(int weekNumber);
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

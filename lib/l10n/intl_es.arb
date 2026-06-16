@@ -1,7 +1,6 @@
 {
   "@@locale": "es",
   "@@x-note": "Copia defensiva de intl_es_AR.arb (decisión Q3 del audit). El locale real lo fija locale_resolver.dart → es-AR; esto es seguro de muerte: si algún día se quita ese lock, plain-`es` muestra español válido en vez de strings vacíos.",
-
   "authSplashTagline": "ENTRENÁ. COMPARTÍ. CRECÉ.",
   "authWelcomeEyebrow": "ENTRENAMIENTO · GYM · COACH",
   "authWelcomeBody": "Cargá tu rutina, ejecutá los sets, seguí a tus pibes y encontrá un coach cerca tuyo.",
@@ -44,7 +43,6 @@
   "authValidationPasswordRules": "La contraseña debe tener al menos 8 caracteres, una letra y un número",
   "authValidationPasswordMismatch": "Las contraseñas no coinciden",
   "authProfileSignOut": "Cerrar sesión",
-
   "chatListTitle": "MENSAJES",
   "chatListDeletedUser": "Usuario eliminado",
   "chatListStartConversation": "Iniciá la conversación",
@@ -66,13 +64,17 @@
   "performanceChartSpanDays": "({count} {count, plural, =1{día} other{días}})",
   "@performanceChartSpanDays": {
     "placeholders": {
-      "count": { "type": "int" }
+      "count": {
+        "type": "int"
+      }
     }
   },
   "performanceChartSpanWeeks": "({count} {count, plural, =1{semana} other{semanas}})",
   "@performanceChartSpanWeeks": {
     "placeholders": {
-      "count": { "type": "int" }
+      "count": {
+        "type": "int"
+      }
     }
   },
   "performanceChartMetricCmj": "CMJ",
@@ -98,14 +100,14 @@
   "routineEditorWeeksLabel": "SEMANAS",
   "routineEditorDaysLabel": "DÍAS DEL PLAN",
   "routineEditorAddWeek": "Semana",
-  "routineEditorRemoveLastWeek": "Quitar última",
+  "routineEditorRemoveLastWeek": "",
   "routineEditorDuplicateWeek": "Duplicar semana",
   "routineEditorWeekShort": "Sem {n}",
   "routineEditorInvalidWeekHint": "Sets incompletos en Sem {week} · Día {day}",
-  "routineEditorDuplicateWeekTitle": "Duplicar semana",
-  "routineEditorDuplicateWeekBody": "Se copiará la Semana {source} en la Semana {target}.",
-  "routineEditorDialogCancel": "Cancelar",
-  "routineEditorDialogConfirm": "Confirmar",
+  "routineEditorDuplicateWeekTitle": "",
+  "routineEditorDuplicateWeekBody": "",
+  "routineEditorDialogCancel": "",
+  "routineEditorDialogConfirm": "",
   "routineEditorSlotMenuReplace": "Cambiar ejercicio",
   "routineEditorSlotMenuMoveUp": "Subir",
   "routineEditorSlotMenuMoveDown": "Bajar",
@@ -114,11 +116,10 @@
   "routineEditorAddSet": "+ Agregar set",
   "routineEditorMeasureReps": "Reps",
   "routineEditorMeasureTime": "Tiempo",
-  "routineEditorSetTypeNormal": "Normal",
-  "routineEditorSetTypeWarmup": "Entrada en calor (W)",
-  "routineEditorSetTypeDrop": "Drop (D)",
-  "routineEditorSetTypeFailure": "Al fallo (F)",
-
+  "routineEditorSetTypeNormal": "",
+  "routineEditorSetTypeWarmup": "",
+  "routineEditorSetTypeDrop": "",
+  "routineEditorSetTypeFailure": "",
   "routineDetailNotFound": "Rutina no encontrada",
   "routineDetailNoDaysConfigured": "Esta rutina no tiene días configurados.",
   "routineDetailLoadError": "No pudimos cargar la rutina.",
@@ -134,5 +135,36 @@
   "routineDetailCompleted": "COMPLETADO",
   "routineDetailWeekLocked": "SEMANA BLOQUEADA",
   "routineDetailDayLocked": "DÍA BLOQUEADO",
-  "routineDetailStart": "EMPEZAR"
+  "routineDetailStart": "EMPEZAR",
+  "@routineEditorDuplicateWeekBody": {
+    "placeholders": {
+      "sourceWeek": {
+        "type": "int"
+      },
+      "targetWeek": {
+        "type": "int"
+      }
+    }
+  },
+  "routineEditorDeleteScopeTitle": "",
+  "routineEditorScopeOnlyThisWeek": "",
+  "routineEditorScopeAllWeeks": "",
+  "routineEditorAddScopeTitle": "",
+  "routineEditorAddScopeBody": "",
+  "routineEditorAddOnlyThisWeek": "",
+  "routineEditorAddAllWeeks": "",
+  "routineEditorWeekLabel": "",
+  "routineEditorLevelSection": "",
+  "routineEditorWeeksSection": "",
+  "routineEditorDaysSection": "",
+  "routineEditorNameHint": "",
+  "routineEditorSplitHint": "",
+  "routineEditorIncompleteSetsLabel": "",
+  "@routineEditorIncompleteSetsLabel": {
+    "placeholders": {
+      "weekNumber": {
+        "type": "int"
+      }
+    }
+  }
 }
