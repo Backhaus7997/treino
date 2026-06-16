@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/analytics/analytics_service.dart';
@@ -73,14 +74,27 @@ TrainerLink _activeLink() => TrainerLink(
       acceptedAt: DateTime.utc(2026, 1, 2),
     );
 
-Widget _wrap(Widget child, {List<Override> overrides = const []}) =>
-    ProviderScope(
-      overrides: overrides,
-      child: MaterialApp(
-        theme: AppTheme.dark(),
-        home: Scaffold(body: child),
+Widget _wrap(Widget child, {List<Override> overrides = const []}) {
+  // The screen calls context.go('/dashboard') after assigning, so the test
+  // needs a GoRouter in the tree (otherwise: "No GoRouter found in context").
+  final router = GoRouter(
+    initialLocation: '/',
+    routes: [
+      GoRoute(path: '/', builder: (_, __) => Scaffold(body: child)),
+      GoRoute(
+        path: '/dashboard',
+        builder: (_, __) => const Scaffold(body: SizedBox.shrink()),
       ),
-    );
+    ],
+  );
+  return ProviderScope(
+    overrides: overrides,
+    child: MaterialApp.router(
+      theme: AppTheme.dark(),
+      routerConfig: router,
+    ),
+  );
+}
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
