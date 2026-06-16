@@ -128,26 +128,32 @@ class _SiButton extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Disable while the confirm() write is in flight so a rapid double-tap
+    // cannot fire two confirm() calls before the first completes.
+    final isLoading = ref.watch(checkInNotifierProvider).isLoading;
+
     return ElevatedButton(
-      onPressed: () async {
-        final messenger = ScaffoldMessenger.of(context);
-        final navigator = Navigator.of(context);
-        final errorText = AppL10n.of(context).checkInError;
+      onPressed: isLoading
+          ? null
+          : () async {
+              final messenger = ScaffoldMessenger.of(context);
+              final navigator = Navigator.of(context);
+              final errorText = AppL10n.of(context).checkInError;
 
-        await ref
-            .read(checkInNotifierProvider.notifier)
-            .confirm(gymId: gymId, gymName: gymName);
+              await ref
+                  .read(checkInNotifierProvider.notifier)
+                  .confirm(gymId: gymId, gymName: gymName);
 
-        // confirm() swallows write failures into AsyncValue.guard, so the only
-        // signal of failure is the notifier state. Surface errors instead of
-        // closing on a write that never persisted; keep the dialog open so the
-        // user can retry.
-        if (ref.read(checkInNotifierProvider).hasError) {
-          messenger.showSnackBar(SnackBar(content: Text(errorText)));
-          return;
-        }
-        navigator.pop();
-      },
+              // confirm() swallows write failures into AsyncValue.guard, so the
+              // only signal of failure is the notifier state. Surface errors
+              // instead of closing on a write that never persisted; keep the
+              // dialog open so the user can retry.
+              if (ref.read(checkInNotifierProvider).hasError) {
+                messenger.showSnackBar(SnackBar(content: Text(errorText)));
+                return;
+              }
+              navigator.pop();
+            },
       style: ElevatedButton.styleFrom(
         backgroundColor: palette.accent,
         foregroundColor: palette.bg,

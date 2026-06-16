@@ -19,6 +19,12 @@ List<int> parseReps(String input) {
   final trimmed = input.trim();
   if (trimmed.isEmpty) return [];
 
+  // A dash is only a separator when it sits *between* two digits (e.g. "6-8").
+  // A dash that acts as a sign (start of input or after another separator,
+  // followed by a digit) means negative reps → reject the whole input, since
+  // the split below would otherwise swallow it and accept a positive value.
+  if (RegExp(r'(^|[\s/-])-\d').hasMatch(trimmed)) return [];
+
   // Split on dashes, slashes, or whitespace (one or more of each).
   final parts = trimmed.split(RegExp(r'[\s/\-]+'));
   final result = <int>[];

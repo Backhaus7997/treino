@@ -14,9 +14,9 @@
 //   workout-49 — SessionNotifier.updateSet throws when SetLog id is empty.
 //   workout-50 — SessionNotifier.updateSet overwrites the matching log in place
 //                (same list size, same id, repo.updateSetLog called once).
-//   workout-20 — parseReps('-5'): negative input must be rejected → [] . The
-//                current implementation splits on '-' and yields [5] instead
-//                (a leading minus is swallowed), so this is marked skip:'BUG'.
+//   workout-20 — parseReps('-5'): negative input is rejected → [] (the leading
+//                minus is no longer swallowed as a separator). Fixed in the
+//                2026-06-16 audit follow-up; the test is now active.
 //
 // Conventions mirror session_notifier_test.dart (mocktail, ProviderContainer
 // overrides, stub_factories helpers) and session_player_screen_test.dart
@@ -248,11 +248,6 @@ void main() {
         // reps make no sense), so the whole string is rejected.
         expect(parseReps('-5'), equals(<int>[]));
       },
-      // BUG: the regex splits on '-', dropping the leading minus, so '-5'
-      // currently parses to [5] instead of [] (negative sign silently
-      // swallowed). See lib/features/workout/domain/reps_format.dart parseReps.
-      skip: 'BUG: parseReps("-5") returns [5]; leading minus is swallowed by '
-          'the dash split instead of rejecting negative input',
     );
   });
 }

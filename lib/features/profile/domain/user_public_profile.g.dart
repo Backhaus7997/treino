@@ -16,8 +16,10 @@ _$UserPublicProfileImpl _$$UserPublicProfileImplFromJson(
       gymId: json['gymId'] as String?,
       workoutsCount: (json['workoutsCount'] as num?)?.toInt(),
       racha: (json['racha'] as num?)?.toInt(),
-      followersCount: (json['followersCount'] as num?)?.toInt(),
-      followingCount: (json['followingCount'] as num?)?.toInt(),
+      followersCount:
+          _nonNegativeCount((json['followersCount'] as num?)?.toInt()),
+      followingCount:
+          _nonNegativeCount((json['followingCount'] as num?)?.toInt()),
       sharedTemplatesWithAthletes:
           json['sharedTemplatesWithAthletes'] as bool? ?? false,
     );

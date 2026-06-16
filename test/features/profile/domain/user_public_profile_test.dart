@@ -67,6 +67,20 @@ void main() {
         expect(profile.gymId, equals('gym-001'));
       });
 
+      test(
+          'SCENARIO-320e: negative stored counters clamp to 0 on read '
+          '(atomic decrement cannot floor at zero — defensive read guard)', () {
+        final json = {
+          'uid': 'u1',
+          'displayName': 'Ana',
+          'followersCount': -1,
+          'followingCount': -1,
+        };
+        final profile = UserPublicProfile.fromJson(json);
+        expect(profile.followersCount, equals(0));
+        expect(profile.followingCount, equals(0));
+      });
+
       test('SCENARIO-320d: JSON round-trip preserves counter fields', () {
         const profile = UserPublicProfile(
           uid: 'u3',
