@@ -7,6 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../app/theme/app_palette.dart';
 import '../../../core/analytics/analytics_service.dart';
 import '../../../core/widgets/treino_icon.dart';
+import '../../../l10n/app_l10n.dart';
 import '../../feed/presentation/widgets/post_avatar.dart';
 import '../../profile/application/user_public_profile_providers.dart';
 import '../../workout/application/session_providers.dart'
@@ -68,8 +69,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No pudimos enviar el mensaje. Probá de nuevo.'),
+          SnackBar(
+            content: Text(AppL10n.of(context).chatScreenSendError),
           ),
         );
       }
@@ -81,6 +82,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     final messagesAsync = ref.watch(messagesProvider(widget.chatId));
     final currentUid = ref.watch(currentUidProvider);
     final pubAsync = ref.watch(userPublicProfileProvider(widget.otherUid));
@@ -97,14 +99,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         title: pubAsync.when(
           loading: () => const SizedBox.shrink(),
           error: (_, __) => Text(
-            'Usuario',
+            l10n.chatScreenTitleFallback,
             style: TextStyle(color: palette.textPrimary, fontSize: 16),
           ),
           data: (pub) {
-            // i18n: Fase 6 Etapa 3
             // When userPublicProfiles/{uid} is deleted, pub is null →
             // show "Usuario eliminado" per ADR-ACCDEL-005.
-            final name = pub?.displayName ?? 'Usuario eliminado';
+            final name = pub?.displayName ?? l10n.chatListDeletedUser;
             final avatar = pub?.avatarUrl;
             return Row(
               children: [
@@ -143,7 +144,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   child: Padding(
                     padding: const EdgeInsets.all(20),
                     child: Text(
-                      'No pudimos cargar los mensajes.',
+                      l10n.chatScreenLoadError,
                       style: TextStyle(color: palette.textMuted),
                     ),
                   ),
@@ -246,6 +247,7 @@ class _Composer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppL10n.of(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
       child: Row(
@@ -266,7 +268,7 @@ class _Composer extends StatelessWidget {
                 minLines: 1,
                 textInputAction: TextInputAction.newline,
                 decoration: InputDecoration(
-                  hintText: 'Escribí un mensaje…',
+                  hintText: l10n.chatScreenComposerHint,
                   hintStyle: TextStyle(color: palette.textMuted),
                   border: InputBorder.none,
                   isCollapsed: true,
@@ -286,7 +288,7 @@ class _Composer extends StatelessWidget {
                         strokeWidth: 2, color: palette.accent),
                   )
                 : Icon(TreinoIcon.send, color: palette.accent),
-            tooltip: 'Enviar',
+            tooltip: l10n.chatScreenSendLabel,
           ),
         ],
       ),

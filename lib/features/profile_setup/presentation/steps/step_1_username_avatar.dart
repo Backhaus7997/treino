@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../../../core/widgets/treino_icon.dart';
 import '../../../auth/presentation/widgets/auth_input.dart';
 import '../../application/profile_setup_notifier.dart';
 import '../../application/profile_setup_providers.dart';
@@ -84,7 +85,7 @@ class _Step1UsernameAvatarState extends ConsumerState<Step1UsernameAvatar> {
             controller: _usernameCtrl,
             label: 'USERNAME',
             hint: '@julieta',
-            leadingIcon: Icons.alternate_email,
+            leadingIcon: TreinoIcon.atSign,
             keyboardType: TextInputType.text,
             textInputAction: TextInputAction.done,
             validator: ProfileSetupValidators.validateUsername,

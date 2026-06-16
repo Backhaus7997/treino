@@ -677,6 +677,199 @@ class AppL10nEn extends AppL10n {
   String get dashboardActividadRecienteSectionLabel => 'ACTIVIDAD RECIENTE';
 
   @override
+  String get dashboardWeekday1 => 'LUNES';
+
+  @override
+  String get dashboardWeekday2 => 'MARTES';
+
+  @override
+  String get dashboardWeekday3 => 'MIÉRCOLES';
+
+  @override
+  String get dashboardWeekday4 => 'JUEVES';
+
+  @override
+  String get dashboardWeekday5 => 'VIERNES';
+
+  @override
+  String get dashboardWeekday6 => 'SÁBADO';
+
+  @override
+  String get dashboardWeekday7 => 'DOMINGO';
+
+  @override
+  String get dashboardMonth1 => 'ENERO';
+
+  @override
+  String get dashboardMonth2 => 'FEBRERO';
+
+  @override
+  String get dashboardMonth3 => 'MARZO';
+
+  @override
+  String get dashboardMonth4 => 'ABRIL';
+
+  @override
+  String get dashboardMonth5 => 'MAYO';
+
+  @override
+  String get dashboardMonth6 => 'JUNIO';
+
+  @override
+  String get dashboardMonth7 => 'JULIO';
+
+  @override
+  String get dashboardMonth8 => 'AGOSTO';
+
+  @override
+  String get dashboardMonth9 => 'SEPTIEMBRE';
+
+  @override
+  String get dashboardMonth10 => 'OCTUBRE';
+
+  @override
+  String get dashboardMonth11 => 'NOVIEMBRE';
+
+  @override
+  String get dashboardMonth12 => 'DICIEMBRE';
+
+  @override
+  String get dashboardDateToday => 'Hoy';
+
+  @override
+  String get dashboardDateTomorrow => 'Mañana';
+
+  @override
+  String get dashboardRechazarLabel => 'RECHAZAR';
+
+  @override
+  String get dashboardAceptarLabel => 'ACEPTAR';
+
+  @override
+  String get dashboardPagosPorCobrarTitle => 'PAGOS POR COBRAR';
+
+  @override
+  String get dashboardCobroTrailingLabel => '+ Cobro';
+
+  @override
+  String get dashboardInvitarAlumnoLabel => '+ INVITAR ALUMNO';
+
+  @override
+  String get dashboardAsignarRutinaLabel => '+ ASIGNAR RUTINA';
+
+  @override
+  String get dashboardCobroSueltoTitle => 'COBRO SUELTO';
+
+  @override
+  String get dashboardAlumnoLabel => 'ALUMNO';
+
+  @override
+  String get dashboardMontoArsLabel => 'MONTO (ARS)';
+
+  @override
+  String get dashboardConceptoLabel => 'CONCEPTO';
+
+  @override
+  String get dashboardAgregarCobroLabel => 'AGREGAR COBRO';
+
+  @override
+  String get dashboardMontoHint => 'Ej: 5000';
+
+  @override
+  String get dashboardConceptoHint => 'Ej: Clase de verano';
+
+  @override
+  String get dashboardSeleccionaAlumnoHint => 'Seleccioná un alumno';
+
+  @override
+  String get dashboardSinAlumnosActivos => 'No tenés alumnos activos.';
+
+  @override
+  String get dashboardMarcarCobradoTitle => '¿Marcar como cobrado?';
+
+  @override
+  String get dashboardCancelarLabel => 'Cancelar';
+
+  @override
+  String get dashboardCobradoLabel => 'Cobrado';
+
+  @override
+  String get dashboardCobroRegistrado => 'Cobro registrado.';
+
+  @override
+  String get dashboardCobroError => 'Error al registrar el cobro. Intentá de nuevo.';
+
+  @override
+  String get dashboardCobroSueltoAgregado => 'Cobro suelto agregado.';
+
+  @override
+  String get dashboardCompletaCampos => 'Completá todos los campos.';
+
+  @override
+  String get dashboardMontoInvalido => 'Ingresá un monto válido.';
+
+  @override
+  String get dashboardGuardarError => 'Error al guardar. Intentá de nuevo.';
+
+  @override
+  String get dashboardCadenceMensual => 'Mensual';
+
+  @override
+  String get dashboardCadenceSemanal => 'Semanal';
+
+  @override
+  String get dashboardCadencePorSesion => 'Por sesión';
+
+  @override
+  String get dashboardCadenceSuelto => 'Suelto';
+
+  @override
+  String get dashboardAlumnoFallback => 'Alumno';
+
+  @override
+  String get dashboardProximamente => 'Próximamente.';
+
+  @override
+  String get dashboardIniciaSesion => 'Iniciá sesión para ver tus próximos turnos.';
+
+  @override
+  String get dashboardCargando => 'Cargando…';
+
+  @override
+  String get dashboardErrorTurnos => 'No pudimos cargar tus próximos turnos.';
+
+  @override
+  String get dashboardSinTurnosProximos => 'No tenés turnos próximos confirmados.';
+
+  @override
+  String get dashboardNadieEntreno => 'Nadie entrenó hoy todavía.';
+
+  @override
+  String get dashboardErrorActividad => 'No pudimos cargar la actividad de hoy.';
+
+  @override
+  String get dashboardSinCobros => 'Sin cobros pendientes.';
+
+  @override
+  String get dashboardErrorCobros => 'No pudimos cargar los cobros.';
+
+  @override
+  String get dashboardHolaSinNombre => 'HOLA';
+
+  @override
+  String get dashboardInvitarProximamente => 'Invitar alumno — próximamente.';
+
+  @override
+  String dashboardSolicitudesPendientesTitle(int count) {
+    return 'SOLICITUDES PENDIENTES ($count)';
+  }
+
+  @override
+  String dashboardHolaConNombre(String name) {
+    return 'HOLA, $name';
+  }
+
+  @override
   String get reviewSnackBarSuccess => '¡Gracias por tu reseña!';
 
   @override
@@ -834,4 +1027,307 @@ class AppL10nEn extends AppL10n {
   String profileCuentaRutinasSubtitle(int count) {
     return '$count activas';
   }
+
+  @override
+  String get chatListTitle => '';
+
+  @override
+  String get chatListDeletedUser => '';
+
+  @override
+  String get chatListStartConversation => '';
+
+  @override
+  String get chatListEmptyTitle => '';
+
+  @override
+  String get chatListEmptyBody => '';
+
+  @override
+  String get chatListError => '';
+
+  @override
+  String get chatListRetryLabel => '';
+
+  @override
+  String get chatRelativeJustNow => '';
+
+  @override
+  String chatRelativeMinutes(int minutes) {
+    return '';
+  }
+
+  @override
+  String chatRelativeHours(int hours) {
+    return '';
+  }
+
+  @override
+  String chatRelativeDays(int days) {
+    return '';
+  }
+
+  @override
+  String get chatScreenTitleFallback => '';
+
+  @override
+  String get chatScreenLoadError => '';
+
+  @override
+  String get chatScreenComposerHint => '';
+
+  @override
+  String get chatScreenSendLabel => '';
+
+  @override
+  String get chatScreenSendError => '';
+
+  @override
+  String get performanceLogTitle => 'Log assessment';
+
+  @override
+  String get performanceLogCancel => 'Cancel';
+
+  @override
+  String get performanceLogSaveCta => 'SAVE ASSESSMENT';
+
+  @override
+  String get performanceLogNoSession => 'No active session. Can\'t save.';
+
+  @override
+  String get performanceLogSaveSuccess => 'Assessment saved';
+
+  @override
+  String get performanceLogSaveError =>
+      'We couldn\'t save the assessment. Try again.';
+
+  @override
+  String get performanceLogNotesHint => 'Trainer notes…';
+
+  @override
+  String get performanceLogSectionJumps => 'JUMPS (cm)';
+
+  @override
+  String get performanceLogSectionSpeed => 'SPEED (s)';
+
+  @override
+  String get performanceLogSectionStrength => 'STRENGTH 1RM (kg)';
+
+  @override
+  String get performanceLogSectionEndurance => 'ENDURANCE / OTHER';
+
+  @override
+  String get performanceLogSectionNotes => 'NOTES';
+
+  @override
+  String get performanceLogFieldCmj => 'CMJ';
+
+  @override
+  String get performanceLogFieldSquatJump => 'Squat Jump';
+
+  @override
+  String get performanceLogFieldAbalakov => 'Abalakov';
+
+  @override
+  String get performanceLogFieldBroadJump => 'Broad jump';
+
+  @override
+  String get performanceLogFieldSprint10 => 'Sprint 10m';
+
+  @override
+  String get performanceLogFieldSprint20 => '20m';
+
+  @override
+  String get performanceLogFieldSprint30 => '30m';
+
+  @override
+  String get performanceLogFieldSprint40 => '40m';
+
+  @override
+  String get performanceLogFieldSquat1rm => 'Squat';
+
+  @override
+  String get performanceLogFieldBenchPress => 'Bench press';
+
+  @override
+  String get performanceLogFieldDeadlift => 'Deadlift';
+
+  @override
+  String get performanceLogFieldOverheadPress => 'Overhead press';
+
+  @override
+  String get performanceLogFieldPullUp => 'Weighted pull-up';
+
+  @override
+  String get performanceLogFieldVo2max => 'VO2max';
+
+  @override
+  String get performanceLogFieldCourseNavette => 'Beep test (level)';
+
+  @override
+  String get performanceLogFieldCooper => 'Cooper';
+
+  @override
+  String get performanceLogFieldSitAndReach => 'Sit-and-reach flexibility';
+
+  @override
+  String get performanceChartSectionLabel => '';
+
+  @override
+  String get performanceChartEmptyHint => '';
+
+  @override
+  String performanceChartSpanDays(int count) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+
+    return '';
+  }
+
+  @override
+  String performanceChartSpanWeeks(int count) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+
+    return '';
+  }
+
+  @override
+  String get performanceChartMetricCmj => '';
+
+  @override
+  String get performanceChartMetricSquatJump => '';
+
+  @override
+  String get performanceChartMetricAbalakov => '';
+
+  @override
+  String get performanceChartMetricBroadJump => '';
+
+  @override
+  String get performanceChartMetricSprint10 => '';
+
+  @override
+  String get performanceChartMetricSprint20 => '';
+
+  @override
+  String get performanceChartMetricSprint30 => '';
+
+  @override
+  String get performanceChartMetricSprint40 => '';
+
+  @override
+  String get performanceChartMetricSquat1rm => '';
+
+  @override
+  String get performanceChartMetricBench1rm => '';
+
+  @override
+  String get performanceChartMetricDeadlift1rm => '';
+
+  @override
+  String get performanceChartMetricOverheadPress1rm => '';
+
+  @override
+  String get performanceChartMetricPullUp1rm => '';
+
+  @override
+  String get performanceChartMetricVo2max => '';
+
+  @override
+  String get performanceChartMetricCourseNavette => '';
+
+  @override
+  String get performanceChartMetricCooper => '';
+
+  @override
+  String get performanceChartMetricSitAndReach => '';
+
+  @override
+  String routineEditorDayName(int n) {
+    return 'Day $n';
+  }
+
+  @override
+  String get routineEditorAddExercise => 'Add exercise';
+
+  @override
+  String get routineEditorLevelLabel => 'LEVEL';
+
+  @override
+  String get routineEditorWeeksLabel => 'WEEKS';
+
+  @override
+  String get routineEditorDaysLabel => 'PLAN DAYS';
+
+  @override
+  String get routineEditorAddWeek => 'Week';
+
+  @override
+  String get routineEditorRemoveLastWeek => 'Remove last';
+
+  @override
+  String get routineEditorDuplicateWeek => 'Duplicate week';
+
+  @override
+  String routineEditorWeekShort(int n) {
+    return 'Wk $n';
+  }
+
+  @override
+  String routineEditorInvalidWeekHint(int week, int day) {
+    return 'Incomplete sets in Wk $week · Day $day';
+  }
+
+  @override
+  String get routineEditorDuplicateWeekTitle => 'Duplicate week';
+
+  @override
+  String routineEditorDuplicateWeekBody(int source, int target) {
+    return 'Week $source will be copied into Week $target.';
+  }
+
+  @override
+  String get routineEditorDialogCancel => 'Cancel';
+
+  @override
+  String get routineEditorDialogConfirm => 'Confirm';
+
+  @override
+  String get routineEditorSlotMenuReplace => 'Change exercise';
+
+  @override
+  String get routineEditorSlotMenuMoveUp => 'Move up';
+
+  @override
+  String get routineEditorSlotMenuMoveDown => 'Move down';
+
+  @override
+  String get routineEditorSlotMenuRemove => 'Remove';
+
+  @override
+  String get routineEditorRestLabel => 'Rest';
+
+  @override
+  String get routineEditorAddSet => '+ Add set';
+
+  @override
+  String get routineEditorMeasureReps => 'Reps';
+
+  @override
+  String get routineEditorMeasureTime => 'Time';
+
+  @override
+  String get routineEditorSetTypeNormal => 'Normal';
+
+  @override
+  String get routineEditorSetTypeWarmup => 'Warm-up (W)';
+
+  @override
+  String get routineEditorSetTypeDrop => 'Drop (D)';
+
+  @override
+  String get routineEditorSetTypeFailure => 'To failure (F)';
 }

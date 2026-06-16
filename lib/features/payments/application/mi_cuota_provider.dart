@@ -78,6 +78,9 @@ final miCuotaProvider = Provider.autoDispose<AsyncValue<MiCuotaState?>>((ref) {
   if (linkAsync.isLoading && !linkAsync.hasValue) {
     return const AsyncValue.loading();
   }
+  if (linkAsync.hasError && !linkAsync.hasValue) {
+    return AsyncValue.error(linkAsync.error!, linkAsync.stackTrace!);
+  }
 
   final link = linkAsync.valueOrNull;
   if (link == null || link.status != TrainerLinkStatus.active) {
@@ -91,6 +94,9 @@ final miCuotaProvider = Provider.autoDispose<AsyncValue<MiCuotaState?>>((ref) {
   final paymentsAsync = ref.watch(athletePaymentsProvider);
   if (paymentsAsync.isLoading && !paymentsAsync.hasValue) {
     return const AsyncValue.loading();
+  }
+  if (paymentsAsync.hasError && !paymentsAsync.hasValue) {
+    return AsyncValue.error(paymentsAsync.error!, paymentsAsync.stackTrace!);
   }
   final payments = paymentsAsync.valueOrNull ?? const <Payment>[];
 
@@ -120,6 +126,11 @@ final miCuotaProvider = Provider.autoDispose<AsyncValue<MiCuotaState?>>((ref) {
     // Still surface the one-off charges if we already have them.
     if (items.isNotEmpty) return AsyncValue.data(MiCuotaState(items: items));
     return const AsyncValue.loading();
+  }
+  if (billingAsync.hasError && !billingAsync.hasValue) {
+    // Still surface the one-off charges if we already have them.
+    if (items.isNotEmpty) return AsyncValue.data(MiCuotaState(items: items));
+    return AsyncValue.error(billingAsync.error!, billingAsync.stackTrace!);
   }
 
   final billing = billingAsync.valueOrNull;
@@ -157,6 +168,15 @@ final miCuotaProvider = Provider.autoDispose<AsyncValue<MiCuotaState?>>((ref) {
             return AsyncValue.data(MiCuotaState(items: items));
           }
           return const AsyncValue.loading();
+        }
+        if (sessionsAsync.hasError && !sessionsAsync.hasValue) {
+          if (items.isNotEmpty) {
+            return AsyncValue.data(MiCuotaState(items: items));
+          }
+          return AsyncValue.error(
+            sessionsAsync.error!,
+            sessionsAsync.stackTrace!,
+          );
         }
         final sessions = sessionsAsync.valueOrNull ?? const [];
 

@@ -221,5 +221,247 @@
     "placeholders": {
       "count": { "type": "int" }
     }
-  }
+  },
+
+  "chatListTitle": "",
+  "chatListDeletedUser": "",
+  "chatListStartConversation": "",
+  "chatListEmptyTitle": "",
+  "chatListEmptyBody": "",
+  "chatListError": "",
+  "chatListRetryLabel": "",
+  "chatRelativeJustNow": "",
+  "chatRelativeMinutes": "",
+  "@chatRelativeMinutes": {
+    "placeholders": {
+      "minutes": { "type": "int" }
+    }
+  },
+  "chatRelativeHours": "",
+  "@chatRelativeHours": {
+    "placeholders": {
+      "hours": { "type": "int" }
+    }
+  },
+  "chatRelativeDays": "",
+  "@chatRelativeDays": {
+    "placeholders": {
+      "days": { "type": "int" }
+    }
+  },
+
+  "chatScreenTitleFallback": "",
+  "chatScreenLoadError": "",
+  "chatScreenComposerHint": "",
+  "chatScreenSendLabel": "",
+  "chatScreenSendError": "",
+
+  "performanceLogTitle": "Log assessment",
+  "@performanceLogTitle": {},
+
+  "performanceLogCancel": "Cancel",
+  "@performanceLogCancel": {},
+
+  "performanceLogSaveCta": "SAVE ASSESSMENT",
+  "@performanceLogSaveCta": {},
+
+  "performanceLogNoSession": "No active session. Can't save.",
+  "@performanceLogNoSession": {},
+
+  "performanceLogSaveSuccess": "Assessment saved",
+  "@performanceLogSaveSuccess": {},
+
+  "performanceLogSaveError": "We couldn't save the assessment. Try again.",
+  "@performanceLogSaveError": {},
+
+  "performanceLogNotesHint": "Trainer notes…",
+  "@performanceLogNotesHint": {},
+
+  "performanceLogSectionJumps": "JUMPS (cm)",
+  "@performanceLogSectionJumps": {},
+
+  "performanceLogSectionSpeed": "SPEED (s)",
+  "@performanceLogSectionSpeed": {},
+
+  "performanceLogSectionStrength": "STRENGTH 1RM (kg)",
+  "@performanceLogSectionStrength": {},
+
+  "performanceLogSectionEndurance": "ENDURANCE / OTHER",
+  "@performanceLogSectionEndurance": {},
+
+  "performanceLogSectionNotes": "NOTES",
+  "@performanceLogSectionNotes": {},
+
+  "performanceLogFieldCmj": "CMJ",
+  "@performanceLogFieldCmj": {},
+
+  "performanceLogFieldSquatJump": "Squat Jump",
+  "@performanceLogFieldSquatJump": {},
+
+  "performanceLogFieldAbalakov": "Abalakov",
+  "@performanceLogFieldAbalakov": {},
+
+  "performanceLogFieldBroadJump": "Broad jump",
+  "@performanceLogFieldBroadJump": {},
+
+  "performanceLogFieldSprint10": "Sprint 10m",
+  "@performanceLogFieldSprint10": {},
+
+  "performanceLogFieldSprint20": "20m",
+  "@performanceLogFieldSprint20": {},
+
+  "performanceLogFieldSprint30": "30m",
+  "@performanceLogFieldSprint30": {},
+
+  "performanceLogFieldSprint40": "40m",
+  "@performanceLogFieldSprint40": {},
+
+  "performanceLogFieldSquat1rm": "Squat",
+  "@performanceLogFieldSquat1rm": {},
+
+  "performanceLogFieldBenchPress": "Bench press",
+  "@performanceLogFieldBenchPress": {},
+
+  "performanceLogFieldDeadlift": "Deadlift",
+  "@performanceLogFieldDeadlift": {},
+
+  "performanceLogFieldOverheadPress": "Overhead press",
+  "@performanceLogFieldOverheadPress": {},
+
+  "performanceLogFieldPullUp": "Weighted pull-up",
+  "@performanceLogFieldPullUp": {},
+
+  "performanceLogFieldVo2max": "VO2max",
+  "@performanceLogFieldVo2max": {},
+
+  "performanceLogFieldCourseNavette": "Beep test (level)",
+  "@performanceLogFieldCourseNavette": {},
+
+  "performanceLogFieldCooper": "Cooper",
+  "@performanceLogFieldCooper": {},
+
+  "performanceLogFieldSitAndReach": "Sit-and-reach flexibility",
+  "@performanceLogFieldSitAndReach": {},
+
+  "performanceChartSectionLabel": "",
+  "@performanceChartSectionLabel": {},
+  "performanceChartEmptyHint": "",
+  "@performanceChartEmptyHint": {},
+  "performanceChartSpanDays": "",
+  "@performanceChartSpanDays": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "performanceChartSpanWeeks": "",
+  "@performanceChartSpanWeeks": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "performanceChartMetricCmj": "",
+  "@performanceChartMetricCmj": {},
+  "performanceChartMetricSquatJump": "",
+  "@performanceChartMetricSquatJump": {},
+  "performanceChartMetricAbalakov": "",
+  "@performanceChartMetricAbalakov": {},
+  "performanceChartMetricBroadJump": "",
+  "@performanceChartMetricBroadJump": {},
+  "performanceChartMetricSprint10": "",
+  "@performanceChartMetricSprint10": {},
+  "performanceChartMetricSprint20": "",
+  "@performanceChartMetricSprint20": {},
+  "performanceChartMetricSprint30": "",
+  "@performanceChartMetricSprint30": {},
+  "performanceChartMetricSprint40": "",
+  "@performanceChartMetricSprint40": {},
+  "performanceChartMetricSquat1rm": "",
+  "@performanceChartMetricSquat1rm": {},
+  "performanceChartMetricBench1rm": "",
+  "@performanceChartMetricBench1rm": {},
+  "performanceChartMetricDeadlift1rm": "",
+  "@performanceChartMetricDeadlift1rm": {},
+  "performanceChartMetricOverheadPress1rm": "",
+  "@performanceChartMetricOverheadPress1rm": {},
+  "performanceChartMetricPullUp1rm": "",
+  "@performanceChartMetricPullUp1rm": {},
+  "performanceChartMetricVo2max": "",
+  "@performanceChartMetricVo2max": {},
+  "performanceChartMetricCourseNavette": "",
+  "@performanceChartMetricCourseNavette": {},
+  "performanceChartMetricCooper": "",
+  "@performanceChartMetricCooper": {},
+  "performanceChartMetricSitAndReach": "",
+  "@performanceChartMetricSitAndReach": {},
+
+  "routineEditorDayName": "Day {n}",
+  "@routineEditorDayName": {
+    "placeholders": {
+      "n": { "type": "int" }
+    }
+  },
+  "routineEditorAddExercise": "Add exercise",
+  "@routineEditorAddExercise": {},
+  "routineEditorLevelLabel": "LEVEL",
+  "@routineEditorLevelLabel": {},
+  "routineEditorWeeksLabel": "WEEKS",
+  "@routineEditorWeeksLabel": {},
+  "routineEditorDaysLabel": "PLAN DAYS",
+  "@routineEditorDaysLabel": {},
+  "routineEditorAddWeek": "Week",
+  "@routineEditorAddWeek": {},
+  "routineEditorRemoveLastWeek": "Remove last",
+  "@routineEditorRemoveLastWeek": {},
+  "routineEditorDuplicateWeek": "Duplicate week",
+  "@routineEditorDuplicateWeek": {},
+  "routineEditorWeekShort": "Wk {n}",
+  "@routineEditorWeekShort": {
+    "placeholders": {
+      "n": { "type": "int" }
+    }
+  },
+  "routineEditorInvalidWeekHint": "Incomplete sets in Wk {week} · Day {day}",
+  "@routineEditorInvalidWeekHint": {
+    "placeholders": {
+      "week": { "type": "int" },
+      "day": { "type": "int" }
+    }
+  },
+  "routineEditorDuplicateWeekTitle": "Duplicate week",
+  "@routineEditorDuplicateWeekTitle": {},
+  "routineEditorDuplicateWeekBody": "Week {source} will be copied into Week {target}.",
+  "@routineEditorDuplicateWeekBody": {
+    "placeholders": {
+      "source": { "type": "int" },
+      "target": { "type": "int" }
+    }
+  },
+  "routineEditorDialogCancel": "Cancel",
+  "@routineEditorDialogCancel": {},
+  "routineEditorDialogConfirm": "Confirm",
+  "@routineEditorDialogConfirm": {},
+  "routineEditorSlotMenuReplace": "Change exercise",
+  "@routineEditorSlotMenuReplace": {},
+  "routineEditorSlotMenuMoveUp": "Move up",
+  "@routineEditorSlotMenuMoveUp": {},
+  "routineEditorSlotMenuMoveDown": "Move down",
+  "@routineEditorSlotMenuMoveDown": {},
+  "routineEditorSlotMenuRemove": "Remove",
+  "@routineEditorSlotMenuRemove": {},
+  "routineEditorRestLabel": "Rest",
+  "@routineEditorRestLabel": {},
+  "routineEditorAddSet": "+ Add set",
+  "@routineEditorAddSet": {},
+  "routineEditorMeasureReps": "Reps",
+  "@routineEditorMeasureReps": {},
+  "routineEditorMeasureTime": "Time",
+  "@routineEditorMeasureTime": {},
+  "routineEditorSetTypeNormal": "Normal",
+  "@routineEditorSetTypeNormal": {},
+  "routineEditorSetTypeWarmup": "Warm-up (W)",
+  "@routineEditorSetTypeWarmup": {},
+  "routineEditorSetTypeDrop": "Drop (D)",
+  "@routineEditorSetTypeDrop": {},
+  "routineEditorSetTypeFailure": "To failure (F)",
+  "@routineEditorSetTypeFailure": {}
 }

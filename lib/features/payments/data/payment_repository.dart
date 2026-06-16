@@ -28,6 +28,24 @@ class PaymentRepository {
     });
   }
 
+  /// Marks every payment in [ids] as paid atomically.
+  ///
+  /// Uses a single write batch so all docs flip together or none do: a
+  /// failure mid-way (network drop, or a concurrently deleted doc making the
+  /// update fail) leaves no half-paid state. A no-op when [ids] is empty.
+  Future<void> markManyPaid(List<String> ids, DateTime paidAt) async {
+    if (ids.isEmpty) return;
+    final batch = _firestore.batch();
+    final paidAtTs = Timestamp.fromDate(paidAt.toUtc());
+    for (final id in ids) {
+      batch.update(_collection.doc(id), {
+        'status': 'paid',
+        'paidAt': paidAtTs,
+      });
+    }
+    await batch.commit();
+  }
+
   /// Live stream of all payments for [trainerId].
   /// Single-field query — no composite index required.
   Stream<List<Payment>> watchForTrainer(String trainerId) {

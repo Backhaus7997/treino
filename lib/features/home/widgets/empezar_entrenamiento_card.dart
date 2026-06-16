@@ -4,15 +4,16 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/treino_icon.dart';
+import '../../../l10n/app_l10n.dart';
 import 'home_cta_button.dart';
 
-/// Hardcoded "Empezar Entrenamiento" card.
-/// All strings are private static const — ready for provider-driven swap
-/// without renaming the widget. Zero constructor params; no ref.watch / ref.read.
+/// "Empezar Entrenamiento" card.
+/// The day label is derived from the real current weekday; the remaining
+/// strings are private static const, ready for provider-driven swap without
+/// renaming the widget. Zero constructor params; no ref.watch / ref.read.
 class EmpezarEntrenamientoCard extends StatelessWidget {
   const EmpezarEntrenamientoCard({super.key});
 
-  static const _dayLabel = 'HOY · JUEVES';
   static const _heroLabel = 'PUSH';
   static const _subtitle = 'Pecho · Hombros · Tríceps';
   static const _exerciseCount = '6 ejercicios';
@@ -22,6 +23,12 @@ class EmpezarEntrenamientoCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+    // Derive the label from the real current weekday so it never shows a
+    // stale "today". `dashboardDateToday` is "Hoy"; uppercased to match the
+    // card's all-caps day label style.
+    final dayLabel =
+        '${l10n.dashboardDateToday.toUpperCase()} · ${_weekdayName(l10n, DateTime.now().weekday)}';
 
     return Container(
       decoration: BoxDecoration(
@@ -36,7 +43,7 @@ class EmpezarEntrenamientoCard extends StatelessWidget {
           children: [
             // Day label
             Text(
-              _dayLabel,
+              dayLabel,
               style: GoogleFonts.barlowCondensed(
                 fontWeight: FontWeight.w600,
                 fontSize: 11,
@@ -102,5 +109,24 @@ class EmpezarEntrenamientoCard extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+String _weekdayName(AppL10n l10n, int weekday) {
+  switch (weekday) {
+    case DateTime.monday:
+      return l10n.dashboardWeekday1;
+    case DateTime.tuesday:
+      return l10n.dashboardWeekday2;
+    case DateTime.wednesday:
+      return l10n.dashboardWeekday3;
+    case DateTime.thursday:
+      return l10n.dashboardWeekday4;
+    case DateTime.friday:
+      return l10n.dashboardWeekday5;
+    case DateTime.saturday:
+      return l10n.dashboardWeekday6;
+    default:
+      return l10n.dashboardWeekday7;
   }
 }

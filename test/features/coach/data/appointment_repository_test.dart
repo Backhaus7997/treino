@@ -127,6 +127,63 @@ void main() {
       },
     );
 
+    // ─── REQ-COACH-AGENDA-009: 28-day booking horizon ────────────────────
+    test(
+      'REQ-COACH-AGENDA-009: book throws BookingTooFarAheadException when '
+      'startsAt is more than 28 days out',
+      () async {
+        // 29 days from now → beyond the 28-day horizon.
+        final tooFar = DateTime.now().toUtc().add(const Duration(days: 29));
+        final tooFarMinute = DateTime.utc(
+          tooFar.year,
+          tooFar.month,
+          tooFar.day,
+          tooFar.hour,
+          tooFar.minute,
+        );
+
+        await expectLater(
+          repo.book(
+            trainerId: trainerId,
+            athleteId: athleteId,
+            athleteDisplayName: athleteDisplayName,
+            startsAt: tooFarMinute,
+            durationMin: durationMin,
+          ),
+          throwsA(isA<BookingTooFarAheadException>()),
+        );
+
+        // Nothing was written.
+        final all = await firestore.collection('appointments').get();
+        expect(all.docs, isEmpty);
+      },
+    );
+
+    test(
+      'REQ-COACH-AGENDA-009: book succeeds when startsAt is within 28 days',
+      () async {
+        // 27 days from now → inside the horizon.
+        final soon = DateTime.now().toUtc().add(const Duration(days: 27));
+        final soonMinute = DateTime.utc(
+          soon.year,
+          soon.month,
+          soon.day,
+          soon.hour,
+          soon.minute,
+        );
+
+        final appt = await repo.book(
+          trainerId: trainerId,
+          athleteId: athleteId,
+          athleteDisplayName: athleteDisplayName,
+          startsAt: soonMinute,
+          durationMin: durationMin,
+        );
+
+        expect(appt.status, equals(AppointmentStatus.confirmed));
+      },
+    );
+
     // ─── SCENARIO-496: deterministic doc ID assertion ─────────────────────
     test(
       'SCENARIO-496: book asserts doc ID is exactly trainerId_startsAtMs',

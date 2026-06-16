@@ -13,7 +13,7 @@ class PostWorkoutNotifier extends AutoDisposeAsyncNotifier<void> {
   @override
   Future<void> build() async {}
 
-  Future<void> shareWorkout(Session session) async {
+  Future<void> shareWorkout(Session session, {required String text}) async {
     state = const AsyncLoading();
     try {
       final authUser = await ref.read(authStateChangesProvider.future);
@@ -25,7 +25,7 @@ class PostWorkoutNotifier extends AutoDisposeAsyncNotifier<void> {
         authorDisplayName: profile?.displayName ?? '',
         authorAvatarUrl: profile?.avatarUrl,
         authorGymId: profile?.gymId,
-        text: '¡Terminé mi entreno! 💪',
+        text: text,
         routineTag: RoutineTag(
           routineId: session.routineId,
           routineName: session.routineName,

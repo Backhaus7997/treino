@@ -122,6 +122,13 @@ final pagosPorCobrarProvider =
   if (paymentsAsync.isLoading && !paymentsAsync.hasValue) {
     return const AsyncValue.loading();
   }
+  // Without this guard, an errored payments stream falls back to an empty list,
+  // which makes the "already paid" / lastPaidAt logic treat every athlete as
+  // never paid and re-surface their full recurring charges. Surface the error
+  // instead so the dashboard shows its error state rather than wrong amounts.
+  if (paymentsAsync.hasError && !paymentsAsync.hasValue) {
+    return AsyncValue.error(paymentsAsync.error!, paymentsAsync.stackTrace!);
+  }
 
   final allPayments = paymentsAsync.valueOrNull ?? const [];
 
@@ -171,6 +178,11 @@ final pagosPorCobrarProvider =
       anyLoading = true;
       continue;
     }
+    if (billingAsync.hasError && !billingAsync.hasValue) {
+      // Cannot determine this athlete's recurring config — skip their recurring
+      // charge rather than guess. One-off pendings above already surfaced.
+      continue;
+    }
 
     final billing = billingAsync.valueOrNull;
     if (billing == null) continue; // no recurring config — one-offs only
@@ -215,6 +227,10 @@ final pagosPorCobrarProvider =
         final sessionsAsync = ref.watch(sessionsByUidProvider(athleteId));
         if (sessionsAsync.isLoading && !sessionsAsync.hasValue) {
           anyLoading = true;
+          continue;
+        }
+        if (sessionsAsync.hasError && !sessionsAsync.hasValue) {
+          // Cannot count sessions for this athlete — skip rather than charge 0.
           continue;
         }
 

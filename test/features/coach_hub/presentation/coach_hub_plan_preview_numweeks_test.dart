@@ -128,8 +128,10 @@ void main() {
             userProfileProvider.overrideWith(
               (ref) => Stream.value(_trainerProfile()),
             ),
-            linksForTrainerProvider('trainer-1').overrideWith(
-              (ref) async => [_activeLink()],
+            // _AthletePicker now watches the real-time stream provider
+            // (ADR-CHLM-03), not the deprecated one-shot FutureProvider.
+            trainerLinksStreamProvider.overrideWith(
+              (ref) => Stream.value([_activeLink()]),
             ),
             userPublicProfileProvider('athlete-1').overrideWith(
               (ref) => Stream<UserPublicProfile?>.value(
