@@ -330,7 +330,7 @@ GoRouter buildRouter({
                 path: 'routine/:routineId',
                 builder: (context, state) {
                   final routineId = state.pathParameters['routineId']!;
-                  return RoutineDetailScreen(routineId: routineId);
+                  return _withBg(RoutineDetailScreen(routineId: routineId));
                 },
               ),
               GoRoute(
@@ -341,10 +341,10 @@ GoRouter buildRouter({
                 builder: (context, state) {
                   final exerciseId = state.pathParameters['exerciseId']!;
                   final ownerId = state.uri.queryParameters['ownerId'];
-                  return ExerciseDetailScreen(
+                  return _withBg(ExerciseDetailScreen(
                     exerciseId: exerciseId,
                     ownerId: ownerId,
-                  );
+                  ));
                 },
               ),
               // NOTE: routine-editor, template-editor, my-routine-editor are
@@ -358,18 +358,18 @@ GoRouter buildRouter({
             routes: [
               GoRoute(
                 path: 'create',
-                builder: (_, __) => const CreatePostScreen(),
+                builder: (_, __) => _withBg(const CreatePostScreen()),
               ),
               GoRoute(
                 path: 'profile/:uid',
                 builder: (context, state) {
                   final uid = state.pathParameters['uid']!;
-                  return PublicProfileScreen(targetUid: uid);
+                  return _withBg(PublicProfileScreen(targetUid: uid));
                 },
               ),
               GoRoute(
                 path: 'search',
-                builder: (_, __) => const SearchUsersScreen(),
+                builder: (_, __) => _withBg(const SearchUsersScreen()),
               ),
             ],
           ),
@@ -379,7 +379,7 @@ GoRouter buildRouter({
             routes: [
               GoRoute(
                 path: 'insights',
-                builder: (_, __) => const InsightsScreen(),
+                builder: (_, __) => _withBg(const InsightsScreen()),
               ),
             ],
           ),
@@ -394,14 +394,14 @@ GoRouter buildRouter({
                 path: 'trainer/:uid',
                 builder: (context, state) {
                   final uid = state.pathParameters['uid']!;
-                  return TrainerPublicProfileScreen(uid: uid);
+                  return _withBg(TrainerPublicProfileScreen(uid: uid));
                 },
               ),
               GoRoute(
                 path: 'athlete/:athleteId',
                 builder: (context, state) {
                   final athleteId = state.pathParameters['athleteId']!;
-                  return AthleteDetailScreen(athleteId: athleteId);
+                  return _withBg(AthleteDetailScreen(athleteId: athleteId));
                 },
               ),
               GoRoute(
@@ -409,18 +409,19 @@ GoRouter buildRouter({
                 builder: (context, state) {
                   final chatId = state.pathParameters['chatId']!;
                   final otherUid = state.uri.queryParameters['other'] ?? '';
-                  return ChatScreen(chatId: chatId, otherUid: otherUid);
+                  return _withBg(
+                      ChatScreen(chatId: chatId, otherUid: otherUid));
                 },
               ),
               GoRoute(
                 path: 'agenda',
-                builder: (_, __) => const _AthleteAgendaRouteHost(),
+                builder: (_, __) => _withBg(const _AthleteAgendaRouteHost()),
               ),
               GoRoute(
                 path: 'availability-editor',
                 builder: (context, state) {
                   final uid = state.uri.queryParameters['trainerId'] ?? '';
-                  return AvailabilityEditorScreen(trainerId: uid);
+                  return _withBg(AvailabilityEditorScreen(trainerId: uid));
                 },
               ),
             ],
@@ -432,12 +433,12 @@ GoRouter buildRouter({
               // Existing — Fase 3 Etapa 6
               GoRoute(
                 path: 'friend-requests',
-                builder: (_, __) => const FriendRequestsInboxScreen(),
+                builder: (_, __) => _withBg(const FriendRequestsInboxScreen()),
               ),
               // NEW — Fase 3 Etapa 7 (profile-screen-rewrite)
               GoRoute(
                 path: 'edit-personal',
-                builder: (_, __) => const ProfileEditPersonalScreen(),
+                builder: (_, __) => _withBg(const ProfileEditPersonalScreen()),
               ),
               // NEW — Fase 6 Etapa 1 (trainer-profile-onboarding)
               // ADR-TPO-005: reads ?mode=onboarding query param; any other
@@ -448,16 +449,16 @@ GoRouter buildRouter({
                   final mode = state.uri.queryParameters['mode'] == 'onboarding'
                       ? ProfileEditTrainerMode.onboarding
                       : ProfileEditTrainerMode.edit;
-                  return ProfileEditTrainerScreen(mode: mode);
+                  return _withBg(ProfileEditTrainerScreen(mode: mode));
                 },
               ),
               GoRoute(
                 path: 'gym',
-                builder: (_, __) => const ProfileGymScreen(),
+                builder: (_, __) => _withBg(const ProfileGymScreen()),
               ),
               GoRoute(
                 path: 'routines',
-                builder: (_, __) => const ProfileRoutinesScreen(),
+                builder: (_, __) => _withBg(const ProfileRoutinesScreen()),
               ),
               // /profile/settings GoRoute REMOVED 2026-05-28 — PR#4 pivot.
               // Sign-out and eliminar-cuenta tiles now live directly in
@@ -473,13 +474,14 @@ GoRouter buildRouter({
               // Trainer custom exercise library — list + create/edit form.
               GoRoute(
                 path: 'my-exercises',
-                builder: (_, __) => const MyExercisesScreen(),
+                builder: (_, __) => _withBg(const MyExercisesScreen()),
                 routes: [
                   GoRoute(
                     path: ':exId',
                     builder: (context, state) {
                       final exId = state.pathParameters['exId'];
-                      return CustomExerciseEditorScreen(exerciseId: exId);
+                      return _withBg(
+                          CustomExerciseEditorScreen(exerciseId: exId));
                     },
                   ),
                 ],
@@ -498,6 +500,16 @@ CustomTransitionPage<void> _noAnim(Widget child) => CustomTransitionPage(
       reverseTransitionDuration: Duration.zero,
       transitionsBuilder: (_, __, ___, child) => child,
     );
+
+/// Wraps any shell sub-route's widget with [AppBackground] so the pushed
+/// route fully covers the tab root content underneath it during/after the
+/// slide transition. Without this, transparent Scaffolds and bare-widget
+/// screens bleed through to the previous screen visible in the navigator
+/// stack (smoke gap discovered 2026-06-16).
+///
+/// Use INSIDE the ShellRoute branches' GoRoute builders only; top-level
+/// routes (outside the shell) own their own Scaffold + background.
+Widget _withBg(Widget child) => AppBackground(child: child);
 
 /// Resuelve athleteId (currentUid) y trainerId (active link) y monta
 /// AthleteAgendaScreen. Loading state mientras se resuelve el link.
