@@ -6,20 +6,55 @@ import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/home/widgets/empezar_entrenamiento_card.dart';
 import 'package:treino/features/home/widgets/home_cta_button.dart';
+import 'package:treino/l10n/app_l10n.dart';
 
 Widget _wrap(Widget w) => MaterialApp(
       theme: AppTheme.dark(),
+      localizationsDelegates: AppL10n.localizationsDelegates,
+      supportedLocales: AppL10n.supportedLocales,
+      locale: const Locale('es', 'AR'),
       home: Scaffold(body: SingleChildScrollView(child: w)),
     );
 
+// Spanish (es_AR) uppercase weekday names, Monday..Sunday — mirrors
+// AppL10n.dashboardWeekday1..7 so the expected label can be derived for the
+// real current weekday instead of asserting a hardcoded day.
+const _esWeekdays = [
+  'LUNES',
+  'MARTES',
+  'MIÉRCOLES',
+  'JUEVES',
+  'VIERNES',
+  'SÁBADO',
+  'DOMINGO',
+];
+
+String _expectedDayLabel() =>
+    'HOY · ${_esWeekdays[DateTime.now().weekday - DateTime.monday]}';
+
 void main() {
   group('EmpezarEntrenamientoCard', () {
-    testWidgets('REQ-HOME-EMPEZAR-001: all 6 hardcoded strings present',
+    testWidgets(
+        'REQ-HOME-EMPEZAR-DAY-001: day label reflects the real current weekday',
         (tester) async {
       await tester.pumpWidget(_wrap(const EmpezarEntrenamientoCard()));
       await tester.pump();
 
-      expect(find.text('HOY · JUEVES'), findsOneWidget);
+      // The card must show today's actual weekday — not a stale "JUEVES".
+      expect(find.text(_expectedDayLabel()), findsOneWidget);
+
+      // Guard against the old hardcoded bug: a wrong weekday must never show
+      // unless today genuinely is that day.
+      if (DateTime.now().weekday != DateTime.thursday) {
+        expect(find.text('HOY · JUEVES'), findsNothing);
+      }
+    });
+
+    testWidgets('REQ-HOME-EMPEZAR-001: remaining card strings present',
+        (tester) async {
+      await tester.pumpWidget(_wrap(const EmpezarEntrenamientoCard()));
+      await tester.pump();
+
       expect(find.text('PUSH'), findsOneWidget);
       expect(find.text('Pecho · Hombros · Tríceps'), findsOneWidget);
       expect(find.text('6 ejercicios'), findsOneWidget);
@@ -75,7 +110,13 @@ void main() {
       );
 
       await tester.pumpWidget(
-        MaterialApp.router(theme: AppTheme.dark(), routerConfig: router),
+        MaterialApp.router(
+          theme: AppTheme.dark(),
+          localizationsDelegates: AppL10n.localizationsDelegates,
+          supportedLocales: AppL10n.supportedLocales,
+          locale: const Locale('es', 'AR'),
+          routerConfig: router,
+        ),
       );
       await tester.pump();
 

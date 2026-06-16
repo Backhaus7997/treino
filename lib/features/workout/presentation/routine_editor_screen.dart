@@ -161,13 +161,24 @@ class _EditableDay {
   String name;
   List<_EditableSlot> slots = [];
 
+  /// True while [name] is the auto-generated default ("Día N"). Drives the
+  /// re-numbering in `_removeDay`: only auto-named days follow their position,
+  /// custom names (hydrated from a saved routine) are preserved. Tracked as a
+  /// flag instead of comparing [name] to a localized template — that compare
+  /// silently broke whenever the active locale differed from the literal.
+  bool isDefaultName;
+
   /// Collapsed/expanded state lives HERE (on the model that persists in the
   /// editor's _days list), not in the tile's State — the ListView recycles
   /// off-screen tiles, so a tile-local flag reset to `true` every time the
   /// day scrolled back into view (device bug 2026-06-11).
   bool expanded = true;
 
-  _EditableDay({required this.dayNumber, required this.name});
+  _EditableDay({
+    required this.dayNumber,
+    required this.name,
+    this.isDefaultName = false,
+  });
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -347,7 +358,12 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _splitController = TextEditingController();
   ExperienceLevel _level = ExperienceLevel.beginner;
-  List<_EditableDay> _days = [_EditableDay(dayNumber: 1, name: 'Día 1')];
+  // Seeded with an empty name + isDefaultName: true; the real localized label
+  // ("Día 1") is filled in by [_relabelDefaultDays] from didChangeDependencies,
+  // where a BuildContext (and thus AppL10n) is available.
+  List<_EditableDay> _days = [
+    _EditableDay(dayNumber: 1, name: '', isDefaultName: true),
+  ];
 
   /// 0-based week shown in the editor. Display is 1-based ("Sem 1").
   int _selectedWeek = 0;
@@ -373,6 +389,25 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     final existingId = _existingIdFor(widget.mode);
     if (existingId != null) {
       _loadExistingRoutine(existingId);
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Localize (and re-localize on locale change) every auto-named day. Custom
+    // names hydrated from a saved routine are left untouched.
+    _relabelDefaultDays();
+  }
+
+  /// Rewrites the [name] of every default-named day to the current locale's
+  /// "Día N" label. No-op for days the user/trainer named explicitly.
+  void _relabelDefaultDays() {
+    final l10n = AppL10n.of(context);
+    for (final day in _days) {
+      if (day.isDefaultName) {
+        day.name = l10n.routineEditorDayName(day.dayNumber);
+      }
     }
   }
 
@@ -422,9 +457,17 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
       if (routine.split != null) {
         _splitController.text = routine.split!;
       }
+      final l10n = AppL10n.of(context);
       _days = routine.days.map((day) {
-        final editableDay =
-            _EditableDay(dayNumber: day.dayNumber, name: day.name);
+        final editableDay = _EditableDay(
+          dayNumber: day.dayNumber,
+          name: day.name,
+          // A persisted day whose name still matches the localized default
+          // ('Día N') is treated as default-named, so deleting a day keeps
+          // re-numbering the remaining default-named days. A custom name set
+          // by the user no longer matches and is preserved as-is.
+          isDefaultName: day.name == l10n.routineEditorDayName(day.dayNumber),
+        );
         editableDay.slots = day.slots.map((slot) {
           final editableSlot = _EditableSlot()
             ..exercise = Exercise(
@@ -460,7 +503,13 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
         return editableDay;
       }).toList();
       if (_days.isEmpty) {
-        _days = [_EditableDay(dayNumber: 1, name: 'Día 1')];
+        _days = [
+          _EditableDay(
+            dayNumber: 1,
+            name: l10n.routineEditorDayName(1),
+            isDefaultName: true,
+          ),
+        ];
       }
       setState(() => _loading = false);
     } catch (_) {
@@ -602,6 +651,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     // Dismiss IME before showing dialog — avoids on-device IME state leaks.
     FocusManager.instance.primaryFocus?.unfocus();
 
+    final l10n = AppL10n.of(context);
     final sourceWeekDisplay =
         _selectedWeek; // 1-based (selectedWeek is 0-based)
     final targetWeekDisplay = _selectedWeek + 1;
@@ -613,23 +663,25 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
         return AlertDialog(
           backgroundColor: palette.bgCard,
           title: Text(
-            'Duplicar semana',
+            l10n.routineEditorDuplicateWeekTitle,
             style: TextStyle(color: palette.textPrimary),
           ),
           content: Text(
-            'Se copiará la Semana $sourceWeekDisplay en la Semana $targetWeekDisplay.',
+            l10n.routineEditorDuplicateWeekBody(
+                sourceWeekDisplay, targetWeekDisplay),
             style: TextStyle(color: palette.textMuted, fontSize: 14),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(false),
-              child:
-                  Text('Cancelar', style: TextStyle(color: palette.textMuted)),
+              child: Text(l10n.routineEditorDialogCancel,
+                  style: TextStyle(color: palette.textMuted)),
             ),
             TextButton(
               key: const Key('duplicate_week_confirm_button'),
               onPressed: () => Navigator.of(ctx).pop(true),
-              child: Text('Confirmar', style: TextStyle(color: palette.accent)),
+              child: Text(l10n.routineEditorDialogConfirm,
+                  style: TextStyle(color: palette.accent)),
             ),
           ],
         );
@@ -674,13 +726,22 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
 
   void _addDay() {
     if (_days.length >= _kMaxDays) return;
+    final l10n = AppL10n.of(context);
     setState(() {
       final n = _days.length + 1;
-      _days = [..._days, _EditableDay(dayNumber: n, name: 'Día $n')];
+      _days = [
+        ..._days,
+        _EditableDay(
+          dayNumber: n,
+          name: l10n.routineEditorDayName(n),
+          isDefaultName: true,
+        ),
+      ];
     });
   }
 
   void _removeDay(int index) {
+    final l10n = AppL10n.of(context);
     setState(() {
       _days = [
         for (int i = 0; i < _days.length; i++)
@@ -688,11 +749,12 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
       ];
       // Re-number — keep the default "Día N" name in sync with the new
       // position (so deleting Día 1 makes Día 2 become Día 1); preserve any
-      // custom name the user typed.
+      // custom name the user typed. Tracked via [isDefaultName] rather than a
+      // string compare so it stays correct in any locale.
       for (int i = 0; i < _days.length; i++) {
         final newNumber = i + 1;
-        if (_days[i].name == 'Día ${_days[i].dayNumber}') {
-          _days[i].name = 'Día $newNumber';
+        if (_days[i].isDefaultName) {
+          _days[i].name = l10n.routineEditorDayName(newNumber);
         }
         _days[i].dayNumber = newNumber;
       }
@@ -1350,7 +1412,8 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     _SectionLabel(
-                                        label: 'NIVEL', palette: palette),
+                                        label: l10n.routineEditorLevelLabel,
+                                        palette: palette),
                                     const SizedBox(height: 4),
                                     _LevelDropdown(
                                       value: _level,
@@ -1372,7 +1435,9 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                         // ── Semanas del plan ────────────────────────────────
                         // Week state machine — REQ-PERIOD-010..014. The chips
                         // switch the week every slot editor renders (live-view).
-                        _SectionLabel(label: 'SEMANAS', palette: palette),
+                        _SectionLabel(
+                            label: l10n.routineEditorWeeksLabel,
+                            palette: palette),
                         const SizedBox(height: 6),
                         _WeekTabBar(
                           numWeeks: _numWeeks,
@@ -1396,9 +1461,10 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                         if (hiddenInvalidWeeks.isNotEmpty) ...[
                           const SizedBox(height: 4),
                           Text(
-                            'Sets incompletos en Sem '
-                            '${hiddenInvalidWeeks.first + 1} · Día '
-                            '${invalidWeeks[hiddenInvalidWeeks.first]}',
+                            l10n.routineEditorInvalidWeekHint(
+                              hiddenInvalidWeeks.first + 1,
+                              invalidWeeks[hiddenInvalidWeeks.first]!,
+                            ),
                             key: const Key('invalid_week_hint'),
                             style: GoogleFonts.barlow(
                               fontSize: 11,
@@ -1409,7 +1475,9 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                         const SizedBox(height: 12),
 
                         // ── Días del plan ───────────────────────────────────
-                        _SectionLabel(label: 'DÍAS DEL PLAN', palette: palette),
+                        _SectionLabel(
+                            label: l10n.routineEditorDaysLabel,
+                            palette: palette),
                         const SizedBox(height: 6),
 
                         for (int di = 0; di < _days.length; di++) ...[
@@ -1567,6 +1635,7 @@ class _WeekTabBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppL10n.of(context);
     final canAdd = numWeeks < maxWeeks;
     final canRemove = numWeeks > 1;
     final canDuplicate = selectedWeek > 0;
@@ -1604,7 +1673,8 @@ class _WeekTabBar extends StatelessWidget {
                   size: 14,
                   color: canAdd ? palette.accent : palette.border,
                 ),
-                label: Text('Semana', style: actionStyle(canAdd)),
+                label: Text(l10n.routineEditorAddWeek,
+                    style: actionStyle(canAdd)),
               ),
             ],
           ),
@@ -1621,7 +1691,7 @@ class _WeekTabBar extends StatelessWidget {
                 color: canRemove ? palette.textMuted : palette.border,
               ),
               label: Text(
-                'Quitar última',
+                l10n.routineEditorRemoveLastWeek,
                 style: GoogleFonts.barlowCondensed(
                   fontWeight: FontWeight.w600,
                   fontSize: 12,
@@ -1638,7 +1708,8 @@ class _WeekTabBar extends StatelessWidget {
                 size: 14,
                 color: canDuplicate ? palette.accent : palette.border,
               ),
-              label: Text('Duplicar semana', style: actionStyle(canDuplicate)),
+              label: Text(l10n.routineEditorDuplicateWeek,
+                  style: actionStyle(canDuplicate)),
             ),
           ],
         ),
@@ -1684,7 +1755,7 @@ class _WeekChip extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              'Sem ${index + 1}',
+              AppL10n.of(context).routineEditorWeekShort(index + 1),
               style: GoogleFonts.barlowCondensed(
                 fontWeight: FontWeight.w700,
                 fontSize: 13,
@@ -1927,7 +1998,7 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
                       icon: Icon(TreinoIcon.plus,
                           size: 14, color: palette.accent),
                       label: Text(
-                        l10n.coachEditorAddSlot,
+                        l10n.routineEditorAddExercise,
                         style: GoogleFonts.barlowCondensed(
                           fontWeight: FontWeight.w600,
                           fontSize: 14,
@@ -2081,7 +2152,7 @@ class _SupersetGroupCard extends StatelessWidget {
             onPressed: onAddExercise,
             icon: Icon(TreinoIcon.plus, size: 14, color: palette.highlight),
             label: Text(
-              'Agregar ejercicio',
+              AppL10n.of(context).routineEditorAddExercise,
               style: GoogleFonts.barlowCondensed(
                 fontWeight: FontWeight.w600,
                 fontSize: 14,
@@ -2271,14 +2342,14 @@ class _SlotEditorState extends State<_SlotEditor> {
                     _slotMenuItem(
                       _SlotAction.replace,
                       TreinoIcon.edit,
-                      'Cambiar ejercicio',
+                      l10n.routineEditorSlotMenuReplace,
                       palette,
                     ),
                     if (showMove)
                       _slotMenuItem(
                         _SlotAction.moveUp,
                         TreinoIcon.chevronUp,
-                        'Subir',
+                        l10n.routineEditorSlotMenuMoveUp,
                         palette,
                         enabled: widget.canMoveUp,
                       ),
@@ -2286,14 +2357,14 @@ class _SlotEditorState extends State<_SlotEditor> {
                       _slotMenuItem(
                         _SlotAction.moveDown,
                         TreinoIcon.chevronDown,
-                        'Bajar',
+                        l10n.routineEditorSlotMenuMoveDown,
                         palette,
                         enabled: widget.canMoveDown,
                       ),
                     _slotMenuItem(
                       _SlotAction.remove,
                       TreinoIcon.trash,
-                      'Eliminar',
+                      l10n.routineEditorSlotMenuRemove,
                       palette,
                       danger: true,
                     ),
@@ -2309,7 +2380,7 @@ class _SlotEditorState extends State<_SlotEditor> {
             children: [
               Expanded(
                 child: DurationTextField(
-                  label: 'Descanso',
+                  label: l10n.routineEditorRestLabel,
                   valueSeconds: slot.restSeconds,
                   onChanged: (v) {
                     slot.restSeconds = v;
@@ -2348,7 +2419,7 @@ class _SlotEditorState extends State<_SlotEditor> {
               },
               icon: Icon(TreinoIcon.plus, size: 14, color: palette.accent),
               label: Text(
-                '+ Agregar set',
+                l10n.routineEditorAddSet,
                 style: GoogleFonts.barlowCondensed(
                   fontWeight: FontWeight.w600,
                   fontSize: 14,
@@ -2435,6 +2506,7 @@ class _SetTableState extends State<_SetTable> {
   /// sets. Rep ranges were removed from the UI — picking "Reps" normalises any
   /// legacy range slot back to single reps.
   Future<void> _pickMeasureMode(BuildContext context, Offset position) async {
+    final l10n = AppL10n.of(context);
     final renderBox = context.findRenderObject() as RenderBox?;
     final overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
     final relativeOffset = renderBox != null
@@ -2454,7 +2526,7 @@ class _SetTableState extends State<_SetTable> {
         PopupMenuItem(
           value: ExerciseMode.reps,
           child: Text(
-            'Reps',
+            l10n.routineEditorMeasureReps,
             style: GoogleFonts.barlow(
                 color: widget.palette.textPrimary, fontSize: 13),
           ),
@@ -2462,7 +2534,7 @@ class _SetTableState extends State<_SetTable> {
         PopupMenuItem(
           value: ExerciseMode.duration,
           child: Text(
-            'Tiempo',
+            l10n.routineEditorMeasureTime,
             style: GoogleFonts.barlow(
                 color: widget.palette.textPrimary, fontSize: 13),
           ),
@@ -2672,6 +2744,7 @@ class _SetRowState extends State<_SetRow> {
   static String _formatWeight(double? w) => formatEditorWeight(w);
 
   Future<void> _pickSetType(BuildContext context) async {
+    final l10n = AppL10n.of(context);
     final renderBox = context.findRenderObject() as RenderBox?;
     final overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
     final offset = renderBox != null
@@ -2687,12 +2760,18 @@ class _SetRowState extends State<_SetRow> {
         0,
       ),
       color: widget.palette.bgCard,
-      items: const [
-        PopupMenuItem(value: SetType.normal, child: Text('Normal')),
+      items: [
         PopupMenuItem(
-            value: SetType.warmup, child: Text('Entrada en calor (W)')),
-        PopupMenuItem(value: SetType.drop, child: Text('Drop (D)')),
-        PopupMenuItem(value: SetType.failure, child: Text('Al fallo (F)')),
+            value: SetType.normal,
+            child: Text(l10n.routineEditorSetTypeNormal)),
+        PopupMenuItem(
+            value: SetType.warmup,
+            child: Text(l10n.routineEditorSetTypeWarmup)),
+        PopupMenuItem(
+            value: SetType.drop, child: Text(l10n.routineEditorSetTypeDrop)),
+        PopupMenuItem(
+            value: SetType.failure,
+            child: Text(l10n.routineEditorSetTypeFailure)),
       ],
     );
     if (result != null) widget.onTypeChanged(result);

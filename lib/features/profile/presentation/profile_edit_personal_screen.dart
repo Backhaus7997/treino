@@ -140,9 +140,17 @@ class _ProfileEditPersonalScreenState
     return null;
   }
 
+  /// True while an avatar upload or Firestore update is in flight.
+  /// Used to gate the save handler, the header back-tap and the avatar
+  /// picker so an in-flight save cannot be interrupted (orphaned uploads).
+  bool get _isBusy =>
+      _saveState.value == _SaveState.uploading ||
+      _saveState.value == _SaveState.saving;
+
   // ── Avatar pick ──────────────────────────────────────────────────────────
 
   Future<void> _pickAvatar() async {
+    if (_isBusy) return;
     final picker = ImagePicker();
     final file = await picker.pickImage(
       source: ImageSource.gallery,
@@ -157,6 +165,7 @@ class _ProfileEditPersonalScreenState
   // ── Save ─────────────────────────────────────────────────────────────────
 
   Future<void> _save() async {
+    if (_isBusy) return; // re-entrancy guard — a save is already in flight
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
     _saveState.value = _SaveState.saving;
@@ -179,6 +188,18 @@ class _ProfileEditPersonalScreenState
         avatarUrl = await ref
             .read(avatarUploadServiceProvider)
             .upload(_pendingLocalPath!);
+        // Persist the uploaded URL immediately and clear the staged path so
+        // that if the Firestore update below fails, a retry reuses this URL
+        // instead of re-uploading (which would orphan a storage object).
+        if (mounted) {
+          setState(() {
+            _existingAvatarUrl = avatarUrl;
+            _pendingLocalPath = null;
+          });
+        } else {
+          _existingAvatarUrl = avatarUrl;
+          _pendingLocalPath = null;
+        }
       } catch (_) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -222,7 +243,10 @@ class _ProfileEditPersonalScreenState
       partial['experienceLevel'] = _selectedExperience?.toJson();
     }
 
-    if (avatarUrl != _existingAvatarUrl) {
+    // Compare against the persisted URL (from the initial profile), not
+    // _existingAvatarUrl — the latter is updated to the freshly-uploaded URL
+    // above, so it would no longer reflect a change after an upload.
+    if (avatarUrl != _initialProfile?.avatarUrl) {
       partial['avatarUrl'] = avatarUrl;
     }
 
@@ -260,6 +284,9 @@ class _ProfileEditPersonalScreenState
       return true;
     }
     if (_pendingLocalPath != null) return true;
+    // An avatar already uploaded but not yet persisted (e.g. upload succeeded
+    // but the Firestore update failed) still counts as a pending change.
+    if (_existingAvatarUrl != _initialProfile?.avatarUrl) return true;
     if (_selectedGender != _initialProfile?.gender) return true;
     if (_selectedExperience != _initialProfile?.experienceLevel) return true;
     final w = double.tryParse(_weightCtrl.text.replaceAll(',', '.'));
@@ -270,6 +297,7 @@ class _ProfileEditPersonalScreenState
   }
 
   void _onBackTap() {
+    if (_isBusy) return; // don't interrupt an in-flight save
     if (_isDirty) {
       _showDiscardDialog();
     } else {

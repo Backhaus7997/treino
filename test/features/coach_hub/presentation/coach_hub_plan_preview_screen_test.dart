@@ -142,8 +142,11 @@ void main() {
             exercisesProvider.overrideWith(
               (ref) => Future.value([exercise]),
             ),
-            linksForTrainerProvider('trainer-1').overrideWith(
-              (ref) async => [],
+            // _AthletePicker watches the real-time stream provider
+            // (ADR-CHLM-03); override it so the picker reaches its data
+            // branch instead of hanging on the loading spinner.
+            trainerLinksStreamProvider.overrideWith(
+              (ref) => Stream.value(const []),
             ),
           ],
         ),
@@ -198,8 +201,11 @@ void main() {
             exercisesProvider.overrideWith(
               (ref) => Future.value([exercise]),
             ),
-            linksForTrainerProvider('trainer-1').overrideWith(
-              (ref) async => [],
+            // _AthletePicker watches the real-time stream provider
+            // (ADR-CHLM-03); override it so the picker reaches its data
+            // branch instead of hanging on the loading spinner.
+            trainerLinksStreamProvider.overrideWith(
+              (ref) => Stream.value(const []),
             ),
           ],
         ),
@@ -250,8 +256,11 @@ void main() {
             exercisesProvider.overrideWith(
               (ref) => Future.value([exercise]),
             ),
-            linksForTrainerProvider('trainer-1').overrideWith(
-              (ref) async => [],
+            // _AthletePicker watches the real-time stream provider
+            // (ADR-CHLM-03); override it so the picker reaches its data
+            // branch instead of hanging on the loading spinner.
+            trainerLinksStreamProvider.overrideWith(
+              (ref) => Stream.value(const []),
             ),
           ],
         ),

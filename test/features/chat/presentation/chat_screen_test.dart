@@ -12,6 +12,7 @@ import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
+import 'package:treino/l10n/app_l10n.dart';
 
 import '../../../helpers/fake_analytics_service.dart';
 
@@ -20,6 +21,9 @@ Widget _wrap(Widget child, {List<Override> overrides = const []}) =>
       overrides: overrides,
       child: MaterialApp(
         theme: AppTheme.dark(),
+        locale: const Locale('es', 'AR'),
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
         home: child,
       ),
     );

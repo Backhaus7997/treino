@@ -76,7 +76,7 @@ class TrainerDashboardTab extends ConsumerWidget {
         const SizedBox(height: 8),
         _PlaceholderCard(
           palette: palette,
-          message: 'Próximamente.',
+          message: AppL10n.of(context).dashboardProximamente,
         ),
         const SizedBox(height: 20),
         _PagosPorCobrarSection(palette: palette),
@@ -109,7 +109,7 @@ class _DashboardHeader extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          _formatHeaderDate(DateTime.now()),
+          _formatHeaderDate(AppL10n.of(context), DateTime.now()),
           style: GoogleFonts.barlowCondensed(
             fontWeight: FontWeight.w700,
             fontSize: 12,
@@ -123,7 +123,10 @@ class _DashboardHeader extends ConsumerWidget {
           children: [
             Expanded(
               child: Text(
-                firstName.isEmpty ? 'HOLA' : 'HOLA, ${firstName.toUpperCase()}',
+                firstName.isEmpty
+                    ? AppL10n.of(context).dashboardHolaSinNombre
+                    : AppL10n.of(context)
+                        .dashboardHolaConNombre(firstName.toUpperCase()),
                 style: GoogleFonts.barlowCondensed(
                   fontWeight: FontWeight.w700,
                   fontSize: 28,
@@ -227,7 +230,9 @@ class _SolicitudesPendientesSection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _SectionHeader(label: 'SOLICITUDES PENDIENTES (${pending.length})'),
+        _SectionHeader(
+            label: AppL10n.of(context)
+                .dashboardSolicitudesPendientesTitle(pending.length)),
         const SizedBox(height: 8),
         for (final link in pending) ...[
           _PendingRequestCard(link: link),
@@ -246,8 +251,10 @@ class _PendingRequestCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     final profileAsync = ref.watch(userPublicProfileProvider(link.athleteId));
-    final name = profileAsync.valueOrNull?.displayName ?? 'Alumno';
+    final name =
+        profileAsync.valueOrNull?.displayName ?? l10n.dashboardAlumnoFallback;
     final initials = _initials(name);
 
     return Container(
@@ -293,7 +300,7 @@ class _PendingRequestCard extends ConsumerWidget {
                     ),
                   ),
                   child: Text(
-                    'RECHAZAR',
+                    l10n.dashboardRechazarLabel,
                     style: GoogleFonts.barlowCondensed(
                       fontWeight: FontWeight.w700,
                       fontSize: 12,
@@ -322,7 +329,7 @@ class _PendingRequestCard extends ConsumerWidget {
                     ),
                   ),
                   child: Text(
-                    'ACEPTAR',
+                    l10n.dashboardAceptarLabel,
                     style: GoogleFonts.barlowCondensed(
                       fontWeight: FontWeight.w700,
                       fontSize: 12,
@@ -355,18 +362,10 @@ class _ResumenDelDiaCard extends ConsumerWidget {
 
     final all = apptAsync.valueOrNull ?? const <Appointment>[];
     final now = DateTime.now().toUtc();
-    final todayAppts =
-        all.where((a) => _isSameLocalDay(a.startsAt, now)).toList();
-    final pending = todayAppts
-        .where((a) =>
-            a.status == AppointmentStatus.confirmed && a.startsAt.isAfter(now))
-        .length;
-    final done = todayAppts
-        .where((a) =>
-            a.status == AppointmentStatus.confirmed && !a.startsAt.isAfter(now))
-        .length;
-    final cancelled =
-        todayAppts.where((a) => a.status == AppointmentStatus.cancelled).length;
+    final counts = dashboardDayCounts(all, now);
+    final pending = counts.pending;
+    final done = counts.done;
+    final cancelled = counts.cancelled;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
@@ -544,11 +543,11 @@ class _ProximasSesionesList extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     final trainerId = ref.watch(currentUidProvider) ?? '';
     if (trainerId.isEmpty) {
       return _PlaceholderCard(
-          palette: palette,
-          message: 'Iniciá sesión para ver tus próximos turnos.');
+          palette: palette, message: l10n.dashboardIniciaSesion);
     }
     final apptAsync = ref
         .watch(trainerAppointmentsStreamProvider(_appointmentsKey(trainerId)));
@@ -556,11 +555,11 @@ class _ProximasSesionesList extends ConsumerWidget {
     return apptAsync.when(
       loading: () => _PlaceholderCard(
         palette: palette,
-        message: 'Cargando…',
+        message: l10n.dashboardCargando,
       ),
       error: (_, __) => _PlaceholderCard(
         palette: palette,
-        message: 'No pudimos cargar tus próximos turnos.',
+        message: l10n.dashboardErrorTurnos,
       ),
       data: (all) {
         final now = DateTime.now().toUtc();
@@ -575,7 +574,7 @@ class _ProximasSesionesList extends ConsumerWidget {
         if (next3.isEmpty) {
           return _PlaceholderCard(
             palette: palette,
-            message: 'No tenés turnos próximos confirmados.',
+            message: l10n.dashboardSinTurnosProximos,
           );
         }
 
@@ -617,7 +616,9 @@ class _ProximaSesionRow extends ConsumerWidget {
         ref.watch(userPublicProfileProvider(appointment.athleteId));
     final athleteName =
         profileAsync.valueOrNull?.displayName ?? appointment.athleteDisplayName;
-    final showName = _looksLikeUid(athleteName) ? 'Alumno' : athleteName;
+    final showName = _looksLikeUid(athleteName)
+        ? AppL10n.of(context).dashboardAlumnoFallback
+        : athleteName;
     final initials = _initials(showName);
 
     return InkWell(
@@ -667,7 +668,7 @@ class _ProximaSesionRow extends ConsumerWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    '${_formatDateLabel(appointment.startsAt)} · ${appointment.durationMin} min',
+                    '${_formatDateLabel(AppL10n.of(context), appointment.startsAt)} · ${appointment.durationMin} min',
                     style: GoogleFonts.barlow(
                       fontWeight: FontWeight.w400,
                       fontSize: 12,
@@ -695,15 +696,16 @@ class _EntrenaronHoyList extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     final todayAsync = ref.watch(trainedTodayProvider);
 
     if (todayAsync.isLoading && !todayAsync.hasValue) {
-      return _PlaceholderCard(palette: palette, message: 'Cargando…');
+      return _PlaceholderCard(palette: palette, message: l10n.dashboardCargando);
     }
     if (todayAsync.hasError && !todayAsync.hasValue) {
       return _PlaceholderCard(
         palette: palette,
-        message: 'No pudimos cargar la actividad de hoy.',
+        message: l10n.dashboardErrorActividad,
       );
     }
 
@@ -711,7 +713,7 @@ class _EntrenaronHoyList extends ConsumerWidget {
     if (entries.isEmpty) {
       return _PlaceholderCard(
         palette: palette,
-        message: 'Nadie entrenó hoy todavía.',
+        message: l10n.dashboardNadieEntreno,
       );
     }
 
@@ -749,8 +751,9 @@ class _EntrenaronHoyRow extends ConsumerWidget {
     final palette = AppPalette.of(context);
     final profileAsync = ref.watch(userPublicProfileProvider(entry.athleteId));
     final rawName = profileAsync.valueOrNull?.displayName ?? '';
-    final showName =
-        rawName.isEmpty || _looksLikeUid(rawName) ? 'Alumno' : rawName;
+    final showName = rawName.isEmpty || _looksLikeUid(rawName)
+        ? AppL10n.of(context).dashboardAlumnoFallback
+        : rawName;
     final initials = _initials(showName);
     final session = entry.session;
 
@@ -831,12 +834,13 @@ class _PagosPorCobrarSection extends ConsumerWidget {
       );
     }
 
+    final l10n = AppL10n.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _SectionHeader(
-          label: 'PAGOS POR COBRAR',
-          trailingLabel: '+ Cobro',
+          label: l10n.dashboardPagosPorCobrarTitle,
+          trailingLabel: l10n.dashboardCobroTrailingLabel,
           trailingOnTap: openAddSueltoSheet,
         ),
         const SizedBox(height: 8),
@@ -852,15 +856,16 @@ class _PagosPorCobrarList extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     final cobrosAsync = ref.watch(pagosPorCobrarProvider);
 
     if (cobrosAsync.isLoading && !cobrosAsync.hasValue) {
-      return _PlaceholderCard(palette: palette, message: 'Cargando…');
+      return _PlaceholderCard(palette: palette, message: l10n.dashboardCargando);
     }
     if (cobrosAsync.hasError && !cobrosAsync.hasValue) {
       return _PlaceholderCard(
         palette: palette,
-        message: 'No pudimos cargar los cobros.',
+        message: l10n.dashboardErrorCobros,
       );
     }
 
@@ -868,7 +873,7 @@ class _PagosPorCobrarList extends ConsumerWidget {
     if (cobros.isEmpty) {
       return _PlaceholderCard(
         palette: palette,
-        message: 'Sin cobros pendientes.',
+        message: l10n.dashboardSinCobros,
       );
     }
 
@@ -901,11 +906,11 @@ class _CobroPendienteRow extends ConsumerWidget {
   const _CobroPendienteRow({required this.cobro});
   final CobroPendiente cobro;
 
-  static String _cadenceLabel(BillingCadence c) => switch (c) {
-        BillingCadence.mensual => 'Mensual',
-        BillingCadence.semanal => 'Semanal',
-        BillingCadence.porSesion => 'Por sesión',
-        BillingCadence.suelto => 'Suelto',
+  static String _cadenceLabel(AppL10n l10n, BillingCadence c) => switch (c) {
+        BillingCadence.mensual => l10n.dashboardCadenceMensual,
+        BillingCadence.semanal => l10n.dashboardCadenceSemanal,
+        BillingCadence.porSesion => l10n.dashboardCadencePorSesion,
+        BillingCadence.suelto => l10n.dashboardCadenceSuelto,
       };
 
   static String _formatAmount(int amount) {
@@ -924,10 +929,12 @@ class _CobroPendienteRow extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     final profileAsync = ref.watch(userPublicProfileProvider(cobro.athleteId));
     final rawName = profileAsync.valueOrNull?.displayName ?? '';
-    final showName =
-        rawName.isEmpty || _looksLikeUid(rawName) ? 'Alumno' : rawName;
+    final showName = rawName.isEmpty || _looksLikeUid(rawName)
+        ? l10n.dashboardAlumnoFallback
+        : rawName;
     final initials = _initials(showName);
     final trainerId = ref.watch(currentUidProvider) ?? '';
 
@@ -937,7 +944,7 @@ class _CobroPendienteRow extends ConsumerWidget {
         builder: (ctx) => AlertDialog(
           backgroundColor: palette.bgCard,
           title: Text(
-            '¿Marcar como cobrado?',
+            l10n.dashboardMarcarCobradoTitle,
             style: GoogleFonts.barlowCondensed(
               fontWeight: FontWeight.w700,
               fontSize: 18,
@@ -954,12 +961,13 @@ class _CobroPendienteRow extends ConsumerWidget {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(false),
-              child:
-                  Text('Cancelar', style: TextStyle(color: palette.textMuted)),
+              child: Text(l10n.dashboardCancelarLabel,
+                  style: TextStyle(color: palette.textMuted)),
             ),
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(true),
-              child: Text('Cobrado', style: TextStyle(color: palette.accent)),
+              child: Text(l10n.dashboardCobradoLabel,
+                  style: TextStyle(color: palette.accent)),
             ),
           ],
         ),
@@ -1004,22 +1012,21 @@ class _CobroPendienteRow extends ConsumerWidget {
             ));
 
           case BillingCadence.suelto:
-            for (final pid in cobro.pendingPaymentIds) {
-              await repo.markPaid(pid, now);
-            }
+            // Flip all pending one-off charges atomically: a mid-loop failure
+            // (network drop / concurrently deleted doc) must not leave the
+            // athlete in a half-paid state.
+            await repo.markManyPaid(cobro.pendingPaymentIds, now);
         }
 
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Cobro registrado.')),
+            SnackBar(content: Text(l10n.dashboardCobroRegistrado)),
           );
         }
       } catch (_) {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-                content:
-                    Text('Error al registrar el cobro. Intentá de nuevo.')),
+            SnackBar(content: Text(l10n.dashboardCobroError)),
           );
         }
       }
@@ -1046,7 +1053,7 @@ class _CobroPendienteRow extends ConsumerWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '${cobro.concept} · ${_cadenceLabel(cobro.cadence)}',
+                  '${cobro.concept} · ${_cadenceLabel(l10n, cobro.cadence)}',
                   style: GoogleFonts.barlow(
                     fontWeight: FontWeight.w400,
                     fontSize: 12,
@@ -1076,7 +1083,7 @@ class _CobroPendienteRow extends ConsumerWidget {
                 borderRadius: BorderRadius.circular(9999),
               ),
               child: Text(
-                'Cobrado',
+                l10n.dashboardCobradoLabel,
                 style: GoogleFonts.barlowCondensed(
                   fontWeight: FontWeight.w700,
                   fontSize: 12,
@@ -1117,6 +1124,7 @@ class _AddSueltoSheetState extends ConsumerState<_AddSueltoSheet> {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     final linksAsync = ref.watch(trainerLinksStreamProvider);
     final activeLinks = (linksAsync.valueOrNull ?? const [])
         .where((l) => l.status == TrainerLinkStatus.active)
@@ -1134,7 +1142,7 @@ class _AddSueltoSheetState extends ConsumerState<_AddSueltoSheet> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'COBRO SUELTO',
+            l10n.dashboardCobroSueltoTitle,
             style: GoogleFonts.barlowCondensed(
               fontWeight: FontWeight.w700,
               fontSize: 18,
@@ -1145,7 +1153,7 @@ class _AddSueltoSheetState extends ConsumerState<_AddSueltoSheet> {
           const SizedBox(height: 18),
           // Athlete picker
           Text(
-            'ALUMNO',
+            l10n.dashboardAlumnoLabel,
             style: GoogleFonts.barlowCondensed(
               fontWeight: FontWeight.w700,
               fontSize: 11,
@@ -1156,7 +1164,7 @@ class _AddSueltoSheetState extends ConsumerState<_AddSueltoSheet> {
           const SizedBox(height: 8),
           if (activeLinks.isEmpty)
             Text(
-              'No tenés alumnos activos.',
+              l10n.dashboardSinAlumnosActivos,
               style: GoogleFonts.barlow(
                 fontSize: 13,
                 color: palette.textMuted,
@@ -1171,7 +1179,7 @@ class _AddSueltoSheetState extends ConsumerState<_AddSueltoSheet> {
             ),
           const SizedBox(height: 14),
           Text(
-            'MONTO (ARS)',
+            l10n.dashboardMontoArsLabel,
             style: GoogleFonts.barlowCondensed(
               fontWeight: FontWeight.w700,
               fontSize: 11,
@@ -1188,7 +1196,7 @@ class _AddSueltoSheetState extends ConsumerState<_AddSueltoSheet> {
               color: palette.textPrimary,
             ),
             decoration: InputDecoration(
-              hintText: 'Ej: 5000',
+              hintText: l10n.dashboardMontoHint,
               hintStyle: GoogleFonts.barlow(
                 fontSize: 14,
                 color: palette.textMuted,
@@ -1211,7 +1219,7 @@ class _AddSueltoSheetState extends ConsumerState<_AddSueltoSheet> {
           ),
           const SizedBox(height: 14),
           Text(
-            'CONCEPTO',
+            l10n.dashboardConceptoLabel,
             style: GoogleFonts.barlowCondensed(
               fontWeight: FontWeight.w700,
               fontSize: 11,
@@ -1227,7 +1235,7 @@ class _AddSueltoSheetState extends ConsumerState<_AddSueltoSheet> {
               color: palette.textPrimary,
             ),
             decoration: InputDecoration(
-              hintText: 'Ej: Clase de verano',
+              hintText: l10n.dashboardConceptoHint,
               hintStyle: GoogleFonts.barlow(
                 fontSize: 14,
                 color: palette.textMuted,
@@ -1272,7 +1280,7 @@ class _AddSueltoSheetState extends ConsumerState<_AddSueltoSheet> {
                       ),
                     )
                   : Text(
-                      'AGREGAR COBRO',
+                      l10n.dashboardAgregarCobroLabel,
                       style: GoogleFonts.barlowCondensed(
                         fontWeight: FontWeight.w700,
                         fontSize: 13,
@@ -1287,13 +1295,14 @@ class _AddSueltoSheetState extends ConsumerState<_AddSueltoSheet> {
   }
 
   Future<void> _submit() async {
+    final l10n = AppL10n.of(context);
     final athleteId = _selectedAthleteId;
     final amountText = _amountController.text.trim();
     final concept = _conceptController.text.trim();
 
     if (athleteId == null || amountText.isEmpty || concept.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Completá todos los campos.')),
+        SnackBar(content: Text(l10n.dashboardCompletaCampos)),
       );
       return;
     }
@@ -1301,7 +1310,7 @@ class _AddSueltoSheetState extends ConsumerState<_AddSueltoSheet> {
     final amount = int.tryParse(amountText);
     if (amount == null || amount <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Ingresá un monto válido.')),
+        SnackBar(content: Text(l10n.dashboardMontoInvalido)),
       );
       return;
     }
@@ -1323,14 +1332,14 @@ class _AddSueltoSheetState extends ConsumerState<_AddSueltoSheet> {
       if (mounted) {
         Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Cobro suelto agregado.')),
+          SnackBar(content: Text(l10n.dashboardCobroSueltoAgregado)),
         );
       }
     } catch (_) {
       if (mounted) {
         setState(() => _saving = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Error al guardar. Intentá de nuevo.')),
+          SnackBar(content: Text(l10n.dashboardGuardarError)),
         );
       }
     }
@@ -1353,10 +1362,11 @@ class _AthleteDropdown extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppL10n.of(context);
     return DropdownButtonFormField<String>(
       initialValue: selectedId,
       hint: Text(
-        'Seleccioná un alumno',
+        l10n.dashboardSeleccionaAlumnoHint,
         style: GoogleFonts.barlow(fontSize: 14, color: palette.textMuted),
       ),
       dropdownColor: palette.bgCard,
@@ -1382,7 +1392,7 @@ class _AthleteDropdown extends ConsumerWidget {
             ref.watch(userPublicProfileProvider(link.athleteId));
         final rawName = profileAsync.valueOrNull?.displayName ?? '';
         final showName = rawName.isEmpty || _looksLikeUid(rawName)
-            ? 'Alumno (${link.athleteId.substring(0, 6)})'
+            ? '${l10n.dashboardAlumnoFallback} (${link.athleteId.substring(0, 6)})'
             : rawName;
         return DropdownMenuItem<String>(
           value: link.athleteId,
@@ -1431,14 +1441,15 @@ class _BottomActions extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     return Row(
       children: [
         Expanded(
           child: OutlinedButton(
             onPressed: () {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Invitar alumno — próximamente.'),
+                SnackBar(
+                  content: Text(l10n.dashboardInvitarProximamente),
                 ),
               );
             },
@@ -1451,7 +1462,7 @@ class _BottomActions extends StatelessWidget {
               ),
             ),
             child: Text(
-              '+ INVITAR ALUMNO',
+              l10n.dashboardInvitarAlumnoLabel,
               style: GoogleFonts.barlowCondensed(
                 fontWeight: FontWeight.w700,
                 fontSize: 12,
@@ -1473,7 +1484,7 @@ class _BottomActions extends StatelessWidget {
               ),
             ),
             child: Text(
-              '+ ASIGNAR RUTINA',
+              l10n.dashboardAsignarRutinaLabel,
               style: GoogleFonts.barlowCondensed(
                 fontWeight: FontWeight.w700,
                 fontSize: 12,
@@ -1489,35 +1500,100 @@ class _BottomActions extends StatelessWidget {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const _kSpanishDays = <String>[
-  '',
-  'LUNES',
-  'MARTES',
-  'MIÉRCOLES',
-  'JUEVES',
-  'VIERNES',
-  'SÁBADO',
-  'DOMINGO',
-];
+/// Immutable result of the "Resumen del día" classification.
+class DashboardDayCounts {
+  const DashboardDayCounts({
+    required this.pending,
+    required this.done,
+    required this.cancelled,
+  });
 
-const _kSpanishMonths = <String>[
-  '',
-  'ENERO',
-  'FEBRERO',
-  'MARZO',
-  'ABRIL',
-  'MAYO',
-  'JUNIO',
-  'JULIO',
-  'AGOSTO',
-  'SEPTIEMBRE',
-  'OCTUBRE',
-  'NOVIEMBRE',
-  'DICIEMBRE',
-];
+  final int pending;
+  final int done;
+  final int cancelled;
+}
 
-String _formatHeaderDate(DateTime dt) {
-  return '${_kSpanishDays[dt.weekday]} ${dt.day} ${_kSpanishMonths[dt.month]}';
+/// Classifies today's appointments into pending / done / cancelled for the
+/// dashboard summary.
+///
+/// A confirmed session counts as `done` only once it has actually ended
+/// (`startsAt + durationMin`); while it has not yet ended — including while it
+/// is in progress — it counts as `pending`. [now] must be UTC, matching the
+/// UTC [Appointment.startsAt].
+DashboardDayCounts dashboardDayCounts(
+  List<Appointment> all,
+  DateTime now,
+) {
+  final todayAppts = all.where((a) => _isSameLocalDay(a.startsAt, now)).toList();
+  DateTime endOf(Appointment a) =>
+      a.startsAt.add(Duration(minutes: a.durationMin));
+  final pending = todayAppts
+      .where((a) =>
+          a.status == AppointmentStatus.confirmed && endOf(a).isAfter(now))
+      .length;
+  final done = todayAppts
+      .where((a) =>
+          a.status == AppointmentStatus.confirmed && !endOf(a).isAfter(now))
+      .length;
+  final cancelled =
+      todayAppts.where((a) => a.status == AppointmentStatus.cancelled).length;
+  return DashboardDayCounts(
+    pending: pending,
+    done: done,
+    cancelled: cancelled,
+  );
+}
+
+String _weekdayName(AppL10n l10n, int weekday) {
+  switch (weekday) {
+    case DateTime.monday:
+      return l10n.dashboardWeekday1;
+    case DateTime.tuesday:
+      return l10n.dashboardWeekday2;
+    case DateTime.wednesday:
+      return l10n.dashboardWeekday3;
+    case DateTime.thursday:
+      return l10n.dashboardWeekday4;
+    case DateTime.friday:
+      return l10n.dashboardWeekday5;
+    case DateTime.saturday:
+      return l10n.dashboardWeekday6;
+    default:
+      return l10n.dashboardWeekday7;
+  }
+}
+
+String _monthName(AppL10n l10n, int month) {
+  switch (month) {
+    case 1:
+      return l10n.dashboardMonth1;
+    case 2:
+      return l10n.dashboardMonth2;
+    case 3:
+      return l10n.dashboardMonth3;
+    case 4:
+      return l10n.dashboardMonth4;
+    case 5:
+      return l10n.dashboardMonth5;
+    case 6:
+      return l10n.dashboardMonth6;
+    case 7:
+      return l10n.dashboardMonth7;
+    case 8:
+      return l10n.dashboardMonth8;
+    case 9:
+      return l10n.dashboardMonth9;
+    case 10:
+      return l10n.dashboardMonth10;
+    case 11:
+      return l10n.dashboardMonth11;
+    default:
+      return l10n.dashboardMonth12;
+  }
+}
+
+String _formatHeaderDate(AppL10n l10n, DateTime dt) {
+  return '${_weekdayName(l10n, dt.weekday)} ${dt.day} ${_monthName(l10n, dt.month)}';
 }
 
 String _formatTime(DateTime dt) {
@@ -1526,12 +1602,12 @@ String _formatTime(DateTime dt) {
   return '$hh:$mm';
 }
 
-String _formatDateLabel(DateTime dt) {
+String _formatDateLabel(AppL10n l10n, DateTime dt) {
   final now = DateTime.now().toUtc();
   final isToday = _isSameLocalDay(dt, now);
   final isTomorrow = _isSameLocalDay(dt, now.add(const Duration(days: 1)));
-  if (isToday) return 'Hoy';
-  if (isTomorrow) return 'Mañana';
+  if (isToday) return l10n.dashboardDateToday;
+  if (isTomorrow) return l10n.dashboardDateTomorrow;
   final dd = dt.day.toString().padLeft(2, '0');
   final mm = dt.month.toString().padLeft(2, '0');
   return '$dd/$mm';

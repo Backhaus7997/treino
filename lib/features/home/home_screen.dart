@@ -61,8 +61,11 @@ class _AthleteHome extends ConsumerWidget {
     ref.listen<AsyncValue<({Session session, List<SetLog> setLogs})?>>(
       activeSessionForUidProvider,
       (prev, next) {
-        if (prev is AsyncData &&
-            identical((prev as AsyncData).value, next.value)) {
+        // Dedupe by stable session id, not identity. The provider returns a
+        // fresh Dart record on every run, so `identical` never matches and the
+        // resume dialog would re-stack whenever currentUidProvider's auth
+        // stream re-emits the same active session.
+        if (prev?.valueOrNull?.session.id == next.valueOrNull?.session.id) {
           return;
         }
         _maybeShowResumePrompt(context, ref, next);
@@ -124,6 +127,10 @@ void _maybeShowResumePrompt(
             totalVolumeKg: _sumVolume(record.setLogs),
             durationMin: _elapsedMin(session.startedAt),
           );
+          // _AthleteHome may have been disposed during the finish() write
+          // (user navigated away). Invalidating through a torn-down ref throws,
+          // so guard on the host context before touching ref again.
+          if (!context.mounted) return;
           if (dialogCtx.mounted) {
             Navigator.of(dialogCtx, rootNavigator: true).pop();
           }

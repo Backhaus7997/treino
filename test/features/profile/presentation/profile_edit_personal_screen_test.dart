@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -353,6 +355,67 @@ void main() {
         find.byKey(const Key('edit_personal_avatar_editor')),
         findsOneWidget,
       );
+    });
+  });
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // SCENARIO-516: in-flight save cannot be interrupted by the header back-tap
+  // (re-entrancy guard / back-gating — regression for orphaned-upload bug)
+  // ──────────────────────────────────────────────────────────────────────────
+  group('SCENARIO-516: save is not interruptible while in flight', () {
+    testWidgets(
+        'tapping header back during an in-flight save does not pop the route',
+        (tester) async {
+      // update() is held open via a Completer so the screen stays in the
+      // "saving" state for the duration of the test.
+      final updateCompleter = Completer<void>();
+      final repo = MockUserRepository();
+      var updateCalls = 0;
+      when(() => repo.update(any(), any())).thenAnswer((_) {
+        updateCalls++;
+        return updateCompleter.future;
+      });
+
+      await tester.pumpWidget(
+        _buildScreen(
+          profile: _profile(displayName: 'Carlos'),
+          userRepository: repo,
+          authenticated: true,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Make the form dirty so a back-tap would normally trigger the discard
+      // dialog (and a pop). With the guard active it must do neither.
+      final nameField = find.byKey(const Key('edit_personal_display_name'));
+      await tester.enterText(nameField, 'Carlos R.');
+      await tester.pump();
+
+      // Kick off the save — it will hang in the "saving" state.
+      await tester
+          .ensureVisible(find.byKey(const Key('edit_personal_save_button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('edit_personal_save_button')));
+      await tester.pump(); // let _save() reach the awaited update()
+
+      // Tap the header back arrow while the save is in flight.
+      await tester.tap(find.text('EDITAR PERFIL')); // i18n: Fase 6 Etapa 3
+      await tester.pump();
+
+      // No discard dialog, and we are still on the edit screen.
+      expect(find.text('¿Descartar los cambios?'), findsNothing);
+      expect(find.text('EDITAR PERFIL'), findsOneWidget);
+      expect(find.text('PROFILE_SCREEN'), findsNothing);
+
+      // Tapping save again must NOT trigger a second update() (re-entrancy).
+      await tester.tap(find.byKey(const Key('edit_personal_save_button')));
+      await tester.pump();
+      expect(updateCalls, equals(1));
+
+      // Let the save complete so the screen finally pops.
+      updateCompleter.complete();
+      await tester.pumpAndSettle();
+      expect(find.text('PROFILE_SCREEN'), findsOneWidget);
     });
   });
 }

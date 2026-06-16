@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../profile/application/user_providers.dart' show firestoreProvider;
+import '../../profile_setup/domain/gym.dart' show kNoGymId;
 import '../../workout/application/session_providers.dart'
     show currentUidProvider;
 import '../data/check_in_repository.dart';
@@ -37,14 +38,20 @@ class CheckInNotifier extends AsyncNotifier<CheckIn?> {
     final uid = ref.read(currentUidProvider);
     if (uid == null) return;
 
+    // The kNoGymId sentinel ('no-gym') is a valid profile value meaning the
+    // user opted out of a gym — it must NOT be recorded as an in-gym check-in.
+    // Treat null/empty/sentinel as not-in-gym and null out gym fields so the
+    // stored record stays consistent (no inGym=true pointing at 'no-gym').
+    final inGym = gymId != null && gymId.isNotEmpty && gymId != kNoGymId;
+
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() async {
       final result =
           await ref.read(checkInRepositoryProvider).createTodayCheckIn(
                 uid,
-                inGym: gymId != null,
-                gymId: gymId,
-                gymName: gymName,
+                inGym: inGym,
+                gymId: inGym ? gymId : null,
+                gymName: inGym ? gymName : null,
               );
       // Invalidate so FeedScreen re-evaluates on next mount.
       ref.invalidate(todayCheckInProvider);

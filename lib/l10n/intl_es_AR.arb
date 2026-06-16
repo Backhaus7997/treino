@@ -251,6 +251,73 @@
   "dashboardDejarFeedbackLabel": "Dejar feedback",
   "dashboardActividadRecienteSectionLabel": "ACTIVIDAD RECIENTE",
 
+  "_comment_dashboard_i18n": "trainer_dashboard_tab.dart user-facing strings",
+  "dashboardWeekday1": "LUNES",
+  "dashboardWeekday2": "MARTES",
+  "dashboardWeekday3": "MIÉRCOLES",
+  "dashboardWeekday4": "JUEVES",
+  "dashboardWeekday5": "VIERNES",
+  "dashboardWeekday6": "SÁBADO",
+  "dashboardWeekday7": "DOMINGO",
+  "dashboardMonth1": "ENERO",
+  "dashboardMonth2": "FEBRERO",
+  "dashboardMonth3": "MARZO",
+  "dashboardMonth4": "ABRIL",
+  "dashboardMonth5": "MAYO",
+  "dashboardMonth6": "JUNIO",
+  "dashboardMonth7": "JULIO",
+  "dashboardMonth8": "AGOSTO",
+  "dashboardMonth9": "SEPTIEMBRE",
+  "dashboardMonth10": "OCTUBRE",
+  "dashboardMonth11": "NOVIEMBRE",
+  "dashboardMonth12": "DICIEMBRE",
+  "dashboardDateToday": "Hoy",
+  "dashboardDateTomorrow": "Mañana",
+  "dashboardRechazarLabel": "RECHAZAR",
+  "dashboardAceptarLabel": "ACEPTAR",
+  "dashboardPagosPorCobrarTitle": "PAGOS POR COBRAR",
+  "dashboardCobroTrailingLabel": "+ Cobro",
+  "dashboardInvitarAlumnoLabel": "+ INVITAR ALUMNO",
+  "dashboardAsignarRutinaLabel": "+ ASIGNAR RUTINA",
+  "dashboardCobroSueltoTitle": "COBRO SUELTO",
+  "dashboardAlumnoLabel": "ALUMNO",
+  "dashboardMontoArsLabel": "MONTO (ARS)",
+  "dashboardConceptoLabel": "CONCEPTO",
+  "dashboardAgregarCobroLabel": "AGREGAR COBRO",
+  "dashboardMontoHint": "Ej: 5000",
+  "dashboardConceptoHint": "Ej: Clase de verano",
+  "dashboardSeleccionaAlumnoHint": "Seleccioná un alumno",
+  "dashboardSinAlumnosActivos": "No tenés alumnos activos.",
+  "dashboardMarcarCobradoTitle": "¿Marcar como cobrado?",
+  "dashboardCancelarLabel": "Cancelar",
+  "dashboardCobradoLabel": "Cobrado",
+  "dashboardCobroRegistrado": "Cobro registrado.",
+  "dashboardCobroError": "Error al registrar el cobro. Intentá de nuevo.",
+  "dashboardCobroSueltoAgregado": "Cobro suelto agregado.",
+  "dashboardCompletaCampos": "Completá todos los campos.",
+  "dashboardMontoInvalido": "Ingresá un monto válido.",
+  "dashboardGuardarError": "Error al guardar. Intentá de nuevo.",
+  "dashboardCadenceMensual": "Mensual",
+  "dashboardCadenceSemanal": "Semanal",
+  "dashboardCadencePorSesion": "Por sesión",
+  "dashboardCadenceSuelto": "Suelto",
+  "dashboardAlumnoFallback": "Alumno",
+  "dashboardProximamente": "Próximamente.",
+  "dashboardIniciaSesion": "Iniciá sesión para ver tus próximos turnos.",
+  "dashboardCargando": "Cargando…",
+  "dashboardErrorTurnos": "No pudimos cargar tus próximos turnos.",
+  "dashboardSinTurnosProximos": "No tenés turnos próximos confirmados.",
+  "dashboardNadieEntreno": "Nadie entrenó hoy todavía.",
+  "dashboardErrorActividad": "No pudimos cargar la actividad de hoy.",
+  "dashboardSinCobros": "Sin cobros pendientes.",
+  "dashboardErrorCobros": "No pudimos cargar los cobros.",
+  "dashboardHolaSinNombre": "HOLA",
+  "dashboardInvitarProximamente": "Invitar alumno — próximamente.",
+  "dashboardSolicitudesPendientesTitle": "SOLICITUDES PENDIENTES ({count})",
+  "@dashboardSolicitudesPendientesTitle": { "placeholders": { "count": { "type": "int" } } },
+  "dashboardHolaConNombre": "HOLA, {name}",
+  "@dashboardHolaConNombre": { "placeholders": { "name": { "type": "String" } } },
+
   "reviewSnackBarSuccess": "¡Gracias por tu reseña!",
 
   "plantillasRetryLabel": "Reintentar",
@@ -338,5 +405,274 @@
     "placeholders": {
       "count": { "type": "int" }
     }
-  }
+  },
+
+  "chatListTitle": "MENSAJES",
+  "@chatListTitle": {},
+
+  "chatListDeletedUser": "Usuario eliminado",
+  "@chatListDeletedUser": {},
+
+  "chatListStartConversation": "Iniciá la conversación",
+  "@chatListStartConversation": {},
+
+  "chatListEmptyTitle": "Sin mensajes todavía",
+  "@chatListEmptyTitle": {},
+
+  "chatListEmptyBody": "Cuando tengas un vínculo activo con un PF, vas a poder chatear desde acá.",
+  "@chatListEmptyBody": {},
+
+  "chatListError": "No pudimos cargar tus mensajes.",
+  "@chatListError": {},
+
+  "chatListRetryLabel": "Reintentar",
+  "@chatListRetryLabel": {},
+
+  "chatRelativeJustNow": "recién",
+  "@chatRelativeJustNow": {},
+
+  "chatRelativeMinutes": "hace {minutes}m",
+  "@chatRelativeMinutes": {
+    "placeholders": {
+      "minutes": { "type": "int" }
+    }
+  },
+
+  "chatRelativeHours": "hace {hours}h",
+  "@chatRelativeHours": {
+    "placeholders": {
+      "hours": { "type": "int" }
+    }
+  },
+
+  "chatRelativeDays": "hace {days}d",
+  "@chatRelativeDays": {
+    "placeholders": {
+      "days": { "type": "int" }
+    }
+  },
+
+  "chatScreenTitleFallback": "Usuario",
+  "@chatScreenTitleFallback": {},
+
+  "chatScreenLoadError": "No pudimos cargar los mensajes.",
+  "@chatScreenLoadError": {},
+
+  "chatScreenComposerHint": "Escribí un mensaje…",
+  "@chatScreenComposerHint": {},
+
+  "chatScreenSendLabel": "Enviar",
+  "@chatScreenSendLabel": {},
+
+  "chatScreenSendError": "No pudimos enviar el mensaje. Probá de nuevo.",
+  "@chatScreenSendError": {},
+
+  "performanceLogTitle": "Cargar evaluación",
+  "@performanceLogTitle": {},
+
+  "performanceLogCancel": "Cancelar",
+  "@performanceLogCancel": {},
+
+  "performanceLogSaveCta": "GUARDAR EVALUACIÓN",
+  "@performanceLogSaveCta": {},
+
+  "performanceLogNoSession": "No hay sesión activa. No se puede guardar.",
+  "@performanceLogNoSession": {},
+
+  "performanceLogSaveSuccess": "Evaluación guardada",
+  "@performanceLogSaveSuccess": {},
+
+  "performanceLogSaveError": "No pudimos guardar la evaluación. Probá de nuevo.",
+  "@performanceLogSaveError": {},
+
+  "performanceLogNotesHint": "Observaciones del entrenador…",
+  "@performanceLogNotesHint": {},
+
+  "performanceLogSectionJumps": "SALTOS (cm)",
+  "@performanceLogSectionJumps": {},
+
+  "performanceLogSectionSpeed": "VELOCIDAD (seg)",
+  "@performanceLogSectionSpeed": {},
+
+  "performanceLogSectionStrength": "FUERZA 1RM (kg)",
+  "@performanceLogSectionStrength": {},
+
+  "performanceLogSectionEndurance": "RESISTENCIA / OTROS",
+  "@performanceLogSectionEndurance": {},
+
+  "performanceLogSectionNotes": "NOTAS",
+  "@performanceLogSectionNotes": {},
+
+  "performanceLogFieldCmj": "CMJ",
+  "@performanceLogFieldCmj": {},
+
+  "performanceLogFieldSquatJump": "Squat Jump",
+  "@performanceLogFieldSquatJump": {},
+
+  "performanceLogFieldAbalakov": "Abalakov",
+  "@performanceLogFieldAbalakov": {},
+
+  "performanceLogFieldBroadJump": "Salto largo",
+  "@performanceLogFieldBroadJump": {},
+
+  "performanceLogFieldSprint10": "Sprint 10m",
+  "@performanceLogFieldSprint10": {},
+
+  "performanceLogFieldSprint20": "20m",
+  "@performanceLogFieldSprint20": {},
+
+  "performanceLogFieldSprint30": "30m",
+  "@performanceLogFieldSprint30": {},
+
+  "performanceLogFieldSprint40": "40m",
+  "@performanceLogFieldSprint40": {},
+
+  "performanceLogFieldSquat1rm": "Sentadilla",
+  "@performanceLogFieldSquat1rm": {},
+
+  "performanceLogFieldBenchPress": "Press banca",
+  "@performanceLogFieldBenchPress": {},
+
+  "performanceLogFieldDeadlift": "Peso muerto",
+  "@performanceLogFieldDeadlift": {},
+
+  "performanceLogFieldOverheadPress": "Press militar",
+  "@performanceLogFieldOverheadPress": {},
+
+  "performanceLogFieldPullUp": "Dominada lastrada",
+  "@performanceLogFieldPullUp": {},
+
+  "performanceLogFieldVo2max": "VO2máx",
+  "@performanceLogFieldVo2max": {},
+
+  "performanceLogFieldCourseNavette": "Course Navette (nivel)",
+  "@performanceLogFieldCourseNavette": {},
+
+  "performanceLogFieldCooper": "Cooper",
+  "@performanceLogFieldCooper": {},
+
+  "performanceLogFieldSitAndReach": "Flexibilidad sit-and-reach",
+  "@performanceLogFieldSitAndReach": {},
+
+  "performanceChartSectionLabel": "PROGRESO",
+  "@performanceChartSectionLabel": {},
+  "performanceChartEmptyHint": "Cargá otra evaluación para ver el progreso.",
+  "@performanceChartEmptyHint": {},
+  "performanceChartSpanDays": "({count} {count, plural, =1{día} other{días}})",
+  "@performanceChartSpanDays": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "performanceChartSpanWeeks": "({count} {count, plural, =1{semana} other{semanas}})",
+  "@performanceChartSpanWeeks": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "performanceChartMetricCmj": "CMJ",
+  "@performanceChartMetricCmj": {},
+  "performanceChartMetricSquatJump": "Squat Jump",
+  "@performanceChartMetricSquatJump": {},
+  "performanceChartMetricAbalakov": "Abalakov",
+  "@performanceChartMetricAbalakov": {},
+  "performanceChartMetricBroadJump": "Salto largo",
+  "@performanceChartMetricBroadJump": {},
+  "performanceChartMetricSprint10": "Sprint 10m",
+  "@performanceChartMetricSprint10": {},
+  "performanceChartMetricSprint20": "Sprint 20m",
+  "@performanceChartMetricSprint20": {},
+  "performanceChartMetricSprint30": "Sprint 30m",
+  "@performanceChartMetricSprint30": {},
+  "performanceChartMetricSprint40": "Sprint 40m",
+  "@performanceChartMetricSprint40": {},
+  "performanceChartMetricSquat1rm": "Sentadilla 1RM",
+  "@performanceChartMetricSquat1rm": {},
+  "performanceChartMetricBench1rm": "Banca 1RM",
+  "@performanceChartMetricBench1rm": {},
+  "performanceChartMetricDeadlift1rm": "Peso muerto 1RM",
+  "@performanceChartMetricDeadlift1rm": {},
+  "performanceChartMetricOverheadPress1rm": "Press militar 1RM",
+  "@performanceChartMetricOverheadPress1rm": {},
+  "performanceChartMetricPullUp1rm": "Dominada 1RM",
+  "@performanceChartMetricPullUp1rm": {},
+  "performanceChartMetricVo2max": "VO2máx",
+  "@performanceChartMetricVo2max": {},
+  "performanceChartMetricCourseNavette": "Course Navette",
+  "@performanceChartMetricCourseNavette": {},
+  "performanceChartMetricCooper": "Cooper",
+  "@performanceChartMetricCooper": {},
+  "performanceChartMetricSitAndReach": "Flexibilidad",
+  "@performanceChartMetricSitAndReach": {},
+
+  "routineEditorDayName": "Día {n}",
+  "@routineEditorDayName": {
+    "placeholders": {
+      "n": { "type": "int" }
+    }
+  },
+  "routineEditorAddExercise": "Agregar ejercicio",
+  "@routineEditorAddExercise": {},
+  "routineEditorLevelLabel": "NIVEL",
+  "@routineEditorLevelLabel": {},
+  "routineEditorWeeksLabel": "SEMANAS",
+  "@routineEditorWeeksLabel": {},
+  "routineEditorDaysLabel": "DÍAS DEL PLAN",
+  "@routineEditorDaysLabel": {},
+  "routineEditorAddWeek": "Semana",
+  "@routineEditorAddWeek": {},
+  "routineEditorRemoveLastWeek": "Quitar última",
+  "@routineEditorRemoveLastWeek": {},
+  "routineEditorDuplicateWeek": "Duplicar semana",
+  "@routineEditorDuplicateWeek": {},
+  "routineEditorWeekShort": "Sem {n}",
+  "@routineEditorWeekShort": {
+    "placeholders": {
+      "n": { "type": "int" }
+    }
+  },
+  "routineEditorInvalidWeekHint": "Sets incompletos en Sem {week} · Día {day}",
+  "@routineEditorInvalidWeekHint": {
+    "placeholders": {
+      "week": { "type": "int" },
+      "day": { "type": "int" }
+    }
+  },
+  "routineEditorDuplicateWeekTitle": "Duplicar semana",
+  "@routineEditorDuplicateWeekTitle": {},
+  "routineEditorDuplicateWeekBody": "Se copiará la Semana {source} en la Semana {target}.",
+  "@routineEditorDuplicateWeekBody": {
+    "placeholders": {
+      "source": { "type": "int" },
+      "target": { "type": "int" }
+    }
+  },
+  "routineEditorDialogCancel": "Cancelar",
+  "@routineEditorDialogCancel": {},
+  "routineEditorDialogConfirm": "Confirmar",
+  "@routineEditorDialogConfirm": {},
+  "routineEditorSlotMenuReplace": "Cambiar ejercicio",
+  "@routineEditorSlotMenuReplace": {},
+  "routineEditorSlotMenuMoveUp": "Subir",
+  "@routineEditorSlotMenuMoveUp": {},
+  "routineEditorSlotMenuMoveDown": "Bajar",
+  "@routineEditorSlotMenuMoveDown": {},
+  "routineEditorSlotMenuRemove": "Eliminar",
+  "@routineEditorSlotMenuRemove": {},
+  "routineEditorRestLabel": "Descanso",
+  "@routineEditorRestLabel": {},
+  "routineEditorAddSet": "+ Agregar set",
+  "@routineEditorAddSet": {},
+  "routineEditorMeasureReps": "Reps",
+  "@routineEditorMeasureReps": {},
+  "routineEditorMeasureTime": "Tiempo",
+  "@routineEditorMeasureTime": {},
+  "routineEditorSetTypeNormal": "Normal",
+  "@routineEditorSetTypeNormal": {},
+  "routineEditorSetTypeWarmup": "Entrada en calor (W)",
+  "@routineEditorSetTypeWarmup": {},
+  "routineEditorSetTypeDrop": "Drop (D)",
+  "@routineEditorSetTypeDrop": {},
+  "routineEditorSetTypeFailure": "Al fallo (F)",
+  "@routineEditorSetTypeFailure": {}
 }

@@ -33,6 +33,8 @@ final _fakePostRepoProvider = Provider<_FakePostRepository>(
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+const _sharedText = '¡Terminé mi entreno! 💪';
+
 UserProfile _makeProfile({String? displayName = 'Ana'}) => UserProfile(
       uid: 'u1',
       email: 'ana@test.com',
@@ -94,7 +96,7 @@ void main() {
       addTearDown(container.dispose);
 
       final notifier = container.read(postWorkoutNotifierProvider.notifier);
-      await notifier.shareWorkout(_makeSession());
+      await notifier.shareWorkout(_makeSession(), text: _sharedText);
 
       expect(fakeRepo.capturedPost, isNotNull);
       expect(fakeRepo.capturedPost!.authorDisplayName, equals('Ana'));
@@ -109,7 +111,7 @@ void main() {
       addTearDown(container.dispose);
 
       final notifier = container.read(postWorkoutNotifierProvider.notifier);
-      await notifier.shareWorkout(_makeSession());
+      await notifier.shareWorkout(_makeSession(), text: _sharedText);
 
       expect(fakeRepo.capturedPost, isNotNull);
       expect(fakeRepo.capturedPost!.authorDisplayName, equals(''));
@@ -124,8 +126,10 @@ void main() {
       addTearDown(container.dispose);
 
       final notifier = container.read(postWorkoutNotifierProvider.notifier);
-      await notifier
-          .shareWorkout(_makeSession(routineId: 'r1', routineName: 'Push'));
+      await notifier.shareWorkout(
+        _makeSession(routineId: 'r1', routineName: 'Push'),
+        text: _sharedText,
+      );
 
       expect(fakeRepo.capturedPost, isNotNull);
       expect(fakeRepo.capturedPost!.privacy, equals(PostPrivacy.friends));
@@ -139,17 +143,32 @@ void main() {
     // ── SCENARIO-341: postAutoCompleteText ───────────────────────────────
 
     test(
-        'SCENARIO-341: shareWorkout sets post text to the autocomplete text',
+        'SCENARIO-341: shareWorkout sets post text to the provided localized text',
         () async {
       final container = makeContainer();
       addTearDown(container.dispose);
 
       final notifier = container.read(postWorkoutNotifierProvider.notifier);
-      await notifier.shareWorkout(_makeSession());
+      await notifier.shareWorkout(_makeSession(), text: _sharedText);
 
       expect(fakeRepo.capturedPost, isNotNull);
-      expect(fakeRepo.capturedPost!.text,
-          equals('¡Terminé mi entreno! 💪'));
+      expect(fakeRepo.capturedPost!.text, equals(_sharedText));
+    });
+
+    // ── REGRESSION: text is not hardcoded — caller controls localization ───
+
+    test(
+        'shareWorkout uses the caller-provided text (no hardcoded Spanish)',
+        () async {
+      final container = makeContainer();
+      addTearDown(container.dispose);
+
+      const englishText = 'Finished my workout! 💪';
+      final notifier = container.read(postWorkoutNotifierProvider.notifier);
+      await notifier.shareWorkout(_makeSession(), text: englishText);
+
+      expect(fakeRepo.capturedPost, isNotNull);
+      expect(fakeRepo.capturedPost!.text, equals(englishText));
     });
 
     // ── SCENARIO-340: rethrows when PostRepository fails ─────────────────
@@ -164,7 +183,7 @@ void main() {
       final notifier = container.read(postWorkoutNotifierProvider.notifier);
 
       await expectLater(
-        () => notifier.shareWorkout(_makeSession()),
+        () => notifier.shareWorkout(_makeSession(), text: _sharedText),
         throwsException,
       );
 
@@ -182,7 +201,7 @@ class _FakeNotifier extends PostWorkoutNotifier {
   final _FakePostRepository _fakeRepo;
 
   @override
-  Future<void> shareWorkout(Session session) async {
+  Future<void> shareWorkout(Session session, {required String text}) async {
     state = const AsyncLoading();
     try {
       final profile = await ref.read(userProfileProvider.future);
@@ -192,7 +211,7 @@ class _FakeNotifier extends PostWorkoutNotifier {
         authorDisplayName: profile?.displayName ?? '',
         authorAvatarUrl: profile?.avatarUrl,
         authorGymId: profile?.gymId,
-        text: '¡Terminé mi entreno! 💪',
+        text: text,
         routineTag: RoutineTag(
           routineId: session.routineId,
           routineName: session.routineName,

@@ -28,6 +28,16 @@ final sessionsByUidProvider =
   return ref.watch(sessionRepositoryProvider).listByUid(uid);
 });
 
+/// Fetches only [uid]'s FINISHED sessions completed today (UTC), ordered by
+/// finishedAt descending. Bounded server-side query — used by the trainer
+/// dashboard's "Entrenaron hoy" list to avoid a full-history read per athlete.
+/// autoDispose: refreshes on re-mount, mirroring [sessionsByUidProvider].
+final finishedTodayByUidProvider =
+    FutureProvider.autoDispose.family<List<Session>, String>((ref, uid) async {
+  if (uid.isEmpty) return const [];
+  return ref.watch(sessionRepositoryProvider).listFinishedToday(uid);
+});
+
 /// Returns the currently active session for [uid], or null if none.
 final activeSessionProvider =
     FutureProvider.family<Session?, String>((ref, uid) async {

@@ -156,6 +156,35 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
     return double.tryParse(raw);
   }
 
+  /// True when at least one numeric field parses to a value or notes is filled.
+  /// Guards against persisting a fully-null measurement document.
+  bool _hasAnyValue() {
+    final numericCtrls = <TextEditingController>[
+      _weightCtrl,
+      _fatCtrl,
+      _muscleCtrl,
+      _shouldersCtrl,
+      _chestCtrl,
+      _waistCtrl,
+      _hipsCtrl,
+      _glutesCtrl,
+      _bicepsLCtrl,
+      _bicepsRCtrl,
+      _bicepsFlexLCtrl,
+      _bicepsFlexRCtrl,
+      _forearmLCtrl,
+      _forearmRCtrl,
+      _upperThighLCtrl,
+      _upperThighRCtrl,
+      _midThighLCtrl,
+      _midThighRCtrl,
+      _calfLCtrl,
+      _calfRCtrl,
+    ];
+    final hasNumeric = numericCtrls.any((c) => _parseDouble(c) != null);
+    return hasNumeric || _notesCtrl.text.trim().isNotEmpty;
+  }
+
   // ── Save ───────────────────────────────────────────────────────────────────
 
   Future<void> _save() async {
@@ -166,6 +195,17 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
         const SnackBar(
           content: Text(
             'No hay sesión activa. No se puede guardar.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    if (!_hasAnyValue()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Cargá al menos un valor antes de guardar.',
           ),
         ),
       );

@@ -237,10 +237,14 @@ class SessionNotifier
       setLog: updated,
     );
 
-    final newLogs = current.setLogs
+    // Re-leemos el estado: pudo cambiar durante el await (p.ej. un logSet
+    // concurrente). Sin esto, sobrescribiríamos con el snapshot viejo y
+    // perderíamos el set recién logueado. Mismo patrón que logSet.
+    final latest = state.value ?? current;
+    final newLogs = latest.setLogs
         .map((l) => l.id == updated.id ? updated : l)
         .toList(growable: false);
-    state = AsyncData(current.copyWith(setLogs: newLogs));
+    state = AsyncData(latest.copyWith(setLogs: newLogs));
   }
 
   Future<void> abandonSession() async {

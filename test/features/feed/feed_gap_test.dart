@@ -275,9 +275,9 @@ void main() {
   });
 
   // ===========================================================================
-  // feed-41 — delete clamps the followingCount decrement at zero
+  // feed-41 — delete decrements followingCount atomically (FieldValue.increment)
   // ===========================================================================
-  group('feed-41 — delete clamps followingCount decrement at zero', () {
+  group('feed-41 — delete decrements followingCount atomically', () {
     late FakeFirebaseFirestore firestore;
     late UserPublicProfileRepository publicProfileRepo;
 
@@ -286,8 +286,8 @@ void main() {
       publicProfileRepo = UserPublicProfileRepository(firestore: firestore);
     });
 
-    test(
-        'followingCount=0 stays 0 after delete (never goes negative)', () async {
+    test('deleting a friendship decrements followingCount by one (1 -> 0)',
+        () async {
       await firestore.collection('friendships').doc('aaa_bbb').set(
             _makeFriendship(
               id: 'aaa_bbb',
@@ -297,11 +297,11 @@ void main() {
               status: FriendshipStatus.accepted,
             ).toJson(),
           );
-      // Already-zero counter — a naive decrement would produce -1.
+      // The caller currently follows one peer.
       await firestore.collection('userPublicProfiles').doc('aaa').set({
         'uid': 'aaa',
         'followersCount': 0,
-        'followingCount': 0,
+        'followingCount': 1,
       });
 
       final repo = FriendshipRepository(
@@ -315,7 +315,13 @@ void main() {
           await firestore.collection('friendships').doc('aaa_bbb').get();
       expect(friendshipSnap.exists, isFalse);
 
-      // Counter clamped at 0.
+      // Atomically decremented to 0. NOTE: delete now uses
+      // FieldValue.increment(-1) for race-safety (avoids the lost-update race a
+      // read-modify-write would suffer), which cannot clamp at zero. The
+      // non-negative floor is therefore NOT enforced at the repo layer — a
+      // decrement only runs for a friendship the caller actually had (and
+      // previously counted). Audit follow-up: if a defensive floor is wanted,
+      // clamp on read (max(0, followingCount)).
       final profileSnap =
           await firestore.collection('userPublicProfiles').doc('aaa').get();
       expect(profileSnap.data()!['followingCount'], equals(0));

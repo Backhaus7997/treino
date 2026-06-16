@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../workout/application/session_providers.dart'
-    show sessionsByUidProvider;
+    show finishedTodayByUidProvider;
 import '../../workout/domain/session.dart';
 import '../../workout/domain/session_status.dart';
 import '../domain/trainer_link_status.dart';
@@ -30,6 +30,8 @@ class TrainedTodayEntry {
 ///   Individual athlete errors are skipped (that athlete is omitted).
 /// - Per athlete keeps the most-recent finished session whose `finishedAt`
 ///   falls on the same UTC calendar day as today.
+/// - Per athlete reads only today's finished sessions (bounded server-side
+///   query via [finishedTodayByUidProvider]) instead of the full history.
 /// - Returns entries sorted by [Session.finishedAt] descending.
 final trainedTodayProvider =
     Provider.autoDispose<AsyncValue<List<TrainedTodayEntry>>>((ref) {
@@ -61,7 +63,7 @@ final trainedTodayProvider =
   bool anyLoading = false;
 
   for (final athleteId in athleteIds) {
-    final sessionsAsync = ref.watch(sessionsByUidProvider(athleteId));
+    final sessionsAsync = ref.watch(finishedTodayByUidProvider(athleteId));
 
     if (sessionsAsync.isLoading && !sessionsAsync.hasValue) {
       anyLoading = true;
@@ -73,7 +75,8 @@ final trainedTodayProvider =
 
     final sessions = sessionsAsync.valueOrNull ?? const [];
 
-    // Find the most-recent finished session from today (UTC).
+    // The provider already scopes to today's finished sessions; we still pick
+    // the most-recent and re-check the UTC day defensively.
     Session? best;
     for (final s in sessions) {
       if (s.status != SessionStatus.finished) continue;
