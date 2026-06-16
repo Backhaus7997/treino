@@ -118,6 +118,7 @@
   "routineEditorSetTypeWarmup": "Entrada en calor (W)",
   "routineEditorSetTypeDrop": "Drop (D)",
   "routineEditorSetTypeFailure": "Al fallo (F)",
+  "routineEditorIncompleteSetsFeedback": "Completá los sets de \"{exerciseName}\" antes de guardar.",
 
   "routineDetailNotFound": "Rutina no encontrada",
   "routineDetailNoDaysConfigured": "Esta rutina no tiene días configurados.",

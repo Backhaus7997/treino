@@ -797,7 +797,8 @@ class AppL10nEn extends AppL10n {
   String get dashboardCobroRegistrado => 'Cobro registrado.';
 
   @override
-  String get dashboardCobroError => 'Error al registrar el cobro. Intentá de nuevo.';
+  String get dashboardCobroError =>
+      'Error al registrar el cobro. Intentá de nuevo.';
 
   @override
   String get dashboardCobroSueltoAgregado => 'Cobro suelto agregado.';
@@ -830,7 +831,8 @@ class AppL10nEn extends AppL10n {
   String get dashboardProximamente => 'Próximamente.';
 
   @override
-  String get dashboardIniciaSesion => 'Iniciá sesión para ver tus próximos turnos.';
+  String get dashboardIniciaSesion =>
+      'Iniciá sesión para ver tus próximos turnos.';
 
   @override
   String get dashboardCargando => 'Cargando…';
@@ -839,13 +841,15 @@ class AppL10nEn extends AppL10n {
   String get dashboardErrorTurnos => 'No pudimos cargar tus próximos turnos.';
 
   @override
-  String get dashboardSinTurnosProximos => 'No tenés turnos próximos confirmados.';
+  String get dashboardSinTurnosProximos =>
+      'No tenés turnos próximos confirmados.';
 
   @override
   String get dashboardNadieEntreno => 'Nadie entrenó hoy todavía.';
 
   @override
-  String get dashboardErrorActividad => 'No pudimos cargar la actividad de hoy.';
+  String get dashboardErrorActividad =>
+      'No pudimos cargar la actividad de hoy.';
 
   @override
   String get dashboardSinCobros => 'Sin cobros pendientes.';
@@ -1178,19 +1182,11 @@ class AppL10nEn extends AppL10n {
 
   @override
   String performanceChartSpanDays(int count) {
-    final intl.NumberFormat countNumberFormat =
-        intl.NumberFormat.decimalPattern(localeName);
-    final String countString = countNumberFormat.format(count);
-
     return '';
   }
 
   @override
   String performanceChartSpanWeeks(int count) {
-    final intl.NumberFormat countNumberFormat =
-        intl.NumberFormat.decimalPattern(localeName);
-    final String countString = countNumberFormat.format(count);
-
     return '';
   }
 
@@ -1330,6 +1326,9 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get routineEditorSetTypeFailure => 'To failure (F)';
+
+  @override
+  String routineEditorIncompleteSetsFeedback(String exerciseName) => '';
 
   @override
   String get routineDetailNotFound => '';

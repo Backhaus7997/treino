@@ -243,24 +243,32 @@ void main() {
       overrides: _overrides(repo: repo),
     );
 
-    // Submit should be disabled (empty name)
-    final submitDisabled = tester.widget<ElevatedButton>(
+    // UX fix: the submit button is ALWAYS tappable now — validation is
+    // surfaced on tap (message + red highlight + scroll to the offending
+    // exercise) instead of a dead grey button. So it must simply NOT persist
+    // while the routine is invalid.
+    final submitEmpty = tester.widget<ElevatedButton>(
       find.widgetWithText(ElevatedButton, 'CREAR RUTINA'),
     );
-    expect(submitDisabled.onPressed, isNull,
-        reason: 'submit disabled when name is empty');
+    expect(submitEmpty.onPressed, isNotNull,
+        reason: 'submit is always enabled; validation happens on tap');
 
-    // Fill name — no split required for athlete
+    // Tapping with an empty routine must NOT persist.
+    await tester.tap(find.widgetWithText(ElevatedButton, 'CREAR RUTINA'));
+    await tester.pump();
+    verifyNever(() => repo.createUserOwned(
+        uid: any(named: 'uid'), draft: any(named: 'draft')));
+
+    // Fill name — no split required for athlete.
     await tester.enterText(
         find.byKey(const Key('editor_name_field')), 'Mi rutina');
     await tester.pumpAndSettle();
 
-    // Submit still disabled — no slots yet
-    final submitNoSlots = tester.widget<ElevatedButton>(
-      find.widgetWithText(ElevatedButton, 'CREAR RUTINA'),
-    );
-    expect(submitNoSlots.onPressed, isNull,
-        reason: 'submit disabled when no slots');
+    // Still no slots → tapping must still not save.
+    await tester.tap(find.widgetWithText(ElevatedButton, 'CREAR RUTINA'));
+    await tester.pump();
+    verifyNever(() => repo.createUserOwned(
+        uid: any(named: 'uid'), draft: any(named: 'draft')));
   });
 
   // ── Submit path: athlete mode produces Routine(split: null, level: beginner) ─

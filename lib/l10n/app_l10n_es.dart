@@ -826,7 +826,8 @@ class AppL10nEs extends AppL10n {
   String get dashboardCobroRegistrado => 'Cobro registrado.';
 
   @override
-  String get dashboardCobroError => 'Error al registrar el cobro. Intentá de nuevo.';
+  String get dashboardCobroError =>
+      'Error al registrar el cobro. Intentá de nuevo.';
 
   @override
   String get dashboardCobroSueltoAgregado => 'Cobro suelto agregado.';
@@ -859,7 +860,8 @@ class AppL10nEs extends AppL10n {
   String get dashboardProximamente => 'Próximamente.';
 
   @override
-  String get dashboardIniciaSesion => 'Iniciá sesión para ver tus próximos turnos.';
+  String get dashboardIniciaSesion =>
+      'Iniciá sesión para ver tus próximos turnos.';
 
   @override
   String get dashboardCargando => 'Cargando…';
@@ -868,13 +870,15 @@ class AppL10nEs extends AppL10n {
   String get dashboardErrorTurnos => 'No pudimos cargar tus próximos turnos.';
 
   @override
-  String get dashboardSinTurnosProximos => 'No tenés turnos próximos confirmados.';
+  String get dashboardSinTurnosProximos =>
+      'No tenés turnos próximos confirmados.';
 
   @override
   String get dashboardNadieEntreno => 'Nadie entrenó hoy todavía.';
 
   @override
-  String get dashboardErrorActividad => 'No pudimos cargar la actividad de hoy.';
+  String get dashboardErrorActividad =>
+      'No pudimos cargar la actividad de hoy.';
 
   @override
   String get dashboardSinCobros => 'Sin cobros pendientes.';
@@ -1211,32 +1215,24 @@ class AppL10nEs extends AppL10n {
 
   @override
   String performanceChartSpanDays(int count) {
-    final intl.NumberFormat countNumberFormat =
-        intl.NumberFormat.decimalPattern(localeName);
-    final String countString = countNumberFormat.format(count);
-
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
       other: 'días',
       one: 'día',
     );
-    return '($countString $_temp0)';
+    return '($count $_temp0)';
   }
 
   @override
   String performanceChartSpanWeeks(int count) {
-    final intl.NumberFormat countNumberFormat =
-        intl.NumberFormat.decimalPattern(localeName);
-    final String countString = countNumberFormat.format(count);
-
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
       other: 'semanas',
       one: 'semana',
     );
-    return '($countString $_temp0)';
+    return '($count $_temp0)';
   }
 
   @override
@@ -1377,6 +1373,10 @@ class AppL10nEs extends AppL10n {
   String get routineEditorSetTypeFailure => 'Al fallo (F)';
 
   @override
+  String routineEditorIncompleteSetsFeedback(String exerciseName) =>
+      'Completá los sets de "$exerciseName" antes de guardar.';
+
+  @override
   String get routineDetailNotFound => 'Rutina no encontrada';
 
   @override
@@ -1390,8 +1390,7 @@ class AppL10nEs extends AppL10n {
   String get routineDetailNoExercisesThisWeek => 'Sin ejercicios esta semana';
 
   @override
-  String get routineDetailNoExercisesThisDay =>
-      'No hay ejercicios en este día';
+  String get routineDetailNoExercisesThisDay => 'No hay ejercicios en este día';
 
   @override
   String get routineDetailStatExercises => 'EJERCICIOS';
@@ -2253,7 +2252,8 @@ class AppL10nEsAr extends AppL10nEs {
   String get dashboardCobroRegistrado => 'Cobro registrado.';
 
   @override
-  String get dashboardCobroError => 'Error al registrar el cobro. Intentá de nuevo.';
+  String get dashboardCobroError =>
+      'Error al registrar el cobro. Intentá de nuevo.';
 
   @override
   String get dashboardCobroSueltoAgregado => 'Cobro suelto agregado.';
@@ -2286,7 +2286,8 @@ class AppL10nEsAr extends AppL10nEs {
   String get dashboardProximamente => 'Próximamente.';
 
   @override
-  String get dashboardIniciaSesion => 'Iniciá sesión para ver tus próximos turnos.';
+  String get dashboardIniciaSesion =>
+      'Iniciá sesión para ver tus próximos turnos.';
 
   @override
   String get dashboardCargando => 'Cargando…';
@@ -2295,13 +2296,15 @@ class AppL10nEsAr extends AppL10nEs {
   String get dashboardErrorTurnos => 'No pudimos cargar tus próximos turnos.';
 
   @override
-  String get dashboardSinTurnosProximos => 'No tenés turnos próximos confirmados.';
+  String get dashboardSinTurnosProximos =>
+      'No tenés turnos próximos confirmados.';
 
   @override
   String get dashboardNadieEntreno => 'Nadie entrenó hoy todavía.';
 
   @override
-  String get dashboardErrorActividad => 'No pudimos cargar la actividad de hoy.';
+  String get dashboardErrorActividad =>
+      'No pudimos cargar la actividad de hoy.';
 
   @override
   String get dashboardSinCobros => 'Sin cobros pendientes.';
@@ -2541,34 +2544,173 @@ class AppL10nEsAr extends AppL10nEs {
       'No pudimos enviar el mensaje. Probá de nuevo.';
 
   @override
-  String performanceChartSpanDays(int count) {
-    final intl.NumberFormat countNumberFormat =
-        intl.NumberFormat.decimalPattern(localeName);
-    final String countString = countNumberFormat.format(count);
+  String get performanceLogTitle => 'Cargar evaluación';
 
+  @override
+  String get performanceLogCancel => 'Cancelar';
+
+  @override
+  String get performanceLogSaveCta => 'GUARDAR EVALUACIÓN';
+
+  @override
+  String get performanceLogNoSession =>
+      'No hay sesión activa. No se puede guardar.';
+
+  @override
+  String get performanceLogSaveSuccess => 'Evaluación guardada';
+
+  @override
+  String get performanceLogSaveError =>
+      'No pudimos guardar la evaluación. Probá de nuevo.';
+
+  @override
+  String get performanceLogNotesHint => 'Observaciones del entrenador…';
+
+  @override
+  String get performanceLogSectionJumps => 'SALTOS (cm)';
+
+  @override
+  String get performanceLogSectionSpeed => 'VELOCIDAD (seg)';
+
+  @override
+  String get performanceLogSectionStrength => 'FUERZA 1RM (kg)';
+
+  @override
+  String get performanceLogSectionEndurance => 'RESISTENCIA / OTROS';
+
+  @override
+  String get performanceLogSectionNotes => 'NOTAS';
+
+  @override
+  String get performanceLogFieldCmj => 'CMJ';
+
+  @override
+  String get performanceLogFieldSquatJump => 'Squat Jump';
+
+  @override
+  String get performanceLogFieldAbalakov => 'Abalakov';
+
+  @override
+  String get performanceLogFieldBroadJump => 'Salto largo';
+
+  @override
+  String get performanceLogFieldSprint10 => 'Sprint 10m';
+
+  @override
+  String get performanceLogFieldSprint20 => '20m';
+
+  @override
+  String get performanceLogFieldSprint30 => '30m';
+
+  @override
+  String get performanceLogFieldSprint40 => '40m';
+
+  @override
+  String get performanceLogFieldSquat1rm => 'Sentadilla';
+
+  @override
+  String get performanceLogFieldBenchPress => 'Press banca';
+
+  @override
+  String get performanceLogFieldDeadlift => 'Peso muerto';
+
+  @override
+  String get performanceLogFieldOverheadPress => 'Press militar';
+
+  @override
+  String get performanceLogFieldPullUp => 'Dominada lastrada';
+
+  @override
+  String get performanceLogFieldVo2max => 'VO2máx';
+
+  @override
+  String get performanceLogFieldCourseNavette => 'Course Navette (nivel)';
+
+  @override
+  String get performanceLogFieldCooper => 'Cooper';
+
+  @override
+  String get performanceLogFieldSitAndReach => 'Flexibilidad sit-and-reach';
+
+  @override
+  String get performanceChartSectionLabel => 'PROGRESO';
+
+  @override
+  String get performanceChartEmptyHint =>
+      'Cargá otra evaluación para ver el progreso.';
+
+  @override
+  String performanceChartSpanDays(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
       other: 'días',
       one: 'día',
     );
-    return '($countString $_temp0)';
+    return '($count $_temp0)';
   }
 
   @override
   String performanceChartSpanWeeks(int count) {
-    final intl.NumberFormat countNumberFormat =
-        intl.NumberFormat.decimalPattern(localeName);
-    final String countString = countNumberFormat.format(count);
-
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
       other: 'semanas',
       one: 'semana',
     );
-    return '($countString $_temp0)';
+    return '($count $_temp0)';
   }
+
+  @override
+  String get performanceChartMetricCmj => 'CMJ';
+
+  @override
+  String get performanceChartMetricSquatJump => 'Squat Jump';
+
+  @override
+  String get performanceChartMetricAbalakov => 'Abalakov';
+
+  @override
+  String get performanceChartMetricBroadJump => 'Salto largo';
+
+  @override
+  String get performanceChartMetricSprint10 => 'Sprint 10m';
+
+  @override
+  String get performanceChartMetricSprint20 => 'Sprint 20m';
+
+  @override
+  String get performanceChartMetricSprint30 => 'Sprint 30m';
+
+  @override
+  String get performanceChartMetricSprint40 => 'Sprint 40m';
+
+  @override
+  String get performanceChartMetricSquat1rm => 'Sentadilla 1RM';
+
+  @override
+  String get performanceChartMetricBench1rm => 'Banca 1RM';
+
+  @override
+  String get performanceChartMetricDeadlift1rm => 'Peso muerto 1RM';
+
+  @override
+  String get performanceChartMetricOverheadPress1rm => 'Press militar 1RM';
+
+  @override
+  String get performanceChartMetricPullUp1rm => 'Dominada 1RM';
+
+  @override
+  String get performanceChartMetricVo2max => 'VO2máx';
+
+  @override
+  String get performanceChartMetricCourseNavette => 'Course Navette';
+
+  @override
+  String get performanceChartMetricCooper => 'Cooper';
+
+  @override
+  String get performanceChartMetricSitAndReach => 'Flexibilidad';
 
   @override
   String routineEditorDayName(int n) {
@@ -2657,6 +2799,10 @@ class AppL10nEsAr extends AppL10nEs {
   String get routineEditorSetTypeFailure => 'Al fallo (F)';
 
   @override
+  String routineEditorIncompleteSetsFeedback(String exerciseName) =>
+      'Completá los sets de "$exerciseName" antes de guardar.';
+
+  @override
   String get routineDetailNotFound => 'Rutina no encontrada';
 
   @override
@@ -2670,8 +2816,7 @@ class AppL10nEsAr extends AppL10nEs {
   String get routineDetailNoExercisesThisWeek => 'Sin ejercicios esta semana';
 
   @override
-  String get routineDetailNoExercisesThisDay =>
-      'No hay ejercicios en este día';
+  String get routineDetailNoExercisesThisDay => 'No hay ejercicios en este día';
 
   @override
   String get routineDetailStatExercises => 'EJERCICIOS';

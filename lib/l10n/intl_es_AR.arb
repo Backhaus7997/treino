@@ -674,6 +674,16 @@
   "@routineEditorSetTypeDrop": {},
   "routineEditorSetTypeFailure": "Al fallo (F)",
   "@routineEditorSetTypeFailure": {},
+  "routineEditorIncompleteSetsFeedback": "Completá los sets de \"{exerciseName}\" antes de guardar.",
+  "@routineEditorIncompleteSetsFeedback": {
+    "description": "SnackBar shown when the user taps save with at least one incomplete set. Names the first offending exercise.",
+    "placeholders": {
+      "exerciseName": {
+        "type": "String",
+        "example": "Press de banca"
+      }
+    }
+  },
 
   "routineDetailNotFound": "Rutina no encontrada",
   "@routineDetailNotFound": {},

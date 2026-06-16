@@ -832,10 +832,13 @@ void main() {
 
     await _tapByKey(tester, 'week_tab_0');
 
-    // Save blocked.
+    // UX fix: the save button is no longer hard-disabled — it is always
+    // tappable and surfaces feedback on tap. The invalid week is instead
+    // attributed via the per-week warning below (and tapping would show the
+    // message + scroll, not persist).
     final submit = tester.widget<ElevatedButton>(find.byType(ElevatedButton));
-    expect(submit.onPressed, isNull,
-        reason: 'an invalid week anywhere must block save');
+    expect(submit.onPressed, isNotNull,
+        reason: 'button always tappable; invalid week surfaced via attribution');
 
     // Attribution: badge on Sem 3's chip + hint naming week and day.
     expect(find.byKey(const Key('week_tab_warning_2')), findsOneWidget);
