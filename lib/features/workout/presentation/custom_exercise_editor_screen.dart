@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/treino_icon.dart';
+import '../../../l10n/app_l10n.dart';
 import '../application/custom_exercise_providers.dart';
 import '../application/session_providers.dart' show currentUidProvider;
 import '../domain/custom_exercise.dart';
@@ -64,6 +65,7 @@ class _CustomExerciseEditorScreenState
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     final uid = ref.watch(currentUidProvider) ?? '';
 
     CustomExercise? existing;
@@ -80,11 +82,23 @@ class _CustomExerciseEditorScreenState
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
           child: Row(
             children: [
-              GestureDetector(
-                onTap: () => context.pop(),
-                behavior: HitTestBehavior.opaque,
-                child:
-                    Icon(TreinoIcon.back, size: 20, color: palette.textPrimary),
+              Semantics(
+                button: true,
+                label: l10n.commonBack,
+                child: GestureDetector(
+                  onTap: () => context.pop(),
+                  behavior: HitTestBehavior.opaque,
+                  child: ConstrainedBox(
+                    constraints:
+                        const BoxConstraints(minWidth: 44, minHeight: 44),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      widthFactor: 1,
+                      child: Icon(TreinoIcon.back,
+                          size: 20, color: palette.textPrimary),
+                    ),
+                  ),
+                ),
               ),
               const SizedBox(width: 14),
               Text(

@@ -19,6 +19,7 @@ import 'package:treino/features/workout/application/session_providers.dart';
 import 'package:treino/features/workout/application/session_state.dart';
 import 'package:treino/features/workout/domain/set_log.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
+import 'package:treino/l10n/app_l10n.dart';
 import 'package:treino/features/workout/presentation/session_player_screen.dart';
 
 import '../../../features/workout/application/stub_factories.dart';
@@ -43,6 +44,8 @@ Widget _wrap(Widget w, List<Override> overrides) => ProviderScope(
       overrides: overrides,
       child: MaterialApp(
         theme: AppTheme.dark(),
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
         home: Scaffold(body: w),
       ),
     );

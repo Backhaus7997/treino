@@ -94,6 +94,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         elevation: 0,
         leading: IconButton(
           icon: Icon(TreinoIcon.back, color: palette.textPrimary),
+          tooltip: l10n.commonBack,
           onPressed: () => Navigator.of(context).maybePop(),
         ),
         title: pubAsync.when(
@@ -109,10 +110,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             final avatar = pub?.avatarUrl;
             return Row(
               children: [
-                PostAvatar(
-                  authorDisplayName: name,
-                  authorAvatarUrl: avatar,
-                  size: 36,
+                Semantics(
+                  image: true,
+                  label: l10n.a11yAvatarLabel(name),
+                  child: PostAvatar(
+                    authorDisplayName: name,
+                    authorAvatarUrl: avatar,
+                    size: 36,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -281,14 +286,18 @@ class _Composer extends StatelessWidget {
           IconButton(
             onPressed: sending ? null : onSend,
             icon: sending
-                ? SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                        strokeWidth: 2, color: palette.accent),
+                ? Semantics(
+                    label: l10n.chatSendingA11y,
+                    enabled: false,
+                    child: SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: palette.accent),
+                    ),
                   )
                 : Icon(TreinoIcon.send, color: palette.accent),
-            tooltip: l10n.chatScreenSendLabel,
+            tooltip: sending ? l10n.chatSendingA11y : l10n.chatScreenSendLabel,
           ),
         ],
       ),
@@ -302,6 +311,7 @@ class _ConversationEmpty extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppL10n.of(context);
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(20),
@@ -311,7 +321,7 @@ class _ConversationEmpty extends StatelessWidget {
             Icon(TreinoIcon.chat, color: palette.textMuted, size: 48),
             const SizedBox(height: 12),
             Text(
-              'Sin mensajes todavía',
+              l10n.chatListEmptyTitle,
               style: GoogleFonts.barlowCondensed(
                 color: palette.textPrimary,
                 fontSize: 18,

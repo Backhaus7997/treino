@@ -31,6 +31,7 @@ import 'package:treino/features/coach_hub/presentation/coach_hub_login_screen.da
 import 'package:treino/features/coach_hub/presentation/coach_hub_not_allowed_screen.dart';
 import 'package:treino/features/coach_hub/presentation/shell/coach_hub_scaffold.dart';
 import 'package:treino/features/coach_hub/presentation/shell/proximamente_screen.dart';
+import 'package:treino/l10n/app_l10n.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
@@ -117,7 +118,12 @@ Future<GoRouter> _pumpRouter(
   await tester.pumpWidget(
     UncontrolledProviderScope(
       container: container,
-      child: MaterialApp.router(theme: AppTheme.dark(), routerConfig: router),
+      child: MaterialApp.router(
+        theme: AppTheme.dark(),
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+        routerConfig: router,
+      ),
     ),
   );
   await tester.pumpAndSettle();

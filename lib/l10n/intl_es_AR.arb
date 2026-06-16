@@ -739,5 +739,121 @@
         "type": "int"
       }
     }
+  },
+  "commonBack": "Volver",
+  "@commonBack": {
+    "description": "Shared accessibility label / tooltip for icon-only back navigation buttons. Replaces the duplicated literal 'Volver' across auth, feed, workout and chat back affordances (findings 0,2,3,4,15,16,17,20,21,22,24,25,27). There is currently NO generic back key in the ARB."
+  },
+  "commonClose": "Cerrar",
+  "@commonClose": {
+    "description": "Generic accessibility label / tooltip for icon-only close buttons (finding 23 post-workout summary close IconButton). A value 'Cerrar' exists only as the dialog-scoped authTrainerInquiryDialogClose; a reusable generic key is needed for a11y close affordances."
+  },
+  "commonLoading": "Cargando…",
+  "@commonLoading": {
+    "description": "Generic Semantics label for bare loading spinners so screen readers announce loading state (findings 7 coach_hub section/inline spinners, 16 public profile spinner). Existing 'Cargando…' is dashboard-scoped (dashboardCargando); a reusable cross-module key is needed."
+  },
+  "commonProcessing": "Procesando…",
+  "@commonProcessing": {
+    "description": "Semantics label for action busy spinners that replace Aceptar/Rechazar buttons mid-request (finding 7 coach_hub _PendingRequestTile)."
+  },
+  "commonWarning": "Atención",
+  "@commonWarning": {
+    "description": "semanticLabel for the unmatched-exercise warning icon in coach_hub plan preview (finding 10 _UnmatchedWarning Icon(TreinoIcon.warning))."
+  },
+  "chatSendingA11y": "Enviando…",
+  "@chatSendingA11y": {
+    "description": "Semantics label announced while the chat send button shows a CircularProgressIndicator (finding 4 chat_screen send busy state)."
+  },
+  "feedSearchA11y": "Buscar",
+  "@feedSearchA11y": {
+    "description": "Accessibility label for the icon-only header search action in the feed (finding 11 feed_screen search GestureDetector)."
+  },
+  "feedCreatePostA11y": "Crear publicación",
+  "@feedCreatePostA11y": {
+    "description": "Accessibility label for the icon-only create-post '+' action in the feed header (finding 11 feed_screen create GestureDetector)."
+  },
+  "feedPublishingA11y": "Publicando…",
+  "@feedPublishingA11y": {
+    "description": "Semantics liveRegion/label for the create-post submit spinner state while a post is being published (finding 12 create_post_screen PUBLICAR spinner branch)."
+  },
+  "searchUsersClearA11y": "Limpiar búsqueda",
+  "@searchUsersClearA11y": {
+    "description": "Accessibility label for the icon-only clear-field button on the user search screen (finding 17). Existing workoutPickerSheetClear='Limpiar' is a different, sheet-scoped action."
+  },
+  "publicProfileMessageDisabledA11y": "Mensaje (próximamente)",
+  "@publicProfileMessageDisabledA11y": {
+    "description": "Semantics label for the disabled MENSAJE stub on the public profile screen, exposed via Semantics(button:true, enabled:false) (finding 16)."
+  },
+  "a11yAvatarLabel": "Foto de perfil de {name}",
+  "@a11yAvatarLabel": {
+    "description": "Parametric Semantics label for user avatars (PostAvatar / HomeHeader avatar) wrapped at call sites so screen readers announce whose photo it is (findings 4,6,7,16,18,19). Fix agents must add the matching @a11yAvatarLabel placeholder metadata (name: String). When the name is null, use a11yAvatarLabelGeneric.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "a11yAvatarLabelGeneric": "Foto de perfil",
+  "@a11yAvatarLabelGeneric": {
+    "description": "Non-parametric avatar Semantics label used when the display name is unavailable/null (findings 4,6,7,16,18,19)."
+  },
+  "homePendingRequestsA11y": "{count} solicitudes pendientes",
+  "@homePendingRequestsA11y": {
+    "description": "Semantics label for the bell-with-badge in the trainer home header that currently conveys the pending count purely visually (finding 18). Fix agents add the @homePendingRequestsA11y placeholder metadata (count: int).",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "workoutRoutineOptionsA11y": "Opciones de rutina",
+  "@workoutRoutineOptionsA11y": {
+    "description": "tooltip / Semantics label for the icon-only overflow PopupMenuButton in _UserRoutineCard on the workout screen (finding 29 mis_rutinas_section dotsThree)."
+  },
+  "sessionPlayerSetCompleteA11y": "Marcar serie {setNumber} como completada",
+  "@sessionPlayerSetCompleteA11y": {
+    "description": "Parametric Semantics label for the per-set check toggle in the session player - the single most-tapped action (finding 27). Fix agents add the @ placeholder metadata (setNumber: int).",
+    "placeholders": {
+      "setNumber": {
+        "type": "int"
+      }
+    }
+  },
+  "sessionPlayerTechniqueA11y": "Ver técnica de {exerciseName}",
+  "@sessionPlayerTechniqueA11y": {
+    "description": "Parametric Semantics label for the technique info icon button in the session player (finding 27). Fix agents add the @ placeholder metadata (exerciseName: String).",
+    "placeholders": {
+      "exerciseName": {
+        "type": "String"
+      }
+    }
+  },
+  "sessionPlayerTimerStartA11y": "Iniciar temporizador",
+  "@sessionPlayerTimerStartA11y": {
+    "description": "Semantics label for the duration 'Iniciar' / timer icon control in the session player (finding 27)."
+  },
+  "routineEditorDeleteDayA11y": "Eliminar día",
+  "@routineEditorDeleteDayA11y": {
+    "description": "tooltip / Semantics label for the icon-only day-delete trash button in the routine editor (findings 25/26 day-header trash IconButton)."
+  },
+  "athleteDetailEditPlanA11y": "Editar plan",
+  "@athleteDetailEditPlanA11y": {
+    "description": "Accessibility label for the edit-plan icon button in the athlete detail plan card (finding 5)."
+  },
+  "athleteDetailDeletePlanA11y": "Eliminar plan",
+  "@athleteDetailDeletePlanA11y": {
+    "description": "Accessibility label for the delete-plan icon button in the athlete detail plan card (finding 5)."
+  },
+  "coachMapDisabledOnlineA11y": "Mapa, no disponible en modo Online",
+  "@coachMapDisabledOnlineA11y": {
+    "description": "Accessibility label announcing why the MAPA toggle is disabled when the trainers list is in Online mode (finding 6)."
+  },
+  "commonCancel": "Cancelar",
+  "@commonCancel": {
+    "description": "Generic accessibility/action label for a Cancel control."
+  },
+  "publicProfileLoadErrorA11y": "No pudimos cargar este perfil.",
+  "@publicProfileLoadErrorA11y": {
+    "description": "Live-region accessibility label for the public profile load-error state (finding 16)."
   }
 }

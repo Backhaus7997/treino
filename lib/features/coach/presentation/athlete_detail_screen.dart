@@ -1500,6 +1500,7 @@ class _PlanCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
@@ -1540,8 +1541,8 @@ class _PlanCard extends StatelessWidget {
               IconButton(
                 onPressed: onEdit,
                 icon: Icon(TreinoIcon.edit, size: 18, color: palette.textMuted),
-                tooltip: 'Editar plan',
-                constraints: const BoxConstraints(),
+                tooltip: l10n.athleteDetailEditPlanA11y,
+                constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
                 padding: const EdgeInsets.only(left: 8),
               ),
             if (onDelete != null)
@@ -1549,8 +1550,8 @@ class _PlanCard extends StatelessWidget {
                 onPressed: onDelete,
                 icon:
                     Icon(TreinoIcon.trash, size: 18, color: palette.textMuted),
-                tooltip: 'Eliminar plan',
-                constraints: const BoxConstraints(),
+                tooltip: l10n.athleteDetailDeletePlanA11y,
+                constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
                 padding: const EdgeInsets.only(left: 8),
               ),
           ],

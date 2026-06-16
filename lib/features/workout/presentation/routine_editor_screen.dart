@@ -1348,6 +1348,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                     children: [
                       IconButton(
                         icon: Icon(TreinoIcon.back, color: palette.textPrimary),
+                        tooltip: l10n.commonBack,
                         onPressed: () => context.canPop()
                             ? context.pop()
                             : context.go('/workout'),
@@ -1398,6 +1399,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                         IconButton(
                           icon:
                               Icon(TreinoIcon.back, color: palette.textPrimary),
+                          tooltip: l10n.commonBack,
                           onPressed: () => context.canPop()
                               ? context.pop()
                               : context.go(widget.mode is SelfCreating
@@ -1837,43 +1839,55 @@ class _WeekChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(9999),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-        decoration: BoxDecoration(
-          color: selected ? palette.accent : palette.bgCard,
-          borderRadius: BorderRadius.circular(9999),
-          border: Border.all(
-            color: selected ? palette.accent : palette.border,
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              AppL10n.of(context).routineEditorWeekShort(index + 1),
-              style: GoogleFonts.barlowCondensed(
-                fontWeight: FontWeight.w700,
-                fontSize: 13,
-                letterSpacing: 0.5,
-                color: selected ? palette.bg : palette.textMuted,
-              ),
+    final l10n = AppL10n.of(context);
+    return Semantics(
+      // Announce the chip as a selectable tab so VoiceOver conveys the
+      // selected state; the "Sem N" text child supplies the label.
+      button: true,
+      selected: selected,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(9999),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+          decoration: BoxDecoration(
+            color: selected ? palette.accent : palette.bgCard,
+            borderRadius: BorderRadius.circular(9999),
+            border: Border.all(
+              color: selected ? palette.accent : palette.border,
             ),
-            if (warning) ...[
-              const SizedBox(width: 5),
-              Container(
-                key: Key('week_tab_warning_$index'),
-                width: 6,
-                height: 6,
-                decoration: BoxDecoration(
-                  color: palette.danger,
-                  shape: BoxShape.circle,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                l10n.routineEditorWeekShort(index + 1),
+                style: GoogleFonts.barlowCondensed(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                  letterSpacing: 0.5,
+                  color: selected ? palette.bg : palette.textMuted,
                 ),
               ),
+              if (warning) ...[
+                const SizedBox(width: 5),
+                Semantics(
+                  // The danger dot is purely visual; expose its meaning to
+                  // screen readers so the week's validation state is announced.
+                  label: l10n.commonWarning,
+                  child: Container(
+                    key: Key('week_tab_warning_$index'),
+                    width: 6,
+                    height: 6,
+                    decoration: BoxDecoration(
+                      color: palette.danger,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
@@ -2102,8 +2116,10 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
                     IconButton(
                       icon: Icon(TreinoIcon.trash,
                           size: 18, color: palette.textMuted),
+                      tooltip: l10n.routineEditorDeleteDayA11y,
                       onPressed: widget.onRemoveDay,
-                      constraints: const BoxConstraints(),
+                      constraints: const BoxConstraints(
+                          minWidth: 44, minHeight: 44),
                       padding: EdgeInsets.zero,
                     ),
                 ],
@@ -2327,22 +2343,29 @@ class _MoveButtons extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Widget btn(IconData icon, bool enabled, VoidCallback? cb) => IconButton(
+    final l10n = AppL10n.of(context);
+    Widget btn(IconData icon, bool enabled, VoidCallback? cb, String label) =>
+        IconButton(
           icon: Icon(
             icon,
             size: 18,
             color: enabled ? palette.textMuted : palette.border,
           ),
+          tooltip: label,
           onPressed: enabled ? cb : null,
           visualDensity: VisualDensity.compact,
-          constraints: const BoxConstraints(),
+          // Keep the chevrons visually compact (18px icon) while expanding the
+          // hit area to the 44x44 minimum touch target.
+          constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
           padding: const EdgeInsets.symmetric(horizontal: 3),
         );
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        btn(TreinoIcon.chevronUp, canMoveUp, onMoveUp),
-        btn(TreinoIcon.chevronDown, canMoveDown, onMoveDown),
+        btn(TreinoIcon.chevronUp, canMoveUp, onMoveUp,
+            l10n.routineEditorSlotMenuMoveUp),
+        btn(TreinoIcon.chevronDown, canMoveDown, onMoveDown,
+            l10n.routineEditorSlotMenuMoveDown),
       ],
     );
   }
@@ -2470,6 +2493,7 @@ class _SlotEditorState extends State<_SlotEditor> {
                     : null,
                 icon: Icon(TreinoIcon.dotsThree,
                     size: 20, color: palette.textMuted),
+                tooltip: l10n.workoutRoutineOptionsA11y,
                 color: palette.bgCard,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
@@ -2945,6 +2969,7 @@ class _SetRowState extends State<_SetRow> {
   Widget build(BuildContext context) {
     final s = widget.editableSet;
     final palette = widget.palette;
+    final l10n = AppL10n.of(context);
     final label = setChipLabel(widget.allSets, widget.index);
 
     return Row(
@@ -2952,22 +2977,29 @@ class _SetRowState extends State<_SetRow> {
       children: [
         // ── Set chip — 44×44 tap target ───────────────────────────────────
         Builder(
-          builder: (ctx) => GestureDetector(
-            onTap: () => _pickSetType(ctx),
-            child: Container(
-              width: 44,
-              height: 44,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: _chipColor(s.type, palette),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                label,
-                style: GoogleFonts.barlowCondensed(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: _chipTextColor(s.type, palette),
+          builder: (ctx) => Semantics(
+            button: true,
+            // Announce the set position, its type (warmup/drop/failure) and
+            // whether it is currently invalid — the bare "1"/"C" glyph carries
+            // none of that meaning for VoiceOver.
+            label: _chipSemanticsLabel(label, s.type, widget.isInvalid, l10n),
+            child: GestureDetector(
+              onTap: () => _pickSetType(ctx),
+              child: Container(
+                width: 44,
+                height: 44,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: _chipColor(s.type, palette),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  label,
+                  style: GoogleFonts.barlowCondensed(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: _chipTextColor(s.type, palette),
+                  ),
                 ),
               ),
             ),
@@ -3052,6 +3084,7 @@ class _SetRowState extends State<_SetRow> {
               ? IconButton(
                   icon: Icon(TreinoIcon.close,
                       size: 16, color: palette.textMuted),
+                  tooltip: l10n.commonClose,
                   onPressed: widget.onRemove,
                   constraints:
                       const BoxConstraints(minWidth: 40, minHeight: 44),
@@ -3061,6 +3094,21 @@ class _SetRowState extends State<_SetRow> {
         ),
       ],
     );
+  }
+
+  /// Builds the VoiceOver label for the set-type chip: the set position, the
+  /// localized type name, and the invalid/warning state when present.
+  String _chipSemanticsLabel(
+      String setLabel, SetType type, bool isInvalid, AppL10n l10n) {
+    final typeName = switch (type) {
+      SetType.warmup => l10n.routineEditorSetTypeWarmup,
+      SetType.drop => l10n.routineEditorSetTypeDrop,
+      SetType.failure => l10n.routineEditorSetTypeFailure,
+      SetType.normal => l10n.routineEditorSetTypeNormal,
+    };
+    final parts = [setLabel, typeName];
+    if (isInvalid) parts.add(l10n.commonWarning);
+    return parts.join(', ');
   }
 
   Color _chipColor(SetType type, AppPalette palette) {

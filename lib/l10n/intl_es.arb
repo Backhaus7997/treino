@@ -167,5 +167,57 @@
         "type": "int"
       }
     }
-  }
+  },
+  "commonBack": "Volver",
+  "commonClose": "Cerrar",
+  "commonLoading": "Cargando…",
+  "commonProcessing": "Procesando…",
+  "commonWarning": "Atención",
+  "chatSendingA11y": "Enviando…",
+  "feedSearchA11y": "Buscar",
+  "feedCreatePostA11y": "Crear publicación",
+  "feedPublishingA11y": "Publicando…",
+  "searchUsersClearA11y": "Limpiar búsqueda",
+  "publicProfileMessageDisabledA11y": "Mensaje (próximamente)",
+  "a11yAvatarLabel": "Foto de perfil de {name}",
+  "@a11yAvatarLabel": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "a11yAvatarLabelGeneric": "Foto de perfil",
+  "homePendingRequestsA11y": "{count} solicitudes pendientes",
+  "@homePendingRequestsA11y": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "workoutRoutineOptionsA11y": "Opciones de rutina",
+  "sessionPlayerSetCompleteA11y": "Marcar serie {setNumber} como completada",
+  "@sessionPlayerSetCompleteA11y": {
+    "placeholders": {
+      "setNumber": {
+        "type": "int"
+      }
+    }
+  },
+  "sessionPlayerTechniqueA11y": "Ver técnica de {exerciseName}",
+  "@sessionPlayerTechniqueA11y": {
+    "placeholders": {
+      "exerciseName": {
+        "type": "String"
+      }
+    }
+  },
+  "sessionPlayerTimerStartA11y": "Iniciar temporizador",
+  "routineEditorDeleteDayA11y": "Eliminar día",
+  "athleteDetailEditPlanA11y": "Editar plan",
+  "athleteDetailDeletePlanA11y": "Eliminar plan",
+  "coachMapDisabledOnlineA11y": "Mapa, no disponible en modo Online",
+  "commonCancel": "Cancelar",
+  "publicProfileLoadErrorA11y": "No pudimos cargar este perfil."
 }

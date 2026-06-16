@@ -26,6 +26,7 @@ import 'package:treino/features/workout/presentation/session_player_screen.dart'
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
+import 'package:treino/l10n/app_l10n.dart';
 
 import '../../../features/workout/application/stub_factories.dart';
 
@@ -35,6 +36,8 @@ Widget _wrapProvider(Widget w, List<Override> overrides) => ProviderScope(
       overrides: overrides,
       child: MaterialApp(
         theme: AppTheme.dark(),
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
         home: Scaffold(body: w),
       ),
     );
@@ -49,6 +52,8 @@ Widget _wrapRouter({
     overrides: overrides,
     child: MaterialApp.router(
       theme: AppTheme.dark(),
+      localizationsDelegates: AppL10n.localizationsDelegates,
+      supportedLocales: AppL10n.supportedLocales,
       routerConfig: router,
     ),
   );
@@ -520,6 +525,8 @@ void main() {
         overrides: [sessionNotifierProvider.overrideWith(() => stub)],
         child: MaterialApp.router(
           theme: AppTheme.dark(),
+          localizationsDelegates: AppL10n.localizationsDelegates,
+          supportedLocales: AppL10n.supportedLocales,
           routerConfig: router,
         ),
       ));

@@ -155,32 +155,39 @@ class _BellWithBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        Icon(TreinoIcon.bell, size: 22, color: palette.textPrimary),
-        if (badgeCount > 0)
-          Positioned(
-            right: -4,
-            top: -4,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-              decoration: BoxDecoration(
-                color: palette.accent,
-                borderRadius: BorderRadius.circular(9999),
-                border: Border.all(color: palette.bg, width: 1),
-              ),
-              child: Text(
-                badgeCount > 9 ? '9+' : '$badgeCount',
-                style: GoogleFonts.barlowCondensed(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 10,
-                  color: palette.bg,
+    final l10n = AppL10n.of(context);
+    return Semantics(
+      label: l10n.homePendingRequestsA11y(badgeCount),
+      child: ExcludeSemantics(
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Icon(TreinoIcon.bell, size: 22, color: palette.textPrimary),
+            if (badgeCount > 0)
+              Positioned(
+                right: -4,
+                top: -4,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: palette.accent,
+                    borderRadius: BorderRadius.circular(9999),
+                    border: Border.all(color: palette.bg, width: 1),
+                  ),
+                  child: Text(
+                    badgeCount > 9 ? '9+' : '$badgeCount',
+                    style: GoogleFonts.barlowCondensed(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 10,
+                      color: palette.bg,
+                    ),
+                  ),
                 ),
               ),
-            ),
-          ),
-      ],
+          ],
+        ),
+      ),
     );
   }
 }

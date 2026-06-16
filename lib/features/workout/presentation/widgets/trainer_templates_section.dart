@@ -121,20 +121,23 @@ class _TrainerTemplateCard extends StatelessWidget {
         child: Row(
           children: [
             // Tinted icon square matching RoutineCard's visual language.
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: palette.accent.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: palette.accent.withValues(alpha: 0.3),
+            // Decorative: the routine name text alongside carries all meaning.
+            ExcludeSemantics(
+              child: Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: palette.accent.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: palette.accent.withValues(alpha: 0.3),
+                  ),
                 ),
-              ),
-              child: Icon(
-                TreinoIcon.tabWorkout,
-                color: palette.accent,
-                size: 18,
+                child: Icon(
+                  TreinoIcon.tabWorkout,
+                  color: palette.accent,
+                  size: 18,
+                ),
               ),
             ),
             const SizedBox(width: 12),

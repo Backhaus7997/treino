@@ -1473,6 +1473,86 @@ class AppL10nEs extends AppL10n {
   String routineEditorIncompleteSetsLabel(int weekNumber) {
     return '';
   }
+
+  @override
+  String get commonBack => 'Volver';
+
+  @override
+  String get commonClose => 'Cerrar';
+
+  @override
+  String get commonLoading => 'Cargando…';
+
+  @override
+  String get commonProcessing => 'Procesando…';
+
+  @override
+  String get commonWarning => 'Atención';
+
+  @override
+  String get chatSendingA11y => 'Enviando…';
+
+  @override
+  String get feedSearchA11y => 'Buscar';
+
+  @override
+  String get feedCreatePostA11y => 'Crear publicación';
+
+  @override
+  String get feedPublishingA11y => 'Publicando…';
+
+  @override
+  String get searchUsersClearA11y => 'Limpiar búsqueda';
+
+  @override
+  String get publicProfileMessageDisabledA11y => 'Mensaje (próximamente)';
+
+  @override
+  String a11yAvatarLabel(String name) {
+    return 'Foto de perfil de $name';
+  }
+
+  @override
+  String get a11yAvatarLabelGeneric => 'Foto de perfil';
+
+  @override
+  String homePendingRequestsA11y(int count) {
+    return '$count solicitudes pendientes';
+  }
+
+  @override
+  String get workoutRoutineOptionsA11y => 'Opciones de rutina';
+
+  @override
+  String sessionPlayerSetCompleteA11y(int setNumber) {
+    return 'Marcar serie $setNumber como completada';
+  }
+
+  @override
+  String sessionPlayerTechniqueA11y(String exerciseName) {
+    return 'Ver técnica de $exerciseName';
+  }
+
+  @override
+  String get sessionPlayerTimerStartA11y => 'Iniciar temporizador';
+
+  @override
+  String get routineEditorDeleteDayA11y => 'Eliminar día';
+
+  @override
+  String get athleteDetailEditPlanA11y => 'Editar plan';
+
+  @override
+  String get athleteDetailDeletePlanA11y => 'Eliminar plan';
+
+  @override
+  String get coachMapDisabledOnlineA11y => 'Mapa, no disponible en modo Online';
+
+  @override
+  String get commonCancel => 'Cancelar';
+
+  @override
+  String get publicProfileLoadErrorA11y => 'No pudimos cargar este perfil.';
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -2946,4 +3026,84 @@ class AppL10nEsAr extends AppL10nEs {
   String routineEditorIncompleteSetsLabel(int weekNumber) {
     return 'Sets incompletos en Sem $weekNumber';
   }
+
+  @override
+  String get commonBack => 'Volver';
+
+  @override
+  String get commonClose => 'Cerrar';
+
+  @override
+  String get commonLoading => 'Cargando…';
+
+  @override
+  String get commonProcessing => 'Procesando…';
+
+  @override
+  String get commonWarning => 'Atención';
+
+  @override
+  String get chatSendingA11y => 'Enviando…';
+
+  @override
+  String get feedSearchA11y => 'Buscar';
+
+  @override
+  String get feedCreatePostA11y => 'Crear publicación';
+
+  @override
+  String get feedPublishingA11y => 'Publicando…';
+
+  @override
+  String get searchUsersClearA11y => 'Limpiar búsqueda';
+
+  @override
+  String get publicProfileMessageDisabledA11y => 'Mensaje (próximamente)';
+
+  @override
+  String a11yAvatarLabel(String name) {
+    return 'Foto de perfil de $name';
+  }
+
+  @override
+  String get a11yAvatarLabelGeneric => 'Foto de perfil';
+
+  @override
+  String homePendingRequestsA11y(int count) {
+    return '$count solicitudes pendientes';
+  }
+
+  @override
+  String get workoutRoutineOptionsA11y => 'Opciones de rutina';
+
+  @override
+  String sessionPlayerSetCompleteA11y(int setNumber) {
+    return 'Marcar serie $setNumber como completada';
+  }
+
+  @override
+  String sessionPlayerTechniqueA11y(String exerciseName) {
+    return 'Ver técnica de $exerciseName';
+  }
+
+  @override
+  String get sessionPlayerTimerStartA11y => 'Iniciar temporizador';
+
+  @override
+  String get routineEditorDeleteDayA11y => 'Eliminar día';
+
+  @override
+  String get athleteDetailEditPlanA11y => 'Editar plan';
+
+  @override
+  String get athleteDetailDeletePlanA11y => 'Eliminar plan';
+
+  @override
+  String get coachMapDisabledOnlineA11y => 'Mapa, no disponible en modo Online';
+
+  @override
+  String get commonCancel => 'Cancelar';
+
+  @override
+  String get publicProfileLoadErrorA11y => 'No pudimos cargar este perfil.';
 }

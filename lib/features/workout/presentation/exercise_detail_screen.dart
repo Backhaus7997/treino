@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/treino_icon.dart';
+import '../../../l10n/app_l10n.dart';
 import '../application/exercise_providers.dart';
 import '../domain/exercise.dart';
 import 'widgets/exercise_video_player.dart';
@@ -102,6 +103,7 @@ class _BackBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     return Padding(
       padding: const EdgeInsets.only(left: 12, top: 8),
       child: Material(
@@ -109,6 +111,7 @@ class _BackBar extends StatelessWidget {
         shape: const CircleBorder(),
         clipBehavior: Clip.antiAlias,
         child: IconButton(
+          tooltip: l10n.commonBack,
           icon: Icon(TreinoIcon.back, color: palette.textPrimary),
           onPressed: () =>
               context.canPop() ? context.pop() : context.go('/workout'),

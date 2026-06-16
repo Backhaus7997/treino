@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../app/theme/app_palette.dart';
 import '../../core/widgets/treino_icon.dart';
+import '../../l10n/app_l10n.dart';
 import '../check_in/application/check_in_providers.dart';
 import '../check_in/presentation/check_in_dialog.dart';
 import 'domain/gym_name.dart';
@@ -104,6 +105,7 @@ class _FeedHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
@@ -119,23 +121,51 @@ class _FeedHeader extends StatelessWidget {
             ),
           ),
           const Spacer(),
-          GestureDetector(
-            onTap: () => context.push('/feed/search'),
-            behavior: HitTestBehavior.opaque,
-            child: Icon(TreinoIcon.search, size: 20, color: palette.textMuted),
-          ),
-          const SizedBox(width: 18),
-          GestureDetector(
-            onTap: () => context.push('/feed/create'),
-            behavior: HitTestBehavior.opaque,
-            child: Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: palette.accent,
-                shape: BoxShape.circle,
+          Semantics(
+            button: true,
+            label: l10n.feedSearchA11y,
+            child: GestureDetector(
+              onTap: () => context.push('/feed/search'),
+              behavior: HitTestBehavior.opaque,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  minWidth: 44,
+                  minHeight: 44,
+                ),
+                child: Center(
+                  child: Icon(
+                    TreinoIcon.search,
+                    size: 20,
+                    color: palette.textMuted,
+                  ),
+                ),
               ),
-              child: Icon(TreinoIcon.plus, size: 20, color: palette.bg),
+            ),
+          ),
+          const SizedBox(width: 4),
+          Semantics(
+            button: true,
+            label: l10n.feedCreatePostA11y,
+            child: GestureDetector(
+              onTap: () => context.push('/feed/create'),
+              behavior: HitTestBehavior.opaque,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  minWidth: 44,
+                  minHeight: 44,
+                ),
+                child: Center(
+                  child: Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: palette.accent,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(TreinoIcon.plus, size: 20, color: palette.bg),
+                  ),
+                ),
+              ),
             ),
           ),
         ],

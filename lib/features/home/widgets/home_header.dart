@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
+import '../../../l10n/app_l10n.dart';
 import '../../profile/domain/user_profile.dart';
 
 /// Greeting + avatar header for the Home screen.
@@ -21,6 +22,7 @@ class HomeHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
 
     final displayName = profile?.displayName;
     final avatarUrl = profile?.avatarUrl;
@@ -31,24 +33,30 @@ class HomeHeader extends StatelessWidget {
 
     final initials = _computeInitials(displayName);
 
-    final Widget avatarWidget = SizedBox(
-      width: 56,
-      height: 56,
-      child: ClipOval(
-        child: avatarUrl != null
-            ? CachedNetworkImage(
-                imageUrl: avatarUrl,
-                fit: BoxFit.cover,
-                placeholder: (_, __) => _AvatarFallback(
-                  initials: initials,
-                  palette: palette,
-                ),
-                errorWidget: (_, __, ___) => _AvatarFallback(
-                  initials: initials,
-                  palette: palette,
-                ),
-              )
-            : _AvatarFallback(initials: initials, palette: palette),
+    final Widget avatarWidget = Semantics(
+      image: true,
+      label: (displayName != null && displayName.isNotEmpty)
+          ? l10n.a11yAvatarLabel(displayName)
+          : l10n.a11yAvatarLabelGeneric,
+      child: SizedBox(
+        width: 56,
+        height: 56,
+        child: ClipOval(
+          child: avatarUrl != null
+              ? CachedNetworkImage(
+                  imageUrl: avatarUrl,
+                  fit: BoxFit.cover,
+                  placeholder: (_, __) => _AvatarFallback(
+                    initials: initials,
+                    palette: palette,
+                  ),
+                  errorWidget: (_, __, ___) => _AvatarFallback(
+                    initials: initials,
+                    palette: palette,
+                  ),
+                )
+              : _AvatarFallback(initials: initials, palette: palette),
+        ),
       ),
     );
 

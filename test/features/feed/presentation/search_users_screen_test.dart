@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
+import 'package:treino/l10n/app_l10n.dart';
 import 'package:treino/features/feed/presentation/search_users_screen.dart';
 import 'package:treino/features/feed/presentation/widgets/feed_empty_state.dart';
 import 'package:treino/features/feed/presentation/widgets/user_search_result_tile.dart';
@@ -61,6 +62,8 @@ Widget _wrapWithRouter({
     overrides: overrides,
     child: MaterialApp.router(
       theme: AppTheme.dark(),
+      localizationsDelegates: AppL10n.localizationsDelegates,
+      supportedLocales: AppL10n.supportedLocales,
       routerConfig: router,
     ),
   );
@@ -334,6 +337,8 @@ void main() {
           ],
           child: MaterialApp.router(
             theme: AppTheme.dark(),
+            localizationsDelegates: AppL10n.localizationsDelegates,
+            supportedLocales: AppL10n.supportedLocales,
             routerConfig: router,
           ),
         ),

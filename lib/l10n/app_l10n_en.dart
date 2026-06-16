@@ -1427,4 +1427,84 @@ class AppL10nEn extends AppL10n {
   String routineEditorIncompleteSetsLabel(int weekNumber) {
     return '';
   }
+
+  @override
+  String get commonBack => 'Back';
+
+  @override
+  String get commonClose => 'Close';
+
+  @override
+  String get commonLoading => 'Loading…';
+
+  @override
+  String get commonProcessing => 'Processing…';
+
+  @override
+  String get commonWarning => 'Warning';
+
+  @override
+  String get chatSendingA11y => 'Sending…';
+
+  @override
+  String get feedSearchA11y => 'Search';
+
+  @override
+  String get feedCreatePostA11y => 'Create post';
+
+  @override
+  String get feedPublishingA11y => 'Publishing…';
+
+  @override
+  String get searchUsersClearA11y => 'Clear search';
+
+  @override
+  String get publicProfileMessageDisabledA11y => 'Message (coming soon)';
+
+  @override
+  String a11yAvatarLabel(String name) {
+    return 'Profile photo of $name';
+  }
+
+  @override
+  String get a11yAvatarLabelGeneric => 'Profile photo';
+
+  @override
+  String homePendingRequestsA11y(int count) {
+    return '$count pending requests';
+  }
+
+  @override
+  String get workoutRoutineOptionsA11y => 'Routine options';
+
+  @override
+  String sessionPlayerSetCompleteA11y(int setNumber) {
+    return 'Mark set $setNumber as completed';
+  }
+
+  @override
+  String sessionPlayerTechniqueA11y(String exerciseName) {
+    return 'View technique for $exerciseName';
+  }
+
+  @override
+  String get sessionPlayerTimerStartA11y => 'Start timer';
+
+  @override
+  String get routineEditorDeleteDayA11y => 'Delete day';
+
+  @override
+  String get athleteDetailEditPlanA11y => 'Edit plan';
+
+  @override
+  String get athleteDetailDeletePlanA11y => 'Delete plan';
+
+  @override
+  String get coachMapDisabledOnlineA11y => 'Map, unavailable in Online mode';
+
+  @override
+  String get commonCancel => 'Cancel';
+
+  @override
+  String get publicProfileLoadErrorA11y => 'We couldn\'t load this profile.';
 }

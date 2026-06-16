@@ -237,7 +237,9 @@ class _CompletedIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    return Icon(TreinoIcon.checkCircleFill, color: palette.accent, size: 20);
+    return ExcludeSemantics(
+      child: Icon(TreinoIcon.checkCircleFill, color: palette.accent, size: 20),
+    );
   }
 }
 
