@@ -207,6 +207,24 @@ _EditableSet _editableSetFromSpec(SetSpec spec) => _EditableSet(
       durationSeconds: spec.durationSeconds,
     );
 
+/// Picks the rep mode that matches the hydrated set data: REP RANGE only when at
+/// least one non-failure set actually carries a min/max pair; otherwise SINGLE.
+///
+/// Why not just use `slot.effectiveRepMode`: a legacy slot can carry a
+/// slot-level range (targetRepsMin != targetRepsMax) while its per-set specs
+/// only hold a single `reps` value. That mismatch forced REP RANGE on edit and
+/// left the min/max fields empty (and flagged red) for an exercise the user
+/// never configured as a range.
+RepMode _repModeFromHydratedSets(List<List<_EditableSet>> weeklySets) {
+  for (final week in weeklySets) {
+    for (final s in week) {
+      if (s.type == SetType.failure) continue;
+      if (s.repsMin != null || s.repsMax != null) return RepMode.range;
+    }
+  }
+  return RepMode.single;
+}
+
 /// Validates a single [_EditableSet] given the slot's modes.
 bool isSetValid(_EditableSet s, ExerciseMode exerciseMode, RepMode repMode) {
   // A failure set ("al fallo") has no countable target by definition — the
@@ -358,6 +376,15 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _splitController = TextEditingController();
   ExperienceLevel _level = ExperienceLevel.beginner;
+
+  /// ScrollController for the main ListView so we can programmatically
+  /// scroll to the first invalid slot when the user taps save.
+  final ScrollController _listScrollController = ScrollController();
+
+  /// One GlobalKey per day tile, re-synced whenever [_days] changes.
+  /// Used by [Scrollable.ensureVisible] in [_submit] to bring the first
+  /// invalid day into view.
+  final Map<_EditableDay, GlobalKey> _dayKeys = {};
   // Seeded with an empty name + isDefaultName: true; the real localized label
   // ("Día 1") is filled in by [_relabelDefaultDays] from didChangeDependencies,
   // where a BuildContext (and thus AppL10n) is available.
@@ -478,7 +505,6 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                   'compound', // denormalized — category not stored in slot
             )
             ..exerciseMode = slot.effectiveExerciseMode
-            ..repMode = slot.effectiveRepMode
             ..restSeconds = slot.restSeconds
             ..supersetGroup = slot.supersetGroup
             // Hydrate presence mask from the domain slot (REQ-WPRES-001).
@@ -497,6 +523,12 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
               slot.effectiveSets.map(_editableSetFromSpec).toList(),
             ];
           }
+          // Derive rep mode from the actual hydrated sets, not the slot's legacy
+          // targetRepsMin/Max — otherwise an exercise whose sets carry only a
+          // single `reps` value gets forced into REP RANGE with empty min/max
+          // fields on edit (the bug seen on "Press de banca").
+          editableSlot.repMode =
+              _repModeFromHydratedSets(editableSlot.weeklySets);
           _normalizeSlotWeeks(editableSlot);
           return editableSlot;
         }).toList();
@@ -525,7 +557,31 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
   void dispose() {
     _nameController.dispose();
     _splitController.dispose();
+    _listScrollController.dispose();
     super.dispose();
+  }
+
+  /// Returns or creates a stable [GlobalKey] for [day]. Keys survive rebuilds
+  /// because they are keyed on the [_EditableDay] identity (same instance across
+  /// setState calls), not on the day's position in the list.
+  GlobalKey _keyForDay(_EditableDay day) =>
+      _dayKeys.putIfAbsent(day, () => GlobalKey());
+
+  /// Finds the first day + slot where the current week has an invalid set.
+  /// Returns null when every slot is valid.
+  ({_EditableDay day, String? exerciseName})? _firstInvalidSlot() {
+    for (final day in _days) {
+      for (final slot in day.slots) {
+        if (!slot.isPresentInWeek(_selectedWeek)) continue;
+        final weekSets = slot.setsForWeek(_selectedWeek);
+        final allValid = weekSets.isNotEmpty &&
+            weekSets.every((s) => isSetValid(s, slot.exerciseMode, slot.repMode));
+        if (!allValid) {
+          return (day: day, exerciseName: slot.exercise?.name);
+        }
+      }
+    }
+    return null;
   }
 
   /// Whether the editor is in a trainer-creating mode (assigning or
@@ -1063,7 +1119,40 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
   }
 
   Future<void> _submit() async {
-    if (!_isValid || _submitting) return;
+    if (_submitting) return;
+
+    // If invalid: show feedback and scroll to first offending slot instead of
+    // silently blocking save (UX fix: button is now always tappable).
+    if (!_isValid) {
+      final l10n = AppL10n.of(context);
+      final first = _firstInvalidSlot();
+      final message = first?.exerciseName != null
+          ? l10n.routineEditorIncompleteSetsFeedback(first!.exerciseName!)
+          : l10n.routineEditorIncompleteSetsFeedback('…');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+      // Expand the first invalid day and scroll to it.
+      if (first != null) {
+        // Ensure the day is expanded so the user can see the invalid sets.
+        if (!first.day.expanded) {
+          setState(() => first.day.expanded = true);
+        }
+        // Wait one frame for the expansion to apply before scrolling.
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          final key = _keyForDay(first.day);
+          if (key.currentContext != null) {
+            Scrollable.ensureVisible(
+              key.currentContext!,
+              duration: const Duration(milliseconds: 350),
+              curve: Curves.easeInOut,
+              alignment: 0.1,
+            );
+          }
+        });
+      }
+      return;
+    }
 
     setState(() => _submitting = true);
     final uid = ref.read(currentUidProvider) ?? '';
@@ -1335,6 +1424,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                       // 2026-06-11).
                       keyboardDismissBehavior:
                           ScrollViewKeyboardDismissBehavior.onDrag,
+                      controller: _listScrollController,
                       padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
                       children: [
                         // ── Name + (Split when trainer mode) ───────────────
@@ -1480,6 +1570,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
 
                         for (int di = 0; di < _days.length; di++) ...[
                           _DayExpansionTile(
+                            key: _keyForDay(_days[di]),
                             day: _days[di],
                             week: _selectedWeek,
                             palette: palette,
@@ -1502,6 +1593,15 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                             allowSuperset: true,
                             onAddSuperset: () =>
                                 _addSupersetForDay(context, di),
+                            slotIsValid: (slot) {
+                              if (!slot.isPresentInWeek(_selectedWeek)) {
+                                return true;
+                              }
+                              final weekSets = slot.setsForWeek(_selectedWeek);
+                              return weekSets.isNotEmpty &&
+                                  weekSets.every((s) => isSetValid(
+                                      s, slot.exerciseMode, slot.repMode));
+                            },
                           ),
                           const SizedBox(height: 6),
                         ],
@@ -1537,7 +1637,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                       width: double.infinity,
                       child: ElevatedButton(
                         onPressed:
-                            (_isValid && !_submitting) ? () => _submit() : null,
+                            !_submitting ? () => _submit() : null,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: palette.accent,
                           foregroundColor: palette.bg,
@@ -1784,6 +1884,7 @@ class _WeekChip extends StatelessWidget {
 
 class _DayExpansionTile extends StatefulWidget {
   const _DayExpansionTile({
+    super.key,
     required this.day,
     required this.week,
     required this.palette,
@@ -1797,6 +1898,7 @@ class _DayExpansionTile extends StatefulWidget {
     required this.onMoveSlotInGroup,
     this.allowSuperset = false,
     this.onAddSuperset,
+    this.slotIsValid,
   });
 
   final _EditableDay day;
@@ -1815,6 +1917,10 @@ class _DayExpansionTile extends StatefulWidget {
   final void Function(_EditableSlot slot, Exercise newExercise)
       onReplaceExercise;
   final void Function(int absIndex, int dir) onMoveSlotInGroup;
+
+  /// Returns true when [slot] has no incomplete sets for the currently viewed
+  /// week. Used to drive red affordances in the slot and day-header cards.
+  final bool Function(_EditableSlot slot)? slotIsValid;
 
   @override
   State<_DayExpansionTile> createState() => _DayExpansionTileState();
@@ -1863,6 +1969,9 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
           canMoveDown: canDown,
           onMoveUp: () => _moveBlock(b, -1),
           onMoveDown: () => _moveBlock(b, 1),
+          hasSlotError: widget.slotIsValid != null
+              ? !widget.slotIsValid!(slot)
+              : false,
         ));
       } else {
         // Superset block — the whole block moves as one unit. Only the
@@ -1881,6 +1990,7 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
           canMoveDown: canDown,
           onMoveUp: () => _moveBlock(b, -1),
           onMoveDown: () => _moveBlock(b, 1),
+          slotIsValid: widget.slotIsValid,
         ));
       }
       rows.add(const SizedBox(height: 8));
@@ -1933,11 +2043,21 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
   Widget build(BuildContext context) {
     final l10n = AppL10n.of(context);
     final palette = widget.palette;
+    // Day-level error: at least one visible slot has incomplete sets.
+    final hasDayError = widget.slotIsValid != null &&
+        widget.day.slots.any((slot) =>
+            slot.isPresentInWeek(widget.week) &&
+            !widget.slotIsValid!(slot));
     return Container(
       decoration: BoxDecoration(
         color: palette.bgCard,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: palette.border),
+        border: Border.all(
+          color: hasDayError
+              ? palette.danger.withAlpha(180)
+              : palette.border,
+          width: hasDayError ? 1.5 : 1.0,
+        ),
       ),
       child: Column(
         children: [
@@ -1954,7 +2074,7 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
                         ? TreinoIcon.chevronDown
                         : TreinoIcon.chevronRight,
                     size: 16,
-                    color: palette.textMuted,
+                    color: hasDayError ? palette.danger : palette.textMuted,
                   ),
                   const SizedBox(width: 8),
                   Expanded(
@@ -1967,6 +2087,17 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
                       ),
                     ),
                   ),
+                  if (hasDayError) ...[
+                    Container(
+                      width: 7,
+                      height: 7,
+                      margin: const EdgeInsets.only(right: 8),
+                      decoration: BoxDecoration(
+                        color: palette.danger,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ],
                   if (widget.onRemoveDay != null)
                     IconButton(
                       icon: Icon(TreinoIcon.trash,
@@ -2061,6 +2192,7 @@ class _SupersetGroupCard extends StatelessWidget {
     this.canMoveDown = false,
     this.onMoveUp,
     this.onMoveDown,
+    this.slotIsValid,
   });
 
   final List<({int index, _EditableSlot slot})> groupSlots;
@@ -2080,6 +2212,9 @@ class _SupersetGroupCard extends StatelessWidget {
   final bool canMoveDown;
   final VoidCallback? onMoveUp;
   final VoidCallback? onMoveDown;
+
+  /// Returns true when [slot] is valid for the current week.
+  final bool Function(_EditableSlot slot)? slotIsValid;
 
   @override
   Widget build(BuildContext context) {
@@ -2141,6 +2276,9 @@ class _SupersetGroupCard extends StatelessWidget {
               onMoveDown: mi < groupSlots.length - 1
                   ? () => onMoveSlotInGroup(groupSlots[mi].index, 1)
                   : null,
+              hasSlotError: slotIsValid != null
+                  ? !slotIsValid!(groupSlots[mi].slot)
+                  : false,
             ),
             if (mi < groupSlots.length - 1) const SizedBox(height: 8),
           ],
@@ -2226,6 +2364,7 @@ class _SlotEditor extends StatefulWidget {
     this.canMoveDown = false,
     this.onMoveUp,
     this.onMoveDown,
+    this.hasSlotError = false,
   });
 
   final _EditableSlot slot;
@@ -2248,6 +2387,10 @@ class _SlotEditor extends StatefulWidget {
   final bool canMoveDown;
   final VoidCallback? onMoveUp;
   final VoidCallback? onMoveDown;
+
+  /// True when this slot has at least one incomplete set in the viewed week.
+  /// Drives a subtle red left border so the user can find it when scrolling.
+  final bool hasSlotError;
 
   @override
   State<_SlotEditor> createState() => _SlotEditorState();
@@ -2272,11 +2415,21 @@ class _SlotEditorState extends State<_SlotEditor> {
     final sets = slot.setsForWeek(widget.week);
     // One light surface per card — no outer border, just a fill + generous
     // padding. Inner fields are NOT individually boxed.
+    // A red left accent stripe appears when the slot has incomplete sets so
+    // the user can locate the problem at a glance while scrolling.
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
       decoration: BoxDecoration(
         color: palette.bgCard,
         borderRadius: BorderRadius.circular(12),
+        border: widget.hasSlotError
+            ? Border(
+                left: BorderSide(
+                  color: palette.danger.withAlpha(180),
+                  width: 3,
+                ),
+              )
+            : null,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2395,6 +2548,7 @@ class _SlotEditorState extends State<_SlotEditor> {
             slot: slot,
             sets: sets,
             palette: palette,
+            showSetErrors: widget.hasSlotError,
             onChanged: () {
               setState(() {}); // redraw chip labels after type change
               widget.onChanged();
@@ -2484,9 +2638,14 @@ class _SetTable extends StatefulWidget {
     required this.sets,
     required this.palette,
     required this.onChanged,
+    this.showSetErrors = false,
   });
 
   final _EditableSlot slot;
+
+  /// When true, individual set rows highlight their input fields with a red
+  /// underline when [isSetValid] returns false for that set.
+  final bool showSetErrors;
 
   /// The active week's set list (same object as `slot.weeklySets[w]`) — the
   /// table needs no week knowledge, it renders and mutates this list in place.
@@ -2580,6 +2739,8 @@ class _SetTableState extends State<_SetTable> {
               exerciseMode: slot.exerciseMode,
               repMode: slot.repMode,
               isDuration: isDuration,
+              isInvalid: widget.showSetErrors &&
+                  !isSetValid(sets[i], slot.exerciseMode, slot.repMode),
               onTypeChanged: (type) {
                 setState(() => sets[i].type = type);
                 widget.onChanged();
@@ -2692,6 +2853,7 @@ class _SetRow extends StatefulWidget {
     required this.onTypeChanged,
     required this.onChanged,
     this.onRemove,
+    this.isInvalid = false,
   });
 
   final _EditableSet editableSet;
@@ -2704,6 +2866,10 @@ class _SetRow extends StatefulWidget {
   final void Function(SetType) onTypeChanged;
   final VoidCallback onChanged;
   final VoidCallback? onRemove;
+
+  /// When true, the reps/duration input fields show a red underline to
+  /// indicate this set is incomplete and needs to be filled in.
+  final bool isInvalid;
 
   @override
   State<_SetRow> createState() => _SetRowState();
@@ -2813,6 +2979,7 @@ class _SetRowState extends State<_SetRow> {
           Expanded(
             child: DurationTextField(
               valueSeconds: s.durationSeconds ?? 0,
+              hasError: widget.isInvalid,
               onChanged: (v) {
                 s.durationSeconds = v > 0 ? v : null;
                 widget.onChanged();
@@ -2820,7 +2987,7 @@ class _SetRowState extends State<_SetRow> {
             ),
           ),
         ] else ...[
-          // KG field
+          // KG field — always optional, no error highlight
           Expanded(
             child: _NumberField(
               controller: _kgCtrl,
@@ -2841,6 +3008,7 @@ class _SetRowState extends State<_SetRow> {
                 controller: _repsMinCtrl,
                 palette: palette,
                 hint: 'mín',
+                hasError: widget.isInvalid,
                 onChanged: (v) {
                   s.repsMin = v;
                   widget.onChanged();
@@ -2854,6 +3022,7 @@ class _SetRowState extends State<_SetRow> {
                 controller: _repsMaxCtrl,
                 palette: palette,
                 hint: 'máx',
+                hasError: widget.isInvalid,
                 onChanged: (v) {
                   s.repsMax = v;
                   widget.onChanged();
@@ -2867,6 +3036,7 @@ class _SetRowState extends State<_SetRow> {
                 controller: _repsCtrl,
                 palette: palette,
                 hint: 'reps',
+                hasError: widget.isInvalid,
                 onChanged: (v) {
                   s.reps = v;
                   widget.onChanged();
@@ -2923,6 +3093,7 @@ class _NumberField extends StatelessWidget {
     this.onDecimalChanged,
     this.decimal = false,
     this.hint,
+    this.hasError = false,
   }) : assert(
           decimal ? onDecimalChanged != null : onChanged != null,
           'decimal fields need onDecimalChanged; integer fields need onChanged',
@@ -2941,8 +3112,15 @@ class _NumberField extends StatelessWidget {
   /// When true the field accepts fractional values (e.g. 17.5 kg).
   final bool decimal;
 
+  /// When true the field underline turns danger-red to signal the value
+  /// is missing or invalid.
+  final bool hasError;
+
   @override
   Widget build(BuildContext context) {
+    final errorBorder = UnderlineInputBorder(
+      borderSide: BorderSide(color: palette.danger, width: 1.5),
+    );
     return TextField(
       controller: controller,
       keyboardType: decimal
@@ -2953,18 +3131,29 @@ class _NumberField extends StatelessWidget {
       decoration: InputDecoration(
         isDense: true,
         hintText: hint,
-        hintStyle: GoogleFonts.barlow(fontSize: 13, color: palette.textMuted),
+        hintStyle: GoogleFonts.barlow(
+          fontSize: 13,
+          color: hasError ? palette.danger.withAlpha(180) : palette.textMuted,
+        ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
         filled: false,
-        border: UnderlineInputBorder(
-          borderSide: BorderSide(color: palette.border),
-        ),
-        enabledBorder: UnderlineInputBorder(
-          borderSide: BorderSide(color: palette.border),
-        ),
-        focusedBorder: UnderlineInputBorder(
-          borderSide: BorderSide(color: palette.accent, width: 2),
-        ),
+        border: hasError
+            ? errorBorder
+            : UnderlineInputBorder(
+                borderSide: BorderSide(color: palette.border),
+              ),
+        enabledBorder: hasError
+            ? errorBorder
+            : UnderlineInputBorder(
+                borderSide: BorderSide(color: palette.border),
+              ),
+        focusedBorder: hasError
+            ? UnderlineInputBorder(
+                borderSide: BorderSide(color: palette.danger, width: 2),
+              )
+            : UnderlineInputBorder(
+                borderSide: BorderSide(color: palette.accent, width: 2),
+              ),
       ),
       onChanged: (v) {
         if (decimal) {

@@ -78,11 +78,16 @@ class DurationTextField extends StatefulWidget {
     required this.valueSeconds,
     required this.onChanged,
     this.label,
+    this.hasError = false,
   });
 
   final int valueSeconds;
   final ValueChanged<int> onChanged;
   final String? label;
+
+  /// When true the underline turns danger-red to signal the duration is
+  /// missing or zero (the set is incomplete).
+  final bool hasError;
 
   @override
   State<DurationTextField> createState() => _DurationTextFieldState();
@@ -149,13 +154,24 @@ class _DurationTextFieldState extends State<DurationTextField> {
                 const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
             filled: false,
             border: UnderlineInputBorder(
-              borderSide: BorderSide(color: palette.border),
+              borderSide: BorderSide(
+                color:
+                    widget.hasError ? palette.danger : palette.border,
+                width: widget.hasError ? 1.5 : 1.0,
+              ),
             ),
             enabledBorder: UnderlineInputBorder(
-              borderSide: BorderSide(color: palette.border),
+              borderSide: BorderSide(
+                color:
+                    widget.hasError ? palette.danger : palette.border,
+                width: widget.hasError ? 1.5 : 1.0,
+              ),
             ),
             focusedBorder: UnderlineInputBorder(
-              borderSide: BorderSide(color: palette.accent, width: 2),
+              borderSide: BorderSide(
+                color: widget.hasError ? palette.danger : palette.accent,
+                width: 2,
+              ),
             ),
           ),
           onChanged: (raw) {

@@ -462,6 +462,16 @@
   "@routineEditorSetTypeDrop": {},
   "routineEditorSetTypeFailure": "",
   "@routineEditorSetTypeFailure": {},
+  "routineEditorIncompleteSetsFeedback": "",
+  "@routineEditorIncompleteSetsFeedback": {
+    "description": "SnackBar shown when the user taps save with at least one incomplete set. Names the first offending exercise.",
+    "placeholders": {
+      "exerciseName": {
+        "type": "String",
+        "example": "Bench Press"
+      }
+    }
+  },
   "routineDetailNotFound": "",
   "@routineDetailNotFound": {},
   "routineDetailNoDaysConfigured": "",

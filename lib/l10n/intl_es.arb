@@ -120,6 +120,7 @@
   "routineEditorSetTypeWarmup": "",
   "routineEditorSetTypeDrop": "",
   "routineEditorSetTypeFailure": "",
+  "routineEditorIncompleteSetsFeedback": "Completá los sets de \"{exerciseName}\" antes de guardar.",
   "routineDetailNotFound": "Rutina no encontrada",
   "routineDetailNoDaysConfigured": "Esta rutina no tiene días configurados.",
   "routineDetailLoadError": "No pudimos cargar la rutina.",

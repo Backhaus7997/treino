@@ -2612,6 +2612,12 @@ abstract class AppL10n {
   /// **'Al fallo (F)'**
   String get routineEditorSetTypeFailure;
 
+  /// SnackBar shown when the user taps save with at least one incomplete set. Names the first offending exercise.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Completá los sets de \"{exerciseName}\" antes de guardar.'**
+  String routineEditorIncompleteSetsFeedback(String exerciseName);
+
   /// No description provided for @routineDetailNotFound.
   ///
   /// In es_AR, this message translates to:
