@@ -26,8 +26,12 @@ mixin _$UserPublicProfile {
   String? get avatarUrl => throw _privateConstructorUsedError;
   String? get gymId => throw _privateConstructorUsedError;
   int? get workoutsCount => throw _privateConstructorUsedError;
-  int? get racha => throw _privateConstructorUsedError;
-  int? get followersCount => throw _privateConstructorUsedError;
+  int? get racha =>
+      throw _privateConstructorUsedError; // ignore: invalid_annotation_target
+  @JsonKey(fromJson: _nonNegativeCount)
+  int? get followersCount =>
+      throw _privateConstructorUsedError; // ignore: invalid_annotation_target
+  @JsonKey(fromJson: _nonNegativeCount)
   int? get followingCount =>
       throw _privateConstructorUsedError; // Opt-in flag a trainer can flip to expose ALL their `trainer-template`
 // routines to their active athletes (a "buffet" the athletes can browse
@@ -61,8 +65,8 @@ abstract class $UserPublicProfileCopyWith<$Res> {
       String? gymId,
       int? workoutsCount,
       int? racha,
-      int? followersCount,
-      int? followingCount,
+      @JsonKey(fromJson: _nonNegativeCount) int? followersCount,
+      @JsonKey(fromJson: _nonNegativeCount) int? followingCount,
       bool sharedTemplatesWithAthletes});
 }
 
@@ -153,8 +157,8 @@ abstract class _$$UserPublicProfileImplCopyWith<$Res>
       String? gymId,
       int? workoutsCount,
       int? racha,
-      int? followersCount,
-      int? followingCount,
+      @JsonKey(fromJson: _nonNegativeCount) int? followersCount,
+      @JsonKey(fromJson: _nonNegativeCount) int? followingCount,
       bool sharedTemplatesWithAthletes});
 }
 
@@ -238,8 +242,8 @@ class _$UserPublicProfileImpl implements _UserPublicProfile {
       this.gymId,
       this.workoutsCount,
       this.racha,
-      this.followersCount,
-      this.followingCount,
+      @JsonKey(fromJson: _nonNegativeCount) this.followersCount,
+      @JsonKey(fromJson: _nonNegativeCount) this.followingCount,
       this.sharedTemplatesWithAthletes = false});
 
   factory _$UserPublicProfileImpl.fromJson(Map<String, dynamic> json) =>
@@ -259,9 +263,13 @@ class _$UserPublicProfileImpl implements _UserPublicProfile {
   final int? workoutsCount;
   @override
   final int? racha;
+// ignore: invalid_annotation_target
   @override
+  @JsonKey(fromJson: _nonNegativeCount)
   final int? followersCount;
+// ignore: invalid_annotation_target
   @override
+  @JsonKey(fromJson: _nonNegativeCount)
   final int? followingCount;
 // Opt-in flag a trainer can flip to expose ALL their `trainer-template`
 // routines to their active athletes (a "buffet" the athletes can browse
@@ -345,8 +353,8 @@ abstract class _UserPublicProfile implements UserPublicProfile {
       final String? gymId,
       final int? workoutsCount,
       final int? racha,
-      final int? followersCount,
-      final int? followingCount,
+      @JsonKey(fromJson: _nonNegativeCount) final int? followersCount,
+      @JsonKey(fromJson: _nonNegativeCount) final int? followingCount,
       final bool sharedTemplatesWithAthletes}) = _$UserPublicProfileImpl;
 
   factory _UserPublicProfile.fromJson(Map<String, dynamic> json) =
@@ -365,10 +373,12 @@ abstract class _UserPublicProfile implements UserPublicProfile {
   @override
   int? get workoutsCount;
   @override
-  int? get racha;
+  int? get racha; // ignore: invalid_annotation_target
   @override
-  int? get followersCount;
+  @JsonKey(fromJson: _nonNegativeCount)
+  int? get followersCount; // ignore: invalid_annotation_target
   @override
+  @JsonKey(fromJson: _nonNegativeCount)
   int?
       get followingCount; // Opt-in flag a trainer can flip to expose ALL their `trainer-template`
 // routines to their active athletes (a "buffet" the athletes can browse
