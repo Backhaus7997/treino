@@ -9,13 +9,18 @@ import 'package:treino/features/coach_hub/application/sidebar_collapsed_provider
 import 'package:treino/features/coach_hub/presentation/shell/coach_hub_scaffold.dart';
 import 'package:treino/features/coach_hub/presentation/shell/coach_hub_sidebar.dart';
 import 'package:treino/features/coach_hub/presentation/shell/coach_hub_top_bar.dart';
-
-// TODO(W1.3): responsive tests (mobile banner < 768, force-collapse 1024–1279).
+import 'package:treino/features/coach_hub/presentation/shell/mobile_banner.dart';
+import 'package:treino/features/profile/application/user_providers.dart';
+import 'package:treino/features/profile/domain/user_profile.dart';
 
 /// Monta el `CoachHubScaffold` dentro de un `ShellRoute`, con el `child`
-/// provisto por la ruta activa (como en producción, ADR-CHW-008).
-Future<void> _pumpScaffold(WidgetTester tester) async {
-  SharedPreferences.setMockInitialValues({});
+/// provisto por la ruta activa (como en producción, ADR-CHW-008). `prefs`
+/// siembra `shared_preferences` (eg. estado colapsado guardado).
+Future<void> _pumpScaffold(
+  WidgetTester tester, {
+  Map<String, Object> prefs = const {},
+}) async {
+  SharedPreferences.setMockInitialValues(prefs);
   final sp = await SharedPreferences.getInstance();
 
   final router = GoRouter(
@@ -38,12 +43,25 @@ Future<void> _pumpScaffold(WidgetTester tester) async {
     ProviderScope(
       overrides: [
         sharedPreferencesProvider.overrideWith((ref) => Future.value(sp)),
+        userProfileProvider
+            .overrideWith((ref) => Stream<UserProfile?>.value(null)),
       ],
       child: MaterialApp.router(theme: AppTheme.dark(), routerConfig: router),
     ),
   );
   await tester.pumpAndSettle();
 }
+
+/// Setea el viewport lógico (devicePixelRatio 1.0) y lo resetea en teardown.
+void _setWidth(WidgetTester tester, double width) {
+  tester.view.physicalSize = Size(width, 900);
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+}
+
+double _sidebarWidth(WidgetTester tester) =>
+    tester.getSize(find.byKey(const Key('coach_hub_sidebar_container'))).width;
 
 void main() {
   testWidgets('renderiza sidebar + top bar + slot de contenido [SCENARIO-748]',
@@ -66,5 +84,110 @@ void main() {
   testWidgets('existe exactamente un Scaffold en el shell', (tester) async {
     await _pumpScaffold(tester);
     expect(find.byType(Scaffold), findsOneWidget);
+  });
+
+  group('guard responsivo (W1.3, ADR-CHW-004)', () {
+    testWidgets('ancho 600 (mobile) → MobileBanner, sin sidebar [SCENARIO-762]',
+        (tester) async {
+      _setWidth(tester, 600);
+      await _pumpScaffold(tester);
+
+      expect(find.byType(MobileBanner), findsOneWidget);
+      expect(find.byType(CoachHubSidebar), findsNothing);
+      expect(find.byType(CoachHubTopBar), findsNothing);
+    });
+
+    testWidgets('ancho 900 (compact, banda tablet 768–1023) → sidebar a 72 px',
+        (tester) async {
+      _setWidth(tester, 900);
+      await _pumpScaffold(tester);
+
+      expect(find.byType(CoachHubSidebar), findsOneWidget);
+      expect(_sidebarWidth(tester), 72);
+    });
+
+    testWidgets(
+        'ancho 1100 (compact) → sidebar forzado a 72 px y toggle deshabilitado '
+        '[SCENARIO-763]', (tester) async {
+      _setWidth(tester, 1100);
+      await _pumpScaffold(
+          tester); // prefs vacías → provider = false (expandido)
+
+      expect(find.byType(CoachHubSidebar), findsOneWidget);
+      expect(_sidebarWidth(tester), 72); // forzado pese a provider=false
+      final toggle = tester.widget<IconButton>(find.ancestor(
+        of: find.byTooltip('Contraer/expandir menú'),
+        matching: find.byType(IconButton),
+      ));
+      expect(toggle.onPressed, isNull);
+    });
+
+    testWidgets(
+        'ancho 1400 (desktop) → sidebar respeta provider (264 expandido) '
+        '[SCENARIO-762]', (tester) async {
+      _setWidth(tester, 1400);
+      await _pumpScaffold(tester); // provider = false → expandido
+
+      expect(_sidebarWidth(tester), 264);
+    });
+
+    testWidgets(
+        'ancho 1400 (desktop) + colapsado guardado → sidebar 72 (respeta '
+        'provider, NO forzado)', (tester) async {
+      _setWidth(tester, 1400);
+      await _pumpScaffold(
+        tester,
+        prefs: const {'coach_hub.sidebar.collapsed': true},
+      );
+
+      expect(_sidebarWidth(tester), 72);
+    });
+
+    testWidgets(
+        'compact NO escribe sidebarCollapsedProvider — preserva el estado '
+        'guardado al volver a desktop (ADR-CHW-004)', (tester) async {
+      _setWidth(tester, 1100); // compact → force-collapse
+      SharedPreferences.setMockInitialValues(
+          {}); // guardado = false (expandido)
+      final sp = await SharedPreferences.getInstance();
+      final container = ProviderContainer(overrides: [
+        sharedPreferencesProvider.overrideWith((ref) => Future.value(sp)),
+        userProfileProvider
+            .overrideWith((ref) => Stream<UserProfile?>.value(null)),
+      ]);
+      addTearDown(container.dispose);
+      await container.read(sharedPreferencesProvider.future);
+
+      final router = GoRouter(
+        initialLocation: '/dashboard',
+        routes: [
+          ShellRoute(
+            pageBuilder: (ctx, state, child) =>
+                NoTransitionPage(child: CoachHubScaffold(child: child)),
+            routes: [
+              GoRoute(
+                path: '/dashboard',
+                builder: (_, __) => const Text('CONTENT_SLOT'),
+              ),
+            ],
+          ),
+        ],
+      );
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child:
+              MaterialApp.router(theme: AppTheme.dark(), routerConfig: router),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Se ve colapsado (forzado por el viewport compact)...
+      expect(_sidebarWidth(tester), 72);
+      // ...pero el provider NUNCA fue escrito: sigue false. Ése es el mecanismo
+      // que garantiza que al volver a desktop el sidebar se restaure a
+      // expandido — el override de compact es solo local (ADR-CHW-004).
+      expect(container.read(sidebarCollapsedProvider), isFalse);
+    });
   });
 }

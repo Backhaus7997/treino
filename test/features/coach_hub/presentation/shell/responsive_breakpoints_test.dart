@@ -11,6 +11,7 @@ void main() {
 
     test('ancho entre 768 y 1279 → compact', () {
       expect(viewportFor(768), Viewport.compact);
+      expect(viewportFor(900), Viewport.compact); // banda tablet 768–1023
       expect(viewportFor(1100), Viewport.compact);
       expect(viewportFor(1279.9), Viewport.compact);
     });
@@ -23,8 +24,8 @@ void main() {
 
     test('constantes de breakpoint quedan bloqueadas (ADR-CHW-004)', () {
       expect(kMobileBreakpoint, 768);
-      expect(kCompactBreakpoint, 1024);
       expect(kDesktopBreakpoint, 1280);
+      // No hay kCompactBreakpoint: compact = [768, 1280). Ver responsive.dart.
     });
   });
 }
