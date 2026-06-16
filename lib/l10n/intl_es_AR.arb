@@ -251,7 +251,6 @@
   "dashboardDejarFeedbackLabel": "Dejar feedback",
   "dashboardActividadRecienteSectionLabel": "ACTIVIDAD RECIENTE",
 
-  "_comment_dashboard_i18n": "trainer_dashboard_tab.dart user-facing strings",
   "dashboardWeekday1": "LUNES",
   "dashboardWeekday2": "MARTES",
   "dashboardWeekday3": "MIÉRCOLES",
