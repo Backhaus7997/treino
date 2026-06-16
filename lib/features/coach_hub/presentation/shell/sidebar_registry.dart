@@ -1,198 +1,69 @@
-import 'package:flutter/widgets.dart';
-import 'package:treino/core/widgets/treino_icon.dart';
+import 'package:treino/features/coach_hub/presentation/sections/actividad/routes.dart';
+import 'package:treino/features/coach_hub/presentation/sections/agenda/routes.dart';
+import 'package:treino/features/coach_hub/presentation/sections/ajustes/routes.dart';
+import 'package:treino/features/coach_hub/presentation/sections/alumnos/routes.dart';
+import 'package:treino/features/coach_hub/presentation/sections/biblioteca/routes.dart';
+import 'package:treino/features/coach_hub/presentation/sections/chat/routes.dart';
+import 'package:treino/features/coach_hub/presentation/sections/cuestionario/routes.dart';
+import 'package:treino/features/coach_hub/presentation/sections/dashboard/routes.dart';
+import 'package:treino/features/coach_hub/presentation/sections/habitos/routes.dart';
+import 'package:treino/features/coach_hub/presentation/sections/invitaciones/routes.dart';
+import 'package:treino/features/coach_hub/presentation/sections/nutricion/routes.dart';
+import 'package:treino/features/coach_hub/presentation/sections/pagos/routes.dart';
+import 'package:treino/features/coach_hub/presentation/sections/planes/routes.dart';
+import 'package:treino/features/coach_hub/presentation/sections/planner/routes.dart';
+import 'package:treino/features/coach_hub/presentation/sections/recetas/routes.dart';
+import 'package:treino/features/coach_hub/presentation/sections/reportes/routes.dart';
+import 'package:treino/features/coach_hub/presentation/sections/rutinas/routes.dart';
+import 'package:treino/features/coach_hub/presentation/sections/suplementos/routes.dart';
+import 'package:treino/features/coach_hub/presentation/sections/templates/routes.dart';
 
 import 'sidebar_item.dart';
 
-/// Registro plano de los items del sidebar del Coach Hub web (REQ-CHW-SIDEBAR-001).
+/// Registro de los items del sidebar del Coach Hub web (REQ-CHW-SIDEBAR-001).
 ///
-/// Orden de grupos por [SidebarGroup] (ADR-CHW-002, ODQ-1). En W1.1 es una
-/// lista plana; en W1.2 se refactoriza a spreads de cada
-/// `sections/<section>/routes.dart`.
+/// Agregador data-driven (ADR-CHW-002): cada `sections/<section>/routes.dart`
+/// posee su propio `<section>SidebarItems`; acá se concatenan vía spreads. El
+/// **orden de los spreads fija el orden visual** dentro de cada grupo
+/// ([SidebarGroup], ODQ-1) — por eso se listan en orden de pantalla, no
+/// alfabético. Este archivo es el único punto de conflicto al agregar secciones
+/// en W2+, y se resuelve con merge aditivo.
 ///
 /// Nota de scope: la enumeración tiene **19 items**. `Solicitudes` (reemplazado
 /// por `Actividad`) y `Perfil Público` (Fase W6) están fuera de W1, ver
-/// "Out of Scope" del spec. Los `iconBuilder` son tear-offs top-level para que
-/// la lista sea `const`.
-
-// RESUMEN
-IconData _iconDashboard() => TreinoIcon.sidebarDashboard;
-IconData _iconActividad() => TreinoIcon.sidebarActividad;
-IconData _iconAgenda() => TreinoIcon.sidebarAgenda;
-
-// ALUMNOS
-IconData _iconAlumnos() => TreinoIcon.sidebarAlumnos;
-IconData _iconInvitaciones() => TreinoIcon.sidebarInvitaciones;
-IconData _iconCuestionario() => TreinoIcon.sidebarCuestionario;
-
-// PLAN
-IconData _iconRutinas() => TreinoIcon.sidebarRutinas;
-IconData _iconPlanner() => TreinoIcon.sidebarPlanner;
-IconData _iconBiblioteca() => TreinoIcon.sidebarBiblioteca;
-IconData _iconTemplates() => TreinoIcon.sidebarTemplates;
-
-// WELLNESS
-IconData _iconNutricion() => TreinoIcon.sidebarNutricion;
-IconData _iconRecetas() => TreinoIcon.sidebarRecetas;
-IconData _iconSuplementos() => TreinoIcon.sidebarSuplementos;
-IconData _iconHabitos() => TreinoIcon.sidebarHabitos;
-
-// NEGOCIO
-IconData _iconPagos() => TreinoIcon.sidebarPagos;
-IconData _iconPlanes() => TreinoIcon.sidebarPlanes;
-IconData _iconReportes() => TreinoIcon.sidebarReportes;
-
-// COMUNICACIÓN
-IconData _iconChat() => TreinoIcon.sidebarChat;
-
-// AJUSTES (bottom)
-IconData _iconAjustes() => TreinoIcon.sidebarAjustes;
-
-/// Los 19 items del sidebar, en orden visual. Labels es-AR — `// i18n: Fase W1`.
+/// "Out of Scope" del spec. `legacy/routes.dart` (`/upload-plan`) aporta rutas
+/// pero NO items de sidebar.
 const List<SidebarItem> sidebarRegistry = [
   // RESUMEN
-  SidebarItem(
-    id: 'dashboard',
-    label: 'Dashboard', // i18n: Fase W1
-    route: '/dashboard',
-    iconBuilder: _iconDashboard,
-    group: SidebarGroup.resumen,
-  ),
-  SidebarItem(
-    id: 'actividad',
-    label: 'Actividad', // i18n: Fase W1
-    route: '/actividad',
-    iconBuilder: _iconActividad,
-    group: SidebarGroup.resumen,
-  ),
-  SidebarItem(
-    id: 'agenda',
-    label: 'Agenda', // i18n: Fase W1
-    route: '/agenda',
-    iconBuilder: _iconAgenda,
-    group: SidebarGroup.resumen,
-  ),
+  ...dashboardSidebarItems,
+  ...actividadSidebarItems,
+  ...agendaSidebarItems,
 
   // ALUMNOS
-  SidebarItem(
-    id: 'alumnos',
-    label: 'Alumnos', // i18n: Fase W1
-    route: '/alumnos',
-    iconBuilder: _iconAlumnos,
-    group: SidebarGroup.alumnos,
-  ),
-  SidebarItem(
-    id: 'invitaciones',
-    label: 'Invitaciones', // i18n: Fase W1
-    route: '/invitaciones',
-    iconBuilder: _iconInvitaciones,
-    group: SidebarGroup.alumnos,
-  ),
-  SidebarItem(
-    id: 'cuestionario',
-    label: 'Cuestionario', // i18n: Fase W1
-    route: '/cuestionario',
-    iconBuilder: _iconCuestionario,
-    group: SidebarGroup.alumnos,
-  ),
+  ...alumnosSidebarItems,
+  ...invitacionesSidebarItems,
+  ...cuestionarioSidebarItems,
 
   // PLAN
-  SidebarItem(
-    id: 'rutinas',
-    label: 'Rutinas', // i18n: Fase W1
-    route: '/rutinas',
-    iconBuilder: _iconRutinas,
-    group: SidebarGroup.plan,
-  ),
-  SidebarItem(
-    id: 'planner',
-    label: 'Planner semanal', // i18n: Fase W1
-    route: '/planner',
-    iconBuilder: _iconPlanner,
-    group: SidebarGroup.plan,
-  ),
-  SidebarItem(
-    id: 'biblioteca',
-    label: 'Biblioteca', // i18n: Fase W1
-    route: '/biblioteca',
-    iconBuilder: _iconBiblioteca,
-    group: SidebarGroup.plan,
-  ),
-  SidebarItem(
-    id: 'templates',
-    label: 'Templates', // i18n: Fase W1
-    route: '/templates',
-    iconBuilder: _iconTemplates,
-    group: SidebarGroup.plan,
-  ),
+  ...rutinasSidebarItems,
+  ...plannerSidebarItems,
+  ...bibliotecaSidebarItems,
+  ...templatesSidebarItems,
 
   // WELLNESS
-  SidebarItem(
-    id: 'nutricion',
-    label: 'Nutrición', // i18n: Fase W1
-    route: '/nutricion',
-    iconBuilder: _iconNutricion,
-    group: SidebarGroup.wellness,
-  ),
-  SidebarItem(
-    id: 'recetas',
-    label: 'Recetas', // i18n: Fase W1
-    route: '/recetas',
-    iconBuilder: _iconRecetas,
-    group: SidebarGroup.wellness,
-  ),
-  SidebarItem(
-    id: 'suplementos',
-    label: 'Suplementos', // i18n: Fase W1
-    route: '/suplementos',
-    iconBuilder: _iconSuplementos,
-    group: SidebarGroup.wellness,
-  ),
-  SidebarItem(
-    id: 'habitos',
-    label: 'Hábitos', // i18n: Fase W1
-    route: '/habitos',
-    iconBuilder: _iconHabitos,
-    group: SidebarGroup.wellness,
-  ),
+  ...nutricionSidebarItems,
+  ...recetasSidebarItems,
+  ...suplementosSidebarItems,
+  ...habitosSidebarItems,
 
   // NEGOCIO
-  SidebarItem(
-    id: 'pagos',
-    label: 'Pagos', // i18n: Fase W1
-    route: '/pagos',
-    iconBuilder: _iconPagos,
-    group: SidebarGroup.negocio,
-  ),
-  SidebarItem(
-    id: 'planes',
-    label: 'Planes comerciales', // i18n: Fase W1
-    route: '/planes',
-    iconBuilder: _iconPlanes,
-    group: SidebarGroup.negocio,
-  ),
-  SidebarItem(
-    id: 'reportes',
-    label: 'Reportes', // i18n: Fase W1
-    route: '/reportes',
-    iconBuilder: _iconReportes,
-    group: SidebarGroup.negocio,
-  ),
+  ...pagosSidebarItems,
+  ...planesSidebarItems,
+  ...reportesSidebarItems,
 
   // COMUNICACIÓN
-  SidebarItem(
-    id: 'chat',
-    label: 'Chat', // i18n: Fase W1
-    route: '/chat',
-    iconBuilder: _iconChat,
-    group: SidebarGroup.comunicacion,
-  ),
+  ...chatSidebarItems,
 
   // AJUSTES (bottom)
-  SidebarItem(
-    id: 'ajustes',
-    label: 'Ajustes', // i18n: Fase W1
-    route: '/ajustes',
-    iconBuilder: _iconAjustes,
-    group: SidebarGroup.ajustes,
-  ),
+  ...ajustesSidebarItems,
 ];

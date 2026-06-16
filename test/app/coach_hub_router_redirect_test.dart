@@ -230,5 +230,66 @@ void main() {
 
       expect(await _call(container, '/dashboard'), '/not-allowed');
     });
+
+    // ── Section routes (W1.2) ────────────────────────────────────────────────
+    // El redirect es agnóstico de la ruta concreta: cualquier path signed-in
+    // (no /login, no /not-allowed) se comporta igual que /dashboard. Estos
+    // casos lo fijan sobre rutas de sección reales.
+
+    test('trainer en /alumnos → no redirect (stay)', () async {
+      final user = _MockUser();
+      final container = _container(
+        authOverride: authNotifierProvider.overrideWith(
+          () => _StubAuthNotifier(AsyncData(user)),
+        ),
+        profileOverride: userProfileProvider.overrideWith(
+          (ref) => Stream<UserProfile?>.value(_trainerProfile()),
+        ),
+      );
+      addTearDown(container.dispose);
+
+      expect(await _call(container, '/alumnos'), isNull);
+    });
+
+    test('anonymous en /alumnos → redirige a /login', () async {
+      final container = _container(
+        authOverride: authNotifierProvider.overrideWith(
+          () => _StubAuthNotifier(const AsyncData(null)),
+        ),
+      );
+      addTearDown(container.dispose);
+
+      expect(await _call(container, '/alumnos'), '/login');
+    });
+
+    test('athlete en /alumnos → redirige a /not-allowed', () async {
+      final user = _MockUser();
+      final container = _container(
+        authOverride: authNotifierProvider.overrideWith(
+          () => _StubAuthNotifier(AsyncData(user)),
+        ),
+        profileOverride: userProfileProvider.overrideWith(
+          (ref) => Stream<UserProfile?>.value(_athleteProfile()),
+        ),
+      );
+      addTearDown(container.dispose);
+
+      expect(await _call(container, '/alumnos'), '/not-allowed');
+    });
+
+    test('trainer en /actividad → no redirect (stay)', () async {
+      final user = _MockUser();
+      final container = _container(
+        authOverride: authNotifierProvider.overrideWith(
+          () => _StubAuthNotifier(AsyncData(user)),
+        ),
+        profileOverride: userProfileProvider.overrideWith(
+          (ref) => Stream<UserProfile?>.value(_trainerProfile()),
+        ),
+      );
+      addTearDown(container.dispose);
+
+      expect(await _call(container, '/actividad'), isNull);
+    });
   });
 }
