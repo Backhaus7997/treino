@@ -244,15 +244,49 @@ class _SolicitudesPendientesSection extends ConsumerWidget {
   }
 }
 
-class _PendingRequestCard extends ConsumerWidget {
+class _PendingRequestCard extends ConsumerStatefulWidget {
   const _PendingRequestCard({required this.link});
   final TrainerLink link;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_PendingRequestCard> createState() =>
+      _PendingRequestCardState();
+}
+
+class _PendingRequestCardState extends ConsumerState<_PendingRequestCard> {
+  // Guards against double-submit: a fast double-tap before the stream rebuilds
+  // and removes this card would otherwise fire accept/decline (and analytics)
+  // twice. Stays true on success — the card is about to disappear; only resets
+  // on error so the trainer can retry.
+  bool _busy = false;
+
+  Future<void> _decline() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      await ref.read(trainerLinkRepositoryProvider).decline(widget.link.id);
+    } catch (_) {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _accept() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      await ref.read(trainerLinkRepositoryProvider).accept(widget.link.id);
+      ref.read(analyticsServiceProvider).logLinkAccepted(linkId: widget.link.id);
+    } catch (_) {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
-    final profileAsync = ref.watch(userPublicProfileProvider(link.athleteId));
+    final profileAsync =
+        ref.watch(userPublicProfileProvider(widget.link.athleteId));
     final name =
         profileAsync.valueOrNull?.displayName ?? l10n.dashboardAlumnoFallback;
     final initials = _initials(name);
@@ -289,8 +323,7 @@ class _PendingRequestCard extends ConsumerWidget {
             children: [
               Expanded(
                 child: OutlinedButton(
-                  onPressed: () =>
-                      ref.read(trainerLinkRepositoryProvider).decline(link.id),
+                  onPressed: _busy ? null : _decline,
                   style: OutlinedButton.styleFrom(
                     side: BorderSide(color: palette.highlight, width: 1),
                     foregroundColor: palette.highlight,
@@ -312,14 +345,7 @@ class _PendingRequestCard extends ConsumerWidget {
               const SizedBox(width: 12),
               Expanded(
                 child: ElevatedButton(
-                  onPressed: () async {
-                    await ref
-                        .read(trainerLinkRepositoryProvider)
-                        .accept(link.id);
-                    ref
-                        .read(analyticsServiceProvider)
-                        .logLinkAccepted(linkId: link.id);
-                  },
+                  onPressed: _busy ? null : _accept,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: palette.accent,
                     foregroundColor: palette.bg,

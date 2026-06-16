@@ -10,10 +10,12 @@ final performanceTestRepositoryProvider = Provider<PerformanceTestRepository>(
   (ref) => PerformanceTestRepository(firestore: ref.watch(firestoreProvider)),
 );
 
-/// Live stream of performance tests for [athleteId] recorded by the current trainer.
+/// Live stream of all performance tests for [athleteId], regardless of who
+/// recorded them.
 ///
-/// - Queries by `recordedBy` (single-field, no composite index).
-/// - Filters to [athleteId] and sorts by [recordedAt] ascending client-side.
+/// - Queries by `athleteId` (single-field, no composite index) so the full
+///   history is returned even across trainer reassignment or co-trainers.
+/// - Sorts by [recordedAt] ascending client-side.
 /// - Returns an empty list when no trainer is authenticated.
 final performanceTestsForAthleteProvider = StreamProvider.autoDispose
     .family<List<PerformanceTest>, String>((ref, athleteId) {
@@ -22,9 +24,9 @@ final performanceTestsForAthleteProvider = StreamProvider.autoDispose
 
   return ref
       .watch(performanceTestRepositoryProvider)
-      .watchRecordedBy(trainerUid)
+      .watchForAthlete(athleteId)
       .map(
-        (all) => all.where((t) => t.athleteId == athleteId).toList()
+        (all) => all.toList()
           ..sort((a, b) => a.recordedAt.compareTo(b.recordedAt)),
       );
 });

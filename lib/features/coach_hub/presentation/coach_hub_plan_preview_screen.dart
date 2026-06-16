@@ -662,9 +662,12 @@ class _DayCard extends StatelessWidget {
         i.repsMin == i.repsMax ? '${i.repsMin}' : '${i.repsMin}-${i.repsMax}';
     final base = '${i.sets} × $reps';
     final rest = i.restSec != null ? ' · ${i.restSec}s' : '';
-    final w = i.weightKg != null ? ' · ${i.weightKg} kg' : '';
+    final w = i.weightKg != null ? ' · ${_formatWeight(i.weightKg!)} kg' : '';
     return '$base$rest$w';
   }
+
+  String _formatWeight(double w) =>
+      w == w.truncateToDouble() ? w.toInt().toString() : w.toString();
 }
 
 /// Bottom sheet con search + lista del catálogo de exercises.

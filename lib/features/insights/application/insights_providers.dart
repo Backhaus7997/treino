@@ -18,9 +18,12 @@ final weeklyInsightsProvider =
   final repo = ref.read(sessionRepositoryProvider);
 
   // Rango de semana — lunes 00:00 local hasta el siguiente lunes (exclusivo).
+  // Aritmética de calendario (no Duration) para que el borde caiga en
+  // medianoche local incluso atravesando un cambio de horario (DST).
   final now = DateTime.now().toLocal();
   final weekStart = _mondayOfWeek(now);
-  final weekEndExclusive = weekStart.add(const Duration(days: 7));
+  final weekEndExclusive =
+      DateTime(weekStart.year, weekStart.month, weekStart.day + 7);
 
   // Todas las sessions del usuario (listByUid ya viene ordenado DESC por
   // startedAt en SessionRepository).
@@ -136,6 +139,7 @@ final weeklyInsightsProvider =
 
 DateTime _mondayOfWeek(DateTime now) {
   final daysFromMonday = now.weekday - DateTime.monday;
-  return DateTime(now.year, now.month, now.day)
-      .subtract(Duration(days: daysFromMonday));
+  // Resta de días vía constructor de calendario para normalizar el borde a
+  // medianoche local aun cuando la semana cruza un cambio de horario (DST).
+  return DateTime(now.year, now.month, now.day - daysFromMonday);
 }

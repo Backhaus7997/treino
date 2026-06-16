@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
+import '../../../core/widgets/treino_icon.dart';
 import '../application/search_users_provider.dart';
 import 'widgets/feed_empty_state.dart';
 import 'widgets/user_search_result_tile.dart';
@@ -113,7 +114,7 @@ class _SearchUsersHeader extends StatelessWidget {
           GestureDetector(
             onTap: () => context.pop(),
             behavior: HitTestBehavior.opaque,
-            child: Icon(Icons.arrow_back, size: 20, color: palette.textPrimary),
+            child: Icon(TreinoIcon.back, size: 20, color: palette.textPrimary),
           ),
           const SizedBox(width: 14),
           Text(
@@ -187,7 +188,7 @@ class _SearchTextField extends StatelessWidget {
             if (value.text.isEmpty) return const SizedBox.shrink();
             return GestureDetector(
               onTap: onClear,
-              child: Icon(Icons.close, size: 18, color: palette.textMuted),
+              child: Icon(TreinoIcon.close, size: 18, color: palette.textMuted),
             );
           },
         ),

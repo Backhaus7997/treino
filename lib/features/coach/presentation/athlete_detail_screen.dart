@@ -425,6 +425,12 @@ String _formatMeasurementDate(DateTime dt) {
   return '${dt.day} ${_kMonthsShort[dt.month]} ${dt.year}';
 }
 
+/// Formats a metric double for the summary cards. Mirrors the chart header
+/// formatting (see measurement_progress_chart.dart) so whole numbers render
+/// as '70' (not '70.0') and float tails are trimmed to one decimal.
+String _formatMetricValue(double value) =>
+    value % 1 == 0 ? value.toStringAsFixed(0) : value.toStringAsFixed(1);
+
 /// Section that shows the latest anthropometric measurement for [athleteId]
 /// and a '+ Cargar' CTA to open the log form.
 ///
@@ -552,22 +558,22 @@ class _AntropometriaSection extends ConsumerWidget {
                           if (latest.weightKg != null)
                             _Metric(
                               'Peso',
-                              '${latest.weightKg} kg',
+                              '${_formatMetricValue(latest.weightKg!)} kg',
                             ),
                           if (latest.fatPercentage != null)
                             _Metric(
                               '% Graso',
-                              '${latest.fatPercentage}%',
+                              '${_formatMetricValue(latest.fatPercentage!)}%',
                             ),
                           if (latest.muscleMassKg != null)
                             _Metric(
                               'Masa muscular',
-                              '${latest.muscleMassKg} kg',
+                              '${_formatMetricValue(latest.muscleMassKg!)} kg',
                             ),
                           if (latest.waistCm != null)
                             _Metric(
                               'Cintura',
-                              '${latest.waistCm} cm',
+                              '${_formatMetricValue(latest.waistCm!)} cm',
                             ),
                         ],
                         palette: palette,

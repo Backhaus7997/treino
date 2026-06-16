@@ -117,5 +117,22 @@
   "routineEditorSetTypeNormal": "Normal",
   "routineEditorSetTypeWarmup": "Entrada en calor (W)",
   "routineEditorSetTypeDrop": "Drop (D)",
-  "routineEditorSetTypeFailure": "Al fallo (F)"
+  "routineEditorSetTypeFailure": "Al fallo (F)",
+
+  "routineDetailNotFound": "Rutina no encontrada",
+  "routineDetailNoDaysConfigured": "Esta rutina no tiene días configurados.",
+  "routineDetailLoadError": "No pudimos cargar la rutina.",
+  "routineDetailNoExercisesThisWeek": "Sin ejercicios esta semana",
+  "routineDetailNoExercisesThisDay": "No hay ejercicios en este día",
+  "routineDetailStatExercises": "EJERCICIOS",
+  "routineDetailStatSets": "SETS",
+  "routineDetailStatMinutes": "MINUTOS",
+  "routineDetailSuperset": "SUPERSERIE",
+  "routineDetailDayLabel": "DÍA {day}",
+  "routineDetailWeekLabel": "SEM {week}",
+  "routineDetailPlanComplete": "PLAN COMPLETADO",
+  "routineDetailCompleted": "COMPLETADO",
+  "routineDetailWeekLocked": "SEMANA BLOQUEADA",
+  "routineDetailDayLocked": "DÍA BLOQUEADO",
+  "routineDetailStart": "EMPEZAR"
 }

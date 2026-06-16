@@ -115,6 +115,9 @@ void main() {
           container: container,
           child: MaterialApp.router(
             theme: AppTheme.dark(),
+            locale: const Locale('es', 'AR'),
+            localizationsDelegates: AppL10n.localizationsDelegates,
+            supportedLocales: AppL10n.supportedLocales,
             routerConfig: router,
           ),
         ),
@@ -171,6 +174,9 @@ void main() {
           container: container,
           child: MaterialApp.router(
             theme: AppTheme.dark(),
+            locale: const Locale('es', 'AR'),
+            localizationsDelegates: AppL10n.localizationsDelegates,
+            supportedLocales: AppL10n.supportedLocales,
             routerConfig: router,
           ),
         ),

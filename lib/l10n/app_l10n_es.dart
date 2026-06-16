@@ -1375,6 +1375,60 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get routineEditorSetTypeFailure => 'Al fallo (F)';
+
+  @override
+  String get routineDetailNotFound => 'Rutina no encontrada';
+
+  @override
+  String get routineDetailNoDaysConfigured =>
+      'Esta rutina no tiene días configurados.';
+
+  @override
+  String get routineDetailLoadError => 'No pudimos cargar la rutina.';
+
+  @override
+  String get routineDetailNoExercisesThisWeek => 'Sin ejercicios esta semana';
+
+  @override
+  String get routineDetailNoExercisesThisDay =>
+      'No hay ejercicios en este día';
+
+  @override
+  String get routineDetailStatExercises => 'EJERCICIOS';
+
+  @override
+  String get routineDetailStatSets => 'SETS';
+
+  @override
+  String get routineDetailStatMinutes => 'MINUTOS';
+
+  @override
+  String get routineDetailSuperset => 'SUPERSERIE';
+
+  @override
+  String routineDetailDayLabel(int day) {
+    return 'DÍA $day';
+  }
+
+  @override
+  String routineDetailWeekLabel(int week) {
+    return 'SEM $week';
+  }
+
+  @override
+  String get routineDetailPlanComplete => 'PLAN COMPLETADO';
+
+  @override
+  String get routineDetailCompleted => 'COMPLETADO';
+
+  @override
+  String get routineDetailWeekLocked => 'SEMANA BLOQUEADA';
+
+  @override
+  String get routineDetailDayLocked => 'DÍA BLOQUEADO';
+
+  @override
+  String get routineDetailStart => 'EMPEZAR';
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -2601,4 +2655,58 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get routineEditorSetTypeFailure => 'Al fallo (F)';
+
+  @override
+  String get routineDetailNotFound => 'Rutina no encontrada';
+
+  @override
+  String get routineDetailNoDaysConfigured =>
+      'Esta rutina no tiene días configurados.';
+
+  @override
+  String get routineDetailLoadError => 'No pudimos cargar la rutina.';
+
+  @override
+  String get routineDetailNoExercisesThisWeek => 'Sin ejercicios esta semana';
+
+  @override
+  String get routineDetailNoExercisesThisDay =>
+      'No hay ejercicios en este día';
+
+  @override
+  String get routineDetailStatExercises => 'EJERCICIOS';
+
+  @override
+  String get routineDetailStatSets => 'SETS';
+
+  @override
+  String get routineDetailStatMinutes => 'MINUTOS';
+
+  @override
+  String get routineDetailSuperset => 'SUPERSERIE';
+
+  @override
+  String routineDetailDayLabel(int day) {
+    return 'DÍA $day';
+  }
+
+  @override
+  String routineDetailWeekLabel(int week) {
+    return 'SEM $week';
+  }
+
+  @override
+  String get routineDetailPlanComplete => 'PLAN COMPLETADO';
+
+  @override
+  String get routineDetailCompleted => 'COMPLETADO';
+
+  @override
+  String get routineDetailWeekLocked => 'SEMANA BLOQUEADA';
+
+  @override
+  String get routineDetailDayLocked => 'DÍA BLOQUEADO';
+
+  @override
+  String get routineDetailStart => 'EMPEZAR';
 }

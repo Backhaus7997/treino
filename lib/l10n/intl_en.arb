@@ -463,5 +463,46 @@
   "routineEditorSetTypeDrop": "Drop (D)",
   "@routineEditorSetTypeDrop": {},
   "routineEditorSetTypeFailure": "To failure (F)",
-  "@routineEditorSetTypeFailure": {}
+  "@routineEditorSetTypeFailure": {},
+
+  "routineDetailNotFound": "",
+  "@routineDetailNotFound": {},
+  "routineDetailNoDaysConfigured": "",
+  "@routineDetailNoDaysConfigured": {},
+  "routineDetailLoadError": "",
+  "@routineDetailLoadError": {},
+  "routineDetailNoExercisesThisWeek": "",
+  "@routineDetailNoExercisesThisWeek": {},
+  "routineDetailNoExercisesThisDay": "",
+  "@routineDetailNoExercisesThisDay": {},
+  "routineDetailStatExercises": "",
+  "@routineDetailStatExercises": {},
+  "routineDetailStatSets": "",
+  "@routineDetailStatSets": {},
+  "routineDetailStatMinutes": "",
+  "@routineDetailStatMinutes": {},
+  "routineDetailSuperset": "",
+  "@routineDetailSuperset": {},
+  "routineDetailDayLabel": "",
+  "@routineDetailDayLabel": {
+    "placeholders": {
+      "day": { "type": "int" }
+    }
+  },
+  "routineDetailWeekLabel": "",
+  "@routineDetailWeekLabel": {
+    "placeholders": {
+      "week": { "type": "int" }
+    }
+  },
+  "routineDetailPlanComplete": "",
+  "@routineDetailPlanComplete": {},
+  "routineDetailCompleted": "",
+  "@routineDetailCompleted": {},
+  "routineDetailWeekLocked": "",
+  "@routineDetailWeekLocked": {},
+  "routineDetailDayLocked": "",
+  "@routineDetailDayLocked": {},
+  "routineDetailStart": "",
+  "@routineDetailStart": {}
 }
