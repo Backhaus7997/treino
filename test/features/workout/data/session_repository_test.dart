@@ -347,13 +347,14 @@ void main() {
       finishedAt: DateTime.utc(2026, 5, 15, 10, 45, 0),
       totalVolumeKg: 100.0,
       durationMin: 45,
+      wasFullyCompleted: true,
     );
 
     final profileSnap =
         await firestore.collection('userPublicProfiles').doc(uid).get();
     expect(profileSnap.exists, isTrue);
     final data = profileSnap.data()!;
-    // 1 finished session
+    // 1 fully completed session
     expect(data['workoutsCount'], equals(1));
     // racha is computed by computeStreak using DateTime.now() — the value
     // is correct (0 if not trained today in local TZ, 1 if trained today).

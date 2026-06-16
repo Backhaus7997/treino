@@ -232,6 +232,7 @@ class _CoachHubPlanPreviewScreenState
       assignedBy: trainerUid,
       assignedTo: athleteId,
       visibility: RoutineVisibility.private,
+      numWeeks: plan.durationWeeks,
     );
   }
 

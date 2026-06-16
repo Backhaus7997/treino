@@ -54,7 +54,6 @@ class AccountDeletionNotifier extends AsyncNotifier<void> {
     }
 
     state = const AsyncLoading();
-    ref.read(accountDeletionInFlightProvider.notifier).state = true;
     try {
       final authService = ref.read(authServiceProvider);
       await authService.reauthenticate(credential);
@@ -66,8 +65,6 @@ class AccountDeletionNotifier extends AsyncNotifier<void> {
     } catch (e, st) {
       debugPrint('[AccountDeletion] unexpected error: $e\n$st');
       state = AsyncError(AuthFailure.deletionFailed(cause: e), st);
-    } finally {
-      ref.read(accountDeletionInFlightProvider.notifier).state = false;
     }
   }
 
@@ -89,61 +86,71 @@ class AccountDeletionNotifier extends AsyncNotifier<void> {
   }
 
   /// Calls the CF and, on success, signs out and emits [AsyncData(null)].
+  ///
+  /// Manages [accountDeletionInFlightProvider] for the full duration of the
+  /// CF cascade so BOTH entry paths ([deleteAccount] and [retry]) defer the
+  /// router's loggedIn=true + profile=null → /profile-setup redirect during
+  /// the window where the Firestore profile is deleted before the Auth user.
   Future<void> _callCfAndFinish() async {
-    final service = ref.read(accountDeletionServiceProvider);
-    final firebaseAuth = ref.read(firebaseAuthProvider);
-    final uid = firebaseAuth.currentUser?.uid;
-    if (uid == null) {
-      state = AsyncError(
-        const AuthFailure.userNotFound(),
-        StackTrace.current,
+    ref.read(accountDeletionInFlightProvider.notifier).state = true;
+    try {
+      final service = ref.read(accountDeletionServiceProvider);
+      final firebaseAuth = ref.read(firebaseAuthProvider);
+      final uid = firebaseAuth.currentUser?.uid;
+      if (uid == null) {
+        state = AsyncError(
+          const AuthFailure.userNotFound(),
+          StackTrace.current,
+        );
+        return;
+      }
+
+      final result = await service.call(uid: uid);
+      debugPrint(
+        '[AccountDeletion] CF returned: status=${result.status}, '
+        'deletedCollections=${result.deletedCollections}, errors=${result.errors}',
       );
-      return;
+
+      // The definitive signal that the account is gone: Auth user deleted.
+      // CF reports 'partial' when any non-auth cascade step errors (e.g.,
+      // sweeping friendships with a missing index, audit log write fails) —
+      // but if Auth was deleted, the user's account is effectively gone and
+      // we MUST sign out + redirect. Treating partial-with-auth-deleted as
+      // failure leaves the UI stuck and confuses the user.
+      final authDeleted = result.deletedCollections.contains('users-auth');
+
+      if (!authDeleted) {
+        // Real failure — Auth user still exists.
+        state = AsyncError(
+          const AuthFailure.deletionFailed(),
+          StackTrace.current,
+        );
+        return;
+      }
+
+      // Order matters: sign out BEFORE flipping the deleted-flag.
+      //
+      // The flag listener in EliminarCuentaSheet calls context.go('/welcome')
+      // when the flag becomes true. If the flag flips while the local auth
+      // state is still cached (loggedIn=true) + the Firestore profile is null
+      // (deleted by the CF cascade), the router's redirect logic resolves
+      // /welcome → /home → /profile-setup, stranding the user mid-onboarding.
+      //
+      // By awaiting signOut first, authStateChanges emits null before we
+      // signal the navigation, so the router sees !loggedIn and routes to
+      // /welcome cleanly.
+      await ref.read(authServiceProvider).signOut();
+
+      // Reset any onboarding state from the deleted user so a follow-up
+      // signup starts on a blank form (otherwise the previous user's draft
+      // re-appears in profile-setup if the user creates a new account).
+      ref.invalidate(profileSetupNotifierProvider);
+
+      state = const AsyncData(null);
+      ref.read(accountDeletedFlagProvider.notifier).state = true;
+    } finally {
+      ref.read(accountDeletionInFlightProvider.notifier).state = false;
     }
-
-    final result = await service.call(uid: uid);
-    debugPrint(
-      '[AccountDeletion] CF returned: status=${result.status}, '
-      'deletedCollections=${result.deletedCollections}, errors=${result.errors}',
-    );
-
-    // The definitive signal that the account is gone: Auth user deleted.
-    // CF reports 'partial' when any non-auth cascade step errors (e.g.,
-    // sweeping friendships with a missing index, audit log write fails) —
-    // but if Auth was deleted, the user's account is effectively gone and
-    // we MUST sign out + redirect. Treating partial-with-auth-deleted as
-    // failure leaves the UI stuck and confuses the user.
-    final authDeleted = result.deletedCollections.contains('users-auth');
-
-    if (!authDeleted) {
-      // Real failure — Auth user still exists.
-      state = AsyncError(
-        const AuthFailure.deletionFailed(),
-        StackTrace.current,
-      );
-      return;
-    }
-
-    // Order matters: sign out BEFORE flipping the deleted-flag.
-    //
-    // The flag listener in EliminarCuentaSheet calls context.go('/welcome')
-    // when the flag becomes true. If the flag flips while the local auth
-    // state is still cached (loggedIn=true) + the Firestore profile is null
-    // (deleted by the CF cascade), the router's redirect logic resolves
-    // /welcome → /home → /profile-setup, stranding the user mid-onboarding.
-    //
-    // By awaiting signOut first, authStateChanges emits null before we
-    // signal the navigation, so the router sees !loggedIn and routes to
-    // /welcome cleanly.
-    await ref.read(authServiceProvider).signOut();
-
-    // Reset any onboarding state from the deleted user so a follow-up
-    // signup starts on a blank form (otherwise the previous user's draft
-    // re-appears in profile-setup if the user creates a new account).
-    ref.invalidate(profileSetupNotifierProvider);
-
-    state = const AsyncData(null);
-    ref.read(accountDeletedFlagProvider.notifier).state = true;
   }
 
   /// Opens the ReAuthBottomSheet and returns the credential or null.

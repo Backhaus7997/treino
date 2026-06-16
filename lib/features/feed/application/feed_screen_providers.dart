@@ -18,7 +18,7 @@ final myFriendsFeedProvider = FutureProvider<List<Post>>((ref) async {
   final friendUids = await ref.watch(acceptedFriendsProvider(auth.uid).future);
   if (friendUids.isEmpty) return const <Post>[];
 
-  return await ref.watch(feedForFriendsProvider(friendUids).future);
+  return await ref.watch(feedForFriendsProvider(friendUidsKey(friendUids)).future);
 });
 
 /// Returns the gym-privacy feed for the current user's gym.

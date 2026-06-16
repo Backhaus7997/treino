@@ -1,3 +1,5 @@
+import 'dart:developer' as developer;
+
 import 'package:cloud_firestore/cloud_firestore.dart'
     show CollectionReference, DocumentSnapshot, FieldPath, FirebaseFirestore;
 
@@ -55,6 +57,18 @@ class GymRepository {
   Gym? _fromDoc(DocumentSnapshot<Map<String, Object?>> snap) {
     final data = snap.data();
     if (!snap.exists || data == null) return null;
-    return Gym.fromJson({...data, 'id': snap.id});
+    try {
+      // Wrapped in try/catch so a single malformed gym doc (bad lat/lng,
+      // missing geohash, etc.) is skipped instead of aborting the whole
+      // catalog read — matches the resilient intent of `whereType<Gym>()`.
+      return Gym.fromJson({...data, 'id': snap.id});
+    } catch (e, st) {
+      developer.log(
+        'GymRepository: skipped unparseable gym ${snap.id}',
+        error: e,
+        stackTrace: st,
+      );
+      return null;
+    }
   }
 }

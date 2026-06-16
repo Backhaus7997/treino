@@ -31,6 +31,9 @@ class _TreinoAppState extends ConsumerState<TreinoApp> {
   /// Foreground message subscription — cancelled on dispose.
   StreamSubscription<RemoteMessage>? _fgSub;
 
+  /// Background-tap subscription (onMessageOpenedApp) — cancelled on dispose.
+  StreamSubscription<RemoteMessage>? _bgSub;
+
   @override
   void initState() {
     super.initState();
@@ -45,6 +48,15 @@ class _TreinoAppState extends ConsumerState<TreinoApp> {
     // (a) Attach foreground SnackBar listener. (ADR-PN-010, REQ-PN-HANDLER-001)
     final fcm = ref.read(fcmServiceProvider);
     _fgSub = fcm.onForegroundMessage.listen(_onForeground);
+
+    // (a2) Background tap: app resumed from background via notification tap →
+    //      navigate to the deepLink. (ADR-PN-009, REQ-PN-HANDLER-002,
+    //      SCENARIO-655, 656.)
+    _bgSub = fcm.onMessageOpenedApp.listen((message) {
+      final ctx = _router.routerDelegate.navigatorKey.currentContext;
+      if (ctx == null || !ctx.mounted) return;
+      goDeepLink(ctx, message.data['deepLink'] as String?);
+    });
 
     // (b) Cold-start gate: wait for router to be ready before navigating.
     //     addPostFrameCallback guarantees GoRouter is fully mounted.
@@ -61,6 +73,7 @@ class _TreinoAppState extends ConsumerState<TreinoApp> {
   @override
   void dispose() {
     _fgSub?.cancel();
+    _bgSub?.cancel();
     super.dispose();
   }
 

@@ -978,7 +978,7 @@ class _CobroPendienteRow extends ConsumerWidget {
             final now2 = DateTime.now().toUtc();
             final periodKey = cobro.cadence == BillingCadence.mensual
                 ? '${now2.year}-${now2.month.toString().padLeft(2, '0')}'
-                : '${now2.year}-W${_isoWeekNumber(now2).toString().padLeft(2, '0')}';
+                : isoWeekPeriodKey(now2);
             await repo.add(Payment(
               id: '',
               trainerId: trainerId,
@@ -1565,15 +1565,6 @@ bool _looksLikeUid(String s) {
   if (s.contains(' ')) return false;
   final alphaNumeric = RegExp(r'^[a-zA-Z0-9]+$');
   return alphaNumeric.hasMatch(s);
-}
-
-/// ISO 8601 week number (Thursday-based). Used to derive semanal periodKey
-/// when marking a payment as cobrado.
-int _isoWeekNumber(DateTime date) {
-  final thursday = date.subtract(Duration(days: date.weekday - 4));
-  final jan4 = DateTime.utc(thursday.year, 1, 4);
-  final week1Monday = jan4.subtract(Duration(days: jan4.weekday - 1));
-  return ((thursday.difference(week1Monday).inDays) ~/ 7) + 1;
 }
 
 TrainerAppointmentsKey _appointmentsKey(String trainerId) {

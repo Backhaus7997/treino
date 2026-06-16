@@ -1311,11 +1311,14 @@ class _RepsSetRowState extends State<_RepsSetRow> {
 
   void _onWeightChanged(String value) {
     final parsed = double.tryParse(value.replaceAll(',', '.'));
-    if (parsed != null && parsed >= 0 && parsed <= 500) {
-      _weightKg = parsed;
-      if (widget.isDone) {
-        widget.onWeightUpdate?.call(_weightKg);
-      }
+    // Empty/unparseable -> 0; out-of-range -> clamped to [0, 500]. This keeps
+    // _weightKg in sync with what the user sees and with what gets logged,
+    // instead of silently retaining a stale value.
+    final next = (parsed ?? 0).clamp(0.0, 500.0).toDouble();
+    if (next == _weightKg) return;
+    setState(() => _weightKg = next);
+    if (widget.isDone) {
+      widget.onWeightUpdate?.call(_weightKg);
     }
   }
 

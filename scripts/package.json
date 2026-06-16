@@ -9,7 +9,9 @@
     "seed:all": "node seed_workout_catalog.js --all",
     "seed:trainers": "node seed_trainer_profiles.js",
     "seed:trainers:clear": "node seed_trainer_profiles.js --clear",
-    "promote:trainer": "node promote_user_to_trainer.js"
+    "promote:trainer": "node promote_user_to_trainer.js",
+    "seed:emulator": "FIREBASE_AUTH_EMULATOR_HOST=localhost:9099 FIRESTORE_EMULATOR_HOST=localhost:8080 node seed_emulator_full.js",
+    "seed:emulator:clear": "FIREBASE_AUTH_EMULATOR_HOST=localhost:9099 FIRESTORE_EMULATOR_HOST=localhost:8080 node seed_emulator_full.js --clear"
   },
   "dependencies": {
     "firebase-admin": "^12.0.0"

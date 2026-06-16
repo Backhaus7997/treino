@@ -261,7 +261,11 @@ String _relativeTime(DateTime createdAt) {
   if (delta.inHours < 1) return 'hace ${delta.inMinutes}m';
   if (delta.inDays < 1) return 'hace ${delta.inHours}h';
   if (delta.inDays < 7) return 'hace ${delta.inDays}d';
-  final d = createdAt.day.toString().padLeft(2, '0');
-  final m = createdAt.month.toString().padLeft(2, '0');
+  // createdAt is stored in UTC; format the absolute date in the user's local
+  // zone so negative-offset regions (e.g. Argentina, UTC-3) don't show the
+  // next day for late-evening messages.
+  final local = createdAt.toLocal();
+  final d = local.day.toString().padLeft(2, '0');
+  final m = local.month.toString().padLeft(2, '0');
   return '$d/$m';
 }

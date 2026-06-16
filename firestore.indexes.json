@@ -147,7 +147,8 @@
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "privacy", "order": "ASCENDING" },
-        { "fieldPath": "authorUid", "order": "ASCENDING" }
+        { "fieldPath": "authorUid", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
     },
     {
@@ -155,7 +156,16 @@
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "privacy", "order": "ASCENDING" },
-        { "fieldPath": "authorGymId", "order": "ASCENDING" }
+        { "fieldPath": "authorGymId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "posts",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "privacy", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
     },
     {

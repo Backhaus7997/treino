@@ -788,6 +788,12 @@ abstract class AppL10n {
   /// **'¿Borrar este horario? Las reservas existentes se mantienen.'**
   String get agendaRuleDeleteConfirm;
 
+  /// No description provided for @agendaRuleInvalidWindow.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'La hora de fin debe ser posterior al inicio y dejar espacio para al menos un turno.'**
+  String get agendaRuleInvalidWindow;
+
   /// No description provided for @agendaBookingCancelledByCoach.
   ///
   /// In es_AR, this message translates to:
@@ -1615,6 +1621,12 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'{gymName} · ¡Detectamos que podés estar entrenando!'**
   String checkInGymSubtext(String gymName);
+
+  /// No description provided for @checkInError.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos registrar tu check-in. Probá de nuevo.'**
+  String get checkInError;
 
   /// No description provided for @profileCuentaTitle.
   ///

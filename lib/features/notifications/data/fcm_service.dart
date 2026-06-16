@@ -41,6 +41,13 @@ class FcmService {
   /// Does NOT call [requestPermission] (ADR-PN-003).
   /// REQ-PN-CLIENT-002, SCENARIO-645, 646, 647, 678, 685.
   Future<void> init(String uid) async {
+    // init() is called twice in the normal flow: once on sign-in and again
+    // from PermissionGate after a permission grant. Cancel any existing
+    // subscription first so we never leak a listener or fire saveToken twice
+    // on a token refresh. Mirrors the cleanup in dispose().
+    await _refreshSub?.cancel();
+    _refreshSub = null;
+
     try {
       final token = await _messaging.getToken();
       if (token != null) {

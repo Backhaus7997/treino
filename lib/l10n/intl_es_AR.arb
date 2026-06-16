@@ -124,6 +124,7 @@
   "agendaBlockDayCta": "BLOQUEAR UN DÍA",
   "agendaEditorTitle": "Mis horarios",
   "agendaRuleDeleteConfirm": "¿Borrar este horario? Las reservas existentes se mantienen.",
+  "agendaRuleInvalidWindow": "La hora de fin debe ser posterior al inicio y dejar espacio para al menos un turno.",
   "agendaBookingCancelledByCoach": "Reserva cancelada por el entrenador.",
   "agendaSlotFreeLabel": "Disponible",
   "agendaSlotBlockedLabel": "Bloqueado",
@@ -302,6 +303,7 @@
       "gymName": { "type": "String" }
     }
   },
+  "checkInError": "No pudimos registrar tu check-in. Probá de nuevo.",
 
   "profileCuentaTitle": "CUENTA",
   "@profileCuentaTitle": {},

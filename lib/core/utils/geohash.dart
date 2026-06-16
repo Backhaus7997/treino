@@ -56,3 +56,60 @@ String geohash5(double lat, double lon) {
   }
   return buffer.toString();
 }
+
+// ── Neighbor expansion ─────────────────────────────────────────────────────
+//
+// Standard geohash adjacency tables (Gustavo Niemeyer's reference algorithm).
+// `_kNeighbors[dir][parity]` maps each base32 char to the char of the adjacent
+// cell in direction `dir`; `_kBorders[dir][parity]` lists the chars that sit on
+// that border (requiring a carry into the parent prefix). `parity` is 0 for an
+// even-length hash and 1 for odd.
+
+const _kNeighbors = <String, List<String>>{
+  'n': ['p0r21436x8zb9dcf5h7kjnmqesgutwvy', 'bc01fg45238967deuvhjyznpkmstqrwx'],
+  's': ['14365h7k9dcfesgujnmqp0r2twvyx8zb', '238967debc01fg45kmstqrwxuvhjyznp'],
+  'e': ['bc01fg45238967deuvhjyznpkmstqrwx', 'p0r21436x8zb9dcf5h7kjnmqesgutwvy'],
+  'w': ['238967debc01fg45kmstqrwxuvhjyznp', '14365h7k9dcfesgujnmqp0r2twvyx8zb'],
+};
+
+const _kBorders = <String, List<String>>{
+  'n': ['prxz', 'bcfguvyz'],
+  's': ['028b', '0145hjnp'],
+  'e': ['bcfguvyz', 'prxz'],
+  'w': ['0145hjnp', '028b'],
+};
+
+/// Returns the geohash cell adjacent to [geohash] in cardinal direction [dir]
+/// (`'n'`, `'s'`, `'e'`, `'w'`). Preserves the input length.
+String _adjacent(String geohash, String dir) {
+  final source = geohash.toLowerCase();
+  final lastCh = source[source.length - 1];
+  var parent = source.substring(0, source.length - 1);
+  final type = source.length % 2; // 0 = even, 1 = odd
+  if (_kBorders[dir]![type].contains(lastCh) && parent.isNotEmpty) {
+    parent = _adjacent(parent, dir);
+  }
+  return parent + _kBase32[_kNeighbors[dir]![type].indexOf(lastCh)];
+}
+
+/// Returns the 8 geohash cells surrounding [geohash] (4 cardinal + 4 diagonal),
+/// each at the same precision as the input.
+///
+/// Used to widen a geohash proximity query so trainers in cells adjacent to the
+/// athlete's own cell are not dropped at cell boundaries. Combine with the
+/// athlete's own cell to build a 3×3 grid (9 cells total), which stays within
+/// Firestore's `array-contains-any` 30-value limit.
+List<String> geohashNeighbors(String geohash) {
+  final n = _adjacent(geohash, 'n');
+  final s = _adjacent(geohash, 's');
+  return [
+    n,
+    s,
+    _adjacent(geohash, 'e'),
+    _adjacent(geohash, 'w'),
+    _adjacent(n, 'e'),
+    _adjacent(n, 'w'),
+    _adjacent(s, 'e'),
+    _adjacent(s, 'w'),
+  ];
+}

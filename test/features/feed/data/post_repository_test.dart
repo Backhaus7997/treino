@@ -162,4 +162,79 @@ void main() {
       expect(result.first.privacy, equals(PostPrivacy.gym));
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // Ordering: feeds must return newest-first (createdAt desc)
+  // ---------------------------------------------------------------------------
+  group('PostRepository ordering (newest first)', () {
+    test('feedPublic orders posts by createdAt descending', () async {
+      await repo.create(_makePost(
+        id: 'old',
+        createdAt: DateTime.utc(2026, 1, 1),
+      ));
+      await repo.create(_makePost(
+        id: 'new',
+        createdAt: DateTime.utc(2026, 3, 1),
+      ));
+      await repo.create(_makePost(
+        id: 'mid',
+        createdAt: DateTime.utc(2026, 2, 1),
+      ));
+
+      final result = await repo.feedPublic();
+
+      expect(result.map((p) => p.id).toList(), equals(['new', 'mid', 'old']));
+    });
+
+    test('feedForFriends orders merged posts by createdAt descending',
+        () async {
+      await repo.create(_makePost(
+        id: 'old',
+        authorUid: 'uidB',
+        privacy: PostPrivacy.friends,
+        createdAt: DateTime.utc(2026, 1, 1),
+      ));
+      await repo.create(_makePost(
+        id: 'new',
+        authorUid: 'uidC',
+        privacy: PostPrivacy.friends,
+        createdAt: DateTime.utc(2026, 3, 1),
+      ));
+      await repo.create(_makePost(
+        id: 'mid',
+        authorUid: 'uidB',
+        privacy: PostPrivacy.friends,
+        createdAt: DateTime.utc(2026, 2, 1),
+      ));
+
+      final result = await repo.feedForFriends(['uidB', 'uidC']);
+
+      expect(result.map((p) => p.id).toList(), equals(['new', 'mid', 'old']));
+    });
+
+    test('feedForGym orders posts by createdAt descending', () async {
+      await repo.create(_makePost(
+        id: 'old',
+        authorGymId: 'gym1',
+        privacy: PostPrivacy.gym,
+        createdAt: DateTime.utc(2026, 1, 1),
+      ));
+      await repo.create(_makePost(
+        id: 'new',
+        authorGymId: 'gym1',
+        privacy: PostPrivacy.gym,
+        createdAt: DateTime.utc(2026, 3, 1),
+      ));
+      await repo.create(_makePost(
+        id: 'mid',
+        authorGymId: 'gym1',
+        privacy: PostPrivacy.gym,
+        createdAt: DateTime.utc(2026, 2, 1),
+      ));
+
+      final result = await repo.feedForGym('gym1');
+
+      expect(result.map((p) => p.id).toList(), equals(['new', 'mid', 'old']));
+    });
+  });
 }
