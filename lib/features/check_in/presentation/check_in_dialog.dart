@@ -130,10 +130,23 @@ class _SiButton extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return ElevatedButton(
       onPressed: () async {
+        final messenger = ScaffoldMessenger.of(context);
+        final navigator = Navigator.of(context);
+        final errorText = AppL10n.of(context).checkInError;
+
         await ref
             .read(checkInNotifierProvider.notifier)
             .confirm(gymId: gymId, gymName: gymName);
-        if (context.mounted) Navigator.of(context).pop();
+
+        // confirm() swallows write failures into AsyncValue.guard, so the only
+        // signal of failure is the notifier state. Surface errors instead of
+        // closing on a write that never persisted; keep the dialog open so the
+        // user can retry.
+        if (ref.read(checkInNotifierProvider).hasError) {
+          messenger.showSnackBar(SnackBar(content: Text(errorText)));
+          return;
+        }
+        navigator.pop();
       },
       style: ElevatedButton.styleFrom(
         backgroundColor: palette.accent,

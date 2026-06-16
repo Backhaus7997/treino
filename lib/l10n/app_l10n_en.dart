@@ -356,6 +356,9 @@ class AppL10nEn extends AppL10n {
   String get agendaRuleDeleteConfirm => '';
 
   @override
+  String get agendaRuleInvalidWindow => '';
+
+  @override
   String get agendaBookingCancelledByCoach => '';
 
   @override
@@ -796,6 +799,10 @@ class AppL10nEn extends AppL10n {
   String checkInGymSubtext(String gymName) {
     return '$gymName · ¡Detectamos que podés estar entrenando!';
   }
+
+  @override
+  String get checkInError =>
+      'No pudimos registrar tu check-in. Probá de nuevo.';
 
   @override
   String get profileCuentaTitle => 'CUENTA';

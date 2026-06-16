@@ -9,6 +9,7 @@ import '../../workout/domain/session_status.dart';
 import '../domain/athlete_billing.dart';
 import '../domain/payment.dart';
 import 'billing_providers.dart' show athleteBillingPairProvider;
+import 'pagos_por_cobrar_provider.dart' show isoWeekPeriodKey;
 import 'payment_providers.dart' show athletePaymentsProvider;
 
 // ── ISO week helper (mirrors pagos_por_cobrar_provider) ───────────────────────
@@ -96,8 +97,7 @@ final miCuotaProvider = Provider.autoDispose<AsyncValue<MiCuotaState?>>((ref) {
   // ── 3. Now ─────────────────────────────────────────────────────────────────
   final now = DateTime.now().toUtc();
   final monthKey = '${now.year}-${now.month.toString().padLeft(2, '0')}';
-  final weekKey =
-      '${now.year}-W${_isoWeekNumber(now).toString().padLeft(2, '0')}';
+  final weekKey = isoWeekPeriodKey(now);
 
   final items = <MiCuotaItem>[];
 
@@ -160,8 +160,11 @@ final miCuotaProvider = Provider.autoDispose<AsyncValue<MiCuotaState?>>((ref) {
         }
         final sessions = sessionsAsync.valueOrNull ?? const [];
 
+        // Billing window floor: start no earlier than when the relationship
+        // began (link.acceptedAt) so sessions finished before linking to this
+        // trainer are not charged. Falls back to epoch only when missing.
         final epoch = DateTime.utc(1970);
-        var lastPaidAt = epoch;
+        var lastPaidAt = link.acceptedAt?.toUtc() ?? epoch;
         for (final p in payments) {
           if (p.status == PaymentStatus.paid && p.paidAt != null) {
             if (p.paidAt!.isAfter(lastPaidAt)) lastPaidAt = p.paidAt!;

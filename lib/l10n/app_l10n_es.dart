@@ -367,6 +367,10 @@ class AppL10nEs extends AppL10n {
       '¿Borrar este horario? Las reservas existentes se mantienen.';
 
   @override
+  String get agendaRuleInvalidWindow =>
+      'La hora de fin debe ser posterior al inicio y dejar espacio para al menos un turno.';
+
+  @override
   String get agendaBookingCancelledByCoach =>
       'Reserva cancelada por el entrenador.';
 
@@ -824,6 +828,10 @@ class AppL10nEs extends AppL10n {
   String checkInGymSubtext(String gymName) {
     return '$gymName · ¡Detectamos que podés estar entrenando!';
   }
+
+  @override
+  String get checkInError =>
+      'No pudimos registrar tu check-in. Probá de nuevo.';
 
   @override
   String get profileCuentaTitle => 'CUENTA';
@@ -1220,6 +1228,10 @@ class AppL10nEsAr extends AppL10nEs {
       '¿Borrar este horario? Las reservas existentes se mantienen.';
 
   @override
+  String get agendaRuleInvalidWindow =>
+      'La hora de fin debe ser posterior al inicio y dejar espacio para al menos un turno.';
+
+  @override
   String get agendaBookingCancelledByCoach =>
       'Reserva cancelada por el entrenador.';
 
@@ -1677,6 +1689,10 @@ class AppL10nEsAr extends AppL10nEs {
   String checkInGymSubtext(String gymName) {
     return '$gymName · ¡Detectamos que podés estar entrenando!';
   }
+
+  @override
+  String get checkInError =>
+      'No pudimos registrar tu check-in. Probá de nuevo.';
 
   @override
   String get profileCuentaTitle => 'CUENTA';

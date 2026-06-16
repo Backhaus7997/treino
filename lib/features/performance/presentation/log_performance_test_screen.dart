@@ -26,13 +26,17 @@ const _kMonths = <String>[
   'dic',
 ];
 
+/// Formats [dt] using the same UTC convention as every reader of
+/// [PerformanceTest.recordedAt] (chart `_shortDate`, athlete detail
+/// `_formatMeasurementDate`): the stored UTC instant is shown as-is, with no
+/// `.toLocal()`. Pass a UTC value (e.g. `DateTime.now().toUtc()`) so the header
+/// matches the date that gets persisted and rendered after saving.
 String _formatDateTimeEs(DateTime dt) {
-  final local = dt.toLocal();
-  final d = local.day;
-  final m = _kMonths[local.month];
-  final y = local.year;
-  final hh = local.hour.toString().padLeft(2, '0');
-  final mm = local.minute.toString().padLeft(2, '0');
+  final d = dt.day;
+  final m = _kMonths[dt.month];
+  final y = dt.year;
+  final hh = dt.hour.toString().padLeft(2, '0');
+  final mm = dt.minute.toString().padLeft(2, '0');
   return '$d $m $y · $hh:$mm';
 }
 
@@ -217,7 +221,10 @@ class _LogPerformanceTestScreenState
     final palette = AppPalette.of(context);
     final trainerUid = ref.watch(currentUidProvider);
     final canSave = trainerUid != null && !_saving;
-    final now = DateTime.now();
+    // Use UTC to match the persisted recordedAt (see _save) and the UTC display
+    // convention of every reader, so the header date never disagrees with the
+    // saved record near midnight.
+    final now = DateTime.now().toUtc();
 
     return Scaffold(
       backgroundColor: palette.bg,

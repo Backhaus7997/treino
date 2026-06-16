@@ -2649,8 +2649,7 @@ class _SetRowState extends State<_SetRow> {
   void initState() {
     super.initState();
     final s = widget.editableSet;
-    _kgCtrl = TextEditingController(
-        text: s.weightKg != null ? s.weightKg!.toStringAsFixed(0) : '');
+    _kgCtrl = TextEditingController(text: _formatWeight(s.weightKg));
     _repsCtrl =
         TextEditingController(text: s.reps != null ? s.reps.toString() : '');
     _repsMinCtrl = TextEditingController(
@@ -2667,6 +2666,10 @@ class _SetRowState extends State<_SetRow> {
     _repsMaxCtrl.dispose();
     super.dispose();
   }
+
+  /// Seeds the KG controller without losing fractional loads: integers show
+  /// without a decimal (60), fractional values keep theirs (17.5).
+  static String _formatWeight(double? w) => formatEditorWeight(w);
 
   Future<void> _pickSetType(BuildContext context) async {
     final renderBox = context.findRenderObject() as RenderBox?;
@@ -2746,8 +2749,9 @@ class _SetRowState extends State<_SetRow> {
               controller: _kgCtrl,
               palette: palette,
               hint: 'kg',
-              onChanged: (v) {
-                s.weightKg = v?.toDouble();
+              decimal: true,
+              onDecimalChanged: (v) {
+                s.weightKg = v;
                 widget.onChanged();
               },
             ),
@@ -2838,20 +2842,35 @@ class _NumberField extends StatelessWidget {
   const _NumberField({
     required this.controller,
     required this.palette,
-    required this.onChanged,
+    this.onChanged,
+    this.onDecimalChanged,
+    this.decimal = false,
     this.hint,
-  });
+  }) : assert(
+          decimal ? onDecimalChanged != null : onChanged != null,
+          'decimal fields need onDecimalChanged; integer fields need onChanged',
+        );
 
   final TextEditingController controller;
   final AppPalette palette;
   final String? hint;
-  final void Function(int?) onChanged;
+
+  /// Integer callback used when [decimal] is false (reps, etc.).
+  final void Function(int?)? onChanged;
+
+  /// Double callback used when [decimal] is true (weight in kg).
+  final void Function(double?)? onDecimalChanged;
+
+  /// When true the field accepts fractional values (e.g. 17.5 kg).
+  final bool decimal;
 
   @override
   Widget build(BuildContext context) {
     return TextField(
       controller: controller,
-      keyboardType: TextInputType.number,
+      keyboardType: decimal
+          ? const TextInputType.numberWithOptions(decimal: true)
+          : TextInputType.number,
       style: GoogleFonts.barlow(fontSize: 16, color: palette.textPrimary),
       textAlign: TextAlign.center,
       decoration: InputDecoration(
@@ -2871,8 +2890,11 @@ class _NumberField extends StatelessWidget {
         ),
       ),
       onChanged: (v) {
-        final parsed = int.tryParse(v);
-        onChanged(parsed);
+        if (decimal) {
+          onDecimalChanged!(parseEditorWeight(v));
+        } else {
+          onChanged!(int.tryParse(v));
+        }
       },
     );
   }
@@ -2922,6 +2944,21 @@ class _LevelDropdown extends StatelessWidget {
     );
   }
 }
+
+// ── Weight (kg) field helpers ───────────────────────────────────────────────
+// SetSpec.weightKg is a double, so the editor must author fractional loads
+// (e.g. 17.5 kg). These keep the seed-formatter and the field parser in sync.
+
+/// Formats a weight for display in the KG field: integers drop the decimal
+/// (60), fractional values keep theirs (17.5). Null/absent → empty string.
+String formatEditorWeight(double? w) {
+  if (w == null) return '';
+  return w == w.truncateToDouble() ? w.toInt().toString() : w.toString();
+}
+
+/// Parses KG field text into a nullable double, accepting comma as the decimal
+/// separator (common on iOS numeric keypads). Empty/invalid → null.
+double? parseEditorWeight(String v) => double.tryParse(v.replaceAll(',', '.'));
 
 // ── Test bridge ───────────────────────────────────────────────────────────────
 // Exposes internal helpers for unit tests without making the private types

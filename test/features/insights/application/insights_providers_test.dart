@@ -224,12 +224,15 @@ void main() {
         id: 'r1',
         days: [
           makeDay(slots: [
-            makeSlot(exerciseId: 'e-chest', targetSets: 4),
-            makeSlot(exerciseId: 'e-back', targetSets: 3),
+            makeSlot(
+                exerciseId: 'e-chest', muscleGroup: 'chest', targetSets: 4),
+            makeSlot(exerciseId: 'e-back', muscleGroup: 'back', targetSets: 3),
           ]),
           makeDay(dayNumber: 2, slots: [
-            makeSlot(exerciseId: 'e-quads', targetSets: 5),
-            makeSlot(exerciseId: 'e-glutes', targetSets: 3),
+            makeSlot(
+                exerciseId: 'e-quads', muscleGroup: 'quads', targetSets: 5),
+            makeSlot(
+                exerciseId: 'e-glutes', muscleGroup: 'glutes', targetSets: 3),
           ]),
         ],
       );

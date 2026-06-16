@@ -92,11 +92,17 @@ class SessionRepository {
       final allSnap = await colRef.get();
       final allSessions =
           allSnap.docs.map(_sessionFromDoc).whereType<Session>().toList();
-      final finishedList =
-          allSessions.where((s) => s.status == SessionStatus.finished).toList();
-      final racha = computeStreak(finishedList);
+      // Only sessions actually completed count toward the public workout count
+      // and streak. Abandoned sessions are also written with status=finished
+      // (wasFullyCompleted=false), so we must exclude them here to match the
+      // display filter (historial_section.dart, planProgressProvider).
+      final completedList = allSessions
+          .where((s) =>
+              s.status == SessionStatus.finished && s.wasFullyCompleted)
+          .toList();
+      final racha = computeStreak(completedList);
       await pubRepo.updateCounters(uid, {
-        'workoutsCount': finishedList.length,
+        'workoutsCount': completedList.length,
         'racha': racha,
       });
     } catch (e, st) {

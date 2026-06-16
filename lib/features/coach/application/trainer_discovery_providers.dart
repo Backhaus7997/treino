@@ -258,8 +258,13 @@ final trainerDiscoveryProvider =
     //
     // Esto resuelve un bug UX donde los PFs virtuales puros (sin
     // trainerGeohashes) no aparecían sin tocar el filtro "Online".
+    // El query debe cubrir la celda del atleta MÁS las 8 vecinas (grid 3×3),
+    // sino un PF a unos cientos de metros pero del otro lado de un borde de
+    // celda (~4.9km) nunca entra al candidate set. 9 valores quedan dentro
+    // del límite de 30 de `array-contains-any` de Firestore.
     final athleteGeohash = geohash5(pos.latitude, pos.longitude);
-    final nearby = await repo.listByGeohashes([athleteGeohash]);
+    final cells = [athleteGeohash, ...geohashNeighbors(athleteGeohash)];
+    final nearby = await repo.listByGeohashes(cells);
     final virtuals = await repo.listVirtualOnly();
     final byUid = <String, TrainerPublicProfile>{};
     for (final t in nearby) {
