@@ -207,6 +207,24 @@ _EditableSet _editableSetFromSpec(SetSpec spec) => _EditableSet(
       durationSeconds: spec.durationSeconds,
     );
 
+/// Picks the rep mode that matches the hydrated set data: REP RANGE only when at
+/// least one non-failure set actually carries a min/max pair; otherwise SINGLE.
+///
+/// Why not just use `slot.effectiveRepMode`: a legacy slot can carry a
+/// slot-level range (targetRepsMin != targetRepsMax) while its per-set specs
+/// only hold a single `reps` value. That mismatch forced REP RANGE on edit and
+/// left the min/max fields empty (and flagged red) for an exercise the user
+/// never configured as a range.
+RepMode _repModeFromHydratedSets(List<List<_EditableSet>> weeklySets) {
+  for (final week in weeklySets) {
+    for (final s in week) {
+      if (s.type == SetType.failure) continue;
+      if (s.repsMin != null || s.repsMax != null) return RepMode.range;
+    }
+  }
+  return RepMode.single;
+}
+
 /// Validates a single [_EditableSet] given the slot's modes.
 bool isSetValid(_EditableSet s, ExerciseMode exerciseMode, RepMode repMode) {
   // A failure set ("al fallo") has no countable target by definition — the
@@ -487,7 +505,6 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                   'compound', // denormalized — category not stored in slot
             )
             ..exerciseMode = slot.effectiveExerciseMode
-            ..repMode = slot.effectiveRepMode
             ..restSeconds = slot.restSeconds
             ..supersetGroup = slot.supersetGroup
             // Hydrate presence mask from the domain slot (REQ-WPRES-001).
@@ -506,6 +523,12 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
               slot.effectiveSets.map(_editableSetFromSpec).toList(),
             ];
           }
+          // Derive rep mode from the actual hydrated sets, not the slot's legacy
+          // targetRepsMin/Max — otherwise an exercise whose sets carry only a
+          // single `reps` value gets forced into REP RANGE with empty min/max
+          // fields on edit (the bug seen on "Press de banca").
+          editableSlot.repMode =
+              _repModeFromHydratedSets(editableSlot.weeklySets);
           _normalizeSlotWeeks(editableSlot);
           return editableSlot;
         }).toList();
