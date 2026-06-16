@@ -26,7 +26,7 @@ import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach_hub/application/sidebar_collapsed_provider.dart';
-import 'package:treino/features/coach_hub/presentation/coach_hub_dashboard_screen.dart';
+import 'package:treino/features/coach_hub/presentation/sections/dashboard/coach_hub_dashboard_screen.dart';
 import 'package:treino/features/coach_hub/presentation/coach_hub_login_screen.dart';
 import 'package:treino/features/coach_hub/presentation/coach_hub_not_allowed_screen.dart';
 import 'package:treino/features/coach_hub/presentation/shell/coach_hub_scaffold.dart';
