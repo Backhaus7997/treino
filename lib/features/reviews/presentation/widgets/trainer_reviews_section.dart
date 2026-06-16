@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
+import '../../../profile/application/user_public_profile_providers.dart';
 import '../../application/review_providers.dart';
 import 'review_tile.dart';
 
@@ -50,9 +51,30 @@ class TrainerReviewsSection extends ConsumerWidget {
                 ),
               );
             }
+            // Resolve all review authors in a single batched read instead of
+            // one live listener per tile (avoids the per-tile N+1 listen
+            // pattern). Sort + dedupe so equal author sets share one provider
+            // instance. While the batch is loading, render tiles with no
+            // resolved profile (each falls back to its own author stream),
+            // preserving the previous behaviour during the brief load window.
+            final athleteIds = (reviews.map((r) => r.athleteId).toSet().toList()
+                  ..sort())
+                .join(',');
+            final profilesAsync =
+                ref.watch(userPublicProfilesBatchProvider(athleteIds));
+            final profiles = profilesAsync.valueOrNull;
+            final resolved = profiles != null;
+
             return Column(
-              children:
-                  reviews.map((review) => ReviewTile(review: review)).toList(),
+              children: reviews
+                  .map(
+                    (review) => ReviewTile(
+                      review: review,
+                      resolvedProfile: profiles?[review.athleteId],
+                      profileResolved: resolved,
+                    ),
+                  )
+                  .toList(),
             );
           },
         ),

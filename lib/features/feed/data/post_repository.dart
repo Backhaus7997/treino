@@ -42,6 +42,7 @@ class PostRepository {
   Future<List<Post>> feedPublic() async {
     final snap = await _posts
         .where('privacy', isEqualTo: PostPrivacy.public.toJson())
+        .orderBy('createdAt', descending: true)
         .get();
     return snap.docs.map(_fromDoc).whereType<Post>().toList();
   }
@@ -62,10 +63,14 @@ class PostRepository {
       final snap = await _posts
           .where('privacy', isEqualTo: PostPrivacy.friends.toJson())
           .where('authorUid', whereIn: chunk)
+          .orderBy('createdAt', descending: true)
           .get();
       results.addAll(snap.docs.map(_fromDoc).whereType<Post>());
     }
 
+    // Each chunk is sorted server-side, but the merged list across chunks is
+    // not globally ordered — re-sort newest-first client-side.
+    results.sort((a, b) => b.createdAt.compareTo(a.createdAt));
     return results;
   }
 
@@ -75,6 +80,7 @@ class PostRepository {
     final snap = await _posts
         .where('privacy', isEqualTo: PostPrivacy.gym.toJson())
         .where('authorGymId', isEqualTo: gymId)
+        .orderBy('createdAt', descending: true)
         .get();
     return snap.docs.map(_fromDoc).whereType<Post>().toList();
   }

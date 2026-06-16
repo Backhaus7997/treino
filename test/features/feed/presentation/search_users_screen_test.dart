@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/feed/presentation/search_users_screen.dart';
 import 'package:treino/features/feed/presentation/widgets/feed_empty_state.dart';
 import 'package:treino/features/feed/presentation/widgets/user_search_result_tile.dart';
@@ -263,12 +264,12 @@ void main() {
       await tester.pump();
 
       // Initially no clear button
-      expect(find.byIcon(Icons.close), findsNothing);
+      expect(find.byIcon(TreinoIcon.close), findsNothing);
 
       await tester.enterText(find.byType(TextField), 'mart');
       await tester.pump();
 
-      expect(find.byIcon(Icons.close), findsOneWidget);
+      expect(find.byIcon(TreinoIcon.close), findsOneWidget);
     });
 
     // -------------------------------------------------------------------------
@@ -287,7 +288,7 @@ void main() {
       await tester.enterText(find.byType(TextField), 'martin');
       await tester.pump();
 
-      await tester.tap(find.byIcon(Icons.close));
+      await tester.tap(find.byIcon(TreinoIcon.close));
       await tester.pump();
 
       final tf = tester.widget<TextField>(find.byType(TextField));
@@ -347,7 +348,7 @@ void main() {
       expect(find.text('BUSCAR USUARIOS'), findsOneWidget);
 
       // Tap back arrow (find the GestureDetector wrapping an arrow icon)
-      await tester.tap(find.byIcon(Icons.arrow_back));
+      await tester.tap(find.byIcon(TreinoIcon.back));
       await tester.pumpAndSettle();
 
       // Should be back at /feed

@@ -9,6 +9,14 @@
       ]
     },
     {
+      "collectionGroup": "sessions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "finishedAt", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "trainer_links",
       "queryScope": "COLLECTION",
       "fields": [
@@ -127,6 +135,15 @@
       ]
     },
     {
+      "collectionGroup": "appointments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "recurringId", "order": "ASCENDING" },
+        { "fieldPath": "trainerId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "coach_availability_overrides",
       "queryScope": "COLLECTION",
       "fields": [
@@ -147,7 +164,8 @@
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "privacy", "order": "ASCENDING" },
-        { "fieldPath": "authorUid", "order": "ASCENDING" }
+        { "fieldPath": "authorUid", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
     },
     {
@@ -155,7 +173,16 @@
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "privacy", "order": "ASCENDING" },
-        { "fieldPath": "authorGymId", "order": "ASCENDING" }
+        { "fieldPath": "authorGymId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "posts",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "privacy", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
     },
     {

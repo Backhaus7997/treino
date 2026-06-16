@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -87,6 +88,7 @@ class _Step4WeightHeightState extends ConsumerState<Step4WeightHeight> {
             hint: '168',
             leadingIcon: TreinoIcon.ruler,
             keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
             textInputAction: TextInputAction.done,
             validator: ProfileSetupValidators.validateHeightCm,
           ),

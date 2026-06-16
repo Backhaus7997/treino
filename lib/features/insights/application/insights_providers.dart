@@ -18,9 +18,12 @@ final weeklyInsightsProvider =
   final repo = ref.read(sessionRepositoryProvider);
 
   // Rango de semana — lunes 00:00 local hasta el siguiente lunes (exclusivo).
+  // Aritmética de calendario (no Duration) para que el borde caiga en
+  // medianoche local incluso atravesando un cambio de horario (DST).
   final now = DateTime.now().toLocal();
   final weekStart = _mondayOfWeek(now);
-  final weekEndExclusive = weekStart.add(const Duration(days: 7));
+  final weekEndExclusive =
+      DateTime(weekStart.year, weekStart.month, weekStart.day + 7);
 
   // Todas las sessions del usuario (listByUid ya viene ordenado DESC por
   // startedAt en SessionRepository).
@@ -48,34 +51,58 @@ final weeklyInsightsProvider =
   final exercises = await ref.watch(exercisesProvider.future);
   final byId = {for (final e in exercises) e.id: e};
 
-  // setsByGroup — iterar los setLogs de cada session de la semana.
+  // Rutina de la sesión más reciente (mejor heurística disponible hasta que
+  // UserProfile.currentRoutineId exista). Se trae antes de los setLogs porque
+  // sus slots llevan el `muscleGroup` denormalizado — la única fuente del
+  // grupo para ejercicios custom del trainer, que NO están en el catálogo
+  // público.
+  final routine = mostRecentSession != null
+      ? await ref.watch(routineByIdProvider(mostRecentSession.routineId).future)
+      : null;
+
+  // Fallback exerciseId → muscleGroup String desde los slots de la rutina.
+  // Cubre ejercicios custom ausentes del catálogo, cuyos setLogs sólo guardan
+  // exerciseId (SetLog no denormaliza el grupo).
+  final slotGroupById = <String, String>{};
+  if (routine != null) {
+    for (final day in routine.days) {
+      for (final slot in day.slots) {
+        slotGroupById.putIfAbsent(slot.exerciseId, () => slot.muscleGroup);
+      }
+    }
+  }
+
+  // setsByGroup — los setLogs de cada session de la semana. Las lecturas por
+  // sesión se paralelizan con Future.wait (una subcolección por sesión) para
+  // colapsar N round-trips seriales en un batch.
   final setsByGroup = <MuscleGroupDisplay, int>{};
-  for (final s in weekSessions) {
-    final logs = await repo.listSetLogs(uid: uid, sessionId: s.id);
+  final logsPerSession = await Future.wait(
+    weekSessions.map((s) => repo.listSetLogs(uid: uid, sessionId: s.id)),
+  );
+  for (final logs in logsPerSession) {
     for (final log in logs) {
-      final group = byId[log.exerciseId]?.muscleGroup.toDisplayGroup();
+      // Catálogo público primero; si el id es custom (ausente), resolver vía
+      // el muscleGroup denormalizado del slot de la rutina.
+      final groupRaw =
+          byId[log.exerciseId]?.muscleGroup ?? slotGroupById[log.exerciseId];
+      final group = groupRaw?.toDisplayGroup();
       if (group != null) {
         setsByGroup[group] = (setsByGroup[group] ?? 0) + 1;
       }
     }
   }
 
-  // targetByGroup — de la rutina de la sesión más reciente (mejor heurística
-  // disponible hasta que UserProfile.currentRoutineId exista). Si el usuario
-  // nunca entrenó (no hay session) o la rutina no se encuentra, queda vacío
-  // y las progress bars se renderizan sin target.
+  // targetByGroup — usa el `muscleGroup` ya denormalizado del slot (correcto
+  // para ejercicios custom y sin depender de que el catálogo esté completo).
+  // Si el usuario nunca entrenó o la rutina no se encuentra, queda vacío y las
+  // progress bars se renderizan sin target.
   final targetByGroup = <MuscleGroupDisplay, int>{};
-  if (mostRecentSession != null) {
-    final routine = await ref
-        .watch(routineByIdProvider(mostRecentSession.routineId).future);
-    if (routine != null) {
-      for (final day in routine.days) {
-        for (final slot in day.slots) {
-          final group = byId[slot.exerciseId]?.muscleGroup.toDisplayGroup();
-          if (group != null) {
-            targetByGroup[group] =
-                (targetByGroup[group] ?? 0) + slot.targetSets;
-          }
+  if (routine != null) {
+    for (final day in routine.days) {
+      for (final slot in day.slots) {
+        final group = slot.muscleGroup.toDisplayGroup();
+        if (group != null) {
+          targetByGroup[group] = (targetByGroup[group] ?? 0) + slot.targetSets;
         }
       }
     }
@@ -112,6 +139,7 @@ final weeklyInsightsProvider =
 
 DateTime _mondayOfWeek(DateTime now) {
   final daysFromMonday = now.weekday - DateTime.monday;
-  return DateTime(now.year, now.month, now.day)
-      .subtract(Duration(days: daysFromMonday));
+  // Resta de días vía constructor de calendario para normalizar el borde a
+  // medianoche local aun cuando la semana cruza un cambio de horario (DST).
+  return DateTime(now.year, now.month, now.day - daysFromMonday);
 }

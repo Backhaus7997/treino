@@ -1,39 +1,30 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart' as intl;
 
 import '../../../app/theme/app_palette.dart';
+import '../../../l10n/app_l10n.dart';
 import '../../workout/application/session_providers.dart'
     show currentUidProvider;
 import '../application/performance_test_providers.dart';
 import '../domain/performance_test.dart';
 
-// ── Month names (Spanish, no lib dependency) ──────────────────────────────────
+// ── Date header ──────────────────────────────────────────────────────────────
 
-const _kMonths = <String>[
-  '',
-  'ene',
-  'feb',
-  'mar',
-  'abr',
-  'may',
-  'jun',
-  'jul',
-  'ago',
-  'sep',
-  'oct',
-  'nov',
-  'dic',
-];
-
-String _formatDateTimeEs(DateTime dt) {
-  final local = dt.toLocal();
-  final d = local.day;
-  final m = _kMonths[local.month];
-  final y = local.year;
-  final hh = local.hour.toString().padLeft(2, '0');
-  final mm = local.minute.toString().padLeft(2, '0');
-  return '$d $m $y · $hh:$mm';
+/// Formats [dt] for the screen header using the active [localeName].
+///
+/// Uses the same UTC convention as every reader of
+/// [PerformanceTest.recordedAt] (chart `_shortDate`, athlete detail
+/// `_formatMeasurementDate`): the stored UTC instant is shown as-is, with no
+/// `.toLocal()`. [intl.DateFormat.format] reads the [DateTime]'s own calendar
+/// fields (day/month/year/hour/minute) directly, so passing a UTC value (e.g.
+/// `DateTime.now().toUtc()`) keeps the header aligned with the date that gets
+/// persisted and rendered after saving, while localizing the month name.
+String _formatDateTime(DateTime dt, String localeName) {
+  final date = intl.DateFormat('d MMM y', localeName).format(dt);
+  final time = intl.DateFormat('HH:mm', localeName).format(dt);
+  return '$date · $time';
 }
 
 // ── Screen ────────────────────────────────────────────────────────────────────
@@ -151,13 +142,12 @@ class _LogPerformanceTestScreenState
 
   Future<void> _save() async {
     if (_saving) return;
+    final l10n = AppL10n.of(context);
     final trainerUid = ref.read(currentUidProvider);
     if (trainerUid == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'No hay sesión activa. No se puede guardar.',
-          ),
+        SnackBar(
+          content: Text(l10n.performanceLogNoSession),
         ),
       );
       return;
@@ -195,16 +185,14 @@ class _LogPerformanceTestScreenState
       if (!mounted) return;
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Evaluación guardada')),
+        SnackBar(content: Text(l10n.performanceLogSaveSuccess)),
       );
     } catch (_) {
       if (!mounted) return;
       setState(() => _saving = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'No pudimos guardar la evaluación. Probá de nuevo.',
-          ),
+        SnackBar(
+          content: Text(l10n.performanceLogSaveError),
         ),
       );
     }
@@ -215,9 +203,13 @@ class _LogPerformanceTestScreenState
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     final trainerUid = ref.watch(currentUidProvider);
     final canSave = trainerUid != null && !_saving;
-    final now = DateTime.now();
+    // Use UTC to match the persisted recordedAt (see _save) and the UTC display
+    // convention of every reader, so the header date never disagrees with the
+    // saved record near midnight.
+    final now = DateTime.now().toUtc();
 
     return Scaffold(
       backgroundColor: palette.bg,
@@ -233,7 +225,7 @@ class _LogPerformanceTestScreenState
                     onPressed:
                         _saving ? null : () => Navigator.of(context).pop(),
                     child: Text(
-                      'Cancelar',
+                      l10n.performanceLogCancel,
                       style: GoogleFonts.barlow(
                         color: _saving ? palette.textMuted : palette.highlight,
                         fontSize: 14,
@@ -246,7 +238,7 @@ class _LogPerformanceTestScreenState
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Text(
-                        'Cargar evaluación',
+                        l10n.performanceLogTitle,
                         style: GoogleFonts.barlowCondensed(
                           fontWeight: FontWeight.w700,
                           fontSize: 16,
@@ -254,7 +246,7 @@ class _LogPerformanceTestScreenState
                         ),
                       ),
                       Text(
-                        _formatDateTimeEs(now),
+                        _formatDateTime(now, l10n.localeName),
                         style: GoogleFonts.barlow(
                           fontSize: 12,
                           color: palette.textMuted,
@@ -274,31 +266,31 @@ class _LogPerformanceTestScreenState
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // ── SALTOS ───────────────────────────────────────────────
-                    _sectionLabel('SALTOS (cm)', palette),
+                    _sectionLabel(l10n.performanceLogSectionJumps, palette),
                     const SizedBox(height: 12),
                     _numericField(
-                      label: 'CMJ',
+                      label: l10n.performanceLogFieldCmj,
                       controller: _cmjCtrl,
                       palette: palette,
                       suffix: 'cm',
                     ),
                     const SizedBox(height: 12),
                     _numericField(
-                      label: 'Squat Jump',
+                      label: l10n.performanceLogFieldSquatJump,
                       controller: _squatJumpCtrl,
                       palette: palette,
                       suffix: 'cm',
                     ),
                     const SizedBox(height: 12),
                     _numericField(
-                      label: 'Abalakov',
+                      label: l10n.performanceLogFieldAbalakov,
                       controller: _abalakovCtrl,
                       palette: palette,
                       suffix: 'cm',
                     ),
                     const SizedBox(height: 12),
                     _numericField(
-                      label: 'Salto largo',
+                      label: l10n.performanceLogFieldBroadJump,
                       controller: _broadJumpCtrl,
                       palette: palette,
                       suffix: 'cm',
@@ -306,31 +298,31 @@ class _LogPerformanceTestScreenState
                     const SizedBox(height: 20),
 
                     // ── VELOCIDAD ────────────────────────────────────────────
-                    _sectionLabel('VELOCIDAD (seg)', palette),
+                    _sectionLabel(l10n.performanceLogSectionSpeed, palette),
                     const SizedBox(height: 12),
                     _numericField(
-                      label: 'Sprint 10m',
+                      label: l10n.performanceLogFieldSprint10,
                       controller: _sprint10Ctrl,
                       palette: palette,
                       suffix: 's',
                     ),
                     const SizedBox(height: 12),
                     _numericField(
-                      label: '20m',
+                      label: l10n.performanceLogFieldSprint20,
                       controller: _sprint20Ctrl,
                       palette: palette,
                       suffix: 's',
                     ),
                     const SizedBox(height: 12),
                     _numericField(
-                      label: '30m',
+                      label: l10n.performanceLogFieldSprint30,
                       controller: _sprint30Ctrl,
                       palette: palette,
                       suffix: 's',
                     ),
                     const SizedBox(height: 12),
                     _numericField(
-                      label: '40m',
+                      label: l10n.performanceLogFieldSprint40,
                       controller: _sprint40Ctrl,
                       palette: palette,
                       suffix: 's',
@@ -338,38 +330,38 @@ class _LogPerformanceTestScreenState
                     const SizedBox(height: 20),
 
                     // ── FUERZA 1RM ───────────────────────────────────────────
-                    _sectionLabel('FUERZA 1RM (kg)', palette),
+                    _sectionLabel(l10n.performanceLogSectionStrength, palette),
                     const SizedBox(height: 12),
                     _numericField(
-                      label: 'Sentadilla',
+                      label: l10n.performanceLogFieldSquat1rm,
                       controller: _squat1rmCtrl,
                       palette: palette,
                       suffix: 'kg',
                     ),
                     const SizedBox(height: 12),
                     _numericField(
-                      label: 'Press banca',
+                      label: l10n.performanceLogFieldBenchPress,
                       controller: _benchPress1rmCtrl,
                       palette: palette,
                       suffix: 'kg',
                     ),
                     const SizedBox(height: 12),
                     _numericField(
-                      label: 'Peso muerto',
+                      label: l10n.performanceLogFieldDeadlift,
                       controller: _deadlift1rmCtrl,
                       palette: palette,
                       suffix: 'kg',
                     ),
                     const SizedBox(height: 12),
                     _numericField(
-                      label: 'Press militar',
+                      label: l10n.performanceLogFieldOverheadPress,
                       controller: _overheadPress1rmCtrl,
                       palette: palette,
                       suffix: 'kg',
                     ),
                     const SizedBox(height: 12),
                     _numericField(
-                      label: 'Dominada lastrada',
+                      label: l10n.performanceLogFieldPullUp,
                       controller: _pullUp1rmCtrl,
                       palette: palette,
                       suffix: 'kg',
@@ -377,30 +369,30 @@ class _LogPerformanceTestScreenState
                     const SizedBox(height: 20),
 
                     // ── RESISTENCIA / OTROS ──────────────────────────────────
-                    _sectionLabel('RESISTENCIA / OTROS', palette),
+                    _sectionLabel(l10n.performanceLogSectionEndurance, palette),
                     const SizedBox(height: 12),
                     _numericField(
-                      label: 'VO2máx',
+                      label: l10n.performanceLogFieldVo2max,
                       controller: _vo2maxCtrl,
                       palette: palette,
                       suffix: 'ml/kg/min',
                     ),
                     const SizedBox(height: 12),
                     _numericField(
-                      label: 'Course Navette (nivel)',
+                      label: l10n.performanceLogFieldCourseNavette,
                       controller: _courseNavetteCtrl,
                       palette: palette,
                     ),
                     const SizedBox(height: 12),
                     _numericField(
-                      label: 'Cooper',
+                      label: l10n.performanceLogFieldCooper,
                       controller: _cooperCtrl,
                       palette: palette,
                       suffix: 'm',
                     ),
                     const SizedBox(height: 12),
                     _numericField(
-                      label: 'Flexibilidad sit-and-reach',
+                      label: l10n.performanceLogFieldSitAndReach,
                       controller: _sitAndReachCtrl,
                       palette: palette,
                       suffix: 'cm',
@@ -408,7 +400,7 @@ class _LogPerformanceTestScreenState
                     const SizedBox(height: 20),
 
                     // ── NOTAS ────────────────────────────────────────────────
-                    _sectionLabel('NOTAS', palette),
+                    _sectionLabel(l10n.performanceLogSectionNotes, palette),
                     const SizedBox(height: 12),
                     TextFormField(
                       controller: _notesCtrl,
@@ -421,7 +413,7 @@ class _LogPerformanceTestScreenState
                       ),
                       decoration: _inputDecoration(
                         palette: palette,
-                        hint: 'Observaciones del entrenador…',
+                        hint: l10n.performanceLogNotesHint,
                       ),
                     ),
 
@@ -459,7 +451,7 @@ class _LogPerformanceTestScreenState
                           ),
                         )
                       : Text(
-                          'GUARDAR EVALUACIÓN',
+                          l10n.performanceLogSaveCta,
                           style: GoogleFonts.barlowCondensed(
                             fontWeight: FontWeight.w700,
                             fontSize: 14,

@@ -1,7 +1,7 @@
 import 'dart:developer' as developer;
 
 import 'package:cloud_firestore/cloud_firestore.dart'
-    show CollectionReference, DocumentSnapshot, FirebaseFirestore;
+    show CollectionReference, DocumentSnapshot, FieldValue, FirebaseFirestore;
 
 import '../../../features/profile/data/user_public_profile_repository.dart';
 import '../domain/friendship.dart';
@@ -74,10 +74,11 @@ class FriendshipRepository {
     if (pubRepo == null) return;
 
     try {
-      final profile = await pubRepo.get(myUid);
-      final currentFollowing = profile?.followingCount ?? 0;
+      // Atomic server-side increment avoids the lost-update race that a
+      // read-modify-write would suffer under concurrent accepts/deletes (or a
+      // racing counter write to the same userPublicProfiles doc).
       await pubRepo.updateCounters(myUid, {
-        'followingCount': currentFollowing + 1,
+        'followingCount': FieldValue.increment(1),
       });
     } catch (e, st) {
       developer.log(
@@ -149,11 +150,14 @@ class FriendshipRepository {
     if (pubRepo == null) return;
 
     try {
-      final profile = await pubRepo.get(myUid);
-      final currentFollowing = profile?.followingCount ?? 0;
+      // Atomic server-side decrement avoids the lost-update race that a
+      // read-modify-write would suffer under concurrent accepts/deletes. Note:
+      // a server-side increment cannot clamp at zero, so the floor is no longer
+      // enforced here — followingCount is only ever decremented for a friendship
+      // the caller actually had (and therefore previously counted), so it cannot
+      // legitimately go negative.
       await pubRepo.updateCounters(myUid, {
-        'followingCount':
-            (currentFollowing - 1).clamp(0, double.maxFinite).toInt(),
+        'followingCount': FieldValue.increment(-1),
       });
     } catch (e, st) {
       developer.log(

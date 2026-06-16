@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/treino_icon.dart';
+import '../../../l10n/app_l10n.dart';
 import '../../feed/presentation/widgets/post_avatar.dart';
 import '../../profile/application/user_public_profile_providers.dart';
 import '../../workout/application/session_providers.dart'
@@ -22,6 +23,7 @@ class ChatListScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     final chatsAsync = ref.watch(chatsForCurrentUserProvider);
     final currentUid = ref.watch(currentUidProvider);
 
@@ -35,7 +37,7 @@ class ChatListScreen extends ConsumerWidget {
           onPressed: () => Navigator.of(context).maybePop(),
         ),
         title: Text(
-          'MENSAJES',
+          l10n.chatListTitle,
           style: GoogleFonts.barlowCondensed(
             color: palette.textPrimary,
             fontSize: 20,
@@ -87,6 +89,7 @@ class _ChatRow extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     final otherUid = _otherUidOf(chat, currentUid);
     final pubAsync = ref.watch(userPublicProfileProvider(otherUid));
 
@@ -107,10 +110,9 @@ class _ChatRow extends ConsumerWidget {
           loading: () => _RowSkeleton(palette: palette),
           error: (_, __) => _RowSkeleton(palette: palette),
           data: (pub) {
-            // i18n: Fase 6 Etapa 3
             // When userPublicProfiles/{uid} is deleted (account deletion cascade),
             // pub is null → show "Usuario eliminado" per ADR-ACCDEL-005.
-            final name = pub?.displayName ?? 'Usuario eliminado';
+            final name = pub?.displayName ?? l10n.chatListDeletedUser;
             final avatarUrl = pub?.avatarUrl;
             return Row(
               children: [
@@ -136,7 +138,7 @@ class _ChatRow extends ConsumerWidget {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        chat.lastMessageText ?? 'Iniciá la conversación',
+                        chat.lastMessageText ?? l10n.chatListStartConversation,
                         style: TextStyle(
                           color: palette.textMuted,
                           fontSize: 13,
@@ -150,7 +152,7 @@ class _ChatRow extends ConsumerWidget {
                 if (chat.lastMessageAt != null) ...[
                   const SizedBox(width: 12),
                   Text(
-                    _relativeTime(chat.lastMessageAt!),
+                    _relativeTime(chat.lastMessageAt!, l10n),
                     style: TextStyle(
                       color: palette.textMuted,
                       fontSize: 12,
@@ -197,6 +199,7 @@ class _EmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(20),
@@ -206,7 +209,7 @@ class _EmptyState extends StatelessWidget {
             Icon(TreinoIcon.chatEmpty, color: palette.textMuted, size: 64),
             const SizedBox(height: 18),
             Text(
-              'Sin mensajes todavía',
+              l10n.chatListEmptyTitle,
               style: GoogleFonts.barlowCondensed(
                 color: palette.textPrimary,
                 fontSize: 20,
@@ -216,7 +219,7 @@ class _EmptyState extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              'Cuando tengas un vínculo activo con un PF, vas a poder chatear desde acá.',
+              l10n.chatListEmptyBody,
               textAlign: TextAlign.center,
               style: TextStyle(color: palette.textMuted, fontSize: 14),
             ),
@@ -234,6 +237,7 @@ class _ErrorState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(20),
@@ -241,11 +245,14 @@ class _ErrorState extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              'No pudimos cargar tus mensajes.',
+              l10n.chatListError,
               style: TextStyle(color: palette.textMuted),
             ),
             const SizedBox(height: 12),
-            TextButton(onPressed: onRetry, child: const Text('Reintentar')),
+            TextButton(
+              onPressed: onRetry,
+              child: Text(l10n.chatListRetryLabel),
+            ),
           ],
         ),
       ),
@@ -255,13 +262,17 @@ class _ErrorState extends StatelessWidget {
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-String _relativeTime(DateTime createdAt) {
+String _relativeTime(DateTime createdAt, AppL10n l10n) {
   final delta = DateTime.now().difference(createdAt);
-  if (delta.inMinutes < 1) return 'recién';
-  if (delta.inHours < 1) return 'hace ${delta.inMinutes}m';
-  if (delta.inDays < 1) return 'hace ${delta.inHours}h';
-  if (delta.inDays < 7) return 'hace ${delta.inDays}d';
-  final d = createdAt.day.toString().padLeft(2, '0');
-  final m = createdAt.month.toString().padLeft(2, '0');
+  if (delta.inMinutes < 1) return l10n.chatRelativeJustNow;
+  if (delta.inHours < 1) return l10n.chatRelativeMinutes(delta.inMinutes);
+  if (delta.inDays < 1) return l10n.chatRelativeHours(delta.inHours);
+  if (delta.inDays < 7) return l10n.chatRelativeDays(delta.inDays);
+  // createdAt is stored in UTC; format the absolute date in the user's local
+  // zone so negative-offset regions (e.g. Argentina, UTC-3) don't show the
+  // next day for late-evening messages.
+  final local = createdAt.toLocal();
+  final d = local.day.toString().padLeft(2, '0');
+  final m = local.month.toString().padLeft(2, '0');
   return '$d/$m';
 }

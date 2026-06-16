@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
@@ -18,6 +19,7 @@ class AuthInput extends StatefulWidget {
     this.suffixToggle = false,
     this.validator,
     this.keyboardType,
+    this.inputFormatters,
     this.textInputAction,
     this.onFieldSubmitted,
     this.autofillHints,
@@ -34,6 +36,7 @@ class AuthInput extends StatefulWidget {
   final bool suffixToggle;
   final FormFieldValidator<String>? validator;
   final TextInputType? keyboardType;
+  final List<TextInputFormatter>? inputFormatters;
   final TextInputAction? textInputAction;
   final ValueChanged<String>? onFieldSubmitted;
   final Iterable<String>? autofillHints;
@@ -95,6 +98,7 @@ class _AuthInputState extends State<AuthInput> {
           focusNode: widget.focusNode,
           obscureText: _obscured,
           keyboardType: widget.keyboardType,
+          inputFormatters: widget.inputFormatters,
           textInputAction: widget.textInputAction,
           autofillHints: widget.autofillHints,
           enabled: widget.enabled,

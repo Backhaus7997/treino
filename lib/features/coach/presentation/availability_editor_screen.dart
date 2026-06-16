@@ -528,6 +528,17 @@ class _RuleFormSheetState extends ConsumerState<_RuleFormSheet> {
   }
 
   Future<void> _save(BuildContext context) async {
+    final startTotalMinutes = _startHour * 60 + _startMinute;
+    final endTotalMinutes = _endHour * 60 + _endMinute;
+    // The window must end after it starts AND be wide enough to fit at least
+    // one slot, otherwise compute_free_slots generates zero bookable slots and
+    // the published rule silently produces an empty day.
+    if (endTotalMinutes < startTotalMinutes + _slotDurationMin) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppL10n.of(context).agendaRuleInvalidWindow)),
+      );
+      return;
+    }
     setState(() => _saving = true);
     try {
       final repo = ref.read(availabilityRepositoryProvider);

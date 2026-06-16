@@ -26,6 +26,7 @@ class AppointmentRepository {
   // SCENARIO-490: slot exists status=confirmed → throw SlotAlreadyTakenException.
   // SCENARIO-491-amended: slot exists status=cancelled → flip, preserve log.
   // SCENARIO-496: doc ID is exactly '${trainerId}_${startsAt.millisecondsSinceEpoch}'.
+  // REQ-COACH-AGENDA-009 / SCENARIO-496: reject slots more than 28 days out.
 
   Future<Appointment> book({
     required String trainerId,
@@ -34,6 +35,12 @@ class AppointmentRepository {
     required DateTime startsAt,
     required int durationMin,
   }) async {
+    // REQ-COACH-AGENDA-009: booking horizon is 28 days. Guard before any read.
+    if (startsAt.toUtc().difference(DateTime.now().toUtc()) >
+        const Duration(days: 28)) {
+      throw const BookingTooFarAheadException();
+    }
+
     final startsAtMs = startsAt.millisecondsSinceEpoch;
     final docId = '${trainerId}_$startsAtMs';
     final docRef = _appointments.doc(docId);
@@ -237,23 +244,26 @@ class AppointmentRepository {
     required String actorUid,
     String? reason,
   }) async {
-    final now = DateTime.now();
-    final nowWall =
-        DateTime.utc(now.year, now.month, now.day, now.hour, now.minute);
-    final realNow = now.toUtc();
+    final realNow = DateTime.now().toUtc();
 
-    // Reuses the existing (trainerId, status, startsAt) composite index.
+    // Query only this series (equality on recurringId + trainerId + status),
+    // not the trainer's entire forward booking set. Needs a composite index on
+    // (recurringId, trainerId, status). The >24h gate is applied client-side
+    // per doc, so startsAt stays out of the query.
     final snap = await _appointments
+        .where('recurringId', isEqualTo: recurringId)
         .where('trainerId', isEqualTo: trainerId)
         .where('status', isEqualTo: 'confirmed')
-        .where('startsAt', isGreaterThanOrEqualTo: Timestamp.fromDate(nowWall))
         .get();
 
-    final batch = _firestore.batch();
+    // Firestore caps a WriteBatch at 500 operations; chunk to stay under it so
+    // a long, dense series can't overflow a single commit.
+    const maxBatchOps = 500;
+    var batch = _firestore.batch();
+    var opsInBatch = 0;
     var count = 0;
     for (final d in snap.docs) {
       final appt = Appointment.fromJson({...d.data(), 'id': d.id});
-      if (appt.recurringId != recurringId) continue;
       // Only the occurrences the rule will accept (>24h ahead). The batch is
       // atomic, so a single <24h write would reject the whole commit — a small
       // safety margin absorbs the client→server latency near the boundary.
@@ -274,8 +284,14 @@ class AppointmentRepository {
         ]),
       });
       count++;
+      opsInBatch++;
+      if (opsInBatch == maxBatchOps) {
+        await batch.commit();
+        batch = _firestore.batch();
+        opsInBatch = 0;
+      }
     }
-    if (count > 0) {
+    if (opsInBatch > 0) {
       await batch.commit();
     }
     return count;

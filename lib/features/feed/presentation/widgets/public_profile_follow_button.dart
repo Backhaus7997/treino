@@ -48,11 +48,17 @@ class PublicProfileFollowButton extends ConsumerWidget {
         label: 'SEGUIR',
         style: _FollowPillStyle.mintFilled,
         onTap: () async {
-          await repo.request(viewerUid, targetUid);
-          // Stream providers (friendshipByPairProvider, acceptedFriendsProvider)
-          // self-update via .snapshots() — no manual invalidation needed.
-          // SEGUIR only creates a pending request, so myFriendsFeedProvider
-          // (accepted friends list) is unaffected — no invalidation required here.
+          try {
+            await repo.request(viewerUid, targetUid);
+            // Stream providers (friendshipByPairProvider, acceptedFriendsProvider)
+            // self-update via .snapshots() — no manual invalidation needed.
+            // SEGUIR only creates a pending request, so myFriendsFeedProvider
+            // (accepted friends list) is unaffected — no invalidation required.
+          } catch (_) {
+            // Swallow — same fire-and-forget pattern as inbox pills and the
+            // unfriend sheet (ADR-FRI-009). Stream will not emit, so the pill
+            // stays as SEGUIR and the user can retry.
+          }
         },
       );
     }
@@ -77,13 +83,24 @@ class PublicProfileFollowButton extends ConsumerWidget {
       label: 'ACEPTAR',
       style: _FollowPillStyle.mintFilled,
       onTap: () async {
-        await repo.accept(f.id, viewerUid);
-        // Stream providers self-update on Firestore mutation — no invalidation
-        // needed for friendshipByPairProvider or acceptedFriendsProvider.
-        // myFriendsFeedProvider (still a FutureProvider) MUST be invalidated
-        // explicitly — Riverpod does NOT auto-cascade to providers with no
-        // active listener at the moment (ADR-FPS-006).
-        ref.invalidate(myFriendsFeedProvider);
+        // Capture the root container BEFORE the await: accepting changes the
+        // accepted-friends list and the profile route may be popped during the
+        // write, after which `ref` from this ConsumerWidget can silently no-op
+        // on `invalidate` (ADR-FPS-006). The container survives disposal.
+        final container = ProviderScope.containerOf(context, listen: false);
+        try {
+          await repo.accept(f.id, viewerUid);
+          // Stream providers self-update on Firestore mutation — no invalidation
+          // needed for friendshipByPairProvider or acceptedFriendsProvider.
+          // myFriendsFeedProvider (still a FutureProvider) MUST be invalidated
+          // explicitly — Riverpod does NOT auto-cascade to providers with no
+          // active listener at the moment (ADR-FPS-006).
+          container.invalidate(myFriendsFeedProvider);
+        } catch (_) {
+          // Swallow — same fire-and-forget pattern as inbox pills and the
+          // unfriend sheet (ADR-FRI-009). On failure the feed is NOT
+          // invalidated and the pill stays as ACEPTAR so the user can retry.
+        }
       },
     );
   }

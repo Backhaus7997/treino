@@ -49,7 +49,10 @@ class PostWorkoutSummaryScreen extends ConsumerWidget {
                   try {
                     await ref
                         .read(postWorkoutNotifierProvider.notifier)
-                        .shareWorkout(session);
+                        .shareWorkout(
+                          session,
+                          text: l10n.workoutPostAutoCompleteText,
+                        );
                     if (!context.mounted) return;
                     messenger.showSnackBar(SnackBar(
                       content: Text(l10n.workoutSnackShareSuccess),

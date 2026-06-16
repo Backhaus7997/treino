@@ -171,6 +171,39 @@ void main() {
         await refreshController.close();
       },
     );
+
+    // Regression: init() called twice (sign-in, then PermissionGate after a
+    // permission grant) must cancel the previous onTokenRefresh subscription
+    // before resubscribing. Otherwise the first listener is leaked and every
+    // subsequent token refresh fires saveToken twice (duplicate Firestore
+    // writes).
+    test(
+      'init called twice does not leak the previous onTokenRefresh '
+      'subscription — a refresh saves the token only once',
+      () async {
+        const uid = 'user-double-init';
+        // Broadcast so a leaked subscription would also receive the event.
+        final refreshController = StreamController<String>.broadcast();
+
+        when(() => messaging.getToken()).thenAnswer((_) async => 'tok-initial');
+        when(() => messaging.onTokenRefresh)
+            .thenAnswer((_) => refreshController.stream);
+
+        await service.init(uid);
+        await service.init(uid);
+
+        // Ignore the saveToken calls from the two getToken() persists.
+        clearInteractions(repo);
+
+        refreshController.add('tok-refreshed');
+        await Future<void>.delayed(Duration.zero);
+
+        // Exactly one active listener → exactly one write.
+        verify(() => repo.saveToken(uid, 'tok-refreshed')).called(1);
+
+        await refreshController.close();
+      },
+    );
   });
 
   group('FcmService.dispose', () {

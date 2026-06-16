@@ -24,7 +24,8 @@ class AuthService {
   final GoogleSignIn _googleSignIn;
   final AppleSignInGateway _appleGateway;
 
-  /// Creates the user, sends verification email, then atomically creates the
+  /// Creates the user, best-effort sends the verification email (a failure here
+  /// is swallowed — it can be resent later), then atomically creates the
   /// Firestore profile doc with `displayName: null` (REQ-PROF-033, REQ-AUTH-002).
   /// `displayName` is intentionally NOT collected at signup — ProfileSetup
   /// (Etapa 6) is the single owner of that field.
@@ -47,7 +48,14 @@ class AuthService {
     final user = cred.user!;
 
     try {
-      await user.sendEmailVerification();
+      // Verification is best-effort: a quota/rate-limit failure here must NOT
+      // orphan the freshly created Auth user. The user can re-send later via
+      // [sendEmailVerification] from the verify-email screen.
+      try {
+        await user.sendEmailVerification();
+      } on FirebaseAuthException catch (_) {
+        // Swallow — signup continues; verification can be resent.
+      }
 
       try {
         await _userRepository.getOrCreate(

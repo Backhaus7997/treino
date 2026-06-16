@@ -1,5 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart'
-    show CollectionReference, FirebaseFirestore, SetOptions;
+    show CollectionReference, FieldPath, FirebaseFirestore, SetOptions;
 
 import '../domain/user_public_profile.dart';
 
@@ -38,6 +38,34 @@ class UserPublicProfileRepository {
       if (!snap.exists || data == null) return null;
       return UserPublicProfile.fromJson(data);
     });
+  }
+
+  /// Batch lookup of public profiles by uid, returned as a `uid -> profile`
+  /// map. Missing docs are simply absent from the map. Empty input
+  /// short-circuits without I/O.
+  ///
+  /// `whereIn` is capped at 30 values per query in Firestore, so the distinct
+  /// uids are chunked defensively. Used to resolve many review authors in a
+  /// handful of reads instead of one live listener per tile (avoids the
+  /// per-tile N+1 listen pattern in the RESEÑAS section).
+  Future<Map<String, UserPublicProfile>> getByIds(List<String> uids) async {
+    if (uids.isEmpty) return const {};
+    final distinct = uids.toSet().toList();
+    const chunkSize = 30;
+    final out = <String, UserPublicProfile>{};
+    for (var i = 0; i < distinct.length; i += chunkSize) {
+      final chunk = distinct.sublist(
+        i,
+        i + chunkSize > distinct.length ? distinct.length : i + chunkSize,
+      );
+      final snap =
+          await _col.where(FieldPath.documentId, whereIn: chunk).get();
+      for (final doc in snap.docs) {
+        final data = doc.data();
+        out[doc.id] = UserPublicProfile.fromJson(data);
+      }
+    }
+    return out;
   }
 
   /// Writes [profile] to `userPublicProfiles/{profile.uid}` with merge

@@ -1,30 +1,23 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart' as intl;
 
 import '../../../../app/theme/app_palette.dart';
+import '../../../../l10n/app_l10n.dart';
 import '../../domain/performance_test.dart';
 
-// ── Spanish month abbreviations ───────────────────────────────────────────────
+// ── Localized short date ──────────────────────────────────────────────────────
 
-const _kMonthsShort = <String>[
-  '',
-  'ene',
-  'feb',
-  'mar',
-  'abr',
-  'may',
-  'jun',
-  'jul',
-  'ago',
-  'sep',
-  'oct',
-  'nov',
-  'dic',
-];
-
-/// Short date label: '7 abr'
-String _shortDate(DateTime dt) => '${dt.day} ${_kMonthsShort[dt.month]}';
+/// Short date label, e.g. '7 abr' (es) / '7 Apr' (en).
+///
+/// Uses the same UTC convention as every reader of
+/// [PerformanceTest.recordedAt] (see `log_performance_test_screen`): the stored
+/// UTC instant is rendered as-is, with no `.toLocal()`. [intl.DateFormat.format]
+/// reads the [DateTime]'s own calendar fields directly, localizing the month
+/// name via [localeName].
+String _shortDate(DateTime dt, String localeName) =>
+    intl.DateFormat('d MMM', localeName).format(dt);
 
 // ── Metric descriptor ─────────────────────────────────────────────────────────
 
@@ -35,38 +28,72 @@ class _ChartMetric {
     required this.extractor,
   });
 
-  final String label;
+  /// Resolves the display label for the active locale.
+  final String Function(AppL10n) label;
   final String unit;
   final double? Function(PerformanceTest) extractor;
 }
 
 /// All candidate metrics in preferred display order.
 const _kAllMetrics = <_ChartMetric>[
-  _ChartMetric(label: 'CMJ', unit: 'cm', extractor: _extractCmj),
-  _ChartMetric(label: 'Squat Jump', unit: 'cm', extractor: _extractSquatJump),
-  _ChartMetric(label: 'Abalakov', unit: 'cm', extractor: _extractAbalakov),
-  _ChartMetric(label: 'Salto largo', unit: 'cm', extractor: _extractBroadJump),
-  _ChartMetric(label: 'Sprint 10m', unit: 's', extractor: _extractSprint10),
-  _ChartMetric(label: 'Sprint 20m', unit: 's', extractor: _extractSprint20),
-  _ChartMetric(label: 'Sprint 30m', unit: 's', extractor: _extractSprint30),
-  _ChartMetric(label: 'Sprint 40m', unit: 's', extractor: _extractSprint40),
   _ChartMetric(
-      label: 'Sentadilla 1RM', unit: 'kg', extractor: _extractSquat1rm),
-  _ChartMetric(label: 'Banca 1RM', unit: 'kg', extractor: _extractBench1rm),
+      label: _labelCmj, unit: 'cm', extractor: _extractCmj),
   _ChartMetric(
-      label: 'Peso muerto 1RM', unit: 'kg', extractor: _extractDeadlift1rm),
+      label: _labelSquatJump, unit: 'cm', extractor: _extractSquatJump),
   _ChartMetric(
-      label: 'Press militar 1RM',
+      label: _labelAbalakov, unit: 'cm', extractor: _extractAbalakov),
+  _ChartMetric(
+      label: _labelBroadJump, unit: 'cm', extractor: _extractBroadJump),
+  _ChartMetric(
+      label: _labelSprint10, unit: 's', extractor: _extractSprint10),
+  _ChartMetric(
+      label: _labelSprint20, unit: 's', extractor: _extractSprint20),
+  _ChartMetric(
+      label: _labelSprint30, unit: 's', extractor: _extractSprint30),
+  _ChartMetric(
+      label: _labelSprint40, unit: 's', extractor: _extractSprint40),
+  _ChartMetric(
+      label: _labelSquat1rm, unit: 'kg', extractor: _extractSquat1rm),
+  _ChartMetric(
+      label: _labelBench1rm, unit: 'kg', extractor: _extractBench1rm),
+  _ChartMetric(
+      label: _labelDeadlift1rm, unit: 'kg', extractor: _extractDeadlift1rm),
+  _ChartMetric(
+      label: _labelOverheadPress1rm,
       unit: 'kg',
       extractor: _extractOverheadPress1rm),
-  _ChartMetric(label: 'Dominada 1RM', unit: 'kg', extractor: _extractPullUp1rm),
-  _ChartMetric(label: 'VO2máx', unit: 'ml/kg/min', extractor: _extractVo2max),
   _ChartMetric(
-      label: 'Course Navette', unit: 'nivel', extractor: _extractCourseNavette),
-  _ChartMetric(label: 'Cooper', unit: 'm', extractor: _extractCooper),
+      label: _labelPullUp1rm, unit: 'kg', extractor: _extractPullUp1rm),
   _ChartMetric(
-      label: 'Flexibilidad', unit: 'cm', extractor: _extractSitAndReach),
+      label: _labelVo2max, unit: 'ml/kg/min', extractor: _extractVo2max),
+  _ChartMetric(
+      label: _labelCourseNavette,
+      unit: 'nivel',
+      extractor: _extractCourseNavette),
+  _ChartMetric(
+      label: _labelCooper, unit: 'm', extractor: _extractCooper),
+  _ChartMetric(
+      label: _labelSitAndReach, unit: 'cm', extractor: _extractSitAndReach),
 ];
+
+String _labelCmj(AppL10n l) => l.performanceChartMetricCmj;
+String _labelSquatJump(AppL10n l) => l.performanceChartMetricSquatJump;
+String _labelAbalakov(AppL10n l) => l.performanceChartMetricAbalakov;
+String _labelBroadJump(AppL10n l) => l.performanceChartMetricBroadJump;
+String _labelSprint10(AppL10n l) => l.performanceChartMetricSprint10;
+String _labelSprint20(AppL10n l) => l.performanceChartMetricSprint20;
+String _labelSprint30(AppL10n l) => l.performanceChartMetricSprint30;
+String _labelSprint40(AppL10n l) => l.performanceChartMetricSprint40;
+String _labelSquat1rm(AppL10n l) => l.performanceChartMetricSquat1rm;
+String _labelBench1rm(AppL10n l) => l.performanceChartMetricBench1rm;
+String _labelDeadlift1rm(AppL10n l) => l.performanceChartMetricDeadlift1rm;
+String _labelOverheadPress1rm(AppL10n l) =>
+    l.performanceChartMetricOverheadPress1rm;
+String _labelPullUp1rm(AppL10n l) => l.performanceChartMetricPullUp1rm;
+String _labelVo2max(AppL10n l) => l.performanceChartMetricVo2max;
+String _labelCourseNavette(AppL10n l) => l.performanceChartMetricCourseNavette;
+String _labelCooper(AppL10n l) => l.performanceChartMetricCooper;
+String _labelSitAndReach(AppL10n l) => l.performanceChartMetricSitAndReach;
 
 double? _extractCmj(PerformanceTest t) => t.cmjCm;
 double? _extractSquatJump(PerformanceTest t) => t.squatJumpCm;
@@ -88,11 +115,11 @@ double? _extractSitAndReach(PerformanceTest t) => t.sitAndReachCm;
 
 // ── Weeks / days delta helper ─────────────────────────────────────────────────
 
-String _spanLabel(DateTime first, DateTime last) {
+String _spanLabel(AppL10n l10n, DateTime first, DateTime last) {
   final days = last.difference(first).inDays.abs();
-  if (days < 7) return '($days ${days == 1 ? "día" : "días"})';
+  if (days < 7) return l10n.performanceChartSpanDays(days);
   final weeks = (days / 7).round();
-  return '($weeks ${weeks == 1 ? "semana" : "semanas"})';
+  return l10n.performanceChartSpanWeeks(weeks);
 }
 
 // ── Public widget ─────────────────────────────────────────────────────────────
@@ -117,14 +144,14 @@ class PerformanceProgressChart extends StatefulWidget {
 }
 
 class _PerformanceProgressChartState extends State<PerformanceProgressChart> {
-  late _ChartMetric _selected;
+  _ChartMetric? _selected;
   late List<_ChartMetric> _available;
 
   @override
   void initState() {
     super.initState();
     _available = _buildAvailable(widget.tests);
-    _selected = _available.first;
+    _selected = _available.isEmpty ? null : _available.first;
   }
 
   @override
@@ -132,13 +159,24 @@ class _PerformanceProgressChartState extends State<PerformanceProgressChart> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.tests != widget.tests) {
       _available = _buildAvailable(widget.tests);
-      // Keep current selection if still valid, else reset
-      final stillValid = _available.any((m) => m.label == _selected.label);
-      if (!stillValid) _selected = _available.first;
+      if (_available.isEmpty) {
+        _selected = null;
+      } else {
+        // Keep current selection if still valid, else reset. Metrics are
+        // const instances from [_kAllMetrics], so identity comparison is stable.
+        final stillValid = _available.any((m) => identical(m, _selected));
+        if (!stillValid) _selected = _available.first;
+      }
     }
   }
 
   /// Returns metrics that have ≥2 non-null data points.
+  ///
+  /// Returns an empty list when no metric is plottable — the caller gates on
+  /// total test count, but two tests filling different fields yield no metric
+  /// with ≥2 same-field values. Returning empty lets [build] show the
+  /// "load another evaluation" hint instead of a fabricated, unplottable
+  /// fallback metric.
   static List<_ChartMetric> _buildAvailable(List<PerformanceTest> tests) {
     final result = <_ChartMetric>[];
     for (final metric in _kAllMetrics) {
@@ -149,14 +187,16 @@ class _PerformanceProgressChartState extends State<PerformanceProgressChart> {
       }
       if (count >= 2) result.add(metric);
     }
-    return result.isEmpty ? [_kAllMetrics.first] : result;
+    return result;
   }
 
   /// Extract (spotIndex, value, test) for the selected metric.
-  List<({int idx, double value, PerformanceTest t})> _dataPoints() {
+  List<({int idx, double value, PerformanceTest t})> _dataPoints(
+    _ChartMetric metric,
+  ) {
     final result = <({int idx, double value, PerformanceTest t})>[];
     for (var i = 0; i < widget.tests.length; i++) {
-      final v = _selected.extractor(widget.tests[i]);
+      final v = metric.extractor(widget.tests[i]);
       if (v != null) result.add((idx: i, value: v, t: widget.tests[i]));
     }
     return result;
@@ -165,7 +205,8 @@ class _PerformanceProgressChartState extends State<PerformanceProgressChart> {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    final points = _dataPoints();
+    final l10n = AppL10n.of(context);
+    final selected = _selected;
 
     return Container(
       width: double.infinity,
@@ -180,7 +221,7 @@ class _PerformanceProgressChartState extends State<PerformanceProgressChart> {
         children: [
           // ── Section label ──────────────────────────────────────────────
           Text(
-            'PROGRESO',
+            l10n.performanceChartSectionLabel,
             style: GoogleFonts.barlowCondensed(
               fontWeight: FontWeight.w700,
               fontSize: 12,
@@ -190,31 +231,56 @@ class _PerformanceProgressChartState extends State<PerformanceProgressChart> {
           ),
           const SizedBox(height: 8),
 
-          // ── Metric chip selector ───────────────────────────────────────
-          _MetricChipRow(
-            available: _available,
-            selected: _selected,
-            palette: palette,
-            onSelect: (m) => setState(() => _selected = m),
-          ),
-          const SizedBox(height: 12),
-
-          // ── Header: current value + delta ──────────────────────────────
-          if (points.isNotEmpty)
-            _ChartHeader(points: points, metric: _selected, palette: palette),
-          const SizedBox(height: 12),
-
-          // ── Line chart ─────────────────────────────────────────────────
-          if (points.length >= 2)
-            _ProgressLineChart(
-              points: points,
-              allTests: widget.tests,
-              metric: _selected,
-              palette: palette,
-            ),
+          // No metric has ≥2 same-field values: show a hint instead of a
+          // fabricated, unplottable chart.
+          if (selected == null)
+            Text(
+              l10n.performanceChartEmptyHint,
+              style: GoogleFonts.barlow(
+                fontSize: 13,
+                color: palette.textMuted,
+              ),
+            )
+          else
+            ..._buildChart(selected, palette, l10n),
         ],
       ),
     );
+  }
+
+  List<Widget> _buildChart(
+    _ChartMetric selected,
+    AppPalette palette,
+    AppL10n l10n,
+  ) {
+    final points = _dataPoints(selected);
+    return [
+      // ── Metric chip selector ───────────────────────────────────────
+      _MetricChipRow(
+        available: _available,
+        selected: selected,
+        palette: palette,
+        l10n: l10n,
+        onSelect: (m) => setState(() => _selected = m),
+      ),
+      const SizedBox(height: 12),
+
+      // ── Header: current value + delta ──────────────────────────────
+      if (points.isNotEmpty)
+        _ChartHeader(
+            points: points, metric: selected, palette: palette, l10n: l10n),
+      const SizedBox(height: 12),
+
+      // ── Line chart ─────────────────────────────────────────────────
+      if (points.length >= 2)
+        _ProgressLineChart(
+          points: points,
+          allTests: widget.tests,
+          metric: selected,
+          palette: palette,
+          l10n: l10n,
+        ),
+    ];
   }
 }
 
@@ -225,12 +291,14 @@ class _MetricChipRow extends StatelessWidget {
     required this.available,
     required this.selected,
     required this.palette,
+    required this.l10n,
     required this.onSelect,
   });
 
   final List<_ChartMetric> available;
   final _ChartMetric selected;
   final AppPalette palette;
+  final AppL10n l10n;
   final void Function(_ChartMetric) onSelect;
 
   @override
@@ -243,8 +311,9 @@ class _MetricChipRow extends StatelessWidget {
             if (i > 0) const SizedBox(width: 6),
             _Chip(
               metric: available[i],
-              isSelected: available[i].label == selected.label,
+              isSelected: identical(available[i], selected),
               palette: palette,
+              l10n: l10n,
               onTap: () => onSelect(available[i]),
             ),
           ],
@@ -259,12 +328,14 @@ class _Chip extends StatelessWidget {
     required this.metric,
     required this.isSelected,
     required this.palette,
+    required this.l10n,
     required this.onTap,
   });
 
   final _ChartMetric metric;
   final bool isSelected;
   final AppPalette palette;
+  final AppL10n l10n;
   final VoidCallback onTap;
 
   @override
@@ -281,7 +352,7 @@ class _Chip extends StatelessWidget {
           ),
         ),
         child: Text(
-          metric.label,
+          metric.label(l10n),
           style: GoogleFonts.barlow(
             fontSize: 12,
             fontWeight: FontWeight.w600,
@@ -300,11 +371,13 @@ class _ChartHeader extends StatelessWidget {
     required this.points,
     required this.metric,
     required this.palette,
+    required this.l10n,
   });
 
   final List<({int idx, double value, PerformanceTest t})> points;
   final _ChartMetric metric;
   final AppPalette palette;
+  final AppL10n l10n;
 
   @override
   Widget build(BuildContext context) {
@@ -313,7 +386,7 @@ class _ChartHeader extends StatelessWidget {
     final delta = last.value - first.value;
     final absDelta = delta.abs();
     final glyph = delta >= 0 ? '▲' : '▼';
-    final span = _spanLabel(first.t.recordedAt, last.t.recordedAt);
+    final span = _spanLabel(l10n, first.t.recordedAt, last.t.recordedAt);
     final currentStr = last.value % 1 == 0
         ? last.value.toStringAsFixed(0)
         : last.value.toStringAsFixed(1);
@@ -369,15 +442,18 @@ class _ProgressLineChart extends StatelessWidget {
     required this.allTests,
     required this.metric,
     required this.palette,
+    required this.l10n,
   });
 
   final List<({int idx, double value, PerformanceTest t})> points;
   final List<PerformanceTest> allTests;
   final _ChartMetric metric;
   final AppPalette palette;
+  final AppL10n l10n;
 
   @override
   Widget build(BuildContext context) {
+    final localeName = l10n.localeName;
     final spots = points.map((p) => FlSpot(p.idx.toDouble(), p.value)).toList();
 
     // Y range with ~8% padding
@@ -458,7 +534,7 @@ class _ProgressLineChart extends StatelessWidget {
                   return SideTitleWidget(
                     meta: meta,
                     child: Text(
-                      _shortDate(date),
+                      _shortDate(date, localeName),
                       style: GoogleFonts.barlowCondensed(
                         fontSize: 10,
                         color: palette.textMuted,
@@ -518,7 +594,8 @@ class _ProgressLineChart extends StatelessWidget {
                   final valStr = spot.y % 1 == 0
                       ? spot.y.toStringAsFixed(0)
                       : spot.y.toStringAsFixed(1);
-                  final dateStr = date != null ? '\n${_shortDate(date)}' : '';
+                  final dateStr =
+                      date != null ? '\n${_shortDate(date, localeName)}' : '';
                   return LineTooltipItem(
                     '$valStr ${metric.unit}$dateStr',
                     GoogleFonts.barlow(

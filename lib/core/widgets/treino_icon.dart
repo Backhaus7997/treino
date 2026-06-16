@@ -52,6 +52,7 @@ class TreinoIcon {
   // Auth
   static const IconData lock = PhosphorIconsRegular.lock;
   static const IconData mail = PhosphorIconsRegular.envelope;
+  static const IconData atSign = PhosphorIconsRegular.at;
   static const IconData eye = PhosphorIconsRegular.eye;
   static const IconData eyeOff = PhosphorIconsRegular.eyeSlash;
 

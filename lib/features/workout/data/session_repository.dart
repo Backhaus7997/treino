@@ -19,6 +19,14 @@ class SessionRepository {
   final FirebaseFirestore _firestore;
   final UserPublicProfileRepository? _publicProfileRepository;
 
+  /// Upper bound on how many recent sessions [finish] reads back when
+  /// recomputing the public `workoutsCount` / `racha` counters. Caps the read
+  /// cost+latency at a constant instead of growing linearly with the user's
+  /// lifetime session count on every workout completion. A streak can never
+  /// exceed this many distinct days, and the counters self-heal each finish, so
+  /// the window stays exact for any realistic athlete while bounding the read.
+  static const int _counterRecomputeWindow = 365;
+
   // ─── Private collection getters ─────────────────────────────────────────
 
   CollectionReference<Map<String, Object?>> _sessions(String uid) =>
@@ -80,23 +88,35 @@ class SessionRepository {
     });
 
     // Cross-feature: update public stats counters (best-effort, REQ-WRX-003).
-    // Executes after the primary session update. Uses a fresh collection
-    // reference to read all sessions for uid, then filters in Dart to avoid
-    // fake_cloud_firestore's indexed-query stale-read issue. (ADR-WRS-13)
+    // Executes after the primary session update. Reads a BOUNDED window of the
+    // user's most recent sessions (newest-first, capped at
+    // [_counterRecomputeWindow]) and recomputes in Dart — instead of an
+    // unbounded full-collection read on every finish — then filters in Dart to
+    // avoid fake_cloud_firestore's indexed-query stale-read issue.
     final pubRepo = _publicProfileRepository;
     if (pubRepo == null) return;
 
     try {
-      final colRef =
-          _firestore.collection('users').doc(uid).collection('sessions');
-      final allSnap = await colRef.get();
+      final recentSnap = await _firestore
+          .collection('users')
+          .doc(uid)
+          .collection('sessions')
+          .orderBy('startedAt', descending: true)
+          .limit(_counterRecomputeWindow)
+          .get();
       final allSessions =
-          allSnap.docs.map(_sessionFromDoc).whereType<Session>().toList();
-      final finishedList =
-          allSessions.where((s) => s.status == SessionStatus.finished).toList();
-      final racha = computeStreak(finishedList);
+          recentSnap.docs.map(_sessionFromDoc).whereType<Session>().toList();
+      // Only sessions actually completed count toward the public workout count
+      // and streak. Abandoned sessions are also written with status=finished
+      // (wasFullyCompleted=false), so we must exclude them here to match the
+      // display filter (historial_section.dart, planProgressProvider).
+      final completedList = allSessions
+          .where((s) =>
+              s.status == SessionStatus.finished && s.wasFullyCompleted)
+          .toList();
+      final racha = computeStreak(completedList);
       await pubRepo.updateCounters(uid, {
-        'workoutsCount': finishedList.length,
+        'workoutsCount': completedList.length,
         'racha': racha,
       });
     } catch (e, st) {
@@ -126,6 +146,44 @@ class SessionRepository {
     final snap =
         await _sessions(uid).orderBy('startedAt', descending: true).get();
     return snap.docs.map(_sessionFromDoc).whereType<Session>().toList();
+  }
+
+  // ─── listFinishedToday ────────────────────────────────────────────────────
+
+  /// Returns the athlete's FINISHED sessions whose `finishedAt` falls on the
+  /// current UTC calendar day, ordered by `finishedAt` descending.
+  ///
+  /// Bounded server-side query (status + finishedAt range + limit) so the
+  /// trainer dashboard's "Entrenaron hoy" list does NOT pull each athlete's
+  /// full session history. [now] is injectable for deterministic tests.
+  Future<List<Session>> listFinishedToday(String uid, {DateTime? now}) async {
+    final today = (now ?? DateTime.now()).toUtc();
+    final startOfDay = DateTime.utc(today.year, today.month, today.day);
+    final startOfNextDay = startOfDay.add(const Duration(days: 1));
+    // Apply the lower bound on the server (status + finishedAt >= startOfDay)
+    // so the read stays bounded to recent sessions, then enforce the upper
+    // bound (finishedAt < startOfNextDay) in Dart. Mirrors the workaround in
+    // [finish]: fake_cloud_firestore drops the `isLessThan` upper bound when it
+    // is combined with `isGreaterThanOrEqualTo` in a single `.where()`, which
+    // would otherwise leak a future-dated session (finishedAt == startOfNextDay)
+    // into "today".
+    final snap = await _sessions(uid)
+        .where('status', isEqualTo: 'finished')
+        .where(
+          'finishedAt',
+          isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay),
+        )
+        .orderBy('finishedAt', descending: true)
+        .get();
+    return snap.docs
+        .map(_sessionFromDoc)
+        .whereType<Session>()
+        .where((s) {
+          final finishedAt = s.finishedAt;
+          return finishedAt != null &&
+              finishedAt.toUtc().isBefore(startOfNextDay);
+        })
+        .toList();
   }
 
   // ─── getActive ──────────────────────────────────────────────────────────

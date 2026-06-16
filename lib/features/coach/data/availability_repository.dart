@@ -25,12 +25,32 @@ class AvailabilityRepository {
   /// Persists a new [AvailabilityRule] at `coach_availability_rules/{rule.id}`.
   /// SCENARIO-485.
   Future<void> addRule(AvailabilityRule rule) async {
+    _assertBookableWindow(rule);
     await _rules.doc(rule.id).set(rule.toJson());
   }
 
   /// Updates an existing [AvailabilityRule] at `coach_availability_rules/{rule.id}`.
   Future<void> updateRule(AvailabilityRule rule) async {
+    _assertBookableWindow(rule);
     await _rules.doc(rule.id).update(rule.toJson());
+  }
+
+  /// Guards against persisting a rule whose window cannot fit a single slot.
+  ///
+  /// Without this, `compute_free_slots` would generate zero bookable slots and
+  /// the trainer would publish a silently-empty day. Validation lives on write
+  /// only (not on `fromJson`) so reads stay tolerant of any legacy bad data.
+  void _assertBookableWindow(AvailabilityRule rule) {
+    final startTotalMinutes = rule.startHour * 60 + rule.startMinute;
+    final endTotalMinutes = rule.endHour * 60 + rule.endMinute;
+    if (endTotalMinutes < startTotalMinutes + rule.slotDurationMin) {
+      throw ArgumentError.value(
+        rule,
+        'rule',
+        'Availability window must end after it starts and fit at least one '
+            '${rule.slotDurationMin}-minute slot.',
+      );
+    }
   }
 
   /// Deletes the rule doc at `coach_availability_rules/{ruleId}`. SCENARIO-486.

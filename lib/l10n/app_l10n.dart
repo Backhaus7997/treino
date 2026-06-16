@@ -788,6 +788,12 @@ abstract class AppL10n {
   /// **'¿Borrar este horario? Las reservas existentes se mantienen.'**
   String get agendaRuleDeleteConfirm;
 
+  /// No description provided for @agendaRuleInvalidWindow.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'La hora de fin debe ser posterior al inicio y dejar espacio para al menos un turno.'**
+  String get agendaRuleInvalidWindow;
+
   /// No description provided for @agendaBookingCancelledByCoach.
   ///
   /// In es_AR, this message translates to:
@@ -1388,6 +1394,384 @@ abstract class AppL10n {
   /// **'ACTIVIDAD RECIENTE'**
   String get dashboardActividadRecienteSectionLabel;
 
+  /// No description provided for @dashboardWeekday1.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'LUNES'**
+  String get dashboardWeekday1;
+
+  /// No description provided for @dashboardWeekday2.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'MARTES'**
+  String get dashboardWeekday2;
+
+  /// No description provided for @dashboardWeekday3.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'MIÉRCOLES'**
+  String get dashboardWeekday3;
+
+  /// No description provided for @dashboardWeekday4.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'JUEVES'**
+  String get dashboardWeekday4;
+
+  /// No description provided for @dashboardWeekday5.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'VIERNES'**
+  String get dashboardWeekday5;
+
+  /// No description provided for @dashboardWeekday6.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'SÁBADO'**
+  String get dashboardWeekday6;
+
+  /// No description provided for @dashboardWeekday7.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'DOMINGO'**
+  String get dashboardWeekday7;
+
+  /// No description provided for @dashboardMonth1.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ENERO'**
+  String get dashboardMonth1;
+
+  /// No description provided for @dashboardMonth2.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'FEBRERO'**
+  String get dashboardMonth2;
+
+  /// No description provided for @dashboardMonth3.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'MARZO'**
+  String get dashboardMonth3;
+
+  /// No description provided for @dashboardMonth4.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ABRIL'**
+  String get dashboardMonth4;
+
+  /// No description provided for @dashboardMonth5.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'MAYO'**
+  String get dashboardMonth5;
+
+  /// No description provided for @dashboardMonth6.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'JUNIO'**
+  String get dashboardMonth6;
+
+  /// No description provided for @dashboardMonth7.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'JULIO'**
+  String get dashboardMonth7;
+
+  /// No description provided for @dashboardMonth8.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'AGOSTO'**
+  String get dashboardMonth8;
+
+  /// No description provided for @dashboardMonth9.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'SEPTIEMBRE'**
+  String get dashboardMonth9;
+
+  /// No description provided for @dashboardMonth10.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'OCTUBRE'**
+  String get dashboardMonth10;
+
+  /// No description provided for @dashboardMonth11.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'NOVIEMBRE'**
+  String get dashboardMonth11;
+
+  /// No description provided for @dashboardMonth12.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'DICIEMBRE'**
+  String get dashboardMonth12;
+
+  /// No description provided for @dashboardDateToday.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Hoy'**
+  String get dashboardDateToday;
+
+  /// No description provided for @dashboardDateTomorrow.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Mañana'**
+  String get dashboardDateTomorrow;
+
+  /// No description provided for @dashboardRechazarLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'RECHAZAR'**
+  String get dashboardRechazarLabel;
+
+  /// No description provided for @dashboardAceptarLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ACEPTAR'**
+  String get dashboardAceptarLabel;
+
+  /// No description provided for @dashboardPagosPorCobrarTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'PAGOS POR COBRAR'**
+  String get dashboardPagosPorCobrarTitle;
+
+  /// No description provided for @dashboardCobroTrailingLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'+ Cobro'**
+  String get dashboardCobroTrailingLabel;
+
+  /// No description provided for @dashboardInvitarAlumnoLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'+ INVITAR ALUMNO'**
+  String get dashboardInvitarAlumnoLabel;
+
+  /// No description provided for @dashboardAsignarRutinaLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'+ ASIGNAR RUTINA'**
+  String get dashboardAsignarRutinaLabel;
+
+  /// No description provided for @dashboardCobroSueltoTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'COBRO SUELTO'**
+  String get dashboardCobroSueltoTitle;
+
+  /// No description provided for @dashboardAlumnoLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ALUMNO'**
+  String get dashboardAlumnoLabel;
+
+  /// No description provided for @dashboardMontoArsLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'MONTO (ARS)'**
+  String get dashboardMontoArsLabel;
+
+  /// No description provided for @dashboardConceptoLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CONCEPTO'**
+  String get dashboardConceptoLabel;
+
+  /// No description provided for @dashboardAgregarCobroLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'AGREGAR COBRO'**
+  String get dashboardAgregarCobroLabel;
+
+  /// No description provided for @dashboardMontoHint.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ej: 5000'**
+  String get dashboardMontoHint;
+
+  /// No description provided for @dashboardConceptoHint.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ej: Clase de verano'**
+  String get dashboardConceptoHint;
+
+  /// No description provided for @dashboardSeleccionaAlumnoHint.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Seleccioná un alumno'**
+  String get dashboardSeleccionaAlumnoHint;
+
+  /// No description provided for @dashboardSinAlumnosActivos.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No tenés alumnos activos.'**
+  String get dashboardSinAlumnosActivos;
+
+  /// No description provided for @dashboardMarcarCobradoTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Marcar como cobrado?'**
+  String get dashboardMarcarCobradoTitle;
+
+  /// No description provided for @dashboardCancelarLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cancelar'**
+  String get dashboardCancelarLabel;
+
+  /// No description provided for @dashboardCobradoLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cobrado'**
+  String get dashboardCobradoLabel;
+
+  /// No description provided for @dashboardCobroRegistrado.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cobro registrado.'**
+  String get dashboardCobroRegistrado;
+
+  /// No description provided for @dashboardCobroError.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Error al registrar el cobro. Intentá de nuevo.'**
+  String get dashboardCobroError;
+
+  /// No description provided for @dashboardCobroSueltoAgregado.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cobro suelto agregado.'**
+  String get dashboardCobroSueltoAgregado;
+
+  /// No description provided for @dashboardCompletaCampos.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Completá todos los campos.'**
+  String get dashboardCompletaCampos;
+
+  /// No description provided for @dashboardMontoInvalido.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ingresá un monto válido.'**
+  String get dashboardMontoInvalido;
+
+  /// No description provided for @dashboardGuardarError.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Error al guardar. Intentá de nuevo.'**
+  String get dashboardGuardarError;
+
+  /// No description provided for @dashboardCadenceMensual.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Mensual'**
+  String get dashboardCadenceMensual;
+
+  /// No description provided for @dashboardCadenceSemanal.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Semanal'**
+  String get dashboardCadenceSemanal;
+
+  /// No description provided for @dashboardCadencePorSesion.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Por sesión'**
+  String get dashboardCadencePorSesion;
+
+  /// No description provided for @dashboardCadenceSuelto.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Suelto'**
+  String get dashboardCadenceSuelto;
+
+  /// No description provided for @dashboardAlumnoFallback.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Alumno'**
+  String get dashboardAlumnoFallback;
+
+  /// No description provided for @dashboardProximamente.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Próximamente.'**
+  String get dashboardProximamente;
+
+  /// No description provided for @dashboardIniciaSesion.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Iniciá sesión para ver tus próximos turnos.'**
+  String get dashboardIniciaSesion;
+
+  /// No description provided for @dashboardCargando.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cargando…'**
+  String get dashboardCargando;
+
+  /// No description provided for @dashboardErrorTurnos.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cargar tus próximos turnos.'**
+  String get dashboardErrorTurnos;
+
+  /// No description provided for @dashboardSinTurnosProximos.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No tenés turnos próximos confirmados.'**
+  String get dashboardSinTurnosProximos;
+
+  /// No description provided for @dashboardNadieEntreno.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Nadie entrenó hoy todavía.'**
+  String get dashboardNadieEntreno;
+
+  /// No description provided for @dashboardErrorActividad.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cargar la actividad de hoy.'**
+  String get dashboardErrorActividad;
+
+  /// No description provided for @dashboardSinCobros.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Sin cobros pendientes.'**
+  String get dashboardSinCobros;
+
+  /// No description provided for @dashboardErrorCobros.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cargar los cobros.'**
+  String get dashboardErrorCobros;
+
+  /// No description provided for @dashboardHolaSinNombre.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'HOLA'**
+  String get dashboardHolaSinNombre;
+
+  /// No description provided for @dashboardInvitarProximamente.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Invitar alumno — próximamente.'**
+  String get dashboardInvitarProximamente;
+
+  /// No description provided for @dashboardSolicitudesPendientesTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'SOLICITUDES PENDIENTES ({count})'**
+  String dashboardSolicitudesPendientesTitle(int count);
+
+  /// No description provided for @dashboardHolaConNombre.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'HOLA, {name}'**
+  String dashboardHolaConNombre(String name);
+
   /// No description provided for @reviewSnackBarSuccess.
   ///
   /// In es_AR, this message translates to:
@@ -1616,6 +2000,12 @@ abstract class AppL10n {
   /// **'{gymName} · ¡Detectamos que podés estar entrenando!'**
   String checkInGymSubtext(String gymName);
 
+  /// No description provided for @checkInError.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos registrar tu check-in. Probá de nuevo.'**
+  String get checkInError;
+
   /// No description provided for @profileCuentaTitle.
   ///
   /// In es_AR, this message translates to:
@@ -1670,6 +2060,462 @@ abstract class AppL10n {
   /// **'{count} activas'**
   String profileCuentaRutinasSubtitle(int count);
 
+  /// No description provided for @chatListTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'MENSAJES'**
+  String get chatListTitle;
+
+  /// No description provided for @chatListDeletedUser.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Usuario eliminado'**
+  String get chatListDeletedUser;
+
+  /// No description provided for @chatListStartConversation.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Iniciá la conversación'**
+  String get chatListStartConversation;
+
+  /// No description provided for @chatListEmptyTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Sin mensajes todavía'**
+  String get chatListEmptyTitle;
+
+  /// No description provided for @chatListEmptyBody.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cuando tengas un vínculo activo con un PF, vas a poder chatear desde acá.'**
+  String get chatListEmptyBody;
+
+  /// No description provided for @chatListError.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cargar tus mensajes.'**
+  String get chatListError;
+
+  /// No description provided for @chatListRetryLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Reintentar'**
+  String get chatListRetryLabel;
+
+  /// No description provided for @chatRelativeJustNow.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'recién'**
+  String get chatRelativeJustNow;
+
+  /// No description provided for @chatRelativeMinutes.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'hace {minutes}m'**
+  String chatRelativeMinutes(int minutes);
+
+  /// No description provided for @chatRelativeHours.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'hace {hours}h'**
+  String chatRelativeHours(int hours);
+
+  /// No description provided for @chatRelativeDays.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'hace {days}d'**
+  String chatRelativeDays(int days);
+
+  /// No description provided for @chatScreenTitleFallback.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Usuario'**
+  String get chatScreenTitleFallback;
+
+  /// No description provided for @chatScreenLoadError.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cargar los mensajes.'**
+  String get chatScreenLoadError;
+
+  /// No description provided for @chatScreenComposerHint.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Escribí un mensaje…'**
+  String get chatScreenComposerHint;
+
+  /// No description provided for @chatScreenSendLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Enviar'**
+  String get chatScreenSendLabel;
+
+  /// No description provided for @chatScreenSendError.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos enviar el mensaje. Probá de nuevo.'**
+  String get chatScreenSendError;
+
+  /// No description provided for @performanceLogTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cargar evaluación'**
+  String get performanceLogTitle;
+
+  /// No description provided for @performanceLogCancel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cancelar'**
+  String get performanceLogCancel;
+
+  /// No description provided for @performanceLogSaveCta.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'GUARDAR EVALUACIÓN'**
+  String get performanceLogSaveCta;
+
+  /// No description provided for @performanceLogNoSession.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No hay sesión activa. No se puede guardar.'**
+  String get performanceLogNoSession;
+
+  /// No description provided for @performanceLogSaveSuccess.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Evaluación guardada'**
+  String get performanceLogSaveSuccess;
+
+  /// No description provided for @performanceLogSaveError.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos guardar la evaluación. Probá de nuevo.'**
+  String get performanceLogSaveError;
+
+  /// No description provided for @performanceLogNotesHint.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Observaciones del entrenador…'**
+  String get performanceLogNotesHint;
+
+  /// No description provided for @performanceLogSectionJumps.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'SALTOS (cm)'**
+  String get performanceLogSectionJumps;
+
+  /// No description provided for @performanceLogSectionSpeed.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'VELOCIDAD (seg)'**
+  String get performanceLogSectionSpeed;
+
+  /// No description provided for @performanceLogSectionStrength.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'FUERZA 1RM (kg)'**
+  String get performanceLogSectionStrength;
+
+  /// No description provided for @performanceLogSectionEndurance.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'RESISTENCIA / OTROS'**
+  String get performanceLogSectionEndurance;
+
+  /// No description provided for @performanceLogSectionNotes.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'NOTAS'**
+  String get performanceLogSectionNotes;
+
+  /// No description provided for @performanceLogFieldCmj.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CMJ'**
+  String get performanceLogFieldCmj;
+
+  /// No description provided for @performanceLogFieldSquatJump.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Squat Jump'**
+  String get performanceLogFieldSquatJump;
+
+  /// No description provided for @performanceLogFieldAbalakov.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Abalakov'**
+  String get performanceLogFieldAbalakov;
+
+  /// No description provided for @performanceLogFieldBroadJump.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Salto largo'**
+  String get performanceLogFieldBroadJump;
+
+  /// No description provided for @performanceLogFieldSprint10.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Sprint 10m'**
+  String get performanceLogFieldSprint10;
+
+  /// No description provided for @performanceLogFieldSprint20.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'20m'**
+  String get performanceLogFieldSprint20;
+
+  /// No description provided for @performanceLogFieldSprint30.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'30m'**
+  String get performanceLogFieldSprint30;
+
+  /// No description provided for @performanceLogFieldSprint40.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'40m'**
+  String get performanceLogFieldSprint40;
+
+  /// No description provided for @performanceLogFieldSquat1rm.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Sentadilla'**
+  String get performanceLogFieldSquat1rm;
+
+  /// No description provided for @performanceLogFieldBenchPress.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Press banca'**
+  String get performanceLogFieldBenchPress;
+
+  /// No description provided for @performanceLogFieldDeadlift.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Peso muerto'**
+  String get performanceLogFieldDeadlift;
+
+  /// No description provided for @performanceLogFieldOverheadPress.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Press militar'**
+  String get performanceLogFieldOverheadPress;
+
+  /// No description provided for @performanceLogFieldPullUp.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Dominada lastrada'**
+  String get performanceLogFieldPullUp;
+
+  /// No description provided for @performanceLogFieldVo2max.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'VO2máx'**
+  String get performanceLogFieldVo2max;
+
+  /// No description provided for @performanceLogFieldCourseNavette.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Course Navette (nivel)'**
+  String get performanceLogFieldCourseNavette;
+
+  /// No description provided for @performanceLogFieldCooper.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cooper'**
+  String get performanceLogFieldCooper;
+
+  /// No description provided for @performanceLogFieldSitAndReach.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Flexibilidad sit-and-reach'**
+  String get performanceLogFieldSitAndReach;
+
+  /// No description provided for @performanceChartSectionLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'PROGRESO'**
+  String get performanceChartSectionLabel;
+
+  /// No description provided for @performanceChartEmptyHint.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cargá otra evaluación para ver el progreso.'**
+  String get performanceChartEmptyHint;
+
+  /// No description provided for @performanceChartSpanDays.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'({count} {count, plural, =1{día} other{días}})'**
+  String performanceChartSpanDays(int count);
+
+  /// No description provided for @performanceChartSpanWeeks.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'({count} {count, plural, =1{semana} other{semanas}})'**
+  String performanceChartSpanWeeks(int count);
+
+  /// No description provided for @performanceChartMetricCmj.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CMJ'**
+  String get performanceChartMetricCmj;
+
+  /// No description provided for @performanceChartMetricSquatJump.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Squat Jump'**
+  String get performanceChartMetricSquatJump;
+
+  /// No description provided for @performanceChartMetricAbalakov.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Abalakov'**
+  String get performanceChartMetricAbalakov;
+
+  /// No description provided for @performanceChartMetricBroadJump.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Salto largo'**
+  String get performanceChartMetricBroadJump;
+
+  /// No description provided for @performanceChartMetricSprint10.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Sprint 10m'**
+  String get performanceChartMetricSprint10;
+
+  /// No description provided for @performanceChartMetricSprint20.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Sprint 20m'**
+  String get performanceChartMetricSprint20;
+
+  /// No description provided for @performanceChartMetricSprint30.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Sprint 30m'**
+  String get performanceChartMetricSprint30;
+
+  /// No description provided for @performanceChartMetricSprint40.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Sprint 40m'**
+  String get performanceChartMetricSprint40;
+
+  /// No description provided for @performanceChartMetricSquat1rm.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Sentadilla 1RM'**
+  String get performanceChartMetricSquat1rm;
+
+  /// No description provided for @performanceChartMetricBench1rm.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Banca 1RM'**
+  String get performanceChartMetricBench1rm;
+
+  /// No description provided for @performanceChartMetricDeadlift1rm.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Peso muerto 1RM'**
+  String get performanceChartMetricDeadlift1rm;
+
+  /// No description provided for @performanceChartMetricOverheadPress1rm.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Press militar 1RM'**
+  String get performanceChartMetricOverheadPress1rm;
+
+  /// No description provided for @performanceChartMetricPullUp1rm.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Dominada 1RM'**
+  String get performanceChartMetricPullUp1rm;
+
+  /// No description provided for @performanceChartMetricVo2max.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'VO2máx'**
+  String get performanceChartMetricVo2max;
+
+  /// No description provided for @performanceChartMetricCourseNavette.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Course Navette'**
+  String get performanceChartMetricCourseNavette;
+
+  /// No description provided for @performanceChartMetricCooper.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cooper'**
+  String get performanceChartMetricCooper;
+
+  /// No description provided for @performanceChartMetricSitAndReach.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Flexibilidad'**
+  String get performanceChartMetricSitAndReach;
+
+  /// No description provided for @routineEditorDayName.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Día {n}'**
+  String routineEditorDayName(int n);
+
+  /// No description provided for @routineEditorAddExercise.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Agregar ejercicio'**
+  String get routineEditorAddExercise;
+
+  /// No description provided for @routineEditorLevelLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'NIVEL'**
+  String get routineEditorLevelLabel;
+
+  /// No description provided for @routineEditorWeeksLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'SEMANAS'**
+  String get routineEditorWeeksLabel;
+
+  /// No description provided for @routineEditorDaysLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'DÍAS DEL PLAN'**
+  String get routineEditorDaysLabel;
+
+  /// No description provided for @routineEditorAddWeek.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Semana'**
+  String get routineEditorAddWeek;
+
+  /// No description provided for @routineEditorRemoveLastWeek.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Quitar última'**
+  String get routineEditorRemoveLastWeek;
+
+  /// No description provided for @routineEditorDuplicateWeek.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Duplicar semana'**
+  String get routineEditorDuplicateWeek;
+
+  /// No description provided for @routineEditorWeekShort.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Sem {n}'**
+  String routineEditorWeekShort(int n);
+
+  /// No description provided for @routineEditorInvalidWeekHint.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Sets incompletos en Sem {week} · Día {day}'**
+  String routineEditorInvalidWeekHint(int week, int day);
+
   /// No description provided for @routineEditorDuplicateWeekTitle.
   ///
   /// In es_AR, this message translates to:
@@ -1693,6 +2539,174 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Confirmar'**
   String get routineEditorDialogConfirm;
+
+  /// No description provided for @routineEditorSlotMenuReplace.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cambiar ejercicio'**
+  String get routineEditorSlotMenuReplace;
+
+  /// No description provided for @routineEditorSlotMenuMoveUp.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Subir'**
+  String get routineEditorSlotMenuMoveUp;
+
+  /// No description provided for @routineEditorSlotMenuMoveDown.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Bajar'**
+  String get routineEditorSlotMenuMoveDown;
+
+  /// No description provided for @routineEditorSlotMenuRemove.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Eliminar'**
+  String get routineEditorSlotMenuRemove;
+
+  /// No description provided for @routineEditorRestLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Descanso'**
+  String get routineEditorRestLabel;
+
+  /// No description provided for @routineEditorAddSet.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'+ Agregar set'**
+  String get routineEditorAddSet;
+
+  /// No description provided for @routineEditorMeasureReps.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Reps'**
+  String get routineEditorMeasureReps;
+
+  /// No description provided for @routineEditorMeasureTime.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tiempo'**
+  String get routineEditorMeasureTime;
+
+  /// No description provided for @routineEditorSetTypeNormal.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Normal'**
+  String get routineEditorSetTypeNormal;
+
+  /// No description provided for @routineEditorSetTypeWarmup.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Entrada en calor (W)'**
+  String get routineEditorSetTypeWarmup;
+
+  /// No description provided for @routineEditorSetTypeDrop.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Drop (D)'**
+  String get routineEditorSetTypeDrop;
+
+  /// No description provided for @routineEditorSetTypeFailure.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Al fallo (F)'**
+  String get routineEditorSetTypeFailure;
+
+  /// No description provided for @routineDetailNotFound.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Rutina no encontrada'**
+  String get routineDetailNotFound;
+
+  /// No description provided for @routineDetailNoDaysConfigured.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Esta rutina no tiene días configurados.'**
+  String get routineDetailNoDaysConfigured;
+
+  /// No description provided for @routineDetailLoadError.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cargar la rutina.'**
+  String get routineDetailLoadError;
+
+  /// No description provided for @routineDetailNoExercisesThisWeek.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Sin ejercicios esta semana'**
+  String get routineDetailNoExercisesThisWeek;
+
+  /// No description provided for @routineDetailNoExercisesThisDay.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No hay ejercicios en este día'**
+  String get routineDetailNoExercisesThisDay;
+
+  /// No description provided for @routineDetailStatExercises.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'EJERCICIOS'**
+  String get routineDetailStatExercises;
+
+  /// No description provided for @routineDetailStatSets.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'SETS'**
+  String get routineDetailStatSets;
+
+  /// No description provided for @routineDetailStatMinutes.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'MINUTOS'**
+  String get routineDetailStatMinutes;
+
+  /// No description provided for @routineDetailSuperset.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'SUPERSERIE'**
+  String get routineDetailSuperset;
+
+  /// No description provided for @routineDetailDayLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'DÍA {day}'**
+  String routineDetailDayLabel(int day);
+
+  /// No description provided for @routineDetailWeekLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'SEM {week}'**
+  String routineDetailWeekLabel(int week);
+
+  /// No description provided for @routineDetailPlanComplete.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'PLAN COMPLETADO'**
+  String get routineDetailPlanComplete;
+
+  /// No description provided for @routineDetailCompleted.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'COMPLETADO'**
+  String get routineDetailCompleted;
+
+  /// No description provided for @routineDetailWeekLocked.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'SEMANA BLOQUEADA'**
+  String get routineDetailWeekLocked;
+
+  /// No description provided for @routineDetailDayLocked.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'DÍA BLOQUEADO'**
+  String get routineDetailDayLocked;
+
+  /// No description provided for @routineDetailStart.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'EMPEZAR'**
+  String get routineDetailStart;
 
   /// No description provided for @routineEditorDeleteScopeTitle.
   ///
@@ -1742,12 +2756,6 @@ abstract class AppL10n {
   /// **'Semana'**
   String get routineEditorWeekLabel;
 
-  /// No description provided for @routineEditorRemoveLastWeek.
-  ///
-  /// In es_AR, this message translates to:
-  /// **'Quitar última'**
-  String get routineEditorRemoveLastWeek;
-
   /// No description provided for @routineEditorLevelSection.
   ///
   /// In es_AR, this message translates to:
@@ -1783,30 +2791,6 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Sets incompletos en Sem {weekNumber}'**
   String routineEditorIncompleteSetsLabel(int weekNumber);
-
-  /// No description provided for @routineEditorSetTypeNormal.
-  ///
-  /// In es_AR, this message translates to:
-  /// **'Normal'**
-  String get routineEditorSetTypeNormal;
-
-  /// No description provided for @routineEditorSetTypeWarmup.
-  ///
-  /// In es_AR, this message translates to:
-  /// **'Entrada en calor (W)'**
-  String get routineEditorSetTypeWarmup;
-
-  /// No description provided for @routineEditorSetTypeDrop.
-  ///
-  /// In es_AR, this message translates to:
-  /// **'Drop (D)'**
-  String get routineEditorSetTypeDrop;
-
-  /// No description provided for @routineEditorSetTypeFailure.
-  ///
-  /// In es_AR, this message translates to:
-  /// **'Al fallo (F)'**
-  String get routineEditorSetTypeFailure;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

@@ -86,7 +86,10 @@ class _CreatePostBodyState extends ConsumerState<_CreatePostBody> {
                   palette: palette,
                 ),
                 const SizedBox(height: 8),
-                _CharCounter(charCount: state.text.length, palette: palette),
+                _CharCounter(
+                  charCount: state.text.characters.length,
+                  palette: palette,
+                ),
                 const SizedBox(height: 20),
                 _PrivacyLabel(palette: palette),
                 const SizedBox(height: 12),

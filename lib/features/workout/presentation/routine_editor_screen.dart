@@ -161,13 +161,24 @@ class _EditableDay {
   String name;
   List<_EditableSlot> slots = [];
 
+  /// True while [name] is the auto-generated default ("Día N"). Drives the
+  /// re-numbering in `_removeDay`: only auto-named days follow their position,
+  /// custom names (hydrated from a saved routine) are preserved. Tracked as a
+  /// flag instead of comparing [name] to a localized template — that compare
+  /// silently broke whenever the active locale differed from the literal.
+  bool isDefaultName;
+
   /// Collapsed/expanded state lives HERE (on the model that persists in the
   /// editor's _days list), not in the tile's State — the ListView recycles
   /// off-screen tiles, so a tile-local flag reset to `true` every time the
   /// day scrolled back into view (device bug 2026-06-11).
   bool expanded = true;
 
-  _EditableDay({required this.dayNumber, required this.name});
+  _EditableDay({
+    required this.dayNumber,
+    required this.name,
+    this.isDefaultName = false,
+  });
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -347,7 +358,12 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _splitController = TextEditingController();
   ExperienceLevel _level = ExperienceLevel.beginner;
-  List<_EditableDay> _days = [_EditableDay(dayNumber: 1, name: 'Día 1')];
+  // Seeded with an empty name + isDefaultName: true; the real localized label
+  // ("Día 1") is filled in by [_relabelDefaultDays] from didChangeDependencies,
+  // where a BuildContext (and thus AppL10n) is available.
+  List<_EditableDay> _days = [
+    _EditableDay(dayNumber: 1, name: '', isDefaultName: true),
+  ];
 
   /// 0-based week shown in the editor. Display is 1-based ("Sem 1").
   int _selectedWeek = 0;
@@ -373,6 +389,25 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     final existingId = _existingIdFor(widget.mode);
     if (existingId != null) {
       _loadExistingRoutine(existingId);
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Localize (and re-localize on locale change) every auto-named day. Custom
+    // names hydrated from a saved routine are left untouched.
+    _relabelDefaultDays();
+  }
+
+  /// Rewrites the [name] of every default-named day to the current locale's
+  /// "Día N" label. No-op for days the user/trainer named explicitly.
+  void _relabelDefaultDays() {
+    final l10n = AppL10n.of(context);
+    for (final day in _days) {
+      if (day.isDefaultName) {
+        day.name = l10n.routineEditorDayName(day.dayNumber);
+      }
     }
   }
 
@@ -422,9 +457,17 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
       if (routine.split != null) {
         _splitController.text = routine.split!;
       }
+      final l10n = AppL10n.of(context);
       _days = routine.days.map((day) {
-        final editableDay =
-            _EditableDay(dayNumber: day.dayNumber, name: day.name);
+        final editableDay = _EditableDay(
+          dayNumber: day.dayNumber,
+          name: day.name,
+          // A persisted day whose name still matches the localized default
+          // ('Día N') is treated as default-named, so deleting a day keeps
+          // re-numbering the remaining default-named days. A custom name set
+          // by the user no longer matches and is preserved as-is.
+          isDefaultName: day.name == l10n.routineEditorDayName(day.dayNumber),
+        );
         editableDay.slots = day.slots.map((slot) {
           final editableSlot = _EditableSlot()
             ..exercise = Exercise(
@@ -460,7 +503,13 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
         return editableDay;
       }).toList();
       if (_days.isEmpty) {
-        _days = [_EditableDay(dayNumber: 1, name: 'Día 1')];
+        _days = [
+          _EditableDay(
+            dayNumber: 1,
+            name: l10n.routineEditorDayName(1),
+            isDefaultName: true,
+          ),
+        ];
       }
       setState(() => _loading = false);
     } catch (_) {
@@ -677,13 +726,22 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
 
   void _addDay() {
     if (_days.length >= _kMaxDays) return;
+    final l10n = AppL10n.of(context);
     setState(() {
       final n = _days.length + 1;
-      _days = [..._days, _EditableDay(dayNumber: n, name: 'Día $n')];
+      _days = [
+        ..._days,
+        _EditableDay(
+          dayNumber: n,
+          name: l10n.routineEditorDayName(n),
+          isDefaultName: true,
+        ),
+      ];
     });
   }
 
   void _removeDay(int index) {
+    final l10n = AppL10n.of(context);
     setState(() {
       _days = [
         for (int i = 0; i < _days.length; i++)
@@ -691,11 +749,12 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
       ];
       // Re-number — keep the default "Día N" name in sync with the new
       // position (so deleting Día 1 makes Día 2 become Día 1); preserve any
-      // custom name the user typed.
+      // custom name the user typed. Tracked via [isDefaultName] rather than a
+      // string compare so it stays correct in any locale.
       for (int i = 0; i < _days.length; i++) {
         final newNumber = i + 1;
-        if (_days[i].name == 'Día ${_days[i].dayNumber}') {
-          _days[i].name = 'Día $newNumber';
+        if (_days[i].isDefaultName) {
+          _days[i].name = l10n.routineEditorDayName(newNumber);
         }
         _days[i].dayNumber = newNumber;
       }
@@ -1111,8 +1170,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
           if (userRoutines.length >= 10) {
             if (!mounted) return;
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                  content: Text(l10n.workoutSelfEditorCapReached)),
+              SnackBar(content: Text(l10n.workoutSelfEditorCapReached)),
             );
             setState(() => _submitting = false);
             return;
@@ -1152,8 +1210,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
           await repo.updateUserOwned(uid: uid, draft: draft);
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-                content: Text(l10n.workoutSelfEditorUpdateSuccess)),
+            SnackBar(content: Text(l10n.workoutSelfEditorUpdateSuccess)),
           );
           context.pop();
       }
@@ -1696,7 +1753,7 @@ class _WeekChip extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              'Sem ${index + 1}',
+              AppL10n.of(context).routineEditorWeekShort(index + 1),
               style: GoogleFonts.barlowCondensed(
                 fontWeight: FontWeight.w700,
                 fontSize: 13,
@@ -1939,7 +1996,7 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
                       icon: Icon(TreinoIcon.plus,
                           size: 14, color: palette.accent),
                       label: Text(
-                        l10n.coachEditorAddSlot,
+                        l10n.routineEditorAddExercise,
                         style: GoogleFonts.barlowCondensed(
                           fontWeight: FontWeight.w600,
                           fontSize: 14,
@@ -2093,7 +2150,7 @@ class _SupersetGroupCard extends StatelessWidget {
             onPressed: onAddExercise,
             icon: Icon(TreinoIcon.plus, size: 14, color: palette.highlight),
             label: Text(
-              'Agregar ejercicio',
+              AppL10n.of(context).routineEditorAddExercise,
               style: GoogleFonts.barlowCondensed(
                 fontWeight: FontWeight.w600,
                 fontSize: 14,
@@ -2283,14 +2340,14 @@ class _SlotEditorState extends State<_SlotEditor> {
                     _slotMenuItem(
                       _SlotAction.replace,
                       TreinoIcon.edit,
-                      'Cambiar ejercicio',
+                      l10n.routineEditorSlotMenuReplace,
                       palette,
                     ),
                     if (showMove)
                       _slotMenuItem(
                         _SlotAction.moveUp,
                         TreinoIcon.chevronUp,
-                        'Subir',
+                        l10n.routineEditorSlotMenuMoveUp,
                         palette,
                         enabled: widget.canMoveUp,
                       ),
@@ -2298,14 +2355,14 @@ class _SlotEditorState extends State<_SlotEditor> {
                       _slotMenuItem(
                         _SlotAction.moveDown,
                         TreinoIcon.chevronDown,
-                        'Bajar',
+                        l10n.routineEditorSlotMenuMoveDown,
                         palette,
                         enabled: widget.canMoveDown,
                       ),
                     _slotMenuItem(
                       _SlotAction.remove,
                       TreinoIcon.trash,
-                      'Eliminar',
+                      l10n.routineEditorSlotMenuRemove,
                       palette,
                       danger: true,
                     ),
@@ -2321,7 +2378,7 @@ class _SlotEditorState extends State<_SlotEditor> {
             children: [
               Expanded(
                 child: DurationTextField(
-                  label: 'Descanso',
+                  label: l10n.routineEditorRestLabel,
                   valueSeconds: slot.restSeconds,
                   onChanged: (v) {
                     slot.restSeconds = v;
@@ -2360,7 +2417,7 @@ class _SlotEditorState extends State<_SlotEditor> {
               },
               icon: Icon(TreinoIcon.plus, size: 14, color: palette.accent),
               label: Text(
-                '+ Agregar set',
+                l10n.routineEditorAddSet,
                 style: GoogleFonts.barlowCondensed(
                   fontWeight: FontWeight.w600,
                   fontSize: 14,
@@ -2447,6 +2504,7 @@ class _SetTableState extends State<_SetTable> {
   /// sets. Rep ranges were removed from the UI — picking "Reps" normalises any
   /// legacy range slot back to single reps.
   Future<void> _pickMeasureMode(BuildContext context, Offset position) async {
+    final l10n = AppL10n.of(context);
     final renderBox = context.findRenderObject() as RenderBox?;
     final overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
     final relativeOffset = renderBox != null
@@ -2466,7 +2524,7 @@ class _SetTableState extends State<_SetTable> {
         PopupMenuItem(
           value: ExerciseMode.reps,
           child: Text(
-            'Reps',
+            l10n.routineEditorMeasureReps,
             style: GoogleFonts.barlow(
                 color: widget.palette.textPrimary, fontSize: 13),
           ),
@@ -2474,7 +2532,7 @@ class _SetTableState extends State<_SetTable> {
         PopupMenuItem(
           value: ExerciseMode.duration,
           child: Text(
-            'Tiempo',
+            l10n.routineEditorMeasureTime,
             style: GoogleFonts.barlow(
                 color: widget.palette.textPrimary, fontSize: 13),
           ),
@@ -2661,8 +2719,7 @@ class _SetRowState extends State<_SetRow> {
   void initState() {
     super.initState();
     final s = widget.editableSet;
-    _kgCtrl = TextEditingController(
-        text: s.weightKg != null ? s.weightKg!.toStringAsFixed(0) : '');
+    _kgCtrl = TextEditingController(text: _formatWeight(s.weightKg));
     _repsCtrl =
         TextEditingController(text: s.reps != null ? s.reps.toString() : '');
     _repsMinCtrl = TextEditingController(
@@ -2680,14 +2737,18 @@ class _SetRowState extends State<_SetRow> {
     super.dispose();
   }
 
+  /// Seeds the KG controller without losing fractional loads: integers show
+  /// without a decimal (60), fractional values keep theirs (17.5).
+  static String _formatWeight(double? w) => formatEditorWeight(w);
+
   Future<void> _pickSetType(BuildContext context) async {
+    final l10n = AppL10n.of(context);
     final renderBox = context.findRenderObject() as RenderBox?;
     final overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
     final offset = renderBox != null
         ? renderBox.localToGlobal(Offset.zero, ancestor: overlay)
         : Offset.zero;
 
-    final l10n = AppL10n.of(context);
     final result = await showMenu<SetType>(
       context: context,
       position: RelativeRect.fromLTRB(
@@ -2765,8 +2826,9 @@ class _SetRowState extends State<_SetRow> {
               controller: _kgCtrl,
               palette: palette,
               hint: 'kg',
-              onChanged: (v) {
-                s.weightKg = v?.toDouble();
+              decimal: true,
+              onDecimalChanged: (v) {
+                s.weightKg = v;
                 widget.onChanged();
               },
             ),
@@ -2857,20 +2919,35 @@ class _NumberField extends StatelessWidget {
   const _NumberField({
     required this.controller,
     required this.palette,
-    required this.onChanged,
+    this.onChanged,
+    this.onDecimalChanged,
+    this.decimal = false,
     this.hint,
-  });
+  }) : assert(
+          decimal ? onDecimalChanged != null : onChanged != null,
+          'decimal fields need onDecimalChanged; integer fields need onChanged',
+        );
 
   final TextEditingController controller;
   final AppPalette palette;
   final String? hint;
-  final void Function(int?) onChanged;
+
+  /// Integer callback used when [decimal] is false (reps, etc.).
+  final void Function(int?)? onChanged;
+
+  /// Double callback used when [decimal] is true (weight in kg).
+  final void Function(double?)? onDecimalChanged;
+
+  /// When true the field accepts fractional values (e.g. 17.5 kg).
+  final bool decimal;
 
   @override
   Widget build(BuildContext context) {
     return TextField(
       controller: controller,
-      keyboardType: TextInputType.number,
+      keyboardType: decimal
+          ? const TextInputType.numberWithOptions(decimal: true)
+          : TextInputType.number,
       style: GoogleFonts.barlow(fontSize: 16, color: palette.textPrimary),
       textAlign: TextAlign.center,
       decoration: InputDecoration(
@@ -2890,8 +2967,11 @@ class _NumberField extends StatelessWidget {
         ),
       ),
       onChanged: (v) {
-        final parsed = int.tryParse(v);
-        onChanged(parsed);
+        if (decimal) {
+          onDecimalChanged!(parseEditorWeight(v));
+        } else {
+          onChanged!(int.tryParse(v));
+        }
       },
     );
   }
@@ -2941,6 +3021,21 @@ class _LevelDropdown extends StatelessWidget {
     );
   }
 }
+
+// ── Weight (kg) field helpers ───────────────────────────────────────────────
+// SetSpec.weightKg is a double, so the editor must author fractional loads
+// (e.g. 17.5 kg). These keep the seed-formatter and the field parser in sync.
+
+/// Formats a weight for display in the KG field: integers drop the decimal
+/// (60), fractional values keep theirs (17.5). Null/absent → empty string.
+String formatEditorWeight(double? w) {
+  if (w == null) return '';
+  return w == w.truncateToDouble() ? w.toInt().toString() : w.toString();
+}
+
+/// Parses KG field text into a nullable double, accepting comma as the decimal
+/// separator (common on iOS numeric keypads). Empty/invalid → null.
+double? parseEditorWeight(String v) => double.tryParse(v.replaceAll(',', '.'));
 
 // ── Test bridge ───────────────────────────────────────────────────────────────
 // Exposes internal helpers for unit tests without making the private types

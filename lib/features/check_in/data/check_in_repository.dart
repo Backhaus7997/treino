@@ -41,20 +41,26 @@ class CheckInRepository {
     final id = CheckIn.dateKey(local);
     final ref = _col(uid).doc(id);
 
-    final existing = await ref.get();
-    if (existing.exists && existing.data() != null) {
-      return CheckIn.fromJson(existing.data()!);
-    }
+    // Run the existence check and write inside a transaction so a rapid
+    // double-tap (or a concurrent device) cannot both observe "no existing
+    // doc" and both call set() — which would clobber the original checkedInAt.
+    return _firestore.runTransaction<CheckIn>((transaction) async {
+      final existing = await transaction.get(ref);
+      final existingData = existing.data();
+      if (existing.exists && existingData != null) {
+        return CheckIn.fromJson(existingData);
+      }
 
-    final checkIn = CheckIn(
-      uid: uid,
-      date: id,
-      checkedInAt: now.toUtc(),
-      gymId: inGym ? gymId : null,
-      gymName: inGym ? gymName : null,
-    );
+      final checkIn = CheckIn(
+        uid: uid,
+        date: id,
+        checkedInAt: now.toUtc(),
+        gymId: inGym ? gymId : null,
+        gymName: inGym ? gymName : null,
+      );
 
-    await ref.set(checkIn.toJson());
-    return checkIn;
+      transaction.set(ref, checkIn.toJson());
+      return checkIn;
+    });
   }
 }

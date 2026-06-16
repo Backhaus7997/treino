@@ -9,6 +9,40 @@ import '../../insights/application/insights_providers.dart';
 import '../../insights/domain/weekly_insights.dart';
 import '../../insights/presentation/widgets/body_silhouette_placeholder.dart';
 
+/// ISO 8601 week number for [date] (1..53).
+///
+/// Handles the two year-boundary edge cases the naive formula misses:
+/// a result < 1 belongs to the last week of the previous ISO year, and a
+/// result of 53 in a year without 53 ISO weeks is week 1 of the next year.
+int isoWeekNumber(DateTime date) {
+  final dayOfYear =
+      DateTime(date.year, date.month, date.day)
+          .difference(DateTime(date.year, 1, 1))
+          .inDays +
+      1;
+  final weekday = date.weekday; // 1..7 (Mon..Sun)
+  final woy = ((dayOfYear - weekday + 10) / 7).floor();
+
+  if (woy < 1) {
+    // Belongs to the last week of the previous ISO year.
+    return isoWeeksInYear(date.year - 1);
+  }
+  if (woy > isoWeeksInYear(date.year)) {
+    // Overflow into week 1 of the next ISO year.
+    return 1;
+  }
+  return woy;
+}
+
+/// Number of ISO 8601 weeks (52 or 53) in [year].
+///
+/// A year has 53 weeks iff its last day (Dec 31) is a Thursday, or the
+/// previous year's last day is a Thursday (i.e. this year starts on Thu).
+int isoWeeksInYear(int year) {
+  int p(int y) => (y + (y ~/ 4) - (y ~/ 100) + (y ~/ 400)) % 7;
+  return (p(year) == 4 || p(year - 1) == 3) ? 53 : 52;
+}
+
 /// Card "Esta Semana" del Home.
 /// Wired to [weeklyInsightsProvider] — muestra racha, tira de días,
 /// contadores SEMANA/MES y el mapa muscular placeholder.
@@ -306,24 +340,11 @@ class _CardHeader extends StatelessWidget {
     'DIC',
   ];
 
-  /// ISO 8601 week number for [date].
-  int _isoWeekNumber(DateTime date) {
-    final dayOfYear = int.parse(
-          DateTime(date.year, date.month, date.day)
-              .difference(DateTime(date.year, 1, 1))
-              .inDays
-              .toString(),
-        ) +
-        1;
-    final weekday = date.weekday; // 1..7 (Mon..Sun)
-    return ((dayOfYear - weekday + 10) / 7).floor();
-  }
-
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final now = DateTime.now().toLocal();
-    final week = _isoWeekNumber(now);
+    final week = isoWeekNumber(now);
     final month = _monthsEs[now.month - 1];
 
     return Row(

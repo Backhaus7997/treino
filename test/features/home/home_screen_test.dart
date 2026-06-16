@@ -17,6 +17,7 @@ import 'package:treino/features/workout/application/session_providers.dart';
 import 'package:treino/features/workout/domain/session.dart';
 import 'package:treino/features/workout/domain/session_status.dart';
 import 'package:treino/features/workout/domain/set_log.dart';
+import 'package:treino/l10n/app_l10n.dart';
 
 UserProfile makeProfile({
   String? displayName = 'Martín',
@@ -48,6 +49,9 @@ Widget _wrapWithOverrides(Widget w, List<Override> overrides) => ProviderScope(
       overrides: overrides,
       child: MaterialApp(
         theme: AppTheme.dark(),
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+        locale: const Locale('es', 'AR'),
         home: Scaffold(body: w),
       ),
     );

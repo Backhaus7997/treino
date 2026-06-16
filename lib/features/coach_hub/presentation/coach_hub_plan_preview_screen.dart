@@ -98,6 +98,8 @@ class _CoachHubPlanPreviewScreenState
 
     if (!mounted) return;
 
+    // Total failure: nothing was saved. Keep the parsed plan and the current
+    // selection so the trainer can retry without re-uploading the Excel.
     if (failed.length == athleteIds.length) {
       setState(() {
         _error = 'No pudimos guardar el plan. Probá de nuevo.';
@@ -106,13 +108,28 @@ class _CoachHubPlanPreviewScreenState
       return;
     }
 
+    // Partial failure: some assignments succeeded, others didn't. Keep the
+    // parsed plan in memory and stay on the preview, narrowing the selection
+    // to only the failed athletes so the trainer can retry just those without
+    // re-uploading and re-parsing the Excel.
+    if (failed.isNotEmpty) {
+      final ok = athleteIds.length - failed.length;
+      setState(() {
+        _selectedAthleteIds
+          ..clear()
+          ..addAll(failed);
+        _error = 'Plan asignado a $ok atleta(s). ${failed.length} fallaron. '
+            'Quedaron seleccionados para reintentar.';
+        _saving = false;
+      });
+      return;
+    }
+
+    // Full success: clear the parsed plan and move on to the dashboard.
     ref.read(parsedPlanProvider.notifier).state = null;
-    final ok = athleteIds.length - failed.length;
-    final msg = failed.isEmpty
-        ? (ok == 1
-            ? 'Plan asignado correctamente.'
-            : 'Plan asignado a $ok atletas.')
-        : 'Plan asignado a $ok atleta(s). ${failed.length} fallaron.';
+    final msg = athleteIds.length == 1
+        ? 'Plan asignado correctamente.'
+        : 'Plan asignado a ${athleteIds.length} atletas.';
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(msg)),
     );
@@ -125,6 +142,7 @@ class _CoachHubPlanPreviewScreenState
   /// la lista `unmatched`.
   Future<void> _pickExerciseFor({
     required int dayNumber,
+    required int itemIndex,
     required String rowName,
   }) async {
     final exercises = await ref.read(exercisesProvider.future);
@@ -147,26 +165,35 @@ class _CoachHubPlanPreviewScreenState
     final current = ref.read(parsedPlanProvider);
     if (current == null) return;
 
+    // Match on the exact (day, item index) — keying on rowName alone would
+    // resolve every same-named unmatched row in the day at once. ADR-CXP-006.
     final updatedDays = current.days
         .map((d) => d.dayNumber != dayNumber
             ? d
             : d.copyWith(
-                items: d.items
-                    .map(
-                        (it) => (it.rowName == rowName && it.exerciseId == null)
-                            ? it.copyWith(
-                                exerciseId: picked.id,
-                                exerciseName: picked.name,
-                                muscleGroup: picked.muscleGroup,
-                              )
-                            : it)
-                    .toList(),
+                items: [
+                  for (var idx = 0; idx < d.items.length; idx++)
+                    (idx == itemIndex && d.items[idx].exerciseId == null)
+                        ? d.items[idx].copyWith(
+                            exerciseId: picked.id,
+                            exerciseName: picked.name,
+                            muscleGroup: picked.muscleGroup,
+                          )
+                        : d.items[idx],
+                ],
               ))
         .toList();
 
-    final updatedUnmatched = current.unmatched
-        .where((u) => !(u.dayNumber == dayNumber && u.rowName == rowName))
-        .toList();
+    // Remove exactly one matching unmatched entry, not every same-named row.
+    final updatedUnmatched = <ParsedPlanUnmatched>[];
+    var removedOne = false;
+    for (final u in current.unmatched) {
+      if (!removedOne && u.dayNumber == dayNumber && u.rowName == rowName) {
+        removedOne = true;
+        continue;
+      }
+      updatedUnmatched.add(u);
+    }
 
     ref.read(parsedPlanProvider.notifier).state = current.copyWith(
       days: updatedDays,
@@ -232,6 +259,7 @@ class _CoachHubPlanPreviewScreenState
       assignedBy: trainerUid,
       assignedTo: athleteId,
       visibility: RoutineVisibility.private,
+      numWeeks: plan.durationWeeks,
     );
   }
 
@@ -283,8 +311,9 @@ class _CoachHubPlanPreviewScreenState
                       child: _DayCard(
                         palette: palette,
                         day: d,
-                        onPickManual: (item) => _pickExerciseFor(
+                        onPickManual: (index, item) => _pickExerciseFor(
                           dayNumber: d.dayNumber,
+                          itemIndex: index,
                           rowName: item.rowName,
                         ),
                       ),
@@ -293,7 +322,6 @@ class _CoachHubPlanPreviewScreenState
                   const SizedBox(height: 6),
                   _AthletePicker(
                     palette: palette,
-                    trainerId: profile.uid,
                     selectedAthleteIds: _selectedAthleteIds,
                     onToggle: _toggleAthlete,
                   ),
@@ -531,7 +559,7 @@ class _DayCard extends StatelessWidget {
   });
   final AppPalette palette;
   final ParsedPlanDay day;
-  final Future<void> Function(ParsedPlanItem item) onPickManual;
+  final Future<void> Function(int index, ParsedPlanItem item) onPickManual;
 
   @override
   Widget build(BuildContext context) {
@@ -555,8 +583,10 @@ class _DayCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
-          ...day.items.map(
-            (i) => Padding(
+          ...day.items.asMap().entries.map((entry) {
+            final index = entry.key;
+            final i = entry.value;
+            return Padding(
               padding: const EdgeInsets.symmetric(vertical: 6),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -594,7 +624,7 @@ class _DayCard extends StatelessWidget {
                         if (i.exerciseId == null) ...[
                           const SizedBox(height: 6),
                           TextButton.icon(
-                            onPressed: () => onPickManual(i),
+                            onPressed: () => onPickManual(index, i),
                             icon: Icon(
                               TreinoIcon.search,
                               size: 16,
@@ -620,8 +650,8 @@ class _DayCard extends StatelessWidget {
                   ),
                 ],
               ),
-            ),
-          ),
+            );
+          }),
         ],
       ),
     );
@@ -632,9 +662,12 @@ class _DayCard extends StatelessWidget {
         i.repsMin == i.repsMax ? '${i.repsMin}' : '${i.repsMin}-${i.repsMax}';
     final base = '${i.sets} × $reps';
     final rest = i.restSec != null ? ' · ${i.restSec}s' : '';
-    final w = i.weightKg != null ? ' · ${i.weightKg} kg' : '';
+    final w = i.weightKg != null ? ' · ${_formatWeight(i.weightKg!)} kg' : '';
     return '$base$rest$w';
   }
+
+  String _formatWeight(double w) =>
+      w == w.truncateToDouble() ? w.toInt().toString() : w.toString();
 }
 
 /// Bottom sheet con search + lista del catálogo de exercises.
@@ -815,18 +848,18 @@ class _UnmatchedBadge extends StatelessWidget {
 class _AthletePicker extends ConsumerWidget {
   const _AthletePicker({
     required this.palette,
-    required this.trainerId,
     required this.selectedAthleteIds,
     required this.onToggle,
   });
   final AppPalette palette;
-  final String trainerId;
   final Set<String> selectedAthleteIds;
   final void Function(String athleteId) onToggle;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final linksAsync = ref.watch(linksForTrainerProvider(trainerId));
+    // Real-time stream (not the deprecated one-shot FutureProvider) so a link
+    // accepted/paused/terminated elsewhere updates the list live. ADR-CHLM-03.
+    final linksAsync = ref.watch(trainerLinksStreamProvider);
     return linksAsync.when(
       loading: () => Center(
         child: CircularProgressIndicator(color: palette.accent),

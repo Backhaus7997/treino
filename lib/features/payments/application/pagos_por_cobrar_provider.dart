@@ -26,6 +26,24 @@ int _isoWeekNumber(DateTime date) {
   return ((thursday.difference(week1Monday).inDays) ~/ 7) + 1;
 }
 
+/// Returns the ISO 8601 week-owning year for [date].
+///
+/// Near the New Year boundary this differs from [date]'s calendar year: the
+/// owning year is the year of the Thursday in the same ISO week (the same
+/// Thursday [_isoWeekNumber] keys off). E.g. 2027-01-01 (Fri) belongs to ISO
+/// week 53 of 2026, so its owning year is 2026.
+int _isoWeekYear(DateTime date) =>
+    date.subtract(Duration(days: date.weekday - 4)).year;
+
+/// Stable `YYYY-Www` period key for the ISO week containing [date].
+///
+/// Uses the ISO week-owning year (not the calendar year) so the same physical
+/// ISO week maps to one key on both sides of the New Year boundary. Reader
+/// (this provider, mi_cuota_provider) and writer (trainer_dashboard_tab) MUST
+/// build the key the same way or weekly charges double-bill across year-end.
+String isoWeekPeriodKey(DateTime date) =>
+    '${_isoWeekYear(date)}-W${_isoWeekNumber(date).toString().padLeft(2, '0')}';
+
 // ── Spanish month names ───────────────────────────────────────────────────────
 
 const _kMeses = <String>[
@@ -104,6 +122,13 @@ final pagosPorCobrarProvider =
   if (paymentsAsync.isLoading && !paymentsAsync.hasValue) {
     return const AsyncValue.loading();
   }
+  // Without this guard, an errored payments stream falls back to an empty list,
+  // which makes the "already paid" / lastPaidAt logic treat every athlete as
+  // never paid and re-surface their full recurring charges. Surface the error
+  // instead so the dashboard shows its error state rather than wrong amounts.
+  if (paymentsAsync.hasError && !paymentsAsync.hasValue) {
+    return AsyncValue.error(paymentsAsync.error!, paymentsAsync.stackTrace!);
+  }
 
   final allPayments = paymentsAsync.valueOrNull ?? const [];
 
@@ -114,7 +139,7 @@ final pagosPorCobrarProvider =
   final currentWeek = _isoWeekNumber(now);
 
   final monthKey = '$currentYear-${currentMonth.toString().padLeft(2, '0')}';
-  final weekKey = '$currentYear-W${currentWeek.toString().padLeft(2, '0')}';
+  final weekKey = isoWeekPeriodKey(now);
 
   // ── 4. Per-athlete computation ────────────────────────────────────────────
   final results = <CobroPendiente>[];
@@ -151,6 +176,11 @@ final pagosPorCobrarProvider =
 
     if (billingAsync.isLoading && !billingAsync.hasValue) {
       anyLoading = true;
+      continue;
+    }
+    if (billingAsync.hasError && !billingAsync.hasValue) {
+      // Cannot determine this athlete's recurring config — skip their recurring
+      // charge rather than guess. One-off pendings above already surfaced.
       continue;
     }
 
@@ -199,12 +229,19 @@ final pagosPorCobrarProvider =
           anyLoading = true;
           continue;
         }
+        if (sessionsAsync.hasError && !sessionsAsync.hasValue) {
+          // Cannot count sessions for this athlete — skip rather than charge 0.
+          continue;
+        }
 
         final sessions = sessionsAsync.valueOrNull ?? const [];
 
-        // last payment paidAt for this athlete (or epoch)
+        // Billing window floor: start no earlier than when the relationship
+        // began (link.acceptedAt) so sessions finished before the athlete ever
+        // linked to this trainer are not charged. Falls back to epoch only
+        // when acceptedAt is missing.
         final epoch = DateTime.utc(1970);
-        DateTime lastPaidAt = epoch;
+        DateTime lastPaidAt = link.acceptedAt?.toUtc() ?? epoch;
         for (final p in athletePayments) {
           if (p.status == PaymentStatus.paid && p.paidAt != null) {
             if (p.paidAt!.isAfter(lastPaidAt)) {

@@ -60,6 +60,26 @@ void main() {
       final all = await repo.listAll();
       expect(all.single.id, 'mi-id-custom');
     });
+
+    test('salta un doc malformado en vez de romper el catálogo entero',
+        () async {
+      // Doc válido.
+      await firestore.collection('gyms').doc('ok-1').set(
+            _gymDoc(name: 'Megatlon Belgrano', lat: -34.55, lng: -58.46),
+          );
+      // Doc malformado: lat guardado como String → Gym.fromJson lanza al
+      // castear. Antes del fix esto abortaba todo listAll().
+      await firestore.collection('gyms').doc('broken').set({
+        ..._gymDoc(name: 'Corrupto', lat: 0, lng: 0),
+        'lat': 'no-soy-un-double',
+      });
+      await firestore.collection('gyms').doc('ok-2').set(
+            _gymDoc(name: 'SmartFit Caballito', lat: -34.61, lng: -58.44),
+          );
+
+      final all = await repo.listAll();
+      expect(all.map((g) => g.id).toSet(), {'ok-1', 'ok-2'});
+    });
   });
 
   group('GymRepository.getById', () {

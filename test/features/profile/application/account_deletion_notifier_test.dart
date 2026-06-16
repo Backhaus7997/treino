@@ -11,6 +11,8 @@
 //   - A fake showModalBottomSheet callback (simulating the sheet result)
 //   - Mocked providers for AuthService, AccountDeletionService, FirebaseAuth
 
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -216,5 +218,54 @@ void main() {
 
     // Sheet was opened only once (on first deleteAccount call)
     expect(sheetOpenCount, 1);
+  });
+
+  // REGRESSION: retry() must hold accountDeletionInFlightProvider true for the
+  // full CF cascade window so the router defers the loggedIn=true + profile=null
+  // → /profile-setup redirect (mirrors deleteAccount). Previously retry() never
+  // set the flag, stranding the user mid-deletion on /profile-setup.
+  test(
+      'retry within 5 min sets accountDeletionInFlightProvider during CF '
+      'and resets it after', () async {
+    final credential = FakeAuthCredential();
+    final cfGate = Completer<void>();
+    bool? inFlightDuringCf;
+
+    when(() => mockAuthService.reauthenticate(any())).thenAnswer((_) async {});
+    when(() => mockAuthService.signOut()).thenAnswer((_) async {});
+
+    final container = buildContainer(sheetResult: () async => credential);
+
+    // First call establishes the fresh re-auth window.
+    when(() => mockDeletionService.call(uid: any(named: 'uid'))).thenAnswer(
+        (_) async => FakeDeletionResult(
+            status: 'success', deletedCollections: const ['users-auth']));
+    await container
+        .read(accountDeletionNotifierProvider.notifier)
+        .deleteAccount();
+    expect(container.read(accountDeletionInFlightProvider), isFalse);
+
+    // Retry: capture the flag value while the CF is mid-flight (gated).
+    when(() => mockDeletionService.call(uid: any(named: 'uid')))
+        .thenAnswer((_) async {
+      inFlightDuringCf = container.read(accountDeletionInFlightProvider);
+      await cfGate.future;
+      return FakeDeletionResult(
+          status: 'success', deletedCollections: const ['users-auth']);
+    });
+
+    final retryFuture =
+        container.read(accountDeletionNotifierProvider.notifier).retry();
+
+    // Let retry() run up to the gated CF call.
+    await Future<void>.delayed(Duration.zero);
+    expect(inFlightDuringCf, isTrue,
+        reason: 'flag must be true while the CF cascade is in flight');
+
+    cfGate.complete();
+    await retryFuture;
+
+    expect(container.read(accountDeletionInFlightProvider), isFalse,
+        reason: 'flag must be reset after the cascade completes');
   });
 }

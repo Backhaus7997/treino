@@ -318,7 +318,7 @@ class _TrackingNotifier extends PostWorkoutNotifier {
   final void Function() onShare;
 
   @override
-  Future<void> shareWorkout(Session session) async {
+  Future<void> shareWorkout(Session session, {required String text}) async {
     onShare();
     state = const AsyncData(null);
   }
@@ -326,7 +326,7 @@ class _TrackingNotifier extends PostWorkoutNotifier {
 
 class _SuccessNotifier extends PostWorkoutNotifier {
   @override
-  Future<void> shareWorkout(Session session) async {
+  Future<void> shareWorkout(Session session, {required String text}) async {
     state = const AsyncLoading();
     await Future<void>.delayed(Duration.zero);
     state = const AsyncData(null);
@@ -335,7 +335,7 @@ class _SuccessNotifier extends PostWorkoutNotifier {
 
 class _ErrorNotifier extends PostWorkoutNotifier {
   @override
-  Future<void> shareWorkout(Session session) async {
+  Future<void> shareWorkout(Session session, {required String text}) async {
     state = const AsyncLoading();
     await Future<void>.delayed(Duration.zero);
     final err = Exception('fail');
