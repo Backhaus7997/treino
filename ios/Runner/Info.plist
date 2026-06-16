@@ -42,6 +42,21 @@
 	</array>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Necesitamos tu ubicación para mostrarte entrenadores cerca tuyo.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Para tomar y subir tu foto de perfil.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Para elegir tu foto de perfil y subir planes de entrenamiento en Excel desde tu galería.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Para guardar imágenes de tu progreso en tu galería cuando lo solicites.</string>
+	<!--
+		Export Compliance: declaramos que la app solo usa criptografía estándar
+		exenta (HTTPS/TLS vía Firebase). Sin esta key, App Store Connect bloquea
+		el processing hasta que respondas el form de Export Compliance en cada
+		build subido. ITSAppUsesNonExemptEncryption=false declara que NO usamos
+		criptografía no-estándar/propietaria → bypass del form.
+	-->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>
