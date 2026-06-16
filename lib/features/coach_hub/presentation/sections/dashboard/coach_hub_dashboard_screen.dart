@@ -1,18 +1,17 @@
-import 'package:firebase_auth/firebase_auth.dart';
+// NOTE: el Scaffold y el SafeArea los provee CoachHubScaffold (el shell).
+// NO los agregues acá (ADR-CHW-005).
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
-
-import '../../../app/theme/app_palette.dart';
-import '../../../core/analytics/analytics_service.dart';
-import '../../../core/widgets/treino_icon.dart';
-import '../../coach/application/trainer_link_providers.dart';
-import '../../coach/domain/trainer_link.dart';
-import '../../coach/domain/trainer_link_status.dart';
-import '../../feed/presentation/widgets/post_avatar.dart';
-import '../../profile/application/user_providers.dart';
-import '../../profile/application/user_public_profile_providers.dart';
+import 'package:treino/app/theme/app_palette.dart';
+import 'package:treino/core/analytics/analytics_service.dart';
+import 'package:treino/core/widgets/treino_icon.dart';
+import 'package:treino/features/coach/application/trainer_link_providers.dart';
+import 'package:treino/features/coach/domain/trainer_link.dart';
+import 'package:treino/features/coach/domain/trainer_link_status.dart';
+import 'package:treino/features/feed/presentation/widgets/post_avatar.dart';
+import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 
 /// Coach Hub status filter for the dashboard sections.
 ///
@@ -102,99 +101,47 @@ class CoachHubDashboardScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
-    final profileAsync = ref.watch(userProfileProvider);
-    final displayName = profileAsync.valueOrNull?.displayName ?? 'PF';
 
-    return Scaffold(
-      backgroundColor: palette.bg,
-      body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 800),
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Header con brand + sign-out
-                  Row(
-                    children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'TREINO COACH HUB',
-                            style: GoogleFonts.barlowCondensed(
-                              color: palette.highlight,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 1.8,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            'BIENVENIDO, ${displayName.toUpperCase()}',
-                            style: GoogleFonts.barlowCondensed(
-                              color: palette.textPrimary,
-                              fontSize: 24,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 1.2,
-                              height: 1,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const Spacer(),
-                      TextButton.icon(
-                        onPressed: () async {
-                          await FirebaseAuth.instance.signOut();
-                          // El router redirige automáticamente al /login
-                          // cuando authStateChangesProvider emite null.
-                        },
-                        icon: Icon(
-                          TreinoIcon.signOut,
-                          color: palette.textMuted,
-                          size: 18,
-                        ),
-                        label: Text(
-                          'Salir',
-                          style: TextStyle(color: palette.textMuted),
-                        ),
-                      ),
-                    ],
+    // Sin Scaffold/SafeArea ni header de marca: el shell (CoachHubScaffold)
+    // provee el chrome (sidebar + top bar) y el sign-out vive en el menú de
+    // usuario del top bar (W1.3). Acá solo va el contenido (ADR-CHW-005).
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 800),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              ElevatedButton.icon(
+                onPressed: () => context.go('/upload-plan'),
+                icon: Icon(TreinoIcon.upload, size: 18, color: palette.bg),
+                label: Text(
+                  'IMPORTAR PLAN DESDE EXCEL',
+                  style: GoogleFonts.barlowCondensed(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                    letterSpacing: 1.4,
                   ),
-                  const SizedBox(height: 18),
-                  ElevatedButton.icon(
-                    onPressed: () => context.go('/upload-plan'),
-                    icon: Icon(TreinoIcon.upload, size: 18, color: palette.bg),
-                    label: Text(
-                      'IMPORTAR PLAN DESDE EXCEL',
-                      style: GoogleFonts.barlowCondensed(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13,
-                        letterSpacing: 1.4,
-                      ),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: palette.accent,
-                      foregroundColor: palette.bg,
-                      minimumSize: const Size.fromHeight(48),
-                      shape: const StadiumBorder(),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  // Pending requests (only renders when there's at least one)
-                  const _PendingRequestsList(),
-                  // Status filter chips
-                  const _FilterChipRow(),
-                  const SizedBox(height: 14),
-                  // Three sections, each gated on _statusFilterProvider
-                  const _ActiveStudentsList(),
-                  const _PausedStudentsList(),
-                  const _HistorialList(),
-                ],
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: palette.accent,
+                  foregroundColor: palette.bg,
+                  minimumSize: const Size.fromHeight(48),
+                  shape: const StadiumBorder(),
+                ),
               ),
-            ),
+              const SizedBox(height: 24),
+              // Pending requests (only renders when there's at least one)
+              const _PendingRequestsList(),
+              // Status filter chips
+              const _FilterChipRow(),
+              const SizedBox(height: 14),
+              // Three sections, each gated on _statusFilterProvider
+              const _ActiveStudentsList(),
+              const _PausedStudentsList(),
+              const _HistorialList(),
+            ],
           ),
         ),
       ),
