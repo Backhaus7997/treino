@@ -5,6 +5,8 @@ import 'package:treino/app/theme/app_palette.dart';
 import 'content_max_width.dart';
 import 'coach_hub_sidebar.dart';
 import 'coach_hub_top_bar.dart';
+import 'mobile_banner.dart';
+import 'responsive.dart' as rsp;
 
 /// Layout raíz del Coach Hub web (REQ-CHW-SHELL-001/002).
 ///
@@ -12,8 +14,11 @@ import 'coach_hub_top_bar.dart';
 /// `child` (página de sección) en el área de contenido acotada por
 /// [ContentMaxWidth]. Fondo `palette.bg` — dark mode, sin HEX literales.
 ///
-/// W1.1 shipea SIN el guard responsivo (force-collapse < 1024, banner < 768);
-/// eso se agrega en W1.3.4.
+/// Guard responsivo (ADR-CHW-004, REQ-CHW-RESPONSIVE-001/002):
+/// - `< 768 px` → [MobileBanner] reemplaza todo el shell.
+/// - `768–1279 px` (compact) → sidebar forzado a colapsado; el provider NO se
+///   escribe, así el valor guardado se preserva al volver a desktop.
+/// - `>= 1280 px` (desktop) → el sidebar respeta `sidebarCollapsedProvider`.
 class CoachHubScaffold extends ConsumerWidget {
   const CoachHubScaffold({super.key, required this.child});
 
@@ -22,13 +27,18 @@ class CoachHubScaffold extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
-    // TODO(W1.3): apply viewportFor() responsive guard.
+    final viewport = rsp.viewportFor(MediaQuery.sizeOf(context).width);
+
+    if (viewport == rsp.Viewport.mobile) return const MobileBanner();
+
+    final forceCollapsed = viewport == rsp.Viewport.compact;
+
     return Scaffold(
       backgroundColor: palette.bg,
       body: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const CoachHubSidebar(),
+          CoachHubSidebar(collapsedOverride: forceCollapsed ? true : null),
           Expanded(
             child: Column(
               children: [
