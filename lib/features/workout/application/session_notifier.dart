@@ -252,19 +252,31 @@ class SessionNotifier
     final current = state.value;
     if (current == null) return;
 
-    _finalize();
     final repo = ref.read(sessionRepositoryProvider);
     final uid = ref.read(currentUidProvider);
     if (uid == null) return;
 
-    await repo.finish(
-      uid: uid,
-      sessionId: current.session.id,
-      finishedAt: DateTime.now(),
-      wasFullyCompleted: false,
-      totalVolumeKg: current.totalVolumeKg,
-      durationMin: _durationMin(current.elapsedSeconds),
-    );
+    // Mark finalized BEFORE the await so a concurrent abandon/finish call is a
+    // no-op (the SCENARIO-266 double-finish guard). The timer is NOT cancelled
+    // yet: if the write fails we reset _finalized and keep the notifier (and its
+    // timer) alive so the user can retry. Only after the write succeeds do we
+    // tear down the timer. Otherwise a failed Firestore write would leave the
+    // session active in Firestore but the local notifier dead and frozen.
+    _finalized = true;
+    try {
+      await repo.finish(
+        uid: uid,
+        sessionId: current.session.id,
+        finishedAt: DateTime.now(),
+        wasFullyCompleted: false,
+        totalVolumeKg: current.totalVolumeKg,
+        durationMin: _durationMin(current.elapsedSeconds),
+      );
+    } catch (_) {
+      _finalized = false;
+      rethrow;
+    }
+    _finalize();
     state = AsyncData(current.copyWith(
       session: current.session.copyWith(wasFullyCompleted: false),
     ));
@@ -279,19 +291,29 @@ class SessionNotifier
           'finishSession llamado antes de que isFullyCompleted sea true');
     }
 
-    _finalize();
     final repo = ref.read(sessionRepositoryProvider);
     final uid = ref.read(currentUidProvider);
     if (uid == null) return;
 
-    await repo.finish(
-      uid: uid,
-      sessionId: current.session.id,
-      finishedAt: DateTime.now(),
-      wasFullyCompleted: true,
-      totalVolumeKg: current.totalVolumeKg,
-      durationMin: _durationMin(current.elapsedSeconds),
-    );
+    // Mark finalized BEFORE the await so a concurrent finish/abandon call is a
+    // no-op. The timer stays alive until the write succeeds: on failure we reset
+    // _finalized and keep the notifier usable so the user can retry, instead of
+    // leaving the session active in Firestore while the local notifier is frozen.
+    _finalized = true;
+    try {
+      await repo.finish(
+        uid: uid,
+        sessionId: current.session.id,
+        finishedAt: DateTime.now(),
+        wasFullyCompleted: true,
+        totalVolumeKg: current.totalVolumeKg,
+        durationMin: _durationMin(current.elapsedSeconds),
+      );
+    } catch (_) {
+      _finalized = false;
+      rethrow;
+    }
+    _finalize();
     // Solo en el path "finished fully completed" — los abandonos no cuentan
     // como "routine_finished" para producto. Si más adelante producto pide
     // ver abandons, se agrega `routine_abandoned` aparte.

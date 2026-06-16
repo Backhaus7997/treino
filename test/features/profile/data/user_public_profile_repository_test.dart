@@ -204,4 +204,39 @@ void main() {
     final resultsWhitespace = await repo.searchByDisplayName('   ');
     expect(resultsWhitespace, isEmpty);
   });
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // getByIds batch lookup — backs the RESEÑAS section's single-read author
+  // resolution (replaces the per-tile N+1 listen pattern).
+  // ──────────────────────────────────────────────────────────────────────────
+  test('getByIds returns a uid->profile map and omits missing/duplicate ids',
+      () async {
+    await firestore.collection('userPublicProfiles').doc('u1').set({
+      'uid': 'u1',
+      'displayName': 'Ana',
+      'displayNameLowercase': 'ana',
+      'avatarUrl': null,
+      'gymId': null,
+    });
+    await firestore.collection('userPublicProfiles').doc('u2').set({
+      'uid': 'u2',
+      'displayName': 'Beto',
+      'displayNameLowercase': 'beto',
+      'avatarUrl': 'https://cdn.example.com/beto.jpg',
+      'gymId': null,
+    });
+
+    // u3 has no doc (deleted account); u1 is requested twice (deduped).
+    final result = await repo.getByIds(['u1', 'u2', 'u3', 'u1']);
+
+    expect(result.keys.toSet(), equals({'u1', 'u2'}));
+    expect(result['u1']!.displayName, equals('Ana'));
+    expect(result['u2']!.avatarUrl, equals('https://cdn.example.com/beto.jpg'));
+    expect(result.containsKey('u3'), isFalse);
+  });
+
+  test('getByIds short-circuits on empty input', () async {
+    final result = await repo.getByIds(const []);
+    expect(result, isEmpty);
+  });
 }

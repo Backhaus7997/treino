@@ -166,7 +166,7 @@ class _OwnProfileStatsRow extends ConsumerWidget {
               _StatTile(
                 label: 'VOLUMEN KG', // i18n: Fase 6 Etapa 3
                 value: statsAsync.when(
-                  data: (s) => kFormat(s.totalVolumeKg),
+                  data: (s) => kFormatMagnitude(s.totalVolumeKg),
                   loading: () => '--',
                   error: (_, __) => '--',
                 ),

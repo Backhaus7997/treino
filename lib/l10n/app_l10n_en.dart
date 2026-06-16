@@ -1330,4 +1330,56 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get routineEditorSetTypeFailure => 'To failure (F)';
+
+  @override
+  String get routineDetailNotFound => '';
+
+  @override
+  String get routineDetailNoDaysConfigured => '';
+
+  @override
+  String get routineDetailLoadError => '';
+
+  @override
+  String get routineDetailNoExercisesThisWeek => '';
+
+  @override
+  String get routineDetailNoExercisesThisDay => '';
+
+  @override
+  String get routineDetailStatExercises => '';
+
+  @override
+  String get routineDetailStatSets => '';
+
+  @override
+  String get routineDetailStatMinutes => '';
+
+  @override
+  String get routineDetailSuperset => '';
+
+  @override
+  String routineDetailDayLabel(int day) {
+    return '';
+  }
+
+  @override
+  String routineDetailWeekLabel(int week) {
+    return '';
+  }
+
+  @override
+  String get routineDetailPlanComplete => '';
+
+  @override
+  String get routineDetailCompleted => '';
+
+  @override
+  String get routineDetailWeekLocked => '';
+
+  @override
+  String get routineDetailDayLocked => '';
+
+  @override
+  String get routineDetailStart => '';
 }

@@ -28,7 +28,19 @@ Widget _wrap({required List<Review> reviews}) => ProviderScope(
       overrides: [
         trainerReviewsProvider(_trainerId)
             .overrideWith((ref) => Stream.value(reviews)),
-        // Provide a fallback profile so ReviewTile doesn't hang in loading
+        // The section now batch-resolves all authors in one read. Override the
+        // batch provider (keyed by the comma-joined, sorted, deduped uid set)
+        // so the tiles render resolved profiles without touching Firebase auth.
+        userPublicProfilesBatchProvider(_athleteId).overrideWith(
+          (ref) => Future.value(const {
+            _athleteId: UserPublicProfile(
+              uid: _athleteId,
+              displayName: 'Test Athlete',
+            ),
+          }),
+        ),
+        // Fallback for the single-author path (used during the batch's brief
+        // load window) so ReviewTile never hangs in loading.
         userPublicProfileProvider(_athleteId).overrideWith(
           (ref) => Stream.value(const UserPublicProfile(
             uid: _athleteId,

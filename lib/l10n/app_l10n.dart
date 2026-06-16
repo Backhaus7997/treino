@@ -2518,6 +2518,102 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Al fallo (F)'**
   String get routineEditorSetTypeFailure;
+
+  /// No description provided for @routineDetailNotFound.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Rutina no encontrada'**
+  String get routineDetailNotFound;
+
+  /// No description provided for @routineDetailNoDaysConfigured.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Esta rutina no tiene días configurados.'**
+  String get routineDetailNoDaysConfigured;
+
+  /// No description provided for @routineDetailLoadError.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cargar la rutina.'**
+  String get routineDetailLoadError;
+
+  /// No description provided for @routineDetailNoExercisesThisWeek.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Sin ejercicios esta semana'**
+  String get routineDetailNoExercisesThisWeek;
+
+  /// No description provided for @routineDetailNoExercisesThisDay.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No hay ejercicios en este día'**
+  String get routineDetailNoExercisesThisDay;
+
+  /// No description provided for @routineDetailStatExercises.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'EJERCICIOS'**
+  String get routineDetailStatExercises;
+
+  /// No description provided for @routineDetailStatSets.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'SETS'**
+  String get routineDetailStatSets;
+
+  /// No description provided for @routineDetailStatMinutes.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'MINUTOS'**
+  String get routineDetailStatMinutes;
+
+  /// No description provided for @routineDetailSuperset.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'SUPERSERIE'**
+  String get routineDetailSuperset;
+
+  /// No description provided for @routineDetailDayLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'DÍA {day}'**
+  String routineDetailDayLabel(int day);
+
+  /// No description provided for @routineDetailWeekLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'SEM {week}'**
+  String routineDetailWeekLabel(int week);
+
+  /// No description provided for @routineDetailPlanComplete.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'PLAN COMPLETADO'**
+  String get routineDetailPlanComplete;
+
+  /// No description provided for @routineDetailCompleted.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'COMPLETADO'**
+  String get routineDetailCompleted;
+
+  /// No description provided for @routineDetailWeekLocked.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'SEMANA BLOQUEADA'**
+  String get routineDetailWeekLocked;
+
+  /// No description provided for @routineDetailDayLocked.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'DÍA BLOQUEADO'**
+  String get routineDetailDayLocked;
+
+  /// No description provided for @routineDetailStart.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'EMPEZAR'**
+  String get routineDetailStart;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

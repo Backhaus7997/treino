@@ -54,13 +54,15 @@ class _RoutineDetailScreenState extends ConsumerState<RoutineDetailScreen> {
           child: routineAsync.when(
             data: (routine) {
               if (routine == null) {
-                return const _NotFoundState(label: 'Rutina no encontrada');
+                return _NotFoundState(
+                    label: AppL10n.of(context).routineDetailNotFound);
               }
               // `clamp(0, length - 1)` throws when length == 0 — empty-check
               // BEFORE clamping.
               if (routine.days.isEmpty) {
-                return const _EmptyState(
-                    message: 'Esta rutina no tiene días configurados.');
+                return _EmptyState(
+                    message:
+                        AppL10n.of(context).routineDetailNoDaysConfigured);
               }
               final dayIndex =
                   selectedDayIndex.clamp(0, routine.days.length - 1);
@@ -91,7 +93,7 @@ class _RoutineDetailScreenState extends ConsumerState<RoutineDetailScreen> {
             },
             loading: () => const _RoutineLoadingSkeleton(),
             error: (_, __) => _ErrorState(
-              message: 'No pudimos cargar la rutina.',
+              message: AppL10n.of(context).routineDetailLoadError,
               onRetry: () =>
                   ref.invalidate(routineByIdProvider(widget.routineId)),
             ),
@@ -246,14 +248,15 @@ class _RoutineDetailContent extends ConsumerWidget {
   /// REQ-WPRES-015: [isPeriodized] is false for single-week plans → no filter.
   List<Widget> _buildPresenceFilteredSection(
     int viewedWeek,
-    bool isPeriodized,
-  ) {
+    bool isPeriodized, {
+    required String emptyWeekMessage,
+  }) {
     // Build the list (filtering applied inside _buildExerciseList when needed).
     final exerciseWidgets =
         _buildExerciseList(viewedWeek, isPeriodized: isPeriodized);
     if (isPeriodized && exerciseWidgets.isEmpty) {
       // All slots absent for this week → informational message (not a lock).
-      return const [_EmptyState(message: 'Sin ejercicios esta semana')];
+      return [_EmptyState(message: emptyWeekMessage)];
     }
     return exerciseWidgets;
   }
@@ -267,13 +270,15 @@ class _RoutineDetailContent extends ConsumerWidget {
     // For single-week plans the viewed week is always 0.
     final viewedWeek = isPeriodized ? selectedWeekIndex : 0;
 
+    final l10n = AppL10n.of(context);
+
     return CustomScrollView(
       slivers: [
         SliverToBoxAdapter(
           child: _HeroStrip(
             routine: routine,
             badgeText:
-                '${(routine.split ?? AppL10n.of(context).workoutSplitFallback).toUpperCase()} · DÍA ${day.dayNumber}',
+                '${(routine.split ?? l10n.workoutSplitFallback).toUpperCase()} · ${l10n.routineDetailDayLabel(day.dayNumber)}',
             titleText: day.name.toUpperCase(),
           ),
         ),
@@ -286,15 +291,15 @@ class _RoutineDetailContent extends ConsumerWidget {
               _StatRow(
                 tiles: [
                   StatTile(
-                    label: 'EJERCICIOS',
+                    label: l10n.routineDetailStatExercises,
                     value: '${day.slots.length}',
                   ),
                   StatTile(
-                    label: 'SETS',
+                    label: l10n.routineDetailStatSets,
                     value: '${_totalSets(day)}',
                   ),
                   StatTile(
-                    label: 'MINUTOS',
+                    label: l10n.routineDetailStatMinutes,
                     value: _minutesValue(day, selectedWeekIndex),
                   ),
                 ],
@@ -317,14 +322,18 @@ class _RoutineDetailContent extends ConsumerWidget {
                 ),
                 const SizedBox(height: 20),
               ],
-              const _SectionHeader(text: 'EJERCICIOS'),
+              _SectionHeader(text: l10n.routineDetailStatExercises),
               const SizedBox(height: 12),
               if (day.slots.isEmpty)
-                const _EmptyState(message: 'No hay ejercicios en este día')
+                _EmptyState(message: l10n.routineDetailNoExercisesThisDay)
               else
                 // REQ-WPRES-020: filter by presence when periodized.
                 // REQ-WPRES-028: zero present slots → show info message.
-                ..._buildPresenceFilteredSection(viewedWeek, isPeriodized),
+                ..._buildPresenceFilteredSection(
+                  viewedWeek,
+                  isPeriodized,
+                  emptyWeekMessage: l10n.routineDetailNoExercisesThisWeek,
+                ),
               const SizedBox(height: 20),
               // CTA bar — periodized vs single-week
               if (isPeriodized)
@@ -385,7 +394,7 @@ class _SupersetBlock extends StatelessWidget {
                 Icon(TreinoIcon.streak, size: 14, color: palette.highlight),
                 const SizedBox(width: 6),
                 Text(
-                  'SUPERSERIE',
+                  AppL10n.of(context).routineDetailSuperset,
                   style: GoogleFonts.barlowCondensed(
                     fontWeight: FontWeight.w700,
                     fontSize: 12,
@@ -695,6 +704,7 @@ class _DaySelector extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
@@ -703,7 +713,7 @@ class _DaySelector extends StatelessWidget {
             padding: const EdgeInsets.only(right: 8),
             child: ChoiceChip(
               label: Text(
-                'DÍA ${days[i].dayNumber}',
+                l10n.routineDetailDayLabel(days[i].dayNumber),
                 style: GoogleFonts.barlowCondensed(
                   fontWeight: FontWeight.w600,
                   fontSize: 11,
@@ -741,6 +751,7 @@ class _WeekSelector extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
@@ -749,7 +760,7 @@ class _WeekSelector extends StatelessWidget {
             padding: const EdgeInsets.only(right: 8),
             child: ChoiceChip(
               label: Text(
-                'SEM ${i + 1}',
+                l10n.routineDetailWeekLabel(i + 1),
                 style: GoogleFonts.barlowCondensed(
                   fontWeight: FontWeight.w600,
                   fontSize: 11,
@@ -813,6 +824,7 @@ class _PeriodizedCTABar extends ConsumerWidget {
       error: (_, __) => const SizedBox.shrink(),
       data: (progress) {
         final palette = AppPalette.of(context);
+        final l10n = AppL10n.of(context);
 
         // Plan-complete banner (REQ-PERIOD-037, SCENARIO-036).
         if (progress.planComplete) {
@@ -831,7 +843,7 @@ class _PeriodizedCTABar extends ConsumerWidget {
                   Icon(TreinoIcon.check, size: 20, color: palette.accent),
                   const SizedBox(width: 10),
                   Text(
-                    'PLAN COMPLETADO',
+                    l10n.routineDetailPlanComplete,
                     style: GoogleFonts.barlowCondensed(
                       fontWeight: FontWeight.w700,
                       fontSize: 16,
@@ -894,7 +906,7 @@ class _PeriodizedCTABar extends ConsumerWidget {
                   Icon(TreinoIcon.check, size: 16, color: palette.accent),
                   const SizedBox(width: 8),
                   Text(
-                    'COMPLETADO',
+                    l10n.routineDetailCompleted,
                     style: GoogleFonts.barlowCondensed(
                       fontWeight: FontWeight.w700,
                       fontSize: 14,
@@ -926,7 +938,9 @@ class _PeriodizedCTABar extends ConsumerWidget {
                   Icon(TreinoIcon.lock, size: 16, color: palette.textMuted),
                   const SizedBox(width: 8),
                   Text(
-                    weekLocked ? 'SEMANA BLOQUEADA' : 'DÍA BLOQUEADO',
+                    weekLocked
+                        ? l10n.routineDetailWeekLocked
+                        : l10n.routineDetailDayLocked,
                     style: GoogleFonts.barlowCondensed(
                       fontWeight: FontWeight.w700,
                       fontSize: 14,
@@ -966,7 +980,7 @@ class _PeriodizedCTABar extends ConsumerWidget {
                     ),
                   ),
                   child: Text(
-                    'EMPEZAR',
+                    l10n.routineDetailStart,
                     style: GoogleFonts.barlowCondensed(
                       fontWeight: FontWeight.w700,
                       fontSize: 16,
@@ -1038,6 +1052,7 @@ class _StartSessionCTABar extends ConsumerWidget {
     );
     if (role == UserRole.trainer) return const SizedBox.shrink();
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 18),
       child: Row(
@@ -1061,7 +1076,7 @@ class _StartSessionCTABar extends ConsumerWidget {
                 ),
               ),
               child: Text(
-                'EMPEZAR',
+                l10n.routineDetailStart,
                 style: GoogleFonts.barlowCondensed(
                   fontWeight: FontWeight.w700,
                   fontSize: 16,
@@ -1123,7 +1138,7 @@ class _ErrorState extends StatelessWidget {
           TextButton(
             onPressed: onRetry,
             child: Text(
-              'Reintentar',
+              AppL10n.of(context).workoutButtonRetry,
               style: GoogleFonts.barlowCondensed(
                 fontWeight: FontWeight.w600,
                 fontSize: 14,

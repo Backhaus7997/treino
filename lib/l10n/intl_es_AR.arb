@@ -674,5 +674,46 @@
   "routineEditorSetTypeDrop": "Drop (D)",
   "@routineEditorSetTypeDrop": {},
   "routineEditorSetTypeFailure": "Al fallo (F)",
-  "@routineEditorSetTypeFailure": {}
+  "@routineEditorSetTypeFailure": {},
+
+  "routineDetailNotFound": "Rutina no encontrada",
+  "@routineDetailNotFound": {},
+  "routineDetailNoDaysConfigured": "Esta rutina no tiene días configurados.",
+  "@routineDetailNoDaysConfigured": {},
+  "routineDetailLoadError": "No pudimos cargar la rutina.",
+  "@routineDetailLoadError": {},
+  "routineDetailNoExercisesThisWeek": "Sin ejercicios esta semana",
+  "@routineDetailNoExercisesThisWeek": {},
+  "routineDetailNoExercisesThisDay": "No hay ejercicios en este día",
+  "@routineDetailNoExercisesThisDay": {},
+  "routineDetailStatExercises": "EJERCICIOS",
+  "@routineDetailStatExercises": {},
+  "routineDetailStatSets": "SETS",
+  "@routineDetailStatSets": {},
+  "routineDetailStatMinutes": "MINUTOS",
+  "@routineDetailStatMinutes": {},
+  "routineDetailSuperset": "SUPERSERIE",
+  "@routineDetailSuperset": {},
+  "routineDetailDayLabel": "DÍA {day}",
+  "@routineDetailDayLabel": {
+    "placeholders": {
+      "day": { "type": "int" }
+    }
+  },
+  "routineDetailWeekLabel": "SEM {week}",
+  "@routineDetailWeekLabel": {
+    "placeholders": {
+      "week": { "type": "int" }
+    }
+  },
+  "routineDetailPlanComplete": "PLAN COMPLETADO",
+  "@routineDetailPlanComplete": {},
+  "routineDetailCompleted": "COMPLETADO",
+  "@routineDetailCompleted": {},
+  "routineDetailWeekLocked": "SEMANA BLOQUEADA",
+  "@routineDetailWeekLocked": {},
+  "routineDetailDayLocked": "DÍA BLOQUEADO",
+  "@routineDetailDayLocked": {},
+  "routineDetailStart": "EMPEZAR",
+  "@routineDetailStart": {}
 }

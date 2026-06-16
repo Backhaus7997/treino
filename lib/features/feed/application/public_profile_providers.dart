@@ -56,7 +56,11 @@ final firstPostByAuthorProvider =
       .get();
 
   if (snap.docs.isEmpty) return null;
-  return Post.fromJson(snap.docs.first.data());
+  // Inject the doc id so seed-written posts (which strip `id` from the body
+  // and store it only as the doc ID) deserialize correctly — matches
+  // PostRepository._fromDoc. Post.id is required with no default.
+  final doc = snap.docs.first;
+  return Post.fromJson({...doc.data(), 'id': doc.id});
 });
 
 /// AsyncNotifier that composes [userPublicProfileProvider] and

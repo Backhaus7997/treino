@@ -184,6 +184,37 @@ void main() {
           await container.read(firstPostByAuthorProvider('target').future);
       expect(result, isNull);
     });
+
+    test(
+        'SCENARIO-202b: injects doc id for seed-written posts missing id in body',
+        () async {
+      final firestore = FakeFirebaseFirestore();
+      // Seed-written doc: `id` is stored only as the doc ID, NOT in the body.
+      await firestore.collection('posts').doc('seed_post_1').set({
+        'authorUid': 'target',
+        'authorDisplayName': 'Seeded',
+        'authorAvatarUrl': null,
+        'authorGymId': null,
+        'text': 'seeded',
+        'routineTag': null,
+        'privacy': PostPrivacy.public.toJson(),
+        'createdAt': Timestamp.fromDate(DateTime.utc(2026, 6, 1)),
+      });
+
+      final container = ProviderContainer(overrides: [
+        firestoreProvider.overrideWithValue(firestore),
+        authStateChangesProvider
+            .overrideWith((_) => Stream.value(_userWithUid('viewer'))),
+      ]);
+      addTearDown(container.dispose);
+
+      final result =
+          await container.read(firstPostByAuthorProvider('target').future);
+
+      expect(result, isNotNull);
+      expect(result!.id, equals('seed_post_1'));
+      expect(result.authorDisplayName, equals('Seeded'));
+    });
   });
 
   // ────────────────────────────────────────────────────────────────────
