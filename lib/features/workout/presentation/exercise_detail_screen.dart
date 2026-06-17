@@ -171,7 +171,9 @@ class _ExerciseDetailContent extends StatelessWidget {
                 ),
         ),
         SliverPadding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
+          // Bottom inset clears the shell's floating nav bar (extendBody:true).
+          padding: EdgeInsets.fromLTRB(
+              20, 0, 20, MediaQuery.paddingOf(context).bottom),
           sliver: SliverList(
             delegate: SliverChildListDelegate([
               const SizedBox(height: 20),

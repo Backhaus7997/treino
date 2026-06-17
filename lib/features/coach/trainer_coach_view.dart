@@ -154,7 +154,9 @@ class _AlumnosTab extends ConsumerWidget {
           );
         }
         return ListView.separated(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+          // Bottom inset clears the shell's floating nav bar (extendBody:true).
+          padding: EdgeInsets.fromLTRB(
+              20, 12, 20, 20 + MediaQuery.paddingOf(context).bottom),
           physics: const AlwaysScrollableScrollPhysics(),
           itemCount: visible.length,
           separatorBuilder: (_, __) => const SizedBox(height: 12),

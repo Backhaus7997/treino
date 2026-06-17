@@ -304,6 +304,32 @@ GoRouter buildRouter({
         ),
       ),
 
+      // ─── Full-screen sub-screens moved OUT of the ShellRoute ──────────────
+      // These were shell sub-routes that showed the bottom nav bar; they read
+      // better as immersive full screens (like the routine editors). Paths are
+      // unchanged, so existing push() affordances keep working — they now land
+      // on the ROOT navigator (above the shell) instead of inside it.
+      GoRoute(
+        // Messages inbox — ChatListScreen owns its own transparent Scaffold.
+        path: '/feed/messages',
+        builder: (_, __) => _withBg(const ChatListScreen()),
+      ),
+      GoRoute(
+        // Trainer custom exercise library — list + create/edit form. Both are
+        // bare Columns (no Scaffold of their own) → wrap in _immersive.
+        path: '/profile/my-exercises',
+        builder: (_, __) => _immersive(const MyExercisesScreen()),
+        routes: [
+          GoRoute(
+            path: ':exId',
+            builder: (context, state) {
+              final exId = state.pathParameters['exId'];
+              return _immersive(CustomExerciseEditorScreen(exerciseId: exId));
+            },
+          ),
+        ],
+      ),
+
       // ShellRoute with the existing 5 tabs.
       // Use `pageBuilder` (not `builder`) so the shell itself uses an
       // instant transition when entered from a top-level route like /splash —
@@ -387,14 +413,8 @@ GoRouter buildRouter({
                 path: 'search',
                 builder: (_, __) => _withBg(const SearchUsersScreen()),
               ),
-              // Messages inbox — lists all of the current user's chats.
-              // Reached from the messages affordance in the feed header.
-              // Each row pushes the 1-1 ChatScreen via the root navigator
-              // (ChatListScreen owns that push with its own Scaffold).
-              GoRoute(
-                path: 'messages',
-                builder: (_, __) => _withBg(const ChatListScreen()),
-              ),
+              // Messages inbox moved to the top-level immersive route
+              // /feed/messages (no bottom nav bar).
             ],
           ),
           GoRoute(
@@ -495,21 +515,8 @@ GoRouter buildRouter({
               // CTA on the PERFIL PÚBLICO card. A future subscribe flow can
               // reintroduce a multi-tier catalog if needed.
 
-              // Trainer custom exercise library — list + create/edit form.
-              GoRoute(
-                path: 'my-exercises',
-                builder: (_, __) => _withBg(const MyExercisesScreen()),
-                routes: [
-                  GoRoute(
-                    path: ':exId',
-                    builder: (context, state) {
-                      final exId = state.pathParameters['exId'];
-                      return _withBg(
-                          CustomExerciseEditorScreen(exerciseId: exId));
-                    },
-                  ),
-                ],
-              ),
+              // Trainer custom exercise library moved to the top-level
+              // immersive route /profile/my-exercises (no bottom nav bar).
             ],
           ),
         ],
@@ -534,6 +541,16 @@ CustomTransitionPage<void> _noAnim(Widget child) => CustomTransitionPage(
 /// Use INSIDE the ShellRoute branches' GoRoute builders only; top-level
 /// routes (outside the shell) own their own Scaffold + background.
 Widget _withBg(Widget child) => AppBackground(child: child);
+
+/// Full-screen immersive wrapper for routes OUTSIDE the ShellRoute whose
+/// screen does NOT own a Scaffold (e.g. MyExercisesScreen / the custom
+/// exercise editor are bare Columns). Provides a transparent Scaffold +
+/// AppBackground + SafeArea so the screen fills the viewport with no bottom
+/// nav bar — matching the routine-editor full-screen pattern.
+Widget _immersive(Widget child) => Scaffold(
+      backgroundColor: Colors.transparent,
+      body: AppBackground(child: SafeArea(child: child)),
+    );
 
 /// Resuelve athleteId (currentUid) y trainerId (active link) y monta
 /// AthleteAgendaScreen. Loading state mientras se resuelve el link.
