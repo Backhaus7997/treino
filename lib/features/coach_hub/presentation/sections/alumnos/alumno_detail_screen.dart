@@ -10,6 +10,8 @@ import 'package:treino/features/gyms/application/gym_providers.dart';
 import 'package:treino/features/measurements/application/measurement_providers.dart';
 import 'package:treino/features/measurements/presentation/widgets/measurement_progress_chart.dart';
 import 'package:treino/features/payments/application/pagos_por_cobrar_provider.dart';
+import 'package:treino/features/payments/application/payment_providers.dart';
+import 'package:treino/features/payments/domain/payment.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/features/workout/application/assigned_routine_providers.dart';
@@ -23,7 +25,7 @@ import 'resumen_metrics.dart';
 
 /// Detalle del alumno (`/alumnos/:id`, Fase W2 PR2).
 ///
-/// Header (identidad + estado + métricas denormalizadas) + tab bar de 9
+/// Header (identidad + estado + métricas denormalizadas) + tab bar de 10
 /// secciones. En PR2 sólo **Progreso › Antropometría** está implementado
 /// (reusa `measurementsForAthleteProvider` + `MeasurementProgressChart`); el
 /// resto de tabs son placeholder. Rendimiento (performance), Nutrición,
@@ -40,6 +42,7 @@ class AlumnoDetailScreen extends ConsumerWidget {
     'Entrenamientos',
     'Nutrición',
     'Progreso',
+    'Pagos',
     'Historial',
     'Chat',
     'Notas privadas',
@@ -49,6 +52,7 @@ class AlumnoDetailScreen extends ConsumerWidget {
   static const _resumenIndex = 0;
   static const _entrenamientoIndex = 1;
   static const _progresoIndex = 3;
+  static const _pagosIndex = 4;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -110,6 +114,8 @@ class AlumnoDetailScreen extends ConsumerWidget {
                     _EntrenamientoTab(athleteId: athleteId)
                   else if (i == _progresoIndex)
                     _ProgresoTab(athleteId: athleteId)
+                  else if (i == _pagosIndex)
+                    _PagosTab(athleteId: athleteId)
                   else
                     _TabPlaceholder(label: _tabs[i]),
               ],
@@ -816,6 +822,218 @@ class _AdherenciaHeatmap extends StatelessWidget {
               Text('Más', style: axisStyle), // i18n: Fase W2
             ],
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Monto en pesos con separador de miles es-AR (28000 → "$28.000").
+String _fmtArs(int amount) {
+  final digits = amount.abs().toString();
+  final buf = StringBuffer();
+  for (var i = 0; i < digits.length; i++) {
+    if (i > 0 && (digits.length - i) % 3 == 0) buf.write('.');
+    buf.write(digits[i]);
+  }
+  return '${amount < 0 ? '-' : ''}\$$buf';
+}
+
+/// Tab Pagos (W2 PR5): estado de cuenta + historial de pagos del alumno.
+///
+/// Sólo data trainer-readable: el historial sale de `trainerPaymentsProvider`
+/// (que filtra por `trainerId == uid`, única forma que las reglas permiten al
+/// entrenador) acotado a este alumno, y el cobro pendiente se reusa de
+/// `pagosPorCobrarProvider` (que ya computa cadencia/deuda) sin reimplementar
+/// billing. Las acciones (registrar pago, marcar pagado, recordatorios) y las
+/// métricas globales (ingreso del mes/proyección) se difieren.
+class _PagosTab extends ConsumerWidget {
+  const _PagosTab({required this.athleteId});
+  final String athleteId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final palette = AppPalette.of(context);
+    final paymentsAsync = ref.watch(trainerPaymentsProvider);
+    final pendingAsync = ref.watch(pagosPorCobrarProvider);
+
+    if (paymentsAsync.isLoading || pendingAsync.isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (paymentsAsync.hasError || pendingAsync.hasError) {
+      return _muted(
+          palette, 'No se pudieron cargar los pagos.'); // i18n: Fase W2
+    }
+
+    final history = paymentsAsync.requireValue
+        .where((p) => p.athleteId == athleteId)
+        .toList()
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    final pending = pendingAsync.requireValue
+        .where((c) => c.athleteId == athleteId)
+        .toList();
+    final pendingTotal = pending.fold<int>(0, (sum, c) => sum + c.amountArs);
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _sectionLabel(palette, 'ESTADO DE CUENTA'), // i18n: Fase W2
+          const SizedBox(height: 10),
+          _EstadoCuentaCard(
+            palette: palette,
+            pendingTotal: pendingTotal,
+            conceptos: [for (final c in pending) c.concept],
+          ),
+          const SizedBox(height: 20),
+          _sectionLabel(palette, 'HISTORIAL DE PAGOS'), // i18n: Fase W2
+          const SizedBox(height: 10),
+          if (history.isEmpty)
+            _muted(palette, 'Sin pagos registrados todavía.') // i18n: Fase W2
+          else
+            _PagosTable(payments: history, palette: palette),
+          const SizedBox(height: 14),
+          Text(
+            'Próximamente: registrar pago, marcar pagado y recordatorios.', // i18n: Fase W2
+            style: TextStyle(color: palette.textMuted, fontSize: 12),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EstadoCuentaCard extends StatelessWidget {
+  const _EstadoCuentaCard({
+    required this.palette,
+    required this.pendingTotal,
+    required this.conceptos,
+  });
+
+  final AppPalette palette;
+  final int pendingTotal;
+  final List<String> conceptos;
+
+  @override
+  Widget build(BuildContext context) {
+    final alDia = pendingTotal <= 0;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: palette.bgCard,
+        border: Border.all(color: palette.border),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            alDia
+                ? 'Sin cobros pendientes'
+                : 'Pendiente de cobro', // i18n: Fase W2
+            style: TextStyle(color: palette.textMuted, fontSize: 12),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            alDia ? 'Al día' : _fmtArs(pendingTotal), // i18n: Fase W2
+            style: TextStyle(
+              color: alDia ? palette.accent : palette.warning,
+              fontSize: 24,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          if (conceptos.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              conceptos.join(' · '),
+              style: TextStyle(color: palette.textMuted, fontSize: 13),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _PagosTable extends StatelessWidget {
+  const _PagosTable({required this.payments, required this.palette});
+  final List<Payment> payments;
+  final AppPalette palette;
+
+  @override
+  Widget build(BuildContext context) {
+    final h = TextStyle(
+        color: palette.textMuted,
+        fontSize: 11,
+        fontWeight: FontWeight.w600,
+        letterSpacing: 0.5);
+    final c = TextStyle(color: palette.textPrimary, fontSize: 13);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      decoration: BoxDecoration(
+        color: palette.bgCard,
+        border: Border.all(color: palette.border),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Row(
+              children: [
+                // i18n: Fase W2 (encabezados)
+                Expanded(flex: 3, child: Text('FECHA', style: h)),
+                Expanded(flex: 4, child: Text('CONCEPTO', style: h)),
+                Expanded(
+                  flex: 3,
+                  child: Text('MONTO', style: h, textAlign: TextAlign.right),
+                ),
+                Expanded(
+                  flex: 3,
+                  child: Text('ESTADO', style: h, textAlign: TextAlign.right),
+                ),
+              ],
+            ),
+          ),
+          for (final p in payments)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    flex: 3,
+                    child: Text(_fmtDate(p.createdAt), style: c),
+                  ),
+                  Expanded(
+                    flex: 4,
+                    child: Text(p.concept,
+                        overflow: TextOverflow.ellipsis, style: c),
+                  ),
+                  Expanded(
+                    flex: 3,
+                    child: Text(_fmtArs(p.amountArs),
+                        style: c, textAlign: TextAlign.right),
+                  ),
+                  Expanded(
+                    flex: 3,
+                    child: Text(
+                      p.status == PaymentStatus.paid
+                          ? 'Pagado'
+                          : 'Pendiente', // i18n: Fase W2
+                      textAlign: TextAlign.right,
+                      style: TextStyle(
+                        color: p.status == PaymentStatus.paid
+                            ? palette.accent
+                            : palette.warning,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
         ],
       ),
     );
