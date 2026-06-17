@@ -49,8 +49,35 @@ class MeasurementRepository {
 
   /// Live stream of all measurements for [athleteId] (athlete's own view).
   /// Single-field query — no composite index required.
+  ///
+  /// Solo segura cuando el caller ES el atleta (`uid == athleteId`): un
+  /// entrenador NO puede correrla porque las reglas exigen
+  /// `recordedBy == uid || athleteId == uid` y esta query no garantiza la
+  /// primera rama → Firestore deniega. Para el contexto de entrenador usar
+  /// [watchForTrainerAthlete].
   Stream<List<Measurement>> watchForAthlete(String athleteId) {
     return _collection.where('athleteId', isEqualTo: athleteId).snapshots().map(
+          (snap) => snap.docs.map(_fromDoc).whereType<Measurement>().toList(),
+        );
+  }
+
+  // ─── watchForTrainerAthlete ─────────────────────────────────────────────
+
+  /// Live stream de las mediciones que [trainerUid] registró para [athleteId].
+  ///
+  /// Dos igualdades (`recordedBy` + `athleteId`) — NO requiere índice compuesto.
+  /// Satisface la regla de lectura vía `recordedBy == uid`, así que es la query
+  /// correcta para el Coach Hub / detalle de alumno del entrenador. Sort
+  /// (recordedAt ascending) se hace client-side.
+  Stream<List<Measurement>> watchForTrainerAthlete(
+    String trainerUid,
+    String athleteId,
+  ) {
+    return _collection
+        .where('recordedBy', isEqualTo: trainerUid)
+        .where('athleteId', isEqualTo: athleteId)
+        .snapshots()
+        .map(
           (snap) => snap.docs.map(_fromDoc).whereType<Measurement>().toList(),
         );
   }
