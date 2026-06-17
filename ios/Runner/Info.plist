@@ -42,6 +42,15 @@
 	</array>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Necesitamos tu ubicación para mostrarte entrenadores cerca tuyo.</string>
+	<!--
+		Required even though the app never requests "always" location: Apple's
+		static binary scan detects the geolocator/flutter_map SDK's reference
+		to the NSLocationAlwaysAndWhenInUseUsageDescription API and rejects
+		uploads without the matching purpose string (ITMS-90683). Same copy
+		as the WhenInUse variant — the app's location usage is identical.
+	-->
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Necesitamos tu ubicación para mostrarte entrenadores cerca tuyo.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Para tomar y subir tu foto de perfil.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
