@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach_hub/presentation/sections/ajustes/tabs/cuenta_tab.dart';
+import 'package:treino/features/coach_hub/presentation/sections/ajustes/tabs/notificaciones_tab.dart';
 import 'package:treino/features/coach_hub/presentation/shell/section_header.dart';
 
 /// Tabs internos de la sección «Configuración» (Ajustes) del Coach Hub web.
@@ -172,9 +173,7 @@ class _TabBody extends StatelessWidget {
   Widget build(BuildContext context) {
     return switch (tab) {
       AjustesTab.cuenta => const CuentaTab(),
-      AjustesTab.notificaciones => const _Proximamente(
-          tab: AjustesTab.notificaciones,
-        ),
+      AjustesTab.notificaciones => const NotificacionesTab(),
       AjustesTab.facturacion => const _Proximamente(
           tab: AjustesTab.facturacion,
         ),
