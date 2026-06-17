@@ -8,6 +8,7 @@ import 'package:treino/features/feed/domain/friendship.dart';
 import 'package:treino/features/feed/domain/friendship_status.dart';
 import 'package:treino/features/feed/presentation/friend_requests_inbox_screen.dart';
 import 'package:treino/features/feed/presentation/widgets/friend_request_inbox_tile.dart';
+import 'package:treino/l10n/app_l10n.dart';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -30,6 +31,8 @@ Widget _buildScreen({required List<Override> overrides}) {
     overrides: overrides,
     child: MaterialApp(
       theme: AppTheme.dark(),
+      localizationsDelegates: AppL10n.localizationsDelegates,
+      supportedLocales: AppL10n.supportedLocales,
       home: const Scaffold(body: FriendRequestsInboxScreen()),
     ),
   );

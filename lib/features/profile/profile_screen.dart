@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../../app/theme/app_palette.dart';
 import '../../core/utils/k_formatter.dart';
 import '../../core/widgets/treino_icon.dart';
+import '../../l10n/app_l10n.dart';
 import '../auth/application/auth_providers.dart';
 import 'application/profile_stats_providers.dart';
 import 'application/user_providers.dart';
@@ -13,7 +15,6 @@ import 'presentation/widgets/eliminar_cuenta_sheet.dart';
 import 'presentation/widgets/profile_avatar_card.dart';
 import 'presentation/widgets/profile_cuenta_section.dart';
 import 'presentation/widgets/profile_header.dart';
-import 'presentation/widgets/profile_section_group.dart';
 import 'presentation/widgets/profile_section_tile.dart';
 import 'presentation/widgets/profile_trainer_section.dart';
 import 'trainer_profile_view.dart';
@@ -47,6 +48,7 @@ class _AthleteProfile extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
     final theme = Theme.of(context);
+    final l10n = AppL10n.of(context);
 
     return SingleChildScrollView(
       // SingleChildScrollView does NOT inherit the ambient MediaQuery inset —
@@ -54,10 +56,18 @@ class _AthleteProfile extends ConsumerWidget {
       padding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom),
       child: Column(
         children: [
-          const ProfileHeader(),
+          // a11y: ProfileHeader renders "TU CUENTA" + "PERFIL" as the screen
+          // title block. header:true lets VoiceOver/TalkBack treat it as a
+          // navigable heading. (Per-section-title headings are handled by
+          // _A11ySectionGroup below.)
+          Semantics(header: true, child: const ProfileHeader()),
           // Avatar card BEFORE stats — mockup parity 2026-06-01 polish pass.
           // Visual hierarchy: header → identity (who I am) → stats (what I did).
-          const ProfileAvatarCard(),
+          // a11y: MergeSemantics fuses the avatar image node (PostAvatar, no
+          // label of its own) with the name/handle/gym text into one identity
+          // node, so the avatar is announced with the user's name instead of
+          // surfacing as an empty image node.
+          const MergeSemantics(child: ProfileAvatarCard()),
           _OwnProfileStatsRow(palette: palette, theme: theme),
           const ProfileCuentaSection(),
           // Sección "ENTRENADOR" condicional — solo visible cuando
@@ -68,14 +78,26 @@ class _AthleteProfile extends ConsumerWidget {
           // Reusa MyExercisesScreen (/profile/my-exercises) que ya existía
           // solo para el entrenador. El backend (users/{uid}/customExercises)
           // es uid-keyed → funciona para el alumno sin cambios.
-          ProfileSectionGroup(
+          _A11ySectionGroup(
             title: 'ENTRENAMIENTO',
+            palette: palette,
             tiles: [
-              ProfileSectionTile(
-                icon: TreinoIcon.sparkle,
-                title: 'Mis ejercicios',
-                inGroup: true,
-                onTap: () => context.push('/profile/my-exercises'),
+              // a11y: button:true + label gives the bare-GestureDetector tile a
+              // button role; excludeSemantics drops the child subtree (raw
+              // title Text + unlabeled chevron) so VoiceOver announces one
+              // clean "Mis ejercicios, button" node. No AppL10n key exists for
+              // this label yet (deferred to i18n Fase 6 Etapa 3) — reuse the
+              // visible title so the announcement matches the screen.
+              Semantics(
+                button: true,
+                label: 'Mis ejercicios',
+                excludeSemantics: true,
+                child: ProfileSectionTile(
+                  icon: TreinoIcon.sparkle,
+                  title: 'Mis ejercicios',
+                  inGroup: true,
+                  onTap: () => context.push('/profile/my-exercises'),
+                ),
               ),
             ],
           ),
@@ -84,35 +106,136 @@ class _AthleteProfile extends ConsumerWidget {
           // Sign-out + account deletion grouped in one boxed section, mockup
           // parity polish 2026-06-01. Settings as a dedicated surface stays
           // deferred to a future SDD (notifications, theme, language).
-          ProfileSectionGroup(
+          _A11ySectionGroup(
             title: 'SESIÓN', // i18n: Fase 6 Etapa 3
+            palette: palette,
             tiles: [
-              ProfileSectionTile(
-                icon: TreinoIcon.signOut,
-                title: 'Cerrar sesión', // i18n: Fase 6 Etapa 3
-                inGroup: true,
-                onTap: () => ref.read(authNotifierProvider.notifier).signOut(),
+              // a11y: button role + label, chevron/raw text excluded.
+              Semantics(
+                button: true,
+                label: l10n.authProfileSignOut, // 'Cerrar sesión'
+                excludeSemantics: true,
+                child: ProfileSectionTile(
+                  icon: TreinoIcon.signOut,
+                  title: 'Cerrar sesión', // i18n: Fase 6 Etapa 3
+                  inGroup: true,
+                  onTap: () =>
+                      ref.read(authNotifierProvider.notifier).signOut(),
+                ),
               ),
-              ProfileSectionTile(
-                icon: TreinoIcon.trash,
-                title: 'Eliminar cuenta', // i18n: Fase 6 Etapa 3
-                destructive: true,
-                inGroup: true,
-                onTap: () => showModalBottomSheet<void>(
-                  context: context,
-                  useRootNavigator: true,
-                  backgroundColor: palette.bgCard,
-                  shape: const RoundedRectangleBorder(
-                    borderRadius:
-                        BorderRadius.vertical(top: Radius.circular(18)),
+              Semantics(
+                button: true,
+                label: l10n.eliminarCuentaSheetTitle, // 'Eliminar cuenta'
+                excludeSemantics: true,
+                child: ProfileSectionTile(
+                  icon: TreinoIcon.trash,
+                  title: 'Eliminar cuenta', // i18n: Fase 6 Etapa 3
+                  destructive: true,
+                  inGroup: true,
+                  onTap: () => showModalBottomSheet<void>(
+                    context: context,
+                    useRootNavigator: true,
+                    backgroundColor: palette.bgCard,
+                    shape: const RoundedRectangleBorder(
+                      borderRadius:
+                          BorderRadius.vertical(top: Radius.circular(18)),
+                    ),
+                    isScrollControlled: true,
+                    builder: (_) => const EliminarCuentaSheet(),
                   ),
-                  isScrollControlled: true,
-                  builder: (_) => const EliminarCuentaSheet(),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 20),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Section group (a11y-aware) ──────────────────────────────────────────────────
+
+/// In-file variant of `ProfileSectionGroup` that accepts arbitrary [Widget]
+/// tiles (so each row can be wrapped in [Semantics] for button role + label)
+/// and marks the group [title] as a heading.
+///
+/// Visual treatment is kept byte-for-byte identical to `ProfileSectionGroup`
+/// (same padding, Barlow Condensed title, bgCard container, 14px radius, border
+/// + hairline divider alphas) so there is no layout drift — the only delta is
+/// the semantics tree. `ProfileSectionGroup.tiles` is typed
+/// `List<ProfileSectionTile>`, which cannot hold a `Semantics`-wrapped tile,
+/// hence this local group.
+class _A11ySectionGroup extends StatelessWidget {
+  const _A11ySectionGroup({
+    required this.title,
+    required this.tiles,
+    required this.palette,
+  });
+
+  final String title;
+  final List<Widget> tiles;
+  final AppPalette palette;
+
+  @override
+  Widget build(BuildContext context) {
+    // Interleave tiles with hairline dividers (1px, muted). Dividers are
+    // decorative → ExcludeSemantics keeps them out of the semantics tree.
+    final children = <Widget>[];
+    for (var i = 0; i < tiles.length; i++) {
+      if (i > 0) {
+        children.add(
+          ExcludeSemantics(
+            child: Container(
+              height: 1,
+              color: palette.textMuted.withValues(alpha: 0.10),
+            ),
+          ),
+        );
+      }
+      children.add(tiles[i]);
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(0, 18, 0, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            // a11y: section title is a navigable heading.
+            child: Semantics(
+              header: true,
+              child: Text(
+                title, // i18n: Fase 6 Etapa 3
+                style: GoogleFonts.barlowCondensed(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12,
+                  letterSpacing: 1.4,
+                  color: palette.textMuted,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: palette.bgCard,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: palette.textMuted.withValues(alpha: 0.12),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisSize: MainAxisSize.min,
+                children: children,
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -201,10 +324,13 @@ class _StatDivider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 1,
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      color: palette.textMuted.withValues(alpha: 0.18),
+    // a11y: purely decorative separator — keep it out of the semantics tree.
+    return ExcludeSemantics(
+      child: Container(
+        width: 1,
+        margin: const EdgeInsets.symmetric(vertical: 8),
+        color: palette.textMuted.withValues(alpha: 0.18),
+      ),
     );
   }
 }
@@ -229,26 +355,32 @@ class _StatTile extends StatelessWidget {
     // Mockup parity 2026-06-01: number prominent ON TOP, label small below
     // (previous order was inverted). Value font bumped to headlineMedium for
     // the visual weight the mockup uses (143 / 92k / 12 read first).
+    //
+    // a11y: MergeSemantics fuses the value + label text nodes into one
+    // accessible node so a screen reader announces each stat as a single unit
+    // (e.g. "143 SESIONES") instead of two disconnected fragments.
     return Expanded(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            value,
-            style: theme.textTheme.headlineMedium?.copyWith(
-              color: valueColor,
-              fontWeight: FontWeight.w700,
+      child: MergeSemantics(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              value,
+              style: theme.textTheme.headlineMedium?.copyWith(
+                color: valueColor,
+                fontWeight: FontWeight.w700,
+              ),
             ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: palette.textMuted,
-              letterSpacing: 1.2,
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: palette.textMuted,
+                letterSpacing: 1.2,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

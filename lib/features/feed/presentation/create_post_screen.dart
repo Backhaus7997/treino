@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/treino_icon.dart';
+import '../../../l10n/app_l10n.dart';
 import '../../profile/application/user_providers.dart';
 import '../application/create_post_notifier.dart';
 import '../domain/post_privacy.dart';
@@ -135,64 +136,97 @@ class _CreatePostHeader extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
       child: Row(
         children: [
           // CANCELAR
-          GestureDetector(
-            onTap: () => context.pop(),
-            behavior: HitTestBehavior.opaque,
-            child: Text(
-              'CANCELAR',
-              style: GoogleFonts.barlowCondensed(
-                fontWeight: FontWeight.w700,
-                fontSize: 14,
-                color: palette.textMuted,
+          Semantics(
+            button: true,
+            label: l10n.commonCancel,
+            child: GestureDetector(
+              onTap: () => context.pop(),
+              behavior: HitTestBehavior.opaque,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+                child: Align(
+                  widthFactor: 1,
+                  child: ExcludeSemantics(
+                    child: Text(
+                      'CANCELAR',
+                      style: GoogleFonts.barlowCondensed(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                        color: palette.textMuted,
+                      ),
+                    ),
+                  ),
+                ),
               ),
             ),
           ),
           const Spacer(),
           // Title
-          Text(
-            'NUEVO POST',
-            style: GoogleFonts.barlowCondensed(
-              fontWeight: FontWeight.w700,
-              fontSize: 18,
-              letterSpacing: 1.2,
-              color: palette.textPrimary,
+          Semantics(
+            header: true,
+            child: Text(
+              'NUEVO POST',
+              style: GoogleFonts.barlowCondensed(
+                fontWeight: FontWeight.w700,
+                fontSize: 18,
+                letterSpacing: 1.2,
+                color: palette.textPrimary,
+              ),
             ),
           ),
           const Spacer(),
           // PUBLICAR
           Opacity(
             opacity: state.canSubmit ? 1.0 : 0.4,
-            child: GestureDetector(
-              onTap: state.canSubmit
-                  ? () async {
-                      final ok = await notifier.submit();
-                      if (ok && context.mounted) context.pop();
-                    }
-                  : null,
-              behavior: HitTestBehavior.opaque,
-              child: state.isSubmitting
-                  ? SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: palette.accent,
-                      ),
-                    )
-                  : Text(
-                      'PUBLICAR',
-                      style: GoogleFonts.barlowCondensed(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14,
-                        color: palette.accent,
-                      ),
+            child: Semantics(
+              button: true,
+              enabled: state.canSubmit,
+              label: state.isSubmitting
+                  ? l10n.feedPublishingA11y
+                  : l10n.feedCreatePostA11y,
+              liveRegion: state.isSubmitting,
+              child: GestureDetector(
+                onTap: state.canSubmit
+                    ? () async {
+                        final ok = await notifier.submit();
+                        if (ok && context.mounted) context.pop();
+                      }
+                    : null,
+                behavior: HitTestBehavior.opaque,
+                child: ConstrainedBox(
+                  constraints:
+                      const BoxConstraints(minWidth: 44, minHeight: 44),
+                  child: Center(
+                    widthFactor: 1,
+                    child: ExcludeSemantics(
+                      child: state.isSubmitting
+                          ? SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: palette.accent,
+                              ),
+                            )
+                          : Text(
+                              'PUBLICAR',
+                              style: GoogleFonts.barlowCondensed(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14,
+                                color: palette.accent,
+                              ),
+                            ),
                     ),
+                  ),
+                ),
+              ),
             ),
           ),
         ],
@@ -360,24 +394,38 @@ class _PrivacyPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final pill = GestureDetector(
-      onTap: isEnabled ? () => onSelect(privacy) : null,
-      behavior: HitTestBehavior.opaque,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
-        decoration: BoxDecoration(
-          color: _isActive ? palette.accent : palette.bgCard,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: _isActive ? palette.accent : palette.border,
-          ),
-        ),
-        child: Text(
-          label,
-          style: GoogleFonts.barlowCondensed(
-            fontWeight: FontWeight.w700,
-            fontSize: 13,
-            color: _isActive ? palette.bg : palette.textPrimary,
+    final pill = Semantics(
+      button: true,
+      selected: _isActive,
+      enabled: isEnabled,
+      label: label,
+      child: GestureDetector(
+        onTap: isEnabled ? () => onSelect(privacy) : null,
+        behavior: HitTestBehavior.opaque,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 44),
+          child: Center(
+            widthFactor: 1,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+              decoration: BoxDecoration(
+                color: _isActive ? palette.accent : palette.bgCard,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: _isActive ? palette.accent : palette.border,
+                ),
+              ),
+              child: ExcludeSemantics(
+                child: Text(
+                  label,
+                  style: GoogleFonts.barlowCondensed(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                    color: _isActive ? palette.bg : palette.textPrimary,
+                  ),
+                ),
+              ),
+            ),
           ),
         ),
       ),
@@ -433,7 +481,13 @@ class _RoutineTagStubChip extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(TreinoIcon.dumbbell, size: 16, color: palette.textMuted),
+              ExcludeSemantics(
+                child: Icon(
+                  TreinoIcon.dumbbell,
+                  size: 16,
+                  color: palette.textMuted,
+                ),
+              ),
               const SizedBox(width: 8),
               Text(
                 'ETIQUETAR RUTINA',

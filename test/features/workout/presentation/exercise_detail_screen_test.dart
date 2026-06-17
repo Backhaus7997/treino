@@ -11,11 +11,14 @@ import 'package:treino/features/workout/domain/exercise.dart';
 import 'package:treino/features/workout/presentation/exercise_detail_screen.dart';
 import 'package:treino/features/workout/presentation/widgets/stat_tile.dart';
 import 'package:treino/features/workout/presentation/widgets/technique_instruction_item.dart';
+import 'package:treino/l10n/app_l10n.dart';
 
 Widget _wrapWithOverrides(Widget w, List<Override> overrides) => ProviderScope(
       overrides: overrides,
       child: MaterialApp(
         theme: AppTheme.dark(),
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
         home: Scaffold(body: w),
       ),
     );

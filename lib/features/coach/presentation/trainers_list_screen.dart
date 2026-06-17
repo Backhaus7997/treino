@@ -246,37 +246,49 @@ class _TogglePill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppL10n.of(context);
     final bg = disabled
         ? Colors.transparent
         : (active ? palette.highlight : Colors.transparent);
     final fg = disabled
         ? palette.textMuted
         : (active ? palette.bg : palette.textMuted);
-    return GestureDetector(
-      onTap: disabled ? null : onTap,
-      child: Opacity(
-        opacity: disabled ? 0.4 : 1.0,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          decoration: BoxDecoration(
-            color: bg,
-            borderRadius: BorderRadius.circular(9999),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, color: fg, size: 14),
-              const SizedBox(width: 4),
-              Text(
-                label,
-                style: GoogleFonts.barlowCondensed(
-                  color: fg,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 12,
-                  letterSpacing: 0.8,
+    return Semantics(
+      button: true,
+      selected: active,
+      enabled: !disabled,
+      // En estado disabled (pill MAPA con modo Online activo) anunciamos el
+      // motivo para que el screen reader no lea solo un botón deshabilitado
+      // sin contexto. En estado normal el label lo provee el Text hijo.
+      label: disabled ? l10n.coachMapDisabledOnlineA11y : null,
+      child: GestureDetector(
+        onTap: disabled ? null : onTap,
+        child: Opacity(
+          opacity: disabled ? 0.4 : 1.0,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: bg,
+              borderRadius: BorderRadius.circular(9999),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ExcludeSemantics(
+                  child: Icon(icon, color: fg, size: 14),
                 ),
-              ),
-            ],
+                const SizedBox(width: 4),
+                Text(
+                  label,
+                  style: GoogleFonts.barlowCondensed(
+                    color: fg,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                    letterSpacing: 0.8,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -474,24 +486,28 @@ class _ModeTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        behavior: HitTestBehavior.opaque,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          decoration: BoxDecoration(
-            color: active ? palette.accent : Colors.transparent,
-            borderRadius: BorderRadius.circular(9999),
-          ),
-          child: Center(
-            child: Text(
-              label,
-              style: GoogleFonts.barlowCondensed(
-                fontWeight: FontWeight.w700,
-                fontSize: 13,
-                letterSpacing: 1.2,
-                color: active ? palette.bg : palette.textMuted,
+      child: Semantics(
+        button: true,
+        selected: active,
+        child: GestureDetector(
+          onTap: onTap,
+          behavior: HitTestBehavior.opaque,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 160),
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            decoration: BoxDecoration(
+              color: active ? palette.accent : Colors.transparent,
+              borderRadius: BorderRadius.circular(9999),
+            ),
+            child: Center(
+              child: Text(
+                label,
+                style: GoogleFonts.barlowCondensed(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                  letterSpacing: 1.2,
+                  color: active ? palette.bg : palette.textMuted,
+                ),
               ),
             ),
           ),

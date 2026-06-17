@@ -16,6 +16,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:treino/app/coach_hub_router.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/l10n/app_l10n.dart';
 import 'package:treino/features/auth/application/auth_notifier.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
@@ -81,7 +82,12 @@ Future<void> _pumpDashboardInShell(WidgetTester tester) async {
   await tester.pumpWidget(
     UncontrolledProviderScope(
       container: container,
-      child: MaterialApp.router(theme: AppTheme.dark(), routerConfig: router),
+      child: MaterialApp.router(
+        theme: AppTheme.dark(),
+        routerConfig: router,
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+      ),
     ),
   );
   await tester.pumpAndSettle();

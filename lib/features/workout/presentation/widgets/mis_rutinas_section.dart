@@ -331,6 +331,7 @@ class _UserRoutineCard extends ConsumerWidget {
             // Overflow menu
             PopupMenuButton<_CardAction>(
               key: Key('routine_card_more_${routine.id}'),
+              tooltip: l10n.workoutRoutineOptionsA11y,
               icon: Icon(TreinoIcon.dotsThree, color: palette.textMuted),
               onSelected: (action) {
                 switch (action) {

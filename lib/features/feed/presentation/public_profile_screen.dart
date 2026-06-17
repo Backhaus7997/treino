@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
+import '../../../l10n/app_l10n.dart';
 import '../../auth/application/auth_providers.dart';
 import '../application/public_profile_providers.dart';
 import 'widgets/public_profile_follow_button.dart';
@@ -31,6 +32,7 @@ class PublicProfileScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     final viewAsync = ref.watch(publicProfileViewProvider(targetUid));
 
     return viewAsync.when(
@@ -41,7 +43,11 @@ class PublicProfileScreen extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              PublicProfileHero(view: view),
+              Semantics(
+                image: true,
+                label: l10n.a11yAvatarLabel(view.authorDisplayName),
+                child: PublicProfileHero(view: view),
+              ),
               const SizedBox(height: 20),
               if (!view.isSelf) ...[
                 Padding(
@@ -87,18 +93,25 @@ class PublicProfileScreen extends ConsumerWidget {
         );
       },
       loading: () => Center(
-        child: CircularProgressIndicator(color: palette.accent),
+        child: Semantics(
+          label: l10n.commonLoading,
+          child: CircularProgressIndicator(color: palette.accent),
+        ),
       ),
       error: (_, __) => Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20),
         child: Center(
-          child: Text(
-            'No pudimos cargar este perfil.',
-            style: GoogleFonts.barlow(
-              fontSize: 14,
-              color: palette.textMuted,
+          child: Semantics(
+            liveRegion: true,
+            label: l10n.publicProfileLoadErrorA11y,
+            child: Text(
+              l10n.publicProfileLoadErrorA11y,
+              style: GoogleFonts.barlow(
+                fontSize: 14,
+                color: palette.textMuted,
+              ),
+              textAlign: TextAlign.center,
             ),
-            textAlign: TextAlign.center,
           ),
         ),
       ),
@@ -112,26 +125,35 @@ class _MessageButtonStub extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    return Opacity(
-      opacity: 0.6,
-      child: GestureDetector(
-        onTap: null,
-        behavior: HitTestBehavior.opaque,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-          decoration: BoxDecoration(
-            color: Colors.transparent,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: palette.border, width: 1),
-          ),
-          child: Center(
-            child: Text(
-              'MENSAJE',
-              style: GoogleFonts.barlowCondensed(
-                fontWeight: FontWeight.w700,
-                fontSize: 13,
-                letterSpacing: 1.0,
-                color: palette.textMuted,
+    final l10n = AppL10n.of(context);
+    return Semantics(
+      button: true,
+      enabled: false,
+      label: l10n.publicProfileMessageDisabledA11y,
+      child: ExcludeSemantics(
+        child: Opacity(
+          opacity: 0.6,
+          child: GestureDetector(
+            onTap: null,
+            behavior: HitTestBehavior.opaque,
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.transparent,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: palette.border, width: 1),
+              ),
+              child: Center(
+                child: Text(
+                  'MENSAJE',
+                  style: GoogleFonts.barlowCondensed(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                    letterSpacing: 1.0,
+                    color: palette.textMuted,
+                  ),
+                ),
               ),
             ),
           ),

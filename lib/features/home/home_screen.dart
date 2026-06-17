@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../l10n/app_l10n.dart';
 import '../coach/presentation/trainer_dashboard_tab.dart';
 import '../notifications/presentation/permission_gate.dart';
 import '../profile/application/user_providers.dart';
@@ -157,6 +158,13 @@ class _HomeHeaderSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const SizedBox(height: 56);
+    final l10n = AppL10n.of(context);
+    // Announce the loading state so screen readers don't land on a silent,
+    // empty 56px surface while the profile header resolves.
+    return Semantics(
+      label: l10n.commonLoading,
+      liveRegion: true,
+      child: const SizedBox(height: 56),
+    );
   }
 }

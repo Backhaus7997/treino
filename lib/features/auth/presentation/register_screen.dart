@@ -150,6 +150,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     alignment: Alignment.centerLeft,
                     child: IconButton(
                       padding: EdgeInsets.zero,
+                      tooltip: l10n.commonBack,
                       icon: Icon(TreinoIcon.back, color: palette.textPrimary),
                       onPressed: () => context.canPop()
                           ? context.pop()

@@ -17,6 +17,7 @@ import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
 import 'package:treino/features/workout/application/exercise_providers.dart';
 import 'package:treino/features/workout/domain/exercise.dart';
+import 'package:treino/l10n/app_l10n.dart';
 
 // ─── Mocks ──────────────────────────────────────────────────────────────────
 
@@ -82,6 +83,8 @@ Widget _wrap(
       overrides: overrides,
       child: MaterialApp(
         theme: AppTheme.dark(),
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
         home: Scaffold(body: child),
       ),
     );

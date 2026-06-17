@@ -108,6 +108,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     alignment: Alignment.centerLeft,
                     child: IconButton(
                       padding: EdgeInsets.zero,
+                      tooltip: l10n.commonBack,
                       icon: Icon(TreinoIcon.back, color: palette.textPrimary),
                       onPressed: () => context.canPop()
                           ? context.pop()
@@ -115,8 +116,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  // Logo — left-aligned to match headline column
-                  const TreinoLogo(size: 56),
+                  // Logo — left-aligned to match headline column.
+                  // Decorative: the TREINO brand mark conveys no info that the
+                  // adjacent headline does not, so it is hidden from a11y tree.
+                  const ExcludeSemantics(child: TreinoLogo(size: 56)),
                   const SizedBox(height: 20),
                   // Headline
                   Text(
@@ -246,14 +249,26 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             color: palette.textMuted,
                           ),
                         ),
-                        GestureDetector(
-                          onTap: () => context.push('/register'),
-                          child: Text(
-                            l10n.authLoginRegisterLink,
-                            style: GoogleFonts.barlow(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: palette.accent,
+                        Semantics(
+                          button: true,
+                          label: l10n.authLoginRegisterLink,
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: () => context.push('/register'),
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(
+                                minHeight: 44,
+                              ),
+                              child: Center(
+                                child: Text(
+                                  l10n.authLoginRegisterLink,
+                                  style: GoogleFonts.barlow(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: palette.accent,
+                                  ),
+                                ),
+                              ),
                             ),
                           ),
                         ),

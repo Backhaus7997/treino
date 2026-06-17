@@ -101,6 +101,7 @@ class _LoadedBody extends StatelessWidget {
             alignment: Alignment.centerRight,
             child: IconButton(
               icon: Icon(TreinoIcon.close, color: palette.textPrimary),
+              tooltip: l10n.commonClose,
               onPressed: () => context.go('/workout'),
             ),
           ),
@@ -177,16 +178,18 @@ class _LoadedBody extends StatelessWidget {
           ),
           const SizedBox(height: 32),
 
-          // Mood row — 5 emojis, visual only
-          const Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              Text('😞', style: TextStyle(fontSize: 28)),
-              Text('😕', style: TextStyle(fontSize: 28)),
-              Text('😐', style: TextStyle(fontSize: 28)),
-              Text('🙂', style: TextStyle(fontSize: 28)),
-              Text('😄', style: TextStyle(fontSize: 28)),
-            ],
+          // Mood row — 5 emojis, visual only (decorative, non-interactive)
+          const ExcludeSemantics(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                Text('😞', style: TextStyle(fontSize: 28)),
+                Text('😕', style: TextStyle(fontSize: 28)),
+                Text('😐', style: TextStyle(fontSize: 28)),
+                Text('🙂', style: TextStyle(fontSize: 28)),
+                Text('😄', style: TextStyle(fontSize: 28)),
+              ],
+            ),
           ),
           const SizedBox(height: 40),
 

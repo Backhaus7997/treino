@@ -7,6 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/treino_icon.dart';
+import '../../../l10n/app_l10n.dart';
 import '../application/search_users_provider.dart';
 import 'widgets/feed_empty_state.dart';
 import 'widgets/user_search_result_tile.dart';
@@ -107,14 +108,30 @@ class _SearchUsersHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppL10n.of(context);
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
       child: Row(
         children: [
-          GestureDetector(
-            onTap: () => context.pop(),
-            behavior: HitTestBehavior.opaque,
-            child: Icon(TreinoIcon.back, size: 20, color: palette.textPrimary),
+          Semantics(
+            button: true,
+            label: l10n.commonBack,
+            child: GestureDetector(
+              onTap: () => context.pop(),
+              behavior: HitTestBehavior.opaque,
+              child: SizedBox(
+                width: 44,
+                height: 44,
+                child: Center(
+                  child: Icon(
+                    TreinoIcon.back,
+                    size: 20,
+                    color: palette.textPrimary,
+                  ),
+                ),
+              ),
+            ),
           ),
           const SizedBox(width: 14),
           Text(
@@ -151,6 +168,8 @@ class _SearchTextField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppL10n.of(context);
+
     return TextField(
       controller: controller,
       onChanged: onChanged,
@@ -186,9 +205,24 @@ class _SearchTextField extends StatelessWidget {
           valueListenable: controller,
           builder: (context, value, _) {
             if (value.text.isEmpty) return const SizedBox.shrink();
-            return GestureDetector(
-              onTap: onClear,
-              child: Icon(TreinoIcon.close, size: 18, color: palette.textMuted),
+            return Semantics(
+              button: true,
+              label: l10n.searchUsersClearA11y,
+              child: GestureDetector(
+                onTap: onClear,
+                behavior: HitTestBehavior.opaque,
+                child: SizedBox(
+                  width: 44,
+                  height: 44,
+                  child: Center(
+                    child: Icon(
+                      TreinoIcon.close,
+                      size: 18,
+                      color: palette.textMuted,
+                    ),
+                  ),
+                ),
+              ),
             );
           },
         ),

@@ -8,6 +8,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../app/theme/app_palette.dart';
 import '../../../core/analytics/analytics_service.dart';
 import '../../../core/widgets/treino_icon.dart';
+import '../../../l10n/app_l10n.dart';
 import '../../coach/application/trainer_link_providers.dart';
 import '../../coach/domain/trainer_link.dart';
 import '../../coach/domain/trainer_link_status.dart';
@@ -508,6 +509,7 @@ class _UnmatchedWarning extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppL10n.of(context);
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -518,7 +520,11 @@ class _UnmatchedWarning extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(TreinoIcon.warning, color: palette.warning),
+          Icon(
+            TreinoIcon.warning,
+            color: palette.warning,
+            semanticLabel: l10n.commonWarning,
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -640,8 +646,7 @@ class _DayCard extends StatelessWidget {
                             style: TextButton.styleFrom(
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 8, vertical: 4),
-                              minimumSize: const Size(0, 0),
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              minimumSize: const Size(0, 44),
                             ),
                           ),
                         ],
@@ -935,42 +940,50 @@ class _AthleteOption extends ConsumerWidget {
     final pubAsync = ref.watch(userPublicProfileProvider(link.athleteId));
     final name = pubAsync.valueOrNull?.displayName ?? 'Atleta';
 
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(14),
-      child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 4),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: selected
-              ? palette.accent.withValues(alpha: 0.12)
-              : palette.bgCard,
+    return MergeSemantics(
+      child: Semantics(
+        button: true,
+        toggled: selected,
+        child: InkWell(
+          onTap: onTap,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: selected ? palette.accent : palette.border,
-            width: selected ? 1.5 : 1,
-          ),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              selected
-                  ? TreinoIcon.checkCircleFill
-                  : TreinoIcon.checkCircleEmpty,
-              color: selected ? palette.accent : palette.textMuted,
-              size: 22,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                name,
-                style: TextStyle(
-                  color: palette.textPrimary,
-                  fontWeight: FontWeight.w600,
-                ),
+          child: Container(
+            margin: const EdgeInsets.symmetric(vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: selected
+                  ? palette.accent.withValues(alpha: 0.12)
+                  : palette.bgCard,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: selected ? palette.accent : palette.border,
+                width: selected ? 1.5 : 1,
               ),
             ),
-          ],
+            child: Row(
+              children: [
+                ExcludeSemantics(
+                  child: Icon(
+                    selected
+                        ? TreinoIcon.checkCircleFill
+                        : TreinoIcon.checkCircleEmpty,
+                    color: selected ? palette.accent : palette.textMuted,
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    name,
+                    style: TextStyle(
+                      color: palette.textPrimary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );

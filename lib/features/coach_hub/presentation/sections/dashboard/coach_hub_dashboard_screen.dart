@@ -12,6 +12,7 @@ import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/feed/presentation/widgets/post_avatar.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
+import 'package:treino/l10n/app_l10n.dart';
 
 /// Coach Hub status filter for the dashboard sections.
 ///
@@ -362,10 +363,15 @@ class _SectionLoading extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 18),
       child: Center(
-        child: CircularProgressIndicator(color: palette.accent),
+        child: Semantics(
+          label: l10n.commonLoading,
+          liveRegion: true,
+          child: CircularProgressIndicator(color: palette.accent),
+        ),
       ),
     );
   }
@@ -397,6 +403,7 @@ class _StudentTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     final pubAsync = ref.watch(userPublicProfileProvider(link.athleteId));
     final name = pubAsync.valueOrNull?.displayName ?? 'Atleta';
     final avatar = pubAsync.valueOrNull?.avatarUrl;
@@ -450,10 +457,14 @@ class _StudentTile extends ConsumerWidget {
       ),
       child: Row(
         children: [
-          PostAvatar(
-            authorDisplayName: name,
-            authorAvatarUrl: avatar,
-            size: 44,
+          Semantics(
+            image: true,
+            label: l10n.a11yAvatarLabel(name),
+            child: PostAvatar(
+              authorDisplayName: name,
+              authorAvatarUrl: avatar,
+              size: 44,
+            ),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -508,6 +519,7 @@ class _PausedStudentTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     final pubAsync = ref.watch(userPublicProfileProvider(link.athleteId));
     final name = pubAsync.valueOrNull?.displayName ?? 'Atleta';
     final avatar = pubAsync.valueOrNull?.avatarUrl;
@@ -564,10 +576,14 @@ class _PausedStudentTile extends ConsumerWidget {
       ),
       child: Row(
         children: [
-          PostAvatar(
-            authorDisplayName: name,
-            authorAvatarUrl: avatar,
-            size: 44,
+          Semantics(
+            image: true,
+            label: l10n.a11yAvatarLabel(name),
+            child: PostAvatar(
+              authorDisplayName: name,
+              authorAvatarUrl: avatar,
+              size: 44,
+            ),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -624,6 +640,7 @@ class _TerminatedStudentTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     final pubAsync = ref.watch(userPublicProfileProvider(link.athleteId));
     final name = pubAsync.valueOrNull?.displayName ?? 'Atleta';
     final avatar = pubAsync.valueOrNull?.avatarUrl;
@@ -640,10 +657,14 @@ class _TerminatedStudentTile extends ConsumerWidget {
         children: [
           Opacity(
             opacity: 0.65,
-            child: PostAvatar(
-              authorDisplayName: name,
-              authorAvatarUrl: avatar,
-              size: 40,
+            child: Semantics(
+              image: true,
+              label: l10n.a11yAvatarLabel(name),
+              child: PostAvatar(
+                authorDisplayName: name,
+                authorAvatarUrl: avatar,
+                size: 40,
+              ),
             ),
           ),
           const SizedBox(width: 14),
@@ -783,6 +804,7 @@ class _PendingRequestTileState extends ConsumerState<_PendingRequestTile> {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     final pubAsync =
         ref.watch(userPublicProfileProvider(widget.link.athleteId));
     final name = pubAsync.valueOrNull?.displayName ?? 'Atleta';
@@ -798,10 +820,14 @@ class _PendingRequestTileState extends ConsumerState<_PendingRequestTile> {
       ),
       child: Row(
         children: [
-          PostAvatar(
-            authorDisplayName: name,
-            authorAvatarUrl: avatar,
-            size: 40,
+          Semantics(
+            image: true,
+            label: l10n.a11yAvatarLabel(name),
+            child: PostAvatar(
+              authorDisplayName: name,
+              authorAvatarUrl: avatar,
+              size: 40,
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -832,12 +858,16 @@ class _PendingRequestTileState extends ConsumerState<_PendingRequestTile> {
           ),
           const SizedBox(width: 8),
           if (_busy)
-            SizedBox(
-              width: 18,
-              height: 18,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: palette.accent,
+            Semantics(
+              label: l10n.commonProcessing,
+              liveRegion: true,
+              child: SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: palette.accent,
+                ),
               ),
             )
           else ...[

@@ -271,10 +271,12 @@ class _EmptyState extends StatelessWidget {
           ),
           const SizedBox(height: 18),
           Center(
-            child: Icon(
-              TreinoIcon.streak,
-              size: 64,
-              color: palette.accent,
+            child: ExcludeSemantics(
+              child: Icon(
+                TreinoIcon.streak,
+                size: 64,
+                color: palette.accent,
+              ),
             ),
           ),
           const SizedBox(height: 18),
@@ -361,12 +363,14 @@ class _CardHeader extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(
-                  color: palette.accent,
-                  shape: BoxShape.circle,
+              ExcludeSemantics(
+                child: Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: palette.accent,
+                    shape: BoxShape.circle,
+                  ),
                 ),
               ),
               const SizedBox(width: 8),

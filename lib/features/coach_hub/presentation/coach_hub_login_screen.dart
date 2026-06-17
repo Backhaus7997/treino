@@ -86,6 +86,7 @@ class _CoachHubLoginScreenState extends ConsumerState<CoachHubLoginScreen> {
             constraints: const BoxConstraints(maxWidth: 400),
             child: Form(
               key: _formKey,
+              child: AutofillGroup(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -132,6 +133,10 @@ class _CoachHubLoginScreenState extends ConsumerState<CoachHubLoginScreen> {
                     autocorrect: false,
                     enableSuggestions: false,
                     keyboardType: TextInputType.emailAddress,
+                    autofillHints: const [
+                      AutofillHints.username,
+                      AutofillHints.email,
+                    ],
                     style: TextStyle(color: palette.textPrimary),
                     decoration: _inputDecoration(palette, 'Email'),
                     validator: (v) {
@@ -148,6 +153,7 @@ class _CoachHubLoginScreenState extends ConsumerState<CoachHubLoginScreen> {
                   TextFormField(
                     controller: _passwordController,
                     obscureText: true,
+                    autofillHints: const [AutofillHints.password],
                     style: TextStyle(color: palette.textPrimary),
                     decoration: _inputDecoration(palette, 'Contraseña'),
                     onFieldSubmitted: (_) => _submit(),
@@ -203,6 +209,7 @@ class _CoachHubLoginScreenState extends ConsumerState<CoachHubLoginScreen> {
                     ),
                   ),
                 ],
+              ),
               ),
             ),
           ),

@@ -536,5 +536,57 @@
         "type": "int"
       }
     }
-  }
+  },
+  "commonBack": "Back",
+  "commonClose": "Close",
+  "commonLoading": "Loading…",
+  "commonProcessing": "Processing…",
+  "commonWarning": "Warning",
+  "chatSendingA11y": "Sending…",
+  "feedSearchA11y": "Search",
+  "feedCreatePostA11y": "Create post",
+  "feedPublishingA11y": "Publishing…",
+  "searchUsersClearA11y": "Clear search",
+  "publicProfileMessageDisabledA11y": "Message (coming soon)",
+  "a11yAvatarLabel": "Profile photo of {name}",
+  "@a11yAvatarLabel": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "a11yAvatarLabelGeneric": "Profile photo",
+  "homePendingRequestsA11y": "{count} pending requests",
+  "@homePendingRequestsA11y": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "workoutRoutineOptionsA11y": "Routine options",
+  "sessionPlayerSetCompleteA11y": "Mark set {setNumber} as completed",
+  "@sessionPlayerSetCompleteA11y": {
+    "placeholders": {
+      "setNumber": {
+        "type": "int"
+      }
+    }
+  },
+  "sessionPlayerTechniqueA11y": "View technique for {exerciseName}",
+  "@sessionPlayerTechniqueA11y": {
+    "placeholders": {
+      "exerciseName": {
+        "type": "String"
+      }
+    }
+  },
+  "sessionPlayerTimerStartA11y": "Start timer",
+  "routineEditorDeleteDayA11y": "Delete day",
+  "athleteDetailEditPlanA11y": "Edit plan",
+  "athleteDetailDeletePlanA11y": "Delete plan",
+  "coachMapDisabledOnlineA11y": "Map, unavailable in Online mode",
+  "commonCancel": "Cancel",
+  "publicProfileLoadErrorA11y": "We couldn't load this profile."
 }

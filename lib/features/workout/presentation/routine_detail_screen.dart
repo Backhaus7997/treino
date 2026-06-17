@@ -120,16 +120,22 @@ class _BackBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     return Padding(
       padding: const EdgeInsets.only(left: 12, top: 8),
       child: Material(
         color: Colors.black.withValues(alpha: 0.35),
         shape: const CircleBorder(),
         clipBehavior: Clip.antiAlias,
-        child: IconButton(
-          icon: Icon(TreinoIcon.back, color: palette.textPrimary),
-          onPressed: () =>
-              context.canPop() ? context.pop() : context.go('/workout'),
+        child: Semantics(
+          button: true,
+          label: l10n.commonBack,
+          child: IconButton(
+            tooltip: l10n.commonBack,
+            icon: Icon(TreinoIcon.back, color: palette.textPrimary),
+            onPressed: () =>
+                context.canPop() ? context.pop() : context.go('/workout'),
+          ),
         ),
       ),
     );

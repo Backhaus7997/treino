@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/l10n/app_l10n.dart';
 import 'package:treino/features/feed/application/feed_screen_providers.dart'
     show myFriendsFeedProvider;
 import 'package:treino/features/feed/application/friendship_providers.dart';
@@ -87,6 +88,8 @@ Widget _buildTile({
     overrides: overrides,
     child: MaterialApp(
       theme: AppTheme.dark(),
+      localizationsDelegates: AppL10n.localizationsDelegates,
+      supportedLocales: AppL10n.supportedLocales,
       home: Scaffold(
         body: FriendRequestInboxTile(
           friendship: friendship,
@@ -344,6 +347,8 @@ void main() {
         overrides: overrides,
         child: MaterialApp.router(
           theme: AppTheme.dark(),
+          localizationsDelegates: AppL10n.localizationsDelegates,
+          supportedLocales: AppL10n.supportedLocales,
           routerConfig: router,
         ),
       );
@@ -488,6 +493,8 @@ void main() {
           ],
           child: MaterialApp(
             theme: AppTheme.dark(),
+            localizationsDelegates: AppL10n.localizationsDelegates,
+            supportedLocales: AppL10n.supportedLocales,
             home: Scaffold(
               body: Column(
                 children: [

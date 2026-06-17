@@ -8,6 +8,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/treino_icon.dart';
+import '../../../l10n/app_l10n.dart';
 import '../../profile/application/user_providers.dart';
 import '../../feed/domain/gym_name.dart';
 import '../application/exercise_providers.dart';
@@ -382,21 +383,32 @@ class _SessionHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
       child: Row(
         children: [
-          GestureDetector(
-            onTap: onBack,
-            child: Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: palette.bgCard,
+          Semantics(
+            button: true,
+            label: l10n.commonBack,
+            child: GestureDetector(
+              onTap: onBack,
+              behavior: HitTestBehavior.opaque,
+              child: Container(
+                constraints:
+                    const BoxConstraints(minWidth: 44, minHeight: 44),
+                alignment: Alignment.center,
+                child: Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: palette.bgCard,
+                  ),
+                  child: Icon(TreinoIcon.back,
+                      color: palette.textPrimary, size: 18),
+                ),
               ),
-              child:
-                  Icon(TreinoIcon.back, color: palette.textPrimary, size: 18),
             ),
           ),
           const SizedBox(width: 12),
@@ -417,8 +429,7 @@ class _SessionHeader extends StatelessWidget {
               side: BorderSide(color: palette.highlight),
               foregroundColor: palette.highlight,
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              minimumSize: Size.zero,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              minimumSize: const Size(0, 44),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(9999),
               ),
@@ -1100,6 +1111,7 @@ class _ExerciseSectionState extends State<_ExerciseSection> {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     final effectiveSets = widget.slot.effectiveSetsForWeek(widget.week);
     final loggedCount = widget.logsForExercise.length;
     final totalSets = effectiveSets.length;
@@ -1203,15 +1215,23 @@ class _ExerciseSectionState extends State<_ExerciseSection> {
                 ),
               ),
               if (_hasTechnique) ...[
-                GestureDetector(
-                  onTap: () => _showTechnique(context),
-                  behavior: HitTestBehavior.opaque,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    child: Icon(
-                      TreinoIcon.infoCircle,
-                      size: 20,
-                      color: palette.textMuted,
+                Semantics(
+                  button: true,
+                  label: l10n
+                      .sessionPlayerTechniqueA11y(widget.slot.exerciseName),
+                  child: GestureDetector(
+                    onTap: () => _showTechnique(context),
+                    behavior: HitTestBehavior.opaque,
+                    child: Container(
+                      constraints:
+                          const BoxConstraints(minWidth: 44, minHeight: 44),
+                      alignment: Alignment.center,
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      child: Icon(
+                        TreinoIcon.infoCircle,
+                        size: 20,
+                        color: palette.textMuted,
+                      ),
                     ),
                   ),
                 ),
@@ -1331,6 +1351,7 @@ class _RepsSetRowState extends State<_RepsSetRow> {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     final textColor = widget.isDone ? palette.textMuted : palette.textPrimary;
 
     // Summary row — always visible.
@@ -1362,19 +1383,23 @@ class _RepsSetRowState extends State<_RepsSetRow> {
               ),
             ),
           ),
-          GestureDetector(
-            onTap: widget.isDone ? widget.onSummaryTap : _onCheckTap,
-            behavior: HitTestBehavior.opaque,
-            child: Container(
-              width: 32,
-              height: 32,
-              alignment: Alignment.center,
-              child: Icon(
-                widget.isDone
-                    ? TreinoIcon.checkCircleFill
-                    : TreinoIcon.checkCircleEmpty,
-                color: widget.isDone ? palette.accent : palette.textMuted,
-                size: 22,
+          Semantics(
+            button: true,
+            label: l10n.sessionPlayerSetCompleteA11y(widget.setNumber),
+            child: GestureDetector(
+              onTap: widget.isDone ? widget.onSummaryTap : _onCheckTap,
+              behavior: HitTestBehavior.opaque,
+              child: Container(
+                width: 44,
+                height: 44,
+                alignment: Alignment.center,
+                child: Icon(
+                  widget.isDone
+                      ? TreinoIcon.checkCircleFill
+                      : TreinoIcon.checkCircleEmpty,
+                  color: widget.isDone ? palette.accent : palette.textMuted,
+                  size: 22,
+                ),
               ),
             ),
           ),
@@ -1575,6 +1600,7 @@ class _DurationSetRowState extends State<_DurationSetRow> {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     final textColor = widget.isDone ? palette.textMuted : palette.textPrimary;
     final isInteractive = widget.onDone != null && !widget.isDone;
 
@@ -1632,26 +1658,34 @@ class _DurationSetRowState extends State<_DurationSetRow> {
           if (widget.isDone)
             Icon(TreinoIcon.checkCircleFill, color: palette.accent, size: 22)
           else if (!_running)
-            GestureDetector(
-              onTap: isInteractive ? _startTimer : null,
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                decoration: BoxDecoration(
-                  color: isInteractive
-                      ? palette.accent.withValues(alpha: 0.15)
-                      : palette.bgCard,
-                  borderRadius: BorderRadius.circular(9999),
-                  border: Border.all(
-                    color: isInteractive ? palette.accent : palette.border,
+            Semantics(
+              button: true,
+              label: l10n.sessionPlayerTimerStartA11y,
+              child: GestureDetector(
+                onTap: isInteractive ? _startTimer : null,
+                behavior: HitTestBehavior.opaque,
+                child: Container(
+                  constraints:
+                      const BoxConstraints(minWidth: 44, minHeight: 44),
+                  alignment: Alignment.center,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: isInteractive
+                        ? palette.accent.withValues(alpha: 0.15)
+                        : palette.bgCard,
+                    borderRadius: BorderRadius.circular(9999),
+                    border: Border.all(
+                      color: isInteractive ? palette.accent : palette.border,
+                    ),
                   ),
-                ),
-                child: Text(
-                  'Iniciar',
-                  style: GoogleFonts.barlowCondensed(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13,
-                    color: isInteractive ? palette.accent : palette.textMuted,
+                  child: Text(
+                    'Iniciar',
+                    style: GoogleFonts.barlowCondensed(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                      color: isInteractive ? palette.accent : palette.textMuted,
+                    ),
                   ),
                 ),
               ),

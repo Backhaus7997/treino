@@ -10,6 +10,7 @@ import 'package:treino/features/coach_hub/application/cf_providers.dart';
 import 'package:treino/features/coach_hub/application/plan_import_providers.dart';
 import 'package:treino/features/coach_hub/domain/parsed_plan.dart';
 import 'package:treino/features/coach_hub/presentation/coach_hub_plan_preview_screen.dart';
+import 'package:treino/l10n/app_l10n.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/experience_level.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
@@ -91,6 +92,8 @@ Widget _wrap(
       overrides: overrides,
       child: MaterialApp(
         theme: AppTheme.dark(),
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
         home: Scaffold(body: child),
       ),
     );

@@ -2797,6 +2797,150 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Sets incompletos en Sem {weekNumber}'**
   String routineEditorIncompleteSetsLabel(int weekNumber);
+
+  /// Shared accessibility label / tooltip for icon-only back navigation buttons. Replaces the duplicated literal 'Volver' across auth, feed, workout and chat back affordances (findings 0,2,3,4,15,16,17,20,21,22,24,25,27). There is currently NO generic back key in the ARB.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Volver'**
+  String get commonBack;
+
+  /// Generic accessibility label / tooltip for icon-only close buttons (finding 23 post-workout summary close IconButton). A value 'Cerrar' exists only as the dialog-scoped authTrainerInquiryDialogClose; a reusable generic key is needed for a11y close affordances.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cerrar'**
+  String get commonClose;
+
+  /// Generic Semantics label for bare loading spinners so screen readers announce loading state (findings 7 coach_hub section/inline spinners, 16 public profile spinner). Existing 'Cargando…' is dashboard-scoped (dashboardCargando); a reusable cross-module key is needed.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cargando…'**
+  String get commonLoading;
+
+  /// Semantics label for action busy spinners that replace Aceptar/Rechazar buttons mid-request (finding 7 coach_hub _PendingRequestTile).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Procesando…'**
+  String get commonProcessing;
+
+  /// semanticLabel for the unmatched-exercise warning icon in coach_hub plan preview (finding 10 _UnmatchedWarning Icon(TreinoIcon.warning)).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Atención'**
+  String get commonWarning;
+
+  /// Semantics label announced while the chat send button shows a CircularProgressIndicator (finding 4 chat_screen send busy state).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Enviando…'**
+  String get chatSendingA11y;
+
+  /// Accessibility label for the icon-only header search action in the feed (finding 11 feed_screen search GestureDetector).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Buscar'**
+  String get feedSearchA11y;
+
+  /// Accessibility label for the icon-only create-post '+' action in the feed header (finding 11 feed_screen create GestureDetector).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Crear publicación'**
+  String get feedCreatePostA11y;
+
+  /// Semantics liveRegion/label for the create-post submit spinner state while a post is being published (finding 12 create_post_screen PUBLICAR spinner branch).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Publicando…'**
+  String get feedPublishingA11y;
+
+  /// Accessibility label for the icon-only clear-field button on the user search screen (finding 17). Existing workoutPickerSheetClear='Limpiar' is a different, sheet-scoped action.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Limpiar búsqueda'**
+  String get searchUsersClearA11y;
+
+  /// Semantics label for the disabled MENSAJE stub on the public profile screen, exposed via Semantics(button:true, enabled:false) (finding 16).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Mensaje (próximamente)'**
+  String get publicProfileMessageDisabledA11y;
+
+  /// Parametric Semantics label for user avatars (PostAvatar / HomeHeader avatar) wrapped at call sites so screen readers announce whose photo it is (findings 4,6,7,16,18,19). Fix agents must add the matching @a11yAvatarLabel placeholder metadata (name: String). When the name is null, use a11yAvatarLabelGeneric.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Foto de perfil de {name}'**
+  String a11yAvatarLabel(String name);
+
+  /// Non-parametric avatar Semantics label used when the display name is unavailable/null (findings 4,6,7,16,18,19).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Foto de perfil'**
+  String get a11yAvatarLabelGeneric;
+
+  /// Semantics label for the bell-with-badge in the trainer home header that currently conveys the pending count purely visually (finding 18). Fix agents add the @homePendingRequestsA11y placeholder metadata (count: int).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{count} solicitudes pendientes'**
+  String homePendingRequestsA11y(int count);
+
+  /// tooltip / Semantics label for the icon-only overflow PopupMenuButton in _UserRoutineCard on the workout screen (finding 29 mis_rutinas_section dotsThree).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Opciones de rutina'**
+  String get workoutRoutineOptionsA11y;
+
+  /// Parametric Semantics label for the per-set check toggle in the session player - the single most-tapped action (finding 27). Fix agents add the @ placeholder metadata (setNumber: int).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Marcar serie {setNumber} como completada'**
+  String sessionPlayerSetCompleteA11y(int setNumber);
+
+  /// Parametric Semantics label for the technique info icon button in the session player (finding 27). Fix agents add the @ placeholder metadata (exerciseName: String).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ver técnica de {exerciseName}'**
+  String sessionPlayerTechniqueA11y(String exerciseName);
+
+  /// Semantics label for the duration 'Iniciar' / timer icon control in the session player (finding 27).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Iniciar temporizador'**
+  String get sessionPlayerTimerStartA11y;
+
+  /// tooltip / Semantics label for the icon-only day-delete trash button in the routine editor (findings 25/26 day-header trash IconButton).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Eliminar día'**
+  String get routineEditorDeleteDayA11y;
+
+  /// Accessibility label for the edit-plan icon button in the athlete detail plan card (finding 5).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Editar plan'**
+  String get athleteDetailEditPlanA11y;
+
+  /// Accessibility label for the delete-plan icon button in the athlete detail plan card (finding 5).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Eliminar plan'**
+  String get athleteDetailDeletePlanA11y;
+
+  /// Accessibility label announcing why the MAPA toggle is disabled when the trainers list is in Online mode (finding 6).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Mapa, no disponible en modo Online'**
+  String get coachMapDisabledOnlineA11y;
+
+  /// Generic accessibility/action label for a Cancel control.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cancelar'**
+  String get commonCancel;
+
+  /// Live-region accessibility label for the public profile load-error state (finding 16).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cargar este perfil.'**
+  String get publicProfileLoadErrorA11y;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

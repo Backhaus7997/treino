@@ -17,6 +17,7 @@ import 'package:treino/features/feed/feed_screen.dart';
 import 'package:treino/features/feed/presentation/widgets/feed_empty_state.dart';
 import 'package:treino/features/feed/presentation/widgets/feed_segment_pills.dart';
 import 'package:treino/features/feed/presentation/widgets/post_card.dart';
+import 'package:treino/l10n/app_l10n.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
@@ -62,6 +63,8 @@ Widget _wrapProvider(Widget w, List<Override> overrides) => ProviderScope(
       overrides: overrides,
       child: MaterialApp(
         theme: AppTheme.dark(),
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
         home: Scaffold(body: w),
       ),
     );
@@ -85,6 +88,8 @@ Widget _wrapProviderRouter(Widget w, List<Override> overrides) {
     overrides: overrides,
     child: MaterialApp.router(
       theme: AppTheme.dark(),
+      localizationsDelegates: AppL10n.localizationsDelegates,
+      supportedLocales: AppL10n.supportedLocales,
       routerConfig: router,
     ),
   );
@@ -142,6 +147,8 @@ void main() {
           overrides: baseOverrides,
           child: MaterialApp(
             theme: AppTheme.dark(),
+            localizationsDelegates: AppL10n.localizationsDelegates,
+            supportedLocales: AppL10n.supportedLocales,
             home: const Scaffold(body: FeedScreen()),
           ),
         ),

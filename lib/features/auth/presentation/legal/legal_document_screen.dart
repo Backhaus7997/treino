@@ -45,15 +45,18 @@ class LegalDocumentScreen extends StatelessWidget {
                     ),
                     const SizedBox(width: 4),
                     Expanded(
-                      child: Text(
-                        title,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.barlowCondensed(
-                          fontSize: 24,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.3,
-                          color: palette.textPrimary,
+                      child: Semantics(
+                        header: true,
+                        child: Text(
+                          title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.barlowCondensed(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.3,
+                            color: palette.textPrimary,
+                          ),
                         ),
                       ),
                     ),
@@ -86,13 +89,16 @@ class LegalDocumentScreen extends StatelessWidget {
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          section.heading,
-                          style: GoogleFonts.barlowCondensed(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 0.3,
-                            color: palette.accent,
+                        Semantics(
+                          header: true,
+                          child: Text(
+                            section.heading,
+                            style: GoogleFonts.barlowCondensed(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.3,
+                              color: palette.accent,
+                            ),
                           ),
                         ),
                         const SizedBox(height: 6),

@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/treino_icon.dart';
+import '../../../l10n/app_l10n.dart';
 import '../application/custom_exercise_providers.dart';
 import '../application/session_providers.dart' show currentUidProvider;
 import '../domain/custom_exercise.dart';
@@ -16,6 +17,7 @@ class MyExercisesScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     final uid = ref.watch(currentUidProvider) ?? '';
     final exercisesAsync = uid.isEmpty
         ? const AsyncValue<List<CustomExercise>>.data(<CustomExercise>[])
@@ -27,20 +29,24 @@ class MyExercisesScreen extends ConsumerWidget {
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
           child: Row(
             children: [
-              GestureDetector(
-                onTap: () => context.pop(),
-                behavior: HitTestBehavior.opaque,
-                child:
+              IconButton(
+                tooltip: l10n.commonBack,
+                icon:
                     Icon(TreinoIcon.back, size: 20, color: palette.textPrimary),
+                onPressed: () =>
+                    context.canPop() ? context.pop() : context.go('/profile'),
               ),
-              const SizedBox(width: 14),
-              Text(
-                'MIS EJERCICIOS',
-                style: GoogleFonts.barlowCondensed(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 16,
-                  letterSpacing: 1.0,
-                  color: palette.textPrimary,
+              const SizedBox(width: 6),
+              Semantics(
+                header: true,
+                child: Text(
+                  'MIS EJERCICIOS',
+                  style: GoogleFonts.barlowCondensed(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 16,
+                    letterSpacing: 1.0,
+                    color: palette.textPrimary,
+                  ),
                 ),
               ),
             ],
@@ -114,7 +120,10 @@ class _EmptyState extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(TreinoIcon.sparkle, size: 48, color: palette.textMuted),
+            ExcludeSemantics(
+              child:
+                  Icon(TreinoIcon.sparkle, size: 48, color: palette.textMuted),
+            ),
             const SizedBox(height: 18),
             Text(
               'Tu biblioteca está vacía.',
@@ -149,54 +158,69 @@ class _ExerciseCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hasVideo =
+        exercise.videoUrl != null && exercise.videoUrl!.isNotEmpty;
+    final label = [
+      exercise.name,
+      if (exercise.muscleGroup.isNotEmpty) exercise.muscleGroup,
+    ].join(', ');
+
     return Material(
       color: palette.bgCard,
       borderRadius: BorderRadius.circular(14),
-      child: InkWell(
-        onTap: () => context.push('/profile/my-exercises/${exercise.id}'),
-        borderRadius: BorderRadius.circular(14),
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: palette.border, width: 1),
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      exercise.name,
-                      style: GoogleFonts.barlow(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
-                        color: palette.textPrimary,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    if (exercise.muscleGroup.isNotEmpty) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        exercise.muscleGroup,
-                        style: GoogleFonts.barlow(
-                          fontWeight: FontWeight.w400,
-                          fontSize: 12,
-                          color: palette.textMuted,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
+      child: Semantics(
+        button: true,
+        label: label,
+        child: InkWell(
+          onTap: () => context.push('/profile/my-exercises/${exercise.id}'),
+          borderRadius: BorderRadius.circular(14),
+          child: ExcludeSemantics(
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: palette.border, width: 1),
               ),
-              if (exercise.videoUrl != null && exercise.videoUrl!.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: Icon(TreinoIcon.play, size: 16, color: palette.accent),
-                ),
-              Icon(TreinoIcon.forward, size: 16, color: palette.textMuted),
-            ],
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          exercise.name,
+                          style: GoogleFonts.barlow(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                            color: palette.textPrimary,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (exercise.muscleGroup.isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            exercise.muscleGroup,
+                            style: GoogleFonts.barlow(
+                              fontWeight: FontWeight.w400,
+                              fontSize: 12,
+                              color: palette.textMuted,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  if (hasVideo)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: Icon(TreinoIcon.play,
+                          size: 16, color: palette.accent),
+                    ),
+                  Icon(TreinoIcon.forward, size: 16, color: palette.textMuted),
+                ],
+              ),
+            ),
           ),
         ),
       ),

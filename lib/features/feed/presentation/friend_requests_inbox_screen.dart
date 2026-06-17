@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/treino_icon.dart';
+import '../../../l10n/app_l10n.dart';
 import '../../auth/application/auth_providers.dart';
 import '../application/friendship_providers.dart';
 import 'widgets/friend_request_inbox_tile.dart';
@@ -95,14 +96,25 @@ class _InboxHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppL10n.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
       child: Row(
         children: [
-          GestureDetector(
-            onTap: () => context.pop(),
-            behavior: HitTestBehavior.opaque,
-            child: Icon(TreinoIcon.back, size: 20, color: palette.textPrimary),
+          Semantics(
+            button: true,
+            label: l10n.commonBack,
+            child: GestureDetector(
+              onTap: () => context.pop(),
+              behavior: HitTestBehavior.opaque,
+              child: Container(
+                constraints:
+                    const BoxConstraints(minWidth: 44, minHeight: 44),
+                alignment: Alignment.centerLeft,
+                child: Icon(TreinoIcon.back,
+                    size: 20, color: palette.textPrimary),
+              ),
+            ),
           ),
           const SizedBox(width: 14),
           Text(

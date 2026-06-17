@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
+import '../../../../l10n/app_l10n.dart';
 import '../../../profile/application/user_public_profile_providers.dart';
 import '../../application/feed_screen_providers.dart'
     show myFriendsFeedProvider;
@@ -47,6 +48,7 @@ class _FriendRequestInboxTileState
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     final profileAsync =
         ref.watch(userPublicProfileProvider(widget.friendship.requesterId));
 
@@ -121,6 +123,7 @@ class _FriendRequestInboxTileState
             children: [
               _InboxActionPill(
                 label: 'RECHAZAR',
+                semanticsLabel: l10n.dashboardRechazarLabel,
                 variant: _PillVariant.outlinedMuted,
                 palette: palette,
                 onTap: _busy ? null : _onRechazar,
@@ -128,6 +131,7 @@ class _FriendRequestInboxTileState
               const SizedBox(width: 8),
               _InboxActionPill(
                 label: 'ACEPTAR',
+                semanticsLabel: l10n.dashboardAceptarLabel,
                 variant: _PillVariant.mintFilled,
                 palette: palette,
                 onTap: _busy ? null : _onAceptar,
@@ -198,12 +202,18 @@ enum _PillVariant { mintFilled, outlinedMuted }
 class _InboxActionPill extends StatelessWidget {
   const _InboxActionPill({
     required this.label,
+    required this.semanticsLabel,
     required this.variant,
     required this.palette,
     required this.onTap,
   });
 
   final String label;
+
+  /// Localized action name announced to TalkBack/VoiceOver. The visible
+  /// [label] stays a styled literal, so the semantics node carries the
+  /// l10n string and the [Text] is wrapped in [ExcludeSemantics].
+  final String semanticsLabel;
   final _PillVariant variant;
   final AppPalette palette;
   final VoidCallback? onTap;
@@ -215,23 +225,45 @@ class _InboxActionPill extends StatelessWidget {
     final borderColor = isFilled ? palette.accent : palette.border;
     final textColor = isFilled ? palette.bg : palette.textMuted;
 
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: borderColor),
-        ),
-        child: Text(
-          label,
-          style: GoogleFonts.barlowCondensed(
-            fontWeight: FontWeight.w700,
-            fontSize: 12,
-            letterSpacing: 1.0,
-            color: textColor,
+    // a11y: expose the pill as a button with its localized action label and
+    // enabled/disabled state (onTap is null while a request is in flight), so
+    // TalkBack/VoiceOver announce it as an actionable, stateful control
+    // instead of static text — matching the sibling pill pattern.
+    return Semantics(
+      button: true,
+      enabled: onTap != null,
+      label: semanticsLabel,
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        // Guarantee a >=44pt tap target (iOS HIG minimum) without enlarging
+        // the visual pill — the opaque hit test covers the full constrained
+        // box while the decorated Container keeps its size.
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+          child: Center(
+            widthFactor: 1,
+            heightFactor: 1,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: bg,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: borderColor),
+              ),
+              // Decorative once the Semantics node carries the action label.
+              child: ExcludeSemantics(
+                child: Text(
+                  label,
+                  style: GoogleFonts.barlowCondensed(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                    letterSpacing: 1.0,
+                    color: textColor,
+                  ),
+                ),
+              ),
+            ),
           ),
         ),
       ),
