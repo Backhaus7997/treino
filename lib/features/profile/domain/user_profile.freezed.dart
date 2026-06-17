@@ -33,7 +33,15 @@ mixin _$UserProfile {
   int? get heightCm => throw _privateConstructorUsedError;
   Gender? get gender => throw _privateConstructorUsedError;
   ExperienceLevel? get experienceLevel => throw _privateConstructorUsedError;
-  String? get avatarUrl => throw _privateConstructorUsedError;
+  String? get avatarUrl =>
+      throw _privateConstructorUsedError; // ── Datos personales estructurados (Coach Hub web W3.1b) ──────────────
+// `firstName`/`lastName` son la fuente de los campos Nombre/Apellido del
+// form de Cuenta del Coach Hub. `displayName` (usado en roster + perfil
+// público) se DERIVA de ambos al guardar, para no romper a quien ya lo
+// consume. `phone` es privado: NO se propaga a userPublicProfiles.
+  String? get firstName => throw _privateConstructorUsedError;
+  String? get lastName => throw _privateConstructorUsedError;
+  String? get phone => throw _privateConstructorUsedError;
   @TimestampConverter()
   DateTime? get bornAt =>
       throw _privateConstructorUsedError; // ── Trainer-specific (Fase 5 Etapa 1 foundations) ───────────────────
@@ -102,6 +110,9 @@ abstract class $UserProfileCopyWith<$Res> {
       Gender? gender,
       ExperienceLevel? experienceLevel,
       String? avatarUrl,
+      String? firstName,
+      String? lastName,
+      String? phone,
       @TimestampConverter() DateTime? bornAt,
       String? trainerBio,
       String? trainerSpecialty,
@@ -142,6 +153,9 @@ class _$UserProfileCopyWithImpl<$Res, $Val extends UserProfile>
     Object? gender = freezed,
     Object? experienceLevel = freezed,
     Object? avatarUrl = freezed,
+    Object? firstName = freezed,
+    Object? lastName = freezed,
+    Object? phone = freezed,
     Object? bornAt = freezed,
     Object? trainerBio = freezed,
     Object? trainerSpecialty = freezed,
@@ -202,6 +216,18 @@ class _$UserProfileCopyWithImpl<$Res, $Val extends UserProfile>
       avatarUrl: freezed == avatarUrl
           ? _value.avatarUrl
           : avatarUrl // ignore: cast_nullable_to_non_nullable
+              as String?,
+      firstName: freezed == firstName
+          ? _value.firstName
+          : firstName // ignore: cast_nullable_to_non_nullable
+              as String?,
+      lastName: freezed == lastName
+          ? _value.lastName
+          : lastName // ignore: cast_nullable_to_non_nullable
+              as String?,
+      phone: freezed == phone
+          ? _value.phone
+          : phone // ignore: cast_nullable_to_non_nullable
               as String?,
       bornAt: freezed == bornAt
           ? _value.bornAt
@@ -272,6 +298,9 @@ abstract class _$$UserProfileImplCopyWith<$Res>
       Gender? gender,
       ExperienceLevel? experienceLevel,
       String? avatarUrl,
+      String? firstName,
+      String? lastName,
+      String? phone,
       @TimestampConverter() DateTime? bornAt,
       String? trainerBio,
       String? trainerSpecialty,
@@ -310,6 +339,9 @@ class __$$UserProfileImplCopyWithImpl<$Res>
     Object? gender = freezed,
     Object? experienceLevel = freezed,
     Object? avatarUrl = freezed,
+    Object? firstName = freezed,
+    Object? lastName = freezed,
+    Object? phone = freezed,
     Object? bornAt = freezed,
     Object? trainerBio = freezed,
     Object? trainerSpecialty = freezed,
@@ -370,6 +402,18 @@ class __$$UserProfileImplCopyWithImpl<$Res>
       avatarUrl: freezed == avatarUrl
           ? _value.avatarUrl
           : avatarUrl // ignore: cast_nullable_to_non_nullable
+              as String?,
+      firstName: freezed == firstName
+          ? _value.firstName
+          : firstName // ignore: cast_nullable_to_non_nullable
+              as String?,
+      lastName: freezed == lastName
+          ? _value.lastName
+          : lastName // ignore: cast_nullable_to_non_nullable
+              as String?,
+      phone: freezed == phone
+          ? _value.phone
+          : phone // ignore: cast_nullable_to_non_nullable
               as String?,
       bornAt: freezed == bornAt
           ? _value.bornAt
@@ -435,6 +479,9 @@ class _$UserProfileImpl implements _UserProfile {
       this.gender,
       this.experienceLevel,
       this.avatarUrl,
+      this.firstName,
+      this.lastName,
+      this.phone,
       @TimestampConverter() this.bornAt,
       this.trainerBio,
       this.trainerSpecialty,
@@ -478,6 +525,17 @@ class _$UserProfileImpl implements _UserProfile {
   final ExperienceLevel? experienceLevel;
   @override
   final String? avatarUrl;
+// ── Datos personales estructurados (Coach Hub web W3.1b) ──────────────
+// `firstName`/`lastName` son la fuente de los campos Nombre/Apellido del
+// form de Cuenta del Coach Hub. `displayName` (usado en roster + perfil
+// público) se DERIVA de ambos al guardar, para no romper a quien ya lo
+// consume. `phone` es privado: NO se propaga a userPublicProfiles.
+  @override
+  final String? firstName;
+  @override
+  final String? lastName;
+  @override
+  final String? phone;
   @override
   @TimestampConverter()
   final DateTime? bornAt;
@@ -547,7 +605,7 @@ class _$UserProfileImpl implements _UserProfile {
 
   @override
   String toString() {
-    return 'UserProfile(uid: $uid, email: $email, displayName: $displayName, role: $role, createdAt: $createdAt, updatedAt: $updatedAt, gymId: $gymId, bodyWeightKg: $bodyWeightKg, heightCm: $heightCm, gender: $gender, experienceLevel: $experienceLevel, avatarUrl: $avatarUrl, bornAt: $bornAt, trainerBio: $trainerBio, trainerSpecialty: $trainerSpecialty, trainerMonthlyRate: $trainerMonthlyRate, paymentAlias: $paymentAlias, trainerLatitude: $trainerLatitude, trainerLongitude: $trainerLongitude, trainerGeohash: $trainerGeohash, trainerLocations: $trainerLocations, trainerGeohashes: $trainerGeohashes, trainerOffersOnline: $trainerOffersOnline)';
+    return 'UserProfile(uid: $uid, email: $email, displayName: $displayName, role: $role, createdAt: $createdAt, updatedAt: $updatedAt, gymId: $gymId, bodyWeightKg: $bodyWeightKg, heightCm: $heightCm, gender: $gender, experienceLevel: $experienceLevel, avatarUrl: $avatarUrl, firstName: $firstName, lastName: $lastName, phone: $phone, bornAt: $bornAt, trainerBio: $trainerBio, trainerSpecialty: $trainerSpecialty, trainerMonthlyRate: $trainerMonthlyRate, paymentAlias: $paymentAlias, trainerLatitude: $trainerLatitude, trainerLongitude: $trainerLongitude, trainerGeohash: $trainerGeohash, trainerLocations: $trainerLocations, trainerGeohashes: $trainerGeohashes, trainerOffersOnline: $trainerOffersOnline)';
   }
 
   @override
@@ -574,6 +632,11 @@ class _$UserProfileImpl implements _UserProfile {
                 other.experienceLevel == experienceLevel) &&
             (identical(other.avatarUrl, avatarUrl) ||
                 other.avatarUrl == avatarUrl) &&
+            (identical(other.firstName, firstName) ||
+                other.firstName == firstName) &&
+            (identical(other.lastName, lastName) ||
+                other.lastName == lastName) &&
+            (identical(other.phone, phone) || other.phone == phone) &&
             (identical(other.bornAt, bornAt) || other.bornAt == bornAt) &&
             (identical(other.trainerBio, trainerBio) ||
                 other.trainerBio == trainerBio) &&
@@ -613,6 +676,9 @@ class _$UserProfileImpl implements _UserProfile {
         gender,
         experienceLevel,
         avatarUrl,
+        firstName,
+        lastName,
+        phone,
         bornAt,
         trainerBio,
         trainerSpecialty,
@@ -656,6 +722,9 @@ abstract class _UserProfile implements UserProfile {
       final Gender? gender,
       final ExperienceLevel? experienceLevel,
       final String? avatarUrl,
+      final String? firstName,
+      final String? lastName,
+      final String? phone,
       @TimestampConverter() final DateTime? bornAt,
       final String? trainerBio,
       final String? trainerSpecialty,
@@ -696,7 +765,18 @@ abstract class _UserProfile implements UserProfile {
   @override
   ExperienceLevel? get experienceLevel;
   @override
-  String? get avatarUrl;
+  String?
+      get avatarUrl; // ── Datos personales estructurados (Coach Hub web W3.1b) ──────────────
+// `firstName`/`lastName` son la fuente de los campos Nombre/Apellido del
+// form de Cuenta del Coach Hub. `displayName` (usado en roster + perfil
+// público) se DERIVA de ambos al guardar, para no romper a quien ya lo
+// consume. `phone` es privado: NO se propaga a userPublicProfiles.
+  @override
+  String? get firstName;
+  @override
+  String? get lastName;
+  @override
+  String? get phone;
   @override
   @TimestampConverter()
   DateTime?

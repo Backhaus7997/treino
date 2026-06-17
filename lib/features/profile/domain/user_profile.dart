@@ -36,6 +36,14 @@ class UserProfile with _$UserProfile {
     Gender? gender,
     ExperienceLevel? experienceLevel,
     String? avatarUrl,
+    // ── Datos personales estructurados (Coach Hub web W3.1b) ──────────────
+    // `firstName`/`lastName` son la fuente de los campos Nombre/Apellido del
+    // form de Cuenta del Coach Hub. `displayName` (usado en roster + perfil
+    // público) se DERIVA de ambos al guardar, para no romper a quien ya lo
+    // consume. `phone` es privado: NO se propaga a userPublicProfiles.
+    String? firstName,
+    String? lastName,
+    String? phone,
     @TimestampConverter() DateTime? bornAt,
     // ── Trainer-specific (Fase 5 Etapa 1 foundations) ───────────────────
     String? trainerBio,

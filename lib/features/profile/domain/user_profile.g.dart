@@ -23,6 +23,9 @@ _$UserProfileImpl _$$UserProfileImplFromJson(Map<String, dynamic> json) =>
       experienceLevel: $enumDecodeNullable(
           _$ExperienceLevelEnumMap, json['experienceLevel']),
       avatarUrl: json['avatarUrl'] as String?,
+      firstName: json['firstName'] as String?,
+      lastName: json['lastName'] as String?,
+      phone: json['phone'] as String?,
       bornAt: _$JsonConverterFromJson<Timestamp, DateTime>(
           json['bornAt'], const TimestampConverter().fromJson),
       trainerBio: json['trainerBio'] as String?,
@@ -57,6 +60,9 @@ Map<String, dynamic> _$$UserProfileImplToJson(_$UserProfileImpl instance) =>
       'gender': _$GenderEnumMap[instance.gender],
       'experienceLevel': _$ExperienceLevelEnumMap[instance.experienceLevel],
       'avatarUrl': instance.avatarUrl,
+      'firstName': instance.firstName,
+      'lastName': instance.lastName,
+      'phone': instance.phone,
       'bornAt': _$JsonConverterToJson<Timestamp, DateTime>(
           instance.bornAt, const TimestampConverter().toJson),
       'trainerBio': instance.trainerBio,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:treino/app/theme/app_palette.dart';
+import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach_hub/presentation/sections/ajustes/tabs/cuenta_tab.dart';
 import 'package:treino/features/coach_hub/presentation/shell/section_header.dart';
 
@@ -13,6 +14,13 @@ extension AjustesTabX on AjustesTab {
         AjustesTab.notificaciones => 'Notificaciones', // i18n: Fase W3
         AjustesTab.facturacion => 'Facturación TREINO', // i18n: Fase W3
         AjustesTab.datos => 'Datos y privacidad', // i18n: Fase W3
+      };
+
+  IconData get icon => switch (this) {
+        AjustesTab.cuenta => TreinoIcon.users,
+        AjustesTab.notificaciones => TreinoIcon.bell,
+        AjustesTab.facturacion => TreinoIcon.sidebarPagos,
+        AjustesTab.datos => TreinoIcon.shieldCheck,
       };
 }
 
@@ -44,7 +52,7 @@ class AjustesScreen extends ConsumerWidget {
           const SectionHeader(title: 'CONFIGURACIÓN'), // i18n: Fase W3
           const SizedBox(height: 4),
           Text(
-            'Cuenta · Notificaciones · Preferencias', // i18n: Fase W3
+            'Cuenta · Negocio · Preferencias', // i18n: Fase W3
             style: TextStyle(color: palette.textMuted, fontSize: 13),
           ),
           const SizedBox(height: 20),
@@ -86,6 +94,7 @@ class _SubNav extends StatelessWidget {
         children: [
           for (final tab in AjustesTab.values)
             _SubNavItem(
+              icon: tab.icon,
               label: tab.label,
               selected: tab == selected,
               onTap: () => onSelect(tab),
@@ -99,12 +108,14 @@ class _SubNav extends StatelessWidget {
 
 class _SubNavItem extends StatelessWidget {
   const _SubNavItem({
+    required this.icon,
     required this.label,
     required this.selected,
     required this.onTap,
     required this.palette,
   });
 
+  final IconData icon;
   final String label;
   final bool selected;
   final VoidCallback onTap;
@@ -125,13 +136,27 @@ class _SubNavItem extends StatelessWidget {
           ),
           borderRadius: BorderRadius.circular(10),
         ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: selected ? palette.textPrimary : palette.textMuted,
-            fontSize: 14,
-            fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-          ),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              size: 18,
+              color: selected ? palette.accent : palette.textMuted,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: selected ? palette.textPrimary : palette.textMuted,
+                  fontSize: 14,
+                  fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
