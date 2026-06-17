@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
@@ -11,7 +12,6 @@ import '../../workout/application/session_providers.dart'
     show currentUidProvider;
 import '../application/chat_providers.dart';
 import '../domain/chat.dart';
-import 'chat_screen.dart';
 
 /// Pantalla que lista todos los chats del usuario actual.
 ///
@@ -95,14 +95,10 @@ class _ChatRow extends ConsumerWidget {
 
     return InkWell(
       onTap: () {
-        Navigator.of(context).push(
-          MaterialPageRoute<void>(
-            builder: (_) => ChatScreen(
-              chatId: chat.chatId,
-              otherUid: otherUid,
-            ),
-          ),
-        );
+        // Open the chat via the top-level go_router route so it renders
+        // full-screen (no nav bar) with a proper background — the same route
+        // the athlete-detail MENSAJE button uses.
+        context.push('/coach/chat/${chat.chatId}?other=$otherUid');
       },
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),

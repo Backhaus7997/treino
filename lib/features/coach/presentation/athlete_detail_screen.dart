@@ -221,12 +221,11 @@ class _AthleteDetailBody extends ConsumerWidget {
         ),
 
         // ── MENSAJE + CREAR PLAN buttons ──────────────────────────────
-        // Bottom inset clears the shell's floating nav bar (extendBody:true
-        // publishes its height via MediaQuery.padding.bottom). Without it the
-        // buttons render BEHIND the bar and are untappable.
+        // Full-screen route (no nav bar); _immersive's SafeArea handles the
+        // home-indicator inset, so a plain bottom padding sits the buttons at
+        // the bottom of the screen.
         Padding(
-          padding: EdgeInsets.fromLTRB(
-              20, 0, 20, 20 + MediaQuery.paddingOf(context).bottom),
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
           child: Column(
             children: [
               SizedBox(

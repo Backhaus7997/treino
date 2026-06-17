@@ -330,6 +330,27 @@ GoRouter buildRouter({
         ],
       ),
 
+      GoRoute(
+        // Athlete detail (coach) — full-screen, MENSAJE/CREAR PLAN sit at the
+        // bottom with no nav bar. Bare Column (no Scaffold) → wrap in _immersive.
+        path: '/coach/athlete/:athleteId',
+        builder: (context, state) {
+          final athleteId = state.pathParameters['athleteId']!;
+          return _immersive(AthleteDetailScreen(athleteId: athleteId));
+        },
+      ),
+      GoRoute(
+        // 1-1 chat — full-screen, no nav bar. Reached from the athlete-detail
+        // MENSAJE button AND the messages inbox; both push this same route so
+        // it always opens full-screen with a proper background.
+        path: '/coach/chat/:chatId',
+        builder: (context, state) {
+          final chatId = state.pathParameters['chatId']!;
+          final otherUid = state.uri.queryParameters['other'] ?? '';
+          return _withBg(ChatScreen(chatId: chatId, otherUid: otherUid));
+        },
+      ),
+
       // ShellRoute with the existing 5 tabs.
       // Use `pageBuilder` (not `builder`) so the shell itself uses an
       // instant transition when entered from a top-level route like /splash —
@@ -441,22 +462,9 @@ GoRouter buildRouter({
                   return _withBg(TrainerPublicProfileScreen(uid: uid));
                 },
               ),
-              GoRoute(
-                path: 'athlete/:athleteId',
-                builder: (context, state) {
-                  final athleteId = state.pathParameters['athleteId']!;
-                  return _withBg(AthleteDetailScreen(athleteId: athleteId));
-                },
-              ),
-              GoRoute(
-                path: 'chat/:chatId',
-                builder: (context, state) {
-                  final chatId = state.pathParameters['chatId']!;
-                  final otherUid = state.uri.queryParameters['other'] ?? '';
-                  return _withBg(
-                      ChatScreen(chatId: chatId, otherUid: otherUid));
-                },
-              ),
+              // athlete detail + 1-1 chat moved to top-level immersive routes
+              // (/coach/athlete/:id, /coach/chat/:id) so they show NO bottom
+              // nav bar — see the top-level GoRoutes above.
               GoRoute(
                 path: 'agenda',
                 builder: (_, __) => _withBg(const _AthleteAgendaRouteHost()),
