@@ -855,5 +855,102 @@
   "publicProfileLoadErrorA11y": "No pudimos cargar este perfil.",
   "@publicProfileLoadErrorA11y": {
     "description": "Live-region accessibility label for the public profile load-error state (finding 16)."
+  },
+  "authGenericErrorFallback": "Algo salió mal. Probá de nuevo.",
+  "@authGenericErrorFallback": {
+    "description": "Generic auth failure fallback shown when an unexpected (non-AuthFailure) error occurs in forgot-password submit and on splash auth-resolve failure. Reused by findings 0/20 and 1."
+  },
+  "agendaNoUpcomingSessions": "Tu PF todavía no te agendó sesiones.",
+  "@agendaNoUpcomingSessions": {
+    "description": "Empty state on the athlete agenda screen when there are no upcoming/confirmed sessions (finding 4). Distinct from agendaEmptyAvailability which is about a trainer's own hours."
+  },
+  "agendaSaveError": "No pudimos guardar. Probá de nuevo.",
+  "@agendaSaveError": {
+    "description": "Error snackbar when saving an availability rule/override fails in the availability editor sheets (findings 6/24)."
+  },
+  "agendaSaveSuccess": "Horario guardado.",
+  "@agendaSaveSuccess": {
+    "description": "Success snackbar after saving an availability rule/override in the availability editor (findings 6/24)."
+  },
+  "coachHubSectionLoadError": "No pudimos cargar esta sección.",
+  "@coachHubSectionLoadError": {
+    "description": "Error text for the coach hub dashboard sections (paused/historial/pending requests) that currently swallow loading+error via maybeWhen+orElse (finding 7). Pair with coachRetryLabel for the retry CTA."
+  },
+  "coachHubSignOutError": "No pudimos cerrar sesión. Probá de nuevo.",
+  "@coachHubSignOutError": {
+    "description": "Inline error on the coach-hub not-allowed screen when signOut() fails (finding 8)."
+  },
+  "feedLoadError": "No pudimos cargar tu feed. Probá de nuevo.",
+  "@feedLoadError": {
+    "description": "Feed error branch text, replacing the hardcoded literal repeated 3x in feed_screen.dart (finding 9). Pair with coachRetryLabel for the retry CTA."
+  },
+  "createPostLoadError": "No pudimos abrir el editor. Probá de nuevo.",
+  "@createPostLoadError": {
+    "description": "Friendly localized error replacing the raw 'Error: $e' debug placeholder in create_post_screen.dart's AsyncValue.error branch (finding 10). Pair with coachRetryLabel."
+  },
+  "insightsLoadError": "No pudimos cargar tus insights. Probá de nuevo.",
+  "@insightsLoadError": {
+    "description": "Insights error branch message, paired with a Reintentar (coachRetryLabel) button calling ref.invalidate(weeklyInsightsProvider) (finding 12)."
+  },
+  "profileLoadError": "No pudimos cargar tu perfil. Probá de nuevo.",
+  "@profileLoadError": {
+    "description": "Error state for profile_edit_personal_screen's profile load (finding 13) and reusable for the trainer-edit gyms section error (finding 14). Pair with coachRetryLabel."
+  },
+  "sessionDetailNoSets": "Esta sesión no tiene sets registrados.",
+  "@sessionDetailNoSets": {
+    "description": "Empty state for session_detail_screen when setLogs is empty (finding 18)."
+  },
+  "sessionLogSetError": "No pudimos guardar la serie. Reintentá.",
+  "@sessionLogSetError": {
+    "description": "Snackbar shown when logging/updating a set fails in the session player (finding 21). Pair with a retry action."
+  },
+  "sessionFinishError": "No pudimos finalizar la sesión. Probá de nuevo.",
+  "@sessionFinishError": {
+    "description": "Snackbar when finishSession/abandonSession fails so the user isn't stranded on the player (finding 22)."
+  },
+  "routineEditorMissingName": "Poné un nombre a la rutina.",
+  "@routineEditorMissingName": {
+    "description": "Inline validation hint when the routine name is empty and the save button is disabled (finding 19)."
+  },
+  "routineEditorMissingExercise": "Agregá al menos un ejercicio al Día {dayNumber}.",
+  "@routineEditorMissingExercise": {
+    "description": "Inline validation hint when a day has no exercises (finding 19).",
+    "placeholders": {
+      "dayNumber": {
+        "type": "int"
+      }
+    }
+  },
+  "routineEditorMissingReps": "Completá las reps de los sets antes de guardar.",
+  "@routineEditorMissingReps": {
+    "description": "Inline validation hint when a visible set is missing a valid reps/duration value in a single-week self-routine (finding 19). routineEditorIncompleteSetsFeedback already covers the named-exercise multi-week case."
+  },
+  "feedPostPublishedSuccess": "Post publicado.",
+  "@feedPostPublishedSuccess": {
+    "description": "Success snackbar after publishing a post (finding 25). Shown via the root ScaffoldMessenger since the compose screen pops on success."
+  },
+  "feedRequestSentSuccess": "Solicitud enviada.",
+  "@feedRequestSentSuccess": {
+    "description": "Success feedback when a friend/follow request is sent from the public profile follow button (findings 25/26)."
+  },
+  "feedRequestAcceptedSuccess": "Ahora son amigos.",
+  "@feedRequestAcceptedSuccess": {
+    "description": "Success feedback when a friend request is accepted (finding 25). Used by the public profile accept action and optionally the inbox accept."
+  },
+  "feedFriendActionError": "No pudimos completar la acción. Probá de nuevo.",
+  "@feedFriendActionError": {
+    "description": "Error snackbar for friendship mutations (accept/reject/request/unfriend) that currently swallow errors, in the inbox tile and public profile follow button (findings 11/26)."
+  },
+  "profilePersonalSaveSuccess": "Cambios guardados.",
+  "@profilePersonalSaveSuccess": {
+    "description": "Success feedback after saving 'Datos personales' (editar personal), matching the trainer-edit pattern (finding 27)."
+  },
+  "profileGymSaveSuccess": "Gimnasio actualizado.",
+  "@profileGymSaveSuccess": {
+    "description": "Success feedback after saving the gym selection (finding 27)."
+  },
+  "profileGymSaveError": "No pudimos guardar el gimnasio. Probá de nuevo.",
+  "@profileGymSaveError": {
+    "description": "Error snackbar when the gym save fails (currently has no catch) in profile_gym_screen (finding 28)."
   }
 }

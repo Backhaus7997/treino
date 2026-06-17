@@ -73,7 +73,13 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
       }
     } catch (_) {
       if (!mounted) return;
-      setState(() => _isLoading = false);
+      // Never swallow a user-initiated error silently: surface a generic
+      // failure so AuthFailureBanner renders (Nielsen #1 visibility of system
+      // status, #9 help users recover from errors).
+      setState(() {
+        _failure = const AuthFailure.unknown('reset-failed');
+        _isLoading = false;
+      });
     }
   }
 

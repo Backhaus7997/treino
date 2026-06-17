@@ -498,7 +498,13 @@ class _GymsSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppL10n.of(context);
     final gymsAsync = ref.watch(gymsProvider);
+    // The gym catalog drives the per-card title/address. While it loads (or if
+    // it errors) we must NOT collapse into the 'Gimnasio' fallback — that
+    // misrepresents a pending/failed fetch as a genuinely missing gym.
+    final gymsLoading = gymsAsync.isLoading && !gymsAsync.hasValue;
+    final gymsErrored = gymsAsync.hasError && !gymsAsync.hasValue;
     final gymsById = <String, Gym>{
       for (final g in gymsAsync.valueOrNull ?? const <Gym>[]) g.id: g,
     };
@@ -521,6 +527,42 @@ class _GymsSection extends ConsumerWidget {
               style: TextStyle(color: palette.textMuted, fontSize: 13),
             ),
           )
+        else if (gymsErrored)
+          // Catalog fetch failed: show an inline error + retry instead of
+          // rendering every saved gym as the generic 'Gimnasio' placeholder.
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            decoration: BoxDecoration(
+              color: palette.bgCard,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: palette.border),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  l10n.profileLoadError,
+                  style: TextStyle(color: palette.danger, fontSize: 13),
+                ),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton(
+                    onPressed: () => ref.invalidate(gymsProvider),
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      minimumSize: const Size(0, 32),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: Text(
+                      l10n.coachRetryLabel,
+                      style: TextStyle(color: palette.accent),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          )
         else
           Column(
             children: locations
@@ -529,8 +571,22 @@ class _GymsSection extends ConsumerWidget {
                       child: _LocationCard(
                         palette: palette,
                         icon: TreinoIcon.gym,
-                        title: gymsById[loc.gymId]?.name ?? 'Gimnasio',
+                        // While the catalog is still loading we show a neutral
+                        // loading label rather than the 'Gimnasio' fallback,
+                        // which would otherwise masquerade as real data.
+                        title: gymsById[loc.gymId]?.name ??
+                            (gymsLoading ? l10n.coachLoadingLabel : 'Gimnasio'),
                         subtitle: gymsById[loc.gymId]?.address,
+                        trailing: gymsLoading && !gymsById.containsKey(loc.gymId)
+                            ? SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: palette.accent,
+                                ),
+                              )
+                            : null,
                         onRemove: () => onRemove(loc),
                       ),
                     ))
@@ -621,12 +677,16 @@ class _LocationCard extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.onRemove,
+    this.trailing,
   });
   final AppPalette palette;
   final IconData icon;
   final String title;
   final String? subtitle;
   final VoidCallback onRemove;
+  // Optional leading-of-the-remove-button slot, used to surface a per-card
+  // loading spinner while the gym catalog is still resolving the title.
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -671,6 +731,10 @@ class _LocationCard extends StatelessWidget {
               ],
             ),
           ),
+          if (trailing != null) ...[
+            trailing!,
+            const SizedBox(width: 4),
+          ],
           IconButton(
             onPressed: onRemove,
             icon: Icon(TreinoIcon.trash, size: 18, color: palette.textMuted),

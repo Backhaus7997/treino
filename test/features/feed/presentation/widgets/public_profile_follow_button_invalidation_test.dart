@@ -23,6 +23,7 @@ import 'package:treino/features/feed/domain/friendship_status.dart';
 import 'package:treino/features/feed/presentation/widgets/public_profile_follow_button.dart';
 import 'package:treino/features/profile/application/user_providers.dart'
     show firestoreProvider;
+import 'package:treino/l10n/app_l10n.dart';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -50,6 +51,9 @@ Widget _wrap(
       ],
       child: MaterialApp(
         theme: AppTheme.dark(),
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+        locale: const Locale('es', 'AR'),
         home: Scaffold(body: w),
       ),
     );
@@ -150,6 +154,9 @@ void main() {
           ],
           child: MaterialApp(
             theme: AppTheme.dark(),
+            localizationsDelegates: AppL10n.localizationsDelegates,
+            supportedLocales: AppL10n.supportedLocales,
+            locale: const Locale('es', 'AR'),
             home: Scaffold(
               body: Column(
                 children: [

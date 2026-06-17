@@ -14,6 +14,7 @@ import '../../feed/domain/gym_name.dart';
 import '../application/exercise_providers.dart';
 import '../application/routine_providers.dart';
 import '../application/session_init.dart';
+import '../application/session_notifier.dart';
 import '../application/session_providers.dart';
 import '../application/session_state.dart';
 import '../domain/routine.dart';
@@ -169,6 +170,63 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
   // showDialog en paralelo a la navegación — produce `!_debugLocked` assertion.
   bool _isFinalizing = false;
 
+  // Canal de error de log/update de sets (finding 22). El notifier lo emite por
+  // un ValueListenable SEPARADO del AsyncValue para no destruir la sesión activa
+  // ante un solo set fallido. Nos suscribimos en initState y REMOVEMOS el listener
+  // en dispose para no filtrarlo; guardamos la referencia al notifier para poder
+  // hacer removeListener con el mismo objeto en dispose.
+  SessionNotifier? _notifier;
+
+  @override
+  void initState() {
+    super.initState();
+    // Diferido a post-frame: leer el provider y suscribirse al canal de error
+    // recién cuando el árbol está montado, así el SnackBar tiene un
+    // ScaffoldMessenger válido y no corremos ref.read durante initState.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _notifier = ref.read(sessionNotifierProvider(widget.init).notifier);
+      _notifier!.logSetError.addListener(_onLogSetError);
+    });
+  }
+
+  @override
+  void dispose() {
+    _notifier?.logSetError.removeListener(_onLogSetError);
+    super.dispose();
+  }
+
+  /// Reacciona a un fallo de log/update de set: muestra un SnackBar con
+  /// Reintentar (finding 22) y limpia el canal para no re-emitir el mismo error.
+  void _onLogSetError() {
+    final notifier = _notifier;
+    if (notifier == null || notifier.logSetError.value == null) return;
+    if (!mounted) {
+      notifier.clearLogSetError();
+      return;
+    }
+    final l10n = AppL10n.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(l10n.sessionLogSetError),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 6),
+        action: SnackBarAction(
+          label: l10n.coachRetryLabel,
+          onPressed: () {
+            messenger.hideCurrentSnackBar();
+            notifier.retryLastLogError();
+          },
+        ),
+      ),
+    );
+    // Limpiamos el canal una vez mostrado el feedback para que no re-dispare el
+    // mismo error en el próximo notify.
+    notifier.clearLogSetError();
+  }
+
   // ── Helpers ───────────────────────────────────────────────────────────────
 
   void _showAbandonConfirm() {
@@ -184,7 +242,19 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
   Future<void> _onAbandonConfirmed() async {
     final notifier = ref.read(sessionNotifierProvider(widget.init).notifier);
     _isFinalizing = true;
-    await notifier.abandonSession();
+    try {
+      // El notifier RESETEA _finalized y RELANZA si el write a Firestore falla
+      // (finding 23). Sin este try/catch, un fallo dejaba _isFinalizing=true sin
+      // navegar → pantalla congelada. Capturamos, reseteamos la marca y ofrecemos
+      // Reintentar sin navegar. El happy-path (navegar) queda intacto.
+      await notifier.abandonSession();
+    } catch (_) {
+      if (mounted) {
+        _isFinalizing = false;
+        _showFinishError(_onAbandonConfirmed);
+      }
+      return;
+    }
     if (mounted) {
       context.go('/workout');
     }
@@ -195,10 +265,43 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
     final sessionId =
         ref.read(sessionNotifierProvider(widget.init)).value?.session.id;
     _isFinalizing = true;
-    await notifier.finishSession();
+    try {
+      // Mismo contrato que abandon: el notifier relanza ante fallo de write
+      // (finding 23). Capturamos para no dejar la pantalla congelada con el
+      // botón inutilizable; reseteamos _isFinalizing y mostramos Reintentar.
+      await notifier.finishSession();
+    } catch (_) {
+      if (mounted) {
+        _isFinalizing = false;
+        _showFinishError(_finishSession);
+      }
+      return;
+    }
     if (mounted && sessionId != null) {
       context.go('/workout/session-summary/$sessionId');
     }
+  }
+
+  /// SnackBar de error de finalización/abandono con acción Reintentar
+  /// (finding 23). [onRetry] re-invoca el mismo flujo (finish o abandon).
+  void _showFinishError(Future<void> Function() onRetry) {
+    final l10n = AppL10n.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(l10n.sessionFinishError),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 6),
+        action: SnackBarAction(
+          label: l10n.coachRetryLabel,
+          onPressed: () {
+            messenger.hideCurrentSnackBar();
+            onRetry();
+          },
+        ),
+      ),
+    );
   }
 
   /// Loguea un set directamente sin pasar por la sheet.

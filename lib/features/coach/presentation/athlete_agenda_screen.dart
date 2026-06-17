@@ -137,8 +137,33 @@ class _AthleteAgendaScreenState extends ConsumerState<AthleteAgendaScreen> {
               now: now,
             ),
           ),
+        ] else ...[
+          _emptyState(context, palette),
         ],
       ],
+    );
+  }
+
+  Widget _emptyState(BuildContext context, AppPalette palette) {
+    final l10n = AppL10n.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 40),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            TreinoIcon.calendar,
+            size: 40,
+            color: palette.textMuted,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            l10n.agendaNoUpcomingSessions,
+            style: GoogleFonts.barlow(fontSize: 14, color: palette.textMuted),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
     );
   }
 

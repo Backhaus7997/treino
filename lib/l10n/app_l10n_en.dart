@@ -1507,4 +1507,86 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get publicProfileLoadErrorA11y => 'We couldn\'t load this profile.';
+
+  @override
+  String get authGenericErrorFallback =>
+      'Something went wrong. Please try again.';
+
+  @override
+  String get agendaNoUpcomingSessions =>
+      'Your coach hasn\'t scheduled any sessions yet.';
+
+  @override
+  String get agendaSaveError => 'We couldn\'t save. Please try again.';
+
+  @override
+  String get agendaSaveSuccess => 'Schedule saved.';
+
+  @override
+  String get coachHubSectionLoadError => 'We couldn\'t load this section.';
+
+  @override
+  String get coachHubSignOutError =>
+      'We couldn\'t sign you out. Please try again.';
+
+  @override
+  String get feedLoadError => 'We couldn\'t load your feed. Please try again.';
+
+  @override
+  String get createPostLoadError =>
+      'We couldn\'t open the editor. Please try again.';
+
+  @override
+  String get insightsLoadError =>
+      'We couldn\'t load your insights. Please try again.';
+
+  @override
+  String get profileLoadError =>
+      'We couldn\'t load your profile. Please try again.';
+
+  @override
+  String get sessionDetailNoSets => 'This session has no logged sets.';
+
+  @override
+  String get sessionLogSetError =>
+      'We couldn\'t save the set. Please try again.';
+
+  @override
+  String get sessionFinishError =>
+      'We couldn\'t finish the session. Please try again.';
+
+  @override
+  String get routineEditorMissingName => 'Give your routine a name.';
+
+  @override
+  String routineEditorMissingExercise(int dayNumber) {
+    return 'Add at least one exercise to Day $dayNumber.';
+  }
+
+  @override
+  String get routineEditorMissingReps =>
+      'Fill in the reps for your sets before saving.';
+
+  @override
+  String get feedPostPublishedSuccess => 'Post published.';
+
+  @override
+  String get feedRequestSentSuccess => 'Request sent.';
+
+  @override
+  String get feedRequestAcceptedSuccess => 'You\'re now friends.';
+
+  @override
+  String get feedFriendActionError =>
+      'We couldn\'t complete the action. Please try again.';
+
+  @override
+  String get profilePersonalSaveSuccess => 'Changes saved.';
+
+  @override
+  String get profileGymSaveSuccess => 'Gym updated.';
+
+  @override
+  String get profileGymSaveError =>
+      'We couldn\'t save your gym. Please try again.';
 }

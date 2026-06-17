@@ -5,17 +5,47 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/treino_icon.dart';
+import '../../../l10n/app_l10n.dart';
 
 /// Screen que se muestra cuando un athlete (o user sin role=trainer)
 /// entra al Coach Hub web.
 ///
 /// Le explica que el hub es solo para PFs y le ofrece sign-out para
 /// volver al login (donde podría usar otra cuenta) o cerrar la pestaña.
-class CoachHubNotAllowedScreen extends ConsumerWidget {
+class CoachHubNotAllowedScreen extends ConsumerStatefulWidget {
   const CoachHubNotAllowedScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<CoachHubNotAllowedScreen> createState() =>
+      _CoachHubNotAllowedScreenState();
+}
+
+class _CoachHubNotAllowedScreenState
+    extends ConsumerState<CoachHubNotAllowedScreen> {
+  bool _signingOut = false;
+  String? _error;
+
+  Future<void> _signOut() async {
+    if (_signingOut) return;
+    setState(() {
+      _signingOut = true;
+      _error = null;
+    });
+    try {
+      await FirebaseAuth.instance.signOut();
+      // El router redirige automáticamente al /login via refreshListenable.
+      // No reseteamos _signingOut: la screen se desmonta en el redirect.
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _error = AppL10n.of(context).coachHubSignOutError;
+        _signingOut = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     return Scaffold(
       backgroundColor: palette.bg,
@@ -65,17 +95,23 @@ class CoachHubNotAllowedScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 24),
                 OutlinedButton.icon(
-                  onPressed: () async {
-                    await FirebaseAuth.instance.signOut();
-                    // El router redirige automáticamente al /login.
-                  },
-                  icon: Icon(
-                    TreinoIcon.signOut,
-                    color: palette.textPrimary,
-                    size: 18,
-                  ),
+                  onPressed: _signingOut ? null : _signOut,
+                  icon: _signingOut
+                      ? SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: palette.textPrimary,
+                          ),
+                        )
+                      : Icon(
+                          TreinoIcon.signOut,
+                          color: palette.textPrimary,
+                          size: 18,
+                        ),
                   label: Text(
-                    'Cerrar sesión',
+                    AppL10n.of(context).authProfileSignOut,
                     style: TextStyle(color: palette.textPrimary),
                   ),
                   style: OutlinedButton.styleFrom(
@@ -84,6 +120,14 @@ class CoachHubNotAllowedScreen extends ConsumerWidget {
                     shape: const StadiumBorder(),
                   ),
                 ),
+                if (_error != null) ...[
+                  const SizedBox(height: 14),
+                  Text(
+                    _error!,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: palette.danger, fontSize: 13),
+                  ),
+                ],
               ],
             ),
           ),

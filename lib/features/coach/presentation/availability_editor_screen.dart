@@ -68,12 +68,30 @@ class _EditorBody extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final rulesAsync = ref.watch(availabilityRulesStreamProvider(trainerId));
-    final overridesAsync = ref.watch(overridesStreamProvider(OverridesKey(
+    final palette = AppPalette.of(context);
+    final overridesKey = OverridesKey(
       trainerId: trainerId,
       fromDate: _kRangeFrom,
       toDate: _kRangeTo,
-    )));
+    );
+    final rulesAsync = ref.watch(availabilityRulesStreamProvider(trainerId));
+    final overridesAsync = ref.watch(overridesStreamProvider(overridesKey));
+
+    // Distinguish loading and error from a genuinely empty config: collapsing
+    // both into `?? const []` would show the empty-state hints on first load
+    // and silently hide stream failures behind the same hints.
+    if (rulesAsync.isLoading || overridesAsync.isLoading) {
+      return Center(child: CircularProgressIndicator(color: palette.accent));
+    }
+    if (rulesAsync.hasError || overridesAsync.hasError) {
+      return _ErrorState(
+        palette: palette,
+        onRetry: () {
+          ref.invalidate(availabilityRulesStreamProvider(trainerId));
+          ref.invalidate(overridesStreamProvider(overridesKey));
+        },
+      );
+    }
 
     final rules = rulesAsync.valueOrNull ?? const [];
     final overrides = overridesAsync.valueOrNull ?? const [];
@@ -564,9 +582,20 @@ class _RuleFormSheetState extends ConsumerState<_RuleFormSheet> {
           slotDurationMin: _slotDurationMin,
         ));
       }
-      if (context.mounted) Navigator.of(context).pop();
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(AppL10n.of(context).agendaSaveSuccess)),
+        );
+        Navigator.of(context).pop();
+      }
     } catch (_) {
-      // ignore save errors in this phase
+      // Surface the failure and keep the sheet open so the trainer can retry —
+      // popping silently would let them believe the rule was published.
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(AppL10n.of(context).agendaSaveError)),
+        );
+      }
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -706,9 +735,20 @@ class _BlockOverrideFormSheetState
               date: _date,
             ),
           );
-      if (context.mounted) Navigator.of(context).pop();
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(AppL10n.of(context).agendaSaveSuccess)),
+        );
+        Navigator.of(context).pop();
+      }
     } catch (_) {
-      // ignore
+      // Surface the failure and keep the sheet open so the trainer can retry —
+      // popping silently would let them believe the day was blocked.
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(AppL10n.of(context).agendaSaveError)),
+        );
+      }
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -731,6 +771,51 @@ class _SectionHeader extends StatelessWidget {
         fontSize: 12,
         letterSpacing: 1.2,
         color: palette.textMuted,
+      ),
+    );
+  }
+}
+
+class _ErrorState extends StatelessWidget {
+  const _ErrorState({required this.palette, required this.onRetry});
+  final AppPalette palette;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppL10n.of(context);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              l10n.coachErrorLabel,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.barlow(fontSize: 14, color: palette.textMuted),
+            ),
+            const SizedBox(height: 16),
+            OutlinedButton(
+              onPressed: onRetry,
+              style: OutlinedButton.styleFrom(
+                side: BorderSide(color: palette.accent),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(9999),
+                ),
+              ),
+              child: Text(
+                l10n.coachRetryLabel,
+                style: GoogleFonts.barlowCondensed(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                  letterSpacing: 0.8,
+                  color: palette.accent,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

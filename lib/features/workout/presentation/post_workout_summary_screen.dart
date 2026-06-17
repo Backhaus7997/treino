@@ -24,6 +24,7 @@ class PostWorkoutSummaryScreen extends ConsumerWidget {
     final summaryAsync = ref.watch(
       sessionSummaryProvider((uid: uid, sessionId: sessionId)),
     );
+    final isSharing = ref.watch(postWorkoutNotifierProvider).isLoading;
 
     return Scaffold(
       body: AppBackground(
@@ -43,6 +44,7 @@ class PostWorkoutSummaryScreen extends ConsumerWidget {
               return _LoadedBody(
                 session: session,
                 setLogs: data.setLogs,
+                isSharing: isSharing,
                 onShare: () async {
                   final messenger = ScaffoldMessenger.of(context);
                   final l10n = AppL10n.of(context);
@@ -80,11 +82,13 @@ class _LoadedBody extends StatelessWidget {
   const _LoadedBody({
     required this.session,
     required this.setLogs,
+    required this.isSharing,
     required this.onShare,
   });
 
   final Session session;
   final List<SetLog> setLogs;
+  final bool isSharing;
   final VoidCallback onShare;
 
   @override
@@ -102,7 +106,7 @@ class _LoadedBody extends StatelessWidget {
             child: IconButton(
               icon: Icon(TreinoIcon.close, color: palette.textPrimary),
               tooltip: l10n.commonClose,
-              onPressed: () => context.go('/workout'),
+              onPressed: isSharing ? null : () => context.go('/workout'),
             ),
           ),
           const SizedBox(height: 8),
@@ -195,15 +199,31 @@ class _LoadedBody extends StatelessWidget {
 
           // LISTO button (filled)
           FilledButton(
-            onPressed: () => context.go('/workout'),
+            onPressed: isSharing ? null : () => context.go('/workout'),
             child: Text(l10n.workoutButtonDone),
           ),
           const SizedBox(height: 12),
 
-          // COMPARTIR button (outlined)
+          // COMPARTIR button (outlined) — disabled with spinner while sharing
           OutlinedButton(
-            onPressed: onShare,
-            child: Text(l10n.workoutButtonShare),
+            onPressed: isSharing ? null : onShare,
+            child: isSharing
+                ? Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: palette.accent,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Text(l10n.commonLoading),
+                    ],
+                  )
+                : Text(l10n.workoutButtonShare),
           ),
         ],
       ),

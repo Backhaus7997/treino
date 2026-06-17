@@ -588,5 +588,35 @@
   "athleteDetailDeletePlanA11y": "Delete plan",
   "coachMapDisabledOnlineA11y": "Map, unavailable in Online mode",
   "commonCancel": "Cancel",
-  "publicProfileLoadErrorA11y": "We couldn't load this profile."
+  "publicProfileLoadErrorA11y": "We couldn't load this profile.",
+  "authGenericErrorFallback": "Something went wrong. Please try again.",
+  "agendaNoUpcomingSessions": "Your coach hasn't scheduled any sessions yet.",
+  "agendaSaveError": "We couldn't save. Please try again.",
+  "agendaSaveSuccess": "Schedule saved.",
+  "coachHubSectionLoadError": "We couldn't load this section.",
+  "coachHubSignOutError": "We couldn't sign you out. Please try again.",
+  "feedLoadError": "We couldn't load your feed. Please try again.",
+  "createPostLoadError": "We couldn't open the editor. Please try again.",
+  "insightsLoadError": "We couldn't load your insights. Please try again.",
+  "profileLoadError": "We couldn't load your profile. Please try again.",
+  "sessionDetailNoSets": "This session has no logged sets.",
+  "sessionLogSetError": "We couldn't save the set. Please try again.",
+  "sessionFinishError": "We couldn't finish the session. Please try again.",
+  "routineEditorMissingName": "Give your routine a name.",
+  "routineEditorMissingExercise": "Add at least one exercise to Day {dayNumber}.",
+  "@routineEditorMissingExercise": {
+    "placeholders": {
+      "dayNumber": {
+        "type": "int"
+      }
+    }
+  },
+  "routineEditorMissingReps": "Fill in the reps for your sets before saving.",
+  "feedPostPublishedSuccess": "Post published.",
+  "feedRequestSentSuccess": "Request sent.",
+  "feedRequestAcceptedSuccess": "You're now friends.",
+  "feedFriendActionError": "We couldn't complete the action. Please try again.",
+  "profilePersonalSaveSuccess": "Changes saved.",
+  "profileGymSaveSuccess": "Gym updated.",
+  "profileGymSaveError": "We couldn't save your gym. Please try again."
 }

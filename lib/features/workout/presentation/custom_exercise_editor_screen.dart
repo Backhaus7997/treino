@@ -68,14 +68,70 @@ class _CustomExerciseEditorScreenState
     final l10n = AppL10n.of(context);
     final uid = ref.watch(currentUidProvider) ?? '';
 
-    CustomExercise? existing;
+    // Edit mode hydrates from the trainer's custom-exercise stream. Branch on
+    // the AsyncValue explicitly so a slow/failed load is visible (Nielsen #1)
+    // instead of silently degrading to an empty "new" form, which could let
+    // the user overwrite or duplicate an exercise.
     if (widget.isEditing && uid.isNotEmpty) {
       final listAsync = ref.watch(customExercisesForTrainerStreamProvider(uid));
-      final list = listAsync.valueOrNull ?? const <CustomExercise>[];
-      existing = list.where((e) => e.id == widget.exerciseId).firstOrNull;
-      if (existing != null) _hydrate(existing);
+      return listAsync.when(
+        loading: () => _StatusScaffold(
+          palette: palette,
+          l10n: l10n,
+          child: Center(
+            child: CircularProgressIndicator(color: palette.accent),
+          ),
+        ),
+        error: (_, __) => _StatusScaffold(
+          palette: palette,
+          l10n: l10n,
+          child: _ErrorState(
+            palette: palette,
+            // coachErrorLabel/coachRetryLabel are blank in the English locale,
+            // which left the error state with no visible text or button label
+            // (Nielsen #1). Route through keys that are populated in both
+            // locales so the message and retry CTA are always visible.
+            message: l10n.coachHubSectionLoadError,
+            retryLabel: l10n.plantillasRetryLabel,
+            onRetry: () => ref.invalidate(
+                customExercisesForTrainerStreamProvider(uid)),
+          ),
+        ),
+        data: (list) {
+          final existing =
+              list.where((e) => e.id == widget.exerciseId).firstOrNull;
+          if (existing == null) {
+            return _StatusScaffold(
+              palette: palette,
+              l10n: l10n,
+              child: _ErrorState(
+                palette: palette,
+                // Previously reused workoutSelfEditorNotFound, authored for the
+                // ROUTINE editor ("Esta rutina ya no existe…") — wrong domain
+                // on an exercise editor, and blank in the English locale. Use a
+                // neutral key populated in both locales so the not-found state
+                // is visible and not falsely about routines.
+                message: l10n.coachHubSectionLoadError,
+                retryLabel: l10n.commonBack,
+                onRetry: () => context.pop(),
+              ),
+            );
+          }
+          _hydrate(existing);
+          return _buildForm(context, palette, l10n, existing);
+        },
+      );
     }
 
+    return _buildForm(context, palette, l10n, null);
+  }
+
+  Widget _buildForm(
+    BuildContext context,
+    AppPalette palette,
+    AppL10n l10n,
+    CustomExercise? existing,
+  ) {
     return Column(
       children: [
         Padding(
@@ -393,6 +449,117 @@ class _CustomExerciseEditorScreenState
     } finally {
       if (mounted) setState(() => _deleting = false);
     }
+  }
+}
+
+/// Header + back affordance shared by the loading / error / not-found states
+/// so the user is never trapped on a blank screen while editing.
+class _StatusScaffold extends StatelessWidget {
+  const _StatusScaffold({
+    required this.palette,
+    required this.l10n,
+    required this.child,
+  });
+
+  final AppPalette palette;
+  final AppL10n l10n;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+          child: Row(
+            children: [
+              Semantics(
+                button: true,
+                label: l10n.commonBack,
+                child: GestureDetector(
+                  onTap: () => context.pop(),
+                  behavior: HitTestBehavior.opaque,
+                  child: ConstrainedBox(
+                    constraints:
+                        const BoxConstraints(minWidth: 44, minHeight: 44),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      widthFactor: 1,
+                      child: Icon(TreinoIcon.back,
+                          size: 20, color: palette.textPrimary),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 14),
+              Text(
+                'EDITAR EJERCICIO',
+                style: GoogleFonts.barlowCondensed(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 16,
+                  letterSpacing: 1.0,
+                  color: palette.textPrimary,
+                ),
+              ),
+            ],
+          ),
+        ),
+        Expanded(child: child),
+      ],
+    );
+  }
+}
+
+class _ErrorState extends StatelessWidget {
+  const _ErrorState({
+    required this.palette,
+    required this.message,
+    required this.retryLabel,
+    required this.onRetry,
+  });
+
+  final AppPalette palette;
+  final String message;
+  final String retryLabel;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style:
+                  GoogleFonts.barlow(fontSize: 14, color: palette.textMuted),
+            ),
+            const SizedBox(height: 16),
+            OutlinedButton(
+              onPressed: onRetry,
+              style: OutlinedButton.styleFrom(
+                side: BorderSide(color: palette.accent, width: 1),
+                foregroundColor: palette.accent,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(9999),
+                ),
+              ),
+              child: Text(
+                retryLabel,
+                style: GoogleFonts.barlowCondensed(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12,
+                  letterSpacing: 0.8,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
