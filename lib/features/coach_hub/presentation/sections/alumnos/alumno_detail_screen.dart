@@ -12,6 +12,12 @@ import 'package:treino/features/measurements/presentation/widgets/measurement_pr
 import 'package:treino/features/payments/application/pagos_por_cobrar_provider.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
+import 'package:treino/features/workout/application/assigned_routine_providers.dart';
+import 'package:treino/features/workout/application/session_providers.dart';
+import 'package:treino/features/workout/domain/routine.dart';
+import 'package:treino/features/workout/domain/routine_status.dart';
+import 'package:treino/features/workout/domain/session.dart';
+import 'package:treino/features/workout/domain/session_status.dart';
 
 import 'alumnos_screen.dart' show AlumnoEstado, AlumnoEstadoX, estadoForLink;
 
@@ -40,6 +46,7 @@ class AlumnoDetailScreen extends ConsumerWidget {
     'Archivos',
     'Seguimiento',
   ];
+  static const _entrenamientoIndex = 1;
   static const _progresoIndex = 3;
 
   @override
@@ -96,7 +103,9 @@ class AlumnoDetailScreen extends ConsumerWidget {
               physics: const NeverScrollableScrollPhysics(),
               children: [
                 for (var i = 0; i < _tabs.length; i++)
-                  if (i == _progresoIndex)
+                  if (i == _entrenamientoIndex)
+                    _EntrenamientoTab(athleteId: athleteId)
+                  else if (i == _progresoIndex)
                     _ProgresoTab(athleteId: athleteId)
                   else
                     _TabPlaceholder(label: _tabs[i]),
@@ -147,9 +156,6 @@ class _Header extends StatelessWidget {
   final AlumnoEstado? estado;
   final String? gymName;
   final AppPalette palette;
-
-  String _fmtDate(DateTime d) =>
-      '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
 
   @override
   Widget build(BuildContext context) {
@@ -494,3 +500,214 @@ Widget _muted(AppPalette palette, String text) => Center(
             style: TextStyle(color: palette.textMuted, fontSize: 14)),
       ),
     );
+
+String _fmtDate(DateTime d) =>
+    '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+
+/// Tab Entrenamiento (W2 PR3): rutina activa + historial de sesiones.
+///
+/// Reusa `assignedRoutinesProvider` y `sessionsByUidProvider` (data ya
+/// trainer-readable). La evolución por ejercicio se difiere: depende de
+/// `setLogs`, que es owner-only en firestore.rules.
+class _EntrenamientoTab extends ConsumerWidget {
+  const _EntrenamientoTab({required this.athleteId});
+  final String athleteId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final palette = AppPalette.of(context);
+    final trainerUid = ref.watch(currentUidProvider);
+    final routinesAsync = ref.watch(assignedRoutinesProvider(athleteId));
+    final sessionsAsync = ref.watch(sessionsByUidProvider(athleteId));
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _sectionLabel(palette, 'RUTINA ACTIVA'), // i18n: Fase W2
+          const SizedBox(height: 10),
+          routinesAsync.when(
+            loading: () => _muted(palette, 'Cargando…'), // i18n: Fase W2
+            error: (e, _) => _muted(
+                palette, 'No se pudo cargar la rutina.'), // i18n: Fase W2
+            data: (routines) {
+              final actives =
+                  routines.where((r) => r.status == RoutineStatus.active);
+              final active = actives
+                      .where((r) => r.assignedBy == trainerUid)
+                      .firstOrNull ??
+                  actives.firstOrNull;
+              if (active == null) {
+                return _muted(
+                    palette, 'Sin rutina activa asignada.'); // i18n: Fase W2
+              }
+              return _RutinaCard(routine: active, palette: palette);
+            },
+          ),
+          const SizedBox(height: 20),
+          _sectionLabel(palette, 'HISTORIAL DE SESIONES'), // i18n: Fase W2
+          const SizedBox(height: 10),
+          sessionsAsync.when(
+            loading: () => _muted(palette, 'Cargando…'), // i18n: Fase W2
+            error: (e, _) => _muted(
+                palette, 'No se pudo cargar el historial.'), // i18n: Fase W2
+            data: (sessions) {
+              // Mismo filtro que el historial del atleta (historial_section.dart)
+              // y los contadores públicos: las sesiones abandonadas se persisten
+              // con status=finished pero wasFullyCompleted=false, así que se
+              // excluyen para no mostrarle al entrenador filas que el alumno no
+              // ve en su propio historial. // i18n: Fase W2
+              final finished = sessions
+                  .where((s) =>
+                      s.status == SessionStatus.finished && s.wasFullyCompleted)
+                  .take(20)
+                  .toList();
+              if (finished.isEmpty) {
+                return _muted(palette,
+                    'Sin sesiones registradas todavía.'); // i18n: Fase W2
+              }
+              return _HistorialTable(sessions: finished, palette: palette);
+            },
+          ),
+          const SizedBox(height: 14),
+          Text(
+            'Próximamente: evolución por ejercicio (PR, volumen, frecuencia).', // i18n: Fase W2
+            style: TextStyle(color: palette.textMuted, fontSize: 12),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RutinaCard extends StatelessWidget {
+  const _RutinaCard({required this.routine, required this.palette});
+  final Routine routine;
+  final AppPalette palette;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: palette.bgCard,
+        border: Border.all(color: palette.border),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            routine.name,
+            style: TextStyle(
+              color: palette.textPrimary,
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '${routine.days.length} días · ${routine.numWeeks} ${routine.numWeeks == 1 ? 'semana' : 'semanas'}', // i18n: Fase W2
+            style: TextStyle(color: palette.textMuted, fontSize: 12),
+          ),
+          const SizedBox(height: 10),
+          for (final day in routine.days)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      day.name,
+                      style:
+                          TextStyle(color: palette.textPrimary, fontSize: 14),
+                    ),
+                  ),
+                  Text(
+                    '${day.slots.length} ${day.slots.length == 1 ? 'ejercicio' : 'ejercicios'}', // i18n: Fase W2
+                    style: TextStyle(color: palette.textMuted, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HistorialTable extends StatelessWidget {
+  const _HistorialTable({required this.sessions, required this.palette});
+  final List<Session> sessions;
+  final AppPalette palette;
+
+  @override
+  Widget build(BuildContext context) {
+    final h = TextStyle(
+        color: palette.textMuted,
+        fontSize: 11,
+        fontWeight: FontWeight.w600,
+        letterSpacing: 0.5);
+    final c = TextStyle(color: palette.textPrimary, fontSize: 13);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      decoration: BoxDecoration(
+        color: palette.bgCard,
+        border: Border.all(color: palette.border),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Row(
+              children: [
+                // i18n: Fase W2 (encabezados)
+                Expanded(flex: 3, child: Text('FECHA', style: h)),
+                Expanded(flex: 4, child: Text('SESIÓN', style: h)),
+                Expanded(flex: 2, child: Text('DURACIÓN', style: h)),
+                Expanded(
+                  flex: 2,
+                  child: Text('VOLUMEN', style: h, textAlign: TextAlign.right),
+                ),
+              ],
+            ),
+          ),
+          for (final s in sessions)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    flex: 3,
+                    child: Text(
+                      s.finishedAt != null ? _fmtDate(s.finishedAt!) : '—',
+                      style: c,
+                    ),
+                  ),
+                  Expanded(
+                    flex: 4,
+                    child: Text(s.routineName,
+                        overflow: TextOverflow.ellipsis, style: c),
+                  ),
+                  Expanded(
+                    flex: 2,
+                    child:
+                        Text('${s.durationMin} min', style: c), // i18n: Fase W2
+                  ),
+                  Expanded(
+                    flex: 2,
+                    child:
+                        Text('${s.totalVolumeKg.round()} kg', // i18n: Fase W2
+                            style: c,
+                            textAlign: TextAlign.right),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}

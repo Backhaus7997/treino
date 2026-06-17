@@ -24,9 +24,16 @@ import 'package:treino/features/measurements/domain/measurement.dart';
 import 'package:treino/features/measurements/presentation/widgets/measurement_progress_chart.dart';
 import 'package:treino/features/payments/application/pagos_por_cobrar_provider.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
+import 'package:treino/features/profile/domain/experience_level.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
+import 'package:treino/features/workout/application/assigned_routine_providers.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
+import 'package:treino/features/workout/domain/routine.dart';
+import 'package:treino/features/workout/domain/routine_day.dart';
+import 'package:treino/features/workout/domain/routine_slot.dart';
+import 'package:treino/features/workout/domain/routine_status.dart';
 import 'package:treino/features/workout/domain/session.dart';
+import 'package:treino/features/workout/domain/session_status.dart';
 
 class _MockRepo extends Mock implements TrainerLinkRepository {}
 
@@ -54,11 +61,68 @@ Measurement _meas(double weightKg, {double? fat, double? waist, int day = 1}) =>
       waistCm: waist,
     );
 
+Routine _routine({
+  String id = 'r1',
+  String name = 'Hipertrofia 4 días',
+  String assignedBy = 't1',
+  RoutineStatus status = RoutineStatus.active,
+  int numWeeks = 4,
+  List<RoutineDay> days = const [
+    RoutineDay(dayNumber: 1, name: 'Lunes - Push', slots: []),
+    RoutineDay(dayNumber: 2, name: 'Martes - Pull', slots: []),
+  ],
+}) =>
+    Routine(
+      id: id,
+      name: name,
+      level: ExperienceLevel.intermediate,
+      days: days,
+      status: status,
+      assignedBy: assignedBy,
+      numWeeks: numWeeks,
+    );
+
+const _slot = RoutineSlot(
+  exerciseId: 'e1',
+  exerciseName: 'Press banca',
+  muscleGroup: 'Pecho',
+  targetSets: 3,
+  targetRepsMin: 8,
+  targetRepsMax: 12,
+  restSeconds: 90,
+);
+
+// finishedAt por defecto no-null (DateTime no es const, por eso `?? `);
+// para el caso null se construye un Session inline en el test correspondiente.
+Session _session({
+  String id = 's1',
+  String routineName = 'Push - Pecho',
+  SessionStatus status = SessionStatus.finished,
+  bool wasFullyCompleted = true,
+  int durationMin = 52,
+  double totalVolumeKg = 7840,
+  DateTime? finishedAt,
+}) =>
+    Session(
+      id: id,
+      uid: 'a1',
+      routineId: 'r1',
+      routineName: routineName,
+      startedAt: DateTime.utc(2026, 1, 10),
+      finishedAt: finishedAt ?? DateTime.utc(2026, 1, 10),
+      status: status,
+      durationMin: durationMin,
+      totalVolumeKg: totalVolumeKg,
+      wasFullyCompleted: wasFullyCompleted,
+    );
+
 Future<void> _pump(
   WidgetTester tester, {
   UserPublicProfile? profile,
   TrainerLink? link,
   List<Measurement> measurements = const [],
+  List<Routine> routines = const [],
+  List<Session> sessions = const [],
 }) async {
   tester.view.physicalSize = const Size(1200, 900);
   tester.view.devicePixelRatio = 1.0;
@@ -76,6 +140,9 @@ Future<void> _pump(
             .overrideWith((ref) => const AsyncData(<CobroPendiente>[])),
         measurementsForAthleteProvider
             .overrideWith((ref, id) => Stream.value(measurements)),
+        currentUidProvider.overrideWithValue('t1'),
+        assignedRoutinesProvider.overrideWith((ref, id) => routines),
+        sessionsByUidProvider.overrideWith((ref, id) => sessions),
       ],
       child: MaterialApp(
         theme: AppTheme.dark(),
@@ -170,6 +237,196 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Próximamente.'), findsOneWidget);
+    });
+
+    testWidgets('tab Entrenamientos: estados vacíos (W2 PR3)', (tester) async {
+      await _pump(tester,
+          profile: _prof(), link: _link(TrainerLinkStatus.active));
+
+      await tester.tap(find.text('Entrenamientos'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('RUTINA ACTIVA'), findsOneWidget);
+      expect(find.text('Sin rutina activa asignada.'), findsOneWidget);
+      expect(find.text('HISTORIAL DE SESIONES'), findsOneWidget);
+      expect(find.text('Sin sesiones registradas todavía.'), findsOneWidget);
+    });
+
+    testWidgets(
+        'tab Entrenamientos: rutina activa + historial con datos (W2 PR3)',
+        (tester) async {
+      await _pump(
+        tester,
+        profile: _prof(),
+        link: _link(TrainerLinkStatus.active),
+        routines: [_routine()],
+        sessions: [_session(totalVolumeKg: 7839.6)],
+      );
+
+      await tester.tap(find.text('Entrenamientos'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Hipertrofia 4 días'), findsOneWidget); // rutina activa
+      expect(
+          find.text('2 días · 4 semanas'), findsOneWidget); // resumen (plural)
+      expect(find.text('Lunes - Push'), findsOneWidget); // día
+      expect(find.text('0 ejercicios'), findsNWidgets(2)); // 2 días sin slots
+      expect(find.text('Push - Pecho'), findsOneWidget); // fila de sesión
+      expect(find.text('10/01/2026'), findsOneWidget); // fecha formateada
+      expect(find.text('52 min'), findsOneWidget);
+      expect(find.text('7840 kg'), findsOneWidget); // .round() de 7839.6
+    });
+
+    testWidgets(
+        'tab Entrenamientos: 1 semana / 1 ejercicio usa singular (W2 PR3)',
+        (tester) async {
+      await _pump(
+        tester,
+        profile: _prof(),
+        link: _link(TrainerLinkStatus.active),
+        routines: [
+          _routine(numWeeks: 1, days: const [
+            RoutineDay(dayNumber: 1, name: 'Día A', slots: [_slot]),
+          ]),
+        ],
+      );
+
+      await tester.tap(find.text('Entrenamientos'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('1 días · 1 semana'), findsOneWidget); // semana singular
+      expect(find.text('1 ejercicio'), findsOneWidget); // ejercicio singular
+    });
+
+    testWidgets(
+        'tab Entrenamientos: prioriza la rutina del trainer logueado (W2 PR3)',
+        (tester) async {
+      await _pump(
+        tester,
+        profile: _prof(),
+        link: _link(TrainerLinkStatus.active),
+        routines: [
+          _routine(id: 'rOtro', name: 'Plan de otro coach', assignedBy: 't2'),
+          _routine(id: 'rMia', name: 'Mi plan', assignedBy: 't1'),
+        ],
+      );
+
+      await tester.tap(find.text('Entrenamientos'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Mi plan'), findsOneWidget);
+      expect(find.text('Plan de otro coach'), findsNothing);
+    });
+
+    testWidgets(
+        'tab Entrenamientos: sin rutina propia cae a la activa de otro trainer (W2 PR3)',
+        (tester) async {
+      await _pump(
+        tester,
+        profile: _prof(),
+        link: _link(TrainerLinkStatus.active),
+        routines: [_routine(name: 'Plan heredado', assignedBy: 't2')],
+      );
+
+      await tester.tap(find.text('Entrenamientos'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Plan heredado'), findsOneWidget);
+      expect(find.text('Sin rutina activa asignada.'), findsNothing);
+    });
+
+    testWidgets(
+        'tab Entrenamientos: rutina archivada y sesión en curso quedan excluidas (W2 PR3)',
+        (tester) async {
+      await _pump(
+        tester,
+        profile: _prof(),
+        link: _link(TrainerLinkStatus.active),
+        routines: [
+          _routine(name: 'Rutina vieja', status: RoutineStatus.archived)
+        ],
+        sessions: [
+          _session(routineName: 'En curso', status: SessionStatus.active)
+        ],
+      );
+
+      await tester.tap(find.text('Entrenamientos'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Sin rutina activa asignada.'), findsOneWidget);
+      expect(find.text('Rutina vieja'), findsNothing);
+      expect(find.text('Sin sesiones registradas todavía.'), findsOneWidget);
+      expect(find.text('En curso'), findsNothing);
+    });
+
+    testWidgets(
+        'tab Entrenamientos: sesión abandonada (wasFullyCompleted=false) queda excluida (W2 PR3)',
+        (tester) async {
+      await _pump(
+        tester,
+        profile: _prof(),
+        link: _link(TrainerLinkStatus.active),
+        sessions: [
+          _session(routineName: 'Abandonada', wasFullyCompleted: false)
+        ],
+      );
+
+      await tester.tap(find.text('Entrenamientos'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Abandonada'), findsNothing);
+      expect(find.text('Sin sesiones registradas todavía.'), findsOneWidget);
+    });
+
+    testWidgets(
+        'tab Entrenamientos: sesión sin finishedAt muestra "—" (W2 PR3)',
+        (tester) async {
+      await _pump(
+        tester,
+        profile: _prof(),
+        link: _link(TrainerLinkStatus.active),
+        sessions: [
+          Session(
+            id: 's-null',
+            uid: 'a1',
+            routineId: 'r1',
+            routineName: 'Sin fecha',
+            startedAt: DateTime.utc(2026, 1, 10),
+            status: SessionStatus.finished,
+            wasFullyCompleted: true,
+            durationMin: 30,
+            totalVolumeKg: 1000,
+          ),
+        ],
+      );
+
+      await tester.tap(find.text('Entrenamientos'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Sin fecha'), findsOneWidget);
+      expect(find.text('—'), findsOneWidget);
+    });
+
+    testWidgets('tab Entrenamientos: historial se topa en 20 filas (W2 PR3)',
+        (tester) async {
+      final many = [
+        for (var i = 0; i < 21; i++)
+          _session(id: 's$i', routineName: 'Sesión $i'),
+      ];
+      await _pump(
+        tester,
+        profile: _prof(),
+        link: _link(TrainerLinkStatus.active),
+        sessions: many,
+      );
+
+      await tester.tap(find.text('Entrenamientos'));
+      await tester.pumpAndSettle();
+
+      // El .take(20) descarta la 21.ª (índice 20); las primeras 20 entran.
+      expect(find.text('Sesión 0'), findsOneWidget);
+      expect(find.text('Sesión 19'), findsOneWidget);
+      expect(find.text('Sesión 20'), findsNothing);
     });
   });
 
