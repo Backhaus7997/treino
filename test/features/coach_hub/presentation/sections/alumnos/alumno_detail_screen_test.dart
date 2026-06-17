@@ -1,6 +1,6 @@
 // Tests for the Coach Hub web Alumno detail (W2 PR2).
 //
-// Header (name + estado + denormalized metrics), the 9-tab bar, the Progreso
+// Header (name + estado + denormalized metrics), the 10-tab bar, the Progreso
 // tab (Antropometría: measurement cards + chart), and placeholder tabs —
 // pumped with stubbed providers (no Firestore, no GoRouter needed since we
 // don't tap the back link).
@@ -23,6 +23,10 @@ import 'package:treino/features/measurements/application/measurement_providers.d
 import 'package:treino/features/measurements/domain/measurement.dart';
 import 'package:treino/features/measurements/presentation/widgets/measurement_progress_chart.dart';
 import 'package:treino/features/payments/application/pagos_por_cobrar_provider.dart';
+import 'package:treino/features/payments/application/payment_providers.dart';
+import 'package:treino/features/payments/domain/athlete_billing.dart'
+    show BillingCadence;
+import 'package:treino/features/payments/domain/payment.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/features/profile/domain/experience_level.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
@@ -116,6 +120,36 @@ Session _session({
       wasFullyCompleted: wasFullyCompleted,
     );
 
+Payment _pago({
+  String id = 'p1',
+  String athleteId = 'a1',
+  int amountArs = 28000,
+  String concept = 'Mensual Junio 2026',
+  PaymentStatus status = PaymentStatus.paid,
+  DateTime? createdAt,
+}) =>
+    Payment(
+      id: id,
+      trainerId: 't1',
+      athleteId: athleteId,
+      amountArs: amountArs,
+      concept: concept,
+      status: status,
+      createdAt: createdAt ?? DateTime.utc(2026, 6, 1),
+    );
+
+CobroPendiente _cobro({
+  String athleteId = 'a1',
+  int amountArs = 18000,
+  String concept = 'Mensual Junio 2026',
+}) =>
+    CobroPendiente(
+      athleteId: athleteId,
+      amountArs: amountArs,
+      cadence: BillingCadence.mensual,
+      concept: concept,
+    );
+
 Future<void> _pump(
   WidgetTester tester, {
   UserPublicProfile? profile,
@@ -123,6 +157,8 @@ Future<void> _pump(
   List<Measurement> measurements = const [],
   List<Routine> routines = const [],
   List<Session> sessions = const [],
+  List<Payment> payments = const [],
+  List<CobroPendiente> pendingCobros = const [],
 }) async {
   tester.view.physicalSize = const Size(1200, 900);
   tester.view.devicePixelRatio = 1.0;
@@ -136,8 +172,8 @@ Future<void> _pump(
             .overrideWith((ref, id) => Stream.value(profile)),
         trainerLinksStreamProvider
             .overrideWith((ref) => Stream.value(link == null ? [] : [link])),
-        pagosPorCobrarProvider
-            .overrideWith((ref) => const AsyncData(<CobroPendiente>[])),
+        pagosPorCobrarProvider.overrideWith((ref) => AsyncData(pendingCobros)),
+        trainerPaymentsProvider.overrideWith((ref) => Stream.value(payments)),
         measurementsForAthleteProvider
             .overrideWith((ref, id) => Stream.value(measurements)),
         currentUidProvider.overrideWithValue('t1'),
@@ -172,15 +208,16 @@ void main() {
       expect(find.text('14 d'), findsOneWidget); // racha
     });
 
-    testWidgets('tab bar muestra exactamente las 9 secciones', (tester) async {
+    testWidgets('tab bar muestra exactamente las 10 secciones', (tester) async {
       await _pump(tester,
           profile: _prof(), link: _link(TrainerLinkStatus.active));
-      expect(find.byType(Tab), findsNWidgets(9));
+      expect(find.byType(Tab), findsNWidgets(10));
       for (final t in [
         'Resumen',
         'Entrenamientos',
         'Progreso',
         'Nutrición',
+        'Pagos',
         'Historial',
         'Chat',
         'Notas privadas',
@@ -273,6 +310,104 @@ void main() {
       // "Sin plan" con el mismo wording.
       expect(find.text('Sin plan'), findsNWidgets(2));
       expect(find.text('Sin plan asignado'), findsNothing);
+    });
+
+    testWidgets('tab Pagos: al día + sin historial (W2 PR5)', (tester) async {
+      await _pump(tester,
+          profile: _prof(), link: _link(TrainerLinkStatus.active));
+
+      await tester.tap(find.text('Pagos'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('ESTADO DE CUENTA'), findsOneWidget);
+      expect(find.text('Al día'), findsOneWidget);
+      expect(find.text('HISTORIAL DE PAGOS'), findsOneWidget);
+      expect(find.text('Sin pagos registrados todavía.'), findsOneWidget);
+    });
+
+    testWidgets('tab Pagos: pendiente + historial con datos (W2 PR5)',
+        (tester) async {
+      await _pump(
+        tester,
+        profile: _prof(),
+        link: _link(TrainerLinkStatus.active),
+        payments: [
+          _pago(
+              id: 'p1',
+              concept: 'Mensual mayo',
+              amountArs: 28000,
+              status: PaymentStatus.paid,
+              createdAt: DateTime.utc(2026, 5, 1)),
+          _pago(
+              id: 'p2',
+              concept: 'Clase suelta',
+              amountArs: 5000,
+              status: PaymentStatus.pending,
+              createdAt: DateTime.utc(2026, 6, 10)),
+          // De otro alumno → debe filtrarse por athleteId.
+          _pago(
+              id: 'pX', athleteId: 'otro', concept: 'Ajeno', amountArs: 99000),
+        ],
+        pendingCobros: [
+          _cobro(amountArs: 18000, concept: 'Mensual Junio 2026')
+        ],
+      );
+
+      await tester.tap(find.text('Pagos'));
+      await tester.pumpAndSettle();
+
+      // Estado de cuenta: pendiente $18.000.
+      expect(find.text('Pendiente de cobro'), findsOneWidget);
+      expect(find.text('\$18.000'), findsOneWidget);
+
+      // Historial del alumno (no el pago "Ajeno" de otro).
+      expect(find.text('Mensual mayo'), findsOneWidget);
+      expect(find.text('\$28.000'), findsOneWidget);
+      expect(find.text('\$5.000'), findsOneWidget); // 4 dígitos → un separador
+      expect(find.text('Pagado'), findsOneWidget);
+      expect(find.text('Clase suelta'), findsOneWidget);
+      expect(find.text('Pendiente'), findsOneWidget);
+      expect(find.text('Ajeno'), findsNothing);
+
+      // Orden DESC por createdAt: la fila de junio va ARRIBA de la de mayo.
+      expect(
+        tester.getTopLeft(find.text('Clase suelta')).dy,
+        lessThan(tester.getTopLeft(find.text('Mensual mayo')).dy),
+      );
+    });
+
+    testWidgets('tab Pagos: suma varios cobros pendientes (W2 PR5)',
+        (tester) async {
+      await _pump(
+        tester,
+        profile: _prof(),
+        link: _link(TrainerLinkStatus.active),
+        pendingCobros: [
+          _cobro(amountArs: 18000, concept: 'Mensual'),
+          _cobro(amountArs: 12000, concept: 'Extra'),
+        ],
+      );
+
+      await tester.tap(find.text('Pagos'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('\$30.000'), findsOneWidget); // 18.000 + 12.000
+      expect(find.text('Mensual · Extra'), findsOneWidget);
+    });
+
+    testWidgets('tab Pagos: monto de 7 dígitos usa dos separadores (W2 PR5)',
+        (tester) async {
+      await _pump(
+        tester,
+        profile: _prof(),
+        link: _link(TrainerLinkStatus.active),
+        payments: [_pago(concept: 'Plan anual', amountArs: 1200000)],
+      );
+
+      await tester.tap(find.text('Pagos'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('\$1.200.000'), findsOneWidget);
     });
 
     testWidgets('tab Entrenamientos: estados vacíos (W2 PR3)', (tester) async {
