@@ -84,9 +84,14 @@ class _RoutineDetailScreenState extends ConsumerState<RoutineDetailScreen> {
                   // createdBy fallback, an athlete's own custom exercise resolves
                   // to null → "Ejercicio no encontrado".
                   final ownerId = routine.assignedBy ?? routine.createdBy;
+                  // `name` is the slot's display name, carried through so
+                  // slotExerciseProvider can do a name/alias fallback when
+                  // `exerciseId` drifted from the catalogue.
+                  final nameParam =
+                      'name=${Uri.encodeQueryComponent(slot.exerciseName)}';
                   final target = ownerId != null && ownerId.isNotEmpty
-                      ? '/workout/exercise/${slot.exerciseId}?ownerId=$ownerId'
-                      : '/workout/exercise/${slot.exerciseId}';
+                      ? '/workout/exercise/${slot.exerciseId}?ownerId=$ownerId&$nameParam'
+                      : '/workout/exercise/${slot.exerciseId}?$nameParam';
                   context.push(target);
                 },
               );
