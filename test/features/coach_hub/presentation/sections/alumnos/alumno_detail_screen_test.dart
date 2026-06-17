@@ -195,13 +195,16 @@ void main() {
       }
     });
 
-    testWidgets('Progreso (tab default) muestra antropometría', (tester) async {
+    testWidgets('Progreso muestra antropometría', (tester) async {
       await _pump(
         tester,
         profile: _prof(),
         link: _link(TrainerLinkStatus.active),
         measurements: [_meas(60.5, fat: 22.4, waist: 71)],
       );
+
+      await tester.tap(find.text('Progreso'));
+      await tester.pumpAndSettle();
 
       expect(find.text('ANTROPOMETRÍA'), findsOneWidget);
       expect(find.text('Peso'), findsOneWidget);
@@ -215,6 +218,10 @@ void main() {
         link: _link(TrainerLinkStatus.active),
         measurements: const [],
       );
+
+      await tester.tap(find.text('Progreso'));
+      await tester.pumpAndSettle();
+
       expect(find.text('Sin mediciones cargadas todavía.'), findsOneWidget);
     });
 
@@ -226,6 +233,10 @@ void main() {
         link: _link(TrainerLinkStatus.active),
         measurements: [_meas(62, day: 1), _meas(60.5, day: 20)],
       );
+
+      await tester.tap(find.text('Progreso'));
+      await tester.pumpAndSettle();
+
       expect(find.byType(MeasurementProgressChart), findsOneWidget);
     });
 
@@ -233,10 +244,35 @@ void main() {
       await _pump(tester,
           profile: _prof(), link: _link(TrainerLinkStatus.active));
 
-      await tester.tap(find.text('Resumen'));
+      await tester.tap(find.text('Nutrición'));
       await tester.pumpAndSettle();
 
       expect(find.text('Próximamente.'), findsOneWidget);
+    });
+
+    testWidgets(
+        'Resumen (tab default) muestra las 4 métricas + heatmap (W2 PR4)',
+        (tester) async {
+      await _pump(tester,
+          profile: _prof(), link: _link(TrainerLinkStatus.active));
+
+      // Resumen es el tab por defecto: no hace falta tapear.
+      expect(find.text('ADHERENCIA 30D'), findsOneWidget);
+      expect(find.text('SESIONES / SEM'), findsOneWidget);
+      expect(find.text('VOLUMEN'), findsOneWidget);
+      expect(find.text('PESO CORPORAL'), findsOneWidget);
+      expect(find.text('ADHERENCIA · 12 SEMANAS'), findsOneWidget);
+    });
+
+    testWidgets('Resumen sin plan ni mediciones → estados neutros (W2 PR4)',
+        (tester) async {
+      await _pump(tester,
+          profile: _prof(), link: _link(TrainerLinkStatus.active));
+
+      // Sin rutina activa → ambas cards (adherencia + sesiones/sem) dicen
+      // "Sin plan" con el mismo wording.
+      expect(find.text('Sin plan'), findsNWidgets(2));
+      expect(find.text('Sin plan asignado'), findsNothing);
     });
 
     testWidgets('tab Entrenamientos: estados vacíos (W2 PR3)', (tester) async {
@@ -471,6 +507,11 @@ void main() {
                 .overrideWith((ref, id) => Stream.value(const <Measurement>[])),
             gymsProvider.overrideWith((ref) => const <Gym>[]),
             trainerLinkRepositoryProvider.overrideWithValue(repo),
+            // El detalle abre en Resumen (W2 PR4), que lee estos providers.
+            sessionsByUidProvider.overrideWith((ref, id) => const <Session>[]),
+            assignedRoutinesProvider
+                .overrideWith((ref, id) => const <Routine>[]),
+            currentUidProvider.overrideWithValue('t1'),
           ],
           child:
               MaterialApp.router(theme: AppTheme.dark(), routerConfig: router),
@@ -481,14 +522,15 @@ void main() {
 
     testWidgets('tap en la fila del roster navega al detalle', (tester) async {
       await pumpRouter(tester, repo: _MockRepo());
-      // En el roster todavía (el detalle vacío diría "Sin mediciones…").
-      expect(find.text('Sin mediciones cargadas todavía.'), findsNothing);
+      // En el roster todavía: el detalle abre en Resumen, cuya sección de
+      // heatmap es marcador exclusivo del detalle.
+      expect(find.text('ADHERENCIA · 12 SEMANAS'), findsNothing);
 
       await tester.tap(find.text('Sofía'));
       await tester.pumpAndSettle();
 
-      // Ahora en el detalle (Progreso vacío).
-      expect(find.text('Sin mediciones cargadas todavía.'), findsOneWidget);
+      // Ahora en el detalle (tab Resumen por defecto).
+      expect(find.text('ADHERENCIA · 12 SEMANAS'), findsOneWidget);
     });
 
     testWidgets('tap en la acción Terminar abre diálogo y NO navega',

@@ -11,42 +11,50 @@ import 'package:treino/features/workout/application/session_providers.dart'
 
 void main() {
   // ---------------------------------------------------------------------------
-  // The athlete view must surface the FULL measurement history for an athlete,
-  // regardless of which trainer recorded each entry (reassignment / co-trainer).
-  // Previously the provider queried by `recordedBy` == current trainer, so any
-  // measurement logged by another trainer was silently invisible.
+  // measurementsForAthleteProvider corre en contexto de ENTRENADOR. Las reglas
+  // de Firestore solo le permiten leer mediciones donde `recordedBy == uid`, por
+  // lo que la query es `recordedBy + athleteId`. Un `where athleteId ==` a secas
+  // es DENEGADO para el entrenador (eso rompía el Resumen/Progreso del Coach
+  // Hub). Por eso el provider devuelve SOLO lo que el entrenador actual registró
+  // para ese alumno. (FakeFirebaseFirestore no aplica reglas, pero validamos el
+  // contrato del query: filtra por recordedBy Y athleteId.)
   // ---------------------------------------------------------------------------
   test(
-    'measurementsForAthleteProvider returns measurements recorded by other '
-    'trainers, not just the current one',
+    'vista entrenador: devuelve solo lo que registró el entrenador actual '
+    'para ese alumno',
     () async {
       final firestore = FakeFirebaseFirestore();
       final repo = MeasurementRepository(firestore: firestore);
 
       const athleteId = 'athlete1';
+      const otherAthlete = 'athlete2';
       const currentTrainer = 'trainerT2';
-      const previousTrainer = 'trainerT1';
+      const otherTrainer = 'trainerT1';
 
-      // Logged by a previous/other trainer for the same athlete.
-      await repo.add(
-        Measurement(
-          id: '',
-          athleteId: athleteId,
-          recordedBy: previousTrainer,
-          recordedAt: DateTime.utc(2026, 1, 1),
-          weightKg: 80,
-        ),
-      );
-      // Logged by the current trainer.
-      await repo.add(
-        Measurement(
-          id: '',
-          athleteId: athleteId,
-          recordedBy: currentTrainer,
-          recordedAt: DateTime.utc(2026, 2, 1),
-          weightKg: 79,
-        ),
-      );
+      // (a) Otro entrenador, mismo alumno → NO visible (filtro recordedBy).
+      await repo.add(Measurement(
+        id: '',
+        athleteId: athleteId,
+        recordedBy: otherTrainer,
+        recordedAt: DateTime.utc(2026, 1, 1),
+        weightKg: 80,
+      ));
+      // (b) Entrenador actual, mismo alumno → visible.
+      await repo.add(Measurement(
+        id: '',
+        athleteId: athleteId,
+        recordedBy: currentTrainer,
+        recordedAt: DateTime.utc(2026, 2, 1),
+        weightKg: 79,
+      ));
+      // (c) Entrenador actual, OTRO alumno → NO visible (filtro athleteId).
+      await repo.add(Measurement(
+        id: '',
+        athleteId: otherAthlete,
+        recordedBy: currentTrainer,
+        recordedAt: DateTime.utc(2026, 3, 1),
+        weightKg: 70,
+      ));
 
       final container = ProviderContainer(
         overrides: [
@@ -57,11 +65,27 @@ void main() {
       addTearDown(container.dispose);
 
       final result = await container
-          .read(measurementsForAthleteProvider(athleteId).stream)
-          .first;
+          .read(measurementsForAthleteProvider(athleteId).future);
 
-      // Both measurements are visible and sorted by recordedAt ascending.
-      expect(result.map((m) => m.recordedBy), [previousTrainer, currentTrainer]);
+      expect(result.map((m) => m.weightKg), [79]);
+      expect(result.single.recordedBy, currentTrainer);
+      expect(result.single.athleteId, athleteId);
     },
   );
+
+  test('devuelve vacío cuando no hay entrenador autenticado', () async {
+    final firestore = FakeFirebaseFirestore();
+    final container = ProviderContainer(
+      overrides: [
+        firestoreProvider.overrideWithValue(firestore),
+        currentUidProvider.overrideWithValue(null),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final result =
+        await container.read(measurementsForAthleteProvider('athlete1').future);
+
+    expect(result, isEmpty);
+  });
 }
