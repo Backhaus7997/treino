@@ -144,7 +144,9 @@ class _TrainerAgendaTabState extends ConsumerState<TrainerAgendaTab> {
         // ── Timeline (scrollable, fills remaining space) ─────────────────────
         Expanded(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
+            // Bottom inset clears the shell's floating nav bar (extendBody:true).
+            padding: EdgeInsets.fromLTRB(
+                20, 0, 20, MediaQuery.paddingOf(context).bottom),
             child: DayTimeline(
               trainerId: widget.trainerId,
               day: selectedDay,

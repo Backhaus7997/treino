@@ -221,6 +221,9 @@ class _AthleteDetailBody extends ConsumerWidget {
         ),
 
         // ── MENSAJE + CREAR PLAN buttons ──────────────────────────────
+        // Full-screen route (no nav bar); _immersive's SafeArea handles the
+        // home-indicator inset, so a plain bottom padding sits the buttons at
+        // the bottom of the screen.
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
           child: Column(
