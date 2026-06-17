@@ -23,10 +23,13 @@ mixin _$CustomExercise {
   String get id => throw _privateConstructorUsedError;
   String get ownerId => throw _privateConstructorUsedError;
   String get name => throw _privateConstructorUsedError;
-  String get muscleGroup => throw _privateConstructorUsedError;
+  String get muscleGroup =>
+      throw _privateConstructorUsedError; // Optional secondary muscle (canonical key). null = single-muscle exercise.
+  String? get secondaryMuscleGroup => throw _privateConstructorUsedError;
   String get description => throw _privateConstructorUsedError;
   String? get videoUrl => throw _privateConstructorUsedError;
-  int? get defaultRestSeconds => throw _privateConstructorUsedError;
+  int? get defaultRestSeconds =>
+      throw _privateConstructorUsedError; // ignore: invalid_annotation_target
   @JsonKey(fromJson: _equipmentFromJson, toJson: _equipmentToJson)
   EquipmentType? get equipment =>
       throw _privateConstructorUsedError; // REQ-RER-015: nullable; stays null on existing docs (no backfill — ADR-RER-03)
@@ -56,6 +59,7 @@ abstract class $CustomExerciseCopyWith<$Res> {
       String ownerId,
       String name,
       String muscleGroup,
+      String? secondaryMuscleGroup,
       String description,
       String? videoUrl,
       int? defaultRestSeconds,
@@ -84,6 +88,7 @@ class _$CustomExerciseCopyWithImpl<$Res, $Val extends CustomExercise>
     Object? ownerId = null,
     Object? name = null,
     Object? muscleGroup = null,
+    Object? secondaryMuscleGroup = freezed,
     Object? description = null,
     Object? videoUrl = freezed,
     Object? defaultRestSeconds = freezed,
@@ -108,6 +113,10 @@ class _$CustomExerciseCopyWithImpl<$Res, $Val extends CustomExercise>
           ? _value.muscleGroup
           : muscleGroup // ignore: cast_nullable_to_non_nullable
               as String,
+      secondaryMuscleGroup: freezed == secondaryMuscleGroup
+          ? _value.secondaryMuscleGroup
+          : secondaryMuscleGroup // ignore: cast_nullable_to_non_nullable
+              as String?,
       description: null == description
           ? _value.description
           : description // ignore: cast_nullable_to_non_nullable
@@ -149,6 +158,7 @@ abstract class _$$CustomExerciseImplCopyWith<$Res>
       String ownerId,
       String name,
       String muscleGroup,
+      String? secondaryMuscleGroup,
       String description,
       String? videoUrl,
       int? defaultRestSeconds,
@@ -175,6 +185,7 @@ class __$$CustomExerciseImplCopyWithImpl<$Res>
     Object? ownerId = null,
     Object? name = null,
     Object? muscleGroup = null,
+    Object? secondaryMuscleGroup = freezed,
     Object? description = null,
     Object? videoUrl = freezed,
     Object? defaultRestSeconds = freezed,
@@ -199,6 +210,10 @@ class __$$CustomExerciseImplCopyWithImpl<$Res>
           ? _value.muscleGroup
           : muscleGroup // ignore: cast_nullable_to_non_nullable
               as String,
+      secondaryMuscleGroup: freezed == secondaryMuscleGroup
+          ? _value.secondaryMuscleGroup
+          : secondaryMuscleGroup // ignore: cast_nullable_to_non_nullable
+              as String?,
       description: null == description
           ? _value.description
           : description // ignore: cast_nullable_to_non_nullable
@@ -235,6 +250,7 @@ class _$CustomExerciseImpl implements _CustomExercise {
       required this.ownerId,
       required this.name,
       this.muscleGroup = '',
+      this.secondaryMuscleGroup,
       this.description = '',
       this.videoUrl,
       this.defaultRestSeconds,
@@ -255,6 +271,9 @@ class _$CustomExerciseImpl implements _CustomExercise {
   @override
   @JsonKey()
   final String muscleGroup;
+// Optional secondary muscle (canonical key). null = single-muscle exercise.
+  @override
+  final String? secondaryMuscleGroup;
   @override
   @JsonKey()
   final String description;
@@ -262,6 +281,7 @@ class _$CustomExerciseImpl implements _CustomExercise {
   final String? videoUrl;
   @override
   final int? defaultRestSeconds;
+// ignore: invalid_annotation_target
   @override
   @JsonKey(fromJson: _equipmentFromJson, toJson: _equipmentToJson)
   final EquipmentType? equipment;
@@ -275,7 +295,7 @@ class _$CustomExerciseImpl implements _CustomExercise {
 
   @override
   String toString() {
-    return 'CustomExercise(id: $id, ownerId: $ownerId, name: $name, muscleGroup: $muscleGroup, description: $description, videoUrl: $videoUrl, defaultRestSeconds: $defaultRestSeconds, equipment: $equipment, createdAt: $createdAt, updatedAt: $updatedAt)';
+    return 'CustomExercise(id: $id, ownerId: $ownerId, name: $name, muscleGroup: $muscleGroup, secondaryMuscleGroup: $secondaryMuscleGroup, description: $description, videoUrl: $videoUrl, defaultRestSeconds: $defaultRestSeconds, equipment: $equipment, createdAt: $createdAt, updatedAt: $updatedAt)';
   }
 
   @override
@@ -288,6 +308,8 @@ class _$CustomExerciseImpl implements _CustomExercise {
             (identical(other.name, name) || other.name == name) &&
             (identical(other.muscleGroup, muscleGroup) ||
                 other.muscleGroup == muscleGroup) &&
+            (identical(other.secondaryMuscleGroup, secondaryMuscleGroup) ||
+                other.secondaryMuscleGroup == secondaryMuscleGroup) &&
             (identical(other.description, description) ||
                 other.description == description) &&
             (identical(other.videoUrl, videoUrl) ||
@@ -310,6 +332,7 @@ class _$CustomExerciseImpl implements _CustomExercise {
       ownerId,
       name,
       muscleGroup,
+      secondaryMuscleGroup,
       description,
       videoUrl,
       defaultRestSeconds,
@@ -340,6 +363,7 @@ abstract class _CustomExercise implements CustomExercise {
           required final String ownerId,
           required final String name,
           final String muscleGroup,
+          final String? secondaryMuscleGroup,
           final String description,
           final String? videoUrl,
           final int? defaultRestSeconds,
@@ -359,13 +383,16 @@ abstract class _CustomExercise implements CustomExercise {
   @override
   String get name;
   @override
-  String get muscleGroup;
+  String
+      get muscleGroup; // Optional secondary muscle (canonical key). null = single-muscle exercise.
+  @override
+  String? get secondaryMuscleGroup;
   @override
   String get description;
   @override
   String? get videoUrl;
   @override
-  int? get defaultRestSeconds;
+  int? get defaultRestSeconds; // ignore: invalid_annotation_target
   @override
   @JsonKey(fromJson: _equipmentFromJson, toJson: _equipmentToJson)
   EquipmentType?

@@ -8,6 +8,7 @@ import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
 import '../application/exercise_providers.dart';
 import '../domain/exercise.dart';
+import '../domain/muscle_group.dart';
 import 'widgets/exercise_video_player.dart';
 import 'widgets/stat_tile.dart';
 import 'widgets/technique_instruction_item.dart';
@@ -15,28 +16,15 @@ import 'widgets/technique_instruction_item.dart';
 // Display-name maps. Data from Firestore is stored in English (e.g. 'chest',
 // 'compound') so the UI translates to Spanish at render time. Unknown values
 // fall back to the original string upper-cased so we never crash.
-const _muscleGroupEs = <String, String>{
-  'chest': 'PECHO',
-  'back': 'ESPALDA',
-  'shoulders': 'HOMBROS',
-  'quads': 'CUÁDRICEPS',
-  'hamstrings': 'ISQUIOS',
-  'glutes': 'GLÚTEOS',
-  'calves': 'PANTORRILLAS',
-  'biceps': 'BÍCEPS',
-  'triceps': 'TRÍCEPS',
-  'core': 'CORE',
-  'cardio': 'CARDIO',
-  'fullbody': 'CUERPO COMPLETO',
-};
-
 const _categoryEs = <String, String>{
   'compound': 'COMPUESTO',
   'isolation': 'AISLAMIENTO',
 };
 
-String _muscleEs(String raw) =>
-    _muscleGroupEs[raw.toLowerCase()] ?? raw.toUpperCase();
+// Canonical taxonomy label (Pecho, Isquiotibiales, …), upper-cased for the
+// detail header. Resolves canonical keys AND legacy Spanish labels; unknown
+// values fall back to their upper-cased raw text.
+String _muscleEs(String raw) => muscleGroupLabel(raw).toUpperCase();
 
 String _categoryEsOf(String raw) =>
     _categoryEs[raw.toLowerCase()] ?? raw.toUpperCase();

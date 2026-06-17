@@ -14,6 +14,10 @@ class Exercise with _$Exercise {
     required String id,
     required String name,
     required String muscleGroup,
+    // Optional second muscle worked (canonical key, e.g. 'shoulders'). null =
+    // single-muscle exercise. Matched by the picker filter just like the
+    // primary so an exercise surfaces under either group.
+    String? secondaryMuscleGroup,
     required String
         category, // 'compound' | 'isolation' (free-form String, validated in seed)
     List<String>?
