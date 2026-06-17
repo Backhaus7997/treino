@@ -68,6 +68,19 @@ dev_dependencies:
   json_serializable: ^6.8.0
   mocktail: ^1.0.4
   fake_cloud_firestore: ^3.0.3
+  # Generates ios/Runner/Assets.xcassets/AppIcon.appiconset/ from a single
+  # 1024×1024 source (assets/icon/app_icon.png). Run after changing the
+  # source: `dart run flutter_launcher_icons`. NOT a runtime dependency
+  # — only invoked during build setup.
+  flutter_launcher_icons: ^0.14.4
+
+# flutter_launcher_icons config — see docs for android/web options if
+# we ever ship those targets. For now: iOS-only, mobile-only project.
+flutter_launcher_icons:
+  ios: true
+  android: false
+  image_path: "assets/icon/app_icon.png"
+  remove_alpha_ios: true
 
 flutter:
   generate: true
