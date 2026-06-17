@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../domain/custom_exercise.dart';
+import '../domain/equipment_type.dart';
 import 'custom_exercise_video_upload_service.dart';
 
 /// Firestore-backed repository for a trainer's personal exercise library.
@@ -32,9 +33,11 @@ class CustomExerciseRepository {
     required String trainerId,
     required String name,
     String muscleGroup = '',
+    String? secondaryMuscleGroup,
     String description = '',
     String? videoUrl,
     int? defaultRestSeconds,
+    EquipmentType? equipment,
   }) async {
     final now = DateTime.now().toUtc();
     final ref = _col(trainerId).doc();
@@ -43,9 +46,11 @@ class CustomExerciseRepository {
       ownerId: trainerId,
       name: name,
       muscleGroup: muscleGroup,
+      secondaryMuscleGroup: secondaryMuscleGroup,
       description: description,
       videoUrl: videoUrl,
       defaultRestSeconds: defaultRestSeconds,
+      equipment: equipment,
       createdAt: now,
       updatedAt: now,
     );

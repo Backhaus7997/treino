@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/coach/presentation/widgets/muscle_filter_sheet.dart';
-import 'package:treino/features/insights/domain/muscle_group.dart';
+import 'package:treino/features/workout/domain/muscle_group.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
 Widget _wrap(Widget child) => MaterialApp(
@@ -14,45 +14,38 @@ Widget _wrap(Widget child) => MaterialApp(
     );
 
 void main() {
-  // TODO PR2-followup: rewrite for the multi-select sheet API
-  // (toggle semantics + sticky Aplicar button + Set<MuscleGroupDisplay>
-  // return). The old single-select tests were removed because the API
-  // changed in the PR2 refinement (user feedback during smoke). The
-  // sheet behaviour is exercised manually for now.
-  group(
-    'MuscleFilterSheet — T-RER-019 (stubbed)',
-    () {
-      testWidgets('sheet opens with multi-select API (smoke)', (tester) async {
-        tester.view.physicalSize = const Size(400, 1200);
-        tester.view.devicePixelRatio = 1.0;
-        addTearDown(tester.view.resetPhysicalSize);
-        addTearDown(tester.view.resetDevicePixelRatio);
+  group('MuscleFilterSheet — canonical taxonomy', () {
+    testWidgets('opens with the granular 12-group list (multi-select)',
+        (tester) async {
+      tester.view.physicalSize = const Size(400, 1400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
 
-        Set<MuscleGroupDisplay>? result;
-        await tester.pumpWidget(_wrap(
-          Builder(
-            builder: (ctx) => ElevatedButton(
-              onPressed: () async {
-                result = await showMuscleFilterSheet(
-                  ctx,
-                  current: const {MuscleGroupDisplay.pecho},
-                );
-              },
-              child: const Text('open'),
-            ),
+      Set<MuscleGroup>? result;
+      await tester.pumpWidget(_wrap(
+        Builder(
+          builder: (ctx) => ElevatedButton(
+            onPressed: () async {
+              result = await showMuscleFilterSheet(
+                ctx,
+                current: const {MuscleGroup.pecho},
+              );
+            },
+            child: const Text('open'),
           ),
-        ));
-        await tester.tap(find.text('open'));
-        await tester.pumpAndSettle();
+        ),
+      ));
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
 
-        // The sheet should render with a multi-select list. Smoke: assert
-        // pre-selected group is visible.
-        expect(
-            find.text(MuscleGroupDisplay.pecho.displayLabel), findsOneWidget);
-        // result is not yet populated (no Aplicar tap) but the variable must
-        // be reachable to keep the analyzer happy.
-        expect(result, isNull);
-      });
-    },
-  );
+      // Pre-selected group is visible, rendered upper-case in the filter.
+      expect(find.text(MuscleGroup.pecho.label.toUpperCase()), findsOneWidget);
+      // A granular group that did NOT exist in the old 6-group sheet proves
+      // the filter now mirrors the creation taxonomy.
+      expect(find.text(MuscleGroup.isquiotibiales.label.toUpperCase()),
+          findsOneWidget);
+      expect(result, isNull); // no Aplicar tap yet
+    });
+  });
 }

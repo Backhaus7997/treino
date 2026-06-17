@@ -187,4 +187,47 @@ void main() {
       expect(find.text('Sentadilla con Barra'), findsOneWidget);
     });
   });
+
+  group('ExercisePickerSheet — muscle filter (granular + secondary)', () {
+    // Primary cuádriceps, secondary hombros — must surface under EITHER group.
+    const lunge = Exercise(
+      id: 'lunge-press',
+      name: 'Estocada a Press',
+      muscleGroup: 'quads',
+      secondaryMuscleGroup: 'shoulders',
+      category: 'compound',
+    );
+    const curl = Exercise(
+      id: 'biceps-curl',
+      name: 'Curl de Bíceps',
+      muscleGroup: 'biceps',
+      category: 'isolation',
+    );
+
+    testWidgets('Hombros filter matches an exercise by its SECONDARY muscle',
+        (tester) async {
+      tester.view.physicalSize = const Size(400, 1400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await _openPicker(tester, exercises: const [lunge, curl]);
+
+      // Both visible before filtering.
+      expect(find.text('Estocada a Press'), findsOneWidget);
+      expect(find.text('Curl de Bíceps'), findsOneWidget);
+
+      // Open the muscle filter and pick Hombros.
+      await tester.tap(find.text('Músculos'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('HOMBROS'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.textContaining('APLICAR'));
+      await tester.pumpAndSettle();
+
+      // Lunge surfaces via its secondary (shoulders); the curl is filtered out.
+      expect(find.text('Estocada a Press'), findsOneWidget);
+      expect(find.text('Curl de Bíceps'), findsNothing);
+    });
+  });
 }

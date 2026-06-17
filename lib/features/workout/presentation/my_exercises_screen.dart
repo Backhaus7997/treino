@@ -9,6 +9,7 @@ import '../../../l10n/app_l10n.dart';
 import '../application/custom_exercise_providers.dart';
 import '../application/session_providers.dart' show currentUidProvider;
 import '../domain/custom_exercise.dart';
+import '../domain/muscle_group.dart';
 
 /// Trainer's personal exercise library — list + entry point to create more.
 class MyExercisesScreen extends ConsumerWidget {
@@ -158,11 +159,11 @@ class _ExerciseCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hasVideo =
-        exercise.videoUrl != null && exercise.videoUrl!.isNotEmpty;
+    final hasVideo = exercise.videoUrl != null && exercise.videoUrl!.isNotEmpty;
     final label = [
       exercise.name,
-      if (exercise.muscleGroup.isNotEmpty) exercise.muscleGroup,
+      if (exercise.muscleGroup.isNotEmpty)
+        muscleGroupLabel(exercise.muscleGroup),
     ].join(', ');
 
     return Material(
@@ -180,8 +181,7 @@ class _ExerciseCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(color: palette.border, width: 1),
               ),
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
               child: Row(
                 children: [
                   Expanded(
@@ -200,7 +200,7 @@ class _ExerciseCard extends StatelessWidget {
                         if (exercise.muscleGroup.isNotEmpty) ...[
                           const SizedBox(height: 2),
                           Text(
-                            exercise.muscleGroup,
+                            muscleGroupLabel(exercise.muscleGroup),
                             style: GoogleFonts.barlow(
                               fontWeight: FontWeight.w400,
                               fontSize: 12,

@@ -4,7 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/treino_icon.dart';
-import '../../../insights/domain/muscle_group.dart';
+import '../../../workout/domain/muscle_group.dart';
 import '../../../workout/application/custom_exercise_providers.dart';
 import '../../../workout/application/exercise_providers.dart';
 import '../../../workout/application/session_providers.dart'
@@ -58,7 +58,7 @@ class _ExercisePickerSheetContent extends ConsumerStatefulWidget {
 class _ExercisePickerSheetContentState
     extends ConsumerState<_ExercisePickerSheetContent> {
   String _query = '';
-  Set<MuscleGroupDisplay> _muscleFilters = {};
+  Set<MuscleGroup> _muscleFilters = {};
   Set<EquipmentType> _equipmentFilters = {};
   late Set<String> _selected;
 
@@ -77,10 +77,15 @@ class _ExercisePickerSheetContentState
       final aliasMatch = e.aliases.any((a) => a.toLowerCase().contains(q));
       if (!nameMatch && !aliasMatch) return false;
     }
-    // OR within muscle filter, AND across filter types.
+    // OR within muscle filter, AND across filter types. An exercise matches if
+    // EITHER its primary or its (optional) secondary muscle is in the filter,
+    // so e.g. "estocada a press" surfaces under both Cuádriceps and Hombros.
     if (_muscleFilters.isNotEmpty) {
-      final exerciseGroup = e.muscleGroup.toDisplayGroup();
-      if (!_muscleFilters.contains(exerciseGroup)) return false;
+      final primary = MuscleGroup.fromKey(e.muscleGroup);
+      final secondary = MuscleGroup.fromKey(e.secondaryMuscleGroup);
+      final hit = (primary != null && _muscleFilters.contains(primary)) ||
+          (secondary != null && _muscleFilters.contains(secondary));
+      if (!hit) return false;
     }
     // ADR-RER-05: EXCLUDE exercises with null equipment when ANY equipment
     // filter is active. OR within equipment filter.
@@ -382,7 +387,9 @@ class _ExercisePickerSheetContentState
             _ExerciseRow(
               id: c.id,
               name: c.name,
-              subtitle: c.muscleGroup.isEmpty ? null : c.muscleGroup,
+              subtitle: c.muscleGroup.isEmpty
+                  ? null
+                  : muscleGroupLabel(c.muscleGroup),
               badge: 'MÍO',
               isCustom: true,
               ownerId: uid,
@@ -397,7 +404,7 @@ class _ExercisePickerSheetContentState
             _ExerciseRow(
               id: e.id,
               name: e.name,
-              subtitle: e.muscleGroup,
+              subtitle: muscleGroupLabel(e.muscleGroup),
               badge: null,
               isCustom: false,
               ownerId: null,
@@ -839,6 +846,7 @@ Exercise _toExercise(CustomExercise c) {
     id: c.id,
     name: c.name,
     muscleGroup: c.muscleGroup,
+    secondaryMuscleGroup: c.secondaryMuscleGroup,
     category: 'custom',
     techniqueInstructions: null,
     videoUrl: c.videoUrl,

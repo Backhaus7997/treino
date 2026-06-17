@@ -3,7 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/treino_icon.dart';
-import '../../../insights/domain/muscle_group.dart';
+import '../../../workout/domain/muscle_group.dart';
 import '../../../../l10n/app_l10n.dart';
 
 /// Shows a MULTI-select bottom sheet for filtering exercises by muscle group.
@@ -15,11 +15,11 @@ import '../../../../l10n/app_l10n.dart';
 ///
 /// REQ-RER-005, REQ-RER-008, ADR-RER-06 (refined for multi-select per user
 /// feedback during PR2 smoke).
-Future<Set<MuscleGroupDisplay>?> showMuscleFilterSheet(
+Future<Set<MuscleGroup>?> showMuscleFilterSheet(
   BuildContext context, {
-  Set<MuscleGroupDisplay> current = const {},
+  Set<MuscleGroup> current = const {},
 }) {
-  return showModalBottomSheet<Set<MuscleGroupDisplay>>(
+  return showModalBottomSheet<Set<MuscleGroup>>(
     context: context,
     useRootNavigator: true,
     isScrollControlled: true,
@@ -31,7 +31,7 @@ Future<Set<MuscleGroupDisplay>?> showMuscleFilterSheet(
 class _MuscleFilterSheetContent extends StatefulWidget {
   const _MuscleFilterSheetContent({required this.current});
 
-  final Set<MuscleGroupDisplay> current;
+  final Set<MuscleGroup> current;
 
   @override
   State<_MuscleFilterSheetContent> createState() =>
@@ -39,7 +39,7 @@ class _MuscleFilterSheetContent extends StatefulWidget {
 }
 
 class _MuscleFilterSheetContentState extends State<_MuscleFilterSheetContent> {
-  late Set<MuscleGroupDisplay> _selected;
+  late Set<MuscleGroup> _selected;
 
   @override
   void initState() {
@@ -47,7 +47,7 @@ class _MuscleFilterSheetContentState extends State<_MuscleFilterSheetContent> {
     _selected = {...widget.current};
   }
 
-  void _toggle(MuscleGroupDisplay group) {
+  void _toggle(MuscleGroup group) {
     setState(() {
       if (_selected.contains(group)) {
         _selected.remove(group);
@@ -127,7 +127,7 @@ class _MuscleFilterSheetContentState extends State<_MuscleFilterSheetContent> {
                   shrinkWrap: true,
                   padding: const EdgeInsets.only(bottom: 12),
                   children: [
-                    for (final group in MuscleGroupDisplay.displayOrder)
+                    for (final group in MuscleGroup.displayOrder)
                       _MuscleRow(
                         group: group,
                         selected: _selected.contains(group),
@@ -181,7 +181,7 @@ class _MuscleRow extends StatelessWidget {
     required this.palette,
   });
 
-  final MuscleGroupDisplay group;
+  final MuscleGroup group;
   final bool selected;
   final VoidCallback onTap;
   final AppPalette palette;
@@ -205,15 +205,18 @@ class _MuscleRow extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Image.asset(
-              _MuscleAsset.of(group),
+            SizedBox(
               width: 28,
               height: 28,
+              child: group.assetPath != null
+                  ? Image.asset(group.assetPath!, width: 28, height: 28)
+                  : Icon(TreinoIcon.dumbbell,
+                      size: 24, color: palette.textMuted),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
-                group.displayLabel,
+                group.label.toUpperCase(),
                 style: GoogleFonts.barlow(
                   color: palette.textPrimary,
                   fontSize: 14,
@@ -232,17 +235,4 @@ class _MuscleRow extends StatelessWidget {
       ),
     );
   }
-}
-
-/// Maps a [MuscleGroupDisplay] to its PNG asset path.
-/// Assets are declared in pubspec.yaml under assets/muscles/.
-class _MuscleAsset {
-  static String of(MuscleGroupDisplay group) => switch (group) {
-        MuscleGroupDisplay.pecho => 'assets/muscles/chest.png',
-        MuscleGroupDisplay.espalda => 'assets/muscles/back.png',
-        MuscleGroupDisplay.piernas => 'assets/muscles/quads.png',
-        MuscleGroupDisplay.brazos => 'assets/muscles/biceps.png',
-        MuscleGroupDisplay.hombros => 'assets/muscles/shoulders.png',
-        MuscleGroupDisplay.core => 'assets/muscles/core.png',
-      };
 }

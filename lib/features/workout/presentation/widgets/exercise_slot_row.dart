@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/treino_icon.dart';
+import '../../domain/muscle_group.dart';
 import '../../domain/reps_format.dart';
 import '../../domain/routine_slot.dart';
 import '../../domain/set_enums.dart';
@@ -223,7 +224,7 @@ class ExerciseSlotRow extends StatelessWidget {
                           ),
                           const SizedBox(width: 12),
                           Text(
-                            slot.muscleGroup.toUpperCase(),
+                            muscleGroupLabel(slot.muscleGroup).toUpperCase(),
                             style: GoogleFonts.barlowCondensed(
                               fontWeight: FontWeight.w600,
                               fontSize: 11,

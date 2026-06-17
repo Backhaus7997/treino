@@ -26,6 +26,8 @@ class CustomExercise with _$CustomExercise {
     required String ownerId,
     required String name,
     @Default('') String muscleGroup,
+    // Optional secondary muscle (canonical key). null = single-muscle exercise.
+    String? secondaryMuscleGroup,
     @Default('') String description,
     String? videoUrl,
     int? defaultRestSeconds,

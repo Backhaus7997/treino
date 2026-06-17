@@ -11,6 +11,7 @@ _$ExerciseImpl _$$ExerciseImplFromJson(Map<String, dynamic> json) =>
       id: json['id'] as String,
       name: json['name'] as String,
       muscleGroup: json['muscleGroup'] as String,
+      secondaryMuscleGroup: json['secondaryMuscleGroup'] as String?,
       category: json['category'] as String,
       techniqueInstructions: (json['techniqueInstructions'] as List<dynamic>?)
           ?.map((e) => e as String)
@@ -29,6 +30,7 @@ Map<String, dynamic> _$$ExerciseImplToJson(_$ExerciseImpl instance) =>
       'id': instance.id,
       'name': instance.name,
       'muscleGroup': instance.muscleGroup,
+      'secondaryMuscleGroup': instance.secondaryMuscleGroup,
       'category': instance.category,
       'techniqueInstructions': instance.techniqueInstructions,
       'videoUrl': instance.videoUrl,

@@ -98,9 +98,11 @@ final slotExerciseProvider = FutureProvider.family<Exercise?,
       id: custom.id,
       name: custom.name,
       muscleGroup: custom.muscleGroup,
+      secondaryMuscleGroup: custom.secondaryMuscleGroup,
       category: 'custom',
       videoUrl: custom.videoUrl,
       defaultRestSeconds: custom.defaultRestSeconds,
+      equipment: custom.equipment,
     );
   },
 );

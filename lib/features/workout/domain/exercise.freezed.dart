@@ -22,7 +22,11 @@ Exercise _$ExerciseFromJson(Map<String, dynamic> json) {
 mixin _$Exercise {
   String get id => throw _privateConstructorUsedError;
   String get name => throw _privateConstructorUsedError;
-  String get muscleGroup => throw _privateConstructorUsedError;
+  String get muscleGroup =>
+      throw _privateConstructorUsedError; // Optional second muscle worked (canonical key, e.g. 'shoulders'). null =
+// single-muscle exercise. Matched by the picker filter just like the
+// primary so an exercise surfaces under either group.
+  String? get secondaryMuscleGroup => throw _privateConstructorUsedError;
   String get category =>
       throw _privateConstructorUsedError; // 'compound' | 'isolation' (free-form String, validated in seed)
   List<String>? get techniqueInstructions =>
@@ -31,6 +35,7 @@ mixin _$Exercise {
   int? get defaultRestSeconds => throw _privateConstructorUsedError;
   List<String> get aliases =>
       throw _privateConstructorUsedError; // Spanish/jargon synonyms for the Excel importer match
+// ignore: invalid_annotation_target
   @JsonKey(fromJson: _equipmentFromJson, toJson: _equipmentToJson)
   EquipmentType? get equipment => throw _privateConstructorUsedError;
 
@@ -53,6 +58,7 @@ abstract class $ExerciseCopyWith<$Res> {
       {String id,
       String name,
       String muscleGroup,
+      String? secondaryMuscleGroup,
       String category,
       List<String>? techniqueInstructions,
       String? videoUrl,
@@ -80,6 +86,7 @@ class _$ExerciseCopyWithImpl<$Res, $Val extends Exercise>
     Object? id = null,
     Object? name = null,
     Object? muscleGroup = null,
+    Object? secondaryMuscleGroup = freezed,
     Object? category = null,
     Object? techniqueInstructions = freezed,
     Object? videoUrl = freezed,
@@ -100,6 +107,10 @@ class _$ExerciseCopyWithImpl<$Res, $Val extends Exercise>
           ? _value.muscleGroup
           : muscleGroup // ignore: cast_nullable_to_non_nullable
               as String,
+      secondaryMuscleGroup: freezed == secondaryMuscleGroup
+          ? _value.secondaryMuscleGroup
+          : secondaryMuscleGroup // ignore: cast_nullable_to_non_nullable
+              as String?,
       category: null == category
           ? _value.category
           : category // ignore: cast_nullable_to_non_nullable
@@ -140,6 +151,7 @@ abstract class _$$ExerciseImplCopyWith<$Res>
       {String id,
       String name,
       String muscleGroup,
+      String? secondaryMuscleGroup,
       String category,
       List<String>? techniqueInstructions,
       String? videoUrl,
@@ -165,6 +177,7 @@ class __$$ExerciseImplCopyWithImpl<$Res>
     Object? id = null,
     Object? name = null,
     Object? muscleGroup = null,
+    Object? secondaryMuscleGroup = freezed,
     Object? category = null,
     Object? techniqueInstructions = freezed,
     Object? videoUrl = freezed,
@@ -185,6 +198,10 @@ class __$$ExerciseImplCopyWithImpl<$Res>
           ? _value.muscleGroup
           : muscleGroup // ignore: cast_nullable_to_non_nullable
               as String,
+      secondaryMuscleGroup: freezed == secondaryMuscleGroup
+          ? _value.secondaryMuscleGroup
+          : secondaryMuscleGroup // ignore: cast_nullable_to_non_nullable
+              as String?,
       category: null == category
           ? _value.category
           : category // ignore: cast_nullable_to_non_nullable
@@ -220,6 +237,7 @@ class _$ExerciseImpl implements _Exercise {
       {required this.id,
       required this.name,
       required this.muscleGroup,
+      this.secondaryMuscleGroup,
       required this.category,
       final List<String>? techniqueInstructions,
       this.videoUrl,
@@ -239,6 +257,11 @@ class _$ExerciseImpl implements _Exercise {
   final String name;
   @override
   final String muscleGroup;
+// Optional second muscle worked (canonical key, e.g. 'shoulders'). null =
+// single-muscle exercise. Matched by the picker filter just like the
+// primary so an exercise surfaces under either group.
+  @override
+  final String? secondaryMuscleGroup;
   @override
   final String category;
 // 'compound' | 'isolation' (free-form String, validated in seed)
@@ -269,13 +292,14 @@ class _$ExerciseImpl implements _Exercise {
   }
 
 // Spanish/jargon synonyms for the Excel importer match
+// ignore: invalid_annotation_target
   @override
   @JsonKey(fromJson: _equipmentFromJson, toJson: _equipmentToJson)
   final EquipmentType? equipment;
 
   @override
   String toString() {
-    return 'Exercise(id: $id, name: $name, muscleGroup: $muscleGroup, category: $category, techniqueInstructions: $techniqueInstructions, videoUrl: $videoUrl, defaultRestSeconds: $defaultRestSeconds, aliases: $aliases, equipment: $equipment)';
+    return 'Exercise(id: $id, name: $name, muscleGroup: $muscleGroup, secondaryMuscleGroup: $secondaryMuscleGroup, category: $category, techniqueInstructions: $techniqueInstructions, videoUrl: $videoUrl, defaultRestSeconds: $defaultRestSeconds, aliases: $aliases, equipment: $equipment)';
   }
 
   @override
@@ -287,6 +311,8 @@ class _$ExerciseImpl implements _Exercise {
             (identical(other.name, name) || other.name == name) &&
             (identical(other.muscleGroup, muscleGroup) ||
                 other.muscleGroup == muscleGroup) &&
+            (identical(other.secondaryMuscleGroup, secondaryMuscleGroup) ||
+                other.secondaryMuscleGroup == secondaryMuscleGroup) &&
             (identical(other.category, category) ||
                 other.category == category) &&
             const DeepCollectionEquality()
@@ -307,6 +333,7 @@ class _$ExerciseImpl implements _Exercise {
       id,
       name,
       muscleGroup,
+      secondaryMuscleGroup,
       category,
       const DeepCollectionEquality().hash(_techniqueInstructions),
       videoUrl,
@@ -335,6 +362,7 @@ abstract class _Exercise implements Exercise {
       {required final String id,
       required final String name,
       required final String muscleGroup,
+      final String? secondaryMuscleGroup,
       required final String category,
       final List<String>? techniqueInstructions,
       final String? videoUrl,
@@ -351,7 +379,12 @@ abstract class _Exercise implements Exercise {
   @override
   String get name;
   @override
-  String get muscleGroup;
+  String
+      get muscleGroup; // Optional second muscle worked (canonical key, e.g. 'shoulders'). null =
+// single-muscle exercise. Matched by the picker filter just like the
+// primary so an exercise surfaces under either group.
+  @override
+  String? get secondaryMuscleGroup;
   @override
   String
       get category; // 'compound' | 'isolation' (free-form String, validated in seed)
@@ -365,6 +398,7 @@ abstract class _Exercise implements Exercise {
   @override
   List<String>
       get aliases; // Spanish/jargon synonyms for the Excel importer match
+// ignore: invalid_annotation_target
   @override
   @JsonKey(fromJson: _equipmentFromJson, toJson: _equipmentToJson)
   EquipmentType? get equipment;

@@ -10,7 +10,8 @@ import '../../../l10n/app_l10n.dart';
 import '../application/custom_exercise_providers.dart';
 import '../application/session_providers.dart' show currentUidProvider;
 import '../domain/custom_exercise.dart';
-import '../domain/muscle_options.dart';
+import '../domain/equipment_type.dart';
+import '../domain/muscle_group.dart';
 import 'widgets/exercise_video_player.dart';
 
 /// Create or edit a trainer's custom exercise. Routed at
@@ -31,7 +32,9 @@ class CustomExerciseEditorScreen extends ConsumerStatefulWidget {
 class _CustomExerciseEditorScreenState
     extends ConsumerState<CustomExerciseEditorScreen> {
   final _nameCtrl = TextEditingController();
-  String? _selectedMuscle;
+  MuscleGroup? _primaryMuscle;
+  MuscleGroup? _secondaryMuscle;
+  EquipmentType? _equipment;
   final _descCtrl = TextEditingController();
   final _videoCtrl = TextEditingController();
   bool _initialized = false;
@@ -53,10 +56,13 @@ class _CustomExerciseEditorScreenState
     if (_initialized) return;
     _initialized = true;
     _nameCtrl.text = ex.name;
-    // Pre-select if the stored value is in the fixed list.
-    // Legacy free-text values not in the list → default to null (unselected).
-    _selectedMuscle =
-        kMuscleOptions.contains(ex.muscleGroup) ? ex.muscleGroup : null;
+    // Canonicalise whatever was stored — canonical keys AND legacy Spanish
+    // labels resolve to a group; unknown/'Otro' stays null (unselected).
+    _primaryMuscle = MuscleGroup.fromKey(ex.muscleGroup);
+    _secondaryMuscle = MuscleGroup.fromKey(ex.secondaryMuscleGroup);
+    // Never let secondary equal primary after canonicalisation.
+    if (_secondaryMuscle == _primaryMuscle) _secondaryMuscle = null;
+    _equipment = ex.equipment;
     _descCtrl.text = ex.description;
     _videoCtrl.text = ex.videoUrl ?? '';
     _videoPreviewUrl = ex.videoUrl ?? '';
@@ -93,8 +99,8 @@ class _CustomExerciseEditorScreenState
             // locales so the message and retry CTA are always visible.
             message: l10n.coachHubSectionLoadError,
             retryLabel: l10n.plantillasRetryLabel,
-            onRetry: () => ref.invalidate(
-                customExercisesForTrainerStreamProvider(uid)),
+            onRetry: () =>
+                ref.invalidate(customExercisesForTrainerStreamProvider(uid)),
           ),
         ),
         data: (list) {
@@ -183,9 +189,35 @@ class _CustomExerciseEditorScreenState
               _Label('Grupo muscular', palette: palette),
               const SizedBox(height: 6),
               _MuscleDropdown(
-                value: _selectedMuscle,
+                value: _primaryMuscle,
+                hint: 'Seleccionar…',
                 palette: palette,
-                onChanged: (v) => setState(() => _selectedMuscle = v),
+                onChanged: (v) => setState(() {
+                  _primaryMuscle = v;
+                  // Keep secondary distinct from the primary.
+                  if (_secondaryMuscle == v) _secondaryMuscle = null;
+                }),
+              ),
+              const SizedBox(height: 14),
+              _Label('Músculo secundario (opcional)', palette: palette),
+              const SizedBox(height: 6),
+              _MuscleDropdown(
+                value: _secondaryMuscle,
+                hint: 'Ninguno',
+                palette: palette,
+                // Exclude the primary so you can't pick the same muscle twice.
+                exclude: _primaryMuscle,
+                // Let the user clear it back to "Ninguno".
+                allowClear: true,
+                onChanged: (v) => setState(() => _secondaryMuscle = v),
+              ),
+              const SizedBox(height: 14),
+              _Label('Equipamiento (opcional)', palette: palette),
+              const SizedBox(height: 6),
+              _EquipmentDropdown(
+                value: _equipment,
+                palette: palette,
+                onChanged: (v) => setState(() => _equipment = v),
               ),
               const SizedBox(height: 14),
               _Label('Descripción / cues', palette: palette),
@@ -369,17 +401,21 @@ class _CustomExerciseEditorScreenState
       if (existing != null) {
         await repo.update(existing.copyWith(
           name: name,
-          muscleGroup: _selectedMuscle ?? '',
+          muscleGroup: _primaryMuscle?.key ?? '',
+          secondaryMuscleGroup: _secondaryMuscle?.key,
           description: _descCtrl.text.trim(),
           videoUrl: videoUrl.isEmpty ? null : videoUrl,
+          equipment: _equipment,
         ));
       } else {
         created = await repo.create(
           trainerId: uid,
           name: name,
-          muscleGroup: _selectedMuscle ?? '',
+          muscleGroup: _primaryMuscle?.key ?? '',
+          secondaryMuscleGroup: _secondaryMuscle?.key,
           description: _descCtrl.text.trim(),
           videoUrl: videoUrl.isEmpty ? null : videoUrl,
+          equipment: _equipment,
         );
       }
       if (!context.mounted) return;
@@ -534,8 +570,7 @@ class _ErrorState extends StatelessWidget {
             Text(
               message,
               textAlign: TextAlign.center,
-              style:
-                  GoogleFonts.barlow(fontSize: 14, color: palette.textMuted),
+              style: GoogleFonts.barlow(fontSize: 14, color: palette.textMuted),
             ),
             const SizedBox(height: 16),
             OutlinedButton(
@@ -628,16 +663,112 @@ class _Field extends StatelessWidget {
   }
 }
 
+/// Single-select dropdown over the canonical [MuscleGroup] taxonomy.
+///
+/// Used for both the primary muscle (required-ish, no clear option) and the
+/// optional secondary muscle ([allowClear] adds a "Ninguno" row, [exclude]
+/// hides the primary so the same muscle can't be picked twice).
 class _MuscleDropdown extends StatelessWidget {
   const _MuscleDropdown({
+    required this.value,
+    required this.hint,
+    required this.palette,
+    required this.onChanged,
+    this.exclude,
+    this.allowClear = false,
+  });
+
+  final MuscleGroup? value;
+  final String hint;
+  final AppPalette palette;
+  final void Function(MuscleGroup?) onChanged;
+  final MuscleGroup? exclude;
+  final bool allowClear;
+
+  @override
+  Widget build(BuildContext context) {
+    final groups = MuscleGroup.displayOrder.where((g) => g != exclude).toList();
+    return _DropdownShell(
+      palette: palette,
+      child: DropdownButton<MuscleGroup?>(
+        value: value,
+        isExpanded: true,
+        dropdownColor: palette.bgCard,
+        hint: _hintText(hint, palette),
+        style: GoogleFonts.barlow(
+          fontWeight: FontWeight.w500,
+          fontSize: 14,
+          color: palette.textPrimary,
+        ),
+        icon: Icon(TreinoIcon.chevronDown, size: 16, color: palette.textMuted),
+        items: [
+          if (allowClear)
+            DropdownMenuItem<MuscleGroup?>(
+              value: null,
+              child: _itemText(hint, palette, muted: true),
+            ),
+          for (final g in groups)
+            DropdownMenuItem<MuscleGroup?>(
+              value: g,
+              child: _itemText(g.label, palette),
+            ),
+        ],
+        onChanged: onChanged,
+      ),
+    );
+  }
+}
+
+/// Single-select dropdown over [EquipmentType], always clearable back to a
+/// "Sin especificar" (null) state — equipment is optional.
+class _EquipmentDropdown extends StatelessWidget {
+  const _EquipmentDropdown({
     required this.value,
     required this.palette,
     required this.onChanged,
   });
 
-  final String? value;
+  final EquipmentType? value;
   final AppPalette palette;
-  final void Function(String?) onChanged;
+  final void Function(EquipmentType?) onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return _DropdownShell(
+      palette: palette,
+      child: DropdownButton<EquipmentType?>(
+        value: value,
+        isExpanded: true,
+        dropdownColor: palette.bgCard,
+        hint: _hintText('Sin especificar', palette),
+        style: GoogleFonts.barlow(
+          fontWeight: FontWeight.w500,
+          fontSize: 14,
+          color: palette.textPrimary,
+        ),
+        icon: Icon(TreinoIcon.chevronDown, size: 16, color: palette.textMuted),
+        items: [
+          DropdownMenuItem<EquipmentType?>(
+            value: null,
+            child: _itemText('Sin especificar', palette, muted: true),
+          ),
+          for (final e in EquipmentType.values)
+            DropdownMenuItem<EquipmentType?>(
+              value: e,
+              child: _itemText(e.label, palette),
+            ),
+        ],
+        onChanged: onChanged,
+      ),
+    );
+  }
+}
+
+/// Shared bordered container + hidden underline for the editor dropdowns.
+class _DropdownShell extends StatelessWidget {
+  const _DropdownShell({required this.palette, required this.child});
+  final AppPalette palette;
+  final Widget child;
 
   @override
   Widget build(BuildContext context) {
@@ -648,47 +779,28 @@ class _MuscleDropdown extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: palette.border, width: 1),
       ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: value,
-          isExpanded: true,
-          dropdownColor: palette.bgCard,
-          hint: Text(
-            'Seleccionar…',
-            style: GoogleFonts.barlow(
-              fontWeight: FontWeight.w400,
-              fontSize: 14,
-              color: palette.textMuted,
-            ),
-          ),
-          style: GoogleFonts.barlow(
-            fontWeight: FontWeight.w500,
-            fontSize: 14,
-            color: palette.textPrimary,
-          ),
-          icon:
-              Icon(TreinoIcon.chevronDown, size: 16, color: palette.textMuted),
-          items: kMuscleOptions
-              .map(
-                (m) => DropdownMenuItem(
-                  value: m,
-                  child: Text(
-                    m,
-                    style: GoogleFonts.barlow(
-                      fontWeight: FontWeight.w500,
-                      fontSize: 14,
-                      color: palette.textPrimary,
-                    ),
-                  ),
-                ),
-              )
-              .toList(),
-          onChanged: onChanged,
-        ),
-      ),
+      child: DropdownButtonHideUnderline(child: child),
     );
   }
 }
+
+Widget _hintText(String text, AppPalette palette) => Text(
+      text,
+      style: GoogleFonts.barlow(
+        fontWeight: FontWeight.w400,
+        fontSize: 14,
+        color: palette.textMuted,
+      ),
+    );
+
+Widget _itemText(String text, AppPalette palette, {bool muted = false}) => Text(
+      text,
+      style: GoogleFonts.barlow(
+        fontWeight: muted ? FontWeight.w400 : FontWeight.w500,
+        fontSize: 14,
+        color: muted ? palette.textMuted : palette.textPrimary,
+      ),
+    );
 
 class _UploadVideoButton extends StatelessWidget {
   const _UploadVideoButton({

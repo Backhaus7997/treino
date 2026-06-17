@@ -17,6 +17,7 @@ import '../../profile/application/user_public_profile_providers.dart';
 import '../../profile/domain/experience_level.dart';
 import '../../workout/application/exercise_providers.dart';
 import '../../workout/domain/exercise.dart';
+import '../../workout/domain/muscle_group.dart';
 import '../../workout/application/routine_providers.dart';
 import '../../workout/domain/routine.dart';
 import '../../workout/domain/routine_day.dart';
@@ -355,90 +356,94 @@ class _CoachHubPlanPreviewScreenState
         await _handleBack();
       },
       child: Scaffold(
-      backgroundColor: palette.bg,
-      body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 720),
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _Header(palette: palette, planName: plan.name, onBack: _handleBack),
-                  const SizedBox(height: 18),
-                  _PlanMetaCard(palette: palette, plan: plan),
-                  const SizedBox(height: 18),
-                  if (plan.unmatched.isNotEmpty) ...[
-                    _UnmatchedWarning(palette: palette, plan: plan),
-                    const SizedBox(height: 18),
-                  ],
-                  ...plan.days.map(
-                    (d) => Padding(
-                      padding: const EdgeInsets.only(bottom: 14),
-                      child: _DayCard(
+        backgroundColor: palette.bg,
+        body: SafeArea(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 720),
+              child: SingleChildScrollView(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _Header(
                         palette: palette,
-                        day: d,
-                        onPickManual: (index, item) => _pickExerciseFor(
-                          dayNumber: d.dayNumber,
-                          itemIndex: index,
-                          rowName: item.rowName,
+                        planName: plan.name,
+                        onBack: _handleBack),
+                    const SizedBox(height: 18),
+                    _PlanMetaCard(palette: palette, plan: plan),
+                    const SizedBox(height: 18),
+                    if (plan.unmatched.isNotEmpty) ...[
+                      _UnmatchedWarning(palette: palette, plan: plan),
+                      const SizedBox(height: 18),
+                    ],
+                    ...plan.days.map(
+                      (d) => Padding(
+                        padding: const EdgeInsets.only(bottom: 14),
+                        child: _DayCard(
+                          palette: palette,
+                          day: d,
+                          onPickManual: (index, item) => _pickExerciseFor(
+                            dayNumber: d.dayNumber,
+                            itemIndex: index,
+                            rowName: item.rowName,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 6),
-                  _AthletePicker(
-                    palette: palette,
-                    selectedAthleteIds: _selectedAthleteIds,
-                    onToggle: _toggleAthlete,
-                  ),
-                  if (_error != null) ...[
-                    const SizedBox(height: 14),
-                    Text(
-                      _error!,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: palette.danger, fontSize: 13),
+                    const SizedBox(height: 6),
+                    _AthletePicker(
+                      palette: palette,
+                      selectedAthleteIds: _selectedAthleteIds,
+                      onToggle: _toggleAthlete,
+                    ),
+                    if (_error != null) ...[
+                      const SizedBox(height: 14),
+                      Text(
+                        _error!,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: palette.danger, fontSize: 13),
+                      ),
+                    ],
+                    const SizedBox(height: 18),
+                    ElevatedButton(
+                      onPressed:
+                          _saving ? null : () => _assign(plan, profile.uid),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: palette.accent,
+                        foregroundColor: palette.bg,
+                        minimumSize: const Size.fromHeight(48),
+                        shape: const StadiumBorder(),
+                        disabledBackgroundColor:
+                            palette.accent.withValues(alpha: 0.3),
+                      ),
+                      child: _saving
+                          ? SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: palette.bg,
+                              ),
+                            )
+                          : Text(
+                              _selectedAthleteIds.length > 1
+                                  ? 'ASIGNAR PLAN A ${_selectedAthleteIds.length} ATLETAS'
+                                  : 'ASIGNAR PLAN',
+                              style: GoogleFonts.barlowCondensed(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14,
+                                letterSpacing: 1.4,
+                              ),
+                            ),
                     ),
                   ],
-                  const SizedBox(height: 18),
-                  ElevatedButton(
-                    onPressed:
-                        _saving ? null : () => _assign(plan, profile.uid),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: palette.accent,
-                      foregroundColor: palette.bg,
-                      minimumSize: const Size.fromHeight(48),
-                      shape: const StadiumBorder(),
-                      disabledBackgroundColor:
-                          palette.accent.withValues(alpha: 0.3),
-                    ),
-                    child: _saving
-                        ? SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: palette.bg,
-                            ),
-                          )
-                        : Text(
-                            _selectedAthleteIds.length > 1
-                                ? 'ASIGNAR PLAN A ${_selectedAthleteIds.length} ATLETAS'
-                                : 'ASIGNAR PLAN',
-                            style: GoogleFonts.barlowCondensed(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 14,
-                              letterSpacing: 1.4,
-                            ),
-                          ),
-                  ),
-                ],
+                ),
               ),
             ),
           ),
         ),
-      ),
       ),
     );
   }
@@ -880,7 +885,7 @@ class _ExercisePickerSheetState extends State<_ExercisePickerSheet> {
                             ),
                           ),
                           subtitle: Text(
-                            ex.muscleGroup,
+                            muscleGroupLabel(ex.muscleGroup),
                             style: TextStyle(
                               color: palette.textMuted,
                               fontSize: 12,
