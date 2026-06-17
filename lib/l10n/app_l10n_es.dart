@@ -9,6 +9,19 @@ class AppL10nEs extends AppL10n {
   AppL10nEs([String locale = 'es']) : super(locale);
 
   @override
+  String get homeAthleteFirstRunTitle => 'Arrancá tu entrenamiento';
+
+  @override
+  String get homeAthleteFirstRunBody =>
+      'Creá tu primera rutina o buscá un entrenador para empezar.';
+
+  @override
+  String get homeAthleteFirstRunCreateCta => 'CREAR RUTINA';
+
+  @override
+  String get homeAthleteFirstRunFindTrainerCta => 'Buscar entrenador';
+
+  @override
   String get authSplashTagline => 'ENTRENÁ. COMPARTÍ. CRECÉ.';
 
   @override
@@ -1634,11 +1647,76 @@ class AppL10nEs extends AppL10n {
   @override
   String get profileGymSaveError =>
       'No pudimos guardar el gimnasio. Inténtalo de nuevo.';
+
+  @override
+  String get feedPullToRefreshA11y => 'Desliza para actualizar';
+
+  @override
+  String get logFieldInvalidNumber => 'Ingresa un número válido';
+
+  @override
+  String get logFieldOutOfRange => 'El valor está fuera de rango';
+
+  @override
+  String get logEmptyRecordWarning =>
+      'Completa al menos un dato antes de guardar';
+
+  @override
+  String get profileSetupUsernameChecking => 'Comprobando disponibilidad…';
+
+  @override
+  String get profileSetupUsernameTaken =>
+      'Ese nombre de usuario ya está en uso';
+
+  @override
+  String get profileSetupUsernameAvailable => 'Nombre de usuario disponible';
+
+  @override
+  String get profileSetupUsernameCheckError =>
+      'No pudimos comprobar el nombre de usuario. Inténtalo de nuevo.';
+
+  @override
+  String get routineEditorDiscardTitle => '¿Descartar cambios?';
+
+  @override
+  String get routineEditorDiscardBody =>
+      'Si sales ahora perderás los cambios sin guardar.';
+
+  @override
+  String get routineEditorDiscardConfirm => 'Descartar';
+
+  @override
+  String trainerCtaExistingLinkExplanation(String trainerName) {
+    return 'Solo puedes tener un PF activo. Termina tu vínculo actual con $trainerName para pedir uno nuevo.';
+  }
+
+  @override
+  String get coachHubPreviewDiscardTitle => '¿Salir sin guardar el plan?';
+
+  @override
+  String get coachHubPreviewDiscardBody =>
+      'Vas a perder los ejercicios que mapeaste manualmente.';
+
+  @override
+  String get coachHubPreviewDiscardConfirm => 'Salir igual';
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
 class AppL10nEsAr extends AppL10nEs {
   AppL10nEsAr() : super('es_AR');
+
+  @override
+  String get homeAthleteFirstRunTitle => 'Arrancá tu entrenamiento';
+
+  @override
+  String get homeAthleteFirstRunBody =>
+      'Creá tu primera rutina o buscá un entrenador para empezar.';
+
+  @override
+  String get homeAthleteFirstRunCreateCta => 'CREAR RUTINA';
+
+  @override
+  String get homeAthleteFirstRunFindTrainerCta => 'Buscar entrenador';
 
   @override
   String get authSplashTagline => 'ENTRENÁ. COMPARTÍ. CRECÉ.';
@@ -3265,4 +3343,55 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get profileGymSaveError =>
       'No pudimos guardar el gimnasio. Probá de nuevo.';
+
+  @override
+  String get feedPullToRefreshA11y => 'Deslizá para actualizar';
+
+  @override
+  String get logFieldInvalidNumber => 'Ingresá un número válido';
+
+  @override
+  String get logFieldOutOfRange => 'El valor está fuera de rango';
+
+  @override
+  String get logEmptyRecordWarning =>
+      'Completá al menos un dato antes de guardar';
+
+  @override
+  String get profileSetupUsernameChecking => 'Verificando disponibilidad…';
+
+  @override
+  String get profileSetupUsernameTaken => 'Ese username ya está en uso';
+
+  @override
+  String get profileSetupUsernameAvailable => 'Username disponible';
+
+  @override
+  String get profileSetupUsernameCheckError =>
+      'No pudimos verificar el username. Probá de nuevo.';
+
+  @override
+  String get routineEditorDiscardTitle => '¿Descartar cambios?';
+
+  @override
+  String get routineEditorDiscardBody =>
+      'Si salís ahora vas a perder los cambios sin guardar.';
+
+  @override
+  String get routineEditorDiscardConfirm => 'Descartar';
+
+  @override
+  String trainerCtaExistingLinkExplanation(String trainerName) {
+    return 'Solo podés tener un PF activo. Terminá tu vínculo actual con $trainerName para pedir uno nuevo.';
+  }
+
+  @override
+  String get coachHubPreviewDiscardTitle => '¿Salir sin guardar el plan?';
+
+  @override
+  String get coachHubPreviewDiscardBody =>
+      'Vas a perder los ejercicios que mapeaste manualmente.';
+
+  @override
+  String get coachHubPreviewDiscardConfirm => 'Salir igual';
 }

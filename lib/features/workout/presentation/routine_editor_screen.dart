@@ -408,15 +408,42 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
   /// Shown when the routine to edit no longer exists in Firestore.
   bool _loadNotFound = false;
 
+  /// True once the user has touched anything (name/split text, level, or any
+  /// day/slot/set mutation). Drives the unsaved-changes guard (PopScope +
+  /// "¿Descartar cambios?" dialog) on both the AppBar back button and the
+  /// iOS edge-swipe / system back gesture.
+  bool _isDirty = false;
+
+  /// Suppresses dirtiness while we hydrate the editor from Firestore — the
+  /// hydration path mutates the name controller and `_days`, which would
+  /// otherwise mark a freshly-loaded routine as dirty.
+  bool _hydrating = false;
+
   @override
   void initState() {
     super.initState();
+    // Typing in the name/split fields marks the editor dirty. Guarded by
+    // `_hydrating` so loading an existing routine doesn't trip the flag.
+    _nameController.addListener(_markDirty);
+    _splitController.addListener(_markDirty);
     // Hydrate editor when editing an existing routine/plan/template.
     // Works for all three modes: SelfCreating, TrainerAssigning, TrainerTemplating.
     final existingId = _existingIdFor(widget.mode);
     if (existingId != null) {
       _loadExistingRoutine(existingId);
     }
+  }
+
+  /// Marks the editor as having unsaved changes. No-op while hydrating.
+  ///
+  /// Deliberately sets the flag WITHOUT its own setState: every caller either
+  /// runs alongside a setState that mutates editor data (structural methods),
+  /// is itself inside a setState body, or fires from a TextField whose
+  /// onChanged already rebuilds. PopScope re-reads `canPop` on each pop
+  /// attempt, so no extra rebuild is needed for the guard to be live.
+  void _markDirty() {
+    if (_hydrating) return;
+    _isDirty = true;
   }
 
   @override
@@ -475,6 +502,9 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
       }
       // Map Routine → editor state — inverse of the create path in _submit().
       // Applies equally to SelfCreating / TrainerAssigning / TrainerTemplating.
+      // Guard against the controller listeners marking a freshly-loaded
+      // routine dirty while we assign their text below.
+      _hydrating = true;
       _nameController.text = routine.name;
       _level = routine.level;
       // Defensive clamp — a hand-edited doc can't exceed the editor cap nor
@@ -543,9 +573,11 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
           ),
         ];
       }
+      _hydrating = false;
       setState(() => _loading = false);
     } catch (_) {
       if (!mounted) return;
+      _hydrating = false;
       setState(() {
         _loading = false;
         _loadNotFound = true;
@@ -555,6 +587,8 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
 
   @override
   void dispose() {
+    _nameController.removeListener(_markDirty);
+    _splitController.removeListener(_markDirty);
     _nameController.dispose();
     _splitController.dispose();
     _listScrollController.dispose();
@@ -697,6 +731,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
   void _addWeek() {
     if (_numWeeks >= _kMaxWeeks) return;
     FocusManager.instance.primaryFocus?.unfocus();
+    _markDirty();
     setState(() {
       _numWeeks++;
       for (final day in _days) {
@@ -713,6 +748,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
   void _removeLastWeek() {
     if (_numWeeks <= 1) return;
     FocusManager.instance.primaryFocus?.unfocus();
+    _markDirty();
     setState(() {
       final removedIndex = _numWeeks - 1; // the index being removed
       _numWeeks--;
@@ -785,6 +821,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     if (confirmed != true) return;
     if (!mounted) return;
 
+    _markDirty();
     setState(() {
       final sourceWeek = _selectedWeek - 1;
       final targetWeek = _selectedWeek;
@@ -821,6 +858,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
   void _addDay() {
     if (_days.length >= _kMaxDays) return;
     final l10n = AppL10n.of(context);
+    _markDirty();
     setState(() {
       final n = _days.length + 1;
       _days = [
@@ -836,6 +874,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
 
   void _removeDay(int index) {
     final l10n = AppL10n.of(context);
+    _markDirty();
     setState(() {
       _days = [
         for (int i = 0; i < _days.length; i++)
@@ -856,6 +895,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
   }
 
   void _removeSlot(int dayIndex, int slotIndex) {
+    _markDirty();
     setState(() {
       _days[dayIndex].slots = [
         for (int i = 0; i < _days[dayIndex].slots.length; i++)
@@ -941,6 +981,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
       return;
     }
 
+    _markDirty();
     setState(() => slot.activeWeeks = newMask);
   }
 
@@ -989,6 +1030,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
 
   /// Replaces a day's slot order after a block-level reorder in the tile.
   void _reorderSlots(int dayIndex, List<_EditableSlot> newOrder) {
+    _markDirty();
     setState(() {
       _days[dayIndex].slots = newOrder;
     });
@@ -997,6 +1039,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
   /// Replaces [slot]'s exercise with [newExercise], keeping all other fields
   /// (sets, rest, exerciseMode, repMode, supersetGroup) intact.
   void _replaceExercise(_EditableSlot slot, Exercise newExercise) {
+    _markDirty();
     setState(() {
       slot.exercise = newExercise;
     });
@@ -1015,7 +1058,10 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
       dir,
       (a, b) => a.supersetGroup == b.supersetGroup,
     );
-    if (swapped) setState(() {});
+    if (swapped) {
+      _markDirty();
+      setState(() {});
+    }
   }
 
   /// Opens the multi-select picker for [dayIndex] and appends N new slots.
@@ -1036,6 +1082,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     final scope = await _promptAddScope(context);
     if (scope == null || !mounted) return;
 
+    _markDirty();
     setState(() {
       // Only add exercises not already in this day (one instance per day) —
       // avoids the duplicate-on-reopen issue.
@@ -1073,6 +1120,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
       // Skip exercises already in this day (one instance per day).
       final newOnes = picked.where((e) => !existingIds.contains(e.id)).toList();
       if (newOnes.isEmpty) return;
+      _markDirty();
       final nextGroup =
           (day.slots.map((s) => s.supersetGroup ?? 0).fold(0, max)) + 1;
       final newSlots = newOnes
@@ -1109,6 +1157,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     setState(() {
       final newOnes = picked.where((e) => !existingIds.contains(e.id)).toList();
       if (newOnes.isEmpty) return;
+      _markDirty();
       final newSlots = newOnes
           .map((ex) => _EditableSlot()
             ..exercise = ex
@@ -1195,6 +1244,12 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
       return;
     }
 
+    // A successful save persists the work, so the editor is no longer "dirty":
+    // clear the flag up front so the post-save context.pop()/context.go() in the
+    // branches below is NOT intercepted by the unsaved-changes PopScope guard
+    // (the discard dialog would otherwise fire on a successful save). Restored
+    // in the catch branch when the save fails and the user stays on screen.
+    _isDirty = false;
     setState(() => _submitting = true);
     final uid = ref.read(currentUidProvider) ?? '';
     final days = _buildDays();
@@ -1302,6 +1357,8 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text(l10n.workoutSelfEditorCapReached)),
             );
+            // No save happened — re-arm the unsaved-changes guard.
+            _isDirty = true;
             setState(() => _submitting = false);
             return;
           }
@@ -1356,8 +1413,94 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(errorText)),
       );
+      // The save failed — the user stays on screen with unsaved changes, so
+      // re-arm the guard cleared at the top of _submit.
+      _isDirty = true;
       setState(() => _submitting = false);
     }
+  }
+
+  /// Pops the editor the same way the bare back button used to, used after the
+  /// unsaved-changes guard has cleared (no dirty state, or the user confirmed
+  /// discard). Mirrors the original AppBar back navigation.
+  void _leaveEditor() {
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go(widget.mode is SelfCreating ? '/workout' : '/coach');
+    }
+  }
+
+  /// Handles the AppBar back button. When there are unsaved changes, asks for
+  /// confirmation before leaving; otherwise pops immediately.
+  Future<void> _handleBackButton() async {
+    if (!_isDirty) {
+      _leaveEditor();
+      return;
+    }
+    final discard = await _confirmDiscard();
+    if (discard && mounted) {
+      _leaveEditor();
+    }
+  }
+
+  /// Shows the "¿Descartar cambios?" confirmation dialog. Returns true when the
+  /// user chose to discard, false when they cancelled or dismissed it. Styled
+  /// after the abandon-session dialog in session_player_screen.dart.
+  Future<bool> _confirmDiscard() async {
+    final l10n = AppL10n.of(context);
+    final discard = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        final palette = AppPalette.of(ctx);
+        return AlertDialog(
+          backgroundColor: palette.bgCard,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: Text(
+            l10n.routineEditorDiscardTitle,
+            style: GoogleFonts.barlowCondensed(
+              fontWeight: FontWeight.w700,
+              fontSize: 18,
+              color: palette.textPrimary,
+            ),
+          ),
+          content: Text(
+            l10n.routineEditorDiscardBody,
+            style: GoogleFonts.barlow(fontSize: 14, color: palette.textMuted),
+          ),
+          actions: [
+            OutlinedButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: Text(
+                l10n.commonCancel,
+                style: GoogleFonts.barlowCondensed(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                  color: palette.textPrimary,
+                ),
+              ),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: palette.highlight,
+              ),
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: Text(
+                l10n.routineEditorDiscardConfirm,
+                style: GoogleFonts.barlowCondensed(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                  color: palette.bg,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+    return discard ?? false;
   }
 
   @override
@@ -1422,10 +1565,22 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
       final invalidWeeks = _invalidWeekFirstDay;
       final hiddenInvalidWeeks =
           invalidWeeks.keys.where((w) => w != _selectedWeek).toList()..sort();
-      return Scaffold(
-        // Tapping anywhere outside a field dismisses the keyboard (device UX
-        // 2026-06-11). translucent → child widgets still receive their taps.
-        body: GestureDetector(
+      // Unsaved-changes guard: blocks the iOS edge-swipe / system back gesture
+      // while the editor is dirty and routes it through the discard confirm.
+      // canPop is recomputed every build, so it stays in sync with _isDirty.
+      return PopScope(
+        canPop: !_isDirty,
+        onPopInvokedWithResult: (didPop, _) async {
+          if (didPop) return;
+          final discard = await _confirmDiscard();
+          if (discard && mounted) {
+            _leaveEditor();
+          }
+        },
+        child: Scaffold(
+          // Tapping anywhere outside a field dismisses the keyboard (device UX
+          // 2026-06-11). translucent → child widgets still receive their taps.
+          body: GestureDetector(
           behavior: HitTestBehavior.translucent,
           onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
           child: AppBackground(
@@ -1441,11 +1596,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                           icon:
                               Icon(TreinoIcon.back, color: palette.textPrimary),
                           tooltip: l10n.commonBack,
-                          onPressed: () => context.canPop()
-                              ? context.pop()
-                              : context.go(widget.mode is SelfCreating
-                                  ? '/workout'
-                                  : '/coach'),
+                          onPressed: _handleBackButton,
                         ),
                         const SizedBox(width: 4),
                         Text(
@@ -1553,6 +1704,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                                       palette: palette,
                                       onChanged: (v) {
                                         if (v != null) {
+                                          _markDirty();
                                           setState(() => _level = v);
                                         }
                                       },
@@ -1624,7 +1776,10 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                                 _reorderSlots(di, newOrder),
                             onRemoveDay:
                                 _days.length > 1 ? () => _removeDay(di) : null,
-                            onSlotChanged: () => setState(() {}),
+                            onSlotChanged: () {
+                              _markDirty();
+                              setState(() {});
+                            },
                             onAddToGroup: (g) =>
                                 _addExerciseToGroup(context, di, g),
                             onReplaceExercise: (slot, ex) =>
@@ -1713,6 +1868,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                 ],
               ),
             ),
+          ),
           ),
         ),
       );

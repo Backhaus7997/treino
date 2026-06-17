@@ -11,6 +11,7 @@ import '../../../core/widgets/treino_icon.dart';
 import '../application/auth_providers.dart';
 import '../../../l10n/app_l10n.dart';
 import '../domain/auth_failure.dart';
+import '../domain/email_password_validator.dart';
 import 'widgets/auth_failure_banner.dart';
 import 'widgets/auth_input.dart';
 import 'widgets/auth_pill_button.dart';
@@ -52,6 +53,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       _emailCtrl.text.trim().isEmpty || _passwordCtrl.text.isEmpty;
 
   Future<void> _submit() async {
+    // Error prevention (Nielsen): validate format client-side before the
+    // network round-trip, mirroring register_screen.dart.
+    if (!(_formKey.currentState?.validate() ?? false)) return;
     await ref.read(authNotifierProvider.notifier).signIn(
           email: _emailCtrl.text.trim(),
           password: _passwordCtrl.text,
@@ -152,6 +156,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     focusNode: _emailFocus,
                     nextFocusNode: _passwordFocus,
                     autofillHints: const [AutofillHints.email],
+                    validator: EmailPasswordValidator.validateEmail,
                   ),
                   const SizedBox(height: 14),
                   // Password field — no label per mockup (icon-only)

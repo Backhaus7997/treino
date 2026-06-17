@@ -1,13 +1,29 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/treino_icon.dart';
+import '../../../l10n/app_l10n.dart';
 import '../../workout/application/session_providers.dart'
     show currentUidProvider;
 import '../application/measurement_providers.dart';
 import '../domain/measurement.dart';
+
+/// Upper sanity bound for any logged metric (kg, %, or cm).
+///
+/// Caps absurd entries (e.g. 9999 kg) without rejecting realistic values:
+/// the tallest measured circumferences and heaviest body weights stay well
+/// under 500. Combined with the `>= 0` floor this is an error-prevention
+/// guard, not a clinical range.
+const double _kMaxMetricValue = 500;
+
+/// Rejects any character that cannot be part of a decimal metric at entry
+/// time, so the user never types a value that would be silently dropped.
+final List<TextInputFormatter> _decimalInputFormatters = <TextInputFormatter>[
+  FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+];
 
 // ── Month names (Spanish, no lib dependency) ──────────────────────────────────
 
@@ -93,7 +109,21 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
   late final TextEditingController _notesCtrl;
 
   // ── State ──────────────────────────────────────────────────────────────────
+  final _formKey = GlobalKey<FormState>();
   bool _saving = false;
+
+  /// Owned by the parent so a save attempt can force the circumferences
+  /// section open when one of its (collapsed) fields fails validation —
+  /// otherwise the inline error would render off-screen.
+  bool _circumferencesExpanded = false;
+
+  /// Tracks whether the form currently has at least one value, so GUARDAR can
+  /// be disabled live as the user types/clears fields (error prevention).
+  bool _hasValue = false;
+
+  /// Every controller on the form — used to wire change listeners and to
+  /// recompute [_hasValue] on each edit.
+  late final List<TextEditingController> _allCtrls;
 
   @override
   void initState() {
@@ -119,6 +149,42 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
     _calfLCtrl = TextEditingController();
     _calfRCtrl = TextEditingController();
     _notesCtrl = TextEditingController();
+
+    _allCtrls = <TextEditingController>[
+      _weightCtrl,
+      _fatCtrl,
+      _muscleCtrl,
+      _shouldersCtrl,
+      _chestCtrl,
+      _waistCtrl,
+      _hipsCtrl,
+      _glutesCtrl,
+      _bicepsLCtrl,
+      _bicepsRCtrl,
+      _bicepsFlexLCtrl,
+      _bicepsFlexRCtrl,
+      _forearmLCtrl,
+      _forearmRCtrl,
+      _upperThighLCtrl,
+      _upperThighRCtrl,
+      _midThighLCtrl,
+      _midThighRCtrl,
+      _calfLCtrl,
+      _calfRCtrl,
+      _notesCtrl,
+    ];
+    for (final c in _allCtrls) {
+      c.addListener(_onFieldChanged);
+    }
+  }
+
+  /// Recomputes [_hasValue] whenever any field changes so GUARDAR reflects the
+  /// current form state without waiting for a submit attempt.
+  void _onFieldChanged() {
+    final has = _hasAnyValue();
+    if (has != _hasValue) {
+      setState(() => _hasValue = has);
+    }
   }
 
   @override
@@ -156,6 +222,50 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
     return double.tryParse(raw);
   }
 
+  /// Validator for every numeric field. Empty stays valid (all fields are
+  /// optional), but a non-empty value must parse and fall within sane bounds.
+  /// Surfaces the error inline instead of silently nulling the value.
+  String? _validateMetric(String? value, AppL10n l10n) {
+    final raw = value?.trim().replaceAll(',', '.') ?? '';
+    if (raw.isEmpty) return null;
+    final parsed = double.tryParse(raw);
+    if (parsed == null) return l10n.logFieldInvalidNumber;
+    if (parsed < 0 || parsed > _kMaxMetricValue) return l10n.logFieldOutOfRange;
+    return null;
+  }
+
+  /// True when [ctrl] holds a non-empty value that fails [_validateMetric].
+  /// Used to detect invalid input inside the collapsed circumferences section,
+  /// whose fields are unmounted and therefore skipped by `Form.validate()`.
+  bool _isMetricInvalid(TextEditingController ctrl) {
+    final raw = ctrl.text.trim().replaceAll(',', '.');
+    if (raw.isEmpty) return false;
+    final parsed = double.tryParse(raw);
+    return parsed == null || parsed < 0 || parsed > _kMaxMetricValue;
+  }
+
+  /// All circumference controllers (the collapsible section). Kept separate so
+  /// the section can be force-expanded when one of them holds invalid input.
+  List<TextEditingController> get _circumferenceCtrls => <TextEditingController>[
+        _shouldersCtrl,
+        _chestCtrl,
+        _waistCtrl,
+        _hipsCtrl,
+        _glutesCtrl,
+        _bicepsLCtrl,
+        _bicepsRCtrl,
+        _bicepsFlexLCtrl,
+        _bicepsFlexRCtrl,
+        _forearmLCtrl,
+        _forearmRCtrl,
+        _upperThighLCtrl,
+        _upperThighRCtrl,
+        _midThighLCtrl,
+        _midThighRCtrl,
+        _calfLCtrl,
+        _calfRCtrl,
+      ];
+
   /// True when at least one numeric field parses to a value or notes is filled.
   /// Guards against persisting a fully-null measurement document.
   bool _hasAnyValue() {
@@ -189,6 +299,7 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
 
   Future<void> _save() async {
     if (_saving) return;
+    final l10n = AppL10n.of(context);
     final trainerUid = ref.read(currentUidProvider);
     if (trainerUid == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -201,13 +312,23 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
       return;
     }
 
+    // If a collapsed circumference holds an invalid value, expand the section
+    // first so its inline error is actually visible before we validate.
+    if (!_circumferencesExpanded &&
+        _circumferenceCtrls.any(_isMetricInvalid)) {
+      setState(() => _circumferencesExpanded = true);
+      // Let the section mount before its fields' validators run.
+      await Future<void>.delayed(Duration.zero);
+      if (!mounted) return;
+    }
+
+    // Reject invalid / out-of-range entries before building the model so a
+    // mistyped value is surfaced inline instead of being silently dropped.
+    if (!(_formKey.currentState?.validate() ?? true)) return;
+
     if (!_hasAnyValue()) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Cargá al menos un valor antes de guardar.',
-          ),
-        ),
+        SnackBar(content: Text(l10n.logEmptyRecordWarning)),
       );
       return;
     }
@@ -267,8 +388,11 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     final trainerUid = ref.watch(currentUidProvider);
-    final canSave = trainerUid != null && !_saving;
+    // GUARDAR stays disabled until there is at least one value to save, so an
+    // accidental tap cannot persist an all-null record.
+    final canSave = trainerUid != null && !_saving && _hasValue;
     final now = DateTime.now();
 
     return Scaffold(
@@ -320,11 +444,13 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
 
             // ── Body ────────────────────────────────────────────────────────
             Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
+              child: Form(
+                key: _formKey,
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                     // Body composition
                     _sectionLabel('COMPOSICIÓN CORPORAL', palette),
                     const SizedBox(height: 12),
@@ -332,24 +458,33 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
                       label: 'Peso (kg)',
                       controller: _weightCtrl,
                       palette: palette,
+                      validator: (v) => _validateMetric(v, l10n),
                     ),
                     const SizedBox(height: 12),
                     _numericField(
                       label: 'Grasa (%)',
                       controller: _fatCtrl,
                       palette: palette,
+                      validator: (v) => _validateMetric(v, l10n),
                     ),
                     const SizedBox(height: 12),
                     _numericField(
                       label: 'Masa muscular (kg)',
                       controller: _muscleCtrl,
                       palette: palette,
+                      validator: (v) => _validateMetric(v, l10n),
                     ),
                     const SizedBox(height: 20),
 
                     // Circumferences — collapsible
                     _CircumferencesSection(
                       palette: palette,
+                      validateMetric: (v) => _validateMetric(v, l10n),
+                      expanded: _circumferencesExpanded,
+                      onToggle: () => setState(
+                        () => _circumferencesExpanded =
+                            !_circumferencesExpanded,
+                      ),
                       shouldersCtrl: _shouldersCtrl,
                       chestCtrl: _chestCtrl,
                       waistCtrl: _waistCtrl,
@@ -390,7 +525,8 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
 
                     // Space so FAB doesn't cover last field
                     const SizedBox(height: 80),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -500,6 +636,7 @@ Widget _numericField({
   required TextEditingController controller,
   required AppPalette palette,
   String? suffix,
+  FormFieldValidator<String>? validator,
 }) {
   return Column(
     crossAxisAlignment: CrossAxisAlignment.start,
@@ -516,6 +653,8 @@ Widget _numericField({
       TextFormField(
         controller: controller,
         keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        inputFormatters: _decimalInputFormatters,
+        validator: validator,
         style: GoogleFonts.barlow(
           color: palette.textPrimary,
           fontSize: 14,
@@ -537,6 +676,7 @@ Widget _bilateralField({
   required TextEditingController leftCtrl,
   required TextEditingController rightCtrl,
   required AppPalette palette,
+  FormFieldValidator<String>? validator,
 }) {
   return Column(
     crossAxisAlignment: CrossAxisAlignment.start,
@@ -551,12 +691,15 @@ Widget _bilateralField({
       ),
       const SizedBox(height: 6),
       Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Expanded(
             child: TextFormField(
               controller: leftCtrl,
               keyboardType:
                   const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: _decimalInputFormatters,
+              validator: validator,
               style: GoogleFonts.barlow(
                 color: palette.textPrimary,
                 fontSize: 14,
@@ -573,6 +716,8 @@ Widget _bilateralField({
               controller: rightCtrl,
               keyboardType:
                   const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: _decimalInputFormatters,
+              validator: validator,
               style: GoogleFonts.barlow(
                 color: palette.textPrimary,
                 fontSize: 14,
@@ -591,9 +736,12 @@ Widget _bilateralField({
 
 // ── Circumferences section ────────────────────────────────────────────────────
 
-class _CircumferencesSection extends StatefulWidget {
+class _CircumferencesSection extends StatelessWidget {
   const _CircumferencesSection({
     required this.palette,
+    required this.validateMetric,
+    required this.expanded,
+    required this.onToggle,
     required this.shouldersCtrl,
     required this.chestCtrl,
     required this.waistCtrl,
@@ -614,6 +762,9 @@ class _CircumferencesSection extends StatefulWidget {
   });
 
   final AppPalette palette;
+  final FormFieldValidator<String> validateMetric;
+  final bool expanded;
+  final VoidCallback onToggle;
   final TextEditingController shouldersCtrl;
   final TextEditingController chestCtrl;
   final TextEditingController waistCtrl;
@@ -633,15 +784,8 @@ class _CircumferencesSection extends StatefulWidget {
   final TextEditingController calfRCtrl;
 
   @override
-  State<_CircumferencesSection> createState() => _CircumferencesSectionState();
-}
-
-class _CircumferencesSectionState extends State<_CircumferencesSection> {
-  bool _expanded = false;
-
-  @override
   Widget build(BuildContext context) {
-    final p = widget.palette;
+    final p = palette;
 
     return Container(
       decoration: BoxDecoration(
@@ -654,7 +798,7 @@ class _CircumferencesSectionState extends State<_CircumferencesSection> {
         children: [
           // ── Header row ────────────────────────────────────────────────────
           InkWell(
-            onTap: () => setState(() => _expanded = !_expanded),
+            onTap: onToggle,
             borderRadius: BorderRadius.circular(16),
             child: Padding(
               padding: const EdgeInsets.all(14),
@@ -685,7 +829,7 @@ class _CircumferencesSectionState extends State<_CircumferencesSection> {
                     ),
                   ),
                   Icon(
-                    _expanded ? TreinoIcon.chevronUp : TreinoIcon.chevronDown,
+                    expanded ? TreinoIcon.chevronUp : TreinoIcon.chevronDown,
                     color: p.textMuted,
                     size: 16,
                   ),
@@ -695,7 +839,7 @@ class _CircumferencesSectionState extends State<_CircumferencesSection> {
           ),
 
           // ── Expanded content ──────────────────────────────────────────────
-          if (_expanded) ...[
+          if (expanded) ...[
             Divider(color: p.border, height: 1, thickness: 1),
             Padding(
               padding: const EdgeInsets.all(14),
@@ -706,83 +850,94 @@ class _CircumferencesSectionState extends State<_CircumferencesSection> {
                   const SizedBox(height: 12),
                   _numericField(
                     label: 'Hombros',
-                    controller: widget.shouldersCtrl,
+                    controller: shouldersCtrl,
                     palette: p,
                     suffix: 'cm',
+                    validator: validateMetric,
                   ),
                   const SizedBox(height: 12),
                   _numericField(
                     label: 'Pecho',
-                    controller: widget.chestCtrl,
+                    controller: chestCtrl,
                     palette: p,
                     suffix: 'cm',
+                    validator: validateMetric,
                   ),
                   const SizedBox(height: 12),
                   _numericField(
                     label: 'Cintura',
-                    controller: widget.waistCtrl,
+                    controller: waistCtrl,
                     palette: p,
                     suffix: 'cm',
+                    validator: validateMetric,
                   ),
                   const SizedBox(height: 12),
                   _numericField(
                     label: 'Cadera',
-                    controller: widget.hipsCtrl,
+                    controller: hipsCtrl,
                     palette: p,
                     suffix: 'cm',
+                    validator: validateMetric,
                   ),
                   const SizedBox(height: 12),
                   _numericField(
                     label: 'Glúteos',
-                    controller: widget.glutesCtrl,
+                    controller: glutesCtrl,
                     palette: p,
                     suffix: 'cm',
+                    validator: validateMetric,
                   ),
                   const SizedBox(height: 20),
                   _subGroupLabel('TREN SUPERIOR', p),
                   const SizedBox(height: 12),
                   _bilateralField(
                     label: 'Bíceps',
-                    leftCtrl: widget.bicepsLCtrl,
-                    rightCtrl: widget.bicepsRCtrl,
+                    leftCtrl: bicepsLCtrl,
+                    rightCtrl: bicepsRCtrl,
                     palette: p,
+                    validator: validateMetric,
                   ),
                   const SizedBox(height: 12),
                   _bilateralField(
                     label: 'Bíceps (flex)',
-                    leftCtrl: widget.bicepsFlexLCtrl,
-                    rightCtrl: widget.bicepsFlexRCtrl,
+                    leftCtrl: bicepsFlexLCtrl,
+                    rightCtrl: bicepsFlexRCtrl,
                     palette: p,
+                    validator: validateMetric,
                   ),
                   const SizedBox(height: 12),
                   _bilateralField(
                     label: 'Antebrazo',
-                    leftCtrl: widget.forearmLCtrl,
-                    rightCtrl: widget.forearmRCtrl,
+                    leftCtrl: forearmLCtrl,
+                    rightCtrl: forearmRCtrl,
                     palette: p,
+                    validator: validateMetric,
                   ),
                   const SizedBox(height: 20),
                   _subGroupLabel('TREN INFERIOR', p),
                   const SizedBox(height: 12),
                   _bilateralField(
                     label: 'Muslo superior',
-                    leftCtrl: widget.upperThighLCtrl,
-                    rightCtrl: widget.upperThighRCtrl,
+                    leftCtrl: upperThighLCtrl,
+                    rightCtrl: upperThighRCtrl,
                     palette: p,
+                    validator: validateMetric,
                   ),
                   const SizedBox(height: 12),
                   _bilateralField(
                     label: 'Muslo medio',
-                    leftCtrl: widget.midThighLCtrl,
-                    rightCtrl: widget.midThighRCtrl,
+                    leftCtrl: midThighLCtrl,
+                    rightCtrl: midThighRCtrl,
                     palette: p,
+                    validator: validateMetric,
                   ),
                   const SizedBox(height: 12),
                   _bilateralField(
                     label: 'Gemelo',
-                    leftCtrl: widget.calfLCtrl,
-                    rightCtrl: widget.calfRCtrl,
+                    leftCtrl: calfLCtrl,
+                    rightCtrl: calfRCtrl,
                     palette: p,
+                    validator: validateMetric,
                   ),
                 ],
               ),

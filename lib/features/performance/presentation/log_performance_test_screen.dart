@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart' as intl;
@@ -81,7 +82,13 @@ class _LogPerformanceTestScreenState
   late final TextEditingController _notesCtrl;
 
   // ── State ──────────────────────────────────────────────────────────────────
+  final _formKey = GlobalKey<FormState>();
   bool _saving = false;
+  bool _hasAnyMetric = false;
+
+  /// Every metric controller (excludes [_notesCtrl]) — used to detect whether
+  /// at least one metric has a value so empty evaluations can't be saved.
+  late final List<TextEditingController> _metricCtrls;
 
   @override
   void initState() {
@@ -104,10 +111,45 @@ class _LogPerformanceTestScreenState
     _cooperCtrl = TextEditingController();
     _sitAndReachCtrl = TextEditingController();
     _notesCtrl = TextEditingController();
+
+    _metricCtrls = [
+      _cmjCtrl,
+      _squatJumpCtrl,
+      _abalakovCtrl,
+      _broadJumpCtrl,
+      _sprint10Ctrl,
+      _sprint20Ctrl,
+      _sprint30Ctrl,
+      _sprint40Ctrl,
+      _squat1rmCtrl,
+      _benchPress1rmCtrl,
+      _deadlift1rmCtrl,
+      _overheadPress1rmCtrl,
+      _pullUp1rmCtrl,
+      _vo2maxCtrl,
+      _courseNavetteCtrl,
+      _cooperCtrl,
+      _sitAndReachCtrl,
+    ];
+    for (final ctrl in _metricCtrls) {
+      ctrl.addListener(_recomputeHasAnyMetric);
+    }
+  }
+
+  /// Recomputes whether any metric field is non-empty so the Save button
+  /// reflects it. Cheap string check; only calls [setState] on a real change.
+  void _recomputeHasAnyMetric() {
+    final hasAny = _metricCtrls.any((c) => c.text.trim().isNotEmpty);
+    if (hasAny != _hasAnyMetric) {
+      setState(() => _hasAnyMetric = hasAny);
+    }
   }
 
   @override
   void dispose() {
+    for (final ctrl in _metricCtrls) {
+      ctrl.removeListener(_recomputeHasAnyMetric);
+    }
     _cmjCtrl.dispose();
     _squatJumpCtrl.dispose();
     _abalakovCtrl.dispose();
@@ -138,6 +180,22 @@ class _LogPerformanceTestScreenState
     return double.tryParse(raw);
   }
 
+  /// Validates a numeric metric field. Empty is valid (all fields optional);
+  /// non-numeric input or a non-positive value surfaces inline error text so a
+  /// typo like `12.x.3` is never silently dropped. Reuses the existing generic
+  /// "valid number" string — a non-parseable or non-positive measurement is not
+  /// a valid value, so the same message covers both cases.
+  String? _validateMetric(String? value) {
+    final l10n = AppL10n.of(context);
+    final raw = (value ?? '').trim().replaceAll(',', '.');
+    if (raw.isEmpty) return null;
+    final parsed = double.tryParse(raw);
+    if (parsed == null || parsed <= 0) {
+      return l10n.profileEditPersonalWeightInvalidNumber;
+    }
+    return null;
+  }
+
   // ── Save ───────────────────────────────────────────────────────────────────
 
   Future<void> _save() async {
@@ -152,6 +210,15 @@ class _LogPerformanceTestScreenState
       );
       return;
     }
+
+    // Block empty evaluations: at least one metric must be filled before save.
+    // The Save button is already disabled while [_hasAnyMetric] is false
+    // (see `canSave` in build), so this is a defensive guard only.
+    if (!_hasAnyMetric) return;
+
+    // Surface inline errors for any non-numeric / non-positive field instead of
+    // silently dropping the value via tryParse.
+    if (!(_formKey.currentState?.validate() ?? true)) return;
 
     setState(() => _saving = true);
 
@@ -205,7 +272,7 @@ class _LogPerformanceTestScreenState
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
     final trainerUid = ref.watch(currentUidProvider);
-    final canSave = trainerUid != null && !_saving;
+    final canSave = trainerUid != null && !_saving && _hasAnyMetric;
     // Use UTC to match the persisted recordedAt (see _save) and the UTC display
     // convention of every reader, so the header date never disagrees with the
     // saved record near midnight.
@@ -262,7 +329,10 @@ class _LogPerformanceTestScreenState
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
-                child: Column(
+                child: Form(
+                  key: _formKey,
+                  autovalidateMode: AutovalidateMode.onUserInteraction,
+                  child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // ── SALTOS ───────────────────────────────────────────────
@@ -271,6 +341,7 @@ class _LogPerformanceTestScreenState
                     _numericField(
                       label: l10n.performanceLogFieldCmj,
                       controller: _cmjCtrl,
+                      validator: _validateMetric,
                       palette: palette,
                       suffix: 'cm',
                     ),
@@ -278,6 +349,7 @@ class _LogPerformanceTestScreenState
                     _numericField(
                       label: l10n.performanceLogFieldSquatJump,
                       controller: _squatJumpCtrl,
+                      validator: _validateMetric,
                       palette: palette,
                       suffix: 'cm',
                     ),
@@ -285,6 +357,7 @@ class _LogPerformanceTestScreenState
                     _numericField(
                       label: l10n.performanceLogFieldAbalakov,
                       controller: _abalakovCtrl,
+                      validator: _validateMetric,
                       palette: palette,
                       suffix: 'cm',
                     ),
@@ -292,6 +365,7 @@ class _LogPerformanceTestScreenState
                     _numericField(
                       label: l10n.performanceLogFieldBroadJump,
                       controller: _broadJumpCtrl,
+                      validator: _validateMetric,
                       palette: palette,
                       suffix: 'cm',
                     ),
@@ -303,6 +377,7 @@ class _LogPerformanceTestScreenState
                     _numericField(
                       label: l10n.performanceLogFieldSprint10,
                       controller: _sprint10Ctrl,
+                      validator: _validateMetric,
                       palette: palette,
                       suffix: 's',
                     ),
@@ -310,6 +385,7 @@ class _LogPerformanceTestScreenState
                     _numericField(
                       label: l10n.performanceLogFieldSprint20,
                       controller: _sprint20Ctrl,
+                      validator: _validateMetric,
                       palette: palette,
                       suffix: 's',
                     ),
@@ -317,6 +393,7 @@ class _LogPerformanceTestScreenState
                     _numericField(
                       label: l10n.performanceLogFieldSprint30,
                       controller: _sprint30Ctrl,
+                      validator: _validateMetric,
                       palette: palette,
                       suffix: 's',
                     ),
@@ -324,6 +401,7 @@ class _LogPerformanceTestScreenState
                     _numericField(
                       label: l10n.performanceLogFieldSprint40,
                       controller: _sprint40Ctrl,
+                      validator: _validateMetric,
                       palette: palette,
                       suffix: 's',
                     ),
@@ -335,6 +413,7 @@ class _LogPerformanceTestScreenState
                     _numericField(
                       label: l10n.performanceLogFieldSquat1rm,
                       controller: _squat1rmCtrl,
+                      validator: _validateMetric,
                       palette: palette,
                       suffix: 'kg',
                     ),
@@ -342,6 +421,7 @@ class _LogPerformanceTestScreenState
                     _numericField(
                       label: l10n.performanceLogFieldBenchPress,
                       controller: _benchPress1rmCtrl,
+                      validator: _validateMetric,
                       palette: palette,
                       suffix: 'kg',
                     ),
@@ -349,6 +429,7 @@ class _LogPerformanceTestScreenState
                     _numericField(
                       label: l10n.performanceLogFieldDeadlift,
                       controller: _deadlift1rmCtrl,
+                      validator: _validateMetric,
                       palette: palette,
                       suffix: 'kg',
                     ),
@@ -356,6 +437,7 @@ class _LogPerformanceTestScreenState
                     _numericField(
                       label: l10n.performanceLogFieldOverheadPress,
                       controller: _overheadPress1rmCtrl,
+                      validator: _validateMetric,
                       palette: palette,
                       suffix: 'kg',
                     ),
@@ -363,6 +445,7 @@ class _LogPerformanceTestScreenState
                     _numericField(
                       label: l10n.performanceLogFieldPullUp,
                       controller: _pullUp1rmCtrl,
+                      validator: _validateMetric,
                       palette: palette,
                       suffix: 'kg',
                     ),
@@ -374,6 +457,7 @@ class _LogPerformanceTestScreenState
                     _numericField(
                       label: l10n.performanceLogFieldVo2max,
                       controller: _vo2maxCtrl,
+                      validator: _validateMetric,
                       palette: palette,
                       suffix: 'ml/kg/min',
                     ),
@@ -381,12 +465,14 @@ class _LogPerformanceTestScreenState
                     _numericField(
                       label: l10n.performanceLogFieldCourseNavette,
                       controller: _courseNavetteCtrl,
+                      validator: _validateMetric,
                       palette: palette,
                     ),
                     const SizedBox(height: 12),
                     _numericField(
                       label: l10n.performanceLogFieldCooper,
                       controller: _cooperCtrl,
+                      validator: _validateMetric,
                       palette: palette,
                       suffix: 'm',
                     ),
@@ -394,6 +480,7 @@ class _LogPerformanceTestScreenState
                     _numericField(
                       label: l10n.performanceLogFieldSitAndReach,
                       controller: _sitAndReachCtrl,
+                      validator: _validateMetric,
                       palette: palette,
                       suffix: 'cm',
                     ),
@@ -420,6 +507,7 @@ class _LogPerformanceTestScreenState
                     // Space so pinned button doesn't cover last field
                     const SizedBox(height: 80),
                   ],
+                  ),
                 ),
               ),
             ),
@@ -529,6 +617,7 @@ Widget _numericField({
   required TextEditingController controller,
   required AppPalette palette,
   String? suffix,
+  String? Function(String?)? validator,
 }) {
   return Column(
     crossAxisAlignment: CrossAxisAlignment.start,
@@ -545,6 +634,14 @@ Widget _numericField({
       TextFormField(
         controller: controller,
         keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        // Allow digits and decimal separators (, or .) only; blocks letters and
+        // stray symbols at the keyboard level. Multiple separators (e.g.
+        // '1.2.3') can still be typed, so the validator is the source of truth
+        // and rejects any value double.tryParse can't read.
+        inputFormatters: [
+          FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+        ],
+        validator: validator,
         style: GoogleFonts.barlow(
           color: palette.textPrimary,
           fontSize: 14,

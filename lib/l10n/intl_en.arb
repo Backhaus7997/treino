@@ -1,4 +1,8 @@
 {
+  "homeAthleteFirstRunTitle": "Start training",
+  "homeAthleteFirstRunBody": "Create your first routine or find a trainer to get started.",
+  "homeAthleteFirstRunCreateCta": "CREATE ROUTINE",
+  "homeAthleteFirstRunFindTrainerCta": "Find a trainer",
   "@@locale": "en",
   "@@x-translation-status": "TODO — EN launch deferred (audit Q4). Strings intentionally empty; locale_resolver.dart locks the app to es-AR so these are never shown. Populate before re-enabling English in the resolver.",
   "authSplashTagline": "",
@@ -618,5 +622,27 @@
   "feedFriendActionError": "We couldn't complete the action. Please try again.",
   "profilePersonalSaveSuccess": "Changes saved.",
   "profileGymSaveSuccess": "Gym updated.",
-  "profileGymSaveError": "We couldn't save your gym. Please try again."
+  "profileGymSaveError": "We couldn't save your gym. Please try again.",
+  "feedPullToRefreshA11y": "Pull to refresh",
+  "logFieldInvalidNumber": "Enter a valid number",
+  "logFieldOutOfRange": "Value is out of range",
+  "logEmptyRecordWarning": "Fill in at least one value before saving",
+  "profileSetupUsernameChecking": "Checking availability…",
+  "profileSetupUsernameTaken": "That username is already taken",
+  "profileSetupUsernameAvailable": "Username available",
+  "profileSetupUsernameCheckError": "We couldn't check the username. Try again.",
+  "routineEditorDiscardTitle": "Discard changes?",
+  "routineEditorDiscardBody": "If you leave now you'll lose your unsaved changes.",
+  "routineEditorDiscardConfirm": "Discard",
+  "trainerCtaExistingLinkExplanation": "You can only have one active trainer. End your current link with {trainerName} to request a new one.",
+  "@trainerCtaExistingLinkExplanation": {
+    "placeholders": {
+      "trainerName": {
+        "type": "String"
+      }
+    }
+  },
+  "coachHubPreviewDiscardTitle": "Leave without saving the plan?",
+  "coachHubPreviewDiscardBody": "You'll lose the exercises you matched manually.",
+  "coachHubPreviewDiscardConfirm": "Leave anyway"
 }

@@ -6,6 +6,7 @@ import '../../../../app/theme/app_palette.dart';
 import '../../../../core/analytics/analytics_service.dart';
 import '../../../workout/application/session_providers.dart'
     show currentUidProvider;
+import '../../application/trainer_discovery_providers.dart';
 import '../../application/trainer_link_providers.dart';
 import '../../domain/trainer_link.dart';
 import '../../domain/trainer_link_status.dart';
@@ -72,20 +73,29 @@ class _TrainerContactCtaStubState extends ConsumerState<TrainerContactCtaStub> {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     final linkAsync = ref.watch(currentAthleteLinkProvider);
 
     // Disabled si: ya hay vínculo en pending/active, está submitting, o
     // el provider todavía no resolvió.
-    final hasActiveOrPending = linkAsync.valueOrNull != null &&
-        (linkAsync.valueOrNull!.status == TrainerLinkStatus.pending ||
-            linkAsync.valueOrNull!.status == TrainerLinkStatus.active);
+    final existingLink = linkAsync.valueOrNull;
+    final hasActiveOrPending = existingLink != null &&
+        (existingLink.status == TrainerLinkStatus.pending ||
+            existingLink.status == TrainerLinkStatus.active);
     final disabled = _submitting || !linkAsync.hasValue || hasActiveOrPending;
 
-    final label = hasActiveOrPending
-        ? _existingLinkLabel(linkAsync.valueOrNull!)
-        : AppL10n.of(context).coachCtaLabel;
+    // El atleta está bloqueado porque ya tiene un vínculo con OTRO PF: no
+    // dejamos un botón disabled sin explicación. Mostramos una línea de ayuda
+    // debajo del botón con el motivo y a quién terminar el vínculo (constraint
+    // de un único PF activo a la vez en MVP).
+    final blockedByOtherTrainer =
+        hasActiveOrPending && existingLink.trainerId != widget.trainerId;
 
-    return OutlinedButton(
+    final label = hasActiveOrPending
+        ? _existingLinkLabel(existingLink)
+        : l10n.coachCtaLabel;
+
+    final button = OutlinedButton(
       onPressed: disabled ? null : _onPressed,
       style: OutlinedButton.styleFrom(
         foregroundColor: palette.accent,
@@ -112,6 +122,40 @@ class _TrainerContactCtaStubState extends ConsumerState<TrainerContactCtaStub> {
                 letterSpacing: 1.5,
               ),
             ),
+    );
+
+    if (!blockedByOtherTrainer) return button;
+
+    // Resolvemos el nombre del PF vinculado actual para la línea de ayuda.
+    // Si todavía no resolvió, usamos un placeholder neutro en lugar del id.
+    final currentTrainerAsync =
+        ref.watch(trainerByIdProvider(existingLink.trainerId));
+    final currentTrainerName =
+        currentTrainerAsync.valueOrNull?.displayName?.trim();
+    final trainerName =
+        (currentTrainerName == null || currentTrainerName.isEmpty)
+            ? l10n.athleteCoachViewTrainerFallbackName
+            : currentTrainerName;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        button,
+        const SizedBox(height: 8),
+        Semantics(
+          liveRegion: true,
+          child: Text(
+            l10n.trainerCtaExistingLinkExplanation(trainerName),
+            textAlign: TextAlign.center,
+            style: GoogleFonts.barlow(
+              fontSize: 13,
+              color: palette.textMuted,
+              height: 1.4,
+            ),
+          ),
+        ),
+      ],
     );
   }
 

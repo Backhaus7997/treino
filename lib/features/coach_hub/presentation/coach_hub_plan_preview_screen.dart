@@ -47,6 +47,60 @@ class _CoachHubPlanPreviewScreenState
   bool _saving = false;
   String? _error;
 
+  /// Tracks whether the trainer has resolved any "sin match" exercise manually.
+  /// Used to warn before leaving the preview, since the parsed+mapped plan lives
+  /// in an ephemeral autoDispose provider and is lost on back-navigation.
+  bool _hasManualMappings = false;
+
+  /// Confirms before destroying the parsed (and possibly manually-mapped) plan
+  /// by navigating back to the upload screen. Returns `true` if the trainer
+  /// chose to leave, `false` (or null → treated as stay) otherwise.
+  Future<bool> _confirmDiscard() async {
+    final l10n = AppL10n.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        final palette = AppPalette.of(ctx);
+        return AlertDialog(
+          backgroundColor: palette.bgCard,
+          title: Text(
+            l10n.coachHubPreviewDiscardTitle,
+            style: TextStyle(color: palette.textPrimary),
+          ),
+          content: Text(
+            l10n.coachHubPreviewDiscardBody,
+            style: TextStyle(color: palette.textMuted, fontSize: 14),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: Text(l10n.commonCancel,
+                  style: TextStyle(color: palette.textMuted)),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: Text(l10n.coachHubPreviewDiscardConfirm,
+                  style: TextStyle(color: palette.danger)),
+            ),
+          ],
+        );
+      },
+    );
+    return confirmed ?? false;
+  }
+
+  /// Back handler shared by the header button and the system/hardware back.
+  /// Skips the dialog when the trainer has not mapped anything manually
+  /// (nothing valuable to lose beyond the re-parseable upload).
+  Future<void> _handleBack() async {
+    if (_hasManualMappings) {
+      final leave = await _confirmDiscard();
+      if (!leave) return;
+    }
+    if (!mounted) return;
+    context.go('/upload-plan');
+  }
+
   void _toggleAthlete(String athleteId) {
     setState(() {
       if (_selectedAthleteIds.contains(athleteId)) {
@@ -200,7 +254,10 @@ class _CoachHubPlanPreviewScreenState
       days: updatedDays,
       unmatched: updatedUnmatched,
     );
-    setState(() => _error = null);
+    setState(() {
+      _error = null;
+      _hasManualMappings = true;
+    });
     // FIRE-AND-FORGET: see ADR-CXP-006 // i18n: Fase 6 Etapa 5
     unawaited(_addAlias(picked.id, rowName));
   }
@@ -287,7 +344,15 @@ class _CoachHubPlanPreviewScreenState
       );
     }
 
-    return Scaffold(
+    return PopScope(
+      // Block the implicit pop so manual mappings aren't silently lost; route
+      // the system/hardware back through the same confirm flow as the header.
+      canPop: !_hasManualMappings,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        await _handleBack();
+      },
+      child: Scaffold(
       backgroundColor: palette.bg,
       body: SafeArea(
         child: Center(
@@ -298,7 +363,7 @@ class _CoachHubPlanPreviewScreenState
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _Header(palette: palette, planName: plan.name),
+                  _Header(palette: palette, planName: plan.name, onBack: _handleBack),
                   const SizedBox(height: 18),
                   _PlanMetaCard(palette: palette, plan: plan),
                   const SizedBox(height: 18),
@@ -372,21 +437,27 @@ class _CoachHubPlanPreviewScreenState
           ),
         ),
       ),
+      ),
     );
   }
 }
 
 class _Header extends StatelessWidget {
-  const _Header({required this.palette, required this.planName});
+  const _Header({
+    required this.palette,
+    required this.planName,
+    required this.onBack,
+  });
   final AppPalette palette;
   final String planName;
+  final Future<void> Function() onBack;
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
         IconButton(
-          onPressed: () => context.go('/upload-plan'),
+          onPressed: onBack,
           icon: Icon(TreinoIcon.arrowLeft, color: palette.textPrimary),
           tooltip: 'Volver',
         ),

@@ -9,6 +9,19 @@ class AppL10nEn extends AppL10n {
   AppL10nEn([String locale = 'en']) : super(locale);
 
   @override
+  String get homeAthleteFirstRunTitle => 'Start training';
+
+  @override
+  String get homeAthleteFirstRunBody =>
+      'Create your first routine or find a trainer to get started.';
+
+  @override
+  String get homeAthleteFirstRunCreateCta => 'CREATE ROUTINE';
+
+  @override
+  String get homeAthleteFirstRunFindTrainerCta => 'Find a trainer';
+
+  @override
   String get authSplashTagline => '';
 
   @override
@@ -1589,4 +1602,55 @@ class AppL10nEn extends AppL10n {
   @override
   String get profileGymSaveError =>
       'We couldn\'t save your gym. Please try again.';
+
+  @override
+  String get feedPullToRefreshA11y => 'Pull to refresh';
+
+  @override
+  String get logFieldInvalidNumber => 'Enter a valid number';
+
+  @override
+  String get logFieldOutOfRange => 'Value is out of range';
+
+  @override
+  String get logEmptyRecordWarning =>
+      'Fill in at least one value before saving';
+
+  @override
+  String get profileSetupUsernameChecking => 'Checking availability…';
+
+  @override
+  String get profileSetupUsernameTaken => 'That username is already taken';
+
+  @override
+  String get profileSetupUsernameAvailable => 'Username available';
+
+  @override
+  String get profileSetupUsernameCheckError =>
+      'We couldn\'t check the username. Try again.';
+
+  @override
+  String get routineEditorDiscardTitle => 'Discard changes?';
+
+  @override
+  String get routineEditorDiscardBody =>
+      'If you leave now you\'ll lose your unsaved changes.';
+
+  @override
+  String get routineEditorDiscardConfirm => 'Discard';
+
+  @override
+  String trainerCtaExistingLinkExplanation(String trainerName) {
+    return 'You can only have one active trainer. End your current link with $trainerName to request a new one.';
+  }
+
+  @override
+  String get coachHubPreviewDiscardTitle => 'Leave without saving the plan?';
+
+  @override
+  String get coachHubPreviewDiscardBody =>
+      'You\'ll lose the exercises you matched manually.';
+
+  @override
+  String get coachHubPreviewDiscardConfirm => 'Leave anyway';
 }

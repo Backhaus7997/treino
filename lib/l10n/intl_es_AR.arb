@@ -1,4 +1,12 @@
 {
+  "homeAthleteFirstRunTitle": "Arrancá tu entrenamiento",
+  "@homeAthleteFirstRunTitle": {"description": "Home first-run empty-state title for an athlete with no routine (usability finding 6)."},
+  "homeAthleteFirstRunBody": "Creá tu primera rutina o buscá un entrenador para empezar.",
+  "@homeAthleteFirstRunBody": {"description": "Home first-run empty-state body offering both the create-routine and find-trainer paths (finding 6)."},
+  "homeAthleteFirstRunCreateCta": "CREAR RUTINA",
+  "@homeAthleteFirstRunCreateCta": {"description": "Home first-run primary CTA to create a routine (finding 6)."},
+  "homeAthleteFirstRunFindTrainerCta": "Buscar entrenador",
+  "@homeAthleteFirstRunFindTrainerCta": {"description": "Home first-run secondary CTA to browse trainers (finding 6)."},
   "@@locale": "es_AR",
   "authSplashTagline": "ENTRENÁ. COMPARTÍ. CRECÉ.",
   "authWelcomeEyebrow": "ENTRENAMIENTO · GYM · COACH",
@@ -952,5 +960,70 @@
   "profileGymSaveError": "No pudimos guardar el gimnasio. Probá de nuevo.",
   "@profileGymSaveError": {
     "description": "Error snackbar when the gym save fails (currently has no catch) in profile_gym_screen (finding 28)."
+  },
+  "feedPullToRefreshA11y": "Deslizá para actualizar",
+  "@feedPullToRefreshA11y": {
+    "description": "Semantics/hint label for the RefreshIndicator added to feed segments (finding 1). Optional a11y label for the manual refresh gesture."
+  },
+  "logFieldInvalidNumber": "Ingresá un número válido",
+  "@logFieldInvalidNumber": {
+    "description": "Per-field inline validation error shown when a measurement/performance metric contains non-numeric text instead of silently dropping it (findings 2, 3)."
+  },
+  "logFieldOutOfRange": "El valor está fuera de rango",
+  "@logFieldOutOfRange": {
+    "description": "Inline validation error when a numeric metric is negative or exceeds sane bounds in the measurement/performance log forms (findings 2, 3)."
+  },
+  "logEmptyRecordWarning": "Completá al menos un dato antes de guardar",
+  "@logEmptyRecordWarning": {
+    "description": "Message shown (or reason GUARDAR is disabled) when the measurement/performance form has no metric filled, preventing an empty record (findings 2, 3, 10)."
+  },
+  "profileSetupUsernameChecking": "Verificando disponibilidad…",
+  "@profileSetupUsernameChecking": {
+    "description": "Inline status shown under the step-1 username field while the async @handle availability query is in flight (finding 4)."
+  },
+  "profileSetupUsernameTaken": "Ese username ya está en uso",
+  "@profileSetupUsernameTaken": {
+    "description": "Inline error shown when the chosen @handle is already used by another userPublicProfiles document (finding 4)."
+  },
+  "profileSetupUsernameAvailable": "Username disponible",
+  "@profileSetupUsernameAvailable": {
+    "description": "Inline confirmation shown when the async availability check finds the chosen @handle is free (finding 4)."
+  },
+  "profileSetupUsernameCheckError": "No pudimos verificar el username. Probá de nuevo.",
+  "@profileSetupUsernameCheckError": {
+    "description": "Inline error shown when the @handle availability query fails (network/Firestore error) during profile setup step 1 (finding 4)."
+  },
+  "routineEditorDiscardTitle": "¿Descartar cambios?",
+  "@routineEditorDiscardTitle": {
+    "description": "Title of the confirm dialog shown by PopScope when leaving the routine editor with unsaved edits (finding 7)."
+  },
+  "routineEditorDiscardBody": "Si salís ahora vas a perder los cambios sin guardar.",
+  "@routineEditorDiscardBody": {
+    "description": "Body of the unsaved-changes confirm dialog in the routine editor (finding 7). Reuses routineEditorDialogCancel for the cancel action."
+  },
+  "routineEditorDiscardConfirm": "Descartar",
+  "@routineEditorDiscardConfirm": {
+    "description": "Destructive confirm action of the unsaved-changes dialog in the routine editor (finding 7)."
+  },
+  "trainerCtaExistingLinkExplanation": "Solo podés tener un PF activo. Terminá tu vínculo actual con {trainerName} para pedir uno nuevo.",
+  "@trainerCtaExistingLinkExplanation": {
+    "description": "Explanatory text shown in a sheet or inline helper when the contact CTA is blocked because the athlete already has a link with a different trainer (finding 8).",
+    "placeholders": {
+      "trainerName": {
+        "type": "String"
+      }
+    }
+  },
+  "coachHubPreviewDiscardTitle": "¿Salir sin guardar el plan?",
+  "@coachHubPreviewDiscardTitle": {
+    "description": "Title of the confirm dialog shown when leaving the coach-hub plan preview screen with manually-mapped exercises that would be lost (finding 9)."
+  },
+  "coachHubPreviewDiscardBody": "Vas a perder los ejercicios que mapeaste manualmente.",
+  "@coachHubPreviewDiscardBody": {
+    "description": "Body of the confirm dialog warning the PF that going back from the plan preview discards manual exercise mappings held in the autoDispose parsedPlanProvider (finding 9)."
+  },
+  "coachHubPreviewDiscardConfirm": "Salir igual",
+  "@coachHubPreviewDiscardConfirm": {
+    "description": "Destructive confirm action of the coach-hub preview leave-without-saving dialog (finding 9)."
   }
 }
