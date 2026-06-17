@@ -3,20 +3,25 @@ import 'package:go_router/go_router.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach_hub/presentation/shell/sidebar_item.dart';
 
+import 'alumno_detail_screen.dart';
 import 'alumnos_screen.dart';
 
 /// Rutas e item de sidebar de la sección «Alumnos» del Coach Hub web.
 ///
-/// Fase W2 PR1: la ruta `/alumnos` ya renderiza el roster real
-/// ([AlumnosScreen]). El detalle `/alumnos/:id` (mini-CRM por alumno) llega en
-/// PRs siguientes. Cada sección posee su propio archivo para que los PRs
-/// paralelos no choquen en `coach_hub_router.dart` (ADR-CHW-002/008).
+/// Fase W2: `/alumnos` es el roster ([AlumnosScreen], PR1) y `/alumnos/:id` el
+/// detalle del alumno ([AlumnoDetailScreen], PR2 — tabs; sólo Progreso real por
+/// ahora). Cada sección posee su propio archivo para que los PRs paralelos no
+/// choquen en `coach_hub_router.dart` (ADR-CHW-002/008).
 final List<RouteBase> alumnosRoutes = [
   GoRoute(
     path: '/alumnos',
     builder: (_, __) => const AlumnosScreen(),
   ),
-  // TODO(W2 PR2+): GoRoute('/alumnos/:id') → detalle del alumno
+  GoRoute(
+    path: '/alumnos/:id',
+    builder: (_, state) =>
+        AlumnoDetailScreen(athleteId: state.pathParameters['id']!),
+  ),
 ];
 
 const List<SidebarItem> alumnosSidebarItems = [

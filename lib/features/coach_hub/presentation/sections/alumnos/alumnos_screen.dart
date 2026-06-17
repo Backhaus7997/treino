@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
@@ -373,65 +374,70 @@ class _RosterRow extends ConsumerWidget {
                 const [])
             .isNotEmpty;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: palette.bgCard,
-        border: Border.all(color: palette.border),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            flex: 4,
-            child: Row(
-              children: [
-                _Avatar(name: name, url: profile?.avatarUrl, palette: palette),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        name,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: palette.textPrimary,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      if (gymName != null)
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => context.go('/alumnos/${link.athleteId}'),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: palette.bgCard,
+          border: Border.all(color: palette.border),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              flex: 4,
+              child: Row(
+                children: [
+                  _Avatar(
+                      name: name, url: profile?.avatarUrl, palette: palette),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                         Text(
-                          gymName!,
+                          name,
                           overflow: TextOverflow.ellipsis,
-                          style:
-                              TextStyle(color: palette.textMuted, fontSize: 12),
+                          style: TextStyle(
+                            color: palette.textPrimary,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
-                    ],
+                        if (gymName != null)
+                          Text(
+                            gymName!,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                                color: palette.textMuted, fontSize: 12),
+                          ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-              flex: 2, child: _EstadoBadge(estado: estado, palette: palette)),
-          Expanded(
-            flex: 2,
-            child: Text(
-              trainedToday ? 'Hoy' : '—', // i18n: Fase W2
-              style: TextStyle(
-                color: trainedToday ? palette.accent : palette.textMuted,
-                fontSize: 13,
+                ],
               ),
             ),
-          ),
-          Expanded(
-            flex: 2,
-            child: _RowActions(link: link, palette: palette),
-          ),
-        ],
+            Expanded(
+                flex: 2, child: _EstadoBadge(estado: estado, palette: palette)),
+            Expanded(
+              flex: 2,
+              child: Text(
+                trainedToday ? 'Hoy' : '—', // i18n: Fase W2
+                style: TextStyle(
+                  color: trainedToday ? palette.accent : palette.textMuted,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+            Expanded(
+              flex: 2,
+              child: _RowActions(link: link, palette: palette),
+            ),
+          ],
+        ),
       ),
     );
   }
