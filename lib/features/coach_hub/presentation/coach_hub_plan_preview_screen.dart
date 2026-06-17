@@ -98,7 +98,9 @@ class _CoachHubPlanPreviewScreenState
       if (!leave) return;
     }
     if (!mounted) return;
-    context.go('/upload-plan');
+    // pop back to the upload step (the push origin) so the picked file stays
+    // in state; fall back to go() when there's no stack (deep-linked here).
+    context.canPop() ? context.pop() : context.go('/upload-plan');
   }
 
   void _toggleAthlete(String athleteId) {

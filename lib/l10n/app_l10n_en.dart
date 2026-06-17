@@ -469,6 +469,12 @@ class AppL10nEn extends AppL10n {
   }
 
   @override
+  String get workoutHistorialSeeAll => '';
+
+  @override
+  String get workoutHistorialFullTitle => '';
+
+  @override
   String get workoutDetailStatDuration => '';
 
   @override
@@ -1460,10 +1466,21 @@ class AppL10nEn extends AppL10n {
   String get chatSendingA11y => 'Sending…';
 
   @override
+  String get feedMessagesA11y => 'Messages';
+
+  @override
   String get feedSearchA11y => 'Search';
 
   @override
   String get feedCreatePostA11y => 'Create post';
+
+  @override
+  String get feedFriendRequestsA11y => 'Friend requests';
+
+  @override
+  String feedFriendRequestsWithCountA11y(int count) {
+    return 'Friend requests, $count pending';
+  }
 
   @override
   String get feedPublishingA11y => 'Publishing…';

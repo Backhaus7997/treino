@@ -115,7 +115,10 @@ class CoachHubDashboardScreen extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               ElevatedButton.icon(
-                onPressed: () => context.go('/upload-plan'),
+                // push (not go): the upload→preview flow is modeled as pushed
+                // sub-steps so back/pop returns to the dashboard with the
+                // navigation stack intact (browser Back behaves as expected).
+                onPressed: () => context.push('/upload-plan'),
                 icon: Icon(TreinoIcon.upload, size: 18, color: palette.bg),
                 label: Text(
                   'IMPORTAR PLAN DESDE EXCEL',

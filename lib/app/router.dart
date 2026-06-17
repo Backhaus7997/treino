@@ -9,6 +9,7 @@ import '../features/auth/presentation/login_screen.dart';
 import '../features/auth/presentation/register_screen.dart';
 import '../features/auth/presentation/splash_screen.dart';
 import '../features/auth/presentation/welcome_screen.dart';
+import '../features/chat/presentation/chat_list_screen.dart';
 import '../features/chat/presentation/chat_screen.dart';
 import '../features/coach/coach_screen.dart';
 import '../features/coach/application/trainer_link_providers.dart';
@@ -26,6 +27,7 @@ import '../features/workout/application/session_init.dart';
 import '../features/workout/presentation/exercise_detail_screen.dart';
 import '../features/workout/presentation/post_workout_summary_screen.dart';
 import '../features/workout/presentation/session_detail_screen.dart';
+import '../features/workout/presentation/session_history_screen.dart';
 import '../features/workout/presentation/routine_detail_screen.dart';
 import '../features/workout/presentation/session_player_screen.dart';
 import '../features/feed/feed_screen.dart';
@@ -250,6 +252,15 @@ GoRouter buildRouter({
         },
       ),
 
+      // ─── Historial full list — TOP-LEVEL ROUTE (outside ShellRoute) ───────
+      // First-class destination for past sessions, reached from the "Ver todo"
+      // affordance in HistorialSection. Declared before the `:sessionId` detail
+      // route so the literal `/workout/historial` matches the list, not detail.
+      GoRoute(
+        path: '/workout/historial',
+        builder: (context, state) => const SessionHistoryScreen(),
+      ),
+
       // ─── Historial detail — TOP-LEVEL ROUTE (outside ShellRoute) ──────────
       // Immersive: oculta la bottom bar. Design §11-12.
       GoRoute(
@@ -370,6 +381,14 @@ GoRouter buildRouter({
               GoRoute(
                 path: 'search',
                 builder: (_, __) => _withBg(const SearchUsersScreen()),
+              ),
+              // Messages inbox — lists all of the current user's chats.
+              // Reached from the messages affordance in the feed header.
+              // Each row pushes the 1-1 ChatScreen via the root navigator
+              // (ChatListScreen owns that push with its own Scaffold).
+              GoRoute(
+                path: 'messages',
+                builder: (_, __) => _withBg(const ChatListScreen()),
               ),
             ],
           ),

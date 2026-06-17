@@ -179,6 +179,8 @@
       }
     }
   },
+  "workoutHistorialSeeAll": "Ver todo",
+  "workoutHistorialFullTitle": "HISTORIAL",
   "workoutDetailStatDuration": "DURACIÓN",
   "workoutDetailStatSets": "SETS",
   "workoutDetailStatVolume": "VOLUMEN",
@@ -772,6 +774,10 @@
   "@chatSendingA11y": {
     "description": "Semantics label announced while the chat send button shows a CircularProgressIndicator (finding 4 chat_screen send busy state)."
   },
+  "feedMessagesA11y": "Mensajes",
+  "@feedMessagesA11y": {
+    "description": "Accessibility label for the icon-only header messages action in the feed that opens the chat inbox (navigation finding: ChatListScreen was unreachable)."
+  },
   "feedSearchA11y": "Buscar",
   "@feedSearchA11y": {
     "description": "Accessibility label for the icon-only header search action in the feed (finding 11 feed_screen search GestureDetector)."
@@ -779,6 +785,19 @@
   "feedCreatePostA11y": "Crear publicación",
   "@feedCreatePostA11y": {
     "description": "Accessibility label for the icon-only create-post '+' action in the feed header (finding 11 feed_screen create GestureDetector)."
+  },
+  "feedFriendRequestsA11y": "Solicitudes de amistad",
+  "@feedFriendRequestsA11y": {
+    "description": "Accessibility label for the icon-only friend-requests inbox action in the feed header bell icon (navigation finding: friend-requests inbox was unreachable from the feed/social surface)."
+  },
+  "feedFriendRequestsWithCountA11y": "Solicitudes de amistad, {count} pendientes",
+  "@feedFriendRequestsWithCountA11y": {
+    "description": "Accessibility label for the feed header friend-requests bell icon when there are pending requests; announces the badge count to screen readers.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
   },
   "feedPublishingA11y": "Publicando…",
   "@feedPublishingA11y": {
