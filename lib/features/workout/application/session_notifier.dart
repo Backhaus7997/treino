@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/analytics/analytics_service.dart';
@@ -19,6 +20,30 @@ class SessionNotifier
   Timer? _timer;
   bool _finalized = false;
 
+  /// Canal de error SEPARADO del AsyncValue.
+  ///
+  /// Por qué no mutamos `state` a AsyncError en un fallo de logSet/updateSet:
+  /// la pantalla renderiza via `sessionAsync.when(...)` con flags por defecto
+  /// (skipError:false). En Riverpod 2.6.1, `when()` enruta al branch `error:`
+  /// cuando `hasError && (!hasValue || !skipError)`. Un AsyncError.copyWithPrevious
+  /// conserva `hasValue==true` PERO también `hasError==true`, así que `when()`
+  /// igual cae en `error:` y vuela TODA la UI de sesión activa (timer, stats,
+  /// sets logueados) por un único set que falló — peor que el no-op anterior.
+  ///
+  /// En su lugar emitimos el fallo por este ValueNotifier sin tocar el estado
+  /// de datos: la sesión activa sigue intacta y la UI puede escucharlo
+  /// (addListener / ref.listen) para mostrar un SnackBar con Reintentar
+  /// (copy: sessionLogSetError) y reaccionar sin perder la pantalla.
+  final ValueNotifier<SessionLogError?> _logSetError =
+      ValueNotifier<SessionLogError?>(null);
+
+  /// Canal observable de fallos de log/update de sets. La capa de UI lo escucha
+  /// para feedback visible (SnackBar + Reintentar) sin destruir la sesión.
+  ValueListenable<SessionLogError?> get logSetError => _logSetError;
+
+  /// La UI llama esto al mostrar el feedback para no re-emitir el mismo error.
+  void clearLogSetError() => _logSetError.value = null;
+
   @override
   Future<SessionState> build(SessionInit arg) async {
     final state = switch (arg) {
@@ -37,6 +62,7 @@ class SessionNotifier
     ref.onDispose(() {
       _timer?.cancel();
       _timer = null;
+      _logSetError.dispose();
     });
 
     return state;
@@ -212,6 +238,15 @@ class SessionNotifier
         setLogs: newLogs,
         currentExerciseIndex: newIndex,
       ));
+    } catch (e) {
+      // El write a Firestore falló (red caída, permisos, offline). NO mutamos
+      // `state` a AsyncError: eso flipearía `when()` al branch `error:` y volaría
+      // toda la sesión activa por un solo set fallido (ver doc de _logSetError).
+      // Emitimos el fallo por el canal separado conservando la acción para que la
+      // UI pueda mostrar SnackBar + Reintentar. setLogs no se toca: no hubo
+      // optimismo que revertir, así que la fila sigue interactiva sin loguear.
+      _logSetError.value =
+          SessionLogError(action: SessionLogAction.log, setLog: setLog);
     } finally {
       _isLoggingSet = false;
     }
@@ -231,20 +266,45 @@ class SessionNotifier
     final uid = ref.read(currentUidProvider);
     if (uid == null) return;
 
-    await repo.updateSetLog(
-      uid: uid,
-      sessionId: current.session.id,
-      setLog: updated,
-    );
+    try {
+      await repo.updateSetLog(
+        uid: uid,
+        sessionId: current.session.id,
+        setLog: updated,
+      );
 
-    // Re-leemos el estado: pudo cambiar durante el await (p.ej. un logSet
-    // concurrente). Sin esto, sobrescribiríamos con el snapshot viejo y
-    // perderíamos el set recién logueado. Mismo patrón que logSet.
-    final latest = state.value ?? current;
-    final newLogs = latest.setLogs
-        .map((l) => l.id == updated.id ? updated : l)
-        .toList(growable: false);
-    state = AsyncData(latest.copyWith(setLogs: newLogs));
+      // Re-leemos el estado: pudo cambiar durante el await (p.ej. un logSet
+      // concurrente). Sin esto, sobrescribiríamos con el snapshot viejo y
+      // perderíamos el set recién logueado. Mismo patrón que logSet.
+      final latest = state.value ?? current;
+      final newLogs = latest.setLogs
+          .map((l) => l.id == updated.id ? updated : l)
+          .toList(growable: false);
+      state = AsyncData(latest.copyWith(setLogs: newLogs));
+    } catch (e) {
+      // Mismo fallo silencioso que logSet: editar el peso/reps de una serie ya
+      // hecha podía romper el write sin feedback. NO mutamos `state` a AsyncError
+      // (volaría la sesión via when() error:). Emitimos por el canal separado
+      // para que la UI muestre SnackBar + Reintentar. El cambio local no se aplica:
+      // la fila sigue mostrando el valor previamente persistido.
+      _logSetError.value =
+          SessionLogError(action: SessionLogAction.update, setLog: updated);
+    }
+  }
+
+  /// Reintenta la última operación de log/update que falló. Lo invoca la acción
+  /// "Reintentá" del SnackBar (capa de UI). Limpia el canal de error y re-despacha
+  /// hacia logSet/updateSet, que volverán a emitir por el canal si vuelve a fallar.
+  Future<void> retryLastLogError() async {
+    final pending = _logSetError.value;
+    if (pending == null) return;
+    _logSetError.value = null;
+    switch (pending.action) {
+      case SessionLogAction.log:
+        await logSet(pending.setLog);
+      case SessionLogAction.update:
+        await updateSet(pending.setLog);
+    }
   }
 
   Future<void> abandonSession() async {
@@ -361,4 +421,21 @@ class SessionNotifier
     if (elapsedSeconds <= 0) return 1;
     return (elapsedSeconds + 59) ~/ 60;
   }
+}
+
+/// Qué operación de set falló, para que el reintento despache al método correcto.
+enum SessionLogAction { log, update }
+
+/// Evento de fallo de log/update de set emitido por [SessionNotifier.logSetError].
+///
+/// Viaja por un canal separado del AsyncValue para que la UI pueda mostrar
+/// feedback visible (SnackBar con copy `sessionLogSetError` + acción Reintentar
+/// → [SessionNotifier.retryLastLogError]) SIN destruir la sesión activa. Lleva el
+/// [setLog] original para que el reintento re-despache la misma operación.
+@immutable
+class SessionLogError {
+  const SessionLogError({required this.action, required this.setLog});
+
+  final SessionLogAction action;
+  final SetLog setLog;
 }

@@ -157,6 +157,13 @@ class _FriendRequestInboxTileState
     final container = ProviderScope.containerOf(context, listen: false);
     final repo = container.read(friendshipRepositoryProvider);
     final viewerUid = widget.viewerUid;
+    // Capture the messenger BEFORE the await for the same reason as the
+    // container: a successful accept removes this row and disposes the tile,
+    // so `context` may be unmounted by the time we want to report a failure.
+    // The messenger is rooted above the list and survives the disposal, so
+    // the error SnackBar is always shown (visibility of system status).
+    final messenger = ScaffoldMessenger.of(context);
+    final errorMessage = AppL10n.of(context).feedFriendActionError;
     try {
       await repo.accept(widget.friendship.id, viewerUid);
       // Stream providers (`acceptedFriendsProvider`, `friendshipByPairProvider`)
@@ -166,7 +173,11 @@ class _FriendRequestInboxTileState
       // providers with no active listener at the moment (ADR-FPS-006).
       container.invalidate(myFriendsFeedProvider);
     } catch (_) {
-      // Swallow — stream will not emit a removal, so row stays.
+      // The stream will not emit a removal, so the row stays — tell the user
+      // the action failed so they can retry instead of silently swallowing it.
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(errorMessage)));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -180,13 +191,22 @@ class _FriendRequestInboxTileState
     // for consistency and in case future calls need it.
     final container = ProviderScope.containerOf(context, listen: false);
     final repo = container.read(friendshipRepositoryProvider);
+    // Dispose-safe capture (see `_onAceptar`): a successful reject removes the
+    // row and disposes the tile, so the messenger must be resolved before the
+    // await to guarantee the failure SnackBar survives the tile's disposal.
+    final messenger = ScaffoldMessenger.of(context);
+    final errorMessage = AppL10n.of(context).feedFriendActionError;
     try {
       await repo.delete(widget.friendship.id, widget.viewerUid);
       // Stream providers self-update on Firestore mutation — no manual
       // invalidation required. Rejection never created a friendship, so
       // myFriendsFeedProvider is unaffected.
     } catch (_) {
-      // Swallow — stream will not emit a removal, so row stays.
+      // The stream will not emit a removal, so the row stays — surface the
+      // failure instead of swallowing it so the user can retry.
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(errorMessage)));
     } finally {
       if (mounted) setState(() => _busy = false);
     }

@@ -2941,6 +2941,144 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'No pudimos cargar este perfil.'**
   String get publicProfileLoadErrorA11y;
+
+  /// Generic auth failure fallback shown when an unexpected (non-AuthFailure) error occurs in forgot-password submit and on splash auth-resolve failure. Reused by findings 0/20 and 1.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Algo salió mal. Probá de nuevo.'**
+  String get authGenericErrorFallback;
+
+  /// Empty state on the athlete agenda screen when there are no upcoming/confirmed sessions (finding 4). Distinct from agendaEmptyAvailability which is about a trainer's own hours.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tu PF todavía no te agendó sesiones.'**
+  String get agendaNoUpcomingSessions;
+
+  /// Error snackbar when saving an availability rule/override fails in the availability editor sheets (findings 6/24).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos guardar. Probá de nuevo.'**
+  String get agendaSaveError;
+
+  /// Success snackbar after saving an availability rule/override in the availability editor (findings 6/24).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Horario guardado.'**
+  String get agendaSaveSuccess;
+
+  /// Error text for the coach hub dashboard sections (paused/historial/pending requests) that currently swallow loading+error via maybeWhen+orElse (finding 7). Pair with coachRetryLabel for the retry CTA.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cargar esta sección.'**
+  String get coachHubSectionLoadError;
+
+  /// Inline error on the coach-hub not-allowed screen when signOut() fails (finding 8).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cerrar sesión. Probá de nuevo.'**
+  String get coachHubSignOutError;
+
+  /// Feed error branch text, replacing the hardcoded literal repeated 3x in feed_screen.dart (finding 9). Pair with coachRetryLabel for the retry CTA.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cargar tu feed. Probá de nuevo.'**
+  String get feedLoadError;
+
+  /// Friendly localized error replacing the raw 'Error: $e' debug placeholder in create_post_screen.dart's AsyncValue.error branch (finding 10). Pair with coachRetryLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos abrir el editor. Probá de nuevo.'**
+  String get createPostLoadError;
+
+  /// Insights error branch message, paired with a Reintentar (coachRetryLabel) button calling ref.invalidate(weeklyInsightsProvider) (finding 12).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cargar tus insights. Probá de nuevo.'**
+  String get insightsLoadError;
+
+  /// Error state for profile_edit_personal_screen's profile load (finding 13) and reusable for the trainer-edit gyms section error (finding 14). Pair with coachRetryLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cargar tu perfil. Probá de nuevo.'**
+  String get profileLoadError;
+
+  /// Empty state for session_detail_screen when setLogs is empty (finding 18).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Esta sesión no tiene sets registrados.'**
+  String get sessionDetailNoSets;
+
+  /// Snackbar shown when logging/updating a set fails in the session player (finding 21). Pair with a retry action.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos guardar la serie. Reintentá.'**
+  String get sessionLogSetError;
+
+  /// Snackbar when finishSession/abandonSession fails so the user isn't stranded on the player (finding 22).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos finalizar la sesión. Probá de nuevo.'**
+  String get sessionFinishError;
+
+  /// Inline validation hint when the routine name is empty and the save button is disabled (finding 19).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Poné un nombre a la rutina.'**
+  String get routineEditorMissingName;
+
+  /// Inline validation hint when a day has no exercises (finding 19).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Agregá al menos un ejercicio al Día {dayNumber}.'**
+  String routineEditorMissingExercise(int dayNumber);
+
+  /// Inline validation hint when a visible set is missing a valid reps/duration value in a single-week self-routine (finding 19). routineEditorIncompleteSetsFeedback already covers the named-exercise multi-week case.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Completá las reps de los sets antes de guardar.'**
+  String get routineEditorMissingReps;
+
+  /// Success snackbar after publishing a post (finding 25). Shown via the root ScaffoldMessenger since the compose screen pops on success.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Post publicado.'**
+  String get feedPostPublishedSuccess;
+
+  /// Success feedback when a friend/follow request is sent from the public profile follow button (findings 25/26).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Solicitud enviada.'**
+  String get feedRequestSentSuccess;
+
+  /// Success feedback when a friend request is accepted (finding 25). Used by the public profile accept action and optionally the inbox accept.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ahora son amigos.'**
+  String get feedRequestAcceptedSuccess;
+
+  /// Error snackbar for friendship mutations (accept/reject/request/unfriend) that currently swallow errors, in the inbox tile and public profile follow button (findings 11/26).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos completar la acción. Probá de nuevo.'**
+  String get feedFriendActionError;
+
+  /// Success feedback after saving 'Datos personales' (editar personal), matching the trainer-edit pattern (finding 27).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cambios guardados.'**
+  String get profilePersonalSaveSuccess;
+
+  /// Success feedback after saving the gym selection (finding 27).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Gimnasio actualizado.'**
+  String get profileGymSaveSuccess;
+
+  /// Error snackbar when the gym save fails (currently has no catch) in profile_gym_screen (finding 28).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos guardar el gimnasio. Probá de nuevo.'**
+  String get profileGymSaveError;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

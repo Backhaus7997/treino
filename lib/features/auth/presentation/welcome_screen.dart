@@ -8,20 +8,39 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../app/theme/app_background.dart';
 import '../../../app/theme/app_palette.dart';
 import '../application/auth_providers.dart';
+import '../domain/auth_failure.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../profile/application/account_deletion_notifier.dart';
+import 'widgets/auth_failure_banner.dart';
 import 'widgets/auth_pill_button.dart';
 import 'widgets/auth_secondary_button.dart';
 import 'widgets/treino_logo.dart';
 
-class WelcomeScreen extends ConsumerWidget {
+/// Identifies which social provider button is currently awaiting its OAuth
+/// round-trip, so only that button shows an in-flight spinner.
+enum _SocialProvider { google, apple }
+
+class WelcomeScreen extends ConsumerStatefulWidget {
   const WelcomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<WelcomeScreen> createState() => _WelcomeScreenState();
+}
+
+class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
+  /// The provider button the user last tapped. Used to scope the loading
+  /// spinner to the tapped button while authNotifierProvider.isLoading is true.
+  _SocialProvider? _pendingProvider;
+
+  @override
+  Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
-    final isLoading = ref.watch(authNotifierProvider).isLoading;
+    final authState = ref.watch(authNotifierProvider);
+    final isLoading = authState.isLoading;
+    final failure = authState.hasError && authState.error is AuthFailure
+        ? authState.error as AuthFailure
+        : null;
 
     // Show "Tu cuenta fue eliminada" SnackBar when the deletion flag is set.
     ref.listen<bool>(accountDeletedFlagProvider, (_, isDeleted) {
@@ -144,9 +163,16 @@ class WelcomeScreen extends ConsumerWidget {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
+                          // Surface social sign-in failures (and OAuth
+                          // cancellations) — previously swallowed silently.
+                          if (failure != null) ...[
+                            AuthFailureBanner(failure: failure),
+                            const SizedBox(height: 12),
+                          ],
                           AuthPillButton(
                             label: l10n.authWelcomeCta,
-                            onPressed: () => context.push('/register'),
+                            onPressed:
+                                isLoading ? null : () => context.push('/register'),
                             showArrow: false,
                           ),
                           const SizedBox(height: 12),
@@ -155,25 +181,36 @@ class WelcomeScreen extends ConsumerWidget {
                               Expanded(
                                 child: AuthSecondaryButton(
                                   icon: FontAwesomeIcons.google,
-                                  iconWidget: SvgPicture.asset(
-                                    'assets/logo/google_g.svg',
-                                    width: 18,
-                                    height: 18,
-                                  ),
+                                  // Swap the brand glyph for a spinner while
+                                  // this provider's OAuth round-trip is in
+                                  // flight, so the screen is not frozen with no
+                                  // feedback.
+                                  iconWidget: isLoading &&
+                                          _pendingProvider ==
+                                              _SocialProvider.google
+                                      ? _buttonSpinner(palette)
+                                      : SvgPicture.asset(
+                                          'assets/logo/google_g.svg',
+                                          width: 18,
+                                          height: 18,
+                                        ),
                                   label: l10n.authGoogleLabel,
-                                  onPressed: isLoading
-                                      ? null
-                                      : () => _signInWithGoogle(context, ref),
+                                  onPressed:
+                                      isLoading ? null : _signInWithGoogle,
                                 ),
                               ),
                               const SizedBox(width: 12),
                               Expanded(
                                 child: AuthSecondaryButton(
                                   icon: FontAwesomeIcons.apple,
+                                  iconWidget: isLoading &&
+                                          _pendingProvider ==
+                                              _SocialProvider.apple
+                                      ? _buttonSpinner(palette)
+                                      : null,
                                   label: l10n.authAppleLabel,
-                                  onPressed: isLoading
-                                      ? null
-                                      : () => _signInWithApple(context, ref),
+                                  onPressed:
+                                      isLoading ? null : _signInWithApple,
                                 ),
                               ),
                             ],
@@ -220,19 +257,34 @@ class WelcomeScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _signInWithGoogle(BuildContext context, WidgetRef ref) async {
+  /// Small spinner shown in place of a social button's brand glyph while its
+  /// OAuth call is in flight. Mirrors AuthPillButton's loading indicator.
+  Widget _buttonSpinner(AppPalette palette) {
+    return SizedBox(
+      width: 18,
+      height: 18,
+      child: CircularProgressIndicator(
+        strokeWidth: 2,
+        valueColor: AlwaysStoppedAnimation<Color>(palette.textPrimary),
+      ),
+    );
+  }
+
+  Future<void> _signInWithGoogle() async {
     // No intent gating on Welcome — both new and existing users land in /home.
+    setState(() => _pendingProvider = _SocialProvider.google);
     await ref.read(authNotifierProvider.notifier).signInWithGoogle();
-    if (!context.mounted) return;
+    if (!mounted) return;
     final s = ref.read(authNotifierProvider);
     if (s.hasValue && s.valueOrNull != null) {
       context.go('/home');
     }
   }
 
-  Future<void> _signInWithApple(BuildContext context, WidgetRef ref) async {
+  Future<void> _signInWithApple() async {
+    setState(() => _pendingProvider = _SocialProvider.apple);
     await ref.read(authNotifierProvider.notifier).signInWithApple();
-    if (!context.mounted) return;
+    if (!mounted) return;
     final s = ref.read(authNotifierProvider);
     if (s.hasValue && s.valueOrNull != null) {
       context.go('/home');

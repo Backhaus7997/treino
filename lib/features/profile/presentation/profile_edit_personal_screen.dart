@@ -176,6 +176,16 @@ class _ProfileEditPersonalScreenState
         ref.read(authStateChangesProvider).valueOrNull?.uid;
     if (uid == null) {
       _saveState.value = _SaveState.error;
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              AppL10n.of(context).authGenericErrorFallback,
+              style: GoogleFonts.barlow(fontSize: 14),
+            ),
+          ),
+        );
+      }
       return;
     }
 
@@ -261,7 +271,17 @@ class _ProfileEditPersonalScreenState
 
     try {
       await ref.read(userRepositoryProvider).update(uid, partial);
-      if (mounted) context.pop();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              AppL10n.of(context).profilePersonalSaveSuccess,
+              style: GoogleFonts.barlow(fontSize: 14),
+            ),
+          ),
+        );
+        context.pop();
+      }
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -361,6 +381,7 @@ class _ProfileEditPersonalScreenState
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
 
     // Lazy seed: fires once when the stream delivers the first UserProfile.
     // In production the stream is already warm (no-op). In tests the
@@ -375,6 +396,23 @@ class _ProfileEditPersonalScreenState
         });
       }
     });
+
+    // Loading: stream has not yet emitted and has not errored — show a spinner
+    // instead of empty chrome with blank fields (matches trainer-edit screen).
+    if (profileAsync.isLoading && !profileAsync.hasValue) {
+      return Center(child: CircularProgressIndicator(color: palette.accent));
+    }
+
+    // Error: the profile stream failed. Render a localized message + retry so
+    // the form is not stranded blank with no signal.
+    if (profileAsync.hasError && !profileAsync.hasValue) {
+      return _ProfileLoadError(
+        message: l10n.profileLoadError,
+        retryLabel: l10n.coachRetryLabel,
+        onRetry: () => ref.invalidate(userProfileProvider),
+        palette: palette,
+      );
+    }
 
     return Column(
       children: [
@@ -924,6 +962,72 @@ class _FieldLabel extends StatelessWidget {
         fontSize: 12,
         fontWeight: FontWeight.w700,
         letterSpacing: 1.4,
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Profile load error state
+// ---------------------------------------------------------------------------
+
+/// Shown when [userProfileProvider] fails so the form is not stranded blank.
+/// Offers a Reintentar affordance that re-runs the provider.
+class _ProfileLoadError extends StatelessWidget {
+  const _ProfileLoadError({
+    required this.message,
+    required this.retryLabel,
+    required this.onRetry,
+    required this.palette,
+  });
+
+  final String message;
+  final String retryLabel;
+  final VoidCallback onRetry;
+  final AppPalette palette;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(TreinoIcon.warning, size: 36, color: palette.textMuted),
+            const SizedBox(height: 12),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.barlow(
+                color: palette.textMuted,
+                fontSize: 14,
+              ),
+            ),
+            const SizedBox(height: 16),
+            GestureDetector(
+              onTap: onRetry,
+              child: Container(
+                height: 44,
+                padding: const EdgeInsets.symmetric(horizontal: 28),
+                decoration: BoxDecoration(
+                  color: palette.accent,
+                  borderRadius: BorderRadius.circular(9999),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  retryLabel,
+                  style: GoogleFonts.barlowCondensed(
+                    color: palette.bg,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1.0,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

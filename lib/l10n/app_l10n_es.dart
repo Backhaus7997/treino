@@ -1553,6 +1553,87 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get publicProfileLoadErrorA11y => 'No pudimos cargar este perfil.';
+
+  @override
+  String get authGenericErrorFallback => 'Algo salió mal. Inténtalo de nuevo.';
+
+  @override
+  String get agendaNoUpcomingSessions =>
+      'Tu entrenador todavía no te agendó sesiones.';
+
+  @override
+  String get agendaSaveError => 'No pudimos guardar. Inténtalo de nuevo.';
+
+  @override
+  String get agendaSaveSuccess => 'Horario guardado.';
+
+  @override
+  String get coachHubSectionLoadError => 'No pudimos cargar esta sección.';
+
+  @override
+  String get coachHubSignOutError =>
+      'No pudimos cerrar sesión. Inténtalo de nuevo.';
+
+  @override
+  String get feedLoadError => 'No pudimos cargar tu feed. Inténtalo de nuevo.';
+
+  @override
+  String get createPostLoadError =>
+      'No pudimos abrir el editor. Inténtalo de nuevo.';
+
+  @override
+  String get insightsLoadError =>
+      'No pudimos cargar tus insights. Inténtalo de nuevo.';
+
+  @override
+  String get profileLoadError =>
+      'No pudimos cargar tu perfil. Inténtalo de nuevo.';
+
+  @override
+  String get sessionDetailNoSets => 'Esta sesión no tiene sets registrados.';
+
+  @override
+  String get sessionLogSetError =>
+      'No pudimos guardar la serie. Inténtalo de nuevo.';
+
+  @override
+  String get sessionFinishError =>
+      'No pudimos finalizar la sesión. Inténtalo de nuevo.';
+
+  @override
+  String get routineEditorMissingName => 'Ponle un nombre a la rutina.';
+
+  @override
+  String routineEditorMissingExercise(int dayNumber) {
+    return 'Agrega al menos un ejercicio al Día $dayNumber.';
+  }
+
+  @override
+  String get routineEditorMissingReps =>
+      'Completa las reps de los sets antes de guardar.';
+
+  @override
+  String get feedPostPublishedSuccess => 'Post publicado.';
+
+  @override
+  String get feedRequestSentSuccess => 'Solicitud enviada.';
+
+  @override
+  String get feedRequestAcceptedSuccess => 'Ahora son amigos.';
+
+  @override
+  String get feedFriendActionError =>
+      'No pudimos completar la acción. Inténtalo de nuevo.';
+
+  @override
+  String get profilePersonalSaveSuccess => 'Cambios guardados.';
+
+  @override
+  String get profileGymSaveSuccess => 'Gimnasio actualizado.';
+
+  @override
+  String get profileGymSaveError =>
+      'No pudimos guardar el gimnasio. Inténtalo de nuevo.';
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -3106,4 +3187,82 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get publicProfileLoadErrorA11y => 'No pudimos cargar este perfil.';
+
+  @override
+  String get authGenericErrorFallback => 'Algo salió mal. Probá de nuevo.';
+
+  @override
+  String get agendaNoUpcomingSessions => 'Tu PF todavía no te agendó sesiones.';
+
+  @override
+  String get agendaSaveError => 'No pudimos guardar. Probá de nuevo.';
+
+  @override
+  String get agendaSaveSuccess => 'Horario guardado.';
+
+  @override
+  String get coachHubSectionLoadError => 'No pudimos cargar esta sección.';
+
+  @override
+  String get coachHubSignOutError =>
+      'No pudimos cerrar sesión. Probá de nuevo.';
+
+  @override
+  String get feedLoadError => 'No pudimos cargar tu feed. Probá de nuevo.';
+
+  @override
+  String get createPostLoadError =>
+      'No pudimos abrir el editor. Probá de nuevo.';
+
+  @override
+  String get insightsLoadError =>
+      'No pudimos cargar tus insights. Probá de nuevo.';
+
+  @override
+  String get profileLoadError => 'No pudimos cargar tu perfil. Probá de nuevo.';
+
+  @override
+  String get sessionDetailNoSets => 'Esta sesión no tiene sets registrados.';
+
+  @override
+  String get sessionLogSetError => 'No pudimos guardar la serie. Reintentá.';
+
+  @override
+  String get sessionFinishError =>
+      'No pudimos finalizar la sesión. Probá de nuevo.';
+
+  @override
+  String get routineEditorMissingName => 'Poné un nombre a la rutina.';
+
+  @override
+  String routineEditorMissingExercise(int dayNumber) {
+    return 'Agregá al menos un ejercicio al Día $dayNumber.';
+  }
+
+  @override
+  String get routineEditorMissingReps =>
+      'Completá las reps de los sets antes de guardar.';
+
+  @override
+  String get feedPostPublishedSuccess => 'Post publicado.';
+
+  @override
+  String get feedRequestSentSuccess => 'Solicitud enviada.';
+
+  @override
+  String get feedRequestAcceptedSuccess => 'Ahora son amigos.';
+
+  @override
+  String get feedFriendActionError =>
+      'No pudimos completar la acción. Probá de nuevo.';
+
+  @override
+  String get profilePersonalSaveSuccess => 'Cambios guardados.';
+
+  @override
+  String get profileGymSaveSuccess => 'Gimnasio actualizado.';
+
+  @override
+  String get profileGymSaveError =>
+      'No pudimos guardar el gimnasio. Probá de nuevo.';
 }

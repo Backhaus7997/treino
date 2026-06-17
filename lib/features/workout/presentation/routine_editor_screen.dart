@@ -584,6 +584,44 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     return null;
   }
 
+  /// Resolves the FIRST unmet save requirement into a specific, actionable
+  /// message — so the user learns WHAT is missing instead of seeing the
+  /// generic "incomplete sets" feedback regardless of cause (finding 21).
+  ///
+  /// Priority mirrors the order a user fills the form: name → at least one
+  /// exercise per day → complete reps/duration on every visible set. Returns
+  /// the offending [day] (when one applies) so the caller can scroll it into
+  /// view, and `null` when the form is fully valid.
+  ({String message, _EditableDay? day})? _firstValidationError(AppL10n l10n) {
+    // 1) Name.
+    if (_nameController.text.trim().isEmpty) {
+      return (message: l10n.routineEditorMissingName, day: null);
+    }
+    // 2) Every day needs at least one exercise.
+    for (final day in _days) {
+      final hasExercise = day.slots.any((s) => s.exercise != null);
+      if (day.slots.isEmpty || !hasExercise) {
+        return (
+          message: l10n.routineEditorMissingExercise(day.dayNumber),
+          day: day,
+        );
+      }
+    }
+    // 3) Incomplete sets. Prefer the named-exercise feedback when we can point
+    // at a specific exercise; otherwise fall back to the generic reps hint.
+    final invalid = _firstInvalidSlot();
+    if (invalid != null) {
+      final name = invalid.exerciseName;
+      return (
+        message: name != null
+            ? l10n.routineEditorIncompleteSetsFeedback(name)
+            : l10n.routineEditorMissingReps,
+        day: invalid.day,
+      );
+    }
+    return null;
+  }
+
   /// Whether the editor is in a trainer-creating mode (assigning or
   /// templating). Athlete (SelfCreating) mode hides trainer-only fields.
   /// REQ-RER-012, REQ-RER-013, ADR-RER-04.
@@ -1121,35 +1159,38 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
   Future<void> _submit() async {
     if (_submitting) return;
 
-    // If invalid: show feedback and scroll to first offending slot instead of
-    // silently blocking save (UX fix: button is now always tappable).
+    // If invalid: show a SPECIFIC message for the first unmet requirement
+    // (missing name / no exercise on Día N / incomplete sets) and scroll to the
+    // offending day, instead of a generic hint that always blames the sets
+    // (finding 21). The button is always tappable so this feedback can fire.
     if (!_isValid) {
       final l10n = AppL10n.of(context);
-      final first = _firstInvalidSlot();
-      final message = first?.exerciseName != null
-          ? l10n.routineEditorIncompleteSetsFeedback(first!.exerciseName!)
-          : l10n.routineEditorIncompleteSetsFeedback('…');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message)),
-      );
-      // Expand the first invalid day and scroll to it.
-      if (first != null) {
-        // Ensure the day is expanded so the user can see the invalid sets.
-        if (!first.day.expanded) {
-          setState(() => first.day.expanded = true);
-        }
-        // Wait one frame for the expansion to apply before scrolling.
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          final key = _keyForDay(first.day);
-          if (key.currentContext != null) {
-            Scrollable.ensureVisible(
-              key.currentContext!,
-              duration: const Duration(milliseconds: 350),
-              curve: Curves.easeInOut,
-              alignment: 0.1,
-            );
+      final error = _firstValidationError(l10n);
+      if (error != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error.message)),
+        );
+        // Expand and scroll to the day the error points at (name errors carry
+        // no day — nothing to scroll to).
+        final day = error.day;
+        if (day != null) {
+          // Ensure the day is expanded so the user can see the offending sets.
+          if (!day.expanded) {
+            setState(() => day.expanded = true);
           }
-        });
+          // Wait one frame for the expansion to apply before scrolling.
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            final key = _keyForDay(day);
+            if (key.currentContext != null) {
+              Scrollable.ensureVisible(
+                key.currentContext!,
+                duration: const Duration(milliseconds: 350),
+                curve: Curves.easeInOut,
+                alignment: 0.1,
+              );
+            }
+          });
+        }
       }
       return;
     }

@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/treino_icon.dart';
+import '../../../l10n/app_l10n.dart';
 import '../application/insights_providers.dart';
 import '../domain/muscle_group.dart';
 import '../domain/weekly_insights.dart';
@@ -30,18 +31,8 @@ class InsightsScreen extends ConsumerWidget {
             loading: () => Center(
               child: CircularProgressIndicator(color: palette.accent),
             ),
-            error: (_, __) => Center(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Text(
-                  'No pudimos cargar tus insights.',
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.barlow(
-                    fontSize: 14,
-                    color: palette.textMuted,
-                  ),
-                ),
-              ),
+            error: (_, __) => _ErrorState(
+              onRetry: () => ref.invalidate(weeklyInsightsProvider),
             ),
             data: (insights) {
               if (insights == null || insights.sessionsCount == 0) {
@@ -135,6 +126,43 @@ class _EmptyState extends StatelessWidget {
                 fontSize: 14,
                 color: palette.textMuted,
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Error state ───────────────────────────────────────────────────────────────
+
+class _ErrorState extends StatelessWidget {
+  const _ErrorState({required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              l10n.insightsLoadError,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.barlow(
+                fontSize: 14,
+                color: palette.textMuted,
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: onRetry,
+              child: Text(l10n.coachRetryLabel),
             ),
           ],
         ),

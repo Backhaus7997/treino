@@ -14,6 +14,7 @@ import '../workout/application/session_providers.dart' show currentUidProvider;
 import 'application/feed_screen_providers.dart';
 import 'application/post_providers.dart';
 import 'domain/feed_segment.dart';
+import 'domain/post.dart';
 import 'presentation/widgets/feed_empty_state.dart';
 import 'presentation/widgets/feed_segment_pills.dart';
 import 'presentation/widgets/post_card.dart';
@@ -174,54 +175,97 @@ class _FeedHeader extends StatelessWidget {
   }
 }
 
-class _AmigosBody extends ConsumerWidget {
-  const _AmigosBody();
+/// A scrollable list of [PostCard]s sharing the common feed layout.
+Widget _feedPostList(BuildContext context, List<Post> posts) {
+  // TODO(pagination): cursor-based pagination deferred (see explore §9)
+  return ListView.separated(
+    physics: const AlwaysScrollableScrollPhysics(),
+    padding: EdgeInsets.fromLTRB(
+      20,
+      0,
+      20,
+      MediaQuery.paddingOf(context).bottom,
+    ),
+    itemCount: posts.length,
+    separatorBuilder: (_, __) => const SizedBox(height: 14),
+    itemBuilder: (_, i) => PostCard(
+      post: posts[i],
+      onAuthorTap: () => context.go('/feed/profile/${posts[i].authorUid}'),
+    ),
+  );
+}
+
+/// Shared async resolver for the three feed segments.
+///
+/// Renders a consistent loading spinner and — critically — an error state
+/// that pairs the localized message with a Reintentar CTA. Because the feed
+/// providers are [FutureProvider]s they do NOT self-heal, so the retry
+/// invalidates [onRetry]'s provider to force a refetch.
+class _FeedAsyncBody<T> extends StatelessWidget {
+  const _FeedAsyncBody({
+    required this.async,
+    required this.onRetry,
+    required this.dataBuilder,
+  });
+
+  final AsyncValue<T> async;
+  final VoidCallback onRetry;
+  final Widget Function(BuildContext context, T data) dataBuilder;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    final asyncPosts = ref.watch(myFriendsFeedProvider);
+    final l10n = AppL10n.of(context);
 
-    return asyncPosts.when(
-      data: (posts) {
-        if (posts.isEmpty) {
-          return const FeedEmptyState(
-            message: 'Aún no hay posts de tus amigos',
-          );
-        }
-        return ListView.separated(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: EdgeInsets.fromLTRB(
-            20,
-            0,
-            20,
-            MediaQuery.paddingOf(context).bottom,
-          ),
-          itemCount: posts.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 14),
-          itemBuilder: (_, i) => PostCard(
-            post: posts[i],
-            onAuthorTap: () =>
-                context.go('/feed/profile/${posts[i].authorUid}'),
-          ),
-        );
-      },
+    return async.when(
+      data: (data) => dataBuilder(context, data),
       loading: () => Center(
         child: CircularProgressIndicator(color: palette.accent),
       ),
       error: (_, __) => Center(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Text(
-            'No pudimos cargar tu feed. Intentá de nuevo.',
-            style: GoogleFonts.barlow(
-              fontSize: 14,
-              color: palette.textMuted,
-            ),
-            textAlign: TextAlign.center,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                l10n.feedLoadError,
+                style: GoogleFonts.barlow(
+                  fontSize: 14,
+                  color: palette.textMuted,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              TextButton(
+                onPressed: onRetry,
+                style: TextButton.styleFrom(foregroundColor: palette.accent),
+                child: Text(l10n.coachRetryLabel),
+              ),
+            ],
           ),
         ),
       ),
+    );
+  }
+}
+
+class _AmigosBody extends ConsumerWidget {
+  const _AmigosBody();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return _FeedAsyncBody<List<Post>>(
+      async: ref.watch(myFriendsFeedProvider),
+      onRetry: () => ref.invalidate(myFriendsFeedProvider),
+      dataBuilder: (context, posts) {
+        if (posts.isEmpty) {
+          return const FeedEmptyState(
+            message: 'Aún no hay posts de tus amigos',
+          );
+        }
+        return _feedPostList(context, posts);
+      },
     );
   }
 }
@@ -231,11 +275,10 @@ class _MiGymBody extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final palette = AppPalette.of(context);
-    final asyncPosts = ref.watch(myGymFeedProvider);
-
-    return asyncPosts.when(
-      data: (posts) {
+    return _FeedAsyncBody<List<Post>?>(
+      async: ref.watch(myGymFeedProvider),
+      onRetry: () => ref.invalidate(myGymFeedProvider),
+      dataBuilder: (context, posts) {
         if (posts == null) {
           return const FeedEmptyState(
             message: 'Todavía no estás en un gym',
@@ -246,40 +289,8 @@ class _MiGymBody extends ConsumerWidget {
             message: 'Tu gym todavía no tiene posts',
           );
         }
-        // TODO(pagination): cursor-based pagination deferred (see explore §9)
-        return ListView.separated(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: EdgeInsets.fromLTRB(
-            20,
-            0,
-            20,
-            MediaQuery.paddingOf(context).bottom,
-          ),
-          itemCount: posts.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 14),
-          itemBuilder: (_, i) => PostCard(
-            post: posts[i],
-            onAuthorTap: () =>
-                context.go('/feed/profile/${posts[i].authorUid}'),
-          ),
-        );
+        return _feedPostList(context, posts);
       },
-      loading: () => Center(
-        child: CircularProgressIndicator(color: palette.accent),
-      ),
-      error: (_, __) => Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Text(
-            'No pudimos cargar tu feed. Intentá de nuevo.',
-            style: GoogleFonts.barlow(
-              fontSize: 14,
-              color: palette.textMuted,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ),
-      ),
     );
   }
 }
@@ -289,50 +300,17 @@ class _PublicoBody extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final palette = AppPalette.of(context);
-    final asyncPosts = ref.watch(feedPublicProvider);
-
-    return asyncPosts.when(
-      data: (posts) {
+    return _FeedAsyncBody<List<Post>>(
+      async: ref.watch(feedPublicProvider),
+      onRetry: () => ref.invalidate(feedPublicProvider),
+      dataBuilder: (context, posts) {
         if (posts.isEmpty) {
           return const FeedEmptyState(
             message: 'Aún no hay posts públicos',
           );
         }
-        // TODO(pagination): cursor-based pagination deferred (see explore §9)
-        return ListView.separated(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: EdgeInsets.fromLTRB(
-            20,
-            0,
-            20,
-            MediaQuery.paddingOf(context).bottom,
-          ),
-          itemCount: posts.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 14),
-          itemBuilder: (_, i) => PostCard(
-            post: posts[i],
-            onAuthorTap: () =>
-                context.go('/feed/profile/${posts[i].authorUid}'),
-          ),
-        );
+        return _feedPostList(context, posts);
       },
-      loading: () => Center(
-        child: CircularProgressIndicator(color: palette.accent),
-      ),
-      error: (_, __) => Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Text(
-            'No pudimos cargar tu feed. Intentá de nuevo.',
-            style: GoogleFonts.barlow(
-              fontSize: 14,
-              color: palette.textMuted,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ),
-      ),
     );
   }
 }

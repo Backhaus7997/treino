@@ -26,9 +26,137 @@ class CreatePostScreen extends ConsumerWidget {
     final notifier = ref.read(createPostNotifierProvider.notifier);
 
     return stateAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(child: Text('Error: $e')),
+      loading: () => const _CreatePostLoading(),
+      error: (_, __) => _CreatePostError(
+        onRetry: () => ref.invalidate(createPostNotifierProvider),
+      ),
       data: (state) => _CreatePostBody(state: state, notifier: notifier),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Loading state
+// ---------------------------------------------------------------------------
+
+class _CreatePostLoading extends StatelessWidget {
+  const _CreatePostLoading();
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+
+    return Semantics(
+      label: l10n.coachLoadingLabel,
+      liveRegion: true,
+      child: Center(
+        child: CircularProgressIndicator(color: palette.accent),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Error state
+// ---------------------------------------------------------------------------
+
+class _CreatePostError extends StatelessWidget {
+  const _CreatePostError({required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ExcludeSemantics(
+              child: Icon(
+                TreinoIcon.warning,
+                size: 48,
+                color: palette.textMuted,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Semantics(
+              liveRegion: true,
+              child: Text(
+                l10n.createPostLoadError,
+                style: GoogleFonts.barlow(
+                  fontWeight: FontWeight.w400,
+                  fontSize: 14,
+                  color: palette.textMuted,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Semantics(
+                  button: true,
+                  label: l10n.commonCancel,
+                  child: GestureDetector(
+                    onTap: () => context.pop(),
+                    behavior: HitTestBehavior.opaque,
+                    child: ConstrainedBox(
+                      constraints:
+                          const BoxConstraints(minWidth: 44, minHeight: 44),
+                      child: Center(
+                        widthFactor: 1,
+                        child: ExcludeSemantics(
+                          child: Text(
+                            'CANCELAR',
+                            style: GoogleFonts.barlowCondensed(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14,
+                              color: palette.textMuted,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 24),
+                Semantics(
+                  button: true,
+                  label: l10n.coachRetryLabel,
+                  child: GestureDetector(
+                    onTap: onRetry,
+                    behavior: HitTestBehavior.opaque,
+                    child: ConstrainedBox(
+                      constraints:
+                          const BoxConstraints(minWidth: 44, minHeight: 44),
+                      child: Center(
+                        widthFactor: 1,
+                        child: ExcludeSemantics(
+                          child: Text(
+                            l10n.coachRetryLabel.toUpperCase(),
+                            style: GoogleFonts.barlowCondensed(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14,
+                              color: palette.accent,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -195,8 +323,20 @@ class _CreatePostHeader extends ConsumerWidget {
               child: GestureDetector(
                 onTap: state.canSubmit
                     ? () async {
+                        // Capture the root messenger + copy BEFORE the await: the
+                        // screen pops on success, after which `context` is unmounted.
+                        // The app-level messenger survives the pop, so the success
+                        // toast is still delivered on the feed.
+                        final messenger = ScaffoldMessenger.of(context);
+                        final successMessage = l10n.feedPostPublishedSuccess;
                         final ok = await notifier.submit();
-                        if (ok && context.mounted) context.pop();
+                        if (ok && context.mounted) {
+                          messenger
+                            ..hideCurrentSnackBar()
+                            ..showSnackBar(
+                                SnackBar(content: Text(successMessage)));
+                          context.pop();
+                        }
                       }
                     : null,
                 behavior: HitTestBehavior.opaque,

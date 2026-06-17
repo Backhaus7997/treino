@@ -38,7 +38,28 @@ class _ProfileGymScreenState extends ConsumerState<ProfileGymScreen> {
     setState(() => _saving = true);
     try {
       await ref.read(userRepositoryProvider).update(uid, {'gymId': gymId});
-      if (mounted) context.pop();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              AppL10n.of(context).profileGymSaveSuccess,
+              style: GoogleFonts.barlow(fontSize: 14),
+            ),
+          ),
+        );
+        context.pop();
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              AppL10n.of(context).profileGymSaveError,
+              style: GoogleFonts.barlow(fontSize: 14),
+            ),
+          ),
+        );
+      }
     } finally {
       if (mounted) setState(() => _saving = false);
     }

@@ -9,6 +9,7 @@ import 'package:treino/features/feed/data/friendship_repository.dart';
 import 'package:treino/features/feed/domain/friendship.dart';
 import 'package:treino/features/feed/domain/friendship_status.dart';
 import 'package:treino/features/feed/presentation/widgets/public_profile_follow_button.dart';
+import 'package:treino/l10n/app_l10n.dart';
 
 /// Repository whose write paths always throw, simulating an offline /
 /// permission-denied Firestore write (the bug repro).
@@ -32,6 +33,8 @@ Widget _wrap(Widget w, FriendshipRepository repo) => ProviderScope(
       ],
       child: MaterialApp(
         theme: AppTheme.dark(),
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
         home: Scaffold(body: w),
       ),
     );

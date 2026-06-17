@@ -8,6 +8,7 @@ import 'package:treino/features/auth/application/auth_notifier.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/auth/presentation/splash_screen.dart';
 import 'package:treino/features/auth/presentation/widgets/treino_logo.dart';
+import 'package:treino/l10n/app_l10n.dart';
 
 class MockUser extends Mock implements User {}
 
@@ -39,7 +40,11 @@ Widget _buildApp({required _TestAuthNotifier notifier}) {
   final router = _makeRouter(screen);
   return ProviderScope(
     overrides: [authNotifierProvider.overrideWith(() => notifier)],
-    child: MaterialApp.router(routerConfig: router),
+    child: MaterialApp.router(
+      routerConfig: router,
+      localizationsDelegates: AppL10n.localizationsDelegates,
+      supportedLocales: AppL10n.supportedLocales,
+    ),
   );
 }
 

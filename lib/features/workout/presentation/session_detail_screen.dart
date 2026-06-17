@@ -151,13 +151,28 @@ class _DetailLoaded extends StatelessWidget {
           ),
           const SizedBox(height: 32),
 
-          // Exercise blocks
-          ...grouped.entries.map(
-            (entry) => _ExerciseBlock(
-              exerciseName: entry.key,
-              sets: entry.value,
+          // Exercise blocks — or empty state when no sets were logged.
+          if (grouped.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 32),
+              child: Text(
+                l10n.sessionDetailNoSets,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.barlowCondensed(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 16,
+                  color: palette.textMuted,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            )
+          else
+            ...grouped.entries.map(
+              (entry) => _ExerciseBlock(
+                exerciseName: entry.key,
+                sets: entry.value,
+              ),
             ),
-          ),
         ],
       ),
     );

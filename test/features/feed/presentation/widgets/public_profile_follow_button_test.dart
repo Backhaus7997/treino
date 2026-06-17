@@ -10,6 +10,7 @@ import 'package:treino/features/feed/domain/friendship_status.dart';
 import 'package:treino/features/feed/presentation/widgets/public_profile_follow_button.dart';
 import 'package:treino/features/profile/application/user_providers.dart'
     show firestoreProvider;
+import 'package:treino/l10n/app_l10n.dart';
 
 Widget _wrap(Widget w, FakeFirebaseFirestore firestore) => ProviderScope(
       overrides: [
@@ -17,6 +18,9 @@ Widget _wrap(Widget w, FakeFirebaseFirestore firestore) => ProviderScope(
       ],
       child: MaterialApp(
         theme: AppTheme.dark(),
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+        locale: const Locale('es', 'AR'),
         home: Scaffold(body: w),
       ),
     );

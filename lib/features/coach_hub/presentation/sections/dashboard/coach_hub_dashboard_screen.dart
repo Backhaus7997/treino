@@ -243,11 +243,14 @@ class _ActiveStudentsList extends ConsumerWidget {
       return const SizedBox.shrink();
     }
 
+    final l10n = AppL10n.of(context);
     final linksAsync = ref.watch(trainerLinksStreamProvider);
     return linksAsync.when(
       loading: () => const _SectionLoading(),
-      error: (_, __) =>
-          const _SectionError(message: 'No pudimos cargar tus alumnos.'),
+      error: (_, __) => _SectionError(
+        message: l10n.coachHubSectionLoadError,
+        onRetry: () => ref.invalidate(trainerLinksStreamProvider),
+      ),
       data: (links) {
         final active =
             links.where((l) => l.status == TrainerLinkStatus.active).toList();
@@ -286,8 +289,14 @@ class _PausedStudentsList extends ConsumerWidget {
       return const SizedBox.shrink();
     }
 
+    final l10n = AppL10n.of(context);
     final linksAsync = ref.watch(trainerLinksStreamProvider);
-    return linksAsync.maybeWhen(
+    return linksAsync.when(
+      loading: () => const _SectionLoading(),
+      error: (_, __) => _SectionError(
+        message: l10n.coachHubSectionLoadError,
+        onRetry: () => ref.invalidate(trainerLinksStreamProvider),
+      ),
       data: (links) {
         final paused =
             links.where((l) => l.status == TrainerLinkStatus.paused).toList();
@@ -309,7 +318,6 @@ class _PausedStudentsList extends ConsumerWidget {
           ],
         );
       },
-      orElse: () => const SizedBox.shrink(),
     );
   }
 }
@@ -327,8 +335,14 @@ class _HistorialList extends ConsumerWidget {
       return const SizedBox.shrink();
     }
 
+    final l10n = AppL10n.of(context);
     final linksAsync = ref.watch(trainerLinksStreamProvider);
-    return linksAsync.maybeWhen(
+    return linksAsync.when(
+      loading: () => const _SectionLoading(),
+      error: (_, __) => _SectionError(
+        message: l10n.coachHubSectionLoadError,
+        onRetry: () => ref.invalidate(trainerLinksStreamProvider),
+      ),
       data: (links) {
         final terminated = links
             .where((l) => l.status == TrainerLinkStatus.terminated)
@@ -351,7 +365,6 @@ class _HistorialList extends ConsumerWidget {
           ],
         );
       },
-      orElse: () => const SizedBox.shrink(),
     );
   }
 }
@@ -378,17 +391,32 @@ class _SectionLoading extends StatelessWidget {
 }
 
 class _SectionError extends StatelessWidget {
-  const _SectionError({required this.message});
+  const _SectionError({required this.message, this.onRetry});
   final String message;
+  final VoidCallback? onRetry;
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 18),
-      child: Text(
-        message,
-        style: TextStyle(color: palette.textMuted),
-        textAlign: TextAlign.center,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            message,
+            style: TextStyle(color: palette.textMuted),
+            textAlign: TextAlign.center,
+          ),
+          if (onRetry != null) ...[
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: onRetry,
+              style: TextButton.styleFrom(foregroundColor: palette.accent),
+              child: Text(l10n.coachRetryLabel),
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -712,9 +740,23 @@ class _PendingRequestsList extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     final linksAsync = ref.watch(trainerLinksStreamProvider);
 
-    return linksAsync.maybeWhen(
+    return linksAsync.when(
+      // The accept/decline queue MUST surface a failure rather than vanish:
+      // silently swallowing the error hides actionable requests (finding 7).
+      error: (_, __) => Padding(
+        padding: const EdgeInsets.only(bottom: 18),
+        child: _SectionError(
+          message: l10n.coachHubSectionLoadError,
+          onRetry: () => ref.invalidate(trainerLinksStreamProvider),
+        ),
+      ),
+      // Loading stays collapsed: the ACTIVOS section already renders the
+      // global section loader, so the pending banner just appears once data
+      // arrives (preserves the existing happy-path of only showing when > 0).
+      loading: () => const SizedBox.shrink(),
       data: (links) {
         final pending =
             links.where((l) => l.status == TrainerLinkStatus.pending).toList();
@@ -743,7 +785,6 @@ class _PendingRequestsList extends ConsumerWidget {
           ],
         );
       },
-      orElse: () => const SizedBox.shrink(),
     );
   }
 }

@@ -63,6 +63,7 @@ Widget _wrapProvider(Widget w, List<Override> overrides) => ProviderScope(
       overrides: overrides,
       child: MaterialApp(
         theme: AppTheme.dark(),
+        locale: const Locale('es', 'AR'),
         localizationsDelegates: AppL10n.localizationsDelegates,
         supportedLocales: AppL10n.supportedLocales,
         home: Scaffold(body: w),
@@ -338,7 +339,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        find.text('No pudimos cargar tu feed. Intentá de nuevo.'),
+        find.text('No pudimos cargar tu feed. Probá de nuevo.'),
         findsOneWidget,
       );
     });
@@ -406,7 +407,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        find.text('No pudimos cargar tu feed. Intentá de nuevo.'),
+        find.text('No pudimos cargar tu feed. Probá de nuevo.'),
         findsOneWidget,
       );
     });
@@ -520,7 +521,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        find.text('No pudimos cargar tu feed. Intentá de nuevo.'),
+        find.text('No pudimos cargar tu feed. Probá de nuevo.'),
         findsOneWidget,
       );
     });
