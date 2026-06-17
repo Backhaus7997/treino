@@ -87,7 +87,9 @@ class _CoachHubUploadPlanScreenState
           .parseAndMatch(bytes: Uint8List.fromList(bytes));
       ref.read(parsedPlanProvider.notifier).state = parsed;
       if (!mounted) return;
-      context.go('/upload-plan/preview');
+      // push (not go): preview is a sub-step, so pop() from it returns here
+      // with the picked file still in state and the browser Back works.
+      context.push('/upload-plan/preview');
     } on PlanImportException catch (e) {
       if (!mounted) return;
       setState(() {
@@ -190,7 +192,10 @@ class _Header extends StatelessWidget {
     return Row(
       children: [
         IconButton(
-          onPressed: () => context.go('/dashboard'),
+          // pop back to the dashboard (the push origin); fall back to go()
+          // when there's no stack to pop (e.g. deep-linked directly here).
+          onPressed: () =>
+              context.canPop() ? context.pop() : context.go('/dashboard'),
           icon: Icon(TreinoIcon.arrowLeft, color: palette.textPrimary),
           tooltip: 'Volver',
         ),

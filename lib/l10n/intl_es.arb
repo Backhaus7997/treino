@@ -1,4 +1,6 @@
 {
+  "workoutHistorialSeeAll": "Ver todo",
+  "workoutHistorialFullTitle": "HISTORIAL",
   "homeAthleteFirstRunTitle": "Arrancá tu entrenamiento",
   "homeAthleteFirstRunBody": "Creá tu primera rutina o buscá un entrenador para empezar.",
   "homeAthleteFirstRunCreateCta": "CREAR RUTINA",
@@ -178,8 +180,11 @@
   "commonProcessing": "Procesando…",
   "commonWarning": "Atención",
   "chatSendingA11y": "Enviando…",
+  "feedMessagesA11y": "Mensajes",
   "feedSearchA11y": "Buscar",
   "feedCreatePostA11y": "Crear publicación",
+  "feedFriendRequestsA11y": "Solicitudes de amistad",
+  "feedFriendRequestsWithCountA11y": "Solicitudes de amistad, {count} pendientes",
   "feedPublishingA11y": "Publicando…",
   "searchUsersClearA11y": "Limpiar búsqueda",
   "publicProfileMessageDisabledA11y": "Mensaje (próximamente)",

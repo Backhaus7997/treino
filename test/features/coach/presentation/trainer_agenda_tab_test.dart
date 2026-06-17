@@ -91,6 +91,9 @@ void main() {
             ],
             child: MaterialApp(
               theme: AppTheme.dark(),
+              localizationsDelegates: AppL10n.localizationsDelegates,
+              supportedLocales: AppL10n.supportedLocales,
+              locale: const Locale('es', 'AR'),
               home: const Scaffold(
                   body: TrainerAgendaTab(trainerId: 'trainer-1')),
             ),

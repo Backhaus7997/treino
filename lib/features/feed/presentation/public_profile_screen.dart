@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
+import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../auth/application/auth_providers.dart';
 import '../application/public_profile_providers.dart';
@@ -35,82 +37,100 @@ class PublicProfileScreen extends ConsumerWidget {
     final l10n = AppL10n.of(context);
     final viewAsync = ref.watch(publicProfileViewProvider(targetUid));
 
-    return viewAsync.when(
-      data: (view) {
-        final viewerUid =
-            ref.watch(authStateChangesProvider).valueOrNull?.uid ?? '';
-        return SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Semantics(
-                image: true,
-                label: l10n.a11yAvatarLabel(view.authorDisplayName),
-                child: PublicProfileHero(view: view),
-              ),
-              const SizedBox(height: 20),
-              if (!view.isSelf) ...[
+    // Transparent Scaffold + AppBar so the screen still composites over the
+    // shell's AppBackground, while providing an on-screen back affordance
+    // (mirrors TrainerPublicProfileScreen). Without this the pushed sub-route
+    // is a navigational dead-end — the bottom tab bar replaces the stack
+    // rather than popping.
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: Icon(TreinoIcon.back, color: palette.textPrimary),
+          tooltip: l10n.commonBack,
+          onPressed: () =>
+              context.canPop() ? context.pop() : context.go('/feed'),
+        ),
+      ),
+      body: viewAsync.when(
+        data: (view) {
+          final viewerUid =
+              ref.watch(authStateChangesProvider).valueOrNull?.uid ?? '';
+          return SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Semantics(
+                  image: true,
+                  label: l10n.a11yAvatarLabel(view.authorDisplayName),
+                  child: PublicProfileHero(view: view),
+                ),
+                const SizedBox(height: 20),
+                if (!view.isSelf) ...[
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: PublicProfileFollowButton(
+                            friendship: view.friendship,
+                            viewerUid: viewerUid,
+                            targetUid: targetUid,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        const Expanded(child: _MessageButtonStub()),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                ],
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: PublicProfileFollowButton(
-                          friendship: view.friendship,
-                          viewerUid: viewerUid,
-                          targetUid: targetUid,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      const Expanded(child: _MessageButtonStub()),
-                    ],
+                  child: PublicProfileStatsRow(
+                    workoutsCount: view.workoutsCount,
+                    racha: view.racha,
+                    followersCount: view.followersCount,
+                    followingCount: view.followingCount,
                   ),
                 ),
                 const SizedBox(height: 20),
-              ],
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: PublicProfileStatsRow(
-                  workoutsCount: view.workoutsCount,
-                  racha: view.racha,
-                  followersCount: view.followersCount,
-                  followingCount: view.followingCount,
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: _ProfileTabPills(targetUid: targetUid),
                 ),
-              ),
-              const SizedBox(height: 20),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: _ProfileTabPills(targetUid: targetUid),
-              ),
-              const SizedBox(height: 18),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: _ProfileTabBody(targetUid: targetUid),
-              ),
-              const SizedBox(height: 20),
-            ],
-          ),
-        );
-      },
-      loading: () => Center(
-        child: Semantics(
-          label: l10n.commonLoading,
-          child: CircularProgressIndicator(color: palette.accent),
-        ),
-      ),
-      error: (_, __) => Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        child: Center(
+                const SizedBox(height: 18),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: _ProfileTabBody(targetUid: targetUid),
+                ),
+                const SizedBox(height: 20),
+              ],
+            ),
+          );
+        },
+        loading: () => Center(
           child: Semantics(
-            liveRegion: true,
-            label: l10n.publicProfileLoadErrorA11y,
-            child: Text(
-              l10n.publicProfileLoadErrorA11y,
-              style: GoogleFonts.barlow(
-                fontSize: 14,
-                color: palette.textMuted,
+            label: l10n.commonLoading,
+            child: CircularProgressIndicator(color: palette.accent),
+          ),
+        ),
+        error: (_, __) => Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Center(
+            child: Semantics(
+              liveRegion: true,
+              label: l10n.publicProfileLoadErrorA11y,
+              child: Text(
+                l10n.publicProfileLoadErrorA11y,
+                style: GoogleFonts.barlow(
+                  fontSize: 14,
+                  color: palette.textMuted,
+                ),
+                textAlign: TextAlign.center,
               ),
-              textAlign: TextAlign.center,
             ),
           ),
         ),
@@ -137,8 +157,7 @@ class _MessageButtonStub extends StatelessWidget {
             onTap: null,
             behavior: HitTestBehavior.opaque,
             child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
               decoration: BoxDecoration(
                 color: Colors.transparent,
                 borderRadius: BorderRadius.circular(20),

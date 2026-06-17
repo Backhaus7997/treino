@@ -12,6 +12,7 @@ import 'domain/gym_name.dart';
 import '../profile/application/user_providers.dart';
 import '../workout/application/session_providers.dart' show currentUidProvider;
 import 'application/feed_screen_providers.dart';
+import 'application/friendship_providers.dart';
 import 'application/post_providers.dart';
 import 'domain/feed_segment.dart';
 import 'domain/post.dart';
@@ -100,13 +101,17 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
   }
 }
 
-class _FeedHeader extends StatelessWidget {
+class _FeedHeader extends ConsumerWidget {
   const _FeedHeader();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
+
+    final uid = ref.watch(currentUidProvider);
+    final pendingRequests =
+        uid == null ? 0 : ref.watch(pendingRequestCountProvider(uid));
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
@@ -122,6 +127,83 @@ class _FeedHeader extends StatelessWidget {
             ),
           ),
           const Spacer(),
+          Semantics(
+            button: true,
+            label: pendingRequests > 0
+                ? l10n.feedFriendRequestsWithCountA11y(pendingRequests)
+                : l10n.feedFriendRequestsA11y,
+            child: GestureDetector(
+              onTap: () => context.push('/profile/friend-requests'),
+              behavior: HitTestBehavior.opaque,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  minWidth: 44,
+                  minHeight: 44,
+                ),
+                child: Center(
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Icon(
+                        TreinoIcon.bell,
+                        size: 20,
+                        color: palette.textMuted,
+                      ),
+                      if (pendingRequests > 0)
+                        Positioned(
+                          top: -4,
+                          right: -5,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 4,
+                              vertical: 1,
+                            ),
+                            constraints: const BoxConstraints(minWidth: 16),
+                            decoration: BoxDecoration(
+                              color: palette.accent,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              pendingRequests > 9 ? '9+' : '$pendingRequests',
+                              textAlign: TextAlign.center,
+                              style: GoogleFonts.barlow(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                height: 1.2,
+                                color: palette.bg,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 4),
+          Semantics(
+            button: true,
+            label: l10n.feedMessagesA11y,
+            child: GestureDetector(
+              onTap: () => context.push('/feed/messages'),
+              behavior: HitTestBehavior.opaque,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  minWidth: 44,
+                  minHeight: 44,
+                ),
+                child: Center(
+                  child: Icon(
+                    TreinoIcon.chat,
+                    size: 20,
+                    color: palette.textMuted,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 4),
           Semantics(
             button: true,
             label: l10n.feedSearchA11y,

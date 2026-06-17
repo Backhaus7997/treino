@@ -8,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_background.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/feed/application/public_profile_providers.dart';
 import 'package:treino/features/feed/domain/public_profile_view.dart';
@@ -89,7 +90,7 @@ Widget _wrap({
 void main() {
   group('PublicProfileScreen', () {
     testWidgets(
-        'SCENARIO-207: does not introduce Scaffold/AppBackground/SafeArea',
+        'SCENARIO-207: provides own back affordance, no AppBackground/SafeArea',
         (tester) async {
       await tester.pumpWidget(_wrap(
         child: const PublicProfileScreen(targetUid: 'target'),
@@ -97,10 +98,18 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      // Only 1 Scaffold from the outer test wrapper
-      expect(find.byType(Scaffold), findsOneWidget);
+      // Screen now wraps its body in a transparent Scaffold + AppBar so it has
+      // an on-screen back affordance (mirrors TrainerPublicProfileScreen).
+      // That is the screen's Scaffold plus the outer test wrapper's = 2.
+      expect(find.byType(Scaffold), findsNWidgets(2));
+      expect(find.byType(AppBar), findsOneWidget);
+      expect(find.byType(BackButton), findsNothing); // custom leading, not default
+      expect(find.widgetWithIcon(IconButton, TreinoIcon.back), findsOneWidget);
+      // Still does NOT introduce its own AppBackground — it composites over the
+      // shell's AppBackground via the transparent Scaffold/AppBar. (The AppBar
+      // contributes its own internal SafeArea, which is expected and harmless,
+      // so we no longer assert SafeArea is absent.)
       expect(find.byType(AppBackground), findsNothing);
-      expect(find.byType(SafeArea), findsNothing);
     });
 
     testWidgets(

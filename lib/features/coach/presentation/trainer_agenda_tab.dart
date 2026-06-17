@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:table_calendar/table_calendar.dart';
 
 import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/treino_icon.dart';
+import '../../../l10n/app_l10n.dart';
 import '../application/agenda_providers.dart';
 import '../domain/appointment.dart';
 import 'widgets/day_timeline.dart';
@@ -13,7 +15,8 @@ import 'widgets/new_session_sheet.dart';
 /// Trainer-side AGENDA sub-tab inside TrainerCoachView.
 ///
 /// Trainer can:
-/// - See their availability rules summary + navigate to availability editor
+/// - Open the availability editor via the "Mis horarios" header action, to
+///   configure their bookable hours without leaving the AGENDA surface
 /// - View a monthly calendar with dots on days that have bookings
 /// - See the selected day's sessions inline as a [DayTimeline] below the calendar
 /// - Tap a block in the timeline → [SessionDetailSheet]
@@ -68,27 +71,50 @@ class _TrainerAgendaTabState extends ConsumerState<TrainerAgendaTab> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // ── Nueva sesión CTA ────────────────────────────────────────────
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () => _openNewSessionSheet(context),
-                  icon: const Icon(TreinoIcon.plus, size: 16),
-                  label: Text(
-                    'NUEVA SESIÓN',
-                    style: GoogleFonts.barlowCondensed(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 13,
-                      letterSpacing: 0.8,
+              // ── Nueva sesión CTA + Mis horarios entry point ─────────────────
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () => _openNewSessionSheet(context),
+                      icon: const Icon(TreinoIcon.plus, size: 16),
+                      label: Text(
+                        'NUEVA SESIÓN',
+                        style: GoogleFonts.barlowCondensed(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: palette.accent,
+                        foregroundColor: palette.bg,
+                        minimumSize: const Size.fromHeight(48),
+                        shape: const StadiumBorder(),
+                      ),
                     ),
                   ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: palette.accent,
-                    foregroundColor: palette.bg,
-                    minimumSize: const Size.fromHeight(48),
-                    shape: const StadiumBorder(),
+                  const SizedBox(width: 10),
+                  // Availability editor entry point — keeps "configure when I'm
+                  // bookable" and "see/book my agenda" on one coherent surface.
+                  Tooltip(
+                    message: AppL10n.of(context).agendaEditorTitle,
+                    child: SizedBox(
+                      width: 48,
+                      height: 48,
+                      child: OutlinedButton(
+                        onPressed: () => _openAvailabilityEditor(context),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: palette.accent,
+                          side: BorderSide(color: palette.accent, width: 1),
+                          padding: EdgeInsets.zero,
+                          shape: const CircleBorder(),
+                        ),
+                        child: const Icon(TreinoIcon.clock, size: 20),
+                      ),
+                    ),
                   ),
-                ),
+                ],
               ),
               const SizedBox(height: 16),
 
@@ -141,6 +167,12 @@ class _TrainerAgendaTabState extends ConsumerState<TrainerAgendaTab> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (_) => const NewSessionSheet(),
+    );
+  }
+
+  void _openAvailabilityEditor(BuildContext context) {
+    context.push(
+      '/coach/availability-editor?trainerId=${widget.trainerId}',
     );
   }
 }

@@ -33,12 +33,41 @@ class _HistorialSectionState extends ConsumerState<HistorialSection> {
 
     final sessionsAsync = ref.watch(sessionsByUidProvider(uid));
 
+    final completedCount = sessionsAsync.maybeWhen(
+      data: (all) => all
+          .where((s) =>
+              s.status == SessionStatus.finished && s.wasFullyCompleted)
+          .length,
+      orElse: () => 0,
+    );
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          l10n.workoutHistorialHeading,
-          style: theme.textTheme.titleMedium,
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                l10n.workoutHistorialHeading,
+                style: theme.textTheme.titleMedium,
+              ),
+            ),
+            // First-class entry point to the full, uncapped history. Surfaced
+            // only when there is history so the empty state stays clean.
+            if (completedCount > 0)
+              TextButton(
+                onPressed: () => context.push('/workout/historial'),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  minimumSize: const Size(0, 0),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: Text(
+                  l10n.workoutHistorialSeeAll,
+                  style: TextStyle(color: AppPalette.of(context).accent),
+                ),
+              ),
+          ],
         ),
         const SizedBox(height: 12),
         sessionsAsync.when(

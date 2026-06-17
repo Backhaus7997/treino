@@ -176,6 +176,8 @@
       }
     }
   },
+  "workoutHistorialSeeAll": "",
+  "workoutHistorialFullTitle": "",
   "workoutDetailStatDuration": "",
   "workoutDetailStatSets": "",
   "workoutDetailStatVolume": "",
@@ -547,8 +549,11 @@
   "commonProcessing": "Processing…",
   "commonWarning": "Warning",
   "chatSendingA11y": "Sending…",
+  "feedMessagesA11y": "Messages",
   "feedSearchA11y": "Search",
   "feedCreatePostA11y": "Create post",
+  "feedFriendRequestsA11y": "Friend requests",
+  "feedFriendRequestsWithCountA11y": "Friend requests, {count} pending",
   "feedPublishingA11y": "Publishing…",
   "searchUsersClearA11y": "Clear search",
   "publicProfileMessageDisabledA11y": "Message (coming soon)",

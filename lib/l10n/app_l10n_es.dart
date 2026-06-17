@@ -483,6 +483,12 @@ class AppL10nEs extends AppL10n {
   }
 
   @override
+  String get workoutHistorialSeeAll => 'Ver todo';
+
+  @override
+  String get workoutHistorialFullTitle => 'HISTORIAL';
+
+  @override
   String get workoutDetailStatDuration => 'DURACIÓN';
 
   @override
@@ -1506,10 +1512,21 @@ class AppL10nEs extends AppL10n {
   String get chatSendingA11y => 'Enviando…';
 
   @override
+  String get feedMessagesA11y => 'Mensajes';
+
+  @override
   String get feedSearchA11y => 'Buscar';
 
   @override
   String get feedCreatePostA11y => 'Crear publicación';
+
+  @override
+  String get feedFriendRequestsA11y => 'Solicitudes de amistad';
+
+  @override
+  String feedFriendRequestsWithCountA11y(int count) {
+    return 'Solicitudes de amistad, $count pendientes';
+  }
 
   @override
   String get feedPublishingA11y => 'Publicando…';
@@ -2178,6 +2195,12 @@ class AppL10nEsAr extends AppL10nEs {
   String workoutHistorialShowMore(int n) {
     return 'Ver más ($n)';
   }
+
+  @override
+  String get workoutHistorialSeeAll => 'Ver todo';
+
+  @override
+  String get workoutHistorialFullTitle => 'HISTORIAL';
 
   @override
   String get workoutDetailStatDuration => 'DURACIÓN';
@@ -3205,10 +3228,21 @@ class AppL10nEsAr extends AppL10nEs {
   String get chatSendingA11y => 'Enviando…';
 
   @override
+  String get feedMessagesA11y => 'Mensajes';
+
+  @override
   String get feedSearchA11y => 'Buscar';
 
   @override
   String get feedCreatePostA11y => 'Crear publicación';
+
+  @override
+  String get feedFriendRequestsA11y => 'Solicitudes de amistad';
+
+  @override
+  String feedFriendRequestsWithCountA11y(int count) {
+    return 'Solicitudes de amistad, $count pendientes';
+  }
 
   @override
   String get feedPublishingA11y => 'Publicando…';

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/l10n/app_l10n.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
@@ -15,6 +16,8 @@ Widget _wrap(Widget child, {List<Override> overrides = const []}) =>
       overrides: overrides,
       child: MaterialApp(
         theme: AppTheme.dark(),
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
         home: Scaffold(body: child),
       ),
     );
@@ -177,6 +180,8 @@ void main() {
           ]),
           child: MaterialApp.router(
             theme: AppTheme.dark(),
+            localizationsDelegates: AppL10n.localizationsDelegates,
+            supportedLocales: AppL10n.supportedLocales,
             routerConfig: router,
           ),
         ),

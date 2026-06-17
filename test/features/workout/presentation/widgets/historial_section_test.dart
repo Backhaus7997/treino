@@ -370,5 +370,48 @@ void main() {
       }
       expect(find.textContaining('Ver más'), findsNothing);
     });
+
+    // ── "Ver todo" full-history entry point ─────────────────────────────────
+
+    // SCENARIO-372: header shows "Ver todo" when there is history
+    testWidgets('SCENARIO-372: "Ver todo" affordance shows when history exists',
+        (tester) async {
+      await _pumpHistorialSection(tester, sessions: manySessions(3));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Ver todo'), findsOneWidget);
+    });
+
+    // SCENARIO-373: header hides "Ver todo" on the empty state
+    testWidgets('SCENARIO-373: "Ver todo" affordance hidden when no history',
+        (tester) async {
+      await _pumpHistorialSection(tester, sessions: []);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Ver todo'), findsNothing);
+    });
+
+    // SCENARIO-374: tapping "Ver todo" navigates to /workout/historial (list)
+    testWidgets(
+        'SCENARIO-374: tapping "Ver todo" navigates to /workout/historial list',
+        (tester) async {
+      await _pumpHistorialSection(
+        tester,
+        sessions: manySessions(3),
+        extraRoutes: [
+          GoRoute(
+            path: '/workout/historial',
+            builder: (_, __) =>
+                const Scaffold(body: Center(child: Text('Historial completo'))),
+          ),
+        ],
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Ver todo'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Historial completo'), findsOneWidget);
+    });
   });
 }

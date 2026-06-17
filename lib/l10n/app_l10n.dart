@@ -1004,6 +1004,18 @@ abstract class AppL10n {
   /// **'Ver más ({n})'**
   String workoutHistorialShowMore(int n);
 
+  /// No description provided for @workoutHistorialSeeAll.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ver todo'**
+  String get workoutHistorialSeeAll;
+
+  /// No description provided for @workoutHistorialFullTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'HISTORIAL'**
+  String get workoutHistorialFullTitle;
+
   /// No description provided for @workoutDetailStatDuration.
   ///
   /// In es_AR, this message translates to:
@@ -2858,6 +2870,12 @@ abstract class AppL10n {
   /// **'Enviando…'**
   String get chatSendingA11y;
 
+  /// Accessibility label for the icon-only header messages action in the feed that opens the chat inbox (navigation finding: ChatListScreen was unreachable).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Mensajes'**
+  String get feedMessagesA11y;
+
   /// Accessibility label for the icon-only header search action in the feed (finding 11 feed_screen search GestureDetector).
   ///
   /// In es_AR, this message translates to:
@@ -2869,6 +2887,18 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Crear publicación'**
   String get feedCreatePostA11y;
+
+  /// Accessibility label for the icon-only friend-requests inbox action in the feed header bell icon (navigation finding: friend-requests inbox was unreachable from the feed/social surface).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Solicitudes de amistad'**
+  String get feedFriendRequestsA11y;
+
+  /// Accessibility label for the feed header friend-requests bell icon when there are pending requests; announces the badge count to screen readers.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Solicitudes de amistad, {count} pendientes'**
+  String feedFriendRequestsWithCountA11y(int count);
 
   /// Semantics liveRegion/label for the create-post submit spinner state while a post is being published (finding 12 create_post_screen PUBLICAR spinner branch).
   ///
