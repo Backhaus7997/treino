@@ -6,6 +6,7 @@ import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach_hub/presentation/sections/ajustes/ajustes_screen.dart';
 import 'package:treino/features/coach_hub/presentation/sections/ajustes/tabs/avatar_web_uploader.dart';
+import 'package:treino/features/coach_hub/presentation/sections/ajustes/tabs/notificaciones_prefs.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/data/user_repository.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
@@ -36,6 +37,9 @@ Widget _harness({
         ),
         trainerLinksStreamProvider
             .overrideWith((ref) => Stream<List<TrainerLink>>.value(const [])),
+        webNotificationPreferencesProvider.overrideWith(
+          (ref) => Stream<NotifPrefs>.value(NotifPrefs.fromFirestore(null)),
+        ),
         if (repo != null) userRepositoryProvider.overrideWithValue(repo),
         if (uploader != null)
           avatarWebUploaderProvider.overrideWithValue(uploader),
@@ -77,9 +81,36 @@ void main() {
 
       await tester.tap(find.text('Notificaciones'));
       await tester.pump();
+      await tester.pump(); // deja emitir el StreamProvider de prefs
 
-      expect(find.text('Notificaciones · Próximamente'), findsOneWidget);
+      // Ya no es placeholder: muestra la matriz real.
+      expect(find.text('NOTIFICACIONES'), findsOneWidget);
+      expect(find.text('PUSH'), findsOneWidget);
       expect(find.text('INFORMACIÓN PERSONAL'), findsNothing);
+    });
+
+    testWidgets('Notificaciones: togglear un canal persiste notificationPrefs',
+        (tester) async {
+      final repo = _MockUserRepo();
+      when(() => repo.update(any(), any())).thenAnswer((_) async {});
+
+      await tester.pumpWidget(_harness(repo: repo));
+      await tester.pump();
+
+      await tester.tap(find.text('Notificaciones'));
+      await tester.pump();
+      await tester.pump(); // deja emitir el StreamProvider de prefs
+
+      // Primer checkbox = pago_recibido × EMAIL (default on) → lo apago.
+      await tester.tap(find.byType(Checkbox).first);
+      await tester.pump();
+
+      final captured = verify(() => repo.update('pf1', captureAny()))
+          .captured
+          .single as Map<String, Object?>;
+      final prefs = captured['notificationPrefs'] as Map<String, dynamic>;
+      expect((prefs['pago_recibido'] as Map)['email'], false);
+      expect((prefs['pago_recibido'] as Map)['push'], true);
     });
 
     testWidgets(
