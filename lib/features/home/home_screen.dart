@@ -2,17 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../app/theme/app_palette.dart';
+import '../../core/widgets/treino_icon.dart';
 import '../../l10n/app_l10n.dart';
 import '../coach/presentation/trainer_dashboard_tab.dart';
 import '../notifications/presentation/permission_gate.dart';
 import '../profile/application/user_providers.dart';
 import '../profile/domain/user_role.dart';
+import '../workout/application/assigned_routine_providers.dart';
 import '../workout/application/session_providers.dart';
+import '../workout/application/user_routines_providers.dart';
 import '../workout/domain/session.dart';
 import '../workout/domain/set_log.dart';
 import '../workout/presentation/widgets/resume_session_modal.dart';
 import 'widgets/empezar_entrenamiento_card.dart';
 import 'widgets/esta_semana_card.dart';
+import 'widgets/home_cta_button.dart';
 import 'widgets/home_header.dart';
 
 /// Role-aware home screen.
@@ -79,6 +84,18 @@ class _AthleteHome extends ConsumerWidget {
       error: (_, __) => const HomeHeader(profile: null),
     );
 
+    // Gate the hero "Empezar" card behind real routine data so a brand-new
+    // athlete never lands on a hardcoded fake workout (finding 5). We treat
+    // the athlete as first-run only once BOTH their self-created routines and
+    // their trainer-assigned plans have resolved to empty. While either is
+    // loading or errors, fall back to the existing card (no spinner flash,
+    // and we never hide a real workout behind a transient empty read).
+    final uid = ref.watch(currentUidProvider) ?? '';
+    final hasNoRoutine = uid.isEmpty
+        ? false
+        : _isEmptyData(ref.watch(userCreatedRoutinesProvider(uid))) &&
+            _isEmptyData(ref.watch(assignedRoutinesProvider(uid)));
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: ListView(
@@ -90,10 +107,82 @@ class _AthleteHome extends ConsumerWidget {
         children: [
           headerOrSkeleton,
           const SizedBox(height: 20),
-          const EmpezarEntrenamientoCard(),
+          if (hasNoRoutine)
+            const _AthleteFirstRunCard()
+          else
+            const EmpezarEntrenamientoCard(),
           const SizedBox(height: 12),
           const EstaSemanaCard(),
         ],
+      ),
+    );
+  }
+}
+
+/// True only when [async] has resolved to an empty list. Loading and error
+/// states return false so the caller keeps showing the existing workout card
+/// instead of a premature first-run empty state (finding 5).
+bool _isEmptyData(AsyncValue<List<Object?>> async) =>
+    async.valueOrNull?.isEmpty ?? false;
+
+/// First-run empty state shown on Home when the athlete has no self-created
+/// routine and no trainer-assigned plan. Replaces the hardcoded fake workout
+/// card with an honest onboarding surface and two CTAs (finding 5).
+class _AthleteFirstRunCard extends StatelessWidget {
+  const _AthleteFirstRunCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+    final theme = Theme.of(context);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: palette.bgCard,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: palette.border, width: 1),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              l10n.homeAthleteFirstRunTitle,
+              style: theme.textTheme.titleMedium
+                  ?.copyWith(color: palette.textPrimary),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              l10n.homeAthleteFirstRunBody,
+              style: theme.textTheme.bodyMedium
+                  ?.copyWith(color: palette.textMuted),
+            ),
+            const SizedBox(height: 18),
+            HomeCTAButton(
+              label: l10n.homeAthleteFirstRunCreateCta,
+              leadingIcon: TreinoIcon.plus,
+              onPressed: () => context.push('/workout/my-routine-editor'),
+            ),
+            const SizedBox(height: 10),
+            // Secondary CTA: route to the Coach tab where athletes browse and
+            // request a trainer.
+            OutlinedButton.icon(
+              onPressed: () => context.go('/coach'),
+              icon: Icon(TreinoIcon.search, size: 16, color: palette.accent),
+              label: Text(
+                l10n.homeAthleteFirstRunFindTrainerCta,
+                style: TextStyle(color: palette.accent),
+              ),
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size.fromHeight(48),
+                side: BorderSide(color: palette.accent.withValues(alpha: 0.6)),
+                shape: const StadiumBorder(),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

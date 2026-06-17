@@ -195,6 +195,20 @@ Widget _feedPostList(BuildContext context, List<Post> posts) {
   );
 }
 
+/// Wraps an empty/placeholder state in a scrollable so it can still be
+/// pulled-to-refresh even when there is nothing to scroll.
+Widget _scrollableEmptyState(BuildContext context, Widget child) {
+  return LayoutBuilder(
+    builder: (context, constraints) => SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(minHeight: constraints.maxHeight),
+        child: child,
+      ),
+    ),
+  );
+}
+
 /// Shared async resolver for the three feed segments.
 ///
 /// Renders a consistent loading spinner and — critically — an error state
@@ -205,11 +219,13 @@ class _FeedAsyncBody<T> extends StatelessWidget {
   const _FeedAsyncBody({
     required this.async,
     required this.onRetry,
+    required this.onRefresh,
     required this.dataBuilder,
   });
 
   final AsyncValue<T> async;
   final VoidCallback onRetry;
+  final Future<void> Function() onRefresh;
   final Widget Function(BuildContext context, T data) dataBuilder;
 
   @override
@@ -218,7 +234,14 @@ class _FeedAsyncBody<T> extends StatelessWidget {
     final l10n = AppL10n.of(context);
 
     return async.when(
-      data: (data) => dataBuilder(context, data),
+      data: (data) => Semantics(
+        label: l10n.feedPullToRefreshA11y,
+        child: RefreshIndicator(
+          color: palette.accent,
+          onRefresh: onRefresh,
+          child: dataBuilder(context, data),
+        ),
+      ),
       loading: () => Center(
         child: CircularProgressIndicator(color: palette.accent),
       ),
@@ -258,10 +281,14 @@ class _AmigosBody extends ConsumerWidget {
     return _FeedAsyncBody<List<Post>>(
       async: ref.watch(myFriendsFeedProvider),
       onRetry: () => ref.invalidate(myFriendsFeedProvider),
+      onRefresh: () => ref.refresh(myFriendsFeedProvider.future),
       dataBuilder: (context, posts) {
         if (posts.isEmpty) {
-          return const FeedEmptyState(
-            message: 'Aún no hay posts de tus amigos',
+          return _scrollableEmptyState(
+            context,
+            const FeedEmptyState(
+              message: 'Aún no hay posts de tus amigos',
+            ),
           );
         }
         return _feedPostList(context, posts);
@@ -278,15 +305,22 @@ class _MiGymBody extends ConsumerWidget {
     return _FeedAsyncBody<List<Post>?>(
       async: ref.watch(myGymFeedProvider),
       onRetry: () => ref.invalidate(myGymFeedProvider),
+      onRefresh: () => ref.refresh(myGymFeedProvider.future),
       dataBuilder: (context, posts) {
         if (posts == null) {
-          return const FeedEmptyState(
-            message: 'Todavía no estás en un gym',
+          return _scrollableEmptyState(
+            context,
+            const FeedEmptyState(
+              message: 'Todavía no estás en un gym',
+            ),
           );
         }
         if (posts.isEmpty) {
-          return const FeedEmptyState(
-            message: 'Tu gym todavía no tiene posts',
+          return _scrollableEmptyState(
+            context,
+            const FeedEmptyState(
+              message: 'Tu gym todavía no tiene posts',
+            ),
           );
         }
         return _feedPostList(context, posts);
@@ -303,10 +337,14 @@ class _PublicoBody extends ConsumerWidget {
     return _FeedAsyncBody<List<Post>>(
       async: ref.watch(feedPublicProvider),
       onRetry: () => ref.invalidate(feedPublicProvider),
+      onRefresh: () => ref.refresh(feedPublicProvider.future),
       dataBuilder: (context, posts) {
         if (posts.isEmpty) {
-          return const FeedEmptyState(
-            message: 'Aún no hay posts públicos',
+          return _scrollableEmptyState(
+            context,
+            const FeedEmptyState(
+              message: 'Aún no hay posts públicos',
+            ),
           );
         }
         return _feedPostList(context, posts);

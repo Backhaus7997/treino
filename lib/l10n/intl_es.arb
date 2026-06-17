@@ -1,4 +1,8 @@
 {
+  "homeAthleteFirstRunTitle": "Arrancá tu entrenamiento",
+  "homeAthleteFirstRunBody": "Creá tu primera rutina o buscá un entrenador para empezar.",
+  "homeAthleteFirstRunCreateCta": "CREAR RUTINA",
+  "homeAthleteFirstRunFindTrainerCta": "Buscar entrenador",
   "@@locale": "es",
   "@@x-note": "Copia defensiva de intl_es_AR.arb (decisión Q3 del audit). El locale real lo fija locale_resolver.dart → es-AR; esto es seguro de muerte: si algún día se quita ese lock, plain-`es` muestra español válido en vez de strings vacíos.",
   "authSplashTagline": "ENTRENÁ. COMPARTÍ. CRECÉ.",
@@ -249,5 +253,27 @@
   "feedFriendActionError": "No pudimos completar la acción. Inténtalo de nuevo.",
   "profilePersonalSaveSuccess": "Cambios guardados.",
   "profileGymSaveSuccess": "Gimnasio actualizado.",
-  "profileGymSaveError": "No pudimos guardar el gimnasio. Inténtalo de nuevo."
+  "profileGymSaveError": "No pudimos guardar el gimnasio. Inténtalo de nuevo.",
+  "feedPullToRefreshA11y": "Desliza para actualizar",
+  "logFieldInvalidNumber": "Ingresa un número válido",
+  "logFieldOutOfRange": "El valor está fuera de rango",
+  "logEmptyRecordWarning": "Completa al menos un dato antes de guardar",
+  "profileSetupUsernameChecking": "Comprobando disponibilidad…",
+  "profileSetupUsernameTaken": "Ese nombre de usuario ya está en uso",
+  "profileSetupUsernameAvailable": "Nombre de usuario disponible",
+  "profileSetupUsernameCheckError": "No pudimos comprobar el nombre de usuario. Inténtalo de nuevo.",
+  "routineEditorDiscardTitle": "¿Descartar cambios?",
+  "routineEditorDiscardBody": "Si sales ahora perderás los cambios sin guardar.",
+  "routineEditorDiscardConfirm": "Descartar",
+  "trainerCtaExistingLinkExplanation": "Solo puedes tener un PF activo. Termina tu vínculo actual con {trainerName} para pedir uno nuevo.",
+  "@trainerCtaExistingLinkExplanation": {
+    "placeholders": {
+      "trainerName": {
+        "type": "String"
+      }
+    }
+  },
+  "coachHubPreviewDiscardTitle": "¿Salir sin guardar el plan?",
+  "coachHubPreviewDiscardBody": "Vas a perder los ejercicios que mapeaste manualmente.",
+  "coachHubPreviewDiscardConfirm": "Salir igual"
 }

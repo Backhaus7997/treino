@@ -58,8 +58,7 @@ class UserPublicProfileRepository {
         i,
         i + chunkSize > distinct.length ? distinct.length : i + chunkSize,
       );
-      final snap =
-          await _col.where(FieldPath.documentId, whereIn: chunk).get();
+      final snap = await _col.where(FieldPath.documentId, whereIn: chunk).get();
       for (final doc in snap.docs) {
         final data = doc.data();
         out[doc.id] = UserPublicProfile.fromJson(data);
@@ -95,6 +94,30 @@ class UserPublicProfileRepository {
       {'sharedTemplatesWithAthletes': value},
       SetOptions(merge: true),
     );
+  }
+
+  /// Returns `true` when some OTHER user already owns the handle [displayName]
+  /// (case-insensitive, exact match on `displayNameLowercase`). Used by the
+  /// ProfileSetup step-1 availability check to prevent two athletes claiming
+  /// the same public `@handle`.
+  ///
+  /// [excludeUid] lets the current user keep their own handle (re-running the
+  /// onboarding / editing without seeing their own profile reported as taken).
+  /// Returns `false` for a blank handle (the format validator already rejects
+  /// it) without issuing a Firestore call.
+  Future<bool> isDisplayNameTaken(
+    String displayName, {
+    String? excludeUid,
+  }) async {
+    final normalized = displayName.trim().toLowerCase();
+    if (normalized.isEmpty) return false;
+
+    final snap = await _col
+        .where('displayNameLowercase', isEqualTo: normalized)
+        .limit(2)
+        .get();
+
+    return snap.docs.any((d) => d.id != excludeUid);
   }
 
   /// Returns up to [limit] profiles whose `displayNameLowercase` starts with

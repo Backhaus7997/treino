@@ -98,6 +98,30 @@ abstract class AppL10n {
     Locale('es', 'AR')
   ];
 
+  /// Home first-run empty-state title for an athlete with no routine (usability finding 6).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Arrancá tu entrenamiento'**
+  String get homeAthleteFirstRunTitle;
+
+  /// Home first-run empty-state body offering both the create-routine and find-trainer paths (finding 6).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Creá tu primera rutina o buscá un entrenador para empezar.'**
+  String get homeAthleteFirstRunBody;
+
+  /// Home first-run primary CTA to create a routine (finding 6).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CREAR RUTINA'**
+  String get homeAthleteFirstRunCreateCta;
+
+  /// Home first-run secondary CTA to browse trainers (finding 6).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Buscar entrenador'**
+  String get homeAthleteFirstRunFindTrainerCta;
+
   /// No description provided for @authSplashTagline.
   ///
   /// In es_AR, this message translates to:
@@ -3079,6 +3103,96 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'No pudimos guardar el gimnasio. Probá de nuevo.'**
   String get profileGymSaveError;
+
+  /// Semantics/hint label for the RefreshIndicator added to feed segments (finding 1). Optional a11y label for the manual refresh gesture.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Deslizá para actualizar'**
+  String get feedPullToRefreshA11y;
+
+  /// Per-field inline validation error shown when a measurement/performance metric contains non-numeric text instead of silently dropping it (findings 2, 3).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ingresá un número válido'**
+  String get logFieldInvalidNumber;
+
+  /// Inline validation error when a numeric metric is negative or exceeds sane bounds in the measurement/performance log forms (findings 2, 3).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'El valor está fuera de rango'**
+  String get logFieldOutOfRange;
+
+  /// Message shown (or reason GUARDAR is disabled) when the measurement/performance form has no metric filled, preventing an empty record (findings 2, 3, 10).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Completá al menos un dato antes de guardar'**
+  String get logEmptyRecordWarning;
+
+  /// Inline status shown under the step-1 username field while the async @handle availability query is in flight (finding 4).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Verificando disponibilidad…'**
+  String get profileSetupUsernameChecking;
+
+  /// Inline error shown when the chosen @handle is already used by another userPublicProfiles document (finding 4).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ese username ya está en uso'**
+  String get profileSetupUsernameTaken;
+
+  /// Inline confirmation shown when the async availability check finds the chosen @handle is free (finding 4).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Username disponible'**
+  String get profileSetupUsernameAvailable;
+
+  /// Inline error shown when the @handle availability query fails (network/Firestore error) during profile setup step 1 (finding 4).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos verificar el username. Probá de nuevo.'**
+  String get profileSetupUsernameCheckError;
+
+  /// Title of the confirm dialog shown by PopScope when leaving the routine editor with unsaved edits (finding 7).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Descartar cambios?'**
+  String get routineEditorDiscardTitle;
+
+  /// Body of the unsaved-changes confirm dialog in the routine editor (finding 7). Reuses routineEditorDialogCancel for the cancel action.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Si salís ahora vas a perder los cambios sin guardar.'**
+  String get routineEditorDiscardBody;
+
+  /// Destructive confirm action of the unsaved-changes dialog in the routine editor (finding 7).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Descartar'**
+  String get routineEditorDiscardConfirm;
+
+  /// Explanatory text shown in a sheet or inline helper when the contact CTA is blocked because the athlete already has a link with a different trainer (finding 8).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Solo podés tener un PF activo. Terminá tu vínculo actual con {trainerName} para pedir uno nuevo.'**
+  String trainerCtaExistingLinkExplanation(String trainerName);
+
+  /// Title of the confirm dialog shown when leaving the coach-hub plan preview screen with manually-mapped exercises that would be lost (finding 9).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Salir sin guardar el plan?'**
+  String get coachHubPreviewDiscardTitle;
+
+  /// Body of the confirm dialog warning the PF that going back from the plan preview discards manual exercise mappings held in the autoDispose parsedPlanProvider (finding 9).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Vas a perder los ejercicios que mapeaste manualmente.'**
+  String get coachHubPreviewDiscardBody;
+
+  /// Destructive confirm action of the coach-hub preview leave-without-saving dialog (finding 9).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Salir igual'**
+  String get coachHubPreviewDiscardConfirm;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

@@ -9,6 +9,7 @@ import '../../../core/widgets/treino_icon.dart';
 import '../application/auth_providers.dart';
 import '../../../l10n/app_l10n.dart';
 import '../domain/auth_failure.dart';
+import '../domain/email_password_validator.dart';
 import 'widgets/auth_circle_back_button.dart';
 import 'widgets/auth_failure_banner.dart';
 import 'widgets/auth_input.dart';
@@ -24,6 +25,7 @@ class ForgotPasswordScreen extends ConsumerStatefulWidget {
 
 class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
   final _emailCtrl = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
   bool _sent = false;
   AuthFailure? _failure;
   bool _isLoading = false;
@@ -41,6 +43,8 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
   }
 
   Future<void> _submit() async {
+    // Catch malformed emails before the network call (align with register).
+    if (!(_formKey.currentState?.validate() ?? false)) return;
     final email = _emailCtrl.text.trim();
     setState(() {
       _isLoading = true;
@@ -94,7 +98,9 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
         child: SafeArea(
           child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Column(
+            child: Form(
+              key: _formKey,
+              child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: 12),
@@ -167,6 +173,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                     keyboardType: TextInputType.emailAddress,
                     textInputAction: TextInputAction.done,
                     autofillHints: const [AutofillHints.email],
+                    validator: EmailPasswordValidator.validateEmail,
                     onFieldSubmitted: (_) =>
                         _emailCtrl.text.trim().isEmpty ? null : _submit(),
                   ),
@@ -183,6 +190,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                   ),
                 ],
               ],
+              ),
             ),
           ),
         ),
