@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../auth/application/auth_providers.dart';
+import '../../coach_hub/data/exercise_matcher.dart' show normalize;
 import '../../profile/application/user_providers.dart' show firestoreProvider;
 import '../data/exercise_repository.dart';
 import '../domain/exercise.dart';
@@ -38,24 +39,52 @@ final exerciseByIdProvider = FutureProvider.family<Exercise?, String>(
   },
 );
 
-/// Routine-slot-aware exercise lookup. Tries the public catalogue first; if
-/// the id is unknown there AND an `ownerId` was provided (the routine's
-/// `assignedBy`, i.e. the trainer who built the plan), falls back to that
-/// trainer's `customExercises/{exerciseId}` subcollection so athletes can
-/// open the detail screen for a trainer-defined exercise without
-/// duplicating its content into the routine slot.
+/// Routine-slot-aware exercise lookup. Three-tier fallback:
+///
+///   1. Strict ID match in the public catalogue ([exerciseByIdProvider]).
+///   2. **Name fallback**: if [exerciseName] was provided and the strict
+///      lookup missed, scan the public catalogue for a normalized match
+///      against [Exercise.name] or [Exercise.aliases]. Saves slots whose
+///      stored `exerciseId` drifted from the catalogue — known causes:
+///      seed scripts written with Spanish-slug IDs (`press-banca`) while
+///      the catalogue uses English-kebab (`bench-press`), and
+///      `dedup_exercise_generics.js` deleting generic docs (`bench-press`)
+///      in favour of equipment-qualified variants (`bench-press-barbell`)
+///      without updating in-flight routines.
+///   3. If `ownerId` is non-null and the catalogue lookup fully missed,
+///      try the trainer's `customExercises/{exerciseId}` subcollection
+///      (so athletes can open trainer-defined exercises without
+///      duplicating content into the slot).
 ///
 /// CustomExercise is projected into [Exercise] with `category: 'custom'` so
-/// the existing detail screen renders it without branching. `techniqueInstructions`
-/// stays null for now — trainers don't author per-instruction lists yet.
-final slotExerciseProvider =
-    FutureProvider.family<Exercise?, ({String exerciseId, String? ownerId})>(
+/// the existing detail screen renders it without branching.
+/// `techniqueInstructions` stays null — trainers don't author per-instruction
+/// lists yet.
+final slotExerciseProvider = FutureProvider.family<Exercise?,
+    ({String exerciseId, String? ownerId, String? exerciseName})>(
   (ref, key) async {
+    // Tier 1: strict ID.
     final fromCatalogue = await ref.watch(
       exerciseByIdProvider(key.exerciseId).future,
     );
     if (fromCatalogue != null) return fromCatalogue;
 
+    // Tier 2: name / alias fallback (only if a name was supplied by the slot).
+    final name = key.exerciseName;
+    if (name != null && name.trim().isNotEmpty) {
+      final all = await ref.watch(exercisesProvider.future);
+      final target = normalize(name);
+      if (target.isNotEmpty) {
+        for (final ex in all) {
+          if (normalize(ex.name) == target) return ex;
+          for (final a in ex.aliases) {
+            if (normalize(a) == target) return ex;
+          }
+        }
+      }
+    }
+
+    // Tier 3: trainer custom exercises (id-keyed subcollection).
     final ownerId = key.ownerId;
     if (ownerId == null || ownerId.isEmpty) return null;
 

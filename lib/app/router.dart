@@ -341,9 +341,14 @@ GoRouter buildRouter({
                 builder: (context, state) {
                   final exerciseId = state.pathParameters['exerciseId']!;
                   final ownerId = state.uri.queryParameters['ownerId'];
+                  // `name` carries the slot's display name so the provider
+                  // can do a name/alias fallback when `exerciseId` drifted
+                  // from the catalogue (Spanish-slug seeds, dedup'd generics).
+                  final exerciseName = state.uri.queryParameters['name'];
                   return _withBg(ExerciseDetailScreen(
                     exerciseId: exerciseId,
                     ownerId: ownerId,
+                    exerciseName: exerciseName,
                   ));
                 },
               ),
