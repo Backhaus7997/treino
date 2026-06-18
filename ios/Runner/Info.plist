@@ -52,9 +52,9 @@
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>Necesitamos tu ubicación para mostrarte entrenadores cerca tuyo.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>Para tomar y subir tu foto de perfil.</string>
+	<string>Para tomar fotos y videos que podés compartir en el chat o subir a tu perfil.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Para elegir tu foto de perfil y subir planes de entrenamiento en Excel desde tu galería.</string>
+	<string>Para elegir fotos y videos de tu galería y compartirlos en el chat, o subir tu foto de perfil y planes de entrenamiento.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Para guardar imágenes de tu progreso en tu galería cuando lo solicites.</string>
 	<!--

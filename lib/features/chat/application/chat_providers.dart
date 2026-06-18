@@ -4,12 +4,17 @@ import '../../coach/domain/trainer_link.dart';
 import '../../profile/application/user_providers.dart' show firestoreProvider;
 import '../../workout/application/session_providers.dart'
     show currentUidProvider;
+import '../data/chat_media_upload_service.dart';
 import '../data/chat_repository.dart';
 import '../domain/chat.dart';
 import '../domain/message.dart';
 
 final chatRepositoryProvider = Provider<ChatRepository>(
   (ref) => ChatRepository(firestore: ref.watch(firestoreProvider)),
+);
+
+final chatMediaUploadServiceProvider = Provider<ChatMediaUploadService>(
+  (ref) => ChatMediaUploadService(),
 );
 
 /// Stream de chats del usuario actual, ordenados por lastMessageAt desc.
