@@ -547,6 +547,24 @@ class AppL10nEn extends AppL10n {
   String get workoutMisRutinasOverflowArchive => '';
 
   @override
+  String get workoutMisRutinasOverflowMarkActive => '';
+
+  @override
+  String get workoutMisRutinasOverflowUnmarkActive => '';
+
+  @override
+  String get workoutMisRutinasActiveChip => '';
+
+  @override
+  String get workoutMisRutinasMarkActiveSuccess => '';
+
+  @override
+  String get workoutMisRutinasUnmarkActiveSuccess => '';
+
+  @override
+  String get workoutMisRutinasActiveError => '';
+
+  @override
   String get workoutMisRutinasConfirmTitle => '';
 
   @override

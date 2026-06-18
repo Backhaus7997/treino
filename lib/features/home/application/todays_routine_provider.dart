@@ -8,6 +8,7 @@ import '../../workout/domain/routine.dart';
 import '../../workout/domain/routine_day.dart';
 import '../../workout/domain/session.dart';
 import '../../workout/domain/session_status.dart';
+import 'active_routine_provider.dart';
 
 /// Resolved "what to train today" snapshot for the home `EmpezarEntrenamientoCard`.
 ///
@@ -28,9 +29,11 @@ typedef TodaysRoutine = ({
 ///   1. Trainer-assigned plan (any in `assignedRoutinesProvider`). Picks
 ///      the newest if multiple — repo already orders desc by `createdAt`.
 ///   2. Single self-created routine (`userCreatedRoutinesProvider.length == 1`).
-///   3. Returns null — multi-rutina without trainer plan needs an explicit
-///      "active routine" marker (PR#2 deliverable). Home falls back to
-///      the empty CTA.
+///   3. Multi self-created → the routine marked as active in
+///      `UserProfile.activeRoutineId`. PR#2 (active-routine marker).
+///   4. Returns null — multi-rutina without an active marker. Home falls
+///      back to the empty CTA + nudges the user to mark one via
+///      MisRutinasSection overflow menu.
 ///
 ///   DAY CALCULATION (progress-based)
 ///   * Looks at the latest FINISHED session for the resolved routine.
@@ -60,12 +63,18 @@ final todaysRoutineProvider = FutureProvider.autoDispose<TodaysRoutine?>(
     if (assigned.isNotEmpty) {
       routine = assigned.first;
     } else {
-      // Tier 2: single self-created routine auto-activates. Multi-rutina
-      // case is handled by PR#2 (activeRoutineId field + "mark as active" UI).
       final selfCreated =
           await ref.watch(userCreatedRoutinesProvider(uid).future);
       if (selfCreated.length == 1) {
+        // Tier 2: single self-created routine auto-activates — no manual
+        // marker needed when there's nothing to disambiguate.
         routine = selfCreated.first;
+      } else if (selfCreated.length > 1) {
+        // Tier 3: multi self-created → require an explicit active marker
+        // (PR#2). [activeRoutineProvider] already validates the id against
+        // the live user-created list; a stale pointer (routine archived/
+        // deleted) resolves to null and the home falls back to the empty CTA.
+        routine = ref.watch(activeRoutineProvider);
       }
     }
 
@@ -118,4 +127,3 @@ final todaysRoutineProvider = FutureProvider.autoDispose<TodaysRoutine?>(
     );
   },
 );
-

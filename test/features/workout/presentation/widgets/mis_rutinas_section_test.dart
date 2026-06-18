@@ -13,7 +13,11 @@ import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
+import 'package:treino/features/profile/application/user_providers.dart';
+import 'package:treino/features/profile/data/user_repository.dart';
 import 'package:treino/features/profile/domain/experience_level.dart';
+import 'package:treino/features/profile/domain/user_profile.dart';
+import 'package:treino/features/profile/domain/user_role.dart';
 import 'package:treino/features/workout/application/routine_providers.dart';
 import 'package:treino/features/workout/application/user_routines_providers.dart';
 import 'package:treino/features/workout/data/routine_repository.dart';
@@ -30,6 +34,19 @@ import 'package:firebase_auth/firebase_auth.dart' show User;
 class _MockUser extends Mock implements User {}
 
 class _MockRoutineRepository extends Mock implements RoutineRepository {}
+
+class _MockUserRepository extends Mock implements UserRepository {}
+
+UserProfile _profile({String uid = 'athlete-1', String? activeRoutineId}) =>
+    UserProfile(
+      uid: uid,
+      email: '$uid@treino.app',
+      displayName: 'A1',
+      role: UserRole.athlete,
+      createdAt: DateTime(2026, 1, 1),
+      updatedAt: DateTime(2026, 1, 1),
+      activeRoutineId: activeRoutineId,
+    );
 
 User _userWithUid(String uid) {
   final u = _MockUser();
@@ -107,6 +124,11 @@ Future<void> _pumpSection(
 // ── Tests ──────────────────────────────────────────────────────────────────────
 
 void main() {
+  setUpAll(() {
+    // Needed for mocktail.any() on Map<String, Object?> args in UserRepository.update.
+    registerFallbackValue(<String, Object?>{});
+  });
+
   group('MisRutinasSection', () {
     // SCENARIO-609: empty state renders motivational message + CTA enabled
     testWidgets(
@@ -326,6 +348,171 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Detalles'), findsOneWidget);
+    });
+
+    // ── PR#2: active routine marker ─────────────────────────────────────────
+    // Active marker only appears with 2+ routines — single-routine auto-
+    // activates implicitly so chip + toggle action would be noise.
+
+    testWidgets(
+        'PR#2: single routine → no ACTIVA chip and no toggle action in menu',
+        (tester) async {
+      final routine = _makeUserRoutine(id: 'r-only', name: 'Only Routine');
+      await _pumpSection(
+        tester,
+        overrides: [
+          authStateChangesProvider
+              .overrideWith((ref) => Stream.value(_userWithUid('athlete-1'))),
+          userCreatedRoutinesProvider('athlete-1')
+              .overrideWith((ref) => Stream.value([routine])),
+          userProfileProvider.overrideWith(
+            (ref) => Stream.value(_profile(activeRoutineId: 'r-only')),
+          ),
+        ],
+      );
+      await tester.pumpAndSettle();
+
+      // Chip is hidden even when the id matches — single routine doesn't
+      // need disambiguation.
+      expect(find.byKey(const Key('user_routine_active_chip')), findsNothing);
+
+      // Open the overflow menu — toggle action should NOT be present.
+      await tester.tap(find.byKey(const Key('routine_card_more_r-only')));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('routine_card_toggle_active_r-only')),
+        findsNothing,
+      );
+    });
+
+    testWidgets(
+        'PR#2: 2+ routines + activeRoutineId matches → chip on active card '
+        'only, toggle action available on every card', (tester) async {
+      final r1 = _makeUserRoutine(id: 'r1', name: 'Rutina A');
+      final r2 = _makeUserRoutine(id: 'r2', name: 'Rutina B');
+      await _pumpSection(
+        tester,
+        overrides: [
+          authStateChangesProvider
+              .overrideWith((ref) => Stream.value(_userWithUid('athlete-1'))),
+          userCreatedRoutinesProvider('athlete-1')
+              .overrideWith((ref) => Stream.value([r1, r2])),
+          userProfileProvider.overrideWith(
+            (ref) => Stream.value(_profile(activeRoutineId: 'r2')),
+          ),
+        ],
+      );
+      await tester.pumpAndSettle();
+
+      // Chip appears exactly once — only on the active card.
+      expect(
+        find.byKey(const Key('user_routine_active_chip')),
+        findsOneWidget,
+      );
+
+      // Active card → menu shows "DESMARCAR".
+      await tester.tap(find.byKey(const Key('routine_card_more_r2')));
+      await tester.pumpAndSettle();
+      expect(find.text('DESMARCAR COMO ACTIVA'), findsOneWidget);
+      // Dismiss the menu so the next tap registers cleanly.
+      await tester.tapAt(const Offset(10, 10));
+      await tester.pumpAndSettle();
+
+      // Inactive card → menu shows "MARCAR".
+      await tester.tap(find.byKey(const Key('routine_card_more_r1')));
+      await tester.pumpAndSettle();
+      expect(find.text('MARCAR COMO ACTIVA'), findsOneWidget);
+    });
+
+    testWidgets(
+        'PR#2: 2+ routines + activeRoutineId NULL → no chip anywhere, '
+        'toggle action says MARCAR on every card', (tester) async {
+      final r1 = _makeUserRoutine(id: 'r1', name: 'Rutina A');
+      final r2 = _makeUserRoutine(id: 'r2', name: 'Rutina B');
+      await _pumpSection(
+        tester,
+        overrides: [
+          authStateChangesProvider
+              .overrideWith((ref) => Stream.value(_userWithUid('athlete-1'))),
+          userCreatedRoutinesProvider('athlete-1')
+              .overrideWith((ref) => Stream.value([r1, r2])),
+          userProfileProvider.overrideWith(
+            (ref) => Stream.value(_profile(activeRoutineId: null)),
+          ),
+        ],
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('user_routine_active_chip')), findsNothing);
+
+      await tester.tap(find.byKey(const Key('routine_card_more_r1')));
+      await tester.pumpAndSettle();
+      expect(find.text('MARCAR COMO ACTIVA'), findsOneWidget);
+    });
+
+    testWidgets(
+        'PR#2: tap "MARCAR COMO ACTIVA" calls UserRepository.update with '
+        'activeRoutineId set to that routine id', (tester) async {
+      final mockUserRepo = _MockUserRepository();
+      when(() => mockUserRepo.update(any(), any())).thenAnswer((_) async {});
+
+      final r1 = _makeUserRoutine(id: 'r1', name: 'Rutina A');
+      final r2 = _makeUserRoutine(id: 'r2', name: 'Rutina B');
+      await _pumpSection(
+        tester,
+        overrides: [
+          authStateChangesProvider
+              .overrideWith((ref) => Stream.value(_userWithUid('athlete-1'))),
+          userCreatedRoutinesProvider('athlete-1')
+              .overrideWith((ref) => Stream.value([r1, r2])),
+          userProfileProvider.overrideWith(
+            (ref) => Stream.value(_profile(activeRoutineId: null)),
+          ),
+          userRepositoryProvider.overrideWithValue(mockUserRepo),
+        ],
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('routine_card_more_r1')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('MARCAR COMO ACTIVA'));
+      await tester.pumpAndSettle();
+
+      verify(() => mockUserRepo.update('athlete-1', {'activeRoutineId': 'r1'}))
+          .called(1);
+    });
+
+    testWidgets(
+        'PR#2: tap "DESMARCAR COMO ACTIVA" calls UserRepository.update with '
+        'activeRoutineId set to null', (tester) async {
+      final mockUserRepo = _MockUserRepository();
+      when(() => mockUserRepo.update(any(), any())).thenAnswer((_) async {});
+
+      final r1 = _makeUserRoutine(id: 'r1', name: 'Rutina A');
+      final r2 = _makeUserRoutine(id: 'r2', name: 'Rutina B');
+      await _pumpSection(
+        tester,
+        overrides: [
+          authStateChangesProvider
+              .overrideWith((ref) => Stream.value(_userWithUid('athlete-1'))),
+          userCreatedRoutinesProvider('athlete-1')
+              .overrideWith((ref) => Stream.value([r1, r2])),
+          userProfileProvider.overrideWith(
+            (ref) => Stream.value(_profile(activeRoutineId: 'r2')),
+          ),
+          userRepositoryProvider.overrideWithValue(mockUserRepo),
+        ],
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('routine_card_more_r2')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('DESMARCAR COMO ACTIVA'));
+      await tester.pumpAndSettle();
+
+      verify(() => mockUserRepo.update('athlete-1', {'activeRoutineId': null}))
+          .called(1);
     });
   });
 }

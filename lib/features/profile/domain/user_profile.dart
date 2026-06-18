@@ -78,6 +78,15 @@ class UserProfile with _$UserProfile {
     @Default(<TrainerLocation>[]) List<TrainerLocation> trainerLocations,
     @Default(<String>[]) List<String> trainerGeohashes,
     @Default(false) bool trainerOffersOnline,
+
+    // ── Athlete active routine (home today's card PR#2) ───────────────────
+    // Points to the user-created routine the athlete picked as "the one I'm
+    // currently training". Used by [todaysRoutineProvider] to resolve the home
+    // card when the user has multiple self-created routines and no trainer
+    // plan. Null when no active routine is set (single routine auto-activates,
+    // multi without selection shows the empty CTA). Setting/unsetting is
+    // toggled from the overflow menu of each card in MisRutinasSection.
+    String? activeRoutineId,
   }) = _UserProfile;
 
   factory UserProfile.fromJson(Map<String, Object?> json) =>

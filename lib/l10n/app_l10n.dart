@@ -1160,6 +1160,42 @@ abstract class AppL10n {
   /// **'ELIMINAR'**
   String get workoutMisRutinasOverflowArchive;
 
+  /// No description provided for @workoutMisRutinasOverflowMarkActive.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'MARCAR COMO ACTIVA'**
+  String get workoutMisRutinasOverflowMarkActive;
+
+  /// No description provided for @workoutMisRutinasOverflowUnmarkActive.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'DESMARCAR COMO ACTIVA'**
+  String get workoutMisRutinasOverflowUnmarkActive;
+
+  /// No description provided for @workoutMisRutinasActiveChip.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ACTIVA'**
+  String get workoutMisRutinasActiveChip;
+
+  /// No description provided for @workoutMisRutinasMarkActiveSuccess.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Marcada como tu rutina activa'**
+  String get workoutMisRutinasMarkActiveSuccess;
+
+  /// No description provided for @workoutMisRutinasUnmarkActiveSuccess.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ya no es tu rutina activa'**
+  String get workoutMisRutinasUnmarkActiveSuccess;
+
+  /// No description provided for @workoutMisRutinasActiveError.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cambiar el estado. Reintentá.'**
+  String get workoutMisRutinasActiveError;
+
   /// No description provided for @workoutMisRutinasConfirmTitle.
   ///
   /// In es_AR, this message translates to:

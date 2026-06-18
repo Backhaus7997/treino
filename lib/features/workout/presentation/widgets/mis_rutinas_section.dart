@@ -5,14 +5,15 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/treino_icon.dart';
+import '../../../../features/profile/application/user_providers.dart';
+import '../../../../features/profile/domain/experience_level.dart'
+    show ExperienceLevelEs;
+import '../../../../l10n/app_l10n.dart';
 import '../../application/routine_providers.dart'
     show routineRepositoryProvider;
 import '../../application/session_providers.dart' show currentUidProvider;
 import '../../application/user_routines_providers.dart';
 import '../../domain/routine.dart';
-import '../../../../l10n/app_l10n.dart';
-import '../../../../features/profile/domain/experience_level.dart'
-    show ExperienceLevelEs;
 
 const int _kRoutineCap = 10;
 
@@ -97,13 +98,25 @@ class MisRutinasSection extends ConsumerWidget {
                 onCta: () => context.push('/workout/my-routine-editor'),
               );
             }
+            // `activeRoutineId` viene del UserProfile; durante el loading
+            // de profile (cold start) ningún card se marca como activa —
+            // estado transitorio aceptable, no flickea de "ACTIVA" a vacío.
+            final activeId =
+                ref.watch(userProfileProvider).valueOrNull?.activeRoutineId;
+            // El chip "ACTIVA" solo aporta info cuando hay 2+ rutinas —
+            // con una sola la activación implícita ya está clara.
+            final showActiveBadge = routines.length > 1;
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 for (final routine in routines)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 12),
-                    child: _UserRoutineCard(routine: routine),
+                    child: _UserRoutineCard(
+                      routine: routine,
+                      isActive: showActiveBadge && routine.id == activeId,
+                      canToggleActive: showActiveBadge,
+                    ),
                   ),
               ],
             );
@@ -239,9 +252,54 @@ class _SectionEmptyState extends StatelessWidget {
 // ── User Routine Card ─────────────────────────────────────────────────────────
 
 class _UserRoutineCard extends ConsumerWidget {
-  const _UserRoutineCard({required this.routine});
+  const _UserRoutineCard({
+    required this.routine,
+    this.isActive = false,
+    this.canToggleActive = false,
+  });
 
   final Routine routine;
+
+  /// Marca este card como la rutina activa del atleta. Solo se setea desde
+  /// `MisRutinasSection` cuando hay 2+ rutinas user-created y el id de ésta
+  /// coincide con `UserProfile.activeRoutineId`.
+  final bool isActive;
+
+  /// Habilita las acciones "Marcar/Desmarcar como activa" en el overflow.
+  /// Solo `true` cuando hay 2+ rutinas — con una sola el toggle no aplica.
+  final bool canToggleActive;
+
+  Future<void> _toggleActive(
+    BuildContext context,
+    WidgetRef ref,
+  ) async {
+    final uid = ref.read(currentUidProvider) ?? '';
+    if (uid.isEmpty) return;
+    final l10n = AppL10n.of(context);
+    final wasActive = isActive;
+    try {
+      await ref.read(userRepositoryProvider).update(uid, {
+        'activeRoutineId': wasActive ? null : routine.id,
+      });
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              wasActive
+                  ? l10n.workoutMisRutinasUnmarkActiveSuccess
+                  : l10n.workoutMisRutinasMarkActiveSuccess,
+            ),
+          ),
+        );
+      }
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.workoutMisRutinasActiveError)),
+        );
+      }
+    }
+  }
 
   Future<void> _confirmArchive(
     BuildContext context,
@@ -298,7 +356,10 @@ class _UserRoutineCard extends ConsumerWidget {
         decoration: BoxDecoration(
           color: palette.bgCard,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: palette.border),
+          border: Border.all(
+            color: isActive ? palette.accent : palette.border,
+            width: isActive ? 1.5 : 1,
+          ),
         ),
         padding: const EdgeInsets.all(14),
         child: Row(
@@ -308,13 +369,24 @@ class _UserRoutineCard extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    routine.name,
-                    style: GoogleFonts.barlow(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14,
-                      color: palette.textPrimary,
-                    ),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          routine.name,
+                          style: GoogleFonts.barlow(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                            color: palette.textPrimary,
+                          ),
+                        ),
+                      ),
+                      if (isActive) ...[
+                        const SizedBox(width: 8),
+                        const _ActivaChip(),
+                      ],
+                    ],
                   ),
                   const SizedBox(height: 4),
                   Text(
@@ -342,9 +414,21 @@ class _UserRoutineCard extends ConsumerWidget {
                     );
                   case _CardAction.archive:
                     _confirmArchive(context, ref);
+                  case _CardAction.toggleActive:
+                    _toggleActive(context, ref);
                 }
               },
               itemBuilder: (_) => [
+                if (canToggleActive)
+                  PopupMenuItem(
+                    key: Key('routine_card_toggle_active_${routine.id}'),
+                    value: _CardAction.toggleActive,
+                    child: Text(
+                      isActive
+                          ? l10n.workoutMisRutinasOverflowUnmarkActive
+                          : l10n.workoutMisRutinasOverflowMarkActive,
+                    ),
+                  ),
                 PopupMenuItem(
                   value: _CardAction.edit,
                   child: Text(l10n.workoutMisRutinasOverflowEdit),
@@ -362,4 +446,33 @@ class _UserRoutineCard extends ConsumerWidget {
   }
 }
 
-enum _CardAction { edit, archive }
+enum _CardAction { edit, archive, toggleActive }
+
+// ── ACTIVA chip ───────────────────────────────────────────────────────────────
+
+class _ActivaChip extends StatelessWidget {
+  const _ActivaChip();
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    return Container(
+      key: const Key('user_routine_active_chip'),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+      decoration: BoxDecoration(
+        color: palette.accent.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(9999),
+        border: Border.all(color: palette.accent.withValues(alpha: 0.5)),
+      ),
+      child: Text(
+        AppL10n.of(context).workoutMisRutinasActiveChip,
+        style: GoogleFonts.barlowCondensed(
+          fontWeight: FontWeight.w700,
+          fontSize: 11,
+          letterSpacing: 1.2,
+          color: palette.accent,
+        ),
+      ),
+    );
+  }
+}

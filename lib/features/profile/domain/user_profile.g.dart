@@ -44,6 +44,7 @@ _$UserProfileImpl _$$UserProfileImplFromJson(Map<String, dynamic> json) =>
               .toList() ??
           const <String>[],
       trainerOffersOnline: json['trainerOffersOnline'] as bool? ?? false,
+      activeRoutineId: json['activeRoutineId'] as String?,
     );
 
 Map<String, dynamic> _$$UserProfileImplToJson(_$UserProfileImpl instance) =>
@@ -76,6 +77,7 @@ Map<String, dynamic> _$$UserProfileImplToJson(_$UserProfileImpl instance) =>
           instance.trainerLocations.map((e) => e.toJson()).toList(),
       'trainerGeohashes': instance.trainerGeohashes,
       'trainerOffersOnline': instance.trainerOffersOnline,
+      'activeRoutineId': instance.activeRoutineId,
     };
 
 const _$UserRoleEnumMap = {
