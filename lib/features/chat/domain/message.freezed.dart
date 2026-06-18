@@ -23,6 +23,9 @@ mixin _$Message {
   String get id => throw _privateConstructorUsedError;
   String get senderId => throw _privateConstructorUsedError;
   String get text => throw _privateConstructorUsedError;
+  String? get mediaUrl => throw _privateConstructorUsedError;
+  @JsonKey(fromJson: _mediaTypeFromJson, toJson: _mediaTypeToJson)
+  MediaType? get mediaType => throw _privateConstructorUsedError;
   @TimestampConverter()
   DateTime get createdAt => throw _privateConstructorUsedError;
 
@@ -44,6 +47,9 @@ abstract class $MessageCopyWith<$Res> {
       {String id,
       String senderId,
       String text,
+      String? mediaUrl,
+      @JsonKey(fromJson: _mediaTypeFromJson, toJson: _mediaTypeToJson)
+      MediaType? mediaType,
       @TimestampConverter() DateTime createdAt});
 }
 
@@ -65,6 +71,8 @@ class _$MessageCopyWithImpl<$Res, $Val extends Message>
     Object? id = null,
     Object? senderId = null,
     Object? text = null,
+    Object? mediaUrl = freezed,
+    Object? mediaType = freezed,
     Object? createdAt = null,
   }) {
     return _then(_value.copyWith(
@@ -80,6 +88,14 @@ class _$MessageCopyWithImpl<$Res, $Val extends Message>
           ? _value.text
           : text // ignore: cast_nullable_to_non_nullable
               as String,
+      mediaUrl: freezed == mediaUrl
+          ? _value.mediaUrl
+          : mediaUrl // ignore: cast_nullable_to_non_nullable
+              as String?,
+      mediaType: freezed == mediaType
+          ? _value.mediaType
+          : mediaType // ignore: cast_nullable_to_non_nullable
+              as MediaType?,
       createdAt: null == createdAt
           ? _value.createdAt
           : createdAt // ignore: cast_nullable_to_non_nullable
@@ -99,6 +115,9 @@ abstract class _$$MessageImplCopyWith<$Res> implements $MessageCopyWith<$Res> {
       {String id,
       String senderId,
       String text,
+      String? mediaUrl,
+      @JsonKey(fromJson: _mediaTypeFromJson, toJson: _mediaTypeToJson)
+      MediaType? mediaType,
       @TimestampConverter() DateTime createdAt});
 }
 
@@ -118,6 +137,8 @@ class __$$MessageImplCopyWithImpl<$Res>
     Object? id = null,
     Object? senderId = null,
     Object? text = null,
+    Object? mediaUrl = freezed,
+    Object? mediaType = freezed,
     Object? createdAt = null,
   }) {
     return _then(_$MessageImpl(
@@ -133,6 +154,14 @@ class __$$MessageImplCopyWithImpl<$Res>
           ? _value.text
           : text // ignore: cast_nullable_to_non_nullable
               as String,
+      mediaUrl: freezed == mediaUrl
+          ? _value.mediaUrl
+          : mediaUrl // ignore: cast_nullable_to_non_nullable
+              as String?,
+      mediaType: freezed == mediaType
+          ? _value.mediaType
+          : mediaType // ignore: cast_nullable_to_non_nullable
+              as MediaType?,
       createdAt: null == createdAt
           ? _value.createdAt
           : createdAt // ignore: cast_nullable_to_non_nullable
@@ -147,7 +176,10 @@ class _$MessageImpl implements _Message {
   const _$MessageImpl(
       {required this.id,
       required this.senderId,
-      required this.text,
+      this.text = '',
+      this.mediaUrl,
+      @JsonKey(fromJson: _mediaTypeFromJson, toJson: _mediaTypeToJson)
+      this.mediaType,
       @TimestampConverter() required this.createdAt});
 
   factory _$MessageImpl.fromJson(Map<String, dynamic> json) =>
@@ -158,14 +190,20 @@ class _$MessageImpl implements _Message {
   @override
   final String senderId;
   @override
+  @JsonKey()
   final String text;
+  @override
+  final String? mediaUrl;
+  @override
+  @JsonKey(fromJson: _mediaTypeFromJson, toJson: _mediaTypeToJson)
+  final MediaType? mediaType;
   @override
   @TimestampConverter()
   final DateTime createdAt;
 
   @override
   String toString() {
-    return 'Message(id: $id, senderId: $senderId, text: $text, createdAt: $createdAt)';
+    return 'Message(id: $id, senderId: $senderId, text: $text, mediaUrl: $mediaUrl, mediaType: $mediaType, createdAt: $createdAt)';
   }
 
   @override
@@ -177,13 +215,18 @@ class _$MessageImpl implements _Message {
             (identical(other.senderId, senderId) ||
                 other.senderId == senderId) &&
             (identical(other.text, text) || other.text == text) &&
+            (identical(other.mediaUrl, mediaUrl) ||
+                other.mediaUrl == mediaUrl) &&
+            (identical(other.mediaType, mediaType) ||
+                other.mediaType == mediaType) &&
             (identical(other.createdAt, createdAt) ||
                 other.createdAt == createdAt));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
   @override
-  int get hashCode => Object.hash(runtimeType, id, senderId, text, createdAt);
+  int get hashCode => Object.hash(
+      runtimeType, id, senderId, text, mediaUrl, mediaType, createdAt);
 
   /// Create a copy of Message
   /// with the given fields replaced by the non-null parameter values.
@@ -205,7 +248,10 @@ abstract class _Message implements Message {
   const factory _Message(
       {required final String id,
       required final String senderId,
-      required final String text,
+      final String text,
+      final String? mediaUrl,
+      @JsonKey(fromJson: _mediaTypeFromJson, toJson: _mediaTypeToJson)
+      final MediaType? mediaType,
       @TimestampConverter() required final DateTime createdAt}) = _$MessageImpl;
 
   factory _Message.fromJson(Map<String, dynamic> json) = _$MessageImpl.fromJson;
@@ -216,6 +262,11 @@ abstract class _Message implements Message {
   String get senderId;
   @override
   String get text;
+  @override
+  String? get mediaUrl;
+  @override
+  @JsonKey(fromJson: _mediaTypeFromJson, toJson: _mediaTypeToJson)
+  MediaType? get mediaType;
   @override
   @TimestampConverter()
   DateTime get createdAt;
