@@ -447,12 +447,22 @@ service cloud.firestore {
                     && request.auth.uid in
                         get(/databases/$(database)/documents/chats/$(chatId)).data.members;
 
+        // REQ-CHATMEDIA-006: validity is OR-based — text OR (mediaUrl + mediaType).
+        // A message is valid if it carries non-empty text OR a mediaUrl string
+        // together with a mediaType string (e.g. 'image' / 'video').
+        // senderId, membership, and createdAt checks are unchanged.
         allow create: if request.auth != null
                       && request.auth.uid == request.resource.data.senderId
                       && request.auth.uid in
                           get(/databases/$(database)/documents/chats/$(chatId)).data.members
-                      && request.resource.data.text is string
-                      && request.resource.data.text.size() > 0
+                      && (
+                           (request.resource.data.text is string
+                            && request.resource.data.text.size() > 0)
+                           ||
+                           (request.resource.data.mediaUrl is string
+                            && request.resource.data.mediaUrl.size() > 0
+                            && request.resource.data.mediaType is string)
+                         )
                       && request.resource.data.createdAt is timestamp;
 
         allow update, delete: if false;

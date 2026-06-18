@@ -34,6 +34,42 @@ service firebase.storage {
       allow delete: if request.auth != null && request.auth.uid == userId;
     }
 
+    // Chat media — photos and videos sent inside 1-1 chats (REQ-CHATMEDIA-007).
+    //
+    // Path: /chatMedia/{chatId}/{userId}/{file}
+    //
+    // ⚠️  TRADEOFF — no membership check:
+    // Firebase Storage rules cannot call get() on Firestore documents in the
+    // same request, so we cannot verify that userId is actually a member of
+    // chatId without a Firestore read. Instead we rely on:
+    //   1. The path containing the owner's uid — a client must be authenticated
+    //      AS that uid to write (auth.uid == userId).
+    //   2. The Firestore message-create rule which verifies membership and
+    //      requires a valid mediaUrl before the doc is written.
+    //   3. Download URLs use an unguessable ?token= parameter — the same
+    //      privacy posture as /customExerciseVideos (see ADR there).
+    //
+    // Size limits: images < 15 MB, videos < 100 MB (server-side guard mirrors
+    // the client-side guard in ChatMediaUploadService).
+    match /chatMedia/{chatId}/{userId}/{file=**} {
+      // Any authenticated user can download (needed for both chat members).
+      allow read: if request.auth != null;
+
+      // Only the owner can upload; content type and size are allowlisted.
+      allow write: if request.auth != null
+                  && request.auth.uid == userId
+                  && (
+                       (request.resource.contentType.matches('image/.*')
+                        && request.resource.size < 15 * 1024 * 1024)
+                       ||
+                       (request.resource.contentType.matches('video/.*')
+                        && request.resource.size < 100 * 1024 * 1024)
+                     );
+
+      // Only the owner can delete (cleanup on send failure or exercise removal).
+      allow delete: if request.auth != null && request.auth.uid == userId;
+    }
+
     // Default: deny all other access.
     match /{allPaths=**} {
       allow read, write: if false;

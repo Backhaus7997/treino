@@ -7,11 +7,15 @@
  * Design:
  *   - ADR-PN-005: members ≠ senderId are recipients.
  *   - SenderName from userPublicProfiles/{senderId}.displayName ?? 'Alguien'.
- *   - Body: "${senderName}: ${truncate(text, 100)}" — text capped at 100 chars.
+ *   - Body: "${senderName}: ${displayText}" where displayText is:
+ *       · caption (truncated 100) if text non-empty
+ *       · '📷 Foto' if mediaType === 'image'
+ *       · '🎥 Video' if mediaType === 'video'
+ *       · '' for unknown/missing mediaType with empty text (no crash)
  *   - deepLink: "/coach/chat/${chatId}?other=${senderId}".
  *   - All user-facing strings in es-AR.
  *
- * REQ-PN-CF-002. Fase 6 Etapa 2.
+ * REQ-PN-CF-002, REQ-CHATMEDIA-012. Fase 6 Etapa 2.
  */
 
 import * as admin from "firebase-admin";
@@ -53,6 +57,7 @@ export async function notifyOnChatMessageHandler(
 
   const senderId = messageData.senderId as string | undefined;
   const text = (messageData.text as string | undefined) ?? "";
+  const mediaType = (messageData.mediaType as string | undefined) ?? "";
 
   if (!senderId) {
     logger.warn("notifyOnChatMessage: senderId missing, skipping", { chatId });
@@ -85,9 +90,12 @@ export async function notifyOnChatMessageHandler(
   const senderName: string =
     (profileSnap.data()?.displayName as string | undefined) ?? "Alguien"; // i18n: Fase 6 Etapa 2
 
-  // 3. Build body — truncate message text at 100 chars.
-  const truncatedText = truncate(text, 100);
-  const body = `${senderName}: ${truncatedText}`;
+  // 3. Build body — caption (truncated at 100 chars) wins; for a media-only
+  //    message fall back to a placeholder so the push body is never empty.
+  const mediaFallback =
+    mediaType === "image" ? "📷 Foto" : mediaType === "video" ? "🎥 Video" : "";
+  const displayText = text.length > 0 ? truncate(text, 100) : mediaFallback;
+  const body = `${senderName}: ${displayText}`;
 
   // 4. Build deepLink.
   const deepLink = `/coach/chat/${chatId}?other=${senderId}`;

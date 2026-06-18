@@ -245,3 +245,88 @@ describe("no-op: message in chat where sender is the only member", () => {
     expect(mock.sendEachForMulticast as jest.Mock).not.toHaveBeenCalled();
   });
 });
+
+// ---------------------------------------------------------------------------
+// REQ-CHATMEDIA-012 — media notification bodies
+// ---------------------------------------------------------------------------
+describe("REQ-CHATMEDIA-012: media message notification bodies", () => {
+  const chatId = "chat-media-notify";
+  const senderUid = "sender-media";
+  const recipientUid = "recipient-media";
+
+  beforeEach(async () => {
+    await seedUser(senderUid, []);
+    await seedUser(recipientUid, ["recipient-media-token"]);
+    await seedUserPublicProfile(senderUid, "Sender");
+    await seedChat(chatId, [senderUid, recipientUid]);
+  });
+
+  afterEach(async () => {
+    await cleanup(senderUid, recipientUid);
+    await cleanupChat(chatId);
+  });
+
+  it("image-only: body is 'Sender: 📷 Foto'", async () => {
+    const mock = makeMockMessaging();
+    const messageData = {
+      senderId: senderUid,
+      text: "",
+      mediaType: "image",
+      createdAt: admin.firestore.Timestamp.now(),
+    };
+
+    await notifyOnChatMessageHandler(testApp, chatId, messageData, mock);
+
+    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as admin.messaging.MulticastMessage;
+    expect(callArg.notification?.body).toBe("Sender: 📷 Foto");
+  });
+
+  it("video-only: body is 'Sender: 🎥 Video'", async () => {
+    const mock = makeMockMessaging();
+    const messageData = {
+      senderId: senderUid,
+      text: "",
+      mediaType: "video",
+      createdAt: admin.firestore.Timestamp.now(),
+    };
+
+    await notifyOnChatMessageHandler(testApp, chatId, messageData, mock);
+
+    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as admin.messaging.MulticastMessage;
+    expect(callArg.notification?.body).toBe("Sender: 🎥 Video");
+  });
+
+  it("caption + image: caption wins over media label", async () => {
+    const mock = makeMockMessaging();
+    const messageData = {
+      senderId: senderUid,
+      text: "Look at this!",
+      mediaType: "image",
+      createdAt: admin.firestore.Timestamp.now(),
+    };
+
+    await notifyOnChatMessageHandler(testApp, chatId, messageData, mock);
+
+    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as admin.messaging.MulticastMessage;
+    expect(callArg.notification?.body).toBe("Sender: Look at this!");
+  });
+
+  it("unknown mediaType with empty text: does not throw, body is 'Sender: '", async () => {
+    const mock = makeMockMessaging();
+    const messageData = {
+      senderId: senderUid,
+      text: "",
+      mediaType: "unknown",
+      createdAt: admin.firestore.Timestamp.now(),
+    };
+
+    // Must not throw
+    await expect(
+      notifyOnChatMessageHandler(testApp, chatId, messageData, mock),
+    ).resolves.toBeUndefined();
+
+    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as admin.messaging.MulticastMessage;
+    // Body should be "Sender: " (senderName + empty displayText) — no crash
+    expect(callArg.notification?.body).toBe("Sender: ");
+  });
+});
