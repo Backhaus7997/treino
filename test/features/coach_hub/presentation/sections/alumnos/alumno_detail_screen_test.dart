@@ -22,11 +22,12 @@ import 'package:treino/features/gyms/domain/gym.dart';
 import 'package:treino/features/measurements/application/measurement_providers.dart';
 import 'package:treino/features/measurements/domain/measurement.dart';
 import 'package:treino/features/measurements/presentation/widgets/measurement_progress_chart.dart';
+import 'package:treino/features/payments/application/billing_providers.dart';
 import 'package:treino/features/payments/application/pagos_por_cobrar_provider.dart';
 import 'package:treino/features/payments/application/payment_providers.dart';
 import 'package:treino/features/payments/data/payment_repository.dart';
 import 'package:treino/features/payments/domain/athlete_billing.dart'
-    show BillingCadence;
+    show AthleteBilling, BillingCadence;
 import 'package:treino/features/payments/domain/payment.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/features/profile/domain/experience_level.dart';
@@ -156,6 +157,18 @@ CobroPendiente _cobro({
       pendingPaymentIds: pendingPaymentIds,
     );
 
+AthleteBilling _billing({
+  int amountArs = 24000,
+  BillingCadence cadence = BillingCadence.mensual,
+}) =>
+    AthleteBilling(
+      trainerId: 't1',
+      athleteId: 'a1',
+      amountArs: amountArs,
+      cadence: cadence,
+      updatedAt: DateTime.utc(2026, 1, 1),
+    );
+
 Future<void> _pump(
   WidgetTester tester, {
   UserPublicProfile? profile,
@@ -166,6 +179,7 @@ Future<void> _pump(
   List<Payment> payments = const [],
   List<CobroPendiente> pendingCobros = const [],
   PaymentRepository? paymentRepo,
+  AthleteBilling? billing,
 }) async {
   tester.view.physicalSize = const Size(1200, 900);
   tester.view.devicePixelRatio = 1.0;
@@ -181,6 +195,7 @@ Future<void> _pump(
             .overrideWith((ref) => Stream.value(link == null ? [] : [link])),
         pagosPorCobrarProvider.overrideWith((ref) => AsyncData(pendingCobros)),
         trainerPaymentsProvider.overrideWith((ref) => Stream.value(payments)),
+        athleteBillingProvider.overrideWith((ref, id) => Stream.value(billing)),
         measurementsForAthleteProvider
             .overrideWith((ref, id) => Stream.value(measurements)),
         currentUidProvider.overrideWithValue('t1'),
@@ -220,6 +235,58 @@ void main() {
       expect(find.text('Activo'), findsOneWidget);
       expect(find.text('38'), findsOneWidget); // sesiones
       expect(find.text('14 d'), findsOneWidget); // racha
+    });
+
+    testWidgets(
+        'header: plan (monto·cadencia) + próximo cobro + botón Pago (W2 PR7)',
+        (tester) async {
+      await _pump(
+        tester,
+        profile: _prof(),
+        link: _link(TrainerLinkStatus.active),
+        billing: _billing(amountArs: 24000, cadence: BillingCadence.mensual),
+      );
+
+      expect(find.text('\$24.000 · Mensual'), findsOneWidget);
+      expect(find.textContaining('Próx. cobro:'), findsOneWidget);
+      expect(find.widgetWithText(OutlinedButton, 'Pago'), findsOneWidget);
+    });
+
+    testWidgets('header: cadencia semanal se etiqueta "Semanal" (W2 PR7)',
+        (tester) async {
+      await _pump(
+        tester,
+        profile: _prof(),
+        link: _link(TrainerLinkStatus.active),
+        billing: _billing(amountArs: 9000, cadence: BillingCadence.semanal),
+      );
+
+      expect(find.text('\$9.000 · Semanal'), findsOneWidget);
+    });
+
+    testWidgets('header: botón Pago abre el diálogo de registrar pago (W2 PR7)',
+        (tester) async {
+      await _pump(tester,
+          profile: _prof(),
+          link: _link(TrainerLinkStatus.active),
+          paymentRepo: _MockPaymentRepo());
+
+      await tester.tap(find.widgetWithText(OutlinedButton, 'Pago'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Registrar pago'), findsOneWidget); // título del diálogo
+      expect(find.text('Monto (ARS)'), findsOneWidget);
+    });
+
+    testWidgets('header: sin billing no muestra chips de plan (W2 PR7)',
+        (tester) async {
+      await _pump(tester,
+          profile: _prof(), link: _link(TrainerLinkStatus.active));
+
+      expect(find.textContaining('Próx. cobro:'), findsNothing);
+      expect(find.text('· Mensual'), findsNothing);
+      // El botón Pago está siempre (no depende de billing).
+      expect(find.widgetWithText(OutlinedButton, 'Pago'), findsOneWidget);
     });
 
     testWidgets('tab bar muestra exactamente las 10 secciones', (tester) async {
@@ -887,6 +954,9 @@ void main() {
             assignedRoutinesProvider
                 .overrideWith((ref, id) => const <Routine>[]),
             currentUidProvider.overrideWithValue('t1'),
+            // El header (W2 PR7) lee el billing del alumno.
+            athleteBillingProvider
+                .overrideWith((ref, id) => Stream.value(null)),
           ],
           child:
               MaterialApp.router(theme: AppTheme.dark(), routerConfig: router),
@@ -921,6 +991,63 @@ void main() {
       expect(find.text('Terminar vínculo'), findsOneWidget); // diálogo
       // No navegó al detalle.
       expect(find.text('Sin mediciones cargadas todavía.'), findsNothing);
+    });
+  });
+
+  group('nextDueDate (W2 PR7)', () {
+    test('mensual → 1º del mes que viene', () {
+      expect(
+        nextDueDate(
+            _billing(cadence: BillingCadence.mensual), DateTime(2026, 6, 18)),
+        DateTime(2026, 7, 1),
+      );
+    });
+
+    test('mensual en diciembre → 1º de enero del año que viene', () {
+      expect(
+        nextDueDate(
+            _billing(cadence: BillingCadence.mensual), DateTime(2026, 12, 10)),
+        DateTime(2027, 1, 1),
+      );
+    });
+
+    test('semanal → lunes de la semana que viene', () {
+      // 2026-06-18 es jueves → lunes próximo = 2026-06-22.
+      expect(
+        nextDueDate(
+            _billing(cadence: BillingCadence.semanal), DateTime(2026, 6, 18)),
+        DateTime(2026, 6, 22),
+      );
+    });
+
+    test('semanal cuando hoy ES lunes → el lunes siguiente (+7)', () {
+      // 2026-06-22 es lunes → próximo = 2026-06-29 (no el mismo día).
+      expect(
+        nextDueDate(
+            _billing(cadence: BillingCadence.semanal), DateTime(2026, 6, 22)),
+        DateTime(2026, 6, 29),
+      );
+    });
+
+    test('porSesión y suelto → null (sin fecha fija)', () {
+      expect(
+          nextDueDate(_billing(cadence: BillingCadence.porSesion),
+              DateTime(2026, 6, 18)),
+          isNull);
+      expect(
+          nextDueDate(
+              _billing(cadence: BillingCadence.suelto), DateTime(2026, 6, 18)),
+          isNull);
+    });
+  });
+
+  group('fmtDayMonth (W2 PR7)', () {
+    test('formatea día + mes en es-AR', () {
+      expect(fmtDayMonth(DateTime(2026, 5, 22)), '22 mayo');
+    });
+
+    test('diciembre (tope del array de meses)', () {
+      expect(fmtDayMonth(DateTime(2026, 12, 1)), '1 diciembre');
     });
   });
 }

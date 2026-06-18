@@ -9,10 +9,10 @@ import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/gyms/application/gym_providers.dart';
 import 'package:treino/features/measurements/application/measurement_providers.dart';
 import 'package:treino/features/measurements/presentation/widgets/measurement_progress_chart.dart';
+import 'package:treino/features/payments/application/billing_providers.dart';
 import 'package:treino/features/payments/application/pagos_por_cobrar_provider.dart';
 import 'package:treino/features/payments/application/payment_providers.dart';
-import 'package:treino/features/payments/domain/athlete_billing.dart'
-    show BillingCadence;
+import 'package:treino/features/payments/domain/athlete_billing.dart';
 import 'package:treino/features/payments/domain/payment.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
@@ -78,6 +78,7 @@ class AlumnoDetailScreen extends ConsumerWidget {
     final gymName = gymId == null
         ? null
         : ref.watch(gymByIdProvider(gymId)).valueOrNull?.name;
+    final billing = ref.watch(athleteBillingProvider(athleteId)).valueOrNull;
 
     return DefaultTabController(
       length: _tabs.length,
@@ -97,6 +98,8 @@ class AlumnoDetailScreen extends ConsumerWidget {
                   link: link,
                   estado: estado,
                   gymName: gymName,
+                  billing: billing,
+                  onPago: () => _registrarPago(context, ref, athleteId),
                   palette: palette,
                 ),
                 const SizedBox(height: 14),
@@ -159,6 +162,8 @@ class _Header extends StatelessWidget {
     required this.link,
     required this.estado,
     required this.gymName,
+    required this.billing,
+    required this.onPago,
     required this.palette,
   });
 
@@ -166,6 +171,8 @@ class _Header extends StatelessWidget {
   final TrainerLink? link;
   final AlumnoEstado? estado;
   final String? gymName;
+  final AthleteBilling? billing;
+  final VoidCallback onPago;
   final AppPalette palette;
 
   @override
@@ -176,6 +183,11 @@ class _Header extends StatelessWidget {
     final racha = profile?.racha ?? 0;
     final avatarUrl = profile?.avatarUrl;
     final desde = link?.acceptedAt;
+    final b = billing;
+    // .toUtc() para compartir reloj con el pipeline de billing (monthKey/weekKey
+    // de pagosPorCobrarProvider y las escrituras usan UTC); evita un desfase de
+    // 1 día en el borde del período en AR (UTC-3).
+    final proxCobro = b == null ? null : nextDueDate(b, DateTime.now().toUtc());
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -248,10 +260,37 @@ class _Header extends StatelessWidget {
                             style: TextStyle(
                                 color: palette.textMuted, fontSize: 13),
                           ),
+                        if (b != null && b.cadence != BillingCadence.suelto)
+                          Text(
+                            '${_fmtArs(b.amountArs)} · ${_cadenciaLabel(b.cadence)}', // i18n: Fase W2
+                            style: TextStyle(
+                                color: palette.textMuted, fontSize: 13),
+                          ),
+                        if (proxCobro != null)
+                          Text(
+                            'Próx. cobro: ${fmtDayMonth(proxCobro)}', // i18n: Fase W2
+                            style: TextStyle(
+                                color: palette.textMuted, fontSize: 13),
+                          ),
                       ],
                     ),
                   ],
                 ),
+              ),
+              const SizedBox(width: 12),
+              OutlinedButton(
+                onPressed: onPago,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: palette.accent,
+                  side: BorderSide(color: palette.border),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: const Text('Pago', // i18n: Fase W2
+                    style:
+                        TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
               ),
             ],
           ),
@@ -839,6 +878,49 @@ String _fmtArs(int amount) {
     buf.write(digits[i]);
   }
   return '${amount < 0 ? '-' : ''}\$$buf';
+}
+
+String _cadenciaLabel(BillingCadence c) => switch (c) {
+      BillingCadence.mensual => 'Mensual', // i18n: Fase W2
+      BillingCadence.semanal => 'Semanal',
+      BillingCadence.porSesion => 'Por sesión',
+      BillingCadence.suelto => 'Suelto',
+    };
+
+const _kMesesLargos = [
+  '',
+  'enero',
+  'febrero',
+  'marzo',
+  'abril',
+  'mayo',
+  'junio',
+  'julio',
+  'agosto',
+  'septiembre',
+  'octubre',
+  'noviembre',
+  'diciembre',
+];
+
+/// "22 mayo" — día + mes en es-AR.
+String fmtDayMonth(DateTime d) => '${d.day} ${_kMesesLargos[d.month]}';
+
+/// Fecha del próximo cobro recurrente según cadencia: 1º del mes que viene
+/// (mensual) o lunes de la semana que viene (semanal). `null` para porSesión y
+/// suelto (event-driven / ad-hoc, sin fecha fija).
+DateTime? nextDueDate(AthleteBilling b, DateTime now) {
+  switch (b.cadence) {
+    case BillingCadence.mensual:
+      return DateTime(now.year, now.month + 1, 1);
+    case BillingCadence.semanal:
+      final today = DateTime(now.year, now.month, now.day);
+      final monday = today.subtract(Duration(days: now.weekday - 1));
+      return monday.add(const Duration(days: 7));
+    case BillingCadence.porSesion:
+    case BillingCadence.suelto:
+      return null;
+  }
 }
 
 /// Tab Pagos (W2 PR5/PR6): estado de cuenta + historial de pagos + acciones.
