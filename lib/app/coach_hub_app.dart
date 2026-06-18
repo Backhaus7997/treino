@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../features/auth/application/auth_providers.dart';
+import '../l10n/app_l10n.dart';
 import 'coach_hub_router.dart';
+import 'locale_resolver.dart';
 import 'theme/app_theme.dart';
 
 /// Root widget del TREINO Coach Hub (web).
@@ -36,6 +38,13 @@ class _CoachHubAppState extends ConsumerState<CoachHubApp> {
       darkTheme: AppTheme.dark(),
       themeMode: ThemeMode.dark,
       routerConfig: _router,
+      // l10n: mismos delegates/locales que TreinoApp (app.dart). Sin esto, los
+      // widgets que usan AppL10n.of(context) (p. ej. PerformanceProgressChart)
+      // crashean en el Coach Hub.
+      localizationsDelegates: AppL10n.localizationsDelegates,
+      supportedLocales: AppL10n.supportedLocales,
+      localeResolutionCallback: (locale, supported) =>
+          resolveLocale(locale ?? const Locale('es', 'AR'), supported),
       // Global: tap outside an input dismisses the keyboard (see TreinoApp).
       builder: (context, child) => GestureDetector(
         behavior: HitTestBehavior.translucent,

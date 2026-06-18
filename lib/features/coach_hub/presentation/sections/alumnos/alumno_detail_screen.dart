@@ -14,6 +14,8 @@ import 'package:treino/features/payments/application/pagos_por_cobrar_provider.d
 import 'package:treino/features/payments/application/payment_providers.dart';
 import 'package:treino/features/payments/domain/athlete_billing.dart';
 import 'package:treino/features/payments/domain/payment.dart';
+import 'package:treino/features/performance/application/performance_test_providers.dart';
+import 'package:treino/features/performance/presentation/widgets/performance_progress_chart.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/features/workout/application/assigned_routine_providers.dart';
@@ -430,58 +432,77 @@ class _ProgresoTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
     final measAsync = ref.watch(measurementsForAthleteProvider(athleteId));
-    return measAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => _muted(
-          palette, 'No se pudieron cargar las mediciones.'), // i18n: Fase W2
-      data: (ms) {
-        if (ms.isEmpty) {
-          return _muted(
-              palette, 'Sin mediciones cargadas todavía.'); // i18n: Fase W2
-        }
-        final latest = ms.last;
-        return SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _sectionLabel(palette, 'ANTROPOMETRÍA'), // i18n: Fase W2
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  _MeasCard(
-                      label: 'Peso',
-                      value: latest.weightKg,
-                      unit: 'kg',
-                      palette: palette), // i18n: Fase W2
-                  const SizedBox(width: 10),
-                  _MeasCard(
-                      label: '% Graso',
-                      value: latest.fatPercentage,
-                      unit: '%',
-                      palette: palette), // i18n: Fase W2
-                  const SizedBox(width: 10),
-                  _MeasCard(
-                      label: 'Cintura',
-                      value: latest.waistCm,
-                      unit: 'cm',
-                      palette: palette), // i18n: Fase W2
-                ],
-              ),
-              if (ms.length >= 2) ...[
-                const SizedBox(height: 16),
-                // El chart trae su propia card + heading; no lo re-envolvemos.
-                MeasurementProgressChart(measurements: ms),
+    final perfAsync = ref.watch(performanceTestsForAthleteProvider(athleteId));
+
+    // Antropometría y Rendimiento son fuentes independientes: gateamos juntas
+    // (spinner hasta que ambas tengan valor, error si alguna falla) y mostramos
+    // cada sección por separado según haya datos.
+    if (measAsync.isLoading || perfAsync.isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (measAsync.hasError || perfAsync.hasError) {
+      return _muted(palette, 'No se pudo cargar el progreso.'); // i18n: Fase W2
+    }
+
+    final ms = measAsync.requireValue;
+    final tests = perfAsync.requireValue;
+    if (ms.isEmpty && tests.isEmpty) {
+      return _muted(palette, 'Sin datos de progreso todavía.'); // i18n: Fase W2
+    }
+
+    final latest = ms.isEmpty ? null : ms.last;
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (latest != null) ...[
+            _sectionLabel(palette, 'ANTROPOMETRÍA'), // i18n: Fase W2
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                _MeasCard(
+                    label: 'Peso',
+                    value: latest.weightKg,
+                    unit: 'kg',
+                    palette: palette), // i18n: Fase W2
+                const SizedBox(width: 10),
+                _MeasCard(
+                    label: '% Graso',
+                    value: latest.fatPercentage,
+                    unit: '%',
+                    palette: palette), // i18n: Fase W2
+                const SizedBox(width: 10),
+                _MeasCard(
+                    label: 'Cintura',
+                    value: latest.waistCm,
+                    unit: 'cm',
+                    palette: palette), // i18n: Fase W2
               ],
-              const SizedBox(height: 14),
-              Text(
-                'Próximamente: rendimiento y evolución de cargas.', // i18n: Fase W2
-                style: TextStyle(color: palette.textMuted, fontSize: 12),
-              ),
+            ),
+            if (ms.length >= 2) ...[
+              const SizedBox(height: 16),
+              // El chart trae su propia card + heading; no lo re-envolvemos.
+              MeasurementProgressChart(measurements: ms),
             ],
-          ),
-        );
-      },
+          ],
+          // ── Rendimiento (W2 PR8) ──────────────────────────────────────────
+          // Ambos casos lideran con la misma sección «RENDIMIENTO» (consistencia
+          // con el módulo coach legacy). Con ≥2 tests el chart agrega ABAJO su
+          // propia card interna (heading l10n «PROGRESO»).
+          if (tests.isNotEmpty) ...[
+            if (latest != null) const SizedBox(height: 20),
+            _sectionLabel(palette, 'RENDIMIENTO'), // i18n: Fase W2
+            const SizedBox(height: 10),
+            if (tests.length >= 2)
+              PerformanceProgressChart(tests: tests)
+            else
+              _muted(palette,
+                  'Cargá al menos 2 tests para ver la evolución.'), // i18n: Fase W2
+          ],
+        ],
+      ),
     );
   }
 }
