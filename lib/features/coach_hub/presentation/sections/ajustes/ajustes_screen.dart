@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach_hub/presentation/sections/ajustes/tabs/cuenta_tab.dart';
+import 'package:treino/features/coach_hub/presentation/sections/ajustes/tabs/facturacion_tab.dart';
 import 'package:treino/features/coach_hub/presentation/sections/ajustes/tabs/notificaciones_tab.dart';
 import 'package:treino/features/coach_hub/presentation/shell/section_header.dart';
 
@@ -177,29 +178,7 @@ class _TabBody extends StatelessWidget {
     return switch (tab) {
       AjustesTab.cuenta => const CuentaTab(),
       AjustesTab.notificaciones => const NotificacionesTab(),
-      AjustesTab.facturacion => const _Proximamente(
-          tab: AjustesTab.facturacion,
-        ),
+      AjustesTab.facturacion => const FacturacionTab(),
     };
-  }
-}
-
-class _Proximamente extends StatelessWidget {
-  const _Proximamente({required this.tab});
-
-  final AjustesTab tab;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 48),
-      child: Center(
-        child: Text(
-          '${tab.label} · Próximamente', // i18n: Fase W3
-          style: TextStyle(color: palette.textMuted, fontSize: 14),
-        ),
-      ),
-    );
   }
 }
