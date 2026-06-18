@@ -656,6 +656,82 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('PPL · DÍA 1'), findsOneWidget);
     });
+
+    testWidgets(
+        'initialDayNumber pre-selects the matching day chip on first render',
+        (tester) async {
+      // Routine with 3 days; initialDayNumber: 3 should land on the third
+      // day chip selected, not the default first day. Used by the home
+      // EmpezarEntrenamientoCard to deep-link to today's day.
+      final routine = _makeRoutine(
+        days: [
+          _makeDay(dayNumber: 1, name: 'Día 1'),
+          _makeDay(dayNumber: 2, name: 'Día 2'),
+          _makeDay(dayNumber: 3, name: 'Día 3'),
+        ],
+      );
+      await tester.pumpWidget(_wrapWithOverrides(
+        const RoutineDetailScreen(
+          routineId: 'test-id',
+          initialDayNumber: 3,
+        ),
+        [
+          routineByIdProvider('test-id').overrideWith((ref) async => routine),
+        ],
+      ));
+      await tester.pumpAndSettle();
+
+      // The breadcrumb badge reflects the SELECTED day's name, so finding
+      // "Día 3" there proves day index 3 (1-based → index 2) won.
+      expect(find.text('PPL · DÍA 3'), findsOneWidget);
+    });
+
+    testWidgets(
+        'initialDayNumber out of range clamps to the last day (defensive)',
+        (tester) async {
+      // Routine has 2 days but caller passes initialDayNumber: 99 (e.g. a
+      // stale deep link to a routine that lost days since the URL was made).
+      // The screen's clamp() in build() saves the day → falls back to the
+      // last available day instead of crashing.
+      final routine = _makeRoutine(
+        days: [
+          _makeDay(dayNumber: 1, name: 'Día 1'),
+          _makeDay(dayNumber: 2, name: 'Día 2'),
+        ],
+      );
+      await tester.pumpWidget(_wrapWithOverrides(
+        const RoutineDetailScreen(
+          routineId: 'test-id',
+          initialDayNumber: 99,
+        ),
+        [
+          routineByIdProvider('test-id').overrideWith((ref) async => routine),
+        ],
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.text('PPL · DÍA 2'), findsOneWidget);
+    });
+
+    testWidgets(
+        'initialDayNumber null → defaults to first day (no regression)',
+        (tester) async {
+      final routine = _makeRoutine(
+        days: [
+          _makeDay(dayNumber: 1, name: 'Día 1'),
+          _makeDay(dayNumber: 2, name: 'Día 2'),
+        ],
+      );
+      await tester.pumpWidget(_wrapWithOverrides(
+        const RoutineDetailScreen(routineId: 'test-id'),
+        [
+          routineByIdProvider('test-id').overrideWith((ref) async => routine),
+        ],
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.text('PPL · DÍA 1'), findsOneWidget);
+    });
   });
 
   // ── SCENARIO-WPRES-035 — single-week plan regression (REQ-WPRES-030) ───────
