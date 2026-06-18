@@ -24,6 +24,7 @@ import 'package:treino/features/measurements/domain/measurement.dart';
 import 'package:treino/features/measurements/presentation/widgets/measurement_progress_chart.dart';
 import 'package:treino/features/payments/application/pagos_por_cobrar_provider.dart';
 import 'package:treino/features/payments/application/payment_providers.dart';
+import 'package:treino/features/payments/data/payment_repository.dart';
 import 'package:treino/features/payments/domain/athlete_billing.dart'
     show BillingCadence;
 import 'package:treino/features/payments/domain/payment.dart';
@@ -40,6 +41,8 @@ import 'package:treino/features/workout/domain/session.dart';
 import 'package:treino/features/workout/domain/session_status.dart';
 
 class _MockRepo extends Mock implements TrainerLinkRepository {}
+
+class _MockPaymentRepo extends Mock implements PaymentRepository {}
 
 UserPublicProfile _prof({String name = 'Sofía', int wc = 38, int racha = 14}) =>
     UserPublicProfile(
@@ -142,12 +145,15 @@ CobroPendiente _cobro({
   String athleteId = 'a1',
   int amountArs = 18000,
   String concept = 'Mensual Junio 2026',
+  BillingCadence cadence = BillingCadence.mensual,
+  List<String> pendingPaymentIds = const [],
 }) =>
     CobroPendiente(
       athleteId: athleteId,
       amountArs: amountArs,
-      cadence: BillingCadence.mensual,
+      cadence: cadence,
       concept: concept,
+      pendingPaymentIds: pendingPaymentIds,
     );
 
 Future<void> _pump(
@@ -159,6 +165,7 @@ Future<void> _pump(
   List<Session> sessions = const [],
   List<Payment> payments = const [],
   List<CobroPendiente> pendingCobros = const [],
+  PaymentRepository? paymentRepo,
 }) async {
   tester.view.physicalSize = const Size(1200, 900);
   tester.view.devicePixelRatio = 1.0;
@@ -179,6 +186,8 @@ Future<void> _pump(
         currentUidProvider.overrideWithValue('t1'),
         assignedRoutinesProvider.overrideWith((ref, id) => routines),
         sessionsByUidProvider.overrideWith((ref, id) => sessions),
+        if (paymentRepo != null)
+          paymentRepositoryProvider.overrideWithValue(paymentRepo),
       ],
       child: MaterialApp(
         theme: AppTheme.dark(),
@@ -190,7 +199,12 @@ Future<void> _pump(
 }
 
 void main() {
-  setUpAll(() => registerFallbackValue(''));
+  setUpAll(() {
+    registerFallbackValue('');
+    registerFallbackValue(<String>[]);
+    registerFallbackValue(DateTime.utc(2020));
+    registerFallbackValue(_pago());
+  });
 
   group('AlumnoDetailScreen (W2 PR2)', () {
     testWidgets('header: nombre + estado + métricas denormalizadas',
@@ -356,9 +370,11 @@ void main() {
       await tester.tap(find.text('Pagos'));
       await tester.pumpAndSettle();
 
-      // Estado de cuenta: pendiente $18.000.
+      // Estado de cuenta: el total (24px) + la línea del único cobro (mismo
+      // monto) → el texto aparece 2 veces; más el botón Marcar pagado.
       expect(find.text('Pendiente de cobro'), findsOneWidget);
-      expect(find.text('\$18.000'), findsOneWidget);
+      expect(find.text('\$18.000'), findsNWidgets(2));
+      expect(find.text('Marcar pagado'), findsOneWidget);
 
       // Historial del alumno (no el pago "Ajeno" de otro).
       expect(find.text('Mensual mayo'), findsOneWidget);
@@ -391,8 +407,11 @@ void main() {
       await tester.tap(find.text('Pagos'));
       await tester.pumpAndSettle();
 
-      expect(find.text('\$30.000'), findsOneWidget); // 18.000 + 12.000
-      expect(find.text('Mensual · Extra'), findsOneWidget);
+      expect(find.text('\$30.000'), findsOneWidget); // total 18.000 + 12.000
+      expect(find.text('Mensual'), findsOneWidget); // un concepto por cobro
+      expect(find.text('Extra'), findsOneWidget);
+      expect(
+          find.text('Marcar pagado'), findsNWidgets(2)); // un botón por cobro
     });
 
     testWidgets('tab Pagos: monto de 7 dígitos usa dos separadores (W2 PR5)',
@@ -408,6 +427,227 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('\$1.200.000'), findsOneWidget);
+    });
+
+    testWidgets('tab Pagos: registrar pago crea un Payment pagado (W2 PR6)',
+        (tester) async {
+      final repo = _MockPaymentRepo();
+      when(() => repo.add(any())).thenAnswer((_) async {});
+
+      await _pump(tester,
+          profile: _prof(),
+          link: _link(TrainerLinkStatus.active),
+          paymentRepo: repo);
+
+      await tester.tap(find.text('Pagos'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('+ Registrar pago'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byType(TextField).at(0), '5000');
+      await tester.enterText(find.byType(TextField).at(1), 'Clase de prueba');
+      await tester.tap(find.text('Registrar'));
+      await tester.pumpAndSettle();
+
+      final p = verify(() => repo.add(captureAny())).captured.single as Payment;
+      expect(p.athleteId, 'a1');
+      expect(p.amountArs, 5000);
+      expect(p.concept, 'Clase de prueba');
+      expect(p.status, PaymentStatus.paid);
+    });
+
+    testWidgets(
+        'tab Pagos: registrar pago con monto inválido NO escribe (W2 PR6)',
+        (tester) async {
+      final repo = _MockPaymentRepo();
+
+      await _pump(tester,
+          profile: _prof(),
+          link: _link(TrainerLinkStatus.active),
+          paymentRepo: repo);
+
+      await tester.tap(find.text('Pagos'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('+ Registrar pago'));
+      await tester.pumpAndSettle();
+
+      // Concepto sin monto → validación, sin escritura.
+      await tester.enterText(find.byType(TextField).at(1), 'Algo');
+      await tester.tap(find.text('Registrar'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Ingresá un monto válido.'), findsOneWidget);
+      verifyNever(() => repo.add(any()));
+    });
+
+    testWidgets('tab Pagos: registrar pago sin concepto NO escribe (W2 PR6)',
+        (tester) async {
+      final repo = _MockPaymentRepo();
+
+      await _pump(tester,
+          profile: _prof(),
+          link: _link(TrainerLinkStatus.active),
+          paymentRepo: repo);
+
+      await tester.tap(find.text('Pagos'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('+ Registrar pago'));
+      await tester.pumpAndSettle();
+
+      // Monto válido pero concepto vacío → validación, sin escritura.
+      await tester.enterText(find.byType(TextField).at(0), '5000');
+      await tester.tap(find.text('Registrar'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Completá todos los campos.'), findsOneWidget);
+      verifyNever(() => repo.add(any()));
+    });
+
+    testWidgets('tab Pagos: marcar pagado (suelto) llama markManyPaid (W2 PR6)',
+        (tester) async {
+      final repo = _MockPaymentRepo();
+      when(() => repo.markManyPaid(any(), any())).thenAnswer((_) async {});
+
+      await _pump(
+        tester,
+        profile: _prof(),
+        link: _link(TrainerLinkStatus.active),
+        paymentRepo: repo,
+        pendingCobros: [
+          _cobro(
+            concept: 'Cobro suelto',
+            amountArs: 5000,
+            cadence: BillingCadence.suelto,
+            pendingPaymentIds: ['pp1', 'pp2'],
+          ),
+        ],
+      );
+
+      await tester.tap(find.text('Pagos'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Marcar pagado'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Cobrado')); // confirma
+      await tester.pumpAndSettle();
+
+      verify(() => repo.markManyPaid(['pp1', 'pp2'], any())).called(1);
+      verifyNever(() => repo.add(any()));
+    });
+
+    testWidgets(
+        'tab Pagos: marcar pagado (mensual) crea Payment pagado con periodKey (W2 PR6)',
+        (tester) async {
+      final repo = _MockPaymentRepo();
+      when(() => repo.add(any())).thenAnswer((_) async {});
+
+      await _pump(
+        tester,
+        profile: _prof(),
+        link: _link(TrainerLinkStatus.active),
+        paymentRepo: repo,
+        pendingCobros: [_cobro(concept: 'Mensual', amountArs: 18000)],
+      );
+
+      await tester.tap(find.text('Pagos'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Marcar pagado'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Cobrado'));
+      await tester.pumpAndSettle();
+
+      final p = verify(() => repo.add(captureAny())).captured.single as Payment;
+      expect(p.status, PaymentStatus.paid);
+      expect(p.amountArs, 18000);
+      // El key EXACTO que compara pagosPorCobrarProvider (si no, el cobro no
+      // desaparece): mismo formato/now que el provider.
+      final n = DateTime.now().toUtc();
+      expect(p.periodKey, '${n.year}-${n.month.toString().padLeft(2, '0')}');
+    });
+
+    testWidgets(
+        'tab Pagos: marcar pagado (semanal) usa periodKey ISO-week (W2 PR6)',
+        (tester) async {
+      final repo = _MockPaymentRepo();
+      when(() => repo.add(any())).thenAnswer((_) async {});
+
+      await _pump(
+        tester,
+        profile: _prof(),
+        link: _link(TrainerLinkStatus.active),
+        paymentRepo: repo,
+        pendingCobros: [
+          _cobro(
+              concept: 'Semana',
+              amountArs: 9000,
+              cadence: BillingCadence.semanal),
+        ],
+      );
+
+      await tester.tap(find.text('Pagos'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Marcar pagado'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Cobrado'));
+      await tester.pumpAndSettle();
+
+      final p = verify(() => repo.add(captureAny())).captured.single as Payment;
+      expect(p.status, PaymentStatus.paid);
+      expect(p.periodKey, isoWeekPeriodKey(DateTime.now().toUtc()));
+    });
+
+    testWidgets(
+        'tab Pagos: marcar pagado (porSesión) crea Payment sin periodKey (W2 PR6)',
+        (tester) async {
+      final repo = _MockPaymentRepo();
+      when(() => repo.add(any())).thenAnswer((_) async {});
+
+      await _pump(
+        tester,
+        profile: _prof(),
+        link: _link(TrainerLinkStatus.active),
+        paymentRepo: repo,
+        pendingCobros: [
+          _cobro(
+              concept: '3 sesiones',
+              amountArs: 9000,
+              cadence: BillingCadence.porSesion),
+        ],
+      );
+
+      await tester.tap(find.text('Pagos'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Marcar pagado'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Cobrado'));
+      await tester.pumpAndSettle();
+
+      final p = verify(() => repo.add(captureAny())).captured.single as Payment;
+      expect(p.status, PaymentStatus.paid);
+      expect(p.periodKey, isNull);
+      verifyNever(() => repo.markManyPaid(any(), any()));
+    });
+
+    testWidgets('tab Pagos: cancelar el marcar pagado NO escribe (W2 PR6)',
+        (tester) async {
+      final repo = _MockPaymentRepo();
+
+      await _pump(
+        tester,
+        profile: _prof(),
+        link: _link(TrainerLinkStatus.active),
+        paymentRepo: repo,
+        pendingCobros: [_cobro(concept: 'Mensual', amountArs: 18000)],
+      );
+
+      await tester.tap(find.text('Pagos'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Marcar pagado'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Cancelar'));
+      await tester.pumpAndSettle();
+
+      verifyNever(() => repo.add(any()));
+      verifyNever(() => repo.markManyPaid(any(), any()));
     });
 
     testWidgets('tab Entrenamientos: estados vacíos (W2 PR3)', (tester) async {

@@ -11,6 +11,8 @@ import 'package:treino/features/measurements/application/measurement_providers.d
 import 'package:treino/features/measurements/presentation/widgets/measurement_progress_chart.dart';
 import 'package:treino/features/payments/application/pagos_por_cobrar_provider.dart';
 import 'package:treino/features/payments/application/payment_providers.dart';
+import 'package:treino/features/payments/domain/athlete_billing.dart'
+    show BillingCadence;
 import 'package:treino/features/payments/domain/payment.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
@@ -839,14 +841,17 @@ String _fmtArs(int amount) {
   return '${amount < 0 ? '-' : ''}\$$buf';
 }
 
-/// Tab Pagos (W2 PR5): estado de cuenta + historial de pagos del alumno.
+/// Tab Pagos (W2 PR5/PR6): estado de cuenta + historial de pagos + acciones.
 ///
 /// Sólo data trainer-readable: el historial sale de `trainerPaymentsProvider`
 /// (que filtra por `trainerId == uid`, única forma que las reglas permiten al
 /// entrenador) acotado a este alumno, y el cobro pendiente se reusa de
 /// `pagosPorCobrarProvider` (que ya computa cadencia/deuda) sin reimplementar
-/// billing. Las acciones (registrar pago, marcar pagado, recordatorios) y las
-/// métricas globales (ingreso del mes/proyección) se difieren.
+/// billing. PR6 agrega **registrar pago** (crea un Payment pagado) y **marcar
+/// pagado** (settlea un cobro pendiente: `markManyPaid` para los sueltos; crea
+/// un Payment pagado con el `periodKey` que corresponda para los recurrentes —
+/// misma receta que el dashboard del coach). Los recordatorios y las métricas
+/// globales (ingreso del mes/proyección) se difieren.
 class _PagosTab extends ConsumerWidget {
   const _PagosTab({required this.athleteId});
   final String athleteId;
@@ -872,19 +877,36 @@ class _PagosTab extends ConsumerWidget {
     final pending = pendingAsync.requireValue
         .where((c) => c.athleteId == athleteId)
         .toList();
-    final pendingTotal = pending.fold<int>(0, (sum, c) => sum + c.amountArs);
 
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _sectionLabel(palette, 'ESTADO DE CUENTA'), // i18n: Fase W2
+          Row(
+            children: [
+              Expanded(
+                child:
+                    _sectionLabel(palette, 'ESTADO DE CUENTA'), // i18n: Fase W2
+              ),
+              TextButton(
+                onPressed: () => _registrarPago(context, ref, athleteId),
+                child: Text(
+                  '+ Registrar pago', // i18n: Fase W2
+                  style: TextStyle(
+                    color: palette.accent,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 10),
           _EstadoCuentaCard(
             palette: palette,
-            pendingTotal: pendingTotal,
-            conceptos: [for (final c in pending) c.concept],
+            pending: pending,
+            onMarcarPagado: (c) => _marcarPagado(context, ref, c),
           ),
           const SizedBox(height: 20),
           _sectionLabel(palette, 'HISTORIAL DE PAGOS'), // i18n: Fase W2
@@ -895,7 +917,7 @@ class _PagosTab extends ConsumerWidget {
             _PagosTable(payments: history, palette: palette),
           const SizedBox(height: 14),
           Text(
-            'Próximamente: registrar pago, marcar pagado y recordatorios.', // i18n: Fase W2
+            'Próximamente: recordatorios y exportar.', // i18n: Fase W2
             style: TextStyle(color: palette.textMuted, fontSize: 12),
           ),
         ],
@@ -904,20 +926,117 @@ class _PagosTab extends ConsumerWidget {
   }
 }
 
-class _EstadoCuentaCard extends StatelessWidget {
+class _EstadoCuentaCard extends StatefulWidget {
   const _EstadoCuentaCard({
     required this.palette,
-    required this.pendingTotal,
-    required this.conceptos,
+    required this.pending,
+    required this.onMarcarPagado,
   });
 
   final AppPalette palette;
-  final int pendingTotal;
-  final List<String> conceptos;
+  final List<CobroPendiente> pending;
+  final Future<void> Function(CobroPendiente) onMarcarPagado;
+
+  @override
+  State<_EstadoCuentaCard> createState() => _EstadoCuentaCardState();
+}
+
+class _EstadoCuentaCardState extends State<_EstadoCuentaCard> {
+  // Cobros con una escritura en vuelo. Deshabilita "Marcar pagado" mientras el
+  // settle viaja a Firestore (write → snapshot → providers → rebuild oculta la
+  // fila): sin esto, volver a tocar el botón en esa ventana doble-cobra.
+  final _inFlight = <String>{};
+
+  String _key(CobroPendiente c) =>
+      '${c.athleteId}|${c.cadence.name}|${c.concept}|${c.amountArs}';
+
+  Future<void> _tap(CobroPendiente c) async {
+    final k = _key(c);
+    if (_inFlight.contains(k)) return;
+    setState(() => _inFlight.add(k));
+    try {
+      await widget.onMarcarPagado(c);
+    } finally {
+      if (mounted) setState(() => _inFlight.remove(k));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final alDia = pendingTotal <= 0;
+    final palette = widget.palette;
+    final pending = widget.pending;
+    final Widget inner;
+    if (pending.isEmpty) {
+      inner = Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Sin cobros pendientes', // i18n: Fase W2
+              style: TextStyle(color: palette.textMuted, fontSize: 12)),
+          const SizedBox(height: 4),
+          Text('Al día', // i18n: Fase W2
+              style: TextStyle(
+                  color: palette.accent,
+                  fontSize: 24,
+                  fontWeight: FontWeight.w700)),
+        ],
+      );
+    } else {
+      final total = pending.fold<int>(0, (sum, c) => sum + c.amountArs);
+      inner = Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Pendiente de cobro', // i18n: Fase W2
+              style: TextStyle(color: palette.textMuted, fontSize: 12)),
+          const SizedBox(height: 4),
+          Text(_fmtArs(total),
+              style: TextStyle(
+                  color: palette.warning,
+                  fontSize: 24,
+                  fontWeight: FontWeight.w700)),
+          const SizedBox(height: 12),
+          for (final c in pending)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(c.concept,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                                color: palette.textPrimary, fontSize: 14)),
+                        Text(_fmtArs(c.amountArs),
+                            style: TextStyle(
+                                color: palette.textMuted, fontSize: 12)),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  OutlinedButton(
+                    onPressed:
+                        _inFlight.contains(_key(c)) ? null : () => _tap(c),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: palette.accent,
+                      side: BorderSide(color: palette.border),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 6),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: const Text('Marcar pagado', // i18n: Fase W2
+                        style: TextStyle(
+                            fontSize: 12, fontWeight: FontWeight.w600)),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      );
+    }
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -925,33 +1044,214 @@ class _EstadoCuentaCard extends StatelessWidget {
         border: Border.all(color: palette.border),
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            alDia
-                ? 'Sin cobros pendientes'
-                : 'Pendiente de cobro', // i18n: Fase W2
-            style: TextStyle(color: palette.textMuted, fontSize: 12),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            alDia ? 'Al día' : _fmtArs(pendingTotal), // i18n: Fase W2
-            style: TextStyle(
-              color: alDia ? palette.accent : palette.warning,
-              fontSize: 24,
+      child: inner,
+    );
+  }
+}
+
+void _pagoSnack(BuildContext context, String msg) {
+  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+}
+
+/// Construye un Payment pagado para settlear un cobro recurrente. El [periodKey]
+/// debe matchear el que computa `pagosPorCobrarProvider` (month/ISO-week) para
+/// que el cobro desaparezca tras marcarlo; `null` para porSesión (sin período).
+Payment _paidPaymentFor(
+  String trainerId,
+  CobroPendiente cobro,
+  DateTime now,
+  String? periodKey,
+) =>
+    Payment(
+      id: '',
+      trainerId: trainerId,
+      athleteId: cobro.athleteId,
+      amountArs: cobro.amountArs,
+      concept: cobro.concept,
+      status: PaymentStatus.paid,
+      periodKey: periodKey,
+      createdAt: now,
+      paidAt: now,
+    );
+
+Future<void> _marcarPagado(
+    BuildContext context, WidgetRef ref, CobroPendiente cobro) async {
+  final palette = AppPalette.of(context);
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      backgroundColor: palette.bgCard,
+      title: Text('¿Marcar como cobrado?', // i18n: Fase W2
+          style: TextStyle(
+              color: palette.textPrimary,
               fontWeight: FontWeight.w700,
-            ),
+              fontSize: 18)),
+      content: Text('${cobro.concept} — ${_fmtArs(cobro.amountArs)}',
+          style: TextStyle(color: palette.textMuted, fontSize: 14)),
+      actions: [
+        TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text('Cancelar', // i18n: Fase W2
+                style: TextStyle(color: palette.textMuted))),
+        TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text('Cobrado', // i18n: Fase W2
+                style: TextStyle(
+                    color: palette.accent, fontWeight: FontWeight.w700))),
+      ],
+    ),
+  );
+  if (confirmed != true || !context.mounted) return;
+
+  final trainerId = ref.read(currentUidProvider);
+  if (trainerId == null) return;
+  final repo = ref.read(paymentRepositoryProvider);
+  final now = DateTime.now().toUtc();
+  try {
+    switch (cobro.cadence) {
+      case BillingCadence.suelto:
+        await repo.markManyPaid(cobro.pendingPaymentIds, now);
+      case BillingCadence.mensual:
+        await repo.add(_paidPaymentFor(trainerId, cobro, now,
+            '${now.year}-${now.month.toString().padLeft(2, '0')}'));
+      case BillingCadence.semanal:
+        await repo
+            .add(_paidPaymentFor(trainerId, cobro, now, isoWeekPeriodKey(now)));
+      case BillingCadence.porSesion:
+        await repo.add(_paidPaymentFor(trainerId, cobro, now, null));
+    }
+    if (context.mounted) {
+      _pagoSnack(context, 'Cobro registrado.'); // i18n: Fase W2
+    }
+  } catch (_) {
+    if (context.mounted) {
+      _pagoSnack(
+          context, 'No pudimos guardar. Intentá de nuevo.'); // i18n: Fase W2
+    }
+  }
+}
+
+Future<void> _registrarPago(
+    BuildContext context, WidgetRef ref, String athleteId) async {
+  final result = await showDialog<({int amount, String concept})>(
+    context: context,
+    builder: (_) => const _RegistrarPagoDialog(),
+  );
+  if (result == null) return;
+
+  final trainerId = ref.read(currentUidProvider);
+  if (trainerId == null) return;
+  final now = DateTime.now().toUtc();
+  try {
+    await ref.read(paymentRepositoryProvider).add(Payment(
+          id: '',
+          trainerId: trainerId,
+          athleteId: athleteId,
+          amountArs: result.amount,
+          concept: result.concept,
+          status: PaymentStatus.paid,
+          createdAt: now,
+          paidAt: now,
+        ));
+    if (context.mounted) {
+      _pagoSnack(context, 'Pago registrado.'); // i18n: Fase W2
+    }
+  } catch (_) {
+    if (context.mounted) {
+      _pagoSnack(
+          context, 'No pudimos guardar. Intentá de nuevo.'); // i18n: Fase W2
+    }
+  }
+}
+
+/// Diálogo de alta de un pago ad-hoc (monto + concepto). Devuelve el record o
+/// `null` si se cancela. Copy hardcodeada (CoachHubApp no tiene l10n delegates).
+class _RegistrarPagoDialog extends StatefulWidget {
+  const _RegistrarPagoDialog();
+
+  @override
+  State<_RegistrarPagoDialog> createState() => _RegistrarPagoDialogState();
+}
+
+class _RegistrarPagoDialogState extends State<_RegistrarPagoDialog> {
+  final _monto = TextEditingController();
+  final _concepto = TextEditingController();
+  String? _error;
+
+  @override
+  void dispose() {
+    _monto.dispose();
+    _concepto.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final amount = int.tryParse(_monto.text.trim());
+    final concept = _concepto.text.trim();
+    if (amount == null || amount <= 0) {
+      setState(() => _error = 'Ingresá un monto válido.'); // i18n: Fase W2
+      return;
+    }
+    if (concept.isEmpty) {
+      setState(() => _error = 'Completá todos los campos.'); // i18n: Fase W2
+      return;
+    }
+    Navigator.of(context).pop((amount: amount, concept: concept));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    InputDecoration deco(String label, String hint) => InputDecoration(
+          labelText: label,
+          hintText: hint,
+          labelStyle: TextStyle(color: palette.textMuted),
+          hintStyle: TextStyle(color: palette.textMuted),
+          enabledBorder:
+              OutlineInputBorder(borderSide: BorderSide(color: palette.border)),
+          focusedBorder:
+              OutlineInputBorder(borderSide: BorderSide(color: palette.accent)),
+        );
+    return AlertDialog(
+      backgroundColor: palette.bgCard,
+      title: Text('Registrar pago', // i18n: Fase W2
+          style: TextStyle(
+              color: palette.textPrimary,
+              fontWeight: FontWeight.w700,
+              fontSize: 18)),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: _monto,
+            keyboardType: TextInputType.number,
+            style: TextStyle(color: palette.textPrimary),
+            decoration: deco('Monto (ARS)', 'Ej: 5000'), // i18n: Fase W2
           ),
-          if (conceptos.isNotEmpty) ...[
-            const SizedBox(height: 6),
-            Text(
-              conceptos.join(' · '),
-              style: TextStyle(color: palette.textMuted, fontSize: 13),
-            ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _concepto,
+            style: TextStyle(color: palette.textPrimary),
+            decoration: deco('Concepto', 'Ej: Clase suelta'), // i18n: Fase W2
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: 10),
+            Text(_error!,
+                style: TextStyle(color: palette.danger, fontSize: 12)),
           ],
         ],
       ),
+      actions: [
+        TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text('Cancelar', // i18n: Fase W2
+                style: TextStyle(color: palette.textMuted))),
+        TextButton(
+            onPressed: _submit,
+            child: Text('Registrar', // i18n: Fase W2
+                style: TextStyle(
+                    color: palette.accent, fontWeight: FontWeight.w700))),
+      ],
     );
   }
 }
