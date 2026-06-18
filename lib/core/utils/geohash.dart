@@ -113,3 +113,26 @@ List<String> geohashNeighbors(String geohash) {
     _adjacent(s, 'w'),
   ];
 }
+
+/// Returns the 24 geohash cells forming the two rings around [geohash] (a 5×5
+/// block minus the center), each at the same precision as the input.
+///
+/// Widens [geohashNeighbors] (3×3 / 8 cells, ~15km) to a 5×5 grid (~25km) so a
+/// trainer up to ~2 cells from the athlete is not dropped at the proximity
+/// stage — the 3×3 grid silently missed a trainer only ~9.8km away that landed
+/// in a cell just beyond the immediate ring. Combine with the athlete's own
+/// cell for 25 values total, still within Firestore's `array-contains-any`
+/// 30-value limit. A 7×7 block (49 cells) would EXCEED that limit and require a
+/// different query strategy.
+List<String> geohashNeighbors5x5(String geohash) {
+  // Ring 2 = the neighbors of every ring-1 cell. Unioning the neighbors of the
+  // 3×3 block extends coverage exactly one ring further out (to 5×5); the Set
+  // dedupes the interior cells the expansion revisits.
+  final ring1 = geohashNeighbors(geohash);
+  final grid = <String>{...ring1};
+  for (final cell in ring1) {
+    grid.addAll(geohashNeighbors(cell));
+  }
+  grid.remove(geohash); // center is prepended by the caller, as with geohashNeighbors
+  return grid.toList();
+}
