@@ -51,7 +51,7 @@ void main() {
   setUpAll(() => registerFallbackValue(<String, Object?>{}));
 
   group('AjustesScreen (W3.1)', () {
-    testWidgets('renderiza el header y las 4 tabs de Configuración',
+    testWidgets('renderiza el header y las 3 tabs de Configuración',
         (tester) async {
       await tester.pumpWidget(_harness());
       await tester.pump();
@@ -60,7 +60,8 @@ void main() {
       expect(find.text('Cuenta'), findsOneWidget);
       expect(find.text('Notificaciones'), findsOneWidget);
       expect(find.text('Facturación TREINO'), findsOneWidget);
-      expect(find.text('Datos y privacidad'), findsOneWidget);
+      // «Datos y privacidad» se removió del nav (eliminar vive en mobile).
+      expect(find.text('Datos y privacidad'), findsNothing);
     });
 
     testWidgets('la tab Cuenta muestra los datos del PF logueado',
