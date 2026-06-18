@@ -388,7 +388,19 @@ GoRouter buildRouter({
                 path: 'routine/:routineId',
                 builder: (context, state) {
                   final routineId = state.pathParameters['routineId']!;
-                  return _withBg(RoutineDetailScreen(routineId: routineId));
+                  // Optional pre-selection. `day` is 1-based on the wire to
+                  // match RoutineDay.dayNumber; the screen converts to a
+                  // 0-based index. `week` is already 0-based. Used by the
+                  // home EmpezarEntrenamientoCard to deep-link to today.
+                  final initialDay =
+                      int.tryParse(state.uri.queryParameters['day'] ?? '');
+                  final initialWeek =
+                      int.tryParse(state.uri.queryParameters['week'] ?? '');
+                  return _withBg(RoutineDetailScreen(
+                    routineId: routineId,
+                    initialDayNumber: initialDay,
+                    initialWeekIndex: initialWeek,
+                  ));
                 },
               ),
               GoRoute(
