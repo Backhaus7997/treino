@@ -2,7 +2,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/features/home/application/todays_routine_provider.dart';
+import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/experience_level.dart';
+import 'package:treino/features/profile/domain/user_profile.dart';
+import 'package:treino/features/profile/domain/user_role.dart';
 import 'package:treino/features/workout/application/assigned_routine_providers.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
 import 'package:treino/features/workout/application/user_routines_providers.dart';
@@ -64,10 +67,21 @@ Session _session({
 
 // ─── Test harness ────────────────────────────────────────────────────────────
 
+UserProfile _profile({String? activeRoutineId}) => UserProfile(
+      uid: 'u1',
+      email: 'u1@treino.app',
+      displayName: 'U1',
+      role: UserRole.athlete,
+      createdAt: DateTime(2026, 1, 1),
+      updatedAt: DateTime(2026, 1, 1),
+      activeRoutineId: activeRoutineId,
+    );
+
 ProviderContainer _container({
   List<Routine> assigned = const [],
   List<Routine> selfCreated = const [],
   List<Session> sessions = const [],
+  String? activeRoutineId,
 }) {
   final c = ProviderContainer(
     overrides: [
@@ -76,6 +90,9 @@ ProviderContainer _container({
       userCreatedRoutinesProvider('u1')
           .overrideWith((ref) => Stream.value(selfCreated)),
       sessionsByUidProvider('u1').overrideWith((ref) async => sessions),
+      userProfileProvider.overrideWith(
+        (ref) => Stream.value(_profile(activeRoutineId: activeRoutineId)),
+      ),
     ],
   );
   addTearDown(c.dispose);
@@ -105,14 +122,94 @@ void main() {
       expect(today!.routine.id, equals('self-1'));
     });
 
-    test('no assigned + MULTIPLE self-created → returns null (needs PR#2)',
-        () async {
+    test(
+        'no assigned + MULTIPLE self-created + NO activeRoutineId → null '
+        '(athlete needs to mark one as active)', () async {
       final self1 = _routine(id: 'self-1');
       final self2 = _routine(id: 'self-2');
       final c = _container(assigned: const [], selfCreated: [self1, self2]);
 
       final today = await c.read(todaysRoutineProvider.future);
       expect(today, isNull);
+    });
+
+    test(
+        'no assigned + MULTIPLE self-created + activeRoutineId set → '
+        'returns the active routine', () async {
+      final self1 = _routine(id: 'self-1');
+      final self2 = _routine(id: 'self-2');
+      final c = _container(
+        assigned: const [],
+        selfCreated: [self1, self2],
+        activeRoutineId: 'self-2',
+      );
+
+      // Pre-warm dependent autoDispose streams so activeRoutineProvider can
+      // resolve when todaysRoutineProvider invokes ref.watch on it.
+      c.listen<AsyncValue<UserProfile?>>(userProfileProvider, (_, __) {});
+      c.listen<AsyncValue<List<Routine>>>(
+          userCreatedRoutinesProvider('u1'), (_, __) {});
+      await c.read(userProfileProvider.future);
+      await c.read(userCreatedRoutinesProvider('u1').future);
+
+      final today = await c.read(todaysRoutineProvider.future);
+      expect(today, isNotNull);
+      expect(today!.routine.id, equals('self-2'));
+    });
+
+    test(
+        'multi self-created + activeRoutineId points to non-existent id → null '
+        '(stale pointer, e.g. routine archived after being marked active)',
+        () async {
+      final self1 = _routine(id: 'self-1');
+      final self2 = _routine(id: 'self-2');
+      final c = _container(
+        assigned: const [],
+        selfCreated: [self1, self2],
+        activeRoutineId: 'archived-routine-id',
+      );
+
+      c.listen<AsyncValue<UserProfile?>>(userProfileProvider, (_, __) {});
+      c.listen<AsyncValue<List<Routine>>>(
+          userCreatedRoutinesProvider('u1'), (_, __) {});
+      await c.read(userProfileProvider.future);
+      await c.read(userCreatedRoutinesProvider('u1').future);
+
+      final today = await c.read(todaysRoutineProvider.future);
+      expect(today, isNull);
+    });
+
+    test(
+        'trainer-assigned PRESENT + multi self-created + activeRoutineId → '
+        'trainer-assigned still wins (priority not bypassed)', () async {
+      final assigned = _routine(id: 'assigned-1');
+      final self1 = _routine(id: 'self-1');
+      final self2 = _routine(id: 'self-2');
+      final c = _container(
+        assigned: [assigned],
+        selfCreated: [self1, self2],
+        activeRoutineId: 'self-2',
+      );
+
+      final today = await c.read(todaysRoutineProvider.future);
+      expect(today!.routine.id, equals('assigned-1'),
+          reason: 'trainer-assigned tier wins over self-created active marker');
+    });
+
+    test(
+        'single self-created + activeRoutineId set elsewhere → '
+        'still uses the single routine (auto-active wins)', () async {
+      final self = _routine(id: 'self-only');
+      final c = _container(
+        assigned: const [],
+        selfCreated: [self],
+        activeRoutineId: 'something-else',
+      );
+
+      final today = await c.read(todaysRoutineProvider.future);
+      expect(today!.routine.id, equals('self-only'),
+          reason: 'with a single routine the marker is irrelevant — '
+              'tier 2 auto-activates before tier 3 runs');
     });
 
     test('empty uid → null (unauthenticated state)', () async {
@@ -220,8 +317,7 @@ void main() {
       final c = _container(
         assigned: [r],
         sessions: [
-          _session(
-              routineId: 'r1', dayNumber: 4, status: SessionStatus.active),
+          _session(routineId: 'r1', dayNumber: 4, status: SessionStatus.active),
         ],
       );
 
@@ -266,7 +362,8 @@ void main() {
       final today = await c.read(todaysRoutineProvider.future);
       expect(today!.dayNumber, equals(1));
       expect(today.weekNumber, equals(0),
-          reason: 'week loops back to 0 after the last week of a periodized plan');
+          reason:
+              'week loops back to 0 after the last week of a periodized plan');
     });
   });
 }

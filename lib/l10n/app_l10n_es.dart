@@ -567,6 +567,27 @@ class AppL10nEs extends AppL10n {
   String get workoutMisRutinasOverflowArchive => 'ELIMINAR';
 
   @override
+  String get workoutMisRutinasOverflowMarkActive => 'MARCAR COMO ACTIVA';
+
+  @override
+  String get workoutMisRutinasOverflowUnmarkActive => 'DESMARCAR COMO ACTIVA';
+
+  @override
+  String get workoutMisRutinasActiveChip => 'ACTIVA';
+
+  @override
+  String get workoutMisRutinasMarkActiveSuccess =>
+      'Marcada como tu rutina activa';
+
+  @override
+  String get workoutMisRutinasUnmarkActiveSuccess =>
+      'Ya no es tu rutina activa';
+
+  @override
+  String get workoutMisRutinasActiveError =>
+      'No pudimos cambiar el estado. Reintentá.';
+
+  @override
   String get workoutMisRutinasConfirmTitle => 'Eliminar rutina';
 
   @override
@@ -2279,6 +2300,27 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get workoutMisRutinasOverflowArchive => 'ELIMINAR';
+
+  @override
+  String get workoutMisRutinasOverflowMarkActive => 'MARCAR COMO ACTIVA';
+
+  @override
+  String get workoutMisRutinasOverflowUnmarkActive => 'DESMARCAR COMO ACTIVA';
+
+  @override
+  String get workoutMisRutinasActiveChip => 'ACTIVA';
+
+  @override
+  String get workoutMisRutinasMarkActiveSuccess =>
+      'Marcada como tu rutina activa';
+
+  @override
+  String get workoutMisRutinasUnmarkActiveSuccess =>
+      'Ya no es tu rutina activa';
+
+  @override
+  String get workoutMisRutinasActiveError =>
+      'No pudimos cambiar el estado. Reintentá.';
 
   @override
   String get workoutMisRutinasConfirmTitle => 'Eliminar rutina';
