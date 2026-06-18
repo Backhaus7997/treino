@@ -11,53 +11,49 @@ import 'package:treino/features/workout/application/session_providers.dart'
 
 void main() {
   // ---------------------------------------------------------------------------
-  // The athlete view must surface the FULL performance-test history for an
-  // athlete, regardless of which trainer recorded each entry (reassignment /
-  // co-trainer). Previously the provider queried by `recordedBy` == current
-  // trainer (over-reading the whole trainer-wide collection), so any test
-  // logged by another trainer was silently invisible.
+  // performanceTestsForAthleteProvider corre en contexto de ENTRENADOR. Las
+  // reglas de Firestore solo le permiten leer tests donde `recordedBy == uid`,
+  // por lo que la query es `recordedBy + athleteId`. Un `where athleteId ==` a
+  // secas es DENEGADO al entrenador (mismo patrón que mediciones/pagos). Por eso
+  // el provider devuelve SOLO lo que el entrenador actual registró para ese
+  // alumno. (FakeFirebaseFirestore no aplica reglas; validamos el contrato del
+  // query: filtra por recordedBy Y athleteId.)
   // ---------------------------------------------------------------------------
   test(
-    'performanceTestsForAthleteProvider returns tests recorded by other '
-    'trainers, not just the current one',
+    'vista entrenador: solo lo que registró el entrenador actual para ese alumno',
     () async {
       final firestore = FakeFirebaseFirestore();
       final repo = PerformanceTestRepository(firestore: firestore);
 
       const athleteId = 'athlete1';
+      const otherAthlete = 'athlete2';
       const currentTrainer = 'trainerT2';
-      const previousTrainer = 'trainerT1';
+      const otherTrainer = 'trainerT1';
 
-      // Logged by a previous/other trainer for the same athlete.
-      await repo.add(
-        PerformanceTest(
-          id: '',
-          athleteId: athleteId,
-          recordedBy: previousTrainer,
-          recordedAt: DateTime.utc(2026, 1, 1),
-          cmjCm: 32,
-        ),
-      );
-      // Logged by the current trainer.
-      await repo.add(
-        PerformanceTest(
-          id: '',
-          athleteId: athleteId,
-          recordedBy: currentTrainer,
-          recordedAt: DateTime.utc(2026, 2, 1),
-          cmjCm: 34,
-        ),
-      );
-      // Logged for a DIFFERENT athlete — must NOT leak into this athlete's view.
-      await repo.add(
-        PerformanceTest(
-          id: '',
-          athleteId: 'athlete2',
-          recordedBy: currentTrainer,
-          recordedAt: DateTime.utc(2026, 3, 1),
-          cmjCm: 99,
-        ),
-      );
+      // (a) Otro entrenador, mismo alumno → NO visible.
+      await repo.add(PerformanceTest(
+        id: '',
+        athleteId: athleteId,
+        recordedBy: otherTrainer,
+        recordedAt: DateTime.utc(2026, 1, 1),
+        cmjCm: 30,
+      ));
+      // (b) Entrenador actual, mismo alumno → visible.
+      await repo.add(PerformanceTest(
+        id: '',
+        athleteId: athleteId,
+        recordedBy: currentTrainer,
+        recordedAt: DateTime.utc(2026, 2, 1),
+        cmjCm: 32,
+      ));
+      // (c) Entrenador actual, OTRO alumno → NO visible (filtro athleteId).
+      await repo.add(PerformanceTest(
+        id: '',
+        athleteId: otherAthlete,
+        recordedBy: currentTrainer,
+        recordedAt: DateTime.utc(2026, 3, 1),
+        cmjCm: 40,
+      ));
 
       final container = ProviderContainer(
         overrides: [
@@ -68,12 +64,27 @@ void main() {
       addTearDown(container.dispose);
 
       final result = await container
-          .read(performanceTestsForAthleteProvider(athleteId).stream)
-          .first;
+          .read(performanceTestsForAthleteProvider(athleteId).future);
 
-      // Only this athlete's tests, sorted by recordedAt ascending, with the
-      // entry from the previous trainer included.
-      expect(result.map((t) => t.recordedBy), [previousTrainer, currentTrainer]);
+      expect(result.map((t) => t.cmjCm), [32]);
+      expect(result.single.recordedBy, currentTrainer);
+      expect(result.single.athleteId, athleteId);
     },
   );
+
+  test('devuelve vacío cuando no hay entrenador autenticado', () async {
+    final firestore = FakeFirebaseFirestore();
+    final container = ProviderContainer(
+      overrides: [
+        firestoreProvider.overrideWithValue(firestore),
+        currentUidProvider.overrideWithValue(null),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final result = await container
+        .read(performanceTestsForAthleteProvider('athlete1').future);
+
+    expect(result, isEmpty);
+  });
 }

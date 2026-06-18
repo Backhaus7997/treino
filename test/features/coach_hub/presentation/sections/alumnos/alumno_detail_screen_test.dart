@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:treino/app/locale_resolver.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/data/trainer_link_repository.dart';
@@ -29,6 +30,9 @@ import 'package:treino/features/payments/data/payment_repository.dart';
 import 'package:treino/features/payments/domain/athlete_billing.dart'
     show AthleteBilling, BillingCadence;
 import 'package:treino/features/payments/domain/payment.dart';
+import 'package:treino/features/performance/application/performance_test_providers.dart';
+import 'package:treino/features/performance/domain/performance_test.dart';
+import 'package:treino/features/performance/presentation/widgets/performance_progress_chart.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/features/profile/domain/experience_level.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
@@ -40,6 +44,7 @@ import 'package:treino/features/workout/domain/routine_slot.dart';
 import 'package:treino/features/workout/domain/routine_status.dart';
 import 'package:treino/features/workout/domain/session.dart';
 import 'package:treino/features/workout/domain/session_status.dart';
+import 'package:treino/l10n/app_l10n.dart';
 
 class _MockRepo extends Mock implements TrainerLinkRepository {}
 
@@ -169,6 +174,14 @@ AthleteBilling _billing({
       updatedAt: DateTime.utc(2026, 1, 1),
     );
 
+PerformanceTest _perf({double cmjCm = 30, int day = 1}) => PerformanceTest(
+      id: 'pt$day',
+      athleteId: 'a1',
+      recordedBy: 't1',
+      recordedAt: DateTime.utc(2026, 1, day),
+      cmjCm: cmjCm,
+    );
+
 Future<void> _pump(
   WidgetTester tester, {
   UserPublicProfile? profile,
@@ -180,6 +193,8 @@ Future<void> _pump(
   List<CobroPendiente> pendingCobros = const [],
   PaymentRepository? paymentRepo,
   AthleteBilling? billing,
+  List<PerformanceTest> performanceTests = const [],
+  Object? performanceError,
 }) async {
   tester.view.physicalSize = const Size(1200, 900);
   tester.view.devicePixelRatio = 1.0;
@@ -198,6 +213,10 @@ Future<void> _pump(
         athleteBillingProvider.overrideWith((ref, id) => Stream.value(billing)),
         measurementsForAthleteProvider
             .overrideWith((ref, id) => Stream.value(measurements)),
+        performanceTestsForAthleteProvider.overrideWith((ref, id) =>
+            performanceError != null
+                ? Stream.error(performanceError)
+                : Stream.value(performanceTests)),
         currentUidProvider.overrideWithValue('t1'),
         assignedRoutinesProvider.overrideWith((ref, id) => routines),
         sessionsByUidProvider.overrideWith((ref, id) => sessions),
@@ -205,6 +224,13 @@ Future<void> _pump(
           paymentRepositoryProvider.overrideWithValue(paymentRepo),
       ],
       child: MaterialApp(
+        // l10n EXACTO como CoachHubApp (W2 PR8): delegates + supportedLocales +
+        // localeResolutionCallback. Sin el callback resuelve a `en` (1º en
+        // supportedLocales) y los strings del chart salen en blanco.
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+        localeResolutionCallback: (l, s) =>
+            resolveLocale(l ?? const Locale('es', 'AR'), s),
         theme: AppTheme.dark(),
         home: const Scaffold(body: AlumnoDetailScreen(athleteId: 'a1')),
       ),
@@ -329,18 +355,20 @@ void main() {
       expect(find.text('60.5 kg'), findsOneWidget);
     });
 
-    testWidgets('Progreso sin mediciones → estado vacío', (tester) async {
+    testWidgets('Progreso sin datos (ni mediciones ni tests) → estado vacío',
+        (tester) async {
       await _pump(
         tester,
         profile: _prof(),
         link: _link(TrainerLinkStatus.active),
         measurements: const [],
+        performanceTests: const [],
       );
 
       await tester.tap(find.text('Progreso'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Sin mediciones cargadas todavía.'), findsOneWidget);
+      expect(find.text('Sin datos de progreso todavía.'), findsOneWidget);
     });
 
     testWidgets('Progreso con ≥2 mediciones renderiza el gráfico',
@@ -356,6 +384,83 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(MeasurementProgressChart), findsOneWidget);
+    });
+
+    testWidgets(
+        'Progreso con ≥2 tests de performance renderiza el chart (W2 PR8)',
+        (tester) async {
+      await _pump(
+        tester,
+        profile: _prof(),
+        link: _link(TrainerLinkStatus.active),
+        performanceTests: [_perf(cmjCm: 28, day: 1), _perf(cmjCm: 32, day: 20)],
+      );
+
+      await tester.tap(find.text('Progreso'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(PerformanceProgressChart), findsOneWidget);
+      expect(find.text('RENDIMIENTO'), findsOneWidget); // mi heading de sección
+      // El chart renderea su label l10n («PROGRESO») en es-AR, NO en blanco:
+      // prueba que el localeResolutionCallback del harness resuelve es-AR.
+      expect(find.text('PROGRESO'), findsOneWidget);
+    });
+
+    testWidgets('Progreso con 1 test de performance → hint, sin chart (W2 PR8)',
+        (tester) async {
+      await _pump(
+        tester,
+        profile: _prof(),
+        link: _link(TrainerLinkStatus.active),
+        performanceTests: [_perf(cmjCm: 30, day: 1)],
+      );
+
+      await tester.tap(find.text('Progreso'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('RENDIMIENTO'), findsOneWidget);
+      expect(find.text('Cargá al menos 2 tests para ver la evolución.'),
+          findsOneWidget);
+      expect(find.byType(PerformanceProgressChart), findsNothing);
+      // Sin mediciones → la sección Antropometría queda totalmente suprimida.
+      expect(find.text('ANTROPOMETRÍA'), findsNothing);
+      expect(find.byType(MeasurementProgressChart), findsNothing);
+    });
+
+    testWidgets('Progreso muestra antropometría + rendimiento juntos (W2 PR8)',
+        (tester) async {
+      await _pump(
+        tester,
+        profile: _prof(),
+        link: _link(TrainerLinkStatus.active),
+        measurements: [_meas(62, day: 1), _meas(60.5, day: 20)],
+        performanceTests: [_perf(cmjCm: 28, day: 1), _perf(cmjCm: 32, day: 20)],
+      );
+
+      await tester.tap(find.text('Progreso'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('ANTROPOMETRÍA'), findsOneWidget);
+      expect(find.byType(MeasurementProgressChart), findsOneWidget);
+      expect(find.byType(PerformanceProgressChart), findsOneWidget);
+    });
+
+    testWidgets('Progreso: error en una fuente gatea todo el tab (W2 PR8)',
+        (tester) async {
+      await _pump(
+        tester,
+        profile: _prof(),
+        link: _link(TrainerLinkStatus.active),
+        measurements: [_meas(60.5)], // mediciones OK
+        performanceError: 'boom', // performance falla
+      );
+
+      await tester.tap(find.text('Progreso'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('No se pudo cargar el progreso.'), findsOneWidget);
+      expect(
+          find.text('ANTROPOMETRÍA'), findsNothing); // gateado, no se muestra
     });
 
     testWidgets('tab placeholder muestra "Próximamente."', (tester) async {
@@ -989,8 +1094,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Terminar vínculo'), findsOneWidget); // diálogo
-      // No navegó al detalle.
-      expect(find.text('Sin mediciones cargadas todavía.'), findsNothing);
+      // No navegó al detalle (su tab Resumen mostraría el heatmap).
+      expect(find.text('ADHERENCIA · 12 SEMANAS'), findsNothing);
     });
   });
 

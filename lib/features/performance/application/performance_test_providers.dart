@@ -10,13 +10,16 @@ final performanceTestRepositoryProvider = Provider<PerformanceTestRepository>(
   (ref) => PerformanceTestRepository(firestore: ref.watch(firestoreProvider)),
 );
 
-/// Live stream of all performance tests for [athleteId], regardless of who
-/// recorded them.
+/// Live stream de los tests de performance del alumno [athleteId] visibles para
+/// el entrenador autenticado: los que ÉL registró (`recordedBy`).
 ///
-/// - Queries by `athleteId` (single-field, no composite index) so the full
-///   history is returned even across trainer reassignment or co-trainers.
-/// - Sorts by [recordedAt] ascending client-side.
-/// - Returns an empty list when no trainer is authenticated.
+/// - Query por `recordedBy + athleteId` (dos igualdades, sin índice compuesto).
+///   Es la única forma que las reglas de Firestore le permiten al entrenador:
+///   un `where athleteId ==` a secas es denegado porque la regla exige
+///   `recordedBy == uid || athleteId == uid` (ver
+///   [PerformanceTestRepository.watchForTrainerAthlete]).
+/// - Ordena por [recordedAt] ascendente client-side.
+/// - Devuelve lista vacía si no hay entrenador autenticado.
 final performanceTestsForAthleteProvider = StreamProvider.autoDispose
     .family<List<PerformanceTest>, String>((ref, athleteId) {
   final trainerUid = ref.watch(currentUidProvider);
@@ -24,9 +27,9 @@ final performanceTestsForAthleteProvider = StreamProvider.autoDispose
 
   return ref
       .watch(performanceTestRepositoryProvider)
-      .watchForAthlete(athleteId)
+      .watchForTrainerAthlete(trainerUid, athleteId)
       .map(
-        (all) => all.toList()
-          ..sort((a, b) => a.recordedAt.compareTo(b.recordedAt)),
+        (all) =>
+            all.toList()..sort((a, b) => a.recordedAt.compareTo(b.recordedAt)),
       );
 });
