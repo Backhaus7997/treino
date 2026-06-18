@@ -2,9 +2,9 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:video_player/video_player.dart';
 
 import '../../../../app/theme/app_palette.dart';
+import '../../../../core/widgets/firebase_storage_video_player.dart';
 import '../../../../core/widgets/treino_icon.dart';
 
 /// Tappable card for an exercise's tutorial video. Dual-mode:
@@ -36,7 +36,7 @@ class ExerciseVideoPlayer extends StatelessWidget {
     }
 
     if (isFirebaseStorageVideo(url)) {
-      return _NativeVideoCard(url: url, palette: palette);
+      return FirebaseStorageVideoPlayer(url: url, palette: palette);
     }
 
     final id = parseYoutubeVideoId(url);
@@ -133,150 +133,6 @@ class _PlayOverlay extends StatelessWidget {
             TreinoIcon.play,
             color: Colors.black,
             size: 20,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Native inline video for trainer uploads stored in Firebase Storage.
-/// Initializes [VideoPlayerController.networkUrl] lazily and disposes it
-/// when the URL changes or the widget is removed.
-class _NativeVideoCard extends StatefulWidget {
-  const _NativeVideoCard({required this.url, required this.palette});
-
-  final String url;
-  final AppPalette palette;
-
-  @override
-  State<_NativeVideoCard> createState() => _NativeVideoCardState();
-}
-
-class _NativeVideoCardState extends State<_NativeVideoCard> {
-  VideoPlayerController? _controller;
-  bool _initFailed = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _init();
-  }
-
-  @override
-  void didUpdateWidget(covariant _NativeVideoCard oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.url != widget.url) {
-      _controller?.dispose();
-      _controller = null;
-      _initFailed = false;
-      _init();
-    }
-  }
-
-  Future<void> _init() async {
-    final c = VideoPlayerController.networkUrl(Uri.parse(widget.url));
-    try {
-      await c.initialize();
-      if (!mounted) {
-        await c.dispose();
-        return;
-      }
-      setState(() => _controller = c);
-    } catch (_) {
-      await c.dispose();
-      if (!mounted) return;
-      setState(() => _initFailed = true);
-    }
-  }
-
-  @override
-  void dispose() {
-    _controller?.dispose();
-    super.dispose();
-  }
-
-  void _toggle() {
-    final c = _controller;
-    if (c == null) return;
-    setState(() {
-      c.value.isPlaying ? c.pause() : c.play();
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = widget.palette;
-    if (_initFailed) {
-      return _VideoPlaceholder(palette: palette, urlGiven: widget.url);
-    }
-    final c = _controller;
-    if (c == null) {
-      // Loading skeleton.
-      return AspectRatio(
-        aspectRatio: 16 / 9,
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: Container(
-            color: palette.bgCard,
-            alignment: Alignment.center,
-            child: SizedBox(
-              width: 22,
-              height: 22,
-              child: CircularProgressIndicator(
-                strokeWidth: 2.2,
-                color: palette.textMuted,
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-    final isPlaying = c.value.isPlaying;
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(12),
-      child: AspectRatio(
-        aspectRatio: 16 / 9,
-        child: GestureDetector(
-          onTap: _toggle,
-          behavior: HitTestBehavior.opaque,
-          child: Stack(
-            alignment: Alignment.center,
-            fit: StackFit.expand,
-            children: [
-              FittedBox(
-                fit: BoxFit.cover,
-                child: SizedBox(
-                  width: c.value.size.width,
-                  height: c.value.size.height,
-                  child: VideoPlayer(c),
-                ),
-              ),
-              AnimatedOpacity(
-                opacity: isPlaying ? 0 : 1,
-                duration: const Duration(milliseconds: 180),
-                child: Container(color: Colors.black.withValues(alpha: 0.22)),
-              ),
-              AnimatedOpacity(
-                opacity: isPlaying ? 0 : 1,
-                duration: const Duration(milliseconds: 180),
-                child: const _PlayOverlay(),
-              ),
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 0,
-                child: VideoProgressIndicator(
-                  c,
-                  allowScrubbing: true,
-                  colors: VideoProgressColors(
-                    playedColor: palette.accent,
-                    bufferedColor: Colors.white.withValues(alpha: 0.35),
-                    backgroundColor: Colors.white.withValues(alpha: 0.15),
-                  ),
-                ),
-              ),
-            ],
           ),
         ),
       ),

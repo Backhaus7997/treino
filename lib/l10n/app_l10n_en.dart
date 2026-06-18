@@ -1688,4 +1688,32 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get coachHubPreviewDiscardConfirm => 'Leave anyway';
+
+  @override
+  String get chatAttachMediaLabel => 'Attach';
+
+  @override
+  String get chatPickImageLabel => 'Photo';
+
+  @override
+  String get chatPickVideoLabel => 'Video';
+
+  @override
+  String get chatMediaUploading => 'Uploading…';
+
+  @override
+  String get chatMediaUploadFailed =>
+      'We couldn\'t upload the file. Please try again.';
+
+  @override
+  String get chatMediaPreviewPhoto => '📷 Photo';
+
+  @override
+  String get chatMediaPreviewVideo => '🎥 Video';
+
+  @override
+  String get chatMediaViewFullscreen => 'View photo';
+
+  @override
+  String get chatMediaImageLoadError => 'We couldn\'t load the image.';
 }

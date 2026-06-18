@@ -1050,5 +1050,23 @@
   "coachHubPreviewDiscardConfirm": "Salir igual",
   "@coachHubPreviewDiscardConfirm": {
     "description": "Destructive confirm action of the coach-hub preview leave-without-saving dialog (finding 9)."
-  }
+  },
+  "chatAttachMediaLabel": "Adjuntar",
+  "@chatAttachMediaLabel": {},
+  "chatPickImageLabel": "Foto",
+  "@chatPickImageLabel": {},
+  "chatPickVideoLabel": "Video",
+  "@chatPickVideoLabel": {},
+  "chatMediaUploading": "Subiendo…",
+  "@chatMediaUploading": {},
+  "chatMediaUploadFailed": "No pudimos subir el archivo. Probá de nuevo.",
+  "@chatMediaUploadFailed": {},
+  "chatMediaPreviewPhoto": "📷 Foto",
+  "@chatMediaPreviewPhoto": {},
+  "chatMediaPreviewVideo": "🎥 Video",
+  "@chatMediaPreviewVideo": {},
+  "chatMediaViewFullscreen": "Ver foto",
+  "@chatMediaViewFullscreen": {},
+  "chatMediaImageLoadError": "No pudimos cargar la imagen.",
+  "@chatMediaImageLoadError": {}
 }

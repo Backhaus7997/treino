@@ -69,36 +69,36 @@ Chain strategy: pending
 
 ### Phase 6: Shared Video Player Extraction (REQ-CHATMEDIA-009)
 
-- [ ] 6.1 Create `lib/core/widgets/firebase_storage_video_player.dart` — lift `_NativeVideoCard` (controller lifecycle, play/pause, progress, init-fail) verbatim as public `FirebaseStorageVideoPlayer` widget; keep API surface minimal.
-- [ ] 6.2 Modify `lib/features/workout/presentation/exercise_video_player.dart` (or equivalent) — replace inline `_NativeVideoCard` with `FirebaseStorageVideoPlayer` import; keep `_PlayOverlay`/helpers local; verify existing workout player tests still pass.
-- [ ] 6.3 **[VERIFY]** Run `flutter analyze` (0) + existing workout widget tests still green.
+- [x] 6.1 Create `lib/core/widgets/firebase_storage_video_player.dart` — lift `_NativeVideoCard` (controller lifecycle, play/pause, progress, init-fail) verbatim as public `FirebaseStorageVideoPlayer` widget; keep API surface minimal.
+- [x] 6.2 Modify `lib/features/workout/presentation/exercise_video_player.dart` (or equivalent) — replace inline `_NativeVideoCard` with `FirebaseStorageVideoPlayer` import; keep `_PlayOverlay`/helpers local; verify existing workout player tests still pass.
+- [x] 6.3 **[VERIFY]** Run `flutter analyze` (0) + existing workout widget tests still green.
 
 ### Phase 7: i18n Keys (REQ-CHATMEDIA-014)
 
-- [ ] 7.1 Add 9 keys to `lib/l10n/intl_es_AR.arb`: `chatAttachMediaLabel`, `chatPickImageLabel`, `chatPickVideoLabel`, `chatMediaUploading`, `chatMediaUploadFailed`, `chatMediaPreviewPhoto` (`📷 Foto`), `chatMediaPreviewVideo` (`🎥 Video`), `chatMediaViewFullscreen`, `chatMediaImageLoadError`. Use `"@key": {}` shape.
-- [ ] 7.2 Mirror all 9 keys in `lib/l10n/intl_es.arb` and `lib/l10n/intl_en.arb` with appropriate values.
-- [ ] 7.3 Run `flutter gen-l10n`; confirm `AppL10n` exposes all 9 getters with no analysis errors.
+- [x] 7.1 Add 9 keys to `lib/l10n/intl_es_AR.arb`: `chatAttachMediaLabel`, `chatPickImageLabel`, `chatPickVideoLabel`, `chatMediaUploading`, `chatMediaUploadFailed`, `chatMediaPreviewPhoto` (`📷 Foto`), `chatMediaPreviewVideo` (`🎥 Video`), `chatMediaViewFullscreen`, `chatMediaImageLoadError`. Use `"@key": {}` shape.
+- [x] 7.2 Mirror all 9 keys in `lib/l10n/intl_es.arb` and `lib/l10n/intl_en.arb` with appropriate values.
+- [x] 7.3 Run `flutter gen-l10n`; confirm `AppL10n` exposes all 9 getters with no analysis errors.
 
 ### Phase 8: Image Bubble + Fullscreen Viewer (REQ-CHATMEDIA-008)
 
-- [ ] 8.1 **[RED]** Write `test/features/chat/presentation/chat_image_bubble_test.dart` — render thumbnail (`CachedNetworkImage` present), tap navigates to `PhotoViewerScreen`, caption displayed below when `text` non-empty (REQ-CHATMEDIA-008 scenarios).
-- [ ] 8.2 **[GREEN]** Create `lib/features/chat/presentation/photo_viewer_screen.dart` — `InteractiveViewer` wrapping `CachedNetworkImage`, title from `AppL10n.chatMediaViewFullscreen`.
-- [ ] 8.3 **[GREEN]** Create `lib/features/chat/presentation/chat_image_bubble.dart` — `CachedNetworkImage` thumbnail + loading skeleton + error placeholder (`AppL10n.chatMediaImageLoadError`) + `GestureDetector` → push `PhotoViewerScreen`; caption below when non-empty; colors from `AppPalette`.
+- [x] 8.1 **[RED]** Write `test/features/chat/presentation/chat_image_bubble_test.dart` — render thumbnail (`CachedNetworkImage` present), tap navigates to `PhotoViewerScreen`, caption displayed below when `text` non-empty (REQ-CHATMEDIA-008 scenarios).
+- [x] 8.2 **[GREEN]** Create `lib/features/chat/presentation/photo_viewer_screen.dart` — `InteractiveViewer` wrapping `CachedNetworkImage`, title from `AppL10n.chatMediaViewFullscreen`.
+- [x] 8.3 **[GREEN]** Create `lib/features/chat/presentation/chat_image_bubble.dart` — `CachedNetworkImage` thumbnail + loading skeleton + error placeholder (`AppL10n.chatMediaImageLoadError`) + `GestureDetector` → push `PhotoViewerScreen`; caption below when non-empty; colors from `AppPalette`.
 
 ### Phase 9: Video Bubble (REQ-CHATMEDIA-009)
 
-- [ ] 9.1 **[RED]** Write `test/features/chat/presentation/chat_video_bubble_test.dart` — `FirebaseStorageVideoPlayer` present in tree, caption displayed below when non-empty (REQ-CHATMEDIA-009 scenarios).
-- [ ] 9.2 **[GREEN]** Create `lib/features/chat/presentation/chat_video_bubble.dart` — renders `FirebaseStorageVideoPlayer`; caption below when `text.isNotEmpty`; colors from `AppPalette`.
+- [x] 9.1 **[RED]** Write `test/features/chat/presentation/chat_video_bubble_test.dart` — `FirebaseStorageVideoPlayer` present in tree, caption displayed below when non-empty (REQ-CHATMEDIA-009 scenarios).
+- [x] 9.2 **[GREEN]** Create `lib/features/chat/presentation/chat_video_bubble.dart` — renders `FirebaseStorageVideoPlayer`; caption below when `text.isNotEmpty`; colors from `AppPalette`.
 
 ### Phase 10: iOS Permissions Review (REQ-CHATMEDIA-013)
 
-- [ ] 10.1 **[OPTIONAL / STATIC]** Open `ios/Runner/Info.plist` (lines 54-57) — review `NSCameraUsageDescription` and `NSPhotoLibraryUsageDescription` copy; confirm strings are generic enough to cover chat media (not profile/Excel-specific). Update copy if too narrow. No new keys required — keys already present.
+- [x] 10.1 **[OPTIONAL / STATIC]** Open `ios/Runner/Info.plist` (lines 54-57) — review `NSCameraUsageDescription` and `NSPhotoLibraryUsageDescription` copy; confirm strings are generic enough to cover chat media (not profile/Excel-specific). Update copy if too narrow. No new keys required — keys already present.
 
 ### Phase 11: Bubble Branching + Composer (REQ-CHATMEDIA-010, REQ-CHATMEDIA-015)
 
-- [ ] 11.1 **[RED]** Extend `test/features/chat/presentation/chat_screen_test.dart` — add: attach button opens bottom sheet with photo/video options; controls disabled while uploading; upload failure shows snackbar with `AppL10n.chatMediaUploadFailed`; text-only bubble regression (no media widget in tree) (REQ-CHATMEDIA-010, REQ-CHATMEDIA-015 scenarios).
-- [ ] 11.2 **[GREEN]** Modify `lib/features/chat/presentation/chat_screen.dart` — update `_Bubble` widget: branch on `mediaType`: `null` → text bubble (unchanged); `image` → `ChatImageBubble`; `video` → `ChatVideoBubble`; caption below media when non-empty.
-- [ ] 11.3 **[GREEN]** Modify `_Composer` in `chat_screen.dart` — add attach `IconButton` (use `TreinoIcon`, `AppPalette` colors); bottom sheet with `AppL10n.chatPickImageLabel` / `AppL10n.chatPickVideoLabel` options; call `image_picker` with `imageQuality: 80`; show `LinearProgressIndicator` during upload (via `onProgress`); disable attach + send while uploading; show error snackbar (`AppL10n.chatMediaUploadFailed`) on failure; wire `ChatMediaUploadService.upload` → `ChatRepository.sendMessage`.
-- [ ] 11.4 **[VERIFY]** Run `flutter analyze` (0) + `dart format .` + `flutter test` (full suite, all pass).
+- [x] 11.1 **[RED]** Write `test/features/chat/presentation/chat_screen_media_test.dart` — bubble branching tests + attach button opens bottom sheet with photo/video options; text-only bubble regression (no media widget in tree) (REQ-CHATMEDIA-010, REQ-CHATMEDIA-015 scenarios).
+- [x] 11.2 **[GREEN]** Modify `lib/features/chat/presentation/chat_screen.dart` — update `_Bubble` widget: branch on `mediaType`: `null` → text bubble (unchanged); `image` → `ChatImageBubble`; `video` → `ChatVideoBubble`; caption below media when non-empty.
+- [x] 11.3 **[GREEN]** Modify `_Composer` in `chat_screen.dart` — add attach `IconButton` (use `TreinoIcon`, `AppPalette` colors); bottom sheet with `AppL10n.chatPickImageLabel` / `AppL10n.chatPickVideoLabel` options; call `image_picker` with `imageQuality: 80`; show `LinearProgressIndicator` during upload (via `onProgress`); disable attach + send while uploading; show error snackbar (`AppL10n.chatMediaUploadFailed`) on failure; wire `ChatMediaUploadService.upload` → `ChatRepository.sendMessage`.
+- [x] 11.4 **[VERIFY]** Run `flutter analyze` (0) + `dart format .` + `flutter test` (full suite, all pass).
 
 **PR-B quality gate**: `flutter analyze` 0 + `dart format .` + `flutter test` (full suite) — no regressions.
