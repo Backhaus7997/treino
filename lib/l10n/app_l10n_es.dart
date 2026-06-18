@@ -1737,6 +1737,34 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get coachHubPreviewDiscardConfirm => 'Salir igual';
+
+  @override
+  String get chatAttachMediaLabel => 'Adjuntar';
+
+  @override
+  String get chatPickImageLabel => 'Foto';
+
+  @override
+  String get chatPickVideoLabel => 'Video';
+
+  @override
+  String get chatMediaUploading => 'Subiendo…';
+
+  @override
+  String get chatMediaUploadFailed =>
+      'No pudimos subir el archivo. Inténtalo de nuevo.';
+
+  @override
+  String get chatMediaPreviewPhoto => '📷 Foto';
+
+  @override
+  String get chatMediaPreviewVideo => '🎥 Video';
+
+  @override
+  String get chatMediaViewFullscreen => 'Ver foto';
+
+  @override
+  String get chatMediaImageLoadError => 'No pudimos cargar la imagen.';
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -3470,4 +3498,32 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get coachHubPreviewDiscardConfirm => 'Salir igual';
+
+  @override
+  String get chatAttachMediaLabel => 'Adjuntar';
+
+  @override
+  String get chatPickImageLabel => 'Foto';
+
+  @override
+  String get chatPickVideoLabel => 'Video';
+
+  @override
+  String get chatMediaUploading => 'Subiendo…';
+
+  @override
+  String get chatMediaUploadFailed =>
+      'No pudimos subir el archivo. Probá de nuevo.';
+
+  @override
+  String get chatMediaPreviewPhoto => '📷 Foto';
+
+  @override
+  String get chatMediaPreviewVideo => '🎥 Video';
+
+  @override
+  String get chatMediaViewFullscreen => 'Ver foto';
+
+  @override
+  String get chatMediaImageLoadError => 'No pudimos cargar la imagen.';
 }

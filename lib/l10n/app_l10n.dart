@@ -3259,6 +3259,60 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Salir igual'**
   String get coachHubPreviewDiscardConfirm;
+
+  /// No description provided for @chatAttachMediaLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Adjuntar'**
+  String get chatAttachMediaLabel;
+
+  /// No description provided for @chatPickImageLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Foto'**
+  String get chatPickImageLabel;
+
+  /// No description provided for @chatPickVideoLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Video'**
+  String get chatPickVideoLabel;
+
+  /// No description provided for @chatMediaUploading.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Subiendo…'**
+  String get chatMediaUploading;
+
+  /// No description provided for @chatMediaUploadFailed.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos subir el archivo. Probá de nuevo.'**
+  String get chatMediaUploadFailed;
+
+  /// No description provided for @chatMediaPreviewPhoto.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'📷 Foto'**
+  String get chatMediaPreviewPhoto;
+
+  /// No description provided for @chatMediaPreviewVideo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'🎥 Video'**
+  String get chatMediaPreviewVideo;
+
+  /// No description provided for @chatMediaViewFullscreen.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ver foto'**
+  String get chatMediaViewFullscreen;
+
+  /// No description provided for @chatMediaImageLoadError.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cargar la imagen.'**
+  String get chatMediaImageLoadError;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

@@ -655,5 +655,14 @@
   },
   "coachHubPreviewDiscardTitle": "Leave without saving the plan?",
   "coachHubPreviewDiscardBody": "You'll lose the exercises you matched manually.",
-  "coachHubPreviewDiscardConfirm": "Leave anyway"
+  "coachHubPreviewDiscardConfirm": "Leave anyway",
+  "chatAttachMediaLabel": "Attach",
+  "chatPickImageLabel": "Photo",
+  "chatPickVideoLabel": "Video",
+  "chatMediaUploading": "Uploading…",
+  "chatMediaUploadFailed": "We couldn't upload the file. Please try again.",
+  "chatMediaPreviewPhoto": "📷 Photo",
+  "chatMediaPreviewVideo": "🎥 Video",
+  "chatMediaViewFullscreen": "View photo",
+  "chatMediaImageLoadError": "We couldn't load the image."
 }

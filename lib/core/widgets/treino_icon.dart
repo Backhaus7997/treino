@@ -107,6 +107,9 @@ class TreinoIcon {
   // Chat
   static const IconData send = PhosphorIconsFill.paperPlaneTilt;
   static const IconData chatEmpty = PhosphorIconsRegular.chatsCircle;
+  static const IconData attach = PhosphorIconsRegular.paperclip;
+  static const IconData image = PhosphorIconsRegular.image;
+  static const IconData video = PhosphorIconsRegular.videoCamera;
 
   // Profile settings constant REMOVED 2026-05-28 — gear icon was removed from
   // ProfileHeader as part of the PR#4 pivot. Zero remaining usages.

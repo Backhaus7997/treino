@@ -280,5 +280,14 @@
   },
   "coachHubPreviewDiscardTitle": "¿Salir sin guardar el plan?",
   "coachHubPreviewDiscardBody": "Vas a perder los ejercicios que mapeaste manualmente.",
-  "coachHubPreviewDiscardConfirm": "Salir igual"
+  "coachHubPreviewDiscardConfirm": "Salir igual",
+  "chatAttachMediaLabel": "Adjuntar",
+  "chatPickImageLabel": "Foto",
+  "chatPickVideoLabel": "Video",
+  "chatMediaUploading": "Subiendo…",
+  "chatMediaUploadFailed": "No pudimos subir el archivo. Inténtalo de nuevo.",
+  "chatMediaPreviewPhoto": "📷 Foto",
+  "chatMediaPreviewVideo": "🎥 Video",
+  "chatMediaViewFullscreen": "Ver foto",
+  "chatMediaImageLoadError": "No pudimos cargar la imagen."
 }
