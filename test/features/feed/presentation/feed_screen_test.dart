@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_background.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
+import 'package:treino/features/chat/application/chat_providers.dart';
 import 'package:treino/features/feed/application/feed_screen_providers.dart';
 import 'package:treino/features/feed/application/post_providers.dart';
 import 'package:treino/features/feed/domain/feed_segment.dart';
@@ -117,6 +118,29 @@ void main() {
       await tester.pump();
 
       expect(find.text('FEED'), findsOneWidget);
+    });
+
+    // REQ-CHATUNREAD-005: the messages icon shows an unread-chats count badge.
+    testWidgets('messages icon shows unread badge when count > 0',
+        (tester) async {
+      await tester.pumpWidget(_wrapProvider(const FeedScreen(), [
+        ...baseOverrides,
+        totalUnreadCountProvider.overrideWith((_) => 3),
+      ]));
+      await tester.pump();
+
+      expect(find.text('3'), findsOneWidget);
+    });
+
+    testWidgets('messages icon shows no badge when zero unread',
+        (tester) async {
+      await tester.pumpWidget(_wrapProvider(const FeedScreen(), [
+        ...baseOverrides,
+        totalUnreadCountProvider.overrideWith((_) => 0),
+      ]));
+      await tester.pump();
+
+      expect(find.text('0'), findsNothing);
     });
 
     // SCENARIO-145: FeedScreen renders search and plus icon buttons

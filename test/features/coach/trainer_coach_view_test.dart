@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/l10n/app_l10n.dart';
+import 'package:treino/features/chat/application/chat_providers.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
@@ -219,6 +220,57 @@ void main() {
       await tester.tap(find.text('TERMINAR VÍNCULO'));
       await tester.pumpAndSettle();
       expect(find.text('Terminar vínculo'), findsOneWidget);
+    });
+  });
+
+  // ── Unread dot on alumno card ─────────────────────────────────────────────
+
+  group('TrainerCoachView — unread dot on alumno card', () {
+    List<Override> _stubLinksWithUnread(
+      List<TrainerLink> links, {
+      required bool hasUnread,
+    }) =>
+        [
+          trainerLinksStreamProvider.overrideWith((ref) => Stream.value(links)),
+          for (final l in links) ...[
+            userPublicProfileProvider(l.athleteId).overrideWith(
+                (ref) => Stream.value(_pub(l.athleteId, 'Atleta ${l.id}'))),
+            hasUnreadFromProvider(l.athleteId).overrideWith((ref) => hasUnread),
+          ],
+        ];
+
+    testWidgets(
+        'hasUnreadFromProvider true → unread dot rendered on alumno card',
+        (tester) async {
+      await tester.pumpWidget(_wrap(
+        const TrainerCoachView(),
+        overrides: _stubLinksWithUnread(
+          [_link(id: 'l1', status: TrainerLinkStatus.active, athleteId: 'a1')],
+          hasUnread: true,
+        ),
+      ));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('ALUMNOS'));
+      await tester.pumpAndSettle();
+
+      // The unread dot is a small circle Container with key 'unread-dot-a1'
+      expect(find.byKey(const Key('unread-dot-a1')), findsOneWidget);
+    });
+
+    testWidgets('hasUnreadFromProvider false → no unread dot on alumno card',
+        (tester) async {
+      await tester.pumpWidget(_wrap(
+        const TrainerCoachView(),
+        overrides: _stubLinksWithUnread(
+          [_link(id: 'l1', status: TrainerLinkStatus.active, athleteId: 'a1')],
+          hasUnread: false,
+        ),
+      ));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('ALUMNOS'));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('unread-dot-a1')), findsNothing);
     });
   });
 }

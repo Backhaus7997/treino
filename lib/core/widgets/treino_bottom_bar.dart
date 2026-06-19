@@ -12,10 +12,15 @@ class TreinoBottomBar extends StatelessWidget {
     super.key,
     required this.currentIndex,
     required this.onTap,
+    this.coachUnreadCount = 0,
   });
 
   final int currentIndex;
   final ValueChanged<int> onTap;
+
+  /// Count of unread chats shown as a badge on the COACH tab (index 3).
+  /// Pass 0 (default) to hide the badge.
+  final int coachUnreadCount;
 
   static const List<_TabSpec> _items = [
     _TabSpec(
@@ -98,6 +103,8 @@ class TreinoBottomBar extends StatelessWidget {
                         children: List.generate(_items.length, (i) {
                           final item = _items[i];
                           final active = i == currentIndex;
+                          // Index 3 = COACH tab — show unread badge when > 0.
+                          final badgeCount = i == 3 ? coachUnreadCount : 0;
                           return Expanded(
                             child: GestureDetector(
                               behavior: HitTestBehavior.opaque,
@@ -106,6 +113,7 @@ class TreinoBottomBar extends StatelessWidget {
                                 spec: item,
                                 active: active,
                                 palette: palette,
+                                badgeCount: badgeCount,
                               ),
                             ),
                           );
@@ -171,11 +179,16 @@ class _TabContent extends StatelessWidget {
     required this.spec,
     required this.active,
     required this.palette,
+    this.badgeCount = 0,
   });
 
   final _TabSpec spec;
   final bool active;
   final AppPalette palette;
+
+  /// When > 0, renders a count badge over the tab icon.
+  /// Values above 99 are shown as '99+'.
+  final int badgeCount;
 
   @override
   Widget build(BuildContext context) {
@@ -200,16 +213,47 @@ class _TabContent extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 220),
-              switchInCurve: Curves.easeOutCubic,
-              switchOutCurve: Curves.easeInCubic,
-              child: Icon(
-                active ? spec.iconActive : spec.icon,
-                key: ValueKey<bool>(active),
-                color: color,
-                size: 22,
-              ),
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 220),
+                  switchInCurve: Curves.easeOutCubic,
+                  switchOutCurve: Curves.easeInCubic,
+                  child: Icon(
+                    active ? spec.iconActive : spec.icon,
+                    key: ValueKey<bool>(active),
+                    color: color,
+                    size: 22,
+                  ),
+                ),
+                if (badgeCount > 0)
+                  Positioned(
+                    top: -4,
+                    right: -5,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 4,
+                        vertical: 1,
+                      ),
+                      constraints: const BoxConstraints(minWidth: 16),
+                      decoration: BoxDecoration(
+                        color: palette.accent,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        badgeCount > 99 ? '99+' : '$badgeCount',
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.barlow(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          height: 1.2,
+                          color: palette.bg,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(height: 4),
             // FittedBox scales the label down to fit the pill width on

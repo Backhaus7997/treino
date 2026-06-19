@@ -228,28 +228,52 @@ class _AthleteDetailBody extends ConsumerWidget {
           padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
           child: Column(
             children: [
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () => _onMessage(context, ref),
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: palette.accent, width: 1),
-                    foregroundColor: palette.accent,
-                    minimumSize: const Size.fromHeight(48),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(9999),
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () => _onMessage(context, ref),
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: palette.accent, width: 1),
+                        foregroundColor: palette.accent,
+                        minimumSize: const Size.fromHeight(48),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(9999),
+                        ),
+                      ),
+                      icon: Icon(TreinoIcon.chat,
+                          size: 18, color: palette.accent),
+                      label: Text(
+                        AppL10n.of(context).athleteDetailMessageCta,
+                        style: GoogleFonts.barlowCondensed(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
                     ),
                   ),
-                  icon: Icon(TreinoIcon.chat, size: 18, color: palette.accent),
-                  label: Text(
-                    AppL10n.of(context).athleteDetailMessageCta,
-                    style: GoogleFonts.barlowCondensed(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 13,
-                      letterSpacing: 0.8,
+                  // Unread dot on the chat button when the alumno has written.
+                  if (ref.watch(hasUnreadFromProvider(athleteId)))
+                    Positioned(
+                      top: -3,
+                      right: -3,
+                      child: Semantics(
+                        label: 'Mensajes sin leer',
+                        child: Container(
+                          width: 14,
+                          height: 14,
+                          decoration: BoxDecoration(
+                            color: palette.accent,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: palette.bg, width: 2),
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
-                ),
+                ],
               ),
               const SizedBox(height: 12),
               SizedBox(

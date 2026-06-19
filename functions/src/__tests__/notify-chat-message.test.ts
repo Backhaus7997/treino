@@ -212,6 +212,20 @@ describe("SCENARIO-631: data.deepLink == /coach/chat/{chatId}?other={senderUid}"
       `/coach/chat/${chatId}?other=${senderUid}`,
     );
   });
+
+  it("sets data.senderId to the sender uid (self-notif guard)", async () => {
+    const mock = makeMockMessaging();
+    const messageData = {
+      senderId: senderUid,
+      text: "Mensaje con senderId",
+      createdAt: admin.firestore.Timestamp.now(),
+    };
+
+    await notifyOnChatMessageHandler(testApp, chatId, messageData, mock);
+
+    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as admin.messaging.MulticastMessage;
+    expect(callArg.data?.senderId).toBe(senderUid);
+  });
 });
 
 // ---------------------------------------------------------------------------

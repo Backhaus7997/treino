@@ -16,6 +16,9 @@ _$ChatImpl _$$ChatImplFromJson(Map<String, dynamic> json) => _$ChatImpl(
           json['lastMessageAt'], const TimestampConverter().fromJson),
       lastMessageText: json['lastMessageText'] as String?,
       lastMessageSenderId: json['lastMessageSenderId'] as String?,
+      lastRead:
+          _$JsonConverterFromJson<Map<String, Object?>, Map<String, DateTime>>(
+              json['lastRead'], const TimestampMapConverter().fromJson),
     );
 
 Map<String, dynamic> _$$ChatImplToJson(_$ChatImpl instance) =>
@@ -27,6 +30,9 @@ Map<String, dynamic> _$$ChatImplToJson(_$ChatImpl instance) =>
           instance.lastMessageAt, const TimestampConverter().toJson),
       'lastMessageText': instance.lastMessageText,
       'lastMessageSenderId': instance.lastMessageSenderId,
+      'lastRead':
+          _$JsonConverterToJson<Map<String, Object?>, Map<String, DateTime>>(
+              instance.lastRead, const TimestampMapConverter().toJson),
     };
 
 Value? _$JsonConverterFromJson<Json, Value>(

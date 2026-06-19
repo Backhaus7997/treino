@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/features/chat/application/chat_providers.dart';
 import 'package:treino/features/chat/data/chat_repository.dart';
+import 'package:treino/features/chat/domain/chat.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
@@ -91,6 +94,326 @@ void main() {
           makeContainer(firestore: FakeFirebaseFirestore(), currentUid: 'aaa');
       final messages = await container.read(messagesProvider('').future);
       expect(messages, isEmpty);
+    });
+  });
+
+  // ── chatHasUnread ────────────────────────────────────────────────────────
+
+  group('chatHasUnread', () {
+    const uid = 'aaa';
+    const otherUid = 'bbb';
+    final base = DateTime.utc(2026, 6, 1, 10, 0);
+    final before = base.subtract(const Duration(minutes: 5));
+    final after = base.add(const Duration(minutes: 5));
+
+    Chat makeChat({
+      DateTime? lastMessageAt,
+      String? lastMessageSenderId,
+      Map<String, DateTime>? lastRead,
+    }) =>
+        Chat(
+          chatId: 'aaa_bbb',
+          members: const ['aaa', 'bbb'],
+          createdAt: DateTime.utc(2026, 1, 1),
+          lastMessageAt: lastMessageAt,
+          lastMessageSenderId: lastMessageSenderId,
+          lastRead: lastRead,
+        );
+
+    test('other sender + null lastRead → unread', () {
+      final c = makeChat(
+        lastMessageAt: base,
+        lastMessageSenderId: otherUid,
+        lastRead: null,
+      );
+      expect(chatHasUnread(c, uid), isTrue);
+    });
+
+    test('other sender + lastRead before lastMessageAt → unread', () {
+      final c = makeChat(
+        lastMessageAt: base,
+        lastMessageSenderId: otherUid,
+        lastRead: {uid: before},
+      );
+      expect(chatHasUnread(c, uid), isTrue);
+    });
+
+    test('other sender + lastRead after lastMessageAt → read', () {
+      final c = makeChat(
+        lastMessageAt: base,
+        lastMessageSenderId: otherUid,
+        lastRead: {uid: after},
+      );
+      expect(chatHasUnread(c, uid), isFalse);
+    });
+
+    test('other sender + lastRead == lastMessageAt → read (equal = read)', () {
+      final c = makeChat(
+        lastMessageAt: base,
+        lastMessageSenderId: otherUid,
+        lastRead: {uid: base},
+      );
+      expect(chatHasUnread(c, uid), isFalse);
+    });
+
+    test('self sender → read regardless of lastRead', () {
+      final c = makeChat(
+        lastMessageAt: base,
+        lastMessageSenderId: uid,
+        lastRead: null,
+      );
+      expect(chatHasUnread(c, uid), isFalse);
+    });
+
+    test('lastMessageAt null → read (no message)', () {
+      final c = makeChat(
+        lastMessageAt: null,
+        lastMessageSenderId: otherUid,
+        lastRead: null,
+      );
+      expect(chatHasUnread(c, uid), isFalse);
+    });
+
+    test('uid key missing from lastRead map → unread', () {
+      final c = makeChat(
+        lastMessageAt: base,
+        lastMessageSenderId: otherUid,
+        lastRead: {otherUid: after}, // only otherUid has entry, not uid
+      );
+      expect(chatHasUnread(c, uid), isTrue);
+    });
+  });
+
+  // ── totalUnreadCountProvider ─────────────────────────────────────────────
+
+  group('totalUnreadCountProvider', () {
+    final base = DateTime.utc(2026, 6, 1, 10, 0);
+    final before = base.subtract(const Duration(minutes: 5));
+
+    Chat makeUnreadChat(String chatId, String uid) => Chat(
+          chatId: chatId,
+          members: const ['aaa', 'bbb'],
+          createdAt: DateTime.utc(2026, 1, 1),
+          lastMessageAt: base,
+          lastMessageSenderId: 'bbb',
+          lastRead: {uid: before},
+        );
+
+    Chat makeReadChat(String chatId, String uid) => Chat(
+          chatId: chatId,
+          members: const ['aaa', 'bbb'],
+          createdAt: DateTime.utc(2026, 1, 1),
+          lastMessageAt: before,
+          lastMessageSenderId: 'bbb',
+          lastRead: {uid: base},
+        );
+
+    ProviderContainer makeContainerWithChats(
+      List<Chat> chats, {
+      String? uid,
+    }) {
+      final container = ProviderContainer(overrides: [
+        currentUidProvider.overrideWith((ref) => uid),
+        chatsForCurrentUserProvider.overrideWith(
+          (ref) => Stream.value(chats),
+        ),
+      ]);
+      addTearDown(container.dispose);
+      return container;
+    }
+
+    test('3 chats 2 unread → 2', () async {
+      const uid = 'aaa';
+      final chats = [
+        makeUnreadChat('c1', uid),
+        makeUnreadChat('c2', uid),
+        makeReadChat('c3', uid),
+      ];
+      final container = makeContainerWithChats(chats, uid: uid);
+      // Subscribe to keep autoDispose alive and wait for stream to emit
+      final sub = container.listen(totalUnreadCountProvider, (_, __) {});
+      await container.read(chatsForCurrentUserProvider.future);
+      final count = container.read(totalUnreadCountProvider);
+      sub.close();
+      expect(count, 2);
+    });
+
+    test('0 chats → 0', () async {
+      final container = makeContainerWithChats([], uid: 'aaa');
+      final sub = container.listen(totalUnreadCountProvider, (_, __) {});
+      await container.read(chatsForCurrentUserProvider.future);
+      final count = container.read(totalUnreadCountProvider);
+      sub.close();
+      expect(count, 0);
+    });
+
+    test('null uid → 0', () async {
+      final container = makeContainerWithChats([], uid: null);
+      final sub = container.listen(totalUnreadCountProvider, (_, __) {});
+      await Future.delayed(Duration.zero);
+      final count = container.read(totalUnreadCountProvider);
+      sub.close();
+      expect(count, 0);
+    });
+
+    test('chatsForCurrentUserProvider loading → 0', () {
+      final container = ProviderContainer(overrides: [
+        currentUidProvider.overrideWith((ref) => 'aaa'),
+        chatsForCurrentUserProvider.overrideWith(
+          (ref) => Stream<List<Chat>>.fromFuture(
+            Completer<List<Chat>>().future,
+          ),
+        ),
+      ]);
+      addTearDown(container.dispose);
+      expect(container.read(totalUnreadCountProvider), 0);
+    });
+
+    test('chatsForCurrentUserProvider error → 0', () async {
+      final container = ProviderContainer(overrides: [
+        currentUidProvider.overrideWith((ref) => 'aaa'),
+        chatsForCurrentUserProvider.overrideWith(
+          (ref) => Stream<List<Chat>>.error(Exception('err')),
+        ),
+      ]);
+      addTearDown(container.dispose);
+      await Future.delayed(Duration.zero);
+      expect(container.read(totalUnreadCountProvider), 0);
+    });
+  });
+
+  // ── hasUnreadFromProvider ────────────────────────────────────────────────
+
+  group('hasUnreadFromProvider', () {
+    final base = DateTime.utc(2026, 6, 1, 10, 0);
+    final before = base.subtract(const Duration(minutes: 5));
+
+    Chat makeChatBetween(
+      String aUid,
+      String bUid, {
+      String? lastSender,
+      DateTime? lastAt,
+      Map<String, DateTime>? lastRead,
+    }) =>
+        Chat(
+          chatId: '${aUid}_$bUid',
+          members: [aUid, bUid],
+          createdAt: DateTime.utc(2026, 1, 1),
+          lastMessageAt: lastAt,
+          lastMessageSenderId: lastSender,
+          lastRead: lastRead,
+        );
+
+    ProviderContainer makeContainerWithChats(
+      List<Chat> chats, {
+      String? uid,
+    }) {
+      final container = ProviderContainer(overrides: [
+        currentUidProvider.overrideWith((ref) => uid),
+        chatsForCurrentUserProvider.overrideWith(
+          (ref) => Stream.value(chats),
+        ),
+      ]);
+      addTearDown(container.dispose);
+      return container;
+    }
+
+    test('other person sent last unseen message → true', () async {
+      const me = 'aaa';
+      const other = 'bbb';
+      final chat = makeChatBetween(
+        me,
+        other,
+        lastSender: other,
+        lastAt: base,
+        lastRead: {me: before},
+      );
+      final container = makeContainerWithChats([chat], uid: me);
+      final sub = container.listen(hasUnreadFromProvider(other), (_, __) {});
+      await container.read(chatsForCurrentUserProvider.future);
+      final result = container.read(hasUnreadFromProvider(other));
+      sub.close();
+      expect(result, isTrue);
+    });
+
+    test('last message is my own → false', () async {
+      const me = 'aaa';
+      const other = 'bbb';
+      final chat = makeChatBetween(
+        me,
+        other,
+        lastSender: me,
+        lastAt: base,
+        lastRead: null,
+      );
+      final container = makeContainerWithChats([chat], uid: me);
+      final sub = container.listen(hasUnreadFromProvider(other), (_, __) {});
+      await container.read(chatsForCurrentUserProvider.future);
+      final result = container.read(hasUnreadFromProvider(other));
+      sub.close();
+      expect(result, isFalse);
+    });
+
+    test('no chat with that uid → false', () async {
+      const me = 'aaa';
+      const other = 'bbb';
+      const unrelated = 'ccc';
+      final chat = makeChatBetween(
+        me,
+        unrelated,
+        lastSender: unrelated,
+        lastAt: base,
+        lastRead: {me: before},
+      );
+      final container = makeContainerWithChats([chat], uid: me);
+      final sub = container.listen(hasUnreadFromProvider(other), (_, __) {});
+      await container.read(chatsForCurrentUserProvider.future);
+      final result = container.read(hasUnreadFromProvider(other));
+      sub.close();
+      expect(result, isFalse,
+          reason: 'no chat contains otherUid — must return false');
+    });
+
+    test('chat already read → false', () async {
+      const me = 'aaa';
+      const other = 'bbb';
+      final chat = makeChatBetween(
+        me,
+        other,
+        lastSender: other,
+        lastAt: base,
+        lastRead: {me: base},
+      );
+      final container = makeContainerWithChats([chat], uid: me);
+      final sub = container.listen(hasUnreadFromProvider(other), (_, __) {});
+      await container.read(chatsForCurrentUserProvider.future);
+      final result = container.read(hasUnreadFromProvider(other));
+      sub.close();
+      expect(result, isFalse);
+    });
+
+    test('null uid → false regardless', () async {
+      const other = 'bbb';
+      final container = makeContainerWithChats([], uid: null);
+      final sub = container.listen(hasUnreadFromProvider(other), (_, __) {});
+      await Future.delayed(Duration.zero);
+      final result = container.read(hasUnreadFromProvider(other));
+      sub.close();
+      expect(result, isFalse);
+    });
+
+    test('stream not yet data → false', () {
+      const other = 'bbb';
+      final container = ProviderContainer(overrides: [
+        currentUidProvider.overrideWith((ref) => 'aaa'),
+        chatsForCurrentUserProvider.overrideWith(
+          (ref) => Stream<List<Chat>>.fromFuture(
+            Completer<List<Chat>>().future,
+          ),
+        ),
+      ]);
+      addTearDown(container.dispose);
+      expect(container.read(hasUnreadFromProvider(other)), isFalse);
     });
   });
 

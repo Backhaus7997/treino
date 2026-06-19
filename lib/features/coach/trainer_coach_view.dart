@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../app/theme/app_palette.dart';
 import '../../core/widgets/treino_icon.dart';
+import '../chat/application/chat_providers.dart';
 import '../profile/application/user_public_profile_providers.dart';
 import '../profile/domain/user_public_profile.dart';
 import '../workout/application/session_providers.dart' show currentUidProvider;
@@ -238,6 +239,7 @@ class _ActiveAlumnoCard extends ConsumerWidget {
     final palette = AppPalette.of(context);
     final pubAsync = ref.watch(userPublicProfileProvider(link.athleteId));
     final isPaused = link.status == TrainerLinkStatus.paused;
+    final hasUnread = ref.watch(hasUnreadFromProvider(link.athleteId));
 
     return InkWell(
       onTap: () => context.push('/coach/athlete/${link.athleteId}'),
@@ -262,6 +264,8 @@ class _ActiveAlumnoCard extends ConsumerWidget {
                       color: palette.textMuted,
                     )
                   : null,
+              hasUnread: hasUnread,
+              unreadDotKey: Key('unread-dot-${link.athleteId}'),
             ),
             const SizedBox(height: 14),
             SizedBox(
@@ -383,10 +387,14 @@ class _UserHeader extends StatelessWidget {
     required this.pubAsync,
     required this.subtitle,
     this.statusBadge,
+    this.hasUnread = false,
+    this.unreadDotKey,
   });
   final AsyncValue<UserPublicProfile?> pubAsync;
   final String subtitle;
   final Widget? statusBadge;
+  final bool hasUnread;
+  final Key? unreadDotKey;
 
   @override
   Widget build(BuildContext context) {
@@ -395,17 +403,43 @@ class _UserHeader extends StatelessWidget {
 
     return Row(
       children: [
-        Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: palette.bg,
-            border: Border.all(color: palette.border, width: 1),
-          ),
-          alignment: Alignment.center,
-          child:
-              Icon(TreinoIcon.tabProfile, size: 22, color: palette.textMuted),
+        Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: palette.bg,
+                border: Border.all(color: palette.border, width: 1),
+              ),
+              alignment: Alignment.center,
+              child: Icon(
+                TreinoIcon.tabProfile,
+                size: 22,
+                color: palette.textMuted,
+              ),
+            ),
+            if (hasUnread)
+              Positioned(
+                top: 0,
+                right: 0,
+                child: Semantics(
+                  label: 'Sin leer',
+                  child: Container(
+                    key: unreadDotKey,
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: palette.accent,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: palette.bgCard, width: 1.5),
+                    ),
+                  ),
+                ),
+              ),
+          ],
         ),
         const SizedBox(width: 12),
         Expanded(

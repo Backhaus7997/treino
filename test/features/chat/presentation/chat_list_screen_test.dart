@@ -28,6 +28,7 @@ Chat _chat({
   String? lastMessageText,
   DateTime? lastMessageAt,
   String? lastMessageSenderId,
+  Map<String, DateTime>? lastRead,
 }) =>
     Chat(
       chatId: chatId,
@@ -36,6 +37,7 @@ Chat _chat({
       lastMessageText: lastMessageText,
       lastMessageAt: lastMessageAt,
       lastMessageSenderId: lastMessageSenderId,
+      lastRead: lastRead,
     );
 
 UserPublicProfile _pub(String uid, String name) => UserPublicProfile(
@@ -110,6 +112,118 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Iniciá la conversación'), findsOneWidget);
+    });
+
+    group('_ChatRow unread dot', () {
+      final base = DateTime.utc(2026, 6, 1, 10, 0);
+      final before = base.subtract(const Duration(minutes: 5));
+
+      testWidgets('unread chat → dot present (finds chatUnreadA11y semantics)',
+          (tester) async {
+        final handle = tester.ensureSemantics();
+        // other sender, lastMessageAt after null lastRead → unread
+        await tester.pumpWidget(_wrap(
+          const ChatListScreen(),
+          overrides: [
+            currentUidProvider.overrideWith((_) => 'aaa'),
+            chatsForCurrentUserProvider.overrideWith(
+              (ref) => Stream.value([
+                _chat(
+                  chatId: 'aaa_bbb',
+                  members: const ['aaa', 'bbb'],
+                  lastMessageText: 'hola',
+                  lastMessageAt: base,
+                  lastMessageSenderId: 'bbb',
+                  lastRead: null,
+                ),
+              ]),
+            ),
+            userPublicProfileProvider('bbb').overrideWith(
+              (_) => Stream.value(_pub('bbb', 'Coach Joe')),
+            ),
+          ],
+        ));
+        await tester.pumpAndSettle();
+
+        // The dot is a Semantics-wrapped Container
+        expect(
+          find.byWidgetPredicate(
+            (w) => w is Semantics && w.properties.label == 'Sin leer',
+          ),
+          findsOneWidget,
+        );
+        handle.dispose();
+      });
+
+      testWidgets('read chat → no dot', (tester) async {
+        final handle = tester.ensureSemantics();
+        // lastRead after lastMessageAt → read
+        await tester.pumpWidget(_wrap(
+          const ChatListScreen(),
+          overrides: [
+            currentUidProvider.overrideWith((_) => 'aaa'),
+            chatsForCurrentUserProvider.overrideWith(
+              (ref) => Stream.value([
+                _chat(
+                  chatId: 'aaa_bbb',
+                  members: const ['aaa', 'bbb'],
+                  lastMessageText: 'hola',
+                  lastMessageAt: before,
+                  lastMessageSenderId: 'bbb',
+                  lastRead: {'aaa': base},
+                ),
+              ]),
+            ),
+            userPublicProfileProvider('bbb').overrideWith(
+              (_) => Stream.value(_pub('bbb', 'Coach Joe')),
+            ),
+          ],
+        ));
+        await tester.pumpAndSettle();
+
+        expect(
+          find.byWidgetPredicate(
+            (w) => w is Semantics && w.properties.label == 'Sin leer',
+          ),
+          findsNothing,
+        );
+        handle.dispose();
+      });
+
+      testWidgets('self-sent last message → no dot regardless of lastRead',
+          (tester) async {
+        final handle = tester.ensureSemantics();
+        await tester.pumpWidget(_wrap(
+          const ChatListScreen(),
+          overrides: [
+            currentUidProvider.overrideWith((_) => 'aaa'),
+            chatsForCurrentUserProvider.overrideWith(
+              (ref) => Stream.value([
+                _chat(
+                  chatId: 'aaa_bbb',
+                  members: const ['aaa', 'bbb'],
+                  lastMessageText: 'yo mandé',
+                  lastMessageAt: base,
+                  lastMessageSenderId: 'aaa', // self sender
+                  lastRead: null,
+                ),
+              ]),
+            ),
+            userPublicProfileProvider('bbb').overrideWith(
+              (_) => Stream.value(_pub('bbb', 'Coach Joe')),
+            ),
+          ],
+        ));
+        await tester.pumpAndSettle();
+
+        expect(
+          find.byWidgetPredicate(
+            (w) => w is Semantics && w.properties.label == 'Sin leer',
+          ),
+          findsNothing,
+        );
+        handle.dispose();
+      });
     });
 
     testWidgets(

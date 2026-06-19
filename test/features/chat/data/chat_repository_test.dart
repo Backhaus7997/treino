@@ -353,4 +353,57 @@ void main() {
       expect(chats[1].chatId, id1);
     });
   });
+
+  // ─── markAsRead ─────────────────────────────────────────────────────────
+
+  group('markAsRead', () {
+    late String chatId;
+    setUp(() async {
+      final chat = await repo.getOrCreate(selfId: uidA, otherId: uidB);
+      chatId = chat.chatId;
+      // Need a message so lastMessageAt exists (for watchChatsForUser)
+      await repo.sendMessage(chatId: chatId, senderId: uidB, text: 'hola');
+    });
+
+    test('writes lastRead[uid] as a non-null Timestamp for caller', () async {
+      await repo.markAsRead(chatId: chatId, uid: uidA);
+      final snap = await firestore.collection('chats').doc(chatId).get();
+      final data = snap.data()!;
+      expect(data['lastRead'], isNotNull);
+      final lastRead = data['lastRead'] as Map<String, Object?>;
+      expect(lastRead[uidA], isNotNull);
+    });
+
+    test(
+        'markAsRead(A) then markAsRead(B) leaves both keys present (no clobber)',
+        () async {
+      await repo.markAsRead(chatId: chatId, uid: uidA);
+      await repo.markAsRead(chatId: chatId, uid: uidB);
+      final snap = await firestore.collection('chats').doc(chatId).get();
+      final lastRead = snap.data()!['lastRead'] as Map<String, Object?>;
+      expect(lastRead[uidA], isNotNull);
+      expect(lastRead[uidB], isNotNull);
+    });
+
+    test('re-marking A does not disturb B key', () async {
+      await repo.markAsRead(chatId: chatId, uid: uidA);
+      await repo.markAsRead(chatId: chatId, uid: uidB);
+      // Re-mark A
+      await repo.markAsRead(chatId: chatId, uid: uidA);
+      final snap = await firestore.collection('chats').doc(chatId).get();
+      final lastRead = snap.data()!['lastRead'] as Map<String, Object?>;
+      expect(lastRead[uidA], isNotNull);
+      expect(lastRead[uidB], isNotNull);
+    });
+
+    test('watchChatsForUser surfaces lastRead in returned Chat objects',
+        () async {
+      await repo.markAsRead(chatId: chatId, uid: uidA);
+      final chats = await repo.watchChatsForUser(uidA).first;
+      expect(chats, isNotEmpty);
+      final chat = chats.firstWhere((c) => c.chatId == chatId);
+      expect(chat.lastRead, isNotNull);
+      expect(chat.lastRead![uidA], isNotNull);
+    });
+  });
 }

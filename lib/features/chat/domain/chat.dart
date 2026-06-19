@@ -19,6 +19,7 @@ class Chat with _$Chat {
     @TimestampConverter() DateTime? lastMessageAt,
     String? lastMessageText,
     String? lastMessageSenderId,
+    @TimestampMapConverter() Map<String, DateTime>? lastRead,
   }) = _Chat;
 
   factory Chat.fromJson(Map<String, Object?> json) => _$ChatFromJson(json);

@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -66,6 +67,40 @@ void main() {
 
       expect(find.text('Sin mensajes todavía'), findsOneWidget);
       expect(find.textContaining('el primero'), findsOneWidget);
+    });
+
+    testWidgets('marca el chat como leído al abrir (REQ-CHATUNREAD-007)',
+        (tester) async {
+      final fake = FakeFirebaseFirestore();
+      await fake.collection('chats').doc('aaa_bbb').set({
+        'chatId': 'aaa_bbb',
+        'members': ['aaa', 'bbb'],
+        'createdAt': Timestamp.fromDate(DateTime.utc(2026, 5, 20)),
+        'lastMessageAt': Timestamp.fromDate(DateTime.utc(2026, 5, 21)),
+        'lastMessageText': 'hola',
+        'lastMessageSenderId': 'bbb',
+      });
+      await tester.pumpWidget(_wrap(
+        const ChatScreen(chatId: 'aaa_bbb', otherUid: 'bbb'),
+        overrides: [
+          firestoreProvider.overrideWithValue(fake),
+          currentUidProvider.overrideWith((_) => 'aaa'),
+          messagesProvider('aaa_bbb').overrideWith(
+            (_) => Stream.value(const <Message>[]),
+          ),
+          userPublicProfileProvider('bbb').overrideWith(
+            (_) => Stream.value(_pub('bbb', 'Coach Joe')),
+          ),
+        ],
+      ));
+      await tester.pumpAndSettle();
+
+      // The current user's lastRead key is written; the other member's is not.
+      final doc = await fake.collection('chats').doc('aaa_bbb').get();
+      final lastRead = doc.data()!['lastRead'] as Map<String, dynamic>?;
+      expect(lastRead, isNotNull);
+      expect(lastRead!['aaa'], isNotNull);
+      expect(lastRead.containsKey('bbb'), isFalse);
     });
 
     testWidgets(

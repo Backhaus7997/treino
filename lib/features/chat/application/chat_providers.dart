@@ -9,6 +9,25 @@ import '../data/chat_repository.dart';
 import '../domain/chat.dart';
 import '../domain/message.dart';
 
+// ─── Pure helpers ──────────────────────────────────────────────────────────
+
+/// Returns true when [c] has an unread message for [uid].
+///
+/// Logic:
+/// - No lastMessageAt → no message at all → read.
+/// - Sender is [uid] → own message → read.
+/// - lastRead[uid] absent → never read → unread.
+/// - lastMessageAt strictly after lastRead[uid] → unread.
+/// - equal or before → read.
+bool chatHasUnread(Chat c, String uid) {
+  final lastMessageAt = c.lastMessageAt;
+  if (lastMessageAt == null) return false;
+  if (c.lastMessageSenderId == uid) return false;
+  final readAt = c.lastRead?[uid];
+  if (readAt == null) return true;
+  return lastMessageAt.isAfter(readAt);
+}
+
 final chatRepositoryProvider = Provider<ChatRepository>(
   (ref) => ChatRepository(firestore: ref.watch(firestoreProvider)),
 );
@@ -49,4 +68,40 @@ final chatForLinkProvider =
   return ref
       .read(chatRepositoryProvider)
       .getOrCreate(selfId: uid, otherId: otherId);
+});
+
+/// Whether the current user has an unread message from a specific other user.
+///
+/// Keyed by [otherUid]. Derives from the live [chatsForCurrentUserProvider]
+/// stream — zero new Firestore listeners. Returns false when uid is null, the
+/// stream is not in data state, or no chat with [otherUid] exists.
+final hasUnreadFromProvider =
+    Provider.autoDispose.family<bool, String>((ref, otherUid) {
+  final uid = ref.watch(currentUidProvider);
+  if (uid == null) return false;
+  return ref.watch(chatsForCurrentUserProvider).maybeWhen(
+        data: (chats) {
+          for (final chat in chats) {
+            if (chat.members.contains(otherUid)) {
+              return chatHasUnread(chat, uid);
+            }
+          }
+          return false;
+        },
+        orElse: () => false,
+      );
+});
+
+/// Count of unread chats for the current user.
+///
+/// Derives from the existing [chatsForCurrentUserProvider] stream — zero new
+/// Firestore listeners. Returns 0 when uid is null or the stream is in
+/// loading/error state so consumers never render stale counts.
+final totalUnreadCountProvider = Provider.autoDispose<int>((ref) {
+  final uid = ref.watch(currentUidProvider);
+  if (uid == null) return 0;
+  return ref.watch(chatsForCurrentUserProvider).maybeWhen(
+        data: (chats) => chats.where((c) => chatHasUnread(c, uid)).length,
+        orElse: () => 0,
+      );
 });

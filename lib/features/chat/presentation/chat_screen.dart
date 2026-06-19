@@ -3,6 +3,7 @@ import 'dart:developer' as developer;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../app/theme/app_palette.dart';
@@ -42,6 +43,28 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   // Upload state — drives LinearProgressIndicator and disables controls.
   bool _uploading = false;
   double _uploadProgress = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    // REQ-CHATUNREAD-007: mark this conversation read once it's on screen.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _markAsRead());
+  }
+
+  /// Records the current user's read position for this chat. Best-effort —
+  /// a failure must never break the screen (REQ-CHATUNREAD-007).
+  Future<void> _markAsRead() async {
+    final uid = ref.read(currentUidProvider);
+    if (uid == null) return;
+    try {
+      await ref
+          .read(chatRepositoryProvider)
+          .markAsRead(chatId: widget.chatId, uid: uid);
+    } catch (e, st) {
+      developer.log('markAsRead failed',
+          name: 'chat', error: e, stackTrace: st);
+    }
+  }
 
   @override
   void dispose() {
@@ -172,6 +195,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final currentUid = ref.watch(currentUidProvider);
     final pubAsync = ref.watch(userPublicProfileProvider(widget.otherUid));
 
+    // REQ-CHATUNREAD-007: re-mark as read when a new message arrives while
+    // the screen is open, so the badge doesn't re-appear.
+    ref.listen(messagesProvider(widget.chatId), (_, __) => _markAsRead());
+
     return Scaffold(
       backgroundColor: Colors.transparent,
       appBar: AppBar(
@@ -180,7 +207,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         leading: IconButton(
           icon: Icon(TreinoIcon.back, color: palette.textPrimary),
           tooltip: l10n.commonBack,
-          onPressed: () => Navigator.of(context).maybePop(),
+          // Opened from a push the deep-link uses context.go() (replaces the
+          // stack), so there's nothing to pop — fall back to the chat inbox
+          // instead of a dead button.
+          onPressed: () =>
+              context.canPop() ? context.pop() : context.go('/feed/messages'),
         ),
         title: pubAsync.when(
           loading: () => const SizedBox.shrink(),

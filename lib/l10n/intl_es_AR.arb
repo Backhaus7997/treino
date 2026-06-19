@@ -1068,5 +1068,18 @@
   "chatMediaViewFullscreen": "Ver foto",
   "@chatMediaViewFullscreen": {},
   "chatMediaImageLoadError": "No pudimos cargar la imagen.",
-  "@chatMediaImageLoadError": {}
+  "@chatMediaImageLoadError": {},
+  "feedMessagesWithUnreadA11y": "Mensajes, {count} sin leer",
+  "@feedMessagesWithUnreadA11y": {
+    "description": "Accessibility label for the feed header messages icon when there are unread chats; announces the unread count to screen readers.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "chatUnreadA11y": "Sin leer",
+  "@chatUnreadA11y": {
+    "description": "Accessibility label for the unread dot indicator shown on a _ChatRow in the chat inbox list."
+  }
 }
