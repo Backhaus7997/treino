@@ -433,10 +433,22 @@ service cloud.firestore {
                     && request.resource.data.members[0] < request.resource.data.members[1]
                     && chatId == request.resource.data.members[0] + '_' + request.resource.data.members[1];
 
+      // REQ-CHATUNREAD-008: members may update the chat (preview fields on
+      // send) but a member may only touch THEIR OWN key inside lastRead — a
+      // user cannot forge/clear another member's read state. members and
+      // createdAt remain immutable. get('lastRead', {}) is null-safe for
+      // legacy docs that predate the field.
       allow update: if request.auth != null
                     && request.auth.uid in resource.data.members
                     && request.resource.data.members == resource.data.members
-                    && request.resource.data.createdAt == resource.data.createdAt;
+                    && request.resource.data.createdAt == resource.data.createdAt
+                    && (
+                         !request.resource.data.keys().hasAny(['lastRead'])
+                         || request.resource.data.get('lastRead', {})
+                              .diff(resource.data.get('lastRead', {}))
+                              .affectedKeys()
+                              .hasOnly([request.auth.uid])
+                       );
 
       allow delete: if false;
 
