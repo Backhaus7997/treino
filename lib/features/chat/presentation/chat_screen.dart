@@ -44,6 +44,28 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   double _uploadProgress = 0;
 
   @override
+  void initState() {
+    super.initState();
+    // REQ-CHATUNREAD-007: mark this conversation read once it's on screen.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _markAsRead());
+  }
+
+  /// Records the current user's read position for this chat. Best-effort —
+  /// a failure must never break the screen (REQ-CHATUNREAD-007).
+  Future<void> _markAsRead() async {
+    final uid = ref.read(currentUidProvider);
+    if (uid == null) return;
+    try {
+      await ref
+          .read(chatRepositoryProvider)
+          .markAsRead(chatId: widget.chatId, uid: uid);
+    } catch (e, st) {
+      developer.log('markAsRead failed',
+          name: 'chat', error: e, stackTrace: st);
+    }
+  }
+
+  @override
   void dispose() {
     _textController.dispose();
     super.dispose();
@@ -171,6 +193,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final messagesAsync = ref.watch(messagesProvider(widget.chatId));
     final currentUid = ref.watch(currentUidProvider);
     final pubAsync = ref.watch(userPublicProfileProvider(widget.otherUid));
+
+    // REQ-CHATUNREAD-007: re-mark as read when a new message arrives while
+    // the screen is open, so the badge doesn't re-appear.
+    ref.listen(messagesProvider(widget.chatId), (_, __) => _markAsRead());
 
     return Scaffold(
       backgroundColor: Colors.transparent,
