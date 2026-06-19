@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../app/theme/app_palette.dart';
 import '../../core/widgets/treino_icon.dart';
 import '../../l10n/app_l10n.dart';
+import '../chat/application/chat_providers.dart';
 import '../check_in/application/check_in_providers.dart';
 import '../check_in/presentation/check_in_dialog.dart';
 import 'domain/gym_name.dart';
@@ -112,6 +113,8 @@ class _FeedHeader extends ConsumerWidget {
     final uid = ref.watch(currentUidProvider);
     final pendingRequests =
         uid == null ? 0 : ref.watch(pendingRequestCountProvider(uid));
+    // REQ-CHATUNREAD-005: count of chats with unread messages for the badge.
+    final unreadChats = ref.watch(totalUnreadCountProvider);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
@@ -184,7 +187,9 @@ class _FeedHeader extends ConsumerWidget {
           const SizedBox(width: 4),
           Semantics(
             button: true,
-            label: l10n.feedMessagesA11y,
+            label: unreadChats > 0
+                ? l10n.feedMessagesWithUnreadA11y(unreadChats)
+                : l10n.feedMessagesA11y,
             child: GestureDetector(
               onTap: () => context.push('/feed/messages'),
               behavior: HitTestBehavior.opaque,
@@ -194,10 +199,41 @@ class _FeedHeader extends ConsumerWidget {
                   minHeight: 44,
                 ),
                 child: Center(
-                  child: Icon(
-                    TreinoIcon.chat,
-                    size: 20,
-                    color: palette.textMuted,
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Icon(
+                        TreinoIcon.chat,
+                        size: 20,
+                        color: palette.textMuted,
+                      ),
+                      if (unreadChats > 0)
+                        Positioned(
+                          top: -4,
+                          right: -5,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 4,
+                              vertical: 1,
+                            ),
+                            constraints: const BoxConstraints(minWidth: 16),
+                            decoration: BoxDecoration(
+                              color: palette.accent,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              unreadChats > 99 ? '99+' : '$unreadChats',
+                              textAlign: TextAlign.center,
+                              style: GoogleFonts.barlow(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                height: 1.2,
+                                color: palette.bg,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                 ),
               ),
