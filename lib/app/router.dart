@@ -9,6 +9,8 @@ import '../features/auth/presentation/login_screen.dart';
 import '../features/auth/presentation/register_screen.dart';
 import '../features/auth/presentation/splash_screen.dart';
 import '../features/auth/presentation/welcome_screen.dart';
+import '../features/chat/application/chat_providers.dart'
+    show totalUnreadCountProvider;
 import '../features/chat/presentation/chat_list_screen.dart';
 import '../features/chat/presentation/chat_screen.dart';
 import '../features/coach/coach_screen.dart';
@@ -613,17 +615,17 @@ class _AthleteAgendaRouteHost extends ConsumerWidget {
   }
 }
 
-class _ShellScaffold extends StatefulWidget {
+class _ShellScaffold extends ConsumerStatefulWidget {
   const _ShellScaffold({required this.location, required this.child});
 
   final String location;
   final Widget child;
 
   @override
-  State<_ShellScaffold> createState() => _ShellScaffoldState();
+  ConsumerState<_ShellScaffold> createState() => _ShellScaffoldState();
 }
 
-class _ShellScaffoldState extends State<_ShellScaffold> {
+class _ShellScaffoldState extends ConsumerState<_ShellScaffold> {
   int get _currentIndex {
     final i = _kTabs.indexWhere((t) => widget.location.startsWith(t));
     return i < 0 ? 2 : i;
@@ -631,6 +633,7 @@ class _ShellScaffoldState extends State<_ShellScaffold> {
 
   @override
   Widget build(BuildContext context) {
+    final coachUnreadCount = ref.watch(totalUnreadCountProvider);
     return Scaffold(
       extendBody: true,
       // bottom: false — the body must reach the physical bottom edge so the
@@ -643,6 +646,7 @@ class _ShellScaffoldState extends State<_ShellScaffold> {
       ),
       bottomNavigationBar: TreinoBottomBar(
         currentIndex: _currentIndex,
+        coachUnreadCount: coachUnreadCount,
         onTap: (i) {
           // Pop any open popup (modal bottom sheet, dialog) on the SHELL
           // navigator so it animates closed when the user switches tabs —
