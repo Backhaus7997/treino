@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart' show FirebaseException;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -23,6 +24,8 @@ import 'package:treino/features/workout/application/session_providers.dart';
 import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/domain/routine_status.dart';
 import 'package:treino/features/workout/domain/session.dart';
+import 'package:treino/features/workout/domain/set_log.dart';
+import 'package:treino/features/workout/presentation/widgets/session_exercise_block.dart';
 
 import 'alumnos_screen.dart' show AlumnoEstado, AlumnoEstadoX, estadoForLink;
 import 'resumen_metrics.dart';
@@ -1501,7 +1504,8 @@ class _EntrenamientoTab extends ConsumerWidget {
                 return _muted(palette,
                     'Sin sesiones registradas todavía.'); // i18n: Fase W2
               }
-              return _HistorialTable(sessions: finished, palette: palette);
+              return _HistorialTable(
+                  sessions: finished, palette: palette, athleteId: athleteId);
             },
           ),
           const SizedBox(height: 14),
@@ -1572,9 +1576,14 @@ class _RutinaCard extends StatelessWidget {
 }
 
 class _HistorialTable extends StatelessWidget {
-  const _HistorialTable({required this.sessions, required this.palette});
+  const _HistorialTable({
+    required this.sessions,
+    required this.palette,
+    required this.athleteId,
+  });
   final List<Session> sessions;
   final AppPalette palette;
+  final String athleteId;
 
   @override
   Widget build(BuildContext context) {
@@ -1583,7 +1592,6 @@ class _HistorialTable extends StatelessWidget {
         fontSize: 11,
         fontWeight: FontWeight.w600,
         letterSpacing: 0.5);
-    final c = TextStyle(color: palette.textPrimary, fontSize: 13);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       decoration: BoxDecoration(
@@ -1605,42 +1613,164 @@ class _HistorialTable extends StatelessWidget {
                   flex: 2,
                   child: Text('VOLUMEN', style: h, textAlign: TextAlign.right),
                 ),
+                const SizedBox(width: 24),
               ],
             ),
           ),
+          // Tap a session to expand its real per-exercise set detail
+          // (trainer-athlete-set-logs).
           for (final s in sessions)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Row(
-                children: [
-                  Expanded(
-                    flex: 3,
-                    child: Text(
-                      s.finishedAt != null ? _fmtDate(s.finishedAt!) : '—',
-                      style: c,
-                    ),
-                  ),
-                  Expanded(
-                    flex: 4,
-                    child: Text(s.routineName,
-                        overflow: TextOverflow.ellipsis, style: c),
-                  ),
-                  Expanded(
-                    flex: 2,
-                    child:
-                        Text('${s.durationMin} min', style: c), // i18n: Fase W2
-                  ),
-                  Expanded(
-                    flex: 2,
-                    child:
-                        Text('${s.totalVolumeKg.round()} kg', // i18n: Fase W2
-                            style: c,
-                            textAlign: TextAlign.right),
-                  ),
-                ],
-              ),
+            _ExpandableSessionRow(
+              session: s,
+              athleteId: athleteId,
+              palette: palette,
             ),
         ],
+      ),
+    );
+  }
+}
+
+/// A session row that expands on tap to show the athlete's REAL logged sets
+/// for that session (read-only; gated by `session_shares`).
+class _ExpandableSessionRow extends ConsumerStatefulWidget {
+  const _ExpandableSessionRow({
+    required this.session,
+    required this.athleteId,
+    required this.palette,
+  });
+  final Session session;
+  final String athleteId;
+  final AppPalette palette;
+
+  @override
+  ConsumerState<_ExpandableSessionRow> createState() =>
+      _ExpandableSessionRowState();
+}
+
+class _ExpandableSessionRowState extends ConsumerState<_ExpandableSessionRow> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = widget.palette;
+    final s = widget.session;
+    final c = TextStyle(color: palette.textPrimary, fontSize: 13);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        InkWell(
+          onTap: () => setState(() => _expanded = !_expanded),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Row(
+              children: [
+                Expanded(
+                  flex: 3,
+                  child: Text(
+                    s.finishedAt != null ? _fmtDate(s.finishedAt!) : '—',
+                    style: c,
+                  ),
+                ),
+                Expanded(
+                  flex: 4,
+                  child: Text(s.routineName,
+                      overflow: TextOverflow.ellipsis, style: c),
+                ),
+                Expanded(
+                  flex: 2,
+                  child:
+                      Text('${s.durationMin} min', style: c), // i18n: Fase W2
+                ),
+                Expanded(
+                  flex: 2,
+                  child: Text('${s.totalVolumeKg.round()} kg', // i18n: Fase W2
+                      style: c,
+                      textAlign: TextAlign.right),
+                ),
+                SizedBox(
+                  width: 24,
+                  child: Icon(
+                    _expanded ? TreinoIcon.chevronUp : TreinoIcon.chevronDown,
+                    size: 16,
+                    color: palette.textMuted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (_expanded)
+          _SetLogsExpansion(
+            athleteId: widget.athleteId,
+            sessionId: s.id,
+            palette: palette,
+          ),
+      ],
+    );
+  }
+}
+
+/// Loads and renders one session's per-exercise set logs for the trainer.
+/// Maps `permission-denied` (athlete hasn't shared) to a friendly placeholder.
+class _SetLogsExpansion extends ConsumerWidget {
+  const _SetLogsExpansion({
+    required this.athleteId,
+    required this.sessionId,
+    required this.palette,
+  });
+  final String athleteId;
+  final String sessionId;
+  final AppPalette palette;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(coachSessionSetLogsProvider(
+        (athleteUid: athleteId, sessionId: sessionId)));
+    final muted = TextStyle(color: palette.textMuted, fontSize: 12);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 0, 4, 12),
+      child: async.when(
+        loading: () => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(
+                strokeWidth: 2, color: palette.accent),
+          ),
+        ),
+        error: (e, _) {
+          final noShare =
+              e is FirebaseException && e.code == 'permission-denied';
+          return Text(
+            noShare
+                ? 'El alumno no compartió su historial.' // i18n: Fase W2
+                : 'No se pudo cargar el detalle de la sesión.', // i18n: Fase W2
+            style: muted,
+          );
+        },
+        data: (logs) {
+          if (logs.isEmpty) {
+            return Text(
+                'Sin series registradas en esta sesión.', // i18n: Fase W2
+                style: muted);
+          }
+          final groups = <String, List<SetLog>>{};
+          for (final log in logs) {
+            groups.putIfAbsent(log.exerciseId, () => <SetLog>[]).add(log);
+          }
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (final entry in groups.entries)
+                SessionExerciseBlock(
+                  exerciseName: entry.value.first.exerciseName,
+                  sets: entry.value,
+                ),
+            ],
+          );
+        },
       ),
     );
   }

@@ -44,6 +44,7 @@ import 'package:treino/features/workout/domain/routine_slot.dart';
 import 'package:treino/features/workout/domain/routine_status.dart';
 import 'package:treino/features/workout/domain/session.dart';
 import 'package:treino/features/workout/domain/session_status.dart';
+import 'package:treino/features/workout/domain/set_log.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
 class _MockRepo extends Mock implements TrainerLinkRepository {}
@@ -182,6 +183,23 @@ PerformanceTest _perf({double cmjCm = 30, int day = 1}) => PerformanceTest(
       cmjCm: cmjCm,
     );
 
+SetLog _setLog({
+  String exerciseId = 'ex1',
+  String exerciseName = 'Sentadilla',
+  int setNumber = 1,
+  int reps = 5,
+  double weightKg = 100,
+}) =>
+    SetLog(
+      id: 'sl-$exerciseId-$setNumber',
+      exerciseId: exerciseId,
+      exerciseName: exerciseName,
+      setNumber: setNumber,
+      reps: reps,
+      weightKg: weightKg,
+      completedAt: DateTime.utc(2026, 1, 1),
+    );
+
 Future<void> _pump(
   WidgetTester tester, {
   UserPublicProfile? profile,
@@ -195,6 +213,7 @@ Future<void> _pump(
   AthleteBilling? billing,
   List<PerformanceTest> performanceTests = const [],
   Object? performanceError,
+  List<SetLog> setLogs = const [],
 }) async {
   tester.view.physicalSize = const Size(1200, 900);
   tester.view.devicePixelRatio = 1.0;
@@ -220,6 +239,7 @@ Future<void> _pump(
         currentUidProvider.overrideWithValue('t1'),
         assignedRoutinesProvider.overrideWith((ref, id) => routines),
         sessionsByUidProvider.overrideWith((ref, id) => sessions),
+        coachSessionSetLogsProvider.overrideWith((ref, key) async => setLogs),
         if (paymentRepo != null)
           paymentRepositoryProvider.overrideWithValue(paymentRepo),
       ],
@@ -337,6 +357,31 @@ void main() {
           reason: 'falta el tab $t',
         );
       }
+    });
+
+    testWidgets(
+        'Entrenamientos: tap en una sesión expande sus sets reales '
+        '(trainer-athlete-set-logs)', (tester) async {
+      await _pump(
+        tester,
+        profile: _prof(),
+        link: _link(TrainerLinkStatus.active),
+        sessions: [_session(id: 's1', routineName: 'Hipertrofia 4 días')],
+        setLogs: [_setLog(exerciseName: 'Sentadilla', reps: 5, weightKg: 100)],
+      );
+
+      await tester.tap(find.descendant(
+          of: find.byType(TabBar), matching: find.text('Entrenamientos')));
+      await tester.pumpAndSettle();
+
+      // Colapsado: los sets no se ven todavía.
+      expect(find.text('Sentadilla'), findsNothing);
+
+      // Tap en la fila de la sesión → expande y carga los sets reales.
+      await tester.tap(find.text('Hipertrofia 4 días'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Sentadilla'), findsOneWidget);
     });
 
     testWidgets('Progreso muestra antropometría', (tester) async {
