@@ -510,28 +510,51 @@ class _ActionRow extends ConsumerWidget {
     if (link.status == TrainerLinkStatus.active) {
       return Column(
         children: [
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: () => _onMessage(context, ref),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: palette.accent,
-                foregroundColor: palette.bg,
-                minimumSize: const Size.fromHeight(48),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(9999),
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () => _onMessage(context, ref),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: palette.accent,
+                    foregroundColor: palette.bg,
+                    minimumSize: const Size.fromHeight(48),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(9999),
+                    ),
+                  ),
+                  icon: Icon(TreinoIcon.chat, size: 18, color: palette.bg),
+                  label: Text(
+                    'MENSAJE',
+                    style: GoogleFonts.barlowCondensed(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                      letterSpacing: 0.8,
+                    ),
+                  ),
                 ),
               ),
-              icon: Icon(TreinoIcon.chat, size: 18, color: palette.bg),
-              label: Text(
-                'MENSAJE',
-                style: GoogleFonts.barlowCondensed(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 13,
-                  letterSpacing: 0.8,
+              // Unread dot on the chat button when the PF has written.
+              if (ref.watch(hasUnreadFromProvider(link.trainerId)))
+                Positioned(
+                  top: -3,
+                  right: -3,
+                  child: Semantics(
+                    label: 'Mensajes sin leer',
+                    child: Container(
+                      width: 14,
+                      height: 14,
+                      decoration: BoxDecoration(
+                        color: palette.accent,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: palette.bgCard, width: 2),
+                      ),
+                    ),
+                  ),
                 ),
-              ),
-            ),
+            ],
           ),
           const SizedBox(height: 12),
           SizedBox(
