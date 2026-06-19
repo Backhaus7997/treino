@@ -109,7 +109,7 @@ export async function notifyOnChatMessageHandler(
         title: "TREINO", // i18n: Fase 6 Etapa 2
         body,
       },
-      data: { deepLink },
+      data: { deepLink, senderId },
     },
     messaging,
   );
