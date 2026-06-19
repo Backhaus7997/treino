@@ -144,12 +144,57 @@ void main() {
       addTearDown(container.dispose);
 
       final result = await container.read(weeklyInsightsProvider.future);
+      // Granular bucketing (2026-06-19): cada muscleGroup canónico va a su
+      // propio bucket, sin colapsar quads→piernas o biceps→brazos.
       expect(result!.setsByGroup[MuscleGroupDisplay.pecho], 3);
-      expect(result.setsByGroup[MuscleGroupDisplay.piernas], 2);
-      expect(result.setsByGroup[MuscleGroupDisplay.brazos], 1);
+      expect(result.setsByGroup[MuscleGroupDisplay.cuadriceps], 2);
+      expect(result.setsByGroup[MuscleGroupDisplay.biceps], 1);
       // El log de 'unknownGroup' fue descartado defensivamente.
       expect(
           result.setsByGroup.containsKey(MuscleGroupDisplay.espalda), isFalse);
+    });
+
+    test(
+        'SCENARIO-404b: cutoff 2B — legacy taxonomy strings (brazos/piernas) '
+        'NO suman a ningún bucket, se skipean silenciosamente', () async {
+      final repo = MockSessionRepository();
+      final now = DateTime.now();
+      when(() => repo.listByUid('u1')).thenAnswer((_) async => [
+            makeSession(
+              id: 's1',
+              startedAt: now,
+              status: SessionStatus.finished,
+              routineId: 'r1',
+            ),
+          ]);
+      // Sets de sesiones viejas con la taxonomía colapsada anterior:
+      // un ejercicio "brazos" + uno "piernas" + uno "chest" granular.
+      // Solo el granular debe sumar al rollup nuevo.
+      when(() => repo.listSetLogs(uid: 'u1', sessionId: 's1'))
+          .thenAnswer((_) async => [
+                makeSetLog(id: 'l1', exerciseId: 'e-old-brazos', setNumber: 1),
+                makeSetLog(id: 'l2', exerciseId: 'e-old-piernas', setNumber: 1),
+                makeSetLog(id: 'l3', exerciseId: 'e-chest', setNumber: 1),
+              ]);
+
+      final container = ProviderContainer(overrides: [
+        currentUidProvider.overrideWithValue('u1'),
+        sessionRepositoryProvider.overrideWithValue(repo),
+        exercisesProvider.overrideWith((ref) async => [
+              _ex(id: 'e-old-brazos', muscleGroup: 'brazos'),
+              _ex(id: 'e-old-piernas', muscleGroup: 'piernas'),
+              _ex(id: 'e-chest', muscleGroup: 'chest'),
+            ]),
+        routineByIdProvider('r1').overrideWith((ref) async => null),
+      ]);
+      addTearDown(container.dispose);
+
+      final result = await container.read(weeklyInsightsProvider.future);
+      // Solo el set de chest cuenta. Los legacy "brazos"/"piernas" se filtran.
+      expect(result!.setsByGroup[MuscleGroupDisplay.pecho], 1);
+      expect(result.setsByGroup.length, 1,
+          reason: 'No debe haber otros buckets con sets — legacy strings se '
+              'descartan sin remapear');
     });
 
     test('SCENARIO-405: daysTrained refleja qué días de la semana hubo sesión',
@@ -251,10 +296,13 @@ void main() {
       addTearDown(container.dispose);
 
       final result = await container.read(weeklyInsightsProvider.future);
+      // Granular bucketing (2026-06-19): cada slot va a su propio grupo, sin
+      // colapsar quads+glutes en "piernas". El usuario ve volumen separado
+      // por cabeza muscular.
       expect(result!.targetByGroup[MuscleGroupDisplay.pecho], 4);
       expect(result.targetByGroup[MuscleGroupDisplay.espalda], 3);
-      // quads + glutes ambos mapean a piernas → 5 + 3 = 8
-      expect(result.targetByGroup[MuscleGroupDisplay.piernas], 8);
+      expect(result.targetByGroup[MuscleGroupDisplay.cuadriceps], 5);
+      expect(result.targetByGroup[MuscleGroupDisplay.gluteos], 3);
     });
   });
 }
