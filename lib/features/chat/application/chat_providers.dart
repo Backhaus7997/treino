@@ -70,6 +70,28 @@ final chatForLinkProvider =
       .getOrCreate(selfId: uid, otherId: otherId);
 });
 
+/// Whether the current user has an unread message from a specific other user.
+///
+/// Keyed by [otherUid]. Derives from the live [chatsForCurrentUserProvider]
+/// stream — zero new Firestore listeners. Returns false when uid is null, the
+/// stream is not in data state, or no chat with [otherUid] exists.
+final hasUnreadFromProvider =
+    Provider.autoDispose.family<bool, String>((ref, otherUid) {
+  final uid = ref.watch(currentUidProvider);
+  if (uid == null) return false;
+  return ref.watch(chatsForCurrentUserProvider).maybeWhen(
+        data: (chats) {
+          for (final chat in chats) {
+            if (chat.members.contains(otherUid)) {
+              return chatHasUnread(chat, uid);
+            }
+          }
+          return false;
+        },
+        orElse: () => false,
+      );
+});
+
 /// Count of unread chats for the current user.
 ///
 /// Derives from the existing [chatsForCurrentUserProvider] stream — zero new

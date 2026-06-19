@@ -282,6 +282,141 @@ void main() {
     });
   });
 
+  // ── hasUnreadFromProvider ────────────────────────────────────────────────
+
+  group('hasUnreadFromProvider', () {
+    final base = DateTime.utc(2026, 6, 1, 10, 0);
+    final before = base.subtract(const Duration(minutes: 5));
+
+    Chat makeChatBetween(
+      String aUid,
+      String bUid, {
+      String? lastSender,
+      DateTime? lastAt,
+      Map<String, DateTime>? lastRead,
+    }) =>
+        Chat(
+          chatId: '${aUid}_$bUid',
+          members: [aUid, bUid],
+          createdAt: DateTime.utc(2026, 1, 1),
+          lastMessageAt: lastAt,
+          lastMessageSenderId: lastSender,
+          lastRead: lastRead,
+        );
+
+    ProviderContainer makeContainerWithChats(
+      List<Chat> chats, {
+      String? uid,
+    }) {
+      final container = ProviderContainer(overrides: [
+        currentUidProvider.overrideWith((ref) => uid),
+        chatsForCurrentUserProvider.overrideWith(
+          (ref) => Stream.value(chats),
+        ),
+      ]);
+      addTearDown(container.dispose);
+      return container;
+    }
+
+    test('other person sent last unseen message → true', () async {
+      const me = 'aaa';
+      const other = 'bbb';
+      final chat = makeChatBetween(
+        me,
+        other,
+        lastSender: other,
+        lastAt: base,
+        lastRead: {me: before},
+      );
+      final container = makeContainerWithChats([chat], uid: me);
+      final sub = container.listen(hasUnreadFromProvider(other), (_, __) {});
+      await container.read(chatsForCurrentUserProvider.future);
+      final result = container.read(hasUnreadFromProvider(other));
+      sub.close();
+      expect(result, isTrue);
+    });
+
+    test('last message is my own → false', () async {
+      const me = 'aaa';
+      const other = 'bbb';
+      final chat = makeChatBetween(
+        me,
+        other,
+        lastSender: me,
+        lastAt: base,
+        lastRead: null,
+      );
+      final container = makeContainerWithChats([chat], uid: me);
+      final sub = container.listen(hasUnreadFromProvider(other), (_, __) {});
+      await container.read(chatsForCurrentUserProvider.future);
+      final result = container.read(hasUnreadFromProvider(other));
+      sub.close();
+      expect(result, isFalse);
+    });
+
+    test('no chat with that uid → false', () async {
+      const me = 'aaa';
+      const other = 'bbb';
+      const unrelated = 'ccc';
+      final chat = makeChatBetween(
+        me,
+        unrelated,
+        lastSender: unrelated,
+        lastAt: base,
+        lastRead: {me: before},
+      );
+      final container = makeContainerWithChats([chat], uid: me);
+      final sub = container.listen(hasUnreadFromProvider(other), (_, __) {});
+      await container.read(chatsForCurrentUserProvider.future);
+      final result = container.read(hasUnreadFromProvider(other));
+      sub.close();
+      expect(result, isFalse,
+          reason: 'no chat contains otherUid — must return false');
+    });
+
+    test('chat already read → false', () async {
+      const me = 'aaa';
+      const other = 'bbb';
+      final chat = makeChatBetween(
+        me,
+        other,
+        lastSender: other,
+        lastAt: base,
+        lastRead: {me: base},
+      );
+      final container = makeContainerWithChats([chat], uid: me);
+      final sub = container.listen(hasUnreadFromProvider(other), (_, __) {});
+      await container.read(chatsForCurrentUserProvider.future);
+      final result = container.read(hasUnreadFromProvider(other));
+      sub.close();
+      expect(result, isFalse);
+    });
+
+    test('null uid → false regardless', () async {
+      const other = 'bbb';
+      final container = makeContainerWithChats([], uid: null);
+      final sub = container.listen(hasUnreadFromProvider(other), (_, __) {});
+      await Future.delayed(Duration.zero);
+      final result = container.read(hasUnreadFromProvider(other));
+      sub.close();
+      expect(result, isFalse);
+    });
+
+    test('stream not yet data → false', () {
+      const other = 'bbb';
+      final container = ProviderContainer(overrides: [
+        currentUidProvider.overrideWith((ref) => 'aaa'),
+        chatsForCurrentUserProvider.overrideWith(
+          (ref) => Stream<List<Chat>>.fromFuture(
+            Completer<List<Chat>>().future,
+          ),
+        ),
+      ]);
+      addTearDown(container.dispose);
+      expect(container.read(hasUnreadFromProvider(other)), isFalse);
+    });
+  });
+
   group('chatForLinkProvider', () {
     test('crea o resuelve el chat para un link (desde lado athlete)', () async {
       final firestore = FakeFirebaseFirestore();
