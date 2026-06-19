@@ -666,5 +666,10 @@
   "chatMediaViewFullscreen": "View photo",
   "chatMediaImageLoadError": "We couldn't load the image.",
   "feedMessagesWithUnreadA11y": "Messages, {count} unread",
-  "chatUnreadA11y": "Unread"
+  "chatUnreadA11y": "Unread",
+  "coachSessionSetLogsTitle": "SETS",
+  "coachSessionTapToExpand": "View sets",
+  "coachSessionSetLogsEmpty": "This session has no logged sets.",
+  "coachSessionSetLogsLoadError": "Could not load sets. Please try again.",
+  "coachAthleteNoSharePlaceholder": "The athlete has not shared their history yet."
 }

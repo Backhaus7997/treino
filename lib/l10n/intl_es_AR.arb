@@ -1081,5 +1081,25 @@
   "chatUnreadA11y": "Sin leer",
   "@chatUnreadA11y": {
     "description": "Accessibility label for the unread dot indicator shown on a _ChatRow in the chat inbox list."
+  },
+  "coachSessionSetLogsTitle": "SETS",
+  "@coachSessionSetLogsTitle": {
+    "description": "Section heading inside the session expansion tile in the trainer's Entrenamientos tab."
+  },
+  "coachSessionTapToExpand": "Ver sets",
+  "@coachSessionTapToExpand": {
+    "description": "Call-to-action hint on a finished-session row, inviting the trainer to expand it."
+  },
+  "coachSessionSetLogsEmpty": "Esta sesión no tiene sets registrados.",
+  "@coachSessionSetLogsEmpty": {
+    "description": "Empty state shown when the athlete's session has no logged sets."
+  },
+  "coachSessionSetLogsLoadError": "No pudimos cargar los sets. Intentá de nuevo.",
+  "@coachSessionSetLogsLoadError": {
+    "description": "Generic error shown when loading setLogs fails for a non-permission reason."
+  },
+  "coachAthleteNoSharePlaceholder": "El alumno no compartió su historial todavía.",
+  "@coachAthleteNoSharePlaceholder": {
+    "description": "Shown when the trainer receives permission-denied loading setLogs — the athlete has not shared or revoked sharing."
   }
 }
