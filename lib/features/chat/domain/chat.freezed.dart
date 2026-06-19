@@ -28,6 +28,8 @@ mixin _$Chat {
   DateTime? get lastMessageAt => throw _privateConstructorUsedError;
   String? get lastMessageText => throw _privateConstructorUsedError;
   String? get lastMessageSenderId => throw _privateConstructorUsedError;
+  @TimestampMapConverter()
+  Map<String, DateTime>? get lastRead => throw _privateConstructorUsedError;
 
   /// Serializes this Chat to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -49,7 +51,8 @@ abstract class $ChatCopyWith<$Res> {
       @TimestampConverter() DateTime createdAt,
       @TimestampConverter() DateTime? lastMessageAt,
       String? lastMessageText,
-      String? lastMessageSenderId});
+      String? lastMessageSenderId,
+      @TimestampMapConverter() Map<String, DateTime>? lastRead});
 }
 
 /// @nodoc
@@ -73,6 +76,7 @@ class _$ChatCopyWithImpl<$Res, $Val extends Chat>
     Object? lastMessageAt = freezed,
     Object? lastMessageText = freezed,
     Object? lastMessageSenderId = freezed,
+    Object? lastRead = freezed,
   }) {
     return _then(_value.copyWith(
       chatId: null == chatId
@@ -99,6 +103,10 @@ class _$ChatCopyWithImpl<$Res, $Val extends Chat>
           ? _value.lastMessageSenderId
           : lastMessageSenderId // ignore: cast_nullable_to_non_nullable
               as String?,
+      lastRead: freezed == lastRead
+          ? _value.lastRead
+          : lastRead // ignore: cast_nullable_to_non_nullable
+              as Map<String, DateTime>?,
     ) as $Val);
   }
 }
@@ -116,7 +124,8 @@ abstract class _$$ChatImplCopyWith<$Res> implements $ChatCopyWith<$Res> {
       @TimestampConverter() DateTime createdAt,
       @TimestampConverter() DateTime? lastMessageAt,
       String? lastMessageText,
-      String? lastMessageSenderId});
+      String? lastMessageSenderId,
+      @TimestampMapConverter() Map<String, DateTime>? lastRead});
 }
 
 /// @nodoc
@@ -137,6 +146,7 @@ class __$$ChatImplCopyWithImpl<$Res>
     Object? lastMessageAt = freezed,
     Object? lastMessageText = freezed,
     Object? lastMessageSenderId = freezed,
+    Object? lastRead = freezed,
   }) {
     return _then(_$ChatImpl(
       chatId: null == chatId
@@ -163,6 +173,10 @@ class __$$ChatImplCopyWithImpl<$Res>
           ? _value.lastMessageSenderId
           : lastMessageSenderId // ignore: cast_nullable_to_non_nullable
               as String?,
+      lastRead: freezed == lastRead
+          ? _value._lastRead
+          : lastRead // ignore: cast_nullable_to_non_nullable
+              as Map<String, DateTime>?,
     ));
   }
 }
@@ -176,8 +190,10 @@ class _$ChatImpl implements _Chat {
       @TimestampConverter() required this.createdAt,
       @TimestampConverter() this.lastMessageAt,
       this.lastMessageText,
-      this.lastMessageSenderId})
-      : _members = members;
+      this.lastMessageSenderId,
+      @TimestampMapConverter() final Map<String, DateTime>? lastRead})
+      : _members = members,
+        _lastRead = lastRead;
 
   factory _$ChatImpl.fromJson(Map<String, dynamic> json) =>
       _$$ChatImplFromJson(json);
@@ -202,10 +218,20 @@ class _$ChatImpl implements _Chat {
   final String? lastMessageText;
   @override
   final String? lastMessageSenderId;
+  final Map<String, DateTime>? _lastRead;
+  @override
+  @TimestampMapConverter()
+  Map<String, DateTime>? get lastRead {
+    final value = _lastRead;
+    if (value == null) return null;
+    if (_lastRead is EqualUnmodifiableMapView) return _lastRead;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableMapView(value);
+  }
 
   @override
   String toString() {
-    return 'Chat(chatId: $chatId, members: $members, createdAt: $createdAt, lastMessageAt: $lastMessageAt, lastMessageText: $lastMessageText, lastMessageSenderId: $lastMessageSenderId)';
+    return 'Chat(chatId: $chatId, members: $members, createdAt: $createdAt, lastMessageAt: $lastMessageAt, lastMessageText: $lastMessageText, lastMessageSenderId: $lastMessageSenderId, lastRead: $lastRead)';
   }
 
   @override
@@ -222,7 +248,8 @@ class _$ChatImpl implements _Chat {
             (identical(other.lastMessageText, lastMessageText) ||
                 other.lastMessageText == lastMessageText) &&
             (identical(other.lastMessageSenderId, lastMessageSenderId) ||
-                other.lastMessageSenderId == lastMessageSenderId));
+                other.lastMessageSenderId == lastMessageSenderId) &&
+            const DeepCollectionEquality().equals(other._lastRead, _lastRead));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -234,7 +261,8 @@ class _$ChatImpl implements _Chat {
       createdAt,
       lastMessageAt,
       lastMessageText,
-      lastMessageSenderId);
+      lastMessageSenderId,
+      const DeepCollectionEquality().hash(_lastRead));
 
   /// Create a copy of Chat
   /// with the given fields replaced by the non-null parameter values.
@@ -254,12 +282,14 @@ class _$ChatImpl implements _Chat {
 
 abstract class _Chat implements Chat {
   const factory _Chat(
-      {required final String chatId,
-      required final List<String> members,
-      @TimestampConverter() required final DateTime createdAt,
-      @TimestampConverter() final DateTime? lastMessageAt,
-      final String? lastMessageText,
-      final String? lastMessageSenderId}) = _$ChatImpl;
+          {required final String chatId,
+          required final List<String> members,
+          @TimestampConverter() required final DateTime createdAt,
+          @TimestampConverter() final DateTime? lastMessageAt,
+          final String? lastMessageText,
+          final String? lastMessageSenderId,
+          @TimestampMapConverter() final Map<String, DateTime>? lastRead}) =
+      _$ChatImpl;
 
   factory _Chat.fromJson(Map<String, dynamic> json) = _$ChatImpl.fromJson;
 
@@ -277,6 +307,9 @@ abstract class _Chat implements Chat {
   String? get lastMessageText;
   @override
   String? get lastMessageSenderId;
+  @override
+  @TimestampMapConverter()
+  Map<String, DateTime>? get lastRead;
 
   /// Create a copy of Chat
   /// with the given fields replaced by the non-null parameter values.
