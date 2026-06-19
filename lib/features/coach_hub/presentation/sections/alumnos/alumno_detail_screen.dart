@@ -1493,7 +1493,10 @@ class _EntrenamientoTab extends ConsumerWidget {
           sessionsAsync.when(
             loading: () => _muted(palette, 'Cargando…'), // i18n: Fase W2
             error: (e, _) => _muted(
-                palette, 'No se pudo cargar el historial.'), // i18n: Fase W2
+                palette,
+                e is FirebaseException && e.code == 'permission-denied'
+                    ? 'El alumno no compartió su historial.' // i18n: Fase W2
+                    : 'No se pudo cargar el historial.'), // i18n: Fase W2
             data: (sessions) {
               // isCompletedSession excluye sesiones abandonadas (status=finished
               // pero wasFullyCompleted=false) para no divergir del historial del

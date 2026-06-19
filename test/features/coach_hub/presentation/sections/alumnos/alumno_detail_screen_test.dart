@@ -5,6 +5,7 @@
 // pumped with stubbed providers (no Firestore, no GoRouter needed since we
 // don't tap the back link).
 
+import 'package:cloud_firestore/cloud_firestore.dart' show FirebaseException;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -214,6 +215,7 @@ Future<void> _pump(
   List<PerformanceTest> performanceTests = const [],
   Object? performanceError,
   List<SetLog> setLogs = const [],
+  Object? sessionsError,
 }) async {
   tester.view.physicalSize = const Size(1200, 900);
   tester.view.devicePixelRatio = 1.0;
@@ -238,7 +240,10 @@ Future<void> _pump(
                 : Stream.value(performanceTests)),
         currentUidProvider.overrideWithValue('t1'),
         assignedRoutinesProvider.overrideWith((ref, id) => routines),
-        sessionsByUidProvider.overrideWith((ref, id) => sessions),
+        sessionsByUidProvider.overrideWith((ref, id) {
+          if (sessionsError != null) throw sessionsError;
+          return sessions;
+        }),
         coachSessionSetLogsProvider.overrideWith((ref, key) async => setLogs),
         if (paymentRepo != null)
           paymentRepositoryProvider.overrideWithValue(paymentRepo),
@@ -382,6 +387,25 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Sentadilla'), findsOneWidget);
+    });
+
+    testWidgets(
+        'Entrenamientos: alumno no compartió → mensaje claro (no error genérico)',
+        (tester) async {
+      await _pump(
+        tester,
+        profile: _prof(),
+        link: _link(TrainerLinkStatus.active),
+        sessionsError: FirebaseException(
+            plugin: 'cloud_firestore', code: 'permission-denied'),
+      );
+
+      await tester.tap(find.descendant(
+          of: find.byType(TabBar), matching: find.text('Entrenamientos')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('El alumno no compartió su historial.'), findsOneWidget);
+      expect(find.text('No se pudo cargar el historial.'), findsNothing);
     });
 
     testWidgets('Progreso muestra antropometría', (tester) async {
