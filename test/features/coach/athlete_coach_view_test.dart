@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/features/chat/application/chat_providers.dart';
 import 'package:treino/features/coach/application/trainer_discovery_providers.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/athlete_coach_view.dart';
@@ -385,5 +386,47 @@ void main() {
         expect(resolveCount, greaterThan(resolveCountBefore));
       },
     );
+  });
+
+  // ── Unread dot on coach card (athlete side) ────────────────────────────────
+
+  group('AthleteCoachView — unread dot on coach card', () {
+    testWidgets(
+        'hasUnreadFromProvider(trainerId) true → unread dot on coach card',
+        (tester) async {
+      const trainerId = 'trainer-1';
+      await tester.pumpWidget(_wrap(
+        const AthleteCoachViewTestHarness(),
+        overrides: [
+          currentAthleteLinkProvider
+              .overrideWith((ref) async => _makeLink(trainerId: trainerId)),
+          userPublicProfileProvider(trainerId)
+              .overrideWith((ref) => Stream.value(_makePub())),
+          hasUnreadFromProvider(trainerId).overrideWith((ref) => true),
+        ],
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('unread-dot-trainer-1')), findsOneWidget);
+    });
+
+    testWidgets(
+        'hasUnreadFromProvider(trainerId) false → no unread dot on coach card',
+        (tester) async {
+      const trainerId = 'trainer-1';
+      await tester.pumpWidget(_wrap(
+        const AthleteCoachViewTestHarness(),
+        overrides: [
+          currentAthleteLinkProvider
+              .overrideWith((ref) async => _makeLink(trainerId: trainerId)),
+          userPublicProfileProvider(trainerId)
+              .overrideWith((ref) => Stream.value(_makePub())),
+          hasUnreadFromProvider(trainerId).overrideWith((ref) => false),
+        ],
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('unread-dot-trainer-1')), findsNothing);
+    });
   });
 }

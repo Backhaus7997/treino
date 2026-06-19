@@ -177,6 +177,7 @@ class _LinkStateCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
     final pubAsync = ref.watch(userPublicProfileProvider(link.trainerId));
+    final hasUnread = ref.watch(hasUnreadFromProvider(link.trainerId));
 
     return ListView(
       // + bottom inset: the floating bar overlays the body (extendBody),
@@ -207,7 +208,8 @@ class _LinkStateCard extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: 14),
-              _TrainerHeader(pubAsync: pubAsync, link: link),
+              _TrainerHeader(
+                  pubAsync: pubAsync, link: link, hasUnread: hasUnread),
               if (link.status == TrainerLinkStatus.active) ...[
                 const SizedBox(height: 14),
                 _ShareToggle(link: link),
@@ -234,9 +236,14 @@ class _LinkStateCard extends ConsumerWidget {
 }
 
 class _TrainerHeader extends StatelessWidget {
-  const _TrainerHeader({required this.pubAsync, required this.link});
+  const _TrainerHeader({
+    required this.pubAsync,
+    required this.link,
+    this.hasUnread = false,
+  });
   final AsyncValue<UserPublicProfile?> pubAsync;
   final TrainerLink link;
+  final bool hasUnread;
 
   @override
   Widget build(BuildContext context) {
@@ -251,20 +258,46 @@ class _TrainerHeader extends StatelessWidget {
       behavior: HitTestBehavior.opaque,
       child: Row(
         children: [
-          Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: palette.bg,
-              border: Border.all(color: palette.border, width: 1),
-            ),
-            alignment: Alignment.center,
-            child: Icon(
-              TreinoIcon.tabProfile,
-              size: 28,
-              color: palette.textMuted,
-            ),
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: palette.bg,
+                  border: Border.all(color: palette.border, width: 1),
+                ),
+                alignment: Alignment.center,
+                child: Icon(
+                  TreinoIcon.tabProfile,
+                  size: 28,
+                  color: palette.textMuted,
+                ),
+              ),
+              if (hasUnread)
+                Positioned(
+                  top: 0,
+                  right: 0,
+                  child: Semantics(
+                    label: 'Sin leer',
+                    child: Container(
+                      key: Key('unread-dot-${link.trainerId}'),
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(
+                        color: palette.accent,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: palette.bgCard,
+                          width: 1.5,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
           const SizedBox(width: 14),
           Expanded(
