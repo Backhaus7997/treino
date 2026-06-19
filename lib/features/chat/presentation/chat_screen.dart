@@ -3,6 +3,7 @@ import 'dart:developer' as developer;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../app/theme/app_palette.dart';
@@ -206,7 +207,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         leading: IconButton(
           icon: Icon(TreinoIcon.back, color: palette.textPrimary),
           tooltip: l10n.commonBack,
-          onPressed: () => Navigator.of(context).maybePop(),
+          // Opened from a push the deep-link uses context.go() (replaces the
+          // stack), so there's nothing to pop — fall back to the chat inbox
+          // instead of a dead button.
+          onPressed: () =>
+              context.canPop() ? context.pop() : context.go('/feed/messages'),
         ),
         title: pubAsync.when(
           loading: () => const SizedBox.shrink(),
