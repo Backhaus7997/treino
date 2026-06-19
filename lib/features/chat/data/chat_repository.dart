@@ -141,6 +141,19 @@ class ChatRepository {
     });
   }
 
+  // ─── markAsRead ─────────────────────────────────────────────────────────
+  //
+  // Writes only the caller's key in the lastRead map using a dotted-path
+  // update — Firestore merges only that key, leaving sibling keys intact.
+
+  Future<void> markAsRead({
+    required String chatId,
+    required String uid,
+  }) =>
+      _chats
+          .doc(chatId)
+          .update({'lastRead.$uid': FieldValue.serverTimestamp()});
+
   // ─── watchChatsForUser ──────────────────────────────────────────────────
   //
   // Stream de chats donde el uid es miembro, ordenados por lastMessageAt
