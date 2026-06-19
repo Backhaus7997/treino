@@ -129,4 +129,106 @@ void main() {
       expect(''.toDisplayGroup(), isNull);
     });
   });
+
+  group('MuscleGroupDisplay.frontMaskAssets — body highlighting', () {
+    test('pecho → mask_front_chest', () {
+      expect(MuscleGroupDisplay.pecho.frontMaskAssets,
+          ['assets/body/mask_front_chest.png']);
+    });
+
+    test('hombros → mask_front_shoulders', () {
+      expect(MuscleGroupDisplay.hombros.frontMaskAssets,
+          ['assets/body/mask_front_shoulders.png']);
+    });
+
+    test('biceps → mask_front_biceps', () {
+      expect(MuscleGroupDisplay.biceps.frontMaskAssets,
+          ['assets/body/mask_front_biceps.png']);
+    });
+
+    test('cuadriceps → mask_front_quads', () {
+      expect(MuscleGroupDisplay.cuadriceps.frontMaskAssets,
+          ['assets/body/mask_front_quads.png']);
+    });
+
+    test('pantorrilla → mask_front_calves (also on back, see backMaskAssets)',
+        () {
+      expect(MuscleGroupDisplay.pantorrilla.frontMaskAssets,
+          ['assets/body/mask_front_calves.png']);
+    });
+
+    test('abdominales → abs + obliques (decision 2: paint all masks)', () {
+      expect(MuscleGroupDisplay.abdominales.frontMaskAssets, [
+        'assets/body/mask_front_abs.png',
+        'assets/body/mask_front_obliques.png',
+      ]);
+    });
+
+    test('espalda → empty (back-only muscle, see backMaskAssets)', () {
+      expect(MuscleGroupDisplay.espalda.frontMaskAssets, isEmpty);
+    });
+
+    test('isquiotibiales → empty (back-only muscle)', () {
+      expect(MuscleGroupDisplay.isquiotibiales.frontMaskAssets, isEmpty);
+    });
+
+    test('gluteos → empty (back-only muscle)', () {
+      expect(MuscleGroupDisplay.gluteos.frontMaskAssets, isEmpty);
+    });
+
+    test('triceps → empty (decision 1A: no mask asset yet)', () {
+      expect(MuscleGroupDisplay.triceps.frontMaskAssets, isEmpty);
+    });
+  });
+
+  group('MuscleGroupDisplay.backMaskAssets — body highlighting', () {
+    test('espalda → back + lats + lowerback (decision 2: paint all 3 masks)',
+        () {
+      expect(MuscleGroupDisplay.espalda.backMaskAssets, [
+        'assets/body/mask_back_back.png',
+        'assets/body/mask_back_lats.png',
+        'assets/body/mask_back_lowerback.png',
+      ]);
+    });
+
+    test('hombros → mask_back_shoulders (also on front)', () {
+      expect(MuscleGroupDisplay.hombros.backMaskAssets,
+          ['assets/body/mask_back_shoulders.png']);
+    });
+
+    test('isquiotibiales → mask_back_hamstrings', () {
+      expect(MuscleGroupDisplay.isquiotibiales.backMaskAssets,
+          ['assets/body/mask_back_hamstrings.png']);
+    });
+
+    test('gluteos → mask_back_glutes', () {
+      expect(MuscleGroupDisplay.gluteos.backMaskAssets,
+          ['assets/body/mask_back_glutes.png']);
+    });
+
+    test('pantorrilla → mask_back_calves (also on front)', () {
+      expect(MuscleGroupDisplay.pantorrilla.backMaskAssets,
+          ['assets/body/mask_back_calves.png']);
+    });
+
+    test('pecho → empty (front-only muscle)', () {
+      expect(MuscleGroupDisplay.pecho.backMaskAssets, isEmpty);
+    });
+
+    test('biceps → empty (front-only)', () {
+      expect(MuscleGroupDisplay.biceps.backMaskAssets, isEmpty);
+    });
+
+    test('cuadriceps → empty (front-only)', () {
+      expect(MuscleGroupDisplay.cuadriceps.backMaskAssets, isEmpty);
+    });
+
+    test('abdominales → empty (front-only)', () {
+      expect(MuscleGroupDisplay.abdominales.backMaskAssets, isEmpty);
+    });
+
+    test('triceps → empty (decision 1A: no mask asset yet)', () {
+      expect(MuscleGroupDisplay.triceps.backMaskAssets, isEmpty);
+    });
+  });
 }

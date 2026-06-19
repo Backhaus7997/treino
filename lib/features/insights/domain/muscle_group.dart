@@ -57,6 +57,70 @@ enum MuscleGroupDisplay {
     MuscleGroupDisplay.pantorrilla,
     MuscleGroupDisplay.abdominales,
   ];
+
+  /// Masks PNG bajo `assets/body/` para tintar la vista FRONTAL del cuerpo
+  /// cuando este grupo tiene sets entrenados. Cada mask se stackea sobre
+  /// `bodyfront.png` via `ColorFiltered` + accent.
+  ///
+  /// Lista vacía → este grupo no aparece en la vista frontal (e.g. glúteos
+  /// solo en la espalda, tríceps sin mask todavía).
+  ///
+  /// Decisión 2 (2026-06-19): grupos con múltiples masks (e.g. abdominales
+  /// = abs + obliques, espalda = back + lats + lowerback) se pintan todas
+  /// juntas cuando hay sets — refleja la realidad anatómica del grupo.
+  ///
+  /// Decisión 1A (2026-06-19): tríceps sin mask por ahora (no existe
+  /// `mask_back_triceps.png` en assets). TODO(assets): agregar la mask.
+  List<String> get frontMaskAssets => switch (this) {
+        MuscleGroupDisplay.pecho => const ['assets/body/mask_front_chest.png'],
+        MuscleGroupDisplay.espalda => const [],
+        MuscleGroupDisplay.hombros => const [
+            'assets/body/mask_front_shoulders.png'
+          ],
+        MuscleGroupDisplay.biceps => const [
+            'assets/body/mask_front_biceps.png'
+          ],
+        MuscleGroupDisplay.triceps => const [], // 1A: sin mask
+        MuscleGroupDisplay.cuadriceps => const [
+            'assets/body/mask_front_quads.png'
+          ],
+        MuscleGroupDisplay.isquiotibiales => const [],
+        MuscleGroupDisplay.gluteos => const [],
+        MuscleGroupDisplay.pantorrilla => const [
+            'assets/body/mask_front_calves.png'
+          ],
+        MuscleGroupDisplay.abdominales => const [
+            'assets/body/mask_front_abs.png',
+            'assets/body/mask_front_obliques.png',
+          ],
+      };
+
+  /// Masks PNG bajo `assets/body/` para tintar la vista TRASERA del cuerpo.
+  /// Misma mecánica que [frontMaskAssets].
+  List<String> get backMaskAssets => switch (this) {
+        MuscleGroupDisplay.pecho => const [],
+        MuscleGroupDisplay.espalda => const [
+            'assets/body/mask_back_back.png',
+            'assets/body/mask_back_lats.png',
+            'assets/body/mask_back_lowerback.png',
+          ],
+        MuscleGroupDisplay.hombros => const [
+            'assets/body/mask_back_shoulders.png'
+          ],
+        MuscleGroupDisplay.biceps => const [],
+        MuscleGroupDisplay.triceps => const [], // 1A: sin mask
+        MuscleGroupDisplay.cuadriceps => const [],
+        MuscleGroupDisplay.isquiotibiales => const [
+            'assets/body/mask_back_hamstrings.png'
+          ],
+        MuscleGroupDisplay.gluteos => const [
+            'assets/body/mask_back_glutes.png'
+          ],
+        MuscleGroupDisplay.pantorrilla => const [
+            'assets/body/mask_back_calves.png'
+          ],
+        MuscleGroupDisplay.abdominales => const [],
+      };
 }
 
 /// Mapping del `muscleGroup` granular del catálogo a la categoría display.
