@@ -1765,6 +1765,14 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get chatMediaImageLoadError => 'No pudimos cargar la imagen.';
+
+  @override
+  String feedMessagesWithUnreadA11y(int count) {
+    return 'Mensajes, $count sin leer';
+  }
+
+  @override
+  String get chatUnreadA11y => 'Sin leer';
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -3526,4 +3534,12 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get chatMediaImageLoadError => 'No pudimos cargar la imagen.';
+
+  @override
+  String feedMessagesWithUnreadA11y(int count) {
+    return 'Mensajes, $count sin leer';
+  }
+
+  @override
+  String get chatUnreadA11y => 'Sin leer';
 }

@@ -664,5 +664,7 @@
   "chatMediaPreviewPhoto": "📷 Photo",
   "chatMediaPreviewVideo": "🎥 Video",
   "chatMediaViewFullscreen": "View photo",
-  "chatMediaImageLoadError": "We couldn't load the image."
+  "chatMediaImageLoadError": "We couldn't load the image.",
+  "feedMessagesWithUnreadA11y": "Messages, {count} unread",
+  "chatUnreadA11y": "Unread"
 }

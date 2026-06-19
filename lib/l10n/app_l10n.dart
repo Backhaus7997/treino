@@ -3313,6 +3313,18 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'No pudimos cargar la imagen.'**
   String get chatMediaImageLoadError;
+
+  /// Accessibility label for the feed header messages icon when there are unread chats; announces the unread count to screen readers.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Mensajes, {count} sin leer'**
+  String feedMessagesWithUnreadA11y(int count);
+
+  /// Accessibility label for the unread dot indicator shown on a _ChatRow in the chat inbox list.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Sin leer'**
+  String get chatUnreadA11y;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

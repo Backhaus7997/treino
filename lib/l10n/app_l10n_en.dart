@@ -1716,4 +1716,12 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get chatMediaImageLoadError => 'We couldn\'t load the image.';
+
+  @override
+  String feedMessagesWithUnreadA11y(int count) {
+    return 'Messages, $count unread';
+  }
+
+  @override
+  String get chatUnreadA11y => 'Unread';
 }
