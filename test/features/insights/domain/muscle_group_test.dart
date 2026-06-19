@@ -176,7 +176,7 @@ void main() {
       expect(MuscleGroupDisplay.gluteos.frontMaskAssets, isEmpty);
     });
 
-    test('triceps → empty (decision 1A: no mask asset yet)', () {
+    test('triceps → empty (back-only muscle, see backMaskAssets)', () {
       expect(MuscleGroupDisplay.triceps.frontMaskAssets, isEmpty);
     });
   });
@@ -227,8 +227,9 @@ void main() {
       expect(MuscleGroupDisplay.abdominales.backMaskAssets, isEmpty);
     });
 
-    test('triceps → empty (decision 1A: no mask asset yet)', () {
-      expect(MuscleGroupDisplay.triceps.backMaskAssets, isEmpty);
+    test('triceps → mask_back_triceps', () {
+      expect(MuscleGroupDisplay.triceps.backMaskAssets,
+          ['assets/body/mask_back_triceps.png']);
     });
   });
 }

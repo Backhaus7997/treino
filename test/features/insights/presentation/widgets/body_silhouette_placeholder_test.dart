@@ -125,7 +125,7 @@ void main() {
     });
 
     testWidgets(
-        'triceps with sets → NO mask stacked (decision 1A: no asset yet)',
+        'triceps with sets → mask_back_triceps stacks on back view only',
         (tester) async {
       await tester.pumpWidget(_wrap(
         const BodySilhouettePlaceholder(
@@ -136,8 +136,9 @@ void main() {
           targetByGroup: {MuscleGroupDisplay.triceps: 6},
         ),
       ));
-      // No tríceps mask exists → silhouette is the only PNG per view.
-      expect(_countMasksContaining(tester, 'mask_'), 0);
+      expect(_countMasksContaining(tester, 'mask_back_triceps'), 1);
+      // Tríceps is back-only — no front mask.
+      expect(_countMasksContaining(tester, 'mask_front_'), 0);
     });
 
     testWidgets('group with 0 sets → mask is NOT stacked', (tester) async {
