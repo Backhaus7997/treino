@@ -3373,6 +3373,24 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'El alumno no compartió su historial todavía.'**
   String get coachAthleteNoSharePlaceholder;
+
+  /// Toolbar title for the avatar cropper modal (iOS, Android, web).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Recortar foto'**
+  String get avatarCropperTitle;
+
+  /// Confirm button label in the avatar cropper modal.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'LISTO'**
+  String get avatarCropperDone;
+
+  /// Cancel button label in the avatar cropper modal.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CANCELAR'**
+  String get avatarCropperCancel;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

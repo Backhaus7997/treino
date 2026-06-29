@@ -7,6 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../app/theme/app_palette.dart';
+import '../../../core/image/avatar_cropper.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../auth/application/auth_providers.dart';
@@ -157,9 +158,16 @@ class _ProfileEditPersonalScreenState
       maxWidth: 800,
       imageQuality: 85,
     );
-    if (file != null && mounted) {
-      setState(() => _pendingLocalPath = file.path);
-    }
+    if (file == null || !mounted) return;
+    // Open the cropper with a circular preview and 1:1 lock. A null return
+    // means the user cancelled the crop UI — fall back to keeping whatever
+    // pending path was there before (the picker pick is discarded).
+    final cropped = await AvatarCropper().cropToSquare(
+      sourcePath: file.path,
+      context: context,
+    );
+    if (cropped == null || !mounted) return;
+    setState(() => _pendingLocalPath = cropped);
   }
 
   // ── Save ─────────────────────────────────────────────────────────────────
@@ -441,7 +449,8 @@ class _ProfileEditPersonalScreenState
         // ── Form ────────────────────────────────────────────────────────────
         Expanded(
           child: SingleChildScrollView(
-            padding: EdgeInsets.fromLTRB(20, 8, 20, 20 + MediaQuery.paddingOf(context).bottom),
+            padding: EdgeInsets.fromLTRB(
+                20, 8, 20, 20 + MediaQuery.paddingOf(context).bottom),
             child: Form(
               key: _formKey,
               child: Column(

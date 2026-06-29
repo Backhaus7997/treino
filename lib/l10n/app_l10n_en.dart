@@ -1750,4 +1750,13 @@ class AppL10nEn extends AppL10n {
   @override
   String get coachAthleteNoSharePlaceholder =>
       'The athlete has not shared their history yet.';
+
+  @override
+  String get avatarCropperTitle => '';
+
+  @override
+  String get avatarCropperDone => '';
+
+  @override
+  String get avatarCropperCancel => '';
 }
