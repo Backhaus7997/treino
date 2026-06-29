@@ -1365,6 +1365,15 @@ class AppL10nEn extends AppL10n {
   String get routineEditorSetTypeFailure => '';
 
   @override
+  String get routineEditorNotesLabel => 'Note for athlete';
+
+  @override
+  String get routineEditorNotesHint => 'Technique, tempo, RIR…';
+
+  @override
+  String get exerciseNoteFromCoachTag => 'FROM COACH';
+
+  @override
   String routineEditorIncompleteSetsFeedback(String exerciseName) {
     return '';
   }

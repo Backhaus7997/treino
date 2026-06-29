@@ -474,6 +474,12 @@
   "@routineEditorSetTypeDrop": {},
   "routineEditorSetTypeFailure": "",
   "@routineEditorSetTypeFailure": {},
+  "routineEditorNotesLabel": "Note for athlete",
+  "@routineEditorNotesLabel": {},
+  "routineEditorNotesHint": "Technique, tempo, RIR…",
+  "@routineEditorNotesHint": {},
+  "exerciseNoteFromCoachTag": "FROM COACH",
+  "@exerciseNoteFromCoachTag": {},
   "routineEditorIncompleteSetsFeedback": "",
   "@routineEditorIncompleteSetsFeedback": {
     "description": "SnackBar shown when the user taps save with at least one incomplete set. Names the first offending exercise.",

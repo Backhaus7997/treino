@@ -22,6 +22,7 @@ import '../domain/routine_slot.dart';
 import '../domain/set_enums.dart';
 import '../domain/set_log.dart';
 import '../domain/set_spec.dart';
+import 'widgets/coach_note.dart';
 import 'widgets/set_entry_sheet.dart';
 
 // ── Helpers de formato ────────────────────────────────────────────────────────
@@ -498,8 +499,7 @@ class _SessionHeader extends StatelessWidget {
               onTap: onBack,
               behavior: HitTestBehavior.opaque,
               child: Container(
-                constraints:
-                    const BoxConstraints(minWidth: 44, minHeight: 44),
+                constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
                 alignment: Alignment.center,
                 child: Container(
                   width: 36,
@@ -1320,8 +1320,8 @@ class _ExerciseSectionState extends State<_ExerciseSection> {
               if (_hasTechnique) ...[
                 Semantics(
                   button: true,
-                  label: l10n
-                      .sessionPlayerTechniqueA11y(widget.slot.exerciseName),
+                  label:
+                      l10n.sessionPlayerTechniqueA11y(widget.slot.exerciseName),
                   child: GestureDetector(
                     onTap: () => _showTechnique(context),
                     behavior: HitTestBehavior.opaque,
@@ -1363,6 +1363,14 @@ class _ExerciseSectionState extends State<_ExerciseSection> {
               ),
             ],
           ),
+          // PF's per-exercise note — shown only on the CURRENT exercise block
+          // (currentSetNumber != null) and only when non-empty. Read-only;
+          // distinct from the technique ⓘ via the "DEL COACH" tag.
+          if (widget.currentSetNumber != null &&
+              (widget.slot.notes?.trim().isNotEmpty ?? false)) ...[
+            const SizedBox(height: 10),
+            CoachNote(text: widget.slot.notes!),
+          ],
           const SizedBox(height: 12),
           ...rowWidgets,
         ],

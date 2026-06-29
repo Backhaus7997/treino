@@ -8,6 +8,7 @@ import '../../domain/reps_format.dart';
 import '../../domain/routine_slot.dart';
 import '../../domain/set_enums.dart';
 import '../../domain/set_spec.dart';
+import 'coach_note.dart';
 
 /// Tappeable row that displays one [RoutineSlot] inside [RoutineDetailScreen].
 /// Receives all data by constructor — no ref.watch / ref.read.
@@ -164,100 +165,112 @@ class ExerciseSlotRow extends StatelessWidget {
               borderRadius: BorderRadius.circular(16),
             ),
             padding: const EdgeInsets.all(14),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Ordinal — replaces the placeholder dumbbell icon. Same
-                // 48x48 box; the number tells the athlete the exercise order
-                // within the day.
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: palette.bgCard,
-                    border: Border.all(color: palette.border),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(
-                    '$index',
-                    style: GoogleFonts.barlowCondensed(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 22,
-                      color: palette.textPrimary,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 14),
-                // Main content
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        slot.exerciseName.toUpperCase(),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    // Ordinal — replaces the placeholder dumbbell icon. Same
+                    // 48x48 box; the number tells the athlete the exercise order
+                    // within the day.
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: palette.bgCard,
+                        border: Border.all(color: palette.border),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        '$index',
                         style: GoogleFonts.barlowCondensed(
                           fontWeight: FontWeight.w700,
-                          fontSize: 16,
-                          letterSpacing: 0.5,
+                          fontSize: 22,
                           color: palette.textPrimary,
                         ),
                       ),
-                      const SizedBox(height: 8),
-                      Row(
+                    ),
+                    const SizedBox(width: 14),
+                    // Main content
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            setsReps,
-                            style: GoogleFonts.barlow(
-                              fontWeight: FontWeight.w400,
-                              fontSize: 13,
-                              color: palette.textMuted,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Text(
-                            '·',
-                            style: GoogleFonts.barlow(
-                              fontSize: 13,
-                              color: palette.textMuted,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Text(
-                            muscleGroupLabel(slot.muscleGroup).toUpperCase(),
+                            slot.exerciseName.toUpperCase(),
                             style: GoogleFonts.barlowCondensed(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 11,
-                              letterSpacing: 1.2,
-                              color: palette.textMuted,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 16,
+                              letterSpacing: 0.5,
+                              color: palette.textPrimary,
                             ),
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Text(
+                                setsReps,
+                                style: GoogleFonts.barlow(
+                                  fontWeight: FontWeight.w400,
+                                  fontSize: 13,
+                                  color: palette.textMuted,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Text(
+                                '·',
+                                style: GoogleFonts.barlow(
+                                  fontSize: 13,
+                                  color: palette.textMuted,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Text(
+                                muscleGroupLabel(slot.muscleGroup)
+                                    .toUpperCase(),
+                                style: GoogleFonts.barlowCondensed(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 11,
+                                  letterSpacing: 1.2,
+                                  color: palette.textMuted,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Icon(
+                                TreinoIcon.timer,
+                                size: 14,
+                                color: palette.textMuted,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                '$restText descanso',
+                                style: GoogleFonts.barlow(
+                                  fontWeight: FontWeight.w400,
+                                  fontSize: 12,
+                                  color: palette.textMuted,
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Icon(
-                            TreinoIcon.timer,
-                            size: 14,
-                            color: palette.textMuted,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            '$restText descanso',
-                            style: GoogleFonts.barlow(
-                              fontWeight: FontWeight.w400,
-                              fontSize: 12,
-                              color: palette.textMuted,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(width: 12),
+                    _UltimoBadge(value: lastWeightDisplay),
+                  ],
                 ),
-                const SizedBox(width: 12),
-                _UltimoBadge(value: lastWeightDisplay),
+                // PF's per-exercise note — always shown in the routine detail
+                // when present. Read-only; "DEL COACH" tag distinguishes it.
+                if (slot.notes?.trim().isNotEmpty ?? false) ...[
+                  const SizedBox(height: 10),
+                  CoachNote(text: slot.notes!),
+                ],
               ],
             ),
           ),

@@ -2684,6 +2684,24 @@ abstract class AppL10n {
   /// **'Al fallo (F)'**
   String get routineEditorSetTypeFailure;
 
+  /// No description provided for @routineEditorNotesLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Nota para el alumno'**
+  String get routineEditorNotesLabel;
+
+  /// No description provided for @routineEditorNotesHint.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Técnica, tempo, RIR…'**
+  String get routineEditorNotesHint;
+
+  /// No description provided for @exerciseNoteFromCoachTag.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'DEL COACH'**
+  String get exerciseNoteFromCoachTag;
+
   /// SnackBar shown when the user taps save with at least one incomplete set. Names the first offending exercise.
   ///
   /// In es_AR, this message translates to:
