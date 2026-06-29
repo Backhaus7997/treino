@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -43,30 +45,55 @@ class AvatarWebUploader {
   /// descargable. Devuelve `null` si el usuario cancela el picker.
   /// Throws [AvatarTooLargeException] si supera [maxBytes].
   /// Throws [StateError] si no hay usuario autenticado.
+  ///
+  /// Mantenido para los tests pre-existentes; los call sites nuevos usan
+  /// [pickFile] + [uploadCroppedPath] para poder intercalar el cropper.
   Future<String?> pickAndUpload() async {
-    final file = await _picker.pickImage(
+    final file = await pickFile();
+    if (file == null) return null;
+    return uploadXFile(file);
+  }
+
+  /// Abre solo el picker y devuelve el [XFile] (o `null` si cancela). El
+  /// caller decide si pasarlo por un cropper antes de [uploadXFile]/
+  /// [uploadCroppedPath].
+  Future<XFile?> pickFile() {
+    return _picker.pickImage(
       source: ImageSource.gallery,
       maxWidth: 800,
       imageQuality: 85,
     );
-    if (file == null) return null;
+  }
 
+  /// Sube el path local (típicamente el devuelto por el cropper) y devuelve
+  /// la URL descargable. Misma validación de tamaño que [pickAndUpload].
+  Future<String> uploadCroppedPath(String path) async {
+    final bytes = await XFile(path).readAsBytes();
+    return _uploadBytes(bytes);
+  }
+
+  /// Sube los bytes de un [XFile] tal cual (sin pasar por crop).
+  Future<String> uploadXFile(XFile file) async {
+    final bytes = await file.readAsBytes();
+    return _uploadBytes(bytes);
+  }
+
+  Future<String> _uploadBytes(List<int> rawBytes) async {
     final user = _auth.currentUser;
     if (user == null) {
       throw StateError('No hay usuario autenticado para subir el avatar.');
     }
 
-    final bytes = await file.readAsBytes();
     // `image_picker` en web ignora maxWidth/imageQuality, así que validamos los
     // bytes reales acá (la regla de Storage admite hasta 5MB, pero el producto
     // promete 2MB).
-    if (bytes.lengthInBytes > maxBytes) {
-      throw AvatarTooLargeException(bytes.lengthInBytes);
+    if (rawBytes.length > maxBytes) {
+      throw AvatarTooLargeException(rawBytes.length);
     }
 
     final ref = _storage.ref().child('avatars/${user.uid}.jpg');
     final task = await ref.putData(
-      bytes,
+      Uint8List.fromList(rawBytes),
       SettableMetadata(contentType: 'image/jpeg'),
     );
     return task.ref.getDownloadURL();

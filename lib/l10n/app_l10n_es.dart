@@ -1800,6 +1800,15 @@ class AppL10nEs extends AppL10n {
   @override
   String get coachAthleteNoSharePlaceholder =>
       'El alumno no ha compartido su historial todavía.';
+
+  @override
+  String get avatarCropperTitle => 'Recortar foto';
+
+  @override
+  String get avatarCropperDone => 'LISTO';
+
+  @override
+  String get avatarCropperCancel => 'CANCELAR';
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -3596,4 +3605,13 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get coachAthleteNoSharePlaceholder =>
       'El alumno no compartió su historial todavía.';
+
+  @override
+  String get avatarCropperTitle => 'Recortar foto';
+
+  @override
+  String get avatarCropperDone => 'LISTO';
+
+  @override
+  String get avatarCropperCancel => 'CANCELAR';
 }

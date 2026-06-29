@@ -1107,5 +1107,17 @@
   "coachAthleteNoSharePlaceholder": "El alumno no compartió su historial todavía.",
   "@coachAthleteNoSharePlaceholder": {
     "description": "Shown when the trainer receives permission-denied loading setLogs — the athlete has not shared or revoked sharing."
+  },
+  "avatarCropperTitle": "Recortar foto",
+  "@avatarCropperTitle": {
+    "description": "Toolbar title for the avatar cropper modal (iOS, Android, web)."
+  },
+  "avatarCropperDone": "LISTO",
+  "@avatarCropperDone": {
+    "description": "Confirm button label in the avatar cropper modal."
+  },
+  "avatarCropperCancel": "CANCELAR",
+  "@avatarCropperCancel": {
+    "description": "Cancel button label in the avatar cropper modal."
   }
 }

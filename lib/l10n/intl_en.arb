@@ -677,5 +677,8 @@
   "coachSessionTapToExpand": "View sets",
   "coachSessionSetLogsEmpty": "This session has no logged sets.",
   "coachSessionSetLogsLoadError": "Could not load sets. Please try again.",
-  "coachAthleteNoSharePlaceholder": "The athlete has not shared their history yet."
+  "coachAthleteNoSharePlaceholder": "The athlete has not shared their history yet.",
+  "avatarCropperTitle": "",
+  "avatarCropperDone": "",
+  "avatarCropperCancel": ""
 }
