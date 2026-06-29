@@ -1413,6 +1413,15 @@ class AppL10nEs extends AppL10n {
   String get routineEditorSetTypeFailure => '';
 
   @override
+  String get routineEditorNotesLabel => 'Nota para el alumno';
+
+  @override
+  String get routineEditorNotesHint => 'Técnica, tempo, RIR…';
+
+  @override
+  String get exerciseNoteFromCoachTag => 'DEL COACH';
+
+  @override
   String routineEditorIncompleteSetsFeedback(String exerciseName) {
     return 'Completá los sets de \"$exerciseName\" antes de guardar.';
   }
@@ -3200,6 +3209,15 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get routineEditorSetTypeFailure => 'Al fallo (F)';
+
+  @override
+  String get routineEditorNotesLabel => 'Nota para el alumno';
+
+  @override
+  String get routineEditorNotesHint => 'Técnica, tempo, RIR…';
+
+  @override
+  String get exerciseNoteFromCoachTag => 'DEL COACH';
 
   @override
   String routineEditorIncompleteSetsFeedback(String exerciseName) {

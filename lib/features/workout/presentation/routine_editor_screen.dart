@@ -2,6 +2,7 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -143,6 +144,11 @@ class _EditableSlot {
   /// Whether this slot is present in 0-based [week].
   /// Rule: `activeWeeks.isEmpty || activeWeeks.contains(week)`.
   bool isPresentInWeek(int w) => activeWeeks.isEmpty || activeWeeks.contains(w);
+
+  /// Trainer-authored coaching note for this slot. Null means no note.
+  /// Gated to trainer modes at the UI layer (REQ-EN-002); stored and
+  /// hydrated unconditionally so notes survive athlete re-edits (REQ-EN-005).
+  String? notes;
 
   // ── Legacy scalar fields — kept for backward compat on submit ──────────────
   // These are now derived from [weeklySets] in _submit(); callers outside
@@ -314,6 +320,8 @@ RoutineSlot buildRoutineSlot(_EditableSlot s, int? effectiveGroup) {
     // Presence mask: sorted for deterministic wire output (ADR-WPRES-07).
     // Empty set → empty list → present in all weeks (backward compat).
     activeWeeks: (s.activeWeeks.toList()..sort()),
+    // Emit coaching note; normalize empty/whitespace to null (REQ-EN-003).
+    notes: (s.notes?.trim().isNotEmpty ?? false) ? s.notes!.trim() : null,
   );
 }
 
@@ -539,7 +547,10 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
             ..supersetGroup = slot.supersetGroup
             // Hydrate presence mask from the domain slot (REQ-WPRES-001).
             // Legacy docs have empty activeWeeks → empty set → all weeks.
-            ..activeWeeks = slot.activeWeeks.toSet();
+            ..activeWeeks = slot.activeWeeks.toSet()
+            // Hydrate coaching note unconditionally — data retention is
+            // mode-independent (REQ-EN-005, bug fix: notes were lost on re-edit).
+            ..notes = slot.notes;
 
           // Periodized docs hydrate every week from weeklySets; legacy docs
           // hydrate week 0 from effectiveSets so the original prescription
@@ -1800,6 +1811,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                                   weekSets.every((s) => isSetValid(
                                       s, slot.exerciseMode, slot.repMode));
                             },
+                            isTrainerMode: _isTrainerMode,
                           ),
                           const SizedBox(height: 6),
                         ],
@@ -2110,6 +2122,7 @@ class _DayExpansionTile extends StatefulWidget {
     this.allowSuperset = false,
     this.onAddSuperset,
     this.slotIsValid,
+    this.isTrainerMode = false,
   });
 
   final _EditableDay day;
@@ -2132,6 +2145,11 @@ class _DayExpansionTile extends StatefulWidget {
   /// Returns true when [slot] has no incomplete sets for the currently viewed
   /// week. Used to drive red affordances in the slot and day-header cards.
   final bool Function(_EditableSlot slot)? slotIsValid;
+
+  /// When true, slot editors show trainer-only fields (e.g. coaching note).
+  /// Defaults to false (fail-closed) so caller must opt in explicitly.
+  /// REQ-EN-002.
+  final bool isTrainerMode;
 
   @override
   State<_DayExpansionTile> createState() => _DayExpansionTileState();
@@ -2183,6 +2201,7 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
           hasSlotError: widget.slotIsValid != null
               ? !widget.slotIsValid!(slot)
               : false,
+          isTrainerMode: widget.isTrainerMode,
         ));
       } else {
         // Superset block — the whole block moves as one unit. Only the
@@ -2202,6 +2221,7 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
           onMoveUp: () => _moveBlock(b, -1),
           onMoveDown: () => _moveBlock(b, 1),
           slotIsValid: widget.slotIsValid,
+          isTrainerMode: widget.isTrainerMode,
         ));
       }
       rows.add(const SizedBox(height: 8));
@@ -2406,6 +2426,7 @@ class _SupersetGroupCard extends StatelessWidget {
     this.onMoveUp,
     this.onMoveDown,
     this.slotIsValid,
+    this.isTrainerMode = false,
   });
 
   final List<({int index, _EditableSlot slot})> groupSlots;
@@ -2428,6 +2449,9 @@ class _SupersetGroupCard extends StatelessWidget {
 
   /// Returns true when [slot] is valid for the current week.
   final bool Function(_EditableSlot slot)? slotIsValid;
+
+  /// When true, slot editors show trainer-only fields (e.g. coaching note).
+  final bool isTrainerMode;
 
   @override
   Widget build(BuildContext context) {
@@ -2492,6 +2516,7 @@ class _SupersetGroupCard extends StatelessWidget {
               hasSlotError: slotIsValid != null
                   ? !slotIsValid!(groupSlots[mi].slot)
                   : false,
+              isTrainerMode: isTrainerMode,
             ),
             if (mi < groupSlots.length - 1) const SizedBox(height: 8),
           ],
@@ -2585,6 +2610,7 @@ class _SlotEditor extends StatefulWidget {
     this.onMoveUp,
     this.onMoveDown,
     this.hasSlotError = false,
+    this.isTrainerMode = false,
   });
 
   final _EditableSlot slot;
@@ -2611,6 +2637,10 @@ class _SlotEditor extends StatefulWidget {
   /// True when this slot has at least one incomplete set in the viewed week.
   /// Drives a subtle red left border so the user can find it when scrolling.
   final bool hasSlotError;
+
+  /// When true, shows trainer-only fields (e.g. coaching note).
+  /// Defaults to false (fail-closed). REQ-EN-002.
+  final bool isTrainerMode;
 
   @override
   State<_SlotEditor> createState() => _SlotEditorState();
@@ -2763,6 +2793,30 @@ class _SlotEditorState extends State<_SlotEditor> {
             ],
           ),
           const SizedBox(height: 12),
+
+          // ── Coaching note (trainer modes only) ────────────────────────────
+          // Gated by isTrainerMode — absent from tree in SelfCreating mode.
+          // REQ-EN-002, REQ-EN-004.
+          if (widget.isTrainerMode) ...[
+            TextFormField(
+              key: const Key('slot_notes_field'),
+              initialValue: slot.notes,
+              maxLength: 200,
+              maxLengthEnforcement: MaxLengthEnforcement.enforced,
+              minLines: 1,
+              maxLines: 3,
+              decoration: InputDecoration(
+                labelText: l10n.routineEditorNotesLabel,
+                hintText: l10n.routineEditorNotesHint,
+                counterText: '',
+              ),
+              onChanged: (v) {
+                slot.notes = v.isEmpty ? null : v;
+                widget.onChanged();
+              },
+            ),
+            const SizedBox(height: 12),
+          ],
 
           // ── Set table ─────────────────────────────────────────────────────
           _SetTable(
@@ -3517,6 +3571,7 @@ class RoutineEditorTestBridge {
               int? durationSeconds,
             })>
         sets,
+    String? notes,
   }) {
     final slot = _EditableSlot()
       ..exercise = const Exercise(
@@ -3538,9 +3593,15 @@ class RoutineEditorTestBridge {
                   durationSeconds: r.durationSeconds,
                 ))
             .toList(),
-      ];
+      ]
+      ..notes = notes;
     return buildRoutineSlot(slot, null);
   }
+
+  /// Exposes the [_isTrainerMode] logic for tests.
+  /// Returns true when [mode] is [TrainerAssigning] or [TrainerTemplating].
+  static bool isTrainerModeForTest(RoutineEditorMode mode) =>
+      mode is TrainerAssigning || mode is TrainerTemplating;
 
   /// Delegates to [setChipLabel] after constructing a list of [_EditableSet]s
   /// with the specified types.
