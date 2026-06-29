@@ -605,6 +605,7 @@
   },
   "sessionPlayerTimerStartA11y": "Start timer",
   "routineEditorDeleteDayA11y": "Delete day",
+  "routineEditorEditDayNameA11y": "",
   "athleteDetailEditPlanA11y": "Edit plan",
   "athleteDetailDeletePlanA11y": "Delete plan",
   "coachMapDisabledOnlineA11y": "Map, unavailable in Online mode",

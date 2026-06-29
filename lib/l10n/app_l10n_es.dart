@@ -1600,6 +1600,9 @@ class AppL10nEs extends AppL10n {
   String get routineEditorDeleteDayA11y => 'Eliminar día';
 
   @override
+  String get routineEditorEditDayNameA11y => 'Editar nombre del día';
+
+  @override
   String get athleteDetailEditPlanA11y => 'Editar plan';
 
   @override
@@ -3407,6 +3410,9 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get routineEditorDeleteDayA11y => 'Eliminar día';
+
+  @override
+  String get routineEditorEditDayNameA11y => 'Editar nombre del día';
 
   @override
   String get athleteDetailEditPlanA11y => 'Editar plan';

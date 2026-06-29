@@ -875,6 +875,10 @@
   "@routineEditorDeleteDayA11y": {
     "description": "tooltip / Semantics label for the icon-only day-delete trash button in the routine editor (findings 25/26 day-header trash IconButton)."
   },
+  "routineEditorEditDayNameA11y": "Editar nombre del día",
+  "@routineEditorEditDayNameA11y": {
+    "description": "Tooltip + Semantics label for the icon-only pencil button next to each day's title in the routine editor. Tap turns the title into an inline TextField."
+  },
   "athleteDetailEditPlanA11y": "Editar plan",
   "@athleteDetailEditPlanA11y": {
     "description": "Accessibility label for the edit-plan icon button in the athlete detail plan card (finding 5)."
