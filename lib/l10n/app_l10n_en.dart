@@ -1724,4 +1724,21 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get chatUnreadA11y => 'Unread';
+
+  @override
+  String get coachSessionSetLogsTitle => 'SETS';
+
+  @override
+  String get coachSessionTapToExpand => 'View sets';
+
+  @override
+  String get coachSessionSetLogsEmpty => 'This session has no logged sets.';
+
+  @override
+  String get coachSessionSetLogsLoadError =>
+      'Could not load sets. Please try again.';
+
+  @override
+  String get coachAthleteNoSharePlaceholder =>
+      'The athlete has not shared their history yet.';
 }

@@ -1773,6 +1773,24 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get chatUnreadA11y => 'Sin leer';
+
+  @override
+  String get coachSessionSetLogsTitle => 'SETS';
+
+  @override
+  String get coachSessionTapToExpand => 'Ver sets';
+
+  @override
+  String get coachSessionSetLogsEmpty =>
+      'Esta sesión no tiene sets registrados.';
+
+  @override
+  String get coachSessionSetLogsLoadError =>
+      'No pudimos cargar los sets. Intenta de nuevo.';
+
+  @override
+  String get coachAthleteNoSharePlaceholder =>
+      'El alumno no ha compartido su historial todavía.';
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -3542,4 +3560,22 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get chatUnreadA11y => 'Sin leer';
+
+  @override
+  String get coachSessionSetLogsTitle => 'SETS';
+
+  @override
+  String get coachSessionTapToExpand => 'Ver sets';
+
+  @override
+  String get coachSessionSetLogsEmpty =>
+      'Esta sesión no tiene sets registrados.';
+
+  @override
+  String get coachSessionSetLogsLoadError =>
+      'No pudimos cargar los sets. Intentá de nuevo.';
+
+  @override
+  String get coachAthleteNoSharePlaceholder =>
+      'El alumno no compartió su historial todavía.';
 }

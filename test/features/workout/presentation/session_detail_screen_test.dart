@@ -329,4 +329,39 @@ void main() {
     // After pop, /workout is visible again
     expect(find.text('workout-home'), findsOneWidget);
   });
+
+  // SCENARIO-REL-001: Regression — exercise blocks still render after widget extraction.
+  // E1 = 3 sets, E2 = 2 sets: both headers visible, 5 total set rows,
+  // no edit button. This guards against regressions when _ExerciseBlock/_SetRow
+  // are replaced by the shared SessionExerciseBlock. (REQ-SETLOGS-011)
+  testWidgets(
+      'SCENARIO-REL-001: session_detail_screen renders E1+E2 correctly after SessionExerciseBlock extraction',
+      (tester) async {
+    final setLogs = [
+      _makeSetLog(exerciseName: 'Squat', setNumber: 1, reps: 5, weightKg: 120),
+      _makeSetLog(exerciseName: 'Squat', setNumber: 2, reps: 5, weightKg: 120),
+      _makeSetLog(exerciseName: 'Squat', setNumber: 3, reps: 5, weightKg: 120),
+      _makeSetLog(
+          exerciseName: 'Bench Press', setNumber: 1, reps: 8, weightKg: 80),
+      _makeSetLog(
+          exerciseName: 'Bench Press', setNumber: 2, reps: 8, weightKg: 80),
+    ];
+
+    await tester.pumpWidget(_pumpDetailScreen(
+      summaryOverride: () => (session: _makeSession(), setLogs: setLogs),
+    ));
+    await tester.pumpAndSettle();
+
+    // Both exercise headers visible.
+    expect(find.text('Squat'), findsOneWidget);
+    expect(find.text('Bench Press'), findsOneWidget);
+
+    // Set numbers 1..3 appear (at least Squat has 1,2,3).
+    expect(find.text('1'), findsWidgets);
+    expect(find.text('2'), findsWidgets);
+    expect(find.text('3'), findsOneWidget);
+
+    // No edit/delete buttons anywhere in the tree.
+    expect(find.byType(IconButton), findsOneWidget); // only the back button
+  });
 }

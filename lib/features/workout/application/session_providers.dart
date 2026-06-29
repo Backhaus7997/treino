@@ -136,6 +136,25 @@ final lastWeightByExerciseProvider =
   },
 );
 
+// ─── Coach cross-user set-log provider (REQ-SETLOGS-005) ─────────────────────
+
+/// Fetches the setLogs for a given athlete's session, for the trainer's
+/// read-only view. Keyed on a Dart record so named fields are explicit at
+/// every call site. Returns `[]` immediately when either key field is empty,
+/// without hitting Firestore. autoDispose: drops the cache when the expansion
+/// tile closes.
+final coachSessionSetLogsProvider = FutureProvider.autoDispose
+    .family<List<SetLog>, ({String athleteUid, String sessionId})>(
+        (ref, key) async {
+  if (key.athleteUid.isEmpty || key.sessionId.isEmpty) {
+    return const <SetLog>[];
+  }
+  return ref.read(sessionRepositoryProvider).listSetLogs(
+        uid: key.athleteUid,
+        sessionId: key.sessionId,
+      );
+});
+
 // ─── Periodization (Model B) — plan progress provider ────────────────────────
 
 /// Family key for [planProgressProvider].

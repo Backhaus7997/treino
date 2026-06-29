@@ -1,5 +1,3 @@
-import 'dart:async' show unawaited;
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -212,7 +210,7 @@ class _LinkStateCard extends ConsumerWidget {
                   pubAsync: pubAsync, link: link, hasUnread: hasUnread),
               if (link.status == TrainerLinkStatus.active) ...[
                 const SizedBox(height: 14),
-                _ShareToggle(link: link),
+                _ShareInfo(palette: palette),
                 const SizedBox(height: 12),
                 _AgendaButton(trainerId: link.trainerId),
                 const SizedBox(height: 16),
@@ -340,67 +338,22 @@ class _TrainerHeader extends StatelessWidget {
   }
 }
 
-// ── Share toggle — privacy gate (REQ-COACH-LINK-007..011) ─────────────────────
+// ── Share info — historial auto-compartido (sync via CF syncSessionShareOnTrainerLink) ──
 
-class _ShareToggle extends ConsumerWidget {
-  const _ShareToggle({required this.link});
-  final TrainerLink link;
-
-  Future<void> _onChanged(
-    BuildContext context,
-    WidgetRef ref,
-    bool newValue,
-  ) async {
-    // Enabling sharing → confirmar antes (asymmetric UX: dar acceso es más
-    // delicado que revocarlo). Restaurar privacidad es low-stakes y va directo.
-    if (newValue == true) {
-      final confirmed = await _confirm(
-        context,
-        '¿Seguro?',
-        'Tu PF va a poder ver todas tus sesiones, volumen y racha. '
-            'Podés desactivarlo cuando quieras.',
-        confirmLabel: 'Compartir',
-      );
-      if (!confirmed) return;
-    }
-    // 1. Update the link flag (Firestore rule validates athlete == caller).
-    await ref
-        .read(trainerLinkRepositoryProvider)
-        .setSharedWithTrainer(link.id, newValue);
-
-    // 2. Keep session_shares/{athleteId} in sync with the toggle.
-    //    Best-effort: we don't block the UX on this write.
-    final shareRepo = ref.read(sessionShareRepositoryProvider);
-    if (newValue) {
-      unawaited(
-        shareRepo.grant(
-          athleteId: link.athleteId,
-          trainerId: link.trainerId,
-        ),
-      );
-    } else {
-      unawaited(shareRepo.revoke(link.athleteId));
-    }
-
-    ref.invalidate(currentAthleteLinkProvider);
-  }
+class _ShareInfo extends StatelessWidget {
+  const _ShareInfo({required this.palette});
+  final AppPalette palette;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final palette = AppPalette.of(context);
-    return SwitchListTile(
-      contentPadding: EdgeInsets.zero,
-      title: Text(
-        'Compartir historial con mi PF',
-        style: GoogleFonts.barlow(
-          fontWeight: FontWeight.w600,
-          fontSize: 14,
-          color: palette.textPrimary,
-        ),
+  Widget build(BuildContext context) {
+    return Text(
+      'Tu PF puede ver tu historial de entrenamiento.',
+      style: GoogleFonts.barlow(
+        fontStyle: FontStyle.italic,
+        fontWeight: FontWeight.w400,
+        fontSize: 13,
+        color: palette.textMuted,
       ),
-      value: link.sharedWithTrainer,
-      activeThumbColor: palette.accent,
-      onChanged: (v) => _onChanged(context, ref, v),
     );
   }
 }

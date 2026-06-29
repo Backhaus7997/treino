@@ -291,5 +291,10 @@
   "chatMediaViewFullscreen": "Ver foto",
   "chatMediaImageLoadError": "No pudimos cargar la imagen.",
   "feedMessagesWithUnreadA11y": "Mensajes, {count} sin leer",
-  "chatUnreadA11y": "Sin leer"
+  "chatUnreadA11y": "Sin leer",
+  "coachSessionSetLogsTitle": "SETS",
+  "coachSessionTapToExpand": "Ver sets",
+  "coachSessionSetLogsEmpty": "Esta sesión no tiene sets registrados.",
+  "coachSessionSetLogsLoadError": "No pudimos cargar los sets. Intenta de nuevo.",
+  "coachAthleteNoSharePlaceholder": "El alumno no ha compartido su historial todavía."
 }

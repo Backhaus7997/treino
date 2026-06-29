@@ -3325,6 +3325,36 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Sin leer'**
   String get chatUnreadA11y;
+
+  /// Section heading inside the session expansion tile in the trainer's Entrenamientos tab.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'SETS'**
+  String get coachSessionSetLogsTitle;
+
+  /// Call-to-action hint on a finished-session row, inviting the trainer to expand it.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ver sets'**
+  String get coachSessionTapToExpand;
+
+  /// Empty state shown when the athlete's session has no logged sets.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Esta sesión no tiene sets registrados.'**
+  String get coachSessionSetLogsEmpty;
+
+  /// Generic error shown when loading setLogs fails for a non-permission reason.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cargar los sets. Intentá de nuevo.'**
+  String get coachSessionSetLogsLoadError;
+
+  /// Shown when the trainer receives permission-denied loading setLogs — the athlete has not shared or revoked sharing.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'El alumno no compartió su historial todavía.'**
+  String get coachAthleteNoSharePlaceholder;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

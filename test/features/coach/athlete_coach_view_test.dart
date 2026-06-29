@@ -3,14 +3,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/chat/application/chat_providers.dart';
 import 'package:treino/features/coach/application/trainer_discovery_providers.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/athlete_coach_view.dart';
-import 'package:treino/features/coach/data/session_share_repository.dart';
-import 'package:treino/features/coach/data/trainer_link_repository.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach/presentation/trainers_list_screen.dart';
@@ -19,34 +16,15 @@ import 'package:treino/features/profile/application/user_public_profile_provider
 import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
-class _MockTrainerLinkRepository extends Mock
-    implements TrainerLinkRepository {}
-
-/// No-op share repo so the toggle's grant/revoke never touches Firestore.
-class _FakeSessionShareRepository implements SessionShareRepository {
-  @override
-  Future<void> grant({
-    required String athleteId,
-    required String trainerId,
-  }) async {}
-
-  @override
-  Future<void> revoke(String athleteId) async {}
-}
-
 Widget _wrap(Widget child, {List<Override> overrides = const []}) =>
     ProviderScope(
       overrides: [
-        // Keep Firestore out of these widget tests. Both the payments "Tu cuota"
-        // section (miCuotaProvider) and the share toggle's grant/revoke
-        // (sessionShareRepositoryProvider) read firestoreProvider, which has no
-        // Firebase app in unit tests. Test-specific overrides below win (last
-        // override for a provider takes precedence).
+        // Keep Firestore out of these widget tests. The payments "Tu cuota"
+        // section (miCuotaProvider) reads firestoreProvider, which has no
+        // Firebase app in unit tests.
         miCuotaProvider.overrideWith(
           (ref) => const AsyncValue<MiCuotaState?>.data(null),
         ),
-        sessionShareRepositoryProvider
-            .overrideWithValue(_FakeSessionShareRepository()),
         ...overrides,
       ],
       child: MaterialApp(
@@ -213,41 +191,40 @@ void main() {
     });
   });
 
-  // ── sharedWithTrainer toggle (Fase 5 · Tech Debt) ─────────────────────────
+  // ── Auto-share info label (replaces manual toggle) ────────────────────────
+  //
+  // The "Compartir historial con mi PF" toggle was removed in
+  // trainer-athlete-set-logs. History is now auto-shared via the
+  // syncSessionShareOnTrainerLink Cloud Function when the link is active.
+  // The UI shows a static informational label instead.
 
-  group('sharedWithTrainer toggle', () {
-    setUpAll(() {
-      // Required by mocktail.any() for non-primitive types if needed.
-    });
-
+  group('auto-share info label', () {
     testWidgets(
-      'SCENARIO-469: toggle visible cuando status == active',
+      'active link → shows informational share text (no toggle)',
       (tester) async {
-        final mockRepo = _MockTrainerLinkRepository();
         await tester.pumpWidget(_wrap(
           const AthleteCoachView(),
           overrides: [
-            currentAthleteLinkProvider.overrideWith(
-                (ref) async => _makeLink(sharedWithTrainer: false)),
+            currentAthleteLinkProvider.overrideWith((ref) async => _makeLink()),
             userPublicProfileProvider('trainer-1')
                 .overrideWith((ref) => Stream.value(_makePub())),
-            trainerLinkRepositoryProvider.overrideWithValue(mockRepo),
           ],
         ));
         await tester.pumpAndSettle();
 
         expect(
-          find.text('Compartir historial con mi PF'),
+          find.text('Tu PF puede ver tu historial de entrenamiento.'),
           findsOneWidget,
         );
-        expect(find.byType(SwitchListTile), findsOneWidget);
+        // No toggle present.
+        expect(find.byType(SwitchListTile), findsNothing);
+        expect(find.text('Compartir historial con mi PF'), findsNothing);
       },
     );
 
     testWidgets(
-      'SCENARIO-470: toggle ausente cuando status == pending',
+      'pending link → informational text NOT shown (label is active-only)',
       (tester) async {
-        final mockRepo = _MockTrainerLinkRepository();
         await tester.pumpWidget(_wrap(
           const AthleteCoachView(),
           overrides: [
@@ -255,135 +232,14 @@ void main() {
                 (ref) async => _makeLink(status: TrainerLinkStatus.pending)),
             userPublicProfileProvider('trainer-1')
                 .overrideWith((ref) => Stream.value(_makePub())),
-            trainerLinkRepositoryProvider.overrideWithValue(mockRepo),
           ],
         ));
         await tester.pumpAndSettle();
 
-        expect(find.text('Compartir historial con mi PF'), findsNothing);
-        expect(find.byType(SwitchListTile), findsNothing);
-      },
-    );
-
-    testWidgets(
-      'SCENARIO-471: toggle.value == true cuando link.sharedWithTrainer == true',
-      (tester) async {
-        final mockRepo = _MockTrainerLinkRepository();
-        await tester.pumpWidget(_wrap(
-          const AthleteCoachView(),
-          overrides: [
-            currentAthleteLinkProvider.overrideWith(
-                (ref) async => _makeLink(sharedWithTrainer: true)),
-            userPublicProfileProvider('trainer-1')
-                .overrideWith((ref) => Stream.value(_makePub())),
-            trainerLinkRepositoryProvider.overrideWithValue(mockRepo),
-          ],
-        ));
-        await tester.pumpAndSettle();
-
-        final tile = tester.widget<SwitchListTile>(find.byType(SwitchListTile));
-        expect(tile.value, isTrue);
-      },
-    );
-
-    testWidgets(
-      'SCENARIO-472: tap toggle (off → on) muestra dialog y NO llama repo aún',
-      (tester) async {
-        final mockRepo = _MockTrainerLinkRepository();
-        when(() => mockRepo.setSharedWithTrainer(any(), any()))
-            .thenAnswer((_) async {});
-
-        await tester.pumpWidget(_wrap(
-          const AthleteCoachView(),
-          overrides: [
-            currentAthleteLinkProvider.overrideWith(
-                (ref) async => _makeLink(sharedWithTrainer: false)),
-            userPublicProfileProvider('trainer-1')
-                .overrideWith((ref) => Stream.value(_makePub())),
-            trainerLinkRepositoryProvider.overrideWithValue(mockRepo),
-          ],
-        ));
-        await tester.pumpAndSettle();
-
-        await tester.tap(find.byType(SwitchListTile));
-        await tester.pumpAndSettle();
-
-        // Dialog body debe contener la frase clave del copy.
         expect(
-          find.textContaining('sesiones, volumen y racha'),
-          findsOneWidget,
+          find.text('Tu PF puede ver tu historial de entrenamiento.'),
+          findsNothing,
         );
-        // Repo aún NO se llamó.
-        verifyNever(() => mockRepo.setSharedWithTrainer(any(), any()));
-      },
-    );
-
-    testWidgets(
-      'SCENARIO-473: confirmar dialog → llama repo(true) e invalida provider',
-      (tester) async {
-        final mockRepo = _MockTrainerLinkRepository();
-        when(() => mockRepo.setSharedWithTrainer(any(), any()))
-            .thenAnswer((_) async {});
-
-        // Track invalidaciones del provider: contamos cuántas veces fue refetcheado.
-        var resolveCount = 0;
-        await tester.pumpWidget(_wrap(
-          const AthleteCoachView(),
-          overrides: [
-            currentAthleteLinkProvider.overrideWith((ref) async {
-              resolveCount++;
-              return _makeLink(sharedWithTrainer: false);
-            }),
-            userPublicProfileProvider('trainer-1')
-                .overrideWith((ref) => Stream.value(_makePub())),
-            trainerLinkRepositoryProvider.overrideWithValue(mockRepo),
-          ],
-        ));
-        await tester.pumpAndSettle();
-        final resolveCountBefore = resolveCount;
-
-        await tester.tap(find.byType(SwitchListTile));
-        await tester.pumpAndSettle();
-
-        await tester.tap(find.widgetWithText(ElevatedButton, 'Compartir'));
-        await tester.pumpAndSettle();
-
-        verify(() => mockRepo.setSharedWithTrainer('link-1', true)).called(1);
-        // Provider invalidado → re-resolvió al menos una vez más.
-        expect(resolveCount, greaterThan(resolveCountBefore));
-      },
-    );
-
-    testWidgets(
-      'SCENARIO-474: tap toggle (on → off) NO muestra dialog y llama repo(false)',
-      (tester) async {
-        final mockRepo = _MockTrainerLinkRepository();
-        when(() => mockRepo.setSharedWithTrainer(any(), any()))
-            .thenAnswer((_) async {});
-
-        var resolveCount = 0;
-        await tester.pumpWidget(_wrap(
-          const AthleteCoachView(),
-          overrides: [
-            currentAthleteLinkProvider.overrideWith((ref) async {
-              resolveCount++;
-              return _makeLink(sharedWithTrainer: true);
-            }),
-            userPublicProfileProvider('trainer-1')
-                .overrideWith((ref) => Stream.value(_makePub())),
-            trainerLinkRepositoryProvider.overrideWithValue(mockRepo),
-          ],
-        ));
-        await tester.pumpAndSettle();
-        final resolveCountBefore = resolveCount;
-
-        await tester.tap(find.byType(SwitchListTile));
-        await tester.pumpAndSettle();
-
-        // NO debe aparecer el dialog → el body del confirm no está en el árbol.
-        expect(find.textContaining('sesiones, volumen y racha'), findsNothing);
-        verify(() => mockRepo.setSharedWithTrainer('link-1', false)).called(1);
-        expect(resolveCount, greaterThan(resolveCountBefore));
       },
     );
   });
