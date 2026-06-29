@@ -1,0 +1,3 @@
+=== DUPLICADOS SEGUROS: mismo NOMBRE en español ===
+
+Total grupos con nombre ES idéntico: 0

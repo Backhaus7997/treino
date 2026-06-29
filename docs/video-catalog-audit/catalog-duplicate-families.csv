@@ -1,0 +1,55 @@
+family,count,ids,names,sources
+squat,7,squat-band|squat-barbell|squat-bodyweight|squat-dumbbell|squat-machine|squat-smith-machine|squat-suspension,Squat (Band)|Squat (Barbell)|Squat (Bodyweight)|Squat (Dumbbell)|Squat (Machine)|Squat (Smith Machine)|Squat (Suspension),catalog-json
+bicep-curl,6,bicep-curl|bicep-curl-barbell|bicep-curl-cable|bicep-curl-dumbbell|bicep-curl-machine|bicep-curl-suspension,Bicep Curl|Bicep Curl (Barbell)|Bicep Curl (Cable)|Bicep Curl (Dumbbell)|Bicep Curl (Machine)|Bicep Curl (Suspension),catalog-json
+deadlift,5,deadlift-band|deadlift-barbell|deadlift-dumbbell|deadlift-smith-machine|deadlift-trap-bar,Deadlift (Band)|Deadlift (Barbell)|Deadlift (Dumbbell)|Deadlift (Smith Machine)|Deadlift (Trap bar),catalog-json
+front-raise,5,front-raise-band|front-raise-barbell|front-raise-cable|front-raise-dumbbell|front-raise-suspension,Front Raise (Band)|Front Raise (Barbell)|Front Raise (Cable)|Front Raise (Dumbbell)|Front Raise (Suspension),catalog-json
+shrug,5,shrug-barbell|shrug-cable|shrug-dumbbell|shrug-machine|shrug-smith-machine,Shrug (Barbell)|Shrug (Cable)|Shrug (Dumbbell)|Shrug (Machine)|Shrug (Smith Machine),catalog-json
+standing-calf-raise,5,standing-calf-raise|standing-calf-raise-barbell|standing-calf-raise-dumbbell|standing-calf-raise-machine|standing-calf-raise-smith,Standing Calf Raise|Standing Calf Raise (Barbell)|Standing Calf Raise (Dumbbell)|Standing Calf Raise (Machine)|Standing Calf Raise (Smith),catalog-json
+triceps-extension,5,triceps-extension-barbell|triceps-extension-cable|triceps-extension-dumbbell|triceps-extension-machine|triceps-extension-suspension,Triceps Extension (Barbell)|Triceps Extension (Cable)|Triceps Extension (Dumbbell)|Triceps Extension (Machine)|Triceps Extension (Suspension),catalog-json
+bench-press,4,bench-press-barbell|bench-press-cable|bench-press-dumbbell|bench-press-smith-machine,Bench Press (Barbell)|Bench Press (Cable)|Bench Press (Dumbbell)|Bench Press (Smith Machine),catalog-json
+chest-fly,4,chest-fly-band|chest-fly-dumbbell|chest-fly-machine|chest-fly-suspension,Chest Fly (Band)|Chest Fly (Dumbbell)|Chest Fly (Machine)|Chest Fly (Suspension),catalog-json
+decline-bench-press,4,decline-bench-press-barbell|decline-bench-press-dumbbell|decline-bench-press-machine|decline-bench-press-smith-machine,Decline Bench Press (Barbell)|Decline Bench Press (Dumbbell)|Decline Bench Press (Machine)|Decline Bench Press (Smith Machine),catalog-json
+hip-thrust,4,hip-thrust|hip-thrust-barbell|hip-thrust-machine|hip-thrust-smith-machine,Hip Thrust|Hip Thrust (Barbell)|Hip Thrust (Machine)|Hip Thrust (Smith Machine),seed+catalog-json|catalog-json
+lateral-raise,4,lateral-raise-band|lateral-raise-cable|lateral-raise-dumbbell|lateral-raise-machine,Lateral Raise (Band)|Lateral Raise (Cable)|Lateral Raise (Dumbbell)|Lateral Raise (Machine),catalog-json
+pull-up,4,pull-up|pull-up-assisted|pull-up-band|pull-up-weighted,Pull Up|Pull Up (Assisted)|Pull Up (Band)|Pull Up (Weighted),seed+catalog-json|catalog-json
+single-leg-standing-calf-raise,4,single-leg-standing-calf-raise|single-leg-standing-calf-raise-barbell|single-leg-standing-calf-raise-dumbbell|single-leg-standing-calf-raise-machine,Single Leg Standing Calf Raise|Single Leg Standing Calf Raise (Barbell)|Single Leg Standing Calf Raise (Dumbbell)|Single Leg Standing Calf Raise (Machine),catalog-json
+sumo-squat,4,sumo-squat|sumo-squat-barbell|sumo-squat-dumbbell|sumo-squat-kettlebell,Sumo Squat|Sumo Squat (Barbell)|Sumo Squat (Dumbbell)|Sumo Squat (Kettlebell),catalog-json
+back-extension,3,back-extension-hyperextension|back-extension-machine|back-extension-weighted-hyperextension,Back Extension (Hyperextension)|Back Extension (Machine)|Back Extension (Weighted Hyperextension),catalog-json
+bent-over-row,3,bent-over-row-band|bent-over-row-barbell|bent-over-row-dumbbell,Bent Over Row (Band)|Bent Over Row (Barbell)|Bent Over Row (Dumbbell),catalog-json
+chest-dip,3,chest-dip|chest-dip-assisted|chest-dip-weighted,Chest Dip|Chest Dip (Assisted)|Chest Dip (Weighted),catalog-json
+chin-up,3,chin-up|chin-up-assisted|chin-up-weighted,Chin Up|Chin Up (Assisted)|Chin Up (Weighted),catalog-json
+crunch,3,crunch|crunch-machine|crunch-weighted,Crunch|Crunch (Machine)|Crunch (Weighted),catalog-json
+hammer-curl,3,hammer-curl-band|hammer-curl-cable|hammer-curl-dumbbell,Hammer Curl (Band)|Hammer Curl (Cable)|Hammer Curl (Dumbbell),catalog-json
+incline-bench-press,3,incline-bench-press-barbell|incline-bench-press-dumbbell|incline-bench-press-smith-machine,Incline Bench Press (Barbell)|Incline Bench Press (Dumbbell)|Incline Bench Press (Smith Machine),catalog-json
+lat-pulldown,3,lat-pulldown-band|lat-pulldown-cable|lat-pulldown-machine,Lat Pulldown (Band)|Lat Pulldown (Cable)|Lat Pulldown (Machine),catalog-json
+lunge,3,lunge|lunge-barbell|lunge-dumbbell,Lunge|Lunge (Barbell)|Lunge (Dumbbell),catalog-json
+overhead-press,3,overhead-press-barbell|overhead-press-dumbbell|overhead-press-smith-machine,Overhead Press (Barbell)|Overhead Press (Dumbbell)|Overhead Press (Smith Machine),catalog-json
+preacher-curl,3,preacher-curl-barbell|preacher-curl-dumbbell|preacher-curl-machine,Preacher Curl (Barbell)|Preacher Curl (Dumbbell)|Preacher Curl (Machine),catalog-json
+rear-delt-reverse-fly,3,rear-delt-reverse-fly-cable|rear-delt-reverse-fly-dumbbell|rear-delt-reverse-fly-machine,Rear Delt Reverse Fly (Cable)|Rear Delt Reverse Fly (Dumbbell)|Rear Delt Reverse Fly (Machine),catalog-json
+reverse-curl,3,reverse-curl-barbell|reverse-curl-cable|reverse-curl-dumbbell,Reverse Curl (Barbell)|Reverse Curl (Cable)|Reverse Curl (Dumbbell),catalog-json
+reverse-lunge,3,reverse-lunge|reverse-lunge-barbell|reverse-lunge-dumbbell,Reverse Lunge|Reverse Lunge (Barbell)|Reverse Lunge (Dumbbell),catalog-json
+triceps-dip,3,triceps-dip|triceps-dip-assisted|triceps-dip-weighted,Triceps Dip|Triceps Dip (Assisted)|Triceps Dip (Weighted),catalog-json
+upright-row,3,upright-row-barbell|upright-row-cable|upright-row-dumbbell,Upright Row (Barbell)|Upright Row (Cable)|Upright Row (Dumbbell),catalog-json
+cable-twist,2,cable-twist-down-to-up|cable-twist-up-to-down,Cable Twist (Down to up)|Cable Twist (Up to down),catalog-json
+chest-press,2,chest-press-band|chest-press-machine,Chest Press (Band)|Chest Press (Machine),catalog-json
+decline-crunch,2,decline-crunch|decline-crunch-weighted,Decline Crunch|Decline Crunch (Weighted),catalog-json
+floor-press,2,floor-press-barbell|floor-press-dumbbell,Floor Press (Barbell)|Floor Press (Dumbbell),catalog-json
+hack-squat,2,hack-squat|hack-squat-machine,Hack Squat|Hack Squat (Machine),catalog-json
+lying-neck-curls,2,lying-neck-curls|lying-neck-curls-weighted,Lying Neck Curls|Lying Neck Curls (Weighted),catalog-json
+lying-neck-extension,2,lying-neck-extension|lying-neck-extension-weighted,Lying Neck Extension|Lying Neck Extension (Weighted),catalog-json
+pullover,2,pullover-dumbbell|pullover-machine,Pullover (Dumbbell)|Pullover (Machine),catalog-json
+push-up,2,push-up|push-up-weighted,Push Up|Push Up (Weighted),catalog-json
+romanian-deadlift,2,romanian-deadlift-barbell|romanian-deadlift-dumbbell,Romanian Deadlift (Barbell)|Romanian Deadlift (Dumbbell),catalog-json
+russian-twist,2,russian-twist-bodyweight|russian-twist-weighted,Russian Twist (Bodyweight)|Russian Twist (Weighted),catalog-json
+seated-overhead-press,2,seated-overhead-press-barbell|seated-overhead-press-dumbbell,Seated Overhead Press (Barbell)|Seated Overhead Press (Dumbbell),catalog-json
+shoulder-press,2,shoulder-press-dumbbell|shoulder-press-machine-plates,Shoulder Press (Dumbbell)|Shoulder Press (Machine Plates),catalog-json
+side-bend,2,side-bend|side-bend-dumbbell,Side Bend|Side Bend (Dumbbell),catalog-json
+single-leg-hip-thrust,2,single-leg-hip-thrust|single-leg-hip-thrust-dumbbell,Single Leg Hip Thrust|Single Leg Hip Thrust (Dumbbell),catalog-json
+single-leg-romanian-deadlift,2,single-leg-romanian-deadlift-barbell|single-leg-romanian-deadlift-dumbbell,Single Leg Romanian Deadlift (Barbell)|Single Leg Romanian Deadlift (Dumbbell),catalog-json
+sit-up,2,sit-up|sit-up-weighted,Sit Up|Sit Up (Weighted),catalog-json
+skullcrusher,2,skullcrusher-barbell|skullcrusher-dumbbell,Skullcrusher (Barbell)|Skullcrusher (Dumbbell),catalog-json
+spider-curl,2,spider-curl-barbell|spider-curl-dumbbell,Spider Curl (Barbell)|Spider Curl (Dumbbell),catalog-json
+stair-machine,2,stair-machine-floors|stair-machine-steps,Stair Machine (Floors)|Stair Machine (Steps),catalog-json
+thruster,2,thruster-barbell|thruster-kettlebell,Thruster (Barbell)|Thruster (Kettlebell),catalog-json
+triceps-kickback,2,triceps-kickback-cable|triceps-kickback-dumbbell,Triceps Kickback (Cable)|Triceps Kickback (Dumbbell),catalog-json
+walking-lunge,2,walking-lunge|walking-lunge-dumbbell,Walking Lunge|Walking Lunge (Dumbbell),catalog-json

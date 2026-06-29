@@ -1,0 +1,419 @@
+V=video Storage, e=externo, -=sin video
+
+- ab-scissors                                    Tijeras abdominales
+- ab-wheel                                       Rueda abdominal
+- aerobics                                       Aeróbic
+- air-bike                                       Bicicleta de aire
+V arnold-press-dumbbell                          Press Arnold (Mancuerna)
+- around-the-world                               Around the World (Círculos con mancuernas)
+- assisted-pistol-squats                         Sentadilla pistol asistida
+- back-extension-hyperextension                  Extensión de espalda (Hiperextensión)
+V back-extension-machine                         Extensión de espalda (Máquina)
+- back-extension-weighted-hyperextension         Extensión de espalda (Hiperextensión con peso)
+- ball-slams                                     Golpes con balón medicinal
+- band-pullaparts                                Aperturas con banda
+V barbell-curl                                   Curl con barra
+V barbell-row                                    Remo con barra
+- battle-ropes                                   Cuerdas de batalla
+- behind-the-back-bicep-wrist-curl-barbell       Curl de muñeca tras la espalda (Barra)
+- behind-the-back-curl-cable                     Curl tras la espalda (Polea)
+V belt-squat-machine                             Sentadilla con cinturón (Máquina)
+V bench-dip                                      Fondo en banco
+V bench-press-barbell                            Press de banca (Barra)
+V bench-press-cable                              Press de banca (Polea)
+V bench-press-close-grip-barbell                 Press de banca agarre cerrado (Barra)
+V bench-press-dumbbell                           Press de banca (Mancuerna)
+- bench-press-smith-machine                      Press de banca (Multipower)
+- bench-press-wide-grip-barbell                  Press de banca agarre abierto (Barra)
+V bent-over-row-band                             Remo inclinado (Banda)
+V bent-over-row-barbell                          Remo inclinado (Barra)
+- bent-over-row-dumbbell                         Remo inclinado (Mancuerna)
+- bicep-curl-barbell                             Curl de bíceps (Barra)
+- bicep-curl-cable                               Curl de bíceps (Polea)
+- bicep-curl-dumbbell                            Curl de bíceps (Mancuerna)
+V bicep-curl-machine                             Curl de bíceps (Máquina)
+- bicep-curl-suspension                          Curl de bíceps (TRX)
+V bicycle-crunch                                 Crunch bicicleta
+- bicycle-crunch-raised-legs                     Crunch bicicleta con piernas elevadas
+V bird-dog                                       Bird dog (Perro de muestra)
+V box-jump                                       Salto al cajón
+- box-squat-barbell                              Sentadilla al cajón (Barra)
+- boxing                                         Boxeo
+V bulgarian-split-squat                          Sentadilla búlgara
+V burpee                                         Burpee
+- burpee-over-the-bar                            Burpee sobre la barra
+- butterfly-pec-deck                             Contractor de pecho (Pec Deck)
+- cable-core-palloff-press                       Press Pallof en polea
+V cable-crunch                                   Crunch en polea
+V cable-fly                                      Cruces en polea
+V cable-pull-through                             Pull through en polea
+- cable-twist-down-to-up                         Giro en polea (de abajo hacia arriba)
+- cable-twist-up-to-down                         Giro en polea (de arriba hacia abajo)
+- calf-extension-machine                         Extensión de gemelos (Máquina)
+- calf-press-machine                             Press de gemelos (Máquina)
+V calf-raise                                     Elevación de pantorrillas
+- chest-dip-assisted                             Fondo de pecho (Asistido)
+- chest-dip-weighted                             Fondo de pecho (Con peso)
+V chest-fly-band                                 Apertura de pecho (Banda)
+V chest-fly-dumbbell                             Apertura de pecho (Mancuerna)
+- chest-fly-machine                              Apertura de pecho (Máquina)
+V chest-fly-suspension                           Apertura de pecho (TRX)
+V chest-press-band                               Press de pecho (Banda)
+V chest-press-machine                            Press de pecho (Máquina)
+- chest-supported-incline-row-dumbbell           Remo inclinado con soporte de pecho (Mancuerna)
+- chest-supported-reverse-fly-dumbbell           Apertura inversa con soporte de pecho (Mancuerna)
+- chest-supported-y-raise-dumbbell               Elevación en Y con soporte de pecho (Mancuerna)
+V chin-up-assisted                               Dominada supina (Asistida)
+- chin-up-weighted                               Dominada supina (Con peso)
+- clamshell                                      Almeja (Clamshell)
+- clap-push-ups                                  Flexiones con palmada
+V clean                                          Cargada
+V clean-and-jerk                                 Cargada y envión
+V clean-and-press                                Cargada y press
+- clean-pull                                     Tirón de cargada
+- climbing                                       Escalada
+V close-grip-bench-press                         Press cerrado
+V concentration-curl                             Curl concentrado
+- cross-body-hammer-curl                         Curl martillo cruzado
+V crunch-machine                                 Crunch (Máquina)
+- crunch-weighted                                Crunch (Con peso)
+- curtsy-lunge-dumbbell                          Estocada cruzada (Mancuerna)
+- cycling                                        Ciclismo
+V dead-bug                                       Dead bug (Bicho muerto)
+V dead-hang                                      Colgado pasivo
+- deadlift-band                                  Peso muerto (Banda)
+V deadlift-barbell                               Peso muerto (Barra)
+- deadlift-dumbbell                              Peso muerto (Mancuerna)
+- deadlift-high-pull                             Peso muerto con tirón alto
+- deadlift-smith-machine                         Peso muerto (Multipower)
+V deadlift-trap-bar                              Peso muerto (Barra hexagonal)
+- decline-bench-press-barbell                    Press de banca declinado (Barra)
+V decline-bench-press-dumbbell                   Press de banca declinado (Mancuerna)
+- decline-bench-press-machine                    Press de banca declinado (Máquina)
+- decline-bench-press-smith-machine              Press de banca declinado (Multipower)
+V decline-chest-fly-dumbbell                     Apertura declinada (Mancuerna)
+- decline-crunch-weighted                        Crunch declinado (Con peso)
+V decline-push-up                                Flexión declinada
+- diamond-push-up                                Flexión diamante
+V downward-dog                                   Perro boca abajo
+V drag-curl                                      Curl de arrastre
+- dragon-flag                                    Dragon flag
+- dragonfly                                      Dragonfly
+- dumbbell-row                                   Remo con mancuerna
+- dumbbell-snatch                                Arranque con mancuerna
+V dumbbell-squeeze-press                         Press de presión con mancuernas
+V dumbbell-step-up                               Subida al cajón (Mancuerna)
+- elbow-to-knee                                  Codo a rodilla
+- elliptical-trainer                             Elíptica
+- ez-bar-biceps-curl                             Curl de bíceps (Barra Z)
+V face-pull                                      Jalón al rostro
+V farmers-walk                                   Caminata del granjero
+- feet-up-bench-press-barbell                    Press de banca con pies arriba (Barra)
+- fire-hydrants                                  Hidrante (Fire hydrant)
+V floor-press-barbell                            Press en el suelo (Barra)
+V floor-press-dumbbell                           Press en el suelo (Mancuerna)
+- floor-triceps-dip                              Fondo de tríceps en el suelo
+- flutter-kicks                                  Patada de tijera
+- frog-jumps                                     Saltos de rana
+- frog-pumps-dumbbell                            Empuje de glúteo rana (Mancuerna)
+- front-lever-hold                               Front lever isométrico
+- front-lever-raise                              Elevación a front lever
+V front-raise-band                               Elevación frontal (Banda)
+V front-raise-barbell                            Elevación frontal (Barra)
+- front-raise-cable                              Elevación frontal (Polea)
+V front-raise-dumbbell                           Elevación frontal (Mancuerna)
+- front-raise-suspension                         Elevación frontal (TRX)
+V front-squat                                    Sentadilla frontal
+V glute-bridge                                   Puente de glúteo
+V glute-ham-raise                                Elevación de glúteo e isquiotibial (GHR)
+V glute-kickback-machine                         Patada de glúteo (Máquina)
+- glute-kickback-on-floor                        Patada de glúteo en el suelo
+- good-morning-barbell                           Buenos días (Barra)
+V gorilla-row-kettlebell                         Remo gorila (Pesa rusa)
+V hack-squat-machine                             Sentadilla hack (Máquina)
+- hammer-curl-band                               Curl martillo (Banda)
+V hammer-curl-cable                              Curl martillo (Polea)
+V hammer-curl-dumbbell                           Curl martillo (Mancuerna)
+- handstand-hold                                 Parada de manos isométrica
+- handstand-push-up                              Flexión en parada de manos
+- hang-clean                                     Cargada colgante
+- hang-snatch                                    Arranque colgante
+V hanging-leg-raise                              Elevación de piernas colgado
+- heel-taps                                      Toques de talón
+- hex-press-dumbbell                             Press hex (Mancuerna)
+- high-knee-skips                                Skipping alto con salto
+- high-knees                                     Rodillas altas
+- hiit                                           HIIT
+- hiking                                         Senderismo
+V hip-abduction-machine                          Abducción de cadera (Máquina)
+V hip-adduction-machine                          Aducción de cadera (Máquina)
+V hip-thrust-barbell                             Empuje de cadera (Barra)
+V hip-thrust-machine                             Empuje de cadera (Máquina)
+- hip-thrust-smith-machine                       Empuje de cadera (Multipower)
+- hollow-rock                                    Hollow rock (Balanceo en hueco)
+V incline-bench-press-barbell                    Press de banca inclinado (Barra)
+V incline-bench-press-dumbbell                   Press de banca inclinado (Mancuerna)
+- incline-bench-press-smith-machine              Press de banca inclinado (Multipower)
+V incline-chest-fly-dumbbell                     Apertura inclinada (Mancuerna)
+- incline-chest-press-machine                    Press de pecho inclinado (Máquina)
+V incline-dumbbell-press                         Press inclinado con mancuernas
+- incline-push-ups                               Flexiones inclinadas
+- inverted-row                                   Remo invertido
+- iso-lateral-chest-press-machine                Press de pecho isolateral (Máquina)
+- iso-lateral-high-row-machine                   Remo alto isolateral (Máquina)
+- iso-lateral-low-row                            Remo bajo isolateral
+- iso-lateral-row-machine                        Remo isolateral (Máquina)
+- jack-knife-suspension                          Navaja (TRX)
+- jackknife-sit-up                               Abdominal navaja
+- jm-press-barbell                               Press JM (Barra)
+V jump-rope                                      Saltar la cuerda
+- jump-shrug                                     Encogimiento con salto
+V jump-squat                                     Sentadilla con salto
+V jumping-jack                                   Saltos de tijera (Jumping jack)
+- jumping-lunge                                  Estocada con salto
+- kettlebell-around-the-world                    Círculos con pesa rusa
+- kettlebell-clean                               Cargada con pesa rusa
+V kettlebell-curl                                Curl con pesa rusa
+V kettlebell-goblet-squat                        Sentadilla goblet (Pesa rusa)
+- kettlebell-halo                                Halo con pesa rusa
+- kettlebell-high-pull                           Tirón alto con pesa rusa
+- kettlebell-shoulder-press                      Press de hombros con pesa rusa
+- kettlebell-snatch                              Arranque con pesa rusa
+V kettlebell-swing                               Swing con pesa rusa
+- kettlebell-turkish-get-up                      Levantada turca con pesa rusa
+- kipping-pull-up                                Dominada kipping
+- knee-raise-parallel-bars                       Elevación de rodillas en paralelas
+V kneeling-pulldown-band                         Jalón arrodillado (Banda)
+- kneeling-push-up                               Flexión de rodillas
+- l-sit-hold                                     L-sit isométrico
+- landmine-180                                   Landmine 180
+V landmine-row                                   Remo landmine
+- landmine-squat-and-press                       Sentadilla y press landmine
+- lat-pulldown-band                              Jalón al pecho (Banda)
+- lat-pulldown-cable                             Jalón al pecho (Polea)
+- lat-pulldown-close-grip-cable                  Jalón al pecho agarre cerrado (Polea)
+V lat-pulldown-machine                           Jalón al pecho (Máquina)
+- lateral-band-walks                             Caminata lateral con banda
+- lateral-box-jump                               Salto lateral al cajón
+- lateral-leg-raises                             Elevación lateral de pierna
+V lateral-lunge                                  Estocada lateral
+V lateral-raise                                  Elevaciones laterales
+V lateral-raise-band                             Elevación lateral (Banda)
+V lateral-raise-cable                            Elevación lateral (Polea)
+V lateral-raise-dumbbell                         Elevación lateral (Mancuerna)
+V lateral-raise-machine                          Elevación lateral (Máquina)
+- lateral-squat                                  Sentadilla lateral
+V leg-curl                                       Curl femoral
+V leg-extension-machine                          Extensión de cuádriceps (Máquina)
+V leg-press-horizontal-machine                   Prensa de piernas horizontal (Máquina)
+V leg-press-machine                              Prensa de piernas (Máquina)
+- leg-raise-parallel-bars                        Elevación de piernas en paralelas
+- low-cable-fly-crossovers                       Cruces bajos en polea
+- low-row-suspension                             Remo bajo (TRX)
+- lunge-barbell                                  Estocada (Barra)
+- lunge-dumbbell                                 Estocada (Mancuerna)
+- lying-knee-raise                               Elevación de rodillas tumbado
+- lying-leg-curl-machine                         Curl femoral tumbado (Máquina)
+- lying-leg-raise                                Elevación de piernas tumbado
+- lying-neck-curls-weighted                      Flexión de cuello tumbado (Con peso)
+- lying-neck-extension-weighted                  Extensión de cuello tumbado (Con peso)
+V meadows-rows-barbell                           Remo Meadows (Barra)
+V mountain-climber                               Escalador (Mountain climber)
+- muscle-up                                      Muscle up
+- negative-pull-up                               Dominada negativa
+V nordic-hamstrings-curls                        Curl nórdico de isquiotibiales
+V oblique-crunch                                 Crunch oblicuo
+- one-arm-push-up                                Flexión a un brazo
+- overhead-curl-cable                            Curl por encima de la cabeza (Polea)
+- overhead-dumbbell-lunge                        Estocada con mancuerna sobre la cabeza
+- overhead-plate-raise                           Elevación de disco sobre la cabeza
+V overhead-press-barbell                         Press militar (Barra)
+V overhead-press-dumbbell                        Press militar (Mancuerna)
+- overhead-press-smith-machine                   Press militar (Multipower)
+V overhead-squat                                 Sentadilla sobre la cabeza
+V overhead-triceps-extension-cable               Extensión de tríceps sobre la cabeza (Polea)
+- partial-glute-bridge-barbell                   Puente de glúteo parcial (Barra)
+- pause-squat-barbell                            Sentadilla con pausa (Barra)
+- pendlay-row-barbell                            Remo Pendlay (Barra)
+V pendulum-squat-machine                         Sentadilla péndulo (Máquina)
+V pike-pushup                                    Flexión pike
+- pilates                                        Pilates
+- pinwheel-curl-dumbbell                         Curl molinete (Mancuerna)
+- pistol-squat                                   Sentadilla pistol
+V plank                                          Plancha
+- plank-pushup                                   Plancha con flexión
+- plate-curl                                     Curl con disco
+V plate-front-raise                              Elevación frontal con disco
+- plate-press                                    Press con disco
+- plate-squeeze-svend-press                      Press de disco (Svend Press)
+- power-clean                                    Cargada de potencia
+V power-snatch                                   Arranque de potencia
+- preacher-curl-barbell                          Curl predicador (Barra)
+V preacher-curl-dumbbell                         Curl predicador (Mancuerna)
+- preacher-curl-machine                          Curl predicador (Máquina)
+- press-under                                    Press under
+V pull-up                                        Dominadas
+V pull-up-assisted                               Dominada (Asistida)
+- pull-up-band                                   Dominada (Banda)
+- pull-up-weighted                               Dominada (Con peso)
+V pullover-dumbbell                              Pullover (Mancuerna)
+V pullover-machine                               Pullover (Máquina)
+V push-press                                     Push press
+- push-up-close-grip                             Flexión agarre cerrado
+- push-up-weighted                               Flexión (Con peso)
+V rack-pull                                      Rack pull (Peso muerto parcial)
+- rear-delt-reverse-fly-cable                    Apertura inversa de deltoides posterior (Polea)
+- rear-delt-reverse-fly-dumbbell                 Apertura inversa de deltoides posterior (Mancuerna)
+- rear-delt-reverse-fly-machine                  Apertura inversa de deltoides posterior (Máquina)
+- rear-kick-machine                              Patada trasera (Máquina)
+V renegade-row-dumbbell                          Remo renegado (Mancuerna)
+V reverse-crunch                                 Crunch inverso
+V reverse-curl-barbell                           Curl inverso (Barra)
+V reverse-curl-cable                             Curl inverso (Polea)
+V reverse-curl-dumbbell                          Curl inverso (Mancuerna)
+- reverse-fly-single-arm-cable                   Apertura inversa a un brazo (Polea)
+- reverse-grip-concentration-curl                Curl concentrado agarre inverso
+- reverse-grip-lat-pulldown-cable                Jalón al pecho agarre supino (Polea)
+V reverse-hyperextension                         Hiperextensión inversa
+V reverse-lunge-barbell                          Estocada inversa (Barra)
+V reverse-lunge-dumbbell                         Estocada inversa (Mancuerna)
+- reverse-plank                                  Plancha inversa
+- ring-dips                                      Fondos en anillas
+V ring-pull-up                                   Dominada en anillas
+- ring-push-up                                   Flexión en anillas
+V romanian-deadlift-barbell                      Peso muerto rumano (Barra)
+V romanian-deadlift-dumbbell                     Peso muerto rumano (Mancuerna)
+- rope-cable-curl                                Curl con cuerda en polea
+- rope-straight-arm-pulldown                     Jalón con brazos rectos y cuerda
+- rowing-machine                                 Máquina de remo
+- running                                        Correr
+V russian-twist-bodyweight                       Giro ruso (Peso corporal)
+- russian-twist-weighted                         Giro ruso (Con peso)
+- scapular-pull-ups                              Dominadas escapulares
+- seated-cable-row-bar-grip                      Remo sentado en polea (Agarre de barra)
+- seated-cable-row-bar-wide-grip                 Remo sentado en polea (Agarre abierto)
+- seated-cable-row-v-grip-cable                  Remo sentado en polea (Agarre en V)
+V seated-calf-raise                              Elevación de gemelos sentado
+- seated-chest-flys-cable                        Aperturas de pecho sentado (Polea)
+- seated-dip-machine                             Fondos en máquina sentado
+- seated-incline-curl-dumbbell                   Curl inclinado sentado (Mancuerna)
+V seated-lateral-raise-dumbbell                  Elevación lateral sentado (Mancuerna)
+V seated-leg-curl-machine                        Curl femoral sentado (Máquina)
+- seated-overhead-press-barbell                  Press militar sentado (Barra)
+V seated-overhead-press-dumbbell                 Press militar sentado (Mancuerna)
+- seated-palms-up-wrist-curl                     Curl de muñeca sentado con palmas arriba
+- seated-row-machine                             Remo sentado (Máquina)
+- seated-shoulder-press-machine                  Press de hombros sentado (Máquina)
+- seated-triceps-press                           Press de tríceps sentado
+- seated-wrist-extension-barbell                 Extensión de muñeca sentado (Barra)
+- shoulder-press-dumbbell                        Press de hombros (Mancuerna)
+- shoulder-press-machine-plates                  Press de hombros (Máquina de discos)
+- shoulder-taps                                  Toques de hombro
+V shrug-barbell                                  Encogimiento (Barra)
+- shrug-cable                                    Encogimiento (Polea)
+V shrug-dumbbell                                 Encogimiento (Mancuerna)
+V shrug-machine                                  Encogimiento (Máquina)
+- shrug-smith-machine                            Encogimiento (Multipower)
+V side-bend-dumbbell                             Inclinación lateral (Mancuerna)
+- side-plank                                     Plancha lateral
+- single-arm-cable-crossover                     Cruce en polea a un brazo
+- single-arm-cable-row                           Remo en polea a un brazo
+- single-arm-curl-cable                          Curl a un brazo (Polea)
+- single-arm-landmine-press-barbell              Press landmine a un brazo (Barra)
+- single-arm-lat-pulldown                        Jalón al pecho a un brazo
+- single-arm-lateral-raise-cable                 Elevación lateral a un brazo (Polea)
+- single-arm-tricep-extension-dumbbell           Extensión de tríceps a un brazo (Mancuerna)
+- single-arm-triceps-pushdown-cable              Empuje de tríceps a un brazo (Polea)
+- single-leg-extensions                          Extensión de cuádriceps a una pierna
+V single-leg-glute-bridge                        Puente de glúteo a una pierna
+V single-leg-hip-thrust-dumbbell                 Empuje de cadera a una pierna (Mancuerna)
+- single-leg-press-machine                       Prensa a una pierna (Máquina)
+- single-leg-romanian-deadlift-barbell           Peso muerto rumano a una pierna (Barra)
+- single-leg-romanian-deadlift-dumbbell          Peso muerto rumano a una pierna (Mancuerna)
+- single-leg-standing-calf-raise-barbell         Elevación de gemelo de pie a una pierna (Barra)
+- single-leg-standing-calf-raise-dumbbell        Elevación de gemelo de pie a una pierna (Mancuerna)
+- single-leg-standing-calf-raise-machine         Elevación de gemelo de pie a una pierna (Máquina)
+- sissy-squat-weighted                           Sentadilla sissy (Con peso)
+- sit-up                                         Abdominal completo (Sit up)
+- sit-up-weighted                                Abdominal completo (Con peso)
+- skating                                        Patinaje
+- skiing                                         Esquí
+V skull-crusher                                  Press francés
+V skullcrusher-barbell                           Rompecráneos (Barra)
+V skullcrusher-dumbbell                          Rompecráneos (Mancuerna)
+- sled-push                                      Empuje de trineo
+V snatch                                         Arranque
+- snowboarding                                   Snowboard
+- spider-curl-barbell                            Curl araña (Barra)
+V spider-curl-dumbbell                           Curl araña (Mancuerna)
+- spiderman                                      Spiderman
+- spinning                                       Spinning
+V split-jerk                                     Envión en tijera
+V split-squat-dumbbell                           Sentadilla dividida (Mancuerna)
+- sprints                                        Sprints
+V squat-band                                     Sentadilla (Banda)
+V squat-barbell                                  Sentadilla (Barra)
+V squat-bodyweight                               Sentadilla (Peso corporal)
+- squat-dumbbell                                 Sentadilla (Mancuerna)
+- squat-machine                                  Sentadilla (Máquina)
+- squat-row                                      Sentadilla con remo
+- squat-smith-machine                            Sentadilla (Multipower)
+V squat-suspension                               Sentadilla (TRX)
+- stair-machine-floors                           Escaladora (Pisos)
+- stair-machine-steps                            Escaladora (Escalones)
+- standing-cable-glute-kickbacks                 Patada de glúteo de pie en polea
+- standing-calf-raise-barbell                    Elevación de gemelos de pie (Barra)
+- standing-calf-raise-dumbbell                   Elevación de gemelos de pie (Mancuerna)
+V standing-calf-raise-machine                    Elevación de gemelos de pie (Máquina)
+- standing-calf-raise-smith                      Elevación de gemelos de pie (Multipower)
+- standing-leg-curls                             Curl femoral de pie
+- standing-military-press-barbell                Press militar de pie (Barra)
+- sternum-pull-up-gironda                        Dominada al esternón (Gironda)
+- straight-arm-lat-pulldown-cable                Jalón con brazos rectos (Polea)
+- straight-leg-deadlift                          Peso muerto con piernas rectas
+- stretching                                     Estiramientos
+V sumo-deadlift                                  Peso muerto sumo
+- sumo-squat-barbell                             Sentadilla sumo (Barra)
+V sumo-squat-dumbbell                            Sentadilla sumo (Mancuerna)
+- sumo-squat-kettlebell                          Sentadilla sumo (Pesa rusa)
+V superman                                       Superman
+- swimming                                       Natación
+- t-bar-row                                      Remo en T
+V thruster-barbell                               Thruster (Barra)
+V thruster-kettlebell                            Thruster (Pesa rusa)
+- toe-touch                                      Toque de puntas
+- toes-to-bar                                    Pies a la barra
+- torso-rotation                                 Rotación de torso
+- treadmill                                      Cinta de correr
+V tricep-pushdown                                Extensión de tríceps en polea
+- triceps-dip-assisted                           Fondo de tríceps (Asistido)
+- triceps-dip-weighted                           Fondo de tríceps (Con peso)
+- triceps-extension-barbell                      Extensión de tríceps (Barra)
+- triceps-extension-cable                        Extensión de tríceps (Polea)
+- triceps-extension-dumbbell                     Extensión de tríceps (Mancuerna)
+- triceps-extension-machine                      Extensión de tríceps (Máquina)
+- triceps-extension-suspension                   Extensión de tríceps (TRX)
+V triceps-kickback-cable                         Patada de tríceps (Polea)
+V triceps-kickback-dumbbell                      Patada de tríceps (Mancuerna)
+- triceps-pressdown                              Empuje de tríceps en polea
+V triceps-pushdown                               Empuje de tríceps
+- triceps-rope-pushdown                          Empuje de tríceps con cuerda
+V upright-row-barbell                            Remo al mentón (Barra)
+V upright-row-cable                              Remo al mentón (Polea)
+V upright-row-dumbbell                           Remo al mentón (Mancuerna)
+- v-up                                           V up (Abdominal en V)
+- vertical-traction-machine                      Tracción vertical (Máquina)
+- waiter-curl-dumbbell                           Curl camarero (Mancuerna)
+- walking                                        Caminar
+- walking-lunge-dumbbell                         Estocada caminando (Mancuerna)
+V wall-ball                                      Wall ball (Lanzamiento a la pared)
+V wall-sit                                       Sentadilla isométrica en la pared
+- warm-up                                        Calentamiento
+- wide-elbow-triceps-press-dumbbell              Press de tríceps con codos abiertos (Mancuerna)
+- wide-pull-up                                   Dominada abierta
+- wrist-roller                                   Enrollador de muñeca
+- yoga                                           Yoga
+V zercher-squat                                  Sentadilla Zercher
+V zottman-curl-dumbbell                          Curl Zottman (Mancuerna)
+
+TOTAL 415

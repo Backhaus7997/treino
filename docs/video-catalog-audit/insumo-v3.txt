@@ -1,0 +1,213 @@
+
+#### BACK ####
+  ~otro-equipo  Remo inclinado (Mancuerna)               [dumbbell]  <- female-Band-band-bent-over-row-side.mp4
+  ~otro-equipo  Remo bajo (TRX)                          [suspension]  <- female-Machine-machine-plate-loaded-low-row-side.mp4
+  ~otro-equipo  Dominada (Banda)                         [band]  <- female-Bodyweight-bodyweight-assisted-pull-up-side.mp4
+  ~otro-equipo  Encogimiento (Multipower)                [smith-machine]  <- female-Band-band-shrug-side.mp4
+  ~otro-equipo  Remo en polea a un brazo                 [bodyweight]  <- female-Cables-cable-single-arm-neutral-grip-row-side.mp4
+  ~otro-equipo  Remo en T                                [bodyweight]  <- female-Barbell-landmine-t-bar-rows-side.mp4
+  ✗no-hay       Extensión de espalda (Hiperextensión)    [bodyweight]  <- female-Bodyweight-bodyweight-tricep-extension-side.mp4
+  ✗no-hay       Extensión de espalda (Hiperextensión con peso) [bodyweight]  <- female-Bodyweight-bodyweight-tricep-extension-side.mp4
+  ✗no-hay       Remo inclinado con soporte de pecho (Mancuerna) [dumbbell]  <- female-dumbbell-incline-chest-fly-side.mp4
+  ✗no-hay       Dominada supina (Con peso)               [bodyweight]  <- female-Bodyweight-bodyweight-assisted-chin-up-side.mp4
+  ✗no-hay       Remo alto isolateral (Máquina)           [machine]  <- female-Machine-machine-neutral-row-side.mp4
+  ✗no-hay       Remo bajo isolateral                     [bodyweight]  <- female-Bodyweight-lateral-lunge-side.mp4
+  ✗no-hay       Remo isolateral (Máquina)                [machine]  <- female-Machine-machine-neutral-row-side.mp4
+  ✗no-hay       Dominada kipping                         [bodyweight]  <- female-Bodyweight-bodyweight-assisted-pull-up-side.mp4
+  ✗no-hay       Jalón al pecho (Banda)                   [band]  <- female-Band-band-kneeling-pulldown-side.mp4
+  ✗no-hay       Jalón al pecho (Polea)                   [cable]  <- female-Cables-cable-lat-prayer-side.mp4
+  ✗no-hay       Jalón al pecho agarre cerrado (Polea)    [cable]  <- female-Cables-cable-lat-prayer-side.mp4
+  ✗no-hay       Dominada negativa                        [bodyweight]  <- female-Bodyweight-bodyweight-assisted-pull-up-side.mp4
+  ✗no-hay       Dominada (Con peso)                      [bodyweight]  <- female-Bodyweight-bodyweight-assisted-pull-up-side.mp4
+  ✗no-hay       Jalón al pecho agarre supino (Polea)     [cable]  <- female-Cables-cable-bar-reverse-grip-curl-side.mp4
+  ✗no-hay       Jalón con brazos rectos y cuerda         [bodyweight]  <- female-Bodyweight-backward-arm-circle-side.mp4
+  ✗no-hay       Dominadas escapulares                    [bodyweight]  <- female-Bodyweight-bodyweight-superman-pull-side.mp4
+  ✗no-hay       Remo sentado en polea (Agarre de barra)  [bodyweight]  <- female-bodyweight-reverse-row-side.mp4
+  ✗no-hay       Remo sentado en polea (Agarre abierto)   [bodyweight]  <- female-bodyweight-reverse-row-side.mp4
+  ✗no-hay       Remo sentado en polea (Agarre en V)      [cable]  <- female-Cables-cable-v-bar-standing-row-side.mp4
+  ✗no-hay       Jalón al pecho a un brazo                [bodyweight]  <- female-Bodyweight-backward-arm-circle-side.mp4
+  ✗no-hay       Dominada al esternón (Gironda)           [bodyweight]  <- female-Bodyweight-bodyweight-assisted-pull-up-side.mp4
+  ✗no-hay       Jalón con brazos rectos (Polea)          [cable]  <- female-Cables-cable-single-arm-lat-prayer-side.mp4
+  ✗no-hay       Tracción vertical (Máquina)              [machine]  <- female-Machine-vertical-leg-press-side.mp4
+  ✗no-hay       Dominada abierta                         [bodyweight]  <- female-Bodyweight-bodyweight-assisted-pull-up-side.mp4
+
+#### BICEPS ####
+  ~otro-equipo  Curl tras la espalda (Polea)             [cable]  <- female-barbell-behind-the-back-wrist-curl-side.mp4
+  ~otro-equipo  Curl por encima de la cabeza (Polea)     [cable]  <- female-plate-curl-to-overhead-press-side.mp4
+  ✗no-hay       Curl martillo cruzado                    [bodyweight]  <- female-Bodyweight-bodyweight-concentration-curl-side.mp4
+  ✗no-hay       Curl molinete (Mancuerna)                [dumbbell]  <- female-Dumbbells-dumbbell-curl-side.mp4
+  ✗no-hay       Curl concentrado agarre inverso          [bodyweight]  <- female-Bodyweight-bodyweight-concentration-curl-side.mp4
+  ✗no-hay       Curl de muñeca sentado con palmas arriba [bodyweight]  <- female-Bodyweight-bodyweight-concentration-curl-side.mp4
+  ✗no-hay       Curl camarero (Mancuerna)                [dumbbell]  <- female-Dumbbells-dumbbell-curl-side.mp4
+  ✗no-hay       Enrollador de muñeca                     [bodyweight]  <- female-Bodyweight-bodyweight-squat-side.mp4
+
+#### CALVES ####
+  ✓CONCRETO     Press de gemelos (Máquina)               [machine]  <- female-Machine-machine-horizontal-leg-press-calf-jump-side.mp4
+  ✗no-hay       Extensión de gemelos (Máquina)           [machine]  <- female-machine-leg-extension-side.mp4
+  ✗no-hay       Elevación de gemelo de pie a una pierna (Barra) [barbell]  <- female-Barbell-barbell-calf-raises-side.mp4
+  ✗no-hay       Elevación de gemelo de pie a una pierna (Máquina) [machine]  <- female-machine-standing-calf-raises-side.mp4
+
+#### CARDIO ####
+  ✓CONCRETO     Caminar                                  [bodyweight]  <- female-Recovery-lunge-walking-side.mp4
+  ✗no-hay       Aeróbic                                  [bodyweight]  <- female-Bodyweight-bodyweight-squat-side.mp4
+  ✗no-hay       Bicicleta de aire                        [bodyweight]  <- female-Bodyweight-bodyweight-squat-side.mp4
+  ✗no-hay       Cuerdas de batalla                       [bodyweight]  <- female-Bodyweight-bodyweight-squat-side.mp4
+  ✗no-hay       Boxeo                                    [bodyweight]  <- female-Bodyweight-bodyweight-squat-side.mp4
+  ✗no-hay       Escalada                                 [bodyweight]  <- female-Bodyweight-bodyweight-squat-side.mp4
+  ✗no-hay       Ciclismo                                 [bodyweight]  <- female-Bodyweight-bodyweight-squat-side.mp4
+  ✗no-hay       Elíptica                                 [bodyweight]  <- female-Bodyweight-bodyweight-squat-side.mp4
+  ✗no-hay       HIIT                                     [bodyweight]  <- female-Bodyweight-bodyweight-squat-side.mp4
+  ✗no-hay       Senderismo                               [bodyweight]  <- female-Bodyweight-bodyweight-squat-side.mp4
+  ✗no-hay       Máquina de remo                          [machine]  <- female-Machine-gluteator-side.mp4
+  ✗no-hay       Correr                                   [bodyweight]  <- female-Bodyweight-bodyweight-squat-side.mp4
+  ✗no-hay       Patinaje                                 [bodyweight]  <- female-Bodyweight-bodyweight-squat-side.mp4
+  ✗no-hay       Esquí                                    [bodyweight]  <- female-Bodyweight-bodyweight-squat-side.mp4
+  ✗no-hay       Snowboard                                [bodyweight]  <- female-Bodyweight-bodyweight-squat-side.mp4
+  ✗no-hay       Spinning                                 [bodyweight]  <- female-Bodyweight-bodyweight-squat-side.mp4
+  ✗no-hay       Sprints                                  [bodyweight]  <- female-Bodyweight-bodyweight-squat-side.mp4
+  ✗no-hay       Escaladora (Pisos)                       [bodyweight]  <- female-Bodyweight-bodyweight-squat-side.mp4
+  ✗no-hay       Escaladora (Escalones)                   [bodyweight]  <- female-Bodyweight-bodyweight-step-down-side.mp4
+  ✗no-hay       Natación                                 [bodyweight]  <- female-Bodyweight-bodyweight-squat-side.mp4
+  ✗no-hay       Cinta de correr                          [bodyweight]  <- female-Bodyweight-bodyweight-squat-side.mp4
+
+#### CHEST ####
+  ~otro-equipo  Around the World (Círculos con mancuernas) [bodyweight]  <- female-Band-mini-band-around-the-world-plank-side.mp4
+  ~otro-equipo  Apertura de pecho (Máquina)              [machine]  <- female-band-chest-fly-side.mp4
+  ~otro-equipo  Press de banca declinado (Barra)         [barbell]  <- female-Cables-cable-decline-bench-press-side.mp4
+  ~otro-equipo  Press de banca declinado (Máquina)       [machine]  <- female-Cables-cable-decline-bench-press-side.mp4
+  ~otro-equipo  Press de banca declinado (Multipower)    [smith-machine]  <- female-Cables-cable-decline-bench-press-side.mp4
+  ✓CONCRETO     Cruces en polea                          [cable]  <- female-cable-pec-fly-side.mp4
+  ✓CONCRETO     Press de pecho inclinado (Máquina)       [machine]  <- female-Machine-machine-plate-loaded-incline-chest-press-side.mp4
+  ✓CONCRETO     Press con disco                          [plate]  <- female-plate-clean-and-press-side.mp4
+  ✗no-hay       Press de banca agarre abierto (Barra)    [barbell]  <- female-Barbell-barbell-close-grip-bench-press-side.mp4
+  ✗no-hay       Contractor de pecho (Pec Deck)           [bodyweight]  <- female-Bodyweight-bodyweight-butterfly-stretch-side.mp4
+  ✗no-hay       Fondo de pecho (Con peso)                [bodyweight]  <- female-Bodyweight-dips-side.mp4
+  ✗no-hay       Flexiones con palmada                    [bodyweight]  <- female-Bodyweight-bodyweight-knee-push-ups-side.mp4
+  ✗no-hay       Press hex (Mancuerna)                    [dumbbell]  <- female-dumbbell-squeeze-press-side.mp4
+  ✗no-hay       Flexiones inclinadas                     [bodyweight]  <- female-Bodyweight-bodyweight-knee-push-ups-side.mp4
+  ✗no-hay       Press de pecho isolateral (Máquina)      [machine]  <- female-Machine-machine-chest-press-side.mp4
+  ✗no-hay       Flexión de rodillas                      [bodyweight]  <- female-Bodyweight-push-up-side.mp4
+  ✗no-hay       Cruces bajos en polea                    [bodyweight]  <- female-Bodyweight-ring-rear-delt-fly-side.mp4
+  ✗no-hay       Flexión a un brazo                       [bodyweight]  <- female-Bodyweight-push-up-side.mp4
+  ✗no-hay       Plancha con flexión                      [bodyweight]  <- female-Bodyweight-bodyweight-plank-jack-side.mp4
+  ✗no-hay       Press de disco (Svend Press)             [plate]  <- female-plate-clean-and-press-side.mp4
+  ✗no-hay       Flexión agarre cerrado                   [bodyweight]  <- female-Bodyweight-push-up-side.mp4
+  ✗no-hay       Flexión en anillas                       [bodyweight]  <- female-Bodyweight-push-up-side.mp4
+  ✗no-hay       Cruce en polea a un brazo                [bodyweight]  <- female-Bodyweight-backward-arm-circle-side.mp4
+
+#### CORE ####
+  ✓CONCRETO     Abdominal completo (Sit up)              [bodyweight]  <- female-Bodyweight-frog-sit-up-side.mp4
+  ✓CONCRETO     V up (Abdominal en V)                    [bodyweight]  <- female-Bodyweight-stability-ball-v-up-pass-side.mp4
+  ✗no-hay       Tijeras abdominales                      [bodyweight]  <- female-Bodyweight-scissor-kick-side.mp4
+  ✗no-hay       Rueda abdominal                          [bodyweight]  <- female-Bodyweight-bodyweight-squat-side.mp4
+  ✗no-hay       Press Pallof en polea                    [cable]  <- female-cable-overhead-press-side.mp4
+  ✗no-hay       Giro en polea (de abajo hacia arriba)    [cable]  <- female-Cables-cable-push-down-side.mp4
+  ✗no-hay       Giro en polea (de arriba hacia abajo)    [cable]  <- female-Cables-cable-push-down-side.mp4
+  ✗no-hay       Crunch declinado (Con peso)              [bodyweight]  <- female-bodyweight-crunch-side.mp4
+  ✗no-hay       Dragon flag                              [bodyweight]  <- female-Bodyweight-bodyweight-squat-side.mp4
+  ✗no-hay       Dragonfly                                [bodyweight]  <- female-Bodyweight-bodyweight-squat-side.mp4
+  ✗no-hay       Codo a rodilla                           [bodyweight]  <- female-bodyweight-elbow-side-plank-front.mp4
+  ✗no-hay       Patada de tijera                         [bodyweight]  <- female-Bodyweight-scissor-kick-side.mp4
+  ✗no-hay       Toques de talón                          [bodyweight]  <- female-Bodyweight-alternating-heel-touch-side.mp4
+  ✗no-hay       Hollow rock (Balanceo en hueco)          [bodyweight]  <- female-Bodyweight-hollow-hold-side.mp4
+  ✗no-hay       Navaja (TRX)                             [suspension]  <- female-trx-curl-side.mp4
+  ✗no-hay       Abdominal navaja                         [bodyweight]  <- female-Bodyweight-frog-sit-up-side.mp4
+  ✗no-hay       Elevación de rodillas en paralelas       [bodyweight]  <- female-bodyweight-hanging-knee-raises-side.mp4
+  ✗no-hay       Landmine 180                             [bodyweight]  <- female-Bodyweight-bodyweight-squat-side.mp4
+  ✗no-hay       Elevación de piernas en paralelas        [bodyweight]  <- female-Bodyweight-alternating-leg-raise-side.mp4
+  ✗no-hay       Elevación de rodillas tumbado            [bodyweight]  <- female-bodyweight-hanging-knee-raises-side.mp4
+  ✗no-hay       Elevación de piernas tumbado             [bodyweight]  <- female-Bodyweight-alternating-leg-raise-side.mp4
+  ✗no-hay       Plancha inversa                          [bodyweight]  <- female-Bodyweight-bodyweight-plank-jack-side.mp4
+  ✗no-hay       Abdominal completo (Con peso)            [bodyweight]  <- female-Bodyweight-frog-sit-up-side.mp4
+  ✗no-hay       Spiderman                                [bodyweight]  <- female-Bodyweight-bodyweight-squat-side.mp4
+  ✗no-hay       Estiramientos                            [bodyweight]  <- female-Bodyweight-bodyweight-squat-side.mp4
+  ✗no-hay       Toque de puntas                          [bodyweight]  <- female-Bodyweight-alternating-heel-touch-side.mp4
+  ✗no-hay       Pies a la barra                          [bodyweight]  <- female-Bodyweight-parralel-bar-dips-side.mp4
+  ✗no-hay       Rotación de torso                        [bodyweight]  <- female-Bodyweight-bodyweight-thoracic-spine-rotation-side.mp4
+
+#### FULLBODY ####
+  ~otro-equipo  Arranque con mancuerna                   [dumbbell]  <- female-Barbell-barbell-snatch-side.mp4
+  ~otro-equipo  Elevación a front lever                  [bodyweight]  <- female-Kettlebells-kettlebell-long-lever-lateral-raise-side.mp4
+  ~otro-equipo  Cargada colgante                         [bodyweight]  <- female-Barbell-barbell-hang-clean-and-press-side.mp4
+  ~otro-equipo  Tirón alto con pesa rusa                 [kettlebell]  <- female-Barbell-barbell-high-pull-side.mp4
+  ~otro-equipo  Sentadilla con remo                      [bodyweight]  <- female-Band-band-squat-hold-row-side.mp4
+  ✓CONCRETO     Cargada con pesa rusa                    [kettlebell]  <- female-Kettlebells-clean-and-press-side.mp4
+  ✓CONCRETO     Arranque con pesa rusa                   [kettlebell]  <- female-Kettlebells-double-snatch-side.mp4
+  ✗no-hay       Golpes con balón medicinal               [bodyweight]  <- female-Bodyweight-bodyweight-stability-ball-crunch-side.mp4
+  ✗no-hay       Burpee sobre la barra                    [bodyweight]  <- female-bodyweight-burpee-side.mp4
+  ✗no-hay       Tirón de cargada                         [bodyweight]  <- female-Bodyweight-bodyweight-superman-pull-side.mp4
+  ✗no-hay       Peso muerto con tirón alto               [bodyweight]  <- female-Bodyweight-bodyweight-superman-pull-side.mp4
+  ✗no-hay       Front lever isométrico                   [bodyweight]  <- female-Bodyweight-hollow-hold-side.mp4
+  ✗no-hay       Parada de manos isométrica               [bodyweight]  <- female-Bodyweight-hollow-hold-side.mp4
+  ✗no-hay       Arranque colgante                        [bodyweight]  <- female-Bodyweight-dead-hang-side.mp4
+  ✗no-hay       Skipping alto con salto                  [bodyweight]  <- female-Bodyweight-bodyweight-hanging-knee-tuck-side.mp4
+  ✗no-hay       Rodillas altas                           [bodyweight]  <- female-Bodyweight-bodyweight-hanging-knee-tuck-side.mp4
+  ✗no-hay       Encogimiento con salto                   [bodyweight]  <- female-Bodyweight-bodyweight-pike-shrug-side.mp4
+  ✗no-hay       Levantada turca con pesa rusa            [kettlebell]  <- female-Kettlebells-kettlebell-step-up-side.mp4
+  ✗no-hay       Sentadilla y press landmine              [bodyweight]  <- female-Bodyweight-bodyweight-squat-side.mp4
+  ✗no-hay       Muscle up                                [bodyweight]  <- female-Bodyweight-push-up-side.mp4
+  ✗no-hay       Pilates                                  [bodyweight]  <- female-Bodyweight-bodyweight-squat-side.mp4
+  ✗no-hay       Cargada de potencia                      [bodyweight]  <- female-Bodyweight-bodyweight-squat-side.mp4
+  ✗no-hay       Press under                              [bodyweight]  <- female-Bodyweight-bodyweight-pike-press-side.mp4
+  ✗no-hay       Empuje de trineo                         [bodyweight]  <- female-Bodyweight-push-up-side.mp4
+  ✗no-hay       Calentamiento                            [bodyweight]  <- female-Bodyweight-push-up-side.mp4
+  ✗no-hay       Yoga                                     [bodyweight]  <- female-Bodyweight-bodyweight-squat-side.mp4
+
+#### GLUTES ####
+  ~otro-equipo  Almeja (Clamshell)                       [bodyweight]  <- female-Band-mini-band-clamshell-side.mp4
+  ~otro-equipo  Hidrante (Fire hydrant)                  [bodyweight]  <- female-Band-mini-band-fire-hydrant-side.mp4
+  ✓CONCRETO     Peso muerto (Banda)                      [band]  <- female-Band-band-romanian-deadlift-side.mp4
+  ✓CONCRETO     Peso muerto (Mancuerna)                  [dumbbell]  <- female-Dumbbells-dumbbell-romanian-deadlift-side.mp4
+  ✓CONCRETO     Peso muerto (Multipower)                 [smith-machine]  <- female-Smithmachine-romanian-deadlift-side.mp4
+  ✗no-hay       Empuje de glúteo rana (Mancuerna)        [dumbbell]  <- female-dumbbell-crunch-side.mp4
+  ✗no-hay       Patada de glúteo en el suelo             [bodyweight]  <- female-Bodyweight-kickbacks-side.mp4
+  ✗no-hay       Caminata lateral con banda               [bodyweight]  <- female-Bodyweight-lateral-lunge-side.mp4
+  ✗no-hay       Elevación lateral de pierna              [bodyweight]  <- female-Bodyweight-alternating-leg-raise-side.mp4
+  ✗no-hay       Patada trasera (Máquina)                 [machine]  <- female-Machine-machine-rear-deltoid-row-side.mp4
+  ✗no-hay       Patada de glúteo de pie en polea         [bodyweight]  <- female-Bodyweight-kickbacks-side.mp4
+
+#### HAMSTRINGS ####
+  ✓CONCRETO     Curl femoral de pie                      [bodyweight]  <- female-Recovery-hamstring-curl-standing-bodyweight-single-leg-side.mp4
+  ✗no-hay       Curl femoral tumbado (Máquina)           [machine]  <- female-Machine-machine-seated-leg-curl-side.mp4
+  ✗no-hay       Peso muerto con piernas rectas           [bodyweight]  <- female-Bodyweight-stability-ball-straight-leg-glute-bridge-side.mp4
+
+#### QUADS ####
+  ~otro-equipo  Sentadilla sumo (Barra)                  [barbell]  <- female-dumbbell-sumo-squat-side.mp4
+  ~otro-equipo  Sentadilla sumo (Pesa rusa)              [kettlebell]  <- female-dumbbell-sumo-squat-side.mp4
+  ~otro-equipo  Estocada caminando (Mancuerna)           [dumbbell]  <- female-Recovery-lunge-walking-side.mp4
+  ✓CONCRETO     Sentadilla con pausa (Barra)             [barbell]  <- female-barbell-pause-box-squat-side.mp4
+  ✗no-hay       Sentadilla pistol asistida               [bodyweight]  <- female-Bodyweight-bodyweight-assisted-sissy-squat-side.mp4
+  ✗no-hay       Saltos de rana                           [bodyweight]  <- female-Bodyweight-box-jump-side.mp4
+  ✗no-hay       Estocada con salto                       [bodyweight]  <- female-bodyweight-side-lunge-front.mp4
+  ✗no-hay       Salto lateral al cajón                   [bodyweight]  <- female-Bodyweight-box-jump-side.mp4
+  ✗no-hay       Sentadilla lateral                       [bodyweight]  <- female-Bodyweight-bodyweight-squat-side.mp4
+  ✗no-hay       Estocada con mancuerna sobre la cabeza   [bodyweight]  <- female-bodyweight-side-lunge-front.mp4
+  ✗no-hay       Sentadilla pistol                        [bodyweight]  <- female-Bodyweight-bodyweight-squat-side.mp4
+  ✗no-hay       Extensión de cuádriceps a una pierna     [bodyweight]  <- female-Bodyweight-bodyweight-single-leg-squat-side.mp4
+  ✗no-hay       Sentadilla sissy (Con peso)              [bodyweight]  <- female-Bodyweight-bodyweight-assisted-sissy-squat-side.mp4
+
+#### SHOULDERS ####
+  ~otro-equipo  Círculos con pesa rusa                   [kettlebell]  <- female-Band-mini-band-around-the-world-plank-side.mp4
+  ~otro-equipo  Halo con pesa rusa                       [kettlebell]  <- female-plate-halo-side.mp4
+  ~otro-equipo  Elevación lateral a un brazo (Polea)     [cable]  <- female-Band-band-single-arm-lateral-raise-side.mp4
+  ✓CONCRETO     Elevación frontal (TRX)                  [suspension]  <- female-trx-calf-raise-side.mp4
+  ✗no-hay       Aperturas con banda                      [band]  <- female-Band-band-crunch-side.mp4
+  ✗no-hay       Apertura inversa con soporte de pecho (Mancuerna) [dumbbell]  <- female-dumbbell-chest-fly-side.mp4
+  ✗no-hay       Elevación en Y con soporte de pecho (Mancuerna) [dumbbell]  <- female-Dumbbells-dumbbell-front-raise-side.mp4
+  ✗no-hay       Flexión en parada de manos               [bodyweight]  <- female-Bodyweight-push-up-side.mp4
+  ✗no-hay       Press de hombros con pesa rusa           [kettlebell]  <- female-kettlebell-shoulder-extension-side.mp4
+  ✗no-hay       Flexión de cuello tumbado (Con peso)     [bodyweight]  <- female-Bodyweight-bodyweight-concentration-curl-side.mp4
+  ✗no-hay       Extensión de cuello tumbado (Con peso)   [bodyweight]  <- female-Bodyweight-bodyweight-tricep-extension-side.mp4
+  ✗no-hay       Elevación de disco sobre la cabeza       [bodyweight]  <- female-Bodyweight-calf-raises-side.mp4
+  ✗no-hay       Press de hombros sentado (Máquina)       [machine]  <- female-Machine-machine-chest-press-side.mp4
+  ✗no-hay       Toques de hombro                         [bodyweight]  <- female-Bodyweight-elevated-pike-shoulder-shrug-side.mp4
+
+#### TRICEPS ####
+  ~otro-equipo  Extensión de tríceps (TRX)               [suspension]  <- female-Bodyweight-bodyweight-tricep-extension-side.mp4
+  ✗no-hay       Flexión diamante                         [bodyweight]  <- female-Bodyweight-push-up-side.mp4
+  ✗no-hay       Fondo de tríceps en el suelo             [bodyweight]  <- female-Bodyweight-dips-side.mp4
+  ✗no-hay       Press JM (Barra)                         [barbell]  <- female-Barbell-barbell-bradford-press-side.mp4
+  ✗no-hay       Press de tríceps sentado                 [bodyweight]  <- female-Bodyweight-bodyweight-pike-press-side.mp4
+  ✗no-hay       Fondo de tríceps (Con peso)              [bodyweight]  <- female-Bodyweight-dips-side.mp4
+  ✗no-hay       Empuje de tríceps con cuerda             [bodyweight]  <- female-Bodyweight-bodyweight-tricep-extension-side.mp4
+  ✗no-hay       Press de tríceps con codos abiertos (Mancuerna) [dumbbell]  <- female-Dumbbells-dumbbell-tricep-guillotine-press-side.mp4
