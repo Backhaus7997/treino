@@ -1551,6 +1551,9 @@ class AppL10nEn extends AppL10n {
   String get routineEditorDeleteDayA11y => 'Delete day';
 
   @override
+  String get routineEditorEditDayNameA11y => '';
+
+  @override
   String get athleteDetailEditPlanA11y => 'Edit plan';
 
   @override

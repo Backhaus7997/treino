@@ -3020,6 +3020,12 @@ abstract class AppL10n {
   /// **'Eliminar día'**
   String get routineEditorDeleteDayA11y;
 
+  /// Tooltip + Semantics label for the icon-only pencil button next to each day's title in the routine editor. Tap turns the title into an inline TextField.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Editar nombre del día'**
+  String get routineEditorEditDayNameA11y;
+
   /// Accessibility label for the edit-plan icon button in the athlete detail plan card (finding 5).
   ///
   /// In es_AR, this message translates to:
