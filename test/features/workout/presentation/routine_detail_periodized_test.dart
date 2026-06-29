@@ -282,13 +282,16 @@ void main() {
     });
 
     testWidgets(
-        'SCENARIO-031/032: locked day shows BLOQUEADO text (day 2 locked, no completions)',
-        (tester) async {
+        'A1 (2026-06-29): day 2 of a periodized plan with no prior progress '
+        'is NO LONGER locked — athlete may jump in directly', (tester) async {
+      // Pre-A1 (SCENARIO-031/032) this opened to "DÍA BLOQUEADO" because day 1
+      // was not finished. Decision A1 dropped the sequential lock — every day
+      // is freely accessible, so the screen must show the EMPEZAR affordance
+      // instead of any BLOQUEADO badge.
       final routine = _multiWeekRoutine(
         numWeeks: 2,
         days: [_day(1), _day(2)],
       );
-      // No sessions → no completions → day 2 is locked (day 1 not done)
       await tester.pumpWidget(_wrap(
         RoutineDetailScreen(routineId: routine.id),
         routine: routine,
@@ -300,9 +303,16 @@ void main() {
       await tester.tap(find.text('DÍA 2', skipOffstage: false));
       await _settle(tester);
 
-      // With no completions, day 2 is locked (day 1 not done)
-      expect(find.textContaining('BLOQUEADO', skipOffstage: false),
-          findsOneWidget);
+      expect(
+        find.textContaining('BLOQUEADO', skipOffstage: false),
+        findsNothing,
+        reason: 'A1 removed the sequential day lock — no BLOQUEADO badge',
+      );
+      expect(
+        find.textContaining('BLOQUEADA', skipOffstage: false),
+        findsNothing,
+        reason: 'A1 also removed the sequential week lock',
+      );
     });
 
     testWidgets(
