@@ -1793,4 +1793,22 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get progressionEmpty => 'No set records yet.';
+
+  @override
+  String get profileRoutinesAssignedHeader => '';
+
+  @override
+  String get profileRoutinesOwnHeader => '';
+
+  @override
+  String get profileRoutinesNoTrainerBody => '';
+
+  @override
+  String get profileRoutinesNoTrainerCta => '';
+
+  @override
+  String get profileRoutinesNoOwnBody => '';
+
+  @override
+  String get profileRoutinesActiveChip => '';
 }

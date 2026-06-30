@@ -1843,6 +1843,24 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get progressionEmpty => 'Sin registros de series todavía.';
+
+  @override
+  String get profileRoutinesAssignedHeader => 'RUTINAS ASIGNADAS POR TU PF';
+
+  @override
+  String get profileRoutinesOwnHeader => 'MIS RUTINAS PROPIAS';
+
+  @override
+  String get profileRoutinesNoTrainerBody => 'Todavía no tenés un PF asignado.';
+
+  @override
+  String get profileRoutinesNoTrainerCta => 'BUSCAR PF';
+
+  @override
+  String get profileRoutinesNoOwnBody => 'Todavía no creaste ninguna rutina.';
+
+  @override
+  String get profileRoutinesActiveChip => 'ACTIVA';
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -3682,4 +3700,22 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get progressionEmpty => 'Sin registros de series todavía.';
+
+  @override
+  String get profileRoutinesAssignedHeader => 'RUTINAS ASIGNADAS POR TU PF';
+
+  @override
+  String get profileRoutinesOwnHeader => 'MIS RUTINAS PROPIAS';
+
+  @override
+  String get profileRoutinesNoTrainerBody => 'Todavía no tenés un PF asignado.';
+
+  @override
+  String get profileRoutinesNoTrainerCta => 'BUSCAR PF';
+
+  @override
+  String get profileRoutinesNoOwnBody => 'Todavía no creaste ninguna rutina.';
+
+  @override
+  String get profileRoutinesActiveChip => 'ACTIVA';
 }

@@ -695,5 +695,11 @@
   },
   "progressionSinglePointHint": "You need at least 2 sessions to see the trend.",
   "progressionEmptyExercise": "No data for this exercise.",
-  "progressionEmpty": "No set records yet."
+  "progressionEmpty": "No set records yet.",
+  "profileRoutinesAssignedHeader": "",
+  "profileRoutinesOwnHeader": "",
+  "profileRoutinesNoTrainerBody": "",
+  "profileRoutinesNoTrainerCta": "",
+  "profileRoutinesNoOwnBody": "",
+  "profileRoutinesActiveChip": ""
 }
