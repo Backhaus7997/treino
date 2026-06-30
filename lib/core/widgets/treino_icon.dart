@@ -114,6 +114,9 @@ class TreinoIcon {
   // Profile settings constant REMOVED 2026-05-28 — gear icon was removed from
   // ProfileHeader as part of the PR#4 pivot. Zero remaining usages.
 
+  // Appearance / theme settings
+  static const IconData appearance = PhosphorIconsRegular.sun;
+
   // Coach Hub (web) — import flow
   static const IconData arrowLeft = PhosphorIconsRegular.arrowLeft;
   static const IconData download = PhosphorIconsRegular.downloadSimple;
