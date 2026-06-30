@@ -327,36 +327,40 @@ class _RoutineRow extends StatelessWidget {
     // narrower than its non-active siblings.
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
-    return SizedBox(
-      width: double.infinity,
-      child: Stack(
-        children: [
-          RoutineCard(routine: routine),
-          Positioned(
-            top: 12,
-            right: 12,
-            child: Container(
-              key: const Key('profile_routines_active_chip'),
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-              decoration: BoxDecoration(
-                color: palette.accent.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(9999),
-                border:
-                    Border.all(color: palette.accent.withValues(alpha: 0.5)),
-              ),
-              child: Text(
-                l10n.profileRoutinesActiveChip,
-                style: GoogleFonts.barlowCondensed(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 11,
-                  letterSpacing: 1.2,
-                  color: palette.accent,
-                ),
+    // RoutineCard wraps a Container with no explicit width — sin el
+    // SizedBox de adentro colapsa a su intrinsic size cuando se mete en un
+    // Stack (Stack no estira children por default; los Positioned tampoco
+    // estiran al child non-positioned). Forzar full-width acá iguala el
+    // ancho visual con las cards sin chip.
+    return Stack(
+      children: [
+        SizedBox(
+          width: double.infinity,
+          child: RoutineCard(routine: routine),
+        ),
+        Positioned(
+          top: 12,
+          right: 12,
+          child: Container(
+            key: const Key('profile_routines_active_chip'),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+            decoration: BoxDecoration(
+              color: palette.accent.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(9999),
+              border: Border.all(color: palette.accent.withValues(alpha: 0.5)),
+            ),
+            child: Text(
+              l10n.profileRoutinesActiveChip,
+              style: GoogleFonts.barlowCondensed(
+                fontWeight: FontWeight.w700,
+                fontSize: 11,
+                letterSpacing: 1.2,
+                color: palette.accent,
               ),
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
