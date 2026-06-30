@@ -30,6 +30,8 @@ class AppPalette extends ThemeExtension<AppPalette> {
     required this.espresso,
     required this.danger,
     required this.warning,
+    required this.onDanger,
+    required this.scrimDark,
   });
 
   final Color accent;
@@ -59,6 +61,15 @@ class AppPalette extends ThemeExtension<AppPalette> {
   /// tell at a glance whether action is required or just attention.
   final Color warning;
 
+  /// Foreground (text/icon) rendered on top of [danger] backgrounds.
+  /// Achieves ≥ 4.5:1 contrast ratio against [danger] (WCAG AA).
+  final Color onDanger;
+
+  /// Pure-black token for overlay scrims; apply opacity at call site via
+  /// `withValues(alpha: x)`. Constant across both themes — scrims are always
+  /// dark for image/video legibility.
+  final Color scrimDark;
+
   static const mintMagenta = AppPalette(
     accent: AppColors.mint,
     highlight: AppColors.magenta,
@@ -72,6 +83,25 @@ class AppPalette extends ThemeExtension<AppPalette> {
     espresso: AppColors.espresso,
     danger: Color(0xFFE53935),
     warning: Color(0xFFFFB300),
+    onDanger: Color(0xFFFFFFFF),
+    scrimDark: Color(0xFF000000),
+  );
+
+  static const mintMagentaLight = AppPalette(
+    accent: Color(0xFF2CE5A2),
+    highlight: Color(0xFFC123E0),
+    bg: Color(0xFFFAFAFA),
+    bgCard: Color(0xFFFFFFFF),
+    border: Color(0x1A000000),
+    borderHover: Color(0x33000000),
+    textPrimary: Color(0xFF0F1513),
+    textMuted: Color(0x99000000),
+    sage: Color(0xFFDDE5DF),
+    espresso: Color(0xFFEDE5E2),
+    danger: Color(0xFFD32F2F),
+    warning: Color(0xFFFB8C00),
+    onDanger: Color(0xFFFFFFFF),
+    scrimDark: Color(0xFF000000),
   );
 
   static AppPalette of(BuildContext context) =>
@@ -91,6 +121,8 @@ class AppPalette extends ThemeExtension<AppPalette> {
     Color? espresso,
     Color? danger,
     Color? warning,
+    Color? onDanger,
+    Color? scrimDark,
   }) =>
       AppPalette(
         accent: accent ?? this.accent,
@@ -105,6 +137,8 @@ class AppPalette extends ThemeExtension<AppPalette> {
         espresso: espresso ?? this.espresso,
         danger: danger ?? this.danger,
         warning: warning ?? this.warning,
+        onDanger: onDanger ?? this.onDanger,
+        scrimDark: scrimDark ?? this.scrimDark,
       );
 
   @override
@@ -123,6 +157,8 @@ class AppPalette extends ThemeExtension<AppPalette> {
       espresso: Color.lerp(espresso, other.espresso, t)!,
       danger: Color.lerp(danger, other.danger, t)!,
       warning: Color.lerp(warning, other.warning, t)!,
+      onDanger: Color.lerp(onDanger, other.onDanger, t)!,
+      scrimDark: Color.lerp(scrimDark, other.scrimDark, t)!,
     );
   }
 }
