@@ -108,7 +108,7 @@ class _BackBar extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(left: 12, top: 8),
       child: Material(
-        color: Colors.black.withValues(alpha: 0.35),
+        color: palette.scrimDark.withValues(alpha: 0.35),
         shape: const CircleBorder(),
         clipBehavior: Clip.antiAlias,
         child: IconButton(
@@ -293,7 +293,7 @@ class _HeroStrip extends StatelessWidget {
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    Colors.black.withValues(alpha: 0.45),
+                    palette.scrimDark.withValues(alpha: 0.45),
                     Colors.transparent,
                   ],
                 ),
