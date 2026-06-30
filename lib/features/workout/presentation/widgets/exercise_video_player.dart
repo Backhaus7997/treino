@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../app/theme/app_palette.dart';
+import '../../../../app/theme/app_theme.dart';
 import '../../../../core/widgets/firebase_storage_video_player.dart';
 import '../../../../core/widgets/treino_icon.dart';
 
@@ -28,23 +29,30 @@ class ExerciseVideoPlayer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-    final url = videoUrl?.trim() ?? '';
+    return Theme(
+      data: AppTheme.dark(),
+      child: Builder(
+        builder: (context) {
+          final palette = AppPalette.of(context);
+          final url = videoUrl?.trim() ?? '';
 
-    if (url.isEmpty) {
-      return _VideoPlaceholder(palette: palette, urlGiven: null);
-    }
+          if (url.isEmpty) {
+            return _VideoPlaceholder(palette: palette, urlGiven: null);
+          }
 
-    if (isFirebaseStorageVideo(url)) {
-      return FirebaseStorageVideoPlayer(url: url, palette: palette);
-    }
+          if (isFirebaseStorageVideo(url)) {
+            return FirebaseStorageVideoPlayer(url: url, palette: palette);
+          }
 
-    final id = parseYoutubeVideoId(url);
-    if (id != null) {
-      return _YoutubeThumbCard(videoId: id, palette: palette);
-    }
+          final id = parseYoutubeVideoId(url);
+          if (id != null) {
+            return _YoutubeThumbCard(videoId: id, palette: palette);
+          }
 
-    return _VideoPlaceholder(palette: palette, urlGiven: url);
+          return _VideoPlaceholder(palette: palette, urlGiven: url);
+        },
+      ),
+    );
   }
 }
 
@@ -92,7 +100,9 @@ class _YoutubeThumbCard extends StatelessWidget {
                   errorWidget: (context, _, __) =>
                       Container(color: palette.bgCard),
                 ),
-                Container(color: Colors.black.withValues(alpha: 0.22)),
+                Container(
+                    color: Colors.black
+                        .withValues(alpha: 0.22)), // intentional: media surface
                 const _PlayOverlay(),
               ],
             ),
@@ -115,11 +125,13 @@ class _PlayOverlay extends StatelessWidget {
         width: 44,
         height: 44,
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.92),
+          color: Colors.white
+              .withValues(alpha: 0.92), // intentional: media surface
           shape: BoxShape.circle,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.35),
+              color: Colors.black
+                  .withValues(alpha: 0.35), // intentional: media surface
               blurRadius: 12,
               offset: const Offset(0, 2),
             ),
@@ -131,7 +143,7 @@ class _PlayOverlay extends StatelessWidget {
           padding: EdgeInsets.only(left: 3),
           child: Icon(
             TreinoIcon.play,
-            color: Colors.black,
+            color: Colors.black, // intentional: media surface
             size: 20,
           ),
         ),

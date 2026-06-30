@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
 import '../../app/theme/app_palette.dart';
+import '../../app/theme/app_theme.dart';
 import 'treino_icon.dart';
 
 /// Public, reusable native video player for Firebase Storage download URLs.
@@ -83,7 +84,13 @@ class _FirebaseStorageVideoPlayerState
   @override
   Widget build(BuildContext context) {
     final palette = widget.palette;
+    return Theme(
+      data: AppTheme.dark(),
+      child: _buildContent(palette),
+    );
+  }
 
+  Widget _buildContent(AppPalette palette) {
     if (_initFailed) {
       return _VideoErrorPlaceholder(palette: palette);
     }
@@ -134,7 +141,9 @@ class _FirebaseStorageVideoPlayerState
               AnimatedOpacity(
                 opacity: isPlaying ? 0 : 1,
                 duration: const Duration(milliseconds: 180),
-                child: Container(color: Colors.black.withValues(alpha: 0.22)),
+                child: Container(
+                    color: Colors.black
+                        .withValues(alpha: 0.22)), // intentional: media surface
               ),
               AnimatedOpacity(
                 opacity: isPlaying ? 0 : 1,
@@ -150,8 +159,10 @@ class _FirebaseStorageVideoPlayerState
                   allowScrubbing: true,
                   colors: VideoProgressColors(
                     playedColor: palette.accent,
-                    bufferedColor: Colors.white.withValues(alpha: 0.35),
-                    backgroundColor: Colors.white.withValues(alpha: 0.15),
+                    bufferedColor: Colors.white
+                        .withValues(alpha: 0.35), // intentional: media surface
+                    backgroundColor: Colors.white
+                        .withValues(alpha: 0.15), // intentional: media surface
                   ),
                 ),
               ),
@@ -175,11 +186,13 @@ class _PlayOverlay extends StatelessWidget {
         width: 44,
         height: 44,
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.92),
+          color: Colors.white
+              .withValues(alpha: 0.92), // intentional: media surface
           shape: BoxShape.circle,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.35),
+              color: Colors.black
+                  .withValues(alpha: 0.35), // intentional: media surface
               blurRadius: 12,
               offset: const Offset(0, 2),
             ),
@@ -190,7 +203,7 @@ class _PlayOverlay extends StatelessWidget {
           padding: EdgeInsets.only(left: 3),
           child: Icon(
             TreinoIcon.play,
-            color: Colors.black,
+            color: Colors.black, // intentional: media surface
             size: 20,
           ),
         ),
