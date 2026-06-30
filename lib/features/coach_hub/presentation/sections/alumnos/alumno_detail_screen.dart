@@ -4,9 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
+import 'package:treino/features/chat/application/chat_providers.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
+import 'package:treino/features/coach_hub/presentation/sections/chat/widgets/chat_detail_pane.dart';
 import 'package:treino/features/gyms/application/gym_providers.dart';
 import 'package:treino/features/measurements/application/measurement_providers.dart';
 import 'package:treino/features/measurements/presentation/widgets/measurement_progress_chart.dart';
@@ -60,6 +62,7 @@ class AlumnoDetailScreen extends ConsumerWidget {
   static const _entrenamientoIndex = 1;
   static const _progresoIndex = 3;
   static const _pagosIndex = 4;
+  static const _chatIndex = 6;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -126,6 +129,8 @@ class AlumnoDetailScreen extends ConsumerWidget {
                     _ProgresoTab(athleteId: athleteId)
                   else if (i == _pagosIndex)
                     _PagosTab(athleteId: athleteId)
+                  else if (i == _chatIndex)
+                    _ChatTab(athleteId: athleteId)
                   else
                     _TabPlaceholder(label: _tabs[i]),
               ],
@@ -392,6 +397,37 @@ class _Tabs extends StatelessWidget {
         unselectedLabelStyle: const TextStyle(fontSize: 13),
         tabs: [for (final l in labels) Tab(text: l, height: 38)],
       ),
+    );
+  }
+}
+
+/// Tab «Chat» del Alumno detalle: reusa el [ChatDetailPane] del chat web
+/// global (split-pane sidebar), resolviendo el [Chat] entre PF y este alumno
+/// puntual vía [chatForOtherUidProvider]. Sin lista de conversaciones — el
+/// alumno YA está fijado por el route, no hay nada que elegir.
+///
+/// V1 (2026-06-30): solo texto. La V2 con media reusa el mismo upgrade que
+/// la sección de chat global del sidebar.
+class _ChatTab extends ConsumerWidget {
+  const _ChatTab({required this.athleteId});
+  final String athleteId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final palette = AppPalette.of(context);
+    final chatAsync = ref.watch(chatForOtherUidProvider(athleteId));
+    return chatAsync.when(
+      loading: () => Center(
+        child: CircularProgressIndicator(color: palette.accent),
+      ),
+      error: (_, __) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+        child: Text(
+          'No pudimos abrir el chat. Reintentá.', // i18n: Fase W2
+          style: TextStyle(color: palette.textMuted, fontSize: 15),
+        ),
+      ),
+      data: (chat) => ChatDetailPane(chatId: chat.chatId),
     );
   }
 }
