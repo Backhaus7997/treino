@@ -10,8 +10,10 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app/app.dart';
+import 'core/persistence/shared_prefs_provider.dart';
 import 'firebase_options.dart';
 
 Future<void> main() async {
@@ -94,7 +96,19 @@ Future<void> main() async {
       await FirebaseAuth.instance.useAuthEmulator('localhost', 9099);
     }
 
-    runApp(const ProviderScope(child: TreinoApp()));
+    // Eager-resolve SharedPreferences before runApp so that all providers
+    // depending on sharedPreferencesProvider.requireValue (ThemeModeNotifier,
+    // SidebarCollapsedNotifier) are safe at init time (ADR-LM-009).
+    final prefs = await SharedPreferences.getInstance();
+
+    runApp(
+      ProviderScope(
+        overrides: [
+          sharedPreferencesProvider.overrideWith((_) async => prefs),
+        ],
+        child: const TreinoApp(),
+      ),
+    );
   }, (error, stack) {
     // Cualquier async uncaught dentro del zone cae acá.
     if (!kIsWeb) {
