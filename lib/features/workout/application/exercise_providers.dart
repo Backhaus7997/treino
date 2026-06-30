@@ -19,10 +19,19 @@ final exerciseRepositoryProvider = Provider<ExerciseRepository>(
 /// emits null (unauthenticated), returns []. If it emits a User, loads the
 /// catalogue. This avoids premature evaluation during the async loading phase.
 final exercisesProvider = FutureProvider<List<Exercise>>((ref) async {
-  // Await the first emission from the auth stream rather than reading
-  // .valueOrNull synchronously. This ensures the FutureProvider's own
-  // future only settles after auth is known — not during AsyncLoading.
-  final user = await ref.watch(authStateChangesProvider.future);
+  // Watch the auth AsyncValue directly (not `.future`) so this provider
+  // RE-RUNS on every auth emission. With `.future` it settled on the FIRST
+  // emission — which in release builds is usually `null` (emitted before
+  // Firebase Auth restores the persisted session), leaving the catalogue
+  // stuck empty even after the session is restored. Debug builds hid the bug
+  // because their slower startup let auth restore before this ran.
+  final authState = ref.watch(authStateChangesProvider);
+  // While auth is still resolving its first value, keep this future pending
+  // (don't flash an empty catalogue). Re-runs when auth later emits the User.
+  if (authState.isLoading) {
+    await ref.watch(authStateChangesProvider.future);
+  }
+  final user = ref.watch(authStateChangesProvider).valueOrNull;
   if (user == null) return const [];
   return ref.watch(exerciseRepositoryProvider).listAll();
 });

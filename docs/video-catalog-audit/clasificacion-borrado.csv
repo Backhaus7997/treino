@@ -1,0 +1,190 @@
+sugerencia,grupo,exercise_id,nombre,equipo,nota
+BORRAR,back,sternum-pull-up-gironda,"Dominada al esternón (Gironda)",,raro/redundante
+BORRAR,back,scapular-pull-ups,"Dominadas escapulares",,raro/redundante
+BORRAR,back,iso-lateral-high-row-machine,"Remo alto isolateral (Máquina)",,raro/redundante
+BORRAR,back,vertical-traction-machine,"Tracción vertical (Máquina)",,raro/redundante
+BORRAR,biceps,waiter-curl-dumbbell,"Curl camarero (Mancuerna)",,raro/redundante
+BORRAR,biceps,reverse-grip-concentration-curl,"Curl concentrado agarre inverso",,raro/redundante
+BORRAR,biceps,seated-palms-up-wrist-curl,"Curl de muñeca sentado con palmas arriba",,raro/redundante
+BORRAR,biceps,cross-body-hammer-curl,"Curl martillo cruzado",,raro/redundante
+BORRAR,biceps,pinwheel-curl-dumbbell,"Curl molinete (Mancuerna)",,raro/redundante
+BORRAR,biceps,overhead-curl-cable,"Curl por encima de la cabeza (Polea)",,raro/redundante
+BORRAR,biceps,behind-the-back-curl-cable,"Curl tras la espalda (Polea)",,raro/redundante
+BORRAR,biceps,wrist-roller,"Enrollador de muñeca",,raro/redundante
+BORRAR,chest,around-the-world,"Around the World (Círculos con mancuernas)",,raro/redundante
+BORRAR,chest,low-cable-fly-crossovers,"Cruces bajos en polea",,raro/redundante
+BORRAR,chest,plate-press,"Press con disco",,raro/redundante
+BORRAR,chest,plate-squeeze-svend-press,"Press de disco (Svend Press)",,raro/redundante
+BORRAR,core,elbow-to-knee,"Codo a rodilla",,raro/redundante
+BORRAR,core,dragon-flag,"Dragon flag",,raro/redundante
+BORRAR,core,dragonfly,"Dragonfly",,raro/redundante
+BORRAR,core,leg-raise-parallel-bars,"Elevación de piernas en paralelas",,raro/redundante
+BORRAR,core,knee-raise-parallel-bars,"Elevación de rodillas en paralelas",,raro/redundante
+BORRAR,core,stretching,"Estiramientos",,raro/redundante
+BORRAR,core,hollow-rock,"Hollow rock (Balanceo en hueco)",,raro/redundante
+BORRAR,core,landmine-180,"Landmine 180",,raro/redundante
+BORRAR,core,jack-knife-suspension,"Navaja (TRX)",,raro/redundante
+BORRAR,core,toes-to-bar,"Pies a la barra",,raro/redundante
+BORRAR,core,torso-rotation,"Rotación de torso",,raro/redundante
+BORRAR,core,spiderman,"Spiderman",,raro/redundante
+BORRAR,core,toe-touch,"Toque de puntas",,raro/redundante
+BORRAR,core,heel-taps,"Toques de talón",,raro/redundante
+BORRAR,fullbody,warm-up,"Calentamiento",,raro/no-fitness
+BORRAR,fullbody,front-lever-raise,"Elevación a front lever",,raro/no-fitness
+BORRAR,fullbody,sled-push,"Empuje de trineo",,raro/no-fitness
+BORRAR,fullbody,jump-shrug,"Encogimiento con salto",,raro/no-fitness
+BORRAR,fullbody,front-lever-hold,"Front lever isométrico",,raro/no-fitness
+BORRAR,fullbody,ball-slams,"Golpes con balón medicinal",,raro/no-fitness
+BORRAR,fullbody,handstand-hold,"Parada de manos isométrica",,raro/no-fitness
+BORRAR,fullbody,pilates,"Pilates",,raro/no-fitness
+BORRAR,fullbody,press-under,"Press under",,raro/no-fitness
+BORRAR,fullbody,landmine-squat-and-press,"Sentadilla y press landmine",,raro/no-fitness
+BORRAR,fullbody,high-knee-skips,"Skipping alto con salto",,raro/no-fitness
+BORRAR,fullbody,yoga,"Yoga",,raro/no-fitness
+BORRAR,glutes,clamshell,"Almeja (Clamshell)",,raro/redundante
+BORRAR,glutes,lateral-band-walks,"Caminata lateral con banda",,raro/redundante
+BORRAR,glutes,frog-pumps-dumbbell,"Empuje de glúteo rana (Mancuerna)",,raro/redundante
+BORRAR,glutes,fire-hydrants,"Hidrante (Fire hydrant)",,raro/redundante
+BORRAR,quads,frog-jumps,"Saltos de rana",,raro/redundante
+BORRAR,shoulders,band-pullaparts,"Aperturas con banda",,raro/redundante
+BORRAR,shoulders,kettlebell-around-the-world,"Círculos con pesa rusa",,raro/redundante
+BORRAR,shoulders,overhead-plate-raise,"Elevación de disco sobre la cabeza",,raro/redundante
+BORRAR,shoulders,chest-supported-y-raise-dumbbell,"Elevación en Y con soporte de pecho (Mancuerna)",,raro/redundante
+BORRAR,shoulders,lying-neck-extension-weighted,"Extensión de cuello tumbado (Con peso)",,raro/redundante
+BORRAR,shoulders,lying-neck-curls-weighted,"Flexión de cuello tumbado (Con peso)",,raro/redundante
+BORRAR,shoulders,kettlebell-halo,"Halo con pesa rusa",,raro/redundante
+BORRAR,shoulders,shoulder-taps,"Toques de hombro",,raro/redundante
+MANTENER,back,pull-up-band,"Dominada (Banda)",,fundamental sin video
+MANTENER,back,pull-up-weighted,"Dominada (Con peso)",,fundamental sin video
+MANTENER,back,wide-pull-up,"Dominada abierta",,fundamental sin video
+MANTENER,back,kipping-pull-up,"Dominada kipping",,fundamental sin video
+MANTENER,back,negative-pull-up,"Dominada negativa",,fundamental sin video
+MANTENER,back,chin-up-weighted,"Dominada supina (Con peso)",,fundamental sin video
+MANTENER,back,shrug-smith-machine,"Encogimiento (Multipower)",,fundamental sin video
+MANTENER,back,back-extension-weighted-hyperextension,"Extensión de espalda (Hiperextensión con peso)",,fundamental sin video
+MANTENER,back,back-extension-hyperextension,"Extensión de espalda (Hiperextensión)",,fundamental sin video
+MANTENER,back,lat-pulldown-band,"Jalón al pecho (Banda)",,fundamental sin video
+MANTENER,back,lat-pulldown-cable,"Jalón al pecho (Polea)",,fundamental sin video
+MANTENER,back,single-arm-lat-pulldown,"Jalón al pecho a un brazo",,fundamental sin video
+MANTENER,back,lat-pulldown-close-grip-cable,"Jalón al pecho agarre cerrado (Polea)",,fundamental sin video
+MANTENER,back,reverse-grip-lat-pulldown-cable,"Jalón al pecho agarre supino (Polea)",,fundamental sin video
+MANTENER,back,straight-arm-lat-pulldown-cable,"Jalón con brazos rectos (Polea)",,fundamental sin video
+MANTENER,back,rope-straight-arm-pulldown,"Jalón con brazos rectos y cuerda",,fundamental sin video
+MANTENER,back,low-row-suspension,"Remo bajo (TRX)",,fundamental sin video
+MANTENER,back,iso-lateral-low-row,"Remo bajo isolateral",,fundamental sin video
+MANTENER,back,single-arm-cable-row,"Remo en polea a un brazo",,fundamental sin video
+MANTENER,back,t-bar-row,"Remo en T",,fundamental sin video
+MANTENER,back,bent-over-row-dumbbell,"Remo inclinado (Mancuerna)",,fundamental sin video
+MANTENER,back,chest-supported-incline-row-dumbbell,"Remo inclinado con soporte de pecho (Mancuerna)",,fundamental sin video
+MANTENER,back,iso-lateral-row-machine,"Remo isolateral (Máquina)",,fundamental sin video
+MANTENER,back,seated-cable-row-bar-wide-grip,"Remo sentado en polea (Agarre abierto)",,fundamental sin video
+MANTENER,back,seated-cable-row-bar-grip,"Remo sentado en polea (Agarre de barra)",,fundamental sin video
+MANTENER,back,seated-cable-row-v-grip-cable,"Remo sentado en polea (Agarre en V)",,fundamental sin video
+MANTENER,calves,single-leg-standing-calf-raise-barbell,"Elevación de gemelo de pie a una pierna (Barra)",,fundamental sin video
+MANTENER,calves,single-leg-standing-calf-raise-machine,"Elevación de gemelo de pie a una pierna (Máquina)",,fundamental sin video
+MANTENER,calves,calf-extension-machine,"Extensión de gemelos (Máquina)",,fundamental sin video
+MANTENER,calves,calf-press-machine,"Press de gemelos (Máquina)",,fundamental sin video
+MANTENER,cardio,aerobics,"Aeróbic",,cardio, no necesita demo
+MANTENER,cardio,air-bike,"Bicicleta de aire",,cardio, no necesita demo
+MANTENER,cardio,boxing,"Boxeo",,cardio, no necesita demo
+MANTENER,cardio,walking,"Caminar",,cardio, no necesita demo
+MANTENER,cardio,cycling,"Ciclismo",,cardio, no necesita demo
+MANTENER,cardio,treadmill,"Cinta de correr",,cardio, no necesita demo
+MANTENER,cardio,running,"Correr",,cardio, no necesita demo
+MANTENER,cardio,battle-ropes,"Cuerdas de batalla",,cardio, no necesita demo
+MANTENER,cardio,elliptical-trainer,"Elíptica",,cardio, no necesita demo
+MANTENER,cardio,climbing,"Escalada",,cardio, no necesita demo
+MANTENER,cardio,stair-machine-steps,"Escaladora (Escalones)",,cardio, no necesita demo
+MANTENER,cardio,stair-machine-floors,"Escaladora (Pisos)",,cardio, no necesita demo
+MANTENER,cardio,skiing,"Esquí",,cardio, no necesita demo
+MANTENER,cardio,hiit,"HIIT",,cardio, no necesita demo
+MANTENER,cardio,rowing-machine,"Máquina de remo",,cardio, no necesita demo
+MANTENER,cardio,swimming,"Natación",,cardio, no necesita demo
+MANTENER,cardio,skating,"Patinaje",,cardio, no necesita demo
+MANTENER,cardio,hiking,"Senderismo",,cardio, no necesita demo
+MANTENER,cardio,snowboarding,"Snowboard",,cardio, no necesita demo
+MANTENER,cardio,spinning,"Spinning",,cardio, no necesita demo
+MANTENER,cardio,sprints,"Sprints",,cardio, no necesita demo
+MANTENER,chest,chest-fly-machine,"Apertura de pecho (Máquina)",,fundamental sin video
+MANTENER,chest,butterfly-pec-deck,"Contractor de pecho (Pec Deck)",,fundamental sin video
+MANTENER,chest,single-arm-cable-crossover,"Cruce en polea a un brazo",,fundamental sin video
+MANTENER,chest,one-arm-push-up,"Flexión a un brazo",,fundamental sin video
+MANTENER,chest,push-up-close-grip,"Flexión agarre cerrado",,fundamental sin video
+MANTENER,chest,kneeling-push-up,"Flexión de rodillas",,fundamental sin video
+MANTENER,chest,ring-push-up,"Flexión en anillas",,fundamental sin video
+MANTENER,chest,clap-push-ups,"Flexiones con palmada",,fundamental sin video
+MANTENER,chest,incline-push-ups,"Flexiones inclinadas",,fundamental sin video
+MANTENER,chest,chest-dip-weighted,"Fondo de pecho (Con peso)",,fundamental sin video
+MANTENER,chest,plank-pushup,"Plancha con flexión",,fundamental sin video
+MANTENER,chest,bench-press-wide-grip-barbell,"Press de banca agarre abierto (Barra)",,fundamental sin video
+MANTENER,chest,decline-bench-press-barbell,"Press de banca declinado (Barra)",,fundamental sin video
+MANTENER,chest,decline-bench-press-machine,"Press de banca declinado (Máquina)",,fundamental sin video
+MANTENER,chest,decline-bench-press-smith-machine,"Press de banca declinado (Multipower)",,fundamental sin video
+MANTENER,chest,incline-chest-press-machine,"Press de pecho inclinado (Máquina)",,fundamental sin video
+MANTENER,chest,iso-lateral-chest-press-machine,"Press de pecho isolateral (Máquina)",,fundamental sin video
+MANTENER,chest,hex-press-dumbbell,"Press hex (Mancuerna)",,fundamental sin video
+MANTENER,core,sit-up-weighted,"Abdominal completo (Con peso)",,fundamental sin video
+MANTENER,core,sit-up,"Abdominal completo (Sit up)",,fundamental sin video
+MANTENER,core,jackknife-sit-up,"Abdominal navaja",,fundamental sin video
+MANTENER,core,decline-crunch-weighted,"Crunch declinado (Con peso)",,fundamental sin video
+MANTENER,core,lying-leg-raise,"Elevación de piernas tumbado",,fundamental sin video
+MANTENER,core,lying-knee-raise,"Elevación de rodillas tumbado",,fundamental sin video
+MANTENER,core,cable-twist-down-to-up,"Giro en polea (de abajo hacia arriba)",,fundamental sin video
+MANTENER,core,cable-twist-up-to-down,"Giro en polea (de arriba hacia abajo)",,fundamental sin video
+MANTENER,core,flutter-kicks,"Patada de tijera",,fundamental sin video
+MANTENER,core,reverse-plank,"Plancha inversa",,fundamental sin video
+MANTENER,core,cable-core-palloff-press,"Press Pallof en polea",,fundamental sin video
+MANTENER,core,ab-wheel,"Rueda abdominal",,fundamental sin video
+MANTENER,core,ab-scissors,"Tijeras abdominales",,fundamental sin video
+MANTENER,core,v-up,"V up (Abdominal en V)",,fundamental sin video
+MANTENER,fullbody,hang-snatch,"Arranque colgante",,olímpico/calistenia
+MANTENER,fullbody,dumbbell-snatch,"Arranque con mancuerna",,olímpico/calistenia
+MANTENER,fullbody,kettlebell-snatch,"Arranque con pesa rusa",,olímpico/calistenia
+MANTENER,fullbody,burpee-over-the-bar,"Burpee sobre la barra",,olímpico/calistenia
+MANTENER,fullbody,hang-clean,"Cargada colgante",,olímpico/calistenia
+MANTENER,fullbody,kettlebell-clean,"Cargada con pesa rusa",,olímpico/calistenia
+MANTENER,fullbody,power-clean,"Cargada de potencia",,olímpico/calistenia
+MANTENER,fullbody,kettlebell-turkish-get-up,"Levantada turca con pesa rusa",,olímpico/calistenia
+MANTENER,fullbody,muscle-up,"Muscle up",,olímpico/calistenia
+MANTENER,fullbody,deadlift-high-pull,"Peso muerto con tirón alto",,olímpico/calistenia
+MANTENER,fullbody,high-knees,"Rodillas altas",,olímpico/calistenia
+MANTENER,fullbody,squat-row,"Sentadilla con remo",,olímpico/calistenia
+MANTENER,fullbody,kettlebell-high-pull,"Tirón alto con pesa rusa",,olímpico/calistenia
+MANTENER,fullbody,clean-pull,"Tirón de cargada",,olímpico/calistenia
+MANTENER,glutes,lateral-leg-raises,"Elevación lateral de pierna",,fundamental sin video
+MANTENER,glutes,standing-cable-glute-kickbacks,"Patada de glúteo de pie en polea",,fundamental sin video
+MANTENER,glutes,glute-kickback-on-floor,"Patada de glúteo en el suelo",,fundamental sin video
+MANTENER,glutes,rear-kick-machine,"Patada trasera (Máquina)",,fundamental sin video
+MANTENER,glutes,deadlift-band,"Peso muerto (Banda)",,fundamental sin video
+MANTENER,glutes,deadlift-dumbbell,"Peso muerto (Mancuerna)",,fundamental sin video
+MANTENER,glutes,deadlift-smith-machine,"Peso muerto (Multipower)",,fundamental sin video
+MANTENER,hamstrings,standing-leg-curls,"Curl femoral de pie",,fundamental sin video
+MANTENER,hamstrings,lying-leg-curl-machine,"Curl femoral tumbado (Máquina)",,fundamental sin video
+MANTENER,hamstrings,straight-leg-deadlift,"Peso muerto con piernas rectas",,fundamental sin video
+MANTENER,quads,walking-lunge-dumbbell,"Estocada caminando (Mancuerna)",,fundamental sin video
+MANTENER,quads,overhead-dumbbell-lunge,"Estocada con mancuerna sobre la cabeza",,fundamental sin video
+MANTENER,quads,jumping-lunge,"Estocada con salto",,fundamental sin video
+MANTENER,quads,single-leg-extensions,"Extensión de cuádriceps a una pierna",,fundamental sin video
+MANTENER,quads,lateral-box-jump,"Salto lateral al cajón",,fundamental sin video
+MANTENER,quads,pause-squat-barbell,"Sentadilla con pausa (Barra)",,fundamental sin video
+MANTENER,quads,lateral-squat,"Sentadilla lateral",,fundamental sin video
+MANTENER,quads,pistol-squat,"Sentadilla pistol",,fundamental sin video
+MANTENER,quads,assisted-pistol-squats,"Sentadilla pistol asistida",,fundamental sin video
+MANTENER,quads,sissy-squat-weighted,"Sentadilla sissy (Con peso)",,fundamental sin video
+MANTENER,quads,sumo-squat-barbell,"Sentadilla sumo (Barra)",,fundamental sin video
+MANTENER,quads,sumo-squat-kettlebell,"Sentadilla sumo (Pesa rusa)",,fundamental sin video
+MANTENER,shoulders,chest-supported-reverse-fly-dumbbell,"Apertura inversa con soporte de pecho (Mancuerna)",,fundamental sin video
+MANTENER,shoulders,front-raise-suspension,"Elevación frontal (TRX)",,fundamental sin video
+MANTENER,shoulders,single-arm-lateral-raise-cable,"Elevación lateral a un brazo (Polea)",,fundamental sin video
+MANTENER,shoulders,handstand-push-up,"Flexión en parada de manos",,fundamental sin video
+MANTENER,shoulders,kettlebell-shoulder-press,"Press de hombros con pesa rusa",,fundamental sin video
+MANTENER,shoulders,seated-shoulder-press-machine,"Press de hombros sentado (Máquina)",,fundamental sin video
+MANTENER,triceps,triceps-rope-pushdown,"Empuje de tríceps con cuerda",,fundamental sin video
+MANTENER,triceps,triceps-extension-suspension,"Extensión de tríceps (TRX)",,fundamental sin video
+MANTENER,triceps,diamond-push-up,"Flexión diamante",,fundamental sin video
+MANTENER,triceps,triceps-dip-weighted,"Fondo de tríceps (Con peso)",,fundamental sin video
+MANTENER,triceps,floor-triceps-dip,"Fondo de tríceps en el suelo",,fundamental sin video
+MANTENER,triceps,wide-elbow-triceps-press-dumbbell,"Press de tríceps con codos abiertos (Mancuerna)",,fundamental sin video
+MANTENER,triceps,seated-triceps-press,"Press de tríceps sentado",,fundamental sin video
+MANTENER,triceps,jm-press-barbell,"Press JM (Barra)",,fundamental sin video
+RESCATAR,chest,cable-fly,"Cruces en polea",cable,video concreto: female-cable-pec-fly-side.mp4

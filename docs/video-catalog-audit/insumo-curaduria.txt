@@ -1,0 +1,402 @@
+
+######## BACK (30 sin video) ########
+  back-extension-hyperextension            "Extensión de espalda (Hiperextensión)" [bodyweight]
+      → 0.20 female-Bodyweight-bodyweight-tricep-extension-front.mp4  |  0.20 female-Bodyweight-bodyweight-tricep-extension-side.mp4
+  back-extension-weighted-hyperextension   "Extensión de espalda (Hiperextensión con peso)" [bodyweight]
+      → 0.17 female-Bodyweight-bodyweight-tricep-extension-front.mp4  |  0.17 female-Bodyweight-bodyweight-tricep-extension-side.mp4
+  bent-over-row-dumbbell                   "Remo inclinado (Mancuerna)" [dumbbell]
+      → 0.20 female-dumbbell-pendlay-row-front.mp4  |  0.20 female-dumbbell-pendlay-row-side.mp4
+  chest-supported-incline-row-dumbbell     "Remo inclinado con soporte de pecho (Mancuerna)" [dumbbell]
+      → 0.33 female-dumbbell-incline-chest-fly-front.mp4  |  0.33 female-dumbbell-incline-chest-fly-side.mp4
+  chin-up-weighted                         "Dominada supina (Con peso)" [bodyweight]
+      → 0.40 female-Bodyweight-bodyweight-assisted-chin-up-front.mp4  |  0.40 female-Bodyweight-bodyweight-assisted-chin-up-side.mp4
+  iso-lateral-high-row-machine             "Remo alto isolateral (Máquina)" [machine]
+      → 0.17 female-Machine-machine-neutral-row-front.mp4  |  0.17 female-Machine-machine-neutral-row-side.mp4
+  iso-lateral-low-row                      "Remo bajo isolateral" [bodyweight]
+      → 0.17 female-Bodyweight-lateral-lunge-front.mp4  |  0.17 female-Bodyweight-lateral-lunge-side.mp4
+  iso-lateral-row-machine                  "Remo isolateral (Máquina)" [machine]
+      → 0.20 female-Machine-machine-neutral-row-front.mp4  |  0.20 female-Machine-machine-neutral-row-side.mp4
+  kipping-pull-up                          "Dominada kipping" [bodyweight]
+      → 0.40 female-Bodyweight-bodyweight-assisted-pull-up-front.mp4  |  0.40 female-Bodyweight-bodyweight-assisted-pull-up-side.mp4
+  lat-pulldown-band                        "Jalón al pecho (Banda)" [band]
+      → 0.25 female-Band-band-kneeling-pulldown-front.mp4  |  0.25 female-Band-band-kneeling-pulldown-side.mp4
+  lat-pulldown-cable                       "Jalón al pecho (Polea)" [cable]
+      → 0.25 female-Cables-cable-lat-prayer-front.mp4  |  0.25 female-Cables-cable-lat-prayer-side.mp4
+  lat-pulldown-close-grip-cable            "Jalón al pecho agarre cerrado (Polea)" [cable]
+      → 0.17 female-Cables-cable-lat-prayer-front.mp4  |  0.17 female-Cables-cable-lat-prayer-side.mp4
+  low-row-suspension                       "Remo bajo (TRX)" [suspension]
+      → 0.25 female-trx-rotating-row-front.mp4  |  0.25 female-trx-rotating-row-side.mp4
+  negative-pull-up                         "Dominada negativa" [bodyweight]
+      → 0.40 female-Bodyweight-bodyweight-assisted-pull-up-front.mp4  |  0.40 female-Bodyweight-bodyweight-assisted-pull-up-side.mp4
+  pull-up-band                             "Dominada (Banda)" [band]
+      → 0.25 female-Band-band-face-pull-front.mp4  |  0.25 female-Band-band-face-pull-side.mp4
+  pull-up-weighted                         "Dominada (Con peso)" [bodyweight]
+      → 0.40 female-Bodyweight-bodyweight-assisted-pull-up-front.mp4  |  0.40 female-Bodyweight-bodyweight-assisted-pull-up-side.mp4
+  reverse-grip-lat-pulldown-cable          "Jalón al pecho agarre supino (Polea)" [cable]
+      → 0.29 female-Cables-cable-bar-reverse-grip-curl-front.mp4  |  0.29 female-Cables-cable-bar-reverse-grip-curl-side.mp4
+  rope-straight-arm-pulldown               "Jalón con brazos rectos y cuerda" [bodyweight]
+      → 0.14 female-Bodyweight-backward-arm-circle-front.mp4  |  0.14 female-Bodyweight-backward-arm-circle-side.mp4
+  scapular-pull-ups                        "Dominadas escapulares" [bodyweight]
+      → 0.20 female-Bodyweight-bodyweight-superman-pull-front.mp4  |  0.20 female-Bodyweight-bodyweight-superman-pull-side.mp4
+  seated-cable-row-bar-grip                "Remo sentado en polea (Agarre de barra)" [bodyweight]
+      → 0.14 female-bodyweight-reverse-row-front.mp4  |  0.14 female-bodyweight-reverse-row-side.mp4
+  seated-cable-row-bar-wide-grip           "Remo sentado en polea (Agarre abierto)" [bodyweight]
+      → 0.13 female-bodyweight-reverse-row-front.mp4  |  0.13 female-bodyweight-reverse-row-side.mp4
+  seated-cable-row-v-grip-cable            "Remo sentado en polea (Agarre en V)" [cable]
+      → 0.25 female-Cables-cable-v-bar-standing-row-front.mp4  |  0.25 female-Cables-cable-v-bar-standing-row-side.mp4
+  shrug-smith-machine                      "Encogimiento (Multipower)" [smith-machine]
+      → (NADA mismo equipo)
+  single-arm-cable-row                     "Remo en polea a un brazo" [bodyweight]
+      → 0.17 female-bodyweight-reverse-row-front.mp4  |  0.17 female-bodyweight-reverse-row-side.mp4
+  single-arm-lat-pulldown                  "Jalón al pecho a un brazo" [bodyweight]
+      → 0.14 female-Bodyweight-backward-arm-circle-front.mp4  |  0.14 female-Bodyweight-backward-arm-circle-side.mp4
+  sternum-pull-up-gironda                  "Dominada al esternón (Gironda)" [bodyweight]
+      → 0.33 female-Bodyweight-bodyweight-assisted-pull-up-front.mp4  |  0.33 female-Bodyweight-bodyweight-assisted-pull-up-side.mp4
+  straight-arm-lat-pulldown-cable          "Jalón con brazos rectos (Polea)" [cable]
+      → 0.29 female-Cables-cable-single-arm-lat-prayer-front.mp4  |  0.29 female-Cables-cable-single-arm-lat-prayer-side.mp4
+  t-bar-row                                "Remo en T" [bodyweight]
+      → 0.20 female-bodyweight-reverse-row-front.mp4  |  0.20 female-bodyweight-reverse-row-side.mp4
+  vertical-traction-machine                "Tracción vertical (Máquina)" [machine]
+      → 0.20 female-Machine-vertical-leg-press-front.mp4  |  0.20 female-Machine-vertical-leg-press-side.mp4
+  wide-pull-up                             "Dominada abierta" [bodyweight]
+      → 0.40 female-Bodyweight-bodyweight-assisted-pull-up-front.mp4  |  0.40 female-Bodyweight-bodyweight-assisted-pull-up-side.mp4
+
+######## BICEPS (8 sin video) ########
+  behind-the-back-curl-cable               "Curl tras la espalda (Polea)" [cable]
+      → 0.33 female-Cables-cable-behind-the-back-lateral-raise-front.mp4  |  0.33 female-Cables-cable-behind-the-back-lateral-raise-side.mp4
+  cross-body-hammer-curl                   "Curl martillo cruzado" [bodyweight]
+      → 0.17 female-Bodyweight-bodyweight-concentration-curl-front.mp4  |  0.17 female-Bodyweight-bodyweight-concentration-curl-side.mp4
+  overhead-curl-cable                      "Curl por encima de la cabeza (Polea)" [cable]
+      → 0.25 female-cable-hamstring-curl-front.mp4  |  0.25 female-cable-hamstring-curl-side.mp4
+  pinwheel-curl-dumbbell                   "Curl molinete (Mancuerna)" [dumbbell]
+      → 0.33 female-Dumbbells-dumbbell-curl-front.mp4  |  0.33 female-Dumbbells-dumbbell-curl-side.mp4
+  reverse-grip-concentration-curl          "Curl concentrado agarre inverso" [bodyweight]
+      → 0.40 female-Bodyweight-bodyweight-concentration-curl-front.mp4  |  0.40 female-Bodyweight-bodyweight-concentration-curl-side.mp4
+  seated-palms-up-wrist-curl               "Curl de muñeca sentado con palmas arriba" [bodyweight]
+      → 0.14 female-Bodyweight-bodyweight-concentration-curl-front.mp4  |  0.14 female-Bodyweight-bodyweight-concentration-curl-side.mp4
+  waiter-curl-dumbbell                     "Curl camarero (Mancuerna)" [dumbbell]
+      → 0.33 female-Dumbbells-dumbbell-curl-front.mp4  |  0.33 female-Dumbbells-dumbbell-curl-side.mp4
+  wrist-roller                             "Enrollador de muñeca" [bodyweight]
+      → (NADA mismo equipo)
+
+######## CALVES (4 sin video) ########
+  calf-extension-machine                   "Extensión de gemelos (Máquina)" [machine]
+      → 0.25 female-machine-leg-extension-front.mp4  |  0.25 female-machine-leg-extension-side.mp4
+  calf-press-machine                       "Press de gemelos (Máquina)" [machine]
+      → 0.33 female-Machine-machine-horizontal-leg-press-calf-jump-front.mp4  |  0.33 female-Machine-machine-horizontal-leg-press-calf-jump-side.mp4
+  single-leg-standing-calf-raise-barbell   "Elevación de gemelo de pie a una pierna (Barra)" [barbell]
+      → 0.33 female-Barbell-barbell-calf-raises-front.mp4  |  0.33 female-Barbell-barbell-calf-raises-side.mp4
+  single-leg-standing-calf-raise-machine   "Elevación de gemelo de pie a una pierna (Máquina)" [machine]
+      → 0.50 female-machine-standing-calf-raises-front.mp4  |  0.50 female-machine-standing-calf-raises-side.mp4
+
+######## CARDIO (21 sin video) ########
+  aerobics                                 "Aeróbic" [bodyweight]
+      → (NADA mismo equipo)
+  air-bike                                 "Bicicleta de aire" [bodyweight]
+      → (NADA mismo equipo)
+  battle-ropes                             "Cuerdas de batalla" [bodyweight]
+      → (NADA mismo equipo)
+  boxing                                   "Boxeo" [bodyweight]
+      → (NADA mismo equipo)
+  climbing                                 "Escalada" [bodyweight]
+      → (NADA mismo equipo)
+  cycling                                  "Ciclismo" [bodyweight]
+      → (NADA mismo equipo)
+  elliptical-trainer                       "Elíptica" [bodyweight]
+      → (NADA mismo equipo)
+  hiit                                     "HIIT" [bodyweight]
+      → (NADA mismo equipo)
+  hiking                                   "Senderismo" [bodyweight]
+      → (NADA mismo equipo)
+  rowing-machine                           "Máquina de remo" [machine]
+      → (NADA mismo equipo)
+  running                                  "Correr" [bodyweight]
+      → (NADA mismo equipo)
+  skating                                  "Patinaje" [bodyweight]
+      → (NADA mismo equipo)
+  skiing                                   "Esquí" [bodyweight]
+      → (NADA mismo equipo)
+  snowboarding                             "Snowboard" [bodyweight]
+      → (NADA mismo equipo)
+  spinning                                 "Spinning" [bodyweight]
+      → (NADA mismo equipo)
+  sprints                                  "Sprints" [bodyweight]
+      → (NADA mismo equipo)
+  stair-machine-floors                     "Escaladora (Pisos)" [bodyweight]
+      → (NADA mismo equipo)
+  stair-machine-steps                      "Escaladora (Escalones)" [bodyweight]
+      → 0.20 female-Bodyweight-bodyweight-step-down-front.mp4  |  0.20 female-Bodyweight-bodyweight-step-down-side.mp4
+  swimming                                 "Natación" [bodyweight]
+      → (NADA mismo equipo)
+  treadmill                                "Cinta de correr" [bodyweight]
+      → (NADA mismo equipo)
+  walking                                  "Caminar" [bodyweight]
+      → 0.25 female-Bodyweight-tip-toe-walking-front.mp4  |  0.25 female-Bodyweight-tip-toe-walking-side.mp4
+
+######## CHEST (23 sin video) ########
+  around-the-world                         "Around the World (Círculos con mancuernas)" [bodyweight]
+      → (NADA mismo equipo)
+  bench-press-wide-grip-barbell            "Press de banca agarre abierto (Barra)" [barbell]
+      → 0.50 female-Barbell-barbell-close-grip-bench-press-front.mp4  |  0.50 female-Barbell-barbell-close-grip-bench-press-side.mp4
+  butterfly-pec-deck                       "Contractor de pecho (Pec Deck)" [bodyweight]
+      → 0.20 female-Bodyweight-bodyweight-butterfly-stretch-front.mp4  |  0.20 female-Bodyweight-bodyweight-butterfly-stretch-side.mp4
+  cable-fly                                "Cruces en polea" [cable]
+      → 0.33 female-cable-pec-fly-front.mp4  |  0.33 female-cable-pec-fly-side.mp4
+  chest-dip-weighted                       "Fondo de pecho (Con peso)" [bodyweight]
+      → 0.25 female-Bodyweight-dips-front.mp4  |  0.25 female-Bodyweight-dips-side.mp4
+  chest-fly-machine                        "Apertura de pecho (Máquina)" [machine]
+      → 0.25 female-Machine-machine-chest-press-front.mp4  |  0.25 female-Machine-machine-chest-press-side.mp4
+  clap-push-ups                            "Flexiones con palmada" [bodyweight]
+      → 0.40 female-Bodyweight-bodyweight-knee-push-ups-front.mp4  |  0.40 female-Bodyweight-bodyweight-knee-push-ups-side.mp4
+  decline-bench-press-barbell              "Press de banca declinado (Barra)" [barbell]
+      → 0.50 female-barbell-bench-press-front.mp4  |  0.50 female-barbell-bench-press-side.mp4
+  decline-bench-press-machine              "Press de banca declinado (Máquina)" [machine]
+      → 0.29 female-Machine-machine-plate-loaded-decline-chest-press-front.mp4  |  0.29 female-Machine-machine-plate-loaded-decline-chest-press-side.mp4
+  decline-bench-press-smith-machine        "Press de banca declinado (Multipower)" [smith-machine]
+      → 0.40 female-Smithmachine-bench-press-front.mp4  |  0.40 female-Smithmachine-bench-press-side.mp4
+  hex-press-dumbbell                       "Press hex (Mancuerna)" [dumbbell]
+      → 0.25 female-dumbbell-bench-press-front_9Asgczg.mp4  |  0.25 female-dumbbell-bench-press-side_5wGWrBA.mp4
+  incline-chest-press-machine              "Press de pecho inclinado (Máquina)" [machine]
+      → 0.50 female-Machine-machine-chest-press-front.mp4  |  0.50 female-Machine-machine-chest-press-side.mp4
+  incline-push-ups                         "Flexiones inclinadas" [bodyweight]
+      → 0.40 female-Bodyweight-bodyweight-knee-push-ups-front.mp4  |  0.40 female-Bodyweight-bodyweight-knee-push-ups-side.mp4
+  iso-lateral-chest-press-machine          "Press de pecho isolateral (Máquina)" [machine]
+      → 0.40 female-Machine-machine-chest-press-front.mp4  |  0.40 female-Machine-machine-chest-press-side.mp4
+  kneeling-push-up                         "Flexión de rodillas" [bodyweight]
+      → 0.50 female-Bodyweight-push-up-front.mp4  |  0.50 female-Bodyweight-push-up-side.mp4
+  low-cable-fly-crossovers                 "Cruces bajos en polea" [bodyweight]
+      → 0.13 female-Bodyweight-ring-rear-delt-fly-front.mp4  |  0.13 female-Bodyweight-ring-rear-delt-fly-side.mp4
+  one-arm-push-up                          "Flexión a un brazo" [bodyweight]
+      → 0.40 female-Bodyweight-push-up-front.mp4  |  0.40 female-Bodyweight-push-up-side.mp4
+  plank-pushup                             "Plancha con flexión" [bodyweight]
+      → 0.25 female-Bodyweight-bodyweight-plank-jack-front.mp4  |  0.25 female-Bodyweight-bodyweight-plank-jack-side.mp4
+  plate-press                              "Press con disco" [plate]
+      → 0.33 female-plate-clean-and-press-front.mp4  |  0.33 female-plate-clean-and-press-side.mp4
+  plate-squeeze-svend-press                "Press de disco (Svend Press)" [plate]
+      → 0.20 female-plate-clean-and-press-front.mp4  |  0.20 female-plate-clean-and-press-side.mp4
+  push-up-close-grip                       "Flexión agarre cerrado" [bodyweight]
+      → 0.40 female-Bodyweight-push-up-front.mp4  |  0.40 female-Bodyweight-push-up-side.mp4
+  ring-push-up                             "Flexión en anillas" [bodyweight]
+      → 0.50 female-Bodyweight-push-up-front.mp4  |  0.50 female-Bodyweight-push-up-side.mp4
+  single-arm-cable-crossover               "Cruce en polea a un brazo" [bodyweight]
+      → 0.14 female-Bodyweight-backward-arm-circle-front.mp4  |  0.14 female-Bodyweight-backward-arm-circle-side.mp4
+
+######## CORE (28 sin video) ########
+  ab-scissors                              "Tijeras abdominales" [bodyweight]
+      → 0.25 female-Bodyweight-scissor-kick-front.mp4  |  0.25 female-Bodyweight-scissor-kick-side.mp4
+  ab-wheel                                 "Rueda abdominal" [bodyweight]
+      → (NADA mismo equipo)
+  cable-core-palloff-press                 "Press Pallof en polea" [cable]
+      → 0.20 female-cable-overhead-press-front.mp4  |  0.20 female-cable-overhead-press-side.mp4
+  cable-twist-down-to-up                   "Giro en polea (de abajo hacia arriba)" [cable]
+      → 0.20 female-Cables-cable-push-down-front.mp4  |  0.20 female-Cables-cable-push-down-side.mp4
+  cable-twist-up-to-down                   "Giro en polea (de arriba hacia abajo)" [cable]
+      → 0.20 female-Cables-cable-push-down-front.mp4  |  0.20 female-Cables-cable-push-down-side.mp4
+  decline-crunch-weighted                  "Crunch declinado (Con peso)" [bodyweight]
+      → 0.25 female-bodyweight-crunch-front.mp4  |  0.25 female-bodyweight-crunch-side.mp4
+  dragon-flag                              "Dragon flag" [bodyweight]
+      → (NADA mismo equipo)
+  dragonfly                                "Dragonfly" [bodyweight]
+      → (NADA mismo equipo)
+  elbow-to-knee                            "Codo a rodilla" [bodyweight]
+      → 0.20 female-Bodyweight-bodyweight-hanging-knee-tuck-front.mp4  |  0.20 female-Bodyweight-bodyweight-hanging-knee-tuck-side.mp4
+  flutter-kicks                            "Patada de tijera" [bodyweight]
+      → 0.25 female-Bodyweight-scissor-kick-front.mp4  |  0.25 female-Bodyweight-scissor-kick-side.mp4
+  heel-taps                                "Toques de talón" [bodyweight]
+      → 0.20 female-Bodyweight-alternating-heel-touch-front.mp4  |  0.20 female-Bodyweight-alternating-heel-touch-side.mp4
+  hollow-rock                              "Hollow rock (Balanceo en hueco)" [bodyweight]
+      → 0.25 female-Bodyweight-hollow-hold-front.mp4  |  0.25 female-Bodyweight-hollow-hold-side.mp4
+  jack-knife-suspension                    "Navaja (TRX)" [suspension]
+      → (NADA mismo equipo)
+  jackknife-sit-up                         "Abdominal navaja" [bodyweight]
+      → 0.40 female-Bodyweight-frog-sit-up-front.mp4  |  0.40 female-Bodyweight-frog-sit-up-side.mp4
+  knee-raise-parallel-bars                 "Elevación de rodillas en paralelas" [bodyweight]
+      → 0.33 female-bodyweight-hanging-knee-raises-front.mp4  |  0.33 female-bodyweight-hanging-knee-raises-side.mp4
+  landmine-180                             "Landmine 180" [bodyweight]
+      → (NADA mismo equipo)
+  leg-raise-parallel-bars                  "Elevación de piernas en paralelas" [bodyweight]
+      → 0.33 female-Bodyweight-alternating-leg-raise-front.mp4  |  0.33 female-Bodyweight-alternating-leg-raise-side.mp4
+  lying-knee-raise                         "Elevación de rodillas tumbado" [bodyweight]
+      → 0.40 female-bodyweight-hanging-knee-raises-front.mp4  |  0.40 female-bodyweight-hanging-knee-raises-side.mp4
+  lying-leg-raise                          "Elevación de piernas tumbado" [bodyweight]
+      → 0.40 female-Bodyweight-alternating-leg-raise-front.mp4  |  0.40 female-Bodyweight-alternating-leg-raise-side.mp4
+  reverse-plank                            "Plancha inversa" [bodyweight]
+      → 0.25 female-Bodyweight-bodyweight-plank-jack-front.mp4  |  0.25 female-Bodyweight-bodyweight-plank-jack-side.mp4
+  sit-up                                   "Abdominal completo (Sit up)" [bodyweight]
+      → 0.50 female-Bodyweight-frog-sit-up-front.mp4  |  0.50 female-Bodyweight-frog-sit-up-side.mp4
+  sit-up-weighted                          "Abdominal completo (Con peso)" [bodyweight]
+      → 0.40 female-Bodyweight-frog-sit-up-front.mp4  |  0.40 female-Bodyweight-frog-sit-up-side.mp4
+  spiderman                                "Spiderman" [bodyweight]
+      → (NADA mismo equipo)
+  stretching                               "Estiramientos" [bodyweight]
+      → (NADA mismo equipo)
+  toe-touch                                "Toque de puntas" [bodyweight]
+      → 0.20 female-Bodyweight-alternating-heel-touch-front.mp4  |  0.20 female-Bodyweight-alternating-heel-touch-side.mp4
+  toes-to-bar                              "Pies a la barra" [bodyweight]
+      → 0.20 female-Bodyweight-parralel-bar-dips-front.mp4  |  0.20 female-Bodyweight-parralel-bar-dips-side.mp4
+  torso-rotation                           "Rotación de torso" [bodyweight]
+      → 0.20 female-Bodyweight-bodyweight-thoracic-spine-rotation-front.mp4  |  0.20 female-Bodyweight-bodyweight-thoracic-spine-rotation-side.mp4
+  v-up                                     "V up (Abdominal en V)" [bodyweight]
+      → 0.33 female-Bodyweight-stability-ball-v-up-pass-front.mp4  |  0.33 female-Bodyweight-stability-ball-v-up-pass-side.mp4
+
+######## FULLBODY (26 sin video) ########
+  ball-slams                               "Golpes con balón medicinal" [bodyweight]
+      → 0.20 female-Bodyweight-bodyweight-stability-ball-crunch-front.mp4  |  0.20 female-Bodyweight-bodyweight-stability-ball-crunch-side.mp4
+  burpee-over-the-bar                      "Burpee sobre la barra" [bodyweight]
+      → 0.25 female-bodyweight-burpee-front.mp4  |  0.25 female-bodyweight-burpee-side.mp4
+  clean-pull                               "Tirón de cargada" [bodyweight]
+      → 0.25 female-Bodyweight-bodyweight-superman-pull-front.mp4  |  0.25 female-Bodyweight-bodyweight-superman-pull-side.mp4
+  deadlift-high-pull                       "Peso muerto con tirón alto" [bodyweight]
+      → 0.20 female-Bodyweight-bodyweight-superman-pull-front.mp4  |  0.20 female-Bodyweight-bodyweight-superman-pull-side.mp4
+  dumbbell-snatch                          "Arranque con mancuerna" [dumbbell]
+      → (NADA mismo equipo)
+  front-lever-hold                         "Front lever isométrico" [bodyweight]
+      → 0.20 female-Bodyweight-hollow-hold-front.mp4  |  0.20 female-Bodyweight-hollow-hold-side.mp4
+  front-lever-raise                        "Elevación a front lever" [bodyweight]
+      → 0.20 female-Bodyweight-calf-raises-front.mp4  |  0.20 female-Bodyweight-calf-raises-side.mp4
+  handstand-hold                           "Parada de manos isométrica" [bodyweight]
+      → 0.25 female-Bodyweight-hollow-hold-front.mp4  |  0.25 female-Bodyweight-hollow-hold-side.mp4
+  hang-clean                               "Cargada colgante" [bodyweight]
+      → 0.25 female-Bodyweight-dead-hang-front.mp4  |  0.25 female-Bodyweight-dead-hang-side.mp4
+  hang-snatch                              "Arranque colgante" [bodyweight]
+      → 0.25 female-Bodyweight-dead-hang-front.mp4  |  0.25 female-Bodyweight-dead-hang-side.mp4
+  high-knee-skips                          "Skipping alto con salto" [bodyweight]
+      → 0.17 female-Bodyweight-bodyweight-hanging-knee-tuck-front.mp4  |  0.17 female-Bodyweight-bodyweight-hanging-knee-tuck-side.mp4
+  high-knees                               "Rodillas altas" [bodyweight]
+      → 0.20 female-Bodyweight-bodyweight-hanging-knee-tuck-front.mp4  |  0.20 female-Bodyweight-bodyweight-hanging-knee-tuck-side.mp4
+  jump-shrug                               "Encogimiento con salto" [bodyweight]
+      → 0.25 female-Bodyweight-bodyweight-pike-shrug-front.mp4  |  0.25 female-Bodyweight-bodyweight-pike-shrug-side.mp4
+  kettlebell-clean                         "Cargada con pesa rusa" [kettlebell]
+      → 0.33 female-Kettlebells-clean-and-press-front.mp4  |  0.33 female-Kettlebells-clean-and-press-side.mp4
+  kettlebell-high-pull                     "Tirón alto con pesa rusa" [kettlebell]
+      → 0.17 female-Kettlebells-kettlebell-high-incline-bench-press-front.mp4  |  0.17 female-Kettlebells-kettlebell-high-incline-bench-press-side.mp4
+  kettlebell-snatch                        "Arranque con pesa rusa" [kettlebell]
+      → 0.33 female-Kettlebells-double-snatch-front.mp4  |  0.33 female-Kettlebells-double-snatch-side.mp4
+  kettlebell-turkish-get-up                "Levantada turca con pesa rusa" [kettlebell]
+      → 0.20 female-Kettlebells-kettlebell-step-up-front.mp4  |  0.20 female-Kettlebells-kettlebell-step-up-side.mp4
+  landmine-squat-and-press                 "Sentadilla y press landmine" [bodyweight]
+      → 0.25 female-Bodyweight-bodyweight-squat-front.mp4  |  0.25 female-Bodyweight-bodyweight-squat-side.mp4
+  muscle-up                                "Muscle up" [bodyweight]
+      → 0.25 female-Bodyweight-push-up-front.mp4  |  0.25 female-Bodyweight-push-up-side.mp4
+  pilates                                  "Pilates" [bodyweight]
+      → (NADA mismo equipo)
+  power-clean                              "Cargada de potencia" [bodyweight]
+      → (NADA mismo equipo)
+  press-under                              "Press under" [bodyweight]
+      → 0.25 female-Bodyweight-bodyweight-pike-press-front.mp4  |  0.25 female-Bodyweight-bodyweight-pike-press-side.mp4
+  sled-push                                "Empuje de trineo" [bodyweight]
+      → 0.25 female-Bodyweight-push-up-front.mp4  |  0.25 female-Bodyweight-push-up-side.mp4
+  squat-row                                "Sentadilla con remo" [bodyweight]
+      → 0.33 female-Bodyweight-bodyweight-squat-front.mp4  |  0.33 female-Bodyweight-bodyweight-squat-side.mp4
+  warm-up                                  "Calentamiento" [bodyweight]
+      → 0.25 female-Bodyweight-push-up-front.mp4  |  0.25 female-Bodyweight-push-up-side.mp4
+  yoga                                     "Yoga" [bodyweight]
+      → (NADA mismo equipo)
+
+######## GLUTES (11 sin video) ########
+  clamshell                                "Almeja (Clamshell)" [bodyweight]
+      → (NADA mismo equipo)
+  deadlift-band                            "Peso muerto (Banda)" [band]
+      → 0.33 female-Band-band-romanian-deadlift-front.mp4  |  0.33 female-Band-band-romanian-deadlift-side.mp4
+  deadlift-dumbbell                        "Peso muerto (Mancuerna)" [dumbbell]
+      → 0.33 female-Dumbbells-dumbbell-romanian-deadlift-front.mp4  |  0.33 female-Dumbbells-dumbbell-romanian-deadlift-side.mp4
+  deadlift-smith-machine                   "Peso muerto (Multipower)" [smith-machine]
+      → 0.25 female-Smithmachine-romanian-deadlift-front.mp4  |  0.25 female-Smithmachine-romanian-deadlift-side.mp4
+  fire-hydrants                            "Hidrante (Fire hydrant)" [bodyweight]
+      → (NADA mismo equipo)
+  frog-pumps-dumbbell                      "Empuje de glúteo rana (Mancuerna)" [dumbbell]
+      → (NADA mismo equipo)
+  glute-kickback-on-floor                  "Patada de glúteo en el suelo" [bodyweight]
+      → 0.20 female-Bodyweight-kickbacks-front.mp4  |  0.20 female-Bodyweight-kickbacks-side.mp4
+  lateral-band-walks                       "Caminata lateral con banda" [bodyweight]
+      → 0.20 female-Bodyweight-lateral-lunge-front.mp4  |  0.20 female-Bodyweight-lateral-lunge-side.mp4
+  lateral-leg-raises                       "Elevación lateral de pierna" [bodyweight]
+      → 0.40 female-Bodyweight-alternating-leg-raise-front.mp4  |  0.40 female-Bodyweight-alternating-leg-raise-side.mp4
+  rear-kick-machine                        "Patada trasera (Máquina)" [machine]
+      → 0.20 female-Machine-machine-rear-deltoid-row-front.mp4  |  0.20 female-Machine-machine-rear-deltoid-row-side.mp4
+  standing-cable-glute-kickbacks           "Patada de glúteo de pie en polea" [bodyweight]
+      → 0.20 female-Bodyweight-kickbacks-front.mp4  |  0.20 female-Bodyweight-kickbacks-side.mp4
+
+######## HAMSTRINGS (3 sin video) ########
+  lying-leg-curl-machine                   "Curl femoral tumbado (Máquina)" [machine]
+      → 0.40 female-Machine-machine-seated-leg-curl-front.mp4  |  0.40 female-Machine-machine-seated-leg-curl-side.mp4
+  standing-leg-curls                       "Curl femoral de pie" [bodyweight]
+      → 0.38 female-Recovery-hamstring-curl-standing-bodyweight-single-leg-front.mp4  |  0.38 female-Recovery-hamstring-curl-standing-bodyweight-single-leg-side.mp4
+  straight-leg-deadlift                    "Peso muerto con piernas rectas" [bodyweight]
+      → 0.25 female-Bodyweight-stability-ball-straight-leg-glute-bridge-front.mp4  |  0.25 female-Bodyweight-stability-ball-straight-leg-glute-bridge-side.mp4
+
+######## QUADS (13 sin video) ########
+  assisted-pistol-squats                   "Sentadilla pistol asistida" [bodyweight]
+      → 0.40 female-Bodyweight-bodyweight-assisted-sissy-squat-front.mp4  |  0.40 female-Bodyweight-bodyweight-assisted-sissy-squat-side.mp4
+  frog-jumps                               "Saltos de rana" [bodyweight]
+      → 0.25 female-Bodyweight-box-jump-front.mp4  |  0.25 female-Bodyweight-box-jump-side.mp4
+  jumping-lunge                            "Estocada con salto" [bodyweight]
+      → 0.25 female-Bodyweight-bodyweight-reverse-lunge-front.mp4  |  0.25 female-Bodyweight-bodyweight-reverse-lunge-side.mp4
+  lateral-box-jump                         "Salto lateral al cajón" [bodyweight]
+      → 0.50 female-Bodyweight-box-jump-front.mp4  |  0.50 female-Bodyweight-box-jump-side.mp4
+  lateral-squat                            "Sentadilla lateral" [bodyweight]
+      → 0.33 female-Bodyweight-bodyweight-squat-front.mp4  |  0.33 female-Bodyweight-bodyweight-squat-side.mp4
+  overhead-dumbbell-lunge                  "Estocada con mancuerna sobre la cabeza" [bodyweight]
+      → 0.20 female-Bodyweight-bodyweight-reverse-lunge-front.mp4  |  0.20 female-Bodyweight-bodyweight-reverse-lunge-side.mp4
+  pause-squat-barbell                      "Sentadilla con pausa (Barra)" [barbell]
+      → 0.50 female-barbell-pause-box-squat-front.mp4  |  0.50 female-barbell-pause-box-squat-front_wdR93zG.mp4
+  pistol-squat                             "Sentadilla pistol" [bodyweight]
+      → 0.33 female-Bodyweight-bodyweight-squat-front.mp4  |  0.33 female-Bodyweight-bodyweight-squat-side.mp4
+  single-leg-extensions                    "Extensión de cuádriceps a una pierna" [bodyweight]
+      → 0.40 female-Bodyweight-bodyweight-single-leg-squat-front.mp4  |  0.40 female-Bodyweight-bodyweight-single-leg-squat-side.mp4
+  sissy-squat-weighted                     "Sentadilla sissy (Con peso)" [bodyweight]
+      → 0.40 female-Bodyweight-bodyweight-assisted-sissy-squat-front.mp4  |  0.40 female-Bodyweight-bodyweight-assisted-sissy-squat-side.mp4
+  sumo-squat-barbell                       "Sentadilla sumo (Barra)" [barbell]
+      → 0.33 female-Barbell-barbell-squat-front.mp4  |  0.33 female-Barbell-barbell-squat-side.mp4
+  sumo-squat-kettlebell                    "Sentadilla sumo (Pesa rusa)" [kettlebell]
+      → 0.25 female-Kettlebells-kettlebell-box-squat-front.mp4  |  0.25 female-Kettlebells-kettlebell-box-squat-side.mp4
+  walking-lunge-dumbbell                   "Estocada caminando (Mancuerna)" [dumbbell]
+      → 0.25 female-Dumbbells-dumbbell-forward-lunge-front.mp4  |  0.25 female-Dumbbells-dumbbell-forward-lunge-side.mp4
+
+######## SHOULDERS (14 sin video) ########
+  band-pullaparts                          "Aperturas con banda" [band]
+      → (NADA mismo equipo)
+  chest-supported-reverse-fly-dumbbell     "Apertura inversa con soporte de pecho (Mancuerna)" [dumbbell]
+      → 0.40 female-dumbbell-chest-fly-front.mp4  |  0.40 female-dumbbell-chest-fly-side.mp4
+  chest-supported-y-raise-dumbbell         "Elevación en Y con soporte de pecho (Mancuerna)" [dumbbell]
+      → 0.17 female-dumbbell-chest-fly-front.mp4  |  0.17 female-dumbbell-chest-fly-side.mp4
+  front-raise-suspension                   "Elevación frontal (TRX)" [suspension]
+      → 0.25 female-trx-calf-raise-front.mp4  |  0.25 female-trx-calf-raise-side.mp4
+  handstand-push-up                        "Flexión en parada de manos" [bodyweight]
+      → 0.50 female-Bodyweight-push-up-front.mp4  |  0.50 female-Bodyweight-push-up-side.mp4
+  kettlebell-around-the-world              "Círculos con pesa rusa" [kettlebell]
+      → (NADA mismo equipo)
+  kettlebell-halo                          "Halo con pesa rusa" [kettlebell]
+      → (NADA mismo equipo)
+  kettlebell-shoulder-press                "Press de hombros con pesa rusa" [kettlebell]
+      → 0.25 female-kettlebell-shoulder-extension-front.mp4  |  0.25 female-kettlebell-shoulder-extension-side.mp4
+  lying-neck-curls-weighted                "Flexión de cuello tumbado (Con peso)" [bodyweight]
+      → 0.17 female-Bodyweight-bodyweight-concentration-curl-front.mp4  |  0.17 female-Bodyweight-bodyweight-concentration-curl-side.mp4
+  lying-neck-extension-weighted            "Extensión de cuello tumbado (Con peso)" [bodyweight]
+      → 0.17 female-Bodyweight-bodyweight-tricep-extension-front.mp4  |  0.17 female-Bodyweight-bodyweight-tricep-extension-side.mp4
+  overhead-plate-raise                     "Elevación de disco sobre la cabeza" [bodyweight]
+      → 0.20 female-Bodyweight-calf-raises-front.mp4  |  0.20 female-Bodyweight-calf-raises-side.mp4
+  seated-shoulder-press-machine            "Press de hombros sentado (Máquina)" [machine]
+      → 0.20 female-Machine-machine-chest-press-front.mp4  |  0.20 female-Machine-machine-chest-press-side.mp4
+  shoulder-taps                            "Toques de hombro" [bodyweight]
+      → 0.17 female-Bodyweight-elevated-pike-shoulder-shrug-front.mp4  |  0.17 female-Bodyweight-elevated-pike-shoulder-shrug-side.mp4
+  single-arm-lateral-raise-cable           "Elevación lateral a un brazo (Polea)" [cable]
+      → 0.40 female-Cables-cable-lateral-raise-front.mp4  |  0.40 female-Cables-cable-lateral-raise-side.mp4
+
+######## TRICEPS (8 sin video) ########
+  diamond-push-up                          "Flexión diamante" [bodyweight]
+      → 0.50 female-Bodyweight-push-up-front.mp4  |  0.50 female-Bodyweight-push-up-side.mp4
+  floor-triceps-dip                        "Fondo de tríceps en el suelo" [bodyweight]
+      → 0.25 female-Bodyweight-dips-front.mp4  |  0.25 female-Bodyweight-dips-side.mp4
+  jm-press-barbell                         "Press JM (Barra)" [barbell]
+      → 0.25 female-Barbell-barbell-bradford-press-front.mp4  |  0.25 female-Barbell-barbell-bradford-press-side.mp4
+  seated-triceps-press                     "Press de tríceps sentado" [bodyweight]
+      → 0.20 female-Bodyweight-bodyweight-pike-press-front.mp4  |  0.20 female-Bodyweight-bodyweight-pike-press-side.mp4
+  triceps-dip-weighted                     "Fondo de tríceps (Con peso)" [bodyweight]
+      → 0.25 female-Bodyweight-dips-front.mp4  |  0.25 female-Bodyweight-dips-side.mp4
+  triceps-extension-suspension             "Extensión de tríceps (TRX)" [suspension]
+      → (NADA mismo equipo)
+  triceps-rope-pushdown                    "Empuje de tríceps con cuerda" [bodyweight]
+      → 0.20 female-Bodyweight-bodyweight-tricep-extension-front.mp4  |  0.20 female-Bodyweight-bodyweight-tricep-extension-side.mp4
+  wide-elbow-triceps-press-dumbbell        "Press de tríceps con codos abiertos (Mancuerna)" [dumbbell]
+      → 0.33 female-Dumbbells-dumbbell-tricep-guillotine-press-front.mp4  |  0.33 female-Dumbbells-dumbbell-tricep-guillotine-press-side.mp4

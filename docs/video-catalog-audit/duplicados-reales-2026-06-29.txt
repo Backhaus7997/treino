@@ -1,0 +1,87 @@
+=== DUPLICADOS EXACTOS (mismo movimiento + mismo equipo) — ALTA CONFIANZA ===
+
+[barbell | deadlift]
+   video deadlift-barbell                         "Peso muerto (Barra)"
+   video deadlift-trap-bar                        "Peso muerto (Barra hexagonal)"
+
+[cable | down-to-twist-up]
+   sin   cable-twist-down-to-up                   "Giro en polea (de abajo hacia arriba)"
+   sin   cable-twist-up-to-down                   "Giro en polea (de arriba hacia abajo)"
+
+
+Total grupos exactos: 2 (4 ids)
+
+
+=== CANDIDATOS A REVISAR (mismo equipo, movimiento casi igual: subconjunto de tokens) ===
+
+[bodyweight] back-extension-hyperextension (sin) "Extensión de espalda (Hiperextensión)" <-> back-extension-hyperextension-weighted (sin) "Extensión de espalda (Hiperextensión con peso)"  | back-extension-hyperextension <-> back-extension-weighted-hyperextension
+[barbell] curl (video) "Curl con barra" <-> bicep-curl (sin) "Curl de bíceps (Barra)"  | barbell-curl <-> bicep-curl-barbell
+[barbell] curl (video) "Curl con barra" <-> curl-preacher (sin) "Curl predicador (Barra)"  | barbell-curl <-> preacher-curl-barbell
+[barbell] curl (video) "Curl con barra" <-> curl-reverse (video) "Curl inverso (Barra)"  | barbell-curl <-> reverse-curl-barbell
+[barbell] curl (video) "Curl con barra" <-> curl-spider (sin) "Curl araña (Barra)"  | barbell-curl <-> spider-curl-barbell
+[barbell] row (video) "Remo con barra" <-> pendlay-row (sin) "Remo Pendlay (Barra)"  | barbell-row <-> pendlay-row-barbell
+[barbell] row (video) "Remo con barra" <-> row-upright (video) "Remo al mentón (Barra)"  | barbell-row <-> upright-row-barbell
+[machine] belt-squat (video) "Sentadilla con cinturón (Máquina)" <-> squat (sin) "Sentadilla (Máquina)"  | belt-squat-machine <-> squat-machine
+[barbell] bench-press (video) "Press de banca (Barra)" <-> bench-decline-press (sin) "Press de banca declinado (Barra)"  | bench-press-barbell <-> decline-bench-press-barbell
+[barbell] bench-press (video) "Press de banca (Barra)" <-> bench-incline-press (video) "Press de banca inclinado (Barra)"  | bench-press-barbell <-> incline-bench-press-barbell
+[dumbbell] bench-press (video) "Press de banca (Mancuerna)" <-> bench-decline-press (video) "Press de banca declinado (Mancuerna)"  | bench-press-dumbbell <-> decline-bench-press-dumbbell
+[dumbbell] bench-press (video) "Press de banca (Mancuerna)" <-> bench-incline-press (video) "Press de banca inclinado (Mancuerna)"  | bench-press-dumbbell <-> incline-bench-press-dumbbell
+[smith-machine] bench-press (sin) "Press de banca (Multipower)" <-> bench-decline-press (sin) "Press de banca declinado (Multipower)"  | bench-press-smith-machine <-> decline-bench-press-smith-machine
+[smith-machine] bench-press (sin) "Press de banca (Multipower)" <-> bench-incline-press (sin) "Press de banca inclinado (Multipower)"  | bench-press-smith-machine <-> incline-bench-press-smith-machine
+[bodyweight] box-jump (video) "Salto al cajón" <-> box-jump-lateral (sin) "Salto lateral al cajón"  | box-jump <-> lateral-box-jump
+[barbell] box-squat (sin) "Sentadilla al cajón (Barra)" <-> squat (video) "Sentadilla (Barra)"  | box-squat-barbell <-> squat-barbell
+[bodyweight] calf-raise (video) "Elevación de pantorrillas" <-> calf-raise-seated (video) "Elevación de gemelos sentado"  | calf-raise <-> seated-calf-raise
+[dumbbell] chest-fly (video) "Apertura de pecho (Mancuerna)" <-> chest-decline-fly (video) "Apertura declinada (Mancuerna)"  | chest-fly-dumbbell <-> decline-chest-fly-dumbbell
+[dumbbell] chest-fly (video) "Apertura de pecho (Mancuerna)" <-> chest-fly-incline (video) "Apertura inclinada (Mancuerna)"  | chest-fly-dumbbell <-> incline-chest-fly-dumbbell
+[machine] chest-press (video) "Press de pecho (Máquina)" <-> chest-incline-press (sin) "Press de pecho inclinado (Máquina)"  | chest-press-machine <-> incline-chest-press-machine
+[bodyweight] clean (video) "Cargada" <-> clean-pull (sin) "Tirón de cargada"  | clean <-> clean-pull
+[bodyweight] clean (video) "Cargada" <-> clean-hang (sin) "Cargada colgante"  | clean <-> hang-clean
+[bodyweight] clean (video) "Cargada" <-> clean-power (sin) "Cargada de potencia"  | clean <-> power-clean
+[bodyweight] crunch-weighted (sin) "Crunch (Con peso)" <-> crunch-decline-weighted (sin) "Crunch declinado (Con peso)"  | crunch-weighted <-> decline-crunch-weighted
+[dumbbell] curtsy-lunge (sin) "Estocada cruzada (Mancuerna)" <-> lunge (sin) "Estocada (Mancuerna)"  | curtsy-lunge-dumbbell <-> lunge-dumbbell
+[barbell] deadlift (video) "Peso muerto (Barra)" <-> deadlift-romanian (video) "Peso muerto rumano (Barra)"  | deadlift-barbell <-> romanian-deadlift-barbell
+[dumbbell] deadlift (sin) "Peso muerto (Mancuerna)" <-> deadlift-romanian (video) "Peso muerto rumano (Mancuerna)"  | deadlift-dumbbell <-> romanian-deadlift-dumbbell
+[barbell] deadlift (video) "Peso muerto (Barra hexagonal)" <-> deadlift-romanian (video) "Peso muerto rumano (Barra)"  | deadlift-trap-bar <-> romanian-deadlift-barbell
+[dumbbell] row (sin) "Remo con mancuerna" <-> renegade-row (video) "Remo renegado (Mancuerna)"  | dumbbell-row <-> renegade-row-dumbbell
+[dumbbell] row (sin) "Remo con mancuerna" <-> row-upright (video) "Remo al mentón (Mancuerna)"  | dumbbell-row <-> upright-row-dumbbell
+[bodyweight] front-squat (video) "Sentadilla frontal" <-> squat (video) "Sentadilla (Peso corporal)"  | front-squat <-> squat-bodyweight
+[machine] hack-squat (video) "Sentadilla hack (Máquina)" <-> squat (sin) "Sentadilla (Máquina)"  | hack-squat-machine <-> squat-machine
+[bodyweight] hang-snatch (sin) "Arranque colgante" <-> snatch (video) "Arranque"  | hang-snatch <-> snatch
+[machine] high-iso-lateral-row (sin) "Remo alto isolateral (Máquina)" <-> iso-lateral-row (sin) "Remo isolateral (Máquina)"  | iso-lateral-high-row-machine <-> iso-lateral-row-machine
+[bodyweight] jackknife-sit-up (sin) "Abdominal navaja" <-> sit-up (sin) "Abdominal completo (Sit up)"  | jackknife-sit-up <-> sit-up
+[bodyweight] jump-squat (video) "Sentadilla con salto" <-> squat (video) "Sentadilla (Peso corporal)"  | jump-squat <-> squat-bodyweight
+[bodyweight] kipping-pull-up (sin) "Dominada kipping" <-> pull-up (video) "Dominadas"  | kipping-pull-up <-> pull-up
+[dumbbell] lateral-raise (video) "Elevación lateral (Mancuerna)" <-> lateral-raise-seated (video) "Elevación lateral sentado (Mancuerna)"  | lateral-raise-dumbbell <-> seated-lateral-raise-dumbbell
+[bodyweight] lateral-squat (sin) "Sentadilla lateral" <-> squat (video) "Sentadilla (Peso corporal)"  | lateral-squat <-> squat-bodyweight
+[machine] horizontal-leg-press (video) "Prensa de piernas horizontal (Máquina)" <-> leg-press (video) "Prensa de piernas (Máquina)"  | leg-press-horizontal-machine <-> leg-press-machine
+[machine] leg-press (video) "Prensa de piernas (Máquina)" <-> leg-press-single (sin) "Prensa a una pierna (Máquina)"  | leg-press-machine <-> single-leg-press-machine
+[barbell] lunge (sin) "Estocada (Barra)" <-> lunge-reverse (video) "Estocada inversa (Barra)"  | lunge-barbell <-> reverse-lunge-barbell
+[dumbbell] lunge (sin) "Estocada (Mancuerna)" <-> lunge-reverse (video) "Estocada inversa (Mancuerna)"  | lunge-dumbbell <-> reverse-lunge-dumbbell
+[dumbbell] lunge (sin) "Estocada (Mancuerna)" <-> lunge-walking (sin) "Estocada caminando (Mancuerna)"  | lunge-dumbbell <-> walking-lunge-dumbbell
+[bodyweight] negative-pull-up (sin) "Dominada negativa" <-> pull-up (video) "Dominadas"  | negative-pull-up <-> pull-up
+[barbell] overhead-press (video) "Press militar (Barra)" <-> overhead-press-seated (sin) "Press militar sentado (Barra)"  | overhead-press-barbell <-> seated-overhead-press-barbell
+[dumbbell] overhead-press (video) "Press militar (Mancuerna)" <-> overhead-press-seated (video) "Press militar sentado (Mancuerna)"  | overhead-press-dumbbell <-> seated-overhead-press-dumbbell
+[bodyweight] overhead-squat (video) "Sentadilla sobre la cabeza" <-> squat (video) "Sentadilla (Peso corporal)"  | overhead-squat <-> squat-bodyweight
+[cable] extension-overhead-triceps (video) "Extensión de tríceps sobre la cabeza (Polea)" <-> extension-triceps (sin) "Extensión de tríceps (Polea)"  | overhead-triceps-extension-cable <-> triceps-extension-cable
+[barbell] pause-squat (sin) "Sentadilla con pausa (Barra)" <-> squat (video) "Sentadilla (Barra)"  | pause-squat-barbell <-> squat-barbell
+[machine] pendulum-squat (video) "Sentadilla péndulo (Máquina)" <-> squat (sin) "Sentadilla (Máquina)"  | pendulum-squat-machine <-> squat-machine
+[bodyweight] pistol-squat (sin) "Sentadilla pistol" <-> squat (video) "Sentadilla (Peso corporal)"  | pistol-squat <-> squat-bodyweight
+[bodyweight] plank (video) "Plancha" <-> plank-pushup (sin) "Plancha con flexión"  | plank <-> plank-pushup
+[bodyweight] plank (video) "Plancha" <-> plank-reverse (sin) "Plancha inversa"  | plank <-> reverse-plank
+[bodyweight] plank (video) "Plancha" <-> plank-side (sin) "Plancha lateral"  | plank <-> side-plank
+[bodyweight] power-snatch (video) "Arranque de potencia" <-> snatch (video) "Arranque"  | power-snatch <-> snatch
+[bodyweight] pull-up (video) "Dominadas" <-> assisted-pull-up (video) "Dominada (Asistida)"  | pull-up <-> pull-up-assisted
+[bodyweight] pull-up (video) "Dominadas" <-> pull-up-weighted (sin) "Dominada (Con peso)"  | pull-up <-> pull-up-weighted
+[bodyweight] pull-up (video) "Dominadas" <-> pull-ring-up (video) "Dominada en anillas"  | pull-up <-> ring-pull-up
+[bodyweight] pull-up (video) "Dominadas" <-> pull-up-wide (sin) "Dominada abierta"  | pull-up <-> wide-pull-up
+[bodyweight] russian-twist (video) "Giro ruso (Peso corporal)" <-> russian-twist-weighted (sin) "Giro ruso (Con peso)"  | russian-twist-bodyweight <-> russian-twist-weighted
+[bodyweight] bar-cable-grip-row-seated (sin) "Remo sentado en polea (Agarre de barra)" <-> bar-cable-grip-row-seated-wide (sin) "Remo sentado en polea (Agarre abierto)"  | seated-cable-row-bar-grip <-> seated-cable-row-bar-wide-grip
+[bodyweight] sit-up (sin) "Abdominal completo (Sit up)" <-> sit-up-weighted (sin) "Abdominal completo (Con peso)"  | sit-up <-> sit-up-weighted
+[dumbbell] split-squat (video) "Sentadilla dividida (Mancuerna)" <-> squat (sin) "Sentadilla (Mancuerna)"  | split-squat-dumbbell <-> squat-dumbbell
+[barbell] squat (video) "Sentadilla (Barra)" <-> squat-sumo (sin) "Sentadilla sumo (Barra)"  | squat-barbell <-> sumo-squat-barbell
+[bodyweight] squat (video) "Sentadilla (Peso corporal)" <-> row-squat (sin) "Sentadilla con remo"  | squat-bodyweight <-> squat-row
+[bodyweight] squat (video) "Sentadilla (Peso corporal)" <-> squat-zercher (video) "Sentadilla Zercher"  | squat-bodyweight <-> zercher-squat
+[dumbbell] squat (sin) "Sentadilla (Mancuerna)" <-> squat-sumo (video) "Sentadilla sumo (Mancuerna)"  | squat-dumbbell <-> sumo-squat-dumbbell
+[bodyweight] pushdown-triceps (video) "Empuje de tríceps" <-> pushdown-rope-triceps (sin) "Empuje de tríceps con cuerda"  | triceps-pushdown <-> triceps-rope-pushdown
+
+Total candidatos subconjunto: 69 pares

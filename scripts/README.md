@@ -38,8 +38,12 @@ Auth UID). Find it in the Firebase Console → Authentication → Users.
 
 1. Validates that `users/{uid}` exists. Exits 1 with an error if not.
 2. Logs the user's `email` and `displayName` for human verification.
-3. Calls `users/{uid}.update({ role: 'trainer' })` via Admin SDK (bypasses
-   the client-side role-immutability rule).
+3. In one batch, via Admin SDK (bypasses the client-side role-immutability rule):
+   - sets `users/{uid}.role = 'trainer'`, and
+   - backfills `displayName` + `displayNameLowercase` into
+     `trainerPublicProfiles/{uid}` with `merge:true`. This is required because
+     the trainer-edit onboarding form never writes the displayName, so without
+     it the trainer appears with a BLANK name in discovery.
 4. Exits 0 on success. Idempotent — re-running on an already-promoted user
    is a no-op that exits 0.
 

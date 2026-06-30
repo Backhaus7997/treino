@@ -29,6 +29,23 @@ import 'muscle_filter_sheet.dart';
 /// the user sees existing context when re-opening the picker.
 ///
 /// ADR-RER-01, REQ-RER-001..004, REQ-RER-017.
+///
+/// Lowercases and strips Spanish diacritics so the search field tolerates
+/// accent and case typos: "elevacion" matches "Elevación", "BICEPS" matches
+/// "Bíceps". Applied to both the query and the candidate text before matching.
+String foldSearch(String input) {
+  final lower = input.toLowerCase();
+  const from = 'áàäâãéèëêíìïîóòöôõúùüûñç';
+  const to = 'aaaaaeeeeiiiiooooouuuunc';
+  final buf = StringBuffer();
+  for (final code in lower.runes) {
+    final ch = String.fromCharCode(code);
+    final idx = from.indexOf(ch);
+    buf.write(idx >= 0 ? to[idx] : ch);
+  }
+  return buf.toString();
+}
+
 Future<List<Exercise>?> showExercisePicker(
   BuildContext context, {
   Set<String> alreadySelectedIds = const {},
@@ -61,6 +78,7 @@ class _ExercisePickerSheetContentState
   Set<MuscleGroup> _muscleFilters = {};
   Set<EquipmentType> _equipmentFilters = {};
   late Set<String> _selected;
+  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
@@ -68,13 +86,24 @@ class _ExercisePickerSheetContentState
     _selected = {...widget.alreadySelectedIds};
   }
 
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _clearQuery() {
+    _searchController.clear();
+    setState(() => _query = '');
+  }
+
   // ── Filter predicate ───────────────────────────────────────────────────────
 
   bool _matches(Exercise e) {
-    final q = _query.toLowerCase().trim();
+    final q = foldSearch(_query).trim();
     if (q.isNotEmpty) {
-      final nameMatch = e.name.toLowerCase().contains(q);
-      final aliasMatch = e.aliases.any((a) => a.toLowerCase().contains(q));
+      final nameMatch = foldSearch(e.name).contains(q);
+      final aliasMatch = e.aliases.any((a) => foldSearch(a).contains(q));
       if (!nameMatch && !aliasMatch) return false;
     }
     // OR within muscle filter, AND across filter types. An exercise matches if
@@ -217,12 +246,22 @@ class _ExercisePickerSheetContentState
                   padding:
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   child: TextField(
+                    controller: _searchController,
                     autofocus: false,
                     style: GoogleFonts.barlow(
                         color: palette.textPrimary, fontSize: 14),
                     decoration: InputDecoration(
                       prefixIcon:
                           Icon(TreinoIcon.search, color: palette.textMuted),
+                      suffixIcon: _query.isEmpty
+                          ? null
+                          : IconButton(
+                              icon: Icon(TreinoIcon.close,
+                                  color: palette.textMuted, size: 18),
+                              tooltip: 'Borrar',
+                              splashRadius: 18,
+                              onPressed: _clearQuery,
+                            ),
                       hintText: 'Buscar ejercicio…',
                       hintStyle: GoogleFonts.barlow(
                           color: palette.textMuted, fontSize: 14),
