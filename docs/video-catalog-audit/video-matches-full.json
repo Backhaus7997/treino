@@ -1,141 +1,15 @@
 [
   {
-    "id": "pistol-squat",
-    "fileId": "1Eyuz0AfwluW_K1i8wAnx_2UtnxAsGoMI",
-    "filename": "male-Bodyweight-bodyweight-single-leg-squat-side.mp4",
+    "id": "handstand-push-up",
+    "fileId": "1yqxVz8hcxPJxBdFNUu58otiNKBzs9YKp",
+    "filename": "male-Bodyweight-bodyweight-pike-press-side.mp4",
     "equipment": "",
     "view": "side"
   },
   {
-    "id": "calf-press-machine",
-    "fileId": "14bTFUOoN9kLtlpTgKChl9pENRzwiokLn",
-    "filename": "male-Machine-machine-horizontal-leg-press-calf-jump-side.mp4",
-    "equipment": "",
-    "view": "side"
-  },
-  {
-    "id": "straight-leg-deadlift",
-    "fileId": "1YPFspnACZ1RIYG1_akMqlsWMv9zMMVDf",
-    "filename": "male-barbell-stiff-leg-deadlift-side.mp4",
-    "equipment": "",
-    "view": "side"
-  },
-  {
-    "id": "deadlift-band",
-    "fileId": "1XYMP3yAJTOThRIk2on0buFr_40vwFdoD",
-    "filename": "male-Band-band-romanian-deadlift-side.mp4",
-    "equipment": "",
-    "view": "side"
-  },
-  {
-    "id": "deadlift-dumbbell",
-    "fileId": "1Fh_6VTLVNt9wmTC589rgHZ614ttjWZF6",
-    "filename": "male-Dumbbells-dumbbell-romanian-deadlift-side.mp4",
-    "equipment": "",
-    "view": "side"
-  },
-  {
-    "id": "deadlift-smith-machine",
-    "fileId": "1p2Td-tgtjJLm4L1cJVSmIBe6irMMb1QT",
-    "filename": "male-Smithmachine-romanian-deadlift-side.mp4",
-    "equipment": "",
-    "view": "side"
-  },
-  {
-    "id": "fire-hydrants",
-    "fileId": "1F_doZHrVd9V1QIwB_GpAMPBfUbL50cWO",
-    "filename": "male-Band-mini-band-fire-hydrant-side.mp4",
-    "equipment": "",
-    "view": "side"
-  },
-  {
-    "id": "clamshell",
-    "fileId": "1EQ8wAWxFIWtaxi0GSSTdT5lJj0TMtihm",
-    "filename": "male-Band-mini-band-clamshell-side.mp4",
-    "equipment": "",
-    "view": "side"
-  },
-  {
-    "id": "lateral-band-walks",
-    "fileId": "12K-qQcwzicJZSIMktGyCO4OcVtZ_Atiz",
-    "filename": "male-Band-mini-band-walking-side-to-side-side.mp4",
-    "equipment": "",
-    "view": "side"
-  },
-  {
-    "id": "standing-cable-glute-kickbacks",
-    "fileId": "19w-47yIWPcMYqUq0T4eHC5WEzord6wNT",
-    "filename": "male-Band-mini-band-standing-glute-kickback-side.mp4",
-    "equipment": "",
-    "view": "side"
-  },
-  {
-    "id": "glute-kickback-on-floor",
-    "fileId": "1FmjNCW_YRP149YWFFB2cOC9D53na-5fH",
-    "filename": "male-Band-band-glute-kickback-side.mp4",
-    "equipment": "",
-    "view": "side"
-  },
-  {
-    "id": "sit-up",
-    "fileId": "1WuHSfCd5QtHpAwoK55ko7vHd6n-uySGC",
-    "filename": "male-Bodyweight-situp-side.mp4",
-    "equipment": "",
-    "view": "side"
-  },
-  {
-    "id": "sit-up-weighted",
-    "fileId": "1_NcJvxLqkSuG1wQSLKIGLQOpm3Cy3Lvx",
-    "filename": "male-plate-situp-side.mp4",
-    "equipment": "",
-    "view": "side"
-  },
-  {
-    "id": "v-up",
-    "fileId": "18hmXC9t5xPxRKAU0yk3NxfNHyoiJ4nxe",
-    "filename": "male-Bodyweight-stability-ball-v-up-pass-side.mp4",
-    "equipment": "",
-    "view": "side"
-  },
-  {
-    "id": "lying-leg-raise",
-    "fileId": "1TUfnSiZnpEe8fe8yRHh3syAP2OJiZVKd",
-    "filename": "male-Bodyweight-laying-leg-raises-side.mp4",
-    "equipment": "",
-    "view": "side"
-  },
-  {
-    "id": "flutter-kicks",
-    "fileId": "1WVP9XVKWZM1N43_slIzX7XNsqIZEpirn",
-    "filename": "male-Bodyweight-scissor-kick-side.mp4",
-    "equipment": "",
-    "view": "side"
-  },
-  {
-    "id": "ab-scissors",
-    "fileId": "1PXO6dKrTNnH-GQZ4O8z0-I2OZX3krMAM",
-    "filename": "male-Band-mini-band-scissor-kick-side.mp4",
-    "equipment": "",
-    "view": "side"
-  },
-  {
-    "id": "heel-taps",
-    "fileId": "1W0nCJAyCqxWI7BnoVXffZCk8lpQti9Z1",
-    "filename": "male-Bodyweight-alternating-heel-touch-side.mp4",
-    "equipment": "",
-    "view": "side"
-  },
-  {
-    "id": "cable-core-palloff-press",
-    "fileId": "1i32-HY1kiUDHK5GtU2nEhAP8QLVUHAb4",
-    "filename": "male-Band-band-pallof-press-side.mp4",
-    "equipment": "",
-    "view": "side"
-  },
-  {
-    "id": "knee-raise-parallel-bars",
-    "fileId": "1vJhfrK6kElvOdbPkDXw0Y6QLSIN7l573",
-    "filename": "male-bodyweight-hanging-knee-raises-side.mp4",
+    "id": "plank-pushup",
+    "fileId": "1Bz2_W-BbAJfjLaDWsIG5oT3HRykbK_Zo",
+    "filename": "male-Bodyweight-bodyweight-plank-up-down-side.mp4",
     "equipment": "",
     "view": "side"
   }
