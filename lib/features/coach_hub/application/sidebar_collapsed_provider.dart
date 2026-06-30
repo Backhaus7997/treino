@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../core/persistence/shared_prefs_provider.dart';
+
 /// Estado colapsado/expandido del sidebar del Coach Hub web, persistido por
 /// navegador vía `shared_preferences` (ADR-CHW-003).
 ///
@@ -24,11 +26,6 @@ class SidebarCollapsedNotifier extends StateNotifier<bool> {
     await _prefs.setBool(_kStorageKey, state);
   }
 }
-
-/// Resuelve la instancia de `SharedPreferences` una sola vez al boot.
-final sharedPreferencesProvider = FutureProvider<SharedPreferences>(
-  (_) => SharedPreferences.getInstance(),
-);
 
 /// Estado colapsado del sidebar. Depende de [sharedPreferencesProvider] ya
 /// resuelto; el shell gatea el render hasta que las prefs estén disponibles.

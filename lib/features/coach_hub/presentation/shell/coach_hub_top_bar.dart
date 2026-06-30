@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:treino/app/theme/app_palette.dart';
+import 'package:treino/core/persistence/shared_prefs_provider.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach_hub/application/sidebar_collapsed_provider.dart';
 import 'package:treino/features/profile/application/user_providers.dart';

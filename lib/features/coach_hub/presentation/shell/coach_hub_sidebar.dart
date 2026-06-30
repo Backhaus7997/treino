@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_palette.dart';
+import 'package:treino/core/persistence/shared_prefs_provider.dart';
 import 'package:treino/features/coach_hub/application/sidebar_collapsed_provider.dart';
 
 import 'sidebar_item.dart';
