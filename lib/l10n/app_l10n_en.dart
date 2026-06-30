@@ -1762,4 +1762,35 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get avatarCropperCancel => '';
+
+  @override
+  String get progressionSectionTitle => 'PROGRESS BY EXERCISE';
+
+  @override
+  String get progressionMetricPr => 'PR';
+
+  @override
+  String get progressionMetricVolume => 'Volume';
+
+  @override
+  String progressionFrequency(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count sessions in the last 8 weeks',
+      one: '1 session in the last 8 weeks',
+      zero: 'No sessions in the last 8 weeks',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get progressionSinglePointHint =>
+      'You need at least 2 sessions to see the trend.';
+
+  @override
+  String get progressionEmptyExercise => 'No data for this exercise.';
+
+  @override
+  String get progressionEmpty => 'No set records yet.';
 }

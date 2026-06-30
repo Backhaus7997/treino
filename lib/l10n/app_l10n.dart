@@ -3397,6 +3397,48 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'CANCELAR'**
   String get avatarCropperCancel;
+
+  /// Section header for the per-exercise progression chart in the coach's athlete detail screen.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'EVOLUCIÓN POR EJERCICIO'**
+  String get progressionSectionTitle;
+
+  /// Label for the PR (personal record = max weight) metric chip in the progression chart.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'PR'**
+  String get progressionMetricPr;
+
+  /// Label for the Volume metric chip in the progression chart.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Volumen'**
+  String get progressionMetricVolume;
+
+  /// Frecuencia stat label showing session count in the last 8 weeks.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{count, plural, =0{Sin sesiones en las últimas 8 semanas} =1{1 sesión en las últimas 8 semanas} other{{count} sesiones en las últimas 8 semanas}}'**
+  String progressionFrequency(int count);
+
+  /// Hint shown when only 1 data point exists — no trend line can be drawn.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Necesitás al menos 2 sesiones para ver la evolución.'**
+  String get progressionSinglePointHint;
+
+  /// Hint shown when the selected exercise has 0 data points.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Sin datos para este ejercicio.'**
+  String get progressionEmptyExercise;
+
+  /// Empty state shown when the athlete has no setLogs at all (exercise picker not shown).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Sin registros de series todavía.'**
+  String get progressionEmpty;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

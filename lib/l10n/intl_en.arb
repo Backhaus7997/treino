@@ -681,5 +681,19 @@
   "coachAthleteNoSharePlaceholder": "The athlete has not shared their history yet.",
   "avatarCropperTitle": "",
   "avatarCropperDone": "",
-  "avatarCropperCancel": ""
+  "avatarCropperCancel": "",
+  "progressionSectionTitle": "PROGRESS BY EXERCISE",
+  "progressionMetricPr": "PR",
+  "progressionMetricVolume": "Volume",
+  "progressionFrequency": "{count, plural, =0{No sessions in the last 8 weeks} =1{1 session in the last 8 weeks} other{{count} sessions in the last 8 weeks}}",
+  "@progressionFrequency": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "progressionSinglePointHint": "You need at least 2 sessions to see the trend.",
+  "progressionEmptyExercise": "No data for this exercise.",
+  "progressionEmpty": "No set records yet."
 }

@@ -1123,5 +1123,38 @@
   "avatarCropperCancel": "CANCELAR",
   "@avatarCropperCancel": {
     "description": "Cancel button label in the avatar cropper modal."
+  },
+  "progressionSectionTitle": "EVOLUCIÓN POR EJERCICIO",
+  "@progressionSectionTitle": {
+    "description": "Section header for the per-exercise progression chart in the coach's athlete detail screen."
+  },
+  "progressionMetricPr": "PR",
+  "@progressionMetricPr": {
+    "description": "Label for the PR (personal record = max weight) metric chip in the progression chart."
+  },
+  "progressionMetricVolume": "Volumen",
+  "@progressionMetricVolume": {
+    "description": "Label for the Volume metric chip in the progression chart."
+  },
+  "progressionFrequency": "{count, plural, =0{Sin sesiones en las últimas 8 semanas} =1{1 sesión en las últimas 8 semanas} other{{count} sesiones en las últimas 8 semanas}}",
+  "@progressionFrequency": {
+    "description": "Frecuencia stat label showing session count in the last 8 weeks.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "progressionSinglePointHint": "Necesitás al menos 2 sesiones para ver la evolución.",
+  "@progressionSinglePointHint": {
+    "description": "Hint shown when only 1 data point exists — no trend line can be drawn."
+  },
+  "progressionEmptyExercise": "Sin datos para este ejercicio.",
+  "@progressionEmptyExercise": {
+    "description": "Hint shown when the selected exercise has 0 data points."
+  },
+  "progressionEmpty": "Sin registros de series todavía.",
+  "@progressionEmpty": {
+    "description": "Empty state shown when the athlete has no setLogs at all (exercise picker not shown)."
   }
 }
