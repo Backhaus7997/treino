@@ -1,5 +1,3 @@
-import 'dart:async' show unawaited;
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -177,6 +175,7 @@ class _LinkStateCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
     final pubAsync = ref.watch(userPublicProfileProvider(link.trainerId));
+    final hasUnread = ref.watch(hasUnreadFromProvider(link.trainerId));
 
     return ListView(
       // + bottom inset: the floating bar overlays the body (extendBody),
@@ -207,10 +206,11 @@ class _LinkStateCard extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: 14),
-              _TrainerHeader(pubAsync: pubAsync, link: link),
+              _TrainerHeader(
+                  pubAsync: pubAsync, link: link, hasUnread: hasUnread),
               if (link.status == TrainerLinkStatus.active) ...[
                 const SizedBox(height: 14),
-                _ShareToggle(link: link),
+                _ShareInfo(palette: palette),
                 const SizedBox(height: 12),
                 _AgendaButton(trainerId: link.trainerId),
                 const SizedBox(height: 16),
@@ -234,9 +234,14 @@ class _LinkStateCard extends ConsumerWidget {
 }
 
 class _TrainerHeader extends StatelessWidget {
-  const _TrainerHeader({required this.pubAsync, required this.link});
+  const _TrainerHeader({
+    required this.pubAsync,
+    required this.link,
+    this.hasUnread = false,
+  });
   final AsyncValue<UserPublicProfile?> pubAsync;
   final TrainerLink link;
+  final bool hasUnread;
 
   @override
   Widget build(BuildContext context) {
@@ -251,20 +256,46 @@ class _TrainerHeader extends StatelessWidget {
       behavior: HitTestBehavior.opaque,
       child: Row(
         children: [
-          Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: palette.bg,
-              border: Border.all(color: palette.border, width: 1),
-            ),
-            alignment: Alignment.center,
-            child: Icon(
-              TreinoIcon.tabProfile,
-              size: 28,
-              color: palette.textMuted,
-            ),
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: palette.bg,
+                  border: Border.all(color: palette.border, width: 1),
+                ),
+                alignment: Alignment.center,
+                child: Icon(
+                  TreinoIcon.tabProfile,
+                  size: 28,
+                  color: palette.textMuted,
+                ),
+              ),
+              if (hasUnread)
+                Positioned(
+                  top: 0,
+                  right: 0,
+                  child: Semantics(
+                    label: 'Sin leer',
+                    child: Container(
+                      key: Key('unread-dot-${link.trainerId}'),
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(
+                        color: palette.accent,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: palette.bgCard,
+                          width: 1.5,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -307,67 +338,22 @@ class _TrainerHeader extends StatelessWidget {
   }
 }
 
-// ── Share toggle — privacy gate (REQ-COACH-LINK-007..011) ─────────────────────
+// ── Share info — historial auto-compartido (sync via CF syncSessionShareOnTrainerLink) ──
 
-class _ShareToggle extends ConsumerWidget {
-  const _ShareToggle({required this.link});
-  final TrainerLink link;
-
-  Future<void> _onChanged(
-    BuildContext context,
-    WidgetRef ref,
-    bool newValue,
-  ) async {
-    // Enabling sharing → confirmar antes (asymmetric UX: dar acceso es más
-    // delicado que revocarlo). Restaurar privacidad es low-stakes y va directo.
-    if (newValue == true) {
-      final confirmed = await _confirm(
-        context,
-        '¿Seguro?',
-        'Tu PF va a poder ver todas tus sesiones, volumen y racha. '
-            'Podés desactivarlo cuando quieras.',
-        confirmLabel: 'Compartir',
-      );
-      if (!confirmed) return;
-    }
-    // 1. Update the link flag (Firestore rule validates athlete == caller).
-    await ref
-        .read(trainerLinkRepositoryProvider)
-        .setSharedWithTrainer(link.id, newValue);
-
-    // 2. Keep session_shares/{athleteId} in sync with the toggle.
-    //    Best-effort: we don't block the UX on this write.
-    final shareRepo = ref.read(sessionShareRepositoryProvider);
-    if (newValue) {
-      unawaited(
-        shareRepo.grant(
-          athleteId: link.athleteId,
-          trainerId: link.trainerId,
-        ),
-      );
-    } else {
-      unawaited(shareRepo.revoke(link.athleteId));
-    }
-
-    ref.invalidate(currentAthleteLinkProvider);
-  }
+class _ShareInfo extends StatelessWidget {
+  const _ShareInfo({required this.palette});
+  final AppPalette palette;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final palette = AppPalette.of(context);
-    return SwitchListTile(
-      contentPadding: EdgeInsets.zero,
-      title: Text(
-        'Compartir historial con mi PF',
-        style: GoogleFonts.barlow(
-          fontWeight: FontWeight.w600,
-          fontSize: 14,
-          color: palette.textPrimary,
-        ),
+  Widget build(BuildContext context) {
+    return Text(
+      'Tu PF puede ver tu historial de entrenamiento.',
+      style: GoogleFonts.barlow(
+        fontStyle: FontStyle.italic,
+        fontWeight: FontWeight.w400,
+        fontSize: 13,
+        color: palette.textMuted,
       ),
-      value: link.sharedWithTrainer,
-      activeThumbColor: palette.accent,
-      onChanged: (v) => _onChanged(context, ref, v),
     );
   }
 }
@@ -477,28 +463,51 @@ class _ActionRow extends ConsumerWidget {
     if (link.status == TrainerLinkStatus.active) {
       return Column(
         children: [
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: () => _onMessage(context, ref),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: palette.accent,
-                foregroundColor: palette.bg,
-                minimumSize: const Size.fromHeight(48),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(9999),
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () => _onMessage(context, ref),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: palette.accent,
+                    foregroundColor: palette.bg,
+                    minimumSize: const Size.fromHeight(48),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(9999),
+                    ),
+                  ),
+                  icon: Icon(TreinoIcon.chat, size: 18, color: palette.bg),
+                  label: Text(
+                    'MENSAJE',
+                    style: GoogleFonts.barlowCondensed(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                      letterSpacing: 0.8,
+                    ),
+                  ),
                 ),
               ),
-              icon: Icon(TreinoIcon.chat, size: 18, color: palette.bg),
-              label: Text(
-                'MENSAJE',
-                style: GoogleFonts.barlowCondensed(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 13,
-                  letterSpacing: 0.8,
+              // Unread dot on the chat button when the PF has written.
+              if (ref.watch(hasUnreadFromProvider(link.trainerId)))
+                Positioned(
+                  top: -3,
+                  right: -3,
+                  child: Semantics(
+                    label: 'Mensajes sin leer',
+                    child: Container(
+                      width: 14,
+                      height: 14,
+                      decoration: BoxDecoration(
+                        color: palette.accent,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: palette.bgCard, width: 2),
+                      ),
+                    ),
+                  ),
                 ),
-              ),
-            ),
+            ],
           ),
           const SizedBox(height: 12),
           SizedBox(

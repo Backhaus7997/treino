@@ -3,6 +3,8 @@ import 'dart:developer' as developer;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../app/theme/app_palette.dart';
 import '../../../core/analytics/analytics_service.dart';
@@ -13,7 +15,10 @@ import '../../profile/application/user_public_profile_providers.dart';
 import '../../workout/application/session_providers.dart'
     show currentUidProvider;
 import '../application/chat_providers.dart';
+import '../domain/media_type.dart';
 import '../domain/message.dart';
+import 'chat_image_bubble.dart';
+import 'chat_video_bubble.dart';
 
 /// Pantalla de chat 1-1. Burbujas + textfield + send. Real-time via
 /// `messagesProvider(chatId)`.
@@ -35,6 +40,32 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   final _textController = TextEditingController();
   bool _sending = false;
 
+  // Upload state — drives LinearProgressIndicator and disables controls.
+  bool _uploading = false;
+  double _uploadProgress = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    // REQ-CHATUNREAD-007: mark this conversation read once it's on screen.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _markAsRead());
+  }
+
+  /// Records the current user's read position for this chat. Best-effort —
+  /// a failure must never break the screen (REQ-CHATUNREAD-007).
+  Future<void> _markAsRead() async {
+    final uid = ref.read(currentUidProvider);
+    if (uid == null) return;
+    try {
+      await ref
+          .read(chatRepositoryProvider)
+          .markAsRead(chatId: widget.chatId, uid: uid);
+    } catch (e, st) {
+      developer.log('markAsRead failed',
+          name: 'chat', error: e, stackTrace: st);
+    }
+  }
+
   @override
   void dispose() {
     _textController.dispose();
@@ -42,7 +73,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   Future<void> _onSend() async {
-    if (_sending) return;
+    if (_sending || _uploading) return;
     final text = _textController.text.trim();
     if (text.isEmpty) return;
     final currentUid = ref.read(currentUidProvider);
@@ -79,6 +110,83 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     }
   }
 
+  Future<void> _onAttach() async {
+    if (_uploading || _sending) return;
+    final l10n = AppL10n.of(context);
+    final picked = await showModalBottomSheet<_PickChoice>(
+      context: context,
+      builder: (_) => _AttachSheet(l10n: l10n),
+    );
+    if (picked == null || !mounted) return;
+
+    final currentUid = ref.read(currentUidProvider);
+    if (currentUid == null) return;
+
+    final picker = ImagePicker();
+    XFile? file;
+    MediaType mediaType;
+
+    if (picked == _PickChoice.image) {
+      file = await picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 80,
+      );
+      mediaType = MediaType.image;
+    } else {
+      file = await picker.pickVideo(source: ImageSource.gallery);
+      mediaType = MediaType.video;
+    }
+
+    if (file == null || !mounted) return;
+
+    setState(() {
+      _uploading = true;
+      _uploadProgress = 0;
+    });
+
+    try {
+      final uploadService = ref.read(chatMediaUploadServiceProvider);
+      final mediaUrl = await uploadService.upload(
+        file.path,
+        chatId: widget.chatId,
+        mediaType: mediaType,
+        onProgress: (fraction) {
+          if (mounted) setState(() => _uploadProgress = fraction);
+        },
+      );
+
+      if (!mounted) return;
+
+      await ref.read(chatRepositoryProvider).sendMessage(
+            chatId: widget.chatId,
+            senderId: currentUid,
+            mediaUrl: mediaUrl,
+            mediaType: mediaType,
+          );
+    } catch (e, st) {
+      developer.log(
+        'media upload/send failed',
+        name: 'chat',
+        error: e,
+        stackTrace: st,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(AppL10n.of(context).chatMediaUploadFailed),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _uploading = false;
+          _uploadProgress = 0;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
@@ -86,6 +194,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final messagesAsync = ref.watch(messagesProvider(widget.chatId));
     final currentUid = ref.watch(currentUidProvider);
     final pubAsync = ref.watch(userPublicProfileProvider(widget.otherUid));
+
+    // REQ-CHATUNREAD-007: re-mark as read when a new message arrives while
+    // the screen is open, so the badge doesn't re-appear.
+    ref.listen(messagesProvider(widget.chatId), (_, __) => _markAsRead());
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -95,7 +207,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         leading: IconButton(
           icon: Icon(TreinoIcon.back, color: palette.textPrimary),
           tooltip: l10n.commonBack,
-          onPressed: () => Navigator.of(context).maybePop(),
+          // Opened from a push the deep-link uses context.go() (replaces the
+          // stack), so there's nothing to pop — fall back to the chat inbox
+          // instead of a dead button.
+          onPressed: () =>
+              context.canPop() ? context.pop() : context.go('/feed/messages'),
         ),
         title: pubAsync.when(
           loading: () => const SizedBox.shrink(),
@@ -176,10 +292,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 },
               ),
             ),
+            if (_uploading)
+              LinearProgressIndicator(
+                value: _uploadProgress > 0 ? _uploadProgress : null,
+                color: palette.accent,
+                backgroundColor: palette.bgCard,
+              ),
             _Composer(
               controller: _textController,
-              sending: _sending,
+              sending: _sending || _uploading,
               onSend: _onSend,
+              onAttach: _onAttach,
               palette: palette,
             ),
           ],
@@ -191,6 +314,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
 // ── Private widgets ────────────────────────────────────────────────────────
 
+/// Routes to the correct bubble widget based on [message.mediaType].
+///
+/// - null (text-only) → text bubble (unchanged, REQ-CHATMEDIA-015)
+/// - image → [ChatImageBubble]
+/// - video → [ChatVideoBubble]
 class _Bubble extends StatelessWidget {
   const _Bubble({
     required this.message,
@@ -204,6 +332,30 @@ class _Bubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final mediaType = message.mediaType;
+
+    // Media bubbles: image or video — skip the text-bubble container.
+    if (mediaType == MediaType.image) {
+      return Align(
+        alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: ChatImageBubble(message: message),
+        ),
+      );
+    }
+
+    if (mediaType == MediaType.video) {
+      return Align(
+        alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: ChatVideoBubble(message: message),
+        ),
+      );
+    }
+
+    // Text-only bubble — original implementation, unchanged.
     final radius = BorderRadius.only(
       topLeft: const Radius.circular(14),
       topRight: const Radius.circular(14),
@@ -242,12 +394,14 @@ class _Composer extends StatelessWidget {
     required this.controller,
     required this.sending,
     required this.onSend,
+    required this.onAttach,
     required this.palette,
   });
 
   final TextEditingController controller;
   final bool sending;
   final VoidCallback onSend;
+  final VoidCallback onAttach;
   final AppPalette palette;
 
   @override
@@ -258,6 +412,15 @@ class _Composer extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
+          // Attach button.
+          IconButton(
+            onPressed: sending ? null : onAttach,
+            tooltip: l10n.chatAttachMediaLabel,
+            icon: Icon(
+              TreinoIcon.attach,
+              color: sending ? palette.textMuted : palette.textMuted,
+            ),
+          ),
           Expanded(
             child: Container(
               decoration: BoxDecoration(
@@ -304,6 +467,38 @@ class _Composer extends StatelessWidget {
     );
   }
 }
+
+/// Bottom sheet shown when the user taps the attach button.
+class _AttachSheet extends StatelessWidget {
+  const _AttachSheet({required this.l10n});
+
+  final AppL10n l10n;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    return SafeArea(
+      child: Wrap(
+        children: [
+          ListTile(
+            leading: Icon(TreinoIcon.image, color: palette.textPrimary),
+            title: Text(l10n.chatPickImageLabel,
+                style: TextStyle(color: palette.textPrimary)),
+            onTap: () => Navigator.of(context).pop(_PickChoice.image),
+          ),
+          ListTile(
+            leading: Icon(TreinoIcon.video, color: palette.textPrimary),
+            title: Text(l10n.chatPickVideoLabel,
+                style: TextStyle(color: palette.textPrimary)),
+            onTap: () => Navigator.of(context).pop(_PickChoice.video),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+enum _PickChoice { image, video }
 
 class _ConversationEmpty extends StatelessWidget {
   const _ConversationEmpty({required this.palette});

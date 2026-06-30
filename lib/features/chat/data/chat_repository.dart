@@ -7,6 +7,7 @@ import 'package:cloud_firestore/cloud_firestore.dart'
         Query;
 
 import '../domain/chat.dart';
+import '../domain/media_type.dart';
 import '../domain/message.dart';
 
 /// Repository de chats 1-1 entre PF y athlete. Doc id determinístico
@@ -76,29 +77,49 @@ class ChatRepository {
   // Batch: doc nuevo en messages + update del parent con preview. Atómico
   // para que la lista nunca muestre un preview desincronizado con el último
   // mensaje real.
+  //
+  // REQ-CHATMEDIA-003/004/005: accepts optional mediaUrl + mediaType.
+  // Validation: text non-empty OR (mediaUrl non-null AND mediaType non-null).
+  // Preview: caption (truncated 80) ?? '📷 Foto' / '🎥 Video'.
 
   Future<void> sendMessage({
     required String chatId,
     required String senderId,
-    required String text,
+    String text = '',
+    String? mediaUrl,
+    MediaType? mediaType,
   }) async {
     final trimmed = text.trim();
-    if (trimmed.isEmpty) {
-      throw ArgumentError.value(
-          text, 'text', 'el mensaje no puede estar vacío');
+
+    // REQ-CHATMEDIA-005: at least one of text or mediaUrl must be present.
+    if (trimmed.isEmpty && mediaUrl == null) {
+      throw ArgumentError(
+          'sendMessage: el mensaje debe tener texto o un archivo adjunto.');
+    }
+
+    // mediaUrl requires a mediaType to be meaningful.
+    if (mediaUrl != null && mediaType == null) {
+      throw ArgumentError(
+          'sendMessage: mediaType es requerido cuando se adjunta mediaUrl.');
     }
 
     final batch = _firestore.batch();
     final msgRef = _messagesOf(chatId).doc();
-    batch.set(msgRef, {
+
+    // Build the message document — omit null optional fields.
+    final msgData = <String, Object?>{
       'id': msgRef.id,
       'senderId': senderId,
       'text': trimmed,
       'createdAt': FieldValue.serverTimestamp(),
-    });
+      if (mediaUrl != null) 'mediaUrl': mediaUrl,
+      if (mediaType != null) 'mediaType': mediaType.toJson(),
+    };
+
+    batch.set(msgRef, msgData);
     batch.update(_chats.doc(chatId), {
       'lastMessageAt': FieldValue.serverTimestamp(),
-      'lastMessageText': _previewOf(trimmed),
+      'lastMessageText': _previewOf(trimmed, mediaType),
       'lastMessageSenderId': senderId,
     });
     await batch.commit();
@@ -119,6 +140,19 @@ class ChatRepository {
       return snap.docs.map(_messageFromDoc).whereType<Message>().toList();
     });
   }
+
+  // ─── markAsRead ─────────────────────────────────────────────────────────
+  //
+  // Writes only the caller's key in the lastRead map using a dotted-path
+  // update — Firestore merges only that key, leaving sibling keys intact.
+
+  Future<void> markAsRead({
+    required String chatId,
+    required String uid,
+  }) =>
+      _chats
+          .doc(chatId)
+          .update({'lastRead.$uid': FieldValue.serverTimestamp()});
 
   // ─── watchChatsForUser ──────────────────────────────────────────────────
   //
@@ -158,8 +192,21 @@ class ChatRepository {
     return Message.fromJson({...data, 'id': snap.id});
   }
 
-  String _previewOf(String text) {
-    if (text.length <= previewMaxChars) return text;
-    return '${text.substring(0, previewMaxChars)}…';
+  /// Computes the inbox preview string.
+  ///
+  /// If [text] is non-empty: use text (truncated to [previewMaxChars]).
+  /// Else if [mediaType] is image: '📷 Foto'.
+  /// Else if [mediaType] is video: '🎥 Video'.
+  /// Else: empty string (degenerate fallback, should not happen with valid input).
+  String _previewOf(String text, MediaType? mediaType) {
+    if (text.isNotEmpty) {
+      if (text.length <= previewMaxChars) return text;
+      return '${text.substring(0, previewMaxChars)}…';
+    }
+    return switch (mediaType) {
+      MediaType.image => '📷 Foto',
+      MediaType.video => '🎥 Video',
+      null => '',
+    };
   }
 }

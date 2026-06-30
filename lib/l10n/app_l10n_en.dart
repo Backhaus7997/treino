@@ -547,6 +547,24 @@ class AppL10nEn extends AppL10n {
   String get workoutMisRutinasOverflowArchive => '';
 
   @override
+  String get workoutMisRutinasOverflowMarkActive => '';
+
+  @override
+  String get workoutMisRutinasOverflowUnmarkActive => '';
+
+  @override
+  String get workoutMisRutinasActiveChip => '';
+
+  @override
+  String get workoutMisRutinasMarkActiveSuccess => '';
+
+  @override
+  String get workoutMisRutinasUnmarkActiveSuccess => '';
+
+  @override
+  String get workoutMisRutinasActiveError => '';
+
+  @override
   String get workoutMisRutinasConfirmTitle => '';
 
   @override
@@ -1347,6 +1365,15 @@ class AppL10nEn extends AppL10n {
   String get routineEditorSetTypeFailure => '';
 
   @override
+  String get routineEditorNotesLabel => 'Note for athlete';
+
+  @override
+  String get routineEditorNotesHint => 'Technique, tempo, RIR…';
+
+  @override
+  String get exerciseNoteFromCoachTag => 'FROM COACH';
+
+  @override
   String routineEditorIncompleteSetsFeedback(String exerciseName) {
     return '';
   }
@@ -1524,6 +1551,9 @@ class AppL10nEn extends AppL10n {
   String get routineEditorDeleteDayA11y => 'Delete day';
 
   @override
+  String get routineEditorEditDayNameA11y => '';
+
+  @override
   String get athleteDetailEditPlanA11y => 'Edit plan';
 
   @override
@@ -1670,4 +1700,97 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get coachHubPreviewDiscardConfirm => 'Leave anyway';
+
+  @override
+  String get chatAttachMediaLabel => 'Attach';
+
+  @override
+  String get chatPickImageLabel => 'Photo';
+
+  @override
+  String get chatPickVideoLabel => 'Video';
+
+  @override
+  String get chatMediaUploading => 'Uploading…';
+
+  @override
+  String get chatMediaUploadFailed =>
+      'We couldn\'t upload the file. Please try again.';
+
+  @override
+  String get chatMediaPreviewPhoto => '📷 Photo';
+
+  @override
+  String get chatMediaPreviewVideo => '🎥 Video';
+
+  @override
+  String get chatMediaViewFullscreen => 'View photo';
+
+  @override
+  String get chatMediaImageLoadError => 'We couldn\'t load the image.';
+
+  @override
+  String feedMessagesWithUnreadA11y(int count) {
+    return 'Messages, $count unread';
+  }
+
+  @override
+  String get chatUnreadA11y => 'Unread';
+
+  @override
+  String get coachSessionSetLogsTitle => 'SETS';
+
+  @override
+  String get coachSessionTapToExpand => 'View sets';
+
+  @override
+  String get coachSessionSetLogsEmpty => 'This session has no logged sets.';
+
+  @override
+  String get coachSessionSetLogsLoadError =>
+      'Could not load sets. Please try again.';
+
+  @override
+  String get coachAthleteNoSharePlaceholder =>
+      'The athlete has not shared their history yet.';
+
+  @override
+  String get avatarCropperTitle => '';
+
+  @override
+  String get avatarCropperDone => '';
+
+  @override
+  String get avatarCropperCancel => '';
+
+  @override
+  String get progressionSectionTitle => 'PROGRESS BY EXERCISE';
+
+  @override
+  String get progressionMetricPr => 'PR';
+
+  @override
+  String get progressionMetricVolume => 'Volume';
+
+  @override
+  String progressionFrequency(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count sessions in the last 8 weeks',
+      one: '1 session in the last 8 weeks',
+      zero: 'No sessions in the last 8 weeks',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get progressionSinglePointHint =>
+      'You need at least 2 sessions to see the trend.';
+
+  @override
+  String get progressionEmptyExercise => 'No data for this exercise.';
+
+  @override
+  String get progressionEmpty => 'No set records yet.';
 }

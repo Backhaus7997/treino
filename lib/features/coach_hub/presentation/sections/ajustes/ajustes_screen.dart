@@ -3,25 +3,29 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach_hub/presentation/sections/ajustes/tabs/cuenta_tab.dart';
+import 'package:treino/features/coach_hub/presentation/sections/ajustes/tabs/facturacion_tab.dart';
 import 'package:treino/features/coach_hub/presentation/sections/ajustes/tabs/notificaciones_tab.dart';
 import 'package:treino/features/coach_hub/presentation/shell/section_header.dart';
 
 /// Tabs internos de la sección «Configuración» (Ajustes) del Coach Hub web.
-enum AjustesTab { cuenta, notificaciones, facturacion, datos }
+///
+/// «Datos y privacidad» se omite a propósito en el hub web: la eliminación de
+/// cuenta vive en la app mobile (donde se crea la cuenta y donde aplican las
+/// políticas de las stores). Se puede reintroducir si se decide tener el flujo
+/// también en web.
+enum AjustesTab { cuenta, notificaciones, facturacion }
 
 extension AjustesTabX on AjustesTab {
   String get label => switch (this) {
         AjustesTab.cuenta => 'Cuenta', // i18n: Fase W3
         AjustesTab.notificaciones => 'Notificaciones', // i18n: Fase W3
         AjustesTab.facturacion => 'Facturación TREINO', // i18n: Fase W3
-        AjustesTab.datos => 'Datos y privacidad', // i18n: Fase W3
       };
 
   IconData get icon => switch (this) {
         AjustesTab.cuenta => TreinoIcon.users,
         AjustesTab.notificaciones => TreinoIcon.bell,
         AjustesTab.facturacion => TreinoIcon.sidebarPagos,
-        AjustesTab.datos => TreinoIcon.shieldCheck,
       };
 }
 
@@ -33,10 +37,10 @@ final _ajustesTabProvider = StateProvider.autoDispose<AjustesTab>(
 
 /// Sección «Configuración» del Coach Hub web (`/ajustes`, Fase W3).
 ///
-/// Header + sub-nav vertical (Cuenta · Notificaciones · Facturación · Datos) y
-/// el cuerpo del tab activo. Renderiza DENTRO del shell — sin Scaffold propio
-/// (ADR-CHW-005). W3.1 entrega el scaffold + la tab Cuenta; las otras tres son
-/// placeholders hasta W3.2–W3.4.
+/// Header + sub-nav vertical (Cuenta · Notificaciones · Facturación) y el
+/// cuerpo del tab activo. Renderiza DENTRO del shell — sin Scaffold propio
+/// (ADR-CHW-005). Cuenta y Notificaciones están implementadas; Facturación es
+/// placeholder hasta W3.4.
 class AjustesScreen extends ConsumerWidget {
   const AjustesScreen({super.key});
 
@@ -174,30 +178,7 @@ class _TabBody extends StatelessWidget {
     return switch (tab) {
       AjustesTab.cuenta => const CuentaTab(),
       AjustesTab.notificaciones => const NotificacionesTab(),
-      AjustesTab.facturacion => const _Proximamente(
-          tab: AjustesTab.facturacion,
-        ),
-      AjustesTab.datos => const _Proximamente(tab: AjustesTab.datos),
+      AjustesTab.facturacion => const FacturacionTab(),
     };
-  }
-}
-
-class _Proximamente extends StatelessWidget {
-  const _Proximamente({required this.tab});
-
-  final AjustesTab tab;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 48),
-      child: Center(
-        child: Text(
-          '${tab.label} · Próximamente', // i18n: Fase W3
-          style: TextStyle(color: palette.textMuted, fontSize: 14),
-        ),
-      ),
-    );
   }
 }

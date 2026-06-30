@@ -2,6 +2,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../auth/application/auth_providers.dart';
 import '../../profile/application/user_providers.dart' show firestoreProvider;
+import '../../profile/application/user_public_profile_providers.dart'
+    show userPublicProfileRepositoryProvider;
 import '../data/session_repository.dart';
 import '../domain/session.dart';
 import '../domain/session_status.dart';
@@ -12,10 +14,15 @@ import 'session_init.dart';
 import 'session_notifier.dart';
 import 'session_state.dart';
 
-// ─── Dev A — providers de Etapa 1 (NO modificar) ─────────────────────────────
+// ─── Dev A — providers de Etapa 1 ────────────────────────────────────────────
 
 final sessionRepositoryProvider = Provider<SessionRepository>(
-  (ref) => SessionRepository(firestore: ref.watch(firestoreProvider)),
+  (ref) => SessionRepository(
+    firestore: ref.watch(firestoreProvider),
+    // Wired so finish() can recompute public workoutsCount/racha counters.
+    // Without this the counters silently never update (bug: header showed 0).
+    publicProfileRepository: ref.watch(userPublicProfileRepositoryProvider),
+  ),
 );
 
 /// Fetches all sessions for [uid], ordered by startedAt descending.
@@ -128,6 +135,25 @@ final lastWeightByExerciseProvider =
     return result;
   },
 );
+
+// ─── Coach cross-user set-log provider (REQ-SETLOGS-005) ─────────────────────
+
+/// Fetches the setLogs for a given athlete's session, for the trainer's
+/// read-only view. Keyed on a Dart record so named fields are explicit at
+/// every call site. Returns `[]` immediately when either key field is empty,
+/// without hitting Firestore. autoDispose: drops the cache when the expansion
+/// tile closes.
+final coachSessionSetLogsProvider = FutureProvider.autoDispose
+    .family<List<SetLog>, ({String athleteUid, String sessionId})>(
+        (ref, key) async {
+  if (key.athleteUid.isEmpty || key.sessionId.isEmpty) {
+    return const <SetLog>[];
+  }
+  return ref.read(sessionRepositoryProvider).listSetLogs(
+        uid: key.athleteUid,
+        sessionId: key.sessionId,
+      );
+});
 
 // ─── Periodization (Model B) — plan progress provider ────────────────────────
 

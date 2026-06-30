@@ -1,97 +1,71 @@
 // Gating pure functions for periodized routines (Model B).
 //
-// All functions are top-level and stateless. For numWeeks == 1 plans, the
-// detail screen BYPASSES these entirely — every day is always startable
-// (REQ-PERIOD-042, HARD INVARIANT, SCENARIO-038).
+// All functions are top-level and stateless. week is 0-based; day is 1-based
+// (matching RoutineDay.dayNumber).
 //
-// week is 0-based; day is 1-based (matching RoutineDay.dayNumber).
+// HISTORICAL CONTEXT (and current policy):
 //
-// Phase 3 addition (REQ-WPRES-022): optional [requiredPairs] parameter lets
-// callers mark days with zero present slots as auto-satisfied. A day NOT in
-// [requiredPairs] is treated as already done (invisible to unlock logic).
-// When [requiredPairs] is null, every pair is required — identical to the
-// original behavior, ensuring full back-compat for single-week / legacy plans.
+// The original Model B (Phase 2 periodized routines) enforced a strict
+// sequential gate: a day was startable only if every prior day of its week
+// was completed AND every prior week was fully done. The intent was to
+// preserve the coach's progressive overload plan — a periodized fuerza block
+// is designed assuming Week N is finished before Week N+1.
+//
+// Reality contradicted that intent: athletes miss gym days (or arrive on a
+// day not feeling pecho, want to do espalda) and the lock turned the editor
+// into a wall ("DÍA BLOQUEADO" / "SEMANA BLOQUEADA"). The single-week plan
+// already bypassed the gate (REQ-PERIOD-042) — multi-week behaviour was the
+// only place where the wall lived.
+//
+// Decision A1 (2026-06-29): drop the lock entirely for both periodized AND
+// single-week plans. Every day of every week is always unlocked. The athlete
+// is an adult and knows what they are doing; if they want to skip ahead, they
+// skip ahead. The only signal we keep is "this day is already completed"
+// (drives the "ENTRENADO" badge, not a hard lock).
+//
+// `isStartable` therefore reduces to "not already completed". `isDayUnlocked`
+// and `isWeekUnlocked` are kept (returning constant true) so call sites that
+// branch on them stay source-compatible — easier to delete the branches in a
+// follow-up than to refactor 4 call sites in this PR.
+//
+// Phase 3 addition (REQ-WPRES-022): the optional [requiredPairs] parameter
+// is preserved on every function for source compatibility, but it is no
+// longer consulted by the unlock helpers (since they always return true).
+// `isStartable` continues to ignore it as well — an "absent" day still maps
+// to the same "not completed" branch.
 
 import 'plan_progress.dart' show CompletedKey;
 
-/// A (week, day) is "satisfied" iff it is in [completed] or it is NOT in
-/// [requiredPairs] (auto-satisfied absent day). When [requiredPairs] is null
-/// every pair is required.
-bool _isSatisfied(
-  int week,
-  int day,
-  Set<CompletedKey> completed,
-  Set<CompletedKey>? requiredPairs,
-) {
-  if (completed.contains((week: week, day: day))) return true;
-  if (requiredPairs != null &&
-      !requiredPairs.contains((week: week, day: day))) {
-    return true; // absent day → auto-satisfied
-  }
-  return false;
-}
-
-/// Returns true when [week] is accessible to the athlete.
-///
-/// Week 0 is always unlocked. Week w > 0 is unlocked iff ALL [dayNumbers]
-/// in week w−1 are satisfied (REQ-PERIOD-033).
-///
-/// [requiredPairs] — optional per-week required-day grid (REQ-WPRES-022).
+/// Always returns true (decision A1, 2026-06-29 — athlete can jump to any
+/// week without finishing the previous one). Kept as a function so callers
+/// that read its result for UI affordances stay source-compatible.
 bool isWeekUnlocked(
   int week,
   Set<CompletedKey> completed,
   List<int> dayNumbers, {
   Set<CompletedKey>? requiredPairs,
-}) {
-  if (week <= 0) return true;
-  final prevWeek = week - 1;
-  return dayNumbers.every(
-    (day) => _isSatisfied(prevWeek, day, completed, requiredPairs),
-  );
-}
+}) =>
+    true;
 
-/// Returns true when a specific (week, day) combination is accessible.
-///
-/// A day is unlocked iff its week is unlocked AND all dayNumbers that appear
-/// BEFORE [day] in [dayNumbers] for the same week are already satisfied
-/// (REQ-PERIOD-034).
-///
-/// [requiredPairs] — optional per-week required-day grid (REQ-WPRES-022).
+/// Always returns true (decision A1, 2026-06-29). See [isWeekUnlocked].
 bool isDayUnlocked(
   int week,
   int day,
   Set<CompletedKey> completed,
   List<int> dayNumbers, {
   Set<CompletedKey>? requiredPairs,
-}) {
-  if (!isWeekUnlocked(week, completed, dayNumbers,
-      requiredPairs: requiredPairs)) {
-    return false;
-  }
-  // All prior days in the same week must be satisfied.
-  for (final d in dayNumbers) {
-    if (d == day) break; // reached the target day — stop
-    if (!_isSatisfied(week, d, completed, requiredPairs)) return false;
-  }
-  return true;
-}
+}) =>
+    true;
 
 /// Returns true when the athlete can start the given (week, day).
 ///
-/// Startable = isDayUnlocked AND the (week, day) is NOT already fully
-/// completed (REQ-PERIOD-034, REQ-PERIOD-042).
-///
-/// [requiredPairs] — optional per-week required-day grid (REQ-WPRES-022).
+/// A day is startable iff it is NOT already fully completed. The historical
+/// "all prior days/weeks must be done" gate was removed — see file header.
 bool isStartable(
   int week,
   int day,
   Set<CompletedKey> completed,
   List<int> dayNumbers, {
   Set<CompletedKey>? requiredPairs,
-}) {
-  if (!isDayUnlocked(week, day, completed, dayNumbers,
-      requiredPairs: requiredPairs)) {
-    return false;
-  }
-  return !completed.contains((week: week, day: day));
-}
+}) =>
+    !completed.contains((week: week, day: day));

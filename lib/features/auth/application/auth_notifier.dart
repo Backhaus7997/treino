@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../notifications/application/notification_providers.dart';
 import '../domain/auth_failure.dart';
 import 'auth_providers.dart';
 
@@ -102,6 +103,19 @@ class AuthNotifier extends AsyncNotifier<User?> {
 
   Future<void> signOut() async {
     final service = ref.read(authServiceProvider);
+    // Remove this device's FCM token WHILE STILL AUTHENTICATED. Once signed
+    // out, the `users/{uid}` rule (auth.uid == uid) rejects the write, so the
+    // token would leak into the account — and this device would keep receiving
+    // that account's pushes (even for messages it sent from another account on
+    // the same device). Best-effort: never block logout on it.
+    try {
+      final uid = state.valueOrNull?.uid;
+      if (uid != null) {
+        await ref.read(fcmServiceProvider).dispose(uid);
+      }
+    } catch (_) {
+      // best-effort — logout must proceed regardless.
+    }
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
       await service.signOut();

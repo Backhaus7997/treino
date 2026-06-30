@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:treino/app/theme/app_palette.dart';
+import 'package:treino/core/image/avatar_cropper.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach_hub/presentation/sections/ajustes/tabs/avatar_web_uploader.dart';
@@ -238,8 +239,18 @@ class _FotoEditorState extends ConsumerState<_FotoEditor> {
     if (_busy) return;
     setState(() => _busy = true);
     try {
-      final url = await ref.read(avatarWebUploaderProvider).pickAndUpload();
-      if (url == null) return; // picker cancelado
+      final uploader = ref.read(avatarWebUploaderProvider);
+      final picked = await uploader.pickFile();
+      if (picked == null) return; // picker cancelado
+      if (!mounted) return;
+      // Cropper con preview circular + 1:1 lock antes de subir.
+      final croppedPath = await AvatarCropper().cropToSquare(
+        sourcePath: picked.path,
+        context: context,
+      );
+      if (croppedPath == null) return; // cropper cancelado
+      final url = await uploader.uploadCroppedPath(croppedPath);
+      if (!mounted) return;
       await ref
           .read(userRepositoryProvider)
           .update(widget.profile.uid, {'avatarUrl': url});

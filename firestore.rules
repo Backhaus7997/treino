@@ -433,10 +433,22 @@ service cloud.firestore {
                     && request.resource.data.members[0] < request.resource.data.members[1]
                     && chatId == request.resource.data.members[0] + '_' + request.resource.data.members[1];
 
+      // REQ-CHATUNREAD-008: members may update the chat (preview fields on
+      // send) but a member may only touch THEIR OWN key inside lastRead — a
+      // user cannot forge/clear another member's read state. members and
+      // createdAt remain immutable. get('lastRead', {}) is null-safe for
+      // legacy docs that predate the field.
       allow update: if request.auth != null
                     && request.auth.uid in resource.data.members
                     && request.resource.data.members == resource.data.members
-                    && request.resource.data.createdAt == resource.data.createdAt;
+                    && request.resource.data.createdAt == resource.data.createdAt
+                    && (
+                         !request.resource.data.keys().hasAny(['lastRead'])
+                         || request.resource.data.get('lastRead', {})
+                              .diff(resource.data.get('lastRead', {}))
+                              .affectedKeys()
+                              .hasOnly([request.auth.uid])
+                       );
 
       allow delete: if false;
 
@@ -447,12 +459,22 @@ service cloud.firestore {
                     && request.auth.uid in
                         get(/databases/$(database)/documents/chats/$(chatId)).data.members;
 
+        // REQ-CHATMEDIA-006: validity is OR-based — text OR (mediaUrl + mediaType).
+        // A message is valid if it carries non-empty text OR a mediaUrl string
+        // together with a mediaType string (e.g. 'image' / 'video').
+        // senderId, membership, and createdAt checks are unchanged.
         allow create: if request.auth != null
                       && request.auth.uid == request.resource.data.senderId
                       && request.auth.uid in
                           get(/databases/$(database)/documents/chats/$(chatId)).data.members
-                      && request.resource.data.text is string
-                      && request.resource.data.text.size() > 0
+                      && (
+                           (request.resource.data.text is string
+                            && request.resource.data.text.size() > 0)
+                           ||
+                           (request.resource.data.mediaUrl is string
+                            && request.resource.data.mediaUrl.size() > 0
+                            && request.resource.data.mediaType is string)
+                         )
                       && request.resource.data.createdAt is timestamp;
 
         allow update, delete: if false;
@@ -475,7 +497,6 @@ service cloud.firestore {
 
     // Sessions sub-collection (Fase 4 Etapa 1, REQ-SMS-014).
     // Owner R/W. Trainer granted via session_shares gets read-only access.
-    // Nested setLogs remain owner-only.
     match /users/{uid}/sessions/{sessionId} {
       allow read: if request.auth != null
                   && (request.auth.uid == uid
@@ -483,8 +504,19 @@ service cloud.firestore {
                           && get(/databases/$(database)/documents/session_shares/$(uid)).data.trainerId == request.auth.uid));
       allow write: if request.auth != null && request.auth.uid == uid;
 
+      // setLogs sub-collection (REQ-SETLOGS-001..004, trainer-athlete-set-logs).
+      // Read mirrors parent session-share predicate: owner OR linked trainer.
+      // Write is owner-only — trainers (even linked) may never mutate set data.
+      // Emulator scenarios: E1 linked reads → allowed; E2 linked lists → allowed;
+      // E3 unrelated trainer → denied; E4 no share doc → denied;
+      // E5 linked trainer writes → denied; E6 owner reads → allowed;
+      // E7 owner writes → allowed; E8 unauthenticated → denied.
       match /setLogs/{setLogId} {
-        allow read, write: if request.auth != null && request.auth.uid == uid;
+        allow read: if request.auth != null
+                    && (request.auth.uid == uid
+                        || (exists(/databases/$(database)/documents/session_shares/$(uid))
+                            && get(/databases/$(database)/documents/session_shares/$(uid)).data.trainerId == request.auth.uid));
+        allow write: if request.auth != null && request.auth.uid == uid;
       }
     }
 

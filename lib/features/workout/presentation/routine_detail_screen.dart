@@ -17,6 +17,7 @@ import '../application/session_providers.dart'
     show currentUidProvider, lastWeightByExerciseProvider, planProgressProvider;
 import '../domain/routine.dart';
 import '../domain/routine_day.dart';
+import '../domain/routine_day_duration.dart';
 import '../domain/routine_slot.dart';
 import '../domain/routine_source.dart';
 import 'widgets/exercise_slot_row.dart';
@@ -26,9 +27,24 @@ import 'widgets/stat_tile.dart';
 /// selectedDayIndex is local state (ADR-RD-3).
 /// No Scaffold, AppBackground, or SafeArea — provided by _ShellScaffold (REQ-RDT-011).
 class RoutineDetailScreen extends ConsumerStatefulWidget {
-  const RoutineDetailScreen({super.key, required this.routineId});
+  const RoutineDetailScreen({
+    super.key,
+    required this.routineId,
+    this.initialDayNumber,
+    this.initialWeekIndex,
+  });
 
   final String routineId;
+
+  /// 1-based RoutineDay.dayNumber to pre-select on first render. Out-of-range
+  /// values are clamped to the valid day range by the build method's
+  /// `selectedDayIndex.clamp(...)` so callers can pass any int safely.
+  /// Used by the home `EmpezarEntrenamientoCard` to deep-link to today's day.
+  final int? initialDayNumber;
+
+  /// 0-based week index to pre-select on first render. Same clamping
+  /// guarantees as [initialDayNumber].
+  final int? initialWeekIndex;
 
   @override
   ConsumerState<RoutineDetailScreen> createState() =>
@@ -36,10 +52,21 @@ class RoutineDetailScreen extends ConsumerStatefulWidget {
 }
 
 class _RoutineDetailScreenState extends ConsumerState<RoutineDetailScreen> {
-  int selectedDayIndex = 0;
+  late int selectedDayIndex;
 
   /// 0-based selected week index. Only used when routine.numWeeks > 1.
-  int selectedWeekIndex = 0;
+  late int selectedWeekIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    // initialDayNumber is 1-based on the wire (matches RoutineDay.dayNumber);
+    // local state is 0-based. The build method's clamp() guards against
+    // out-of-range values once the routine resolves.
+    selectedDayIndex =
+        widget.initialDayNumber != null ? widget.initialDayNumber! - 1 : 0;
+    selectedWeekIndex = widget.initialWeekIndex ?? 0;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -176,19 +203,9 @@ class _RoutineDetailContent extends ConsumerWidget {
   /// 2026-06-11). Per set: work time (duration as-is, or ~3s/rep for rep
   /// sets) + the slot's rest. Prefixed "~" to read as an estimate.
   String _minutesValue(RoutineDay d, int week) {
-    if (d.estimatedMinutes != null) return '${d.estimatedMinutes}';
-    var seconds = 0;
-    for (final slot in d.slots) {
-      if (!slot.isPresentInWeek(week)) continue;
-      for (final s in slot.effectiveSetsForWeek(week)) {
-        final work = (s.durationSeconds != null && s.durationSeconds! > 0)
-            ? s.durationSeconds!
-            : (s.reps ?? s.repsMax ?? s.repsMin ?? 12) * 3;
-        seconds += work + slot.restSeconds;
-      }
-    }
-    if (seconds <= 0) return '—';
-    return '~${(seconds / 60).round()}';
+    final est = estimateRoutineDayMinutes(d, week: week);
+    if (est.minutes == null) return '—';
+    return est.authored ? '${est.minutes}' : '~${est.minutes}';
   }
 
   /// Walks [day.slots] and emits either a standalone [ExerciseSlotRow] or a

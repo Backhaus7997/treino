@@ -79,7 +79,15 @@ mixin _$UserProfile {
   List<TrainerLocation> get trainerLocations =>
       throw _privateConstructorUsedError;
   List<String> get trainerGeohashes => throw _privateConstructorUsedError;
-  bool get trainerOffersOnline => throw _privateConstructorUsedError;
+  bool get trainerOffersOnline =>
+      throw _privateConstructorUsedError; // ── Athlete active routine (home today's card PR#2) ───────────────────
+// Points to the user-created routine the athlete picked as "the one I'm
+// currently training". Used by [todaysRoutineProvider] to resolve the home
+// card when the user has multiple self-created routines and no trainer
+// plan. Null when no active routine is set (single routine auto-activates,
+// multi without selection shows the empty CTA). Setting/unsetting is
+// toggled from the overflow menu of each card in MisRutinasSection.
+  String? get activeRoutineId => throw _privateConstructorUsedError;
 
   /// Serializes this UserProfile to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -123,7 +131,8 @@ abstract class $UserProfileCopyWith<$Res> {
       String? trainerGeohash,
       List<TrainerLocation> trainerLocations,
       List<String> trainerGeohashes,
-      bool trainerOffersOnline});
+      bool trainerOffersOnline,
+      String? activeRoutineId});
 }
 
 /// @nodoc
@@ -167,6 +176,7 @@ class _$UserProfileCopyWithImpl<$Res, $Val extends UserProfile>
     Object? trainerLocations = null,
     Object? trainerGeohashes = null,
     Object? trainerOffersOnline = null,
+    Object? activeRoutineId = freezed,
   }) {
     return _then(_value.copyWith(
       uid: null == uid
@@ -273,6 +283,10 @@ class _$UserProfileCopyWithImpl<$Res, $Val extends UserProfile>
           ? _value.trainerOffersOnline
           : trainerOffersOnline // ignore: cast_nullable_to_non_nullable
               as bool,
+      activeRoutineId: freezed == activeRoutineId
+          ? _value.activeRoutineId
+          : activeRoutineId // ignore: cast_nullable_to_non_nullable
+              as String?,
     ) as $Val);
   }
 }
@@ -311,7 +325,8 @@ abstract class _$$UserProfileImplCopyWith<$Res>
       String? trainerGeohash,
       List<TrainerLocation> trainerLocations,
       List<String> trainerGeohashes,
-      bool trainerOffersOnline});
+      bool trainerOffersOnline,
+      String? activeRoutineId});
 }
 
 /// @nodoc
@@ -353,6 +368,7 @@ class __$$UserProfileImplCopyWithImpl<$Res>
     Object? trainerLocations = null,
     Object? trainerGeohashes = null,
     Object? trainerOffersOnline = null,
+    Object? activeRoutineId = freezed,
   }) {
     return _then(_$UserProfileImpl(
       uid: null == uid
@@ -459,6 +475,10 @@ class __$$UserProfileImplCopyWithImpl<$Res>
           ? _value.trainerOffersOnline
           : trainerOffersOnline // ignore: cast_nullable_to_non_nullable
               as bool,
+      activeRoutineId: freezed == activeRoutineId
+          ? _value.activeRoutineId
+          : activeRoutineId // ignore: cast_nullable_to_non_nullable
+              as String?,
     ));
   }
 }
@@ -492,7 +512,8 @@ class _$UserProfileImpl implements _UserProfile {
       this.trainerGeohash,
       final List<TrainerLocation> trainerLocations = const <TrainerLocation>[],
       final List<String> trainerGeohashes = const <String>[],
-      this.trainerOffersOnline = false})
+      this.trainerOffersOnline = false,
+      this.activeRoutineId})
       : _trainerLocations = trainerLocations,
         _trainerGeohashes = trainerGeohashes;
 
@@ -602,10 +623,19 @@ class _$UserProfileImpl implements _UserProfile {
   @override
   @JsonKey()
   final bool trainerOffersOnline;
+// ── Athlete active routine (home today's card PR#2) ───────────────────
+// Points to the user-created routine the athlete picked as "the one I'm
+// currently training". Used by [todaysRoutineProvider] to resolve the home
+// card when the user has multiple self-created routines and no trainer
+// plan. Null when no active routine is set (single routine auto-activates,
+// multi without selection shows the empty CTA). Setting/unsetting is
+// toggled from the overflow menu of each card in MisRutinasSection.
+  @override
+  final String? activeRoutineId;
 
   @override
   String toString() {
-    return 'UserProfile(uid: $uid, email: $email, displayName: $displayName, role: $role, createdAt: $createdAt, updatedAt: $updatedAt, gymId: $gymId, bodyWeightKg: $bodyWeightKg, heightCm: $heightCm, gender: $gender, experienceLevel: $experienceLevel, avatarUrl: $avatarUrl, firstName: $firstName, lastName: $lastName, phone: $phone, bornAt: $bornAt, trainerBio: $trainerBio, trainerSpecialty: $trainerSpecialty, trainerMonthlyRate: $trainerMonthlyRate, paymentAlias: $paymentAlias, trainerLatitude: $trainerLatitude, trainerLongitude: $trainerLongitude, trainerGeohash: $trainerGeohash, trainerLocations: $trainerLocations, trainerGeohashes: $trainerGeohashes, trainerOffersOnline: $trainerOffersOnline)';
+    return 'UserProfile(uid: $uid, email: $email, displayName: $displayName, role: $role, createdAt: $createdAt, updatedAt: $updatedAt, gymId: $gymId, bodyWeightKg: $bodyWeightKg, heightCm: $heightCm, gender: $gender, experienceLevel: $experienceLevel, avatarUrl: $avatarUrl, firstName: $firstName, lastName: $lastName, phone: $phone, bornAt: $bornAt, trainerBio: $trainerBio, trainerSpecialty: $trainerSpecialty, trainerMonthlyRate: $trainerMonthlyRate, paymentAlias: $paymentAlias, trainerLatitude: $trainerLatitude, trainerLongitude: $trainerLongitude, trainerGeohash: $trainerGeohash, trainerLocations: $trainerLocations, trainerGeohashes: $trainerGeohashes, trainerOffersOnline: $trainerOffersOnline, activeRoutineId: $activeRoutineId)';
   }
 
   @override
@@ -657,7 +687,9 @@ class _$UserProfileImpl implements _UserProfile {
             const DeepCollectionEquality()
                 .equals(other._trainerGeohashes, _trainerGeohashes) &&
             (identical(other.trainerOffersOnline, trainerOffersOnline) ||
-                other.trainerOffersOnline == trainerOffersOnline));
+                other.trainerOffersOnline == trainerOffersOnline) &&
+            (identical(other.activeRoutineId, activeRoutineId) ||
+                other.activeRoutineId == activeRoutineId));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -689,7 +721,8 @@ class _$UserProfileImpl implements _UserProfile {
         trainerGeohash,
         const DeepCollectionEquality().hash(_trainerLocations),
         const DeepCollectionEquality().hash(_trainerGeohashes),
-        trainerOffersOnline
+        trainerOffersOnline,
+        activeRoutineId
       ]);
 
   /// Create a copy of UserProfile
@@ -735,7 +768,8 @@ abstract class _UserProfile implements UserProfile {
       final String? trainerGeohash,
       final List<TrainerLocation> trainerLocations,
       final List<String> trainerGeohashes,
-      final bool trainerOffersOnline}) = _$UserProfileImpl;
+      final bool trainerOffersOnline,
+      final String? activeRoutineId}) = _$UserProfileImpl;
 
   factory _UserProfile.fromJson(Map<String, dynamic> json) =
       _$UserProfileImpl.fromJson;
@@ -821,7 +855,16 @@ abstract class _UserProfile implements UserProfile {
   @override
   List<String> get trainerGeohashes;
   @override
-  bool get trainerOffersOnline;
+  bool
+      get trainerOffersOnline; // ── Athlete active routine (home today's card PR#2) ───────────────────
+// Points to the user-created routine the athlete picked as "the one I'm
+// currently training". Used by [todaysRoutineProvider] to resolve the home
+// card when the user has multiple self-created routines and no trainer
+// plan. Null when no active routine is set (single routine auto-activates,
+// multi without selection shows the empty CTA). Setting/unsetting is
+// toggled from the overflow menu of each card in MisRutinasSection.
+  @override
+  String? get activeRoutineId;
 
   /// Create a copy of UserProfile
   /// with the given fields replaced by the non-null parameter values.

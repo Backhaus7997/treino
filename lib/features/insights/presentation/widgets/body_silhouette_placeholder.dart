@@ -3,18 +3,24 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/treino_icon.dart';
+import '../../domain/muscle_group.dart';
 
 /// Silueta muscular del Insights / Home "Esta Semana".
 ///
-/// Renderiza `assets/body/bodyfront.png` + `assets/body/bodyback.png` lado a
-/// lado dentro del card. Las masks individuales por músculo
-/// (`assets/body/mask_<view>_<muscle>.png`) están cargadas en el bundle pero
-/// NO se renderizan en esta etapa — quedan listas para el highlighting
-/// dinámico per muscle group (Fase 6 / polish), donde se stackearán sobre el
-/// body base con `ColorFiltered` + `palette.accent` según `setsByGroup`.
+/// Renderiza `assets/body/bodyfront.png` (y opcionalmente `bodyback.png`) con
+/// masks por grupo muscular stackeadas encima, tintadas en `palette.accent`.
+/// La intensidad del tintado se calcula vs el target de la rutina:
+/// `opacity = (setsDone / target).clamp(0.0, 1.0)`. Grupos sin target en la
+/// rutina pero con sets realizados se pintan a `_kOrphanIntensity` (60%)
+/// para mantener la señal visual sin sugerir cumplimiento de plan.
+///
+/// Decisión 3C (2026-06-19): intensidad proporcional al cumplimiento del
+/// plan en vez de binario — el athlete ve de un vistazo qué tan cerca está
+/// del volumen semanal prescripto, no solo "si tocaste el músculo".
 ///
 /// Si los assets fallan en cargar (test sin bundle, imagen movida), el
-/// `errorBuilder` cae al icono original — la card nunca se rompe visualmente.
+/// `errorBuilder` del PNG base cae al icono original — la card nunca se
+/// rompe visualmente.
 class BodySilhouettePlaceholder extends StatelessWidget {
   const BodySilhouettePlaceholder({
     super.key,
@@ -22,6 +28,8 @@ class BodySilhouettePlaceholder extends StatelessWidget {
     required this.height,
     this.label,
     this.showBack = false,
+    this.setsByGroup = const {},
+    this.targetByGroup = const {},
   });
 
   final double width;
@@ -34,6 +42,21 @@ class BodySilhouettePlaceholder extends StatelessWidget {
   /// Esta Semana). Si `false` (default), solo `bodyfront` centrado (mockup
   /// Insights · Músculos de la semana).
   final bool showBack;
+
+  /// Sets logueados por grupo en la semana actual. Default vacío para
+  /// retrocompatibilidad con call sites que aún no pasan data.
+  final Map<MuscleGroupDisplay, int> setsByGroup;
+
+  /// Target de sets por grupo según la rutina asignada (denominador del
+  /// ratio de intensidad). Default vacío — sin target los grupos entrenados
+  /// se pintan al fallback `_kOrphanIntensity`.
+  final Map<MuscleGroupDisplay, int> targetByGroup;
+
+  /// Intensidad de tintado para grupos con sets realizados pero sin target
+  /// en la rutina (athlete entrenó algo fuera de plan). Suficiente para que
+  /// se vea, pero no full — distingue cumplimiento (100%) de "tocaste pero
+  /// no estaba prescripto".
+  static const double _kOrphanIntensity = 0.6;
 
   @override
   Widget build(BuildContext context) {
@@ -57,22 +80,25 @@ class BodySilhouettePlaceholder extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
                         Expanded(
-                          child: _BodyImage(
-                            assetPath: 'assets/body/bodyfront.png',
+                          child: _BodyView(
+                            baseAsset: 'assets/body/bodyfront.png',
+                            masksByGroup: _frontMasks(),
                             palette: palette,
                           ),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
-                          child: _BodyImage(
-                            assetPath: 'assets/body/bodyback.png',
+                          child: _BodyView(
+                            baseAsset: 'assets/body/bodyback.png',
+                            masksByGroup: _backMasks(),
                             palette: palette,
                           ),
                         ),
                       ],
                     )
-                  : _BodyImage(
-                      assetPath: 'assets/body/bodyfront.png',
+                  : _BodyView(
+                      baseAsset: 'assets/body/bodyfront.png',
+                      masksByGroup: _frontMasks(),
                       palette: palette,
                     ),
             ),
@@ -93,26 +119,88 @@ class BodySilhouettePlaceholder extends StatelessWidget {
       ),
     );
   }
+
+  /// Devuelve `{assetPath: intensity}` para todas las masks frontales que
+  /// deben pintarse esta semana. Una mask puede aparecer una sola vez en el
+  /// map; si un grupo expone varias, todas heredan la misma intensidad.
+  Map<String, double> _frontMasks() => _masksFor((g) => g.frontMaskAssets);
+
+  Map<String, double> _backMasks() => _masksFor((g) => g.backMaskAssets);
+
+  Map<String, double> _masksFor(
+    List<String> Function(MuscleGroupDisplay) selector,
+  ) {
+    final result = <String, double>{};
+    for (final group in MuscleGroupDisplay.displayOrder) {
+      final sets = setsByGroup[group] ?? 0;
+      if (sets <= 0) continue;
+      final intensity = _intensityFor(group, sets);
+      for (final mask in selector(group)) {
+        result[mask] = intensity;
+      }
+    }
+    return result;
+  }
+
+  double _intensityFor(MuscleGroupDisplay group, int sets) {
+    final target = targetByGroup[group] ?? 0;
+    if (target <= 0) return _kOrphanIntensity;
+    return (sets / target).clamp(0.0, 1.0);
+  }
 }
 
-class _BodyImage extends StatelessWidget {
-  const _BodyImage({required this.assetPath, required this.palette});
+/// Stack: PNG base del cuerpo + N masks tintadas en `palette.accent` con la
+/// opacidad calculada en el padre.
+class _BodyView extends StatelessWidget {
+  const _BodyView({
+    required this.baseAsset,
+    required this.masksByGroup,
+    required this.palette,
+  });
 
-  final String assetPath;
+  final String baseAsset;
+  final Map<String, double> masksByGroup;
   final AppPalette palette;
 
   @override
   Widget build(BuildContext context) {
-    return Image.asset(
-      assetPath,
-      fit: BoxFit.contain,
-      errorBuilder: (_, __, ___) => Center(
-        child: Icon(
-          TreinoIcon.tabWorkout,
-          size: 32,
-          color: palette.accent.withValues(alpha: 0.5),
+    return Stack(
+      alignment: Alignment.center,
+      fit: StackFit.expand,
+      children: [
+        // Base body silhouette (always present).
+        Image.asset(
+          baseAsset,
+          fit: BoxFit.contain,
+          errorBuilder: (_, __, ___) => Center(
+            child: Icon(
+              TreinoIcon.tabWorkout,
+              size: 32,
+              color: palette.accent.withValues(alpha: 0.5),
+            ),
+          ),
         ),
-      ),
+        // Each muscle mask tinted in the brand accent. `ColorFiltered.srcIn`
+        // keeps the mask's alpha channel and replaces the RGB with the
+        // accent colour — independent of whatever fill the PNG had.
+        for (final entry in masksByGroup.entries)
+          Opacity(
+            opacity: entry.value,
+            child: ColorFiltered(
+              colorFilter: ColorFilter.mode(
+                palette.accent,
+                BlendMode.srcIn,
+              ),
+              child: Image.asset(
+                entry.key,
+                fit: BoxFit.contain,
+                // Defensive: if a mask is missing from the bundle, render
+                // nothing rather than killing the whole silhouette.
+                errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

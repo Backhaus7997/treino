@@ -205,6 +205,12 @@
   "workoutMisRutinasErrorRetry": "Reintentar",
   "workoutMisRutinasOverflowEdit": "EDITAR",
   "workoutMisRutinasOverflowArchive": "ELIMINAR",
+  "workoutMisRutinasOverflowMarkActive": "MARCAR COMO ACTIVA",
+  "workoutMisRutinasOverflowUnmarkActive": "DESMARCAR COMO ACTIVA",
+  "workoutMisRutinasActiveChip": "ACTIVA",
+  "workoutMisRutinasMarkActiveSuccess": "Marcada como tu rutina activa",
+  "workoutMisRutinasUnmarkActiveSuccess": "Ya no es tu rutina activa",
+  "workoutMisRutinasActiveError": "No pudimos cambiar el estado. Reintentá.",
   "workoutMisRutinasConfirmTitle": "Eliminar rutina",
   "workoutMisRutinasConfirmBody": "La rutina dejará de aparecer en MIS RUTINAS. Tu historial se conserva.",
   "workoutMisRutinasConfirmCancel": "CANCELAR",
@@ -662,6 +668,12 @@
   "@routineEditorSetTypeDrop": {},
   "routineEditorSetTypeFailure": "Al fallo (F)",
   "@routineEditorSetTypeFailure": {},
+  "routineEditorNotesLabel": "Nota para el alumno",
+  "@routineEditorNotesLabel": {},
+  "routineEditorNotesHint": "Técnica, tempo, RIR…",
+  "@routineEditorNotesHint": {},
+  "exerciseNoteFromCoachTag": "DEL COACH",
+  "@exerciseNoteFromCoachTag": {},
   "routineEditorIncompleteSetsFeedback": "Completá los sets de \"{exerciseName}\" antes de guardar.",
   "@routineEditorIncompleteSetsFeedback": {
     "description": "SnackBar shown when the user taps save with at least one incomplete set. Names the first offending exercise.",
@@ -863,6 +875,10 @@
   "@routineEditorDeleteDayA11y": {
     "description": "tooltip / Semantics label for the icon-only day-delete trash button in the routine editor (findings 25/26 day-header trash IconButton)."
   },
+  "routineEditorEditDayNameA11y": "Editar nombre del día",
+  "@routineEditorEditDayNameA11y": {
+    "description": "Tooltip + Semantics label for the icon-only pencil button next to each day's title in the routine editor. Tap turns the title into an inline TextField."
+  },
   "athleteDetailEditPlanA11y": "Editar plan",
   "@athleteDetailEditPlanA11y": {
     "description": "Accessibility label for the edit-plan icon button in the athlete detail plan card (finding 5)."
@@ -1044,5 +1060,101 @@
   "coachHubPreviewDiscardConfirm": "Salir igual",
   "@coachHubPreviewDiscardConfirm": {
     "description": "Destructive confirm action of the coach-hub preview leave-without-saving dialog (finding 9)."
+  },
+  "chatAttachMediaLabel": "Adjuntar",
+  "@chatAttachMediaLabel": {},
+  "chatPickImageLabel": "Foto",
+  "@chatPickImageLabel": {},
+  "chatPickVideoLabel": "Video",
+  "@chatPickVideoLabel": {},
+  "chatMediaUploading": "Subiendo…",
+  "@chatMediaUploading": {},
+  "chatMediaUploadFailed": "No pudimos subir el archivo. Probá de nuevo.",
+  "@chatMediaUploadFailed": {},
+  "chatMediaPreviewPhoto": "📷 Foto",
+  "@chatMediaPreviewPhoto": {},
+  "chatMediaPreviewVideo": "🎥 Video",
+  "@chatMediaPreviewVideo": {},
+  "chatMediaViewFullscreen": "Ver foto",
+  "@chatMediaViewFullscreen": {},
+  "chatMediaImageLoadError": "No pudimos cargar la imagen.",
+  "@chatMediaImageLoadError": {},
+  "feedMessagesWithUnreadA11y": "Mensajes, {count} sin leer",
+  "@feedMessagesWithUnreadA11y": {
+    "description": "Accessibility label for the feed header messages icon when there are unread chats; announces the unread count to screen readers.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "chatUnreadA11y": "Sin leer",
+  "@chatUnreadA11y": {
+    "description": "Accessibility label for the unread dot indicator shown on a _ChatRow in the chat inbox list."
+  },
+  "coachSessionSetLogsTitle": "SETS",
+  "@coachSessionSetLogsTitle": {
+    "description": "Section heading inside the session expansion tile in the trainer's Entrenamientos tab."
+  },
+  "coachSessionTapToExpand": "Ver sets",
+  "@coachSessionTapToExpand": {
+    "description": "Call-to-action hint on a finished-session row, inviting the trainer to expand it."
+  },
+  "coachSessionSetLogsEmpty": "Esta sesión no tiene sets registrados.",
+  "@coachSessionSetLogsEmpty": {
+    "description": "Empty state shown when the athlete's session has no logged sets."
+  },
+  "coachSessionSetLogsLoadError": "No pudimos cargar los sets. Intentá de nuevo.",
+  "@coachSessionSetLogsLoadError": {
+    "description": "Generic error shown when loading setLogs fails for a non-permission reason."
+  },
+  "coachAthleteNoSharePlaceholder": "El alumno no compartió su historial todavía.",
+  "@coachAthleteNoSharePlaceholder": {
+    "description": "Shown when the trainer receives permission-denied loading setLogs — the athlete has not shared or revoked sharing."
+  },
+  "avatarCropperTitle": "Recortar foto",
+  "@avatarCropperTitle": {
+    "description": "Toolbar title for the avatar cropper modal (iOS, Android, web)."
+  },
+  "avatarCropperDone": "LISTO",
+  "@avatarCropperDone": {
+    "description": "Confirm button label in the avatar cropper modal."
+  },
+  "avatarCropperCancel": "CANCELAR",
+  "@avatarCropperCancel": {
+    "description": "Cancel button label in the avatar cropper modal."
+  },
+  "progressionSectionTitle": "EVOLUCIÓN POR EJERCICIO",
+  "@progressionSectionTitle": {
+    "description": "Section header for the per-exercise progression chart in the coach's athlete detail screen."
+  },
+  "progressionMetricPr": "PR",
+  "@progressionMetricPr": {
+    "description": "Label for the PR (personal record = max weight) metric chip in the progression chart."
+  },
+  "progressionMetricVolume": "Volumen",
+  "@progressionMetricVolume": {
+    "description": "Label for the Volume metric chip in the progression chart."
+  },
+  "progressionFrequency": "{count, plural, =0{Sin sesiones en las últimas 8 semanas} =1{1 sesión en las últimas 8 semanas} other{{count} sesiones en las últimas 8 semanas}}",
+  "@progressionFrequency": {
+    "description": "Frecuencia stat label showing session count in the last 8 weeks.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "progressionSinglePointHint": "Necesitás al menos 2 sesiones para ver la evolución.",
+  "@progressionSinglePointHint": {
+    "description": "Hint shown when only 1 data point exists — no trend line can be drawn."
+  },
+  "progressionEmptyExercise": "Sin datos para este ejercicio.",
+  "@progressionEmptyExercise": {
+    "description": "Hint shown when the selected exercise has 0 data points."
+  },
+  "progressionEmpty": "Sin registros de series todavía.",
+  "@progressionEmpty": {
+    "description": "Empty state shown when the athlete has no setLogs at all (exercise picker not shown)."
   }
 }

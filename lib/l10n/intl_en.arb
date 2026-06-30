@@ -202,6 +202,12 @@
   "workoutMisRutinasErrorRetry": "",
   "workoutMisRutinasOverflowEdit": "",
   "workoutMisRutinasOverflowArchive": "",
+  "workoutMisRutinasOverflowMarkActive": "",
+  "workoutMisRutinasOverflowUnmarkActive": "",
+  "workoutMisRutinasActiveChip": "",
+  "workoutMisRutinasMarkActiveSuccess": "",
+  "workoutMisRutinasUnmarkActiveSuccess": "",
+  "workoutMisRutinasActiveError": "",
   "workoutMisRutinasConfirmTitle": "",
   "workoutMisRutinasConfirmBody": "",
   "workoutMisRutinasConfirmCancel": "",
@@ -468,6 +474,12 @@
   "@routineEditorSetTypeDrop": {},
   "routineEditorSetTypeFailure": "",
   "@routineEditorSetTypeFailure": {},
+  "routineEditorNotesLabel": "Note for athlete",
+  "@routineEditorNotesLabel": {},
+  "routineEditorNotesHint": "Technique, tempo, RIR…",
+  "@routineEditorNotesHint": {},
+  "exerciseNoteFromCoachTag": "FROM COACH",
+  "@exerciseNoteFromCoachTag": {},
   "routineEditorIncompleteSetsFeedback": "",
   "@routineEditorIncompleteSetsFeedback": {
     "description": "SnackBar shown when the user taps save with at least one incomplete set. Names the first offending exercise.",
@@ -593,6 +605,7 @@
   },
   "sessionPlayerTimerStartA11y": "Start timer",
   "routineEditorDeleteDayA11y": "Delete day",
+  "routineEditorEditDayNameA11y": "",
   "athleteDetailEditPlanA11y": "Edit plan",
   "athleteDetailDeletePlanA11y": "Delete plan",
   "coachMapDisabledOnlineA11y": "Map, unavailable in Online mode",
@@ -649,5 +662,38 @@
   },
   "coachHubPreviewDiscardTitle": "Leave without saving the plan?",
   "coachHubPreviewDiscardBody": "You'll lose the exercises you matched manually.",
-  "coachHubPreviewDiscardConfirm": "Leave anyway"
+  "coachHubPreviewDiscardConfirm": "Leave anyway",
+  "chatAttachMediaLabel": "Attach",
+  "chatPickImageLabel": "Photo",
+  "chatPickVideoLabel": "Video",
+  "chatMediaUploading": "Uploading…",
+  "chatMediaUploadFailed": "We couldn't upload the file. Please try again.",
+  "chatMediaPreviewPhoto": "📷 Photo",
+  "chatMediaPreviewVideo": "🎥 Video",
+  "chatMediaViewFullscreen": "View photo",
+  "chatMediaImageLoadError": "We couldn't load the image.",
+  "feedMessagesWithUnreadA11y": "Messages, {count} unread",
+  "chatUnreadA11y": "Unread",
+  "coachSessionSetLogsTitle": "SETS",
+  "coachSessionTapToExpand": "View sets",
+  "coachSessionSetLogsEmpty": "This session has no logged sets.",
+  "coachSessionSetLogsLoadError": "Could not load sets. Please try again.",
+  "coachAthleteNoSharePlaceholder": "The athlete has not shared their history yet.",
+  "avatarCropperTitle": "",
+  "avatarCropperDone": "",
+  "avatarCropperCancel": "",
+  "progressionSectionTitle": "PROGRESS BY EXERCISE",
+  "progressionMetricPr": "PR",
+  "progressionMetricVolume": "Volume",
+  "progressionFrequency": "{count, plural, =0{No sessions in the last 8 weeks} =1{1 session in the last 8 weeks} other{{count} sessions in the last 8 weeks}}",
+  "@progressionFrequency": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "progressionSinglePointHint": "You need at least 2 sessions to see the trend.",
+  "progressionEmptyExercise": "No data for this exercise.",
+  "progressionEmpty": "No set records yet."
 }

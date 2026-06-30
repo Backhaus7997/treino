@@ -567,6 +567,27 @@ class AppL10nEs extends AppL10n {
   String get workoutMisRutinasOverflowArchive => 'ELIMINAR';
 
   @override
+  String get workoutMisRutinasOverflowMarkActive => 'MARCAR COMO ACTIVA';
+
+  @override
+  String get workoutMisRutinasOverflowUnmarkActive => 'DESMARCAR COMO ACTIVA';
+
+  @override
+  String get workoutMisRutinasActiveChip => 'ACTIVA';
+
+  @override
+  String get workoutMisRutinasMarkActiveSuccess =>
+      'Marcada como tu rutina activa';
+
+  @override
+  String get workoutMisRutinasUnmarkActiveSuccess =>
+      'Ya no es tu rutina activa';
+
+  @override
+  String get workoutMisRutinasActiveError =>
+      'No pudimos cambiar el estado. Reintentá.';
+
+  @override
   String get workoutMisRutinasConfirmTitle => 'Eliminar rutina';
 
   @override
@@ -1392,6 +1413,15 @@ class AppL10nEs extends AppL10n {
   String get routineEditorSetTypeFailure => '';
 
   @override
+  String get routineEditorNotesLabel => 'Nota para el alumno';
+
+  @override
+  String get routineEditorNotesHint => 'Técnica, tempo, RIR…';
+
+  @override
+  String get exerciseNoteFromCoachTag => 'DEL COACH';
+
+  @override
   String routineEditorIncompleteSetsFeedback(String exerciseName) {
     return 'Completá los sets de \"$exerciseName\" antes de guardar.';
   }
@@ -1570,6 +1600,9 @@ class AppL10nEs extends AppL10n {
   String get routineEditorDeleteDayA11y => 'Eliminar día';
 
   @override
+  String get routineEditorEditDayNameA11y => 'Editar nombre del día';
+
+  @override
   String get athleteDetailEditPlanA11y => 'Editar plan';
 
   @override
@@ -1716,6 +1749,100 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get coachHubPreviewDiscardConfirm => 'Salir igual';
+
+  @override
+  String get chatAttachMediaLabel => 'Adjuntar';
+
+  @override
+  String get chatPickImageLabel => 'Foto';
+
+  @override
+  String get chatPickVideoLabel => 'Video';
+
+  @override
+  String get chatMediaUploading => 'Subiendo…';
+
+  @override
+  String get chatMediaUploadFailed =>
+      'No pudimos subir el archivo. Inténtalo de nuevo.';
+
+  @override
+  String get chatMediaPreviewPhoto => '📷 Foto';
+
+  @override
+  String get chatMediaPreviewVideo => '🎥 Video';
+
+  @override
+  String get chatMediaViewFullscreen => 'Ver foto';
+
+  @override
+  String get chatMediaImageLoadError => 'No pudimos cargar la imagen.';
+
+  @override
+  String feedMessagesWithUnreadA11y(int count) {
+    return 'Mensajes, $count sin leer';
+  }
+
+  @override
+  String get chatUnreadA11y => 'Sin leer';
+
+  @override
+  String get coachSessionSetLogsTitle => 'SETS';
+
+  @override
+  String get coachSessionTapToExpand => 'Ver sets';
+
+  @override
+  String get coachSessionSetLogsEmpty =>
+      'Esta sesión no tiene sets registrados.';
+
+  @override
+  String get coachSessionSetLogsLoadError =>
+      'No pudimos cargar los sets. Intenta de nuevo.';
+
+  @override
+  String get coachAthleteNoSharePlaceholder =>
+      'El alumno no ha compartido su historial todavía.';
+
+  @override
+  String get avatarCropperTitle => 'Recortar foto';
+
+  @override
+  String get avatarCropperDone => 'LISTO';
+
+  @override
+  String get avatarCropperCancel => 'CANCELAR';
+
+  @override
+  String get progressionSectionTitle => 'EVOLUCIÓN POR EJERCICIO';
+
+  @override
+  String get progressionMetricPr => 'PR';
+
+  @override
+  String get progressionMetricVolume => 'Volumen';
+
+  @override
+  String progressionFrequency(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count sesiones en las últimas 8 semanas',
+      one: '1 sesión en las últimas 8 semanas',
+      zero: 'Sin sesiones en las últimas 8 semanas',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get progressionSinglePointHint =>
+      'Necesitas al menos 2 sesiones para ver la evolución.';
+
+  @override
+  String get progressionEmptyExercise => 'Sin datos para este ejercicio.';
+
+  @override
+  String get progressionEmpty => 'Sin registros de series todavía.';
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -2279,6 +2406,27 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get workoutMisRutinasOverflowArchive => 'ELIMINAR';
+
+  @override
+  String get workoutMisRutinasOverflowMarkActive => 'MARCAR COMO ACTIVA';
+
+  @override
+  String get workoutMisRutinasOverflowUnmarkActive => 'DESMARCAR COMO ACTIVA';
+
+  @override
+  String get workoutMisRutinasActiveChip => 'ACTIVA';
+
+  @override
+  String get workoutMisRutinasMarkActiveSuccess =>
+      'Marcada como tu rutina activa';
+
+  @override
+  String get workoutMisRutinasUnmarkActiveSuccess =>
+      'Ya no es tu rutina activa';
+
+  @override
+  String get workoutMisRutinasActiveError =>
+      'No pudimos cambiar el estado. Reintentá.';
 
   @override
   String get workoutMisRutinasConfirmTitle => 'Eliminar rutina';
@@ -3106,6 +3254,15 @@ class AppL10nEsAr extends AppL10nEs {
   String get routineEditorSetTypeFailure => 'Al fallo (F)';
 
   @override
+  String get routineEditorNotesLabel => 'Nota para el alumno';
+
+  @override
+  String get routineEditorNotesHint => 'Técnica, tempo, RIR…';
+
+  @override
+  String get exerciseNoteFromCoachTag => 'DEL COACH';
+
+  @override
   String routineEditorIncompleteSetsFeedback(String exerciseName) {
     return 'Completá los sets de \"$exerciseName\" antes de guardar.';
   }
@@ -3286,6 +3443,9 @@ class AppL10nEsAr extends AppL10nEs {
   String get routineEditorDeleteDayA11y => 'Eliminar día';
 
   @override
+  String get routineEditorEditDayNameA11y => 'Editar nombre del día';
+
+  @override
   String get athleteDetailEditPlanA11y => 'Editar plan';
 
   @override
@@ -3428,4 +3588,98 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get coachHubPreviewDiscardConfirm => 'Salir igual';
+
+  @override
+  String get chatAttachMediaLabel => 'Adjuntar';
+
+  @override
+  String get chatPickImageLabel => 'Foto';
+
+  @override
+  String get chatPickVideoLabel => 'Video';
+
+  @override
+  String get chatMediaUploading => 'Subiendo…';
+
+  @override
+  String get chatMediaUploadFailed =>
+      'No pudimos subir el archivo. Probá de nuevo.';
+
+  @override
+  String get chatMediaPreviewPhoto => '📷 Foto';
+
+  @override
+  String get chatMediaPreviewVideo => '🎥 Video';
+
+  @override
+  String get chatMediaViewFullscreen => 'Ver foto';
+
+  @override
+  String get chatMediaImageLoadError => 'No pudimos cargar la imagen.';
+
+  @override
+  String feedMessagesWithUnreadA11y(int count) {
+    return 'Mensajes, $count sin leer';
+  }
+
+  @override
+  String get chatUnreadA11y => 'Sin leer';
+
+  @override
+  String get coachSessionSetLogsTitle => 'SETS';
+
+  @override
+  String get coachSessionTapToExpand => 'Ver sets';
+
+  @override
+  String get coachSessionSetLogsEmpty =>
+      'Esta sesión no tiene sets registrados.';
+
+  @override
+  String get coachSessionSetLogsLoadError =>
+      'No pudimos cargar los sets. Intentá de nuevo.';
+
+  @override
+  String get coachAthleteNoSharePlaceholder =>
+      'El alumno no compartió su historial todavía.';
+
+  @override
+  String get avatarCropperTitle => 'Recortar foto';
+
+  @override
+  String get avatarCropperDone => 'LISTO';
+
+  @override
+  String get avatarCropperCancel => 'CANCELAR';
+
+  @override
+  String get progressionSectionTitle => 'EVOLUCIÓN POR EJERCICIO';
+
+  @override
+  String get progressionMetricPr => 'PR';
+
+  @override
+  String get progressionMetricVolume => 'Volumen';
+
+  @override
+  String progressionFrequency(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count sesiones en las últimas 8 semanas',
+      one: '1 sesión en las últimas 8 semanas',
+      zero: 'Sin sesiones en las últimas 8 semanas',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get progressionSinglePointHint =>
+      'Necesitás al menos 2 sesiones para ver la evolución.';
+
+  @override
+  String get progressionEmptyExercise => 'Sin datos para este ejercicio.';
+
+  @override
+  String get progressionEmpty => 'Sin registros de series todavía.';
 }

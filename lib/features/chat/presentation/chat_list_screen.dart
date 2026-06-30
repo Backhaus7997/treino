@@ -10,7 +10,8 @@ import '../../feed/presentation/widgets/post_avatar.dart';
 import '../../profile/application/user_public_profile_providers.dart';
 import '../../workout/application/session_providers.dart'
     show currentUidProvider;
-import '../application/chat_providers.dart';
+import '../application/chat_providers.dart'
+    show chatsForCurrentUserProvider, chatHasUnread;
 import '../domain/chat.dart';
 
 /// Pantalla que lista todos los chats del usuario actual.
@@ -92,6 +93,7 @@ class _ChatRow extends ConsumerWidget {
     final l10n = AppL10n.of(context);
     final otherUid = _otherUidOf(chat, currentUid);
     final pubAsync = ref.watch(userPublicProfileProvider(otherUid));
+    final hasUnread = currentUid.isNotEmpty && chatHasUnread(chat, currentUid);
 
     return InkWell(
       onTap: () {
@@ -152,6 +154,20 @@ class _ChatRow extends ConsumerWidget {
                     style: TextStyle(
                       color: palette.textMuted,
                       fontSize: 12,
+                    ),
+                  ),
+                ],
+                if (hasUnread) ...[
+                  const SizedBox(width: 10),
+                  Semantics(
+                    label: l10n.chatUnreadA11y,
+                    child: Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: palette.accent,
+                        shape: BoxShape.circle,
+                      ),
                     ),
                   ),
                 ],

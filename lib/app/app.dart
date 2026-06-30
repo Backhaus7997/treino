@@ -13,6 +13,33 @@ import 'locale_resolver.dart';
 import 'router.dart';
 import 'theme/app_theme.dart';
 
+/// Whether [message] was sent by [currentUid] — used to suppress
+/// self-notifications.
+///
+/// FCM routes by TOKEN, not by uid. If a device's token leaks into another
+/// account's `fcmTokens` (e.g. two accounts tested on one phone), the device
+/// would otherwise receive — and show — a push for a message IT sent. The
+/// device always knows its own uid, so this guard is independent of token
+/// registration hygiene and is the invariant: you are never notified of your
+/// own message.
+///
+/// Reads `data['senderId']` (added by the Cloud Function) and falls back to
+/// the `other` query param embedded in the deepLink, so it works even before
+/// the function is redeployed. Fail-open: returns false when the sender can't
+/// be determined (shows the notification, same as before).
+bool isOwnChatMessage(RemoteMessage message, String? currentUid) {
+  if (currentUid == null) return false;
+  final data = message.data;
+  var senderId = data['senderId'] as String?;
+  if (senderId == null || senderId.isEmpty) {
+    final deepLink = data['deepLink'] as String?;
+    if (deepLink != null) {
+      senderId = Uri.tryParse(deepLink)?.queryParameters['other'];
+    }
+  }
+  return senderId != null && senderId.isNotEmpty && senderId == currentUid;
+}
+
 class TreinoApp extends ConsumerStatefulWidget {
   const TreinoApp({super.key});
 
@@ -53,6 +80,10 @@ class _TreinoAppState extends ConsumerState<TreinoApp> {
     //      navigate to the deepLink. (ADR-PN-009, REQ-PN-HANDLER-002,
     //      SCENARIO-655, 656.)
     _bgSub = fcm.onMessageOpenedApp.listen((message) {
+      if (isOwnChatMessage(
+          message, ref.read(firebaseAuthProvider).currentUser?.uid)) {
+        return;
+      }
       final ctx = _router.routerDelegate.navigatorKey.currentContext;
       if (ctx == null || !ctx.mounted) return;
       goDeepLink(ctx, message.data['deepLink'] as String?);
@@ -64,6 +95,10 @@ class _TreinoAppState extends ConsumerState<TreinoApp> {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final message = await fcm.getInitialMessage();
       if (message == null) return;
+      if (isOwnChatMessage(
+          message, ref.read(firebaseAuthProvider).currentUser?.uid)) {
+        return;
+      }
       final ctx = _router.routerDelegate.navigatorKey.currentContext;
       if (ctx == null || !ctx.mounted) return;
       goDeepLink(ctx, message.data['deepLink'] as String?);
@@ -80,6 +115,12 @@ class _TreinoAppState extends ConsumerState<TreinoApp> {
   /// Foreground message handler — shows SnackBar via root ScaffoldMessenger.
   /// ADR-PN-010, REQ-PN-HANDLER-001, SCENARIO-652, 653, 654.
   void _onForeground(RemoteMessage message) {
+    // Never show the sender their own message (token may be cross-registered
+    // on a shared device). See [isOwnChatMessage].
+    if (isOwnChatMessage(
+        message, ref.read(firebaseAuthProvider).currentUser?.uid)) {
+      return;
+    }
     final messenger = _scaffoldMessengerKey.currentState;
     if (messenger == null) return;
 

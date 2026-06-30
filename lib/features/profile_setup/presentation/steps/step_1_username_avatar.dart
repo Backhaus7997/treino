@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../../app/theme/app_palette.dart';
+import '../../../../core/image/avatar_cropper.dart';
 import '../../../../core/widgets/treino_icon.dart';
 import '../../../../l10n/app_l10n.dart';
 import '../../../auth/presentation/widgets/auth_input.dart';
@@ -60,11 +61,18 @@ class _Step1UsernameAvatarState extends ConsumerState<Step1UsernameAvatar> {
       maxWidth: 800,
       imageQuality: 85,
     );
-    if (file != null) {
-      ref
-          .read(profileSetupNotifierProvider.notifier)
-          .updateAvatarLocalPath(file.path);
-    }
+    if (file == null || !mounted) return;
+    // Open the cropper with a circular preview and 1:1 lock. A null return
+    // means the user cancelled the crop UI — keep the previous draft avatar
+    // (the picker pick is discarded).
+    final cropped = await AvatarCropper().cropToSquare(
+      sourcePath: file.path,
+      context: context,
+    );
+    if (cropped == null || !mounted) return;
+    ref
+        .read(profileSetupNotifierProvider.notifier)
+        .updateAvatarLocalPath(cropped);
   }
 
   @override

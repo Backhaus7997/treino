@@ -15,8 +15,7 @@ import '../../insights/presentation/widgets/body_silhouette_placeholder.dart';
 /// a result < 1 belongs to the last week of the previous ISO year, and a
 /// result of 53 in a year without 53 ISO weeks is week 1 of the next year.
 int isoWeekNumber(DateTime date) {
-  final dayOfYear =
-      DateTime(date.year, date.month, date.day)
+  final dayOfYear = DateTime(date.year, date.month, date.day)
           .difference(DateTime(date.year, 1, 1))
           .inDays +
       1;
@@ -206,10 +205,12 @@ class _Loaded extends StatelessWidget {
           const SizedBox(height: 14),
 
           // ── Body silhouettes (front + back, full-width, prominent) ────
-          const BodySilhouettePlaceholder(
+          BodySilhouettePlaceholder(
             width: double.infinity,
             height: 280,
             showBack: true,
+            setsByGroup: wi.setsByGroup,
+            targetByGroup: wi.targetByGroup,
           ),
           const SizedBox(height: 14),
 

@@ -23,8 +23,15 @@ import '../../workout/application/assigned_routine_providers.dart';
 import '../../workout/application/routine_providers.dart'
     show routineRepositoryProvider;
 import '../../workout/application/session_providers.dart'
-    show currentUidProvider;
+    show currentUidProvider, sessionsByUidProvider, coachSessionSetLogsProvider;
 import '../../workout/domain/routine.dart';
+import '../../workout/domain/session.dart';
+import '../../workout/domain/session_status.dart';
+import '../../workout/application/exercise_progression_providers.dart';
+import '../../workout/domain/set_log.dart';
+import '../../workout/presentation/widgets/exercise_progression_chart.dart';
+import '../../workout/presentation/widgets/session_exercise_block.dart';
+import 'package:cloud_firestore/cloud_firestore.dart' show FirebaseException;
 
 /// Trainer's drill-down view for a specific athlete.
 ///
@@ -209,6 +216,10 @@ class _AthleteDetailBody extends ConsumerWidget {
               const SizedBox(height: 20),
               _RendimientoSection(athleteId: athleteId),
 
+              // ── Historial de sesiones section ─────────────────────────
+              const SizedBox(height: 20),
+              _EntrenamientosSection(athleteId: athleteId),
+
               // ── Cobro section ─────────────────────────────────────────
               const SizedBox(height: 20),
               _CobroSection(athleteId: athleteId),
@@ -228,28 +239,52 @@ class _AthleteDetailBody extends ConsumerWidget {
           padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
           child: Column(
             children: [
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () => _onMessage(context, ref),
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: palette.accent, width: 1),
-                    foregroundColor: palette.accent,
-                    minimumSize: const Size.fromHeight(48),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(9999),
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () => _onMessage(context, ref),
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: palette.accent, width: 1),
+                        foregroundColor: palette.accent,
+                        minimumSize: const Size.fromHeight(48),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(9999),
+                        ),
+                      ),
+                      icon: Icon(TreinoIcon.chat,
+                          size: 18, color: palette.accent),
+                      label: Text(
+                        AppL10n.of(context).athleteDetailMessageCta,
+                        style: GoogleFonts.barlowCondensed(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
                     ),
                   ),
-                  icon: Icon(TreinoIcon.chat, size: 18, color: palette.accent),
-                  label: Text(
-                    AppL10n.of(context).athleteDetailMessageCta,
-                    style: GoogleFonts.barlowCondensed(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 13,
-                      letterSpacing: 0.8,
+                  // Unread dot on the chat button when the alumno has written.
+                  if (ref.watch(hasUnreadFromProvider(athleteId)))
+                    Positioned(
+                      top: -3,
+                      right: -3,
+                      child: Semantics(
+                        label: 'Mensajes sin leer',
+                        child: Container(
+                          width: 14,
+                          height: 14,
+                          decoration: BoxDecoration(
+                            color: palette.accent,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: palette.bg, width: 2),
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
-                ),
+                ],
               ),
               const SizedBox(height: 12),
               SizedBox(
@@ -1486,6 +1521,406 @@ class _NotaEditSheetState extends ConsumerState<_NotaEditSheet> {
                   ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ── Entrenamientos / Historial de sesiones section ───────────────────────────
+
+/// Returns true for sessions that the athlete finished and fully completed
+/// (same predicate as `isCompletedSession` in resumen_metrics.dart — kept
+/// local to avoid a cross-feature import).
+bool _isCompleted(session) =>
+    session.status == SessionStatus.finished && session.wasFullyCompleted;
+
+/// Mobile "Historial de sesiones" section (REQ-SETLOGS-010).
+///
+/// Watches [sessionsByUidProvider] for [athleteId], filters to completed
+/// sessions, and renders each as a tap-to-expand row that lazily loads
+/// [coachSessionSetLogsProvider] and renders [SessionExerciseBlock]s.
+class _EntrenamientosSection extends ConsumerWidget {
+  const _EntrenamientosSection({required this.athleteId});
+
+  final String athleteId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+    final sessionsAsync = ref.watch(sessionsByUidProvider(athleteId));
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // ── Section header ────────────────────────────────────────────────
+        Text(
+          'HISTORIAL DE SESIONES',
+          style: GoogleFonts.barlowCondensed(
+            fontWeight: FontWeight.w700,
+            fontSize: 12,
+            letterSpacing: 1.2,
+            color: palette.textMuted,
+          ),
+        ),
+        const SizedBox(height: 12),
+
+        // ── Async content ─────────────────────────────────────────────────
+        sessionsAsync.when(
+          loading: () => _card(
+            palette: palette,
+            child: Text(
+              'Cargando…',
+              style: GoogleFonts.barlow(fontSize: 13, color: palette.textMuted),
+            ),
+          ),
+          error: (e, _) => _card(
+            palette: palette,
+            child: Text(
+              (e is FirebaseException && e.code == 'permission-denied')
+                  ? l10n.coachAthleteNoSharePlaceholder
+                  : l10n.coachSessionSetLogsLoadError,
+              style: GoogleFonts.barlow(fontSize: 13, color: palette.textMuted),
+            ),
+          ),
+          data: (sessions) {
+            final finished = sessions.where(_isCompleted).take(20).toList();
+            if (finished.isEmpty) {
+              return _card(
+                palette: palette,
+                child: Text(
+                  l10n.coachSessionSetLogsEmpty,
+                  style: GoogleFonts.barlow(
+                      fontSize: 13, color: palette.textMuted),
+                ),
+              );
+            }
+            return _card(
+              palette: palette,
+              child: Column(
+                children: [
+                  for (var i = 0; i < finished.length; i++) ...[
+                    if (i > 0) Divider(color: palette.border, height: 1),
+                    _ExpandableSessionRow(
+                      session: finished[i],
+                      athleteId: athleteId,
+                    ),
+                  ],
+                ],
+              ),
+            );
+          },
+        ),
+
+        // ── Exercise progression section ──────────────────────────────────
+        const SizedBox(height: 24),
+        _ProgressionSection(athleteId: athleteId),
+      ],
+    );
+  }
+
+  Widget _card({required AppPalette palette, required Widget child}) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: palette.bgCard,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: palette.border),
+      ),
+      child: child,
+    );
+  }
+}
+
+// ── Exercise progression section ──────────────────────────────────────────────
+
+/// Per-exercise progression section shown in [_EntrenamientosSection].
+///
+/// Watches [athleteExerciseListProvider] to show an exercise picker row and
+/// [exerciseProgressionProvider] to show the progression chart for the
+/// selected exercise. All user-visible strings come from [AppL10n] (REQ-PROG-10B).
+class _ProgressionSection extends ConsumerStatefulWidget {
+  const _ProgressionSection({required this.athleteId});
+  final String athleteId;
+
+  @override
+  ConsumerState<_ProgressionSection> createState() =>
+      _ProgressionSectionState();
+}
+
+class _ProgressionSectionState extends ConsumerState<_ProgressionSection> {
+  String? _selectedExerciseId;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+    final exerciseListAsync =
+        ref.watch(athleteExerciseListProvider(widget.athleteId));
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // ── Section header ──────────────────────────────────────────────
+        Text(
+          l10n.progressionSectionTitle,
+          style: GoogleFonts.barlowCondensed(
+            fontWeight: FontWeight.w700,
+            fontSize: 12,
+            letterSpacing: 1.2,
+            color: palette.textMuted,
+          ),
+        ),
+        const SizedBox(height: 12),
+
+        exerciseListAsync.when(
+          loading: () => Text(
+            'Cargando…',
+            style: GoogleFonts.barlow(fontSize: 13, color: palette.textMuted),
+          ),
+          error: (e, _) => const SizedBox.shrink(),
+          data: (exercises) {
+            // SCENARIO-PROG-08A: no exercises → empty state, no picker
+            if (exercises.isEmpty) {
+              return Text(
+                l10n.progressionEmpty,
+                style:
+                    GoogleFonts.barlow(fontSize: 13, color: palette.textMuted),
+              );
+            }
+
+            // SCENARIO-PROG-05B: default to most-recently-logged exercise
+            final effectiveId =
+                _selectedExerciseId ?? exercises.first.exerciseId;
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // ── Exercise picker chip row ──────────────────────────
+                ExercisePickerRow(
+                  exercises: exercises,
+                  selectedId: effectiveId,
+                  onSelect: (id) => setState(() => _selectedExerciseId = id),
+                ),
+                const SizedBox(height: 12),
+
+                // ── Progression chart ─────────────────────────────────
+                _ProgressionChartLoader(
+                  athleteId: widget.athleteId,
+                  exerciseId: effectiveId,
+                  palette: palette,
+                  l10n: l10n,
+                ),
+              ],
+            );
+          },
+        ),
+      ],
+    );
+  }
+}
+
+/// Loads and renders [ExerciseProgressionChart] for one exercise.
+class _ProgressionChartLoader extends ConsumerWidget {
+  const _ProgressionChartLoader({
+    required this.athleteId,
+    required this.exerciseId,
+    required this.palette,
+    required this.l10n,
+  });
+
+  final String athleteId;
+  final String exerciseId;
+  final AppPalette palette;
+  final AppL10n l10n;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final progressionAsync = ref.watch(
+      exerciseProgressionProvider(
+          (athleteUid: athleteId, exerciseId: exerciseId)),
+    );
+
+    return progressionAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (e, _) => const SizedBox.shrink(),
+      data: (progression) => ExerciseProgressionChart(
+        progression: progression,
+        labels: ExerciseProgressionChartLabels(
+          prLabel: l10n.progressionMetricPr,
+          volumeLabel: l10n.progressionMetricVolume,
+          volumeUnit: 'kg·reps',
+          prUnit: 'kg',
+          frequencyLabel: (n) => l10n.progressionFrequency(n),
+          singlePointHint: l10n.progressionSinglePointHint,
+          emptyHint: l10n.progressionEmptyExercise,
+        ),
+        localeName: l10n.localeName,
+      ),
+    );
+  }
+}
+
+/// A single tappable session row that expands to show set logs.
+class _ExpandableSessionRow extends ConsumerStatefulWidget {
+  const _ExpandableSessionRow({
+    required this.session,
+    required this.athleteId,
+  });
+
+  final Session session;
+  final String athleteId;
+
+  @override
+  ConsumerState<_ExpandableSessionRow> createState() =>
+      _ExpandableSessionRowState();
+}
+
+class _ExpandableSessionRowState extends ConsumerState<_ExpandableSessionRow> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final session = widget.session;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        InkWell(
+          onTap: () => setState(() => _expanded = !_expanded),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        session.routineName,
+                        style: GoogleFonts.barlow(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                          color: palette.textPrimary,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (session.finishedAt != null)
+                        Text(
+                          _fmtDate(session.finishedAt!),
+                          style: GoogleFonts.barlow(
+                            fontSize: 12,
+                            color: palette.textMuted,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                Text(
+                  '${session.durationMin} min',
+                  style: GoogleFonts.barlow(
+                      fontSize: 12, color: palette.textMuted),
+                ),
+                const SizedBox(width: 8),
+                Icon(
+                  _expanded ? TreinoIcon.chevronUp : TreinoIcon.chevronDown,
+                  size: 16,
+                  color: palette.textMuted,
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (_expanded)
+          _SessionSetLogsExpansion(
+            athleteId: widget.athleteId,
+            sessionId: session.id,
+          ),
+      ],
+    );
+  }
+}
+
+String _fmtDate(DateTime d) =>
+    '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+
+/// Loads and renders the set logs for one session (read-only trainer view).
+/// Maps permission-denied to the no-share placeholder (REQ-SETLOGS-008).
+class _SessionSetLogsExpansion extends ConsumerWidget {
+  const _SessionSetLogsExpansion({
+    required this.athleteId,
+    required this.sessionId,
+  });
+
+  final String athleteId;
+  final String sessionId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+    final async = ref.watch(
+      coachSessionSetLogsProvider(
+          (athleteUid: athleteId, sessionId: sessionId)),
+    );
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(0, 0, 0, 8),
+      child: async.when(
+        loading: () => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Center(
+            child: SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: palette.accent,
+              ),
+            ),
+          ),
+        ),
+        error: (e, _) => Padding(
+          padding: const EdgeInsets.only(top: 4, bottom: 4),
+          child: Text(
+            (e is FirebaseException && e.code == 'permission-denied')
+                ? l10n.coachAthleteNoSharePlaceholder
+                : l10n.coachSessionSetLogsLoadError,
+            style: GoogleFonts.barlow(fontSize: 12, color: palette.textMuted),
+          ),
+        ),
+        data: (logs) {
+          if (logs.isEmpty) {
+            return Padding(
+              padding: const EdgeInsets.only(top: 4, bottom: 4),
+              child: Text(
+                l10n.coachSessionSetLogsEmpty,
+                style:
+                    GoogleFonts.barlow(fontSize: 12, color: palette.textMuted),
+              ),
+            );
+          }
+          // Group by exerciseId preserving insertion order (same as web).
+          final groups = <String, List<SetLog>>{};
+          for (final log in logs) {
+            groups.putIfAbsent(log.exerciseId, () => <SetLog>[]).add(log);
+          }
+          return Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (final entry in groups.entries)
+                  SessionExerciseBlock(
+                    exerciseName: entry.value.first.exerciseName,
+                    sets: entry.value,
+                  ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }

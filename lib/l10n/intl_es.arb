@@ -126,6 +126,9 @@
   "routineEditorSetTypeWarmup": "",
   "routineEditorSetTypeDrop": "",
   "routineEditorSetTypeFailure": "",
+  "routineEditorNotesLabel": "Nota para el alumno",
+  "routineEditorNotesHint": "Técnica, tempo, RIR…",
+  "exerciseNoteFromCoachTag": "DEL COACH",
   "routineEditorIncompleteSetsFeedback": "Completá los sets de \"{exerciseName}\" antes de guardar.",
   "routineDetailNotFound": "Rutina no encontrada",
   "routineDetailNoDaysConfigured": "Esta rutina no tiene días configurados.",
@@ -280,5 +283,35 @@
   },
   "coachHubPreviewDiscardTitle": "¿Salir sin guardar el plan?",
   "coachHubPreviewDiscardBody": "Vas a perder los ejercicios que mapeaste manualmente.",
-  "coachHubPreviewDiscardConfirm": "Salir igual"
+  "coachHubPreviewDiscardConfirm": "Salir igual",
+  "chatAttachMediaLabel": "Adjuntar",
+  "chatPickImageLabel": "Foto",
+  "chatPickVideoLabel": "Video",
+  "chatMediaUploading": "Subiendo…",
+  "chatMediaUploadFailed": "No pudimos subir el archivo. Inténtalo de nuevo.",
+  "chatMediaPreviewPhoto": "📷 Foto",
+  "chatMediaPreviewVideo": "🎥 Video",
+  "chatMediaViewFullscreen": "Ver foto",
+  "chatMediaImageLoadError": "No pudimos cargar la imagen.",
+  "feedMessagesWithUnreadA11y": "Mensajes, {count} sin leer",
+  "chatUnreadA11y": "Sin leer",
+  "coachSessionSetLogsTitle": "SETS",
+  "coachSessionTapToExpand": "Ver sets",
+  "coachSessionSetLogsEmpty": "Esta sesión no tiene sets registrados.",
+  "coachSessionSetLogsLoadError": "No pudimos cargar los sets. Intenta de nuevo.",
+  "coachAthleteNoSharePlaceholder": "El alumno no ha compartido su historial todavía.",
+  "progressionSectionTitle": "EVOLUCIÓN POR EJERCICIO",
+  "progressionMetricPr": "PR",
+  "progressionMetricVolume": "Volumen",
+  "progressionFrequency": "{count, plural, =0{Sin sesiones en las últimas 8 semanas} =1{1 sesión en las últimas 8 semanas} other{{count} sesiones en las últimas 8 semanas}}",
+  "@progressionFrequency": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "progressionSinglePointHint": "Necesitas al menos 2 sesiones para ver la evolución.",
+  "progressionEmptyExercise": "Sin datos para este ejercicio.",
+  "progressionEmpty": "Sin registros de series todavía."
 }

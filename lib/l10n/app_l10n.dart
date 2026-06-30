@@ -1160,6 +1160,42 @@ abstract class AppL10n {
   /// **'ELIMINAR'**
   String get workoutMisRutinasOverflowArchive;
 
+  /// No description provided for @workoutMisRutinasOverflowMarkActive.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'MARCAR COMO ACTIVA'**
+  String get workoutMisRutinasOverflowMarkActive;
+
+  /// No description provided for @workoutMisRutinasOverflowUnmarkActive.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'DESMARCAR COMO ACTIVA'**
+  String get workoutMisRutinasOverflowUnmarkActive;
+
+  /// No description provided for @workoutMisRutinasActiveChip.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ACTIVA'**
+  String get workoutMisRutinasActiveChip;
+
+  /// No description provided for @workoutMisRutinasMarkActiveSuccess.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Marcada como tu rutina activa'**
+  String get workoutMisRutinasMarkActiveSuccess;
+
+  /// No description provided for @workoutMisRutinasUnmarkActiveSuccess.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ya no es tu rutina activa'**
+  String get workoutMisRutinasUnmarkActiveSuccess;
+
+  /// No description provided for @workoutMisRutinasActiveError.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cambiar el estado. Reintentá.'**
+  String get workoutMisRutinasActiveError;
+
   /// No description provided for @workoutMisRutinasConfirmTitle.
   ///
   /// In es_AR, this message translates to:
@@ -2648,6 +2684,24 @@ abstract class AppL10n {
   /// **'Al fallo (F)'**
   String get routineEditorSetTypeFailure;
 
+  /// No description provided for @routineEditorNotesLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Nota para el alumno'**
+  String get routineEditorNotesLabel;
+
+  /// No description provided for @routineEditorNotesHint.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Técnica, tempo, RIR…'**
+  String get routineEditorNotesHint;
+
+  /// No description provided for @exerciseNoteFromCoachTag.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'DEL COACH'**
+  String get exerciseNoteFromCoachTag;
+
   /// SnackBar shown when the user taps save with at least one incomplete set. Names the first offending exercise.
   ///
   /// In es_AR, this message translates to:
@@ -2966,6 +3020,12 @@ abstract class AppL10n {
   /// **'Eliminar día'**
   String get routineEditorDeleteDayA11y;
 
+  /// Tooltip + Semantics label for the icon-only pencil button next to each day's title in the routine editor. Tap turns the title into an inline TextField.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Editar nombre del día'**
+  String get routineEditorEditDayNameA11y;
+
   /// Accessibility label for the edit-plan icon button in the athlete detail plan card (finding 5).
   ///
   /// In es_AR, this message translates to:
@@ -3223,6 +3283,162 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Salir igual'**
   String get coachHubPreviewDiscardConfirm;
+
+  /// No description provided for @chatAttachMediaLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Adjuntar'**
+  String get chatAttachMediaLabel;
+
+  /// No description provided for @chatPickImageLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Foto'**
+  String get chatPickImageLabel;
+
+  /// No description provided for @chatPickVideoLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Video'**
+  String get chatPickVideoLabel;
+
+  /// No description provided for @chatMediaUploading.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Subiendo…'**
+  String get chatMediaUploading;
+
+  /// No description provided for @chatMediaUploadFailed.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos subir el archivo. Probá de nuevo.'**
+  String get chatMediaUploadFailed;
+
+  /// No description provided for @chatMediaPreviewPhoto.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'📷 Foto'**
+  String get chatMediaPreviewPhoto;
+
+  /// No description provided for @chatMediaPreviewVideo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'🎥 Video'**
+  String get chatMediaPreviewVideo;
+
+  /// No description provided for @chatMediaViewFullscreen.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ver foto'**
+  String get chatMediaViewFullscreen;
+
+  /// No description provided for @chatMediaImageLoadError.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cargar la imagen.'**
+  String get chatMediaImageLoadError;
+
+  /// Accessibility label for the feed header messages icon when there are unread chats; announces the unread count to screen readers.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Mensajes, {count} sin leer'**
+  String feedMessagesWithUnreadA11y(int count);
+
+  /// Accessibility label for the unread dot indicator shown on a _ChatRow in the chat inbox list.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Sin leer'**
+  String get chatUnreadA11y;
+
+  /// Section heading inside the session expansion tile in the trainer's Entrenamientos tab.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'SETS'**
+  String get coachSessionSetLogsTitle;
+
+  /// Call-to-action hint on a finished-session row, inviting the trainer to expand it.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ver sets'**
+  String get coachSessionTapToExpand;
+
+  /// Empty state shown when the athlete's session has no logged sets.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Esta sesión no tiene sets registrados.'**
+  String get coachSessionSetLogsEmpty;
+
+  /// Generic error shown when loading setLogs fails for a non-permission reason.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cargar los sets. Intentá de nuevo.'**
+  String get coachSessionSetLogsLoadError;
+
+  /// Shown when the trainer receives permission-denied loading setLogs — the athlete has not shared or revoked sharing.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'El alumno no compartió su historial todavía.'**
+  String get coachAthleteNoSharePlaceholder;
+
+  /// Toolbar title for the avatar cropper modal (iOS, Android, web).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Recortar foto'**
+  String get avatarCropperTitle;
+
+  /// Confirm button label in the avatar cropper modal.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'LISTO'**
+  String get avatarCropperDone;
+
+  /// Cancel button label in the avatar cropper modal.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CANCELAR'**
+  String get avatarCropperCancel;
+
+  /// Section header for the per-exercise progression chart in the coach's athlete detail screen.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'EVOLUCIÓN POR EJERCICIO'**
+  String get progressionSectionTitle;
+
+  /// Label for the PR (personal record = max weight) metric chip in the progression chart.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'PR'**
+  String get progressionMetricPr;
+
+  /// Label for the Volume metric chip in the progression chart.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Volumen'**
+  String get progressionMetricVolume;
+
+  /// Frecuencia stat label showing session count in the last 8 weeks.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{count, plural, =0{Sin sesiones en las últimas 8 semanas} =1{1 sesión en las últimas 8 semanas} other{{count} sesiones en las últimas 8 semanas}}'**
+  String progressionFrequency(int count);
+
+  /// Hint shown when only 1 data point exists — no trend line can be drawn.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Necesitás al menos 2 sesiones para ver la evolución.'**
+  String get progressionSinglePointHint;
+
+  /// Hint shown when the selected exercise has 0 data points.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Sin datos para este ejercicio.'**
+  String get progressionEmptyExercise;
+
+  /// Empty state shown when the athlete has no setLogs at all (exercise picker not shown).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Sin registros de series todavía.'**
+  String get progressionEmpty;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

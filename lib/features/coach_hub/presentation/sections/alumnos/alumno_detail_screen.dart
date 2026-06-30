@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart' show FirebaseException;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -9,9 +10,13 @@ import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/gyms/application/gym_providers.dart';
 import 'package:treino/features/measurements/application/measurement_providers.dart';
 import 'package:treino/features/measurements/presentation/widgets/measurement_progress_chart.dart';
+import 'package:treino/features/payments/application/billing_providers.dart';
 import 'package:treino/features/payments/application/pagos_por_cobrar_provider.dart';
 import 'package:treino/features/payments/application/payment_providers.dart';
+import 'package:treino/features/payments/domain/athlete_billing.dart';
 import 'package:treino/features/payments/domain/payment.dart';
+import 'package:treino/features/performance/application/performance_test_providers.dart';
+import 'package:treino/features/performance/presentation/widgets/performance_progress_chart.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/features/workout/application/assigned_routine_providers.dart';
@@ -19,6 +24,8 @@ import 'package:treino/features/workout/application/session_providers.dart';
 import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/domain/routine_status.dart';
 import 'package:treino/features/workout/domain/session.dart';
+import 'package:treino/features/workout/domain/set_log.dart';
+import 'package:treino/features/workout/presentation/widgets/session_exercise_block.dart';
 
 import 'alumnos_screen.dart' show AlumnoEstado, AlumnoEstadoX, estadoForLink;
 import 'resumen_metrics.dart';
@@ -76,6 +83,7 @@ class AlumnoDetailScreen extends ConsumerWidget {
     final gymName = gymId == null
         ? null
         : ref.watch(gymByIdProvider(gymId)).valueOrNull?.name;
+    final billing = ref.watch(athleteBillingProvider(athleteId)).valueOrNull;
 
     return DefaultTabController(
       length: _tabs.length,
@@ -95,6 +103,8 @@ class AlumnoDetailScreen extends ConsumerWidget {
                   link: link,
                   estado: estado,
                   gymName: gymName,
+                  billing: billing,
+                  onPago: () => _registrarPago(context, ref, athleteId),
                   palette: palette,
                 ),
                 const SizedBox(height: 14),
@@ -157,6 +167,8 @@ class _Header extends StatelessWidget {
     required this.link,
     required this.estado,
     required this.gymName,
+    required this.billing,
+    required this.onPago,
     required this.palette,
   });
 
@@ -164,6 +176,8 @@ class _Header extends StatelessWidget {
   final TrainerLink? link;
   final AlumnoEstado? estado;
   final String? gymName;
+  final AthleteBilling? billing;
+  final VoidCallback onPago;
   final AppPalette palette;
 
   @override
@@ -174,6 +188,11 @@ class _Header extends StatelessWidget {
     final racha = profile?.racha ?? 0;
     final avatarUrl = profile?.avatarUrl;
     final desde = link?.acceptedAt;
+    final b = billing;
+    // .toUtc() para compartir reloj con el pipeline de billing (monthKey/weekKey
+    // de pagosPorCobrarProvider y las escrituras usan UTC); evita un desfase de
+    // 1 día en el borde del período en AR (UTC-3).
+    final proxCobro = b == null ? null : nextDueDate(b, DateTime.now().toUtc());
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -246,10 +265,37 @@ class _Header extends StatelessWidget {
                             style: TextStyle(
                                 color: palette.textMuted, fontSize: 13),
                           ),
+                        if (b != null && b.cadence != BillingCadence.suelto)
+                          Text(
+                            '${_fmtArs(b.amountArs)} · ${_cadenciaLabel(b.cadence)}', // i18n: Fase W2
+                            style: TextStyle(
+                                color: palette.textMuted, fontSize: 13),
+                          ),
+                        if (proxCobro != null)
+                          Text(
+                            'Próx. cobro: ${fmtDayMonth(proxCobro)}', // i18n: Fase W2
+                            style: TextStyle(
+                                color: palette.textMuted, fontSize: 13),
+                          ),
                       ],
                     ),
                   ],
                 ),
+              ),
+              const SizedBox(width: 12),
+              OutlinedButton(
+                onPressed: onPago,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: palette.accent,
+                  side: BorderSide(color: palette.border),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: const Text('Pago', // i18n: Fase W2
+                    style:
+                        TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
               ),
             ],
           ),
@@ -389,58 +435,77 @@ class _ProgresoTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
     final measAsync = ref.watch(measurementsForAthleteProvider(athleteId));
-    return measAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => _muted(
-          palette, 'No se pudieron cargar las mediciones.'), // i18n: Fase W2
-      data: (ms) {
-        if (ms.isEmpty) {
-          return _muted(
-              palette, 'Sin mediciones cargadas todavía.'); // i18n: Fase W2
-        }
-        final latest = ms.last;
-        return SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _sectionLabel(palette, 'ANTROPOMETRÍA'), // i18n: Fase W2
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  _MeasCard(
-                      label: 'Peso',
-                      value: latest.weightKg,
-                      unit: 'kg',
-                      palette: palette), // i18n: Fase W2
-                  const SizedBox(width: 10),
-                  _MeasCard(
-                      label: '% Graso',
-                      value: latest.fatPercentage,
-                      unit: '%',
-                      palette: palette), // i18n: Fase W2
-                  const SizedBox(width: 10),
-                  _MeasCard(
-                      label: 'Cintura',
-                      value: latest.waistCm,
-                      unit: 'cm',
-                      palette: palette), // i18n: Fase W2
-                ],
-              ),
-              if (ms.length >= 2) ...[
-                const SizedBox(height: 16),
-                // El chart trae su propia card + heading; no lo re-envolvemos.
-                MeasurementProgressChart(measurements: ms),
+    final perfAsync = ref.watch(performanceTestsForAthleteProvider(athleteId));
+
+    // Antropometría y Rendimiento son fuentes independientes: gateamos juntas
+    // (spinner hasta que ambas tengan valor, error si alguna falla) y mostramos
+    // cada sección por separado según haya datos.
+    if (measAsync.isLoading || perfAsync.isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (measAsync.hasError || perfAsync.hasError) {
+      return _muted(palette, 'No se pudo cargar el progreso.'); // i18n: Fase W2
+    }
+
+    final ms = measAsync.requireValue;
+    final tests = perfAsync.requireValue;
+    if (ms.isEmpty && tests.isEmpty) {
+      return _muted(palette, 'Sin datos de progreso todavía.'); // i18n: Fase W2
+    }
+
+    final latest = ms.isEmpty ? null : ms.last;
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (latest != null) ...[
+            _sectionLabel(palette, 'ANTROPOMETRÍA'), // i18n: Fase W2
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                _MeasCard(
+                    label: 'Peso',
+                    value: latest.weightKg,
+                    unit: 'kg',
+                    palette: palette), // i18n: Fase W2
+                const SizedBox(width: 10),
+                _MeasCard(
+                    label: '% Graso',
+                    value: latest.fatPercentage,
+                    unit: '%',
+                    palette: palette), // i18n: Fase W2
+                const SizedBox(width: 10),
+                _MeasCard(
+                    label: 'Cintura',
+                    value: latest.waistCm,
+                    unit: 'cm',
+                    palette: palette), // i18n: Fase W2
               ],
-              const SizedBox(height: 14),
-              Text(
-                'Próximamente: rendimiento y evolución de cargas.', // i18n: Fase W2
-                style: TextStyle(color: palette.textMuted, fontSize: 12),
-              ),
+            ),
+            if (ms.length >= 2) ...[
+              const SizedBox(height: 16),
+              // El chart trae su propia card + heading; no lo re-envolvemos.
+              MeasurementProgressChart(measurements: ms),
             ],
-          ),
-        );
-      },
+          ],
+          // ── Rendimiento (W2 PR8) ──────────────────────────────────────────
+          // Ambos casos lideran con la misma sección «RENDIMIENTO» (consistencia
+          // con el módulo coach legacy). Con ≥2 tests el chart agrega ABAJO su
+          // propia card interna (heading l10n «PROGRESO»).
+          if (tests.isNotEmpty) ...[
+            if (latest != null) const SizedBox(height: 20),
+            _sectionLabel(palette, 'RENDIMIENTO'), // i18n: Fase W2
+            const SizedBox(height: 10),
+            if (tests.length >= 2)
+              PerformanceProgressChart(tests: tests)
+            else
+              _muted(palette,
+                  'Cargá al menos 2 tests para ver la evolución.'), // i18n: Fase W2
+          ],
+        ],
+      ),
     );
   }
 }
@@ -839,14 +904,60 @@ String _fmtArs(int amount) {
   return '${amount < 0 ? '-' : ''}\$$buf';
 }
 
-/// Tab Pagos (W2 PR5): estado de cuenta + historial de pagos del alumno.
+String _cadenciaLabel(BillingCadence c) => switch (c) {
+      BillingCadence.mensual => 'Mensual', // i18n: Fase W2
+      BillingCadence.semanal => 'Semanal',
+      BillingCadence.porSesion => 'Por sesión',
+      BillingCadence.suelto => 'Suelto',
+    };
+
+const _kMesesLargos = [
+  '',
+  'enero',
+  'febrero',
+  'marzo',
+  'abril',
+  'mayo',
+  'junio',
+  'julio',
+  'agosto',
+  'septiembre',
+  'octubre',
+  'noviembre',
+  'diciembre',
+];
+
+/// "22 mayo" — día + mes en es-AR.
+String fmtDayMonth(DateTime d) => '${d.day} ${_kMesesLargos[d.month]}';
+
+/// Fecha del próximo cobro recurrente según cadencia: 1º del mes que viene
+/// (mensual) o lunes de la semana que viene (semanal). `null` para porSesión y
+/// suelto (event-driven / ad-hoc, sin fecha fija).
+DateTime? nextDueDate(AthleteBilling b, DateTime now) {
+  switch (b.cadence) {
+    case BillingCadence.mensual:
+      return DateTime(now.year, now.month + 1, 1);
+    case BillingCadence.semanal:
+      final today = DateTime(now.year, now.month, now.day);
+      final monday = today.subtract(Duration(days: now.weekday - 1));
+      return monday.add(const Duration(days: 7));
+    case BillingCadence.porSesion:
+    case BillingCadence.suelto:
+      return null;
+  }
+}
+
+/// Tab Pagos (W2 PR5/PR6): estado de cuenta + historial de pagos + acciones.
 ///
 /// Sólo data trainer-readable: el historial sale de `trainerPaymentsProvider`
 /// (que filtra por `trainerId == uid`, única forma que las reglas permiten al
 /// entrenador) acotado a este alumno, y el cobro pendiente se reusa de
 /// `pagosPorCobrarProvider` (que ya computa cadencia/deuda) sin reimplementar
-/// billing. Las acciones (registrar pago, marcar pagado, recordatorios) y las
-/// métricas globales (ingreso del mes/proyección) se difieren.
+/// billing. PR6 agrega **registrar pago** (crea un Payment pagado) y **marcar
+/// pagado** (settlea un cobro pendiente: `markManyPaid` para los sueltos; crea
+/// un Payment pagado con el `periodKey` que corresponda para los recurrentes —
+/// misma receta que el dashboard del coach). Los recordatorios y las métricas
+/// globales (ingreso del mes/proyección) se difieren.
 class _PagosTab extends ConsumerWidget {
   const _PagosTab({required this.athleteId});
   final String athleteId;
@@ -872,19 +983,36 @@ class _PagosTab extends ConsumerWidget {
     final pending = pendingAsync.requireValue
         .where((c) => c.athleteId == athleteId)
         .toList();
-    final pendingTotal = pending.fold<int>(0, (sum, c) => sum + c.amountArs);
 
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _sectionLabel(palette, 'ESTADO DE CUENTA'), // i18n: Fase W2
+          Row(
+            children: [
+              Expanded(
+                child:
+                    _sectionLabel(palette, 'ESTADO DE CUENTA'), // i18n: Fase W2
+              ),
+              TextButton(
+                onPressed: () => _registrarPago(context, ref, athleteId),
+                child: Text(
+                  '+ Registrar pago', // i18n: Fase W2
+                  style: TextStyle(
+                    color: palette.accent,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 10),
           _EstadoCuentaCard(
             palette: palette,
-            pendingTotal: pendingTotal,
-            conceptos: [for (final c in pending) c.concept],
+            pending: pending,
+            onMarcarPagado: (c) => _marcarPagado(context, ref, c),
           ),
           const SizedBox(height: 20),
           _sectionLabel(palette, 'HISTORIAL DE PAGOS'), // i18n: Fase W2
@@ -895,7 +1023,7 @@ class _PagosTab extends ConsumerWidget {
             _PagosTable(payments: history, palette: palette),
           const SizedBox(height: 14),
           Text(
-            'Próximamente: registrar pago, marcar pagado y recordatorios.', // i18n: Fase W2
+            'Próximamente: recordatorios y exportar.', // i18n: Fase W2
             style: TextStyle(color: palette.textMuted, fontSize: 12),
           ),
         ],
@@ -904,20 +1032,117 @@ class _PagosTab extends ConsumerWidget {
   }
 }
 
-class _EstadoCuentaCard extends StatelessWidget {
+class _EstadoCuentaCard extends StatefulWidget {
   const _EstadoCuentaCard({
     required this.palette,
-    required this.pendingTotal,
-    required this.conceptos,
+    required this.pending,
+    required this.onMarcarPagado,
   });
 
   final AppPalette palette;
-  final int pendingTotal;
-  final List<String> conceptos;
+  final List<CobroPendiente> pending;
+  final Future<void> Function(CobroPendiente) onMarcarPagado;
+
+  @override
+  State<_EstadoCuentaCard> createState() => _EstadoCuentaCardState();
+}
+
+class _EstadoCuentaCardState extends State<_EstadoCuentaCard> {
+  // Cobros con una escritura en vuelo. Deshabilita "Marcar pagado" mientras el
+  // settle viaja a Firestore (write → snapshot → providers → rebuild oculta la
+  // fila): sin esto, volver a tocar el botón en esa ventana doble-cobra.
+  final _inFlight = <String>{};
+
+  String _key(CobroPendiente c) =>
+      '${c.athleteId}|${c.cadence.name}|${c.concept}|${c.amountArs}';
+
+  Future<void> _tap(CobroPendiente c) async {
+    final k = _key(c);
+    if (_inFlight.contains(k)) return;
+    setState(() => _inFlight.add(k));
+    try {
+      await widget.onMarcarPagado(c);
+    } finally {
+      if (mounted) setState(() => _inFlight.remove(k));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final alDia = pendingTotal <= 0;
+    final palette = widget.palette;
+    final pending = widget.pending;
+    final Widget inner;
+    if (pending.isEmpty) {
+      inner = Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Sin cobros pendientes', // i18n: Fase W2
+              style: TextStyle(color: palette.textMuted, fontSize: 12)),
+          const SizedBox(height: 4),
+          Text('Al día', // i18n: Fase W2
+              style: TextStyle(
+                  color: palette.accent,
+                  fontSize: 24,
+                  fontWeight: FontWeight.w700)),
+        ],
+      );
+    } else {
+      final total = pending.fold<int>(0, (sum, c) => sum + c.amountArs);
+      inner = Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Pendiente de cobro', // i18n: Fase W2
+              style: TextStyle(color: palette.textMuted, fontSize: 12)),
+          const SizedBox(height: 4),
+          Text(_fmtArs(total),
+              style: TextStyle(
+                  color: palette.warning,
+                  fontSize: 24,
+                  fontWeight: FontWeight.w700)),
+          const SizedBox(height: 12),
+          for (final c in pending)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(c.concept,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                                color: palette.textPrimary, fontSize: 14)),
+                        Text(_fmtArs(c.amountArs),
+                            style: TextStyle(
+                                color: palette.textMuted, fontSize: 12)),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  OutlinedButton(
+                    onPressed:
+                        _inFlight.contains(_key(c)) ? null : () => _tap(c),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: palette.accent,
+                      side: BorderSide(color: palette.border),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 6),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: const Text('Marcar pagado', // i18n: Fase W2
+                        style: TextStyle(
+                            fontSize: 12, fontWeight: FontWeight.w600)),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      );
+    }
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -925,33 +1150,214 @@ class _EstadoCuentaCard extends StatelessWidget {
         border: Border.all(color: palette.border),
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            alDia
-                ? 'Sin cobros pendientes'
-                : 'Pendiente de cobro', // i18n: Fase W2
-            style: TextStyle(color: palette.textMuted, fontSize: 12),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            alDia ? 'Al día' : _fmtArs(pendingTotal), // i18n: Fase W2
-            style: TextStyle(
-              color: alDia ? palette.accent : palette.warning,
-              fontSize: 24,
+      child: inner,
+    );
+  }
+}
+
+void _pagoSnack(BuildContext context, String msg) {
+  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+}
+
+/// Construye un Payment pagado para settlear un cobro recurrente. El [periodKey]
+/// debe matchear el que computa `pagosPorCobrarProvider` (month/ISO-week) para
+/// que el cobro desaparezca tras marcarlo; `null` para porSesión (sin período).
+Payment _paidPaymentFor(
+  String trainerId,
+  CobroPendiente cobro,
+  DateTime now,
+  String? periodKey,
+) =>
+    Payment(
+      id: '',
+      trainerId: trainerId,
+      athleteId: cobro.athleteId,
+      amountArs: cobro.amountArs,
+      concept: cobro.concept,
+      status: PaymentStatus.paid,
+      periodKey: periodKey,
+      createdAt: now,
+      paidAt: now,
+    );
+
+Future<void> _marcarPagado(
+    BuildContext context, WidgetRef ref, CobroPendiente cobro) async {
+  final palette = AppPalette.of(context);
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      backgroundColor: palette.bgCard,
+      title: Text('¿Marcar como cobrado?', // i18n: Fase W2
+          style: TextStyle(
+              color: palette.textPrimary,
               fontWeight: FontWeight.w700,
-            ),
+              fontSize: 18)),
+      content: Text('${cobro.concept} — ${_fmtArs(cobro.amountArs)}',
+          style: TextStyle(color: palette.textMuted, fontSize: 14)),
+      actions: [
+        TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text('Cancelar', // i18n: Fase W2
+                style: TextStyle(color: palette.textMuted))),
+        TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text('Cobrado', // i18n: Fase W2
+                style: TextStyle(
+                    color: palette.accent, fontWeight: FontWeight.w700))),
+      ],
+    ),
+  );
+  if (confirmed != true || !context.mounted) return;
+
+  final trainerId = ref.read(currentUidProvider);
+  if (trainerId == null) return;
+  final repo = ref.read(paymentRepositoryProvider);
+  final now = DateTime.now().toUtc();
+  try {
+    switch (cobro.cadence) {
+      case BillingCadence.suelto:
+        await repo.markManyPaid(cobro.pendingPaymentIds, now);
+      case BillingCadence.mensual:
+        await repo.add(_paidPaymentFor(trainerId, cobro, now,
+            '${now.year}-${now.month.toString().padLeft(2, '0')}'));
+      case BillingCadence.semanal:
+        await repo
+            .add(_paidPaymentFor(trainerId, cobro, now, isoWeekPeriodKey(now)));
+      case BillingCadence.porSesion:
+        await repo.add(_paidPaymentFor(trainerId, cobro, now, null));
+    }
+    if (context.mounted) {
+      _pagoSnack(context, 'Cobro registrado.'); // i18n: Fase W2
+    }
+  } catch (_) {
+    if (context.mounted) {
+      _pagoSnack(
+          context, 'No pudimos guardar. Intentá de nuevo.'); // i18n: Fase W2
+    }
+  }
+}
+
+Future<void> _registrarPago(
+    BuildContext context, WidgetRef ref, String athleteId) async {
+  final result = await showDialog<({int amount, String concept})>(
+    context: context,
+    builder: (_) => const _RegistrarPagoDialog(),
+  );
+  if (result == null) return;
+
+  final trainerId = ref.read(currentUidProvider);
+  if (trainerId == null) return;
+  final now = DateTime.now().toUtc();
+  try {
+    await ref.read(paymentRepositoryProvider).add(Payment(
+          id: '',
+          trainerId: trainerId,
+          athleteId: athleteId,
+          amountArs: result.amount,
+          concept: result.concept,
+          status: PaymentStatus.paid,
+          createdAt: now,
+          paidAt: now,
+        ));
+    if (context.mounted) {
+      _pagoSnack(context, 'Pago registrado.'); // i18n: Fase W2
+    }
+  } catch (_) {
+    if (context.mounted) {
+      _pagoSnack(
+          context, 'No pudimos guardar. Intentá de nuevo.'); // i18n: Fase W2
+    }
+  }
+}
+
+/// Diálogo de alta de un pago ad-hoc (monto + concepto). Devuelve el record o
+/// `null` si se cancela. Copy hardcodeada (CoachHubApp no tiene l10n delegates).
+class _RegistrarPagoDialog extends StatefulWidget {
+  const _RegistrarPagoDialog();
+
+  @override
+  State<_RegistrarPagoDialog> createState() => _RegistrarPagoDialogState();
+}
+
+class _RegistrarPagoDialogState extends State<_RegistrarPagoDialog> {
+  final _monto = TextEditingController();
+  final _concepto = TextEditingController();
+  String? _error;
+
+  @override
+  void dispose() {
+    _monto.dispose();
+    _concepto.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final amount = int.tryParse(_monto.text.trim());
+    final concept = _concepto.text.trim();
+    if (amount == null || amount <= 0) {
+      setState(() => _error = 'Ingresá un monto válido.'); // i18n: Fase W2
+      return;
+    }
+    if (concept.isEmpty) {
+      setState(() => _error = 'Completá todos los campos.'); // i18n: Fase W2
+      return;
+    }
+    Navigator.of(context).pop((amount: amount, concept: concept));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    InputDecoration deco(String label, String hint) => InputDecoration(
+          labelText: label,
+          hintText: hint,
+          labelStyle: TextStyle(color: palette.textMuted),
+          hintStyle: TextStyle(color: palette.textMuted),
+          enabledBorder:
+              OutlineInputBorder(borderSide: BorderSide(color: palette.border)),
+          focusedBorder:
+              OutlineInputBorder(borderSide: BorderSide(color: palette.accent)),
+        );
+    return AlertDialog(
+      backgroundColor: palette.bgCard,
+      title: Text('Registrar pago', // i18n: Fase W2
+          style: TextStyle(
+              color: palette.textPrimary,
+              fontWeight: FontWeight.w700,
+              fontSize: 18)),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: _monto,
+            keyboardType: TextInputType.number,
+            style: TextStyle(color: palette.textPrimary),
+            decoration: deco('Monto (ARS)', 'Ej: 5000'), // i18n: Fase W2
           ),
-          if (conceptos.isNotEmpty) ...[
-            const SizedBox(height: 6),
-            Text(
-              conceptos.join(' · '),
-              style: TextStyle(color: palette.textMuted, fontSize: 13),
-            ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _concepto,
+            style: TextStyle(color: palette.textPrimary),
+            decoration: deco('Concepto', 'Ej: Clase suelta'), // i18n: Fase W2
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: 10),
+            Text(_error!,
+                style: TextStyle(color: palette.danger, fontSize: 12)),
           ],
         ],
       ),
+      actions: [
+        TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text('Cancelar', // i18n: Fase W2
+                style: TextStyle(color: palette.textMuted))),
+        TextButton(
+            onPressed: _submit,
+            child: Text('Registrar', // i18n: Fase W2
+                style: TextStyle(
+                    color: palette.accent, fontWeight: FontWeight.w700))),
+      ],
     );
   }
 }
@@ -1087,7 +1493,10 @@ class _EntrenamientoTab extends ConsumerWidget {
           sessionsAsync.when(
             loading: () => _muted(palette, 'Cargando…'), // i18n: Fase W2
             error: (e, _) => _muted(
-                palette, 'No se pudo cargar el historial.'), // i18n: Fase W2
+                palette,
+                e is FirebaseException && e.code == 'permission-denied'
+                    ? 'El alumno no compartió su historial.' // i18n: Fase W2
+                    : 'No se pudo cargar el historial.'), // i18n: Fase W2
             data: (sessions) {
               // isCompletedSession excluye sesiones abandonadas (status=finished
               // pero wasFullyCompleted=false) para no divergir del historial del
@@ -1098,7 +1507,8 @@ class _EntrenamientoTab extends ConsumerWidget {
                 return _muted(palette,
                     'Sin sesiones registradas todavía.'); // i18n: Fase W2
               }
-              return _HistorialTable(sessions: finished, palette: palette);
+              return _HistorialTable(
+                  sessions: finished, palette: palette, athleteId: athleteId);
             },
           ),
           const SizedBox(height: 14),
@@ -1169,9 +1579,14 @@ class _RutinaCard extends StatelessWidget {
 }
 
 class _HistorialTable extends StatelessWidget {
-  const _HistorialTable({required this.sessions, required this.palette});
+  const _HistorialTable({
+    required this.sessions,
+    required this.palette,
+    required this.athleteId,
+  });
   final List<Session> sessions;
   final AppPalette palette;
+  final String athleteId;
 
   @override
   Widget build(BuildContext context) {
@@ -1180,7 +1595,6 @@ class _HistorialTable extends StatelessWidget {
         fontSize: 11,
         fontWeight: FontWeight.w600,
         letterSpacing: 0.5);
-    final c = TextStyle(color: palette.textPrimary, fontSize: 13);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       decoration: BoxDecoration(
@@ -1202,42 +1616,164 @@ class _HistorialTable extends StatelessWidget {
                   flex: 2,
                   child: Text('VOLUMEN', style: h, textAlign: TextAlign.right),
                 ),
+                const SizedBox(width: 24),
               ],
             ),
           ),
+          // Tap a session to expand its real per-exercise set detail
+          // (trainer-athlete-set-logs).
           for (final s in sessions)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Row(
-                children: [
-                  Expanded(
-                    flex: 3,
-                    child: Text(
-                      s.finishedAt != null ? _fmtDate(s.finishedAt!) : '—',
-                      style: c,
-                    ),
-                  ),
-                  Expanded(
-                    flex: 4,
-                    child: Text(s.routineName,
-                        overflow: TextOverflow.ellipsis, style: c),
-                  ),
-                  Expanded(
-                    flex: 2,
-                    child:
-                        Text('${s.durationMin} min', style: c), // i18n: Fase W2
-                  ),
-                  Expanded(
-                    flex: 2,
-                    child:
-                        Text('${s.totalVolumeKg.round()} kg', // i18n: Fase W2
-                            style: c,
-                            textAlign: TextAlign.right),
-                  ),
-                ],
-              ),
+            _ExpandableSessionRow(
+              session: s,
+              athleteId: athleteId,
+              palette: palette,
             ),
         ],
+      ),
+    );
+  }
+}
+
+/// A session row that expands on tap to show the athlete's REAL logged sets
+/// for that session (read-only; gated by `session_shares`).
+class _ExpandableSessionRow extends ConsumerStatefulWidget {
+  const _ExpandableSessionRow({
+    required this.session,
+    required this.athleteId,
+    required this.palette,
+  });
+  final Session session;
+  final String athleteId;
+  final AppPalette palette;
+
+  @override
+  ConsumerState<_ExpandableSessionRow> createState() =>
+      _ExpandableSessionRowState();
+}
+
+class _ExpandableSessionRowState extends ConsumerState<_ExpandableSessionRow> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = widget.palette;
+    final s = widget.session;
+    final c = TextStyle(color: palette.textPrimary, fontSize: 13);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        InkWell(
+          onTap: () => setState(() => _expanded = !_expanded),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Row(
+              children: [
+                Expanded(
+                  flex: 3,
+                  child: Text(
+                    s.finishedAt != null ? _fmtDate(s.finishedAt!) : '—',
+                    style: c,
+                  ),
+                ),
+                Expanded(
+                  flex: 4,
+                  child: Text(s.routineName,
+                      overflow: TextOverflow.ellipsis, style: c),
+                ),
+                Expanded(
+                  flex: 2,
+                  child:
+                      Text('${s.durationMin} min', style: c), // i18n: Fase W2
+                ),
+                Expanded(
+                  flex: 2,
+                  child: Text('${s.totalVolumeKg.round()} kg', // i18n: Fase W2
+                      style: c,
+                      textAlign: TextAlign.right),
+                ),
+                SizedBox(
+                  width: 24,
+                  child: Icon(
+                    _expanded ? TreinoIcon.chevronUp : TreinoIcon.chevronDown,
+                    size: 16,
+                    color: palette.textMuted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (_expanded)
+          _SetLogsExpansion(
+            athleteId: widget.athleteId,
+            sessionId: s.id,
+            palette: palette,
+          ),
+      ],
+    );
+  }
+}
+
+/// Loads and renders one session's per-exercise set logs for the trainer.
+/// Maps `permission-denied` (athlete hasn't shared) to a friendly placeholder.
+class _SetLogsExpansion extends ConsumerWidget {
+  const _SetLogsExpansion({
+    required this.athleteId,
+    required this.sessionId,
+    required this.palette,
+  });
+  final String athleteId;
+  final String sessionId;
+  final AppPalette palette;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(coachSessionSetLogsProvider(
+        (athleteUid: athleteId, sessionId: sessionId)));
+    final muted = TextStyle(color: palette.textMuted, fontSize: 12);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 0, 4, 12),
+      child: async.when(
+        loading: () => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(
+                strokeWidth: 2, color: palette.accent),
+          ),
+        ),
+        error: (e, _) {
+          final noShare =
+              e is FirebaseException && e.code == 'permission-denied';
+          return Text(
+            noShare
+                ? 'El alumno no compartió su historial.' // i18n: Fase W2
+                : 'No se pudo cargar el detalle de la sesión.', // i18n: Fase W2
+            style: muted,
+          );
+        },
+        data: (logs) {
+          if (logs.isEmpty) {
+            return Text(
+                'Sin series registradas en esta sesión.', // i18n: Fase W2
+                style: muted);
+          }
+          final groups = <String, List<SetLog>>{};
+          for (final log in logs) {
+            groups.putIfAbsent(log.exerciseId, () => <SetLog>[]).add(log);
+          }
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (final entry in groups.entries)
+                SessionExerciseBlock(
+                  exerciseName: entry.value.first.exerciseName,
+                  sets: entry.value,
+                ),
+            ],
+          );
+        },
       ),
     );
   }

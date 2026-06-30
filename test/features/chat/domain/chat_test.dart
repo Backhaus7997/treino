@@ -62,4 +62,66 @@ void main() {
       expect(a.hashCode, b.hashCode);
     });
   });
+
+  group('Chat.lastRead', () {
+    final t0 = DateTime.utc(2026, 6, 1, 10, 0);
+    final t1 = DateTime.utc(2026, 6, 1, 11, 0);
+
+    test('lastRead round-trips correctly with uid → DateTime map', () {
+      final chat = Chat(
+        chatId: 'aaa_bbb',
+        members: const ['aaa', 'bbb'],
+        createdAt: t0,
+        lastRead: {'aaa': t1},
+      );
+      final decoded = Chat.fromJson(chat.toJson());
+      expect(decoded.lastRead, isNotNull);
+      expect(decoded.lastRead!['aaa'], equals(t1));
+    });
+
+    test('lastRead: null round-trips to null', () {
+      final chat = Chat(
+        chatId: 'aaa_bbb',
+        members: const ['aaa', 'bbb'],
+        createdAt: t0,
+      );
+      final decoded = Chat.fromJson(chat.toJson());
+      expect(decoded.lastRead, isNull);
+    });
+
+    test('fromJson decodes raw Timestamp map from Firestore path', () {
+      final rawMap = <String, Object?>{
+        'chatId': 'aaa_bbb',
+        'members': ['aaa', 'bbb'],
+        'createdAt': Timestamp.fromDate(t0),
+        'lastRead': {
+          'aaa': Timestamp.fromDate(t1),
+        },
+      };
+      final decoded = Chat.fromJson(rawMap);
+      expect(decoded.lastRead, isNotNull);
+      expect(decoded.lastRead!['aaa'], equals(t1));
+    });
+
+    test('no lastRead key in JSON → lastRead is null (legacy doc)', () {
+      final rawMap = <String, Object?>{
+        'chatId': 'aaa_bbb',
+        'members': ['aaa', 'bbb'],
+        'createdAt': Timestamp.fromDate(t0),
+      };
+      final decoded = Chat.fromJson(rawMap);
+      expect(decoded.lastRead, isNull);
+    });
+
+    test('copyWith preserves lastRead when not overridden', () {
+      final chat = Chat(
+        chatId: 'aaa_bbb',
+        members: const ['aaa', 'bbb'],
+        createdAt: t0,
+        lastRead: {'aaa': t1},
+      );
+      final copied = chat.copyWith(lastMessageText: 'hey');
+      expect(copied.lastRead, equals(chat.lastRead));
+    });
+  });
 }
