@@ -168,11 +168,12 @@ class _BodyView extends StatelessWidget {
       alignment: Alignment.center,
       fit: StackFit.expand,
       children: [
-        // Base body silhouette — ColorFiltered so the PNG silhouette adopts
-        // palette.textPrimary in both light and dark modes (srcIn replaces
-        // RGB while keeping the PNG alpha channel).
+        // Base body silhouette — ColorFiltered with palette.textMuted (60%
+        // black in light, 55% white in dark) gives a softer gray tone so the
+        // muscle separation lines of the PNG read as clear anatomical detail
+        // instead of getting flattened into a solid black/white silhouette.
         ColorFiltered(
-          colorFilter: ColorFilter.mode(palette.textPrimary, BlendMode.srcIn),
+          colorFilter: ColorFilter.mode(palette.textMuted, BlendMode.srcIn),
           child: Image.asset(
             baseAsset,
             fit: BoxFit.contain,
