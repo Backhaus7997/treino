@@ -1861,6 +1861,24 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get profileRoutinesActiveChip => 'ACTIVA';
+
+  @override
+  String get appearanceTitle => 'Apariencia';
+
+  @override
+  String get appearanceSystem => 'Sistema';
+
+  @override
+  String get appearanceSystemDesc => 'Sigue el tema del dispositivo';
+
+  @override
+  String get appearanceLight => 'Claro';
+
+  @override
+  String get appearanceDark => 'Oscuro';
+
+  @override
+  String get profileSectionAppearance => 'Apariencia';
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -3718,4 +3736,22 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get profileRoutinesActiveChip => 'ACTIVA';
+
+  @override
+  String get appearanceTitle => 'Apariencia';
+
+  @override
+  String get appearanceSystem => 'Sistema';
+
+  @override
+  String get appearanceSystemDesc => 'Sigue el tema del dispositivo';
+
+  @override
+  String get appearanceLight => 'Claro';
+
+  @override
+  String get appearanceDark => 'Oscuro';
+
+  @override
+  String get profileSectionAppearance => 'Apariencia';
 }

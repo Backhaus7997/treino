@@ -3475,6 +3475,42 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'ACTIVA'**
   String get profileRoutinesActiveChip;
+
+  /// Title of the Appearance settings screen and the tile label in the profile settings list.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Apariencia'**
+  String get appearanceTitle;
+
+  /// Label for the System (OS-controlled) theme option in AppearanceScreen.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Sistema'**
+  String get appearanceSystem;
+
+  /// Subtitle shown under the System option in AppearanceScreen.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Sigue el tema del dispositivo'**
+  String get appearanceSystemDesc;
+
+  /// Label for the Light theme option in AppearanceScreen.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Claro'**
+  String get appearanceLight;
+
+  /// Label for the Dark theme option in AppearanceScreen.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Oscuro'**
+  String get appearanceDark;
+
+  /// Section header label for the Appearance group in the profile screen.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Apariencia'**
+  String get profileSectionAppearance;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {
