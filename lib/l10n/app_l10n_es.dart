@@ -1812,6 +1812,37 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get avatarCropperCancel => 'CANCELAR';
+
+  @override
+  String get progressionSectionTitle => 'EVOLUCIÓN POR EJERCICIO';
+
+  @override
+  String get progressionMetricPr => 'PR';
+
+  @override
+  String get progressionMetricVolume => 'Volumen';
+
+  @override
+  String progressionFrequency(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count sesiones en las últimas 8 semanas',
+      one: '1 sesión en las últimas 8 semanas',
+      zero: 'Sin sesiones en las últimas 8 semanas',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get progressionSinglePointHint =>
+      'Necesitas al menos 2 sesiones para ver la evolución.';
+
+  @override
+  String get progressionEmptyExercise => 'Sin datos para este ejercicio.';
+
+  @override
+  String get progressionEmpty => 'Sin registros de series todavía.';
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -3620,4 +3651,35 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get avatarCropperCancel => 'CANCELAR';
+
+  @override
+  String get progressionSectionTitle => 'EVOLUCIÓN POR EJERCICIO';
+
+  @override
+  String get progressionMetricPr => 'PR';
+
+  @override
+  String get progressionMetricVolume => 'Volumen';
+
+  @override
+  String progressionFrequency(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count sesiones en las últimas 8 semanas',
+      one: '1 sesión en las últimas 8 semanas',
+      zero: 'Sin sesiones en las últimas 8 semanas',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get progressionSinglePointHint =>
+      'Necesitás al menos 2 sesiones para ver la evolución.';
+
+  @override
+  String get progressionEmptyExercise => 'Sin datos para este ejercicio.';
+
+  @override
+  String get progressionEmpty => 'Sin registros de series todavía.';
 }
