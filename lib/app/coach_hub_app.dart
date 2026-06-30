@@ -7,6 +7,8 @@ import '../l10n/app_l10n.dart';
 import 'coach_hub_router.dart';
 import 'locale_resolver.dart';
 import 'theme/app_theme.dart';
+import 'theme/theme_mode_provider.dart';
+import 'theme/theme_watcher.dart';
 
 /// Root widget del TREINO Coach Hub (web).
 ///
@@ -31,12 +33,14 @@ class _CoachHubAppState extends ConsumerState<CoachHubApp> {
 
   @override
   Widget build(BuildContext context) {
+    final themeMode = ref.watch(themeModeProvider);
+
     return MaterialApp.router(
       title: 'TREINO Coach Hub',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.dark(),
+      theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),
-      themeMode: ThemeMode.dark,
+      themeMode: themeMode,
       routerConfig: _router,
       // l10n: mismos delegates/locales que TreinoApp (app.dart). Sin esto, los
       // widgets que usan AppL10n.of(context) (p. ej. PerformanceProgressChart)
@@ -49,7 +53,7 @@ class _CoachHubAppState extends ConsumerState<CoachHubApp> {
       builder: (context, child) => GestureDetector(
         behavior: HitTestBehavior.translucent,
         onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
-        child: child,
+        child: ThemeWatcher(child: child ?? const SizedBox.shrink()),
       ),
     );
   }

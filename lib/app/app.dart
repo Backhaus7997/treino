@@ -12,6 +12,8 @@ import '../l10n/app_l10n.dart';
 import 'locale_resolver.dart';
 import 'router.dart';
 import 'theme/app_theme.dart';
+import 'theme/theme_mode_provider.dart';
+import 'theme/theme_watcher.dart';
 
 /// Whether [message] was sent by [currentUid] — used to suppress
 /// self-notifications.
@@ -160,12 +162,14 @@ class _TreinoAppState extends ConsumerState<TreinoApp> {
 
   @override
   Widget build(BuildContext context) {
+    final themeMode = ref.watch(themeModeProvider);
+
     return MaterialApp.router(
       title: 'TREINO',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.dark(),
+      theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),
-      themeMode: ThemeMode.dark,
+      themeMode: themeMode,
       routerConfig: _router,
       // i18n — ADR-I18N-004, ADR-I18N-005
       localizationsDelegates: AppL10n.localizationsDelegates,
@@ -180,7 +184,7 @@ class _TreinoAppState extends ConsumerState<TreinoApp> {
       builder: (context, child) => GestureDetector(
         behavior: HitTestBehavior.translucent,
         onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
-        child: child,
+        child: ThemeWatcher(child: child ?? const SizedBox.shrink()),
       ),
     );
   }
