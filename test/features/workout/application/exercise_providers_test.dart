@@ -12,13 +12,22 @@ class MockUser extends Mock implements User {}
 ProviderContainer makeContainer({
   required Stream<User?> authStream,
   required ExerciseRepository repo,
-}) =>
-    ProviderContainer(
-      overrides: [
-        authStateChangesProvider.overrideWith((ref) => authStream),
-        exerciseRepositoryProvider.overrideWithValue(repo),
-      ],
-    );
+}) {
+  final container = ProviderContainer(
+    overrides: [
+      authStateChangesProvider.overrideWith((ref) => authStream),
+      exerciseRepositoryProvider.overrideWithValue(repo),
+    ],
+  );
+  // Keep [exercisesProvider] (and its auth dependency) subscribed for the life
+  // of the container. Since PR #209 the provider watches the auth AsyncValue and
+  // only `await`s `authStateChangesProvider.future` while it is loading; without
+  // an active listener the auth StreamProvider never drives its first emission
+  // during a bare `read(...future)`, so the future hangs and the provider is
+  // disposed mid-loading. A real widget is always listening — this mirrors that.
+  container.listen(exercisesProvider, (_, __) {});
+  return container;
+}
 
 void main() {
   group('exercise providers', () {

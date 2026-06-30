@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach/application/agenda_providers.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/domain/appointment.dart';
@@ -265,16 +266,16 @@ void main() {
     testWidgets(
       'SCENARIO-510: tapping a day opens sheet with no book or cancel buttons',
       (tester) async {
-        final now = DateTime.now().toUtc();
-        // A future session 7 days from now so it is in the current calendar view.
-        final futureDay = now.add(const Duration(days: 7));
-        final sessionStart = DateTime.utc(
-          futureDay.year,
-          futureDay.month,
-          futureDay.day,
-          10,
-          0,
-        );
+        // DETERMINISTIC (no DateTime.now() coupling): the calendar opens focused
+        // on the current month, so we advance it ONE page (always next month)
+        // and seed the session on the 15th of that month. Day 15 always exists,
+        // is always in the future, and — once we're on next month's page — is
+        // the only "15" cell rendered (outsideDaysVisible: false), so the tap
+        // hits exactly the day we seeded regardless of today's real date.
+        final now = DateTime.now();
+        final nextMonth = DateTime.utc(now.year, now.month + 1, 1);
+        final sessionStart =
+            DateTime.utc(nextMonth.year, nextMonth.month, 15, 10, 0);
         final appt = _makeAppointment(startsAt: sessionStart, id: 'sheet-1');
 
         await tester.pumpWidget(
@@ -302,9 +303,12 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        // Tap the cell for that specific day — find it by its day number text.
-        final dayFinder = find.text(futureDay.day.toString());
-        await tester.tap(dayFinder.first);
+        // Advance the calendar to next month (where the seeded session lives).
+        await tester.tap(find.byIcon(TreinoIcon.forward));
+        await tester.pumpAndSettle();
+
+        // Tap the cell for day 15 — now unambiguous within next month's grid.
+        await tester.tap(find.text('15').first);
         await tester.pumpAndSettle();
 
         // Sheet is open — no book button, no cancel button.
