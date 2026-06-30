@@ -8,8 +8,9 @@ class TreinoIcon {
   TreinoIcon._();
 
   // Tab bar
-  static const IconData tabHome = PhosphorIconsRegular.houseSimple;
-  static const IconData tabHomeFill = PhosphorIconsFill.houseSimple;
+  // House con puerta (equivalente Phosphor del bootstrap house-fill).
+  static const IconData tabHome = PhosphorIconsRegular.house;
+  static const IconData tabHomeFill = PhosphorIconsFill.house;
   static const IconData tabWorkout = PhosphorIconsRegular.barbell;
   static const IconData tabWorkoutFill = PhosphorIconsFill.barbell;
   static const IconData tabFeed = PhosphorIconsRegular.newspaperClipping;

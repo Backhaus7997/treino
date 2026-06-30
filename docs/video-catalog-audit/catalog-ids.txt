@@ -1,0 +1,793 @@
+pullup-pesocorporal | Dominada | back | peso_corporal | compound
+assisted-pullup-multipower | Dominada asistida | back | multipower | compound
+assisted-pull-up-maquina | Dominada asistida (Máquina) | back | maquina | compound
+assisted-pull-up-pesocorporal | Dominada asistida (Peso corporal) | back | peso_corporal | compound
+weighted-pull-ups-disco | Dominada con peso (Disco) | back | disco | compound
+weighted-pull-ups-mancuerna | Dominada con peso (Mancuerna) | back | mancuerna | compound
+ring-pull-up-pesocorporal | Dominada en anillas | back | peso_corporal | compound
+gironda-chin-up-pesocorporal | Dominada Gironda | back | peso_corporal | compound
+chinup-pesocorporal | Dominada supina | back | peso_corporal | compound
+assisted-chin-up-maquina | Dominada supina asistida (Máquina) | back | maquina | compound
+assisted-chin-up-pesocorporal | Dominada supina asistida (Peso corporal) | back | peso_corporal | compound
+weighted-chin-ups-disco | Dominada supina con peso (Disco) | back | disco | compound
+weighted-chin-ups-mancuerna | Dominada supina con peso (Mancuerna) | back | mancuerna | compound
+ring-chin-up-pesocorporal | Dominada supina en anillas | back | peso_corporal | compound
+ez-bar-shrug-barra | Encogimiento con barra EZ | back | barra | isolation
+shrug-banda | Encogimiento de hombros (Banda) | back | banda | isolation
+shrug-barra | Encogimiento de hombros (Barra) | back | barra | isolation
+shrug-mancuerna | Encogimiento de hombros (Mancuerna) | back | mancuerna | isolation
+shrug-pesarusa | Encogimiento de hombros (Pesa rusa) | back | pesa_rusa | isolation
+shrug-single-pesarusa | Encogimiento de hombros a un brazo | back | pesa_rusa | isolation
+standing-shrug-maquina | Encogimiento de hombros de pie | back | maquina | isolation
+seated-shrug-mancuerna | Encogimiento de hombros sentado (Mancuerna) | back | mancuerna | isolation
+seated-shrug-maquina | Encogimiento de hombros sentado (Máquina) | back | maquina | isolation
+rower-knee-tuck-maquina | Encogimiento de rodillas en rower | back | maquina | compound
+horizontal-shrug-banda | Encogimiento horizontal | back | banda | isolation
+incline-shrug-pesarusa | Encogimiento inclinado | back | pesa_rusa | isolation
+overhead-shrug-disco | Encogimiento sobre la cabeza | back | disco | isolation
+single-arm-pulldown-banda | Jalón al pecho a un brazo | back | banda | compound
+kneeling-pulldown-banda | Jalón al pecho arrodillado | back | banda | compound
+narrow-pulldown-maquina | Jalón al pecho en agarre cerrado | back | maquina | compound
+neutral-pulldown-maquina | Jalón al pecho en agarre neutro | back | maquina | compound
+loaded-pulldown-maquina | Jalón al pecho en máquina | back | maquina | compound
+underhand-pulldown-maquina | Jalón al pecho en supinación | back | maquina | compound
+seated-pulldown-banda | Jalón al pecho sentado | back | banda | compound
+rower-pike-maquina | Pike en rower | back | maquina | compound
+pullover-banda | Pullover (Banda) | back | banda | compound
+pullover-barra | Pullover (Barra) | back | barra | compound
+pullover-polea | Pullover (Cable) | back | cable | compound
+pullover-mancuerna | Pullover (Mancuerna) | back | mancuerna | compound
+pullover-maquina | Pullover (Máquina) | back | maquina | compound
+pullover-pesarusa | Pullover (Pesa rusa) | back | pesa_rusa | compound
+single-arm-pullover-mancuerna | Pullover a un brazo (Mancuerna) | back | mancuerna | compound
+single-arm-pullover-pesarusa | Pullover a un brazo (Pesa rusa) | back | pesa_rusa | compound
+rope-pullover-polea | Pullover con cuerda | back | cable | compound
+row-banda | Remo (Banda) | back | banda | compound
+row-pesarusa | Remo (Pesa rusa) | back | pesa_rusa | compound
+single-arm-row-banda | Remo a un brazo (Banda) | back | banda | compound
+single-arm-row-mancuerna | Remo a un brazo (Mancuerna) | back | mancuerna | compound
+single-arm-row-pesarusa | Remo a un brazo (Pesa rusa) | back | pesa_rusa | compound
+single-arm-row-trx | Remo a un brazo (TRX) | back | trx | compound
+row-single-pesarusa | Remo a una mano | back | pesa_rusa | compound
+alternating-row-pesarusa | Remo alternado | back | pesa_rusa | compound
+alternating-deadstop-row-disco | Remo alternado con parada | back | disco | compound
+archer-row-polea | Remo arquero | back | cable | compound
+loaded-low-row-maquina | Remo bajo en máquina | back | maquina | compound
+row-bilateral-mancuerna | Remo bilateral | back | mancuerna | compound
+pinch-grip-row-disco | Remo con agarre de pinza | back | disco | compound
+rotating-row-polea | Remo con rotación (Cable) | back | cable | compound
+rotating-row-trx | Remo con rotación (TRX) | back | trx | compound
+overhand-row-maquina | Remo en agarre prono (Máquina) | back | maquina | compound
+overhand-row-multipower | Remo en agarre prono (Multipower) | back | multipower | compound
+ring-row-pesocorporal | Remo en anillas | back | peso_corporal | compound
+row-erg-rower-cardio | Remo en ergómetro | back | cardio | compound
+loaded-row-maquina | Remo en máquina | back | maquina | compound
+underhand-row-maquina | Remo en supinación (Máquina) | back | maquina | compound
+underhand-row-multipower | Remo en supinación (Multipower) | back | multipower | compound
+gorilla-row-pesarusa | Remo gorila | back | pesa_rusa | compound
+bent-over-row-banda | Remo inclinado (Banda) | back | banda | compound
+bent-over-row-barra | Remo inclinado (Barra) | back | barra | compound
+reverse-row-pesocorporal | Remo inverso | back | peso_corporal | compound
+inverted-row-multipower | Remo invertido | back | multipower | compound
+weighted-inverted-row-disco | Remo invertido con peso | back | disco | compound
+standing-inverted-row-pesocorporal | Remo invertido de pie | back | peso_corporal | compound
+overhand-inverted-row-pesocorporal | Remo invertido en agarre prono | back | peso_corporal | compound
+underhand-inverted-row-pesocorporal | Remo invertido en supinación | back | peso_corporal | compound
+kayak-row-polea | Remo kayak | back | cable | compound
+landmine-row-barra | Remo landmine | back | barra | compound
+meadows-row-barra | Remo Meadows | back | barra | compound
+neutral-row-maquina | Remo neutro | back | maquina | compound
+pendlay-row-mancuerna | Remo Pendlay | back | mancuerna | compound
+alternating-pendlay-row-mancuerna | Remo Pendlay alternado | back | mancuerna | compound
+pronated-pendlay-row-barra | Remo Pendlay prono | back | barra | compound
+supinated-pendlay-row-barra | Remo Pendlay supino | back | barra | compound
+pronated-row-barra | Remo prono | back | barra | compound
+renegade-row-mancuerna | Remo renegado | back | mancuerna | compound
+loaded-seal-row-maquina | Remo seal en máquina | back | maquina | compound
+knee-lawnmower-row-mancuerna | Remo segadora con rodilla | back | mancuerna | compound
+bench-lawnmower-row-mancuerna | Remo segadora en banco | back | mancuerna | compound
+seated-cable-row-maquina | Remo sentado en polea | back | maquina | compound
+supinated-row-barra | Remo supino (Barra) | back | barra | compound
+supinated-row-mancuerna | Remo supino (Mancuerna) | back | mancuerna | compound
+laying-incline-row-mancuerna | Remo tumbado en banco inclinado | back | mancuerna | compound
+row-unilateral-mancuerna | Remo unilateral | back | mancuerna | compound
+superman-disco | Superman (Disco) | back | disco | compound
+superman-mancuerna | Superman (Mancuerna) | back | mancuerna | compound
+superman-pesarusa | Superman (Pesa rusa) | back | pesa_rusa | compound
+superman-hold-disco | Superman isométrico (Disco) | back | disco | compound
+superman-hold-mancuerna | Superman isométrico (Mancuerna) | back | mancuerna | compound
+superman-hold-pesarusa | Superman isométrico (Pesa rusa) | back | pesa_rusa | compound
+supermans-pesocorporal | Supermanes | back | peso_corporal | compound
+superman-pull-pesocorporal | Tirón Superman | back | peso_corporal | compound
+curl-banda | Curl (Banda) | biceps | banda | isolation
+curl-barra | Curl (Barra) | biceps | barra | isolation
+curl-mancuerna | Curl (Mancuerna) | biceps | mancuerna | isolation
+curl-pesarusa | Curl (Pesa rusa) | biceps | pesa_rusa | isolation
+curl-trx | Curl (TRX) | biceps | trx | isolation
+single-arm-curl-pesarusa | Curl a un brazo | biceps | pesa_rusa | isolation
+high-curl-banda | Curl alto | biceps | banda | isolation
+spider-curl-mancuerna | Curl araña | biceps | mancuerna | isolation
+bar-curl-polea | Curl con barra | biceps | cable | isolation
+ez-bar-curl-barra | Curl con barra EZ | biceps | barra | isolation
+twisting-curl-polea | Curl con giro (Cable) | biceps | cable | isolation
+twisting-curl-mancuerna | Curl con giro (Mancuerna) | biceps | mancuerna | isolation
+concentration-curl-mancuerna | Curl concentrado (Mancuerna) | biceps | mancuerna | isolation
+concentration-curl-pesarusa | Curl concentrado (Pesa rusa) | biceps | pesa_rusa | isolation
+concentration-curl-pesocorporal | Curl concentrado (Peso corporal) | biceps | peso_corporal | isolation
+landmine-concentration-curl-barra | Curl concentrado en landmine | biceps | barra | isolation
+drag-curl-barra | Curl de arrastre (Barra) | biceps | barra | isolation
+drag-curl-mancuerna | Curl de arrastre (Mancuerna) | biceps | mancuerna | isolation
+drag-curl-multipower | Curl de arrastre (Multipower) | biceps | multipower | isolation
+drag-curl-pesarusa | Curl de arrastre (Pesa rusa) | biceps | pesa_rusa | isolation
+bicep-curl-disco | Curl de bíceps (Disco) | biceps | disco | isolation
+bicep-curl-maquina | Curl de bíceps (Máquina) | biceps | maquina | isolation
+ring-curl-pesocorporal | Curl en anillas | biceps | peso_corporal | isolation
+landmine-bicep-curl-barra | Curl en landmine | biceps | barra | isolation
+goblet-curl-pesarusa | Curl goblet | biceps | pesa_rusa | isolation
+incline-curl-mancuerna | Curl inclinado | biceps | mancuerna | isolation
+incline-twisting-curl-mancuerna | Curl inclinado con giro | biceps | mancuerna | isolation
+reverse-curl-banda | Curl inverso (Banda) | biceps | banda | isolation
+reverse-curl-barra | Curl inverso (Barra) | biceps | barra | isolation
+reverse-curl-polea | Curl inverso (Cable) | biceps | cable | isolation
+reverse-curl-mancuerna | Curl inverso (Mancuerna) | biceps | mancuerna | isolation
+reverse-curl-pesarusa | Curl inverso (Pesa rusa) | biceps | pesa_rusa | isolation
+reverse-curl-trx | Curl inverso (TRX) | biceps | trx | isolation
+high-reverse-curl-banda | Curl inverso alto | biceps | banda | isolation
+incline-reverse-curl-mancuerna | Curl inverso inclinado | biceps | mancuerna | isolation
+seated-reverse-curl-mancuerna | Curl inverso sentado | biceps | mancuerna | isolation
+inverted-curl-pesocorporal | Curl invertido | biceps | peso_corporal | isolation
+hammer-curl-polea | Curl martillo (Cable) | biceps | cable | isolation
+hammer-curl-mancuerna | Curl martillo (Mancuerna) | biceps | mancuerna | isolation
+hammer-curl-trx | Curl martillo (TRX) | biceps | trx | isolation
+high-hammer-curl-banda | Curl martillo alto | biceps | banda | isolation
+rope-hammer-curl-polea | Curl martillo con cuerda | biceps | cable | isolation
+incline-hammer-curl-mancuerna | Curl martillo inclinado | biceps | mancuerna | isolation
+seated-hammer-curl-mancuerna | Curl martillo sentado | biceps | mancuerna | isolation
+preacher-curl-mancuerna | Curl predicador (Mancuerna) | biceps | mancuerna | isolation
+preacher-curl-pesarusa | Curl predicador (Pesa rusa) | biceps | pesa_rusa | isolation
+flat-preacher-curl-mancuerna | Curl predicador plano | biceps | mancuerna | isolation
+seated-curl-mancuerna | Curl sentado | biceps | mancuerna | isolation
+laying-curl-mancuerna | Curl tumbado | biceps | mancuerna | isolation
+zottman-curl-mancuerna | Curl Zottman | biceps | mancuerna | isolation
+incline-zottman-curl-mancuerna | Curl Zottman inclinado | biceps | mancuerna | isolation
+seated-zottman-curl-mancuerna | Curl Zottman sentado | biceps | mancuerna | isolation
+calve-raise-polea | Elevación de gemelo | calves | cable | isolation
+calf-raise-banda | Elevación de gemelos (Banda) | calves | banda | isolation
+calf-raises-barra | Elevación de gemelos (Barra) | calves | barra | isolation
+calf-raise-polea | Elevación de gemelos (Cable) | calves | cable | isolation
+calf-raise-mancuerna | Elevación de gemelos (Mancuerna) | calves | mancuerna | isolation
+calf-raise-multipower | Elevación de gemelos (Multipower) | calves | multipower | isolation
+calf-raise-pesarusa | Elevación de gemelos (Pesa rusa) | calves | pesa_rusa | isolation
+calf-raises-pesocorporal | Elevación de gemelos (Peso corporal) | calves | peso_corporal | isolation
+calf-raise-trx | Elevación de gemelos (TRX) | calves | trx | isolation
+walking-calf-raises-pesocorporal | Elevación de gemelos caminando | calves | peso_corporal | isolation
+belt-calf-raise-polea | Elevación de gemelos con cinturón | calves | cable | isolation
+standing-calf-raises-maquina | Elevación de gemelos de pie | calves | maquina | isolation
+landmine-calf-raise-barra | Elevación de gemelos en landmine | calves | barra | isolation
+loaded-calf-raise-maquina | Elevación de gemelos en máquina | calves | maquina | isolation
+goblet-calf-raise-pesarusa | Elevación de gemelos goblet | calves | pesa_rusa | isolation
+seated-calf-raise-barra | Elevación de gemelos sentado (Barra) | calves | barra | isolation
+seated-calf-raise-mancuerna | Elevación de gemelos sentado (Mancuerna) | calves | mancuerna | isolation
+seated-calf-raise-maquina | Elevación de gemelos sentado (Máquina) | calves | maquina | isolation
+seated-calf-raise-multipower | Elevación de gemelos sentado (Multipower) | calves | multipower | isolation
+seated-calf-raise-pesarusa | Elevación de gemelos sentado (Pesa rusa) | calves | pesa_rusa | isolation
+donkey-calf-raise-maquina | Elevación de gemelos tipo burro (Máquina) | calves | maquina | isolation
+donkey-calf-raise-pesocorporal | Elevación de gemelos tipo burro (Peso corporal) | calves | peso_corporal | isolation
+calf-jump-barra | Salto de gemelos | calves | barra | isolation
+chest-fly-banda | Apertura de pecho (Banda) | chest | banda | isolation
+pec-fly-polea | Apertura de pecho (Cable) | chest | cable | isolation
+chest-fly-mancuerna | Apertura de pecho (Mancuerna) | chest | mancuerna | isolation
+pec-fly-maquina | Apertura de pecho (Máquina) | chest | maquina | isolation
+pec-fly-pesarusa | Apertura de pecho (Pesa rusa) | chest | pesa_rusa | isolation
+chest-fly-trx | Apertura de pecho (TRX) | chest | trx | isolation
+decline-chest-fly-mancuerna | Apertura de pecho declinada | chest | mancuerna | isolation
+bench-chest-fly-polea | Apertura de pecho en banco | chest | cable | compound
+incline-chest-fly-polea | Apertura de pecho inclinada (Cable) | chest | cable | isolation
+incline-chest-fly-mancuerna | Apertura de pecho inclinada (Mancuerna) | chest | mancuerna | isolation
+push-up-pesocorporal | Flexión | chest | peso_corporal | compound
+pushup-banda | Flexión (Banda) | chest | banda | compound
+pushup-multipower | Flexión (Multipower) | chest | multipower | compound
+pushup-trx | Flexión (TRX) | chest | trx | compound
+clapping-push-up-pesocorporal | Flexión con palmada | chest | peso_corporal | compound
+weighted-push-ups-disco | Flexión con peso | chest | disco | compound
+pushup-renegade-row-mancuerna | Flexión con remo renegado | chest | mancuerna | compound
+walkover-pushup-pesarusa | Flexión de cruce | chest | pesa_rusa | compound
+decline-push-up-pesocorporal | Flexión declinada | chest | peso_corporal | compound
+elevated-push-up-pesocorporal | Flexión elevada | chest | peso_corporal | compound
+elevated-pushup-mancuerna | Flexión elevada (Mancuerna) | chest | mancuerna | compound
+ring-standing-pushup-pesocorporal | Flexión en anillas de pie | chest | peso_corporal | compound
+diamond-push-ups-pesocorporal | Flexión en diamante | chest | peso_corporal | compound
+knee-push-ups-pesocorporal | Flexión en rodillas | chest | peso_corporal | compound
+incline-push-up-pesocorporal | Flexión inclinada | chest | peso_corporal | compound
+medicine-ball-pushup-balon | Flexión sobre balón medicinal | chest | otro | compound
+weighted-dip-disco | Fondos con peso (Disco) | chest | disco | compound
+weighted-dip-mancuerna | Fondos con peso (Mancuerna) | chest | mancuerna | compound
+single-arm-press-mancuerna | Press a un brazo (Mancuerna) | chest | mancuerna | compound
+single-arm-press-pesarusa | Press a un brazo (Pesa rusa) | chest | pesa_rusa | compound
+cuban-press-mancuerna | Press cubano | chest | mancuerna | compound
+squeeze-press-mancuerna | Press de apretón | chest | mancuerna | compound
+bench-press-banda | Press de banca (Banda) | chest | banda | compound
+bench-press-barra | Press de banca (Barra) | chest | barra | compound
+bench-press-polea | Press de banca (Cable) | chest | cable | compound
+bench-press-mancuerna | Press de banca (Mancuerna) | chest | mancuerna | compound
+bench-press-multipower | Press de banca (Multipower) | chest | multipower | compound
+bench-press-pesarusa | Press de banca (Pesa rusa) | chest | pesa_rusa | compound
+hooklying-bench-press-barra | Press de banca con rodillas flexionadas | chest | barra | compound
+decline-bench-press-polea | Press de banca declinado (Cable) | chest | cable | compound
+decline-bench-press-mancuerna | Press de banca declinado (Mancuerna) | chest | mancuerna | compound
+incline-bench-press-barra | Press de banca inclinado (Barra) | chest | barra | compound
+incline-bench-press-polea | Press de banca inclinado (Cable) | chest | cable | compound
+incline-bench-press-mancuerna | Press de banca inclinado (Mancuerna) | chest | mancuerna | compound
+incline-bench-press-multipower | Press de banca inclinado (Multipower) | chest | multipower | compound
+incline-bench-press-pesarusa | Press de banca inclinado (Pesa rusa) | chest | pesa_rusa | compound
+larsen-bench-press-barra | Press de banca Larsen | chest | barra | compound
+neutral-bench-press-mancuerna | Press de banca neutro | chest | mancuerna | compound
+chestpress-polea | Press de pecho | chest | cable | compound
+chest-press-banda | Press de pecho (Banda) | chest | banda | compound
+chest-press-maquina | Press de pecho (Máquina) | chest | maquina | compound
+chest-press-pesarusa | Press de pecho (Pesa rusa) | chest | pesa_rusa | compound
+standing-chest-press-banda | Press de pecho de pie | chest | banda | compound
+neutral-chest-press-maquina | Press de pecho neutro | chest | maquina | compound
+decline-squeeze-press-mancuerna | Press declinado con presión | chest | mancuerna | compound
+floor-press-banda | Press en el suelo (Banda) | chest | banda | compound
+floor-press-barra | Press en el suelo (Barra) | chest | barra | compound
+floor-press-mancuerna | Press en el suelo (Mancuerna) | chest | mancuerna | compound
+floor-press-pesarusa | Press en el suelo (Pesa rusa) | chest | pesa_rusa | compound
+j-m-press-barra | Press JM | chest | barra | compound
+larsen-press-mancuerna | Press Larsen (Mancuerna) | chest | mancuerna | compound
+larsen-press-pesarusa | Press Larsen (Pesa rusa) | chest | pesa_rusa | compound
+paloff-press-rotation-polea | Press Pallof con rotación | chest | cable | compound
+tate-press-mancuerna | Press Tate (Mancuerna) | chest | mancuerna | compound
+tate-press-pesarusa | Press Tate (Pesa rusa) | chest | pesa_rusa | compound
+y-press-mancuerna | Press Y | chest | mancuerna | compound
+seated-y-press-mancuerna | Press Y sentado | chest | mancuerna | compound
+z-press-barra | Press Z | chest | barra | compound
+situp-barra | Abdominal (Barra) | core | barra | compound
+situp-disco | Abdominal (Disco) | core | disco | compound
+situp-mancuerna | Abdominal (Mancuerna) | core | mancuerna | compound
+situp-multipower | Abdominal (Multipower) | core | multipower | compound
+situp-pesarusa | Abdominal (Pesa rusa) | core | pesa_rusa | compound
+situp-pesocorporal | Abdominal (Peso corporal) | core | peso_corporal | compound
+landmine-sit-up-barra | Abdominal con landmine | core | barra | compound
+frog-sit-up-pesocorporal | Abdominal rana | core | peso_corporal | compound
+bird-dog-pesocorporal | Bird dog | core | peso_corporal | compound
+crunch-banda | Crunch (Banda) | core | banda | isolation
+crunch-mancuerna | Crunch (Mancuerna) | core | mancuerna | isolation
+crunch-maquina | Crunch (Máquina) | core | maquina | isolation
+crunch-pesocorporal | Crunch (Peso corporal) | core | peso_corporal | isolation
+kneeling-crunch-polea | Crunch arrodillado | core | cable | isolation
+rope-kneeling-crunch-polea | Crunch arrodillado con cuerda | core | cable | isolation
+bar-kneeling-crunch-polea | Crunch arrodillado en polea | core | cable | isolation
+bicycle-crunch-pesocorporal | Crunch bicicleta | core | peso_corporal | isolation
+standing-crunch-polea | Crunch de pie | core | cable | isolation
+rope-standing-crunch-polea | Crunch de pie con cuerda | core | cable | isolation
+bar-standing-crunch-polea | Crunch de pie en polea | core | cable | isolation
+stability-ball-crunch-pesocorporal | Crunch en pelota de estabilidad | core | peso_corporal | isolation
+reverse-crunch-pesocorporal | Crunch inverso | core | peso_corporal | isolation
+suitcase-crunch-mancuerna | Crunch maletín | core | mancuerna | isolation
+oblique-crunch-multipower | Crunch oblicuo (Multipower) | core | multipower | isolation
+oblique-crunch-pesocorporal | Crunch oblicuo (Peso corporal) | core | peso_corporal | isolation
+oblique-crunch-trx | Crunch oblicuo (TRX) | core | trx | isolation
+kneeling-oblique-crunch-polea | Crunch oblicuo arrodillado | core | cable | isolation
+frog-crunch-pesocorporal | Crunch rana | core | peso_corporal | isolation
+dead-bug-pesocorporal | Dead bug | core | peso_corporal | compound
+laying-leg-raises-pesocorporal | Elevación de piernas acostado | core | peso_corporal | isolation
+alternating-leg-raise-pesocorporal | Elevación de piernas alternada | core | peso_corporal | isolation
+bent-leg-raise-pesocorporal | Elevación de piernas con rodillas flexionadas | core | peso_corporal | isolation
+knee-tuck-trx | Encogimiento de rodillas | core | trx | compound
+hanging-knee-tuck-multipower | Encogimiento de rodillas colgado (Multipower) | core | multipower | compound
+hanging-knee-tuck-pesocorporal | Encogimiento de rodillas colgado (Peso corporal) | core | peso_corporal | compound
+ab-rollout-trx | Extensión abdominal | core | trx | compound
+side-bend-banda | Flexión lateral (Banda) | core | banda | compound
+side-bend-polea | Flexión lateral (Cable) | core | cable | compound
+side-bend-mancuerna | Flexión lateral (Mancuerna) | core | mancuerna | compound
+side-bend-multipower | Flexión lateral (Multipower) | core | multipower | compound
+landmine-side-bend-barra | Flexión lateral con landmine | core | barra | compound
+overhead-side-bend-mancuerna | Flexión lateral con peso sobre la cabeza | core | mancuerna | compound
+landmine-kneeling-twist-barra | Giro arrodillado con landmine | core | barra | compound
+standing-twist-disco | Giro de pie | core | disco | compound
+landmine-oblique-twist-barra | Giro oblicuo con landmine | core | barra | compound
+russian-twist-disco | Giro ruso (Disco) | core | disco | compound
+russian-twist-mancuerna | Giro ruso (Mancuerna) | core | mancuerna | compound
+russian-twist-pesarusa | Giro ruso (Pesa rusa) | core | pesa_rusa | compound
+russian-twist-pesocorporal | Giro ruso (Peso corporal) | core | peso_corporal | compound
+landmine-russian-twist-barra | Giro ruso con landmine | core | barra | compound
+side-russian-twist-pesocorporal | Giro ruso lateral | core | peso_corporal | compound
+hollow-hold-mancuerna | Hollow hold (Mancuerna) | core | mancuerna | compound
+hollow-hold-pesarusa | Hollow hold (Pesa rusa) | core | pesa_rusa | compound
+hollow-hold-pesocorporal | Hollow hold (Peso corporal) | core | peso_corporal | compound
+landmine-hollow-hold-barra | Hollow hold con landmine | core | barra | compound
+weighted-hollow-hold-disco | Hollow hold con peso | core | disco | compound
+wood-chopper-banda | Leñador (Banda) | core | banda | compound
+wood-chopper-mancuerna | Leñador (Mancuerna) | core | mancuerna | compound
+wood-chopper-pesarusa | Leñador (Pesa rusa) | core | pesa_rusa | compound
+kneeling-wood-chopper-polea | Leñador arrodillado (Cable) | core | cable | compound
+kneeling-wood-chopper-mancuerna | Leñador arrodillado (Mancuerna) | core | mancuerna | compound
+oblique-jackknife-pesocorporal | Navaja oblicua | core | peso_corporal | compound
+scissor-kick-pesocorporal | Patada de tijera | core | peso_corporal | compound
+sideways-scissor-kick-pesocorporal | Patada de tijera lateral | core | peso_corporal | compound
+plank-up-down-pesocorporal | Plancha arriba-abajo | core | peso_corporal | compound
+plank-pullthrough-mancuerna | Plancha con arrastre | core | mancuerna | compound
+medicine-ball-plank-balon | Plancha con balón medicinal | core | otro | compound
+plank-arm-lift-pesocorporal | Plancha con elevación de brazo | core | peso_corporal | compound
+hand-plank-jack-pesocorporal | Plancha con salto de piernas | core | peso_corporal | compound
+plank-jack-pesocorporal | Plancha con saltos de piernas | core | peso_corporal | compound
+weighted-forearm-plank-disco | Plancha de antebrazos con peso | core | disco | compound
+weighted-hand-plank-disco | Plancha de manos con peso | core | disco | compound
+forearm-plank-pesocorporal | Plancha en antebrazos (Peso corporal) | core | peso_corporal | compound
+forearm-plank-trx | Plancha en antebrazos (TRX) | core | trx | compound
+hand-plank-pesocorporal | Plancha en manos (Peso corporal) | core | peso_corporal | compound
+hand-plank-trx | Plancha en manos (TRX) | core | trx | compound
+plank-iytw-mancuerna | Plancha IYTW | core | mancuerna | compound
+forearm-side-plank-trx | Plancha lateral en antebrazos | core | trx | compound
+elbow-side-plank-mancuerna | Plancha lateral en codo (Mancuerna) | core | mancuerna | compound
+elbow-side-plank-pesocorporal | Plancha lateral en codo (Peso corporal) | core | peso_corporal | compound
+hand-side-plank-mancuerna | Plancha lateral en mano (Mancuerna) | core | mancuerna | compound
+hand-side-plank-pesocorporal | Plancha lateral en mano (Peso corporal) | core | peso_corporal | compound
+pallof-press-banda | Press Pallof (Banda) | core | banda | compound
+pallof-press-polea | Press Pallof (Cable) | core | cable | compound
+kneeling-pallof-press-polea | Press Pallof arrodillado | core | cable | compound
+forward-scissor-cardio | Tijera frontal | core | cardio | compound
+alternating-heel-touch-pesocorporal | Toque de talón alternado | core | peso_corporal | compound
+standing-reach-disco | Alcance de pie | fullbody | disco | compound
+reach-and-catch-pesocorporal | Alcanzar y atrapar | fullbody | peso_corporal | compound
+single-arm-snatch-pesarusa | Arranque a un brazo | fullbody | pesa_rusa | compound
+landmine-snatch-barra | Arranque con landmine | fullbody | barra | compound
+power-snatch-barra | Arranque de potencia | fullbody | barra | compound
+double-snatch-pesarusa | Arranque doble | fullbody | pesa_rusa | compound
+muscle-snatch-barra | Arranque muscular | fullbody | barra | compound
+curtsy-step-down-pesocorporal | Bajada del cajón en reverencia | fullbody | peso_corporal | compound
+burpee-pesocorporal | Burpee | fullbody | peso_corporal | compound
+farmers-carry-pesarusa | Caminata con carga pesada | fullbody | pesa_rusa | compound
+overhead-carry-disco | Caminata con carga sobre la cabeza | fullbody | disco | compound
+farmer-walk-mancuerna | Caminata del granjero | fullbody | mancuerna | compound
+recovery-farmers-walk-pesarusa | Caminata del granjero de recuperación | fullbody | pesa_rusa | compound
+treadmill-walk-cardio | Caminata en cinta | fullbody | cardio | compound
+treadmill-backwards-walk-cardio | Caminata hacia atrás en cinta | fullbody | cardio | compound
+suitcase-carry-barra | Caminata tipo maletín | fullbody | barra | compound
+clean-disco | Cargada | fullbody | disco | compound
+clean-and-jerk-barra | Cargada y envión (Barra) | fullbody | barra | compound
+clean-and-jerk-pesarusa | Cargada y envión (Pesa rusa) | fullbody | pesa_rusa | compound
+clean-and-press-barra | Cargada y press (Barra) | fullbody | barra | compound
+clean-and-press-disco | Cargada y press (Disco) | fullbody | disco | compound
+clean-and-press-mancuerna | Cargada y press (Mancuerna) | fullbody | mancuerna | compound
+clean-and-press-pesarusa | Cargada y press (Pesa rusa) | fullbody | pesa_rusa | compound
+curve-treadmill-cardio | Cinta curva | fullbody | cardio | compound
+backward-arm-circle-pesocorporal | Círculo de brazos hacia atrás | fullbody | peso_corporal | compound
+weighted-dead-hang-disco | Colgada muerta con peso | fullbody | disco | compound
+dead-hang-pesocorporal | Colgado estático | fullbody | peso_corporal | compound
+car-driver-disco | Conductor de auto | fullbody | disco | compound
+wrist-curl-barra | Curl de muñeca (Barra) | fullbody | barra | isolation
+wrist-curl-polea | Curl de muñeca (Cable) | fullbody | cable | isolation
+wrist-curl-mancuerna | Curl de muñeca (Mancuerna) | fullbody | mancuerna | isolation
+wrist-curl-pesarusa | Curl de muñeca (Pesa rusa) | fullbody | pesa_rusa | isolation
+bench-wrist-curl-mancuerna | Curl de muñeca en banco (Mancuerna) | fullbody | mancuerna | compound
+bench-wrist-curl-pesarusa | Curl de muñeca en banco (Pesa rusa) | fullbody | pesa_rusa | compound
+step-down-pesocorporal | Descenso del escalón | fullbody | peso_corporal | compound
+partial-step-down-pesocorporal | Descenso parcial del escalón | fullbody | peso_corporal | compound
+lateral-shuffle-cardio | Desplazamiento lateral | fullbody | cardio | isolation
+treadmill-side-shuffle-cardio | Desplazamiento lateral en cinta | fullbody | cardio | compound
+elliptical-cardio | Elíptica | fullbody | cardio | compound
+push-downs-maquina | Empuje hacia abajo en máquina | fullbody | maquina | compound
+push-down-polea | Empuje hacia abajo en polea | fullbody | cable | compound
+split-jerk-barra | Envión con split | fullbody | barra | compound
+landmine-split-jerk-barra | Envión en tijera con landmine | fullbody | barra | compound
+mountain-climber-pesocorporal | Escalador (Peso corporal) | fullbody | peso_corporal | compound
+mountain-climber-trx | Escalador (TRX) | fullbody | trx | compound
+jumping-mountain-climber-pesocorporal | Escalador con salto | fullbody | peso_corporal | compound
+stair-climber-cardio | Escaladora | fullbody | cardio | compound
+quad-stomp-barra | Estampido de cuádriceps (Barra) | fullbody | barra | compound
+quad-stomp-mancuerna | Estampido de cuádriceps (Mancuerna) | fullbody | mancuerna | compound
+quad-stomp-pesarusa | Estampido de cuádriceps (Pesa rusa) | fullbody | pesa_rusa | compound
+quad-stomp-pesocorporal | Estampido de cuádriceps (Peso corporal) | fullbody | peso_corporal | compound
+stretcher-maquina | Estiramiento en máquina | fullbody | maquina | compound
+butterfly-stretch-pesocorporal | Estiramiento mariposa | fullbody | peso_corporal | isolation
+back-extensions-maquina | Extensiones de espalda | fullbody | maquina | isolation
+dips-maquina | Fondos (Máquina) | fullbody | maquina | compound
+dips-pesocorporal | Fondos (Peso corporal) | fullbody | peso_corporal | compound
+box-assisted-dips-pesocorporal | Fondos asistidos con cajón | fullbody | peso_corporal | compound
+bench-dips-pesocorporal | Fondos en banco | fullbody | peso_corporal | compound
+parralel-bar-dips-pesocorporal | Fondos en barras paralelas | fullbody | peso_corporal | compound
+medicine-ball-slam-balon | Golpe con balón medicinal | fullbody | otro | compound
+three-step-heismans-cardio | Heismans de tres pasos | fullbody | cardio | compound
+stability-ball-hyperextension-pesocorporal | Hiperextensión en pelota de estabilidad | fullbody | peso_corporal | isolation
+reverse-hyperextension-maquina | Hiperextensión inversa | fullbody | maquina | isolation
+pull-down-maquina | Jalón | fullbody | maquina | compound
+karaoke-cardio | Karaoke lateral | fullbody | cardio | compound
+hanging-l-sit-pesocorporal | L-sit colgado | fullbody | peso_corporal | compound
+woodchopper-polea | Leñador (Cable) | fullbody | cable | compound
+woodchopper-disco | Leñador (Disco) | fullbody | disco | compound
+windshield-wiper-pesocorporal | Limpiaparabrisas | fullbody | peso_corporal | compound
+farmers-march-pesarusa | Marcha del granjero | fullbody | pesa_rusa | compound
+walking-farmers-march-pesarusa | Marcha del granjero caminando | fullbody | pesa_rusa | compound
+windmill-pesarusa | Molino | fullbody | pesa_rusa | compound
+windmill-bottom-hand-pesarusa | Molino con mano baja | fullbody | pesa_rusa | compound
+deadlift-barra | Peso muerto (Barra) | fullbody | barra | compound
+deadlift-disco | Peso muerto (Disco) | fullbody | disco | compound
+single-leg-deadlift-barra | Peso muerto a una pierna (Barra) | fullbody | barra | compound
+single-leg-deadlift-disco | Peso muerto a una pierna (Disco) | fullbody | disco | compound
+single-leg-deadlift-mancuerna | Peso muerto a una pierna (Mancuerna) | fullbody | mancuerna | compound
+single-leg-deadlift-pesarusa | Peso muerto a una pierna (Pesa rusa) | fullbody | pesa_rusa | compound
+coan-deadlift-barra | Peso muerto Coan | fullbody | barra | compound
+snatch-grip-deadlift-barra | Peso muerto con agarre de arranque | fullbody | barra | compound
+pinch-grip-deadlift-disco | Peso muerto con agarre de pinza | fullbody | disco | compound
+banded-deadlift-barra | Peso muerto con banda | fullbody | barra | compound
+conventional-deadlift-pesarusa | Peso muerto convencional | fullbody | pesa_rusa | compound
+conventional-pause-deadlift-barra | Peso muerto convencional con pausa | fullbody | barra | compound
+block-conventional-deadlift-barra | Peso muerto convencional desde bloques | fullbody | barra | compound
+elevated-deadlift-polea | Peso muerto elevado | fullbody | cable | compound
+reverse-deadlift-barra | Peso muerto inverso | fullbody | barra | compound
+sumo-deadlift-barra | Peso muerto sumo (Barra) | fullbody | barra | compound
+sumo-deadlift-pesarusa | Peso muerto sumo (Pesa rusa) | fullbody | pesa_rusa | compound
+landmine-sumo-deadlift-barra | Peso muerto sumo con landmine | fullbody | barra | compound
+sumo-pause-deadlift-barra | Peso muerto sumo con pausa | fullbody | barra | compound
+suitcase-deadlift-barra | Peso muerto tipo maletín | fullbody | barra | compound
+pike-trx | Pike | fullbody | trx | compound
+stability-ball-pike-pesocorporal | Pike en pelota de estabilidad | fullbody | peso_corporal | compound
+push-press-mancuerna | Push press (Mancuerna) | fullbody | mancuerna | compound
+push-press-pesarusa | Push press (Pesa rusa) | fullbody | pesa_rusa | compound
+waiters-bow-disco | Reverencia del mozo (Disco) | fullbody | disco | compound
+waiters-bow-mancuerna | Reverencia del mozo (Mancuerna) | fullbody | mancuerna | compound
+waiters-bow-pesarusa | Reverencia del mozo (Pesa rusa) | fullbody | pesa_rusa | compound
+waiters-bow-pesocorporal | Reverencia del mozo (Peso corporal) | fullbody | peso_corporal | compound
+decline-skull-crusher-pesarusa | Rompe-cráneos en declinado | fullbody | pesa_rusa | compound
+thoracic-spine-rotation-pesocorporal | Rotación de columna torácica | fullbody | peso_corporal | compound
+shoulder-external-rotation-mancuerna | Rotación externa de hombro | fullbody | mancuerna | compound
+external-rotation-polea | Rotación externa de hombro (Cable) | fullbody | cable | compound
+external-rotation-mancuerna | Rotación externa de hombro (Mancuerna) | fullbody | mancuerna | compound
+internal-rotation-polea | Rotación interna de hombro (Cable) | fullbody | cable | compound
+internal-rotation-mancuerna | Rotación interna de hombro (Mancuerna) | fullbody | mancuerna | compound
+box-jump-pesocorporal | Salto al cajón | fullbody | peso_corporal | compound
+seated-box-jump-pesocorporal | Salto al cajón desde sentado | fullbody | peso_corporal | compound
+jump-rope-cardio | Salto con soga | fullbody | cardio | compound
+diamond-hop-cardio | Salto en diamante | fullbody | cardio | compound
+depth-jump-pesocorporal | Salto en profundidad | fullbody | peso_corporal | compound
+skater-cardio | Salto lateral tipo patinador | fullbody | cardio | compound
+pull-apart-banda | Separación de banda | fullbody | banda | compound
+ski-erg-cardio | Ski erg | fullbody | cardio | compound
+skull-crusher-pesarusa | Skull crusher | fullbody | pesa_rusa | compound
+incline-skullover-mancuerna | Skullover en banco inclinado | fullbody | mancuerna | compound
+high-incline-skullover-mancuerna | Skullover en banco muy inclinado | fullbody | mancuerna | compound
+shuttle-sprint-cardio | Sprint de lanzadera | fullbody | cardio | compound
+treadmill-sprint-cardio | Sprint en cinta | fullbody | cardio | compound
+figure-eight-sprint-cardio | Sprint en ocho | fullbody | cardio | compound
+swing-mancuerna | Swing | fullbody | mancuerna | compound
+single-arm-swing-pesarusa | Swing a un brazo | fullbody | pesa_rusa | compound
+alternating-swing-pesarusa | Swing alternado | fullbody | pesa_rusa | compound
+full-swing-pesarusa | Swing completo | fullbody | pesa_rusa | compound
+double-swing-pesarusa | Swing doble | fullbody | pesa_rusa | compound
+butt-kick-cardio | Talón al glúteo | fullbody | cardio | compound
+thruster-barra | Thruster (Barra) | fullbody | barra | compound
+thruster-mancuerna | Thruster (Mancuerna) | fullbody | mancuerna | compound
+thruster-pesarusa | Thruster (Pesa rusa) | fullbody | pesa_rusa | compound
+single-arm-thruster-mancuerna | Thruster a un brazo (Mancuerna) | fullbody | mancuerna | compound
+single-arm-thruster-pesarusa | Thruster a un brazo (Pesa rusa) | fullbody | pesa_rusa | compound
+landmine-thruster-barra | Thruster con landmine | fullbody | barra | compound
+high-pull-barra | Tirón alto | fullbody | barra | compound
+rack-pull-barra | Tirón desde rack | fullbody | barra | compound
+pull-through-polea | Tirón entre las piernas | fullbody | cable | compound
+pullthrough-banda | Tirón entre las piernas con banda | fullbody | banda | compound
+toe-tap-cardio | Toque de punta | fullbody | cardio | compound
+knee-taps-cardio | Toque de rodillas | fullbody | cardio | compound
+treadmill-jog-cardio | Trote en cinta | fullbody | cardio | compound
+hip-abduction-banda | Abducción de cadera (Banda) | glutes | banda | isolation
+hip-abduction-polea | Abducción de cadera (Cable) | glutes | cable | isolation
+hip-abduction-disco | Abducción de cadera (Disco) | glutes | disco | isolation
+hip-abduction-maquina | Abducción de cadera (Máquina) | glutes | maquina | isolation
+hip-abduction-pesocorporal | Abducción de cadera (Peso corporal) | glutes | peso_corporal | isolation
+standing-hip-abduction-mancuerna | Abducción de cadera de pie | glutes | mancuerna | isolation
+quadruped-hip-abduction-polea | Abducción de cadera en cuadrupedia | glutes | cable | isolation
+hip-adduction-banda | Aducción de cadera (Banda) | glutes | banda | isolation
+hip-adduction-maquina | Aducción de cadera (Máquina) | glutes | maquina | isolation
+standing-hip-adduction-polea | Aducción de cadera de pie | glutes | cable | isolation
+mini-band-clamshell-banda | Apertura de almeja con mini band | glutes | banda | compound
+glute-ham-raise-maquina | Elevación de glúteos e isquiotibiales | glutes | maquina | isolation
+hip-thrust-barra | Hip thrust (Barra) | glutes | barra | compound
+hip-thrust-mancuerna | Hip thrust (Mancuerna) | glutes | mancuerna | compound
+hip-thrust-maquina | Hip thrust (Máquina) | glutes | maquina | compound
+hip-thrust-multipower | Hip thrust (Multipower) | glutes | multipower | compound
+hip-thrust-pesarusa | Hip thrust (Pesa rusa) | glutes | pesa_rusa | compound
+glute-kickback-banda | Patada de glúteos (Banda) | glutes | banda | isolation
+glute-kickback-polea | Patada de glúteos (Cable) | glutes | cable | isolation
+glute-kickback-maquina | Patada de glúteos (Máquina) | glutes | maquina | isolation
+glute-kickback-multipower | Patada de glúteos (Multipower) | glutes | multipower | isolation
+standing-kickback-polea | Patada de glúteos de pie | glutes | cable | isolation
+standing-mid-kickback-polea | Patada de glúteos media de pie | glutes | cable | isolation
+kickbacks-pesocorporal | Patadas de glúteos | glutes | peso_corporal | isolation
+glute-bridge-barra | Puente de glúteos (Barra) | glutes | barra | compound
+glute-bridge-mancuerna | Puente de glúteos (Mancuerna) | glutes | mancuerna | compound
+glute-bridge-pesarusa | Puente de glúteos (Pesa rusa) | glutes | pesa_rusa | compound
+glute-bridge-pesocorporal | Puente de glúteos (Peso corporal) | glutes | peso_corporal | compound
+glute-bridge-trx | Puente de glúteos (TRX) | glutes | trx | compound
+glute-bridge-pullover-disco | Puente de glúteos con pullover | glutes | disco | compound
+good-mornings-pesocorporal | Buenos días | hamstrings | peso_corporal | compound
+good-morning-banda | Buenos días (Banda) | hamstrings | banda | compound
+good-morning-anterior-disco | Buenos días anterior | hamstrings | disco | compound
+standing-good-morning-banda | Buenos días de pie | hamstrings | banda | compound
+goblet-good-morning-mancuerna | Buenos días goblet (Mancuerna) | hamstrings | mancuerna | compound
+goblet-good-morning-pesarusa | Buenos días goblet (Pesa rusa) | hamstrings | pesa_rusa | compound
+zercher-good-morning-barra | Buenos días Zercher (Barra) | hamstrings | barra | compound
+zercher-good-morning-polea | Buenos días Zercher (Cable) | hamstrings | cable | compound
+hamstring-curl-polea | Curl de isquiotibiales (Cable) | hamstrings | cable | isolation
+hamstring-curl-maquina | Curl de isquiotibiales (Máquina) | hamstrings | maquina | isolation
+hamstring-curl-trx | Curl de isquiotibiales (TRX) | hamstrings | trx | isolation
+leg-curl-banda | Curl femoral (Banda) | hamstrings | banda | isolation
+leg-curl-mancuerna | Curl femoral (Mancuerna) | hamstrings | mancuerna | isolation
+standing-hamstring-curl-maquina | Curl femoral de pie | hamstrings | maquina | isolation
+seated-hamstring-curl-maquina | Curl femoral sentado | hamstrings | maquina | isolation
+seated-leg-curl-polea | Curl femoral sentado (Cable) | hamstrings | cable | isolation
+seated-leg-curl-maquina | Curl femoral sentado (Máquina) | hamstrings | maquina | isolation
+nordic-hamstring-curl-pesocorporal | Curl nórdico | hamstrings | peso_corporal | isolation
+romanian-deadlift-banda | Peso muerto rumano (Banda) | hamstrings | banda | compound
+romanian-deadlift-barra | Peso muerto rumano (Barra) | hamstrings | barra | compound
+romanian-deadlift-polea | Peso muerto rumano (Cable) | hamstrings | cable | compound
+romanian-deadlift-mancuerna | Peso muerto rumano (Mancuerna) | hamstrings | mancuerna | compound
+romanian-deadlift-multipower | Peso muerto rumano (Multipower) | hamstrings | multipower | compound
+romanian-deadlift-pesarusa | Peso muerto rumano (Pesa rusa) | hamstrings | pesa_rusa | compound
+romanian-deadlift-single-pesarusa | Peso muerto rumano a una pierna | hamstrings | pesa_rusa | compound
+banded-romanian-deadlift-barra | Peso muerto rumano con banda | hamstrings | barra | compound
+landmine-romanian-deadlift-barra | Peso muerto rumano con landmine | hamstrings | barra | compound
+stiff-leg-deadlift-barra | Peso muerto stiff | hamstrings | barra | compound
+sumo-romanian-deadlift-multipower | Peso muerto sumo rumano | hamstrings | multipower | compound
+squat-hold-reach-disco | Alcance en sentadilla isométrica | quads | disco | compound
+squat-hold-curl-disco | Curl en sentadilla isométrica | quads | disco | compound
+forward-lunge-barra | Estocada al frente (Barra) | quads | barra | compound
+forward-lunge-disco | Estocada al frente (Disco) | quads | disco | compound
+forward-lunge-mancuerna | Estocada al frente (Mancuerna) | quads | mancuerna | compound
+forward-lunge-pesarusa | Estocada al frente (Pesa rusa) | quads | pesa_rusa | compound
+forward-lunge-pesocorporal | Estocada al frente (Peso corporal) | quads | peso_corporal | compound
+alternating-forward-lunge-mancuerna | Estocada al frente alternada (Mancuerna) | quads | mancuerna | compound
+alternating-forward-lunge-pesarusa | Estocada al frente alternada (Pesa rusa) | quads | pesa_rusa | compound
+goblet-forward-lunge-mancuerna | Estocada al frente goblet | quads | mancuerna | compound
+recovery-lunge-alternate-pesocorporal | Estocada alternada de recuperación | quads | peso_corporal | compound
+overhead-walking-lunge-disco | Estocada caminando con peso sobre la cabeza | quads | disco | compound
+recovery-lunge-walking-pesocorporal | Estocada caminando de recuperación | quads | peso_corporal | compound
+swing-lunge-mancuerna | Estocada con balanceo (Mancuerna) | quads | mancuerna | compound
+swing-lunge-pesarusa | Estocada con balanceo (Pesa rusa) | quads | pesa_rusa | compound
+swing-lunge-pesocorporal | Estocada con balanceo (Peso corporal) | quads | peso_corporal | compound
+swingthrough-lunge-pesocorporal | Estocada con balanceo continuo | quads | peso_corporal | compound
+landmine-lunge-barra | Estocada con landmine | quads | barra | compound
+alternating-jump-lunge-pesocorporal | Estocada con salto alternada | quads | peso_corporal | compound
+curtsy-lunge-barra | Estocada cruzada (Barra) | quads | barra | compound
+curtsy-lunge-disco | Estocada cruzada (Disco) | quads | disco | compound
+curtsy-lunge-pesocorporal | Estocada cruzada (Peso corporal) | quads | peso_corporal | compound
+curtsy-lunge-trx | Estocada cruzada (TRX) | quads | trx | compound
+alternating-curtsy-lunge-pesarusa | Estocada cruzada alternada (Pesa rusa) | quads | pesa_rusa | compound
+alternating-curtsy-lunge-pesocorporal | Estocada cruzada alternada (Peso corporal) | quads | peso_corporal | compound
+landmine-curtsy-lunge-barra | Estocada cruzada con landmine | quads | barra | compound
+goblet-curtsy-lunge-mancuerna | Estocada cruzada goblet | quads | mancuerna | compound
+reverse-lunge-barra | Estocada inversa (Barra) | quads | barra | compound
+reverse-lunge-disco | Estocada inversa (Disco) | quads | disco | compound
+reverse-lunge-mancuerna | Estocada inversa (Mancuerna) | quads | mancuerna | compound
+reverse-lunge-multipower | Estocada inversa (Multipower) | quads | multipower | compound
+reverse-lunge-pesarusa | Estocada inversa (Pesa rusa) | quads | pesa_rusa | compound
+reverse-lunge-pesocorporal | Estocada inversa (Peso corporal) | quads | peso_corporal | compound
+reverse-lunge-trx | Estocada inversa (TRX) | quads | trx | compound
+alternating-reverse-lunges-pesocorporal | Estocada inversa alternada | quads | peso_corporal | compound
+alternating-reverse-lunge-mancuerna | Estocada inversa alternada (Mancuerna) | quads | mancuerna | compound
+alternating-reverse-lunge-pesarusa | Estocada inversa alternada (Pesa rusa) | quads | pesa_rusa | compound
+reverse-lunge-twist-disco | Estocada inversa con rotación | quads | disco | compound
+goblet-reverse-lunge-mancuerna | Estocada inversa goblet | quads | mancuerna | compound
+side-lunge-pesocorporal | Estocada lateral | quads | peso_corporal | compound
+lateral-lunge-barra | Estocada lateral (Barra) | quads | barra | compound
+lateral-lunge-disco | Estocada lateral (Disco) | quads | disco | compound
+lateral-lunge-pesarusa | Estocada lateral (Pesa rusa) | quads | pesa_rusa | compound
+lateral-lunge-pesocorporal | Estocada lateral (Peso corporal) | quads | peso_corporal | compound
+lateral-lunge-trx | Estocada lateral (TRX) | quads | trx | compound
+alternating-lateral-lunge-mancuerna | Estocada lateral alternada (Mancuerna) | quads | mancuerna | compound
+alternating-lateral-lunge-pesarusa | Estocada lateral alternada (Pesa rusa) | quads | pesa_rusa | compound
+alternating-lateral-lunge-pesocorporal | Estocada lateral alternada (Peso corporal) | quads | peso_corporal | compound
+lateral-lunge-reach-mancuerna | Estocada lateral con alcance | quads | mancuerna | compound
+landmine-lateral-lunge-barra | Estocada lateral con landmine | quads | barra | compound
+lateral-lunge-jump-pesocorporal | Estocada lateral con salto | quads | peso_corporal | compound
+goblet-lateral-lunge-mancuerna | Estocada lateral goblet | quads | mancuerna | compound
+lateral-lunge-single-pesarusa | Estocada lateral unilateral | quads | pesa_rusa | compound
+forward-lunges-pesocorporal | Estocadas al frente | quads | peso_corporal | compound
+leg-extension-banda | Extensión de piernas (Banda) | quads | banda | isolation
+leg-extension-mancuerna | Extensión de piernas (Mancuerna) | quads | mancuerna | isolation
+leg-extension-maquina | Extensión de piernas (Máquina) | quads | maquina | isolation
+standing-leg-extension-polea | Extensión de piernas de pie | quads | cable | isolation
+seated-leg-extension-polea | Extensión de piernas sentado | quads | cable | isolation
+leg-press-banda | Prensa de piernas (Banda) | quads | banda | compound
+leg-press-maquina | Prensa de piernas (Máquina) | quads | maquina | compound
+leg-press-multipower | Prensa de piernas (Multipower) | quads | multipower | compound
+horizontal-leg-press-maquina | Prensa de piernas horizontal | quads | maquina | compound
+vertical-leg-press-maquina | Prensa de piernas vertical | quads | maquina | compound
+squat-hold-row-banda | Remo en sentadilla isométrica | quads | banda | compound
+squat-banda | Sentadilla (Banda) | quads | banda | compound
+squat-barra | Sentadilla (Barra) | quads | barra | compound
+squat-disco | Sentadilla (Disco) | quads | disco | compound
+squat-multipower | Sentadilla (Multipower) | quads | multipower | compound
+squat-pesocorporal | Sentadilla (Peso corporal) | quads | peso_corporal | compound
+squat-trx | Sentadilla (TRX) | quads | trx | compound
+single-leg-squat-pesocorporal | Sentadilla a una pierna | quads | peso_corporal | compound
+box-squat-mancuerna | Sentadilla al cajón (Mancuerna) | quads | mancuerna | compound
+box-squat-pesarusa | Sentadilla al cajón (Pesa rusa) | quads | pesa_rusa | compound
+box-squat-pesocorporal | Sentadilla al cajón (Peso corporal) | quads | peso_corporal | compound
+pause-box-squat-barra | Sentadilla al cajón con pausa | quads | barra | compound
+offset-squat-mancuerna | Sentadilla asimétrica | quads | mancuerna | compound
+bulgarian-split-squat-barra | Sentadilla búlgara (Barra) | quads | barra | compound
+bulgarian-split-squat-pesocorporal | Sentadilla búlgara (Peso corporal) | quads | peso_corporal | compound
+banded-split-squat-barra | Sentadilla búlgara con banda | quads | barra | compound
+belt-split-squat-polea | Sentadilla búlgara con cinturón | quads | cable | compound
+goblet-split-squat-mancuerna | Sentadilla búlgara goblet | quads | mancuerna | compound
+squat-reach-disco | Sentadilla con alcance | quads | disco | compound
+high-bar-squat-barra | Sentadilla con barra alta | quads | barra | compound
+low-bar-squat-barra | Sentadilla con barra baja | quads | barra | compound
+belt-squat-polea | Sentadilla con cinturón (Cable) | quads | cable | compound
+belt-squat-maquina | Sentadilla con cinturón (Máquina) | quads | maquina | compound
+somersault-squat-mancuerna | Sentadilla con giro de muñeca (Mancuerna) | quads | mancuerna | compound
+somersault-squat-pesarusa | Sentadilla con giro de muñeca (Pesa rusa) | quads | pesa_rusa | compound
+landmine-squat-barra | Sentadilla con landmine | quads | barra | compound
+mini-band-squat-banda | Sentadilla con miniband | quads | banda | compound
+pole-overhead-squat-pesocorporal | Sentadilla con palo sobre la cabeza | quads | peso_corporal | compound
+overhead-squat-disco | Sentadilla con peso sobre la cabeza (Disco) | quads | disco | compound
+overhead-squat-mancuerna | Sentadilla con peso sobre la cabeza (Mancuerna) | quads | mancuerna | compound
+narrow-stance-squat-multipower | Sentadilla con pies juntos | quads | multipower | compound
+squat-press-maquina | Sentadilla con press | quads | maquina | compound
+pulse-squat-pesocorporal | Sentadilla con pulso | quads | peso_corporal | compound
+jump-squat-trx | Sentadilla con salto | quads | trx | compound
+heels-up-squat-pesocorporal | Sentadilla con talones elevados | quads | peso_corporal | compound
+tap-box-squat-barra | Sentadilla con toque al cajón | quads | barra | compound
+recovery-farmers-squat-pesarusa | Sentadilla de recuperación tipo farmer | quads | pesa_rusa | compound
+split-squat-polea | Sentadilla dividida (Cable) | quads | cable | compound
+split-squat-mancuerna | Sentadilla dividida (Mancuerna) | quads | mancuerna | compound
+split-squat-multipower | Sentadilla dividida (Multipower) | quads | multipower | compound
+split-squat-trx | Sentadilla dividida (TRX) | quads | trx | compound
+spanish-squat-banda | Sentadilla española | quads | banda | compound
+banded-front-squat-barra | Sentadilla frontal con banda | quads | barra | compound
+front-rack-squat-mancuerna | Sentadilla frontal en rack (Mancuerna) | quads | mancuerna | compound
+front-rack-squat-pesarusa | Sentadilla frontal en rack (Pesa rusa) | quads | pesa_rusa | compound
+front-squat-olympic-barra | Sentadilla frontal olímpica | quads | barra | compound
+goblet-squat-banda | Sentadilla goblet (Banda) | quads | banda | compound
+goblet-squat-polea | Sentadilla goblet (Cable) | quads | cable | compound
+goblet-squat-mancuerna | Sentadilla goblet (Mancuerna) | quads | mancuerna | compound
+goblet-squat-pesarusa | Sentadilla goblet (Pesa rusa) | quads | pesa_rusa | compound
+goblet-pulse-squat-mancuerna | Sentadilla goblet con pulso | quads | mancuerna | compound
+hack-squat-maquina | Sentadilla hack | quads | maquina | compound
+landmine-hack-squat-barra | Sentadilla hack con landmine | quads | barra | compound
+horizontal-hack-squat-maquina | Sentadilla hack horizontal | quads | maquina | compound
+squat-hold-disco | Sentadilla isométrica | quads | disco | compound
+wall-sit-pesocorporal | Sentadilla isométrica en pared | quads | peso_corporal | compound
+weighted-wall-sit-disco | Sentadilla isométrica en pared con peso | quads | disco | compound
+kickstand-squat-barra | Sentadilla kickstand (Barra) | quads | barra | compound
+kickstand-squat-mancuerna | Sentadilla kickstand (Mancuerna) | quads | mancuerna | compound
+kickstand-squat-pesarusa | Sentadilla kickstand (Pesa rusa) | quads | pesa_rusa | compound
+kickstand-squat-pesocorporal | Sentadilla kickstand (Peso corporal) | quads | peso_corporal | compound
+pendulum-squat-maquina | Sentadilla péndulo | quads | maquina | compound
+sissy-squat-maquina | Sentadilla sissy (Máquina) | quads | maquina | compound
+sissy-squat-multipower | Sentadilla sissy (Multipower) | quads | multipower | compound
+assisted-sissy-squat-pesocorporal | Sentadilla sissy asistida | quads | peso_corporal | compound
+landmine-sissy-squat-barra | Sentadilla sissy con landmine | quads | barra | compound
+goblet-sissy-squat-maquina | Sentadilla sissy goblet | quads | maquina | compound
+sumo-squat-mancuerna | Sentadilla sumo | quads | mancuerna | compound
+banded-back-squat-barra | Sentadilla trasera con banda | quads | barra | compound
+zercher-squat-barra | Sentadilla Zercher (Barra) | quads | barra | compound
+zercher-squat-polea | Sentadilla Zercher (Cable) | quads | cable | compound
+jump-squats-pesocorporal | Sentadillas con salto | quads | peso_corporal | compound
+step-up-barra | Subida al cajón (Barra) | quads | barra | compound
+step-up-mancuerna | Subida al cajón (Mancuerna) | quads | mancuerna | compound
+step-up-pesarusa | Subida al cajón (Pesa rusa) | quads | pesa_rusa | compound
+goblet-step-up-mancuerna | Subida al cajón goblet | quads | mancuerna | compound
+reverse-step-up-pesocorporal | Subida al cajón inversa | quads | peso_corporal | compound
+side-step-up-barra | Subida al cajón lateral (Barra) | quads | barra | compound
+side-step-up-mancuerna | Subida al cajón lateral (Mancuerna) | quads | mancuerna | compound
+step-up-double-pesarusa | Subida doble al cajón | quads | pesa_rusa | compound
+squat-thruster-disco | Thruster con sentadilla | quads | disco | compound
+rear-delt-fly-banda | Apertura de deltoides posterior (Banda) | shoulders | banda | isolation
+rear-delt-fly-polea | Apertura de deltoides posterior (Cable) | shoulders | cable | isolation
+rear-delt-fly-disco | Apertura de deltoides posterior (Disco) | shoulders | disco | isolation
+rear-delt-fly-mancuerna | Apertura de deltoides posterior (Mancuerna) | shoulders | mancuerna | isolation
+rear-deltfly-trx | Apertura de deltoides posterior en TRX | shoulders | trx | isolation
+bench-fly-banda | Apertura en banco | shoulders | banda | compound
+floor-fly-mancuerna | Apertura en el suelo (Mancuerna) | shoulders | mancuerna | isolation
+floor-fly-pesarusa | Apertura en el suelo (Pesa rusa) | shoulders | pesa_rusa | isolation
+reverse-fly-maquina | Apertura inversa | shoulders | maquina | isolation
+laying-reverse-fly-mancuerna | Apertura inversa acostado | shoulders | mancuerna | isolation
+high-reverse-fly-polea | Apertura inversa alta en polea | shoulders | cable | isolation
+i-raise-trx | Elevación en I | shoulders | trx | isolation
+w-raise-trx | Elevación en W | shoulders | trx | isolation
+y-raise-trx | Elevación en Y | shoulders | trx | isolation
+front-raise-banda | Elevación frontal (Banda) | shoulders | banda | isolation
+front-raise-barra | Elevación frontal (Barra) | shoulders | barra | isolation
+front-raise-disco | Elevación frontal (Disco) | shoulders | disco | isolation
+front-raise-mancuerna | Elevación frontal (Mancuerna) | shoulders | mancuerna | isolation
+front-raise-pesarusa | Elevación frontal (Pesa rusa) | shoulders | pesa_rusa | isolation
+bar-front-raise-polea | Elevación frontal con barra | shoulders | cable | isolation
+rope-front-raise-polea | Elevación frontal con cuerda | shoulders | cable | isolation
+incline-front-raise-mancuerna | Elevación frontal en banco inclinado | shoulders | mancuerna | isolation
+lateral-raise-banda | Elevación lateral (Banda) | shoulders | banda | isolation
+lateral-raise-polea | Elevación lateral (Cable) | shoulders | cable | isolation
+laying-lateral-raise-mancuerna | Elevación lateral acostado | shoulders | mancuerna | isolation
+low-lateral-raise-banda | Elevación lateral baja | shoulders | banda | isolation
+full-lateral-raise-disco | Elevación lateral completa (Disco) | shoulders | disco | isolation
+full-lateral-raise-mancuerna | Elevación lateral completa (Mancuerna) | shoulders | mancuerna | isolation
+landmine-lateral-raise-barra | Elevación lateral con landmine | shoulders | barra | isolation
+standing-lateral-raise-maquina | Elevación lateral de pie | shoulders | maquina | isolation
+mid-lateral-raise-banda | Elevación lateral media | shoulders | banda | isolation
+seated-lateral-raise-mancuerna | Elevación lateral sentado | shoulders | mancuerna | isolation
+pike-shrug-pesocorporal | Encogimiento de hombros en posición pike | shoulders | peso_corporal | isolation
+halo-disco | Halo | shoulders | disco | compound
+medicine-ball-halo-balon | Halo con balón medicinal | shoulders | otro | compound
+face-pull-banda | Jalón al rostro | shoulders | banda | compound
+bar-face-pull-polea | Jalón al rostro con barra | shoulders | cable | compound
+face-pulls-polea | Jalón al rostro en polea | shoulders | cable | compound
+arnold-press-mancuerna | Press Arnold | shoulders | mancuerna | compound
+alternating-arnold-press-mancuerna | Press Arnold alternado | shoulders | mancuerna | compound
+seated-arnold-press-mancuerna | Press Arnold sentado | shoulders | mancuerna | compound
+pike-press-pesocorporal | Press en posición pike | shoulders | peso_corporal | compound
+elevated-pike-press-pesocorporal | Press en posición pike elevado | shoulders | peso_corporal | compound
+overhead-press-banda | Press militar (Banda) | shoulders | banda | compound
+overhead-press-barra | Press militar (Barra) | shoulders | barra | compound
+overhead-press-polea | Press militar (Cable) | shoulders | cable | compound
+overhead-press-mancuerna | Press militar (Mancuerna) | shoulders | mancuerna | compound
+alternating-overhead-press-mancuerna | Press militar alternado | shoulders | mancuerna | compound
+overhand-overhead-press-maquina | Press militar con agarre prono | shoulders | maquina | compound
+landmine-overhead-press-barra | Press militar con landmine | shoulders | barra | compound
+front-military-press-maquina | Press militar frontal | shoulders | maquina | compound
+neutral-overhead-press-mancuerna | Press militar neutro (Mancuerna) | shoulders | mancuerna | compound
+neutral-overhead-press-maquina | Press militar neutro (Máquina) | shoulders | maquina | compound
+seated-overhead-press-mancuerna | Press por encima de la cabeza sentado (Mancuerna) | shoulders | mancuerna | compound
+seated-overhead-press-multipower | Press por encima de la cabeza sentado (Multipower) | shoulders | multipower | compound
+seated-overhead-press-pesarusa | Press por encima de la cabeza sentado (Pesa rusa) | shoulders | pesa_rusa | compound
+upright-row-banda | Remo al mentón (Banda) | shoulders | banda | compound
+upright-row-barra | Remo al mentón (Barra) | shoulders | barra | compound
+upright-row-polea | Remo al mentón (Cable) | shoulders | cable | compound
+upright-row-mancuerna | Remo al mentón (Mancuerna) | shoulders | mancuerna | compound
+upright-row-multipower | Remo al mentón (Multipower) | shoulders | multipower | compound
+upright-row-pesarusa | Remo al mentón (Pesa rusa) | shoulders | pesa_rusa | compound
+upright-row-single-pesarusa | Remo al mentón a un brazo | shoulders | pesa_rusa | compound
+rope-upright-row-polea | Remo al mentón con cuerda | shoulders | cable | compound
+rear-delt-row-mancuerna | Remo de deltoides posterior (Mancuerna) | shoulders | mancuerna | compound
+rear-delt-row-pesarusa | Remo de deltoides posterior (Pesa rusa) | shoulders | pesa_rusa | compound
+rear-delt-row-trx | Remo de deltoides posterior (TRX) | shoulders | trx | compound
+rear-deltoid-row-maquina | Remo de deltoides posterior en máquina | shoulders | maquina | compound
+back-extension-maquina | Extensión de espalda | triceps | maquina | isolation
+shoulder-extension-barra | Extensión de hombro para tríceps (Barra) | triceps | barra | isolation
+shoulder-extension-mancuerna | Extensión de hombro para tríceps (Mancuerna) | triceps | mancuerna | isolation
+shoulder-extension-pesarusa | Extensión de hombro para tríceps (Pesa rusa) | triceps | pesa_rusa | isolation
+wrist-extension-barra | Extensión de muñeca (Barra) | triceps | barra | isolation
+wrist-extension-mancuerna | Extensión de muñeca (Mancuerna) | triceps | mancuerna | isolation
+wrist-extension-pesarusa | Extensión de muñeca (Pesa rusa) | triceps | pesa_rusa | isolation
+bench-wrist-extension-mancuerna | Extensión de muñeca en banco (Mancuerna) | triceps | mancuerna | compound
+bench-wrist-extension-pesarusa | Extensión de muñeca en banco (Pesa rusa) | triceps | pesa_rusa | compound
+tricep-extension-pesocorporal | Extensión de tríceps | triceps | peso_corporal | isolation
+laying-tricep-extensions-barra | Extensión de tríceps acostado | triceps | barra | isolation
+standing-tricep-extension-pesarusa | Extensión de tríceps de pie | triceps | pesa_rusa | isolation
+knee-tricep-extension-pesocorporal | Extensión de tríceps en rodillas | triceps | peso_corporal | isolation
+overhead-tricep-extension-banda | Extensión de tríceps por encima de la cabeza (Banda) | triceps | banda | isolation
+overhead-tricep-extension-barra | Extensión de tríceps por encima de la cabeza (Barra) | triceps | barra | isolation
+overhead-tricep-extension-polea | Extensión de tríceps por encima de la cabeza (Cable) | triceps | cable | isolation
+overhead-tricep-extension-disco | Extensión de tríceps por encima de la cabeza (Disco) | triceps | disco | isolation
+overhead-tricep-extension-mancuerna | Extensión de tríceps por encima de la cabeza (Mancuerna) | triceps | mancuerna | isolation
+overhead-tricep-extension-maquina | Extensión de tríceps por encima de la cabeza (Máquina) | triceps | maquina | isolation
+overhead-tricep-extension-pesarusa | Extensión de tríceps por encima de la cabeza (Pesa rusa) | triceps | pesa_rusa | isolation
+pushdown-banda | Jalón de tríceps | triceps | banda | isolation
+single-arm-pushdown-banda | Jalón de tríceps a un brazo (Banda) | triceps | banda | isolation
+single-arm-pushdown-polea | Jalón de tríceps a un brazo (Cable) | triceps | cable | isolation
+bar-pushdown-polea | Jalón de tríceps con barra | triceps | cable | isolation
+cross-pushdown-polea | Jalón de tríceps cruzado | triceps | cable | isolation
+tricep-pushdown-maquina | Jalón de tríceps en máquina | triceps | maquina | isolation
+oblique-pushdown-polea | Jalón de tríceps oblicuo | triceps | cable | isolation
+tricep-kickback-banda | Patada de tríceps (Banda) | triceps | banda | isolation
+tricep-kickback-polea | Patada de tríceps (Cable) | triceps | cable | isolation
+tricep-kickback-mancuerna | Patada de tríceps (Mancuerna) | triceps | mancuerna | isolation
+guillotine-bench-press-mancuerna | Press de banca guillotina (Mancuerna) | triceps | mancuerna | compound
+guillotine-bench-press-multipower | Press de banca guillotina (Multipower) | triceps | multipower | compound
+guillotine-bench-press-pesarusa | Press de banca guillotina (Pesa rusa) | triceps | pesa_rusa | compound
+overhead-tricep-press-polea | Press de tríceps por encima de la cabeza | triceps | cable | compound
+tricep-guillotine-press-barra | Press guillotina de tríceps (Barra) | triceps | barra | compound
+tricep-guillotine-press-mancuerna | Press guillotina de tríceps (Mancuerna) | triceps | mancuerna | compound
+skullcrusher-banda | Rompecráneos (Banda) | triceps | banda | compound
+skullcrusher-barra | Rompecráneos (Barra) | triceps | barra | compound
+skullcrusher-polea | Rompecráneos (Cable) | triceps | cable | compound
+skullcrusher-mancuerna | Rompecráneos (Mancuerna) | triceps | mancuerna | compound
+skullcrusher-multipower | Rompecráneos (Multipower) | triceps | multipower | compound
+skullcrusher-trx | Rompecráneos (TRX) | triceps | trx | compound
+single-arm-skullcrusher-banda | Rompecráneos a un brazo (Banda) | triceps | banda | compound
+single-arm-skullcrusher-polea | Rompecráneos a un brazo (Cable) | triceps | cable | compound
+single-arm-skullcrusher-mancuerna | Rompecráneos a un brazo (Mancuerna) | triceps | mancuerna | compound
+bar-skullcrusher-polea | Rompecráneos con barra en polea | triceps | cable | compound
+decline-skullcrusher-mancuerna | Rompecráneos declinado | triceps | mancuerna | compound
+ring-skullcrusher-pesocorporal | Rompecráneos en anillas | triceps | peso_corporal | compound
+incline-skullcrusher-mancuerna | Rompecráneos inclinado | triceps | mancuerna | compound

@@ -1,0 +1,290 @@
+[
+  {
+    "slug": "seated-lateral-raise",
+    "nombre": "Elevación lateral sentado",
+    "tecnica": [
+      "Sentate con la espalda recta y los pies apoyados en el piso, con una mancuerna en cada mano.",
+      "Subí los brazos hacia los costados hasta la altura de los hombros, con los codos ligeramente flexionados.",
+      "Bajá lento y controlado hasta la posición inicial sin balancear el torso."
+    ]
+  },
+  {
+    "slug": "seated-overhead-press",
+    "nombre": "Press por encima de la cabeza sentado",
+    "tecnica": [
+      "Sentate con la espalda apoyada en el respaldo y el implemento a la altura de los hombros, codos a 90°.",
+      "Empujá hacia arriba extendiendo los brazos completamente sin bloquear los codos.",
+      "Bajá controlado hasta que los codos queden a la altura de los hombros y repetí."
+    ]
+  },
+  {
+    "slug": "standing-lateral-raise",
+    "nombre": "Elevación lateral de pie",
+    "tecnica": [
+      "Parate erguido con los pies a la altura de las caderas y los brazos a los costados.",
+      "Elevá los brazos hacia los lados hasta la altura de los hombros manteniendo los codos ligeramente flexionados.",
+      "Bajá lento y controlado hasta la posición inicial sin inercia."
+    ]
+  },
+  {
+    "slug": "upright-row",
+    "nombre": "Remo al mentón",
+    "tecnica": [
+      "Parate con el implemento frente al cuerpo, agarre prono con las manos más juntas que los hombros.",
+      "Tirá hacia arriba llevando los codos por encima de los hombros y el implemento cerca del torso.",
+      "Bajá lento hasta la posición inicial manteniendo el torso estable."
+    ]
+  },
+  {
+    "slug": "upright-row-single",
+    "nombre": "Remo al mentón a un brazo",
+    "tecnica": [
+      "Parate con una pesa rusa en una mano, el brazo extendido al frente del cuerpo.",
+      "Llevá el codo hacia arriba y afuera hasta superar la altura del hombro, manteniendo la pesa cerca del torso.",
+      "Bajá controlado hasta extender el brazo y repetí antes de cambiar de lado."
+    ]
+  },
+  {
+    "slug": "w-raise",
+    "nombre": "Elevación en W",
+    "tecnica": [
+      "Sujetar las asas del TRX con los brazos extendidos frente a vos y el cuerpo inclinado hacia atrás.",
+      "Llevá los brazos hacia arriba y afuera formando una W con los codos doblados a 90°.",
+      "Apretá las escápulas arriba y volvé controlado a la posición inicial."
+    ]
+  },
+  {
+    "slug": "y-raise",
+    "nombre": "Elevación en Y",
+    "tecnica": [
+      "Sujetar las asas del TRX con los brazos extendidos frente a vos y el cuerpo inclinado hacia atrás.",
+      "Elevá los brazos en diagonal hacia arriba formando una Y, con los pulgares apuntando al techo.",
+      "Apretá los hombros y la espalda alta al final del movimiento y volvé lento a la posición inicial."
+    ]
+  },
+  {
+    "slug": "back-extension",
+    "nombre": "Extensión de espalda",
+    "tecnica": [
+      "Ubicá la cadera en el borde del soporte de la máquina y cruzá los brazos sobre el pecho.",
+      "Bajá el torso hacia adelante de forma controlada hasta sentir el estiramiento en los isquiotibiales.",
+      "Contraé los glúteos y los erectores para subir el torso hasta quedar alineado con las piernas."
+    ]
+  },
+  {
+    "slug": "bar-pushdown",
+    "nombre": "Jalón de tríceps con barra",
+    "tecnica": [
+      "Parate frente a la polea alta sujetando la barra con agarre prono, codos pegados al torso.",
+      "Empujá la barra hacia abajo extendiendo los codos completamente sin mover los hombros.",
+      "Volvé controlado hasta que los antebrazos queden paralelos al piso y repetí."
+    ]
+  },
+  {
+    "slug": "bar-skullcrusher",
+    "nombre": "Rompecráneos con barra en polea",
+    "tecnica": [
+      "Sujetá la barra de la polea baja y acostate en un banco con los brazos extendidos hacia arriba.",
+      "Flexioná los codos bajando la barra hacia la frente sin mover la parte superior del brazo.",
+      "Extendé los codos para volver a la posición inicial apretando el tríceps al final."
+    ]
+  },
+  {
+    "slug": "bench-wrist-extension",
+    "nombre": "Extensión de muñeca en banco",
+    "tecnica": [
+      "Arrodillate frente a un banco y apoyá los antebrazos sobre él con las muñecas colgando al borde.",
+      "Dejá caer las manos hacia abajo con el implemento hasta sentir el estiramiento en el antebrazo.",
+      "Extendé las muñecas hacia arriba todo lo que puedas y volvé lento a la posición inicial."
+    ]
+  },
+  {
+    "slug": "cross-pushdown",
+    "nombre": "Jalón de tríceps cruzado",
+    "tecnica": [
+      "Parate de lado a la polea alta y sujetá el agarre con la mano del brazo opuesto cruzando el cuerpo.",
+      "Empujá hacia abajo y afuera extendiendo el codo completamente con el brazo pegado al torso.",
+      "Volvé controlado a la posición inicial y repetí antes de cambiar de brazo."
+    ]
+  },
+  {
+    "slug": "decline-skullcrusher",
+    "nombre": "Rompecráneos declinado",
+    "tecnica": [
+      "Acostate en un banco declinado sujetando las mancuernas con los brazos extendidos sobre el pecho.",
+      "Flexioná los codos bajando el implemento hacia la frente sin mover la parte superior del brazo.",
+      "Extendé los codos hasta la posición inicial apretando el tríceps al final del movimiento."
+    ]
+  },
+  {
+    "slug": "guillotine-bench-press",
+    "nombre": "Press de banca guillotina",
+    "tecnica": [
+      "Acostate en el banco con los brazos extendidos sosteniendo el implemento directamente sobre el cuello.",
+      "Bajá el implemento de forma controlada hasta la altura del cuello sin rebotar.",
+      "Empujá hacia arriba extendiendo los codos y volvé a la posición inicial."
+    ]
+  },
+  {
+    "slug": "incline-skullcrusher",
+    "nombre": "Rompecráneos inclinado",
+    "tecnica": [
+      "Acostate en un banco inclinado sujetando las mancuernas con los brazos extendidos sobre el pecho.",
+      "Flexioná los codos bajando el implemento hacia la frente sin mover la parte superior del brazo.",
+      "Extendé los codos hasta la posición inicial apretando el tríceps al final del movimiento."
+    ]
+  },
+  {
+    "slug": "knee-tricep-extension",
+    "nombre": "Extensión de tríceps en rodillas",
+    "tecnica": [
+      "Arrodillate con el torso inclinado hacia adelante y las manos apoyadas en el piso frente a vos.",
+      "Doblá los codos llevando la frente hacia el piso mientras mantenés las caderas estables.",
+      "Extendé los brazos empujando el cuerpo hacia arriba hasta que los brazos queden casi rectos."
+    ]
+  },
+  {
+    "slug": "laying-tricep-extensions",
+    "nombre": "Extensión de tríceps acostado",
+    "tecnica": [
+      "Acostate con la barra sostenida sobre el pecho y los brazos ligeramente inclinados hacia atrás.",
+      "Flexioná los codos bajando la barra hacia atrás de la cabeza sin mover los hombros.",
+      "Extendé los codos volviendo a la posición inicial apretando el tríceps."
+    ]
+  },
+  {
+    "slug": "oblique-pushdown",
+    "nombre": "Jalón de tríceps oblicuo",
+    "tecnica": [
+      "Parate de lado a la polea alta sujetando el agarre con una mano, codo pegado al costado del torso.",
+      "Empujá hacia abajo en diagonal extendiendo el codo completamente hacia el lado opuesto del cuerpo.",
+      "Volvé controlado a la posición inicial y repetí antes de cambiar de lado."
+    ]
+  },
+  {
+    "slug": "overhead-tricep-extension",
+    "nombre": "Extensión de tríceps por encima de la cabeza",
+    "tecnica": [
+      "Sujetá el implemento por encima de la cabeza con los codos flexionados apuntando al techo.",
+      "Bajá el implemento detrás de la cabeza de forma controlada hasta sentir el estiramiento en el tríceps.",
+      "Extendé los codos hacia arriba hasta la posición inicial sin mover la parte superior del brazo."
+    ]
+  },
+  {
+    "slug": "overhead-tricep-press",
+    "nombre": "Press de tríceps por encima de la cabeza",
+    "tecnica": [
+      "Sujetá la polea detrás de la cabeza con los codos flexionados apuntando al techo.",
+      "Empujá hacia arriba extendiendo los codos completamente sin separar los brazos del cuerpo.",
+      "Bajá controlado hasta la posición inicial y repetí."
+    ]
+  },
+  {
+    "slug": "pushdown",
+    "nombre": "Jalón de tríceps",
+    "tecnica": [
+      "Parate frente a la polea alta sujetando el agarre con codos pegados al torso.",
+      "Empujá hacia abajo extendiendo los codos completamente sin mover los hombros.",
+      "Volvé controlado hasta que los antebrazos queden paralelos al piso y repetí."
+    ]
+  },
+  {
+    "slug": "ring-skullcrusher",
+    "nombre": "Rompecráneos en anillas",
+    "tecnica": [
+      "Sujetá las anillas con los brazos extendidos frente a vos y el cuerpo inclinado hacia adelante.",
+      "Flexioná los codos llevando la frente hacia las anillas sin mover la parte superior del brazo.",
+      "Extendé los codos empujando el cuerpo hacia atrás hasta la posición inicial apretando el tríceps."
+    ]
+  },
+  {
+    "slug": "shoulder-extension",
+    "nombre": "Extensión de hombro para tríceps",
+    "tecnica": [
+      "Parate con el implemento frente al cuerpo y los brazos casi extendidos.",
+      "Llevá el implemento hacia atrás en un arco amplio manteniendo los codos ligeramente flexionados.",
+      "Volvé controlado a la posición inicial sin mover el torso."
+    ]
+  },
+  {
+    "slug": "single-arm-pushdown",
+    "nombre": "Jalón de tríceps a un brazo",
+    "tecnica": [
+      "Parate frente a la polea alta sujetando el agarre con una sola mano, codo pegado al costado.",
+      "Empujá hacia abajo extendiendo el codo completamente sin mover el hombro.",
+      "Volvé controlado hasta que el antebrazo quede paralelo al piso y repetí antes de cambiar de brazo."
+    ]
+  },
+  {
+    "slug": "single-arm-skullcrusher",
+    "nombre": "Rompecráneos a un brazo",
+    "tecnica": [
+      "Acostate con un implemento en una mano y el brazo extendido sobre el pecho.",
+      "Flexioná el codo bajando el implemento hacia la sien sin mover la parte superior del brazo.",
+      "Extendé el codo hasta la posición inicial apretando el tríceps y repetí antes de cambiar de brazo."
+    ]
+  },
+  {
+    "slug": "skullcrusher",
+    "nombre": "Rompecráneos",
+    "tecnica": [
+      "Acostate con el implemento sostenido sobre el pecho y los brazos casi perpendiculares al piso.",
+      "Flexioná los codos bajando el implemento hacia la frente sin mover la parte superior del brazo.",
+      "Extendé los codos hasta la posición inicial apretando el tríceps al final del movimiento."
+    ]
+  },
+  {
+    "slug": "standing-tricep-extension",
+    "nombre": "Extensión de tríceps de pie",
+    "tecnica": [
+      "Parate con la pesa rusa sujetada por encima de la cabeza y los codos apuntando al techo.",
+      "Bajá el implemento detrás de la cabeza de forma controlada hasta sentir el estiramiento.",
+      "Extendé los codos hacia arriba hasta la posición inicial sin mover la parte superior del brazo."
+    ]
+  },
+  {
+    "slug": "tricep-extension",
+    "nombre": "Extensión de tríceps",
+    "tecnica": [
+      "Posicioná el cuerpo de forma que puedas apoyar el peso en las manos con los codos flexionados.",
+      "Extendé los codos empujando el cuerpo alejándote del punto de apoyo hasta los brazos casi rectos.",
+      "Volvé controlado flexionando los codos a la posición inicial sin dejar caer la cadera."
+    ]
+  },
+  {
+    "slug": "tricep-guillotine-press",
+    "nombre": "Press guillotina de tríceps",
+    "tecnica": [
+      "Acostate en el banco con el implemento sostenido sobre el cuello y los codos apuntando afuera.",
+      "Bajá el implemento de forma controlada hacia el cuello manteniendo los codos en esa posición.",
+      "Empujá hacia arriba extendiendo los codos completamente y volvé a la posición inicial."
+    ]
+  },
+  {
+    "slug": "tricep-kickback",
+    "nombre": "Patada de tríceps",
+    "tecnica": [
+      "Incliná el torso hacia adelante hasta que quede casi paralelo al piso y llevá el codo al costado del cuerpo.",
+      "Extendé el antebrazo hacia atrás hasta que el brazo quede completamente recto.",
+      "Volvé controlado flexionando el codo a 90° y repetí antes de cambiar de brazo."
+    ]
+  },
+  {
+    "slug": "tricep-pushdown",
+    "nombre": "Jalón de tríceps en máquina",
+    "tecnica": [
+      "Sentate o posicioná frente a la máquina con los codos apoyados en el soporte y los antebrazos en el pad.",
+      "Empujá hacia abajo extendiendo los codos completamente sin mover los hombros.",
+      "Volvé controlado hasta la posición inicial sin levantar los codos del soporte."
+    ]
+  },
+  {
+    "slug": "wrist-extension",
+    "nombre": "Extensión de muñeca",
+    "tecnica": [
+      "Sentate con los antebrazos apoyados en los muslos y las muñecas colgando al borde de las rodillas.",
+      "Dejá caer las manos hacia abajo con el implemento hasta sentir el estiramiento en el antebrazo.",
+      "Extendé las muñecas hacia arriba todo lo que puedas y volvé lento a la posición inicial."
+    ]
+  }
+]

@@ -1,0 +1,407 @@
+[
+  {
+    "slug": "hanging-knee-tuck",
+    "nombre": "Encogimiento de rodillas colgado",
+    "tecnica": [
+      "Colgá de la barra con los brazos extendidos y el core activado.",
+      "Llevá las rodillas hacia el pecho en un movimiento controlado, sin balancearte.",
+      "Bajá las piernas lentamente hasta la posición inicial sin perder la tensión abdominal."
+    ]
+  },
+  {
+    "slug": "hollow-hold",
+    "nombre": "Hollow hold",
+    "tecnica": [
+      "Acostate boca arriba, presioná la zona lumbar contra el piso y extendé los brazos por encima de la cabeza.",
+      "Elevá las piernas unos 15-20 cm del suelo y los hombros levemente, formando una curva cóncava con el cuerpo.",
+      "Mantené la posición respirando con control, sin que la zona lumbar se despegue del piso."
+    ]
+  },
+  {
+    "slug": "knee-tuck",
+    "nombre": "Encogimiento de rodillas",
+    "tecnica": [
+      "Sujetá las asas con los pies y colocate en posición de plancha alta con el core activo.",
+      "Llevá ambas rodillas hacia el pecho de forma simultánea y controlada.",
+      "Extendé las piernas hacia atrás lentamente volviendo a la posición de plancha."
+    ]
+  },
+  {
+    "slug": "kneeling-crunch",
+    "nombre": "Crunch arrodillado",
+    "tecnica": [
+      "Arrodillate frente a la polea alta, tomá la cuerda y apoyá las manos a los lados de la cabeza.",
+      "Contraé el abdomen flexionando el torso hacia abajo sin mover las caderas.",
+      "Volvé lento a la posición inicial manteniendo tensión en el core durante todo el recorrido."
+    ]
+  },
+  {
+    "slug": "kneeling-oblique-crunch",
+    "nombre": "Crunch oblicuo arrodillado",
+    "tecnica": [
+      "Arrodillate de lado frente a la polea alta y tomá la cuerda con ambas manos a un costado de la cabeza.",
+      "Flexioná el torso en diagonal hacia el lado opuesto a la polea, contrayendo el oblicuo.",
+      "Volvé lentamente a la posición inicial controlando la resistencia del cable."
+    ]
+  },
+  {
+    "slug": "kneeling-pallof-press",
+    "nombre": "Press Pallof arrodillado",
+    "tecnica": [
+      "Arrodillate de lado frente a la polea, tomá el cable a la altura del pecho con ambas manos.",
+      "Extendé los brazos al frente de forma lenta y controlada sin rotar el torso.",
+      "Volvé las manos al pecho manteniendo el core firme y la postura erguida durante todo el movimiento."
+    ]
+  },
+  {
+    "slug": "kneeling-wood-chopper",
+    "nombre": "Leñador arrodillado",
+    "tecnica": [
+      "Arrodillate con el cable o mancuerna en el lado alto de la diagonal, core activado.",
+      "Jalá en diagonal hacia abajo y al lado contrario, rotando el torso de forma controlada.",
+      "Volvé al punto de partida de manera lenta resistiendo la rotación para trabajar los oblicuos."
+    ]
+  },
+  {
+    "slug": "landmine-hollow-hold",
+    "nombre": "Hollow hold con landmine",
+    "tecnica": [
+      "Acostate boca arriba con el extremo libre de la barra sostenido sobre el pecho con ambas manos.",
+      "Presioná la zona lumbar contra el piso, elevá piernas y hombros formando la posición hollow.",
+      "Mantené la posición con los brazos extendidos hacia arriba y el core completamente activado."
+    ]
+  },
+  {
+    "slug": "landmine-kneeling-twist",
+    "nombre": "Giro arrodillado con landmine",
+    "tecnica": [
+      "Arrodillate frente al landmine con la barra tomada a la altura del pecho con ambas manos.",
+      "Rotá el torso llevando la barra hacia un lado de forma controlada sin mover las caderas.",
+      "Volvé al centro y repetí hacia el lado opuesto manteniendo el core firme en todo momento."
+    ]
+  },
+  {
+    "slug": "landmine-oblique-twist",
+    "nombre": "Giro oblicuo con landmine",
+    "tecnica": [
+      "Parate con los pies a la altura de los hombros y tomá la barra del landmine con ambas manos extendidas al frente.",
+      "Llevá la barra en arco hacia un lado bajando ligeramente el tronco para activar los oblicuos.",
+      "Volvé al centro de manera controlada antes de continuar hacia el lado opuesto."
+    ]
+  },
+  {
+    "slug": "landmine-russian-twist",
+    "nombre": "Giro ruso con landmine",
+    "tecnica": [
+      "Sentate con las rodillas semiflexionadas, el torso levemente inclinado y la barra tomada frente al pecho.",
+      "Rotá el torso llevando la barra hacia un lado de forma controlada sin perder la postura.",
+      "Volvé al centro y girá hacia el otro lado manteniendo el abdomen contraído durante todo el movimiento."
+    ]
+  },
+  {
+    "slug": "landmine-side-bend",
+    "nombre": "Flexión lateral con landmine",
+    "tecnica": [
+      "Parate con los pies a la altura de los hombros y tomá el extremo de la barra con una mano a tu lado.",
+      "Incliná el torso lateralmente hacia el lado contrario al de la barra, contrayendo el oblicuo.",
+      "Volvé lentamente a la posición vertical controlando la resistencia de la barra."
+    ]
+  },
+  {
+    "slug": "landmine-sit-up",
+    "nombre": "Abdominal con landmine",
+    "tecnica": [
+      "Acostate boca arriba con las rodillas dobladas y tomá el extremo de la barra con ambas manos sobre el pecho.",
+      "Subí el torso hacia adelante presionando la barra hasta llevar el tronco erguido.",
+      "Bajá lentamente vértebra por vértebra hasta volver a la posición inicial con control."
+    ]
+  },
+  {
+    "slug": "laying-leg-raises",
+    "nombre": "Elevación de piernas acostado",
+    "tecnica": [
+      "Acostate boca arriba con las piernas extendidas y las manos apoyadas bajo las lumbares o a los costados.",
+      "Elevá las piernas juntas hasta los 90° manteniendo la zona lumbar en contacto con el piso.",
+      "Bajá las piernas lentamente sin que los pies toquen el suelo para mantener la tensión abdominal."
+    ]
+  },
+  {
+    "slug": "medicine-ball-plank",
+    "nombre": "Plancha con balón medicinal",
+    "tecnica": [
+      "Colocá las manos sobre el balón medicinal en posición de plancha alta, pies separados a la altura de los hombros.",
+      "Activá el core, los glúteos y mantené la cadera alineada sin que caiga ni se eleve.",
+      "Sostené la posición respirando con control sin perder la alineación columna-cadera-talones."
+    ]
+  },
+  {
+    "slug": "oblique-crunch",
+    "nombre": "Crunch oblicuo",
+    "tecnica": [
+      "Acostate boca arriba con las rodillas dobladas y las manos detrás de la cabeza.",
+      "Llevá un codo hacia la rodilla contraria girando el torso y contrayendo el oblicuo.",
+      "Bajá lentamente y repetí alternando los lados de forma controlada."
+    ]
+  },
+  {
+    "slug": "oblique-jackknife",
+    "nombre": "Navaja oblicua",
+    "tecnica": [
+      "Acostate de lado con el cuerpo extendido, el brazo inferior apoyado y el superior detrás de la cabeza.",
+      "Elevá simultáneamente las piernas y el torso hacia el lado, contrayendo el oblicuo.",
+      "Bajá de forma controlada volviendo a la posición inicial sin apoyar completamente."
+    ]
+  },
+  {
+    "slug": "overhead-side-bend",
+    "nombre": "Flexión lateral con peso sobre la cabeza",
+    "tecnica": [
+      "Parate erguido con la mancuerna extendida sobre la cabeza con el brazo bien estirado.",
+      "Incliná el torso lateralmente hacia el lado opuesto controlando el movimiento desde el oblicuo.",
+      "Volvé a la posición vertical de forma lenta sin dejar que el brazo caiga."
+    ]
+  },
+  {
+    "slug": "pallof-press",
+    "nombre": "Press Pallof",
+    "tecnica": [
+      "Parate de lado frente a la polea o banda, tomá el cable a la altura del pecho con ambas manos.",
+      "Extendé los brazos al frente lentamente sin rotar el torso, resistiendo la tracción lateral.",
+      "Volvé las manos al pecho de forma controlada manteniendo el core firme durante todo el movimiento."
+    ]
+  },
+  {
+    "slug": "plank-arm-lift",
+    "nombre": "Plancha con elevación de brazo",
+    "tecnica": [
+      "Colocate en posición de plancha alta con las manos debajo de los hombros y el core activado.",
+      "Elevá un brazo extendido al frente hasta la altura del hombro sin rotar la cadera.",
+      "Bajá el brazo con control y repetí alternando lados manteniendo la estabilidad del tronco."
+    ]
+  },
+  {
+    "slug": "plank-iytw",
+    "nombre": "Plancha IYTW",
+    "tecnica": [
+      "Colocate en posición de plancha con una mancuerna en cada mano y el core activo.",
+      "Elevá los brazos formando sucesivamente las letras I, Y, T y W controlando el movimiento desde los hombros.",
+      "Mantené la cadera estable y la espalda plana durante toda la secuencia de movimientos."
+    ]
+  },
+  {
+    "slug": "plank-jack",
+    "nombre": "Plancha con saltos de piernas",
+    "tecnica": [
+      "Colocate en posición de plancha alta con el cuerpo alineado y el core activado.",
+      "Saltá abriendo las piernas hacia los lados simultáneamente sin mover los brazos ni la cadera.",
+      "Volvé a unir los pies de un salto manteniendo la postura estable durante todo el movimiento."
+    ]
+  },
+  {
+    "slug": "plank-pullthrough",
+    "nombre": "Plancha con arrastre",
+    "tecnica": [
+      "Colocate en plancha alta con una mancuerna apoyada en el suelo al lado de una mano.",
+      "Con la mano opuesta, arrastrá la mancuerna por debajo del torso hacia el otro lado sin rotar la cadera.",
+      "Volvé a la posición estable y repetí hacia el lado contrario manteniendo el core firme."
+    ]
+  },
+  {
+    "slug": "plank-up-down",
+    "nombre": "Plancha arriba-abajo",
+    "tecnica": [
+      "Comenzá en posición de plancha baja apoyando los antebrazos, core y glúteos activados.",
+      "Subí a plancha alta apoyando primero una mano y luego la otra, manteniendo la cadera estable.",
+      "Bajá de nuevo a plancha baja alternando el brazo que inicia cada repetición."
+    ]
+  },
+  {
+    "slug": "reverse-crunch",
+    "nombre": "Crunch inverso",
+    "tecnica": [
+      "Acostate boca arriba con las rodillas flexionadas a 90° y las manos apoyadas a los costados.",
+      "Contraé el abdomen elevando la pelvis y llevando las rodillas hacia el pecho.",
+      "Bajá lentamente sin que los pies toquen el suelo para mantener la tensión en el core."
+    ]
+  },
+  {
+    "slug": "rope-kneeling-crunch",
+    "nombre": "Crunch arrodillado con cuerda",
+    "tecnica": [
+      "Arrodillate frente a la polea alta y tomá la cuerda con ambas manos a los costados de la cabeza.",
+      "Flexioná el torso hacia abajo contrayendo el abdomen, llevando los codos hacia las rodillas.",
+      "Volvé lento a la posición inicial manteniendo tensión en el core en todo momento."
+    ]
+  },
+  {
+    "slug": "rope-standing-crunch",
+    "nombre": "Crunch de pie con cuerda",
+    "tecnica": [
+      "Parate frente a la polea alta con los pies separados y tomá la cuerda a la altura de la frente.",
+      "Flexioná el torso hacia abajo contrayendo el abdomen, llevando los codos hacia las rodillas.",
+      "Volvé lentamente a la posición erguida resistiendo la tensión del cable con el core."
+    ]
+  },
+  {
+    "slug": "russian-twist",
+    "nombre": "Giro ruso",
+    "tecnica": [
+      "Sentate con las rodillas flexionadas, el torso inclinado hacia atrás y el abdomen contraído.",
+      "Rotá el torso hacia un lado llevando las manos o el peso a la altura de la cadera.",
+      "Volvé al centro y girá hacia el otro lado de forma controlada sin perder la postura."
+    ]
+  },
+  {
+    "slug": "scissor-kick",
+    "nombre": "Patada de tijera",
+    "tecnica": [
+      "Acostate boca arriba con la zona lumbar presionada al piso y las piernas elevadas unos 15 cm.",
+      "Mové las piernas en sentido alternado de arriba a abajo en un movimiento de tijera continuo.",
+      "Mantené el abdomen contraído durante todo el ejercicio sin que los pies toquen el suelo."
+    ]
+  },
+  {
+    "slug": "side-bend",
+    "nombre": "Flexión lateral",
+    "tecnica": [
+      "Parate erguido con los pies a la altura de los hombros y el peso en una mano al costado del cuerpo.",
+      "Incliná el torso lateralmente hacia el lado del peso de forma controlada, estirando el oblicuo opuesto.",
+      "Volvé a la posición vertical contraiendo el oblicuo del lado del peso para completar el movimiento."
+    ]
+  },
+  {
+    "slug": "side-russian-twist",
+    "nombre": "Giro ruso lateral",
+    "tecnica": [
+      "Acostate de lado con las piernas levemente elevadas del suelo y el torso semiincorporado.",
+      "Rotá el torso hacia arriba y adelante contrayendo el oblicuo del lado superior.",
+      "Bajá lentamente a la posición inicial sin apoyar completamente antes de la siguiente repetición."
+    ]
+  },
+  {
+    "slug": "sideways-scissor-kick",
+    "nombre": "Patada de tijera lateral",
+    "tecnica": [
+      "Acostate boca arriba con las piernas extendidas y elevadas unos 15 cm del suelo.",
+      "Abrí las piernas hacia los costados de forma simultánea y luego cruzalas alternando cuál queda encima.",
+      "Mantené el core activo y la zona lumbar pegada al piso durante todo el movimiento."
+    ]
+  },
+  {
+    "slug": "situp",
+    "nombre": "Abdominal",
+    "tecnica": [
+      "Acostate boca arriba con las rodillas dobladas, los pies apoyados y las manos detrás de la cabeza.",
+      "Subí el torso completo hacia las rodillas contrayendo el abdomen sin tirar del cuello.",
+      "Bajá lentamente vértebra por vértebra hasta quedar tendido antes de iniciar la siguiente repetición."
+    ]
+  },
+  {
+    "slug": "stability-ball-crunch",
+    "nombre": "Crunch en pelota de estabilidad",
+    "tecnica": [
+      "Sentate sobre la pelota y deslizate hasta que la zona lumbar quede apoyada en ella, pies planos en el suelo.",
+      "Llevá las manos detrás de la cabeza y flexioná el torso hacia arriba contrayendo el abdomen.",
+      "Bajá lentamente aprovechando el rango extendido de la pelota para estirar el core antes de repetir."
+    ]
+  },
+  {
+    "slug": "standing-crunch",
+    "nombre": "Crunch de pie",
+    "tecnica": [
+      "Parate frente a la polea alta y tomá el cable con ambas manos a la altura de la cabeza.",
+      "Flexioná el torso hacia abajo contrayendo el abdomen, llevando los codos hacia las rodillas.",
+      "Volvé lentamente a la posición erguida resistiendo la tensión del cable con el core activo."
+    ]
+  },
+  {
+    "slug": "standing-twist",
+    "nombre": "Giro de pie",
+    "tecnica": [
+      "Parate con los pies a la altura de los hombros y el disco sostenido frente al pecho con los brazos extendidos.",
+      "Rotá el torso hacia un lado de forma controlada manteniendo las caderas fijas al frente.",
+      "Volvé al centro y girá hacia el lado opuesto manteniendo el core activo durante todo el movimiento."
+    ]
+  },
+  {
+    "slug": "suitcase-crunch",
+    "nombre": "Crunch maletín",
+    "tecnica": [
+      "Acostate boca arriba con las piernas extendidas y la mancuerna sostenida sobre el pecho con ambas manos.",
+      "Llevá simultáneamente las rodillas al pecho y el torso hacia arriba, acercando la mancuerna a los pies.",
+      "Volvé lentamente a la posición inicial extendiendo el cuerpo sin apoyar completamente."
+    ]
+  },
+  {
+    "slug": "weighted-forearm-plank",
+    "nombre": "Plancha de antebrazos con peso",
+    "tecnica": [
+      "Apoyá los antebrazos en el suelo con el disco sobre la espalda, core y glúteos activados.",
+      "Mantené la cadera alineada con los hombros y los talones sin que la zona lumbar se hunda.",
+      "Sostenete en la posición respirando de forma controlada durante el tiempo indicado."
+    ]
+  },
+  {
+    "slug": "weighted-hand-plank",
+    "nombre": "Plancha de manos con peso",
+    "tecnica": [
+      "Colocate en posición de plancha alta con el disco sobre la espalda y las manos debajo de los hombros.",
+      "Activá el core y los glúteos manteniendo la cadera en línea con los hombros y los talones.",
+      "Sostené la posición respirando de forma estable durante el tiempo indicado sin mover la cadera."
+    ]
+  },
+  {
+    "slug": "weighted-hollow-hold",
+    "nombre": "Hollow hold con peso",
+    "tecnica": [
+      "Acostate boca arriba y sostené el disco con los brazos extendidos por encima de la cabeza.",
+      "Presioná la zona lumbar contra el piso y elevá piernas y hombros formando la posición hollow.",
+      "Mantené la posición con el core completamente activado y los brazos firmes durante el tiempo indicado."
+    ]
+  },
+  {
+    "slug": "wood-chopper",
+    "nombre": "Leñador",
+    "tecnica": [
+      "Parate con los pies separados y el peso o banda en el lado alto de la diagonal, core activo.",
+      "Jalá en diagonal hacia abajo y al lado contrario, rotando el torso de forma controlada.",
+      "Volvé al punto de partida lentamente resistiendo la rotación para trabajar los oblicuos."
+    ]
+  },
+  {
+    "slug": "alternating-swing",
+    "nombre": "Swing alternado",
+    "tecnica": [
+      "Parate con los pies separados, tomá la pesa rusa con una mano y flexioná levemente las rodillas.",
+      "Impulsá la pesa hacia adelante usando la extensión de cadera y transferila a la mano opuesta en el punto más alto.",
+      "Dejá que la pesa baje controlada entre las piernas y repetí el balanceo alternando la mano en cada rep."
+    ]
+  },
+  {
+    "slug": "back-extensions",
+    "nombre": "Extensiones de espalda",
+    "tecnica": [
+      "Posicioná el cuerpo en la máquina con las caderas apoyadas y los pies fijos, torso colgando hacia abajo.",
+      "Elevá el torso hasta alinearlo con las piernas apretando los glúteos y la zona lumbar.",
+      "Bajá lentamente a la posición inicial de forma controlada sin rebotar ni hiperextender."
+    ]
+  },
+  {
+    "slug": "backward-arm-circle",
+    "nombre": "Círculo de brazos hacia atrás",
+    "tecnica": [
+      "Parate erguido con los pies a la altura de los hombros y los brazos extendidos a los costados.",
+      "Realizá círculos hacia atrás con los brazos de forma lenta y controlada, manteniendo el torso estable.",
+      "Aumentá gradualmente el diámetro del círculo y completá las repeticiones indicadas antes de cambiar dirección."
+    ]
+  },
+  {
+    "slug": "banded-deadlift",
+    "nombre": "Peso muerto con banda",
+    "tecnica": [
+      "Pisá la banda con los pies a la altura de los hombros, tomá la barra con agarre prono y la espalda plana.",
+      "Empujá el suelo con los talones, extendé caderas y rodillas de forma simultánea hasta quedar erguido.",
+      "Bajá la barra controlando la resistencia extra de la banda hasta que toque el suelo y repetí."
+    ]
+  }
+]

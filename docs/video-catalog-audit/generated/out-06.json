@@ -1,0 +1,407 @@
+[
+  {
+    "slug": "landmine-thruster",
+    "nombre": "Thruster con landmine",
+    "tecnica": [
+      "Tomá la barra con ambas manos a la altura de los hombros, pies a la anchura de cadera.",
+      "Bajá a una sentadilla profunda manteniendo el torso erguido y el core activo.",
+      "Empujá desde los talones y extendé los brazos por encima de la cabeza en un solo movimiento explosivo."
+    ]
+  },
+  {
+    "slug": "lateral-shuffle",
+    "nombre": "Desplazamiento lateral",
+    "tecnica": [
+      "Parate con las rodillas semiflexionadas, el peso en la mitad del pie y el torso levemente inclinado.",
+      "Empujá lateralmente con la pierna de apoyo y llevá el pie opuesto para cerrarlo sin cruzarlo.",
+      "Repetí el desplazamiento de forma continua manteniéndote bajo y con el core tenso."
+    ]
+  },
+  {
+    "slug": "medicine-ball-slam",
+    "nombre": "Golpe con balón medicinal",
+    "tecnica": [
+      "Parate con los pies a la anchura de hombros, tomá el balón con ambas manos y elevalo sobre la cabeza.",
+      "Contraé el core y lanzá el balón hacia el suelo con toda la fuerza, extendiendo el cuerpo al soltarlo.",
+      "Atrapá el balón al rebotar o tomalo del piso manteniendo la espalda recta."
+    ]
+  },
+  {
+    "slug": "mountain-climber",
+    "nombre": "Escalador",
+    "tecnica": [
+      "Colocate en posición de plancha alta con las manos bajo los hombros y el cuerpo en línea recta.",
+      "Llevá una rodilla hacia el pecho de forma explosiva mientras la otra pierna permanece extendida.",
+      "Alterná las piernas con rapidez manteniendo las caderas bajas y el core contraído."
+    ]
+  },
+  {
+    "slug": "muscle-snatch",
+    "nombre": "Arranque muscular",
+    "tecnica": [
+      "Tomá la barra con agarre ancho, rodillas dobladas, caderas atrás y espalda recta.",
+      "Extendé caderas y rodillas explosivamente y tirá la barra hacia arriba pegada al cuerpo.",
+      "Llevá los codos hacia afuera y arriba para bloquear la barra sobre la cabeza con los brazos extendidos."
+    ]
+  },
+  {
+    "slug": "overhead-carry",
+    "nombre": "Caminata con carga sobre la cabeza",
+    "tecnica": [
+      "Elevá el peso por encima de la cabeza con los brazos totalmente extendidos y el core activo.",
+      "Caminá con pasos controlados manteniendo la columna neutral y los hombros activos.",
+      "Mirá al frente, apretá el glúteo y evitá que el tronco se incline hacia los lados."
+    ]
+  },
+  {
+    "slug": "parralel-bar-dips",
+    "nombre": "Fondos en barras paralelas",
+    "tecnica": [
+      "Apoyate en las barras con los brazos extendidos, el cuerpo recto y el core contraído.",
+      "Bajá doblando los codos hasta que los brazos queden paralelos al suelo, sin dejar que los hombros suban.",
+      "Empujá hacia arriba extendiendo los codos completamente y controlá el descenso."
+    ]
+  },
+  {
+    "slug": "partial-step-down",
+    "nombre": "Descenso parcial del escalón",
+    "tecnica": [
+      "Parate en el borde de un escalón sobre una pierna con el pie paralelo al borde.",
+      "Bajá lentamente la pierna libre hacia el piso flexionando la rodilla de apoyo sin sobrepasar la punta del pie.",
+      "Detené el movimiento antes de tocar el suelo, volvé a la posición inicial de forma controlada."
+    ]
+  },
+  {
+    "slug": "pike",
+    "nombre": "Pike",
+    "tecnica": [
+      "Colocate en plancha alta con los pies en el TRX o en el suelo y las manos bajo los hombros.",
+      "Llevá las caderas hacia arriba y atrás formando una V invertida mientras mantenés las piernas lo más rectas posible.",
+      "Volvé lentamente a la posición de plancha sin dejar caer las caderas."
+    ]
+  },
+  {
+    "slug": "pinch-grip-deadlift",
+    "nombre": "Peso muerto con agarre de pinza",
+    "tecnica": [
+      "Tomá el disco por los bordes con los dedos, pulgares por encima, sin que la palma descanse en el borde.",
+      "Con los pies a la anchura de cadera, bajá la cadera y mantené la espalda recta antes de iniciar el tirón.",
+      "Extendé caderas y rodillas hasta quedar erguido y bajá el peso de forma controlada."
+    ]
+  },
+  {
+    "slug": "power-snatch",
+    "nombre": "Arranque de potencia",
+    "tecnica": [
+      "Tomá la barra con agarre ancho, caderas atrás, espalda recta y barra sobre la mitad del pie.",
+      "Extendé caderas y rodillas explosivamente, elevá los hombros y jalá la barra hacia arriba.",
+      "Recibí la barra por encima de la cabeza con los brazos bloqueados en una posición de semisquat, sin bajar a sentadilla completa."
+    ]
+  },
+  {
+    "slug": "pull-apart",
+    "nombre": "Separación de banda",
+    "tecnica": [
+      "Tomá la banda con ambas manos a la anchura de hombros, brazos al frente a la altura del pecho.",
+      "Abrí los brazos hacia los lados llevando la banda al pecho, apretando las escápulas al final.",
+      "Volvé lentamente a la posición inicial controlando la tensión de la banda."
+    ]
+  },
+  {
+    "slug": "pull-down",
+    "nombre": "Jalón",
+    "tecnica": [
+      "Sentate con los muslos bajo los apoyos, tomá el agarre con las manos a una anchura mayor que los hombros.",
+      "Tirá el agarre hacia el pecho llevando los codos hacia abajo y atrás, apretando la espalda.",
+      "Volvé lentamente a la posición inicial sin que los hombros suban hacia las orejas."
+    ]
+  },
+  {
+    "slug": "pull-through",
+    "nombre": "Tirón entre las piernas",
+    "tecnica": [
+      "Parate de espaldas a la polea baja, tomá la cuerda entre las piernas con ambas manos.",
+      "Con las rodillas levemente flexionadas e inclinándote hacia adelante desde las caderas, dejá que el peso jale los brazos hacia atrás.",
+      "Extendé las caderas hacia adelante de forma explosiva llevando el torso a posición vertical."
+    ]
+  },
+  {
+    "slug": "pullthrough",
+    "nombre": "Tirón entre las piernas con banda",
+    "tecnica": [
+      "Anclá la banda a un punto bajo detrás de vos, tomala entre las piernas con ambas manos.",
+      "Con las rodillas levemente flexionadas inclinate hacia adelante desde las caderas contra la tensión de la banda.",
+      "Empujá las caderas hacia adelante y extendé el tronco hasta quedar erguido apretando el glúteo."
+    ]
+  },
+  {
+    "slug": "push-down",
+    "nombre": "Empuje hacia abajo en polea",
+    "tecnica": [
+      "Parate frente a la polea alta, tomá el agarre con ambas manos a la altura del pecho y los codos pegados al cuerpo.",
+      "Empujá el agarre hacia abajo extendiendo los codos completamente, sin mover los hombros.",
+      "Volvé lento a la posición inicial manteniendo los codos fijos en los costados."
+    ]
+  },
+  {
+    "slug": "push-downs",
+    "nombre": "Empuje hacia abajo en máquina",
+    "tecnica": [
+      "Ajustá el asiento y tomá las manijas a la altura del pecho con los codos flexionados.",
+      "Empujá las manijas hacia abajo extendiendo los codos, contrayendo el tríceps en el punto más bajo.",
+      "Volvé lentamente a la posición inicial sin que los hombros se eleven."
+    ]
+  },
+  {
+    "slug": "push-press",
+    "nombre": "Push press",
+    "tecnica": [
+      "Sostené el peso a la altura de los hombros, pies a la anchura de cadera y rodillas levemente dobladas.",
+      "Hacé un leve impulso de piernas extendiéndolas y usá esa energía para empujar el peso sobre la cabeza.",
+      "Bloquiá los codos arriba, luego bajá el peso de forma controlada absorbiendo con las piernas."
+    ]
+  },
+  {
+    "slug": "quad-stomp",
+    "nombre": "Estampido de cuádriceps",
+    "tecnica": [
+      "Parate con los pies juntos, flexioná las rodillas y descargá el peso en los cuádriceps.",
+      "Extendé las rodillas de forma controlada empujando el suelo hacia abajo con los talones.",
+      "Volvé lentamente a la posición de flexión sin rebotar en la articulación."
+    ]
+  },
+  {
+    "slug": "rack-pull",
+    "nombre": "Tirón desde rack",
+    "tecnica": [
+      "Ajustá los soportes del rack a la altura de las rodillas y colocá la barra sobre ellos.",
+      "Tomá la barra con agarre prono a la anchura de hombros, espalda recta y core activo.",
+      "Extendé caderas y rodillas hasta quedar completamente erguido, luego bajá la barra con control."
+    ]
+  },
+  {
+    "slug": "reach-and-catch",
+    "nombre": "Alcanzar y atrapar",
+    "tecnica": [
+      "Parate con los pies a la anchura de hombros y los brazos relajados a los costados.",
+      "Extendé un brazo hacia adelante o hacia arriba de forma controlada alcanzando el mayor rango posible.",
+      "Volvé al centro y repetí alternando lados, manteniendo el equilibrio y el core activo."
+    ]
+  },
+  {
+    "slug": "recovery-farmers-walk",
+    "nombre": "Caminata del granjero de recuperación",
+    "tecnica": [
+      "Tomá las pesas con agarre neutro a los costados del cuerpo, hombros atrás y core activo.",
+      "Caminá a ritmo moderado con pasos controlados, sin dejar que el tronco se incline.",
+      "Mantené la respiración regular y los hombros nivelados durante todo el recorrido."
+    ]
+  },
+  {
+    "slug": "reverse-deadlift",
+    "nombre": "Peso muerto inverso",
+    "tecnica": [
+      "Tomá la barra con agarre prono a la anchura de hombros, comenzando en posición completamente erguida.",
+      "Bajá la barra deslizándola por las piernas, empujando las caderas hacia atrás y manteniendo la espalda recta.",
+      "Detené el movimiento cuando sientas tensión en los isquiotibiales y volvé al inicio contrayendo glúteos."
+    ]
+  },
+  {
+    "slug": "reverse-hyperextension",
+    "nombre": "Hiperextensión inversa",
+    "tecnica": [
+      "Acostate boca abajo sobre la máquina con las caderas en el borde y los tobillos bajo el soporte.",
+      "Elevá las piernas hasta que queden alineadas con el tronco apretando los glúteos en la posición alta.",
+      "Bajá lentamente las piernas hasta la posición inicial sin balancear el tronco."
+    ]
+  },
+  {
+    "slug": "seated-box-jump",
+    "nombre": "Salto al cajón desde sentado",
+    "tecnica": [
+      "Sentate al borde de un banco frente al cajón, pies apoyados en el suelo a la anchura de caderas.",
+      "Inclinándote levemente hacia adelante, empujá con fuerza contra el suelo y saltá hacia el cajón.",
+      "Aterrizá con ambos pies sobre el cajón, rodillas levemente flexionadas para absorber el impacto."
+    ]
+  },
+  {
+    "slug": "shoulder-external-rotation",
+    "nombre": "Rotación externa de hombro",
+    "tecnica": [
+      "Acostate de lado con el codo flexionado a 90° pegado al costado del cuerpo, mancuerna en la mano de arriba.",
+      "Rotá el antebrazo hacia arriba hasta que quede perpendicular al suelo sin despegar el codo.",
+      "Volvé lentamente a la posición inicial controlando la rotación en todo el recorrido."
+    ]
+  },
+  {
+    "slug": "shuttle-sprint",
+    "nombre": "Sprint de lanzadera",
+    "tecnica": [
+      "Colocá dos marcas a la distancia deseada y parate en posición de largada con el peso en los metatarsos.",
+      "Salí explosivamente hacia la primera marca, tocá el suelo o el cono y girá de forma eficiente.",
+      "Regresá a la posición de inicio a máxima velocidad manteniendo el tronco levemente inclinado al correr."
+    ]
+  },
+  {
+    "slug": "single-arm-snatch",
+    "nombre": "Arranque a un brazo",
+    "tecnica": [
+      "Parate con los pies a la anchura de hombros, tomá la pesa rusa con una mano y bajá la cadera.",
+      "Extendé caderas y rodillas explosivamente jalando la pesa hacia arriba pegada al cuerpo.",
+      "Recibí la pesa sobre la cabeza con el brazo extendido, rodillas levemente flexionadas, y estabilizá."
+    ]
+  },
+  {
+    "slug": "single-arm-swing",
+    "nombre": "Swing a un brazo",
+    "tecnica": [
+      "Parate con los pies un poco más anchos que los hombros, tomá la pesa rusa con una mano.",
+      "Dejá que la pesa oscile hacia atrás entre las piernas flexionando ligeramente las rodillas y empujando las caderas.",
+      "Extendé las caderas de forma explosiva para proyectar la pesa hacia adelante hasta la altura del hombro."
+    ]
+  },
+  {
+    "slug": "single-arm-thruster",
+    "nombre": "Thruster a un brazo",
+    "tecnica": [
+      "Sostené el peso a la altura del hombro con una mano, pies a la anchura de cadera.",
+      "Bajá a una sentadilla profunda manteniendo el tronco erguido y el codo cerca del cuerpo.",
+      "Empujá desde los talones y extendé el brazo sobre la cabeza en un movimiento continuo y explosivo."
+    ]
+  },
+  {
+    "slug": "single-leg-deadlift",
+    "nombre": "Peso muerto a una pierna",
+    "tecnica": [
+      "Parate sobre una pierna con una ligera flexión de rodilla, el peso en la mano del lado opuesto.",
+      "Inclinándote hacia adelante desde la cadera, bajá el peso mientras la pierna libre se eleva hacia atrás.",
+      "Volvé a la posición vertical apretando el glúteo de la pierna de apoyo y manteniendo la espalda recta."
+    ]
+  },
+  {
+    "slug": "skater",
+    "nombre": "Salto lateral tipo patinador",
+    "tecnica": [
+      "Parate sobre una pierna con el tronco levemente inclinado y el core activo.",
+      "Saltá lateralmente aterrizando sobre la pierna opuesta, dejando que la pierna libre quede atrás.",
+      "Absorbé el impacto con la rodilla levemente flexionada y repetí el salto hacia el lado contrario."
+    ]
+  },
+  {
+    "slug": "ski-erg",
+    "nombre": "Ski erg",
+    "tecnica": [
+      "Parate frente a la máquina con los pies a la anchura de hombros y tomá ambas cuerdas con los brazos extendidos sobre la cabeza.",
+      "Tirá las cuerdas hacia abajo y atrás de forma explosiva, flexionando caderas y rodillas simultáneamente.",
+      "Volvé a la posición inicial elevando los brazos de forma controlada para el próximo tirón."
+    ]
+  },
+  {
+    "slug": "skull-crusher",
+    "nombre": "Skull crusher",
+    "tecnica": [
+      "Acostate en un banco con el peso sostenido sobre el pecho, brazos extendidos hacia el techo.",
+      "Bajá el peso hacia la frente doblando solo los codos, manteniéndolos fijos y apuntando al techo.",
+      "Extendé los codos para volver al inicio contrayendo el tríceps sin mover los hombros."
+    ]
+  },
+  {
+    "slug": "snatch-grip-deadlift",
+    "nombre": "Peso muerto con agarre de arranque",
+    "tecnica": [
+      "Tomá la barra con un agarre muy ancho (agarre de arranque), caderas atrás y espalda recta.",
+      "Empujá el suelo con los talones y extendé caderas y rodillas hasta quedar completamente erguido.",
+      "Bajá la barra con control deslizándola por las piernas, sin redondear la espalda baja."
+    ]
+  },
+  {
+    "slug": "split-jerk",
+    "nombre": "Envión con split",
+    "tecnica": [
+      "Sosté la barra sobre el pecho con agarre a la anchura de hombros y rodillas levemente flexionadas.",
+      "Hacé un impulso de piernas y empujá la barra sobre la cabeza mientras dividís las piernas adelante y atrás.",
+      "Bloquiá los brazos arriba, juntá los pies y bajá la barra de forma controlada al pecho."
+    ]
+  },
+  {
+    "slug": "stability-ball-hyperextension",
+    "nombre": "Hiperextensión en pelota de estabilidad",
+    "tecnica": [
+      "Colocá el abdomen sobre la pelota con los pies apoyados contra una pared o soporte firme.",
+      "Bajá el tronco sobre la pelota hasta quedar relajado y luego elevalo hasta la posición neutral.",
+      "Apretá los glúteos en la posición alta sin hiperextender la zona lumbar."
+    ]
+  },
+  {
+    "slug": "stability-ball-pike",
+    "nombre": "Pike en pelota de estabilidad",
+    "tecnica": [
+      "Colocate en posición de plancha alta con las espinillas sobre la pelota de estabilidad.",
+      "Contraé el core y llevá las caderas hacia arriba y atrás rodando la pelota hacia los pies.",
+      "Volvé lentamente a la posición de plancha controlando el movimiento de la pelota."
+    ]
+  },
+  {
+    "slug": "stair-climber",
+    "nombre": "Escaladora",
+    "tecnica": [
+      "Parate en la máquina con la espalda recta y las manos apoyadas ligeramente en las agarraderas.",
+      "Empujá cada escalón hacia abajo con el pie completo, activando glúteos e isquiotibiales.",
+      "Mantené un ritmo constante y evitá inclinarte hacia adelante o apoyarte demasiado en las manos."
+    ]
+  },
+  {
+    "slug": "standing-reach",
+    "nombre": "Alcance de pie",
+    "tecnica": [
+      "Parate con los pies a la anchura de cadera, sostené el disco con ambas manos frente al cuerpo.",
+      "Elevá los brazos extendidos sobre la cabeza llegando lo más alto posible sin arquear la espalda.",
+      "Bajá los brazos de forma controlada y repetí manteniendo el core activo durante todo el movimiento."
+    ]
+  },
+  {
+    "slug": "step-down",
+    "nombre": "Descenso del escalón",
+    "tecnica": [
+      "Parate sobre un escalón o cajón bajo con una pierna, el pie paralelo al borde.",
+      "Bajá lentamente la pierna libre hacia el suelo flexionando la rodilla de apoyo de forma controlada.",
+      "Tocá suavemente el suelo con el talón libre y volvé a la posición inicial empujando desde el pie de apoyo."
+    ]
+  },
+  {
+    "slug": "stretcher",
+    "nombre": "Estiramiento en máquina",
+    "tecnica": [
+      "Ajustá la máquina según la articulación a trabajar y colocate en la posición indicada.",
+      "Aplicá una tensión progresiva y controlada hasta sentir el estiramiento sin dolor agudo.",
+      "Sostené la posición según el tiempo indicado, respirando profundo y relajando el músculo objetivo."
+    ]
+  },
+  {
+    "slug": "suitcase-carry",
+    "nombre": "Caminata tipo maletín",
+    "tecnica": [
+      "Tomá el peso con una sola mano a un costado del cuerpo, hombros nivelados y core activo.",
+      "Caminá con pasos controlados resistiendo la inclinación lateral del tronco hacia el peso.",
+      "Mantené la cadera nivelada y la columna neutral durante todo el recorrido."
+    ]
+  },
+  {
+    "slug": "suitcase-deadlift",
+    "nombre": "Peso muerto tipo maletín",
+    "tecnica": [
+      "Colocá la barra a un costado del cuerpo, tomala con una mano en agarre neutro y la espalda recta.",
+      "Empujá el suelo con los talones y extendé caderas y rodillas manteniendo la barra pegada al muslo.",
+      "Bajá la barra de forma controlada sin dejar que el tronco rote hacia el peso."
+    ]
+  },
+  {
+    "slug": "sumo-deadlift",
+    "nombre": "Peso muerto sumo",
+    "tecnica": [
+      "Abrí los pies más allá de la anchura de hombros con las puntas rotadas hacia afuera, tomá la barra con agarre prono entre las piernas.",
+      "Empujá las rodillas hacia afuera, mantené el pecho erguido y la espalda recta antes de iniciar el tirón.",
+      "Extendé caderas y rodillas simultáneamente hasta quedar erguido y bajá la barra con control."
+    ]
+  }
+]

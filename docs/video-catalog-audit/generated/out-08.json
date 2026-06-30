@@ -1,0 +1,407 @@
+[
+  {
+    "slug": "seated-leg-curl",
+    "nombre": "Curl femoral sentado",
+    "tecnica": [
+      "Sentate en la máquina ajustando el rodillo justo por encima del talón y la espalda apoyada contra el respaldo.",
+      "Flexioná las rodillas llevando los talones hacia los glúteos en un movimiento controlado.",
+      "Apretá los isquiotibiales en la posición contraída y volvé extendiendo las piernas sin soltar de golpe."
+    ]
+  },
+  {
+    "slug": "standing-good-morning",
+    "nombre": "Buenos días de pie",
+    "tecnica": [
+      "Parate con los pies al ancho de los hombros, la banda sobre la nuca y las rodillas levemente flexionadas.",
+      "Incliná el torso hacia adelante desde la cadera manteniendo la espalda recta hasta quedar casi paralelo al piso.",
+      "Contraé los glúteos y los isquiotibiales para volver a la posición inicial con el torso erguido."
+    ]
+  },
+  {
+    "slug": "standing-hamstring-curl",
+    "nombre": "Curl femoral de pie",
+    "tecnica": [
+      "Parate frente a la máquina apoyando el muslo contra el soporte y el rodillo justo por encima del talón.",
+      "Flexioná la rodilla llevando el talón hacia el glúteo sin mover la cadera ni el muslo.",
+      "Bajá la pierna de forma controlada hasta extenderla casi por completo antes de repetir."
+    ]
+  },
+  {
+    "slug": "stiff-leg-deadlift",
+    "nombre": "Peso muerto stiff",
+    "tecnica": [
+      "Parate con los pies al ancho de las caderas, tomá la barra con agarre prono y mantené las rodillas casi extendidas.",
+      "Incliná el torso hacia adelante desde la cadera bajando la barra por las piernas con la espalda recta.",
+      "Contraé los isquiotibiales y los glúteos para volver a la posición erguida empujando las caderas hacia adelante."
+    ]
+  },
+  {
+    "slug": "sumo-romanian-deadlift",
+    "nombre": "Peso muerto sumo rumano",
+    "tecnica": [
+      "Parate con los pies más separados que el ancho de hombros y las puntas hacia afuera, tomá la barra con agarre neutro.",
+      "Llevá las caderas hacia atrás e incliná el torso manteniendo la barra cerca del cuerpo y la espalda recta.",
+      "Empujá las caderas hacia adelante y contraé los glúteos para volver a la posición inicial de forma controlada."
+    ]
+  },
+  {
+    "slug": "zercher-good-morning",
+    "nombre": "Buenos días Zercher",
+    "tecnica": [
+      "Sostenés la barra en el pliegue de los codos con los brazos flexionados y los pies al ancho de los hombros.",
+      "Incliná el torso hacia adelante desde la cadera con la espalda recta hasta quedar casi paralelo al piso.",
+      "Contraé glúteos e isquiotibiales para volver al punto de partida manteniendo la barra estable en los codos."
+    ]
+  },
+  {
+    "slug": "alternating-curtsy-lunge",
+    "nombre": "Estocada cruzada alternada",
+    "tecnica": [
+      "Parate erguido con los pies juntos y los brazos a los lados o con la pesa rusa al pecho.",
+      "Llevá un pie hacia atrás y cruzalo por detrás de la pierna de apoyo flexionando ambas rodillas hasta que la de atrás casi toque el piso.",
+      "Volvé a la posición inicial y repetí del otro lado alternando en cada repetición."
+    ]
+  },
+  {
+    "slug": "alternating-forward-lunge",
+    "nombre": "Estocada al frente alternada",
+    "tecnica": [
+      "Parate erguido con los pies juntos y las mancuernas a los lados del cuerpo.",
+      "Avanzá un pie hacia adelante flexionando ambas rodillas hasta que la trasera casi toque el piso.",
+      "Empujá con el talón delantero para volver y repetí con la pierna contraria."
+    ]
+  },
+  {
+    "slug": "alternating-jump-lunge",
+    "nombre": "Estocada con salto alternada",
+    "tecnica": [
+      "Comenzá en posición de estocada con una pierna adelante y la rodilla trasera cerca del piso.",
+      "Empujá explosivamente con ambas piernas para saltar y cambiá de pierna en el aire.",
+      "Aterrizá suavemente en estocada con la pierna contraria adelante amortiguando el impacto con ambas rodillas."
+    ]
+  },
+  {
+    "slug": "alternating-lateral-lunge",
+    "nombre": "Estocada lateral alternada",
+    "tecnica": [
+      "Parate con los pies juntos y los brazos extendidos al frente o con peso al pecho.",
+      "Llevá un pie hacia un lado flexionando esa rodilla y empujando la cadera hacia atrás, manteniendo la otra pierna extendida.",
+      "Volvé al centro empujando con el talón y repetí hacia el lado contrario."
+    ]
+  },
+  {
+    "slug": "alternating-reverse-lunge",
+    "nombre": "Estocada inversa alternada",
+    "tecnica": [
+      "Parate erguido con los pies juntos y las mancuernas a los lados del cuerpo.",
+      "Llevá un pie hacia atrás flexionando ambas rodillas hasta que la trasera casi toque el piso.",
+      "Volvé a la posición inicial empujando con el talón delantero y repetí con la pierna contraria."
+    ]
+  },
+  {
+    "slug": "alternating-reverse-lunges",
+    "nombre": "Estocada inversa alternada",
+    "tecnica": [
+      "Parate erguido con los pies juntos y los brazos a los lados o cruzados al pecho.",
+      "Llevá un pie hacia atrás flexionando ambas rodillas hasta que la trasera casi toque el piso.",
+      "Volvé a la posición inicial empujando con el talón delantero y alternás la pierna en cada repetición."
+    ]
+  },
+  {
+    "slug": "assisted-sissy-squat",
+    "nombre": "Sentadilla sissy asistida",
+    "tecnica": [
+      "Parate erguido agarrándote de un soporte con una mano para mantener el equilibrio, pies al ancho de caderas.",
+      "Incliná el torso hacia atrás mientras flexionás las rodillas dejando que los talones se levanten del piso.",
+      "Contraé los cuádriceps para volver a la posición inicial manteniendo el cuerpo alineado como una tabla."
+    ]
+  },
+  {
+    "slug": "banded-back-squat",
+    "nombre": "Sentadilla trasera con banda",
+    "tecnica": [
+      "Colocá la barra sobre los trapecios con la banda alrededor de la cadera anclada al piso, pies al ancho de hombros.",
+      "Bajá flexionando rodillas y caderas con la espalda recta hasta que los muslos queden paralelos al piso.",
+      "Empujá a través de los talones para volver arriba venciendo la resistencia adicional de la banda."
+    ]
+  },
+  {
+    "slug": "banded-front-squat",
+    "nombre": "Sentadilla frontal con banda",
+    "tecnica": [
+      "Apoyá la barra en los deltoides anteriores con la banda alrededor de la cadera anclada al piso, pies al ancho de hombros.",
+      "Bajá manteniendo los codos arriba, el torso erguido y las rodillas en línea con los pies.",
+      "Empujá a través de los talones para volver a la posición inicial con el torso vertical."
+    ]
+  },
+  {
+    "slug": "banded-split-squat",
+    "nombre": "Sentadilla búlgara con banda",
+    "tecnica": [
+      "Apoyá el pie trasero en un banco elevado con la banda sobre el muslo del pie de apoyo anclada al piso.",
+      "Bajá flexionando la rodilla delantera hasta que la trasera casi toque el piso manteniendo el torso erguido.",
+      "Empujá con el talón delantero para volver arriba venciendo la resistencia de la banda."
+    ]
+  },
+  {
+    "slug": "belt-split-squat",
+    "nombre": "Sentadilla búlgara con cinturón",
+    "tecnica": [
+      "Conectá el cinturón al cable o polea baja y apoyá el pie trasero en un banco elevado.",
+      "Bajá flexionando la rodilla delantera manteniendo el torso erguido y la rodilla alineada con el pie.",
+      "Empujá con el talón delantero para extender la pierna y volver a la posición inicial."
+    ]
+  },
+  {
+    "slug": "belt-squat",
+    "nombre": "Sentadilla con cinturón",
+    "tecnica": [
+      "Conectá el cinturón a la máquina o al cable, parate sobre las plataformas elevadas con los pies al ancho de hombros.",
+      "Bajá flexionando rodillas y caderas con el torso erguido hasta que los muslos queden paralelos al piso.",
+      "Empujá a través de los talones para volver a la posición inicial manteniendo la espalda recta."
+    ]
+  },
+  {
+    "slug": "box-squat",
+    "nombre": "Sentadilla al cajón",
+    "tecnica": [
+      "Parate frente al cajón con los pies al ancho de hombros y el peso al pecho o los brazos extendidos.",
+      "Bajá empujando la cadera hacia atrás hasta sentarte brevemente en el cajón sin rebotar.",
+      "Contraé los glúteos y cuádriceps para empujar a través de los talones y volver a la posición de pie."
+    ]
+  },
+  {
+    "slug": "bulgarian-split-squat",
+    "nombre": "Sentadilla búlgara",
+    "tecnica": [
+      "Apoyá el empeine del pie trasero en un banco y ubicá el pie delantero lo suficientemente adelante para que la rodilla no supere los dedos al bajar.",
+      "Bajá flexionando la rodilla delantera hasta que la trasera casi toque el piso manteniendo el torso erguido.",
+      "Empujá con el talón delantero para volver a la posición inicial sin perder la estabilidad."
+    ]
+  },
+  {
+    "slug": "curtsy-lunge",
+    "nombre": "Estocada cruzada",
+    "tecnica": [
+      "Parate erguido con los pies al ancho de caderas y el peso distribuido por igual.",
+      "Llevá un pie hacia atrás y cruzalo por detrás de la pierna de apoyo flexionando ambas rodillas.",
+      "Volvé a la posición inicial empujando con el talón del pie de apoyo y repetí del mismo lado o alternando."
+    ]
+  },
+  {
+    "slug": "forward-lunge",
+    "nombre": "Estocada al frente",
+    "tecnica": [
+      "Parate erguido con los pies juntos y el peso a los lados o al pecho.",
+      "Avanzá un pie flexionando ambas rodillas hasta que la trasera casi toque el piso y el muslo delantero quede paralelo al piso.",
+      "Empujá con el talón delantero para volver a la posición inicial y repetí del mismo lado o alternando."
+    ]
+  },
+  {
+    "slug": "forward-lunges",
+    "nombre": "Estocadas al frente",
+    "tecnica": [
+      "Parate erguido con los pies juntos y los brazos a los lados del cuerpo.",
+      "Avanzá un pie flexionando ambas rodillas hasta que la trasera casi toque el piso.",
+      "Empujá con el talón delantero para volver a la posición inicial y continuá alternando piernas."
+    ]
+  },
+  {
+    "slug": "front-rack-squat",
+    "nombre": "Sentadilla frontal en rack",
+    "tecnica": [
+      "Sostenés las mancuernas o pesas rusas a la altura de los hombros con los codos hacia adelante y arriba.",
+      "Bajá flexionando rodillas y caderas manteniendo los codos elevados y el torso lo más vertical posible.",
+      "Empujá a través de los talones para volver arriba sin dejar caer los codos."
+    ]
+  },
+  {
+    "slug": "front-squat-olympic",
+    "nombre": "Sentadilla frontal olímpica",
+    "tecnica": [
+      "Apoyá la barra en los deltoides anteriores con los codos altos, agarre cruzado o en gancho, pies al ancho de hombros.",
+      "Bajá profundo manteniendo los codos arriba y el torso completamente erguido.",
+      "Empujá a través de los talones para volver arriba sin dejar que los codos caigan."
+    ]
+  },
+  {
+    "slug": "goblet-curtsy-lunge",
+    "nombre": "Estocada cruzada goblet",
+    "tecnica": [
+      "Sostenés la mancuerna vertical a la altura del pecho con ambas manos, pies al ancho de caderas.",
+      "Llevá un pie hacia atrás cruzándolo por detrás de la pierna de apoyo y flexioná ambas rodillas.",
+      "Volvé a la posición inicial empujando con el talón del pie de apoyo y mantené el peso al pecho."
+    ]
+  },
+  {
+    "slug": "goblet-forward-lunge",
+    "nombre": "Estocada al frente goblet",
+    "tecnica": [
+      "Sostenés la mancuerna vertical a la altura del pecho con ambas manos, pies juntos.",
+      "Avanzá un pie flexionando ambas rodillas hasta que la trasera casi toque el piso.",
+      "Empujá con el talón delantero para volver a la posición inicial manteniendo el peso estable al pecho."
+    ]
+  },
+  {
+    "slug": "goblet-lateral-lunge",
+    "nombre": "Estocada lateral goblet",
+    "tecnica": [
+      "Sostenés la mancuerna a la altura del pecho con ambas manos, pies juntos.",
+      "Llevá un pie hacia un lado flexionando esa rodilla y empujando la cadera hacia atrás, manteniendo la otra pierna extendida.",
+      "Volvé al centro empujando con el talón y repetí hacia el otro lado."
+    ]
+  },
+  {
+    "slug": "goblet-pulse-squat",
+    "nombre": "Sentadilla goblet con pulso",
+    "tecnica": [
+      "Sostenés la mancuerna vertical a la altura del pecho con ambas manos, pies al ancho de hombros.",
+      "Bajá hasta la posición más profunda de sentadilla y realizá pequeños pulsos hacia arriba y hacia abajo de pocos centímetros.",
+      "Mantené la tensión en los cuádriceps durante todo el movimiento sin llegar a extender completamente las rodillas."
+    ]
+  },
+  {
+    "slug": "goblet-reverse-lunge",
+    "nombre": "Estocada inversa goblet",
+    "tecnica": [
+      "Sostenés la mancuerna vertical a la altura del pecho con ambas manos, pies juntos.",
+      "Llevá un pie hacia atrás flexionando ambas rodillas hasta que la trasera casi toque el piso.",
+      "Empujá con el talón delantero para volver a la posición inicial manteniendo el peso al pecho."
+    ]
+  },
+  {
+    "slug": "goblet-sissy-squat",
+    "nombre": "Sentadilla sissy goblet",
+    "tecnica": [
+      "Sostenés el peso al pecho con ambas manos y agarrate del soporte de la máquina para el equilibrio.",
+      "Incliná el torso hacia atrás mientras flexionás las rodillas dejando que los talones se eleven.",
+      "Contraé los cuádriceps para volver a la posición inicial manteniendo el cuerpo alineado."
+    ]
+  },
+  {
+    "slug": "goblet-split-squat",
+    "nombre": "Sentadilla búlgara goblet",
+    "tecnica": [
+      "Sostenés la mancuerna vertical al pecho con ambas manos y apoyá el empeine del pie trasero en un banco.",
+      "Bajá flexionando la rodilla delantera hasta que la trasera casi toque el piso con el torso erguido.",
+      "Empujá con el talón delantero para volver a la posición inicial sin perder el equilibrio."
+    ]
+  },
+  {
+    "slug": "goblet-squat",
+    "nombre": "Sentadilla goblet",
+    "tecnica": [
+      "Sostenés la mancuerna o pesa rusa vertical a la altura del pecho con ambas manos, pies al ancho de hombros.",
+      "Bajá empujando las rodillas hacia afuera y manteniendo los codos entre las rodillas hasta que los muslos queden paralelos al piso.",
+      "Empujá a través de los talones para volver arriba manteniendo el torso erguido."
+    ]
+  },
+  {
+    "slug": "goblet-step-up",
+    "nombre": "Subida al cajón goblet",
+    "tecnica": [
+      "Sostenés la mancuerna vertical al pecho con ambas manos frente a un cajón o banco.",
+      "Apoyá un pie completo sobre el cajón y empujá a través de ese talón para subir el cuerpo.",
+      "Bajá el pie trasero de forma controlada y repetí del mismo lado antes de cambiar."
+    ]
+  },
+  {
+    "slug": "hack-squat",
+    "nombre": "Sentadilla hack",
+    "tecnica": [
+      "Apoyá la espalda en la plataforma inclinada de la máquina con los hombros bajo los pads y los pies al ancho de hombros.",
+      "Bajá flexionando las rodillas hasta 90° o más manteniendo la espalda en contacto con la plataforma.",
+      "Empujá a través de los talones para volver a la posición inicial sin bloquear las rodillas al extenderlas."
+    ]
+  },
+  {
+    "slug": "heels-up-squat",
+    "nombre": "Sentadilla con talones elevados",
+    "tecnica": [
+      "Parate con los talones sobre una superficie elevada o cuña y los pies al ancho de hombros.",
+      "Bajá flexionando rodillas y caderas manteniendo el torso lo más erguido posible.",
+      "Empujá a través de los metatarsos para volver a la posición inicial sin perder el equilibrio."
+    ]
+  },
+  {
+    "slug": "high-bar-squat",
+    "nombre": "Sentadilla con barra alta",
+    "tecnica": [
+      "Apoyá la barra sobre los trapecios superiores con los pies al ancho de hombros y las puntas ligeramente hacia afuera.",
+      "Bajá flexionando rodillas y caderas manteniendo el torso erguido hasta que los muslos queden paralelos al piso.",
+      "Empujá a través de los talones para volver a la posición inicial manteniendo la barra estable sobre los trapecios."
+    ]
+  },
+  {
+    "slug": "horizontal-hack-squat",
+    "nombre": "Sentadilla hack horizontal",
+    "tecnica": [
+      "Acostáte en la máquina horizontal con la espalda apoyada y los pies en la plataforma al ancho de hombros.",
+      "Flexioná las rodillas llevando la plataforma hacia vos hasta que las rodillas lleguen cerca del pecho.",
+      "Empujá a través de los talones para extender las piernas sin bloquear completamente las rodillas."
+    ]
+  },
+  {
+    "slug": "horizontal-leg-press",
+    "nombre": "Prensa de piernas horizontal",
+    "tecnica": [
+      "Acostáte en la máquina horizontal con la espalda apoyada y los pies en la plataforma al ancho de hombros.",
+      "Flexioná las rodillas llevando la plataforma hacia vos controladamente hasta que los muslos queden paralelos al torso.",
+      "Empujá a través de los talones para extender las piernas sin bloquear las rodillas al final del movimiento."
+    ]
+  },
+  {
+    "slug": "jump-squat",
+    "nombre": "Sentadilla con salto",
+    "tecnica": [
+      "Parate con los pies al ancho de hombros y los brazos a los lados o agarrándote del TRX.",
+      "Bajá rápido hasta la posición de sentadilla y empujá explosivamente para saltar lo más alto posible.",
+      "Aterrizá suavemente con las rodillas levemente flexionadas y volvé de inmediato a la posición de sentadilla."
+    ]
+  },
+  {
+    "slug": "jump-squats",
+    "nombre": "Sentadillas con salto",
+    "tecnica": [
+      "Parate con los pies al ancho de hombros y los brazos a los lados del cuerpo.",
+      "Bajá rápido a la posición de sentadilla y empujá explosivamente con ambas piernas para saltar.",
+      "Aterrizá con las rodillas levemente flexionadas y encadenás el siguiente salto sin pausa."
+    ]
+  },
+  {
+    "slug": "kickstand-squat",
+    "nombre": "Sentadilla kickstand",
+    "tecnica": [
+      "Parate con un pie levemente adelantado como pie principal y el otro en punta detrás como apoyo secundario.",
+      "Bajá flexionando principalmente la rodilla delantera empujando la cadera hacia atrás.",
+      "Empujá con el talón delantero para volver a la posición inicial manteniendo el equilibrio con el pie trasero."
+    ]
+  },
+  {
+    "slug": "landmine-curtsy-lunge",
+    "nombre": "Estocada cruzada con landmine",
+    "tecnica": [
+      "Sostenés el extremo libre de la barra con ambas manos a la altura del pecho frente a vos.",
+      "Llevá un pie hacia atrás cruzándolo por detrás de la pierna de apoyo y flexioná ambas rodillas.",
+      "Volvé a la posición inicial empujando con el talón del pie de apoyo y mantené la barra estable."
+    ]
+  },
+  {
+    "slug": "landmine-hack-squat",
+    "nombre": "Sentadilla hack con landmine",
+    "tecnica": [
+      "Apoyá la barra sobre los hombros por detrás con el extremo libre en el pivote y los pies por delante del cuerpo.",
+      "Bajá flexionando rodillas y caderas manteniendo la espalda en contacto con la barra.",
+      "Empujá a través de los talones para volver arriba siguiendo el arco natural de la barra."
+    ]
+  },
+  {
+    "slug": "landmine-lateral-lunge",
+    "nombre": "Estocada lateral con landmine",
+    "tecnica": [
+      "Sostenés el extremo libre de la barra con ambas manos a la altura del pecho de pie frente al pivote.",
+      "Llevá un pie hacia un lado flexionando esa rodilla y empujando la cadera hacia atrás, manteniendo la otra pierna extendida.",
+      "Volvé al centro empujando con el talón y repetí hacia el otro lado manteniendo la barra estable."
+    ]
+  }
+]

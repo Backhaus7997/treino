@@ -11,6 +11,10 @@ enum EquipmentType {
   banda, // resistance bands — covers home + gym
   pesoCorporal, // bodyweight — pull-ups, dips, planks, hanging leg raise
   cardio, // treadmill, bike, rower — reserved for future fase
+  pesaRusa, // kettlebell — swings, goblet, turkish get-up
+  disco, // plate-loaded / weighted with a single disc
+  trx, // suspension trainer (TRX, rings)
+  multipower, // Smith machine / multipower rack
   otro, // any equipment the catalog does not recognize
   ninguno; // explicit "no equipment" — stretching / mobility
 
@@ -22,6 +26,10 @@ enum EquipmentType {
         EquipmentType.banda => 'Banda',
         EquipmentType.pesoCorporal => 'Peso corporal',
         EquipmentType.cardio => 'Cardio',
+        EquipmentType.pesaRusa => 'Pesa rusa',
+        EquipmentType.disco => 'Disco',
+        EquipmentType.trx => 'TRX',
+        EquipmentType.multipower => 'Multipower',
         EquipmentType.otro => 'Otro',
         EquipmentType.ninguno => 'Ninguno',
       };
@@ -35,6 +43,10 @@ enum EquipmentType {
         EquipmentType.banda => 'banda',
         EquipmentType.pesoCorporal => 'peso_corporal',
         EquipmentType.cardio => 'cardio',
+        EquipmentType.pesaRusa => 'pesa_rusa',
+        EquipmentType.disco => 'disco',
+        EquipmentType.trx => 'trx',
+        EquipmentType.multipower => 'multipower',
         EquipmentType.otro => 'otro',
         EquipmentType.ninguno => 'ninguno',
       };
@@ -49,6 +61,10 @@ enum EquipmentType {
       'banda' => EquipmentType.banda,
       'peso_corporal' => EquipmentType.pesoCorporal,
       'cardio' => EquipmentType.cardio,
+      'pesa_rusa' => EquipmentType.pesaRusa,
+      'disco' => EquipmentType.disco,
+      'trx' => EquipmentType.trx,
+      'multipower' => EquipmentType.multipower,
       'otro' => EquipmentType.otro,
       'ninguno' => EquipmentType.ninguno,
       _ => null, // unknown wire string → null (filter matches all)
