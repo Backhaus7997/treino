@@ -2,6 +2,7 @@
 // NO los agregues acá (ADR-CHW-005).
 //
 // PR1 — Ver turnos (read-only agenda viewer).
+// PR2 — Nueva Sesión (create).
 // Todas las strings están en español hardcodeado + comentario // i18n.
 // NO se usa AppL10n en este archivo (constraint C-6).
 import 'package:flutter/material.dart';
@@ -15,6 +16,7 @@ import '../../../../workout/application/session_providers.dart'
 import 'agenda_web_calendar.dart';
 import 'agenda_web_day_list.dart';
 import 'agenda_web_helpers.dart';
+import 'new_session_dialog.dart';
 
 // ─── AgendaWebScreen ──────────────────────────────────────────────────────────
 
@@ -57,6 +59,15 @@ class _AgendaWebScreenState extends ConsumerState<AgendaWebScreen> {
     _rangeTo = DateTime.utc(now.year + 1, now.month, 1);
   }
 
+  Future<void> _openNewSessionDialog(BuildContext context) async {
+    await showDialog<bool>(
+      context: context,
+      builder: (_) => NewSessionDialog(
+        initialDate: _selectedDay,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final trainerId = ref.watch(currentUidProvider) ?? '';
@@ -77,8 +88,6 @@ class _AgendaWebScreenState extends ConsumerState<AgendaWebScreen> {
       onPageChanged: (focused) => setState(() => _focusedDay = focused),
     );
 
-    // PR1 omite botones Nueva Sesión / Mis horarios (ADR-AGW-9):
-    // llegan en PR2 y PR3 respectivamente.
     return LayoutBuilder(
       builder: (context, constraints) {
         // Solo usamos el layout que llena el alto cuando hay alto acotado;
@@ -110,7 +119,11 @@ class _AgendaWebScreenState extends ConsumerState<AgendaWebScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
-                                _DayHeader(day: selectedDay),
+                                _DayPanelHeader(
+                                  day: selectedDay,
+                                  onNewSession: () =>
+                                      _openNewSessionDialog(context),
+                                ),
                                 const SizedBox(height: 12),
                                 Expanded(
                                   child: AgendaWebDayList(
@@ -149,7 +162,10 @@ class _AgendaWebScreenState extends ConsumerState<AgendaWebScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        _DayHeader(day: selectedDay),
+                        _DayPanelHeader(
+                          day: selectedDay,
+                          onNewSession: () => _openNewSessionDialog(context),
+                        ),
                         const SizedBox(height: 12),
                         AgendaWebDayList(
                           trainerId: trainerId,
@@ -191,23 +207,55 @@ class _Panel extends StatelessWidget {
   }
 }
 
-/// Encabezado del panel de turnos: la fecha seleccionada en español.
-class _DayHeader extends StatelessWidget {
-  const _DayHeader({required this.day});
+/// Encabezado del panel de turnos: fecha en español + botón NUEVA SESIÓN.
+///
+/// PR2: agrega el botón que abre [NewSessionDialog] (ADR-AGW-3).
+class _DayPanelHeader extends StatelessWidget {
+  const _DayPanelHeader({
+    required this.day,
+    required this.onNewSession,
+  });
 
   final DateTime day;
+  final VoidCallback onNewSession;
 
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    return Text(
-      spanishDayLabel(day).toUpperCase(), // i18n
-      style: GoogleFonts.barlowCondensed(
-        fontWeight: FontWeight.w700,
-        fontSize: 14,
-        letterSpacing: 0.8,
-        color: palette.textMuted,
-      ),
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            spanishDayLabel(day).toUpperCase(), // i18n
+            style: GoogleFonts.barlowCondensed(
+              fontWeight: FontWeight.w700,
+              fontSize: 14,
+              letterSpacing: 0.8,
+              color: palette.textMuted,
+            ),
+          ),
+        ),
+        ElevatedButton.icon(
+          onPressed: onNewSession,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: palette.accent,
+            foregroundColor: palette.bg,
+            minimumSize: const Size(0, 36),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
+            shape: const StadiumBorder(),
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
+          icon: const Icon(Icons.add, size: 16),
+          label: Text(
+            'NUEVA SESIÓN', // i18n
+            style: GoogleFonts.barlowCondensed(
+              fontWeight: FontWeight.w700,
+              fontSize: 13,
+              letterSpacing: 0.8,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
