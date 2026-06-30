@@ -3439,6 +3439,42 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Sin registros de series todavía.'**
   String get progressionEmpty;
+
+  /// Section header above the trainer-assigned plans in the Profile › Mis Rutinas screen.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'RUTINAS ASIGNADAS POR TU PF'**
+  String get profileRoutinesAssignedHeader;
+
+  /// Section header above the athlete's self-created routines in the Profile › Mis Rutinas screen.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'MIS RUTINAS PROPIAS'**
+  String get profileRoutinesOwnHeader;
+
+  /// Empty-state body in the assigned-plans section when the athlete has no trainer-assigned plans.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Todavía no tenés un PF asignado.'**
+  String get profileRoutinesNoTrainerBody;
+
+  /// CTA label in the empty-state of the assigned-plans section — navigates to the trainers directory.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'BUSCAR PF'**
+  String get profileRoutinesNoTrainerCta;
+
+  /// Empty-state body in the self-created routines section when the athlete has none.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Todavía no creaste ninguna rutina.'**
+  String get profileRoutinesNoOwnBody;
+
+  /// Chip label shown on the user-created routine card that is currently marked as active by the athlete (UserProfile.activeRoutineId). Mirrors the chip in workoutMisRutinasActiveChip.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ACTIVA'**
+  String get profileRoutinesActiveChip;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

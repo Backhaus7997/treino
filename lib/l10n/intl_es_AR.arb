@@ -1156,5 +1156,29 @@
   "progressionEmpty": "Sin registros de series todavía.",
   "@progressionEmpty": {
     "description": "Empty state shown when the athlete has no setLogs at all (exercise picker not shown)."
+  },
+  "profileRoutinesAssignedHeader": "RUTINAS ASIGNADAS POR TU PF",
+  "@profileRoutinesAssignedHeader": {
+    "description": "Section header above the trainer-assigned plans in the Profile › Mis Rutinas screen."
+  },
+  "profileRoutinesOwnHeader": "MIS RUTINAS PROPIAS",
+  "@profileRoutinesOwnHeader": {
+    "description": "Section header above the athlete's self-created routines in the Profile › Mis Rutinas screen."
+  },
+  "profileRoutinesNoTrainerBody": "Todavía no tenés un PF asignado.",
+  "@profileRoutinesNoTrainerBody": {
+    "description": "Empty-state body in the assigned-plans section when the athlete has no trainer-assigned plans."
+  },
+  "profileRoutinesNoTrainerCta": "BUSCAR PF",
+  "@profileRoutinesNoTrainerCta": {
+    "description": "CTA label in the empty-state of the assigned-plans section — navigates to the trainers directory."
+  },
+  "profileRoutinesNoOwnBody": "Todavía no creaste ninguna rutina.",
+  "@profileRoutinesNoOwnBody": {
+    "description": "Empty-state body in the self-created routines section when the athlete has none."
+  },
+  "profileRoutinesActiveChip": "ACTIVA",
+  "@profileRoutinesActiveChip": {
+    "description": "Chip label shown on the user-created routine card that is currently marked as active by the athlete (UserProfile.activeRoutineId). Mirrors the chip in workoutMisRutinasActiveChip."
   }
 }
