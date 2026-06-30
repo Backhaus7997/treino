@@ -1,0 +1,170 @@
+
+#### BACK (15) ####
+  back-extension-weighted-hyperextension   Extensión de espalda (Hiperextensión con peso)
+  bent-over-row-dumbbell                   Remo inclinado (Mancuerna)
+  chest-supported-incline-row-dumbbell     Remo inclinado con soporte de pecho (Mancuerna)
+  iso-lateral-high-row-machine             Remo alto isolateral (Máquina)
+  kipping-pull-up                          Dominada kipping
+  low-row-suspension                       Remo bajo (TRX)
+  negative-pull-up                         Dominada negativa
+  pull-up-band                             Dominada (Banda)
+  pull-up-weighted                         Dominada (Con peso)
+  rope-straight-arm-pulldown               Jalón con brazos rectos y cuerda
+  scapular-pull-ups                        Dominadas escapulares
+  seated-cable-row-bar-wide-grip           Remo sentado en polea (Agarre abierto)
+  shrug-smith-machine                      Encogimiento (Multipower)
+  vertical-traction-machine                Tracción vertical (Máquina)
+  wide-pull-up                             Dominada abierta
+
+#### CHEST (17) ####
+  around-the-world                         Around the World (Círculos con mancuernas)
+  bench-press-wide-grip-barbell            Press de banca agarre abierto (Barra)
+  cable-fly                                Cruces en polea
+  chest-dip-weighted                       Fondo de pecho (Con peso)
+  clap-push-ups                            Flexiones con palmada
+  decline-bench-press-barbell              Press de banca declinado (Barra)
+  decline-bench-press-smith-machine        Press de banca declinado (Multipower)
+  incline-push-ups                         Flexiones inclinadas
+  iso-lateral-chest-press-machine          Press de pecho isolateral (Máquina)
+  low-cable-fly-crossovers                 Cruces bajos en polea
+  one-arm-push-up                          Flexión a un brazo
+  plank-pushup                             Plancha con flexión
+  plate-press                              Press con disco
+  plate-squeeze-svend-press                Press de disco (Svend Press)
+  push-up-close-grip                       Flexión agarre cerrado
+  ring-push-up                             Flexión en anillas
+  single-arm-cable-crossover               Cruce en polea a un brazo
+
+#### SHOULDERS (13) ####
+  band-pullaparts                          Aperturas con banda
+  chest-supported-reverse-fly-dumbbell     Apertura inversa con soporte de pecho (Mancuerna)
+  chest-supported-y-raise-dumbbell         Elevación en Y con soporte de pecho (Mancuerna)
+  front-raise-suspension                   Elevación frontal (TRX)
+  handstand-push-up                        Flexión en parada de manos
+  kettlebell-around-the-world              Círculos con pesa rusa
+  kettlebell-halo                          Halo con pesa rusa
+  kettlebell-shoulder-press                Press de hombros con pesa rusa
+  lying-neck-curls-weighted                Flexión de cuello tumbado (Con peso)
+  lying-neck-extension-weighted            Extensión de cuello tumbado (Con peso)
+  overhead-plate-raise                     Elevación de disco sobre la cabeza
+  seated-shoulder-press-machine            Press de hombros sentado (Máquina)
+  shoulder-taps                            Toques de hombro
+
+#### BICEPS (8) ####
+  behind-the-back-curl-cable               Curl tras la espalda (Polea)
+  cross-body-hammer-curl                   Curl martillo cruzado
+  overhead-curl-cable                      Curl por encima de la cabeza (Polea)
+  pinwheel-curl-dumbbell                   Curl molinete (Mancuerna)
+  reverse-grip-concentration-curl          Curl concentrado agarre inverso
+  seated-palms-up-wrist-curl               Curl de muñeca sentado con palmas arriba
+  waiter-curl-dumbbell                     Curl camarero (Mancuerna)
+  wrist-roller                             Enrollador de muñeca
+
+#### TRICEPS (7) ####
+  diamond-push-up                          Flexión diamante
+  floor-triceps-dip                        Fondo de tríceps en el suelo
+  jm-press-barbell                         Press JM (Barra)
+  seated-triceps-press                     Press de tríceps sentado
+  triceps-dip-weighted                     Fondo de tríceps (Con peso)
+  triceps-extension-suspension             Extensión de tríceps (TRX)
+  triceps-rope-pushdown                    Empuje de tríceps con cuerda
+
+#### QUADS (12) ####
+  assisted-pistol-squats                   Sentadilla pistol asistida
+  frog-jumps                               Saltos de rana
+  jumping-lunge                            Estocada con salto
+  lateral-box-jump                         Salto lateral al cajón
+  lateral-squat                            Sentadilla lateral
+  overhead-dumbbell-lunge                  Estocada con mancuerna sobre la cabeza
+  pause-squat-barbell                      Sentadilla con pausa (Barra)
+  single-leg-extensions                    Extensión de cuádriceps a una pierna
+  sissy-squat-weighted                     Sentadilla sissy (Con peso)
+  sumo-squat-barbell                       Sentadilla sumo (Barra)
+  sumo-squat-kettlebell                    Sentadilla sumo (Pesa rusa)
+  walking-lunge-dumbbell                   Estocada caminando (Mancuerna)
+
+#### HAMSTRINGS (2) ####
+  lying-leg-curl-machine                   Curl femoral tumbado (Máquina)
+  standing-leg-curls                       Curl femoral de pie
+
+#### GLUTES (3) ####
+  frog-pumps-dumbbell                      Empuje de glúteo rana (Mancuerna)
+  lateral-leg-raises                       Elevación lateral de pierna
+  rear-kick-machine                        Patada trasera (Máquina)
+
+#### CALVES (3) ####
+  calf-extension-machine                   Extensión de gemelos (Máquina)
+  single-leg-standing-calf-raise-barbell   Elevación de gemelo de pie a una pierna (Barra)
+  single-leg-standing-calf-raise-machine   Elevación de gemelo de pie a una pierna (Máquina)
+
+#### CORE (19) ####
+  ab-wheel                                 Rueda abdominal
+  cable-twist-down-to-up                   Giro en polea (de abajo hacia arriba)
+  cable-twist-up-to-down                   Giro en polea (de arriba hacia abajo)
+  decline-crunch-weighted                  Crunch declinado (Con peso)
+  dragon-flag                              Dragon flag
+  dragonfly                                Dragonfly
+  elbow-to-knee                            Codo a rodilla
+  hollow-rock                              Hollow rock (Balanceo en hueco)
+  jack-knife-suspension                    Navaja (TRX)
+  jackknife-sit-up                         Abdominal navaja
+  landmine-180                             Landmine 180
+  leg-raise-parallel-bars                  Elevación de piernas en paralelas
+  lying-knee-raise                         Elevación de rodillas tumbado
+  reverse-plank                            Plancha inversa
+  spiderman                                Spiderman
+  stretching                               Estiramientos
+  toe-touch                                Toque de puntas
+  toes-to-bar                              Pies a la barra
+  torso-rotation                           Rotación de torso
+
+#### FULLBODY (26) ####
+  ball-slams                               Golpes con balón medicinal
+  burpee-over-the-bar                      Burpee sobre la barra
+  clean-pull                               Tirón de cargada
+  deadlift-high-pull                       Peso muerto con tirón alto
+  dumbbell-snatch                          Arranque con mancuerna
+  front-lever-hold                         Front lever isométrico
+  front-lever-raise                        Elevación a front lever
+  handstand-hold                           Parada de manos isométrica
+  hang-clean                               Cargada colgante
+  hang-snatch                              Arranque colgante
+  high-knee-skips                          Skipping alto con salto
+  high-knees                               Rodillas altas
+  jump-shrug                               Encogimiento con salto
+  kettlebell-clean                         Cargada con pesa rusa
+  kettlebell-high-pull                     Tirón alto con pesa rusa
+  kettlebell-snatch                        Arranque con pesa rusa
+  kettlebell-turkish-get-up                Levantada turca con pesa rusa
+  landmine-squat-and-press                 Sentadilla y press landmine
+  muscle-up                                Muscle up
+  pilates                                  Pilates
+  power-clean                              Cargada de potencia
+  press-under                              Press under
+  sled-push                                Empuje de trineo
+  squat-row                                Sentadilla con remo
+  warm-up                                  Calentamiento
+  yoga                                     Yoga
+
+#### CARDIO (21) ####
+  aerobics                                 Aeróbic
+  air-bike                                 Bicicleta de aire
+  battle-ropes                             Cuerdas de batalla
+  boxing                                   Boxeo
+  climbing                                 Escalada
+  cycling                                  Ciclismo
+  elliptical-trainer                       Elíptica
+  hiit                                     HIIT
+  hiking                                   Senderismo
+  rowing-machine                           Máquina de remo
+  running                                  Correr
+  skating                                  Patinaje
+  skiing                                   Esquí
+  snowboarding                             Snowboard
+  spinning                                 Spinning
+  sprints                                  Sprints
+  stair-machine-floors                     Escaladora (Pisos)
+  stair-machine-steps                      Escaladora (Escalones)
+  swimming                                 Natación
+  treadmill                                Cinta de correr
+  walking                                  Caminar

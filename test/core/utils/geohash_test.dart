@@ -99,4 +99,35 @@ void main() {
       expect(geohashNeighbors('69y7p'), contains('69ye0'));
     });
   });
+
+  group('geohashNeighbors5x5', () {
+    test('NEIGHBORS5X5-001: returns exactly 24 distinct cells, none equal to self',
+        () {
+      final ring = geohashNeighbors5x5('69y7p');
+      expect(ring.length, equals(24));
+      expect(ring.toSet().length, equals(24));
+      expect(ring, isNot(contains('69y7p')));
+    });
+
+    test('NEIGHBORS5X5-002: with the center cell stays within Firestore\'s 30-value limit',
+        () {
+      // Caller builds [center, ...neighbors5x5] → must be <= 30 for the
+      // `array-contains-any` query. 5×5 = 25 cells, the safe maximum.
+      final cells = ['69y7p', ...geohashNeighbors5x5('69y7p')];
+      expect(cells.length, equals(25));
+      expect(cells.length, lessThanOrEqualTo(30));
+    });
+
+    test('NEIGHBORS5X5-003: is a superset of the 3×3 ring (contains all 8 immediate neighbors)',
+        () {
+      final ring5 = geohashNeighbors5x5('69y7p').toSet();
+      expect(ring5, containsAll(geohashNeighbors('69y7p')));
+    });
+
+    test('NEIGHBORS5X5-004: every cell preserves the 5-char precision', () {
+      for (final c in geohashNeighbors5x5('gcpvj')) {
+        expect(c.length, equals(5));
+      }
+    });
+  });
 }

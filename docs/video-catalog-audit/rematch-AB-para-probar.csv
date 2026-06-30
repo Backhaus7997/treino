@@ -1,0 +1,105 @@
+veredicto,nivel,score,exercise_id,nombre,equipo,video_drive
+OK,B,0.80,behind-the-back-bicep-wrist-curl-barbell,"Curl de muñeca tras la espalda (Barra)",barbell,male-barbell-behind-the-back-wrist-curl-side.mp4
+OK,B,0.67,bench-press-smith-machine,"Press de banca (Multipower)",smith-machine,male-Smithmachine-bench-press-side.mp4
+OK,B,0.50,bicep-curl-dumbbell,"Curl de bíceps (Mancuerna)",dumbbell,male-Dumbbells-dumbbell-curl-side.mp4
+OK,B,0.50,bicep-curl-suspension,"Curl de bíceps (TRX)",suspension,male-trx-curl-side.mp4
+OK,B,0.50,bicycle-crunch-raised-legs,"Crunch bicicleta con piernas elevadas",bodyweight,male-Bodyweight-bicycle-crunch-side.mp4
+OK,B,0.67,box-squat-barbell,"Sentadilla al cajón (Barra)",barbell,male-barbell-pause-box-squat-side.mp4
+OK,B,0.50,chest-dip-assisted,"Fondo de pecho (Asistido)",bodyweight,male-Bodyweight-bodyweight-box-assisted-dips-side.mp4
+OK,B,0.50,crunch-weighted,"Crunch (Con peso)",bodyweight,male-bodyweight-crunch-side.mp4
+OK,B,0.67,curtsy-lunge-dumbbell,"Estocada cruzada (Mancuerna)",dumbbell,male-dumbbell-goblet-curtsy-lunge-side.mp4
+OK,B,0.50,feet-up-bench-press-barbell,"Press de banca con pies arriba (Barra)",barbell,female-barbell-bench-press-side.mp4
+OK,B,0.67,front-raise-cable,"Elevación frontal (Polea)",cable,male-Cables-cable-bar-front-raise-side.mp4
+OK,B,0.67,good-morning-barbell,"Buenos días (Barra)",barbell,male-barbell-zercher-good-morning-side.mp4
+OK,B,0.67,hammer-curl-band,"Curl martillo (Banda)",band,male-Band-band-bayesian-hammer-curl-side.mp4
+OK,B,0.67,hip-thrust-smith-machine,"Empuje de cadera (Multipower)",smith-machine,male-Smithmachine-hip-thrust-side.mp4
+OK,B,0.75,incline-bench-press-smith-machine,"Press de banca inclinado (Multipower)",smith-machine,male-Smithmachine-incline-bench-press-side.mp4
+OK,B,0.67,inverted-row,"Remo invertido",bodyweight,male-Bodyweight-bodyweight-overhand-inverted-row-side.mp4
+OK,B,0.50,l-sit-hold,"L-sit isométrico",bodyweight,male-Bodyweight-hanging-l-sit-side.mp4
+OK,B,0.50,lunge-barbell,"Estocada (Barra)",barbell,male-Barbell-barbell-curtsy-lunge-side.mp4
+OK,B,0.50,lunge-dumbbell,"Estocada (Mancuerna)",dumbbell,male-Dumbbells-dumbbell-forward-lunge-side.mp4
+OK,B,0.50,overhead-press-smith-machine,"Press militar (Multipower)",smith-machine,male-Smithmachine-seated-overhead-press-side.mp4
+OK,B,0.67,partial-glute-bridge-barbell,"Puente de glúteo parcial (Barra)",barbell,male-barbell-glute-bridge-side.mp4
+OK,B,0.67,pendlay-row-barbell,"Remo Pendlay (Barra)",barbell,male-barbell-pronated-pendlay-row-side.mp4
+OK,B,0.50,plate-curl,"Curl con disco",plate,male-plate-bicep-curl-side.mp4
+OK,B,0.67,push-up-weighted,"Flexión (Con peso)",bodyweight,male-Bodyweight-push-up-side.mp4
+OK,B,0.75,rear-delt-reverse-fly-cable,"Apertura inversa de deltoides posterior (Polea)",cable,male-Cables-cable-rear-delt-fly-side.mp4
+OK,B,0.75,rear-delt-reverse-fly-dumbbell,"Apertura inversa de deltoides posterior (Mancuerna)",dumbbell,male-Dumbbells-dumbbell-rear-delt-fly-side.mp4
+OK,B,0.50,rear-delt-reverse-fly-machine,"Apertura inversa de deltoides posterior (Máquina)",machine,male-Machine-machine-reverse-fly-side.mp4
+OK,B,0.57,reverse-fly-single-arm-cable,"Apertura inversa a un brazo (Polea)",cable,male-Cables-cable-single-arm-internally-rotated-high-reverse-fly-side.mp4
+OK,B,0.50,ring-dips,"Fondos en anillas",bodyweight,male-Bodyweight-dips-side.mp4
+OK,B,0.67,russian-twist-weighted,"Giro ruso (Con peso)",bodyweight,female-Bodyweight-bodyweight-russian-twist-side.mp4
+OK,B,0.50,seated-chest-flys-cable,"Aperturas de pecho sentado (Polea)",cable,male-Cables-cable-bench-chest-fly-side.mp4
+OK,B,0.50,seated-dip-machine,"Fondos en máquina sentado",machine,male-Machine-machine-dips-side.mp4
+OK,B,0.67,seated-incline-curl-dumbbell,"Curl inclinado sentado (Mancuerna)",dumbbell,male-Dumbbells-dumbbell-incline-curl-side.mp4
+OK,B,0.75,seated-overhead-press-barbell,"Press militar sentado (Barra)",barbell,male-Barbell-landmine-seated-overhead-press-side.mp4
+OK,B,0.67,seated-row-machine,"Remo sentado (Máquina)",machine,male-machine-seated-cable-row-side.mp4
+OK,B,0.67,seated-wrist-extension-barbell,"Extensión de muñeca sentado (Barra)",barbell,male-Barbell-barbell-wrist-extension-side.mp4
+OK,B,0.50,shrug-cable,"Encogimiento (Polea)",cable,male-cable-silverback-shrug-side.mp4
+OK,B,0.67,side-plank,"Plancha lateral",bodyweight,male-bodyweight-elbow-side-plank-side.mp4
+OK,B,0.60,single-arm-curl-cable,"Curl a un brazo (Polea)",cable,male-Cables-cable-high-single-arm-rolling-curl-side.mp4
+OK,B,0.80,single-arm-landmine-press-barbell,"Press landmine a un brazo (Barra)",barbell,male-Barbell-landmine-alternating-single-arm-press-side.mp4
+OK,B,0.80,single-arm-tricep-extension-dumbbell,"Extensión de tríceps a un brazo (Mancuerna)",dumbbell,male-dumbbell-single-arm-overhead-tricep-extension-side.mp4
+OK,B,0.75,single-arm-triceps-pushdown-cable,"Empuje de tríceps a un brazo (Polea)",cable,male-Cables-cable-single-arm-pushdown-side.mp4
+OK,A,1.00,single-leg-press-machine,"Prensa a una pierna (Máquina)",machine,male-Machine-machine-single-leg-leg-press-side.mp4
+OK,B,0.80,single-leg-romanian-deadlift-barbell,"Peso muerto rumano a una pierna (Barra)",barbell,male-Barbell-landmine-single-leg-romanian-deadlift-side.mp4
+OK,B,0.75,single-leg-romanian-deadlift-dumbbell,"Peso muerto rumano a una pierna (Mancuerna)",dumbbell,female-Dumbbells-dumbbell-single-leg-deadlift-front.mp4
+OK,B,0.80,single-leg-standing-calf-raise-dumbbell,"Elevación de gemelo de pie a una pierna (Mancuerna)",dumbbell,male-Dumbbells-dumbbell-single-leg-calf-raise-side.mp4
+OK,B,0.50,squat-dumbbell,"Sentadilla (Mancuerna)",dumbbell,male-dumbbell-goblet-squat-side.mp4
+OK,B,0.50,squat-machine,"Sentadilla (Máquina)",machine,male-Machine-machine-belt-squat-side.mp4
+OK,B,0.50,squat-smith-machine,"Sentadilla (Multipower)",smith-machine,male-Smithmachine-squat-side.mp4
+OK,B,0.67,standing-calf-raise-barbell,"Elevación de gemelos de pie (Barra)",barbell,male-Barbell-barbell-calf-raises-side.mp4
+OK,B,0.67,standing-calf-raise-dumbbell,"Elevación de gemelos de pie (Mancuerna)",dumbbell,male-Dumbbells-dumbbell-calf-raise-side.mp4
+OK,B,0.50,standing-calf-raise-smith,"Elevación de gemelos de pie (Multipower)",bodyweight,male-Bodyweight-calf-raises-side.mp4
+OK,B,0.50,triceps-dip-assisted,"Fondo de tríceps (Asistido)",bodyweight,male-Bodyweight-bodyweight-box-assisted-dips-side.mp4
+OK,B,0.67,triceps-extension-barbell,"Extensión de tríceps (Barra)",barbell,male-Barbell-barbell-overhead-tricep-extension-side.mp4
+OK,B,0.67,triceps-extension-cable,"Extensión de tríceps (Polea)",cable,male-Cables-cable-overhead-tricep-extension-side.mp4
+OK,B,0.67,triceps-extension-dumbbell,"Extensión de tríceps (Mancuerna)",dumbbell,male-dumbbell-rolling-tricep-extension-side.mp4
+OK,B,0.67,triceps-extension-machine,"Extensión de tríceps (Máquina)",machine,male-Machine-machine-overhead-tricep-extension-side.mp4
+PROBABLE_MAL,B,0.50,assisted-pistol-squats,"Sentadilla pistol asistida",bodyweight,male-Bodyweight-bodyweight-assisted-sissy-squat-side.mp4
+PROBABLE_MAL,B,0.60,bench-press-wide-grip-barbell,"Press de banca agarre abierto (Barra)",barbell,male-Barbell-barbell-close-grip-bench-press-side.mp4
+PROBABLE_MAL,B,0.50,chest-supported-reverse-fly-dumbbell,"Apertura inversa con soporte de pecho (Mancuerna)",dumbbell,male-dumbbell-chest-fly-side.mp4
+PROBABLE_MAL,B,0.50,chin-up-weighted,"Dominada supina (Con peso)",bodyweight,male-Bodyweight-bodyweight-assisted-chin-up-side.mp4
+PROBABLE_MAL,B,0.50,clap-push-ups,"Flexiones con palmada",bodyweight,male-Bodyweight-bodyweight-knee-push-ups-side.mp4
+PROBABLE_MAL,B,0.50,deadlift-band,"Peso muerto (Banda)",band,male-Band-band-romanian-deadlift-side.mp4
+PROBABLE_MAL,B,0.50,deadlift-dumbbell,"Peso muerto (Mancuerna)",dumbbell,male-Dumbbells-dumbbell-romanian-deadlift-side.mp4
+PROBABLE_MAL,B,0.67,decline-bench-press-barbell,"Press de banca declinado (Barra)",barbell,female-barbell-bench-press-side.mp4
+PROBABLE_MAL,B,0.50,decline-bench-press-smith-machine,"Press de banca declinado (Multipower)",smith-machine,male-Smithmachine-bench-press-side.mp4
+PROBABLE_MAL,B,0.67,diamond-push-up,"Flexión diamante",bodyweight,male-Bodyweight-push-up-side.mp4
+PROBABLE_MAL,B,0.67,handstand-push-up,"Flexión en parada de manos",bodyweight,male-Bodyweight-push-up-side.mp4
+PROBABLE_MAL,B,0.67,incline-chest-press-machine,"Press de pecho inclinado (Máquina)",machine,male-Machine-machine-chest-press-side.mp4
+PROBABLE_MAL,B,0.50,incline-push-ups,"Flexiones inclinadas",bodyweight,male-Bodyweight-bodyweight-knee-push-ups-side.mp4
+PROBABLE_MAL,B,0.50,iso-lateral-chest-press-machine,"Press de pecho isolateral (Máquina)",machine,male-Machine-machine-chest-press-side.mp4
+PROBABLE_MAL,B,0.50,jackknife-sit-up,"Abdominal navaja",bodyweight,male-Bodyweight-frog-sit-up-side.mp4
+PROBABLE_MAL,B,0.50,kettlebell-clean,"Cargada con pesa rusa",kettlebell,male-Kettlebells-clean-and-press-side.mp4
+PROBABLE_MAL,B,0.50,kettlebell-snatch,"Arranque con pesa rusa",kettlebell,male-Kettlebells-double-snatch-side.mp4
+PROBABLE_MAL,B,0.50,kipping-pull-up,"Dominada kipping",bodyweight,male-Bodyweight-bodyweight-assisted-pull-up-side.mp4
+PROBABLE_MAL,B,0.67,kneeling-push-up,"Flexión de rodillas",bodyweight,male-Bodyweight-push-up-side.mp4
+PROBABLE_MAL,B,0.67,lateral-box-jump,"Salto lateral al cajón",bodyweight,male-Bodyweight-box-jump-side.mp4
+PROBABLE_MAL,B,0.50,lateral-leg-raises,"Elevación lateral de pierna",bodyweight,male-Bodyweight-alternating-leg-raise-side.mp4
+PROBABLE_MAL,B,0.50,lateral-squat,"Sentadilla lateral",bodyweight,male-Bodyweight-bodyweight-squat-side.mp4
+PROBABLE_MAL,B,0.50,lying-knee-raise,"Elevación de rodillas tumbado",bodyweight,male-bodyweight-hanging-knee-raises-side.mp4
+PROBABLE_MAL,B,0.50,lying-leg-curl-machine,"Curl femoral tumbado (Máquina)",machine,male-Machine-seated-leg-curl-side.mp4
+PROBABLE_MAL,B,0.50,lying-leg-raise,"Elevación de piernas tumbado",bodyweight,male-Bodyweight-alternating-leg-raise-side.mp4
+PROBABLE_MAL,B,0.50,negative-pull-up,"Dominada negativa",bodyweight,male-Bodyweight-bodyweight-assisted-pull-up-side.mp4
+PROBABLE_MAL,B,0.50,one-arm-push-up,"Flexión a un brazo",bodyweight,male-Bodyweight-push-up-side.mp4
+PROBABLE_MAL,B,0.67,pause-squat-barbell,"Sentadilla con pausa (Barra)",barbell,male-barbell-pause-box-squat-side.mp4
+PROBABLE_MAL,B,0.50,pinwheel-curl-dumbbell,"Curl molinete (Mancuerna)",dumbbell,male-Dumbbells-dumbbell-curl-side.mp4
+PROBABLE_MAL,B,0.50,pistol-squat,"Sentadilla pistol",bodyweight,male-Bodyweight-bodyweight-squat-side.mp4
+PROBABLE_MAL,B,0.50,plate-press,"Press con disco",plate,male-plate-clean-and-press-side.mp4
+PROBABLE_MAL,B,0.50,preacher-curl-barbell,"Curl predicador (Barra)",barbell,male-Barbell-barbell-curl-side.mp4
+PROBABLE_MAL,B,0.50,pull-up-weighted,"Dominada (Con peso)",bodyweight,male-Bodyweight-bodyweight-assisted-pull-up-side.mp4
+PROBABLE_MAL,B,0.50,push-up-close-grip,"Flexión agarre cerrado",bodyweight,male-Bodyweight-push-up-side.mp4
+PROBABLE_MAL,B,0.50,reverse-grip-concentration-curl,"Curl concentrado agarre inverso",bodyweight,male-Bodyweight-bodyweight-concentration-curl-side.mp4
+PROBABLE_MAL,B,0.67,ring-push-up,"Flexión en anillas",bodyweight,male-Bodyweight-push-up-side.mp4
+PROBABLE_MAL,B,0.50,single-arm-lateral-raise-cable,"Elevación lateral a un brazo (Polea)",cable,male-Cables-cable-lateral-raise-side.mp4
+PROBABLE_MAL,B,0.50,single-leg-extensions,"Extensión de cuádriceps a una pierna",bodyweight,male-Bodyweight-bodyweight-single-leg-squat-side.mp4
+PROBABLE_MAL,B,0.60,single-leg-standing-calf-raise-machine,"Elevación de gemelo de pie a una pierna (Máquina)",machine,male-machine-standing-calf-raises-side.mp4
+PROBABLE_MAL,B,0.50,sissy-squat-weighted,"Sentadilla sissy (Con peso)",bodyweight,male-Bodyweight-bodyweight-assisted-sissy-squat-side.mp4
+PROBABLE_MAL,B,0.67,sit-up,"Abdominal completo (Sit up)",bodyweight,male-Bodyweight-frog-sit-up-side.mp4
+PROBABLE_MAL,B,0.50,sit-up-weighted,"Abdominal completo (Con peso)",bodyweight,male-Bodyweight-frog-sit-up-side.mp4
+PROBABLE_MAL,B,0.50,spider-curl-barbell,"Curl araña (Barra)",barbell,male-Barbell-barbell-curl-side.mp4
+PROBABLE_MAL,B,0.50,squat-row,"Sentadilla con remo",bodyweight,male-Bodyweight-bodyweight-squat-side.mp4
+PROBABLE_MAL,B,0.50,sumo-squat-barbell,"Sentadilla sumo (Barra)",barbell,male-Barbell-barbell-squat-side.mp4
+PROBABLE_MAL,B,0.50,waiter-curl-dumbbell,"Curl camarero (Mancuerna)",dumbbell,male-Dumbbells-dumbbell-curl-side.mp4
+PROBABLE_MAL,B,0.50,wide-pull-up,"Dominada abierta",bodyweight,male-Bodyweight-bodyweight-assisted-pull-up-side.mp4

@@ -1,0 +1,416 @@
+exercise_id,name,equipment,status,duplicate_count,proposed_video
+bench-dip,Fondo en banco,bodyweight,ADD_VIDEO,,female-Bodyweight-bench-dips-side.mp4
+meadows-rows-barbell,Remo Meadows (Barra),barbell,ADD_VIDEO,,female-barbell-meadows-row-side.mp4
+nordic-hamstrings-curls,Curl nórdico de isquiotibiales,bodyweight,ADD_VIDEO,,female-Bodyweight-nordic-hamstring-curl-side.mp4
+overhead-triceps-extension-cable,Extensión de tríceps sobre la cabeza (Polea),cable,ADD_VIDEO,,female-Cables-cable-overhead-tricep-extension-side.mp4
+triceps-kickback-cable,Patada de tríceps (Polea),cable,ADD_VIDEO,,female-Cables-cable-tricep-kickback-side.mp4
+triceps-kickback-dumbbell,Patada de tríceps (Mancuerna),dumbbell,ADD_VIDEO,,female-dumbbell-tricep-kickback-side.mp4
+arnold-press-dumbbell,Press Arnold (Mancuerna),dumbbell,HAS_VIDEO,,female-Dumbbells-dumbbell-arnold-press-side.mp4
+back-extension-machine,Extensión de espalda (Máquina),machine,HAS_VIDEO,,female-Machine-machine-back-extension-side.mp4
+barbell-curl,Curl con barra,barbell,HAS_VIDEO,,female-Barbell-barbell-curl-side.mp4
+barbell-row,Remo con barra,barbell,HAS_VIDEO,,
+belt-squat-machine,Sentadilla con cinturón (Máquina),machine,HAS_VIDEO,,female-Machine-machine-belt-squat-side.mp4
+bench-press-barbell,Press de banca (Barra),barbell,HAS_VIDEO,,female-barbell-bench-press-side.mp4
+bench-press-cable,Press de banca (Polea),cable,HAS_VIDEO,,female-Cables-cable-bench-press-side.mp4
+bench-press-close-grip-barbell,Press de banca agarre cerrado (Barra),barbell,HAS_VIDEO,,female-Barbell-barbell-close-grip-bench-press-side.mp4
+bench-press-dumbbell,Press de banca (Mancuerna),dumbbell,HAS_VIDEO,,female-dumbbell-bench-press-side_5wGWrBA.mp4
+bent-over-row-band,Remo inclinado (Banda),band,HAS_VIDEO,,female-Band-band-bent-over-row-side.mp4
+bent-over-row-barbell,Remo inclinado (Barra),barbell,HAS_VIDEO,,female-barbell-bent-over-row-side.mp4
+bicep-curl-machine,Curl de bíceps (Máquina),machine,HAS_VIDEO,,female-Machine-machine-bicep-curl-side.mp4
+bicycle-crunch,Crunch bicicleta,bodyweight,HAS_VIDEO,,female-Bodyweight-bicycle-crunch-side.mp4
+bird-dog,Bird dog (Perro de muestra),bodyweight,HAS_VIDEO,,female-Bodyweight-bird-dog-side.mp4
+box-jump,Salto al cajón,bodyweight,HAS_VIDEO,,female-Bodyweight-box-jump-side.mp4
+bulgarian-split-squat,Sentadilla búlgara,bodyweight,HAS_VIDEO,,female-Bodyweight-bulgarian-split-squat-side.mp4
+burpee,Burpee,bodyweight,HAS_VIDEO,,female-bodyweight-burpee-side.mp4
+cable-crunch,Crunch en polea,cable,HAS_VIDEO,,
+cable-fly,Cruces en polea,cable,HAS_VIDEO,,
+cable-pull-through,Pull through en polea,cable,HAS_VIDEO,,female-Cables-cable-pull-through-side.mp4
+calf-raise,Elevación de pantorrillas,bodyweight,HAS_VIDEO,,female-Bodyweight-calf-raises-side.mp4
+chest-fly-band,Apertura de pecho (Banda),band,HAS_VIDEO,,female-band-chest-fly-side.mp4
+chest-fly-dumbbell,Apertura de pecho (Mancuerna),dumbbell,HAS_VIDEO,,female-dumbbell-chest-fly-side.mp4
+chest-fly-suspension,Apertura de pecho (TRX),suspension,HAS_VIDEO,,female-trx-chest-fly-side.mp4
+chest-press-band,Press de pecho (Banda),band,HAS_VIDEO,,female-band-chest-press-side.mp4
+chest-press-machine,Press de pecho (Máquina),machine,HAS_VIDEO,,female-Machine-machine-chest-press-side.mp4
+chin-up-assisted,Dominada supina (Asistida),bodyweight,HAS_VIDEO,,female-Bodyweight-bodyweight-assisted-chin-up-side.mp4
+clean,Cargada,bodyweight,HAS_VIDEO,,
+clean-and-jerk,Cargada y envión,bodyweight,HAS_VIDEO,,
+clean-and-press,Cargada y press,bodyweight,HAS_VIDEO,,
+close-grip-bench-press,Press cerrado,bodyweight,HAS_VIDEO,,
+concentration-curl,Curl concentrado,bodyweight,HAS_VIDEO,,female-Bodyweight-bodyweight-concentration-curl-side.mp4
+crunch-machine,Crunch (Máquina),machine,HAS_VIDEO,,female-Machine-machine-crunch-side.mp4
+dead-bug,Dead bug (Bicho muerto),bodyweight,HAS_VIDEO,,female-Bodyweight-dead-bug-side.mp4
+dead-hang,Colgado pasivo,bodyweight,HAS_VIDEO,,female-Bodyweight-dead-hang-side.mp4
+deadlift-barbell,Peso muerto (Barra),barbell,HAS_VIDEO,2,female-Barbell-barbell-deadlift-side.mp4
+deadlift-trap-bar,Peso muerto (Barra hexagonal),barbell,HAS_VIDEO,2,female-Barbell-barbell-deadlift-side.mp4
+decline-bench-press-dumbbell,Press de banca declinado (Mancuerna),dumbbell,HAS_VIDEO,,female-dumbbell-decline-bench-press-side.mp4
+decline-chest-fly-dumbbell,Apertura declinada (Mancuerna),dumbbell,HAS_VIDEO,,female-dumbbell-decline-chest-fly-side.mp4
+decline-push-up,Flexión declinada,bodyweight,HAS_VIDEO,,female-Bodyweight-decline-push-up-side.mp4
+downward-dog,Perro boca abajo,bodyweight,HAS_VIDEO,,
+drag-curl,Curl de arrastre,bodyweight,HAS_VIDEO,,
+dumbbell-squeeze-press,Press de presión con mancuernas,dumbbell,HAS_VIDEO,,female-dumbbell-squeeze-press-side.mp4
+dumbbell-step-up,Subida al cajón (Mancuerna),dumbbell,HAS_VIDEO,,female-Dumbbells-dumbbell-step-up-side.mp4
+face-pull,Jalón al rostro,bodyweight,HAS_VIDEO,,
+floor-press-barbell,Press en el suelo (Barra),barbell,HAS_VIDEO,,female-Barbell-barbell-floor-press-side.mp4
+floor-press-dumbbell,Press en el suelo (Mancuerna),dumbbell,HAS_VIDEO,,female-Dumbbells-dumbbell-floor-press-side.mp4
+front-raise-band,Elevación frontal (Banda),band,HAS_VIDEO,,female-Band-band-front-raise-side.mp4
+front-raise-barbell,Elevación frontal (Barra),barbell,HAS_VIDEO,,female-Barbell-barbell-front-raise-side.mp4
+front-raise-dumbbell,Elevación frontal (Mancuerna),dumbbell,HAS_VIDEO,,female-Dumbbells-dumbbell-front-raise-side.mp4
+front-squat,Sentadilla frontal,bodyweight,HAS_VIDEO,,
+glute-bridge,Puente de glúteo,bodyweight,HAS_VIDEO,,female-Bodyweight-glute-bridge-side.mp4
+glute-ham-raise,Elevación de glúteo e isquiotibial (GHR),bodyweight,HAS_VIDEO,,
+glute-kickback-machine,Patada de glúteo (Máquina),machine,HAS_VIDEO,,female-Machine-machine-glute-kickback-side.mp4
+gorilla-row-kettlebell,Remo gorila (Pesa rusa),kettlebell,HAS_VIDEO,,female-Kettlebells-gorilla-row-side.mp4
+hack-squat-machine,Sentadilla hack (Máquina),machine,HAS_VIDEO,,female-Machine-machine-hack-squat-side.mp4
+hammer-curl-cable,Curl martillo (Polea),cable,HAS_VIDEO,,female-Cables-cable-hammer-curl-side.mp4
+hammer-curl-dumbbell,Curl martillo (Mancuerna),dumbbell,HAS_VIDEO,,female-Dumbbells-dumbbell-hammer-curl-side.mp4
+hip-abduction-machine,Abducción de cadera (Máquina),machine,HAS_VIDEO,,female-Machine-machine-hip-abduction-side.mp4
+hip-adduction-machine,Aducción de cadera (Máquina),machine,HAS_VIDEO,,female-Machine-machine-hip-adduction-side.mp4
+hip-thrust-barbell,Empuje de cadera (Barra),barbell,HAS_VIDEO,,female-Barbell-barbell-hip-thrust-side.mp4
+hip-thrust-machine,Empuje de cadera (Máquina),machine,HAS_VIDEO,,female-Machine-machine-hip-thrust-side.mp4
+incline-bench-press-barbell,Press de banca inclinado (Barra),barbell,HAS_VIDEO,,female-Barbell-barbell-incline-bench-press-side.mp4
+incline-bench-press-dumbbell,Press de banca inclinado (Mancuerna),dumbbell,HAS_VIDEO,,female-dumbbell-incline-bench-press-side_cQCX9or.mp4
+incline-chest-fly-dumbbell,Apertura inclinada (Mancuerna),dumbbell,HAS_VIDEO,,female-dumbbell-incline-chest-fly-side.mp4
+incline-dumbbell-press,Press inclinado con mancuernas,bodyweight,HAS_VIDEO,,
+jump-rope,Saltar la cuerda,bodyweight,HAS_VIDEO,,
+jump-squat,Sentadilla con salto,bodyweight,HAS_VIDEO,,female-Bodyweight-jump-squats-side.mp4
+kettlebell-curl,Curl con pesa rusa,kettlebell,HAS_VIDEO,,female-Kettlebells-kettlebell-curl-side.mp4
+kettlebell-goblet-squat,Sentadilla goblet (Pesa rusa),kettlebell,HAS_VIDEO,,female-Kettlebells-kettlebell-goblet-squat-side.mp4
+kettlebell-swing,Swing con pesa rusa,kettlebell,HAS_VIDEO,,female-Kettlebells-kettlebell-swing-side.mp4
+kneeling-pulldown-band,Jalón arrodillado (Banda),band,HAS_VIDEO,,female-Band-band-kneeling-pulldown-side.mp4
+landmine-row,Remo landmine,bodyweight,HAS_VIDEO,,
+lat-pulldown-machine,Jalón al pecho (Máquina),machine,HAS_VIDEO,,
+lateral-lunge,Estocada lateral,bodyweight,HAS_VIDEO,,female-Bodyweight-lateral-lunge-side.mp4
+lateral-raise,Elevaciones laterales,bodyweight,HAS_VIDEO,,
+lateral-raise-band,Elevación lateral (Banda),band,HAS_VIDEO,,female-band-lateral-raise-side.mp4
+lateral-raise-cable,Elevación lateral (Polea),cable,HAS_VIDEO,,female-Cables-cable-lateral-raise-side.mp4
+lateral-raise-dumbbell,Elevación lateral (Mancuerna),dumbbell,HAS_VIDEO,,female-Dumbbells-dumbbell-lateral-raise-side.mp4
+lateral-raise-machine,Elevación lateral (Máquina),machine,HAS_VIDEO,,female-Vitruvian-lateral-raise-side.mp4
+leg-curl,Curl femoral,bodyweight,HAS_VIDEO,,
+leg-extension-machine,Extensión de cuádriceps (Máquina),machine,HAS_VIDEO,,female-machine-leg-extension-side.mp4
+leg-press-horizontal-machine,Prensa de piernas horizontal (Máquina),machine,HAS_VIDEO,,female-Machine-machine-horizontal-leg-press-side.mp4
+leg-press-machine,Prensa de piernas (Máquina),machine,HAS_VIDEO,,female-Machine-machine-leg-press-side.mp4
+mountain-climber,Escalador (Mountain climber),bodyweight,HAS_VIDEO,,female-bodyweight-mountain-climber-side.mp4
+oblique-crunch,Crunch oblicuo,bodyweight,HAS_VIDEO,,female-Bodyweight-oblique-crunch-side.mp4
+overhead-press-barbell,Press militar (Barra),barbell,HAS_VIDEO,,female-Barbell-barbell-overhead-press-side.mp4
+overhead-press-dumbbell,Press militar (Mancuerna),dumbbell,HAS_VIDEO,,female-Dumbbells-dumbbell-overhead-press-side.mp4
+overhead-squat,Sentadilla sobre la cabeza,bodyweight,HAS_VIDEO,,
+pendulum-squat-machine,Sentadilla péndulo (Máquina),machine,HAS_VIDEO,,female-Machine-machine-pendulum-squat-side.mp4
+pike-pushup,Flexión pike,bodyweight,HAS_VIDEO,,
+plank,Plancha,bodyweight,HAS_VIDEO,,
+plate-front-raise,Elevación frontal con disco,plate,HAS_VIDEO,,female-plate-front-raise-side.mp4
+power-snatch,Arranque de potencia,bodyweight,HAS_VIDEO,,
+preacher-curl-dumbbell,Curl predicador (Mancuerna),dumbbell,HAS_VIDEO,,female-Dumbbells-dumbbell-preacher-curl-side.mp4
+pull-up,Dominadas,bodyweight,HAS_VIDEO,,
+pull-up-assisted,Dominada (Asistida),bodyweight,HAS_VIDEO,,female-Bodyweight-bodyweight-assisted-pull-up-side.mp4
+pullover-dumbbell,Pullover (Mancuerna),dumbbell,HAS_VIDEO,,female-dumbbell-pullover-side.mp4
+pullover-machine,Pullover (Máquina),machine,HAS_VIDEO,,female-Machine-machine-pullover-side.mp4
+push-press,Push press,bodyweight,HAS_VIDEO,,
+rack-pull,Rack pull (Peso muerto parcial),bodyweight,HAS_VIDEO,,
+renegade-row-dumbbell,Remo renegado (Mancuerna),dumbbell,HAS_VIDEO,,female-dumbbell-renegade-row-side.mp4
+reverse-crunch,Crunch inverso,bodyweight,HAS_VIDEO,,female-Bodyweight-reverse-crunch-side.mp4
+reverse-curl-barbell,Curl inverso (Barra),barbell,HAS_VIDEO,,female-Barbell-barbell-reverse-curl-side.mp4
+reverse-curl-cable,Curl inverso (Polea),cable,HAS_VIDEO,,female-Cables-cable-reverse-curl-side.mp4
+reverse-curl-dumbbell,Curl inverso (Mancuerna),dumbbell,HAS_VIDEO,,female-Dumbbells-dumbbell-reverse-curl-side.mp4
+reverse-hyperextension,Hiperextensión inversa,bodyweight,HAS_VIDEO,,
+reverse-lunge-barbell,Estocada inversa (Barra),barbell,HAS_VIDEO,,female-barbell-reverse-lunge-side.mp4
+reverse-lunge-dumbbell,Estocada inversa (Mancuerna),dumbbell,HAS_VIDEO,,female-Dumbbells-dumbbell-reverse-lunge-side.mp4
+ring-pull-up,Dominada en anillas,bodyweight,HAS_VIDEO,,female-Bodyweight-ring-pull-up-side.mp4
+romanian-deadlift-barbell,Peso muerto rumano (Barra),barbell,HAS_VIDEO,,female-Barbell-barbell-romanian-deadlift-side.mp4
+romanian-deadlift-dumbbell,Peso muerto rumano (Mancuerna),dumbbell,HAS_VIDEO,,female-Dumbbells-dumbbell-romanian-deadlift-side.mp4
+russian-twist-bodyweight,Giro ruso (Peso corporal),bodyweight,HAS_VIDEO,,female-Bodyweight-bodyweight-russian-twist-side.mp4
+seated-calf-raise,Elevación de gemelos sentado,bodyweight,HAS_VIDEO,,
+seated-lateral-raise-dumbbell,Elevación lateral sentado (Mancuerna),dumbbell,HAS_VIDEO,,female-Dumbbells-seated-lateral-raise-side.mp4
+seated-leg-curl-machine,Curl femoral sentado (Máquina),machine,HAS_VIDEO,,female-Machine-machine-seated-leg-curl-side.mp4
+seated-overhead-press-dumbbell,Press militar sentado (Mancuerna),dumbbell,HAS_VIDEO,,female-dumbbell-seated-overhead-press-side.mp4
+shrug-barbell,Encogimiento (Barra),barbell,HAS_VIDEO,,female-barbell-shrug-side.mp4
+shrug-dumbbell,Encogimiento (Mancuerna),dumbbell,HAS_VIDEO,,female-Dumbbells-dumbbell-shrug-side.mp4
+shrug-machine,Encogimiento (Máquina),machine,HAS_VIDEO,,female-Vitruvian-shrug-side.mp4
+side-bend-dumbbell,Inclinación lateral (Mancuerna),dumbbell,HAS_VIDEO,,female-dumbbell-side-bend-front.mp4
+single-leg-glute-bridge,Puente de glúteo a una pierna,bodyweight,HAS_VIDEO,,female-Bodyweight-single-leg-glute-bridge-side.mp4
+single-leg-hip-thrust-dumbbell,Empuje de cadera a una pierna (Mancuerna),dumbbell,HAS_VIDEO,,female-dumbbell-single-leg-hip-thrust-side.mp4
+skull-crusher,Press francés,bodyweight,HAS_VIDEO,,
+skullcrusher-barbell,Rompecráneos (Barra),barbell,HAS_VIDEO,,female-Barbell-barbell-skullcrusher-side.mp4
+skullcrusher-dumbbell,Rompecráneos (Mancuerna),dumbbell,HAS_VIDEO,,female-dumbbell-skullcrusher-side_BixlAFc.mp4
+snatch,Arranque,bodyweight,HAS_VIDEO,,
+spider-curl-dumbbell,Curl araña (Mancuerna),dumbbell,HAS_VIDEO,,female-dumbbell-spider-curl-side.mp4
+split-jerk,Envión en tijera,bodyweight,HAS_VIDEO,,
+split-squat-dumbbell,Sentadilla dividida (Mancuerna),dumbbell,HAS_VIDEO,,female-dumbbell-split-squat-side.mp4
+squat-band,Sentadilla (Banda),band,HAS_VIDEO,,female-Band-band-squat-side.mp4
+squat-barbell,Sentadilla (Barra),barbell,HAS_VIDEO,,female-Barbell-barbell-squat-side.mp4
+squat-bodyweight,Sentadilla (Peso corporal),bodyweight,HAS_VIDEO,,female-Bodyweight-bodyweight-squat-side.mp4
+squat-suspension,Sentadilla (TRX),suspension,HAS_VIDEO,,female-trx-squat-side.mp4
+standing-calf-raise-machine,Elevación de gemelos de pie (Máquina),machine,HAS_VIDEO,,female-machine-standing-calf-raises-side.mp4
+sumo-deadlift,Peso muerto sumo,bodyweight,HAS_VIDEO,,
+sumo-squat-dumbbell,Sentadilla sumo (Mancuerna),dumbbell,HAS_VIDEO,,female-dumbbell-sumo-squat-side.mp4
+superman,Superman,bodyweight,HAS_VIDEO,,female-Bodyweight-supermans-side.mp4
+thruster-barbell,Thruster (Barra),barbell,HAS_VIDEO,,female-Barbell-barbell-thruster-side.mp4
+thruster-kettlebell,Thruster (Pesa rusa),kettlebell,HAS_VIDEO,,female-Kettlebells-kettlebell-thruster-side.mp4
+tricep-pushdown,Extensión de tríceps en polea,bodyweight,HAS_VIDEO,2,
+upright-row-barbell,Remo al mentón (Barra),barbell,HAS_VIDEO,,female-Barbell-barbell-upright-row-side.mp4
+upright-row-cable,Remo al mentón (Polea),cable,HAS_VIDEO,,female-Cables-cable-upright-row-side.mp4
+upright-row-dumbbell,Remo al mentón (Mancuerna),dumbbell,HAS_VIDEO,,female-dumbbell-upright-row-side.mp4
+wall-ball,Wall ball (Lanzamiento a la pared),bodyweight,HAS_VIDEO,,
+wall-sit,Sentadilla isométrica en la pared,bodyweight,HAS_VIDEO,,female-Bodyweight-wall-sit-side.mp4
+zercher-squat,Sentadilla Zercher,bodyweight,HAS_VIDEO,,
+zottman-curl-dumbbell,Curl Zottman (Mancuerna),dumbbell,HAS_VIDEO,,female-Dumbbells-dumbbell-zottman-curl-side.mp4
+ab-scissors,Tijeras abdominales,bodyweight,NO_VIDEO,,
+ab-wheel,Rueda abdominal,bodyweight,NO_VIDEO,,
+aerobics,Aeróbic,bodyweight,NO_VIDEO,,
+air-bike,Bicicleta de aire,bodyweight,NO_VIDEO,,
+around-the-world,Around the World (Círculos con mancuernas),bodyweight,NO_VIDEO,,
+assisted-pistol-squats,Sentadilla pistol asistida,bodyweight,NO_VIDEO,,
+back-extension-hyperextension,Extensión de espalda (Hiperextensión),bodyweight,NO_VIDEO,,
+back-extension-weighted-hyperextension,Extensión de espalda (Hiperextensión con peso),bodyweight,NO_VIDEO,,
+ball-slams,Golpes con balón medicinal,bodyweight,NO_VIDEO,,
+band-pullaparts,Aperturas con banda,band,NO_VIDEO,,
+battle-ropes,Cuerdas de batalla,bodyweight,NO_VIDEO,,
+behind-the-back-bicep-wrist-curl-barbell,Curl de muñeca tras la espalda (Barra),barbell,NO_VIDEO,,
+behind-the-back-curl-cable,Curl tras la espalda (Polea),cable,NO_VIDEO,,
+bench-press-smith-machine,Press de banca (Multipower),smith-machine,NO_VIDEO,,
+bench-press-wide-grip-barbell,Press de banca agarre abierto (Barra),barbell,NO_VIDEO,,
+bent-over-row-dumbbell,Remo inclinado (Mancuerna),dumbbell,NO_VIDEO,,
+bicep-curl-barbell,Curl de bíceps (Barra),barbell,NO_VIDEO,,
+bicep-curl-cable,Curl de bíceps (Polea),cable,NO_VIDEO,,
+bicep-curl-dumbbell,Curl de bíceps (Mancuerna),dumbbell,NO_VIDEO,,
+bicep-curl-suspension,Curl de bíceps (TRX),suspension,NO_VIDEO,,
+bicycle-crunch-raised-legs,Crunch bicicleta con piernas elevadas,bodyweight,NO_VIDEO,,
+box-squat-barbell,Sentadilla al cajón (Barra),barbell,NO_VIDEO,,
+boxing,Boxeo,bodyweight,NO_VIDEO,,
+burpee-over-the-bar,Burpee sobre la barra,bodyweight,NO_VIDEO,,
+butterfly-pec-deck,Contractor de pecho (Pec Deck),bodyweight,NO_VIDEO,,
+cable-core-palloff-press,Press Pallof en polea,cable,NO_VIDEO,,
+cable-twist-down-to-up,Giro en polea (de abajo hacia arriba),cable,NO_VIDEO,2,
+cable-twist-up-to-down,Giro en polea (de arriba hacia abajo),cable,NO_VIDEO,2,
+calf-extension-machine,Extensión de gemelos (Máquina),machine,NO_VIDEO,,
+calf-press-machine,Press de gemelos (Máquina),machine,NO_VIDEO,,
+chest-dip-assisted,Fondo de pecho (Asistido),bodyweight,NO_VIDEO,,
+chest-dip-weighted,Fondo de pecho (Con peso),bodyweight,NO_VIDEO,,
+chest-fly-machine,Apertura de pecho (Máquina),machine,NO_VIDEO,,
+chest-supported-incline-row-dumbbell,Remo inclinado con soporte de pecho (Mancuerna),dumbbell,NO_VIDEO,,
+chest-supported-reverse-fly-dumbbell,Apertura inversa con soporte de pecho (Mancuerna),dumbbell,NO_VIDEO,,
+chest-supported-y-raise-dumbbell,Elevación en Y con soporte de pecho (Mancuerna),dumbbell,NO_VIDEO,,
+chin-up-weighted,Dominada supina (Con peso),bodyweight,NO_VIDEO,,
+clamshell,Almeja (Clamshell),bodyweight,NO_VIDEO,,
+clap-push-ups,Flexiones con palmada,bodyweight,NO_VIDEO,,
+clean-pull,Tirón de cargada,bodyweight,NO_VIDEO,,
+climbing,Escalada,bodyweight,NO_VIDEO,,
+cross-body-hammer-curl,Curl martillo cruzado,bodyweight,NO_VIDEO,,
+crunch-weighted,Crunch (Con peso),bodyweight,NO_VIDEO,,
+curtsy-lunge-dumbbell,Estocada cruzada (Mancuerna),dumbbell,NO_VIDEO,,
+cycling,Ciclismo,bodyweight,NO_VIDEO,,
+deadlift-band,Peso muerto (Banda),band,NO_VIDEO,,
+deadlift-dumbbell,Peso muerto (Mancuerna),dumbbell,NO_VIDEO,,
+deadlift-high-pull,Peso muerto con tirón alto,bodyweight,NO_VIDEO,,
+deadlift-smith-machine,Peso muerto (Multipower),smith-machine,NO_VIDEO,,
+decline-bench-press-barbell,Press de banca declinado (Barra),barbell,NO_VIDEO,,
+decline-bench-press-machine,Press de banca declinado (Máquina),machine,NO_VIDEO,,
+decline-bench-press-smith-machine,Press de banca declinado (Multipower),smith-machine,NO_VIDEO,,
+decline-crunch-weighted,Crunch declinado (Con peso),bodyweight,NO_VIDEO,,
+diamond-push-up,Flexión diamante,bodyweight,NO_VIDEO,,
+dragon-flag,Dragon flag,bodyweight,NO_VIDEO,,
+dragonfly,Dragonfly,bodyweight,NO_VIDEO,,
+dumbbell-row,Remo con mancuerna,dumbbell,NO_VIDEO,,
+dumbbell-snatch,Arranque con mancuerna,dumbbell,NO_VIDEO,,
+elbow-to-knee,Codo a rodilla,bodyweight,NO_VIDEO,,
+elliptical-trainer,Elíptica,bodyweight,NO_VIDEO,,
+ez-bar-biceps-curl,Curl de bíceps (Barra Z),bodyweight,NO_VIDEO,,
+farmers-walk,Caminata del granjero,bodyweight,NO_VIDEO,,
+feet-up-bench-press-barbell,Press de banca con pies arriba (Barra),barbell,NO_VIDEO,,
+fire-hydrants,Hidrante (Fire hydrant),bodyweight,NO_VIDEO,,
+floor-triceps-dip,Fondo de tríceps en el suelo,bodyweight,NO_VIDEO,,
+flutter-kicks,Patada de tijera,bodyweight,NO_VIDEO,,
+frog-jumps,Saltos de rana,bodyweight,NO_VIDEO,,
+frog-pumps-dumbbell,Empuje de glúteo rana (Mancuerna),dumbbell,NO_VIDEO,,
+front-lever-hold,Front lever isométrico,bodyweight,NO_VIDEO,,
+front-lever-raise,Elevación a front lever,bodyweight,NO_VIDEO,,
+front-raise-cable,Elevación frontal (Polea),cable,NO_VIDEO,,
+front-raise-suspension,Elevación frontal (TRX),suspension,NO_VIDEO,,
+glute-kickback-on-floor,Patada de glúteo en el suelo,bodyweight,NO_VIDEO,,
+good-morning-barbell,Buenos días (Barra),barbell,NO_VIDEO,,
+hammer-curl-band,Curl martillo (Banda),band,NO_VIDEO,,
+handstand-hold,Parada de manos isométrica,bodyweight,NO_VIDEO,,
+handstand-push-up,Flexión en parada de manos,bodyweight,NO_VIDEO,,
+hang-clean,Cargada colgante,bodyweight,NO_VIDEO,,
+hang-snatch,Arranque colgante,bodyweight,NO_VIDEO,,
+hanging-leg-raise,Elevación de piernas colgado,bodyweight,NO_VIDEO,,
+heel-taps,Toques de talón,bodyweight,NO_VIDEO,,
+hex-press-dumbbell,Press hex (Mancuerna),dumbbell,NO_VIDEO,,
+high-knee-skips,Skipping alto con salto,bodyweight,NO_VIDEO,,
+high-knees,Rodillas altas,bodyweight,NO_VIDEO,,
+hiit,HIIT,bodyweight,NO_VIDEO,,
+hiking,Senderismo,bodyweight,NO_VIDEO,,
+hip-thrust-smith-machine,Empuje de cadera (Multipower),smith-machine,NO_VIDEO,,
+hollow-rock,Hollow rock (Balanceo en hueco),bodyweight,NO_VIDEO,,
+incline-bench-press-smith-machine,Press de banca inclinado (Multipower),smith-machine,NO_VIDEO,,
+incline-chest-press-machine,Press de pecho inclinado (Máquina),machine,NO_VIDEO,,
+incline-push-ups,Flexiones inclinadas,bodyweight,NO_VIDEO,,
+inverted-row,Remo invertido,bodyweight,NO_VIDEO,,
+iso-lateral-chest-press-machine,Press de pecho isolateral (Máquina),machine,NO_VIDEO,,
+iso-lateral-high-row-machine,Remo alto isolateral (Máquina),machine,NO_VIDEO,,
+iso-lateral-low-row,Remo bajo isolateral,bodyweight,NO_VIDEO,,
+iso-lateral-row-machine,Remo isolateral (Máquina),machine,NO_VIDEO,,
+jack-knife-suspension,Navaja (TRX),suspension,NO_VIDEO,,
+jackknife-sit-up,Abdominal navaja,bodyweight,NO_VIDEO,,
+jm-press-barbell,Press JM (Barra),barbell,NO_VIDEO,,
+jump-shrug,Encogimiento con salto,bodyweight,NO_VIDEO,,
+jumping-jack,Saltos de tijera (Jumping jack),bodyweight,NO_VIDEO,,
+jumping-lunge,Estocada con salto,bodyweight,NO_VIDEO,,
+kettlebell-around-the-world,Círculos con pesa rusa,kettlebell,NO_VIDEO,,
+kettlebell-clean,Cargada con pesa rusa,kettlebell,NO_VIDEO,,
+kettlebell-halo,Halo con pesa rusa,kettlebell,NO_VIDEO,,
+kettlebell-high-pull,Tirón alto con pesa rusa,kettlebell,NO_VIDEO,,
+kettlebell-shoulder-press,Press de hombros con pesa rusa,kettlebell,NO_VIDEO,,
+kettlebell-snatch,Arranque con pesa rusa,kettlebell,NO_VIDEO,,
+kettlebell-turkish-get-up,Levantada turca con pesa rusa,kettlebell,NO_VIDEO,,
+kipping-pull-up,Dominada kipping,bodyweight,NO_VIDEO,,
+knee-raise-parallel-bars,Elevación de rodillas en paralelas,bodyweight,NO_VIDEO,,
+kneeling-push-up,Flexión de rodillas,bodyweight,NO_VIDEO,,
+l-sit-hold,L-sit isométrico,bodyweight,NO_VIDEO,,
+landmine-180,Landmine 180,bodyweight,NO_VIDEO,,
+landmine-squat-and-press,Sentadilla y press landmine,bodyweight,NO_VIDEO,,
+lat-pulldown-band,Jalón al pecho (Banda),band,NO_VIDEO,,
+lat-pulldown-cable,Jalón al pecho (Polea),cable,NO_VIDEO,,
+lat-pulldown-close-grip-cable,Jalón al pecho agarre cerrado (Polea),cable,NO_VIDEO,,
+lateral-band-walks,Caminata lateral con banda,bodyweight,NO_VIDEO,,
+lateral-box-jump,Salto lateral al cajón,bodyweight,NO_VIDEO,,
+lateral-leg-raises,Elevación lateral de pierna,bodyweight,NO_VIDEO,,
+lateral-squat,Sentadilla lateral,bodyweight,NO_VIDEO,,
+leg-raise-parallel-bars,Elevación de piernas en paralelas,bodyweight,NO_VIDEO,,
+low-cable-fly-crossovers,Cruces bajos en polea,bodyweight,NO_VIDEO,,
+low-row-suspension,Remo bajo (TRX),suspension,NO_VIDEO,,
+lunge-barbell,Estocada (Barra),barbell,NO_VIDEO,,
+lunge-dumbbell,Estocada (Mancuerna),dumbbell,NO_VIDEO,,
+lying-knee-raise,Elevación de rodillas tumbado,bodyweight,NO_VIDEO,,
+lying-leg-curl-machine,Curl femoral tumbado (Máquina),machine,NO_VIDEO,,
+lying-leg-raise,Elevación de piernas tumbado,bodyweight,NO_VIDEO,,
+lying-neck-curls-weighted,Flexión de cuello tumbado (Con peso),bodyweight,NO_VIDEO,,
+lying-neck-extension-weighted,Extensión de cuello tumbado (Con peso),bodyweight,NO_VIDEO,,
+muscle-up,Muscle up,bodyweight,NO_VIDEO,,
+negative-pull-up,Dominada negativa,bodyweight,NO_VIDEO,,
+one-arm-push-up,Flexión a un brazo,bodyweight,NO_VIDEO,,
+overhead-curl-cable,Curl por encima de la cabeza (Polea),cable,NO_VIDEO,,
+overhead-dumbbell-lunge,Estocada con mancuerna sobre la cabeza,bodyweight,NO_VIDEO,,
+overhead-plate-raise,Elevación de disco sobre la cabeza,bodyweight,NO_VIDEO,,
+overhead-press-smith-machine,Press militar (Multipower),smith-machine,NO_VIDEO,,
+partial-glute-bridge-barbell,Puente de glúteo parcial (Barra),barbell,NO_VIDEO,,
+pause-squat-barbell,Sentadilla con pausa (Barra),barbell,NO_VIDEO,,
+pendlay-row-barbell,Remo Pendlay (Barra),barbell,NO_VIDEO,,
+pilates,Pilates,bodyweight,NO_VIDEO,,
+pinwheel-curl-dumbbell,Curl molinete (Mancuerna),dumbbell,NO_VIDEO,,
+pistol-squat,Sentadilla pistol,bodyweight,NO_VIDEO,,
+plank-pushup,Plancha con flexión,bodyweight,NO_VIDEO,,
+plate-curl,Curl con disco,plate,NO_VIDEO,,
+plate-press,Press con disco,plate,NO_VIDEO,,
+plate-squeeze-svend-press,Press de disco (Svend Press),plate,NO_VIDEO,,
+power-clean,Cargada de potencia,bodyweight,NO_VIDEO,,
+preacher-curl-barbell,Curl predicador (Barra),barbell,NO_VIDEO,,
+preacher-curl-machine,Curl predicador (Máquina),machine,NO_VIDEO,,
+press-under,Press under,bodyweight,NO_VIDEO,,
+pull-up-band,Dominada (Banda),band,NO_VIDEO,,
+pull-up-weighted,Dominada (Con peso),bodyweight,NO_VIDEO,,
+push-up-close-grip,Flexión agarre cerrado,bodyweight,NO_VIDEO,,
+push-up-weighted,Flexión (Con peso),bodyweight,NO_VIDEO,,
+rear-delt-reverse-fly-cable,Apertura inversa de deltoides posterior (Polea),cable,NO_VIDEO,,
+rear-delt-reverse-fly-dumbbell,Apertura inversa de deltoides posterior (Mancuerna),dumbbell,NO_VIDEO,,
+rear-delt-reverse-fly-machine,Apertura inversa de deltoides posterior (Máquina),machine,NO_VIDEO,,
+rear-kick-machine,Patada trasera (Máquina),machine,NO_VIDEO,,
+reverse-fly-single-arm-cable,Apertura inversa a un brazo (Polea),cable,NO_VIDEO,,
+reverse-grip-concentration-curl,Curl concentrado agarre inverso,bodyweight,NO_VIDEO,,
+reverse-grip-lat-pulldown-cable,Jalón al pecho agarre supino (Polea),cable,NO_VIDEO,,
+reverse-plank,Plancha inversa,bodyweight,NO_VIDEO,,
+ring-dips,Fondos en anillas,bodyweight,NO_VIDEO,,
+ring-push-up,Flexión en anillas,bodyweight,NO_VIDEO,,
+rope-cable-curl,Curl con cuerda en polea,bodyweight,NO_VIDEO,,
+rope-straight-arm-pulldown,Jalón con brazos rectos y cuerda,bodyweight,NO_VIDEO,,
+rowing-machine,Máquina de remo,machine,NO_VIDEO,,
+running,Correr,bodyweight,NO_VIDEO,,
+russian-twist-weighted,Giro ruso (Con peso),bodyweight,NO_VIDEO,,
+scapular-pull-ups,Dominadas escapulares,bodyweight,NO_VIDEO,,
+seated-cable-row-bar-grip,Remo sentado en polea (Agarre de barra),bodyweight,NO_VIDEO,,
+seated-cable-row-bar-wide-grip,Remo sentado en polea (Agarre abierto),bodyweight,NO_VIDEO,,
+seated-cable-row-v-grip-cable,Remo sentado en polea (Agarre en V),cable,NO_VIDEO,,
+seated-chest-flys-cable,Aperturas de pecho sentado (Polea),cable,NO_VIDEO,,
+seated-dip-machine,Fondos en máquina sentado,machine,NO_VIDEO,,
+seated-incline-curl-dumbbell,Curl inclinado sentado (Mancuerna),dumbbell,NO_VIDEO,,
+seated-overhead-press-barbell,Press militar sentado (Barra),barbell,NO_VIDEO,,
+seated-palms-up-wrist-curl,Curl de muñeca sentado con palmas arriba,bodyweight,NO_VIDEO,,
+seated-row-machine,Remo sentado (Máquina),machine,NO_VIDEO,,
+seated-shoulder-press-machine,Press de hombros sentado (Máquina),machine,NO_VIDEO,,
+seated-triceps-press,Press de tríceps sentado,bodyweight,NO_VIDEO,,
+seated-wrist-extension-barbell,Extensión de muñeca sentado (Barra),barbell,NO_VIDEO,,
+shoulder-press-dumbbell,Press de hombros (Mancuerna),dumbbell,NO_VIDEO,,
+shoulder-press-machine-plates,Press de hombros (Máquina de discos),bodyweight,NO_VIDEO,,
+shoulder-taps,Toques de hombro,bodyweight,NO_VIDEO,,
+shrug-cable,Encogimiento (Polea),cable,NO_VIDEO,,
+shrug-smith-machine,Encogimiento (Multipower),smith-machine,NO_VIDEO,,
+side-plank,Plancha lateral,bodyweight,NO_VIDEO,,
+single-arm-cable-crossover,Cruce en polea a un brazo,bodyweight,NO_VIDEO,,
+single-arm-cable-row,Remo en polea a un brazo,bodyweight,NO_VIDEO,,
+single-arm-curl-cable,Curl a un brazo (Polea),cable,NO_VIDEO,,
+single-arm-landmine-press-barbell,Press landmine a un brazo (Barra),barbell,NO_VIDEO,,
+single-arm-lat-pulldown,Jalón al pecho a un brazo,bodyweight,NO_VIDEO,,
+single-arm-lateral-raise-cable,Elevación lateral a un brazo (Polea),cable,NO_VIDEO,,
+single-arm-tricep-extension-dumbbell,Extensión de tríceps a un brazo (Mancuerna),dumbbell,NO_VIDEO,,
+single-arm-triceps-pushdown-cable,Empuje de tríceps a un brazo (Polea),cable,NO_VIDEO,,
+single-leg-extensions,Extensión de cuádriceps a una pierna,bodyweight,NO_VIDEO,,
+single-leg-press-machine,Prensa a una pierna (Máquina),machine,NO_VIDEO,,
+single-leg-romanian-deadlift-barbell,Peso muerto rumano a una pierna (Barra),barbell,NO_VIDEO,,
+single-leg-romanian-deadlift-dumbbell,Peso muerto rumano a una pierna (Mancuerna),dumbbell,NO_VIDEO,,
+single-leg-standing-calf-raise-barbell,Elevación de gemelo de pie a una pierna (Barra),barbell,NO_VIDEO,,
+single-leg-standing-calf-raise-dumbbell,Elevación de gemelo de pie a una pierna (Mancuerna),dumbbell,NO_VIDEO,,
+single-leg-standing-calf-raise-machine,Elevación de gemelo de pie a una pierna (Máquina),machine,NO_VIDEO,,
+sissy-squat-weighted,Sentadilla sissy (Con peso),bodyweight,NO_VIDEO,,
+sit-up,Abdominal completo (Sit up),bodyweight,NO_VIDEO,,
+sit-up-weighted,Abdominal completo (Con peso),bodyweight,NO_VIDEO,,
+skating,Patinaje,bodyweight,NO_VIDEO,,
+skiing,Esquí,bodyweight,NO_VIDEO,,
+sled-push,Empuje de trineo,bodyweight,NO_VIDEO,,
+snowboarding,Snowboard,bodyweight,NO_VIDEO,,
+spider-curl-barbell,Curl araña (Barra),barbell,NO_VIDEO,,
+spiderman,Spiderman,bodyweight,NO_VIDEO,,
+spinning,Spinning,bodyweight,NO_VIDEO,,
+sprints,Sprints,bodyweight,NO_VIDEO,,
+squat-dumbbell,Sentadilla (Mancuerna),dumbbell,NO_VIDEO,,
+squat-machine,Sentadilla (Máquina),machine,NO_VIDEO,,
+squat-row,Sentadilla con remo,bodyweight,NO_VIDEO,,
+squat-smith-machine,Sentadilla (Multipower),smith-machine,NO_VIDEO,,
+stair-machine-floors,Escaladora (Pisos),bodyweight,NO_VIDEO,,
+stair-machine-steps,Escaladora (Escalones),bodyweight,NO_VIDEO,,
+standing-cable-glute-kickbacks,Patada de glúteo de pie en polea,bodyweight,NO_VIDEO,,
+standing-calf-raise-barbell,Elevación de gemelos de pie (Barra),barbell,NO_VIDEO,,
+standing-calf-raise-dumbbell,Elevación de gemelos de pie (Mancuerna),dumbbell,NO_VIDEO,,
+standing-calf-raise-smith,Elevación de gemelos de pie (Multipower),bodyweight,NO_VIDEO,,
+standing-leg-curls,Curl femoral de pie,bodyweight,NO_VIDEO,,
+standing-military-press-barbell,Press militar de pie (Barra),barbell,NO_VIDEO,,
+sternum-pull-up-gironda,Dominada al esternón (Gironda),bodyweight,NO_VIDEO,,
+straight-arm-lat-pulldown-cable,Jalón con brazos rectos (Polea),cable,NO_VIDEO,,
+straight-leg-deadlift,Peso muerto con piernas rectas,bodyweight,NO_VIDEO,,
+stretching,Estiramientos,bodyweight,NO_VIDEO,,
+sumo-squat-barbell,Sentadilla sumo (Barra),barbell,NO_VIDEO,,
+sumo-squat-kettlebell,Sentadilla sumo (Pesa rusa),kettlebell,NO_VIDEO,,
+swimming,Natación,bodyweight,NO_VIDEO,,
+t-bar-row,Remo en T,bodyweight,NO_VIDEO,,
+toe-touch,Toque de puntas,bodyweight,NO_VIDEO,,
+toes-to-bar,Pies a la barra,bodyweight,NO_VIDEO,,
+torso-rotation,Rotación de torso,bodyweight,NO_VIDEO,,
+treadmill,Cinta de correr,bodyweight,NO_VIDEO,,
+triceps-dip-assisted,Fondo de tríceps (Asistido),bodyweight,NO_VIDEO,,
+triceps-dip-weighted,Fondo de tríceps (Con peso),bodyweight,NO_VIDEO,,
+triceps-extension-barbell,Extensión de tríceps (Barra),barbell,NO_VIDEO,,
+triceps-extension-cable,Extensión de tríceps (Polea),cable,NO_VIDEO,,
+triceps-extension-dumbbell,Extensión de tríceps (Mancuerna),dumbbell,NO_VIDEO,,
+triceps-extension-machine,Extensión de tríceps (Máquina),machine,NO_VIDEO,,
+triceps-extension-suspension,Extensión de tríceps (TRX),suspension,NO_VIDEO,,
+triceps-pressdown,Empuje de tríceps en polea,bodyweight,NO_VIDEO,,
+triceps-pushdown,Empuje de tríceps,bodyweight,NO_VIDEO,2,
+triceps-rope-pushdown,Empuje de tríceps con cuerda,bodyweight,NO_VIDEO,,
+v-up,V up (Abdominal en V),bodyweight,NO_VIDEO,,
+vertical-traction-machine,Tracción vertical (Máquina),machine,NO_VIDEO,,
+waiter-curl-dumbbell,Curl camarero (Mancuerna),dumbbell,NO_VIDEO,,
+walking,Caminar,bodyweight,NO_VIDEO,,
+walking-lunge-dumbbell,Estocada caminando (Mancuerna),dumbbell,NO_VIDEO,,
+warm-up,Calentamiento,bodyweight,NO_VIDEO,,
+wide-elbow-triceps-press-dumbbell,Press de tríceps con codos abiertos (Mancuerna),dumbbell,NO_VIDEO,,
+wide-pull-up,Dominada abierta,bodyweight,NO_VIDEO,,
+wrist-roller,Enrollador de muñeca,bodyweight,NO_VIDEO,,
+yoga,Yoga,bodyweight,NO_VIDEO,,

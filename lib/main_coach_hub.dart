@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app/coach_hub_app.dart';
@@ -24,6 +25,10 @@ import 'firebase_options.dart';
 ///   firebase deploy --only hosting:coach-hub-dev
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Datos de formato de fecha en español (etiquetas del calendario, meses).
+  await initializeDateFormatting('es');
+
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
