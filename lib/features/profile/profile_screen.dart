@@ -101,6 +101,24 @@ class _AthleteProfile extends ConsumerWidget {
               ),
             ],
           ),
+          // ── Apariencia section (REQ-LM-009) ──────────────────────────────
+          _A11ySectionGroup(
+            title: l10n.profileSectionAppearance.toUpperCase(),
+            palette: palette,
+            tiles: [
+              Semantics(
+                button: true,
+                label: l10n.appearanceTitle,
+                excludeSemantics: true,
+                child: ProfileSectionTile(
+                  icon: TreinoIcon.appearance,
+                  title: l10n.appearanceTitle,
+                  inGroup: true,
+                  onTap: () => context.push('/profile/settings/appearance'),
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 12),
           // ── Sesión section — PR#4 v2 pivot 2026-05-28 ────────────────────
           // Sign-out + account deletion grouped in one boxed section, mockup
