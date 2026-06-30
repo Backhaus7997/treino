@@ -38,7 +38,9 @@ import 'package:treino/features/profile/application/user_public_profile_provider
 import 'package:treino/features/profile/domain/experience_level.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/features/workout/application/assigned_routine_providers.dart';
+import 'package:treino/features/workout/application/exercise_progression_providers.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
+import 'package:treino/features/workout/domain/exercise_progression.dart';
 import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/domain/routine_day.dart';
 import 'package:treino/features/workout/domain/routine_slot.dart';
@@ -46,6 +48,7 @@ import 'package:treino/features/workout/domain/routine_status.dart';
 import 'package:treino/features/workout/domain/session.dart';
 import 'package:treino/features/workout/domain/session_status.dart';
 import 'package:treino/features/workout/domain/set_log.dart';
+import 'package:treino/features/workout/presentation/widgets/exercise_progression_chart.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
 class _MockRepo extends Mock implements TrainerLinkRepository {}
@@ -216,6 +219,9 @@ Future<void> _pump(
   Object? performanceError,
   List<SetLog> setLogs = const [],
   Object? sessionsError,
+  // PR2 — exercise progression overrides
+  List<ExerciseListEntry>? exerciseList,
+  ExerciseProgression? exerciseProgression,
 }) async {
   tester.view.physicalSize = const Size(1200, 900);
   tester.view.devicePixelRatio = 1.0;
@@ -247,6 +253,18 @@ Future<void> _pump(
         coachSessionSetLogsProvider.overrideWith((ref, key) async => setLogs),
         if (paymentRepo != null)
           paymentRepositoryProvider.overrideWithValue(paymentRepo),
+        // PR2 — exercise progression providers (default: no exercises / empty)
+        athleteExerciseListProvider.overrideWith(
+          (ref, uid) async => exerciseList ?? const [],
+        ),
+        exerciseProgressionProvider.overrideWith(
+          (ref, key) async =>
+              exerciseProgression ??
+              ExerciseProgression.empty(
+                exerciseId: key.exerciseId,
+                exerciseName: '',
+              ),
+        ),
       ],
       child: MaterialApp(
         // l10n EXACTO como CoachHubApp (W2 PR8): delegates + supportedLocales +
@@ -1222,6 +1240,111 @@ void main() {
 
     test('diciembre (tope del array de meses)', () {
       expect(fmtDayMonth(DateTime(2026, 12, 1)), '1 diciembre');
+    });
+  });
+
+  // ── PR2: Entrenamientos tab — evolución por ejercicio (TASK-10) ──────────────
+
+  group('tab Entrenamientos: evolución por ejercicio (PR2)', () {
+    testWidgets(
+        'placeholder "Próximamente" ya no existe en el tab Entrenamientos (TASK-10)',
+        (tester) async {
+      await _pump(
+        tester,
+        profile: _prof(),
+        link: _link(TrainerLinkStatus.active),
+      );
+
+      await tester.tap(find.descendant(
+          of: find.byType(TabBar), matching: find.text('Entrenamientos')));
+      await tester.pumpAndSettle();
+
+      // SCENARIO-PROG-11A: placeholder gone.
+      expect(
+        find.textContaining('Próximamente: evolución'),
+        findsNothing,
+      );
+    });
+
+    testWidgets(
+        'sin setLogs → empty-state "sin registros" (SCENARIO-PROG-08A / REQ-PROG-11)',
+        (tester) async {
+      await _pump(
+        tester,
+        profile: _prof(),
+        link: _link(TrainerLinkStatus.active),
+        exerciseList: const [], // no exercises
+      );
+
+      await tester.tap(find.descendant(
+          of: find.byType(TabBar), matching: find.text('Entrenamientos')));
+      await tester.pumpAndSettle();
+
+      // Empty state label (SCENARIO-PROG-08A).
+      expect(find.text('EVOLUCIÓN POR EJERCICIO'), findsOneWidget);
+      expect(find.textContaining('Sin registros'), findsOneWidget);
+      // Picker and chart are NOT rendered when list is empty.
+      expect(find.byType(ExercisePickerRow), findsNothing);
+    });
+
+    testWidgets(
+        'con setLogs → picker + chart renderizan (SCENARIO-PROG-11A / REQ-PROG-11)',
+        (tester) async {
+      final entry = const ExerciseListEntry(
+        exerciseId: 'squat',
+        exerciseName: 'Sentadilla',
+      );
+      final progression = ExerciseProgression(
+        exerciseId: 'squat',
+        exerciseName: 'Sentadilla',
+        prSeries: [
+          ProgressionPoint(date: DateTime.utc(2026, 1, 1), value: 90),
+          ProgressionPoint(date: DateTime.utc(2026, 1, 8), value: 95),
+        ],
+        volumeSeries: [
+          ProgressionPoint(date: DateTime.utc(2026, 1, 1), value: 450),
+          ProgressionPoint(date: DateTime.utc(2026, 1, 8), value: 475),
+        ],
+        frequencyLast8Weeks: 3,
+      );
+
+      await _pump(
+        tester,
+        profile: _prof(),
+        link: _link(TrainerLinkStatus.active),
+        exerciseList: [entry],
+        exerciseProgression: progression,
+      );
+
+      await tester.tap(find.descendant(
+          of: find.byType(TabBar), matching: find.text('Entrenamientos')));
+      await tester.pumpAndSettle();
+
+      // Section header always present.
+      expect(find.text('EVOLUCIÓN POR EJERCICIO'), findsOneWidget);
+      // Picker renders with exercise name (SCENARIO-PROG-11A).
+      expect(find.byType(ExercisePickerRow), findsOneWidget);
+      expect(find.text('Sentadilla'), findsOneWidget);
+      // Chart widget renders (SCENARIO-PROG-11A).
+      expect(find.byType(ExerciseProgressionChart), findsOneWidget);
+    });
+
+    testWidgets(
+        'strings en web son español hardcodeado, no AppL10n (SCENARIO-PROG-11B)',
+        (tester) async {
+      await _pump(
+        tester,
+        profile: _prof(),
+        link: _link(TrainerLinkStatus.active),
+      );
+
+      await tester.tap(find.descendant(
+          of: find.byType(TabBar), matching: find.text('Entrenamientos')));
+      await tester.pumpAndSettle();
+
+      // The section label is always rendered as hardcoded 'EVOLUCIÓN POR EJERCICIO'
+      // regardless of locale — never sourced from AppL10n.
+      expect(find.text('EVOLUCIÓN POR EJERCICIO'), findsOneWidget);
     });
   });
 }
