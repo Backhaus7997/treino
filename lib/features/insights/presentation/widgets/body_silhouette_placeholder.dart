@@ -168,15 +168,20 @@ class _BodyView extends StatelessWidget {
       alignment: Alignment.center,
       fit: StackFit.expand,
       children: [
-        // Base body silhouette (always present).
-        Image.asset(
-          baseAsset,
-          fit: BoxFit.contain,
-          errorBuilder: (_, __, ___) => Center(
-            child: Icon(
-              TreinoIcon.tabWorkout,
-              size: 32,
-              color: palette.accent.withValues(alpha: 0.5),
+        // Base body silhouette — ColorFiltered so the PNG silhouette adopts
+        // palette.textPrimary in both light and dark modes (srcIn replaces
+        // RGB while keeping the PNG alpha channel).
+        ColorFiltered(
+          colorFilter: ColorFilter.mode(palette.textPrimary, BlendMode.srcIn),
+          child: Image.asset(
+            baseAsset,
+            fit: BoxFit.contain,
+            errorBuilder: (_, __, ___) => Center(
+              child: Icon(
+                TreinoIcon.tabWorkout,
+                size: 32,
+                color: palette.accent.withValues(alpha: 0.5),
+              ),
             ),
           ),
         ),
