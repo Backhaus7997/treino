@@ -88,8 +88,7 @@ class _RoutineDetailScreenState extends ConsumerState<RoutineDetailScreen> {
               // BEFORE clamping.
               if (routine.days.isEmpty) {
                 return _EmptyState(
-                    message:
-                        AppL10n.of(context).routineDetailNoDaysConfigured);
+                    message: AppL10n.of(context).routineDetailNoDaysConfigured);
               }
               final dayIndex =
                   selectedDayIndex.clamp(0, routine.days.length - 1);
@@ -151,7 +150,7 @@ class _BackBar extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(left: 12, top: 8),
       child: Material(
-        color: Colors.black.withValues(alpha: 0.35),
+        color: palette.scrimDark.withValues(alpha: 0.35),
         shape: const CircleBorder(),
         clipBehavior: Clip.antiAlias,
         child: Semantics(
@@ -566,7 +565,7 @@ class _HeroStrip extends ConsumerWidget {
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    Colors.black.withValues(alpha: 0.45),
+                    palette.scrimDark.withValues(alpha: 0.45),
                     Colors.transparent,
                   ],
                 ),

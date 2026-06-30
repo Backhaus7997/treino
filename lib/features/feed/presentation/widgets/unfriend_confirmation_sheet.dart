@@ -72,7 +72,7 @@ class UnfriendConfirmationSheet extends StatelessWidget {
                   label: 'ELIMINAR',
                   bg: palette.danger,
                   borderColor: palette.danger,
-                  textColor: Colors.white,
+                  textColor: palette.onDanger,
                   onPressed: () {
                     Navigator.of(context).pop();
                     onConfirm();

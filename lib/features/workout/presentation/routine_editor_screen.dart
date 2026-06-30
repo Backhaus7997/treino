@@ -3501,7 +3501,7 @@ class _SetRowState extends State<_SetRow> {
     return switch (type) {
       SetType.warmup => palette.accent.withAlpha(30),
       SetType.drop => palette.highlight.withAlpha(30),
-      SetType.failure => Colors.red.withAlpha(30),
+      SetType.failure => palette.danger.withAlpha(30),
       SetType.normal => palette.bgCard,
     };
   }
@@ -3510,7 +3510,7 @@ class _SetRowState extends State<_SetRow> {
     return switch (type) {
       SetType.warmup => palette.accent,
       SetType.drop => palette.highlight,
-      SetType.failure => Colors.red,
+      SetType.failure => palette.danger,
       SetType.normal => palette.textMuted,
     };
   }

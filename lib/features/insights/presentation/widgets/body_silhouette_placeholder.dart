@@ -168,7 +168,11 @@ class _BodyView extends StatelessWidget {
       alignment: Alignment.center,
       fit: StackFit.expand,
       children: [
-        // Base body silhouette (always present).
+        // Base body silhouette — rendered as the raw dark-baked PNG. On a
+        // light background it reads as a solid black silhouette (high
+        // contrast); on dark backgrounds the near-black bg still gives
+        // enough silhouette outline. Asset-side anatomical detail would
+        // require re-exporting the PNGs with stroked muscle definition.
         Image.asset(
           baseAsset,
           fit: BoxFit.contain,
