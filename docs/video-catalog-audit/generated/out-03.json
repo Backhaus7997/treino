@@ -1,0 +1,407 @@
+[
+  {
+    "slug": "incline-bench-press",
+    "nombre": "Press de banca inclinado",
+    "tecnica": [
+      "Recostáte en el banco inclinado, apoyá los pies en el suelo y tomá la barra con agarre a la anchura de los hombros.",
+      "Bajá la barra de forma controlada hasta el tercio superior del pecho manteniendo los codos a 45°.",
+      "Empujá la barra hacia arriba y levemente hacia atrás hasta extender los brazos por completo."
+    ]
+  },
+  {
+    "slug": "incline-chest-fly",
+    "nombre": "Apertura de pecho inclinada",
+    "tecnica": [
+      "Recostáte en el banco inclinado con los brazos extendidos sobre el pecho y una ligera flexión en los codos.",
+      "Abrí los brazos hacia los lados en arco amplio hasta sentir el estiramiento en el pectoral.",
+      "Cerrá los brazos de vuelta al centro contraendo el pecho y sin que las manos se toquen."
+    ]
+  },
+  {
+    "slug": "incline-push-up",
+    "nombre": "Flexión inclinada",
+    "tecnica": [
+      "Apoyá las manos en una superficie elevada al ancho de los hombros y extendé el cuerpo en línea recta.",
+      "Bajá el pecho hacia la superficie doblando los codos a 45° y manteneniendo el core firme.",
+      "Empujá el suelo con las manos hasta extender los brazos y volvé a la posición inicial."
+    ]
+  },
+  {
+    "slug": "j-m-press",
+    "nombre": "Press JM",
+    "tecnica": [
+      "Recostáte en el banco plano, tomá la barra con agarre estrecho y posicionála sobre la parte alta del pecho.",
+      "Bajá la barra en diagonal hacia la garganta flexionando los codos con los antebrazos casi verticales.",
+      "Empujá la barra de vuelta a la posición inicial extendiendo los tríceps hasta bloquear los codos."
+    ]
+  },
+  {
+    "slug": "knee-push-ups",
+    "nombre": "Flexión en rodillas",
+    "tecnica": [
+      "Arrodillate en el suelo, apoyá las manos al ancho de los hombros y extendé el cuerpo en diagonal.",
+      "Bajá el pecho hacia el suelo doblando los codos a 45° sin dejar caer las caderas.",
+      "Empujá el suelo hasta extender los brazos y volvé a la posición de partida controlando el movimiento."
+    ]
+  },
+  {
+    "slug": "larsen-bench-press",
+    "nombre": "Press de banca Larsen",
+    "tecnica": [
+      "Recostáte en el banco plano con los pies elevados y extendidos, sin apoyarlos en el suelo.",
+      "Bajá la barra de forma controlada hasta el pecho manteniendo los antebrazos verticales.",
+      "Empujá la barra hacia arriba hasta extender los brazos, estabilizando el core durante todo el recorrido."
+    ]
+  },
+  {
+    "slug": "larsen-press",
+    "nombre": "Press Larsen",
+    "tecnica": [
+      "Recostáte en el banco plano con los pies elevados y extendidos, tomá las mancuernas con agarre neutro.",
+      "Bajá las mancuernas hasta la altura del pecho con los codos ligeramente cerrados.",
+      "Empujá hacia arriba extendiendo los brazos y manteniendo el core activo sin arquear la espalda."
+    ]
+  },
+  {
+    "slug": "medicine-ball-pushup",
+    "nombre": "Flexión sobre balón medicinal",
+    "tecnica": [
+      "Apoyá una o ambas manos sobre el balón medicinal y colocá el cuerpo en posición de plancha alta.",
+      "Bajá el pecho hacia el balón doblando los codos de forma controlada y manteniendo el core firme.",
+      "Empujá hasta extender los brazos y volvé a la posición inicial sin perder la alineación del cuerpo."
+    ]
+  },
+  {
+    "slug": "neutral-bench-press",
+    "nombre": "Press de banca neutro",
+    "tecnica": [
+      "Recostáte en el banco plano, tomá las mancuernas con agarre neutro (palmas enfrentadas) sobre el pecho.",
+      "Bajá las mancuernas de forma controlada manteniendo los codos pegados al cuerpo.",
+      "Empujá hacia arriba hasta extender los brazos sin que las mancuernas choquen entre sí."
+    ]
+  },
+  {
+    "slug": "neutral-chest-press",
+    "nombre": "Press de pecho neutro",
+    "tecnica": [
+      "Sentáte en la máquina, ajustá el asiento para que los mangos queden a la altura del pecho y tomálos con agarre neutro.",
+      "Empujá los mangos hacia adelante extendiendo los brazos sin trabar los codos al final.",
+      "Volvé lentamente a la posición inicial sin que el peso descanse en el tope de la máquina."
+    ]
+  },
+  {
+    "slug": "paloff-press-rotation",
+    "nombre": "Press Pallof con rotación",
+    "tecnica": [
+      "Paráte lateral a la polea, tomá el mango con ambas manos a la altura del pecho y alejáte para generar tensión.",
+      "Empujá el mango hacia adelante extendiendo los brazos y luego rotá el torso alejándote de la polea.",
+      "Volvé al centro, doblá los codos y retorná el mango al pecho de forma controlada."
+    ]
+  },
+  {
+    "slug": "pec-fly",
+    "nombre": "Apertura de pecho",
+    "tecnica": [
+      "Sentáte en la máquina o posicionáte frente a la polea con los brazos abiertos y codos ligeramente flexionados.",
+      "Cerrá los brazos en arco amplio hacia el centro contrayendo el pectoral al máximo.",
+      "Volvé lentamente a la posición inicial controlando la apertura y sin hiperextender los hombros."
+    ]
+  },
+  {
+    "slug": "push-up",
+    "nombre": "Flexión",
+    "tecnica": [
+      "Apoyá las manos al ancho de los hombros, extendé las piernas y mantené el cuerpo en línea recta de cabeza a talones.",
+      "Bajá el pecho hacia el suelo doblando los codos a 45° sin dejar que las caderas caigan.",
+      "Empujá el suelo con las manos hasta extender los brazos y volvé al inicio de forma controlada."
+    ]
+  },
+  {
+    "slug": "pushup",
+    "nombre": "Flexión",
+    "tecnica": [
+      "Posicionáte en plancha alta con las manos al ancho de los hombros y el cuerpo alineado.",
+      "Bajá el pecho hacia el suelo (o asistido con banda/TRX) manteniendo el core activo y los codos a 45°.",
+      "Empujá hasta extender los brazos volviendo a la posición inicial de forma controlada."
+    ]
+  },
+  {
+    "slug": "pushup-renegade-row",
+    "nombre": "Flexión con remo renegado",
+    "tecnica": [
+      "Apoyá las manos sobre las mancuernas en posición de plancha alta con los pies separados para mayor estabilidad.",
+      "Realizá una flexión completa bajando el pecho hacia el suelo y volvé arriba.",
+      "Desde arriba, llevá una mancuerna hacia la cadera haciendo remo, apretá la escápula y alternálas."
+    ]
+  },
+  {
+    "slug": "ring-standing-pushup",
+    "nombre": "Flexión en anillas de pie",
+    "tecnica": [
+      "Tomá las anillas reguladas a la altura del pecho, incliná el cuerpo hacia adelante manteniendo la alineación.",
+      "Bajá el pecho hacia las anillas doblando los codos y controlando la inestabilidad del anillo.",
+      "Empujá hacia atrás hasta extender los brazos, estabilizando hombros y core durante todo el movimiento."
+    ]
+  },
+  {
+    "slug": "seated-y-press",
+    "nombre": "Press Y sentado",
+    "tecnica": [
+      "Sentáte con la espalda recta, tomá las mancuernas a la altura de los hombros con los codos hacia adelante.",
+      "Empujá las mancuernas hacia arriba y hacia afuera formando una Y con los brazos al llegar arriba.",
+      "Bajá de forma controlada volviendo los codos a la posición inicial frente a los hombros."
+    ]
+  },
+  {
+    "slug": "single-arm-press",
+    "nombre": "Press a un brazo",
+    "tecnica": [
+      "Recostáte en el banco plano o sentáte, tomá una mancuerna con una mano a la altura del pecho.",
+      "Empujá hacia arriba extendiendo el brazo sin rotar el torso y manteniendo el hombro contrario apoyado.",
+      "Bajá de forma controlada hasta la posición inicial y completá las repeticiones antes de cambiar de brazo."
+    ]
+  },
+  {
+    "slug": "squeeze-press",
+    "nombre": "Press de apretón",
+    "tecnica": [
+      "Recostáte en el banco plano, tomá las mancuernas y unilas en el centro del pecho presionándolas entre sí.",
+      "Empujá hacia arriba manteniendo la presión constante entre las mancuernas durante todo el recorrido.",
+      "Bajá lentamente sin soltar la tensión entre las mancuernas hasta volver al pecho."
+    ]
+  },
+  {
+    "slug": "standing-chest-press",
+    "nombre": "Press de pecho de pie",
+    "tecnica": [
+      "Paráte con un pie adelante, tomá la banda o cable por detrás y posicioná las manos a la altura del pecho.",
+      "Empujá hacia adelante extendiendo los brazos y contrayendo el pectoral al final del movimiento.",
+      "Volvé lentamente a la posición inicial resistiendo la tensión de la banda o cable."
+    ]
+  },
+  {
+    "slug": "tate-press",
+    "nombre": "Press Tate",
+    "tecnica": [
+      "Recostáte en el banco plano, sosté las mancuernas con los codos apuntando hacia los lados y las palmas mirando los pies.",
+      "Bajá las mancuernas hacia el pecho doblando los codos en arco externo hasta tocar el pectoral.",
+      "Empujá hacia arriba extendiendo los tríceps hasta la posición inicial sin mover los codos del eje."
+    ]
+  },
+  {
+    "slug": "walkover-pushup",
+    "nombre": "Flexión de cruce",
+    "tecnica": [
+      "Apoyá una mano en el suelo y la otra sobre la pesa rusa en posición de plancha alta.",
+      "Realizá una flexión completa bajando el pecho de forma controlada y volvé arriba.",
+      "Deslizá la mano del suelo sobre la pesa rusa, mové la otra al suelo y repetí alternando el apoyo."
+    ]
+  },
+  {
+    "slug": "weighted-dip",
+    "nombre": "Fondos con peso",
+    "tecnica": [
+      "Colgáte de las paralelas con un disco o mancuerna sujeta entre las piernas y el torso ligeramente inclinado.",
+      "Bajá flexionando los codos hasta que los hombros queden a la altura de las muñecas.",
+      "Empujá hacia arriba extendiendo los codos hasta volver a la posición inicial sin bloquearlos."
+    ]
+  },
+  {
+    "slug": "weighted-push-ups",
+    "nombre": "Flexión con peso",
+    "tecnica": [
+      "Colocá un disco en la espalda alta, apoyá las manos al ancho de los hombros y extendé el cuerpo en plancha.",
+      "Bajá el pecho hacia el suelo con los codos a 45° manteniendo el core activo para que el disco no se mueva.",
+      "Empujá el suelo hasta extender los brazos y volvé al inicio de forma controlada."
+    ]
+  },
+  {
+    "slug": "y-press",
+    "nombre": "Press Y",
+    "tecnica": [
+      "Paráte o sentáte con la espalda recta, tomá las mancuernas a la altura de los hombros con los codos hacia adelante.",
+      "Empujá hacia arriba y hacia afuera formando una Y con los brazos al llegar a la extensión total.",
+      "Bajá de forma controlada hasta la posición inicial sin dejar caer los codos hacia los lados."
+    ]
+  },
+  {
+    "slug": "z-press",
+    "nombre": "Press Z",
+    "tecnica": [
+      "Sentáte en el suelo con las piernas extendidas y la espalda erguida sin apoyo, tomá la barra a la altura de los hombros.",
+      "Empujá la barra hacia arriba por encima de la cabeza extendiendo los brazos sin arquear la zona lumbar.",
+      "Bajá la barra de forma controlada hasta los hombros manteniendo el torso vertical durante todo el recorrido."
+    ]
+  },
+  {
+    "slug": "ab-rollout",
+    "nombre": "Extensión abdominal",
+    "tecnica": [
+      "Tomá el TRX con ambas manos extendidas frente a vos, incliná el cuerpo hacia adelante y mantené el core activo.",
+      "Deslizá los brazos hacia adelante y abajo alargando el cuerpo en línea recta sin dejar caer las caderas.",
+      "Contraé el core y jalá los brazos de vuelta para volver a la posición inicial de forma controlada."
+    ]
+  },
+  {
+    "slug": "alternating-heel-touch",
+    "nombre": "Toque de talón alternado",
+    "tecnica": [
+      "Acostate boca arriba con las rodillas flexionadas, pies apoyados en el suelo y la espalda baja pegada al piso.",
+      "Contraé el oblicuo lateral e incliná el torso hacia un lado para tocar el talón del mismo lado con la mano.",
+      "Volvé al centro y repetí del otro lado alternando de forma continua y controlada."
+    ]
+  },
+  {
+    "slug": "alternating-leg-raise",
+    "nombre": "Elevación de piernas alternada",
+    "tecnica": [
+      "Acostate boca arriba con las piernas extendidas y la zona lumbar pegada al suelo.",
+      "Levantá una pierna recta hasta los 90° manteniendo la otra a pocos centímetros del suelo.",
+      "Bajá la primera pierna y subí la otra de forma alternada controlando la velocidad en todo momento."
+    ]
+  },
+  {
+    "slug": "bar-kneeling-crunch",
+    "nombre": "Crunch arrodillado en polea",
+    "tecnica": [
+      "Arrodillate frente a la polea alta, tomá la barra con ambas manos y posicionála detrás de la cabeza.",
+      "Flexioná el torso hacia adelante y abajo contrayendo los abdominales hasta llevar los codos hacia las rodillas.",
+      "Volvé lentamente a la posición inicial dejando que el cable estire el abdomen de forma controlada."
+    ]
+  },
+  {
+    "slug": "bar-standing-crunch",
+    "nombre": "Crunch de pie en polea",
+    "tecnica": [
+      "Paráte frente a la polea alta, tomá la barra con ambas manos y sostenéla detrás de la cabeza.",
+      "Flexioná el torso hacia adelante contrayendo los abdominales sin doblar las caderas en exceso.",
+      "Volvé lentamente a la posición erguida resistiendo la tensión del cable durante la extensión."
+    ]
+  },
+  {
+    "slug": "bent-leg-raise",
+    "nombre": "Elevación de piernas con rodillas flexionadas",
+    "tecnica": [
+      "Acostate boca arriba con las rodillas dobladas a 90° y la zona lumbar apoyada en el suelo.",
+      "Levantá las rodillas hacia el pecho contrayendo el abdomen sin que la espalda baja se despegue del piso.",
+      "Bajá las piernas lentamente hasta casi tocar el suelo y volvé a subir manteniendo la tensión abdominal."
+    ]
+  },
+  {
+    "slug": "bicycle-crunch",
+    "nombre": "Crunch bicicleta",
+    "tecnica": [
+      "Acostate boca arriba, entrelazá los dedos detrás de la cabeza y levantá los hombros del suelo.",
+      "Llevá el codo derecho hacia la rodilla izquierda mientras extendés la pierna derecha, rotando el torso.",
+      "Alternálas de forma continua simulando el pedaleo de una bicicleta sin tirar del cuello."
+    ]
+  },
+  {
+    "slug": "bird-dog",
+    "nombre": "Bird dog",
+    "tecnica": [
+      "Apoyáte en cuatro puntos con manos debajo de los hombros y rodillas debajo de las caderas, espalda neutra.",
+      "Extendé el brazo derecho hacia adelante y la pierna izquierda hacia atrás al mismo tiempo manteniendo la cadera nivelada.",
+      "Sostené un segundo, volvé al centro y repetí del lado contrario controlando el equilibrio en todo momento."
+    ]
+  },
+  {
+    "slug": "crunch",
+    "nombre": "Crunch",
+    "tecnica": [
+      "Acostate boca arriba con las rodillas flexionadas y los pies apoyados, las manos detrás de la cabeza sin tirar del cuello.",
+      "Contraé el abdomen y levantá los hombros del suelo curvando el torso hacia las rodillas.",
+      "Bajá lentamente hasta casi apoyar los hombros y volvé a subir sin perder la tensión abdominal."
+    ]
+  },
+  {
+    "slug": "dead-bug",
+    "nombre": "Dead bug",
+    "tecnica": [
+      "Acostate boca arriba con los brazos extendidos hacia el techo y las caderas y rodillas en 90°, zona lumbar pegada al suelo.",
+      "Bajá el brazo derecho hacia atrás y extendé la pierna izquierda simultáneamente casi hasta el suelo.",
+      "Volvé al centro y repetí del lado contrario manteniendo la espalda baja sin separarse del piso en ningún momento."
+    ]
+  },
+  {
+    "slug": "elbow-side-plank",
+    "nombre": "Plancha lateral en codo",
+    "tecnica": [
+      "Apoyáte de costado sobre el antebrazo con el codo debajo del hombro y los pies apilados.",
+      "Levantá las caderas del suelo formando una línea recta de cabeza a talones y contraé el oblicuo.",
+      "Sostené la posición sin dejar caer la cadera ni rotar el torso, y mantené la respiración estable."
+    ]
+  },
+  {
+    "slug": "forearm-plank",
+    "nombre": "Plancha en antebrazos",
+    "tecnica": [
+      "Apoyáte sobre los antebrazos con los codos debajo de los hombros y las piernas extendidas detrás.",
+      "Levantá las caderas hasta que el cuerpo forme una línea recta de cabeza a talones y apretá el core.",
+      "Sostené la posición respirando de forma controlada sin dejar caer las caderas ni elevar el trasero."
+    ]
+  },
+  {
+    "slug": "forearm-side-plank",
+    "nombre": "Plancha lateral en antebrazos",
+    "tecnica": [
+      "Apoyáte de costado sobre el antebrazo con el codo bajo el hombro y los pies apilados o en el TRX.",
+      "Levantá las caderas del suelo formando una línea lateral recta y contraé el oblicuo activamente.",
+      "Sostené la posición sin dejar caer la cadera y mantené el torso sin rotar hacia adelante ni atrás."
+    ]
+  },
+  {
+    "slug": "forward-scissor",
+    "nombre": "Tijera frontal",
+    "tecnica": [
+      "Paráte con los pies juntos y el core activo, los brazos extendidos a los lados o en las caderas.",
+      "Levantá una pierna recta hacia adelante mientras la otra queda abajo, manteniendo el torso erguido.",
+      "Bajá la pierna y alternálas de forma continua con un ritmo controlado o dinámico según el nivel."
+    ]
+  },
+  {
+    "slug": "frog-crunch",
+    "nombre": "Crunch rana",
+    "tecnica": [
+      "Acostate boca arriba, uní las plantas de los pies y dejá caer las rodillas hacia los lados como una rana.",
+      "Contraé el abdomen y llevá el torso hacia arriba acercando los codos a los pies.",
+      "Bajá lentamente hasta casi apoyar la cabeza y volvé a subir manteniendo la tensión abdominal."
+    ]
+  },
+  {
+    "slug": "frog-sit-up",
+    "nombre": "Abdominal rana",
+    "tecnica": [
+      "Acostate boca arriba, uní las plantas de los pies y dejá caer las rodillas hacia los lados, manos detrás de la cabeza.",
+      "Subí el torso completamente hasta sentarte llevando el pecho hacia los pies sin tirar del cuello.",
+      "Bajá de forma controlada hasta apoyar la espalda en el suelo y repetí el movimiento completo."
+    ]
+  },
+  {
+    "slug": "hand-plank",
+    "nombre": "Plancha en manos",
+    "tecnica": [
+      "Apoyáte sobre las manos con los brazos extendidos, muñecas debajo de los hombros y el cuerpo en línea recta.",
+      "Apretá el core, los glúteos y los cuádriceps para mantener la alineación sin arquear la espalda.",
+      "Sostené la posición respirando de forma estable sin dejar caer las caderas ni elevar el trasero."
+    ]
+  },
+  {
+    "slug": "hand-plank-jack",
+    "nombre": "Plancha con salto de piernas",
+    "tecnica": [
+      "Posicionáte en plancha alta con los brazos extendidos, manos debajo de los hombros y el core activo.",
+      "Saltá abriendo ambas piernas hacia los lados simultáneamente sin mover las manos ni dejar caer las caderas.",
+      "Volvé a unir los pies de un salto y repetí el movimiento de forma continua manteniendo la postura."
+    ]
+  },
+  {
+    "slug": "hand-side-plank",
+    "nombre": "Plancha lateral en mano",
+    "tecnica": [
+      "Apoyáte de costado sobre una mano extendida con el brazo recto, debajo del hombro, y los pies apilados.",
+      "Levantá las caderas del suelo formando una línea lateral recta y contraé el oblicuo activamente.",
+      "Sostené la posición sin dejar caer la cadera ni doblar el codo del brazo de apoyo."
+    ]
+  }
+]

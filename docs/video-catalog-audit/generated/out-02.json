@@ -1,0 +1,407 @@
+[
+  {
+    "slug": "incline-zottman-curl",
+    "nombre": "Curl Zottman inclinado",
+    "tecnica": [
+      "Recostarte en un banco inclinado con una mancuerna en cada mano, palmas hacia arriba.",
+      "Curlá los brazos hasta arriba girando las muñecas al llegar a la cima para quedar con palmas hacia abajo.",
+      "Bajá lento en posición invertida y volvé a girar las muñecas antes de repetir."
+    ]
+  },
+  {
+    "slug": "inverted-curl",
+    "nombre": "Curl invertido",
+    "tecnica": [
+      "Colgarte de una barra con agarre prono (palmas hacia afuera), cuerpo en línea recta.",
+      "Flexioná los codos llevando el pecho hacia la barra mientras mantenés el torso rígido.",
+      "Bajá controlado extendiendo los brazos por completo antes de repetir."
+    ]
+  },
+  {
+    "slug": "landmine-bicep-curl",
+    "nombre": "Curl en landmine",
+    "tecnica": [
+      "Parate frente al extremo libre de la barra en landmine y tomá el tubo con ambas manos, palmas hacia arriba.",
+      "Curlá la barra llevando las manos hacia los hombros sin mover los codos del costado del torso.",
+      "Bajá controlado hasta extender los brazos y repetí sin balancear el cuerpo."
+    ]
+  },
+  {
+    "slug": "landmine-concentration-curl",
+    "nombre": "Curl concentrado en landmine",
+    "tecnica": [
+      "Inclinarte levemente hacia adelante y apoyá el codo contra la cara interna del muslo sujetando el extremo libre de la barra.",
+      "Curlá la barra hacia el hombro manteniendo el codo fijo en el muslo.",
+      "Bajá lento hasta extender el brazo y apretá el bíceps arriba en cada repetición."
+    ]
+  },
+  {
+    "slug": "laying-curl",
+    "nombre": "Curl tumbado",
+    "tecnica": [
+      "Acostate boca arriba en un banco con una mancuerna en cada mano y los brazos colgando hacia el piso.",
+      "Curlá las mancuernas hacia los hombros sin separar los codos del cuerpo.",
+      "Bajá controlado hasta que los brazos queden completamente extendidos antes de repetir."
+    ]
+  },
+  {
+    "slug": "preacher-curl",
+    "nombre": "Curl predicador",
+    "tecnica": [
+      "Sentate en el banco predicador y apoyá la parte posterior de los brazos sobre el almohadón inclinado.",
+      "Curlá el peso hacia los hombros sin despegar los tríceps del almohadón.",
+      "Bajá lento hasta extender los codos por completo y repetí sin rebotar abajo."
+    ]
+  },
+  {
+    "slug": "reverse-curl",
+    "nombre": "Curl inverso",
+    "tecnica": [
+      "Tomá la barra o mancuernas con agarre prono (palmas hacia abajo), brazos extendidos.",
+      "Curlá el peso hacia los hombros manteniendo los codos pegados al torso.",
+      "Bajá controlado hasta extender los brazos y repetí sin soltar la tensión."
+    ]
+  },
+  {
+    "slug": "ring-curl",
+    "nombre": "Curl en anillas",
+    "tecnica": [
+      "Tomá las anillas con palmas hacia arriba y recostá el cuerpo en ángulo hacia atrás, brazos extendidos.",
+      "Curlá los codos llevando las manos hacia las sienes sin mover los hombros.",
+      "Bajá controlado extendiendo los brazos y mantené el cuerpo en línea recta durante todo el movimiento."
+    ]
+  },
+  {
+    "slug": "rope-hammer-curl",
+    "nombre": "Curl martillo con cuerda",
+    "tecnica": [
+      "Sujetá los extremos de la cuerda de la polea baja con agarre neutro (pulgares hacia arriba).",
+      "Curlá los brazos llevando los puños hacia los hombros sin mover los codos del costado.",
+      "Bajá controlado y al llegar abajo separá levemente los extremos de la cuerda hacia afuera."
+    ]
+  },
+  {
+    "slug": "seated-curl",
+    "nombre": "Curl sentado",
+    "tecnica": [
+      "Sentate en el borde de un banco con una mancuerna en cada mano, palmas hacia adelante.",
+      "Curlá las mancuernas hacia los hombros sin balancear el torso ni mover los codos.",
+      "Bajá lento hasta extender los brazos y repetí manteniendo la tensión en los bíceps."
+    ]
+  },
+  {
+    "slug": "seated-hammer-curl",
+    "nombre": "Curl martillo sentado",
+    "tecnica": [
+      "Sentate erguido en un banco con una mancuerna en cada mano en agarre neutro (pulgares arriba).",
+      "Curlá las mancuernas hacia los hombros sin rotar las muñecas ni mover los codos.",
+      "Bajá controlado hasta extender los brazos y repetí sin balancear el cuerpo."
+    ]
+  },
+  {
+    "slug": "seated-reverse-curl",
+    "nombre": "Curl inverso sentado",
+    "tecnica": [
+      "Sentate en el borde del banco con una mancuerna en cada mano en agarre prono (palmas hacia abajo).",
+      "Curlá las mancuernas hacia los hombros manteniendo los codos fijos al costado del torso.",
+      "Bajá lento hasta extender los brazos por completo y repetí con control."
+    ]
+  },
+  {
+    "slug": "seated-zottman-curl",
+    "nombre": "Curl Zottman sentado",
+    "tecnica": [
+      "Sentate erguido con una mancuerna en cada mano, palmas hacia adelante.",
+      "Curlá hacia arriba y al llegar arriba girá las muñecas para quedar con palmas hacia abajo.",
+      "Bajá lento en posición invertida, girá las muñecas de vuelta abajo y repetí."
+    ]
+  },
+  {
+    "slug": "single-arm-curl",
+    "nombre": "Curl a un brazo",
+    "tecnica": [
+      "Parate o sentate sosteniendo la pesa rusa con una mano, palma hacia adelante.",
+      "Curlá la pesa hacia el hombro sin mover el codo del costado del torso.",
+      "Bajá controlado hasta extender el brazo por completo y repetí por el lado contrario."
+    ]
+  },
+  {
+    "slug": "spider-curl",
+    "nombre": "Curl araña",
+    "tecnica": [
+      "Recostarte boca abajo sobre un banco inclinado con una mancuerna en cada mano colgando hacia el piso.",
+      "Curlá las mancuernas hacia los hombros manteniendo los codos apuntando hacia el piso.",
+      "Bajá lento hasta extender los brazos por completo y apretá el bíceps al llegar arriba."
+    ]
+  },
+  {
+    "slug": "twisting-curl",
+    "nombre": "Curl con giro",
+    "tecnica": [
+      "Parate con una mancuerna en cada mano en agarre neutro (pulgares arriba).",
+      "Curlá girando la muñeca a supinación (palma arriba) durante el movimiento ascendente.",
+      "Bajá controlado volviendo al agarre neutro y repetí el giro en cada repetición."
+    ]
+  },
+  {
+    "slug": "zottman-curl",
+    "nombre": "Curl Zottman",
+    "tecnica": [
+      "Parate con una mancuerna en cada mano, palmas hacia adelante.",
+      "Curlá hasta arriba y girá las muñecas al llegar para quedar con palmas hacia abajo.",
+      "Bajá lento en posición invertida, volvé a girar las muñecas abajo y repetí."
+    ]
+  },
+  {
+    "slug": "belt-calf-raise",
+    "nombre": "Elevación de gemelos con cinturón",
+    "tecnica": [
+      "Enganchá el cinturón al cable bajo y parate en el borde de un step con los talones afuera.",
+      "Empujá los talones hacia arriba elevándote sobre las puntas de los pies al máximo.",
+      "Bajá lento dejando que los talones desciendan por debajo del nivel del step antes de repetir."
+    ]
+  },
+  {
+    "slug": "calf-jump",
+    "nombre": "Salto de gemelos",
+    "tecnica": [
+      "Parate erguido con la barra sobre los trapecios, pies al ancho de hombros.",
+      "Empujá con fuerza las puntas de los pies para saltar sin flexionar rodillas.",
+      "Aterrizá sobre las puntas y absorbé el impacto lentamente volviendo a la posición inicial."
+    ]
+  },
+  {
+    "slug": "calf-raise",
+    "nombre": "Elevación de gemelos",
+    "tecnica": [
+      "Parate erguido con el peso elegido, pies al ancho de hombros y puntas hacia adelante.",
+      "Empujá los talones hacia arriba elevándote sobre las puntas de los pies al máximo.",
+      "Bajá controlado hasta que los talones toquen el piso y repetí sin rebotar."
+    ]
+  },
+  {
+    "slug": "calf-raises",
+    "nombre": "Elevación de gemelos",
+    "tecnica": [
+      "Parate en el borde de un escalón o superficie elevada con las puntas de los pies apoyadas.",
+      "Empujá los talones hacia arriba elevándote al máximo sobre las puntas.",
+      "Bajá lento dejando que los talones desciendan por debajo del nivel del step y repetí."
+    ]
+  },
+  {
+    "slug": "calve-raise",
+    "nombre": "Elevación de gemelo",
+    "tecnica": [
+      "Parate frente a la polea baja con un pie sobre el soporte y sosteniendo el mango.",
+      "Elevate sobre la punta del pie al máximo contrayendo el gemelo.",
+      "Bajá controlado hasta que el talón quede más abajo que la punta y repetí."
+    ]
+  },
+  {
+    "slug": "donkey-calf-raise",
+    "nombre": "Elevación de gemelos tipo burro",
+    "tecnica": [
+      "Inclinarte hacia adelante con el torso paralelo al piso y pies en el borde de un step.",
+      "Empujá los talones hacia arriba elevándote sobre las puntas de los pies al máximo.",
+      "Bajá lento dejando que los talones desciendan por debajo del nivel del step antes de repetir."
+    ]
+  },
+  {
+    "slug": "goblet-calf-raise",
+    "nombre": "Elevación de gemelos goblet",
+    "tecnica": [
+      "Parate sosteniendo la pesa rusa a la altura del pecho con ambas manos, pies juntos en el borde de un step.",
+      "Empujá los talones hacia arriba elevándote sobre las puntas al máximo.",
+      "Bajá controlado hasta que los talones queden por debajo del step y repetí."
+    ]
+  },
+  {
+    "slug": "landmine-calf-raise",
+    "nombre": "Elevación de gemelos en landmine",
+    "tecnica": [
+      "Parate sobre el borde de un step con el extremo libre del landmine apoyado en el hombro.",
+      "Empujá las puntas de los pies hacia abajo elevando los talones al máximo.",
+      "Bajá controlado dejando que los talones desciendan por debajo del nivel del step y repetí."
+    ]
+  },
+  {
+    "slug": "loaded-calf-raise",
+    "nombre": "Elevación de gemelos en máquina",
+    "tecnica": [
+      "Apoyá los hombros bajo los acolchados de la máquina y ubicá las puntas de los pies en el borde de la plataforma.",
+      "Empujá hacia arriba elevándote sobre las puntas de los pies al máximo.",
+      "Bajá controlado hasta que los talones queden bien por debajo del nivel de la plataforma y repetí."
+    ]
+  },
+  {
+    "slug": "seated-calf-raise",
+    "nombre": "Elevación de gemelos sentado",
+    "tecnica": [
+      "Sentate con las puntas de los pies en el borde de la plataforma y el peso o acolchado sobre los muslos.",
+      "Empujá los talones hacia arriba elevando las puntas de los pies al máximo.",
+      "Bajá controlado hasta que los talones queden por debajo del nivel de la plataforma y repetí."
+    ]
+  },
+  {
+    "slug": "standing-calf-raises",
+    "nombre": "Elevación de gemelos de pie",
+    "tecnica": [
+      "Parate en la máquina con los hombros bajo los acolchados y puntas de los pies en el borde de la plataforma.",
+      "Empujá los talones hacia arriba elevándote sobre las puntas al máximo.",
+      "Bajá lento hasta que los talones queden por debajo de la plataforma y repetí sin rebotar."
+    ]
+  },
+  {
+    "slug": "walking-calf-raises",
+    "nombre": "Elevación de gemelos caminando",
+    "tecnica": [
+      "Parate erguido y comenzá a caminar hacia adelante elevándote sobre las puntas en cada paso.",
+      "Mantené la contracción del gemelo en el punto más alto de cada elevación.",
+      "Avanzá con pasos controlados sin bajar los talones entre repetición y repetición."
+    ]
+  },
+  {
+    "slug": "bench-chest-fly",
+    "nombre": "Apertura de pecho en banco",
+    "tecnica": [
+      "Acostate en el banco con los cables cruzados a los costados, brazos extendidos hacia afuera con leve flexión de codo.",
+      "Llevá las manos hacia el centro por encima del pecho describiendo un arco amplio.",
+      "Volvé lento al punto de partida sin perder la tensión y repetí."
+    ]
+  },
+  {
+    "slug": "bench-press",
+    "nombre": "Press de banca",
+    "tecnica": [
+      "Acostate en el banco con los pies apoyados en el piso, agarre al ancho de hombros o algo más amplio.",
+      "Bajá la barra controlado hasta que roce el pecho manteniendo los codos a unos 45° del torso.",
+      "Empujá la barra hacia arriba extendiendo los codos por completo y repetí."
+    ]
+  },
+  {
+    "slug": "chest-fly",
+    "nombre": "Apertura de pecho",
+    "tecnica": [
+      "Acostate en el banco con una mancuerna en cada mano sobre el pecho, codos levemente flexionados.",
+      "Abrí los brazos hacia los costados describiendo un arco amplio hasta sentir el estiramiento en el pecho.",
+      "Cerrá los brazos volviendo al centro contrayendo el pecho y repetí sin extender los codos del todo."
+    ]
+  },
+  {
+    "slug": "chest-press",
+    "nombre": "Press de pecho",
+    "tecnica": [
+      "Sentate o acostate en la posición que indique el equipo elegido, manos a la altura del pecho.",
+      "Empujá hacia adelante o hacia arriba extendiendo los codos sin bloquearlos al final.",
+      "Volvé lento a la posición inicial controlando la carga y repetí."
+    ]
+  },
+  {
+    "slug": "chestpress",
+    "nombre": "Press de pecho",
+    "tecnica": [
+      "Parate o sentate frente a la polea y sujetá los mangos a la altura del pecho con codos flexionados.",
+      "Empujá hacia adelante extendiendo los brazos hasta que queden casi rectos.",
+      "Volvé lento a la posición inicial sin soltar la tensión y repetí."
+    ]
+  },
+  {
+    "slug": "clapping-push-up",
+    "nombre": "Flexión con palmada",
+    "tecnica": [
+      "Adoptá la posición de flexión estándar con manos al ancho de hombros.",
+      "Bajá controlado hasta casi tocar el pecho en el piso y luego empujá con fuerza explosiva.",
+      "Al despegar las manos del piso palmá y volvé a apoyarlas suavemente absorbiendo el impacto."
+    ]
+  },
+  {
+    "slug": "cuban-press",
+    "nombre": "Press cubano",
+    "tecnica": [
+      "Parate con una mancuerna en cada mano, codos flexionados a 90° y paralelos al piso a la altura de los hombros.",
+      "Rotá los antebrazos hacia arriba hasta que los puños apunten al techo.",
+      "Presioná las mancuernas hacia arriba extendiendo los codos y bajá invirtiendo el movimiento."
+    ]
+  },
+  {
+    "slug": "decline-bench-press",
+    "nombre": "Press de banca declinado",
+    "tecnica": [
+      "Acostate en el banco declinado con los pies sujetos y el agarre al ancho de hombros.",
+      "Bajá el peso controlado hasta el pecho inferior manteniendo los codos a unos 45° del torso.",
+      "Empujá hacia arriba extendiendo los codos por completo y repetí."
+    ]
+  },
+  {
+    "slug": "decline-chest-fly",
+    "nombre": "Apertura de pecho declinada",
+    "tecnica": [
+      "Acostate en el banco declinado con una mancuerna en cada mano sobre el pecho, codos levemente flexionados.",
+      "Abrí los brazos hacia los costados describiendo un arco amplio hasta sentir el estiramiento en el pecho inferior.",
+      "Cerrá los brazos volviendo al centro contrayendo el pecho y repetí."
+    ]
+  },
+  {
+    "slug": "decline-push-up",
+    "nombre": "Flexión declinada",
+    "tecnica": [
+      "Apoyá los pies en una superficie elevada y las manos en el piso al ancho de hombros.",
+      "Bajá el pecho hacia el piso flexionando los codos de manera controlada.",
+      "Empujá hasta extender los brazos y repetí manteniendo el cuerpo en línea recta."
+    ]
+  },
+  {
+    "slug": "decline-squeeze-press",
+    "nombre": "Press declinado con presión",
+    "tecnica": [
+      "Acostate en el banco declinado con una mancuerna en cada mano y mantenelas juntas en el centro.",
+      "Presioná las mancuernas entre sí con fuerza y bajá hacia el pecho inferior sin separarlas.",
+      "Empujá hacia arriba manteniendo la presión y repetí."
+    ]
+  },
+  {
+    "slug": "diamond-push-ups",
+    "nombre": "Flexión en diamante",
+    "tecnica": [
+      "Apoyá las manos en el piso formando un triángulo con los pulgares e índices, directamente debajo del pecho.",
+      "Bajá el pecho hacia las manos flexionando los codos y manteniéndolos pegados al cuerpo.",
+      "Empujá hasta extender los brazos y repetí sin abrir los codos hacia los costados."
+    ]
+  },
+  {
+    "slug": "elevated-push-up",
+    "nombre": "Flexión elevada",
+    "tecnica": [
+      "Apoyá las manos en una superficie elevada (banco o cajón) al ancho de hombros.",
+      "Bajá el pecho hacia la superficie flexionando los codos de manera controlada.",
+      "Empujá hasta extender los brazos y repetí manteniendo el cuerpo en línea recta."
+    ]
+  },
+  {
+    "slug": "elevated-pushup",
+    "nombre": "Flexión elevada",
+    "tecnica": [
+      "Apoyá las manos sobre las mancuernas o superficie elevada al ancho de hombros.",
+      "Bajá el pecho hacia el nivel de las manos flexionando los codos de manera controlada.",
+      "Empujá hasta extender los brazos y repetí manteniendo el cuerpo rígido en línea recta."
+    ]
+  },
+  {
+    "slug": "floor-press",
+    "nombre": "Press en el suelo",
+    "tecnica": [
+      "Acostate boca arriba en el piso con las rodillas flexionadas y el peso en las manos a la altura del pecho.",
+      "Bajá los codos hasta apoyarlos en el suelo de manera controlada.",
+      "Empujá el peso hacia arriba extendiendo los codos por completo y repetí."
+    ]
+  },
+  {
+    "slug": "hooklying-bench-press",
+    "nombre": "Press de banca con rodillas flexionadas",
+    "tecnica": [
+      "Acostate en el banco con las rodillas flexionadas y los pies apoyados sobre el banco, lumbares neutras.",
+      "Bajá la barra controlado hasta que roce el pecho manteniendo los codos a unos 45° del torso.",
+      "Empujá la barra hacia arriba extendiendo los codos por completo y repetí."
+    ]
+  }
+]

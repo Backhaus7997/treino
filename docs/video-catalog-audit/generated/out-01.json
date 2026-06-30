@@ -1,0 +1,407 @@
+[
+  {
+    "slug": "row",
+    "nombre": "Remo",
+    "tecnica": [
+      "Incliná el torso hacia adelante con la espalda recta y las rodillas levemente flexionadas.",
+      "Tirá los codos hacia atrás y arriba, acercando las manos al abdomen.",
+      "Apretá las escápulas en la cima del movimiento y bajá controlado hasta extender los brazos."
+    ]
+  },
+  {
+    "slug": "row-bilateral",
+    "nombre": "Remo bilateral",
+    "tecnica": [
+      "Incliná el torso unos 45° con la espalda neutra y las rodillas semiflexionadas.",
+      "Tirá ambos codos hacia atrás simultáneamente hasta llevar las manos al nivel del abdomen.",
+      "Apretá las escápulas arriba y extendé los brazos de forma controlada."
+    ]
+  },
+  {
+    "slug": "row-erg-rower",
+    "nombre": "Remo en ergómetro",
+    "tecnica": [
+      "Sentate en el remo, agarrá el manubrio con ambas manos y extendé los brazos hacia adelante con rodillas dobladas.",
+      "Empujá con las piernas primero, incliná el torso levemente hacia atrás y luego tirá el manubrio hacia el abdomen.",
+      "Extendé los brazos, incliná el torso hacia adelante y flexioná las rodillas para volver al inicio de forma fluida."
+    ]
+  },
+  {
+    "slug": "row-single",
+    "nombre": "Remo a una mano",
+    "tecnica": [
+      "Apoyá una mano y una rodilla en el banco, espalda paralela al piso y core activo.",
+      "Llevá el codo hacia atrás y arriba sin rotar el torso.",
+      "Apretá la escápula en la cima y bajá controlado hasta extender el brazo."
+    ]
+  },
+  {
+    "slug": "row-unilateral",
+    "nombre": "Remo unilateral",
+    "tecnica": [
+      "Posicioná el torso inclinado con la espalda neutra y apoyá la mano libre en una superficie estable.",
+      "Tirá el codo hacia atrás y arriba, sin rotar los hombros, hasta llevar la mano al costado del cuerpo.",
+      "Bajá el brazo de forma controlada hasta la extensión completa y repetí."
+    ]
+  },
+  {
+    "slug": "rower-knee-tuck",
+    "nombre": "Encogimiento de rodillas en rower",
+    "tecnica": [
+      "Colocá los pies en el rower y adoptá una posición de plancha alta con los brazos extendidos.",
+      "Contraé el abdomen y llevá ambas rodillas hacia el pecho de forma simultánea.",
+      "Extendé las piernas hasta la posición de plancha y repetí manteniendo la cadera estable."
+    ]
+  },
+  {
+    "slug": "rower-pike",
+    "nombre": "Pike en rower",
+    "tecnica": [
+      "Colocá los pies sobre el rower en posición de plancha alta con los brazos extendidos.",
+      "Elevá la cadera hacia el techo manteniendo las piernas rectas, formando una V invertida.",
+      "Bajá la cadera con control hasta volver a la posición de plancha inicial."
+    ]
+  },
+  {
+    "slug": "seated-cable-row",
+    "nombre": "Remo sentado en polea",
+    "tecnica": [
+      "Sentate frente a la polea con los pies apoyados, rodillas levemente flexionadas y espalda erguida.",
+      "Tirá el agarre hacia el abdomen llevando los codos hacia atrás y apretando las escápulas.",
+      "Extendé los brazos con control, permitiendo que la espalda se incline levemente hacia adelante."
+    ]
+  },
+  {
+    "slug": "seated-pulldown",
+    "nombre": "Jalón al pecho sentado",
+    "tecnica": [
+      "Sentate con la espalda erguida, tomá el agarre con las manos a la altura de los hombros o más separadas.",
+      "Tirá el agarre hacia el pecho llevando los codos hacia abajo y afuera, abriendo el pecho.",
+      "Extendé los brazos de forma controlada hasta la posición inicial."
+    ]
+  },
+  {
+    "slug": "seated-shrug",
+    "nombre": "Encogimiento de hombros sentado",
+    "tecnica": [
+      "Sentate con la espalda apoyada, los pies firmes en el suelo y los implementos a los costados del cuerpo.",
+      "Elevá los hombros directamente hacia las orejas sin doblar los codos ni rotar.",
+      "Sostené un segundo arriba y bajá los hombros lentamente hasta la posición inicial."
+    ]
+  },
+  {
+    "slug": "shrug",
+    "nombre": "Encogimiento de hombros",
+    "tecnica": [
+      "Parate con los pies al ancho de los hombros, brazos extendidos sosteniendo el implemento a los costados.",
+      "Elevá los hombros directamente hacia las orejas sin doblar los codos.",
+      "Sostené brevemente en la cima y bajá con control al punto de partida."
+    ]
+  },
+  {
+    "slug": "shrug-single",
+    "nombre": "Encogimiento de hombros a un brazo",
+    "tecnica": [
+      "Parate con el implemento en una mano, brazo extendido al costado del cuerpo.",
+      "Elevá el hombro del lado cargado directamente hacia la oreja sin inclinar el torso.",
+      "Bajá con control y completá todas las repeticiones antes de cambiar de lado."
+    ]
+  },
+  {
+    "slug": "single-arm-pulldown",
+    "nombre": "Jalón al pecho a un brazo",
+    "tecnica": [
+      "Agarrá el agarre unilateral con una mano, sentate o arrodillate con la espalda erguida.",
+      "Tirá el codo hacia abajo y atrás, llevando el agarre hacia el hombro ipsilateral.",
+      "Extendé el brazo de forma controlada hasta la posición inicial sin rotar el torso."
+    ]
+  },
+  {
+    "slug": "single-arm-pullover",
+    "nombre": "Pullover a un brazo",
+    "tecnica": [
+      "Acostate en el banco con la cabeza cerca del borde, sostené el implemento con un brazo extendido sobre el pecho.",
+      "Bajá el brazo en arco por detrás de la cabeza manteniendo el codo levemente flexionado.",
+      "Volvé a la posición inicial contrayendo el dorsal y el pectoral, sin hiperextender el codo."
+    ]
+  },
+  {
+    "slug": "single-arm-row",
+    "nombre": "Remo a un brazo",
+    "tecnica": [
+      "Incliná el torso hacia adelante con la espalda neutra, apoyá la mano libre en una superficie estable si es necesario.",
+      "Tirá el codo hacia atrás y arriba llevando el implemento al costado del abdomen.",
+      "Apretá la escápula en la cima y extendé el brazo con control hasta la posición inicial."
+    ]
+  },
+  {
+    "slug": "standing-inverted-row",
+    "nombre": "Remo invertido de pie",
+    "tecnica": [
+      "Agarrá la barra o soporte con ambas manos en pronación y recostá el cuerpo en diagonal, brazos extendidos.",
+      "Tirá el pecho hacia la barra llevando los codos hacia atrás y apretando las escápulas.",
+      "Extendé los brazos con control y volvé a la posición inclinada inicial."
+    ]
+  },
+  {
+    "slug": "standing-shrug",
+    "nombre": "Encogimiento de hombros de pie",
+    "tecnica": [
+      "Parate con los pies al ancho de los hombros y el implemento en posición de agarre.",
+      "Elevá los hombros hacia las orejas sin doblar los codos ni rotar el cuello.",
+      "Bajá los hombros lentamente hasta la posición de partida y repetí."
+    ]
+  },
+  {
+    "slug": "superman",
+    "nombre": "Superman",
+    "tecnica": [
+      "Acostate boca abajo con los brazos extendidos al frente y las piernas juntas.",
+      "Elevá simultáneamente los brazos, el pecho y las piernas del piso contrayendo la espalda baja y los glúteos.",
+      "Sostené un segundo arriba y bajá con control sin dejar caer el cuerpo."
+    ]
+  },
+  {
+    "slug": "superman-hold",
+    "nombre": "Superman isométrico",
+    "tecnica": [
+      "Acostate boca abajo con los brazos extendidos al frente y el cuerpo en línea recta.",
+      "Elevá brazos, pecho y piernas del suelo simultáneamente contrayendo toda la cadena posterior.",
+      "Mantené la posición elevada el tiempo indicado respirando de forma controlada."
+    ]
+  },
+  {
+    "slug": "superman-pull",
+    "nombre": "Tirón Superman",
+    "tecnica": [
+      "Acostate boca abajo con los brazos extendidos al frente y las piernas rectas en el piso.",
+      "Elevá el pecho y los brazos, luego tirá los codos hacia los costados como si hicieras un remo en el aire.",
+      "Extendé los brazos nuevamente al frente y bajá con control a la posición inicial."
+    ]
+  },
+  {
+    "slug": "supermans",
+    "nombre": "Supermanes",
+    "tecnica": [
+      "Acostate boca abajo con los brazos extendidos al frente y las piernas juntas.",
+      "Elevá brazos, pecho y piernas del suelo contrayendo la espalda baja y los glúteos.",
+      "Bajá con control al piso y repetí de forma fluida y controlada."
+    ]
+  },
+  {
+    "slug": "supinated-pendlay-row",
+    "nombre": "Remo Pendlay supino",
+    "tecnica": [
+      "Tomá la barra con agarre supino (palmas hacia arriba) a la altura de los hombros, espalda paralela al piso.",
+      "Tirá la barra de forma explosiva hacia la parte baja del pecho, dejando que los codos suban bien atrás.",
+      "Bajá la barra hasta el suelo de forma controlada en cada repetición antes de tirar nuevamente."
+    ]
+  },
+  {
+    "slug": "supinated-row",
+    "nombre": "Remo supino",
+    "tecnica": [
+      "Tomá el implemento con agarre supino (palmas hacia arriba) e incliná el torso hacia adelante con la espalda recta.",
+      "Tirá los codos hacia atrás hasta llevar el implemento al abdomen, apretando las escápulas.",
+      "Extendé los brazos con control y volvé a la posición inclinada inicial."
+    ]
+  },
+  {
+    "slug": "underhand-inverted-row",
+    "nombre": "Remo invertido en supinación",
+    "tecnica": [
+      "Agarrá la barra o soporte con agarre supino (palmas hacia vos) y recostá el cuerpo en diagonal con los brazos extendidos.",
+      "Tirá el pecho hacia la barra llevando los codos a los costados del torso.",
+      "Extendé los brazos con control y volvé a la posición inclinada inicial."
+    ]
+  },
+  {
+    "slug": "underhand-pulldown",
+    "nombre": "Jalón al pecho en supinación",
+    "tecnica": [
+      "Tomá la barra con agarre supino (palmas hacia vos) al ancho de los hombros, sentate con el torso erguido.",
+      "Tirá la barra hacia el pecho llevando los codos abajo y atrás, apretando las escápulas.",
+      "Extendé los brazos con control hasta la posición inicial sin perder la postura."
+    ]
+  },
+  {
+    "slug": "underhand-row",
+    "nombre": "Remo en supinación",
+    "tecnica": [
+      "Agarrá el implemento con agarre supino (palmas hacia arriba) e incliná el torso con la espalda neutra.",
+      "Tirá los codos hacia atrás y arriba hasta llevar el agarre al abdomen.",
+      "Bajá los brazos con control hasta la extensión completa y repetí."
+    ]
+  },
+  {
+    "slug": "weighted-chin-ups",
+    "nombre": "Dominada supina con peso",
+    "tecnica": [
+      "Agarrá la barra con agarre supino (palmas hacia vos) a la altura de los hombros con el peso adicional sujeto al cuerpo.",
+      "Tirá el cuerpo hacia arriba hasta que la barbilla supere la barra, apretando el dorsal y los bíceps.",
+      "Bajá con control total hasta extender completamente los codos."
+    ]
+  },
+  {
+    "slug": "weighted-inverted-row",
+    "nombre": "Remo invertido con peso",
+    "tecnica": [
+      "Colocá el peso adicional sobre el pecho y agarrá la barra con agarre prono, cuerpo en diagonal.",
+      "Tirá el pecho hacia la barra llevando los codos atrás y apretando las escápulas.",
+      "Extendé los brazos con control y volvé a la posición inclinada inicial."
+    ]
+  },
+  {
+    "slug": "weighted-pull-ups",
+    "nombre": "Dominada con peso",
+    "tecnica": [
+      "Agarrá la barra con agarre prono al ancho de los hombros con el peso adicional sujeto al cuerpo.",
+      "Tirá el cuerpo hacia arriba hasta que la barbilla supere la barra apretando el dorsal.",
+      "Bajá con control total hasta la extensión completa de los codos."
+    ]
+  },
+  {
+    "slug": "bar-curl",
+    "nombre": "Curl con barra",
+    "tecnica": [
+      "Parate con los pies al ancho de los hombros, tomá la barra con agarre supino a la altura de las caderas.",
+      "Flexioná los codos llevando la barra hacia los hombros sin mover los brazos del costado del cuerpo.",
+      "Bajá la barra con control hasta la extensión completa del codo."
+    ]
+  },
+  {
+    "slug": "bicep-curl",
+    "nombre": "Curl de bíceps",
+    "tecnica": [
+      "Parate o sentate con la espalda erguida y el implemento en agarre supino a los costados del cuerpo.",
+      "Flexioná los codos llevando el implemento hacia los hombros sin mover los brazos del torso.",
+      "Bajá con control hasta la extensión completa del codo."
+    ]
+  },
+  {
+    "slug": "concentration-curl",
+    "nombre": "Curl concentrado",
+    "tecnica": [
+      "Sentate en el banco con las piernas abiertas, apoyá el codo en la cara interna del muslo.",
+      "Flexioná el codo llevando el implemento hacia el hombro sin que el codo se despegue del muslo.",
+      "Bajá con control hasta la extensión completa y repetí antes de cambiar de brazo."
+    ]
+  },
+  {
+    "slug": "curl",
+    "nombre": "Curl",
+    "tecnica": [
+      "Parate con los pies al ancho de los hombros, tomá el implemento con agarre supino a los costados.",
+      "Flexioná los codos llevando el implemento hacia los hombros manteniendo los brazos pegados al torso.",
+      "Bajá con control hasta la extensión completa sin hiperextender el codo."
+    ]
+  },
+  {
+    "slug": "drag-curl",
+    "nombre": "Curl de arrastre",
+    "tecnica": [
+      "Tomá el implemento con agarre supino y parate con los brazos extendidos frente a los muslos.",
+      "Arrastrá el implemento hacia arriba pegado al cuerpo llevando los codos hacia atrás mientras subís.",
+      "Bajá arrastrando el implemento de vuelta al inicio con el mismo recorrido pegado al cuerpo."
+    ]
+  },
+  {
+    "slug": "ez-bar-curl",
+    "nombre": "Curl con barra EZ",
+    "tecnica": [
+      "Tomá la barra EZ con los pulgares hacia arriba en las agarraderas anguladas, parate con la espalda erguida.",
+      "Flexioná los codos llevando la barra hacia los hombros sin mover los brazos del costado del torso.",
+      "Bajá con control hasta la extensión completa del codo y repetí."
+    ]
+  },
+  {
+    "slug": "flat-preacher-curl",
+    "nombre": "Curl predicador plano",
+    "tecnica": [
+      "Apoyá los brazos sobre el soporte plano del banco predicador, tomá el implemento con agarre supino.",
+      "Flexioná los codos llevando el implemento hacia los hombros sin despegar los brazos del soporte.",
+      "Bajá con control hasta casi la extensión completa sin hiperextender el codo."
+    ]
+  },
+  {
+    "slug": "goblet-curl",
+    "nombre": "Curl goblet",
+    "tecnica": [
+      "Tomá la pesa rusa con ambas manos por el cuerpo de la campana, sostenela frente al pecho con los codos abajo.",
+      "Flexioná los codos llevando la pesa hacia la cara sin mover los brazos del eje vertical del cuerpo.",
+      "Bajá con control hasta la posición inicial con los codos aún apuntando al suelo."
+    ]
+  },
+  {
+    "slug": "hammer-curl",
+    "nombre": "Curl martillo",
+    "tecnica": [
+      "Tomá el implemento con agarre neutro (pulgares hacia arriba) y parate con la espalda erguida.",
+      "Flexioná los codos llevando el implemento hacia los hombros sin rotar las muñecas.",
+      "Bajá con control hasta la extensión completa del codo."
+    ]
+  },
+  {
+    "slug": "high-curl",
+    "nombre": "Curl alto",
+    "tecnica": [
+      "Tomá el implemento con el brazo elevado a la altura del hombro o por encima, con el codo apuntando al frente.",
+      "Flexioná el codo llevando el implemento hacia la cabeza desde la posición elevada.",
+      "Extendé el codo con control hasta la posición inicial y repetí."
+    ]
+  },
+  {
+    "slug": "high-hammer-curl",
+    "nombre": "Curl martillo alto",
+    "tecnica": [
+      "Elevá el brazo a la altura del hombro con agarre neutro (pulgar hacia arriba) y el codo apuntando al frente.",
+      "Flexioná el codo llevando el implemento hacia la cabeza sin rotar la muñeca.",
+      "Extendé el codo con control hasta la posición inicial."
+    ]
+  },
+  {
+    "slug": "high-reverse-curl",
+    "nombre": "Curl inverso alto",
+    "tecnica": [
+      "Elevá el brazo a la altura del hombro con agarre prono (palma hacia abajo) y el codo apuntando al frente.",
+      "Flexioná el codo llevando el implemento hacia la cabeza manteniendo el agarre prono.",
+      "Extendé el codo con control hasta la posición inicial."
+    ]
+  },
+  {
+    "slug": "incline-curl",
+    "nombre": "Curl inclinado",
+    "tecnica": [
+      "Recostá la espalda en un banco inclinado a 45-60° con los brazos colgando naturalmente hacia el suelo.",
+      "Flexioná los codos llevando el implemento hacia los hombros sin mover los brazos del costado del torso.",
+      "Bajá con control hasta la extensión completa aprovechando el estiramiento adicional del bíceps."
+    ]
+  },
+  {
+    "slug": "incline-hammer-curl",
+    "nombre": "Curl martillo inclinado",
+    "tecnica": [
+      "Recostá la espalda en un banco inclinado, tomá el implemento con agarre neutro y dejá los brazos colgar.",
+      "Flexioná los codos llevando el implemento hacia los hombros sin rotar las muñecas.",
+      "Bajá con control hasta la extensión completa del codo."
+    ]
+  },
+  {
+    "slug": "incline-reverse-curl",
+    "nombre": "Curl inverso inclinado",
+    "tecnica": [
+      "Recostá la espalda en un banco inclinado, tomá el implemento con agarre prono y dejá los brazos colgar.",
+      "Flexioná los codos llevando el implemento hacia los hombros manteniendo el agarre prono.",
+      "Bajá con control hasta la extensión completa del codo."
+    ]
+  },
+  {
+    "slug": "incline-twisting-curl",
+    "nombre": "Curl inclinado con giro",
+    "tecnica": [
+      "Recostá la espalda en un banco inclinado, tomá el implemento con agarre neutro y dejá los brazos colgar.",
+      "Flexioná el codo y girá la muñeca hacia la supinación (palma hacia arriba) durante el recorrido ascendente.",
+      "Bajá con control rotando la muñeca de vuelta al agarre neutro hasta la extensión completa."
+    ]
+  }
+]

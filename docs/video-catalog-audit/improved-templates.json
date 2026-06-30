@@ -1,0 +1,1787 @@
+[
+  {
+    "id": "ppl-beginner",
+    "name": "Push Pull Legs — Principiante",
+    "split": "PPL",
+    "level": "beginner",
+    "estimatedMinutesPerDay": 60,
+    "imageUrl": null,
+    "days": [
+      {
+        "dayNumber": 1,
+        "name": "Push",
+        "estimatedMinutes": 60,
+        "slots": [
+          {
+            "exerciseId": "bench-press-barra",
+            "exerciseName": "Press de banca (Barra)",
+            "muscleGroup": "chest",
+            "targetSets": 4,
+            "targetRepsMin": 8,
+            "targetRepsMax": 12,
+            "restSeconds": 90,
+            "targetWeightKg": null,
+            "notes": "Bajá la barra al pecho controlado, codos a 45°."
+          },
+          {
+            "exerciseId": "incline-bench-press-barra",
+            "exerciseName": "Press de banca inclinado (Barra)",
+            "muscleGroup": "chest",
+            "targetSets": 3,
+            "targetRepsMin": 10,
+            "targetRepsMax": 12,
+            "restSeconds": 75,
+            "targetWeightKg": null,
+            "notes": "Banco a 30-45°, empuje desde el talón de la mano."
+          },
+          {
+            "exerciseId": "overhead-press-barra",
+            "exerciseName": "Press militar (Barra)",
+            "muscleGroup": "shoulders",
+            "targetSets": 3,
+            "targetRepsMin": 8,
+            "targetRepsMax": 12,
+            "restSeconds": 90,
+            "targetWeightKg": null,
+            "notes": "Glúteos apretados, no arquees la lumbar."
+          },
+          {
+            "exerciseId": "seated-lateral-raise-mancuerna",
+            "exerciseName": "Elevación lateral sentado",
+            "muscleGroup": "shoulders",
+            "targetSets": 3,
+            "targetRepsMin": 12,
+            "targetRepsMax": 15,
+            "restSeconds": 60,
+            "targetWeightKg": null,
+            "notes": "Codo ligeramente flexionado, subí hasta la altura del hombro."
+          },
+          {
+            "exerciseId": "bar-pushdown-polea",
+            "exerciseName": "Jalón de tríceps con barra",
+            "muscleGroup": "triceps",
+            "targetSets": 3,
+            "targetRepsMin": 12,
+            "targetRepsMax": 15,
+            "restSeconds": 60,
+            "targetWeightKg": null,
+            "notes": "Codos pegados al cuerpo, extensión completa abajo."
+          },
+          {
+            "exerciseId": "skullcrusher-barra",
+            "exerciseName": "Rompecráneos (Barra)",
+            "muscleGroup": "triceps",
+            "targetSets": 3,
+            "targetRepsMin": 10,
+            "targetRepsMax": 12,
+            "restSeconds": 60,
+            "targetWeightKg": null,
+            "notes": "Bajá la barra detrás de la cabeza, no al frente."
+          }
+        ]
+      },
+      {
+        "dayNumber": 2,
+        "name": "Pull",
+        "estimatedMinutes": 60,
+        "slots": [
+          {
+            "exerciseId": "deadlift-barra",
+            "exerciseName": "Peso muerto (Barra)",
+            "muscleGroup": "fullbody",
+            "targetSets": 4,
+            "targetRepsMin": 5,
+            "targetRepsMax": 6,
+            "restSeconds": 120,
+            "targetWeightKg": null,
+            "notes": "Barra pegada al cuerpo, columna neutra todo el recorrido."
+          },
+          {
+            "exerciseId": "bent-over-row-barra",
+            "exerciseName": "Remo inclinado (Barra)",
+            "muscleGroup": "back",
+            "targetSets": 3,
+            "targetRepsMin": 8,
+            "targetRepsMax": 12,
+            "restSeconds": 90,
+            "targetWeightKg": null,
+            "notes": "Tronco casi paralelo al piso, tirá hacia el ombligo."
+          },
+          {
+            "exerciseId": "loaded-pulldown-maquina",
+            "exerciseName": "Jalón al pecho en máquina",
+            "muscleGroup": "back",
+            "targetSets": 3,
+            "targetRepsMin": 10,
+            "targetRepsMax": 12,
+            "restSeconds": 75,
+            "targetWeightKg": null,
+            "notes": "Pecho arriba, tirá hacia la clavícula, no hacia el cuello."
+          },
+          {
+            "exerciseId": "curl-barra",
+            "exerciseName": "Curl (Barra)",
+            "muscleGroup": "biceps",
+            "targetSets": 3,
+            "targetRepsMin": 10,
+            "targetRepsMax": 12,
+            "restSeconds": 60,
+            "targetWeightKg": null,
+            "notes": "Codos fijos, no balancees el torso."
+          },
+          {
+            "exerciseId": "hammer-curl-mancuerna",
+            "exerciseName": "Curl martillo (Mancuerna)",
+            "muscleGroup": "biceps",
+            "targetSets": 3,
+            "targetRepsMin": 12,
+            "targetRepsMax": 15,
+            "restSeconds": 60,
+            "targetWeightKg": null,
+            "notes": "Agarre neutro, contraé al máximo arriba."
+          },
+          {
+            "exerciseId": "face-pulls-polea",
+            "exerciseName": "Jalón al rostro en polea",
+            "muscleGroup": "shoulders",
+            "targetSets": 3,
+            "targetRepsMin": 15,
+            "targetRepsMax": 20,
+            "restSeconds": 60,
+            "targetWeightKg": null,
+            "notes": "Polea a altura de cara, codos altos, rotación externa final."
+          }
+        ]
+      },
+      {
+        "dayNumber": 3,
+        "name": "Legs",
+        "estimatedMinutes": 65,
+        "slots": [
+          {
+            "exerciseId": "squat-barra",
+            "exerciseName": "Sentadilla (Barra)",
+            "muscleGroup": "quads",
+            "targetSets": 4,
+            "targetRepsMin": 8,
+            "targetRepsMax": 12,
+            "restSeconds": 120,
+            "targetWeightKg": null,
+            "notes": "Rodillas sobre puntas de pie, bajá hasta paralelo mínimo."
+          },
+          {
+            "exerciseId": "romanian-deadlift-barra",
+            "exerciseName": "Peso muerto rumano (Barra)",
+            "muscleGroup": "hamstrings",
+            "targetSets": 3,
+            "targetRepsMin": 10,
+            "targetRepsMax": 12,
+            "restSeconds": 90,
+            "targetWeightKg": null,
+            "notes": "Empuje de caderas atrás, sentí el isquio estirado."
+          },
+          {
+            "exerciseId": "leg-press-maquina",
+            "exerciseName": "Prensa de piernas (Máquina)",
+            "muscleGroup": "quads",
+            "targetSets": 3,
+            "targetRepsMin": 12,
+            "targetRepsMax": 15,
+            "restSeconds": 90,
+            "targetWeightKg": null,
+            "notes": "Pies a ancho de hombros, rodilla no pase los 90°."
+          },
+          {
+            "exerciseId": "seated-leg-curl-maquina",
+            "exerciseName": "Curl femoral sentado (Máquina)",
+            "muscleGroup": "hamstrings",
+            "targetSets": 3,
+            "targetRepsMin": 12,
+            "targetRepsMax": 15,
+            "restSeconds": 60,
+            "targetWeightKg": null,
+            "notes": "Bajá lento 2 segundos, no rebotes arriba."
+          },
+          {
+            "exerciseId": "hip-thrust-barra",
+            "exerciseName": "Hip thrust (Barra)",
+            "muscleGroup": "glutes",
+            "targetSets": 3,
+            "targetRepsMin": 12,
+            "targetRepsMax": 15,
+            "restSeconds": 90,
+            "targetWeightKg": null,
+            "notes": "Puentea hasta caderas paralelas al piso, apretá glúteo arriba."
+          },
+          {
+            "exerciseId": "calf-raises-barra",
+            "exerciseName": "Elevación de gemelos (Barra)",
+            "muscleGroup": "calves",
+            "targetSets": 4,
+            "targetRepsMin": 15,
+            "targetRepsMax": 20,
+            "restSeconds": 45,
+            "targetWeightKg": null,
+            "notes": "Bajá talón hasta el suelo, pausa 1s arriba."
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "full-body-3day",
+    "name": "Full Body Principiante",
+    "split": "Full Body",
+    "level": "beginner",
+    "estimatedMinutesPerDay": 55,
+    "imageUrl": null,
+    "days": [
+      {
+        "dayNumber": 1,
+        "name": "Día 1",
+        "estimatedMinutes": 55,
+        "slots": [
+          {
+            "exerciseId": "squat-barra",
+            "exerciseName": "Sentadilla (Barra)",
+            "muscleGroup": "quads",
+            "targetSets": 3,
+            "targetRepsMin": 8,
+            "targetRepsMax": 12,
+            "restSeconds": 120,
+            "targetWeightKg": null,
+            "notes": "Pecho arriba, espalda neutra, descenso controlado."
+          },
+          {
+            "exerciseId": "bench-press-barra",
+            "exerciseName": "Press de banca (Barra)",
+            "muscleGroup": "chest",
+            "targetSets": 3,
+            "targetRepsMin": 8,
+            "targetRepsMax": 12,
+            "restSeconds": 90,
+            "targetWeightKg": null,
+            "notes": "Pies en el piso, escápulas retraídas todo el set."
+          },
+          {
+            "exerciseId": "bent-over-row-barra",
+            "exerciseName": "Remo inclinado (Barra)",
+            "muscleGroup": "back",
+            "targetSets": 3,
+            "targetRepsMin": 8,
+            "targetRepsMax": 12,
+            "restSeconds": 90,
+            "targetWeightKg": null,
+            "notes": "Tronco inclinado, barra hacia el ombligo."
+          },
+          {
+            "exerciseId": "overhead-press-barra",
+            "exerciseName": "Press militar (Barra)",
+            "muscleGroup": "shoulders",
+            "targetSets": 3,
+            "targetRepsMin": 8,
+            "targetRepsMax": 12,
+            "restSeconds": 90,
+            "targetWeightKg": null,
+            "notes": "Core apretado, codos delante de la barra al inicio."
+          },
+          {
+            "exerciseId": "forearm-plank-pesocorporal",
+            "exerciseName": "Plancha en antebrazos (Peso corporal)",
+            "muscleGroup": "core",
+            "targetSets": 3,
+            "targetRepsMin": 30,
+            "targetRepsMax": 45,
+            "restSeconds": 45,
+            "targetWeightKg": null,
+            "notes": "Caderas alineadas, no permitas que caiga la pelvis."
+          }
+        ]
+      },
+      {
+        "dayNumber": 2,
+        "name": "Día 2",
+        "estimatedMinutes": 55,
+        "slots": [
+          {
+            "exerciseId": "leg-press-maquina",
+            "exerciseName": "Prensa de piernas (Máquina)",
+            "muscleGroup": "quads",
+            "targetSets": 3,
+            "targetRepsMin": 10,
+            "targetRepsMax": 15,
+            "restSeconds": 90,
+            "targetWeightKg": null,
+            "notes": "No bloquees las rodillas arriba, rango completo."
+          },
+          {
+            "exerciseId": "incline-bench-press-barra",
+            "exerciseName": "Press de banca inclinado (Barra)",
+            "muscleGroup": "chest",
+            "targetSets": 3,
+            "targetRepsMin": 10,
+            "targetRepsMax": 15,
+            "restSeconds": 75,
+            "targetWeightKg": null,
+            "notes": "Toca la parte alta del pecho, no rebotes la barra."
+          },
+          {
+            "exerciseId": "loaded-pulldown-maquina",
+            "exerciseName": "Jalón al pecho en máquina",
+            "muscleGroup": "back",
+            "targetSets": 3,
+            "targetRepsMin": 10,
+            "targetRepsMax": 12,
+            "restSeconds": 75,
+            "targetWeightKg": null,
+            "notes": "Escápulas hacia abajo primero, luego flexioná los codos."
+          },
+          {
+            "exerciseId": "seated-lateral-raise-mancuerna",
+            "exerciseName": "Elevación lateral sentado",
+            "muscleGroup": "shoulders",
+            "targetSets": 3,
+            "targetRepsMin": 12,
+            "targetRepsMax": 15,
+            "restSeconds": 60,
+            "targetWeightKg": null,
+            "notes": "Peso liviano, control total, nada de impulso."
+          },
+          {
+            "exerciseId": "rope-kneeling-crunch-polea",
+            "exerciseName": "Crunch arrodillado con cuerda",
+            "muscleGroup": "core",
+            "targetSets": 3,
+            "targetRepsMin": 15,
+            "targetRepsMax": 20,
+            "restSeconds": 45,
+            "targetWeightKg": null,
+            "notes": "Flexioná desde el abdomen, no desde la cadera."
+          }
+        ]
+      },
+      {
+        "dayNumber": 3,
+        "name": "Día 3",
+        "estimatedMinutes": 55,
+        "slots": [
+          {
+            "exerciseId": "romanian-deadlift-barra",
+            "exerciseName": "Peso muerto rumano (Barra)",
+            "muscleGroup": "hamstrings",
+            "targetSets": 3,
+            "targetRepsMin": 10,
+            "targetRepsMax": 12,
+            "restSeconds": 90,
+            "targetWeightKg": null,
+            "notes": "Barra rozando las piernas, empuje de cadera al subir."
+          },
+          {
+            "exerciseId": "pec-fly-maquina",
+            "exerciseName": "Apertura de pecho (Máquina)",
+            "muscleGroup": "chest",
+            "targetSets": 3,
+            "targetRepsMin": 12,
+            "targetRepsMax": 15,
+            "restSeconds": 60,
+            "targetWeightKg": null,
+            "notes": "Leve flexión en codos, no abras más allá del pecho."
+          },
+          {
+            "exerciseId": "pullup-pesocorporal",
+            "exerciseName": "Dominada",
+            "muscleGroup": "back",
+            "targetSets": 3,
+            "targetRepsMin": 5,
+            "targetRepsMax": 8,
+            "restSeconds": 90,
+            "targetWeightKg": null,
+            "notes": "Colgá muerto abajo, subí hasta que el mentón pase la barra."
+          },
+          {
+            "exerciseId": "hip-thrust-barra",
+            "exerciseName": "Hip thrust (Barra)",
+            "muscleGroup": "glutes",
+            "targetSets": 3,
+            "targetRepsMin": 12,
+            "targetRepsMax": 15,
+            "restSeconds": 90,
+            "targetWeightKg": null,
+            "notes": "Banco en escápulas, rodillas a 90° arriba del movimiento."
+          },
+          {
+            "exerciseId": "hanging-knee-tuck-pesocorporal",
+            "exerciseName": "Encogimiento de rodillas colgado (Peso corporal)",
+            "muscleGroup": "core",
+            "targetSets": 3,
+            "targetRepsMin": 10,
+            "targetRepsMax": 15,
+            "restSeconds": 60,
+            "targetWeightKg": null,
+            "notes": "Encogé rodillas hasta el pecho, bajá sin balancear."
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "upper-lower-intermediate",
+    "name": "Upper/Lower — Intermedio",
+    "split": "Upper/Lower",
+    "level": "intermediate",
+    "estimatedMinutesPerDay": 65,
+    "imageUrl": null,
+    "days": [
+      {
+        "dayNumber": 1,
+        "name": "Upper A",
+        "estimatedMinutes": 65,
+        "slots": [
+          {
+            "exerciseId": "bench-press-barra",
+            "exerciseName": "Press de banca (Barra)",
+            "muscleGroup": "chest",
+            "targetSets": 4,
+            "targetRepsMin": 6,
+            "targetRepsMax": 8,
+            "restSeconds": 120,
+            "targetWeightKg": null,
+            "notes": "Agarre a 1,5x el ancho de hombros, barra al pectoral medio."
+          },
+          {
+            "exerciseId": "bent-over-row-barra",
+            "exerciseName": "Remo inclinado (Barra)",
+            "muscleGroup": "back",
+            "targetSets": 4,
+            "targetRepsMin": 6,
+            "targetRepsMax": 8,
+            "restSeconds": 90,
+            "targetWeightKg": null,
+            "notes": "Pausa 1s en contracción, tronco entre 45-60°."
+          },
+          {
+            "exerciseId": "overhead-press-barra",
+            "exerciseName": "Press militar (Barra)",
+            "muscleGroup": "shoulders",
+            "targetSets": 3,
+            "targetRepsMin": 8,
+            "targetRepsMax": 10,
+            "restSeconds": 90,
+            "targetWeightKg": null,
+            "notes": "Empujá la cabeza hacia adelante al pasar la barra."
+          },
+          {
+            "exerciseId": "pullup-pesocorporal",
+            "exerciseName": "Dominada",
+            "muscleGroup": "back",
+            "targetSets": 3,
+            "targetRepsMin": 6,
+            "targetRepsMax": 10,
+            "restSeconds": 90,
+            "targetWeightKg": null,
+            "notes": "Bajada excéntrica 3 segundos, no sueltes el control."
+          },
+          {
+            "exerciseId": "curl-barra",
+            "exerciseName": "Curl (Barra)",
+            "muscleGroup": "biceps",
+            "targetSets": 3,
+            "targetRepsMin": 10,
+            "targetRepsMax": 12,
+            "restSeconds": 60,
+            "targetWeightKg": null,
+            "notes": "Codos fijos a los lados, sin balancear el cuerpo."
+          },
+          {
+            "exerciseId": "skullcrusher-barra",
+            "exerciseName": "Rompecráneos (Barra)",
+            "muscleGroup": "triceps",
+            "targetSets": 3,
+            "targetRepsMin": 10,
+            "targetRepsMax": 12,
+            "restSeconds": 60,
+            "targetWeightKg": null,
+            "notes": "Codos apuntando al techo, extensión total arriba."
+          }
+        ]
+      },
+      {
+        "dayNumber": 2,
+        "name": "Lower A",
+        "estimatedMinutes": 65,
+        "slots": [
+          {
+            "exerciseId": "squat-barra",
+            "exerciseName": "Sentadilla (Barra)",
+            "muscleGroup": "quads",
+            "targetSets": 4,
+            "targetRepsMin": 6,
+            "targetRepsMax": 8,
+            "restSeconds": 120,
+            "targetWeightKg": null,
+            "notes": "Bajá por debajo del paralelo, rodillas siguen los pies."
+          },
+          {
+            "exerciseId": "romanian-deadlift-barra",
+            "exerciseName": "Peso muerto rumano (Barra)",
+            "muscleGroup": "hamstrings",
+            "targetSets": 3,
+            "targetRepsMin": 8,
+            "targetRepsMax": 10,
+            "restSeconds": 90,
+            "targetWeightKg": null,
+            "notes": "Leve flexión de rodillas, isquios deben sentirse tensos."
+          },
+          {
+            "exerciseId": "leg-press-maquina",
+            "exerciseName": "Prensa de piernas (Máquina)",
+            "muscleGroup": "quads",
+            "targetSets": 3,
+            "targetRepsMin": 10,
+            "targetRepsMax": 12,
+            "restSeconds": 90,
+            "targetWeightKg": null,
+            "notes": "Bajá hasta 90°, no permitas que las rodillas colapsen."
+          },
+          {
+            "exerciseId": "seated-leg-curl-maquina",
+            "exerciseName": "Curl femoral sentado (Máquina)",
+            "muscleGroup": "hamstrings",
+            "targetSets": 3,
+            "targetRepsMin": 12,
+            "targetRepsMax": 15,
+            "restSeconds": 60,
+            "targetWeightKg": null,
+            "notes": "Fase excéntrica lenta, no uses impulso para subir."
+          },
+          {
+            "exerciseId": "calf-raises-barra",
+            "exerciseName": "Elevación de gemelos (Barra)",
+            "muscleGroup": "calves",
+            "targetSets": 4,
+            "targetRepsMin": 15,
+            "targetRepsMax": 20,
+            "restSeconds": 45,
+            "targetWeightKg": null,
+            "notes": "Rango completo: talón abajo, puntas de pie al máximo."
+          },
+          {
+            "exerciseId": "forearm-plank-pesocorporal",
+            "exerciseName": "Plancha en antebrazos (Peso corporal)",
+            "muscleGroup": "core",
+            "targetSets": 3,
+            "targetRepsMin": 40,
+            "targetRepsMax": 60,
+            "restSeconds": 45,
+            "targetWeightKg": null,
+            "notes": "Cuerpo en línea recta, activa el abdomen activamente."
+          }
+        ]
+      },
+      {
+        "dayNumber": 3,
+        "name": "Upper B",
+        "estimatedMinutes": 65,
+        "slots": [
+          {
+            "exerciseId": "incline-bench-press-barra",
+            "exerciseName": "Press de banca inclinado (Barra)",
+            "muscleGroup": "chest",
+            "targetSets": 4,
+            "targetRepsMin": 8,
+            "targetRepsMax": 10,
+            "restSeconds": 90,
+            "targetWeightKg": null,
+            "notes": "Banco a 30°, tocá la parte alta del pecho en cada rep."
+          },
+          {
+            "exerciseId": "loaded-pulldown-maquina",
+            "exerciseName": "Jalón al pecho en máquina",
+            "muscleGroup": "back",
+            "targetSets": 4,
+            "targetRepsMin": 8,
+            "targetRepsMax": 10,
+            "restSeconds": 75,
+            "targetWeightKg": null,
+            "notes": "Agarre a ancho de hombros, arqueá levemente el pecho."
+          },
+          {
+            "exerciseId": "seated-lateral-raise-mancuerna",
+            "exerciseName": "Elevación lateral sentado",
+            "muscleGroup": "shoulders",
+            "targetSets": 4,
+            "targetRepsMin": 12,
+            "targetRepsMax": 15,
+            "restSeconds": 60,
+            "targetWeightKg": null,
+            "notes": "Pulgares ligeramente abajo, codo ligeramente adelante del hombro."
+          },
+          {
+            "exerciseId": "pec-fly-maquina",
+            "exerciseName": "Apertura de pecho (Máquina)",
+            "muscleGroup": "chest",
+            "targetSets": 3,
+            "targetRepsMin": 12,
+            "targetRepsMax": 15,
+            "restSeconds": 60,
+            "targetWeightKg": null,
+            "notes": "Estirá bien el pecho al abrir, apretá en el cierre."
+          },
+          {
+            "exerciseId": "hammer-curl-mancuerna",
+            "exerciseName": "Curl martillo (Mancuerna)",
+            "muscleGroup": "biceps",
+            "targetSets": 3,
+            "targetRepsMin": 12,
+            "targetRepsMax": 15,
+            "restSeconds": 60,
+            "targetWeightKg": null,
+            "notes": "Agarre neutro todo el recorrido, contraé el bíceps arriba."
+          },
+          {
+            "exerciseId": "bar-pushdown-polea",
+            "exerciseName": "Jalón de tríceps con barra",
+            "muscleGroup": "triceps",
+            "targetSets": 3,
+            "targetRepsMin": 12,
+            "targetRepsMax": 15,
+            "restSeconds": 60,
+            "targetWeightKg": null,
+            "notes": "Codos fijos, extensión completa, no sueltes arriba."
+          }
+        ]
+      },
+      {
+        "dayNumber": 4,
+        "name": "Lower B",
+        "estimatedMinutes": 65,
+        "slots": [
+          {
+            "exerciseId": "deadlift-barra",
+            "exerciseName": "Peso muerto (Barra)",
+            "muscleGroup": "fullbody",
+            "targetSets": 4,
+            "targetRepsMin": 4,
+            "targetRepsMax": 6,
+            "restSeconds": 180,
+            "targetWeightKg": null,
+            "notes": "Reset en el suelo cada rep, no rebotes la barra."
+          },
+          {
+            "exerciseId": "leg-extension-maquina",
+            "exerciseName": "Extensión de piernas (Máquina)",
+            "muscleGroup": "quads",
+            "targetSets": 3,
+            "targetRepsMin": 12,
+            "targetRepsMax": 15,
+            "restSeconds": 60,
+            "targetWeightKg": null,
+            "notes": "Pausa 1s arriba, bajá controlado en 2-3 segundos."
+          },
+          {
+            "exerciseId": "hip-thrust-barra",
+            "exerciseName": "Hip thrust (Barra)",
+            "muscleGroup": "glutes",
+            "targetSets": 3,
+            "targetRepsMin": 12,
+            "targetRepsMax": 15,
+            "restSeconds": 90,
+            "targetWeightKg": null,
+            "notes": "Mentón al pecho arriba, caderas bien extendidas al final."
+          },
+          {
+            "exerciseId": "bulgarian-split-squat-barra",
+            "exerciseName": "Sentadilla búlgara (Barra)",
+            "muscleGroup": "quads",
+            "targetSets": 3,
+            "targetRepsMin": 8,
+            "targetRepsMax": 10,
+            "restSeconds": 90,
+            "targetWeightKg": null,
+            "notes": "Pie trasero en banco, rodilla delantera sobre el pie."
+          },
+          {
+            "exerciseId": "seated-calf-raise-maquina",
+            "exerciseName": "Elevación de gemelos sentado (Máquina)",
+            "muscleGroup": "calves",
+            "targetSets": 3,
+            "targetRepsMin": 15,
+            "targetRepsMax": 20,
+            "restSeconds": 45,
+            "targetWeightKg": null,
+            "notes": "Trabaja el soleo aquí, bajada lenta hasta el final."
+          },
+          {
+            "exerciseId": "rope-kneeling-crunch-polea",
+            "exerciseName": "Crunch arrodillado con cuerda",
+            "muscleGroup": "core",
+            "targetSets": 3,
+            "targetRepsMin": 15,
+            "targetRepsMax": 20,
+            "restSeconds": 45,
+            "targetWeightKg": null,
+            "notes": "Curva la espalda hacia adelante, no es un jalón de brazos."
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "bro-split-intermediate",
+    "name": "Bro Split — Intermedio",
+    "split": "Bro Split",
+    "level": "intermediate",
+    "estimatedMinutesPerDay": 55,
+    "imageUrl": null,
+    "days": [
+      {
+        "dayNumber": 1,
+        "name": "Pecho",
+        "estimatedMinutes": 55,
+        "slots": [
+          {
+            "exerciseId": "bench-press-barra",
+            "exerciseName": "Press de banca (Barra)",
+            "muscleGroup": "chest",
+            "targetSets": 4,
+            "targetRepsMin": 8,
+            "targetRepsMax": 10,
+            "restSeconds": 90,
+            "targetWeightKg": null,
+            "notes": "Escápulas retraídas, empujá la barra lejos del pecho."
+          },
+          {
+            "exerciseId": "incline-bench-press-barra",
+            "exerciseName": "Press de banca inclinado (Barra)",
+            "muscleGroup": "chest",
+            "targetSets": 4,
+            "targetRepsMin": 10,
+            "targetRepsMax": 12,
+            "restSeconds": 75,
+            "targetWeightKg": null,
+            "notes": "Banco a 30°, enfocate en el pectoral superior."
+          },
+          {
+            "exerciseId": "pec-fly-maquina",
+            "exerciseName": "Apertura de pecho (Máquina)",
+            "muscleGroup": "chest",
+            "targetSets": 3,
+            "targetRepsMin": 12,
+            "targetRepsMax": 15,
+            "restSeconds": 60,
+            "targetWeightKg": null,
+            "notes": "Controlá la apertura, cierre fuerte con contracción final."
+          },
+          {
+            "exerciseId": "overhead-tricep-extension-barra",
+            "exerciseName": "Extensión de tríceps por encima de la cabeza (Barra)",
+            "muscleGroup": "triceps",
+            "targetSets": 3,
+            "targetRepsMin": 10,
+            "targetRepsMax": 12,
+            "restSeconds": 75,
+            "targetWeightKg": null,
+            "notes": "Codos apuntando al frente, extensión completa arriba."
+          },
+          {
+            "exerciseId": "bar-pushdown-polea",
+            "exerciseName": "Jalón de tríceps con barra",
+            "muscleGroup": "triceps",
+            "targetSets": 3,
+            "targetRepsMin": 12,
+            "targetRepsMax": 15,
+            "restSeconds": 60,
+            "targetWeightKg": null,
+            "notes": "Codos al cuerpo, muñecas neutras, extensión total."
+          }
+        ]
+      },
+      {
+        "dayNumber": 2,
+        "name": "Espalda",
+        "estimatedMinutes": 60,
+        "slots": [
+          {
+            "exerciseId": "deadlift-barra",
+            "exerciseName": "Peso muerto (Barra)",
+            "muscleGroup": "fullbody",
+            "targetSets": 4,
+            "targetRepsMin": 5,
+            "targetRepsMax": 6,
+            "restSeconds": 180,
+            "targetWeightKg": null,
+            "notes": "Espalda neutra, empujá el piso, barra pegada al cuerpo."
+          },
+          {
+            "exerciseId": "bent-over-row-barra",
+            "exerciseName": "Remo inclinado (Barra)",
+            "muscleGroup": "back",
+            "targetSets": 4,
+            "targetRepsMin": 8,
+            "targetRepsMax": 10,
+            "restSeconds": 90,
+            "targetWeightKg": null,
+            "notes": "Traccioná hacia el ombligo, retrae las escápulas al final."
+          },
+          {
+            "exerciseId": "pullup-pesocorporal",
+            "exerciseName": "Dominada",
+            "muscleGroup": "back",
+            "targetSets": 3,
+            "targetRepsMin": 6,
+            "targetRepsMax": 10,
+            "restSeconds": 90,
+            "targetWeightKg": null,
+            "notes": "Bajada excéntrica lenta, dead hang completo abajo."
+          },
+          {
+            "exerciseId": "loaded-pulldown-maquina",
+            "exerciseName": "Jalón al pecho en máquina",
+            "muscleGroup": "back",
+            "targetSets": 3,
+            "targetRepsMin": 10,
+            "targetRepsMax": 12,
+            "restSeconds": 75,
+            "targetWeightKg": null,
+            "notes": "Pecho alto, tirá hacia la clavícula, no al cuello."
+          },
+          {
+            "exerciseId": "curl-barra",
+            "exerciseName": "Curl (Barra)",
+            "muscleGroup": "biceps",
+            "targetSets": 3,
+            "targetRepsMin": 10,
+            "targetRepsMax": 12,
+            "restSeconds": 60,
+            "targetWeightKg": null,
+            "notes": "Supinación al subir, apretá bíceps en el tope."
+          },
+          {
+            "exerciseId": "hammer-curl-mancuerna",
+            "exerciseName": "Curl martillo (Mancuerna)",
+            "muscleGroup": "biceps",
+            "targetSets": 3,
+            "targetRepsMin": 12,
+            "targetRepsMax": 15,
+            "restSeconds": 60,
+            "targetWeightKg": null,
+            "notes": "Agarre neutro, trabajá braquial y braquiorradial."
+          }
+        ]
+      },
+      {
+        "dayNumber": 3,
+        "name": "Hombros",
+        "estimatedMinutes": 50,
+        "slots": [
+          {
+            "exerciseId": "overhead-press-barra",
+            "exerciseName": "Press militar (Barra)",
+            "muscleGroup": "shoulders",
+            "targetSets": 4,
+            "targetRepsMin": 8,
+            "targetRepsMax": 10,
+            "restSeconds": 90,
+            "targetWeightKg": null,
+            "notes": "Agarre algo más ancho que los hombros, bloqueo completo."
+          },
+          {
+            "exerciseId": "seated-lateral-raise-mancuerna",
+            "exerciseName": "Elevación lateral sentado",
+            "muscleGroup": "shoulders",
+            "targetSets": 4,
+            "targetRepsMin": 12,
+            "targetRepsMax": 15,
+            "restSeconds": 60,
+            "targetWeightKg": null,
+            "notes": "Inclinación mínima adelante, codo ligeramente flexionado."
+          },
+          {
+            "exerciseId": "face-pulls-polea",
+            "exerciseName": "Jalón al rostro en polea",
+            "muscleGroup": "shoulders",
+            "targetSets": 3,
+            "targetRepsMin": 15,
+            "targetRepsMax": 20,
+            "restSeconds": 60,
+            "targetWeightKg": null,
+            "notes": "Polea a altura de cara, rotación externa completa al final."
+          },
+          {
+            "exerciseId": "skullcrusher-barra",
+            "exerciseName": "Rompecráneos (Barra)",
+            "muscleGroup": "triceps",
+            "targetSets": 3,
+            "targetRepsMin": 10,
+            "targetRepsMax": 12,
+            "restSeconds": 75,
+            "targetWeightKg": null,
+            "notes": "Bajá la barra detrás de la cabeza, extensión completa."
+          },
+          {
+            "exerciseId": "rope-kneeling-crunch-polea",
+            "exerciseName": "Crunch arrodillado con cuerda",
+            "muscleGroup": "core",
+            "targetSets": 3,
+            "targetRepsMin": 15,
+            "targetRepsMax": 20,
+            "restSeconds": 45,
+            "targetWeightKg": null,
+            "notes": "Curva la columna toracolumbar, no vayas con la cadera."
+          }
+        ]
+      },
+      {
+        "dayNumber": 4,
+        "name": "Piernas",
+        "estimatedMinutes": 65,
+        "slots": [
+          {
+            "exerciseId": "squat-barra",
+            "exerciseName": "Sentadilla (Barra)",
+            "muscleGroup": "quads",
+            "targetSets": 4,
+            "targetRepsMin": 8,
+            "targetRepsMax": 10,
+            "restSeconds": 120,
+            "targetWeightKg": null,
+            "notes": "Por debajo del paralelo, talones en el suelo siempre."
+          },
+          {
+            "exerciseId": "romanian-deadlift-barra",
+            "exerciseName": "Peso muerto rumano (Barra)",
+            "muscleGroup": "hamstrings",
+            "targetSets": 3,
+            "targetRepsMin": 10,
+            "targetRepsMax": 12,
+            "restSeconds": 90,
+            "targetWeightKg": null,
+            "notes": "Siente el isquiotibial estirado, no redondees la espalda."
+          },
+          {
+            "exerciseId": "leg-press-maquina",
+            "exerciseName": "Prensa de piernas (Máquina)",
+            "muscleGroup": "quads",
+            "targetSets": 3,
+            "targetRepsMin": 12,
+            "targetRepsMax": 15,
+            "restSeconds": 90,
+            "targetWeightKg": null,
+            "notes": "Pies a ancho medio, rodilla sigue la dirección del pie."
+          },
+          {
+            "exerciseId": "leg-extension-maquina",
+            "exerciseName": "Extensión de piernas (Máquina)",
+            "muscleGroup": "quads",
+            "targetSets": 3,
+            "targetRepsMin": 12,
+            "targetRepsMax": 15,
+            "restSeconds": 60,
+            "targetWeightKg": null,
+            "notes": "Isométrico 1s arriba, excéntrico 2s al bajar."
+          },
+          {
+            "exerciseId": "seated-leg-curl-maquina",
+            "exerciseName": "Curl femoral sentado (Máquina)",
+            "muscleGroup": "hamstrings",
+            "targetSets": 3,
+            "targetRepsMin": 12,
+            "targetRepsMax": 15,
+            "restSeconds": 60,
+            "targetWeightKg": null,
+            "notes": "Talón hacia el glúteo, no levantes las caderas."
+          },
+          {
+            "exerciseId": "hip-thrust-barra",
+            "exerciseName": "Hip thrust (Barra)",
+            "muscleGroup": "glutes",
+            "targetSets": 3,
+            "targetRepsMin": 12,
+            "targetRepsMax": 15,
+            "restSeconds": 90,
+            "targetWeightKg": null,
+            "notes": "Extensión completa de cadera, apretá glúteos 1s arriba."
+          },
+          {
+            "exerciseId": "calf-raises-barra",
+            "exerciseName": "Elevación de gemelos (Barra)",
+            "muscleGroup": "calves",
+            "targetSets": 4,
+            "targetRepsMin": 15,
+            "targetRepsMax": 20,
+            "restSeconds": 45,
+            "targetWeightKg": null,
+            "notes": "Bajada hasta estiramiento total del gemelo, sin rebote."
+          }
+        ]
+      },
+      {
+        "dayNumber": 5,
+        "name": "Full",
+        "estimatedMinutes": 50,
+        "slots": [
+          {
+            "exerciseId": "bench-press-barra",
+            "exerciseName": "Press de banca (Barra)",
+            "muscleGroup": "chest",
+            "targetSets": 3,
+            "targetRepsMin": 10,
+            "targetRepsMax": 12,
+            "restSeconds": 90,
+            "targetWeightKg": null,
+            "notes": "Sesión de volumen, ritmo controlado en cada rep."
+          },
+          {
+            "exerciseId": "loaded-pulldown-maquina",
+            "exerciseName": "Jalón al pecho en máquina",
+            "muscleGroup": "back",
+            "targetSets": 3,
+            "targetRepsMin": 10,
+            "targetRepsMax": 12,
+            "restSeconds": 75,
+            "targetWeightKg": null,
+            "notes": "Pecho abierto al frente, jalá desde los codos."
+          },
+          {
+            "exerciseId": "squat-barra",
+            "exerciseName": "Sentadilla (Barra)",
+            "muscleGroup": "quads",
+            "targetSets": 3,
+            "targetRepsMin": 10,
+            "targetRepsMax": 12,
+            "restSeconds": 90,
+            "targetWeightKg": null,
+            "notes": "Peso moderado, foco técnico, rodillas bien alineadas."
+          },
+          {
+            "exerciseId": "forearm-plank-pesocorporal",
+            "exerciseName": "Plancha en antebrazos (Peso corporal)",
+            "muscleGroup": "core",
+            "targetSets": 3,
+            "targetRepsMin": 40,
+            "targetRepsMax": 60,
+            "restSeconds": 45,
+            "targetWeightKg": null,
+            "notes": "No dejes caer las caderas, respira con el diafragma."
+          },
+          {
+            "exerciseId": "hanging-knee-tuck-pesocorporal",
+            "exerciseName": "Encogimiento de rodillas colgado (Peso corporal)",
+            "muscleGroup": "core",
+            "targetSets": 3,
+            "targetRepsMin": 12,
+            "targetRepsMax": 15,
+            "restSeconds": 60,
+            "targetWeightKg": null,
+            "notes": "Rodillas al pecho, bajada sin balanceo del cuerpo."
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "powerlifting-base",
+    "name": "Powerlifting Base",
+    "split": "Powerlifting",
+    "level": "advanced",
+    "estimatedMinutesPerDay": 75,
+    "imageUrl": null,
+    "days": [
+      {
+        "dayNumber": 1,
+        "name": "Sentadilla",
+        "estimatedMinutes": 75,
+        "slots": [
+          {
+            "exerciseId": "squat-barra",
+            "exerciseName": "Sentadilla (Barra)",
+            "muscleGroup": "quads",
+            "targetSets": 5,
+            "targetRepsMin": 3,
+            "targetRepsMax": 5,
+            "restSeconds": 180,
+            "targetWeightKg": null,
+            "notes": "80% 1RM, rompe el paralelo, ascenso explosivo."
+          },
+          {
+            "exerciseId": "leg-press-maquina",
+            "exerciseName": "Prensa de piernas (Máquina)",
+            "muscleGroup": "quads",
+            "targetSets": 3,
+            "targetRepsMin": 8,
+            "targetRepsMax": 10,
+            "restSeconds": 120,
+            "targetWeightKg": null,
+            "notes": "Accesorio de volumen, rango completo de movimiento."
+          },
+          {
+            "exerciseId": "romanian-deadlift-barra",
+            "exerciseName": "Peso muerto rumano (Barra)",
+            "muscleGroup": "hamstrings",
+            "targetSets": 3,
+            "targetRepsMin": 6,
+            "targetRepsMax": 8,
+            "restSeconds": 90,
+            "targetWeightKg": null,
+            "notes": "Carga moderada, isquiotibiales como antagonistas del squat."
+          },
+          {
+            "exerciseId": "seated-leg-curl-maquina",
+            "exerciseName": "Curl femoral sentado (Máquina)",
+            "muscleGroup": "hamstrings",
+            "targetSets": 3,
+            "targetRepsMin": 10,
+            "targetRepsMax": 12,
+            "restSeconds": 60,
+            "targetWeightKg": null,
+            "notes": "Aislación de isquios, excéntrico lento para hipertrofia."
+          },
+          {
+            "exerciseId": "rope-kneeling-crunch-polea",
+            "exerciseName": "Crunch arrodillado con cuerda",
+            "muscleGroup": "core",
+            "targetSets": 3,
+            "targetRepsMin": 15,
+            "targetRepsMax": 20,
+            "restSeconds": 45,
+            "targetWeightKg": null,
+            "notes": "Core fuerte para estabilidad en la sentadilla pesada."
+          }
+        ]
+      },
+      {
+        "dayNumber": 2,
+        "name": "Press",
+        "estimatedMinutes": 70,
+        "slots": [
+          {
+            "exerciseId": "bench-press-barra",
+            "exerciseName": "Press de banca (Barra)",
+            "muscleGroup": "chest",
+            "targetSets": 5,
+            "targetRepsMin": 3,
+            "targetRepsMax": 5,
+            "restSeconds": 180,
+            "targetWeightKg": null,
+            "notes": "80% 1RM, arco técnico, barra toca el pecho limpio."
+          },
+          {
+            "exerciseId": "overhead-press-barra",
+            "exerciseName": "Press militar (Barra)",
+            "muscleGroup": "shoulders",
+            "targetSets": 3,
+            "targetRepsMin": 6,
+            "targetRepsMax": 8,
+            "restSeconds": 90,
+            "targetWeightKg": null,
+            "notes": "Antagonista del press, construye hombros para el bench."
+          },
+          {
+            "exerciseId": "skullcrusher-barra",
+            "exerciseName": "Rompecráneos (Barra)",
+            "muscleGroup": "triceps",
+            "targetSets": 3,
+            "targetRepsMin": 8,
+            "targetRepsMax": 10,
+            "restSeconds": 75,
+            "targetWeightKg": null,
+            "notes": "Tríceps largo, accesorio directo del press de banca."
+          },
+          {
+            "exerciseId": "bar-pushdown-polea",
+            "exerciseName": "Jalón de tríceps con barra",
+            "muscleGroup": "triceps",
+            "targetSets": 3,
+            "targetRepsMin": 10,
+            "targetRepsMax": 12,
+            "restSeconds": 60,
+            "targetWeightKg": null,
+            "notes": "Volumen extra de tríceps, extensión completa abajo."
+          },
+          {
+            "exerciseId": "face-pulls-polea",
+            "exerciseName": "Jalón al rostro en polea",
+            "muscleGroup": "shoulders",
+            "targetSets": 3,
+            "targetRepsMin": 15,
+            "targetRepsMax": 20,
+            "restSeconds": 60,
+            "targetWeightKg": null,
+            "notes": "Salud de manguito rotador, no omitir en powerlifting."
+          }
+        ]
+      },
+      {
+        "dayNumber": 3,
+        "name": "Peso Muerto",
+        "estimatedMinutes": 75,
+        "slots": [
+          {
+            "exerciseId": "deadlift-barra",
+            "exerciseName": "Peso muerto (Barra)",
+            "muscleGroup": "fullbody",
+            "targetSets": 5,
+            "targetRepsMin": 2,
+            "targetRepsMax": 4,
+            "restSeconds": 240,
+            "targetWeightKg": null,
+            "notes": "80% 1RM, reset completo en el suelo entre reps."
+          },
+          {
+            "exerciseId": "romanian-deadlift-barra",
+            "exerciseName": "Peso muerto rumano (Barra)",
+            "muscleGroup": "hamstrings",
+            "targetSets": 3,
+            "targetRepsMin": 6,
+            "targetRepsMax": 8,
+            "restSeconds": 120,
+            "targetWeightKg": null,
+            "notes": "Accesorio directo, fortalece el patrón de bisagra."
+          },
+          {
+            "exerciseId": "bent-over-row-barra",
+            "exerciseName": "Remo inclinado (Barra)",
+            "muscleGroup": "back",
+            "targetSets": 3,
+            "targetRepsMin": 6,
+            "targetRepsMax": 8,
+            "restSeconds": 90,
+            "targetWeightKg": null,
+            "notes": "Espalda superior para el lockout del peso muerto."
+          },
+          {
+            "exerciseId": "pullup-pesocorporal",
+            "exerciseName": "Dominada",
+            "muscleGroup": "back",
+            "targetSets": 3,
+            "targetRepsMin": 6,
+            "targetRepsMax": 10,
+            "restSeconds": 90,
+            "targetWeightKg": null,
+            "notes": "Volumen de jalón, dorsales activos en el tirón."
+          },
+          {
+            "exerciseId": "hanging-knee-tuck-pesocorporal",
+            "exerciseName": "Encogimiento de rodillas colgado (Peso corporal)",
+            "muscleGroup": "core",
+            "targetSets": 3,
+            "targetRepsMin": 10,
+            "targetRepsMax": 15,
+            "restSeconds": 60,
+            "targetWeightKg": null,
+            "notes": "Core y flexores, soporte del movimiento de arranque."
+          }
+        ]
+      },
+      {
+        "dayNumber": 4,
+        "name": "Accesorios",
+        "estimatedMinutes": 60,
+        "slots": [
+          {
+            "exerciseId": "incline-bench-press-barra",
+            "exerciseName": "Press de banca inclinado (Barra)",
+            "muscleGroup": "chest",
+            "targetSets": 3,
+            "targetRepsMin": 8,
+            "targetRepsMax": 10,
+            "restSeconds": 75,
+            "targetWeightKg": null,
+            "notes": "Pectoral superior y deltoides anterior, soporte del bench."
+          },
+          {
+            "exerciseId": "seated-cable-row-maquina",
+            "exerciseName": "Remo sentado en polea",
+            "muscleGroup": "back",
+            "targetSets": 3,
+            "targetRepsMin": 8,
+            "targetRepsMax": 10,
+            "restSeconds": 75,
+            "targetWeightKg": null,
+            "notes": "Retracción escapular completa, pausa 1s en contracción."
+          },
+          {
+            "exerciseId": "seated-lateral-raise-mancuerna",
+            "exerciseName": "Elevación lateral sentado",
+            "muscleGroup": "shoulders",
+            "targetSets": 3,
+            "targetRepsMin": 12,
+            "targetRepsMax": 15,
+            "restSeconds": 60,
+            "targetWeightKg": null,
+            "notes": "Deltoides medio, salud del hombro en powerlifting."
+          },
+          {
+            "exerciseId": "curl-barra",
+            "exerciseName": "Curl (Barra)",
+            "muscleGroup": "biceps",
+            "targetSets": 3,
+            "targetRepsMin": 10,
+            "targetRepsMax": 12,
+            "restSeconds": 60,
+            "targetWeightKg": null,
+            "notes": "Bíceps para el lockout del peso muerto y jalones."
+          },
+          {
+            "exerciseId": "overhead-tricep-extension-barra",
+            "exerciseName": "Extensión de tríceps por encima de la cabeza (Barra)",
+            "muscleGroup": "triceps",
+            "targetSets": 3,
+            "targetRepsMin": 10,
+            "targetRepsMax": 12,
+            "restSeconds": 60,
+            "targetWeightKg": null,
+            "notes": "Tríceps largo bajo tensión máxima, clave para el press."
+          },
+          {
+            "exerciseId": "forearm-plank-pesocorporal",
+            "exerciseName": "Plancha en antebrazos (Peso corporal)",
+            "muscleGroup": "core",
+            "targetSets": 3,
+            "targetRepsMin": 45,
+            "targetRepsMax": 60,
+            "restSeconds": 45,
+            "targetWeightKg": null,
+            "notes": "Core antirrotación, base para los tres levantamientos."
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "calistenia-beginner",
+    "name": "Calistenia Principiante",
+    "split": "Full Body",
+    "level": "beginner",
+    "estimatedMinutesPerDay": 45,
+    "imageUrl": null,
+    "days": [
+      {
+        "dayNumber": 1,
+        "name": "Empuje + Core",
+        "estimatedMinutes": 45,
+        "slots": [
+          {
+            "exerciseId": "push-up-pesocorporal",
+            "exerciseName": "Flexión",
+            "muscleGroup": "chest",
+            "targetSets": 4,
+            "targetRepsMin": 8,
+            "targetRepsMax": 15,
+            "restSeconds": 75,
+            "targetWeightKg": null,
+            "notes": "Cuerpo recto de cabeza a talones, pecho roza el piso."
+          },
+          {
+            "exerciseId": "diamond-push-ups-pesocorporal",
+            "exerciseName": "Flexión en diamante",
+            "muscleGroup": "chest",
+            "targetSets": 3,
+            "targetRepsMin": 6,
+            "targetRepsMax": 10,
+            "restSeconds": 75,
+            "targetWeightKg": null,
+            "notes": "Manos en diamante bajo el pecho, codos atrás al bajar."
+          },
+          {
+            "exerciseId": "pike-press-pesocorporal",
+            "exerciseName": "Press en posición pike",
+            "muscleGroup": "shoulders",
+            "targetSets": 3,
+            "targetRepsMin": 6,
+            "targetRepsMax": 10,
+            "restSeconds": 75,
+            "targetWeightKg": null,
+            "notes": "Caderas altas, bajá la cabeza entre las manos."
+          },
+          {
+            "exerciseId": "forearm-plank-pesocorporal",
+            "exerciseName": "Plancha en antebrazos (Peso corporal)",
+            "muscleGroup": "core",
+            "targetSets": 3,
+            "targetRepsMin": 30,
+            "targetRepsMax": 45,
+            "restSeconds": 45,
+            "targetWeightKg": null,
+            "notes": "Pelvis neutra, no dejes caer ni levantar las caderas."
+          },
+          {
+            "exerciseId": "hollow-hold-pesocorporal",
+            "exerciseName": "Hollow hold (Peso corporal)",
+            "muscleGroup": "core",
+            "targetSets": 3,
+            "targetRepsMin": 20,
+            "targetRepsMax": 30,
+            "restSeconds": 45,
+            "targetWeightKg": null,
+            "notes": "Zona lumbar plana en el suelo, piernas estiradas tensas."
+          }
+        ]
+      },
+      {
+        "dayNumber": 2,
+        "name": "Jalón + Piernas",
+        "estimatedMinutes": 50,
+        "slots": [
+          {
+            "exerciseId": "assisted-pull-up-pesocorporal",
+            "exerciseName": "Dominada asistida (Peso corporal)",
+            "muscleGroup": "back",
+            "targetSets": 4,
+            "targetRepsMin": 5,
+            "targetRepsMax": 8,
+            "restSeconds": 90,
+            "targetWeightKg": null,
+            "notes": "Asistite con una silla o compañero, bajá sin rebote."
+          },
+          {
+            "exerciseId": "inverted-row-multipower",
+            "exerciseName": "Remo invertido",
+            "muscleGroup": "back",
+            "targetSets": 3,
+            "targetRepsMin": 8,
+            "targetRepsMax": 12,
+            "restSeconds": 75,
+            "targetWeightKg": null,
+            "notes": "Pecho toca la barra, cuerpo recto, codos al cuerpo."
+          },
+          {
+            "exerciseId": "chinup-pesocorporal",
+            "exerciseName": "Dominada supina",
+            "muscleGroup": "back",
+            "targetSets": 3,
+            "targetRepsMin": 3,
+            "targetRepsMax": 6,
+            "restSeconds": 90,
+            "targetWeightKg": null,
+            "notes": "Agarre supino, jalá hasta que el mentón pase la barra."
+          },
+          {
+            "exerciseId": "squat-pesocorporal",
+            "exerciseName": "Sentadilla (Peso corporal)",
+            "muscleGroup": "quads",
+            "targetSets": 3,
+            "targetRepsMin": 12,
+            "targetRepsMax": 20,
+            "restSeconds": 75,
+            "targetWeightKg": null,
+            "notes": "Brazos al frente, bajá hasta paralelo, talones en el piso."
+          },
+          {
+            "exerciseId": "glute-bridge-pesocorporal",
+            "exerciseName": "Puente de glúteos (Peso corporal)",
+            "muscleGroup": "glutes",
+            "targetSets": 3,
+            "targetRepsMin": 15,
+            "targetRepsMax": 20,
+            "restSeconds": 60,
+            "targetWeightKg": null,
+            "notes": "Extensión completa de cadera arriba, apretá glúteos 1s."
+          },
+          {
+            "exerciseId": "hanging-knee-tuck-pesocorporal",
+            "exerciseName": "Encogimiento de rodillas colgado (Peso corporal)",
+            "muscleGroup": "core",
+            "targetSets": 3,
+            "targetRepsMin": 8,
+            "targetRepsMax": 12,
+            "restSeconds": 60,
+            "targetWeightKg": null,
+            "notes": "Colgado estático, encogé rodillas al pecho sin balancear."
+          }
+        ]
+      },
+      {
+        "dayNumber": 3,
+        "name": "Full + Isométricos",
+        "estimatedMinutes": 45,
+        "slots": [
+          {
+            "exerciseId": "dips-pesocorporal",
+            "exerciseName": "Fondos (Peso corporal)",
+            "muscleGroup": "fullbody",
+            "targetSets": 3,
+            "targetRepsMin": 5,
+            "targetRepsMax": 8,
+            "restSeconds": 90,
+            "targetWeightKg": null,
+            "notes": "Leve inclinación adelante para el pecho, codos atrás."
+          },
+          {
+            "exerciseId": "reverse-row-pesocorporal",
+            "exerciseName": "Remo inverso",
+            "muscleGroup": "back",
+            "targetSets": 3,
+            "targetRepsMin": 8,
+            "targetRepsMax": 12,
+            "restSeconds": 75,
+            "targetWeightKg": null,
+            "notes": "Mesa o barra baja, pecho al agarre, cuerpo rígido."
+          },
+          {
+            "exerciseId": "squat-pesocorporal",
+            "exerciseName": "Sentadilla (Peso corporal)",
+            "muscleGroup": "quads",
+            "targetSets": 3,
+            "targetRepsMin": 15,
+            "targetRepsMax": 20,
+            "restSeconds": 60,
+            "targetWeightKg": null,
+            "notes": "Rango completo, control del descenso en 3 segundos."
+          },
+          {
+            "exerciseId": "forearm-plank-pesocorporal",
+            "exerciseName": "Plancha en antebrazos (Peso corporal)",
+            "muscleGroup": "core",
+            "targetSets": 4,
+            "targetRepsMin": 30,
+            "targetRepsMax": 45,
+            "restSeconds": 45,
+            "targetWeightKg": null,
+            "notes": "Acumulá tiempo bajo tensión, respiración controlada."
+          },
+          {
+            "exerciseId": "elbow-side-plank-pesocorporal",
+            "exerciseName": "Plancha lateral en codo (Peso corporal)",
+            "muscleGroup": "core",
+            "targetSets": 3,
+            "targetRepsMin": 20,
+            "targetRepsMax": 30,
+            "restSeconds": 45,
+            "targetWeightKg": null,
+            "notes": "Cadera alineada, no la dejes caer al piso."
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "hipertrofia-intermedio",
+    "name": "Hipertrofia — Intermedio",
+    "split": "Push/Pull/Legs",
+    "level": "intermediate",
+    "estimatedMinutesPerDay": 65,
+    "imageUrl": null,
+    "days": [
+      {
+        "dayNumber": 1,
+        "name": "Push",
+        "estimatedMinutes": 65,
+        "slots": [
+          {
+            "exerciseId": "bench-press-barra",
+            "exerciseName": "Press de banca (Barra)",
+            "muscleGroup": "chest",
+            "targetSets": 4,
+            "targetRepsMin": 8,
+            "targetRepsMax": 12,
+            "restSeconds": 90,
+            "targetWeightKg": null,
+            "notes": "Control excéntrico 2s, explosivo concéntrico, arco neutro."
+          },
+          {
+            "exerciseId": "incline-bench-press-barra",
+            "exerciseName": "Press de banca inclinado (Barra)",
+            "muscleGroup": "chest",
+            "targetSets": 3,
+            "targetRepsMin": 10,
+            "targetRepsMax": 15,
+            "restSeconds": 75,
+            "targetWeightKg": null,
+            "notes": "30-45° de inclinación, toca la parte alta del pecho."
+          },
+          {
+            "exerciseId": "overhead-press-barra",
+            "exerciseName": "Press militar (Barra)",
+            "muscleGroup": "shoulders",
+            "targetSets": 3,
+            "targetRepsMin": 8,
+            "targetRepsMax": 12,
+            "restSeconds": 90,
+            "targetWeightKg": null,
+            "notes": "Empujá vertical, mete la cabeza entre los brazos arriba."
+          },
+          {
+            "exerciseId": "seated-lateral-raise-mancuerna",
+            "exerciseName": "Elevación lateral sentado",
+            "muscleGroup": "shoulders",
+            "targetSets": 4,
+            "targetRepsMin": 12,
+            "targetRepsMax": 20,
+            "restSeconds": 60,
+            "targetWeightKg": null,
+            "notes": "Alto volumen lateral, peso liviano, contracción máxima."
+          },
+          {
+            "exerciseId": "skullcrusher-barra",
+            "exerciseName": "Rompecráneos (Barra)",
+            "muscleGroup": "triceps",
+            "targetSets": 3,
+            "targetRepsMin": 10,
+            "targetRepsMax": 15,
+            "restSeconds": 60,
+            "targetWeightKg": null,
+            "notes": "Tríceps largo, bajá detrás de la nuca para más rango."
+          },
+          {
+            "exerciseId": "bar-pushdown-polea",
+            "exerciseName": "Jalón de tríceps con barra",
+            "muscleGroup": "triceps",
+            "targetSets": 3,
+            "targetRepsMin": 12,
+            "targetRepsMax": 15,
+            "restSeconds": 60,
+            "targetWeightKg": null,
+            "notes": "Superset opcional con skullcrusher para mayor volumen."
+          }
+        ]
+      },
+      {
+        "dayNumber": 2,
+        "name": "Pull",
+        "estimatedMinutes": 65,
+        "slots": [
+          {
+            "exerciseId": "pullup-pesocorporal",
+            "exerciseName": "Dominada",
+            "muscleGroup": "back",
+            "targetSets": 4,
+            "targetRepsMin": 6,
+            "targetRepsMax": 10,
+            "restSeconds": 90,
+            "targetWeightKg": null,
+            "notes": "Agarre prono, escápulas hacia abajo primero."
+          },
+          {
+            "exerciseId": "seated-cable-row-maquina",
+            "exerciseName": "Remo sentado en polea",
+            "muscleGroup": "back",
+            "targetSets": 4,
+            "targetRepsMin": 10,
+            "targetRepsMax": 12,
+            "restSeconds": 75,
+            "targetWeightKg": null,
+            "notes": "Agarre neutro, traccioná hacia el abdomen bajo, pausa."
+          },
+          {
+            "exerciseId": "loaded-pulldown-maquina",
+            "exerciseName": "Jalón al pecho en máquina",
+            "muscleGroup": "back",
+            "targetSets": 3,
+            "targetRepsMin": 10,
+            "targetRepsMax": 15,
+            "restSeconds": 75,
+            "targetWeightKg": null,
+            "notes": "Arqueá el pecho hacia arriba, jalá desde los codos."
+          },
+          {
+            "exerciseId": "face-pulls-polea",
+            "exerciseName": "Jalón al rostro en polea",
+            "muscleGroup": "shoulders",
+            "targetSets": 3,
+            "targetRepsMin": 15,
+            "targetRepsMax": 20,
+            "restSeconds": 60,
+            "targetWeightKg": null,
+            "notes": "Rotación externa al final, deltoides posterior activo."
+          },
+          {
+            "exerciseId": "curl-barra",
+            "exerciseName": "Curl (Barra)",
+            "muscleGroup": "biceps",
+            "targetSets": 3,
+            "targetRepsMin": 10,
+            "targetRepsMax": 12,
+            "restSeconds": 60,
+            "targetWeightKg": null,
+            "notes": "Supinación completa arriba, excéntrico 2s al bajar."
+          },
+          {
+            "exerciseId": "hammer-curl-mancuerna",
+            "exerciseName": "Curl martillo (Mancuerna)",
+            "muscleGroup": "biceps",
+            "targetSets": 3,
+            "targetRepsMin": 12,
+            "targetRepsMax": 15,
+            "restSeconds": 60,
+            "targetWeightKg": null,
+            "notes": "Agarre neutro, braquial y braquiorradial, control total."
+          }
+        ]
+      },
+      {
+        "dayNumber": 3,
+        "name": "Legs",
+        "estimatedMinutes": 70,
+        "slots": [
+          {
+            "exerciseId": "squat-barra",
+            "exerciseName": "Sentadilla (Barra)",
+            "muscleGroup": "quads",
+            "targetSets": 4,
+            "targetRepsMin": 8,
+            "targetRepsMax": 12,
+            "restSeconds": 120,
+            "targetWeightKg": null,
+            "notes": "Debajo del paralelo, ascenso explosivo, sin wink pélvico."
+          },
+          {
+            "exerciseId": "romanian-deadlift-barra",
+            "exerciseName": "Peso muerto rumano (Barra)",
+            "muscleGroup": "hamstrings",
+            "targetSets": 3,
+            "targetRepsMin": 10,
+            "targetRepsMax": 12,
+            "restSeconds": 90,
+            "targetWeightKg": null,
+            "notes": "Siente el estiramiento de isquios, no bajes con la espalda."
+          },
+          {
+            "exerciseId": "leg-press-maquina",
+            "exerciseName": "Prensa de piernas (Máquina)",
+            "muscleGroup": "quads",
+            "targetSets": 3,
+            "targetRepsMin": 12,
+            "targetRepsMax": 15,
+            "restSeconds": 90,
+            "targetWeightKg": null,
+            "notes": "Pies altos para más glúteos, bajos para más cuádriceps."
+          },
+          {
+            "exerciseId": "leg-extension-maquina",
+            "exerciseName": "Extensión de piernas (Máquina)",
+            "muscleGroup": "quads",
+            "targetSets": 3,
+            "targetRepsMin": 12,
+            "targetRepsMax": 15,
+            "restSeconds": 60,
+            "targetWeightKg": null,
+            "notes": "Pausa en extensión, aísla el cuádriceps, peso moderado."
+          },
+          {
+            "exerciseId": "hip-thrust-barra",
+            "exerciseName": "Hip thrust (Barra)",
+            "muscleGroup": "glutes",
+            "targetSets": 3,
+            "targetRepsMin": 12,
+            "targetRepsMax": 15,
+            "restSeconds": 90,
+            "targetWeightKg": null,
+            "notes": "Extensión máxima de cadera, glúteo contraído arriba."
+          },
+          {
+            "exerciseId": "seated-calf-raise-maquina",
+            "exerciseName": "Elevación de gemelos sentado (Máquina)",
+            "muscleGroup": "calves",
+            "targetSets": 4,
+            "targetRepsMin": 15,
+            "targetRepsMax": 20,
+            "restSeconds": 45,
+            "targetWeightKg": null,
+            "notes": "Soleo en trabajo, talón bien abajo en la fase negativa."
+          }
+        ]
+      }
+    ]
+  }
+]

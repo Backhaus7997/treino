@@ -1,0 +1,407 @@
+[
+  {
+    "slug": "sumo-pause-deadlift",
+    "nombre": "Peso muerto sumo con pausa",
+    "tecnica": [
+      "Parate con los pies más anchos que los hombros, puntas hacia afuera, y tomá la barra con agarre al ancho de las caderas.",
+      "Descendé con la espalda recta hasta que la barra toque el piso y hacé una pausa de 1-2 segundos sin relajar la tensión.",
+      "Empujá el piso hacia abajo, extendé caderas y rodillas de manera coordinada hasta llegar a la posición erguida."
+    ]
+  },
+  {
+    "slug": "swing",
+    "nombre": "Swing",
+    "tecnica": [
+      "Parate con los pies al ancho de hombros, tomá la mancuerna con ambas manos y llevala entre las piernas con una ligera flexión de rodillas.",
+      "Empujá las caderas hacia adelante de forma explosiva y dejá que el impulso eleve la mancuerna hasta la altura de los hombros.",
+      "Dejá caer la mancuerna de forma controlada hacia atrás entre las piernas y repetí el movimiento de caderas sin doblar excesivamente las rodillas."
+    ]
+  },
+  {
+    "slug": "thoracic-spine-rotation",
+    "nombre": "Rotación de columna torácica",
+    "tecnica": [
+      "Arrodillate en cuatro apoyos con la columna neutra, luego colocá una mano detrás de la cabeza.",
+      "Rotá el codo hacia arriba abriendo el pecho lo máximo posible sin mover las caderas ni la zona lumbar.",
+      "Volvé a la posición inicial de forma controlada y repetí del mismo lado antes de cambiar."
+    ]
+  },
+  {
+    "slug": "three-step-heismans",
+    "nombre": "Heismans de tres pasos",
+    "tecnica": [
+      "Parate con los pies juntos y dando tres pasos laterales rápidos hacia un lado, elevá la rodilla exterior al llegar.",
+      "Transferí el peso a la pierna de apoyo, manteniendo el tronco erguido y los brazos coordinados con el movimiento.",
+      "Repetí hacia el lado contrario de forma continua y rítmica, manteniendo la intensidad cardiovascular."
+    ]
+  },
+  {
+    "slug": "thruster",
+    "nombre": "Thruster",
+    "tecnica": [
+      "Sostenés la carga a la altura de los hombros con los codos hacia adelante y realizás una sentadilla profunda manteniendo el torso erguido.",
+      "Al salir de la sentadilla de forma explosiva, usás el impulso de las piernas para empujar la carga directamente hacia arriba.",
+      "Extendés completamente los brazos sobre la cabeza, luego bajás la carga a los hombros de forma controlada para iniciar la siguiente repetición."
+    ]
+  },
+  {
+    "slug": "toe-tap",
+    "nombre": "Toque de punta",
+    "tecnica": [
+      "Parate frente a un escalón o superficie elevada con los pies al ancho de caderas.",
+      "Tapeá con la punta del pie derecho en la superficie elevada de forma alternada, cambiando rápido de pie.",
+      "Mantené el torso erguido, los brazos coordinados y un ritmo constante durante toda la serie."
+    ]
+  },
+  {
+    "slug": "treadmill-backwards-walk",
+    "nombre": "Caminata hacia atrás en cinta",
+    "tecnica": [
+      "Subí a la cinta y agarrá los pasamanos laterales, luego activá la cinta a velocidad baja.",
+      "Caminá hacia atrás apoyando primero la punta del pie y luego el talón, con el torso ligeramente erguido.",
+      "Soltá los pasamanos progresivamente y mantené la mirada al frente o ligeramente hacia arriba para activar la musculatura postural."
+    ]
+  },
+  {
+    "slug": "treadmill-jog",
+    "nombre": "Trote en cinta",
+    "tecnica": [
+      "Subí a la cinta y comenzá caminando para luego aumentar la velocidad gradualmente hasta el trote.",
+      "Aterrizá con el mediopié, mantené los codos a 90° y el torso ligeramente inclinado hacia adelante.",
+      "Respirá de forma rítmica y coordinada con las zancadas, manteniendo los hombros relajados durante toda la sesión."
+    ]
+  },
+  {
+    "slug": "treadmill-side-shuffle",
+    "nombre": "Desplazamiento lateral en cinta",
+    "tecnica": [
+      "Subí a la cinta detenida, girá el cuerpo 90° de manera que quedés de costado respecto a la dirección de la banda.",
+      "Activá la cinta a velocidad moderada y realizá pasos laterales coordinados sin cruzar los pies.",
+      "Mantené las rodillas ligeramente flexionadas, el peso en el mediopié y el torso erguido durante todo el movimiento."
+    ]
+  },
+  {
+    "slug": "treadmill-sprint",
+    "nombre": "Sprint en cinta",
+    "tecnica": [
+      "Subí a la cinta y realizá un calentamiento breve antes de aumentar la velocidad al nivel de sprint.",
+      "Apoyá el mediopié con zancadas activas, llevá los codos hacia atrás con potencia y mantenés el torso levemente inclinado.",
+      "Al terminar el intervalo, bajá la velocidad gradualmente antes de detenerte para evitar caídas o lesiones."
+    ]
+  },
+  {
+    "slug": "treadmill-walk",
+    "nombre": "Caminata en cinta",
+    "tecnica": [
+      "Subí a la cinta y configurá una velocidad cómoda para caminar, entre 4 y 6 km/h según tu condición.",
+      "Apoyá el talón primero y rodá el pie hacia la punta en cada paso, manteniendo el torso erguido y los brazos en movimiento natural.",
+      "Mirá al frente, relajá los hombros y respirá de manera constante durante toda la caminata."
+    ]
+  },
+  {
+    "slug": "waiters-bow",
+    "nombre": "Reverencia del mozo",
+    "tecnica": [
+      "Parate erguido con los pies al ancho de caderas y colocá los pulgares sobre las costillas inferiores y los dedos en las caderas para monitorear la columna.",
+      "Incliná el tronco hacia adelante desde las caderas sin curvar la zona lumbar, hasta quedar casi paralelo al piso.",
+      "Volvé a la posición inicial contrayendo los glúteos y los isquiotibiales, manteniendo la espalda recta en todo momento."
+    ]
+  },
+  {
+    "slug": "walking-farmers-march",
+    "nombre": "Marcha del granjero caminando",
+    "tecnica": [
+      "Tomá las pesas rusas a los costados del cuerpo con agarre firme, hombros hacia atrás y columna neutra.",
+      "Caminá levantando las rodillas al nivel de la cadera de forma alternada, como marchando con control.",
+      "Mantené el torso completamente estable, sin inclinarte hacia los costados ni perder la postura durante todo el recorrido."
+    ]
+  },
+  {
+    "slug": "weighted-dead-hang",
+    "nombre": "Colgada muerta con peso",
+    "tecnica": [
+      "Colgá de una barra con agarre prono o neutro al ancho de hombros y fijá el disco a tu cuerpo con un cinturón o entre los pies.",
+      "Dejá los brazos completamente extendidos, relajá los trapecios y dejá que el peso estire los hombros de forma controlada.",
+      "Sostené la posición el tiempo indicado respirando de forma lenta y constante sin activar la elevación escapular."
+    ]
+  },
+  {
+    "slug": "windmill",
+    "nombre": "Molino",
+    "tecnica": [
+      "Parate con los pies más anchos que los hombros, punta del pie del lado del brazo extendido girada 45° hacia afuera, y sostenés la pesa rusa sobre la cabeza con el brazo extendido.",
+      "Deslizá la mano libre por la pierna hacia abajo mirando siempre la pesa rusa en alto, flexionando la cadera sin doblar la columna.",
+      "Volvé a la posición erguida empujando desde la cadera, manteniendo el brazo con la pesa rusa perpendicular al piso en todo momento."
+    ]
+  },
+  {
+    "slug": "windmill-bottom-hand",
+    "nombre": "Molino con mano baja",
+    "tecnica": [
+      "Parate con los pies más anchos que los hombros, con la pesa rusa en la mano baja y el brazo contrario extendido hacia arriba como guía.",
+      "Incliná el tronco lateralmente desde la cadera llevando la pesa rusa hacia el piso mientras el brazo guía señala hacia arriba.",
+      "Volvé a la posición inicial empujando desde la cadera con control, manteniendo ambos brazos extendidos durante el movimiento."
+    ]
+  },
+  {
+    "slug": "windshield-wiper",
+    "nombre": "Limpiaparabrisas",
+    "tecnica": [
+      "Acostate boca arriba con los brazos extendidos en cruz apoyados en el piso y levantá las piernas en vertical a 90°.",
+      "Bajá las piernas juntas hacia un lado de forma controlada hasta casi tocar el piso sin despegar los hombros.",
+      "Subí las piernas al centro y continuá hacia el lado contrario, como el movimiento de un limpiaparabrisas."
+    ]
+  },
+  {
+    "slug": "woodchopper",
+    "nombre": "Leñador",
+    "tecnica": [
+      "Parate con los pies al ancho de hombros y tomá la carga con ambas manos arriba y a un lado del cuerpo con los brazos extendidos.",
+      "Girá el tronco de forma explosiva llevando la carga diagonalmente hacia abajo y al lado contrario, flexionando levemente las rodillas.",
+      "Volvé de forma controlada a la posición inicial y completá las repeticiones del mismo lado antes de cambiar."
+    ]
+  },
+  {
+    "slug": "wrist-curl",
+    "nombre": "Curl de muñeca",
+    "tecnica": [
+      "Sentate en un banco, apoyá los antebrazos sobre los muslos con las palmas hacia arriba y sostenés la carga con agarre supino.",
+      "Bajá la muñeca lentamente hasta la extensión máxima permitiendo que la carga descienda de forma controlada.",
+      "Curlá las muñecas hacia arriba contrayendo los flexores del antebrazo y mantenés la contracción un segundo en el pico."
+    ]
+  },
+  {
+    "slug": "glute-bridge",
+    "nombre": "Puente de glúteos",
+    "tecnica": [
+      "Acostate boca arriba con las rodillas flexionadas, pies apoyados en el piso al ancho de caderas y brazos a los costados.",
+      "Empujá los talones contra el piso y elevá las caderas hasta que el cuerpo forme una línea recta desde hombros hasta rodillas.",
+      "Apretá los glúteos en la parte alta, mantené un segundo y bajá de forma controlada sin dejar caer las caderas."
+    ]
+  },
+  {
+    "slug": "glute-bridge-pullover",
+    "nombre": "Puente de glúteos con pullover",
+    "tecnica": [
+      "Acostate boca arriba con las rodillas flexionadas, sostenés el disco con ambas manos y los brazos extendidos sobre el pecho.",
+      "Elevá las caderas hasta la posición de puente de glúteos mientras simultáneamente bajás el disco hacia atrás por encima de la cabeza.",
+      "Volvé el disco a la posición inicial sobre el pecho y bajá las caderas de forma controlada para completar la repetición."
+    ]
+  },
+  {
+    "slug": "glute-ham-raise",
+    "nombre": "Elevación de glúteos e isquiotibiales",
+    "tecnica": [
+      "Posicioná los pies asegurados en la máquina con las rodillas apoyadas en el pad y el cuerpo en posición vertical.",
+      "Descendé el torso de forma lenta y controlada hasta llegar casi a la posición horizontal, activando los isquiotibiales.",
+      "Contraé los isquiotibiales y glúteos para volver a la posición vertical sin usar el impulso de la cadera."
+    ]
+  },
+  {
+    "slug": "glute-kickback",
+    "nombre": "Patada de glúteos",
+    "tecnica": [
+      "Posicioná en cuatro apoyos o de pie frente al soporte, con el core activo y la columna neutra.",
+      "Extendé una pierna hacia atrás y arriba contrayendo el glúteo al máximo, sin rotar la cadera ni arquear la zona lumbar.",
+      "Bajá la pierna de forma controlada hasta casi tocar el piso y repetí todas las repeticiones del mismo lado antes de cambiar."
+    ]
+  },
+  {
+    "slug": "hip-abduction",
+    "nombre": "Abducción de cadera",
+    "tecnica": [
+      "Posicioná de pie, recostado de lado o sentado según el equipo disponible, con la columna neutra y el core activo.",
+      "Elevá la pierna o empujá la rodilla hacia afuera de forma controlada activando los abductores y el glúteo medio.",
+      "Volvé a la posición inicial lentamente sin dejar que la pierna caiga y repetí todas las repeticiones del mismo lado."
+    ]
+  },
+  {
+    "slug": "hip-adduction",
+    "nombre": "Aducción de cadera",
+    "tecnica": [
+      "Posicioná de pie o sentado en la máquina con las piernas abiertas más allá del ancho de caderas y el torso erguido.",
+      "Cerrá las piernas hacia el centro de forma controlada contrayendo la musculatura aductora del interior del muslo.",
+      "Volvé a la posición inicial lentamente sin rebotar y completá las repeticiones manteniendo la tensión muscular."
+    ]
+  },
+  {
+    "slug": "hip-thrust",
+    "nombre": "Hip thrust",
+    "tecnica": [
+      "Apoyá la espalda en el banco con la barra o carga sobre las caderas, pies al ancho de caderas y rodillas a 90°.",
+      "Empujá las caderas hacia arriba de forma explosiva hasta que el cuerpo quede paralelo al piso, apretando los glúteos.",
+      "Bajá de forma controlada hasta casi tocar el piso y repetí sin perder la tensión en los glúteos entre repeticiones."
+    ]
+  },
+  {
+    "slug": "kickbacks",
+    "nombre": "Patadas de glúteos",
+    "tecnica": [
+      "Posicioná en cuatro apoyos con las muñecas bajo los hombros, rodillas bajo las caderas y la columna neutra.",
+      "Extendé una pierna hacia atrás y arriba hasta la línea de la cadera contrayendo el glúteo sin rotar el torso.",
+      "Bajá la pierna lentamente hasta casi tocar el piso y repetí todas las repeticiones de un lado antes de cambiar."
+    ]
+  },
+  {
+    "slug": "mini-band-clamshell",
+    "nombre": "Apertura de almeja con mini band",
+    "tecnica": [
+      "Acostate de lado con la banda por encima de las rodillas, caderas flexionadas a 45° y rodillas apiladas una sobre la otra.",
+      "Elevá la rodilla superior hacia el techo como una almeja que se abre, sin mover la pelvis ni la parte baja de la espalda.",
+      "Bajá la rodilla lentamente hasta la posición inicial manteniendo la tensión de la banda durante toda la repetición."
+    ]
+  },
+  {
+    "slug": "quadruped-hip-abduction",
+    "nombre": "Abducción de cadera en cuadrupedia",
+    "tecnica": [
+      "Posicioná en cuatro apoyos con el cable fijado al tobillo, muñecas bajo los hombros y rodillas bajo las caderas.",
+      "Abrí la pierna hacia el costado manteniendo la rodilla flexionada a 90°, sin rotar la pelvis ni hundir la espalda.",
+      "Volvé la pierna a la posición inicial de forma controlada y completá todas las repeticiones del mismo lado."
+    ]
+  },
+  {
+    "slug": "standing-hip-abduction",
+    "nombre": "Abducción de cadera de pie",
+    "tecnica": [
+      "Parate erguido sosteniendo la mancuerna para equilibrio si es necesario, con el core activo y peso sobre una pierna.",
+      "Elevá la pierna libre hacia el costado hasta la altura de la cadera manteniendo ambas caderas niveladas.",
+      "Bajá la pierna de forma controlada sin apoyarla completamente en el piso para mantener la tensión del glúteo medio."
+    ]
+  },
+  {
+    "slug": "standing-hip-adduction",
+    "nombre": "Aducción de cadera de pie",
+    "tecnica": [
+      "Parate de pie con el cable fijado al tobillo de la pierna que va a trabajar, apoyado en el soporte con el lado contrario.",
+      "Cruzá la pierna hacia adentro y ligeramente adelante del cuerpo contrayendo los aductores del interior del muslo.",
+      "Volvé la pierna a la posición inicial de forma lenta y controlada sin soltar la tensión del cable."
+    ]
+  },
+  {
+    "slug": "standing-kickback",
+    "nombre": "Patada de glúteos de pie",
+    "tecnica": [
+      "Parate de pie frente al soporte del cable con la correa fijada al tobillo, ligeramente inclinado hacia adelante para apoyo.",
+      "Extendé la pierna hacia atrás hasta la altura de la cadera contrayendo el glúteo al máximo sin arquear la zona lumbar.",
+      "Volvé la pierna a la posición inicial de forma controlada sin permitir que el cable hale la pierna demasiado adelante."
+    ]
+  },
+  {
+    "slug": "standing-mid-kickback",
+    "nombre": "Patada de glúteos media de pie",
+    "tecnica": [
+      "Parate de pie frente al soporte del cable con la correa al tobillo e inclinate hacia adelante a unos 45° apoyado en el soporte.",
+      "Extendé la pierna hacia atrás y ligeramente hacia arriba hasta el nivel de la cadera sin rotar la pelvis.",
+      "Volvé a la posición de partida de forma controlada manteniendo la tensión del cable en todo el recorrido."
+    ]
+  },
+  {
+    "slug": "banded-romanian-deadlift",
+    "nombre": "Peso muerto rumano con banda",
+    "tecnica": [
+      "Parate con la banda bajo los pies y los extremos en las manos, pies al ancho de caderas y rodillas levemente flexionadas.",
+      "Empujá las caderas hacia atrás bajando el torso con la espalda recta hasta sentir tensión en los isquiotibiales.",
+      "Extendé las caderas hacia adelante volviendo a la posición erguida apretando los glúteos al final del movimiento."
+    ]
+  },
+  {
+    "slug": "goblet-good-morning",
+    "nombre": "Buenos días goblet",
+    "tecnica": [
+      "Parate con los pies al ancho de caderas y sostenés la mancuerna o pesa rusa vertical contra el pecho con ambas manos.",
+      "Empujá las caderas hacia atrás inclinando el tronco hasta quedar casi paralelo al piso, manteniendo la espalda recta.",
+      "Contraé glúteos e isquiotibiales para volver a la posición erguida, manteniendo el peso pegado al pecho en todo momento."
+    ]
+  },
+  {
+    "slug": "good-morning",
+    "nombre": "Buenos días",
+    "tecnica": [
+      "Parate con la banda bajo los pies y los extremos sobre los hombros, pies al ancho de caderas y rodillas levemente flexionadas.",
+      "Empujá las caderas hacia atrás inclinando el torso hacia adelante hasta quedar casi paralelo al piso con la espalda recta.",
+      "Volvé a la posición erguida empujando las caderas hacia adelante y contraendo glúteos al llegar arriba."
+    ]
+  },
+  {
+    "slug": "good-morning-anterior",
+    "nombre": "Buenos días anterior",
+    "tecnica": [
+      "Parate con los pies al ancho de caderas, sostenés el disco frente al pecho con ambas manos y las rodillas ligeramente flexionadas.",
+      "Incliná el torso hacia adelante desde las caderas bajando el disco hacia el piso con la espalda completamente recta.",
+      "Volvé a la posición erguida empujando desde los glúteos y los isquiotibiales de forma controlada."
+    ]
+  },
+  {
+    "slug": "good-mornings",
+    "nombre": "Buenos días",
+    "tecnica": [
+      "Parate con los pies al ancho de caderas, manos detrás de la cabeza o cruzadas en el pecho, rodillas ligeramente flexionadas.",
+      "Empujá las caderas hacia atrás e inclinate hacia adelante hasta que el torso quede casi paralelo al piso, manteniendo la columna neutra.",
+      "Volvé a la posición inicial contrayendo glúteos e isquiotibiales, sin usar el impulso de la espalda."
+    ]
+  },
+  {
+    "slug": "hamstring-curl",
+    "nombre": "Curl de isquiotibiales",
+    "tecnica": [
+      "Posicioná en la máquina con los tobillos bajo el rodillo y las rodillas alineadas con el eje de giro, sin arquear la espalda.",
+      "Flexioná las rodillas llevando los talones hacia los glúteos de forma controlada contrayendo al máximo los isquiotibiales.",
+      "Extendé las piernas lentamente hasta la posición inicial sin dejar caer el peso de forma brusca."
+    ]
+  },
+  {
+    "slug": "landmine-romanian-deadlift",
+    "nombre": "Peso muerto rumano con landmine",
+    "tecnica": [
+      "Parate con los pies al ancho de caderas frente a la barra insertada en el landmine, sostenés el extremo libre con ambas manos o una sola.",
+      "Empujá las caderas hacia atrás bajando la barra con la espalda recta hasta sentir estiramiento en los isquiotibiales.",
+      "Extendé las caderas para volver a la posición erguida, apretando los glúteos al final del recorrido."
+    ]
+  },
+  {
+    "slug": "leg-curl",
+    "nombre": "Curl femoral",
+    "tecnica": [
+      "Acostate boca abajo o posicioná de pie con la banda fijada al tobillo, columna neutra y core activo.",
+      "Flexioná la rodilla llevando el talón hacia el glúteo de forma controlada contrayendo los isquiotibiales.",
+      "Extendé la pierna lentamente hasta la posición inicial manteniendo la tensión de la banda o resistencia en todo el recorrido."
+    ]
+  },
+  {
+    "slug": "nordic-hamstring-curl",
+    "nombre": "Curl nórdico",
+    "tecnica": [
+      "Arrodillate con los tobillos sujetos bajo una superficie fija o con la ayuda de un compañero, cuerpo recto desde rodillas a hombros.",
+      "Descendé el torso lentamente hacia el piso usando los isquiotibiales como freno, con los brazos listos para amortiguar la caída.",
+      "Empujá el piso con las manos para ayudarte a volver a la posición inicial y contraé isquiotibiales en el ascenso."
+    ]
+  },
+  {
+    "slug": "romanian-deadlift",
+    "nombre": "Peso muerto rumano",
+    "tecnica": [
+      "Parate con los pies al ancho de caderas, sostenés la carga frente al cuerpo con agarre pronado y rodillas ligeramente flexionadas.",
+      "Empujá las caderas hacia atrás bajando la carga por delante de las piernas con la espalda recta hasta sentir tensión en los isquiotibiales.",
+      "Extendé las caderas hacia adelante volviendo a la posición erguida y apretá los glúteos al llegar arriba."
+    ]
+  },
+  {
+    "slug": "romanian-deadlift-single",
+    "nombre": "Peso muerto rumano a una pierna",
+    "tecnica": [
+      "Parate sobre una pierna con la pesa rusa en la mano contraria o del mismo lado, rodilla de apoyo ligeramente flexionada.",
+      "Empujá la cadera hacia atrás inclinando el torso y elevando la pierna libre hacia atrás como contrapeso, manteniendo la columna recta.",
+      "Volvé a la posición erguida contrayendo el glúteo de la pierna de apoyo y estabilizando antes de la siguiente repetición."
+    ]
+  },
+  {
+    "slug": "seated-hamstring-curl",
+    "nombre": "Curl femoral sentado",
+    "tecnica": [
+      "Sentate en la máquina con la espalda apoyada en el respaldo, rodillo sobre los tobillos y rodillas alineadas con el eje de giro.",
+      "Llevá los talones hacia abajo y atrás flexionando las rodillas hasta el rango máximo contraendo los isquiotibiales.",
+      "Volvé a la posición inicial de forma lenta y controlada sin dejar que el peso suba de golpe."
+    ]
+  }
+]

@@ -1,0 +1,407 @@
+[
+  {
+    "slug": "alternating-deadstop-row",
+    "nombre": "Remo alternado con parada",
+    "tecnica": [
+      "Párate con los pies al ancho de caderas, incliná el torso hacia adelante con la espalda recta.",
+      "Tirá un codo hacia atrás y arriba hasta que el peso toque tu costado, luego bajalo por completo hasta el piso.",
+      "Cambiá de lado alternando cada repetición sin rotar el torso."
+    ]
+  },
+  {
+    "slug": "alternating-pendlay-row",
+    "nombre": "Remo Pendlay alternado",
+    "tecnica": [
+      "Incliná el torso paralelo al piso con la espalda plana, el peso colgando desde el piso.",
+      "Tirá explosivamente un brazo hasta llevar la mancuerna al costado del torso y volvé al piso.",
+      "Alternando brazos, repetí el gesto sin perder la posición horizontal del torso."
+    ]
+  },
+  {
+    "slug": "alternating-row",
+    "nombre": "Remo alternado",
+    "tecnica": [
+      "Incliná el torso hacia adelante con la espalda neutra y los brazos extendidos sosteniendo el peso.",
+      "Tirá un codo hacia atrás y arriba hasta llevar el peso al costado del torso.",
+      "Bajá el brazo de forma controlada y repetí del otro lado de manera alternada."
+    ]
+  },
+  {
+    "slug": "archer-row",
+    "nombre": "Remo arquero",
+    "tecnica": [
+      "Incliná el torso y extendé un brazo hacia el lado opuesto mientras el otro está semi-flexionado.",
+      "Tirá el codo del brazo de trabajo hacia atrás jalando el peso hacia el torso.",
+      "Mantené el brazo extendido inmóvil como guía y bajá controlado volviendo a la posición inicial."
+    ]
+  },
+  {
+    "slug": "assisted-chin-up",
+    "nombre": "Dominada supina asistida",
+    "tecnica": [
+      "Tomá la barra con agarre supino (palmas hacia vos) al ancho de hombros y dejá que la asistencia soporte parte del peso.",
+      "Tirá de los codos hacia abajo y atrás para subir el mentón por encima de la barra.",
+      "Bajá de forma controlada hasta extender completamente los brazos antes de la siguiente repetición."
+    ]
+  },
+  {
+    "slug": "assisted-pull-up",
+    "nombre": "Dominada asistida",
+    "tecnica": [
+      "Tomá la barra con agarre prono al ancho de hombros y apoyate en la asistencia.",
+      "Tirá de los codos hacia abajo y atrás hasta que el mentón supere la barra.",
+      "Descendé de manera controlada hasta la extensión completa de los brazos."
+    ]
+  },
+  {
+    "slug": "assisted-pullup",
+    "nombre": "Dominada asistida",
+    "tecnica": [
+      "Colocate en la guía con agarre prono, ajustando el contrapeso para reducir la carga efectiva.",
+      "Contraé los dorsales y tirá los codos hacia abajo y atrás para elevar el cuerpo.",
+      "Bajá lentamente hasta los brazos extendidos manteniendo el core activo."
+    ]
+  },
+  {
+    "slug": "bench-lawnmower-row",
+    "nombre": "Remo segadora en banco",
+    "tecnica": [
+      "Apoyá una rodilla y una mano en el banco, el otro pie en el piso y la espalda paralela al suelo.",
+      "Tirá el codo hacia arriba y atrás en un arco rotacional como si arrancaras un motor.",
+      "Apretá la escápula en la parte alta y bajá el brazo hasta la extensión completa."
+    ]
+  },
+  {
+    "slug": "bent-over-row",
+    "nombre": "Remo inclinado",
+    "tecnica": [
+      "Incliná el torso hacia adelante entre 45° y 90°, espalda neutra y rodillas levemente flexionadas.",
+      "Tirá los codos hacia atrás y arriba acercando la barra o el implemento al abdomen.",
+      "Apretá los omóplatos en la parte alta y bajá controlado hasta extender los brazos."
+    ]
+  },
+  {
+    "slug": "chinup",
+    "nombre": "Dominada supina",
+    "tecnica": [
+      "Colgáte de la barra con agarre supino (palmas hacia vos) al ancho de hombros o más cerrado.",
+      "Tirá los codos hacia abajo y atrás hasta que el mentón supere el nivel de la barra.",
+      "Bajá de forma lenta y controlada hasta la extensión completa de los codos."
+    ]
+  },
+  {
+    "slug": "ez-bar-shrug",
+    "nombre": "Encogimiento con barra EZ",
+    "tecnica": [
+      "Tomá la barra EZ con agarre prono o neutro a la altura de los muslos, espalda recta.",
+      "Subí los hombros directamente hacia las orejas sin rotar ni inclinar el cuello.",
+      "Mantené la cima un segundo, luego bajá los hombros de forma controlada."
+    ]
+  },
+  {
+    "slug": "gironda-chin-up",
+    "nombre": "Dominada Gironda",
+    "tecnica": [
+      "Tomá la barra con agarre supino amplio e incliná el torso hacia atrás al iniciar.",
+      "Tirá de la barra hacia el pecho alto manteniendo esa inclinación del torso durante todo el recorrido.",
+      "Bajá lentamente controlando el descenso hasta extender por completo los brazos."
+    ]
+  },
+  {
+    "slug": "gorilla-row",
+    "nombre": "Remo gorila",
+    "tecnica": [
+      "Parate con los pies al ancho de hombros, las pesas rusas en el piso entre tus piernas, incliná el torso.",
+      "Tirá alternadamente cada codo hacia atrás y arriba manteniendo la cadera estable.",
+      "Bajá el peso hasta el piso antes de cada repetición, alternando brazos con ritmo controlado."
+    ]
+  },
+  {
+    "slug": "horizontal-shrug",
+    "nombre": "Encogimiento horizontal",
+    "tecnica": [
+      "Sujeté el implemento con los brazos extendidos al frente a la altura del pecho o debajo.",
+      "Retraé los omóplatos hacia la columna sin doblar los codos, como si los apretaras entre sí.",
+      "Mantené la contracción un momento y volvé a la posición inicial de forma controlada."
+    ]
+  },
+  {
+    "slug": "incline-shrug",
+    "nombre": "Encogimiento inclinado",
+    "tecnica": [
+      "Incliná el torso hacia adelante sosteniendo el peso con los brazos colgando perpendiculares al piso.",
+      "Elevá los hombros hacia las orejas en la dirección de la inclinación del torso.",
+      "Bajá los hombros de forma controlada hasta la posición neutra sin soltar la tensión."
+    ]
+  },
+  {
+    "slug": "inverted-row",
+    "nombre": "Remo invertido",
+    "tecnica": [
+      "Acostáte debajo de la barra y tomala con agarre prono, el cuerpo extendido y los talones en el piso.",
+      "Mantené el cuerpo rígido como una tabla y tirá el pecho hacia la barra.",
+      "Bajá lentamente hasta extender los brazos sin dejar caer las caderas."
+    ]
+  },
+  {
+    "slug": "kayak-row",
+    "nombre": "Remo kayak",
+    "tecnica": [
+      "Sentate o parate frente a la polea con el torso erguido y los brazos extendidos al frente.",
+      "Tirá los codos alternativamente hacia los lados en un movimiento rotacional que imita el paloteo de kayak.",
+      "Rotá el torso levemente con cada jalada y volvé al centro de forma controlada."
+    ]
+  },
+  {
+    "slug": "knee-lawnmower-row",
+    "nombre": "Remo segadora con rodilla",
+    "tecnica": [
+      "Apoyá la rodilla en un banco o superficie y sujetá la mancuerna con el brazo de trabajo.",
+      "Tirá el codo hacia arriba y atrás en un arco diagonal como si arrancaras un motor.",
+      "Apretá la escápula en la parte alta y bajá el brazo hasta la extensión completa."
+    ]
+  },
+  {
+    "slug": "kneeling-pulldown",
+    "nombre": "Jalón al pecho arrodillado",
+    "tecnica": [
+      "Arrodilláte frente al anclaje con el torso erguido y los brazos extendidos arriba.",
+      "Tirá los codos hacia abajo y atrás llevando las manos hacia el pecho.",
+      "Volvé de forma controlada a la extensión completa sin elevar las caderas del piso."
+    ]
+  },
+  {
+    "slug": "landmine-row",
+    "nombre": "Remo landmine",
+    "tecnica": [
+      "Incliná el torso hacia adelante con la espalda neutra y tomá el extremo libre de la barra.",
+      "Tirá el codo hacia atrás y arriba llevando la barra hacia el torso.",
+      "Apretá la escápula en la parte alta y bajá controlado hasta casi tocar el piso."
+    ]
+  },
+  {
+    "slug": "laying-incline-row",
+    "nombre": "Remo tumbado en banco inclinado",
+    "tecnica": [
+      "Acostáte boca abajo en un banco inclinado con los brazos colgando hacia el piso.",
+      "Tirá los codos hacia atrás y arriba llevando las mancuernas hacia el torso.",
+      "Apretá los omóplatos en la parte alta y bajá de forma controlada hasta la extensión."
+    ]
+  },
+  {
+    "slug": "loaded-low-row",
+    "nombre": "Remo bajo en máquina",
+    "tecnica": [
+      "Sentate en la máquina con los pies apoyados, la espalda erguida y los brazos extendidos.",
+      "Tirá los codos hacia atrás llevando el agarre hacia el abdomen bajo.",
+      "Apretá los omóplatos al final y extendé los brazos de forma controlada para volver."
+    ]
+  },
+  {
+    "slug": "loaded-pulldown",
+    "nombre": "Jalón al pecho en máquina",
+    "tecnica": [
+      "Sentate en la máquina con los muslos bien sujetos debajo del rodillo y los brazos extendidos arriba.",
+      "Tirá los codos hacia abajo y atrás llevando la barra o el agarre hasta el pecho.",
+      "Volvé lentamente a la posición inicial controlando la extensión de los brazos."
+    ]
+  },
+  {
+    "slug": "loaded-row",
+    "nombre": "Remo en máquina",
+    "tecnica": [
+      "Sentate con el pecho apoyado en el respaldo, el torso erguido y los brazos extendidos.",
+      "Tirá los codos hacia atrás llevando el agarre hacia el pecho o el abdomen.",
+      "Apretá los omóplatos en la parte alta y extendé los brazos de forma controlada."
+    ]
+  },
+  {
+    "slug": "loaded-seal-row",
+    "nombre": "Remo seal en máquina",
+    "tecnica": [
+      "Acostáte boca abajo en la máquina con el pecho apoyado y los brazos colgando.",
+      "Tirá los codos hacia atrás y arriba llevando el agarre hacia el torso.",
+      "Apretá los omóplatos al llegar arriba y bajá de forma controlada hasta la extensión."
+    ]
+  },
+  {
+    "slug": "meadows-row",
+    "nombre": "Remo Meadows",
+    "tecnica": [
+      "Párate perpendicular a la barra landmine con el pie externo adelantado, incliná el torso.",
+      "Tomá el extremo de la barra con la mano más cercana y tirá el codo hacia atrás en un arco elevado.",
+      "Apretá la escápula arriba y bajá controlado volviendo el brazo casi a la extensión completa."
+    ]
+  },
+  {
+    "slug": "narrow-pulldown",
+    "nombre": "Jalón al pecho en agarre cerrado",
+    "tecnica": [
+      "Sentate en la máquina con el agarre cerrado y los brazos extendidos arriba.",
+      "Tirá los codos hacia abajo y atrás llevando el agarre hacia el pecho.",
+      "Volvé lentamente a la posición inicial manteniendo el torso estable."
+    ]
+  },
+  {
+    "slug": "neutral-pulldown",
+    "nombre": "Jalón al pecho en agarre neutro",
+    "tecnica": [
+      "Sentate en la máquina con las palmas enfrentadas y los brazos extendidos arriba.",
+      "Tirá los codos hacia abajo y levemente hacia atrás llevando el agarre al pecho.",
+      "Extendé los brazos de forma controlada hasta la posición inicial sin soltar la tensión."
+    ]
+  },
+  {
+    "slug": "neutral-row",
+    "nombre": "Remo neutro",
+    "tecnica": [
+      "Sentate o inclinate con el agarre en posición neutra (palmas enfrentadas) y los brazos extendidos.",
+      "Tirá los codos hacia atrás llevando el agarre hacia el abdomen.",
+      "Volvé lentamente a la extensión controlando el recorrido sin dejar caer los hombros."
+    ]
+  },
+  {
+    "slug": "overhand-inverted-row",
+    "nombre": "Remo invertido en agarre prono",
+    "tecnica": [
+      "Acostáte debajo de la barra y tomala con agarre prono al ancho de hombros, cuerpo extendido.",
+      "Mantené el cuerpo rígido y tirá el pecho hacia la barra apretando los omóplatos.",
+      "Bajá de forma controlada hasta la extensión completa sin dejar caer las caderas."
+    ]
+  },
+  {
+    "slug": "overhand-row",
+    "nombre": "Remo en agarre prono",
+    "tecnica": [
+      "Incliná el torso hacia adelante con la espalda neutra y el agarre prono al ancho de hombros.",
+      "Tirá los codos hacia atrás llevando la barra o el agarre hacia el abdomen o el pecho.",
+      "Apretá los omóplatos en la parte alta y bajá de forma controlada hasta extender los brazos."
+    ]
+  },
+  {
+    "slug": "overhead-shrug",
+    "nombre": "Encogimiento sobre la cabeza",
+    "tecnica": [
+      "Extendé los brazos completamente sobre la cabeza sujetando el peso, core activo.",
+      "Elevá los hombros hacia las orejas manteniendo los brazos rectos y el cuello neutro.",
+      "Bajá los hombros de forma controlada volviendo a la posición inicial sin doblar los codos."
+    ]
+  },
+  {
+    "slug": "pendlay-row",
+    "nombre": "Remo Pendlay",
+    "tecnica": [
+      "Incliná el torso paralelo al piso con la espalda plana, los pesos apoyados en el suelo al inicio.",
+      "Tirá explosivamente los codos hacia atrás llevando el peso hasta el torso en un movimiento dinámico.",
+      "Volvé el peso al piso de forma controlada y repetí desde la posición muerta en cada repetición."
+    ]
+  },
+  {
+    "slug": "pinch-grip-row",
+    "nombre": "Remo con agarre de pinza",
+    "tecnica": [
+      "Incliná el torso y sujetá el disco por el borde con los dedos en pinza sin apoyo del pulgar.",
+      "Tirá el codo hacia atrás y arriba llevando el disco hacia el costado del torso.",
+      "Bajá controlado manteniendo la tensión en la pinza durante todo el recorrido."
+    ]
+  },
+  {
+    "slug": "pronated-pendlay-row",
+    "nombre": "Remo Pendlay prono",
+    "tecnica": [
+      "Incliná el torso paralelo al piso con agarre prono y la barra apoyada en el suelo.",
+      "Tirá explosivamente la barra hacia el pecho alto con los codos hacia afuera.",
+      "Devolvé la barra al piso de forma controlada antes de cada repetición."
+    ]
+  },
+  {
+    "slug": "pronated-row",
+    "nombre": "Remo prono",
+    "tecnica": [
+      "Incliná el torso entre 45° y 90° con agarre prono al ancho de hombros o algo más amplio.",
+      "Tirá los codos hacia afuera y atrás llevando la barra hacia el pecho.",
+      "Apretá los omóplatos en la parte alta y bajá de forma controlada hasta extender los brazos."
+    ]
+  },
+  {
+    "slug": "pullover",
+    "nombre": "Pullover",
+    "tecnica": [
+      "Acostáte en un banco con los hombros apoyados, el peso sostenido sobre el pecho y los brazos semiflexionados.",
+      "Bajá el peso en un arco hacia atrás de la cabeza hasta sentir un estiramiento profundo en el dorsal.",
+      "Volvé el peso al punto inicial tirando de los dorsales sin flexionar demasiado los codos."
+    ]
+  },
+  {
+    "slug": "pullup",
+    "nombre": "Dominada",
+    "tecnica": [
+      "Colgáte de la barra con agarre prono al ancho de hombros o ligeramente más amplio.",
+      "Tirá de los codos hacia abajo y atrás hasta que el mentón supere la barra.",
+      "Bajá de forma lenta y controlada hasta la extensión completa de los codos."
+    ]
+  },
+  {
+    "slug": "renegade-row",
+    "nombre": "Remo renegado",
+    "tecnica": [
+      "Asumí posición de plancha con una mancuerna en cada mano, pies separados para mayor base.",
+      "Tirá un codo hacia atrás y arriba sin rotar la cadera ni el torso, manteniéndolo rígido.",
+      "Bajá la mancuerna al piso y repetí del otro lado de forma alternada y controlada."
+    ]
+  },
+  {
+    "slug": "reverse-row",
+    "nombre": "Remo inverso",
+    "tecnica": [
+      "Acostáte boca arriba debajo de la barra y tomala con agarre supino, el cuerpo extendido.",
+      "Tirá el pecho hacia la barra apretando los omóplatos con el cuerpo rígido como tabla.",
+      "Bajá de forma controlada hasta extender los brazos completamente antes de la siguiente repetición."
+    ]
+  },
+  {
+    "slug": "ring-chin-up",
+    "nombre": "Dominada supina en anillas",
+    "tecnica": [
+      "Tomá las anillas con agarre supino y colgáte con los brazos completamente extendidos.",
+      "Tirá los codos hacia abajo y atrás hasta que el mentón supere las anillas.",
+      "Bajá lentamente a la posición inicial controlando la extensión y la estabilización de las anillas."
+    ]
+  },
+  {
+    "slug": "ring-pull-up",
+    "nombre": "Dominada en anillas",
+    "tecnica": [
+      "Tomá las anillas con agarre prono y colgáte con los brazos totalmente extendidos.",
+      "Tirá los codos hacia abajo y atrás elevando el cuerpo hasta que el mentón supere las anillas.",
+      "Bajá de forma controlada hasta la extensión completa sin balancear el cuerpo."
+    ]
+  },
+  {
+    "slug": "ring-row",
+    "nombre": "Remo en anillas",
+    "tecnica": [
+      "Tomá las anillas y reclinát hacia atrás con el cuerpo extendido y los talones en el piso.",
+      "Tirá el pecho hacia las anillas manteniendo el cuerpo rígido y los codos cerca del torso.",
+      "Bajá de forma controlada hasta la extensión completa de los brazos."
+    ]
+  },
+  {
+    "slug": "rope-pullover",
+    "nombre": "Pullover con cuerda",
+    "tecnica": [
+      "Parate de espaldas a la polea alta y tomá la cuerda con ambas manos, incliná levemente el torso.",
+      "Llevá la cuerda en un arco hacia abajo y adelante tirando con los dorsales, codos semiflexionados.",
+      "Volvé de forma controlada hasta el punto de estiramiento máximo del dorsal."
+    ]
+  },
+  {
+    "slug": "rotating-row",
+    "nombre": "Remo con rotación",
+    "tecnica": [
+      "Tomá el implemento con una mano y el torso girado hacia el lado del agarre.",
+      "Tirá el codo hacia atrás rotando el torso en sentido contrario para añadir recorrido al movimiento.",
+      "Volvé a la posición inicial con rotación controlada y repetí el gesto."
+    ]
+  }
+]

@@ -246,6 +246,12 @@ class _EquipmentIcon {
         EquipmentType.banda => TreinoIcon.equipBand,
         EquipmentType.pesoCorporal => TreinoIcon.equipBodyweight,
         EquipmentType.cardio => TreinoIcon.equipCardio,
+        // Phosphor has no kettlebell/disc/suspension glyph; reuse the closest
+        // existing alias — the row label disambiguates.
+        EquipmentType.pesaRusa => TreinoIcon.equipDumbbell,
+        EquipmentType.disco => TreinoIcon.equipBarbell,
+        EquipmentType.trx => TreinoIcon.equipBodyweight,
+        EquipmentType.multipower => TreinoIcon.equipMachine,
         EquipmentType.otro => TreinoIcon.equipOther,
         EquipmentType.ninguno => TreinoIcon.equipNone,
       };

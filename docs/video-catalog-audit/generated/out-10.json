@@ -1,0 +1,407 @@
+[
+  {
+    "slug": "swing-lunge",
+    "nombre": "Estocada con balanceo",
+    "tecnica": [
+      "Parate derecho con los pies juntos y tomá impulso balanceando una pierna hacia adelante.",
+      "Bajá en estocada frontal hasta que la rodilla trasera casi toque el piso.",
+      "Empujá con el talón delantero para volver al centro y repetí del otro lado."
+    ]
+  },
+  {
+    "slug": "swingthrough-lunge",
+    "nombre": "Estocada con balanceo continuo",
+    "tecnica": [
+      "Parate erguido y balanceá una pierna hacia adelante para entrar en la estocada frontal.",
+      "Sin detener el movimiento, impulsá esa pierna hacia atrás pasando por el centro hasta la estocada trasera.",
+      "Controlá el balanceo con el core activo y volvé al inicio antes de cambiar de pierna."
+    ]
+  },
+  {
+    "slug": "tap-box-squat",
+    "nombre": "Sentadilla con toque al cajón",
+    "tecnica": [
+      "Parate de espaldas al cajón con los pies a la altura de los hombros y la barra sobre la espalda alta.",
+      "Bajá la sentadilla de forma controlada hasta que los glúteos toquen suavemente el borde del cajón.",
+      "Sin sentarte, empujá con los talones para subir a la posición inicial manteniendo el torso erguido."
+    ]
+  },
+  {
+    "slug": "vertical-leg-press",
+    "nombre": "Prensa de piernas vertical",
+    "tecnica": [
+      "Acostáte boca arriba en la máquina y apoyá los pies en la plataforma con las rodillas a 90°.",
+      "Empujá la plataforma hacia arriba extendiendo las piernas sin bloquear las rodillas al tope.",
+      "Bajá de forma controlada hasta recuperar los 90° de flexión y repetí el movimiento."
+    ]
+  },
+  {
+    "slug": "wall-sit",
+    "nombre": "Sentadilla isométrica en pared",
+    "tecnica": [
+      "Apoyá la espalda completa contra la pared y deslizate hasta que los muslos queden paralelos al piso.",
+      "Mantenés las rodillas a 90°, los pies planos en el suelo y los brazos relajados a los costados.",
+      "Sostené la posición el tiempo indicado respirando de forma constante sin despegar la espalda de la pared."
+    ]
+  },
+  {
+    "slug": "weighted-wall-sit",
+    "nombre": "Sentadilla isométrica en pared con peso",
+    "tecnica": [
+      "Apoyá la espalda contra la pared y bajá hasta que los muslos queden paralelos al piso.",
+      "Colocá el disco sobre los muslos con ambas manos y mantenés las rodillas a 90°.",
+      "Sostené la posición el tiempo indicado manteniendo la espalda pegada a la pared y el core apretado."
+    ]
+  },
+  {
+    "slug": "zercher-squat",
+    "nombre": "Sentadilla Zercher",
+    "tecnica": [
+      "Tomá la barra en el pliegue de los codos con los antebrazos paralelos al piso y los pies a la altura de los hombros.",
+      "Bajá la sentadilla manteniendo los codos dentro de las rodillas y el torso lo más vertical posible.",
+      "Empujá con los talones para subir apretando los glúteos al tope y manteniendo la barra cerca del cuerpo."
+    ]
+  },
+  {
+    "slug": "alternating-arnold-press",
+    "nombre": "Press Arnold alternado",
+    "tecnica": [
+      "Sentáte con la espalda apoyada, mancuernas a altura de hombros con las palmas mirando hacia vos.",
+      "Empujá una mancuerna hacia arriba rotando la muñeca hasta que la palma mire hacia adelante al extender el brazo.",
+      "Bajá de forma controlada rotando de vuelta mientras subís el otro brazo de forma alterna."
+    ]
+  },
+  {
+    "slug": "alternating-overhead-press",
+    "nombre": "Press militar alternado",
+    "tecnica": [
+      "Sentáte o paráte con las mancuernas a la altura de los hombros y los codos a 90°.",
+      "Empujá una mancuerna directo hacia arriba hasta extender el brazo por completo sin inclinar el torso.",
+      "Bajá controlado y repetí con el otro brazo alternando de forma continua."
+    ]
+  },
+  {
+    "slug": "arnold-press",
+    "nombre": "Press Arnold",
+    "tecnica": [
+      "Sentáte con las mancuernas frente al pecho, palmas mirando hacia vos y codos al frente.",
+      "Empujá hacia arriba rotando las muñecas hasta que las palmas queden mirando hacia adelante al extender.",
+      "Bajá de forma controlada revirtiendo la rotación hasta volver a la posición inicial."
+    ]
+  },
+  {
+    "slug": "bar-face-pull",
+    "nombre": "Jalón al rostro con barra",
+    "tecnica": [
+      "Tomá la barra de la polea alta con agarre prono y paráte con los pies firmes y el core activo.",
+      "Tirá la barra hacia tu frente separando los codos hacia los costados a la altura de los hombros.",
+      "Controlá el regreso a la posición inicial extendiendo los brazos sin que los hombros se vayan hacia adelante."
+    ]
+  },
+  {
+    "slug": "bar-front-raise",
+    "nombre": "Elevación frontal con barra",
+    "tecnica": [
+      "Tomá la barra con agarre prono a la anchura de los hombros y apoyala sobre los muslos.",
+      "Subí la barra hacia adelante y arriba con los brazos casi extendidos hasta la altura de los hombros.",
+      "Bajá de forma controlada hasta los muslos sin balancear el torso."
+    ]
+  },
+  {
+    "slug": "bench-fly",
+    "nombre": "Apertura en banco",
+    "tecnica": [
+      "Acostáte en el banco con los brazos extendidos hacia arriba y las palmas enfrentadas.",
+      "Abrí los brazos hacia los costados bajando en arco amplio hasta que queden a la altura del pecho.",
+      "Volvé al punto inicial apretando el pecho sin bloquear los codos al tope."
+    ]
+  },
+  {
+    "slug": "elevated-pike-press",
+    "nombre": "Press en posición pike elevado",
+    "tecnica": [
+      "Apoyá los pies en una superficie elevada y las manos en el piso con las caderas en alto formando una V invertida.",
+      "Flexioná los codos bajando la cabeza hacia el piso de forma controlada.",
+      "Empujá el piso para extender los brazos y volver a la posición inicial sin bajar las caderas."
+    ]
+  },
+  {
+    "slug": "face-pull",
+    "nombre": "Jalón al rostro",
+    "tecnica": [
+      "Tomá la banda o cuerda a la altura del rostro con ambas manos y paráte con los pies firmes.",
+      "Tirá hacia tu cara separando los codos hacia los costados y rotando los hombros hacia afuera.",
+      "Controlá el regreso extendiendo los brazos sin que los hombros caigan hacia adelante."
+    ]
+  },
+  {
+    "slug": "face-pulls",
+    "nombre": "Jalón al rostro en polea",
+    "tecnica": [
+      "Ajustá la polea a la altura del rostro, tomá la cuerda con las palmas hacia abajo y paráte con el core activo.",
+      "Tirá la cuerda hacia tu cara abriendo los codos hacia los lados y rotando los hombros hacia afuera.",
+      "Extendé los brazos de forma controlada para volver al inicio sin dejar que los hombros vayan hacia adelante."
+    ]
+  },
+  {
+    "slug": "floor-fly",
+    "nombre": "Apertura en el suelo",
+    "tecnica": [
+      "Acostáte boca arriba en el piso con las mancuernas sobre el pecho y los codos levemente flexionados.",
+      "Abrí los brazos en arco hacia los costados hasta que los codos toquen el suelo.",
+      "Volvé al punto inicial apretando el pecho sin extender los codos por completo."
+    ]
+  },
+  {
+    "slug": "front-military-press",
+    "nombre": "Press militar frontal",
+    "tecnica": [
+      "Sentáte en la máquina con la espalda apoyada y tomá las asas a la altura de los hombros.",
+      "Empujá las asas directo hacia arriba hasta extender los brazos sin arquear la espalda baja.",
+      "Bajá de forma controlada hasta la posición inicial manteniendo los hombros bajos y el core activo."
+    ]
+  },
+  {
+    "slug": "front-raise",
+    "nombre": "Elevación frontal",
+    "tecnica": [
+      "Paráte con el implemento frente a los muslos y los brazos casi extendidos.",
+      "Subí los brazos hacia adelante y arriba hasta la altura de los hombros sin balancear el torso.",
+      "Bajá de forma controlada hasta los muslos y repetí manteniendo el core apretado."
+    ]
+  },
+  {
+    "slug": "full-lateral-raise",
+    "nombre": "Elevación lateral completa",
+    "tecnica": [
+      "Paráte con el implemento a los costados del cuerpo y los codos levemente flexionados.",
+      "Subí los brazos hacia los lados en arco amplio pasando la altura de los hombros hasta casi la vertical.",
+      "Bajá de forma lenta y controlada a los costados del cuerpo sin dejar que el torso se incline."
+    ]
+  },
+  {
+    "slug": "halo",
+    "nombre": "Halo",
+    "tecnica": [
+      "Paráte o sentáte con el disco tomado frente al pecho con ambas manos en el borde.",
+      "Rotá el disco alrededor de la cabeza en un círculo continuo manteniéndolo cerca sin golpearte.",
+      "Completá la vuelta volviendo al frente del pecho y repetí en el sentido contrario."
+    ]
+  },
+  {
+    "slug": "high-reverse-fly",
+    "nombre": "Apertura inversa alta en polea",
+    "tecnica": [
+      "Ajustá ambas poleas en alto, tomá la izquierda con la mano derecha y la derecha con la izquierda.",
+      "Con los codos levemente flexionados, abrí los brazos hacia los costados y abajo formando una X.",
+      "Volvé al punto inicial de forma controlada sin que los hombros traccionen hacia adelante."
+    ]
+  },
+  {
+    "slug": "i-raise",
+    "nombre": "Elevación en I",
+    "tecnica": [
+      "Tomá las asas del TRX con los brazos extendidos al frente, cuerpo inclinado hacia atrás.",
+      "Subí los brazos directo hacia arriba formando una línea recta con el torso hasta llegar sobre la cabeza.",
+      "Bajá de forma controlada volviendo a la posición inicial sin arquear la zona lumbar."
+    ]
+  },
+  {
+    "slug": "incline-front-raise",
+    "nombre": "Elevación frontal en banco inclinado",
+    "tecnica": [
+      "Apoyá el pecho en un banco inclinado con las mancuernas colgando perpendiculares al piso.",
+      "Subí los brazos hacia adelante y arriba hasta la altura de los hombros sin balancear el torso.",
+      "Bajá de forma controlada hasta la posición inicial y repetí manteniendo el pecho apoyado en el banco."
+    ]
+  },
+  {
+    "slug": "landmine-lateral-raise",
+    "nombre": "Elevación lateral con landmine",
+    "tecnica": [
+      "Paráte de lado al extremo libre de la barra y tomálo con la mano exterior con el codo levemente flexionado.",
+      "Subí el brazo hacia el costado en arco hasta la altura del hombro sin inclinar el torso.",
+      "Bajá de forma controlada y completá las repeticiones antes de cambiar de lado."
+    ]
+  },
+  {
+    "slug": "landmine-overhead-press",
+    "nombre": "Press militar con landmine",
+    "tecnica": [
+      "Tomá el extremo libre de la barra con una mano a la altura del hombro y paráte con los pies firmes.",
+      "Empujá la barra en arco hacia arriba hasta extender el brazo sin arquear la espalda.",
+      "Bajá de forma controlada siguiendo el arco natural de la barra hasta el hombro."
+    ]
+  },
+  {
+    "slug": "lateral-raise",
+    "nombre": "Elevación lateral",
+    "tecnica": [
+      "Paráte con el implemento a los costados del cuerpo y los codos levemente flexionados.",
+      "Subí los brazos hacia los lados hasta la altura de los hombros sin balancear el torso.",
+      "Bajá de forma controlada a los costados del cuerpo y repetí con el core apretado."
+    ]
+  },
+  {
+    "slug": "laying-lateral-raise",
+    "nombre": "Elevación lateral acostado",
+    "tecnica": [
+      "Acostáte de lado en el suelo o banco con una mancuerna en la mano superior y el codo levemente flexionado.",
+      "Subí el brazo hacia arriba perpendicular al piso hasta la vertical sin rotar el torso.",
+      "Bajá de forma controlada hasta el costado del cuerpo y completá las repeticiones antes de cambiar de lado."
+    ]
+  },
+  {
+    "slug": "laying-reverse-fly",
+    "nombre": "Apertura inversa acostado",
+    "tecnica": [
+      "Acostáte boca abajo en un banco con las mancuernas colgando a los costados y los codos levemente flexionados.",
+      "Subí los brazos hacia los lados en arco hasta la altura de los hombros apretando las escápulas.",
+      "Bajá de forma controlada hasta la posición inicial y repetí sin arquear el cuello."
+    ]
+  },
+  {
+    "slug": "low-lateral-raise",
+    "nombre": "Elevación lateral baja",
+    "tecnica": [
+      "Ajustá la banda o polea en bajo y tomálo con la mano opuesta al punto de anclaje.",
+      "Subí el brazo hacia el costado en arco hasta la altura del hombro sin inclinar el torso.",
+      "Bajá de forma controlada y completá las repeticiones antes de cambiar de lado."
+    ]
+  },
+  {
+    "slug": "medicine-ball-halo",
+    "nombre": "Halo con balón medicinal",
+    "tecnica": [
+      "Paráte o sentáte con el balón medicinal tomado frente al pecho con ambas manos en los costados.",
+      "Rotá el balón alrededor de la cabeza en un círculo continuo manteniéndolo cerca sin golpearte.",
+      "Completá la vuelta volviendo al frente del pecho y repetí en el sentido contrario."
+    ]
+  },
+  {
+    "slug": "mid-lateral-raise",
+    "nombre": "Elevación lateral media",
+    "tecnica": [
+      "Ajustá la banda o polea a la altura de la cadera y tomálo con la mano opuesta al punto de anclaje.",
+      "Subí el brazo hacia el costado en arco hasta la altura del hombro sin inclinar el torso.",
+      "Bajá de forma controlada y completá las repeticiones antes de cambiar de lado."
+    ]
+  },
+  {
+    "slug": "neutral-overhead-press",
+    "nombre": "Press militar neutro",
+    "tecnica": [
+      "Sentáte o paráte con las mancuernas a la altura de los hombros y las palmas enfrentadas entre sí.",
+      "Empujá ambas mancuernas directo hacia arriba manteniendo las palmas mirándose hasta extender los brazos.",
+      "Bajá de forma controlada hasta la posición inicial sin arquear la espalda baja."
+    ]
+  },
+  {
+    "slug": "overhand-overhead-press",
+    "nombre": "Press militar con agarre prono",
+    "tecnica": [
+      "Sentáte en la máquina con el agarre prono (palmas mirando hacia adelante) a la altura de los hombros.",
+      "Empujá las asas directo hacia arriba hasta extender los brazos sin arquear la espalda.",
+      "Bajá de forma controlada hasta la posición inicial manteniendo los hombros bajos y el core activo."
+    ]
+  },
+  {
+    "slug": "overhead-press",
+    "nombre": "Press militar",
+    "tecnica": [
+      "Paráte o sentáte con el implemento a la altura de los hombros y los codos al frente.",
+      "Empujá directo hacia arriba hasta extender los brazos por completo sin inclinar el torso hacia atrás.",
+      "Bajá de forma controlada hasta los hombros y repetí manteniendo el core apretado."
+    ]
+  },
+  {
+    "slug": "pike-press",
+    "nombre": "Press en posición pike",
+    "tecnica": [
+      "Apoyá las manos en el piso y subí las caderas formando una V invertida con el cuerpo.",
+      "Flexioná los codos bajando la cabeza hacia el piso de forma controlada.",
+      "Empujá el piso para extender los brazos y volver a la posición inicial manteniendo las caderas en alto."
+    ]
+  },
+  {
+    "slug": "pike-shrug",
+    "nombre": "Encogimiento de hombros en posición pike",
+    "tecnica": [
+      "Apoyá las manos en el piso y subí las caderas formando una V invertida con el cuerpo.",
+      "Dejá caer los hombros hacia el piso bajando las escápulas de forma controlada.",
+      "Empujá el piso elevando los hombros lo más alto posible apretando los trapecios al tope."
+    ]
+  },
+  {
+    "slug": "rear-delt-fly",
+    "nombre": "Apertura de deltoides posterior",
+    "tecnica": [
+      "Incliná el torso hacia adelante casi paralelo al piso con el implemento colgando frente a vos.",
+      "Abrí los brazos hacia los lados en arco hasta la altura de los hombros apretando las escápulas.",
+      "Bajá de forma controlada al frente sin que los hombros caigan hacia adelante."
+    ]
+  },
+  {
+    "slug": "rear-delt-row",
+    "nombre": "Remo de deltoides posterior",
+    "tecnica": [
+      "Incliná el torso hacia adelante con el implemento colgando, codos levemente flexionados.",
+      "Tirá los codos hacia arriba y hacia afuera hasta que queden a la altura de los hombros.",
+      "Bajá de forma controlada extendiendo los brazos sin rotar el torso."
+    ]
+  },
+  {
+    "slug": "rear-deltfly",
+    "nombre": "Apertura de deltoides posterior en TRX",
+    "tecnica": [
+      "Tomá las asas del TRX con los brazos extendidos al frente, cuerpo inclinado hacia atrás.",
+      "Abrí los brazos hacia los lados en arco hasta que las manos queden a la altura de los hombros.",
+      "Volvé al punto inicial extendiendo los brazos de forma controlada sin que los hombros caigan."
+    ]
+  },
+  {
+    "slug": "rear-deltoid-row",
+    "nombre": "Remo de deltoides posterior en máquina",
+    "tecnica": [
+      "Sentáte frente a la máquina con el pecho apoyado en el pad y tomá las asas con los codos levemente flexionados.",
+      "Tirá las asas hacia atrás y afuera hasta que los codos queden alineados con los hombros.",
+      "Volvé de forma controlada a la posición inicial sin que los hombros se vayan hacia adelante."
+    ]
+  },
+  {
+    "slug": "reverse-fly",
+    "nombre": "Apertura inversa",
+    "tecnica": [
+      "Sentáte en la máquina o incliná el torso con el implemento al frente y los codos levemente flexionados.",
+      "Abrí los brazos hacia los lados en arco hasta la altura de los hombros apretando las escápulas.",
+      "Volvé de forma controlada al frente manteniendo el torso estable."
+    ]
+  },
+  {
+    "slug": "rope-front-raise",
+    "nombre": "Elevación frontal con cuerda",
+    "tecnica": [
+      "Tomá la cuerda de la polea baja con ambas manos y paráte de frente al punto de anclaje.",
+      "Subí los brazos hacia adelante y arriba hasta la altura de los hombros sin balancear el torso.",
+      "Bajá de forma controlada hasta los muslos y repetí manteniendo el core apretado."
+    ]
+  },
+  {
+    "slug": "rope-upright-row",
+    "nombre": "Remo al mentón con cuerda",
+    "tecnica": [
+      "Tomá la cuerda de la polea baja con ambas manos y paráte erguido frente a la máquina.",
+      "Tirá la cuerda hacia arriba guiando los codos por encima de las muñecas hasta la altura del mentón.",
+      "Bajá de forma controlada extendiendo los brazos hasta la posición inicial."
+    ]
+  },
+  {
+    "slug": "seated-arnold-press",
+    "nombre": "Press Arnold sentado",
+    "tecnica": [
+      "Sentáte con la espalda apoyada, mancuernas a la altura del pecho con las palmas mirando hacia vos.",
+      "Empujá hacia arriba rotando las muñecas hasta que las palmas miren hacia adelante al extender los brazos.",
+      "Bajá de forma controlada revirtiendo la rotación hasta volver a la posición inicial."
+    ]
+  }
+]
