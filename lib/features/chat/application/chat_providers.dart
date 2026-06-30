@@ -70,6 +70,21 @@ final chatForLinkProvider =
       .getOrCreate(selfId: uid, otherId: otherId);
 });
 
+/// Resuelve el [Chat] entre el usuario actual y [otherUid], creándolo si no
+/// existe. Equivalente a [chatForLinkProvider] pero keyed por uid plano —
+/// útil cuando el caller ya tiene el uid del otro a mano (Alumno detalle del
+/// Coach Hub web) y no necesita traer el [TrainerLink] solo para inferirlo.
+final chatForOtherUidProvider =
+    FutureProvider.autoDispose.family<Chat, String>((ref, otherUid) async {
+  final uid = ref.watch(currentUidProvider);
+  if (uid == null) {
+    throw StateError('No hay usuario autenticado');
+  }
+  return ref
+      .read(chatRepositoryProvider)
+      .getOrCreate(selfId: uid, otherId: otherUid);
+});
+
 /// Whether the current user has an unread message from a specific other user.
 ///
 /// Keyed by [otherUid]. Derives from the live [chatsForCurrentUserProvider]
