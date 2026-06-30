@@ -74,27 +74,27 @@ Chain strategy: stacked-to-main
 
 ### Phase 2A: Hardcoded color violations
 
-- [ ] T-LM-020 (PR#2, refactor): Replace `Colors.white` at `lib/features/social/presentation/unfriend_confirmation_sheet.dart:75` with `palette.onDanger`. Refs: REQ-LM-007, REQ-LM-008, SCENARIO-820.
-- [ ] T-LM-021 (PR#2, refactor): Replace `Colors.red` at `lib/features/workout/presentation/routine_editor_screen.dart:3504` and `:3513` with `palette.danger`. Refs: REQ-LM-007, SCENARIO-821.
+- [x] T-LM-020 (PR#2, refactor): Replace `Colors.white` at `lib/features/social/presentation/unfriend_confirmation_sheet.dart:75` with `palette.onDanger`. Refs: REQ-LM-007, REQ-LM-008, SCENARIO-820.
+- [x] T-LM-021 (PR#2, refactor): Replace `Colors.red` at `lib/features/workout/presentation/routine_editor_screen.dart:3504` and `:3513` with `palette.danger`. Refs: REQ-LM-007, SCENARIO-821.
 
 ### Phase 2B: Hero scrim migration
 
-- [ ] T-LM-022 (PR#2, refactor): Replace `Colors.black.withOpacity(x)` scrims at `lib/features/workout/presentation/exercise_detail_screen.dart:111` and `:296` with `palette.scrimDark.withValues(alpha: x)`. Refs: REQ-LM-007, ADR-LM-008.
-- [ ] T-LM-023 (PR#2, refactor): Replace `Colors.black.withOpacity(x)` scrims at `lib/features/workout/presentation/routine_detail_screen.dart:154` and `:569` with `palette.scrimDark.withValues(alpha: x)`. Refs: REQ-LM-007, SCENARIO-822.
+- [x] T-LM-022 (PR#2, refactor): Replace `Colors.black.withOpacity(x)` scrims at `lib/features/workout/presentation/exercise_detail_screen.dart:111` and `:296` with `palette.scrimDark.withValues(alpha: x)`. Refs: REQ-LM-007, ADR-LM-008.
+- [x] T-LM-023 (PR#2, refactor): Replace `Colors.black.withOpacity(x)` scrims at `lib/features/workout/presentation/routine_detail_screen.dart:154` and `:569` with `palette.scrimDark.withValues(alpha: x)`. Refs: REQ-LM-007, SCENARIO-822.
 
 ### Phase 2C: Media force-dark wrappers
 
-- [ ] T-LM-024 (PR#2, feat): Wrap root widget in `lib/features/workout/presentation/firebase_storage_video_player.dart` with `Theme(data: AppTheme.dark(), child: ...)`. Annotate any remaining literals with `// intentional: media surface`. Refs: REQ-LM-006, SCENARIO-817, SCENARIO-818.
-- [ ] T-LM-025 (PR#2, feat): Same force-dark wrap in `lib/features/workout/presentation/exercise_video_player.dart`. Refs: REQ-LM-006, SCENARIO-817, SCENARIO-819.
-- [ ] T-LM-026 (PR#2, feat): Same force-dark wrap in `lib/features/profile/presentation/photo_viewer_screen.dart`. Refs: REQ-LM-006, SCENARIO-817, SCENARIO-818, SCENARIO-819.
+- [x] T-LM-024 (PR#2, feat): Wrap root widget in `lib/features/workout/presentation/firebase_storage_video_player.dart` with `Theme(data: AppTheme.dark(), child: ...)`. Annotate any remaining literals with `// intentional: media surface`. Refs: REQ-LM-006, SCENARIO-817, SCENARIO-818.
+- [x] T-LM-025 (PR#2, feat): Same force-dark wrap in `lib/features/workout/presentation/exercise_video_player.dart`. Refs: REQ-LM-006, SCENARIO-817, SCENARIO-819.
+- [x] T-LM-026 (PR#2, feat): Same force-dark wrap in `lib/features/profile/presentation/photo_viewer_screen.dart`. Refs: REQ-LM-006, SCENARIO-817, SCENARIO-818, SCENARIO-819.
 
 ### Phase 2D: Body silhouette ColorFiltered
 
-- [ ] T-LM-027 (PR#2, feat): Wrap `bodyfront.png` and `bodyback.png` `Image.asset` calls in `lib/features/insights/presentation/widgets/body_silhouette_placeholder.dart` with `ColorFiltered(colorFilter: ColorFilter.mode(palette.textPrimary, BlendMode.srcIn), ...)`. Leave `palette.accent` mask overlays untouched. Refs: REQ-LM-011, SCENARIO-831, SCENARIO-832, SCENARIO-833.
+- [x] T-LM-027 (PR#2, feat): Wrap `bodyfront.png` and `bodyback.png` `Image.asset` calls in `lib/features/insights/presentation/widgets/body_silhouette_placeholder.dart` with `ColorFiltered(colorFilter: ColorFilter.mode(palette.textPrimary, BlendMode.srcIn), ...)`. Leave `palette.accent` mask overlays untouched. Refs: REQ-LM-011, SCENARIO-831, SCENARIO-832, SCENARIO-833.
 
 ### Phase 2E: Quality gate + smoke
 
-- [ ] T-LM-028 (PR#2, chore): Run `flutter analyze` (0 issues) and `dart format .` (no diff) on all PR#2 changed files. Refs: REQ-LM-012, SCENARIO-834, SCENARIO-835, SCENARIO-836.
+- [x] T-LM-028 (PR#2, chore): Run `flutter analyze` (0 issues) and `dart format .` (no diff) on all PR#2 changed files. Refs: REQ-LM-012, SCENARIO-834, SCENARIO-835, SCENARIO-836.
 - [ ] T-LM-029 (PR#2, docs): Manual smoke: temporarily hard-code `ThemeMode.light` in app root, verify each migrated surface renders correctly (no white-on-white, no invisible scrims, media players stay dark). Refs: SCENARIO-817, SCENARIO-820, SCENARIO-821, SCENARIO-831.
 
 ---
@@ -103,28 +103,28 @@ Chain strategy: stacked-to-main
 
 ### Phase 3A: i18n keys
 
-- [ ] T-LM-030 (PR#3, i18n): Add 6 ARB keys to `lib/l10n/intl_es_AR.arb`: `appearanceTitle`, `appearanceSystem`, `appearanceSystemDesc`, `appearanceLight`, `appearanceDark`, `profileSectionAppearance` with `@key` metadata. Refs: REQ-LM-010, SCENARIO-829, SCENARIO-830.
-- [ ] T-LM-031 (PR#3, i18n): Add the same 6 keys to `lib/l10n/intl_en.arb` (English scaffold values). Refs: REQ-LM-010, SCENARIO-829.
-- [ ] T-LM-032 (PR#3, chore): Run `flutter gen-l10n` and verify exit code 0 with no missing-key warnings. Refs: REQ-LM-010, SCENARIO-829.
+- [x] T-LM-030 (PR#3, i18n): Add 6 ARB keys to `lib/l10n/intl_es_AR.arb`: `appearanceTitle`, `appearanceSystem`, `appearanceSystemDesc`, `appearanceLight`, `appearanceDark`, `profileSectionAppearance` with `@key` metadata. Refs: REQ-LM-010, SCENARIO-829, SCENARIO-830.
+- [x] T-LM-031 (PR#3, i18n): Add the same 6 keys to `lib/l10n/intl_en.arb` (English scaffold values). Refs: REQ-LM-010, SCENARIO-829.
+- [x] T-LM-032 (PR#3, chore): Run `flutter gen-l10n` and verify exit code 0 with no missing-key warnings. Refs: REQ-LM-010, SCENARIO-829.
 
 ### Phase 3B: AppearanceScreen
 
-- [ ] T-LM-033 (PR#3, feat): Read `lib/features/profile/presentation/` structure to locate the entry point for profile settings and the `ProfileSectionTile` widget pattern before writing code. Refs: REQ-LM-009.
-- [ ] T-LM-034 (PR#3, feat): Create `lib/features/profile/presentation/screens/appearance_screen.dart` — `ConsumerWidget`, AppBar, 3 `RadioListTile<ThemeMode>` (system / light / dark), on-change calls `ref.read(themeModeProvider.notifier).setMode(mode)`. Refs: REQ-LM-009, SCENARIO-825, SCENARIO-827, SCENARIO-828.
+- [x] T-LM-033 (PR#3, feat): Read `lib/features/profile/presentation/` structure to locate the entry point for profile settings and the `ProfileSectionTile` widget pattern before writing code. Refs: REQ-LM-009.
+- [x] T-LM-034 (PR#3, feat): Create `lib/features/profile/presentation/appearance_screen.dart` (no `screens/` subdir — following existing convention) — `ConsumerWidget`, custom header, `RadioGroup<ThemeMode>` + 3 `RadioListTile<ThemeMode>` (system / light / dark), on-change calls `ref.read(themeModeProvider.notifier).setMode(mode)`. Refs: REQ-LM-009, SCENARIO-825, SCENARIO-827, SCENARIO-828.
 
 ### Phase 3C: Navigation wiring
 
-- [ ] T-LM-035 (PR#3, feat): Add route `/profile/settings/appearance` to `lib/app/router.dart` pointing to `AppearanceScreen`. Refs: REQ-LM-009.
-- [ ] T-LM-036 (PR#3, feat): Add `profileSectionAppearance` entry tile (using `ProfileSectionTile` or equivalent) to the profile settings list with `context.push('/profile/settings/appearance')`. Refs: REQ-LM-009, SCENARIO-825, SCENARIO-827.
+- [x] T-LM-035 (PR#3, feat): Add route `/profile/settings/appearance` to `lib/app/router.dart` pointing to `AppearanceScreen`. Refs: REQ-LM-009.
+- [x] T-LM-036 (PR#3, feat): Add `profileSectionAppearance` entry tile (using `_A11ySectionGroup` + `ProfileSectionTile` with `TreinoIcon.appearance`) to `profile_screen.dart` with `context.push('/profile/settings/appearance')`. Refs: REQ-LM-009, SCENARIO-825, SCENARIO-827.
 
 ### Phase 3D: Tests
 
-- [ ] T-LM-037 (PR#3, test): Widget test in `test/features/profile/presentation/appearance_screen_test.dart` — renders 3 options, tap selects correct `ThemeMode`, provider state updated, back does not undo selection. Refs: REQ-LM-009, SCENARIO-825, SCENARIO-826, SCENARIO-827, SCENARIO-828.
-- [ ] T-LM-038 (PR#3, test): Widget test in `test/app/theme/app_theme_test.dart` — `AppTheme.light()` extension resolves to `mintMagentaLight`, brightness is `Brightness.light`. Refs: REQ-LM-002, SCENARIO-804, SCENARIO-805, SCENARIO-806.
+- [x] T-LM-037 (PR#3, test): Widget test in `test/features/profile/presentation/appearance_screen_test.dart` — 6 tests: renders 3 options, tap selects correct `ThemeMode`, provider state updated, back does not undo selection. Refs: REQ-LM-009, SCENARIO-825, SCENARIO-826, SCENARIO-827, SCENARIO-828.
+- [x] T-LM-038 (PR#3, test): Widget test in `test/app/theme/app_theme_test.dart` — 5 tests: `AppTheme.light()` extension resolves to `mintMagentaLight`, brightness is `Brightness.light`, bg/textPrimary luminance assertions. Refs: REQ-LM-002, SCENARIO-804, SCENARIO-805, SCENARIO-806.
 
 ### Phase 3E: Quality gate + QA
 
-- [ ] T-LM-039 (PR#3, chore): Run `flutter analyze` (0 issues) and `dart format .` (no diff) on all PR#3 changed files. Refs: REQ-LM-012, SCENARIO-834, SCENARIO-835.
+- [x] T-LM-039 (PR#3, chore): Run `flutter analyze` (0 issues) and `dart format .` (no diff) on all PR#3 changed files. Refs: REQ-LM-012, SCENARIO-834, SCENARIO-835.
 - [ ] T-LM-040 (PR#3, docs): Manual QA pass — toggle Sistema / Claro / Oscuro in AppearanceScreen, cold restart, verify persistence. Verify status bar icon brightness on iOS device (light icons on dark, dark icons on light). Refs: SCENARIO-825, SCENARIO-826, SCENARIO-814, SCENARIO-815.
 - [ ] T-LM-041 (PR#3, docs): Visual QA pass on all 15 feature modules in light mode — document any regressions found as follow-up issues. Refs: REQ-LM-012.
 

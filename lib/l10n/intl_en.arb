@@ -701,5 +701,11 @@
   "profileRoutinesNoTrainerBody": "",
   "profileRoutinesNoTrainerCta": "",
   "profileRoutinesNoOwnBody": "",
-  "profileRoutinesActiveChip": ""
+  "profileRoutinesActiveChip": "",
+  "appearanceTitle": "Appearance",
+  "appearanceSystem": "System",
+  "appearanceSystemDesc": "Follows the device theme",
+  "appearanceLight": "Light",
+  "appearanceDark": "Dark",
+  "profileSectionAppearance": "Appearance"
 }

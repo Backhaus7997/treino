@@ -43,6 +43,7 @@ import '../features/insights/presentation/insights_screen.dart';
 import '../features/profile/application/user_providers.dart';
 import '../features/profile/domain/user_profile_trainer_completeness.dart';
 import '../features/profile/domain/user_role.dart';
+import '../features/profile/presentation/appearance_screen.dart';
 import '../features/profile/presentation/profile_edit_personal_screen.dart';
 import '../features/profile/presentation/profile_edit_trainer_screen.dart';
 import '../features/profile/presentation/profile_gym_screen.dart';
@@ -525,6 +526,10 @@ GoRouter buildRouter({
               GoRoute(
                 path: 'routines',
                 builder: (_, __) => _withBg(const ProfileRoutinesScreen()),
+              ),
+              GoRoute(
+                path: 'settings/appearance',
+                builder: (_, __) => _withBg(const AppearanceScreen()),
               ),
               // /profile/settings GoRoute REMOVED 2026-05-28 — PR#4 pivot.
               // Sign-out and eliminar-cuenta tiles now live directly in

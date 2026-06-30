@@ -1811,4 +1811,22 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get profileRoutinesActiveChip => '';
+
+  @override
+  String get appearanceTitle => 'Appearance';
+
+  @override
+  String get appearanceSystem => 'System';
+
+  @override
+  String get appearanceSystemDesc => 'Follows the device theme';
+
+  @override
+  String get appearanceLight => 'Light';
+
+  @override
+  String get appearanceDark => 'Dark';
+
+  @override
+  String get profileSectionAppearance => 'Appearance';
 }

@@ -1180,5 +1180,29 @@
   "profileRoutinesActiveChip": "ACTIVA",
   "@profileRoutinesActiveChip": {
     "description": "Chip label shown on the user-created routine card that is currently marked as active by the athlete (UserProfile.activeRoutineId). Mirrors the chip in workoutMisRutinasActiveChip."
+  },
+  "appearanceTitle": "Apariencia",
+  "@appearanceTitle": {
+    "description": "Title of the Appearance settings screen and the tile label in the profile settings list."
+  },
+  "appearanceSystem": "Sistema",
+  "@appearanceSystem": {
+    "description": "Label for the System (OS-controlled) theme option in AppearanceScreen."
+  },
+  "appearanceSystemDesc": "Sigue el tema del dispositivo",
+  "@appearanceSystemDesc": {
+    "description": "Subtitle shown under the System option in AppearanceScreen."
+  },
+  "appearanceLight": "Claro",
+  "@appearanceLight": {
+    "description": "Label for the Light theme option in AppearanceScreen."
+  },
+  "appearanceDark": "Oscuro",
+  "@appearanceDark": {
+    "description": "Label for the Dark theme option in AppearanceScreen."
+  },
+  "profileSectionAppearance": "Apariencia",
+  "@profileSectionAppearance": {
+    "description": "Section header label for the Appearance group in the profile screen."
   }
 }
