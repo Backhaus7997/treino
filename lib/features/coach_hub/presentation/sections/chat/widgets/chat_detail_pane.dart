@@ -16,16 +16,15 @@ import '../../../../../workout/application/session_providers.dart'
 import 'chat_message_bubble.dart';
 
 /// Panel derecho del split-pane: header con el otro user + lista invertida
-/// de mensajes + composer de texto + foto (V2, 2026-07-01).
+/// de mensajes + composer de texto + foto + video (V3, 2026-07-01).
 ///
-/// V2 upgrade: el botón "Adjuntar" abre el picker de imágenes del navegador,
-/// sube la foto vía [ChatMediaUploadServiceWeb] y postea el mensaje con
-/// `mediaUrl` + `mediaType: image`. Durante el upload el composer se
-/// deshabilita y muestra un `LinearProgressIndicator` con la fracción real
-/// que devuelve Storage. Video sigue como placeholder inline "[Video]" hasta
-/// una V3 futura — la razón es que en web el video player nativo requiere
-/// más setup que la imagen (thumbnail + play controls + inline autoplay
-/// guards) y queríamos ship foto ya.
+/// V3 upgrade: el botón "Adjuntar" abre un bottom sheet con "Foto" / "Video".
+/// El picker respectivo (`pickImage` / `pickVideo`) devuelve el XFile, se
+/// sube vía [ChatMediaUploadServiceWeb] y se postea el mensaje con `mediaUrl`
+/// + `mediaType`. Durante el upload el composer se deshabilita y muestra un
+/// `LinearProgressIndicator` con la fracción real que devuelve Storage.
+/// Videos se renderean inline en la burbuja usando el mismo
+/// `FirebaseStorageVideoPlayer` que mobile, para mantener UX consistente.
 class ChatDetailPane extends ConsumerStatefulWidget {
   const ChatDetailPane({super.key, required this.chatId});
 
@@ -105,10 +104,48 @@ class _ChatDetailPaneState extends ConsumerState<ChatDetailPane> {
     }
   }
 
-  /// V2: pickeada + upload + send de una imagen. Solo foto en V2 (video
-  /// diferido). Si el picker se cancela, no pasa nada. Si el upload falla,
-  /// snackbar de error y el composer vuelve a estado inicial.
-  Future<void> _pickAndSendImage() async {
+  /// V2 (foto) + V3 (video): abre un menú Foto/Video y delega en
+  /// [_pickAndSendMedia] con el [MediaType] elegido. Mismo patrón que el
+  /// chat mobile — un solo entrypoint desde el composer.
+  Future<void> _openAttachMenu() async {
+    if (_uploading || _sending) return;
+    final palette = AppPalette.of(context);
+    final choice = await showModalBottomSheet<MediaType>(
+      context: context,
+      backgroundColor: palette.bgCard,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              key: const Key('chat_composer_attach_menu_photo'),
+              leading: Icon(TreinoIcon.image, color: palette.textPrimary),
+              title: Text(
+                'Foto', // i18n: Fase W2
+                style: GoogleFonts.barlow(color: palette.textPrimary),
+              ),
+              onTap: () => Navigator.of(ctx).pop(MediaType.image),
+            ),
+            ListTile(
+              key: const Key('chat_composer_attach_menu_video'),
+              leading: Icon(TreinoIcon.play, color: palette.textPrimary),
+              title: Text(
+                'Video', // i18n: Fase W2
+                style: GoogleFonts.barlow(color: palette.textPrimary),
+              ),
+              onTap: () => Navigator.of(ctx).pop(MediaType.video),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (choice == null || !mounted) return;
+    await _pickAndSendMedia(choice);
+  }
+
+  /// Corre el pick + upload + send de una media (foto o video). Handler
+  /// agnóstico usado por el menú del composer.
+  Future<void> _pickAndSendMedia(MediaType mediaType) async {
     if (_uploading || _sending) return;
     final uid = ref.read(currentUidProvider);
     if (uid == null) return;
@@ -117,10 +154,15 @@ class _ChatDetailPaneState extends ConsumerState<ChatDetailPane> {
     // On web, imageQuality is ignored by the platform but harmless — mobile
     // path resizes to ~80% quality which cuts network cost noticeably. We
     // keep the arg for parity.
-    final file = await picker.pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 80,
-    );
+    final XFile? file;
+    if (mediaType == MediaType.image) {
+      file = await picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 80,
+      );
+    } else {
+      file = await picker.pickVideo(source: ImageSource.gallery);
+    }
     if (file == null || !mounted) return;
 
     setState(() {
@@ -133,7 +175,7 @@ class _ChatDetailPaneState extends ConsumerState<ChatDetailPane> {
       final mediaUrl = await uploadService.upload(
         file.path,
         chatId: widget.chatId,
-        mediaType: MediaType.image,
+        mediaType: mediaType,
         onProgress: (fraction) {
           if (mounted) setState(() => _uploadProgress = fraction);
         },
@@ -145,7 +187,7 @@ class _ChatDetailPaneState extends ConsumerState<ChatDetailPane> {
             chatId: widget.chatId,
             senderId: uid,
             mediaUrl: mediaUrl,
-            mediaType: MediaType.image,
+            mediaType: mediaType,
           );
     } catch (e, st) {
       developer.log(
@@ -155,10 +197,12 @@ class _ChatDetailPaneState extends ConsumerState<ChatDetailPane> {
         stackTrace: st,
       );
       if (mounted) {
+        final label = mediaType == MediaType.image ? 'la foto' : 'el video';
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content:
-                Text('No pudimos enviar la foto. Reintentá.'), // i18n: Fase W2
+          SnackBar(
+            content: Text(
+              'No pudimos enviar $label. Reintentá.', // i18n: Fase W2
+            ),
           ),
         );
       }
@@ -218,7 +262,7 @@ class _ChatDetailPaneState extends ConsumerState<ChatDetailPane> {
             controller: _composerCtrl,
             sending: _sending || _uploading,
             onSend: _send,
-            onAttach: _pickAndSendImage,
+            onAttach: _openAttachMenu,
             palette: palette,
           ),
         ],
@@ -345,27 +389,33 @@ class _MessagesList extends StatelessWidget {
         final m = messages[index];
         final hasMedia = m.mediaUrl != null && m.mediaUrl!.isNotEmpty;
         final isImage = hasMedia && m.mediaType == MediaType.image;
+        final isVideo = hasMedia && m.mediaType == MediaType.video;
         return ChatMessageBubble(
           key: ValueKey(m.id),
           text: m.text,
           isOwn: m.senderId == currentUid,
           createdAt: m.createdAt,
-          // V2 (2026-07-01): imagen real inline. Video sigue como
-          // placeholder label hasta V3.
+          // V3 (2026-07-01): imagen y video inline. Placeholder queda solo
+          // para mediaType desconocido (defensivo).
           imageUrl: isImage ? m.mediaUrl : null,
-          mediaPlaceholderLabel: hasMedia && !isImage ? _mediaLabel(m) : null,
+          videoUrl: isVideo ? m.mediaUrl : null,
+          mediaPlaceholderLabel:
+              hasMedia && !isImage && !isVideo ? _mediaLabel(m) : null,
         );
       },
     );
   }
 
-  /// Label placeholder para media que NO renderea inline todavía. En V2
-  /// solo aplica a videos y a mediaType desconocido (defensivo).
+  /// Label placeholder para media que NO renderea inline. En V3 solo se
+  /// llega acá si `mediaType == null` (defensivo — no debería pasar en la
+  /// práctica porque el rule de Firestore exige mediaType cuando hay
+  /// mediaUrl). Foto y video renderean inline via [ChatMessageBubble].
   String _mediaLabel(Message m) {
     return switch (m.mediaType) {
-      MediaType.video => '🎥 Video', // i18n: Fase W2
+      MediaType.video =>
+        '🎥 Video', // never reached in V3 (video renders inline)
       MediaType.image =>
-        '📷 Foto', // never reached in V2 (image renders inline)
+        '📷 Foto', // never reached in V3 (image renders inline)
       null => '📎 Adjunto', // i18n: Fase W2 — defensive
     };
   }
