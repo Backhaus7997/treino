@@ -1638,6 +1638,246 @@ class AppL10nEs extends AppL10n {
       'No pudimos cerrar sesión. Inténtalo de nuevo.';
 
   @override
+  String get coachHubLoginPrompt =>
+      'Ingresa con la cuenta que ya usas en la app móvil.';
+
+  @override
+  String get coachHubLoginEmailLabel => 'Email';
+
+  @override
+  String get coachHubLoginEmailRequired => 'Ingresa tu email';
+
+  @override
+  String get coachHubLoginEmailInvalid => 'Email inválido';
+
+  @override
+  String get coachHubLoginPasswordLabel => 'Contraseña';
+
+  @override
+  String get coachHubLoginPasswordRequired => 'Ingresa tu contraseña';
+
+  @override
+  String get coachHubLoginSubmit => 'INGRESAR';
+
+  @override
+  String get coachHubLoginFooter =>
+      '¿No tienes cuenta? Créala desde la app móvil TREINO.';
+
+  @override
+  String get coachHubLoginGenericError =>
+      'No pudimos ingresar. Inténtalo de nuevo.';
+
+  @override
+  String get coachHubActionCancel => 'Cancelar';
+
+  @override
+  String get coachHubActionConfirm => 'Confirmar';
+
+  @override
+  String get coachHubActionPause => 'Pausar';
+
+  @override
+  String get coachHubActionResume => 'Reanudar';
+
+  @override
+  String get coachHubActionTerminate => 'Terminar';
+
+  @override
+  String get coachHubActionTerminateLink => 'Terminar vínculo';
+
+  @override
+  String get coachHubActionAccept => 'Aceptar';
+
+  @override
+  String get coachHubActionReject => 'Rechazar';
+
+  @override
+  String get coachHubDashboardImportPlanCta => 'IMPORTAR PLAN DESDE EXCEL';
+
+  @override
+  String get coachHubDashboardFilterActivos => 'ACTIVOS';
+
+  @override
+  String get coachHubDashboardFilterPausados => 'PAUSADOS';
+
+  @override
+  String get coachHubDashboardFilterHistorial => 'HISTORIAL';
+
+  @override
+  String get coachHubDashboardActiveHeader => 'TUS ALUMNOS';
+
+  @override
+  String get coachHubDashboardPausedHeader => 'EN PAUSA';
+
+  @override
+  String get coachHubDashboardHistoryHeader => 'VÍNCULOS PASADOS';
+
+  @override
+  String get coachHubDashboardEmptyActive => 'Sin alumnos activos por ahora.';
+
+  @override
+  String get coachHubDashboardEmptyPaused => 'No hay alumnos pausados.';
+
+  @override
+  String get coachHubDashboardEmptyHistory =>
+      'Sin vínculos terminados todavía.';
+
+  @override
+  String coachHubDashboardPendingHeader(int count) {
+    return 'SOLICITUDES PENDIENTES · $count';
+  }
+
+  @override
+  String get coachHubDashboardPendingContext => 'Quiere vincularse contigo';
+
+  @override
+  String coachHubDashboardLinkedSince(String date) {
+    return 'Vinculado desde $date';
+  }
+
+  @override
+  String coachHubDashboardPausedOn(String date) {
+    return 'Pausado el $date';
+  }
+
+  @override
+  String get coachHubDashboardPausedFallback => 'Pausado';
+
+  @override
+  String get coachHubDashboardPauseLinkTitle => 'Pausar vínculo';
+
+  @override
+  String get coachHubDashboardPauseLinkBody =>
+      'El alumno verá el plan pero no podrá registrar sesiones nuevas hasta que reanudes el vínculo.';
+
+  @override
+  String get coachHubDashboardTerminateLinkTitle => 'Terminar vínculo';
+
+  @override
+  String get coachHubDashboardTerminateLinkBody =>
+      'Esta acción no se puede deshacer. El historial se conserva.';
+
+  @override
+  String get coachHubDashboardResumeLinkTitle => 'Reanudar vínculo';
+
+  @override
+  String coachHubDashboardResumeLinkBody(String name) {
+    return '¿Reanudar el vínculo con $name?';
+  }
+
+  @override
+  String get coachHubDashboardResumeLinkBodyFallback => '¿Reanudar el vínculo?';
+
+  @override
+  String get coachHubDashboardPauseLinkError => 'No pudimos pausar el vínculo.';
+
+  @override
+  String get coachHubDashboardTerminateLinkError =>
+      'No pudimos terminar el vínculo.';
+
+  @override
+  String get coachHubDashboardResumeLinkError =>
+      'No pudimos reanudar el vínculo.';
+
+  @override
+  String get coachHubDashboardAcceptSuccess => 'Vínculo aceptado.';
+
+  @override
+  String get coachHubDashboardAcceptError => 'No pudimos aceptar el vínculo.';
+
+  @override
+  String get coachHubDashboardRejectSuccess => 'Solicitud rechazada.';
+
+  @override
+  String get coachHubDashboardRejectError =>
+      'No pudimos rechazar la solicitud.';
+
+  @override
+  String get coachHubDashboardTerminationReasonDeclined =>
+      'Rechazado por el entrenador';
+
+  @override
+  String get coachHubDashboardTerminationReasonByAthlete =>
+      'Cancelado por el atleta';
+
+  @override
+  String get coachHubDashboardTerminationReasonByTrainer =>
+      'Terminado por el entrenador';
+
+  @override
+  String get coachHubDashboardTerminationReasonFallback => 'Vínculo terminado';
+
+  @override
+  String get coachHubAlumnosTitle => 'ALUMNOS';
+
+  @override
+  String coachHubAlumnosSummary(int total, int active) {
+    return '$total en total · $active activos';
+  }
+
+  @override
+  String get coachHubAlumnosSearchHint => 'Buscar por nombre…';
+
+  @override
+  String get coachHubAlumnosFilterAll => 'Todos';
+
+  @override
+  String get coachHubAlumnosFilterActivos => 'Activos';
+
+  @override
+  String get coachHubAlumnosFilterConDeuda => 'Con deuda';
+
+  @override
+  String get coachHubAlumnosFilterPausados => 'Pausados';
+
+  @override
+  String get coachHubAlumnosFilterInactivos => 'Inactivos';
+
+  @override
+  String get coachHubAlumnosEmpty => 'Todavía no tienes alumnos vinculados.';
+
+  @override
+  String get coachHubAlumnosEmptyFiltered =>
+      'Ningún alumno coincide con el filtro.';
+
+  @override
+  String get coachHubAlumnosLoadError => 'No se pudieron cargar los alumnos.';
+
+  @override
+  String get coachHubAlumnosProfilesLoadError =>
+      'No se pudieron cargar los perfiles.';
+
+  @override
+  String get coachHubAlumnosColumnStudent => 'ALUMNO';
+
+  @override
+  String get coachHubAlumnosColumnStatus => 'ESTADO';
+
+  @override
+  String get coachHubAlumnosColumnLastWorkout => 'ÚLTIMO ENTRENO';
+
+  @override
+  String get coachHubAlumnosColumnActions => 'ACCIONES';
+
+  @override
+  String get coachHubAlumnosNameFallback => 'Atleta';
+
+  @override
+  String get coachHubAlumnosLastWorkoutToday => 'Hoy';
+
+  @override
+  String get coachHubAlumnosStatusActive => 'Activo';
+
+  @override
+  String get coachHubAlumnosStatusDebt => 'Con deuda';
+
+  @override
+  String get coachHubAlumnosStatusPaused => 'Pausado';
+
+  @override
+  String get coachHubAlumnosStatusInactive => 'Inactivo';
+
+  @override
   String get feedLoadError => 'No pudimos cargar tu feed. Inténtalo de nuevo.';
 
   @override
@@ -3514,6 +3754,246 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get coachHubSignOutError =>
       'No pudimos cerrar sesión. Probá de nuevo.';
+
+  @override
+  String get coachHubLoginPrompt =>
+      'Ingresá con la cuenta que ya usás en la app móvil.';
+
+  @override
+  String get coachHubLoginEmailLabel => 'Email';
+
+  @override
+  String get coachHubLoginEmailRequired => 'Ingresá tu email';
+
+  @override
+  String get coachHubLoginEmailInvalid => 'Email inválido';
+
+  @override
+  String get coachHubLoginPasswordLabel => 'Contraseña';
+
+  @override
+  String get coachHubLoginPasswordRequired => 'Ingresá tu contraseña';
+
+  @override
+  String get coachHubLoginSubmit => 'INGRESAR';
+
+  @override
+  String get coachHubLoginFooter =>
+      '¿No tenés cuenta? Creala desde la app móvil TREINO.';
+
+  @override
+  String get coachHubLoginGenericError =>
+      'No pudimos ingresar. Probá de nuevo.';
+
+  @override
+  String get coachHubActionCancel => 'Cancelar';
+
+  @override
+  String get coachHubActionConfirm => 'Confirmar';
+
+  @override
+  String get coachHubActionPause => 'Pausar';
+
+  @override
+  String get coachHubActionResume => 'Reanudar';
+
+  @override
+  String get coachHubActionTerminate => 'Terminar';
+
+  @override
+  String get coachHubActionTerminateLink => 'Terminar vínculo';
+
+  @override
+  String get coachHubActionAccept => 'Aceptar';
+
+  @override
+  String get coachHubActionReject => 'Rechazar';
+
+  @override
+  String get coachHubDashboardImportPlanCta => 'IMPORTAR PLAN DESDE EXCEL';
+
+  @override
+  String get coachHubDashboardFilterActivos => 'ACTIVOS';
+
+  @override
+  String get coachHubDashboardFilterPausados => 'PAUSADOS';
+
+  @override
+  String get coachHubDashboardFilterHistorial => 'HISTORIAL';
+
+  @override
+  String get coachHubDashboardActiveHeader => 'TUS ALUMNOS';
+
+  @override
+  String get coachHubDashboardPausedHeader => 'EN PAUSA';
+
+  @override
+  String get coachHubDashboardHistoryHeader => 'VÍNCULOS PASADOS';
+
+  @override
+  String get coachHubDashboardEmptyActive => 'Sin alumnos activos por ahora.';
+
+  @override
+  String get coachHubDashboardEmptyPaused => 'No hay alumnos pausados.';
+
+  @override
+  String get coachHubDashboardEmptyHistory =>
+      'Sin vínculos terminados todavía.';
+
+  @override
+  String coachHubDashboardPendingHeader(int count) {
+    return 'SOLICITUDES PENDIENTES · $count';
+  }
+
+  @override
+  String get coachHubDashboardPendingContext => 'Quiere vincularse con vos';
+
+  @override
+  String coachHubDashboardLinkedSince(String date) {
+    return 'Vinculado desde $date';
+  }
+
+  @override
+  String coachHubDashboardPausedOn(String date) {
+    return 'Pausado el $date';
+  }
+
+  @override
+  String get coachHubDashboardPausedFallback => 'Pausado';
+
+  @override
+  String get coachHubDashboardPauseLinkTitle => 'Pausar vínculo';
+
+  @override
+  String get coachHubDashboardPauseLinkBody =>
+      'El alumno verá el plan pero no podrá registrar sesiones nuevas hasta que reanudes el vínculo.';
+
+  @override
+  String get coachHubDashboardTerminateLinkTitle => 'Terminar vínculo';
+
+  @override
+  String get coachHubDashboardTerminateLinkBody =>
+      'Esta acción no se puede deshacer. El historial se conserva.';
+
+  @override
+  String get coachHubDashboardResumeLinkTitle => 'Reanudar vínculo';
+
+  @override
+  String coachHubDashboardResumeLinkBody(String name) {
+    return '¿Reanudar el vínculo con $name?';
+  }
+
+  @override
+  String get coachHubDashboardResumeLinkBodyFallback => '¿Reanudar el vínculo?';
+
+  @override
+  String get coachHubDashboardPauseLinkError => 'No pudimos pausar el vínculo.';
+
+  @override
+  String get coachHubDashboardTerminateLinkError =>
+      'No pudimos terminar el vínculo.';
+
+  @override
+  String get coachHubDashboardResumeLinkError =>
+      'No pudimos reanudar el vínculo.';
+
+  @override
+  String get coachHubDashboardAcceptSuccess => 'Vínculo aceptado.';
+
+  @override
+  String get coachHubDashboardAcceptError => 'No pudimos aceptar el vínculo.';
+
+  @override
+  String get coachHubDashboardRejectSuccess => 'Solicitud rechazada.';
+
+  @override
+  String get coachHubDashboardRejectError =>
+      'No pudimos rechazar la solicitud.';
+
+  @override
+  String get coachHubDashboardTerminationReasonDeclined =>
+      'Rechazado por el PF';
+
+  @override
+  String get coachHubDashboardTerminationReasonByAthlete =>
+      'Cancelado por el atleta';
+
+  @override
+  String get coachHubDashboardTerminationReasonByTrainer =>
+      'Terminado por el PF';
+
+  @override
+  String get coachHubDashboardTerminationReasonFallback => 'Vínculo terminado';
+
+  @override
+  String get coachHubAlumnosTitle => 'ALUMNOS';
+
+  @override
+  String coachHubAlumnosSummary(int total, int active) {
+    return '$total en total · $active activos';
+  }
+
+  @override
+  String get coachHubAlumnosSearchHint => 'Buscar por nombre…';
+
+  @override
+  String get coachHubAlumnosFilterAll => 'Todos';
+
+  @override
+  String get coachHubAlumnosFilterActivos => 'Activos';
+
+  @override
+  String get coachHubAlumnosFilterConDeuda => 'Con deuda';
+
+  @override
+  String get coachHubAlumnosFilterPausados => 'Pausados';
+
+  @override
+  String get coachHubAlumnosFilterInactivos => 'Inactivos';
+
+  @override
+  String get coachHubAlumnosEmpty => 'Todavía no tenés alumnos vinculados.';
+
+  @override
+  String get coachHubAlumnosEmptyFiltered =>
+      'Ningún alumno coincide con el filtro.';
+
+  @override
+  String get coachHubAlumnosLoadError => 'No se pudieron cargar los alumnos.';
+
+  @override
+  String get coachHubAlumnosProfilesLoadError =>
+      'No se pudieron cargar los perfiles.';
+
+  @override
+  String get coachHubAlumnosColumnStudent => 'ALUMNO';
+
+  @override
+  String get coachHubAlumnosColumnStatus => 'ESTADO';
+
+  @override
+  String get coachHubAlumnosColumnLastWorkout => 'ÚLTIMO ENTRENO';
+
+  @override
+  String get coachHubAlumnosColumnActions => 'ACCIONES';
+
+  @override
+  String get coachHubAlumnosNameFallback => 'Atleta';
+
+  @override
+  String get coachHubAlumnosLastWorkoutToday => 'Hoy';
+
+  @override
+  String get coachHubAlumnosStatusActive => 'Activo';
+
+  @override
+  String get coachHubAlumnosStatusDebt => 'Con deuda';
+
+  @override
+  String get coachHubAlumnosStatusPaused => 'Pausado';
+
+  @override
+  String get coachHubAlumnosStatusInactive => 'Inactivo';
 
   @override
   String get feedLoadError => 'No pudimos cargar tu feed. Probá de nuevo.';

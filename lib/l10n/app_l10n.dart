@@ -3092,6 +3092,438 @@ abstract class AppL10n {
   /// **'No pudimos cerrar sesión. Probá de nuevo.'**
   String get coachHubSignOutError;
 
+  /// Coach Hub web login screen — subtitle guiding the trainer to reuse their mobile account.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ingresá con la cuenta que ya usás en la app móvil.'**
+  String get coachHubLoginPrompt;
+
+  /// Coach Hub web login screen — email TextFormField label.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Email'**
+  String get coachHubLoginEmailLabel;
+
+  /// Coach Hub web login screen — validation message when the email field is empty.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ingresá tu email'**
+  String get coachHubLoginEmailRequired;
+
+  /// Coach Hub web login screen — validation message when the email is malformed (no @).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Email inválido'**
+  String get coachHubLoginEmailInvalid;
+
+  /// Coach Hub web login screen — password TextFormField label.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Contraseña'**
+  String get coachHubLoginPasswordLabel;
+
+  /// Coach Hub web login screen — validation message when the password field is empty.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ingresá tu contraseña'**
+  String get coachHubLoginPasswordRequired;
+
+  /// Coach Hub web login screen — primary submit button label.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'INGRESAR'**
+  String get coachHubLoginSubmit;
+
+  /// Coach Hub web login screen — footer nudging the user back to the mobile app for signup.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿No tenés cuenta? Creala desde la app móvil TREINO.'**
+  String get coachHubLoginFooter;
+
+  /// Coach Hub web login screen — fallback error when the auth failure is not a typed AuthFailure with userMessage.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos ingresar. Probá de nuevo.'**
+  String get coachHubLoginGenericError;
+
+  /// Coach Hub web — generic Cancel button used across dialogs (pause/terminate/resume link, etc.).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cancelar'**
+  String get coachHubActionCancel;
+
+  /// Coach Hub web — generic Confirm button used across dialogs (pause/terminate/resume link, etc.).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Confirmar'**
+  String get coachHubActionConfirm;
+
+  /// Coach Hub web — Pause action button/tooltip for trainer↔athlete links.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Pausar'**
+  String get coachHubActionPause;
+
+  /// Coach Hub web — Resume action button/tooltip for paused links.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Reanudar'**
+  String get coachHubActionResume;
+
+  /// Coach Hub web — Terminate action button/tooltip (short form used in row IconAction).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Terminar'**
+  String get coachHubActionTerminate;
+
+  /// Coach Hub web — full-form Terminate label used in dialog CTAs and menu items.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Terminar vínculo'**
+  String get coachHubActionTerminateLink;
+
+  /// Coach Hub web — Accept action on incoming trainer↔athlete link requests.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Aceptar'**
+  String get coachHubActionAccept;
+
+  /// Coach Hub web — Reject action on incoming trainer↔athlete link requests.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Rechazar'**
+  String get coachHubActionReject;
+
+  /// Coach Hub web dashboard — primary CTA to jump into the Excel plan importer.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'IMPORTAR PLAN DESDE EXCEL'**
+  String get coachHubDashboardImportPlanCta;
+
+  /// Coach Hub web dashboard — filter chip for currently active links.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ACTIVOS'**
+  String get coachHubDashboardFilterActivos;
+
+  /// Coach Hub web dashboard — filter chip for paused links.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'PAUSADOS'**
+  String get coachHubDashboardFilterPausados;
+
+  /// Coach Hub web dashboard — filter chip for terminated links history.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'HISTORIAL'**
+  String get coachHubDashboardFilterHistorial;
+
+  /// Coach Hub web dashboard — section header above the active students list.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'TUS ALUMNOS'**
+  String get coachHubDashboardActiveHeader;
+
+  /// Coach Hub web dashboard — section header above the paused students list.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'EN PAUSA'**
+  String get coachHubDashboardPausedHeader;
+
+  /// Coach Hub web dashboard — section header above the terminated history list.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'VÍNCULOS PASADOS'**
+  String get coachHubDashboardHistoryHeader;
+
+  /// Coach Hub web dashboard — empty state when the trainer has zero active links.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Sin alumnos activos por ahora.'**
+  String get coachHubDashboardEmptyActive;
+
+  /// Coach Hub web dashboard — empty state when the trainer has zero paused links.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No hay alumnos pausados.'**
+  String get coachHubDashboardEmptyPaused;
+
+  /// Coach Hub web dashboard — empty state when the trainer has zero terminated links.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Sin vínculos terminados todavía.'**
+  String get coachHubDashboardEmptyHistory;
+
+  /// Coach Hub web dashboard — pending requests section header with a count of requests.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'SOLICITUDES PENDIENTES · {count}'**
+  String coachHubDashboardPendingHeader(int count);
+
+  /// Coach Hub web dashboard — subtitle text under each pending request tile explaining the intent.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Quiere vincularse con vos'**
+  String get coachHubDashboardPendingContext;
+
+  /// Coach Hub web dashboard — subtitle on active/history tiles with the acceptance date.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Vinculado desde {date}'**
+  String coachHubDashboardLinkedSince(String date);
+
+  /// Coach Hub web dashboard — subtitle on paused tiles with the pause date.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Pausado el {date}'**
+  String coachHubDashboardPausedOn(String date);
+
+  /// Coach Hub web dashboard — subtitle fallback when the paused link has no pausedAt timestamp.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Pausado'**
+  String get coachHubDashboardPausedFallback;
+
+  /// Coach Hub web dashboard — confirmation dialog title before pausing a link.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Pausar vínculo'**
+  String get coachHubDashboardPauseLinkTitle;
+
+  /// Coach Hub web dashboard — confirmation dialog body for pausing a link. Same copy is used from the alumnos section.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'El alumno verá el plan pero no podrá registrar sesiones nuevas hasta que reanudes el vínculo.'**
+  String get coachHubDashboardPauseLinkBody;
+
+  /// Coach Hub web dashboard — confirmation dialog title before terminating a link.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Terminar vínculo'**
+  String get coachHubDashboardTerminateLinkTitle;
+
+  /// Coach Hub web dashboard — confirmation dialog body for terminating a link. Same copy is used from the alumnos section.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Esta acción no se puede deshacer. El historial se conserva.'**
+  String get coachHubDashboardTerminateLinkBody;
+
+  /// Coach Hub web dashboard — confirmation dialog title before resuming a paused link.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Reanudar vínculo'**
+  String get coachHubDashboardResumeLinkTitle;
+
+  /// Coach Hub web dashboard — confirmation body for resuming a paused link with the athlete name.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Reanudar el vínculo con {name}?'**
+  String coachHubDashboardResumeLinkBody(String name);
+
+  /// Coach Hub web dashboard — fallback body when we cannot resolve the athlete's display name for the resume confirmation.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Reanudar el vínculo?'**
+  String get coachHubDashboardResumeLinkBodyFallback;
+
+  /// Coach Hub web dashboard — snackbar when pause() fails.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos pausar el vínculo.'**
+  String get coachHubDashboardPauseLinkError;
+
+  /// Coach Hub web dashboard — snackbar when terminate() fails.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos terminar el vínculo.'**
+  String get coachHubDashboardTerminateLinkError;
+
+  /// Coach Hub web dashboard — snackbar when resume() fails.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos reanudar el vínculo.'**
+  String get coachHubDashboardResumeLinkError;
+
+  /// Coach Hub web dashboard — snackbar after accepting a pending link request.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Vínculo aceptado.'**
+  String get coachHubDashboardAcceptSuccess;
+
+  /// Coach Hub web dashboard — snackbar when accept() fails.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos aceptar el vínculo.'**
+  String get coachHubDashboardAcceptError;
+
+  /// Coach Hub web dashboard — snackbar after rejecting a pending link request.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Solicitud rechazada.'**
+  String get coachHubDashboardRejectSuccess;
+
+  /// Coach Hub web dashboard — snackbar when reject() fails.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos rechazar la solicitud.'**
+  String get coachHubDashboardRejectError;
+
+  /// Coach Hub web dashboard — history tile subtitle when a link was declined by the trainer at request time.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Rechazado por el PF'**
+  String get coachHubDashboardTerminationReasonDeclined;
+
+  /// Coach Hub web dashboard — history tile subtitle when the athlete ended the link.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cancelado por el atleta'**
+  String get coachHubDashboardTerminationReasonByAthlete;
+
+  /// Coach Hub web dashboard — history tile subtitle when the trainer ended the link.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Terminado por el PF'**
+  String get coachHubDashboardTerminationReasonByTrainer;
+
+  /// Coach Hub web dashboard — history tile subtitle fallback for unknown termination reasons.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Vínculo terminado'**
+  String get coachHubDashboardTerminationReasonFallback;
+
+  /// Coach Hub web alumnos section — page title in the app bar.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ALUMNOS'**
+  String get coachHubAlumnosTitle;
+
+  /// Coach Hub web alumnos section — summary line above the roster with total count and active count.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{total} en total · {active} activos'**
+  String coachHubAlumnosSummary(int total, int active);
+
+  /// Coach Hub web alumnos section — search field hint text.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Buscar por nombre…'**
+  String get coachHubAlumnosSearchHint;
+
+  /// Coach Hub web alumnos section — 'All' filter chip label.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Todos'**
+  String get coachHubAlumnosFilterAll;
+
+  /// Coach Hub web alumnos section — 'Active' filter chip label. Lowercase spelling to match filter chip vs the dashboard's uppercase filter.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Activos'**
+  String get coachHubAlumnosFilterActivos;
+
+  /// Coach Hub web alumnos section — filter chip for athletes with outstanding payments.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Con deuda'**
+  String get coachHubAlumnosFilterConDeuda;
+
+  /// Coach Hub web alumnos section — filter chip for paused athletes.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Pausados'**
+  String get coachHubAlumnosFilterPausados;
+
+  /// Coach Hub web alumnos section — filter chip for inactive athletes.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Inactivos'**
+  String get coachHubAlumnosFilterInactivos;
+
+  /// Coach Hub web alumnos section — empty state when the trainer has no roster at all.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Todavía no tenés alumnos vinculados.'**
+  String get coachHubAlumnosEmpty;
+
+  /// Coach Hub web alumnos section — empty state when the roster is non-empty but the current filter/search returns zero.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ningún alumno coincide con el filtro.'**
+  String get coachHubAlumnosEmptyFiltered;
+
+  /// Coach Hub web alumnos section — error state when the roster stream fails.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No se pudieron cargar los alumnos.'**
+  String get coachHubAlumnosLoadError;
+
+  /// Coach Hub web alumnos section — error state when the enrichment profiles query fails.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No se pudieron cargar los perfiles.'**
+  String get coachHubAlumnosProfilesLoadError;
+
+  /// Coach Hub web alumnos section — roster table column header for student name/avatar.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ALUMNO'**
+  String get coachHubAlumnosColumnStudent;
+
+  /// Coach Hub web alumnos section — roster table column header for status badge.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ESTADO'**
+  String get coachHubAlumnosColumnStatus;
+
+  /// Coach Hub web alumnos section — roster table column header for last workout date.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ÚLTIMO ENTRENO'**
+  String get coachHubAlumnosColumnLastWorkout;
+
+  /// Coach Hub web alumnos section — roster table column header for row actions (pause/resume/terminate).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ACCIONES'**
+  String get coachHubAlumnosColumnActions;
+
+  /// Coach Hub web alumnos section — display name fallback when the profile has no displayName.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Atleta'**
+  String get coachHubAlumnosNameFallback;
+
+  /// Coach Hub web alumnos section — cell text when the last workout was today.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Hoy'**
+  String get coachHubAlumnosLastWorkoutToday;
+
+  /// Coach Hub web alumnos section — status badge for active athletes.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Activo'**
+  String get coachHubAlumnosStatusActive;
+
+  /// Coach Hub web alumnos section — status badge for athletes with outstanding payments.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Con deuda'**
+  String get coachHubAlumnosStatusDebt;
+
+  /// Coach Hub web alumnos section — status badge for paused athletes.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Pausado'**
+  String get coachHubAlumnosStatusPaused;
+
+  /// Coach Hub web alumnos section — status badge for inactive athletes.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Inactivo'**
+  String get coachHubAlumnosStatusInactive;
+
   /// Feed error branch text, replacing the hardcoded literal repeated 3x in feed_screen.dart (finding 9). Pair with coachRetryLabel for the retry CTA.
   ///
   /// In es_AR, this message translates to:

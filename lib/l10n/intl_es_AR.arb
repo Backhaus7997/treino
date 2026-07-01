@@ -923,6 +923,328 @@
   "@coachHubSignOutError": {
     "description": "Inline error on the coach-hub not-allowed screen when signOut() fails (finding 8)."
   },
+  "coachHubLoginPrompt": "Ingresá con la cuenta que ya usás en la app móvil.",
+  "@coachHubLoginPrompt": {
+    "description": "Coach Hub web login screen — subtitle guiding the trainer to reuse their mobile account."
+  },
+  "coachHubLoginEmailLabel": "Email",
+  "@coachHubLoginEmailLabel": {
+    "description": "Coach Hub web login screen — email TextFormField label."
+  },
+  "coachHubLoginEmailRequired": "Ingresá tu email",
+  "@coachHubLoginEmailRequired": {
+    "description": "Coach Hub web login screen — validation message when the email field is empty."
+  },
+  "coachHubLoginEmailInvalid": "Email inválido",
+  "@coachHubLoginEmailInvalid": {
+    "description": "Coach Hub web login screen — validation message when the email is malformed (no @)."
+  },
+  "coachHubLoginPasswordLabel": "Contraseña",
+  "@coachHubLoginPasswordLabel": {
+    "description": "Coach Hub web login screen — password TextFormField label."
+  },
+  "coachHubLoginPasswordRequired": "Ingresá tu contraseña",
+  "@coachHubLoginPasswordRequired": {
+    "description": "Coach Hub web login screen — validation message when the password field is empty."
+  },
+  "coachHubLoginSubmit": "INGRESAR",
+  "@coachHubLoginSubmit": {
+    "description": "Coach Hub web login screen — primary submit button label."
+  },
+  "coachHubLoginFooter": "¿No tenés cuenta? Creala desde la app móvil TREINO.",
+  "@coachHubLoginFooter": {
+    "description": "Coach Hub web login screen — footer nudging the user back to the mobile app for signup."
+  },
+  "coachHubLoginGenericError": "No pudimos ingresar. Probá de nuevo.",
+  "@coachHubLoginGenericError": {
+    "description": "Coach Hub web login screen — fallback error when the auth failure is not a typed AuthFailure with userMessage."
+  },
+  "coachHubActionCancel": "Cancelar",
+  "@coachHubActionCancel": {
+    "description": "Coach Hub web — generic Cancel button used across dialogs (pause/terminate/resume link, etc.)."
+  },
+  "coachHubActionConfirm": "Confirmar",
+  "@coachHubActionConfirm": {
+    "description": "Coach Hub web — generic Confirm button used across dialogs (pause/terminate/resume link, etc.)."
+  },
+  "coachHubActionPause": "Pausar",
+  "@coachHubActionPause": {
+    "description": "Coach Hub web — Pause action button/tooltip for trainer↔athlete links."
+  },
+  "coachHubActionResume": "Reanudar",
+  "@coachHubActionResume": {
+    "description": "Coach Hub web — Resume action button/tooltip for paused links."
+  },
+  "coachHubActionTerminate": "Terminar",
+  "@coachHubActionTerminate": {
+    "description": "Coach Hub web — Terminate action button/tooltip (short form used in row IconAction)."
+  },
+  "coachHubActionTerminateLink": "Terminar vínculo",
+  "@coachHubActionTerminateLink": {
+    "description": "Coach Hub web — full-form Terminate label used in dialog CTAs and menu items."
+  },
+  "coachHubActionAccept": "Aceptar",
+  "@coachHubActionAccept": {
+    "description": "Coach Hub web — Accept action on incoming trainer↔athlete link requests."
+  },
+  "coachHubActionReject": "Rechazar",
+  "@coachHubActionReject": {
+    "description": "Coach Hub web — Reject action on incoming trainer↔athlete link requests."
+  },
+  "coachHubDashboardImportPlanCta": "IMPORTAR PLAN DESDE EXCEL",
+  "@coachHubDashboardImportPlanCta": {
+    "description": "Coach Hub web dashboard — primary CTA to jump into the Excel plan importer."
+  },
+  "coachHubDashboardFilterActivos": "ACTIVOS",
+  "@coachHubDashboardFilterActivos": {
+    "description": "Coach Hub web dashboard — filter chip for currently active links."
+  },
+  "coachHubDashboardFilterPausados": "PAUSADOS",
+  "@coachHubDashboardFilterPausados": {
+    "description": "Coach Hub web dashboard — filter chip for paused links."
+  },
+  "coachHubDashboardFilterHistorial": "HISTORIAL",
+  "@coachHubDashboardFilterHistorial": {
+    "description": "Coach Hub web dashboard — filter chip for terminated links history."
+  },
+  "coachHubDashboardActiveHeader": "TUS ALUMNOS",
+  "@coachHubDashboardActiveHeader": {
+    "description": "Coach Hub web dashboard — section header above the active students list."
+  },
+  "coachHubDashboardPausedHeader": "EN PAUSA",
+  "@coachHubDashboardPausedHeader": {
+    "description": "Coach Hub web dashboard — section header above the paused students list."
+  },
+  "coachHubDashboardHistoryHeader": "VÍNCULOS PASADOS",
+  "@coachHubDashboardHistoryHeader": {
+    "description": "Coach Hub web dashboard — section header above the terminated history list."
+  },
+  "coachHubDashboardEmptyActive": "Sin alumnos activos por ahora.",
+  "@coachHubDashboardEmptyActive": {
+    "description": "Coach Hub web dashboard — empty state when the trainer has zero active links."
+  },
+  "coachHubDashboardEmptyPaused": "No hay alumnos pausados.",
+  "@coachHubDashboardEmptyPaused": {
+    "description": "Coach Hub web dashboard — empty state when the trainer has zero paused links."
+  },
+  "coachHubDashboardEmptyHistory": "Sin vínculos terminados todavía.",
+  "@coachHubDashboardEmptyHistory": {
+    "description": "Coach Hub web dashboard — empty state when the trainer has zero terminated links."
+  },
+  "coachHubDashboardPendingHeader": "SOLICITUDES PENDIENTES · {count}",
+  "@coachHubDashboardPendingHeader": {
+    "description": "Coach Hub web dashboard — pending requests section header with a count of requests.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "3"
+      }
+    }
+  },
+  "coachHubDashboardPendingContext": "Quiere vincularse con vos",
+  "@coachHubDashboardPendingContext": {
+    "description": "Coach Hub web dashboard — subtitle text under each pending request tile explaining the intent."
+  },
+  "coachHubDashboardLinkedSince": "Vinculado desde {date}",
+  "@coachHubDashboardLinkedSince": {
+    "description": "Coach Hub web dashboard — subtitle on active/history tiles with the acceptance date.",
+    "placeholders": {
+      "date": {
+        "type": "String",
+        "example": "12 mar 2026"
+      }
+    }
+  },
+  "coachHubDashboardPausedOn": "Pausado el {date}",
+  "@coachHubDashboardPausedOn": {
+    "description": "Coach Hub web dashboard — subtitle on paused tiles with the pause date.",
+    "placeholders": {
+      "date": {
+        "type": "String",
+        "example": "12 mar 2026"
+      }
+    }
+  },
+  "coachHubDashboardPausedFallback": "Pausado",
+  "@coachHubDashboardPausedFallback": {
+    "description": "Coach Hub web dashboard — subtitle fallback when the paused link has no pausedAt timestamp."
+  },
+  "coachHubDashboardPauseLinkTitle": "Pausar vínculo",
+  "@coachHubDashboardPauseLinkTitle": {
+    "description": "Coach Hub web dashboard — confirmation dialog title before pausing a link."
+  },
+  "coachHubDashboardPauseLinkBody": "El alumno verá el plan pero no podrá registrar sesiones nuevas hasta que reanudes el vínculo.",
+  "@coachHubDashboardPauseLinkBody": {
+    "description": "Coach Hub web dashboard — confirmation dialog body for pausing a link. Same copy is used from the alumnos section."
+  },
+  "coachHubDashboardTerminateLinkTitle": "Terminar vínculo",
+  "@coachHubDashboardTerminateLinkTitle": {
+    "description": "Coach Hub web dashboard — confirmation dialog title before terminating a link."
+  },
+  "coachHubDashboardTerminateLinkBody": "Esta acción no se puede deshacer. El historial se conserva.",
+  "@coachHubDashboardTerminateLinkBody": {
+    "description": "Coach Hub web dashboard — confirmation dialog body for terminating a link. Same copy is used from the alumnos section."
+  },
+  "coachHubDashboardResumeLinkTitle": "Reanudar vínculo",
+  "@coachHubDashboardResumeLinkTitle": {
+    "description": "Coach Hub web dashboard — confirmation dialog title before resuming a paused link."
+  },
+  "coachHubDashboardResumeLinkBody": "¿Reanudar el vínculo con {name}?",
+  "@coachHubDashboardResumeLinkBody": {
+    "description": "Coach Hub web dashboard — confirmation body for resuming a paused link with the athlete name.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "María"
+      }
+    }
+  },
+  "coachHubDashboardResumeLinkBodyFallback": "¿Reanudar el vínculo?",
+  "@coachHubDashboardResumeLinkBodyFallback": {
+    "description": "Coach Hub web dashboard — fallback body when we cannot resolve the athlete's display name for the resume confirmation."
+  },
+  "coachHubDashboardPauseLinkError": "No pudimos pausar el vínculo.",
+  "@coachHubDashboardPauseLinkError": {
+    "description": "Coach Hub web dashboard — snackbar when pause() fails."
+  },
+  "coachHubDashboardTerminateLinkError": "No pudimos terminar el vínculo.",
+  "@coachHubDashboardTerminateLinkError": {
+    "description": "Coach Hub web dashboard — snackbar when terminate() fails."
+  },
+  "coachHubDashboardResumeLinkError": "No pudimos reanudar el vínculo.",
+  "@coachHubDashboardResumeLinkError": {
+    "description": "Coach Hub web dashboard — snackbar when resume() fails."
+  },
+  "coachHubDashboardAcceptSuccess": "Vínculo aceptado.",
+  "@coachHubDashboardAcceptSuccess": {
+    "description": "Coach Hub web dashboard — snackbar after accepting a pending link request."
+  },
+  "coachHubDashboardAcceptError": "No pudimos aceptar el vínculo.",
+  "@coachHubDashboardAcceptError": {
+    "description": "Coach Hub web dashboard — snackbar when accept() fails."
+  },
+  "coachHubDashboardRejectSuccess": "Solicitud rechazada.",
+  "@coachHubDashboardRejectSuccess": {
+    "description": "Coach Hub web dashboard — snackbar after rejecting a pending link request."
+  },
+  "coachHubDashboardRejectError": "No pudimos rechazar la solicitud.",
+  "@coachHubDashboardRejectError": {
+    "description": "Coach Hub web dashboard — snackbar when reject() fails."
+  },
+  "coachHubDashboardTerminationReasonDeclined": "Rechazado por el PF",
+  "@coachHubDashboardTerminationReasonDeclined": {
+    "description": "Coach Hub web dashboard — history tile subtitle when a link was declined by the trainer at request time."
+  },
+  "coachHubDashboardTerminationReasonByAthlete": "Cancelado por el atleta",
+  "@coachHubDashboardTerminationReasonByAthlete": {
+    "description": "Coach Hub web dashboard — history tile subtitle when the athlete ended the link."
+  },
+  "coachHubDashboardTerminationReasonByTrainer": "Terminado por el PF",
+  "@coachHubDashboardTerminationReasonByTrainer": {
+    "description": "Coach Hub web dashboard — history tile subtitle when the trainer ended the link."
+  },
+  "coachHubDashboardTerminationReasonFallback": "Vínculo terminado",
+  "@coachHubDashboardTerminationReasonFallback": {
+    "description": "Coach Hub web dashboard — history tile subtitle fallback for unknown termination reasons."
+  },
+  "coachHubAlumnosTitle": "ALUMNOS",
+  "@coachHubAlumnosTitle": {
+    "description": "Coach Hub web alumnos section — page title in the app bar."
+  },
+  "coachHubAlumnosSummary": "{total} en total · {active} activos",
+  "@coachHubAlumnosSummary": {
+    "description": "Coach Hub web alumnos section — summary line above the roster with total count and active count.",
+    "placeholders": {
+      "total": {
+        "type": "int",
+        "example": "12"
+      },
+      "active": {
+        "type": "int",
+        "example": "8"
+      }
+    }
+  },
+  "coachHubAlumnosSearchHint": "Buscar por nombre…",
+  "@coachHubAlumnosSearchHint": {
+    "description": "Coach Hub web alumnos section — search field hint text."
+  },
+  "coachHubAlumnosFilterAll": "Todos",
+  "@coachHubAlumnosFilterAll": {
+    "description": "Coach Hub web alumnos section — 'All' filter chip label."
+  },
+  "coachHubAlumnosFilterActivos": "Activos",
+  "@coachHubAlumnosFilterActivos": {
+    "description": "Coach Hub web alumnos section — 'Active' filter chip label. Lowercase spelling to match filter chip vs the dashboard's uppercase filter."
+  },
+  "coachHubAlumnosFilterConDeuda": "Con deuda",
+  "@coachHubAlumnosFilterConDeuda": {
+    "description": "Coach Hub web alumnos section — filter chip for athletes with outstanding payments."
+  },
+  "coachHubAlumnosFilterPausados": "Pausados",
+  "@coachHubAlumnosFilterPausados": {
+    "description": "Coach Hub web alumnos section — filter chip for paused athletes."
+  },
+  "coachHubAlumnosFilterInactivos": "Inactivos",
+  "@coachHubAlumnosFilterInactivos": {
+    "description": "Coach Hub web alumnos section — filter chip for inactive athletes."
+  },
+  "coachHubAlumnosEmpty": "Todavía no tenés alumnos vinculados.",
+  "@coachHubAlumnosEmpty": {
+    "description": "Coach Hub web alumnos section — empty state when the trainer has no roster at all."
+  },
+  "coachHubAlumnosEmptyFiltered": "Ningún alumno coincide con el filtro.",
+  "@coachHubAlumnosEmptyFiltered": {
+    "description": "Coach Hub web alumnos section — empty state when the roster is non-empty but the current filter/search returns zero."
+  },
+  "coachHubAlumnosLoadError": "No se pudieron cargar los alumnos.",
+  "@coachHubAlumnosLoadError": {
+    "description": "Coach Hub web alumnos section — error state when the roster stream fails."
+  },
+  "coachHubAlumnosProfilesLoadError": "No se pudieron cargar los perfiles.",
+  "@coachHubAlumnosProfilesLoadError": {
+    "description": "Coach Hub web alumnos section — error state when the enrichment profiles query fails."
+  },
+  "coachHubAlumnosColumnStudent": "ALUMNO",
+  "@coachHubAlumnosColumnStudent": {
+    "description": "Coach Hub web alumnos section — roster table column header for student name/avatar."
+  },
+  "coachHubAlumnosColumnStatus": "ESTADO",
+  "@coachHubAlumnosColumnStatus": {
+    "description": "Coach Hub web alumnos section — roster table column header for status badge."
+  },
+  "coachHubAlumnosColumnLastWorkout": "ÚLTIMO ENTRENO",
+  "@coachHubAlumnosColumnLastWorkout": {
+    "description": "Coach Hub web alumnos section — roster table column header for last workout date."
+  },
+  "coachHubAlumnosColumnActions": "ACCIONES",
+  "@coachHubAlumnosColumnActions": {
+    "description": "Coach Hub web alumnos section — roster table column header for row actions (pause/resume/terminate)."
+  },
+  "coachHubAlumnosNameFallback": "Atleta",
+  "@coachHubAlumnosNameFallback": {
+    "description": "Coach Hub web alumnos section — display name fallback when the profile has no displayName."
+  },
+  "coachHubAlumnosLastWorkoutToday": "Hoy",
+  "@coachHubAlumnosLastWorkoutToday": {
+    "description": "Coach Hub web alumnos section — cell text when the last workout was today."
+  },
+  "coachHubAlumnosStatusActive": "Activo",
+  "@coachHubAlumnosStatusActive": {
+    "description": "Coach Hub web alumnos section — status badge for active athletes."
+  },
+  "coachHubAlumnosStatusDebt": "Con deuda",
+  "@coachHubAlumnosStatusDebt": {
+    "description": "Coach Hub web alumnos section — status badge for athletes with outstanding payments."
+  },
+  "coachHubAlumnosStatusPaused": "Pausado",
+  "@coachHubAlumnosStatusPaused": {
+    "description": "Coach Hub web alumnos section — status badge for paused athletes."
+  },
+  "coachHubAlumnosStatusInactive": "Inactivo",
+  "@coachHubAlumnosStatusInactive": {
+    "description": "Coach Hub web alumnos section — status badge for inactive athletes."
+  },
   "feedLoadError": "No pudimos cargar tu feed. Probá de nuevo.",
   "@feedLoadError": {
     "description": "Feed error branch text, replacing the hardcoded literal repeated 3x in feed_screen.dart (finding 9). Pair with coachRetryLabel for the retry CTA."
