@@ -115,15 +115,15 @@ Each row with `status == pending` MUST show a `"Marcar pagado"` action button. T
 
 ---
 
-### REQ-PAGW-ACTION-002 — "Recordar" opens WhatsApp `wa.me/?text=` with templated message
+### REQ-PAGW-ACTION-002 — "Recordar" sends a payment reminder via the in-app chat
 
-Each payment row MUST show a `"Recordar"` action button. Tapping it MUST call `url_launcher.launchUrl` with a URL of the form `https://wa.me/?text=<encoded message>`. The message MUST include: the payment `amountArs` (formatted es-AR), the payment `concept`, and the trainer's `paymentAlias` (from `UserProfile`). The trainer selects the recipient manually in WhatsApp. No athlete phone number is included or stored.
+Each payment row MUST show a `"Recordar"` action button. Tapping it MUST open a confirmation dialog pre-filled with an editable reminder message; on confirm it MUST send that message to the athlete through the existing in-app chat (`chatForOtherUidProvider` resolves/creates the trainer↔athlete `Chat`, then `ChatRepository.sendMessage`). The message MUST include: the payment `amountArs` (formatted es-AR), the payment `concept`, and the trainer's `paymentAlias` (from `UserProfile`) when present. The `notifyOnChatMessage` Cloud Function delivers the push to the athlete. No athlete phone number is required or stored. (Supersedes the earlier WhatsApp `wa.me` approach — the in-app chat needs no phone and keeps the trainer inside the app.)
 
 #### Scenarios
 
-- GIVEN a payment (amount: 12000, concept: "Plan semanal") and trainer paymentAlias "alias.trainer" WHEN `"Recordar"` is tapped THEN `launchUrl` is called with a URL starting `https://wa.me/?text=` containing `"$12.000"`, `"Plan semanal"`, and `"alias.trainer"`.
-- GIVEN trainer `paymentAlias` is null WHEN `"Recordar"` is tapped THEN the URL is still valid (omits alias or substitutes empty string); no crash.
-- GIVEN the URL is launched THEN the trainer sees WhatsApp with the pre-filled message and selects the contact themselves.
+- GIVEN a payment (amount: 12000, concept: "Plan semanal") and trainer paymentAlias "alias.trainer" WHEN `"Recordar"` is tapped and confirmed THEN `ChatRepository.sendMessage` is called with the trainer as sender and a message containing `"$12.000"`, `"Plan semanal"`, and `"alias.trainer"`, on the deterministic chat id for the pair.
+- GIVEN trainer `paymentAlias` is null/empty WHEN `"Recordar"` is tapped THEN the message is still valid (omits the transfer clause); no crash.
+- GIVEN the reminder dialog is open WHEN the trainer taps "Cancelar" THEN nothing is sent.
 
 ---
 

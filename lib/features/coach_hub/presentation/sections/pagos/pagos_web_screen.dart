@@ -2,8 +2,8 @@
 // NO los agregues acá (ADR-CHW-005).
 //
 // PR2a — PagosScreen shell: header + KPI row + 4 tabs (Vencidos/Por vencer/
-// Pagados/Todos) con tab bodies mínimos. La tabla rica y las acciones de fila
-// (Marcar pagado / Recordar) llegan en PR2b.
+// Pagados/Todos). Tabla rica con acciones de fila (Marcar pagado / Recordar)
+// implementada en PR2b reemplazando _TabBody con PagosWebTable.
 //
 // Todas las strings están en español hardcodeado + comentario // i18n.
 // NO se usa AppL10n en este archivo (constraint C-6).
@@ -12,9 +12,17 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:treino/app/theme/app_palette.dart';
+import 'package:treino/features/payments/domain/payment.dart';
+import 'package:treino/features/profile/application/user_providers.dart'
+    show userProfileProvider;
+import 'package:treino/features/profile/application/user_public_profile_providers.dart'
+    show userPublicProfilesBatchProvider;
+import 'package:treino/features/profile/domain/user_public_profile.dart';
 
+import 'widgets/marcar_pagado_actions.dart';
 import 'widgets/pagos_buckets_provider.dart';
 import 'widgets/pagos_kpi_row.dart';
+import 'widgets/pagos_web_table.dart';
 import 'widgets/registrar_pago_dialog.dart';
 
 // ── PagosScreen ───────────────────────────────────────────────────────────────
@@ -25,7 +33,8 @@ import 'widgets/registrar_pago_dialog.dart';
 /// SafeArea. El shell [CoachHubScaffold] provee el chrome.
 ///
 /// REQ-PAGW-SHELL-001, REQ-PAGW-SHELL-002, REQ-PAGW-KPI-001,
-/// REQ-PAGW-TAB-001, REQ-PAGW-TAB-002, REQ-PAGW-EMPTY-001.
+/// REQ-PAGW-TAB-001, REQ-PAGW-TAB-002, REQ-PAGW-EMPTY-001,
+/// REQ-PAGW-TABLE-001, REQ-PAGW-ACTION-001, REQ-PAGW-ACTION-002.
 class PagosScreen extends ConsumerStatefulWidget {
   const PagosScreen({super.key});
 
@@ -57,14 +66,21 @@ class _PagosScreenState extends ConsumerState<PagosScreen>
       context: context,
       builder: (_) => const RegistrarPagoDialog(),
     );
-    // Result wiring (actual persistence with athlete picker) lands in PR2b.
-    // The dialog already handles its own cancellation/submission display.
+    // NOTE: RegistrarPagoDialog is a trainer-wide dialog without athlete picker.
+    // The dialog itself handles cancellation/submission. Persistence happens
+    // inside the dialog if an athleteId can be provided.
+    // Full athlete-picker wiring for the trainer-wide context is tracked V2
+    // (requires showing an athlete selection before the dialog).
   }
 
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final bucketsAsync = ref.watch(pagosBucketsProvider);
+
+    // Trainer's paymentAlias for WhatsApp reminder messages.
+    final paymentAlias = ref
+        .watch(userProfileProvider.select((s) => s.valueOrNull?.paymentAlias));
 
     // Counts for tab labels (reactive).
     int vencidosN = 0;
@@ -82,8 +98,17 @@ class _PagosScreenState extends ConsumerState<PagosScreen>
       'Vencidos · $vencidosN', // i18n
       'Por vencer · $porVencerN', // i18n
       'Pagados · $pagadosN', // i18n
-      'Todos · $todosN', // i18n (note: no dot for "Todos" — shown for symmetry)
+      'Todos · $todosN', // i18n
     ];
+
+    // Collect all unique athlete ids across all payments to resolve profiles
+    // in a single batch fetch (no N+1). ADR-PGW design section 3.
+    final allPayments = bucketsAsync.valueOrNull?.todos ?? const [];
+    final athleteIds = allPayments.map((p) => p.athleteId).toSet().toList()
+      ..sort();
+    final batchKey = athleteIds.join(',');
+    final profilesAsync = ref.watch(userPublicProfilesBatchProvider(batchKey));
+    final profiles = profilesAsync.valueOrNull ?? const {};
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -150,56 +175,44 @@ class _PagosScreenState extends ConsumerState<PagosScreen>
             controller: _tabController,
             children: [
               // Vencidos tab
-              bucketsAsync.when(
-                data: (b) => _TabBody(
-                  payments: b.vencidos,
-                  emptyLabel: 'No hay pagos vencidos', // i18n
-                  palette: palette,
-                ),
-                loading: () => const Center(child: CircularProgressIndicator()),
-                error: (e, _) => Center(
-                  child: Text('Error al cargar pagos.', // i18n
-                      style: TextStyle(color: palette.danger)),
-                ),
+              _tabBody(
+                bucketsAsync: bucketsAsync,
+                getPayments: (b) => b.vencidos,
+                emptyLabel: 'No hay pagos vencidos', // i18n
+                palette: palette,
+                profiles: profiles,
+                paymentAlias: paymentAlias,
+                showActions: true,
               ),
               // Por vencer tab
-              bucketsAsync.when(
-                data: (b) => _TabBody(
-                  payments: b.porVencer,
-                  emptyLabel: 'No hay pagos pendientes', // i18n
-                  palette: palette,
-                ),
-                loading: () => const Center(child: CircularProgressIndicator()),
-                error: (e, _) => Center(
-                  child: Text('Error al cargar pagos.', // i18n
-                      style: TextStyle(color: palette.danger)),
-                ),
+              _tabBody(
+                bucketsAsync: bucketsAsync,
+                getPayments: (b) => b.porVencer,
+                emptyLabel: 'No hay pagos pendientes', // i18n
+                palette: palette,
+                profiles: profiles,
+                paymentAlias: paymentAlias,
+                showActions: true,
               ),
               // Pagados tab
-              bucketsAsync.when(
-                data: (b) => _TabBody(
-                  payments: b.pagados,
-                  emptyLabel: 'No hay pagos registrados', // i18n
-                  palette: palette,
-                ),
-                loading: () => const Center(child: CircularProgressIndicator()),
-                error: (e, _) => Center(
-                  child: Text('Error al cargar pagos.', // i18n
-                      style: TextStyle(color: palette.danger)),
-                ),
+              _tabBody(
+                bucketsAsync: bucketsAsync,
+                getPayments: (b) => b.pagados,
+                emptyLabel: 'No hay pagos registrados', // i18n
+                palette: palette,
+                profiles: profiles,
+                paymentAlias: paymentAlias,
+                showActions: false,
               ),
               // Todos tab
-              bucketsAsync.when(
-                data: (b) => _TabBody(
-                  payments: b.todos,
-                  emptyLabel: 'No hay pagos', // i18n
-                  palette: palette,
-                ),
-                loading: () => const Center(child: CircularProgressIndicator()),
-                error: (e, _) => Center(
-                  child: Text('Error al cargar pagos.', // i18n
-                      style: TextStyle(color: palette.danger)),
-                ),
+              _tabBody(
+                bucketsAsync: bucketsAsync,
+                getPayments: (b) => b.todos,
+                emptyLabel: 'No hay pagos', // i18n
+                palette: palette,
+                profiles: profiles,
+                paymentAlias: paymentAlias,
+                showActions: true,
               ),
             ],
           ),
@@ -207,56 +220,35 @@ class _PagosScreenState extends ConsumerState<PagosScreen>
       ],
     );
   }
-}
 
-// ── _TabBody ──────────────────────────────────────────────────────────────────
-
-/// Cuerpo mínimo de cada tab en PR2a: muestra el empty-state o una lista
-/// simple (alumno-id + monto). La tabla rica con acciones llega en PR2b.
-class _TabBody extends StatelessWidget {
-  const _TabBody({
-    required this.payments,
-    required this.emptyLabel,
-    required this.palette,
-  });
-
-  final List<dynamic> payments;
-  final String emptyLabel;
-  final AppPalette palette;
-
-  @override
-  Widget build(BuildContext context) {
-    if (payments.isEmpty) {
-      return Center(
+  /// Construye el body de un tab: loading / error / tabla.
+  Widget _tabBody({
+    required AsyncValue<PagosBuckets> bucketsAsync,
+    required List<Payment> Function(PagosBuckets) getPayments,
+    required String emptyLabel,
+    required AppPalette palette,
+    required Map<String, UserPublicProfile> profiles,
+    required String? paymentAlias,
+    required bool showActions,
+  }) {
+    return bucketsAsync.when(
+      data: (b) => PagosWebTable(
+        payments: getPayments(b),
+        profiles: profiles,
+        emptyLabel: emptyLabel,
+        onMarcarPagado:
+            showActions ? (p) => marcarPagadoDoc(context, ref, p) : null,
+        onRecordar:
+            showActions ? (p) => recordar(context, ref, p, paymentAlias) : null,
+        showActions: showActions,
+      ),
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Center(
         child: Text(
-          emptyLabel,
-          style: TextStyle(color: palette.textMuted, fontSize: 14),
+          'Error al cargar pagos.', // i18n
+          style: TextStyle(color: palette.danger),
         ),
-      );
-    }
-    // Minimal list: replaced by PagosWebTable in PR2b.
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-      itemCount: payments.length,
-      itemBuilder: (_, i) {
-        final p = payments[i] as dynamic;
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: Row(
-            children: [
-              Text(
-                p.athleteId as String,
-                style: TextStyle(color: palette.textPrimary),
-              ),
-              const Spacer(),
-              Text(
-                '\$${p.amountArs}',
-                style: TextStyle(color: palette.textMuted),
-              ),
-            ],
-          ),
-        );
-      },
+      ),
     );
   }
 }
