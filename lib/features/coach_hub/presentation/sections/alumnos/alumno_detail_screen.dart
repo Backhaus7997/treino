@@ -16,7 +16,6 @@ import 'package:treino/features/payments/application/billing_providers.dart';
 import 'package:treino/features/payments/application/pagos_por_cobrar_provider.dart';
 import 'package:treino/features/payments/application/payment_providers.dart';
 import 'package:treino/features/payments/domain/athlete_billing.dart';
-import 'package:treino/features/payments/domain/payment.dart';
 import 'package:treino/features/performance/application/performance_test_providers.dart';
 import 'package:treino/features/performance/presentation/widgets/performance_progress_chart.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
@@ -31,6 +30,10 @@ import 'package:treino/features/workout/domain/set_log.dart';
 import 'package:treino/features/workout/presentation/widgets/exercise_progression_chart.dart';
 import 'package:treino/features/workout/presentation/widgets/session_exercise_block.dart';
 
+import '../pagos/widgets/estado_cuenta_card.dart';
+import '../pagos/widgets/marcar_pagado_actions.dart';
+import '../pagos/widgets/pagos_table.dart';
+import '../pagos/widgets/payment_format.dart';
 import 'alumnos_screen.dart' show AlumnoEstado, AlumnoEstadoX, estadoForLink;
 import 'resumen_metrics.dart';
 
@@ -109,7 +112,7 @@ class AlumnoDetailScreen extends ConsumerWidget {
                   estado: estado,
                   gymName: gymName,
                   billing: billing,
-                  onPago: () => _registrarPago(context, ref, athleteId),
+                  onPago: () => registrarPago(context, ref, athleteId),
                   palette: palette,
                 ),
                 const SizedBox(height: 14),
@@ -268,13 +271,13 @@ class _Header extends StatelessWidget {
                           ),
                         if (desde != null)
                           Text(
-                            'Desde ${_fmtDate(desde)}', // i18n: Fase W2
+                            'Desde ${fmtDate(desde)}', // i18n: Fase W2
                             style: TextStyle(
                                 color: palette.textMuted, fontSize: 13),
                           ),
                         if (b != null && b.cadence != BillingCadence.suelto)
                           Text(
-                            '${_fmtArs(b.amountArs)} · ${_cadenciaLabel(b.cadence)}', // i18n: Fase W2
+                            '${fmtArs(b.amountArs)} · ${_cadenciaLabel(b.cadence)}', // i18n: Fase W2
                             style: TextStyle(
                                 color: palette.textMuted, fontSize: 13),
                           ),
@@ -610,9 +613,6 @@ Widget _muted(AppPalette palette, String text) => Center(
       ),
     );
 
-String _fmtDate(DateTime d) =>
-    '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
-
 /// Entero si es redondo, un decimal si no (61 → "61", 60.5 → "60.5").
 String _trimNum(double v) =>
     v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(1);
@@ -931,59 +931,12 @@ class _AdherenciaHeatmap extends StatelessWidget {
   }
 }
 
-/// Monto en pesos con separador de miles es-AR (28000 → "$28.000").
-String _fmtArs(int amount) {
-  final digits = amount.abs().toString();
-  final buf = StringBuffer();
-  for (var i = 0; i < digits.length; i++) {
-    if (i > 0 && (digits.length - i) % 3 == 0) buf.write('.');
-    buf.write(digits[i]);
-  }
-  return '${amount < 0 ? '-' : ''}\$$buf';
-}
-
 String _cadenciaLabel(BillingCadence c) => switch (c) {
       BillingCadence.mensual => 'Mensual', // i18n: Fase W2
       BillingCadence.semanal => 'Semanal',
       BillingCadence.porSesion => 'Por sesión',
       BillingCadence.suelto => 'Suelto',
     };
-
-const _kMesesLargos = [
-  '',
-  'enero',
-  'febrero',
-  'marzo',
-  'abril',
-  'mayo',
-  'junio',
-  'julio',
-  'agosto',
-  'septiembre',
-  'octubre',
-  'noviembre',
-  'diciembre',
-];
-
-/// "22 mayo" — día + mes en es-AR.
-String fmtDayMonth(DateTime d) => '${d.day} ${_kMesesLargos[d.month]}';
-
-/// Fecha del próximo cobro recurrente según cadencia: 1º del mes que viene
-/// (mensual) o lunes de la semana que viene (semanal). `null` para porSesión y
-/// suelto (event-driven / ad-hoc, sin fecha fija).
-DateTime? nextDueDate(AthleteBilling b, DateTime now) {
-  switch (b.cadence) {
-    case BillingCadence.mensual:
-      return DateTime(now.year, now.month + 1, 1);
-    case BillingCadence.semanal:
-      final today = DateTime(now.year, now.month, now.day);
-      final monday = today.subtract(Duration(days: now.weekday - 1));
-      return monday.add(const Duration(days: 7));
-    case BillingCadence.porSesion:
-    case BillingCadence.suelto:
-      return null;
-  }
-}
 
 /// Tab Pagos (W2 PR5/PR6): estado de cuenta + historial de pagos + acciones.
 ///
@@ -1034,7 +987,7 @@ class _PagosTab extends ConsumerWidget {
                     _sectionLabel(palette, 'ESTADO DE CUENTA'), // i18n: Fase W2
               ),
               TextButton(
-                onPressed: () => _registrarPago(context, ref, athleteId),
+                onPressed: () => registrarPago(context, ref, athleteId),
                 child: Text(
                   '+ Registrar pago', // i18n: Fase W2
                   style: TextStyle(
@@ -1047,10 +1000,10 @@ class _PagosTab extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 10),
-          _EstadoCuentaCard(
+          EstadoCuentaCard(
             palette: palette,
             pending: pending,
-            onMarcarPagado: (c) => _marcarPagado(context, ref, c),
+            onMarcarPagado: (c) => marcarPagado(context, ref, c),
           ),
           const SizedBox(height: 20),
           _sectionLabel(palette, 'HISTORIAL DE PAGOS'), // i18n: Fase W2
@@ -1058,426 +1011,12 @@ class _PagosTab extends ConsumerWidget {
           if (history.isEmpty)
             _muted(palette, 'Sin pagos registrados todavía.') // i18n: Fase W2
           else
-            _PagosTable(payments: history, palette: palette),
+            PagosTable(payments: history, palette: palette),
           const SizedBox(height: 14),
           Text(
             'Próximamente: recordatorios y exportar.', // i18n: Fase W2
             style: TextStyle(color: palette.textMuted, fontSize: 12),
           ),
-        ],
-      ),
-    );
-  }
-}
-
-class _EstadoCuentaCard extends StatefulWidget {
-  const _EstadoCuentaCard({
-    required this.palette,
-    required this.pending,
-    required this.onMarcarPagado,
-  });
-
-  final AppPalette palette;
-  final List<CobroPendiente> pending;
-  final Future<void> Function(CobroPendiente) onMarcarPagado;
-
-  @override
-  State<_EstadoCuentaCard> createState() => _EstadoCuentaCardState();
-}
-
-class _EstadoCuentaCardState extends State<_EstadoCuentaCard> {
-  // Cobros con una escritura en vuelo. Deshabilita "Marcar pagado" mientras el
-  // settle viaja a Firestore (write → snapshot → providers → rebuild oculta la
-  // fila): sin esto, volver a tocar el botón en esa ventana doble-cobra.
-  final _inFlight = <String>{};
-
-  String _key(CobroPendiente c) =>
-      '${c.athleteId}|${c.cadence.name}|${c.concept}|${c.amountArs}';
-
-  Future<void> _tap(CobroPendiente c) async {
-    final k = _key(c);
-    if (_inFlight.contains(k)) return;
-    setState(() => _inFlight.add(k));
-    try {
-      await widget.onMarcarPagado(c);
-    } finally {
-      if (mounted) setState(() => _inFlight.remove(k));
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = widget.palette;
-    final pending = widget.pending;
-    final Widget inner;
-    if (pending.isEmpty) {
-      inner = Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Sin cobros pendientes', // i18n: Fase W2
-              style: TextStyle(color: palette.textMuted, fontSize: 12)),
-          const SizedBox(height: 4),
-          Text('Al día', // i18n: Fase W2
-              style: TextStyle(
-                  color: palette.accent,
-                  fontSize: 24,
-                  fontWeight: FontWeight.w700)),
-        ],
-      );
-    } else {
-      final total = pending.fold<int>(0, (sum, c) => sum + c.amountArs);
-      inner = Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Pendiente de cobro', // i18n: Fase W2
-              style: TextStyle(color: palette.textMuted, fontSize: 12)),
-          const SizedBox(height: 4),
-          Text(_fmtArs(total),
-              style: TextStyle(
-                  color: palette.warning,
-                  fontSize: 24,
-                  fontWeight: FontWeight.w700)),
-          const SizedBox(height: 12),
-          for (final c in pending)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 6),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(c.concept,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                                color: palette.textPrimary, fontSize: 14)),
-                        Text(_fmtArs(c.amountArs),
-                            style: TextStyle(
-                                color: palette.textMuted, fontSize: 12)),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  OutlinedButton(
-                    onPressed:
-                        _inFlight.contains(_key(c)) ? null : () => _tap(c),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: palette.accent,
-                      side: BorderSide(color: palette.border),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 6),
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                    child: const Text('Marcar pagado', // i18n: Fase W2
-                        style: TextStyle(
-                            fontSize: 12, fontWeight: FontWeight.w600)),
-                  ),
-                ],
-              ),
-            ),
-        ],
-      );
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: palette.bgCard,
-        border: Border.all(color: palette.border),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: inner,
-    );
-  }
-}
-
-void _pagoSnack(BuildContext context, String msg) {
-  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
-}
-
-/// Construye un Payment pagado para settlear un cobro recurrente. El [periodKey]
-/// debe matchear el que computa `pagosPorCobrarProvider` (month/ISO-week) para
-/// que el cobro desaparezca tras marcarlo; `null` para porSesión (sin período).
-Payment _paidPaymentFor(
-  String trainerId,
-  CobroPendiente cobro,
-  DateTime now,
-  String? periodKey,
-) =>
-    Payment(
-      id: '',
-      trainerId: trainerId,
-      athleteId: cobro.athleteId,
-      amountArs: cobro.amountArs,
-      concept: cobro.concept,
-      status: PaymentStatus.paid,
-      periodKey: periodKey,
-      createdAt: now,
-      paidAt: now,
-    );
-
-Future<void> _marcarPagado(
-    BuildContext context, WidgetRef ref, CobroPendiente cobro) async {
-  final palette = AppPalette.of(context);
-  final confirmed = await showDialog<bool>(
-    context: context,
-    builder: (ctx) => AlertDialog(
-      backgroundColor: palette.bgCard,
-      title: Text('¿Marcar como cobrado?', // i18n: Fase W2
-          style: TextStyle(
-              color: palette.textPrimary,
-              fontWeight: FontWeight.w700,
-              fontSize: 18)),
-      content: Text('${cobro.concept} — ${_fmtArs(cobro.amountArs)}',
-          style: TextStyle(color: palette.textMuted, fontSize: 14)),
-      actions: [
-        TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text('Cancelar', // i18n: Fase W2
-                style: TextStyle(color: palette.textMuted))),
-        TextButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text('Cobrado', // i18n: Fase W2
-                style: TextStyle(
-                    color: palette.accent, fontWeight: FontWeight.w700))),
-      ],
-    ),
-  );
-  if (confirmed != true || !context.mounted) return;
-
-  final trainerId = ref.read(currentUidProvider);
-  if (trainerId == null) return;
-  final repo = ref.read(paymentRepositoryProvider);
-  final now = DateTime.now().toUtc();
-  try {
-    switch (cobro.cadence) {
-      case BillingCadence.suelto:
-        await repo.markManyPaid(cobro.pendingPaymentIds, now);
-      case BillingCadence.mensual:
-        await repo.add(_paidPaymentFor(trainerId, cobro, now,
-            '${now.year}-${now.month.toString().padLeft(2, '0')}'));
-      case BillingCadence.semanal:
-        await repo
-            .add(_paidPaymentFor(trainerId, cobro, now, isoWeekPeriodKey(now)));
-      case BillingCadence.porSesion:
-        await repo.add(_paidPaymentFor(trainerId, cobro, now, null));
-    }
-    if (context.mounted) {
-      _pagoSnack(context, 'Cobro registrado.'); // i18n: Fase W2
-    }
-  } catch (_) {
-    if (context.mounted) {
-      _pagoSnack(
-          context, 'No pudimos guardar. Intentá de nuevo.'); // i18n: Fase W2
-    }
-  }
-}
-
-Future<void> _registrarPago(
-    BuildContext context, WidgetRef ref, String athleteId) async {
-  final result = await showDialog<({int amount, String concept})>(
-    context: context,
-    builder: (_) => const _RegistrarPagoDialog(),
-  );
-  if (result == null) return;
-
-  final trainerId = ref.read(currentUidProvider);
-  if (trainerId == null) return;
-  final now = DateTime.now().toUtc();
-  try {
-    await ref.read(paymentRepositoryProvider).add(Payment(
-          id: '',
-          trainerId: trainerId,
-          athleteId: athleteId,
-          amountArs: result.amount,
-          concept: result.concept,
-          status: PaymentStatus.paid,
-          createdAt: now,
-          paidAt: now,
-        ));
-    if (context.mounted) {
-      _pagoSnack(context, 'Pago registrado.'); // i18n: Fase W2
-    }
-  } catch (_) {
-    if (context.mounted) {
-      _pagoSnack(
-          context, 'No pudimos guardar. Intentá de nuevo.'); // i18n: Fase W2
-    }
-  }
-}
-
-/// Diálogo de alta de un pago ad-hoc (monto + concepto). Devuelve el record o
-/// `null` si se cancela. Copy hardcodeada (CoachHubApp no tiene l10n delegates).
-class _RegistrarPagoDialog extends StatefulWidget {
-  const _RegistrarPagoDialog();
-
-  @override
-  State<_RegistrarPagoDialog> createState() => _RegistrarPagoDialogState();
-}
-
-class _RegistrarPagoDialogState extends State<_RegistrarPagoDialog> {
-  final _monto = TextEditingController();
-  final _concepto = TextEditingController();
-  String? _error;
-
-  @override
-  void dispose() {
-    _monto.dispose();
-    _concepto.dispose();
-    super.dispose();
-  }
-
-  void _submit() {
-    final amount = int.tryParse(_monto.text.trim());
-    final concept = _concepto.text.trim();
-    if (amount == null || amount <= 0) {
-      setState(() => _error = 'Ingresá un monto válido.'); // i18n: Fase W2
-      return;
-    }
-    if (concept.isEmpty) {
-      setState(() => _error = 'Completá todos los campos.'); // i18n: Fase W2
-      return;
-    }
-    Navigator.of(context).pop((amount: amount, concept: concept));
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-    InputDecoration deco(String label, String hint) => InputDecoration(
-          labelText: label,
-          hintText: hint,
-          labelStyle: TextStyle(color: palette.textMuted),
-          hintStyle: TextStyle(color: palette.textMuted),
-          enabledBorder:
-              OutlineInputBorder(borderSide: BorderSide(color: palette.border)),
-          focusedBorder:
-              OutlineInputBorder(borderSide: BorderSide(color: palette.accent)),
-        );
-    return AlertDialog(
-      backgroundColor: palette.bgCard,
-      title: Text('Registrar pago', // i18n: Fase W2
-          style: TextStyle(
-              color: palette.textPrimary,
-              fontWeight: FontWeight.w700,
-              fontSize: 18)),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          TextField(
-            controller: _monto,
-            keyboardType: TextInputType.number,
-            style: TextStyle(color: palette.textPrimary),
-            decoration: deco('Monto (ARS)', 'Ej: 5000'), // i18n: Fase W2
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _concepto,
-            style: TextStyle(color: palette.textPrimary),
-            decoration: deco('Concepto', 'Ej: Clase suelta'), // i18n: Fase W2
-          ),
-          if (_error != null) ...[
-            const SizedBox(height: 10),
-            Text(_error!,
-                style: TextStyle(color: palette.danger, fontSize: 12)),
-          ],
-        ],
-      ),
-      actions: [
-        TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text('Cancelar', // i18n: Fase W2
-                style: TextStyle(color: palette.textMuted))),
-        TextButton(
-            onPressed: _submit,
-            child: Text('Registrar', // i18n: Fase W2
-                style: TextStyle(
-                    color: palette.accent, fontWeight: FontWeight.w700))),
-      ],
-    );
-  }
-}
-
-class _PagosTable extends StatelessWidget {
-  const _PagosTable({required this.payments, required this.palette});
-  final List<Payment> payments;
-  final AppPalette palette;
-
-  @override
-  Widget build(BuildContext context) {
-    final h = TextStyle(
-        color: palette.textMuted,
-        fontSize: 11,
-        fontWeight: FontWeight.w600,
-        letterSpacing: 0.5);
-    final c = TextStyle(color: palette.textPrimary, fontSize: 13);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      decoration: BoxDecoration(
-        color: palette.bgCard,
-        border: Border.all(color: palette.border),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Row(
-              children: [
-                // i18n: Fase W2 (encabezados)
-                Expanded(flex: 3, child: Text('FECHA', style: h)),
-                Expanded(flex: 4, child: Text('CONCEPTO', style: h)),
-                Expanded(
-                  flex: 3,
-                  child: Text('MONTO', style: h, textAlign: TextAlign.right),
-                ),
-                Expanded(
-                  flex: 3,
-                  child: Text('ESTADO', style: h, textAlign: TextAlign.right),
-                ),
-              ],
-            ),
-          ),
-          for (final p in payments)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Row(
-                children: [
-                  Expanded(
-                    flex: 3,
-                    child: Text(_fmtDate(p.createdAt), style: c),
-                  ),
-                  Expanded(
-                    flex: 4,
-                    child: Text(p.concept,
-                        overflow: TextOverflow.ellipsis, style: c),
-                  ),
-                  Expanded(
-                    flex: 3,
-                    child: Text(_fmtArs(p.amountArs),
-                        style: c, textAlign: TextAlign.right),
-                  ),
-                  Expanded(
-                    flex: 3,
-                    child: Text(
-                      p.status == PaymentStatus.paid
-                          ? 'Pagado'
-                          : 'Pendiente', // i18n: Fase W2
-                      textAlign: TextAlign.right,
-                      style: TextStyle(
-                        color: p.status == PaymentStatus.paid
-                            ? palette.accent
-                            : palette.warning,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
         ],
       ),
     );
@@ -1844,7 +1383,7 @@ class _ExpandableSessionRowState extends ConsumerState<_ExpandableSessionRow> {
                 Expanded(
                   flex: 3,
                   child: Text(
-                    s.finishedAt != null ? _fmtDate(s.finishedAt!) : '—',
+                    s.finishedAt != null ? fmtDate(s.finishedAt!) : '—',
                     style: c,
                   ),
                 ),
