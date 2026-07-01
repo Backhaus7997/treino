@@ -171,6 +171,14 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
   // showDialog en paralelo a la navegación — produce `!_debugLocked` assertion.
   bool _isFinalizing = false;
 
+  // Navegación libre (SCENARIO-ORDER): bloques `future` que el usuario destrabó
+  // a mano para adelantarlos (p.ej. la máquina del sugerido está ocupada).
+  // Clave = índice del bloque en buildBlocks — estable porque day.slots NO cambia
+  // durante la sesión. Estado efímero de UI: NO se persiste. El progreso real
+  // vive en los setLogs, que ya son independientes del orden de ejecución, así
+  // que el bloque salteado sigue disponible aunque se cierre y retome la app.
+  final Set<int> _activatedBlocks = {};
+
   // Canal de error de log/update de sets (finding 22). El notifier lo emite por
   // un ValueListenable SEPARADO del AsyncValue para no destruir la sesión activa
   // ante un solo set fallido. Nos suscribimos en initState y REMOVEMOS el listener
@@ -355,12 +363,17 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
     for (var blockIdx = 0; blockIdx < blocks.length; blockIdx++) {
       final block = blocks[blockIdx];
       final status = statuses[blockIdx];
+      // Navegación libre: un bloque `future` puede estar destrabado a mano.
+      final activated = _activatedBlocks.contains(blockIdx);
+      final idx = blockIdx;
 
       if (block.isSuperset) {
         final entries = block.slots.map((s) => _entryFor(state, s)).toList();
         out.add(_SupersetBlock(
           entries: entries,
           status: status,
+          activated: activated,
+          onActivate: () => setState(() => _activatedBlocks.add(idx)),
           allLogs: state.setLogs,
           week: week,
           onSetCheck: _logSet,
@@ -371,6 +384,8 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
         out.add(_StandaloneBlock(
           entry: entry,
           status: status,
+          activated: activated,
+          onActivate: () => setState(() => _activatedBlocks.add(idx)),
           week: week,
           onSetCheck: (setNumber, reps, weightKg) =>
               _logSet(entry.slot, setNumber, reps, weightKg),
@@ -723,12 +738,16 @@ typedef _SupersetEntry = ({
 
 /// Wraps a single exercise slot with block-gating applied.
 /// - completed → compact summary row with ✓
-/// - current   → full _ExerciseSection
-/// - future    → collapsed, dimmed, locked
+/// - current   → full _ExerciseSection (el sugerido, abierto por defecto)
+/// - future    → tarjeta colapsada TAPPABLE ([onActivate]); si el usuario la
+///   destrabó ([activated] == true) se expande al _ExerciseSection completo.
+///   (Navegación libre: adelantar un bloque si el sugerido está ocupado.)
 class _StandaloneBlock extends StatelessWidget {
   const _StandaloneBlock({
     required this.entry,
     required this.status,
+    required this.activated,
+    required this.onActivate,
     required this.week,
     required this.onSetCheck,
     required this.onSetUpdate,
@@ -737,6 +756,10 @@ class _StandaloneBlock extends StatelessWidget {
   final _SupersetEntry entry;
   final BlockStatus status;
 
+  /// Bloque `future` destrabado a mano → se renderiza interactivo.
+  final bool activated;
+  final VoidCallback onActivate;
+
   /// 0-based active week; single-week sessions use 0. (REQ-PERIOD-040)
   final int week;
   final void Function(int setNumber, int reps, double weightKg) onSetCheck;
@@ -744,39 +767,46 @@ class _StandaloneBlock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    switch (status) {
-      case BlockStatus.completed:
-        return _CompletedBlockSummary(
-          exerciseName: entry.slot.exerciseName,
-          totalSets: entry.slot.effectiveSetsForWeek(week).length,
-        );
-      case BlockStatus.future:
-        return _FutureBlockPreview(exerciseName: entry.slot.exerciseName);
-      case BlockStatus.current:
-        final loggedCount = entry.logs.length;
-        final totalSets = entry.slot.effectiveSetsForWeek(week).length;
-        final isDone = loggedCount >= totalSets;
-        return _ExerciseSection(
-          slot: entry.slot,
-          logsForExercise: entry.logs,
-          currentSetNumber: isDone ? null : loggedCount + 1,
-          week: week,
-          techniqueInstructions: entry.technique,
-          videoUrl: entry.videoUrl,
-          onSetCheck: onSetCheck,
-          onSetUpdate: onSetUpdate,
-        );
+    if (status == BlockStatus.completed) {
+      return _CompletedBlockSummary(
+        exerciseName: entry.slot.exerciseName,
+        totalSets: entry.slot.effectiveSetsForWeek(week).length,
+      );
     }
+    if (status == BlockStatus.future && !activated) {
+      return _FutureBlockPreview(
+        exerciseName: entry.slot.exerciseName,
+        onActivate: onActivate,
+      );
+    }
+    // current, o future destrabado → interactivo.
+    final loggedCount = entry.logs.length;
+    final totalSets = entry.slot.effectiveSetsForWeek(week).length;
+    final isDone = loggedCount >= totalSets;
+    return _ExerciseSection(
+      slot: entry.slot,
+      logsForExercise: entry.logs,
+      currentSetNumber: isDone ? null : loggedCount + 1,
+      week: week,
+      techniqueInstructions: entry.technique,
+      videoUrl: entry.videoUrl,
+      onSetCheck: onSetCheck,
+      onSetUpdate: onSetUpdate,
+    );
   }
 }
 
 // ── _SupersetBlock ────────────────────────────────────────────────────────────
 
 /// Wraps a superset group with block-gating applied.
+/// `future` no destrabado → preview tappable; destrabado ([activated]) o
+/// `current` → _SupersetSection interactivo. (Navegación libre.)
 class _SupersetBlock extends StatelessWidget {
   const _SupersetBlock({
     required this.entries,
     required this.status,
+    required this.activated,
+    required this.onActivate,
     required this.allLogs,
     required this.week,
     required this.onSetCheck,
@@ -785,6 +815,10 @@ class _SupersetBlock extends StatelessWidget {
 
   final List<_SupersetEntry> entries;
   final BlockStatus status;
+
+  /// Bloque `future` destrabado a mano → se renderiza interactivo.
+  final bool activated;
+  final VoidCallback onActivate;
   final List<SetLog> allLogs;
 
   /// 0-based active week; single-week sessions use 0. (REQ-PERIOD-040)
@@ -795,19 +829,19 @@ class _SupersetBlock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    switch (status) {
-      case BlockStatus.completed:
-        return _CompletedSupersetSummary(entries: entries);
-      case BlockStatus.future:
-        return _FutureSupersetPreview(entries: entries);
-      case BlockStatus.current:
-        return _SupersetSection(
-          entries: entries,
-          week: week,
-          onSetCheck: onSetCheck,
-          onSetUpdate: onSetUpdate,
-        );
+    if (status == BlockStatus.completed) {
+      return _CompletedSupersetSummary(entries: entries);
     }
+    if (status == BlockStatus.future && !activated) {
+      return _FutureSupersetPreview(entries: entries, onActivate: onActivate);
+    }
+    // current, o future destrabado → interactivo.
+    return _SupersetSection(
+      entries: entries,
+      week: week,
+      onSetCheck: onSetCheck,
+      onSetUpdate: onSetUpdate,
+    );
   }
 }
 
@@ -934,38 +968,65 @@ class _CompletedSupersetSummary extends StatelessWidget {
 
 // ── _FutureBlockPreview ───────────────────────────────────────────────────────
 
-/// Dimmed, locked row for a future standalone block.
+/// Fila colapsada y TAPPABLE de un bloque `future` (navegación libre): en vez de
+/// bloquear, invita a adelantarlo si la máquina del sugerido está ocupada. Al
+/// tocar dispara [onActivate], que lo destraba y lo expande interactivo.
 class _FutureBlockPreview extends StatelessWidget {
-  const _FutureBlockPreview({required this.exerciseName});
+  const _FutureBlockPreview({
+    required this.exerciseName,
+    required this.onActivate,
+  });
 
   final String exerciseName;
+  final VoidCallback onActivate;
 
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    return Opacity(
-      opacity: 0.4,
-      child: Container(
-        decoration: BoxDecoration(
-          color: palette.bgCard,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        child: Row(
-          children: [
-            Icon(TreinoIcon.lock, color: palette.textMuted, size: 18),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                exerciseName,
-                style: GoogleFonts.barlow(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
-                  color: palette.textMuted,
-                ),
-              ),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onActivate,
+        borderRadius: BorderRadius.circular(12),
+        child: Opacity(
+          opacity: 0.75,
+          child: Container(
+            decoration: BoxDecoration(
+              color: palette.bgCard,
+              borderRadius: BorderRadius.circular(12),
             ),
-          ],
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        exerciseName,
+                        style: GoogleFonts.barlow(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                          color: palette.textMuted,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Tocá para adelantar este bloque',
+                        style: GoogleFonts.barlow(
+                          fontWeight: FontWeight.w500,
+                          fontSize: 11,
+                          color: palette.accent,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Icon(TreinoIcon.play, color: palette.accent, size: 16),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -974,54 +1035,75 @@ class _FutureBlockPreview extends StatelessWidget {
 
 // ── _FutureSupersetPreview ────────────────────────────────────────────────────
 
-/// Dimmed, locked row for a future superset block.
+/// Preview colapsado y TAPPABLE de una superserie `future` (navegación libre).
+/// Al tocar dispara [onActivate] y la superserie se expande interactiva.
 class _FutureSupersetPreview extends StatelessWidget {
-  const _FutureSupersetPreview({required this.entries});
+  const _FutureSupersetPreview({
+    required this.entries,
+    required this.onActivate,
+  });
 
   final List<_SupersetEntry> entries;
+  final VoidCallback onActivate;
 
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final names = entries.map((e) => e.slot.exerciseName).join(' · ');
-    return Opacity(
-      opacity: 0.4,
-      child: Container(
-        decoration: BoxDecoration(
-          color: palette.highlight.withValues(alpha: 0.06),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: palette.highlight),
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        child: Row(
-          children: [
-            Icon(TreinoIcon.lock, color: palette.highlight, size: 18),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'SUPERSERIE',
-                    style: GoogleFonts.barlowCondensed(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 10,
-                      letterSpacing: 1.0,
-                      color: palette.highlight,
-                    ),
-                  ),
-                  Text(
-                    names,
-                    style: GoogleFonts.barlow(
-                      fontWeight: FontWeight.w500,
-                      fontSize: 13,
-                      color: palette.textMuted,
-                    ),
-                  ),
-                ],
-              ),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onActivate,
+        borderRadius: BorderRadius.circular(12),
+        child: Opacity(
+          opacity: 0.75,
+          child: Container(
+            decoration: BoxDecoration(
+              color: palette.highlight.withValues(alpha: 0.06),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: palette.highlight),
             ),
-          ],
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'SUPERSERIE',
+                        style: GoogleFonts.barlowCondensed(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 10,
+                          letterSpacing: 1.0,
+                          color: palette.highlight,
+                        ),
+                      ),
+                      Text(
+                        names,
+                        style: GoogleFonts.barlow(
+                          fontWeight: FontWeight.w500,
+                          fontSize: 13,
+                          color: palette.textMuted,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Tocá para adelantar este bloque',
+                        style: GoogleFonts.barlow(
+                          fontWeight: FontWeight.w500,
+                          fontSize: 11,
+                          color: palette.accent,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Icon(TreinoIcon.play, color: palette.accent, size: 16),
+              ],
+            ),
+          ),
         ),
       ),
     );

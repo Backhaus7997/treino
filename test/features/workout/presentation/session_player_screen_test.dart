@@ -764,12 +764,18 @@ void main() {
       expect(curlText.style?.decoration, isNot(TextDecoration.lineThrough));
     });
 
-    testWidgets('future block is dimmed (Opacity 0.4)', (tester) async {
-      // Three blocks: e1 pending (current), e2 future, e3 future.
+    testWidgets(
+        'SCENARIO-ORDER: future block is tappable to skip ahead (navegación libre)',
+        (tester) async {
+      // Viewport alto para garantizar que el bloque future se infle (el ListView
+      // es lazy: fuera del cache extent no se renderiza).
+      await tester.binding.setSurfaceSize(const Size(450, 1400));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      // Dos bloques: e1 pending (current/sugerido), e2 future.
       final slots = [
         makeSlot(exerciseId: 'e1', exerciseName: 'A', targetSets: 1),
         makeSlot(exerciseId: 'e2', exerciseName: 'B', targetSets: 1),
-        makeSlot(exerciseId: 'e3', exerciseName: 'C', targetSets: 1),
       ];
       final day = makeDay(dayNumber: 1, slots: slots);
       final state = SessionState(
@@ -786,14 +792,16 @@ void main() {
         ),
       );
       await tester.pump();
-      // Should have 2 future (dimmed) blocks = 2 Opacity(0.4) widgets for
-      // blocks B and C, plus 1 more for the disabled TERMINAR SESIÓN button.
-      final dimmedOpacities = tester
-          .widgetList<Opacity>(find.byType(Opacity))
-          .where((o) => o.opacity == 0.4)
-          .length;
-      // At minimum 2 future blocks dimmed (B and C).
-      expect(dimmedOpacities, greaterThanOrEqualTo(2));
+      // El bloque future B se muestra como tarjeta TAPPABLE con la invitación a
+      // adelantarlo — ya no como candado bloqueado.
+      expect(find.text('Tocá para adelantar este bloque'), findsOneWidget);
+      // No hay ningún candado: la cárcel de gating se levantó.
+      expect(find.byIcon(TreinoIcon.lock), findsNothing);
+
+      // Tocar B lo destraba y lo expande interactivo → la invitación desaparece.
+      await tester.tap(find.text('Tocá para adelantar este bloque'));
+      await tester.pump();
+      expect(find.text('Tocá para adelantar este bloque'), findsNothing);
     });
   });
 

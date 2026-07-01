@@ -1,4 +1,4 @@
-import '../../profile_setup/domain/gym.dart' show kNoGymId;
+import '../../gyms/domain/gym.dart' show kNoGymId;
 
 /// Hardcoded gym display name lookup. Parallel to `_kHardcodedGyms` in
 /// `profile_setup_providers.dart` (private). Both maps stay in lockstep until

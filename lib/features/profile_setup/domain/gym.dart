@@ -2,11 +2,13 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 
 part 'gym.freezed.dart';
 
-/// Gym del catálogo que el atleta elige en el step 2 del ProfileSetup.
+/// LEGACY — gym hardcodeado usado únicamente por `_kHardcodedGyms` en
+/// `profile_setup_providers.dart`. Reemplazado por `gyms/domain/gym.dart`
+/// (catálogo real, two-level brand→sucursal). Este modelo y sus dos únicos
+/// consumidores (`filteredGymsProvider`, `_kHardcodedGyms`) se eliminan en
+/// gyms-foundation Phase 2, junto con el picker que los usa.
 ///
-/// Mientras Etapa 3 (Firestore + UserProfile) no esté mergeada, la lista vive
-/// hardcoded en `gym_search_provider.dart`. Cuando llegue Firestore, este modelo
-/// se hidrata desde la colección `gyms/`.
+/// `kNoGymId` fue re-homed a `gyms/domain/gym.dart` — no vive más acá.
 @freezed
 class Gym with _$Gym {
   const factory Gym({
@@ -15,7 +17,3 @@ class Gym with _$Gym {
     required String address,
   }) = _Gym;
 }
-
-/// Sentinel id que representa la opción "OTRO GYM / SIN GYM" del mockup.
-/// El atleta puede dejarlo sin elegir un gym del catálogo.
-const String kNoGymId = 'no-gym';

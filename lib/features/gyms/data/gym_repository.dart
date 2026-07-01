@@ -61,6 +61,10 @@ class GymRepository {
       // Wrapped in try/catch so a single malformed gym doc (bad lat/lng,
       // missing geohash, etc.) is skipped instead of aborting the whole
       // catalog read — matches the resilient intent of `whereType<Gym>()`.
+      //
+      // `brandId`/`brandName`/`branchName` are nullable in `Gym` — decoded
+      // automatically by `Gym.fromJson` (no fallback needed here) for docs
+      // seeded before the two-level brand→sucursal migration.
       return Gym.fromJson({...data, 'id': snap.id});
     } catch (e, st) {
       developer.log(
