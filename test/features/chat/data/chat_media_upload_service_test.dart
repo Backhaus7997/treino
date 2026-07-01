@@ -11,7 +11,7 @@ void main() {
   late ChatMediaUploadService service;
 
   setUp(() {
-    service = ChatMediaUploadService.testable();
+    service = ChatMediaUploadServiceMobile.testable();
   });
 
   // ─── Extension → content-type mapping ───────────────────────────────────
