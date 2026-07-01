@@ -83,8 +83,10 @@ corrects.
 
 ### Usage
 
+Run every command below from the **repo root** (the paths are repo-root-relative):
+
 ```sh
-cd scripts && npm install   # once, if not already done
+(cd scripts && npm install)   # once — subshell keeps cwd at the repo root
 
 # 1. Ids first — dry run, then real run against treino-dev:
 node scripts/backfill_gym_ids.js --dry-run
@@ -112,9 +114,11 @@ Both scripts:
 - **`backfill_gym_ids.js`** — the 3 legacy hardcoded ids
   (`smart-fit-palermo`, `sportclub-belgrano`, `megatlon-recoleta`) now exist
   as real `gyms/` docs (Phase 1 seed rewrite), so this is largely a
-  verification pass. It scans `users/` and `userPublicProfiles/` and maps any
-  `gymId` that doesn't resolve to a real `gyms/` doc to `kNoGymId`
-  (`'no-gym'`) rather than guessing a replacement.
+  verification pass. It reconciles **per uid**: `users/{uid}` is the canonical
+  source for `gymId`, and the corrected value is written to BOTH `users/` and
+  `userPublicProfiles/` in one atomic batch, so the two can never disagree
+  after the migration. Any `gymId` that doesn't resolve to a real `gyms/` doc
+  is mapped to `kNoGymId` (`'no-gym'`) rather than guessing a replacement.
 - **`backfill_gym_names.js`** — for `userPublicProfiles` docs that have a
   `gymId` but no `gymName`, resolves the composed display name
   (`"{brandName} - {branchName}"`, or just `brandName` for independent
