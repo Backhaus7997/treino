@@ -172,11 +172,31 @@ async function run() {
   const validGymIds = await fetchValidGymIds();
   console.log(`  ${validGymIds.size} valid gym docs found.`);
 
+  const missingLegacy = [];
   for (const legacyId of KNOWN_LEGACY_IDS) {
     const ok = validGymIds.has(legacyId);
+    if (!ok) missingLegacy.push(legacyId);
     console.log(
-      `  Legacy id check: "${legacyId}" ${ok ? 'OK (resolves to real doc)' : 'MISSING — unexpected, investigate seed'}`,
+      `  Legacy id check: "${legacyId}" ${ok ? 'OK (resolves to real doc)' : 'MISSING'}`,
     );
+  }
+
+  // SAFETY GATE: if any of the known legacy gym docs is absent, the catalog
+  // seed (`seed_gyms.js`) has not been run (or is incomplete). Proceeding would
+  // treat those legacy ids as unknown and map real athlete gyms to `no-gym`,
+  // ERASING their assignment. Abort a real run before touching any user doc.
+  // In --dry-run we only warn, so the operator can still preview the damage.
+  if (missingLegacy.length > 0) {
+    const msg =
+      `Missing seeded legacy gym doc(s): ${missingLegacy.join(', ')}. ` +
+      'Run `node scripts/seed_gyms.js` FIRST so these resolve to real docs. ' +
+      'Otherwise this backfill would erase those athletes\' gym assignments.';
+    if (dryRun) {
+      console.warn(`\n⚠ WARNING: ${msg}\n  (dry-run continues so you can preview; a real run would ABORT here.)\n`);
+    } else {
+      console.error(`\nABORTING: ${msg}`);
+      process.exit(1);
+    }
   }
 
   console.log('\nLoading users/ and userPublicProfiles/ ...');
@@ -236,22 +256,34 @@ async function run() {
     corrected++;
     docWrites += writes.length;
 
+    // On the public profile, gymName is a denormalized copy of the gym's
+    // display name. Whenever we change its gymId we MUST clear the stale
+    // gymName too, otherwise backfill_gym_names.js (which only fills profiles
+    // with a null gymName) skips it and the feed keeps showing the OLD gym
+    // name for the new id. users/{uid} has no gymName field.
+    const payloadFor = (coll) =>
+      coll === 'userPublicProfiles'
+        ? { gymId: target, gymName: null }
+        : { gymId: target };
+    const noteFor = (coll) =>
+      coll === 'userPublicProfiles' ? ' (+ clear gymName)' : '';
+
     if (dryRun) {
       for (const w of writes) {
         console.log(
-          `  [DRY-RUN] WOULD update ${w.coll}/${uid}: gymId ${w.plan.from} -> "${w.plan.to}"`,
+          `  [DRY-RUN] WOULD update ${w.coll}/${uid}: gymId ${w.plan.from} -> "${w.plan.to}"${noteFor(w.coll)}`,
         );
       }
     } else {
       // Single atomic batch per uid → both docs move together, never split.
       const batch = db.batch();
       for (const w of writes) {
-        batch.set(w.ref, { gymId: target }, { merge: true });
+        batch.set(w.ref, payloadFor(w.coll), { merge: true });
       }
       await batch.commit();
       for (const w of writes) {
         console.log(
-          `  ✓ ${w.coll}/${uid}: gymId ${w.plan.from} -> "${w.plan.to}"`,
+          `  ✓ ${w.coll}/${uid}: gymId ${w.plan.from} -> "${w.plan.to}"${noteFor(w.coll)}`,
         );
       }
     }
