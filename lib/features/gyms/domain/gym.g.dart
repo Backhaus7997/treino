@@ -17,6 +17,11 @@ _$GymImpl _$$GymImplFromJson(Map<String, dynamic> json) => _$GymImpl(
       createdBy: json['createdBy'] as String?,
       createdAt:
           const TimestampConverter().fromJson(json['createdAt'] as Timestamp),
+      brandId: json['brandId'] as String?,
+      brandName: json['brandName'] as String?,
+      branchName: json['branchName'] as String?,
+      city: json['city'] as String?,
+      province: json['province'] as String?,
     );
 
 Map<String, dynamic> _$$GymImplToJson(_$GymImpl instance) => <String, dynamic>{
@@ -29,6 +34,11 @@ Map<String, dynamic> _$$GymImplToJson(_$GymImpl instance) => <String, dynamic>{
       'source': _$GymSourceEnumMap[instance.source]!,
       'createdBy': instance.createdBy,
       'createdAt': const TimestampConverter().toJson(instance.createdAt),
+      'brandId': instance.brandId,
+      'brandName': instance.brandName,
+      'branchName': instance.branchName,
+      'city': instance.city,
+      'province': instance.province,
     };
 
 const _$GymSourceEnumMap = {

@@ -4,7 +4,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:treino/features/check_in/application/check_in_providers.dart';
 import 'package:treino/features/check_in/data/check_in_repository.dart';
 import 'package:treino/features/check_in/domain/check_in.dart';
-import 'package:treino/features/profile_setup/domain/gym.dart';
+import 'package:treino/features/gyms/domain/gym.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
 
 class MockCheckInRepository extends Mock implements CheckInRepository {}

@@ -7,8 +7,8 @@ import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../auth/application/auth_providers.dart';
+import '../../gyms/domain/gym.dart' show kNoGymId;
 import '../../profile_setup/application/profile_setup_providers.dart';
-import '../../profile_setup/domain/gym.dart';
 import '../../profile_setup/presentation/widgets/gym_card.dart';
 import '../application/user_providers.dart';
 

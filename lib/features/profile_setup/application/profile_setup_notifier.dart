@@ -4,11 +4,11 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../auth/application/auth_providers.dart' show firebaseAuthProvider;
+import '../../gyms/domain/gym.dart' show kNoGymId;
 import '../../profile/application/user_public_profile_providers.dart';
 import '../../profile/application/user_providers.dart';
 import '../../profile/domain/experience_level.dart';
 import '../../profile/domain/gender.dart';
-import '../domain/gym.dart';
 import '../domain/profile_setup_draft.dart';
 import '../domain/profile_setup_validators.dart';
 import 'profile_setup_providers.dart' show avatarUploadServiceProvider;

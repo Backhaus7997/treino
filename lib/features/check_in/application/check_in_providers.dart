@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../gyms/domain/gym.dart' show kNoGymId;
 import '../../profile/application/user_providers.dart' show firestoreProvider;
-import '../../profile_setup/domain/gym.dart' show kNoGymId;
 import '../../workout/application/session_providers.dart'
     show currentUidProvider;
 import '../data/check_in_repository.dart';

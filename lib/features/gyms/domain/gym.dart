@@ -32,7 +32,33 @@ class Gym with _$Gym {
     required GymSource source,
     String? createdBy,
     @TimestampConverter() required DateTime createdAt,
+
+    /// Two-level catalog (marca → sucursal). Cada `Gym` doc es una sucursal;
+    /// `brandId` agrupa sucursales de la misma cadena (slug estable derivado
+    /// de `brandName`). Para un gym independiente (una sola sucursal),
+    /// `brandId` apunta a su propio `id`.
+    ///
+    /// Nullable para decode backward-compat de los ~20 docs sembrados antes
+    /// de esta migración (no tienen estos campos).
+    String? brandId,
+    String? brandName,
+
+    /// Nombre de la sucursal dentro de la cadena (ej. "Belgrano"). `null`
+    /// para gyms independientes (no hay una segunda sucursal de la cual
+    /// distinguirse).
+    String? branchName,
+
+    /// Opcionales — decode seguro cuando están ausentes en docs viejos.
+    String? city,
+    String? province,
   }) = _Gym;
 
   factory Gym.fromJson(Map<String, Object?> json) => _$GymFromJson(json);
 }
+
+/// Sentinel id que representa la opción "OTRO GYM / SIN GYM" del mockup.
+/// El atleta puede dejarlo sin elegir un gym del catálogo.
+///
+/// Re-homed desde `profile_setup/domain/gym.dart` (ver ADR gyms-foundation
+/// Phase 1) — canonical location ahora vive junto al modelo real de gym.
+const String kNoGymId = 'no-gym';

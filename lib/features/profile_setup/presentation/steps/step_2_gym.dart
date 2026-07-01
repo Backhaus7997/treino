@@ -4,9 +4,9 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/treino_icon.dart';
+import '../../../gyms/domain/gym.dart' show kNoGymId;
 import '../../application/profile_setup_notifier.dart';
 import '../../application/profile_setup_providers.dart';
-import '../../domain/gym.dart';
 import '../widgets/gym_card.dart';
 
 /// Step 2: gym selector con search + lista hardcodeada + opción "OTRO/SIN GYM".
