@@ -6,12 +6,12 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../app/theme/app_palette.dart';
 import '../../../../l10n/app_l10n.dart';
 import '../../../profile/application/user_public_profile_providers.dart';
+import '../../../gyms/domain/gym_display_name.dart';
 import '../../application/feed_screen_providers.dart'
     show myFriendsFeedProvider;
 import '../../application/friendship_providers.dart'
     show friendshipRepositoryProvider;
 import '../../domain/friendship.dart';
-import '../../domain/gym_name.dart';
 import 'post_avatar.dart';
 
 /// A single row in the friend requests inbox.
@@ -55,7 +55,7 @@ class _FriendRequestInboxTileState
     final profile = profileAsync.valueOrNull;
     final displayName = profile?.displayName ?? 'Usuario anónimo';
     final avatarUrl = profile?.avatarUrl;
-    final gymName = gymNameFromId(profile?.gymId);
+    final gymName = gymDisplayNameFromDenormalized(profile?.gymName);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),

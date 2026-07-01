@@ -14,6 +14,7 @@ _$UserPublicProfileImpl _$$UserPublicProfileImplFromJson(
       displayNameLowercase: json['displayNameLowercase'] as String?,
       avatarUrl: json['avatarUrl'] as String?,
       gymId: json['gymId'] as String?,
+      gymName: json['gymName'] as String?,
       workoutsCount: (json['workoutsCount'] as num?)?.toInt(),
       racha: (json['racha'] as num?)?.toInt(),
       followersCount:
@@ -32,6 +33,7 @@ Map<String, dynamic> _$$UserPublicProfileImplToJson(
       'displayNameLowercase': instance.displayNameLowercase,
       'avatarUrl': instance.avatarUrl,
       'gymId': instance.gymId,
+      'gymName': instance.gymName,
       'workoutsCount': instance.workoutsCount,
       'racha': instance.racha,
       'followersCount': instance.followersCount,

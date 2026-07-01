@@ -6,7 +6,8 @@ import '../../../../core/widgets/treino_icon.dart';
 import '../../../../l10n/app_l10n.dart';
 import '../../../auth/application/auth_providers.dart';
 import '../../../feed/application/friendship_providers.dart';
-import '../../../feed/domain/gym_name.dart';
+import '../../../gyms/application/gym_providers.dart';
+import '../../../gyms/domain/gym_display_name.dart';
 import '../../application/assigned_routines_providers.dart';
 import '../../application/user_providers.dart';
 import 'profile_section_group.dart';
@@ -41,8 +42,11 @@ class ProfileCuentaSection extends ConsumerWidget {
     final solicitudesSubtitle = requestCount > 0
         ? l10n.profileCuentaSolicitudesSubtitle(requestCount)
         : null;
-    final gymSubtitle =
-        gymId == null ? l10n.profileCuentaNoGym : gymNameFromId(gymId);
+    // DETAIL context (self) — UserProfile has no denormalized gymName, so
+    // resolve live via gymByIdProvider. gyms-foundation Phase 3.
+    final gymSubtitle = gymId == null
+        ? l10n.profileCuentaNoGym
+        : gymDisplayNameFromGym(ref.watch(gymByIdProvider(gymId)).valueOrNull);
 
     return ProfileSectionGroup(
       title: l10n.profileCuentaTitle,

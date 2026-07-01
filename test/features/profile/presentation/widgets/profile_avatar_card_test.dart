@@ -4,6 +4,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
+import 'package:treino/features/gyms/application/gym_providers.dart';
+import 'package:treino/features/gyms/domain/gym.dart';
+import 'package:treino/features/gyms/domain/gym_source.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
@@ -32,6 +35,7 @@ UserProfile _profile({
 Widget _buildCard({
   required UserProfile profile,
   GoRouter? router,
+  List<Override> extraOverrides = const [],
 }) {
   final effectiveRouter = router ??
       GoRouter(
@@ -50,6 +54,7 @@ Widget _buildCard({
     overrides: [
       authStateChangesProvider.overrideWith((_) => Stream.value(null)),
       userProfileProvider.overrideWith((_) => Stream.value(profile)),
+      ...extraOverrides,
     ],
     child: MaterialApp.router(
       theme: AppTheme.dark(),
@@ -95,11 +100,27 @@ void main() {
     testWidgets('SCENARIO-498: gym chip visible when gymId is non-null',
         (tester) async {
       await tester.pumpWidget(
-        _buildCard(profile: _profile(gymId: 'smart-fit-palermo')),
+        _buildCard(
+          profile: _profile(gymId: 'smart-fit-palermo'),
+          extraOverrides: [
+            gymByIdProvider('smart-fit-palermo').overrideWith(
+              (ref) async => Gym(
+                id: 'smart-fit-palermo',
+                name: 'SmartFit - Palermo',
+                lat: -34.58,
+                lng: -58.42,
+                geohash: 'abc123',
+                source: GymSource.seed,
+                createdAt: DateTime.utc(2026, 1, 1),
+              ),
+            ),
+          ],
+        ),
       );
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('profile_avatar_gym_chip')), findsOneWidget);
+      expect(find.text('SmartFit - Palermo'), findsOneWidget);
     });
 
     // SCENARIO-499: gym chip absent when gymId null

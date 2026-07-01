@@ -10,7 +10,8 @@ import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../profile/application/user_providers.dart';
-import '../../feed/domain/gym_name.dart';
+import '../../gyms/application/gym_providers.dart';
+import '../../gyms/domain/gym_display_name.dart';
 import '../application/exercise_providers.dart';
 import '../application/routine_providers.dart';
 import '../application/session_init.dart';
@@ -586,7 +587,11 @@ class _AttendanceCard extends ConsumerWidget {
     final palette = AppPalette.of(context);
     final profileAsync = ref.watch(userProfileProvider);
     final gymId = profileAsync.valueOrNull?.gymId;
-    final gymName = gymNameFromId(gymId);
+    // DETAIL context (self) — UserProfile has no denormalized gymName, so
+    // resolve live via gymByIdProvider. gyms-foundation Phase 3.
+    final gymName = gymId == null
+        ? ''
+        : gymDisplayNameFromGym(ref.watch(gymByIdProvider(gymId)).valueOrNull);
     final now = DateTime.now().toLocal();
     final hh = now.hour.toString().padLeft(2, '0');
     final mm = now.minute.toString().padLeft(2, '0');

@@ -4,8 +4,9 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/utils/handle_derivation.dart';
-import '../../../feed/domain/gym_name.dart';
 import '../../../feed/presentation/widgets/post_avatar.dart';
+import '../../../gyms/application/gym_providers.dart';
+import '../../../gyms/domain/gym_display_name.dart';
 import '../../application/user_providers.dart';
 
 /// Displays the current user's avatar, display name, derived @handle, and
@@ -110,15 +111,19 @@ class _CardBody extends StatelessWidget {
 
 // ── Gym chip ──────────────────────────────────────────────────────────────────
 
-class _GymChip extends StatelessWidget {
+/// DETAIL context (single self-user) — resolves the gym name live via
+/// [gymByIdProvider] rather than a denormalized field, since `UserProfile`
+/// (unlike `UserPublicProfile`) has no `gymName`. gyms-foundation Phase 3.
+class _GymChip extends ConsumerWidget {
   const _GymChip({required this.gymId, required this.palette});
 
   final String gymId;
   final AppPalette palette;
 
   @override
-  Widget build(BuildContext context) {
-    final name = gymNameFromId(gymId);
+  Widget build(BuildContext context, WidgetRef ref) {
+    final gymAsync = ref.watch(gymByIdProvider(gymId));
+    final name = gymDisplayNameFromGym(gymAsync.valueOrNull);
     if (name.isEmpty) return const SizedBox.shrink();
 
     return Container(

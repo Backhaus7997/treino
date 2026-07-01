@@ -119,6 +119,45 @@ void main() {
       expect(restored.gymId, equals('g1'));
     });
 
+    // ── Phase 3 (gyms-foundation) — denormalized gymName ────────────────────
+    group('gymName (denormalized brand-branch label)', () {
+      test(
+          'SCENARIO-521: fromJson without gymName → field is null '
+          '(backward-compat for existing docs)', () {
+        final json = {
+          'uid': 'u1',
+          'displayName': 'Ana',
+          'gymId': 'sportclub-belgrano',
+        };
+        final profile = UserPublicProfile.fromJson(json);
+        expect(profile.gymName, isNull);
+      });
+
+      test('SCENARIO-522: fromJson with gymName → value preserved', () {
+        final json = {
+          'uid': 'u1',
+          'displayName': 'Ana',
+          'gymId': 'sportclub-belgrano',
+          'gymName': 'SportClub - Belgrano',
+        };
+        final profile = UserPublicProfile.fromJson(json);
+        expect(profile.gymName, equals('SportClub - Belgrano'));
+      });
+
+      test('SCENARIO-523: JSON round-trip preserves gymName', () {
+        const profile = UserPublicProfile(
+          uid: 'u1',
+          displayName: 'Ana',
+          gymId: 'sportclub-belgrano',
+          gymName: 'SportClub - Belgrano',
+        );
+        final json = profile.toJson();
+        final restored = UserPublicProfile.fromJson(json);
+        expect(restored.gymName, equals('SportClub - Belgrano'));
+        expect(restored, equals(profile));
+      });
+    });
+
     // SCENARIO-253: displayNameLowercase auto-derivation is enforced at the
     // write-path layer (UserRepository private helpers), NOT by the model
     // constructor. The model accepts whatever is passed — it is a plain value

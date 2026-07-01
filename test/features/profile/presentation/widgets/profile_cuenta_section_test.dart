@@ -5,6 +5,9 @@ import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/feed/application/friendship_providers.dart';
+import 'package:treino/features/gyms/application/gym_providers.dart';
+import 'package:treino/features/gyms/domain/gym.dart';
+import 'package:treino/features/gyms/domain/gym_source.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
@@ -243,6 +246,39 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('FRIEND_REQUESTS'), findsOneWidget);
+    });
+
+    // SCENARIO-533 (gyms-foundation Phase 3): Gimnasio tile subtitle resolves
+    // the real composed name via gymByIdProvider — DETAIL context, UserProfile
+    // has no denormalized gymName.
+    testWidgets(
+        'SCENARIO-533: Gimnasio tile subtitle shows the real resolved gym name '
+        'when gymId is set', (tester) async {
+      await tester.pumpWidget(
+        _buildSection(
+          overrides: [
+            authStateChangesProvider.overrideWith((_) => Stream.value(null)),
+            userProfileProvider.overrideWith(
+              (_) => Stream.value(_profile(gymId: 'sportclub-belgrano')),
+            ),
+            pendingRequestCountProvider('').overrideWith((_) => 0),
+            gymByIdProvider('sportclub-belgrano').overrideWith(
+              (ref) async => Gym(
+                id: 'sportclub-belgrano',
+                name: 'SportClub - Belgrano',
+                lat: -34.56,
+                lng: -58.45,
+                geohash: 'abc123',
+                source: GymSource.seed,
+                createdAt: DateTime.utc(2026, 1, 1),
+              ),
+            ),
+          ],
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('SportClub - Belgrano'), findsOneWidget);
     });
   });
 }

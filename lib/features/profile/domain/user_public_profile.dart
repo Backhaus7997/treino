@@ -30,6 +30,15 @@ class UserPublicProfile with _$UserPublicProfile {
     String? displayNameLowercase,
     String? avatarUrl,
     String? gymId,
+
+    /// Denormalized composed brand-branch display label (e.g.
+    /// "SportClub - Belgrano", or just the brand name for independent
+    /// single-branch gyms). Dual-written by `UserRepository.update()`
+    /// alongside `gymId` at profile-save time — mirrors `CheckIn.gymName`.
+    /// Nullable for backward-compat with profiles saved before this field
+    /// existed (also `null` when `gymId` is `null`/`kNoGymId`/unresolvable).
+    /// See gyms-foundation Phase 3 (name resolution + denormalization).
+    String? gymName,
     int? workoutsCount,
     int? racha,
     // ignore: invalid_annotation_target

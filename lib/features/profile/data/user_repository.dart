@@ -1,14 +1,28 @@
+import 'dart:developer' as developer;
+
 import 'package:cloud_firestore/cloud_firestore.dart'
     show CollectionReference, FirebaseFirestore, SetOptions, Timestamp;
 
+import '../../gyms/data/gym_repository.dart';
+import '../../gyms/domain/gym.dart' show kNoGymId;
 import '../domain/user_profile.dart';
 import '../domain/user_role.dart';
 
 class UserRepository {
-  UserRepository({required FirebaseFirestore firestore})
-      : _firestore = firestore;
+  UserRepository({
+    required FirebaseFirestore firestore,
+    GymRepository? gyms,
+  })  : _firestore = firestore,
+        _gyms = gyms ?? GymRepository(firestore: firestore);
 
   final FirebaseFirestore _firestore;
+
+  // gyms-foundation Phase 3: resolves the composed brand-branch display name
+  // when `update()` receives a new `gymId`, so `gymName` can be dual-written
+  // into userPublicProfiles (mirrors `CheckIn.gymName`). Defaults to a
+  // firestore-backed instance so existing call sites that only pass
+  // `firestore:` keep working unchanged.
+  final GymRepository _gyms;
 
   // Fields that must never be mutated by client code (mirrors firestore.rules).
   static const _immutableFields = {'uid', 'role', 'email', 'createdAt'};
@@ -90,10 +104,16 @@ class UserRepository {
   /// the athlete was stranded on the onboarding screen. SetOptions(merge:true)
   /// makes re-writing uid on an existing doc a no-op. Mirrors the same fix
   /// already applied to [_trainerPublicSubsetFromPartial] (ADR-TPO-001).
-  Map<String, Object?>? _publicSubsetFromPartial(
+  ///
+  /// gyms-foundation Phase 3: when [partial] carries a new `gymId`, also
+  /// resolves and writes the composed brand-branch `gymName` (mirrors
+  /// `CheckIn.gymName`). This is the ONLY async step in the public subset
+  /// build — `null`/[kNoGymId]/unknown ids all resolve to `gymName: null`
+  /// without throwing, so a stale or bad id never blocks the batch write.
+  Future<Map<String, Object?>?> _publicSubsetFromPartial(
     Map<String, Object?> partial, {
     required String uid,
-  }) {
+  }) async {
     final hasPublicField = partial.keys.any((k) => _publicFields.contains(k));
     if (!hasPublicField) return null;
 
@@ -107,11 +127,33 @@ class UserRepository {
       result['avatarUrl'] = partial['avatarUrl'];
     }
     if (partial.containsKey('gymId')) {
-      result['gymId'] = partial['gymId'];
+      final gymId = partial['gymId'] as String?;
+      result['gymId'] = gymId;
+      result['gymName'] = await _resolveGymName(gymId);
     }
     // Always include uid — required by the create rule on the first write.
     result['uid'] = uid;
     return result;
+  }
+
+  /// Resolves the composed brand-branch display name for [gymId].
+  ///
+  /// - `null` or [kNoGymId] → `null`, no lookup attempted.
+  /// - Unknown/unresolvable id → `null`, logged, never throws — a stale or
+  ///   deleted gym doc must not abort the whole `update()` batch.
+  Future<String?> _resolveGymName(String? gymId) async {
+    if (gymId == null || gymId == kNoGymId) return null;
+    try {
+      final gym = await _gyms.getById(gymId);
+      return gym?.name;
+    } catch (e, st) {
+      developer.log(
+        'UserRepository: failed to resolve gymName for gymId=$gymId',
+        error: e,
+        stackTrace: st,
+      );
+      return null;
+    }
   }
 
   /// Builds a partial trainer-public update map from a raw update [partial].
@@ -295,7 +337,7 @@ class UserRepository {
       partial.entries.where((e) => !_immutableFields.contains(e.key)),
     )..['updatedAt'] = Timestamp.fromDate(DateTime.now().toUtc());
 
-    final publicSubset = _publicSubsetFromPartial(partial, uid: uid);
+    final publicSubset = await _publicSubsetFromPartial(partial, uid: uid);
     final trainerPublicSubset =
         _trainerPublicSubsetFromPartial(partial, uid: uid);
 
