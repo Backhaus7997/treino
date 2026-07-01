@@ -1,0 +1,147 @@
+/// Acciones de pago (marcar pagado / registrar pago) para la sección Pagos del
+/// Coach Hub.
+///
+/// Extraído de `alumno_detail_screen.dart` (PR1 — refactor puro, sin cambio de
+/// comportamiento). `isoWeekPeriodKey` se re-importa desde
+/// `pagos_por_cobrar_provider.dart` — NO duplicado.
+///
+/// Sección: coach_hub/pagos — contrato: sin Scaffold, sin HEX, es-AR + // i18n.
+library;
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:treino/app/theme/app_palette.dart';
+import 'package:treino/features/payments/application/pagos_por_cobrar_provider.dart'
+    show CobroPendiente, isoWeekPeriodKey;
+import 'package:treino/features/payments/application/payment_providers.dart'
+    show paymentRepositoryProvider;
+import 'package:treino/features/payments/domain/athlete_billing.dart';
+import 'package:treino/features/payments/domain/payment.dart';
+import 'package:treino/features/workout/application/session_providers.dart'
+    show currentUidProvider;
+
+import 'payment_format.dart';
+import 'registrar_pago_dialog.dart';
+
+// ── Helpers internos ──────────────────────────────────────────────────────────
+
+/// Muestra un SnackBar con [msg].
+void pagoSnack(BuildContext context, String msg) {
+  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+}
+
+/// Construye un Payment pagado para settlear un cobro recurrente. El [periodKey]
+/// debe matchear el que computa `pagosPorCobrarProvider` (month/ISO-week) para
+/// que el cobro desaparezca tras marcarlo; `null` para porSesión (sin período).
+Payment paidPaymentFor(
+  String trainerId,
+  CobroPendiente cobro,
+  DateTime now,
+  String? periodKey,
+) =>
+    Payment(
+      id: '',
+      trainerId: trainerId,
+      athleteId: cobro.athleteId,
+      amountArs: cobro.amountArs,
+      concept: cobro.concept,
+      status: PaymentStatus.paid,
+      periodKey: periodKey,
+      createdAt: now,
+      paidAt: now,
+    );
+
+// ── Acciones públicas ─────────────────────────────────────────────────────────
+
+/// Muestra confirmación y, si el trainer acepta, marca el cobro como pagado
+/// en Firestore según la cadencia (suelto → markManyPaid; recurrente → add con
+/// periodKey correspondiente).
+Future<void> marcarPagado(
+    BuildContext context, WidgetRef ref, CobroPendiente cobro) async {
+  final palette = AppPalette.of(context);
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      backgroundColor: palette.bgCard,
+      title: Text('¿Marcar como cobrado?', // i18n
+          style: TextStyle(
+              color: palette.textPrimary,
+              fontWeight: FontWeight.w700,
+              fontSize: 18)),
+      content: Text('${cobro.concept} — ${fmtArs(cobro.amountArs)}',
+          style: TextStyle(color: palette.textMuted, fontSize: 14)),
+      actions: [
+        TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text('Cancelar', // i18n
+                style: TextStyle(color: palette.textMuted))),
+        TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text('Cobrado', // i18n
+                style: TextStyle(
+                    color: palette.accent, fontWeight: FontWeight.w700))),
+      ],
+    ),
+  );
+  if (confirmed != true || !context.mounted) return;
+
+  final trainerId = ref.read(currentUidProvider);
+  if (trainerId == null) return;
+  final repo = ref.read(paymentRepositoryProvider);
+  final now = DateTime.now().toUtc();
+  try {
+    switch (cobro.cadence) {
+      case BillingCadence.suelto:
+        await repo.markManyPaid(cobro.pendingPaymentIds, now);
+      case BillingCadence.mensual:
+        await repo.add(paidPaymentFor(trainerId, cobro, now,
+            '${now.year}-${now.month.toString().padLeft(2, '0')}'));
+      case BillingCadence.semanal:
+        await repo
+            .add(paidPaymentFor(trainerId, cobro, now, isoWeekPeriodKey(now)));
+      case BillingCadence.porSesion:
+        await repo.add(paidPaymentFor(trainerId, cobro, now, null));
+    }
+    if (context.mounted) {
+      pagoSnack(context, 'Cobro registrado.'); // i18n
+    }
+  } catch (_) {
+    if (context.mounted) {
+      pagoSnack(context, 'No pudimos guardar. Intentá de nuevo.'); // i18n
+    }
+  }
+}
+
+/// Abre `RegistrarPagoDialog` y, si el trainer confirma, crea un Payment pagado
+/// ad-hoc para el alumno [athleteId].
+Future<void> registrarPago(
+    BuildContext context, WidgetRef ref, String athleteId) async {
+  final result = await showDialog<({int amount, String concept})>(
+    context: context,
+    builder: (_) => const RegistrarPagoDialog(),
+  );
+  if (result == null) return;
+
+  final trainerId = ref.read(currentUidProvider);
+  if (trainerId == null) return;
+  final now = DateTime.now().toUtc();
+  try {
+    await ref.read(paymentRepositoryProvider).add(Payment(
+          id: '',
+          trainerId: trainerId,
+          athleteId: athleteId,
+          amountArs: result.amount,
+          concept: result.concept,
+          status: PaymentStatus.paid,
+          createdAt: now,
+          paidAt: now,
+        ));
+    if (context.mounted) {
+      pagoSnack(context, 'Pago registrado.'); // i18n
+    }
+  } catch (_) {
+    if (context.mounted) {
+      pagoSnack(context, 'No pudimos guardar. Intentá de nuevo.'); // i18n
+    }
+  }
+}

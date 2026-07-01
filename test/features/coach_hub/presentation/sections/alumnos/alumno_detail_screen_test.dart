@@ -18,6 +18,8 @@ import 'package:treino/features/coach/data/trainer_link_repository.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach_hub/presentation/sections/alumnos/alumno_detail_screen.dart';
+import 'package:treino/features/coach_hub/presentation/sections/pagos/widgets/payment_format.dart'
+    show fmtDayMonth, nextDueDate;
 import 'package:treino/features/coach_hub/presentation/sections/alumnos/alumnos_screen.dart';
 import 'package:treino/features/gyms/application/gym_providers.dart';
 import 'package:treino/features/gyms/domain/gym.dart';
