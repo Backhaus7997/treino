@@ -220,6 +220,30 @@ async function run() {
     `  users=${usersSnap.size}  userPublicProfiles=${profilesSnap.size}  distinct uids=${allUids.size}`,
   );
 
+  // Surface (but do NOT silently fix) users that have a real gym but no public
+  // profile doc. Creating the public profile HERE would produce a malformed
+  // doc (missing displayName/avatar/etc. that feed & search require), so this
+  // script does not do it — `backfill_user_public_profiles.js` is the script
+  // that creates COMPLETE public profiles and must run first.
+  const missingPublicProfiles = [];
+  for (const [uid, u] of usersByUid) {
+    if (!profilesByUid.has(uid) && u.hasField && u.value && u.value !== NO_GYM) {
+      missingPublicProfiles.push(uid);
+    }
+  }
+  if (missingPublicProfiles.length > 0) {
+    console.warn(
+      `\n⚠ ${missingPublicProfiles.length} user(s) have a real gymId but NO ` +
+        'userPublicProfiles/{uid} doc — feed & search read the public profile, ' +
+        'so these accounts stay unmigrated for those surfaces.',
+    );
+    console.warn(
+      '  This script does NOT create public profiles (they need displayName / ' +
+        'avatar / counters). Run `node scripts/backfill_user_public_profiles.js` ' +
+        'FIRST to create complete profiles, then re-run this backfill.\n',
+    );
+  }
+
   const ABSENT = { hasField: false, value: undefined };
   let verified = 0; // uids already consistent + resolving
   let corrected = 0; // uids that needed ≥1 write
