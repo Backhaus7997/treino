@@ -3,6 +3,7 @@
 //
 // PR1 — Ver turnos (read-only agenda viewer).
 // PR2 — Nueva Sesión (create).
+// PR3a — Mis horarios (availability rules editor).
 // Todas las strings están en español hardcodeado + comentario // i18n.
 // NO se usa AppL10n en este archivo (constraint C-6).
 import 'package:flutter/material.dart';
@@ -16,6 +17,7 @@ import '../../../../workout/application/session_providers.dart'
 import 'agenda_web_calendar.dart';
 import 'agenda_web_day_list.dart';
 import 'agenda_web_helpers.dart';
+import 'availability_editor_panel.dart';
 import 'new_session_dialog.dart';
 
 // ─── AgendaWebScreen ──────────────────────────────────────────────────────────
@@ -65,6 +67,16 @@ class _AgendaWebScreenState extends ConsumerState<AgendaWebScreen> {
       builder: (_) => NewSessionDialog(
         initialDate: _selectedDay,
       ),
+    );
+  }
+
+  Future<void> _openAvailabilityEditor(
+    BuildContext context,
+    String trainerId,
+  ) async {
+    await showDialog<void>(
+      context: context,
+      builder: (_) => AvailabilityEditorPanel(trainerId: trainerId),
     );
   }
 
@@ -123,6 +135,8 @@ class _AgendaWebScreenState extends ConsumerState<AgendaWebScreen> {
                                   day: selectedDay,
                                   onNewSession: () =>
                                       _openNewSessionDialog(context),
+                                  onMisHorarios: () => _openAvailabilityEditor(
+                                      context, trainerId),
                                 ),
                                 const SizedBox(height: 12),
                                 Expanded(
@@ -165,6 +179,8 @@ class _AgendaWebScreenState extends ConsumerState<AgendaWebScreen> {
                         _DayPanelHeader(
                           day: selectedDay,
                           onNewSession: () => _openNewSessionDialog(context),
+                          onMisHorarios: () =>
+                              _openAvailabilityEditor(context, trainerId),
                         ),
                         const SizedBox(height: 12),
                         AgendaWebDayList(
@@ -207,17 +223,21 @@ class _Panel extends StatelessWidget {
   }
 }
 
-/// Encabezado del panel de turnos: fecha en español + botón NUEVA SESIÓN.
+/// Encabezado del panel de turnos: fecha en español + botón NUEVA SESIÓN +
+/// botón MIS HORARIOS (PR3a).
 ///
 /// PR2: agrega el botón que abre [NewSessionDialog] (ADR-AGW-3).
+/// PR3a: agrega el botón que abre [AvailabilityEditorPanel] (ADR-AGW-3).
 class _DayPanelHeader extends StatelessWidget {
   const _DayPanelHeader({
     required this.day,
     required this.onNewSession,
+    required this.onMisHorarios,
   });
 
   final DateTime day;
   final VoidCallback onNewSession;
+  final VoidCallback onMisHorarios;
 
   @override
   Widget build(BuildContext context) {
@@ -235,6 +255,26 @@ class _DayPanelHeader extends StatelessWidget {
             ),
           ),
         ),
+        OutlinedButton(
+          onPressed: onMisHorarios,
+          style: OutlinedButton.styleFrom(
+            side: BorderSide(color: palette.accent),
+            minimumSize: const Size(0, 36),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+            shape: const StadiumBorder(),
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
+          child: Text(
+            'MIS HORARIOS', // i18n
+            style: GoogleFonts.barlowCondensed(
+              fontWeight: FontWeight.w700,
+              fontSize: 13,
+              letterSpacing: 0.8,
+              color: palette.accent,
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
         ElevatedButton.icon(
           onPressed: onNewSession,
           style: ElevatedButton.styleFrom(
