@@ -59,11 +59,16 @@ class ChatMediaUploadServiceWeb extends ChatMediaUploadService {
     final bytes = await xfile.readAsBytes();
     guardSize(sizeBytes: bytes.length, mediaType: mediaType);
 
-    final ext = extensionFor(localPath);
+    // Web picker returns a blob URL as `path` (no extension). Fall back to
+    // xfile.name (which preserves the original filename incl. extension) or
+    // to xfile.mimeType so we can (a) build a canonical Storage path with a
+    // sane extension and (b) set an image/* contentType — the Storage rule
+    // rejects octet-stream, so guessing wrong here fails the upload.
+    final ext = _resolveExtension(localPath, xfile, mediaType);
     final ts = DateTime.now().microsecondsSinceEpoch.toRadixString(36);
     final path =
         buildPath(chatId: chatId, uid: user.uid, ext: ext, timestamp: ts);
-    final contentType = contentTypeForExt(ext);
+    final contentType = _resolveContentType(ext, xfile, mediaType);
 
     final ref = _storage!.ref().child(path);
     final task = ref.putData(
@@ -80,6 +85,45 @@ class ChatMediaUploadServiceWeb extends ChatMediaUploadService {
 
     final snapshot = await task;
     return snapshot.ref.getDownloadURL();
+  }
+
+  /// Resolves an extension for the Storage path when [localPath] is a blob URL
+  /// (which has none). Falls back to `xfile.name` → `xfile.mimeType` → a
+  /// media-type default. Never returns empty — that would make the Storage
+  /// path malformed (`.../ts123.`).
+  String _resolveExtension(String localPath, XFile xfile, MediaType mediaType) {
+    final fromPath = extensionFor(localPath);
+    if (fromPath.isNotEmpty) return fromPath;
+
+    final fromName = extensionFor(xfile.name);
+    if (fromName.isNotEmpty) return fromName;
+
+    final mime = xfile.mimeType ?? '';
+    if (mime.startsWith('image/')) {
+      final sub = mime.substring('image/'.length);
+      if (sub == 'jpeg') return 'jpg';
+      if (sub.isNotEmpty) return sub;
+    }
+    if (mime.startsWith('video/')) {
+      final sub = mime.substring('video/'.length);
+      if (sub.isNotEmpty) return sub;
+    }
+
+    return mediaType == MediaType.image ? 'jpg' : 'mp4';
+  }
+
+  /// Resolves a Storage-rule-compliant contentType. Prefers the picker's
+  /// mimeType (accurate), falls back to the resolved extension, and finally
+  /// forces `image/jpeg` or `video/mp4` — the Storage rule rejects
+  /// `application/octet-stream`, so this must never return that on web.
+  String _resolveContentType(String ext, XFile xfile, MediaType mediaType) {
+    final mime = xfile.mimeType;
+    if (mime != null && (mime.startsWith('image/') || mime.startsWith('video/'))) {
+      return mime;
+    }
+    final fromExt = contentTypeForExt(ext);
+    if (fromExt != 'application/octet-stream') return fromExt;
+    return mediaType == MediaType.image ? 'image/jpeg' : 'video/mp4';
   }
 
   @override
