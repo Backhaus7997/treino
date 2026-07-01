@@ -11,6 +11,8 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:treino/app/theme/app_palette.dart';
+import 'package:treino/features/chat/application/chat_providers.dart'
+    show chatForOtherUidProvider, chatRepositoryProvider;
 import 'package:treino/features/payments/application/pagos_por_cobrar_provider.dart'
     show CobroPendiente, isoWeekPeriodKey;
 import 'package:treino/features/payments/application/payment_providers.dart'
@@ -109,6 +111,186 @@ Future<void> marcarPagado(
     if (context.mounted) {
       pagoSnack(context, 'No pudimos guardar. Intentá de nuevo.'); // i18n
     }
+  }
+}
+
+// ── Acciones PR2b ─────────────────────────────────────────────────────────────
+
+/// Muestra confirmación y, si el trainer acepta, marca un [Payment] ad-hoc
+/// como pagado via `markManyPaid([p.id], now)`.
+///
+/// Distinto de [marcarPagado] (cadencia-aware para CobroPendiente). Esta acción
+/// es para pagos directos del tab Vencidos/Por vencer de la tabla web.
+///
+/// REQ-PAGW-ACTION-001.
+Future<void> marcarPagadoDoc(
+    BuildContext context, WidgetRef ref, Payment payment) async {
+  final palette = AppPalette.of(context);
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      backgroundColor: palette.bgCard,
+      title: Text('¿Marcar como cobrado?', // i18n
+          style: TextStyle(
+              color: palette.textPrimary,
+              fontWeight: FontWeight.w700,
+              fontSize: 18)),
+      content: Text('${payment.concept} — ${fmtArs(payment.amountArs)}',
+          style: TextStyle(color: palette.textMuted, fontSize: 14)),
+      actions: [
+        TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text('Cancelar', // i18n
+                style: TextStyle(color: palette.textMuted))),
+        TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text('Cobrado', // i18n
+                style: TextStyle(
+                    color: palette.accent, fontWeight: FontWeight.w700))),
+      ],
+    ),
+  );
+  if (confirmed != true || !context.mounted) return;
+
+  final repo = ref.read(paymentRepositoryProvider);
+  final now = DateTime.now().toUtc();
+  try {
+    await repo.markManyPaid([payment.id], now);
+    if (context.mounted) {
+      pagoSnack(context, 'Cobro registrado.'); // i18n
+    }
+  } catch (_) {
+    if (context.mounted) {
+      pagoSnack(context, 'No pudimos guardar. Intentá de nuevo.'); // i18n
+    }
+  }
+}
+
+/// Construye el mensaje de recordatorio de pago.
+///
+/// Incluye monto en es-AR, concepto, y alias de pago del trainer si no es
+/// null/vacío. Puro (sin side-effects) — testeable unitariamente.
+///
+/// REQ-PAGW-ACTION-002.
+String reminderText({
+  required int amount,
+  required String concept,
+  required String? paymentAlias,
+}) {
+  final monto = fmtArs(amount);
+  final buf =
+      StringBuffer('Hola! Te recuerdo el pago de $concept por $monto.'); // i18n
+  if (paymentAlias != null && paymentAlias.isNotEmpty) {
+    buf.write(' Podés transferir a: $paymentAlias'); // i18n
+  }
+  return buf.toString();
+}
+
+/// Envía un recordatorio de pago al alumno por el **chat in-app**.
+///
+/// Muestra un diálogo con el mensaje pre-cargado y editable; al confirmar,
+/// resuelve (creando si hace falta) el chat PF↔alumno vía [chatForOtherUidProvider]
+/// y lo envía con [ChatRepository.sendMessage]. El CF `notifyOnChatMessage` le
+/// manda el push al alumno. Reusa el chat existente — sin backend nuevo, y sin
+/// depender del teléfono del alumno.
+///
+/// REQ-PAGW-ACTION-002.
+Future<void> recordar(
+  BuildContext context,
+  WidgetRef ref,
+  Payment payment,
+  String? paymentAlias,
+) async {
+  final initial = reminderText(
+    amount: payment.amountArs,
+    concept: payment.concept,
+    paymentAlias: paymentAlias,
+  );
+  final text = await showDialog<String>(
+    context: context,
+    builder: (_) => _RecordarDialog(initialText: initial),
+  );
+  if (text == null || text.trim().isEmpty || !context.mounted) return;
+
+  final trainerId = ref.read(currentUidProvider);
+  if (trainerId == null) return;
+  try {
+    final chat =
+        await ref.read(chatForOtherUidProvider(payment.athleteId).future);
+    await ref.read(chatRepositoryProvider).sendMessage(
+          chatId: chat.chatId,
+          senderId: trainerId,
+          text: text.trim(),
+        );
+    if (context.mounted) {
+      pagoSnack(context, 'Recordatorio enviado por chat.'); // i18n
+    }
+  } catch (_) {
+    if (context.mounted) {
+      pagoSnack(context, 'No pudimos enviar el recordatorio.'); // i18n
+    }
+  }
+}
+
+/// Diálogo que muestra el recordatorio pre-cargado y editable antes de enviarlo
+/// por el chat. Devuelve el texto final (al presionar Enviar) o `null` (Cancelar).
+class _RecordarDialog extends StatefulWidget {
+  const _RecordarDialog({required this.initialText});
+
+  final String initialText;
+
+  @override
+  State<_RecordarDialog> createState() => _RecordarDialogState();
+}
+
+class _RecordarDialogState extends State<_RecordarDialog> {
+  late final TextEditingController _controller =
+      TextEditingController(text: widget.initialText);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    return AlertDialog(
+      backgroundColor: palette.bgCard,
+      title: Text(
+        'Enviar recordatorio por chat', // i18n
+        style: TextStyle(
+          color: palette.textPrimary,
+          fontWeight: FontWeight.w700,
+          fontSize: 18,
+        ),
+      ),
+      content: TextField(
+        controller: _controller,
+        minLines: 2,
+        maxLines: 5,
+        autofocus: true,
+        style: TextStyle(color: palette.textPrimary),
+        decoration: InputDecoration(
+          hintText: 'Mensaje para el alumno', // i18n
+          hintStyle: TextStyle(color: palette.textMuted),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text('Cancelar', // i18n
+              style: TextStyle(color: palette.textMuted)),
+        ),
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(_controller.text),
+          child: Text('Enviar', // i18n
+              style: TextStyle(
+                  color: palette.accent, fontWeight: FontWeight.w700)),
+        ),
+      ],
+    );
   }
 }
 
