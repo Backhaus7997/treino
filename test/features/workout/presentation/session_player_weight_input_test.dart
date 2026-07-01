@@ -93,8 +93,10 @@ void main() {
     // Sanity: the field starts pre-filled with the planned weight.
     expect(find.text('60'), findsWidgets);
 
-    // User clears the weight field.
-    await tester.enterText(find.byType(TextField), '');
+    // User clears the weight field. The row now has TWO TextFields (reps +
+    // weight); weight is the second one — same visual order (reps on the
+    // left, weight on the right).
+    await tester.enterText(find.byType(TextField).last, '');
     await tester.pump();
 
     // Summary now reflects 0 kg, not the stale 60.
@@ -125,7 +127,8 @@ void main() {
     );
     await tester.pump();
 
-    await tester.enterText(find.byType(TextField), '600');
+    // Weight field is the second TextField (row now has reps + weight).
+    await tester.enterText(find.byType(TextField).last, '600');
     await tester.pump();
 
     await tester.tap(find.byIcon(TreinoIcon.checkCircleEmpty));
