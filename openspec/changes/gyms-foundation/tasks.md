@@ -80,18 +80,27 @@ Start: depends on Phase 1 (`Gym`, `GymBrand` models exist). End: athlete can bro
 
 Start: depends on Phase 1 only (not Phase 2). End: `UserPublicProfile.gymName` dual-written with composed brand-branch label at save time; all 7 call sites resolve real names; safe fallback for unresolvable ids.
 
-- [ ] 3.1 (RED) Write test: `UserPublicProfile.fromJson`/`toJson` round-trips new `gymName` field — `test/features/profile/domain/user_public_profile_test.dart`
-- [ ] 3.2 (GREEN) Add `String? gymName` to `lib/features/profile/domain/user_public_profile.dart`
-- [ ] 3.3 Regenerate: `dart run build_runner build --delete-conflicting-outputs`
-- [ ] 3.4 **[HIGHEST RISK]** (RED) Write test using `fake_cloud_firestore`: `UserRepository.update({'gymId': validId})` dual-writes `gymName` = resolved sucursal's composed name into `users/{uid}` AND `userPublicProfiles/{uid}` — `test/features/profile/data/user_repository_test.dart`
-- [ ] 3.5 **[HIGHEST RISK]** (RED) Write test: `UserRepository.update({'gymId': kNoGymId})` writes `gymName: null` (no resolution attempted)
-- [ ] 3.6 **[HIGHEST RISK]** (RED) Write test: `UserRepository.update({'gymId': unknownId})` does not crash, writes safe fallback (null/empty), async resolution failure handled gracefully
-- [ ] 3.7 **[HIGHEST RISK]** (GREEN) Inject `GymRepository` into `UserRepository`; in `update()`, when `partial.containsKey('gymId')`, resolve `gym.name` async via `getById` and add `gymName` to `_publicFields` write payload (mirrors `CheckIn.gymName` pattern)
-- [ ] 3.8 (RED) Write test: name fallback for unknown/no-gym/null id renders empty (replaces deleted `gym_name_test.dart`) — covers spec req 3
-- [ ] 3.9 (GREEN) Update 7 call sites to resolve real names — LIST contexts read `profile.gymName` denormalized field: `feed_screen.dart`, `user_search_result_tile.dart`, `friend_request_inbox_tile.dart`
-- [ ] 3.10 (GREEN) Update DETAIL contexts to use `gymByIdProvider` (Riverpod-cached), composing label from resolved `Gym`: `session_player_screen.dart`, `profile_cuenta_section.dart`, `profile_avatar_card.dart`, `public_profile_hero.dart`
-- [ ] 3.11 (RED) Write test: chain gym displays "Brand - Branch"; independent gym displays brand name only (composed label logic) — cover in provider or widget test per call site touched
-- [ ] 3.12 Quality gate: `flutter analyze` 0 issues, `dart format .`, `flutter test` green for this slice
+**STATUS: 12/12 DONE.** Branch `feat/gyms-foundation-names` (local, not pushed, no PR). Full detail in apply-progress (id 342, merged Phase 1+2+3).
+
+- [x] 3.1 (RED) Write test: `UserPublicProfile.fromJson`/`toJson` round-trips new `gymName` field — `test/features/profile/domain/user_public_profile_test.dart`
+- [x] 3.2 (GREEN) Add `String? gymName` to `lib/features/profile/domain/user_public_profile.dart`
+- [x] 3.3 Regenerate: `dart run build_runner build --delete-conflicting-outputs`
+- [x] 3.4 **[HIGHEST RISK]** (RED) Write test using `fake_cloud_firestore`: `UserRepository.update({'gymId': validId})` dual-writes `gymName` = resolved sucursal's composed name into `users/{uid}` AND `userPublicProfiles/{uid}` — `test/features/profile/data/user_repository_test.dart`
+- [x] 3.5 **[HIGHEST RISK]** (RED) Write test: `UserRepository.update({'gymId': kNoGymId})` writes `gymName: null` (no resolution attempted)
+- [x] 3.6 **[HIGHEST RISK]** (RED) Write test: `UserRepository.update({'gymId': unknownId})` does not crash, writes safe fallback (null/empty), async resolution failure handled gracefully
+- [x] 3.7 **[HIGHEST RISK]** (GREEN) Inject `GymRepository` into `UserRepository`; in `update()`, when `partial.containsKey('gymId')`, resolve `gym.name` async via `getById` and add `gymName` to `_publicFields` write payload (mirrors `CheckIn.gymName` pattern). Also verified `gymName` is ONLY written to `userPublicProfiles/{uid}` — NOT `users/{uid}` (mirrors `displayNameLowercase`'s public-only scope, not spec'd explicitly but consistent with existing dual-write convention).
+- [x] 3.8 (RED) Write test: name fallback for unknown/no-gym/null id renders empty (replaces deleted `gym_name_test.dart`) — covers spec req 3. Implemented as `lib/features/gyms/domain/gym_display_name.dart` (`gymDisplayNameFromGym`/`gymDisplayNameFromDenormalized`), not inline per call site — one shared non-crashing fallback contract for both DETAIL (`Gym?`) and LIST (`String?` denormalized) paths.
+- [x] 3.9 (GREEN) Update 7 call sites to resolve real names — LIST contexts read `profile.gymName` denormalized field: `feed_screen.dart` (see deviation below), `user_search_result_tile.dart`, `friend_request_inbox_tile.dart`
+- [x] 3.10 (GREEN) Update DETAIL contexts to use `gymByIdProvider` (Riverpod-cached), composing label from resolved `Gym`: `session_player_screen.dart`, `profile_cuenta_section.dart`, `profile_avatar_card.dart`, `public_profile_hero.dart`
+- [x] 3.11 (RED) Write test: chain gym displays "Brand - Branch"; independent gym displays brand name only (composed label logic) — covered by `gym_display_name_test.dart` (pure helper) + per-call-site widget tests (`public_profile_hero_test.dart`, `profile_avatar_card_test.dart`, `profile_cuenta_section_test.dart`) asserting the real composed name text
+- [x] 3.12 Quality gate: `flutter analyze` 0 issues, `dart format .`, `flutter test` green for this slice — see apply-progress for full command output
+
+### Deviations from tasks.md / design.md (Phase 3)
+
+1. **`feed_screen.dart` is a DETAIL (self) context via `gymByIdProvider`, not a LIST context via `profile.gymName`, despite being listed under task 3.9's LIST group.** `feed_screen.dart`'s `_maybeShowCheckIn()` reads `userProfileProvider` (own `UserProfile`, NOT `UserPublicProfile`) — there is no denormalized `gymName` field to read on that model. Reclassified to DETAIL alongside `session_player_screen.dart`/`profile_cuenta_section.dart`/`profile_avatar_card.dart`, all four of which share the same root cause (self-viewer reads `UserProfile`, not `UserPublicProfile`). Uses `ref.read(gymByIdProvider(gymId).future)` since resolution happens inside an already-async method (`_maybeShowCheckIn`), not a `build()`.
+2. **New pure helper `lib/features/gyms/domain/gym_display_name.dart`** was added (not explicitly listed in design.md's file-changes table) to give every one of the 7 call sites ONE shared non-crashing fallback rule, replacing the retired `gymNameFromId`'s contract. `Gym.name` is already the composed label (per design decision) — the helper only adds the safe-empty-string fallback for `null`/unresolved cases, split into a `Gym?`-based variant (detail) and a `String?`-based variant (denormalized list).
+3. **`PublicProfileHero` converted from `StatelessWidget` to `ConsumerWidget`** (not explicitly called out in design.md) to watch `gymByIdProvider` directly — required since it's a DETAIL context (viewing one other user), same reasoning as `_GymChip` in `profile_avatar_card.dart`.
+4. **`feed/domain/gym_name.dart` + its test deleted** (tasks 1.12-1.13 from Phase 1, carried forward and now unblocked) after confirming via `rg` that all 7 real consumers were migrated and no other file imported it (`check_in_dialog.dart`'s only reference was a stale doc-comment mentioning `gymNameFromId` by name, not an import — updated the comment, not a functional change).
 
 ## Phase 4: Legacy Backfills (PR 4 — dev-first, verified before prod)
 

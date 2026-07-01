@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:treino/features/gyms/data/gym_repository.dart';
 import 'package:treino/features/profile/data/user_repository.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
@@ -13,7 +14,10 @@ void main() {
 
   setUp(() {
     firestore = FakeFirebaseFirestore();
-    repo = UserRepository(firestore: firestore);
+    repo = UserRepository(
+      firestore: firestore,
+      gyms: GymRepository(firestore: firestore),
+    );
   });
 
   // Helper: seed a document directly
@@ -270,6 +274,131 @@ void main() {
     // TODO: SCENARIO-264 — partial batch failure leaves neither doc written.
     // Deferred: faking a mid-commit batch failure is not reliably reproducible
     // with fake_cloud_firestore. Covered by manual T35-style emulator session.
+  });
+
+  // ---------------------------------------------------------------------------
+  // gyms-foundation Phase 3 — gymName dual-write on gymId change
+  // [HIGHEST RISK] tasks 3.4-3.7: UserRepository.update() now resolves the
+  // composed brand-branch label from `gyms/{gymId}` and writes `gymName`
+  // alongside `gymId` into userPublicProfiles. Injects GymRepository — the
+  // first ASYNC dependency into a previously-sync helper
+  // (_publicSubsetFromPartial).
+  // ---------------------------------------------------------------------------
+  group('UserRepository.update — gymName dual-write (gyms-foundation Phase 3)',
+      () {
+    Future<void> seedGymDoc(
+      FakeFirebaseFirestore fs,
+      String id, {
+      required String name,
+    }) async {
+      await fs.collection('gyms').doc(id).set({
+        'name': name,
+        'lat': -31.4,
+        'lng': -64.18,
+        'geohash': 'abc123',
+        'source': 'seed',
+        'createdAt': Timestamp.fromDate(DateTime.utc(2026, 1, 1)),
+      });
+    }
+
+    test(
+        'SCENARIO-524: update with a valid gymId writes the composed gymName '
+        'into userPublicProfiles', () async {
+      await seedGymDoc(
+        firestore,
+        'sportclub-belgrano',
+        name: 'SportClub - Belgrano',
+      );
+      await seedDoc('u-gym-1');
+      await firestore.collection('userPublicProfiles').doc('u-gym-1').set({
+        'uid': 'u-gym-1',
+        'displayName': null,
+        'displayNameLowercase': null,
+        'avatarUrl': null,
+        'gymId': null,
+      });
+
+      await repo.update('u-gym-1', {'gymId': 'sportclub-belgrano'});
+
+      final pubSnap =
+          await firestore.collection('userPublicProfiles').doc('u-gym-1').get();
+      expect(pubSnap.data()!['gymId'], equals('sportclub-belgrano'));
+      expect(pubSnap.data()!['gymName'], equals('SportClub - Belgrano'));
+
+      // users/{uid} does NOT get a gymName field — it's a public-doc-only
+      // denormalization (mirrors displayNameLowercase's public-only scope).
+      final usersSnap =
+          await firestore.collection('users').doc('u-gym-1').get();
+      expect(usersSnap.data()!.containsKey('gymName'), isFalse);
+    });
+
+    test(
+        'SCENARIO-525: update with gymId=kNoGymId writes gymName:null with no '
+        'gym resolution attempted', () async {
+      await seedDoc('u-gym-2');
+      await firestore.collection('userPublicProfiles').doc('u-gym-2').set({
+        'uid': 'u-gym-2',
+        'displayName': null,
+        'displayNameLowercase': null,
+        'avatarUrl': null,
+        'gymId': 'sportclub-belgrano',
+        'gymName': 'SportClub - Belgrano',
+      });
+
+      await repo.update('u-gym-2', {'gymId': 'no-gym'});
+
+      final pubSnap =
+          await firestore.collection('userPublicProfiles').doc('u-gym-2').get();
+      expect(pubSnap.data()!['gymId'], equals('no-gym'));
+      expect(pubSnap.data()!['gymName'], isNull);
+    });
+
+    test(
+        'SCENARIO-526: update with an unknown gymId does not crash and writes '
+        'a safe null fallback for gymName', () async {
+      await seedDoc('u-gym-3');
+      await firestore.collection('userPublicProfiles').doc('u-gym-3').set({
+        'uid': 'u-gym-3',
+        'displayName': null,
+        'displayNameLowercase': null,
+        'avatarUrl': null,
+        'gymId': null,
+      });
+
+      // No gym doc seeded for 'ghost-gym-id' — GymRepository.getById returns
+      // null; the async resolution must not throw and must fall back safely.
+      await expectLater(
+        repo.update('u-gym-3', {'gymId': 'ghost-gym-id'}),
+        completes,
+      );
+
+      final pubSnap =
+          await firestore.collection('userPublicProfiles').doc('u-gym-3').get();
+      expect(pubSnap.data()!['gymId'], equals('ghost-gym-id'));
+      expect(pubSnap.data()!['gymName'], isNull);
+    });
+
+    test(
+        'SCENARIO-527: update WITHOUT gymId in the partial does not touch '
+        'gymName at all', () async {
+      await seedDoc('u-gym-4');
+      await firestore.collection('userPublicProfiles').doc('u-gym-4').set({
+        'uid': 'u-gym-4',
+        'displayName': 'Original',
+        'displayNameLowercase': 'original',
+        'avatarUrl': null,
+        'gymId': 'sportclub-belgrano',
+        'gymName': 'SportClub - Belgrano',
+      });
+
+      await repo.update('u-gym-4', {'displayName': 'Nuevo'});
+
+      final pubSnap =
+          await firestore.collection('userPublicProfiles').doc('u-gym-4').get();
+      // gymName untouched — the partial never mentioned gymId.
+      expect(pubSnap.data()!['gymName'], equals('SportClub - Belgrano'));
+      expect(pubSnap.data()!['gymId'], equals('sportclub-belgrano'));
+    });
   });
 
   // ---------------------------------------------------------------------------

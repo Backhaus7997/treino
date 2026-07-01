@@ -25,6 +25,15 @@ mixin _$UserPublicProfile {
   String? get displayNameLowercase => throw _privateConstructorUsedError;
   String? get avatarUrl => throw _privateConstructorUsedError;
   String? get gymId => throw _privateConstructorUsedError;
+
+  /// Denormalized composed brand-branch display label (e.g.
+  /// "SportClub - Belgrano", or just the brand name for independent
+  /// single-branch gyms). Dual-written by `UserRepository.update()`
+  /// alongside `gymId` at profile-save time — mirrors `CheckIn.gymName`.
+  /// Nullable for backward-compat with profiles saved before this field
+  /// existed (also `null` when `gymId` is `null`/`kNoGymId`/unresolvable).
+  /// See gyms-foundation Phase 3 (name resolution + denormalization).
+  String? get gymName => throw _privateConstructorUsedError;
   int? get workoutsCount => throw _privateConstructorUsedError;
   int? get racha =>
       throw _privateConstructorUsedError; // ignore: invalid_annotation_target
@@ -63,6 +72,7 @@ abstract class $UserPublicProfileCopyWith<$Res> {
       String? displayNameLowercase,
       String? avatarUrl,
       String? gymId,
+      String? gymName,
       int? workoutsCount,
       int? racha,
       @JsonKey(fromJson: _nonNegativeCount) int? followersCount,
@@ -90,6 +100,7 @@ class _$UserPublicProfileCopyWithImpl<$Res, $Val extends UserPublicProfile>
     Object? displayNameLowercase = freezed,
     Object? avatarUrl = freezed,
     Object? gymId = freezed,
+    Object? gymName = freezed,
     Object? workoutsCount = freezed,
     Object? racha = freezed,
     Object? followersCount = freezed,
@@ -116,6 +127,10 @@ class _$UserPublicProfileCopyWithImpl<$Res, $Val extends UserPublicProfile>
       gymId: freezed == gymId
           ? _value.gymId
           : gymId // ignore: cast_nullable_to_non_nullable
+              as String?,
+      gymName: freezed == gymName
+          ? _value.gymName
+          : gymName // ignore: cast_nullable_to_non_nullable
               as String?,
       workoutsCount: freezed == workoutsCount
           ? _value.workoutsCount
@@ -155,6 +170,7 @@ abstract class _$$UserPublicProfileImplCopyWith<$Res>
       String? displayNameLowercase,
       String? avatarUrl,
       String? gymId,
+      String? gymName,
       int? workoutsCount,
       int? racha,
       @JsonKey(fromJson: _nonNegativeCount) int? followersCount,
@@ -180,6 +196,7 @@ class __$$UserPublicProfileImplCopyWithImpl<$Res>
     Object? displayNameLowercase = freezed,
     Object? avatarUrl = freezed,
     Object? gymId = freezed,
+    Object? gymName = freezed,
     Object? workoutsCount = freezed,
     Object? racha = freezed,
     Object? followersCount = freezed,
@@ -206,6 +223,10 @@ class __$$UserPublicProfileImplCopyWithImpl<$Res>
       gymId: freezed == gymId
           ? _value.gymId
           : gymId // ignore: cast_nullable_to_non_nullable
+              as String?,
+      gymName: freezed == gymName
+          ? _value.gymName
+          : gymName // ignore: cast_nullable_to_non_nullable
               as String?,
       workoutsCount: freezed == workoutsCount
           ? _value.workoutsCount
@@ -240,6 +261,7 @@ class _$UserPublicProfileImpl implements _UserPublicProfile {
       this.displayNameLowercase,
       this.avatarUrl,
       this.gymId,
+      this.gymName,
       this.workoutsCount,
       this.racha,
       @JsonKey(fromJson: _nonNegativeCount) this.followersCount,
@@ -259,6 +281,16 @@ class _$UserPublicProfileImpl implements _UserPublicProfile {
   final String? avatarUrl;
   @override
   final String? gymId;
+
+  /// Denormalized composed brand-branch display label (e.g.
+  /// "SportClub - Belgrano", or just the brand name for independent
+  /// single-branch gyms). Dual-written by `UserRepository.update()`
+  /// alongside `gymId` at profile-save time — mirrors `CheckIn.gymName`.
+  /// Nullable for backward-compat with profiles saved before this field
+  /// existed (also `null` when `gymId` is `null`/`kNoGymId`/unresolvable).
+  /// See gyms-foundation Phase 3 (name resolution + denormalization).
+  @override
+  final String? gymName;
   @override
   final int? workoutsCount;
   @override
@@ -283,7 +315,7 @@ class _$UserPublicProfileImpl implements _UserPublicProfile {
 
   @override
   String toString() {
-    return 'UserPublicProfile(uid: $uid, displayName: $displayName, displayNameLowercase: $displayNameLowercase, avatarUrl: $avatarUrl, gymId: $gymId, workoutsCount: $workoutsCount, racha: $racha, followersCount: $followersCount, followingCount: $followingCount, sharedTemplatesWithAthletes: $sharedTemplatesWithAthletes)';
+    return 'UserPublicProfile(uid: $uid, displayName: $displayName, displayNameLowercase: $displayNameLowercase, avatarUrl: $avatarUrl, gymId: $gymId, gymName: $gymName, workoutsCount: $workoutsCount, racha: $racha, followersCount: $followersCount, followingCount: $followingCount, sharedTemplatesWithAthletes: $sharedTemplatesWithAthletes)';
   }
 
   @override
@@ -299,6 +331,7 @@ class _$UserPublicProfileImpl implements _UserPublicProfile {
             (identical(other.avatarUrl, avatarUrl) ||
                 other.avatarUrl == avatarUrl) &&
             (identical(other.gymId, gymId) || other.gymId == gymId) &&
+            (identical(other.gymName, gymName) || other.gymName == gymName) &&
             (identical(other.workoutsCount, workoutsCount) ||
                 other.workoutsCount == workoutsCount) &&
             (identical(other.racha, racha) || other.racha == racha) &&
@@ -321,6 +354,7 @@ class _$UserPublicProfileImpl implements _UserPublicProfile {
       displayNameLowercase,
       avatarUrl,
       gymId,
+      gymName,
       workoutsCount,
       racha,
       followersCount,
@@ -351,6 +385,7 @@ abstract class _UserPublicProfile implements UserPublicProfile {
       final String? displayNameLowercase,
       final String? avatarUrl,
       final String? gymId,
+      final String? gymName,
       final int? workoutsCount,
       final int? racha,
       @JsonKey(fromJson: _nonNegativeCount) final int? followersCount,
@@ -370,6 +405,16 @@ abstract class _UserPublicProfile implements UserPublicProfile {
   String? get avatarUrl;
   @override
   String? get gymId;
+
+  /// Denormalized composed brand-branch display label (e.g.
+  /// "SportClub - Belgrano", or just the brand name for independent
+  /// single-branch gyms). Dual-written by `UserRepository.update()`
+  /// alongside `gymId` at profile-save time — mirrors `CheckIn.gymName`.
+  /// Nullable for backward-compat with profiles saved before this field
+  /// existed (also `null` when `gymId` is `null`/`kNoGymId`/unresolvable).
+  /// See gyms-foundation Phase 3 (name resolution + denormalization).
+  @override
+  String? get gymName;
   @override
   int? get workoutsCount;
   @override

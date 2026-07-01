@@ -9,7 +9,8 @@ import '../../l10n/app_l10n.dart';
 import '../chat/application/chat_providers.dart';
 import '../check_in/application/check_in_providers.dart';
 import '../check_in/presentation/check_in_dialog.dart';
-import 'domain/gym_name.dart';
+import '../gyms/application/gym_providers.dart';
+import '../gyms/domain/gym_display_name.dart';
 import '../profile/application/user_providers.dart';
 import '../workout/application/session_providers.dart' show currentUidProvider;
 import 'application/feed_screen_providers.dart';
@@ -66,9 +67,19 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
     ref.read(_checkInDialogShownThisSessionProvider.notifier).state = true;
 
     // Resolve gym info from the user's profile for the dialog copy.
+    // DETAIL context (self) — UserProfile has no denormalized gymName, so
+    // resolve live via gymByIdProvider. gyms-foundation Phase 3.
     final profile = ref.read(userProfileProvider).valueOrNull;
     final gymId = profile?.gymId;
-    final gymName = gymId != null ? gymNameFromId(gymId) : null;
+    final gymName = gymId == null
+        ? null
+        : gymDisplayNameFromGym(
+            await ref.read(gymByIdProvider(gymId).future).catchError(
+                  (_) => null,
+                ),
+          );
+
+    if (!mounted) return;
 
     await showDialog<void>(
       context: context,

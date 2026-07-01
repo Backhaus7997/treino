@@ -1,23 +1,31 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
-import '../../domain/gym_name.dart';
+import '../../../gyms/application/gym_providers.dart';
+import '../../../gyms/domain/gym_display_name.dart';
 import '../../domain/public_profile_view.dart';
 import 'post_avatar.dart';
 
 /// Hero section of the public profile screen. Renders the avatar (96px),
 /// uppercase display name, and optional gym subtitle (omitted when the gym
 /// is unknown / null / sentinel). Background is a vertical accent→bg gradient.
-class PublicProfileHero extends StatelessWidget {
+///
+/// DETAIL context (single target user) — resolves the gym name live via
+/// [gymByIdProvider] rather than reading a denormalized field, so the name
+/// always reflects the current `gyms/` catalog. gyms-foundation Phase 3.
+class PublicProfileHero extends ConsumerWidget {
   const PublicProfileHero({super.key, required this.view});
 
   final PublicProfileView view;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
-    final gymName = gymNameFromId(view.authorGymId);
+    final gymId = view.authorGymId;
+    final gymAsync = gymId == null ? null : ref.watch(gymByIdProvider(gymId));
+    final gymName = gymDisplayNameFromGym(gymAsync?.valueOrNull);
 
     return Container(
       decoration: BoxDecoration(

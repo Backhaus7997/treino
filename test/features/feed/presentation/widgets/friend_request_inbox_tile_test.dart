@@ -187,6 +187,7 @@ void main() {
         uid: 'bob',
         displayName: 'Ana García',
         gymId: 'smart-fit-palermo',
+        gymName: 'SmartFit - Palermo',
       );
 
       final friendship = _makeFriendship(requesterId: 'bob');
@@ -207,8 +208,8 @@ void main() {
 
       // displayName uppercase (tile renders toUpperCase)
       expect(find.text('ANA GARCÍA'), findsOneWidget);
-      // gym name resolved from gym id
-      expect(find.text('SMART FIT'), findsOneWidget);
+      // gym name read from the denormalized profile.gymName field
+      expect(find.text('SmartFit - Palermo'), findsOneWidget);
       // PostAvatar should be present
       expect(find.byType(PostAvatar), findsOneWidget);
     });
@@ -236,7 +237,7 @@ void main() {
       // The tile uppercases the fallback name
       expect(find.text('USUARIO ANÓNIMO'), findsOneWidget);
       // No gym subtitle row
-      expect(find.text('SMART FIT'), findsNothing);
+      expect(find.text('SmartFit - Palermo'), findsNothing);
     });
 
     // SCENARIO-463: ACEPTAR tap → repo.accept(F.id, myUid) called; no exception surfaces

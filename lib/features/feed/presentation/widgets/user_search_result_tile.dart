@@ -3,7 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/treino_icon.dart';
-import '../../domain/gym_name.dart';
+import '../../../gyms/domain/gym_display_name.dart';
 import '../../../profile/domain/user_public_profile.dart';
 import 'post_avatar.dart';
 
@@ -30,7 +30,7 @@ class UserSearchResultTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    final gymName = gymNameFromId(profile.gymId);
+    final gymName = gymDisplayNameFromDenormalized(profile.gymName);
     final displayName = profile.displayName ?? 'Anónimo';
 
     return GestureDetector(

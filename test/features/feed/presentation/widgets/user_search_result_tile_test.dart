@@ -13,12 +13,14 @@ UserPublicProfile _fakeProfile({
   String uid = 'u1',
   String? displayName = 'Ana',
   String? gymId,
+  String? gymName,
 }) =>
     UserPublicProfile(
       uid: uid,
       displayName: displayName,
       displayNameLowercase: displayName?.toLowerCase(),
       gymId: gymId,
+      gymName: gymName,
     );
 
 /// Wraps the tile inside a GoRouter so context.push works.
@@ -49,11 +51,15 @@ void main() {
   // ---------------------------------------------------------------------------
   group('UserSearchResultTile — rendering', () {
     testWidgets(
-        'SCENARIO-281: renders PostAvatar, displayName, and gym name when '
-        'gymId is "smart-fit-palermo"', (tester) async {
+        'SCENARIO-281: renders PostAvatar, displayName, and the denormalized '
+        'gym name', (tester) async {
       final tile = UserSearchResultTile(
         profile: _fakeProfile(
-            uid: 'u1', displayName: 'Ana', gymId: 'smart-fit-palermo'),
+          uid: 'u1',
+          displayName: 'Ana',
+          gymId: 'smart-fit-palermo',
+          gymName: 'SmartFit - Palermo',
+        ),
         onTap: () {},
       );
 
@@ -62,8 +68,8 @@ void main() {
 
       // displayName visible (rendered uppercase by design)
       expect(find.textContaining('ANA'), findsOneWidget);
-      // gym name resolved from gymId
-      expect(find.textContaining('SMART FIT'), findsOneWidget);
+      // gym name read from the denormalized UserPublicProfile.gymName field
+      expect(find.textContaining('SmartFit - Palermo'), findsOneWidget);
     });
 
     // -------------------------------------------------------------------------

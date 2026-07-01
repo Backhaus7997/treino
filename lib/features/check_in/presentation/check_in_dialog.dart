@@ -22,7 +22,8 @@ class CheckInDialog extends ConsumerWidget {
   /// The user's configured gym id, or null if not set. REQ-WRC-009.
   final String? gymId;
 
-  /// The gym display name resolved from [gymId] via `gymNameFromId`, or null.
+  /// The gym display name resolved by the caller (see
+  /// `gyms/domain/gym_display_name.dart`), or null.
   final String? gymName;
 
   @override
