@@ -6,14 +6,15 @@ import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
+import 'package:treino/features/gyms/application/gym_providers.dart';
+import 'package:treino/features/gyms/domain/gym.dart';
+import 'package:treino/features/gyms/domain/gym_source.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/data/user_repository.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
 import 'package:treino/features/profile/presentation/profile_gym_screen.dart';
 import 'package:treino/l10n/app_l10n.dart';
-import 'package:treino/features/profile_setup/application/profile_setup_providers.dart';
-import 'package:treino/features/profile_setup/domain/gym.dart';
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -31,7 +32,7 @@ class MockUserRepository extends Mock implements UserRepository {}
 // ---------------------------------------------------------------------------
 
 const _uid = 'test-uid';
-const _currentGymId = 'smart-fit-palermo';
+const _currentGymId = 'sportclub-belgrano';
 
 UserProfile _profile({String? gymId = _currentGymId}) => UserProfile(
       uid: _uid,
@@ -43,15 +44,55 @@ UserProfile _profile({String? gymId = _currentGymId}) => UserProfile(
       gymId: gymId,
     );
 
-const List<Gym> _testGyms = [
-  Gym(id: 'gym-a', name: 'GYM NORTE', address: 'Av. Norte 100'),
-  Gym(id: 'gym-b', name: 'GYM SUR', address: 'Av. Sur 200'),
-];
+Gym _gym({
+  required String id,
+  required String name,
+  String? brandId,
+  String? brandName,
+  String? branchName,
+  String? city,
+}) =>
+    Gym(
+      id: id,
+      name: name,
+      lat: 0,
+      lng: 0,
+      geohash: 'x',
+      source: GymSource.seed,
+      createdAt: DateTime.utc(2026, 1, 1),
+      brandId: brandId,
+      brandName: brandName,
+      branchName: branchName,
+      city: city,
+    );
+
+final _sportclubBelgrano = _gym(
+  id: 'sportclub-belgrano',
+  name: 'SportClub - Belgrano',
+  brandId: 'sportclub',
+  brandName: 'SportClub',
+  branchName: 'Belgrano',
+  city: 'CABA',
+);
+final _sportclubPilar = _gym(
+  id: 'sportclub-pilar',
+  name: 'SportClub - Pilar',
+  brandId: 'sportclub',
+  brandName: 'SportClub',
+  branchName: 'Pilar',
+  city: 'GBA',
+);
+final _megatlonRecoleta = _gym(
+  id: 'megatlon-recoleta',
+  name: 'Megatlon Recoleta',
+  brandId: 'megatlon-recoleta',
+  brandName: 'Megatlon',
+);
 
 Widget _buildScreen({
   required UserProfile profile,
   required MockUserRepository repo,
-  List<Gym> gyms = _testGyms,
+  Future<List<Gym>> Function(Ref)? gyms,
 }) {
   final mockUser = MockUser();
 
@@ -76,7 +117,14 @@ Widget _buildScreen({
       authStateChangesProvider.overrideWith((_) => Stream.value(mockUser)),
       userProfileProvider.overrideWith((_) => Stream.value(profile)),
       userRepositoryProvider.overrideWithValue(repo),
-      filteredGymsProvider.overrideWithValue(gyms),
+      gymsProvider.overrideWith(
+        gyms ??
+            (ref) async => [
+                  _sportclubBelgrano,
+                  _sportclubPilar,
+                  _megatlonRecoleta,
+                ],
+      ),
     ],
     child: MaterialApp.router(
       theme: AppTheme.dark(),
@@ -89,7 +137,7 @@ Widget _buildScreen({
 }
 
 // ---------------------------------------------------------------------------
-// Tests — SCENARIO-516, SCENARIO-517
+// Tests — SCENARIO-516, SCENARIO-517 (two-step migration)
 // ---------------------------------------------------------------------------
 
 void main() {
@@ -101,75 +149,125 @@ void main() {
   });
 
   group('ProfileGymScreen', () {
-    // SCENARIO-516: gym list renders
-    testWidgets('SCENARIO-516: renders gym catalog list', (tester) async {
+    // SCENARIO-516: brand list renders (step 1)
+    testWidgets('SCENARIO-516: renders brand catalog list', (tester) async {
       await tester.pumpWidget(
-        _buildScreen(
-          profile: _profile(),
-          repo: mockRepo,
-        ),
+        _buildScreen(profile: _profile(), repo: mockRepo),
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('GYM NORTE'), findsOneWidget);
-      expect(find.text('GYM SUR'), findsOneWidget);
+      expect(find.text('SportClub'), findsOneWidget);
+      expect(find.text('Megatlon'), findsOneWidget);
     });
 
-    // SCENARIO-517: select a gym and confirm → UserRepository.update called
+    // SCENARIO-517: pick chain brand → branch → confirm → UserRepository.update
     testWidgets(
-        'SCENARIO-517: selecting a gym and confirming calls UserRepository.update',
+        'SCENARIO-517: selecting a branch and confirming calls UserRepository.update',
         (tester) async {
       await tester.pumpWidget(
-        _buildScreen(
-          profile: _profile(gymId: null), // start with no gym selected
-          repo: mockRepo,
-          gyms: const [
-            Gym(
-                id: 'crossfit-norte-id',
-                name: 'CROSSFIT NORTE',
-                address: 'Av. Libertad 500'),
-          ],
-        ),
+        _buildScreen(profile: _profile(gymId: null), repo: mockRepo),
       );
       await tester.pumpAndSettle();
 
-      // Tap the gym card to select it.
-      await tester.tap(find.text('CROSSFIT NORTE'));
+      await tester.tap(find.text('SportClub'));
       await tester.pumpAndSettle();
 
-      // Tap the save button.
+      expect(find.text('Belgrano'), findsOneWidget);
+      expect(find.text('Pilar'), findsOneWidget);
+
+      await tester.tap(find.text('Belgrano'));
+      await tester.pumpAndSettle();
+
       await tester.tap(find.text('GUARDAR')); // i18n: Fase 6 Etapa 3
       await tester.pumpAndSettle();
 
       verify(
-        () => mockRepo.update(_uid, {'gymId': 'crossfit-norte-id'}),
+        () => mockRepo.update(_uid, {'gymId': 'sportclub-belgrano'}),
       ).called(1);
     });
 
-    // Regression guard 2026-05-27 (rewritten 2026-06-01):
-    // gymSearchQueryProvider was retaining its value across screen re-entries
-    // while the TextField re-initialized empty, producing a stale filter with
-    // no visible query. Original fix was a manual reset in initState; proper
-    // fix (2026-06-01) was to mark the provider as autoDispose so its state
-    // is destroyed automatically when no widget watches it. This test asserts
-    // the provider IS autoDispose — if someone removes the .autoDispose, the
-    // bug returns and this test fails.
-    test('regression: gymSearchQueryProvider is autoDispose', () async {
-      final container = ProviderContainer();
-      addTearDown(container.dispose);
+    testWidgets(
+        'selecting an independent (single-branch) brand skips step 2 directly',
+        (tester) async {
+      await tester.pumpWidget(
+        _buildScreen(profile: _profile(gymId: null), repo: mockRepo),
+      );
+      await tester.pumpAndSettle();
 
-      // Listen + mutate state.
-      final sub = container.listen(gymSearchQueryProvider, (_, __) {});
-      container.read(gymSearchQueryProvider.notifier).state = 'palermo';
-      expect(container.read(gymSearchQueryProvider), 'palermo');
+      await tester.tap(find.text('Megatlon'));
+      await tester.pumpAndSettle();
 
-      // Drop the subscription. Riverpod's autoDispose runs on the next
-      // microtask — not synchronously — so we yield once before re-reading.
-      sub.close();
-      await Future<void>.delayed(Duration.zero);
+      // No branch-level navigation — SportClub's branches never appear.
+      expect(find.text('Belgrano'), findsNothing);
 
-      // Provider was disposed and re-built with its default value.
-      expect(container.read(gymSearchQueryProvider), '');
+      await tester.tap(find.text('GUARDAR')); // i18n: Fase 6 Etapa 3
+      await tester.pumpAndSettle();
+
+      verify(
+        () => mockRepo.update(_uid, {'gymId': 'megatlon-recoleta'}),
+      ).called(1);
+    });
+
+    testWidgets('back from branch list returns to brand list', (tester) async {
+      await tester.pumpWidget(
+        _buildScreen(profile: _profile(gymId: null), repo: mockRepo),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('SportClub'));
+      await tester.pumpAndSettle();
+      expect(find.text('Belgrano'), findsOneWidget);
+
+      await tester.tap(find.text('VOLVER A MARCAS'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Belgrano'), findsNothing);
+      expect(find.text('SportClub'), findsOneWidget);
+      expect(find.text('Megatlon'), findsOneWidget);
+    });
+
+    testWidgets('error state shows retry that invalidates gymsProvider',
+        (tester) async {
+      var attempt = 0;
+      await tester.pumpWidget(
+        _buildScreen(
+          profile: _profile(),
+          repo: mockRepo,
+          gyms: (ref) async {
+            attempt++;
+            if (attempt == 1) throw Exception('network down');
+            return [_megatlonRecoleta];
+          },
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Megatlon'), findsNothing);
+      final retryFinder = find.text('Reintentar');
+      expect(retryFinder, findsOneWidget);
+
+      await tester.tap(retryFinder);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Megatlon'), findsOneWidget);
+    });
+
+    // "no gym" option preserved outside the two-step flow.
+    testWidgets('"no gym" option remains selectable outside the two-step flow',
+        (tester) async {
+      await tester.pumpWidget(
+        _buildScreen(profile: _profile(gymId: null), repo: mockRepo),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('OTRO GYM / SIN GYM'), findsOneWidget);
+      await tester.tap(find.text('OTRO GYM / SIN GYM'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('GUARDAR')); // i18n: Fase 6 Etapa 3
+      await tester.pumpAndSettle();
+
+      verify(() => mockRepo.update(_uid, {'gymId': kNoGymId})).called(1);
     });
 
     // Save disabled when selection == current gymId
@@ -178,22 +276,16 @@ void main() {
         (tester) async {
       await tester.pumpWidget(
         _buildScreen(
-          profile: _profile(gymId: 'gym-a'),
-          repo: mockRepo,
-          gyms: const [
-            Gym(id: 'gym-a', name: 'GYM NORTE', address: 'Av. Norte 100'),
-            Gym(id: 'gym-b', name: 'GYM SUR', address: 'Av. Sur 200'),
-          ],
-        ),
+            profile: _profile(gymId: 'sportclub-belgrano'), repo: mockRepo),
       );
       await tester.pumpAndSettle();
 
-      // The current gym is gym-a. Tapping it again shouldn't enable save
-      // since it equals currentGymId.
-      await tester.tap(find.text('GYM NORTE'));
+      // Drill into SportClub → Belgrano again (equals currentGymId).
+      await tester.tap(find.text('SportClub'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Belgrano'));
       await tester.pumpAndSettle();
 
-      // The save button should be disabled (no pending change from current).
       final saveButton = tester.widget<ElevatedButton>(
         find.widgetWithText(ElevatedButton, 'GUARDAR'), // i18n: Fase 6 Etapa 3
       );
