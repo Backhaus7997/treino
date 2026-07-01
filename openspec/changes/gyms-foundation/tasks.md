@@ -59,22 +59,22 @@ Start: no dependency (first slice). End: `Gym` model decodes old+new docs, legac
 
 Start: depends on Phase 1 (`Gym`, `GymBrand` models exist). End: athlete can browse brands, drill into branches, single-branch brands skip step 2, in both onboarding and profile-edit flows.
 
-- [ ] 2.1 (RED) Write test: `gymBrandsProvider` groups `gymsProvider` results by `(brandId ?? id)` correctly — `test/features/gyms/application/gym_providers_test.dart`
-- [ ] 2.2 (RED) Write test: `branchesForBrandProvider.family(brandId)` returns only that brand's sucursales
-- [ ] 2.3 (GREEN) Add `gymBrandsProvider` (`Provider.autoDispose<AsyncValue<List<GymBrand>>>`) to `lib/features/gyms/application/gym_providers.dart`
-- [ ] 2.4 (GREEN) Add `branchesForBrandProvider` (`.family<AsyncValue<List<Gym>>, String>`) to same file
-- [ ] 2.5 (GREEN) Add `gymBrandSearchQueryProvider` (`StateProvider.autoDispose<String>`) — shared search state for both steps
-- [ ] 2.6 Delete `lib/features/profile_setup/application/profile_setup_providers.dart` legacy: `_kHardcodedGyms`, `gymSearchQueryProvider`, `filteredGymsProvider`
-- [ ] 2.7 (RED) Write widget test: two-step picker — browse brands without location permission (spec scenario) — `test/features/profile_setup/.../step_2_gym_test.dart`
-- [ ] 2.8 (RED) Write widget test: pick chain brand → shows branch list → pick branch → resolves sucursal id
-- [ ] 2.9 (RED) Write widget test: pick independent (single-branch) brand → SKIPS step 2 → resolves lone sucursal directly
-- [ ] 2.10 (RED) Write widget test: search by brand name filters step 1 list
-- [ ] 2.11 (RED) Write widget test: error + retry mirrors `_GymsSection` pattern (`ref.invalidate(gymsProvider)`)
-- [ ] 2.12 (GREEN) Convert `step_2_gym.dart` from `ConsumerWidget` to `ConsumerStatefulWidget`; add `_selectedBrandId` local state; implement two-step UI (brand list → branch list → back nav)
-- [ ] 2.13 (GREEN) Convert `profile_gym_screen.dart` similarly: `_step`, `_selectedBrandId`, `_pendingGymId` local state; back-from-branch returns to brand list
-- [ ] 2.14 Verify "no gym" option still present outside the two-step flow in both screens
-- [ ] 2.15 (RED) Write widget test: onboarding vs profile-edit parity (ADR-PSR-011) — same two-step behavior in both entry points
-- [ ] 2.16 Quality gate: `flutter analyze` 0 issues, `dart format .`, `flutter test` green for this slice
+- [x] 2.1 (RED) Write test: `gymBrandsProvider` groups `gymsProvider` results by `(brandId ?? id)` correctly — `test/features/gyms/application/gym_providers_test.dart`
+- [x] 2.2 (RED) Write test: `branchesForBrandProvider.family(brandId)` returns only that brand's sucursales
+- [x] 2.3 (GREEN) Add `gymBrandsProvider` (`FutureProvider.autoDispose<List<GymBrand>>`) to `lib/features/gyms/application/gym_providers.dart`
+- [x] 2.4 (GREEN) Add `branchesForBrandProvider` (`FutureProvider.autoDispose.family<List<Gym>, String>`) to same file
+- [x] 2.5 (GREEN) Add `gymBrandSearchQueryProvider` (`StateProvider.autoDispose<String>`) — shared search state for both steps
+- [x] 2.6 Delete `lib/features/profile_setup/application/profile_setup_providers.dart` legacy: `_kHardcodedGyms`, `gymSearchQueryProvider`, `filteredGymsProvider`. **Also deleted the legacy `profile_setup/domain/gym.dart` model + its generated `.freezed.dart`** — after this migration it had zero remaining consumers (previously only `filteredGymsProvider`), so it was safe to remove in this same unit per design.md's PR-slices intent.
+- [x] 2.7 (RED) Write widget test: two-step picker — browse brands without location permission (spec scenario) — `test/features/profile_setup/presentation/steps/step_2_gym_test.dart`
+- [x] 2.8 (RED) Write widget test: pick chain brand → shows branch list → pick branch → resolves sucursal id
+- [x] 2.9 (RED) Write widget test: pick independent (single-branch) brand → SKIPS step 2 → resolves lone sucursal directly
+- [x] 2.10 (RED) Write widget test: search by brand name filters step 1 list
+- [x] 2.11 (RED) Write widget test: error + retry mirrors `_GymsSection` pattern (`ref.invalidate(gymsProvider)`)
+- [x] 2.12 (GREEN) Convert `step_2_gym.dart` from `ConsumerWidget` to `ConsumerStatefulWidget`; add `_selectedBrandId` local state; implement two-step UI (brand list → branch list → back nav)
+- [x] 2.13 (GREEN) Convert `profile_gym_screen.dart` similarly: `_selectedBrandId`, `_pendingGymId` local state; back-from-branch returns to brand list (header back button doubles as brand-list-back when in step 2)
+- [x] 2.14 Verify "no gym" option still present outside the two-step flow in both screens
+- [x] 2.15 (RED) Write widget test: onboarding vs profile-edit parity (ADR-PSR-011) — same two-step behavior in both entry points — `test/features/profile_setup/presentation/gym_picker_parity_test.dart`
+- [x] 2.16 Quality gate: `flutter analyze` 0 issues, `dart format .`, `flutter test` green for this slice
 
 ## Phase 3: Gym Name Resolution + Denormalization (PR 3, parallel to PR 2)
 

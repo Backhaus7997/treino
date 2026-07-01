@@ -7,17 +7,20 @@ import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../auth/application/auth_providers.dart';
+import '../../gyms/application/gym_providers.dart';
 import '../../gyms/domain/gym.dart' show kNoGymId;
-import '../../profile_setup/application/profile_setup_providers.dart';
+import '../../gyms/domain/gym_brand.dart';
 import '../../profile_setup/presentation/widgets/gym_card.dart';
 import '../application/user_providers.dart';
 
 /// Allows the authenticated athlete to search and select a gym from the
-/// existing catalog, then persist the selection to their profile.
+/// existing catalog (two-step: marca → sucursal), then persist the selection
+/// to their profile.
 ///
 /// REQ-PSR-019: search + selection + UserRepository.update({'gymId': ...}).
-/// Reuses [filteredGymsProvider], [gymSearchQueryProvider], and [GymCard]
-/// from profile_setup per ADR-PSR-011. // i18n: Fase 6 Etapa 3
+/// Reuses [gymBrandsProvider], [branchesForBrandProvider],
+/// [gymBrandSearchQueryProvider] and [GymCard] from gyms/profile_setup per
+/// ADR-PSR-011 (onboarding/profile-edit parity). // i18n: Fase 6 Etapa 3
 class ProfileGymScreen extends ConsumerStatefulWidget {
   const ProfileGymScreen({super.key});
 
@@ -29,10 +32,11 @@ class _ProfileGymScreenState extends ConsumerState<ProfileGymScreen> {
   String? _pendingGymId;
   bool _initialized = false;
   bool _saving = false;
+  String? _selectedBrandId;
 
-  // No initState reset needed: gymSearchQueryProvider is autoDispose, so its
-  // state is destroyed when this screen unmounts and re-initializes empty on
-  // the next entry. Workaround removed 2026-06-01.
+  // No initState reset needed: gymBrandSearchQueryProvider is autoDispose, so
+  // its state is destroyed when this screen unmounts and re-initializes empty
+  // on the next entry.
 
   Future<void> _save(String uid, String? gymId) async {
     setState(() => _saving = true);
@@ -65,6 +69,18 @@ class _ProfileGymScreenState extends ConsumerState<ProfileGymScreen> {
     }
   }
 
+  void _onBrandTap(GymBrand brand) {
+    if (brand.branchCount == 1 && brand.singleBranchGymId != null) {
+      setState(() => _pendingGymId = brand.singleBranchGymId);
+      return;
+    }
+    setState(() => _selectedBrandId = brand.brandId);
+  }
+
+  void _onBranchTap(String gymId) => setState(() => _pendingGymId = gymId);
+
+  void _onBackToBrands() => setState(() => _selectedBrandId = null);
+
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
@@ -77,8 +93,8 @@ class _ProfileGymScreenState extends ConsumerState<ProfileGymScreen> {
       _initialized = true;
     }
 
-    final gyms = ref.watch(filteredGymsProvider);
     final saveEnabled = _pendingGymId != currentGymId && !_saving;
+    final selectedBrandId = _selectedBrandId;
 
     return Column(
       children: [
@@ -86,7 +102,8 @@ class _ProfileGymScreenState extends ConsumerState<ProfileGymScreen> {
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
           child: GestureDetector(
-            onTap: () => context.pop(),
+            onTap: () =>
+                selectedBrandId == null ? context.pop() : _onBackToBrands(),
             behavior: HitTestBehavior.opaque,
             child: Row(
               children: [
@@ -110,7 +127,7 @@ class _ProfileGymScreenState extends ConsumerState<ProfileGymScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: TextField(
             onChanged: (v) =>
-                ref.read(gymSearchQueryProvider.notifier).state = v,
+                ref.read(gymBrandSearchQueryProvider.notifier).state = v,
             style: GoogleFonts.barlow(
               color: palette.textPrimary,
               fontSize: 14,
@@ -129,32 +146,20 @@ class _ProfileGymScreenState extends ConsumerState<ProfileGymScreen> {
         ),
         const SizedBox(height: 14),
 
-        // Gym list
+        // Brand list (step 1) or branch list (step 2)
         Expanded(
-          child: ListView.separated(
-            padding: EdgeInsets.fromLTRB(
-                20, 0, 20, MediaQuery.paddingOf(context).bottom),
-            itemCount: gyms.length + 1, // +1 for "OTRO GYM / SIN GYM"
-            separatorBuilder: (_, __) => const SizedBox(height: 12),
-            itemBuilder: (_, i) {
-              if (i < gyms.length) {
-                final gym = gyms[i];
-                return GymCard(
-                  name: gym.name,
-                  address: gym.address,
-                  selected: _pendingGymId == gym.id,
-                  onTap: () => setState(() => _pendingGymId = gym.id),
-                );
-              }
-              // Last item: "OTRO GYM / SIN GYM"
-              return GymCard(
-                name: 'OTRO GYM / SIN GYM', // i18n: Fase 6 Etapa 3
-                address: 'No registramos tu gimnasio', // i18n: Fase 6 Etapa 3
-                selected: _pendingGymId == kNoGymId,
-                onTap: () => setState(() => _pendingGymId = kNoGymId),
-              );
-            },
-          ),
+          child: selectedBrandId == null
+              ? _BrandListView(
+                  pendingGymId: _pendingGymId,
+                  onBrandTap: _onBrandTap,
+                  onNoGymTap: () => setState(() => _pendingGymId = kNoGymId),
+                )
+              : _BranchListView(
+                  brandId: selectedBrandId,
+                  pendingGymId: _pendingGymId,
+                  onBack: _onBackToBrands,
+                  onBranchTap: _onBranchTap,
+                ),
         ),
 
         // Save bar
@@ -195,6 +200,193 @@ class _ProfileGymScreenState extends ConsumerState<ProfileGymScreen> {
                         ),
                       ),
               ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Step 1: lista de marcas, filtrada por [gymBrandSearchQueryProvider],
+/// incluyendo la opción fija "OTRO GYM / SIN GYM" al final.
+class _BrandListView extends ConsumerWidget {
+  const _BrandListView({
+    required this.pendingGymId,
+    required this.onBrandTap,
+    required this.onNoGymTap,
+  });
+
+  final String? pendingGymId;
+  final void Function(GymBrand) onBrandTap;
+  final VoidCallback onNoGymTap;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final brandsAsync = ref.watch(gymBrandsProvider);
+    final query = ref.watch(gymBrandSearchQueryProvider).trim().toLowerCase();
+
+    return brandsAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (_, __) => _ErrorRetry(
+        onRetry: () => ref.invalidate(gymsProvider),
+      ),
+      data: (brands) {
+        final filtered = query.isEmpty
+            ? brands
+            : brands
+                .where((b) => b.brandName.toLowerCase().contains(query))
+                .toList(growable: false);
+
+        return ListView.separated(
+          padding: EdgeInsets.fromLTRB(
+              20, 0, 20, MediaQuery.paddingOf(context).bottom),
+          itemCount: filtered.length + 1, // +1 for "OTRO GYM / SIN GYM"
+          separatorBuilder: (_, __) => const SizedBox(height: 12),
+          itemBuilder: (_, i) {
+            if (i < filtered.length) {
+              final brand = filtered[i];
+              return GymCard(
+                name: brand.brandName,
+                address: brand.branchCount == 1
+                    ? '1 sucursal'
+                    : '${brand.branchCount} sucursales',
+                selected: brand.singleBranchGymId != null &&
+                    pendingGymId == brand.singleBranchGymId,
+                onTap: () => onBrandTap(brand),
+              );
+            }
+            // Last item: "OTRO GYM / SIN GYM"
+            return GymCard(
+              name: 'OTRO GYM / SIN GYM', // i18n: Fase 6 Etapa 3
+              address: 'No registramos tu gimnasio', // i18n: Fase 6 Etapa 3
+              selected: pendingGymId == kNoGymId,
+              onTap: onNoGymTap,
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+/// Step 2: sucursales de la marca elegida ([brandId]), filtradas por
+/// [gymBrandSearchQueryProvider] (branchName o city).
+class _BranchListView extends ConsumerWidget {
+  const _BranchListView({
+    required this.brandId,
+    required this.pendingGymId,
+    required this.onBack,
+    required this.onBranchTap,
+  });
+
+  final String brandId;
+  final String? pendingGymId;
+  final VoidCallback onBack;
+  final void Function(String) onBranchTap;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final palette = AppPalette.of(context);
+    final branchesAsync = ref.watch(branchesForBrandProvider(brandId));
+    final query = ref.watch(gymBrandSearchQueryProvider).trim().toLowerCase();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: GestureDetector(
+            onTap: onBack,
+            behavior: HitTestBehavior.opaque,
+            child: Row(
+              children: [
+                Icon(TreinoIcon.back, size: 18, color: palette.textPrimary),
+                const SizedBox(width: 8),
+                Text(
+                  'VOLVER A MARCAS',
+                  style: GoogleFonts.barlowCondensed(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                    letterSpacing: 1.0,
+                    color: palette.textPrimary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Expanded(
+          child: branchesAsync.when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (_, __) => Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: _ErrorRetry(
+                onRetry: () => ref.invalidate(gymsProvider),
+              ),
+            ),
+            data: (branches) {
+              final filtered = query.isEmpty
+                  ? branches
+                  : branches
+                      .where((g) =>
+                          (g.branchName ?? '').toLowerCase().contains(query) ||
+                          (g.city ?? '').toLowerCase().contains(query))
+                      .toList(growable: false);
+
+              return ListView.separated(
+                padding: EdgeInsets.fromLTRB(
+                    20, 0, 20, MediaQuery.paddingOf(context).bottom),
+                itemCount: filtered.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 12),
+                itemBuilder: (_, i) {
+                  final gym = filtered[i];
+                  return GymCard(
+                    name: gym.branchName ?? gym.name,
+                    address: gym.city ?? gym.address ?? '',
+                    selected: pendingGymId == gym.id,
+                    onTap: () => onBranchTap(gym.id),
+                  );
+                },
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ErrorRetry extends StatelessWidget {
+  const _ErrorRetry({required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          AppL10n.of(context).profileLoadError,
+          style: TextStyle(color: palette.danger, fontSize: 13),
+        ),
+        const SizedBox(height: 8),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton(
+            onPressed: onRetry,
+            style: TextButton.styleFrom(
+              padding: EdgeInsets.zero,
+              minimumSize: const Size(0, 32),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: Text(
+              AppL10n.of(context).coachRetryLabel,
+              style: TextStyle(color: palette.accent),
             ),
           ),
         ),
