@@ -306,7 +306,13 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
   }
 
   /// Loguea un set directamente sin pasar por la sheet.
+  ///
+  /// Defensive: si `reps == 0` no creamos log. El TextField del row puede
+  /// quedar vacío/en 0 como estado intermedio de tipeo, y el athlete puede
+  /// apretar el check antes de completar — preferimos no-op silencioso a
+  /// loggear un set falso que después habría que borrar.
   void _logSet(RoutineSlot slot, int setNumber, int reps, double weightKg) {
+    if (reps <= 0) return;
     ref.read(sessionNotifierProvider(widget.init).notifier).logSet(
           SetLog(
             id: '',
@@ -320,8 +326,10 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
         );
   }
 
-  /// Actualiza un set ya logueado con nuevos valores de peso.
+  /// Actualiza un set ya logueado con nuevos valores de reps y/o peso.
+  /// Reps == 0 se ignora — mismo criterio defensivo que [_logSet].
   void _updateSet(SetLog existing, int reps, double weightKg) {
+    if (reps <= 0) return;
     final updated = existing.copyWith(reps: reps, weightKg: weightKg);
     ref.read(sessionNotifierProvider(widget.init).notifier).updateSet(updated);
   }
@@ -1264,16 +1272,20 @@ class _ExerciseSectionState extends State<_ExerciseSection> {
                 spec: spec,
                 mode: mode,
                 plannedReps: plannedReps,
+                // For done rows preserve the athlete's original entry so
+                // re-editing does not silently snap back to the planned
+                // value; for pending rows preload with the planned target.
+                initialReps: isRowDone ? logged.reps : plannedReps,
                 initialWeightKg: initialWeight,
                 isDone: isRowDone,
                 isExpanded: isExpanded,
                 onCheck: isCurrent
-                    ? (weightKg) =>
-                        widget.onSetCheck(setNumber, plannedReps, weightKg)
+                    ? (reps, weightKg) =>
+                        widget.onSetCheck(setNumber, reps, weightKg)
                     : null,
-                onWeightUpdate: isRowDone
-                    ? (weightKg) =>
-                        widget.onSetUpdate(logged, plannedReps, weightKg)
+                onSetUpdate: isRowDone
+                    ? (reps, weightKg) =>
+                        widget.onSetUpdate(logged, reps, weightKg)
                     : null,
                 onSummaryTap:
                     isRowDone ? () => _toggleDoneRow(setNumber) : null,
@@ -1382,9 +1394,11 @@ class _ExerciseSectionState extends State<_ExerciseSection> {
 // ── _RepsSetRow ───────────────────────────────────────────────────────────────
 
 /// Fila de un set basado en reps.
-/// - Reps: texto fijo (no editable). Logged reps = planned (repsMax for ranges).
+/// - Reps: TextField numérico (entero). Pre-rellena con [plannedReps] (para
+///   rangos, `repsMax`). El athlete puede loggear más o menos reps que las
+///   planned — el rango del PF queda como referencia, no jaula.
 /// - Peso: TextField numérico (teclado decimal).
-/// - Check: marca el set como done.
+/// - Check: marca el set como done con los valores actuales de reps y peso.
 class _RepsSetRow extends StatefulWidget {
   const _RepsSetRow({
     super.key,
@@ -1392,11 +1406,12 @@ class _RepsSetRow extends StatefulWidget {
     required this.spec,
     required this.mode,
     required this.plannedReps,
+    required this.initialReps,
     required this.initialWeightKg,
     required this.isDone,
     required this.isExpanded,
     required this.onCheck,
-    required this.onWeightUpdate,
+    required this.onSetUpdate,
     required this.onSummaryTap,
   });
 
@@ -1404,15 +1419,20 @@ class _RepsSetRow extends StatefulWidget {
   final SetSpec spec;
   final ExerciseMode mode;
   final int plannedReps;
+
+  /// Reps preseleccionadas al montar la row: para rows done son las loggeadas
+  /// (así el athlete puede reeditar sin perder lo que ya puso), para rows
+  /// current/futuras son [plannedReps].
+  final int initialReps;
   final double initialWeightKg;
   final bool isDone;
   final bool isExpanded;
 
-  /// Called when the ☐ is tapped for a pending current row — (weightKg).
-  final void Function(double weightKg)? onCheck;
+  /// Called when the ☐ is tapped for a pending current row — (reps, weightKg).
+  final void Function(int reps, double weightKg)? onCheck;
 
-  /// Called when weight changes for a done row.
-  final void Function(double weightKg)? onWeightUpdate;
+  /// Called when reps or weight change for a done row — (reps, weightKg).
+  final void Function(int reps, double weightKg)? onSetUpdate;
 
   /// Tap on summary row — only active for done rows to toggle expand.
   final VoidCallback? onSummaryTap;
@@ -1423,20 +1443,27 @@ class _RepsSetRow extends StatefulWidget {
 
 class _RepsSetRowState extends State<_RepsSetRow> {
   late TextEditingController _weightController;
+  late TextEditingController _repsController;
   late double _weightKg;
+  late int _reps;
 
   @override
   void initState() {
     super.initState();
     _weightKg = widget.initialWeightKg;
+    _reps = widget.initialReps;
     _weightController = TextEditingController(
       text: _weightKg == 0 ? '' : _formatWeight(_weightKg),
+    );
+    _repsController = TextEditingController(
+      text: _reps == 0 ? '' : _reps.toString(),
     );
   }
 
   @override
   void dispose() {
     _weightController.dispose();
+    _repsController.dispose();
     super.dispose();
   }
 
@@ -1449,15 +1476,39 @@ class _RepsSetRowState extends State<_RepsSetRow> {
     if (next == _weightKg) return;
     setState(() => _weightKg = next);
     if (widget.isDone) {
-      widget.onWeightUpdate?.call(_weightKg);
+      widget.onSetUpdate?.call(_reps, _weightKg);
+    }
+  }
+
+  void _onRepsChanged(String value) {
+    // Empty/unparseable -> 0; clamp to [0, 999] to keep _reps in sync with
+    // what the user sees. 0 is allowed as an intermediate typing state — the
+    // check button is what commits the value; the parent's check handler
+    // guards against 0-rep sets.
+    final parsed = int.tryParse(value);
+    final next = (parsed ?? 0).clamp(0, 999);
+    if (next == _reps) return;
+    setState(() => _reps = next);
+    if (widget.isDone) {
+      widget.onSetUpdate?.call(_reps, _weightKg);
     }
   }
 
   void _onCheckTap() {
-    widget.onCheck?.call(_weightKg);
+    widget.onCheck?.call(_reps, _weightKg);
   }
 
   String get _repsDisplayText => repsDisplayText(widget.spec, widget.mode);
+
+  /// Reps label for the always-visible summary row. When the athlete has
+  /// touched the reps field (or logged the set) we show the actual [_reps];
+  /// otherwise fall back to the planned display so the range hint (e.g.
+  /// "8–12 reps") stays visible until the athlete engages.
+  String _summaryReps() {
+    if (widget.isDone) return '$_reps reps';
+    if (_reps != widget.plannedReps) return '$_reps reps';
+    return _repsDisplayText;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1485,8 +1536,12 @@ class _RepsSetRowState extends State<_RepsSetRow> {
           ),
           const SizedBox(width: 12),
           Expanded(
+            // Summary line — shows the actual _reps (which the athlete may
+            // have edited) rather than the planned range. Falls back to the
+            // planned display when the row is not done and _reps still equals
+            // plannedReps, so the range hint stays visible pre-check.
             child: Text(
-              '$_repsDisplayText · ${_formatWeight(_weightKg)} kg',
+              '${_summaryReps()} · ${_formatWeight(_weightKg)} kg',
               style: GoogleFonts.barlow(
                 fontWeight: FontWeight.w500,
                 fontSize: 14,
@@ -1518,30 +1573,19 @@ class _RepsSetRowState extends State<_RepsSetRow> {
       ),
     );
 
-    // Expanded panel: fixed reps label + weight text field.
+    // Expanded panel: editable reps field + editable weight field.
     final expandedPanel = Padding(
       padding: const EdgeInsets.only(top: 10),
       child: Row(
         children: [
           const SizedBox(width: 32),
-          // Fixed reps display — NOT editable.
+          // Editable reps field — pre-filled with planned reps (repsMax for
+          // ranges). Athlete overrides freely if they hit more or fewer.
           Expanded(
-            child: Container(
-              alignment: Alignment.center,
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              decoration: BoxDecoration(
-                border: Border(
-                  bottom: BorderSide(color: palette.border),
-                ),
-              ),
-              child: Text(
-                _repsDisplayText,
-                style: GoogleFonts.barlow(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 16,
-                  color: textColor,
-                ),
-              ),
+            child: _RepsField(
+              controller: _repsController,
+              textColor: textColor,
+              onChanged: _onRepsChanged,
             ),
           ),
           const SizedBox(width: 8),
@@ -1622,6 +1666,70 @@ class _WeightField extends StatelessWidget {
           ),
           suffix: Text(
             'kg',
+            style: GoogleFonts.barlow(
+              fontWeight: FontWeight.w400,
+              fontSize: 13,
+              color: palette.textMuted,
+            ),
+          ),
+          enabledBorder: UnderlineInputBorder(
+            borderSide: BorderSide(color: palette.border),
+          ),
+          focusedBorder: UnderlineInputBorder(
+            borderSide: BorderSide(color: palette.accent, width: 2),
+          ),
+          isDense: true,
+          contentPadding: const EdgeInsets.symmetric(vertical: 8),
+        ),
+        onChanged: onChanged,
+      ),
+    );
+  }
+}
+
+// ── _RepsField ────────────────────────────────────────────────────────────────
+
+/// Editable integer text field for reps input.
+/// Same underline style as [_WeightField] with a "reps" suffix. Digits only,
+/// no decimals — reps are always integer.
+class _RepsField extends StatelessWidget {
+  const _RepsField({
+    required this.controller,
+    required this.textColor,
+    required this.onChanged,
+  });
+
+  final TextEditingController controller;
+  final Color textColor;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    return SizedBox(
+      height: 44,
+      child: TextField(
+        controller: controller,
+        keyboardType: TextInputType.number,
+        inputFormatters: [
+          FilteringTextInputFormatter.digitsOnly,
+          LengthLimitingTextInputFormatter(3),
+        ],
+        textAlign: TextAlign.center,
+        style: GoogleFonts.barlow(
+          fontWeight: FontWeight.w600,
+          fontSize: 16,
+          color: textColor,
+        ),
+        decoration: InputDecoration(
+          hintText: '0 reps',
+          hintStyle: GoogleFonts.barlow(
+            fontWeight: FontWeight.w400,
+            fontSize: 14,
+            color: palette.textMuted,
+          ),
+          suffix: Text(
+            'reps',
             style: GoogleFonts.barlow(
               fontWeight: FontWeight.w400,
               fontSize: 13,
