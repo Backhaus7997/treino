@@ -6,16 +6,17 @@ import '../../../../../../app/theme/app_palette.dart';
 
 /// Burbuja de un mensaje individual en el detail pane.
 ///
-/// V1 = solo texto. Cuando el mensaje tiene `mediaUrl` no-null lo
-/// renderea como `[Foto]` / `[Video]` placeholder por ahora — al PF en web
-/// le sirve para SABER que llegó un media (no se le esconde el mensaje
-/// completamente), pero la preview visual real llega en V2.
+/// V2 (2026-07-01): las imágenes se renderean INLINE con `Image.network`
+/// (pasás [imageUrl]). Videos y attachments no soportados siguen como
+/// [mediaPlaceholderLabel] visible ("🎥 Video" / "📎 Adjunto") para que el
+/// PF SEPA que llegó pero no colisione con el layout hasta V3.
 class ChatMessageBubble extends StatelessWidget {
   const ChatMessageBubble({
     super.key,
     required this.text,
     required this.isOwn,
     required this.createdAt,
+    this.imageUrl,
     this.mediaPlaceholderLabel,
   });
 
@@ -23,9 +24,13 @@ class ChatMessageBubble extends StatelessWidget {
   final bool isOwn;
   final DateTime createdAt;
 
-  /// Si el mensaje original tiene media (no soportado todavía en web V1),
-  /// pasamos un label "📷 Foto" / "🎥 Video" como placeholder visible.
-  /// Null → mensaje de texto puro.
+  /// URL HTTPS de la imagen a renderear inline. Non-null solo cuando
+  /// `message.mediaType == image`. Se ignora si también hay
+  /// [mediaPlaceholderLabel] (defensivo: no debería pasar).
+  final String? imageUrl;
+
+  /// Label placeholder para media que aún NO se renderea inline (video en
+  /// V2, attachments desconocidos). Null → sin media.
   final String? mediaPlaceholderLabel;
 
   @override
@@ -57,6 +62,48 @@ class ChatMessageBubble extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (imageUrl != null) ...[
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: Image.network(
+                    imageUrl!,
+                    // Cap max height so a portrait photo does not push the
+                    // whole message list way past the fold. Storage may
+                    // return large originals; we let the browser rescale.
+                    fit: BoxFit.contain,
+                    loadingBuilder: (context, child, progress) {
+                      if (progress == null) return child;
+                      return SizedBox(
+                        height: 120,
+                        child: Center(
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: palette.accent,
+                            value: progress.expectedTotalBytes != null
+                                ? progress.cumulativeBytesLoaded /
+                                    progress.expectedTotalBytes!
+                                : null,
+                          ),
+                        ),
+                      );
+                    },
+                    errorBuilder: (_, __, ___) => Container(
+                      height: 80,
+                      padding: const EdgeInsets.all(12),
+                      color: palette.bg.withValues(alpha: 0.4),
+                      child: Text(
+                        'No pudimos cargar la imagen', // i18n: Fase W2
+                        style: GoogleFonts.barlow(
+                          fontWeight: FontWeight.w500,
+                          fontSize: 13,
+                          color: palette.textMuted,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                if (text.isNotEmpty) const SizedBox(height: 6),
+              ],
               if (mediaPlaceholderLabel != null) ...[
                 Container(
                   padding:

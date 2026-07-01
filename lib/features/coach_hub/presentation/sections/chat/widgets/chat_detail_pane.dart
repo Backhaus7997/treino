@@ -1,6 +1,9 @@
+import 'dart:developer' as developer;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../../../../app/theme/app_palette.dart';
 import '../../../../../../core/widgets/treino_icon.dart';
@@ -13,13 +16,16 @@ import '../../../../../workout/application/session_providers.dart'
 import 'chat_message_bubble.dart';
 
 /// Panel derecho del split-pane: header con el otro user + lista invertida
-/// de mensajes + composer de texto.
+/// de mensajes + composer de texto + foto (V2, 2026-07-01).
 ///
-/// V1 — solo texto. El botón de adjuntar está visible pero deshabilitado
-/// con tooltip "Próximamente". Cuando un mensaje del otro lado trae media,
-/// se renderea como placeholder "[Foto] / [Video]" arriba del texto para
-/// que el PF SEPA que llegó (no se lo escondemos), aunque no pueda verla
-/// inline hasta V2.
+/// V2 upgrade: el botón "Adjuntar" abre el picker de imágenes del navegador,
+/// sube la foto vía [ChatMediaUploadServiceWeb] y postea el mensaje con
+/// `mediaUrl` + `mediaType: image`. Durante el upload el composer se
+/// deshabilita y muestra un `LinearProgressIndicator` con la fracción real
+/// que devuelve Storage. Video sigue como placeholder inline "[Video]" hasta
+/// una V3 futura — la razón es que en web el video player nativo requiere
+/// más setup que la imagen (thumbnail + play controls + inline autoplay
+/// guards) y queríamos ship foto ya.
 class ChatDetailPane extends ConsumerStatefulWidget {
   const ChatDetailPane({super.key, required this.chatId});
 
@@ -32,6 +38,8 @@ class ChatDetailPane extends ConsumerStatefulWidget {
 class _ChatDetailPaneState extends ConsumerState<ChatDetailPane> {
   final _composerCtrl = TextEditingController();
   bool _sending = false;
+  bool _uploading = false;
+  double _uploadProgress = 0;
 
   @override
   void initState() {
@@ -97,6 +105,73 @@ class _ChatDetailPaneState extends ConsumerState<ChatDetailPane> {
     }
   }
 
+  /// V2: pickeada + upload + send de una imagen. Solo foto en V2 (video
+  /// diferido). Si el picker se cancela, no pasa nada. Si el upload falla,
+  /// snackbar de error y el composer vuelve a estado inicial.
+  Future<void> _pickAndSendImage() async {
+    if (_uploading || _sending) return;
+    final uid = ref.read(currentUidProvider);
+    if (uid == null) return;
+
+    final picker = ImagePicker();
+    // On web, imageQuality is ignored by the platform but harmless — mobile
+    // path resizes to ~80% quality which cuts network cost noticeably. We
+    // keep the arg for parity.
+    final file = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 80,
+    );
+    if (file == null || !mounted) return;
+
+    setState(() {
+      _uploading = true;
+      _uploadProgress = 0;
+    });
+
+    try {
+      final uploadService = ref.read(chatMediaUploadServiceProvider);
+      final mediaUrl = await uploadService.upload(
+        file.path,
+        chatId: widget.chatId,
+        mediaType: MediaType.image,
+        onProgress: (fraction) {
+          if (mounted) setState(() => _uploadProgress = fraction);
+        },
+      );
+
+      if (!mounted) return;
+
+      await ref.read(chatRepositoryProvider).sendMessage(
+            chatId: widget.chatId,
+            senderId: uid,
+            mediaUrl: mediaUrl,
+            mediaType: MediaType.image,
+          );
+    } catch (e, st) {
+      developer.log(
+        'chat web media upload/send failed',
+        name: 'chat',
+        error: e,
+        stackTrace: st,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content:
+                Text('No pudimos enviar la foto. Reintentá.'), // i18n: Fase W2
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _uploading = false;
+          _uploadProgress = 0;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
@@ -132,10 +207,18 @@ class _ChatDetailPaneState extends ConsumerState<ChatDetailPane> {
             ),
           ),
           const Divider(height: 1),
+          if (_uploading)
+            LinearProgressIndicator(
+              value: _uploadProgress > 0 ? _uploadProgress : null,
+              minHeight: 2,
+              color: palette.accent,
+              backgroundColor: palette.bgCard,
+            ),
           _Composer(
             controller: _composerCtrl,
-            sending: _sending,
+            sending: _sending || _uploading,
             onSend: _send,
+            onAttach: _pickAndSendImage,
             palette: palette,
           ),
         ],
@@ -260,24 +343,29 @@ class _MessagesList extends StatelessWidget {
       itemCount: messages.length,
       itemBuilder: (context, index) {
         final m = messages[index];
+        final hasMedia = m.mediaUrl != null && m.mediaUrl!.isNotEmpty;
+        final isImage = hasMedia && m.mediaType == MediaType.image;
         return ChatMessageBubble(
           key: ValueKey(m.id),
           text: m.text,
           isOwn: m.senderId == currentUid,
           createdAt: m.createdAt,
-          mediaPlaceholderLabel: _mediaLabel(m),
+          // V2 (2026-07-01): imagen real inline. Video sigue como
+          // placeholder label hasta V3.
+          imageUrl: isImage ? m.mediaUrl : null,
+          mediaPlaceholderLabel: hasMedia && !isImage ? _mediaLabel(m) : null,
         );
       },
     );
   }
 
-  /// V1: si el mensaje carga media, mostramos un chip "📷 Foto" / "🎥 Video"
-  /// arriba del texto. Pintar la media real queda para V2.
-  String? _mediaLabel(Message m) {
-    if (m.mediaUrl == null || m.mediaUrl!.isEmpty) return null;
+  /// Label placeholder para media que NO renderea inline todavía. En V2
+  /// solo aplica a videos y a mediaType desconocido (defensivo).
+  String _mediaLabel(Message m) {
     return switch (m.mediaType) {
-      MediaType.image => '📷 Foto', // i18n: Fase W2
       MediaType.video => '🎥 Video', // i18n: Fase W2
+      MediaType.image =>
+        '📷 Foto', // never reached in V2 (image renders inline)
       null => '📎 Adjunto', // i18n: Fase W2 — defensive
     };
   }
@@ -288,12 +376,18 @@ class _Composer extends StatelessWidget {
     required this.controller,
     required this.sending,
     required this.onSend,
+    required this.onAttach,
     required this.palette,
   });
 
   final TextEditingController controller;
   final bool sending;
   final VoidCallback onSend;
+
+  /// Handler del botón "Adjuntar". V2 (2026-07-01): abre el picker de
+  /// imágenes del navegador. `null` = deshabilitado (mientras hay upload en
+  /// curso). Video sigue diferido a V3.
+  final VoidCallback onAttach;
   final AppPalette palette;
 
   @override
@@ -304,17 +398,20 @@ class _Composer extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          // Botón "Adjuntar" deshabilitado: señaliza la intención de V2 sin
-          // bloquear V1. Tooltip explica.
+          // Botón "Adjuntar" — V2 habilitado (foto). Se deshabilita mientras
+          // hay upload o send en curso para evitar dobles envíos.
           Tooltip(
-            message: 'Próximamente — fotos y videos', // i18n: Fase W2
+            message: 'Adjuntar foto', // i18n: Fase W2
             child: IconButton(
+              key: const Key('chat_composer_attach_button'),
               icon: Icon(
                 TreinoIcon.attach,
                 size: 20,
-                color: palette.textMuted.withValues(alpha: 0.4),
+                color: sending
+                    ? palette.textMuted.withValues(alpha: 0.4)
+                    : palette.accent,
               ),
-              onPressed: null,
+              onPressed: sending ? null : onAttach,
               constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
               padding: EdgeInsets.zero,
             ),

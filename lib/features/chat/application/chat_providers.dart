@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../coach/domain/trainer_link.dart';
@@ -5,6 +6,7 @@ import '../../profile/application/user_providers.dart' show firestoreProvider;
 import '../../workout/application/session_providers.dart'
     show currentUidProvider;
 import '../data/chat_media_upload_service.dart';
+import '../data/chat_media_upload_service_web.dart';
 import '../data/chat_repository.dart';
 import '../domain/chat.dart';
 import '../domain/message.dart';
@@ -32,8 +34,18 @@ final chatRepositoryProvider = Provider<ChatRepository>(
   (ref) => ChatRepository(firestore: ref.watch(firestoreProvider)),
 );
 
+/// Resolves the platform-appropriate media upload service.
+///
+/// - Native (iOS/Android/desktop) → [ChatMediaUploadServiceMobile] uses
+///   `dart:io.File` + `putFile`.
+/// - Web → [ChatMediaUploadServiceWeb] uses `XFile.readAsBytes()` +
+///   `putData()` because `dart:io` does not compile in the web toolchain.
+///
+/// Callers depend only on the abstract [ChatMediaUploadService], so switching
+/// impls at build-time via `kIsWeb` is transparent to the chat UI code.
 final chatMediaUploadServiceProvider = Provider<ChatMediaUploadService>(
-  (ref) => ChatMediaUploadService(),
+  (ref) =>
+      kIsWeb ? ChatMediaUploadServiceWeb() : ChatMediaUploadServiceMobile(),
 );
 
 /// Stream de chats del usuario actual, ordenados por lastMessageAt desc.
