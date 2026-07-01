@@ -14,15 +14,26 @@ import 'treino_icon.dart';
 ///
 /// Initialises a [VideoPlayerController.networkUrl] lazily and disposes it
 /// when [url] changes or the widget is removed.
+///
+/// The rendered aspect ratio adapts to the actual video's aspect ratio once
+/// the controller reports [VideoPlayerValue.aspectRatio]. Before init and on
+/// failure a 16:9 skeleton is shown. [maxHeight] caps the vertical extent so
+/// portrait clips (typical for phones) do not push the chat list out of view.
 class FirebaseStorageVideoPlayer extends StatefulWidget {
   const FirebaseStorageVideoPlayer({
     super.key,
     required this.url,
     required this.palette,
+    this.maxHeight = 400,
   });
 
   final String url;
   final AppPalette palette;
+
+  /// Hard cap on the rendered height. Portrait videos at their natural
+  /// aspect ratio would otherwise take ~2x the width in height and overflow
+  /// the chat message list. Set to `double.infinity` to opt out.
+  final double maxHeight;
 
   @override
   State<FirebaseStorageVideoPlayer> createState() =>
@@ -97,9 +108,13 @@ class _FirebaseStorageVideoPlayerState
 
     final c = _controller;
     if (c == null) {
-      // Loading skeleton.
-      return AspectRatio(
+      // Loading skeleton — 16:9 default, capped by [maxHeight] so it does
+      // not exceed the same envelope as a wide video. Layout may shift
+      // once init completes and the real aspect ratio is known; this is
+      // limited to first-render (browser caches the manifest afterwards).
+      return _CappedAspectRatio(
         aspectRatio: 16 / 9,
+        maxHeight: widget.maxHeight,
         child: ClipRRect(
           borderRadius: BorderRadius.circular(12),
           child: Container(
@@ -119,10 +134,16 @@ class _FirebaseStorageVideoPlayerState
     }
 
     final isPlaying = c.value.isPlaying;
+    // Use the real aspect ratio the controller reports (portrait clips are
+    // < 1, landscape > 1). Guarded by _CappedAspectRatio so portrait videos
+    // do not overflow the chat list vertically.
+    final aspect =
+        c.value.aspectRatio > 0 ? c.value.aspectRatio : 16 / 9;
     return ClipRRect(
       borderRadius: BorderRadius.circular(12),
-      child: AspectRatio(
-        aspectRatio: 16 / 9,
+      child: _CappedAspectRatio(
+        aspectRatio: aspect,
+        maxHeight: widget.maxHeight,
         child: GestureDetector(
           onTap: _toggle,
           behavior: HitTestBehavior.opaque,
@@ -230,6 +251,56 @@ class _VideoErrorPlaceholder extends StatelessWidget {
         alignment: Alignment.center,
         child: Icon(TreinoIcon.play, size: 28, color: palette.textMuted),
       ),
+    );
+  }
+}
+
+/// Aspect-ratio box that respects an outer [maxHeight] cap.
+///
+/// A raw [AspectRatio] uses the incoming width to derive height (or vice
+/// versa) without any cap, so a portrait video (aspect < 1) at a fixed
+/// parent width can produce a very tall box (e.g. 320 × 570 for 9:16).
+/// This wraps the ratio calc and clamps the resulting height, then centers
+/// the ratio-preserved child inside the clamped box. Landscape videos are
+/// unaffected because they naturally produce a short-height box.
+class _CappedAspectRatio extends StatelessWidget {
+  const _CappedAspectRatio({
+    required this.aspectRatio,
+    required this.maxHeight,
+    required this.child,
+  });
+
+  final double aspectRatio;
+  final double maxHeight;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Prefer the tightest available width; if unbounded, fall back to a
+        // sane default so the layout still resolves.
+        final width = constraints.maxWidth.isFinite
+            ? constraints.maxWidth
+            : 320.0;
+        final naturalHeight = width / aspectRatio;
+        final height = naturalHeight > maxHeight ? maxHeight : naturalHeight;
+        // Recompute width from the clamped height to keep the aspect ratio
+        // — the child is centered within the parent's width so cropping
+        // does not occur.
+        final adjustedWidth = height * aspectRatio;
+        return SizedBox(
+          width: width,
+          height: height,
+          child: Center(
+            child: SizedBox(
+              width: adjustedWidth,
+              height: height,
+              child: child,
+            ),
+          ),
+        );
+      },
     );
   }
 }

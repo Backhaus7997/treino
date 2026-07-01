@@ -3,13 +3,14 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../../../app/theme/app_palette.dart';
+import '../../../../../../core/widgets/firebase_storage_video_player.dart';
 
 /// Burbuja de un mensaje individual en el detail pane.
 ///
-/// V2 (2026-07-01): las imágenes se renderean INLINE con `Image.network`
-/// (pasás [imageUrl]). Videos y attachments no soportados siguen como
-/// [mediaPlaceholderLabel] visible ("🎥 Video" / "📎 Adjunto") para que el
-/// PF SEPA que llegó pero no colisione con el layout hasta V3.
+/// V3 (2026-07-01): fotos se renderean con `Image.network` (pasás [imageUrl])
+/// y videos se renderean con [FirebaseStorageVideoPlayer] (pasás [videoUrl]),
+/// mismo widget que mobile. Attachments desconocidos siguen como
+/// [mediaPlaceholderLabel] ("📎 Adjunto") — defensivo.
 class ChatMessageBubble extends StatelessWidget {
   const ChatMessageBubble({
     super.key,
@@ -17,6 +18,7 @@ class ChatMessageBubble extends StatelessWidget {
     required this.isOwn,
     required this.createdAt,
     this.imageUrl,
+    this.videoUrl,
     this.mediaPlaceholderLabel,
   });
 
@@ -29,8 +31,13 @@ class ChatMessageBubble extends StatelessWidget {
   /// [mediaPlaceholderLabel] (defensivo: no debería pasar).
   final String? imageUrl;
 
-  /// Label placeholder para media que aún NO se renderea inline (video en
-  /// V2, attachments desconocidos). Null → sin media.
+  /// URL HTTPS del video a renderear inline con [FirebaseStorageVideoPlayer].
+  /// Non-null solo cuando `message.mediaType == video`. Reusa el mismo widget
+  /// que mobile para mantener UX consistente (tap-to-toggle + scrubbing).
+  final String? videoUrl;
+
+  /// Label placeholder para media que aún NO se renderea inline (attachments
+  /// desconocidos). Null → sin media.
   final String? mediaPlaceholderLabel;
 
   @override
@@ -100,6 +107,16 @@ class ChatMessageBubble extends StatelessWidget {
                         ),
                       ),
                     ),
+                  ),
+                ),
+                if (text.isNotEmpty) const SizedBox(height: 6),
+              ],
+              if (videoUrl != null) ...[
+                SizedBox(
+                  width: 320,
+                  child: FirebaseStorageVideoPlayer(
+                    url: videoUrl!,
+                    palette: palette,
                   ),
                 ),
                 if (text.isNotEmpty) const SizedBox(height: 6),
