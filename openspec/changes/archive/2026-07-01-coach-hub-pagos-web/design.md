@@ -195,9 +195,43 @@ Row of 3 cards. `now = DateTime.now().toUtc()`, `monthKey = '$year-${month.padLe
 
 ---
 
-## 5. WhatsApp reminder
+## 5. WhatsApp reminder — CHANGED TO IN-APP CHAT (W4.2 implementation)
 
-### Message template
+### ACTUAL IMPLEMENTATION: In-app chat message
+
+During implementation (PR2b), the requirement REQ-PAGW-ACTION-002 was changed from WhatsApp to the in-app chat system to avoid the phone-number gap and keep the trainer inside the app ecosystem.
+
+#### Message delivery via `ChatRepository`
+
+```dart
+Future<void> recordar(BuildContext context, Payment p, String? paymentAlias) async {
+  final message = reminderText(p, paymentAlias);
+  final otherUid = p.athleteId; // recipient
+  final chatId = _computeDeterministicChatId(ref.read(currentUidProvider)!, otherUid);
+  
+  try {
+    final chat = await ref.read(chatForOtherUidProvider(otherUid).future);
+    await chat.messages.add({
+      'sender': ref.read(currentUidProvider),
+      'text': message,
+      'timestamp': FieldValue.serverTimestamp(),
+    });
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Recordatorio enviado.')), // i18n
+      );
+    }
+  } catch (e) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: ${e.toString()}')),
+      );
+    }
+  }
+}
+```
+
+#### Message template (unchanged)
 ```dart
 String reminderText(Payment p, String? paymentAlias) {
   final monto = fmtArs(p.amountArs);            // "$28.000"
@@ -208,32 +242,13 @@ String reminderText(Payment p, String? paymentAlias) {
   return '$base$alias';
 }
 ```
-- `paymentAlias` comes from `ref.watch(userProfileProvider).valueOrNull?.paymentAlias` (the TRAINER's own profile, `user_profile.dart:52`).
-- **Null / empty alias handled:** the alias sentence is simply omitted; the reminder still sends monto + concepto. No crash, no "null" string.
 
-### Exact `url_launcher` call (matches `exercise_video_player.dart:67-80`)
-```dart
-Future<void> recordar(BuildContext context, Payment p, String? alias) async {
-  final text = Uri.encodeComponent(reminderText(p, alias)); // percent-encode
-  final uri = Uri.parse('https://wa.me/?text=$text');
-  try {
-    final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
-    if (!ok && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No pudimos abrir WhatsApp.')), // i18n
-      );
-    }
-  } catch (_) {
-    if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('No pudimos abrir WhatsApp.')), // i18n
-    );
-  }
-}
-```
-- `wa.me/?text=` (NO phone) — trainer picks the contact in WhatsApp. Athlete phone is not stored (explore gap confirmed: not in `UserPublicProfile`).
-- Encoding: `Uri.encodeComponent` on the message body only (not the whole URL) so spaces/accents/`$` are safe.
-- On web builds `LaunchMode.externalApplication` opens `wa.me` in a new tab → WhatsApp Web/app; identical idiom to the existing YouTube launcher.
+#### Advantages of in-app chat over WhatsApp
+- No athlete phone number needed
+- Notification via `notifyOnChatMessage` Cloud Function (existing)
+- Trainer stays in-app ecosystem
+- Athlete receives push notification and can reply in-thread
+- Chat history preserved for future reference
 
 ---
 
@@ -282,7 +297,7 @@ PagosScreen (ConsumerStatefulWidget, SingleTickerProviderStateMixin)
 | `sections/pagos/widgets/pagos_buckets_provider.dart` | `PagosBuckets` + `pagosBucketsProvider` | ~45 |
 | `sections/pagos/widgets/pagos_kpi_row.dart` | `PagosKpiRow` (3 KPI cards, `AppPalette`) | ~90 |
 | `sections/pagos/widgets/pagos_web_table.dart` | trainer-wide table: ALUMNO·MONTO·FECHA·ESTADO·ACCIONES (distinct from PR1's athlete-scoped `PagosTable`) | ~140 |
-| `test/.../sections/pagos/pagos_web_screen_test.dart` | bucketing, KPI totals, Vencido boundary, WhatsApp URL, Marcar pagado write | ~ (test, not counted in prod budget) |
+| `test/.../sections/pagos/pagos_web_screen_test.dart` | bucketing, KPI totals, Vencido boundary, Chat reminder text, Marcar pagado write | ~ (test, not counted in prod budget) |
 
 ### Edit to `sections/pagos/routes.dart`
 Replace the placeholder (`routes.dart:13-20`):
@@ -302,7 +317,7 @@ Add `import '../pagos/pagos_web_screen.dart';` (adjust relative path) and drop t
 ### Rough line budget (confirm each PR ≤ 400)
 - **PR1** (extraction): ~250-320 changed lines — mostly cut/paste moves + 5 renamed call sites in alumno_detail + 1 test-import update. Net new logic ≈ 0.
 - **PR2** (screen): ~230 + 45 + 90 + 140 ≈ **~505 prod lines across 4 new files**. RISK: exceeds 400. Mitigation options for apply:
-  - The KPI row + table are new widgets, not edits — a reviewer can review them independently. Prefer to keep PR2 as one logical unit but flag `size:exception` OR split PR2 into **PR2a** (screen + buckets provider + KPI row + routes wiring, ~365) and **PR2b** (rich table with per-row WhatsApp/Marcar actions, ~140). Recommend the 2a/2b split to stay under budget cleanly. Final call belongs to the tasks/apply phase per delivery strategy.
+  - The KPI row + table are new widgets, not edits — a reviewer can review them independently. Prefer to keep PR2 as one logical unit but flag `size:exception` OR split PR2 into **PR2a** (screen + buckets provider + KPI row + routes wiring, ~365) and **PR2b** (rich table with per-row chat/Marcar actions, ~140). Recommend the 2a/2b split to stay under budget cleanly. Final call belongs to the tasks/apply phase per delivery strategy.
 
 ---
 
@@ -320,17 +335,17 @@ Add `import '../pagos/pagos_web_screen.dart';` (adjust relative path) and drop t
 **Rejected:** (a) Cloud Function to synthesize missed recurring periods — out of scope (needs backend). (b) Using `pagosPorCobrarProvider` for the Por-vencer tab — its aggregation collapses per-doc rows (kills per-row actions) and injects derived recurring charges with no Firestore doc (un-remindable). It IS used for the Pendiente-cobrar KPI, where a cadence-aware total is correct.
 **Consequence:** Vencidos surfaces only EXISTING unpaid one-off docs from prior months; recurring months never explicitly charged are invisible in V1 (documented gap, needs CF for V2).
 
-### ADR-PGW-003 — No-backend WhatsApp via `wa.me/?text=`
-**Decision:** `launchUrl(Uri.parse('https://wa.me/?text=${Uri.encodeComponent(msg)}'), mode: LaunchMode.externalApplication)`, no phone number; message = monto + concepto + trainer `paymentAlias` (alias sentence omitted when null/empty).
-**Rationale:** Athlete phone is not stored (`UserPublicProfile` has no phone). `wa.me` without a number lets the trainer pick the contact. Reuses the proven `exercise_video_player.dart` launcher idiom (try/catch + snackbar fallback). Zero backend, zero new data.
-**Rejected:** (a) Store athlete phone — schema/privacy change, out of scope. (b) Copy-to-clipboard — worse UX than opening WhatsApp directly.
-**Consequence:** One extra tap (contact selection) in WhatsApp. Acceptable for V1.
+### ADR-PGW-003 — In-app chat reminder (SUPERSEDES WhatsApp approach)
+**Decision:** `ChatRepository.sendMessage` to send reminder via trainer↔athlete `Chat`. Message = monto + concepto + trainer `paymentAlias`. Notification via `notifyOnChatMessage` Cloud Function (existing).
+**Rationale:** No athlete phone number needed (not in `UserPublicProfile`). Trainer stays in-app ecosystem. Chat history preserved. Push notifications via existing Cloud Function. Achieves the reminder goal without backend schema changes.
+**Rejected:** (a) `wa.me/?text=` — requires manual contact selection; less integrated. (b) Store athlete phone — schema/privacy change, out of scope.
+**Consequence:** One chat message per reminder. Athlete receives push notification and can reply in-thread.
 
-### ADR-PGW-004 — 2-PR chained delivery
-**Decision:** PR1 = pure widget extraction (green tests, no behavior change). PR2 = `/pagos` screen + KPI row + tabs + WhatsApp + routes wiring. If PR2 exceeds 400 lines, split into PR2a (screen+KPI+routes) / PR2b (rich table+actions).
-**Rationale:** Extraction is a safe, independently-reviewable refactor that de-risks PR2 and keeps each slice near the 400-line budget. Delivery strategy = `ask-on-risk` (from proposal); the >400 forecast for PR2 is flagged here for the review-workload guard.
+### ADR-PGW-004 — 3-PR chained delivery (PR1 extraction + PR2a screen+data + PR2b table+actions)
+**Decision:** PR1 = pure widget extraction. PR2a = `/pagos` screen + KPI row + buckets provider + routes wiring. PR2b = rich table + row actions (chat/Marcar pagado).
+**Rationale:** Extraction is a safe, independently-reviewable refactor that de-risks PR2 and keeps each slice near the 400-line budget. Splitting PR2 into 2a/2b ensures per-PR diffs stay manageable.
 **Rejected:** Single mega-PR — >600 lines total, mixes refactor with feature, hard to review/revert.
-**Consequence:** Per-PR revert. PR1 revert restores inline privates; PR2 revert restores `ProximamenteScreen`. No data migration.
+**Consequence:** Per-PR revert. PR1 revert restores inline privates; PR2a/2b revert restores `ProximamenteScreen`. No data migration.
 
 ---
 
@@ -338,9 +353,10 @@ Add `import '../pagos/pagos_web_screen.dart';` (adjust relative path) and drop t
 - Reuse-only: NO changes to `lib/features/payments/*` or shared providers. `pagosBucketsProvider` lives in `sections/pagos/` (presentation).
 - Coach Hub section contract: `ConsumerStatefulWidget`, no Scaffold/SafeArea, `showDialog`/`AlertDialog`, `AppPalette.of(context)` (no HEX), `TreinoIcon` (no PhosphorIcons), es-AR hardcoded + `// i18n`, no `AppL10n`.
 - Sidebar registry test invariant preserved (no `badgeProvider`).
+- Chat reminder uses existing `ChatRepository` and `notifyOnChatMessage` — zero new backend infrastructure.
 
 ## Risks / unresolved
-- **PR2 > 400 lines** (Med): mitigated by PR2a/2b split; decision deferred to tasks/apply per `ask-on-risk`.
+- **PR2 > 400 lines per slice** (Med): mitigated by PR2a/2b split; decision deferred to tasks/apply per `ask-on-risk`.
 - **`_fmtDate` location** (Low): must be located in alumno_detail during PR1 and extracted/inlined with `PagosTable`. Verify before moving.
 - **Vencido semantic gap** (Med, documented): recurring periods never charged are invisible; V1 surfaces only existing pending docs. Needs CF for V2.
 - **Test import update in PR1** (Low): moving `nextDueDate`/`fmtDayMonth` requires updating `alumno_detail_screen_test.dart`'s import to `payment_format.dart`. Mechanical, no assertion change.

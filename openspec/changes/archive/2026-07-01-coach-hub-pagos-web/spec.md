@@ -198,7 +198,7 @@ The widgets and helpers extracted from `alumno_detail_screen.dart` (`RegistrarPa
 | TAB-002 | Scenario 1 | — | — |
 | TABLE-001 | Scenario 1 | Scenario 2 (pending states) | — |
 | ACTION-001 | Scenario 1+2 | — | Scenario 3 (cancel) |
-| ACTION-002 | Scenario 1 | Scenario 2 (null alias) | — |
+| ACTION-002 | Scenario 1 | Scenario 2 (null alias) | Scenario 3 (cancel) |
 | REGISTRAR-001 | Scenario 1+3 | — | Scenario 2 (cancel) |
 | EMPTY-001 | — | Scenario 1+2 | — |
 | ROLE-001 | Scenario 2 (trainer) | — | Scenario 1 (athlete) |

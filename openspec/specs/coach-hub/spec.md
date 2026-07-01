@@ -631,3 +631,151 @@ Deleting an override MUST call `availabilityRepository.deleteOverride(trainerId,
 - Engram: `sdd/coach-hub-web-foundation/spec`
 - Proposal: `openspec/changes/coach-hub-web-foundation/proposal.md` + Engram `sdd/coach-hub-web-foundation/proposal` (#48)
 - Exploration: `openspec/changes/coach-hub-web-foundation/exploration.md` + Engram `sdd/coach-hub-web-foundation/explore` (#45)
+
+---
+
+## Coverage Matrix — Coach Hub Pagos Web (PR #224, #226, #231)
+
+| REQ | Category | Status |
+|-----|----------|--------|
+| REQ-PAGW-ROUTE-001 | `/pagos` route wired | Shipped in PR #224 |
+| REQ-PAGW-SHELL-001 | Section contract (no Scaffold/SafeArea) | Shipped in PR #226 |
+| REQ-PAGW-SHELL-002 | Section header + Registrar pago button | Shipped in PR #226 |
+| REQ-PAGW-KPI-001 | KPI row (Ingreso/Pendiente/Vencido) | Shipped in PR #226 |
+| REQ-PAGW-TAB-001 | 4 tabs with mutually exclusive grouping | Shipped in PR #226 |
+| REQ-PAGW-TAB-002 | Tab badge shows payment count | Shipped in PR #226 |
+| REQ-PAGW-TABLE-001 | Payments table (6 columns) | Shipped in PR #231 |
+| REQ-PAGW-ACTION-001 | "Marcar pagado" persists and updates | Shipped in PR #231 |
+| REQ-PAGW-ACTION-002 | "Recordar" sends in-app chat reminder | Shipped in PR #231 |
+| REQ-PAGW-REGISTRAR-001 | "Registrar pago" dialog + repository | Shipped in PR #231 |
+| REQ-PAGW-EMPTY-001 | Empty state per tab | Shipped in PR #231 |
+| REQ-PAGW-ROLE-001 | Non-trainer role gate (invariant) | Shipped in PR #224 |
+| REQ-PAGW-EXTRACT-001 | Widget extraction (PR1, behavior-preserving) | Shipped in PR #224 |
+
+---
+
+## Change: coach-hub-pagos-web (Pagos Web Implementation)
+
+**Merged from**: `openspec/changes/coach-hub-pagos-web/spec.md`
+**Date merged**: 2026-07-01
+**Status**: Fully implemented (PR #224, #226, #231)
+
+This change introduces the `/pagos` section screen for trainer-wide payment tracking, replacing the ProximamenteScreen placeholder. Delivered as three chained PRs: PR1 (Widget extraction) → PR2a (Screen shell + data) → PR2b (Rich table + row actions). All new files live under `coach_hub/presentation/sections/pagos/`. No backend, domain, or mobile changes.
+
+---
+
+### REQ-PAGW-ROUTE-001 — `/pagos` route renders `PagosWebScreen`, not `ProximamenteScreen`
+
+`sections/pagos/routes.dart` MUST register `PagosWebScreen` as the widget for the `/pagos` route. `ProximamenteScreen` MUST NOT appear in the pagos route definition after this change.
+
+**Related Scenarios**: 
+- GIVEN the router is built WHEN the `/pagos` route is resolved THEN the widget tree contains `PagosWebScreen` and no `ProximamenteScreen`.
+- GIVEN a trainer navigates via the sidebar Pagos item WHEN the route resolves THEN `PagosWebScreen` is rendered (no placeholder).
+
+---
+
+### REQ-PAGW-SHELL-001 — `PagosWebScreen` honors the section contract (no Scaffold, no SafeArea)
+
+`PagosWebScreen` MUST be a `ConsumerStatefulWidget`. It MUST NOT introduce `Scaffold`, `SafeArea`, or `AppBackground` anywhere in its subtree. The shell provides those layers (ADR-CHW-005). It MUST use `AppPalette.of(context)` for all colors. No HEX literal color constants in any new file under `sections/pagos/`.
+
+---
+
+### REQ-PAGW-SHELL-002 — Section header and "Registrar pago" action
+
+`PagosWebScreen` MUST render a section header with text `"PAGOS"` and a primary action button labeled `"+ Registrar pago"`. Tapping `"+ Registrar pago"` MUST open the `RegistrarPagoDialog` via `showDialog`/`AlertDialog`. No bottom sheets.
+
+---
+
+### REQ-PAGW-KPI-001 — KPI row shows Ingreso del mes, Pendiente cobrar, Vencido
+
+The screen MUST render a KPI row containing exactly three tiles: **"Ingreso del mes"** (sum of `amountArs` for `status==paid` payments in the current calendar month), **"Pendiente cobrar"** (sum of `amountArs` for Por vencer payments from `pagosPorCobrarProvider`), and **"Vencido"** (sum of `amountArs` for Vencidos payments). Values MUST be formatted as `$X.XXX` (es-AR, no decimals). All derivations are client-side; no new Firestore query or Cloud Function.
+
+---
+
+### REQ-PAGW-TAB-001 — 4 tabs with mutually exclusive grouping
+
+The screen MUST render exactly 4 tabs: **Vencidos**, **Por vencer**, **Pagados**, **Todos**. A `Payment` MUST belong to exactly one of the first three groups — no overlap between Vencidos and Por vencer.
+
+| Tab | Filter rule |
+|-----|-------------|
+| Vencidos | `status == pending` AND `createdAt < currentPeriodStart` |
+| Por vencer | `pagosPorCobrarProvider` current-period pending (status == pending AND createdAt >= currentPeriodStart) |
+| Pagados | `status == paid` |
+| Todos | all payments |
+
+---
+
+### REQ-PAGW-TAB-002 — Tab badge shows payment count
+
+Each tab label MUST display the count of payments belonging to that group as a badge or parenthetical (e.g. `"Vencidos · 3"`). Count updates reactively as the provider stream changes.
+
+---
+
+### REQ-PAGW-TABLE-001 — Payments table columns
+
+Each active tab MUST render a `PagosTable` widget with exactly 6 columns: **Alumno** (athlete display name), **Concepto/Plan** (payment `concept`), **Monto** (`amountArs` formatted es-AR), **Vencimiento** (formatted date), **Estado** (chip: `"Pagado"` / `"Pendiente"` / `"Vencido"`), **Acciones** (row action buttons).
+
+---
+
+### REQ-PAGW-ACTION-001 — "Marcar pagado" persists via repository and updates UI reactively
+
+Each row with `status == pending` MUST show a `"Marcar pagado"` action button. Tapping it MUST open an `AlertDialog` for confirmation. On confirm, it MUST call `paymentRepository.markManyPaid` for that payment. On success, the payment's `status` becomes `paid` and the row moves from Por vencer/Vencidos to Pagados reactively via the provider stream. `showDialog`/`AlertDialog` only — no bottom sheets.
+
+---
+
+### REQ-PAGW-ACTION-002 — "Recordar" sends a payment reminder via the in-app chat
+
+Each payment row MUST show a `"Recordar"` action button. Tapping it MUST open a confirmation dialog pre-filled with an editable reminder message; on confirm it MUST send that message to the athlete through the existing in-app chat (`chatForOtherUidProvider` resolves/creates the trainer↔athlete `Chat`, then `ChatRepository.sendMessage`). The message MUST include: the payment `amountArs` (formatted es-AR), the payment `concept`, and the trainer's `paymentAlias` (from `UserProfile`) when present. The `notifyOnChatMessage` Cloud Function delivers the push to the athlete. No athlete phone number is required or stored. (Supersedes the earlier WhatsApp `wa.me` approach — the in-app chat needs no phone and keeps the trainer inside the app.)
+
+---
+
+### REQ-PAGW-REGISTRAR-001 — "Registrar pago" dialog adds a payment via repository
+
+`RegistrarPagoDialog` (extracted from `alumno_detail_screen.dart`) MUST collect `amount` (int, ARS) and `concept` (String). On confirm, it MUST call `paymentRepository.add(...)` with the provided values and the current trainer ID. The new payment appears in the appropriate tab reactively via `trainerPaymentsProvider`. On cancel, no write occurs.
+
+---
+
+### REQ-PAGW-EMPTY-001 — Empty state per tab
+
+When a tab has zero payments, a non-crashing, informative empty-state widget MUST be displayed. The empty-state text MUST be tab-specific (e.g., `"No hay pagos vencidos"`, `"No hay pagos pendientes"`, `"No hay pagos registrados"`, `"No hay pagos"` for Todos).
+
+---
+
+### REQ-PAGW-ROLE-001 — Non-trainer roles do not access `/pagos`
+
+The `/pagos` route MUST remain gated to the `trainer` role. Athletes navigating to `/pagos` MUST receive the same not-allowed treatment as the existing role gate (no change to existing gate logic — this requirement documents the invariant).
+
+---
+
+### REQ-PAGW-EXTRACT-001 — Widget extraction from `alumno_detail_screen.dart` is behavior-preserving (PR1)
+
+The widgets and helpers extracted from `alumno_detail_screen.dart` (`RegistrarPagoDialog`, `EstadoCuentaCard`, `PagosTable`, `_marcarPagado`, `_registrarPago`, `_fmtArs`, `nextDueDate`, `fmtDayMonth`) to `sections/pagos/widgets/` MUST NOT change the behavior of `alumno_detail_screen.dart`. After extraction, `alumno_detail_screen.dart` MUST re-import them; all existing tests and `flutter analyze` MUST pass unchanged.
+
+---
+
+### Cross-cutting constraints (coach-hub-pagos-web)
+
+| # | Constraint |
+|---|-----------|
+| C-PAGW-1 | All files MUST be under `coach_hub/presentation/sections/pagos/` |
+| C-PAGW-2 | NO `Scaffold` — `CoachHubScaffold` provides the shell (ADR-CHW-005) |
+| C-PAGW-3 | Use `AppPalette.of(context)` — MUST NOT hardcode hex colors |
+| C-PAGW-4 | Use `TreinoIcon.X` — MUST NOT use Phosphor or other icon packs |
+| C-PAGW-5 | Widgets MUST be `ConsumerStatefulWidget`; page-local state `autoDispose+family` |
+| C-PAGW-6 | Strings hardcoded Spanish + `// i18n`; MUST NOT call `AppL10n` |
+| C-PAGW-7 | Dialogs MUST use `showDialog` / `AlertDialog`; MUST NOT use `showModalBottomSheet` |
+| C-PAGW-8 | MUST NOT modify mobile files; payment-handling on mobile remains unchanged |
+| C-PAGW-9 | `dart analyze` must return 0 errors; `dart format` applied; all tests green before merge |
+| C-PAGW-10 | Each PR MUST be independently shippable (PR1 extraction; PR2a screen+data; PR2b table+actions) |
+
+---
+
+### Out of Scope (coach-hub-pagos-web)
+
+- Mercado Pago or any payment gateway integration
+- Storing athlete phone number
+- Auto-detecting uncharged recurring periods (requires Cloud Function — V2)
+- Month selector for payment history (V2)
+- CSV export (V2)
+- `Proyectado mes` KPI (V2, non-trivial client-side derivation)
+- Real `dueDate` field (uses `createdAt` as proxy; full recurring billing deferred)
