@@ -50,6 +50,7 @@ class _StubAuthNotifier extends AuthNotifier {
 class _FakeRankingOptInController extends RankingOptInControllerBase {
   final List<String> enabledCalls = [];
   final List<String> disabledCalls = [];
+  final List<String> syncCalls = [];
 
   @override
   Future<void> enableRankingOptIn(String uid) async {
@@ -59,6 +60,11 @@ class _FakeRankingOptInController extends RankingOptInControllerBase {
   @override
   Future<void> disableRankingOptIn(String uid) async {
     disabledCalls.add(uid);
+  }
+
+  @override
+  Future<void> syncGymIfDesynced(String uid) async {
+    syncCalls.add(uid);
   }
 }
 
@@ -255,4 +261,7 @@ class _FakeRankingOptInControllerAsync extends RankingOptInControllerBase {
 
   @override
   Future<void> disableRankingOptIn(String uid) => _future;
+
+  @override
+  Future<void> syncGymIfDesynced(String uid) async {}
 }
