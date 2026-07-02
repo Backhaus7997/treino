@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart'
     show CollectionReference, FieldPath, FirebaseFirestore, SetOptions;
 
+import '../../gyms/domain/gym.dart' show kNoGymId;
 import '../domain/user_public_profile.dart';
 
 /// Repository for the `userPublicProfiles` collection.
@@ -110,6 +111,36 @@ class UserPublicProfileRepository {
       },
       SetOptions(merge: true),
     );
+  }
+
+  /// Returns up to [limit] opted-in profiles for [gymId], ordered descending
+  /// by [metricField] — the query behind every per-gym leaderboard
+  /// (`gym-rankings` spec: Streak/Volume/Main-Lift Leaderboards).
+  ///
+  /// Returns an empty list without issuing a Firestore call when [gymId] is
+  /// blank or equals [kNoGymId] — an athlete with no gym has no leaderboard
+  /// to show (spec: Gym Scoping and No-Gym Exclusion). Athletes with
+  /// `gymId == null`/`kNoGymId` never match `where('gymId', isEqualTo: ...)`
+  /// against a real gym id either, so the composite index naturally excludes
+  /// them from every OTHER gym's leaderboard too.
+  ///
+  /// A gym with zero opted-in athletes simply yields an empty snapshot — not
+  /// an error (spec: Empty States).
+  Future<List<UserPublicProfile>> leaderboard({
+    required String gymId,
+    required String metricField,
+    int limit = 20,
+  }) async {
+    if (gymId.isEmpty || gymId == kNoGymId) return const [];
+
+    final snap = await _col
+        .where('gymId', isEqualTo: gymId)
+        .where('rankingOptIn', isEqualTo: true)
+        .orderBy(metricField, descending: true)
+        .limit(limit)
+        .get();
+
+    return snap.docs.map((d) => UserPublicProfile.fromJson(d.data())).toList();
   }
 
   /// Flips the trainer's `sharedTemplatesWithAthletes` flag. When `true`,
