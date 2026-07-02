@@ -84,6 +84,34 @@ class UserPublicProfileRepository {
     await _col.doc(uid).set(fields, SetOptions(merge: true));
   }
 
+  /// Flips the athlete's `rankingOptIn` flag via the same partial-merge path
+  /// as [updateCounters]. Does NOT touch the 4 ranking-metric fields — the
+  /// caller (`RankingOptInController`) is responsible for backfilling them
+  /// on enable and clearing them on disable via [clearRankingMetrics]. See
+  /// design `sdd/rankings/design` — Opt-In Toggle Lifecycle.
+  Future<void> setRankingOptIn(String uid, bool value) async {
+    await _col.doc(uid).set({'rankingOptIn': value}, SetOptions(merge: true));
+  }
+
+  /// Resets all 4 ranking-metric fields to their pre-opt-in defaults and
+  /// flips `rankingOptIn` to `false`, via a partial merge so identity fields
+  /// (displayName/avatarUrl/gymId) and unrelated counters are untouched.
+  /// `best<Lift>Kg` fields are cleared to `null` (their default when not
+  /// opted in / no matching lift) rather than `0`, matching the model's
+  /// existing "null = no PR to report" semantics.
+  Future<void> clearRankingMetrics(String uid) async {
+    await _col.doc(uid).set(
+      {
+        'rankingOptIn': false,
+        'lifetimeVolumeKg': 0,
+        'bestSquatKg': null,
+        'bestBenchKg': null,
+        'bestDeadliftKg': null,
+      },
+      SetOptions(merge: true),
+    );
+  }
+
   /// Flips the trainer's `sharedTemplatesWithAthletes` flag. When `true`,
   /// the Firestore rule on `routines` lets any authenticated user read this
   /// trainer's `trainer-template` docs — the athlete client filters them by

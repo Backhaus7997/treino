@@ -46,11 +46,11 @@ Chain strategy: pending
 
 ## Phase 3: Opt-In Toggle + Backfill (Slice 3 — PR 3)
 
-- [ ] 3.1 RED: `test/features/profile/data/user_public_profile_repository_test.dart` — add cases for `setRankingOptIn(uid, true)` merges `rankingOptIn: true` without clobbering other fields; a clear-helper resets `lifetimeVolumeKg`/`best<Lift>Kg` to `0`/absent and `rankingOptIn: false`.
-- [ ] 3.2 GREEN: Modify `lib/features/profile/data/user_public_profile_repository.dart` — add `setRankingOptIn(String uid, bool value)` and a clear-on-disable helper (both via existing `updateCounters` merge path).
-- [ ] 3.3 RED: `test/features/profile/application/ranking_optin_controller_test.dart` — cases per `gym-rankings` spec scenarios: ENABLE computes `lifetimeVolumeKg` = Σ over own session history and `bestSquatKg/bestBenchKg/bestDeadliftKg` from own SetLog history (reuse `aggregateExerciseProgression` per family, 0 if no matching lifts) in one client-side pass; DISABLE clears all 4 fields; ENABLE does NOT recompute `racha` (already denormalized).
-- [ ] 3.4 GREEN: Create `lib/features/profile/application/ranking_optin_controller.dart` — `enableRankingOptIn(uid)` (backfill via own session/SetLog history, family map from Phase 2) and `disableRankingOptIn(uid)` (clear via 3.2 helper).
-- [ ] 3.5 Quality gate: `flutter analyze` 0 issues, `dart format .`, `flutter test test/features/profile/data/user_public_profile_repository_test.dart test/features/profile/application/ranking_optin_controller_test.dart` green.
+- [x] 3.1 RED: `test/features/profile/data/user_public_profile_repository_test.dart` — add cases for `setRankingOptIn(uid, true)` merges `rankingOptIn: true` without clobbering other fields; a clear-helper resets `lifetimeVolumeKg`/`best<Lift>Kg` to `0`/absent and `rankingOptIn: false`.
+- [x] 3.2 GREEN: Modify `lib/features/profile/data/user_public_profile_repository.dart` — add `setRankingOptIn(String uid, bool value)` and a clear-on-disable helper (both via existing `updateCounters` merge path).
+- [x] 3.3 RED: `test/features/profile/application/ranking_optin_controller_test.dart` — cases per `gym-rankings` spec scenarios: ENABLE computes `lifetimeVolumeKg` = Σ over own session history and `bestSquatKg/bestBenchKg/bestDeadliftKg` from own SetLog history (reuse `familyMaxWeight` per family, 0 if no matching lifts) in one client-side pass; DISABLE clears all 4 fields; ENABLE does NOT recompute `racha` (already denormalized).
+- [x] 3.4 GREEN: Create `lib/features/profile/application/ranking_optin_controller.dart` — `enableRankingOptIn(uid)` (backfill via own session/SetLog history, family map from Phase 2) and `disableRankingOptIn(uid)` (clear via 3.2 helper).
+- [x] 3.5 Quality gate: `flutter analyze` 0 issues, `dart format .`, `flutter test test/features/profile/data/user_public_profile_repository_test.dart test/features/profile/application/ranking_optin_controller_test.dart` green.
 
 ## Phase 4: Ranking Queries + UI + Route (Slice 4 — PR 4)
 
