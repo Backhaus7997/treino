@@ -43,7 +43,8 @@ final bibliotecaEquipmentFilterProvider =
 ///   if catalog errors → AsyncError.
 /// - Custom stream errors are swallowed via `valueOrNull ?? []` so a trainer
 ///   with broken custom permissions still browses the catalog.
-/// - Custom entries are prepended (mirrors picker "Tus ejercicios" precedence).
+/// - Merged list (catalog ∪ custom) is sorted alphabetically by name
+///   (foldSearch, diacritic-tolerant) so both kinds interleave predictably.
 /// - Custom exercises carry `category == 'custom'` (via [customToExercise]).
 final bibliotecaExercisesProvider =
     Provider.autoDispose<AsyncValue<List<Exercise>>>((ref) {
@@ -76,8 +77,11 @@ final bibliotecaExercisesProvider =
 
   final customs = customsAsync.requireValue;
 
-  // Merge: customs first, then catalog.
-  final merged = [...customs, ...catalog];
+  // Merge catalog ∪ custom, then sort alphabetically by name (diacritic-tolerant
+  // via foldSearch) so catalog and custom exercises interleave predictably
+  // instead of leading with a wall of custom cards.
+  final merged = [...customs, ...catalog]
+    ..sort((a, b) => foldSearch(a.name).compareTo(foldSearch(b.name)));
 
   // Apply filters.
   final filtered = merged

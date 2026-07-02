@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:treino/app/theme/app_palette.dart';
+import 'package:treino/features/coach_hub/presentation/sections/biblioteca/widgets/template_format.dart';
 import 'package:treino/features/profile/domain/experience_level.dart';
 import 'package:treino/features/workout/domain/routine.dart';
 
@@ -79,7 +80,7 @@ class _TemplateDetailDialog extends StatelessWidget {
               const SizedBox(height: 12),
               // ── días/sem · semanas ───────────────────────────────────────
               Text(
-                '${routine.days.length} días/sem · ${routine.numWeeks} semanas', // i18n
+                routineCadenceLabel(routine), // i18n
                 style: GoogleFonts.barlow(
                   fontSize: 14,
                   color: palette.textMuted,

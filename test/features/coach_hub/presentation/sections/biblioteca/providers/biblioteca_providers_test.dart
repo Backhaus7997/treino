@@ -128,7 +128,8 @@ void main() {
       });
     });
 
-    test('custom exercises are prepended (customs first)', () async {
+    test('merged list is sorted alphabetically by name (catalog ∪ custom)',
+        () async {
       final container = _container(
         catalog: const [_bench, _curl],
         customs: [_customEx],
@@ -140,8 +141,12 @@ void main() {
 
       final result = container.read(bibliotecaExercisesProvider);
       result.whenData((list) {
-        expect(list.isNotEmpty, isTrue);
-        expect(list.first.id, equals(_customEx.id));
+        // foldSearch: "curl de biceps" < "press de banca" < "sentadilla ..."
+        // Custom y catálogo se intercalan por nombre, no custom-primero.
+        expect(
+          list.map((e) => e.id).toList(),
+          equals([_curl.id, _bench.id, _customEx.id]),
+        );
       });
     });
 

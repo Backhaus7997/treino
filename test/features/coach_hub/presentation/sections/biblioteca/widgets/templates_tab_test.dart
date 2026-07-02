@@ -118,6 +118,23 @@ void main() {
       expect(find.textContaining('8 semanas'), findsOneWidget);
     });
 
+    testWidgets('singulariza día/semana cuando el conteo es 1', (tester) async {
+      tester.view.physicalSize = const Size(1280, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final single =
+          _makeRoutine('tpl-single', 'Plan Corto', days: 1, weeks: 1);
+      await tester.pumpWidget(
+        _wrap(const TemplatesTab(), templates: [single]),
+      );
+      await tester.pumpAndSettle();
+
+      // 1 día → "día" (no "días") · 1 semana → "semana" (no "semanas").
+      expect(find.text('1 día/sem · 1 semana'), findsOneWidget);
+    });
+
     testWidgets('each card shows level — SCENARIO-BIBW-09a', (tester) async {
       tester.view.physicalSize = const Size(1280, 900);
       tester.view.devicePixelRatio = 1.0;
