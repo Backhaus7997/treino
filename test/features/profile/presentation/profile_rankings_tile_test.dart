@@ -1,14 +1,17 @@
-// Phase 4 RED — SCENARIO-RANK-8
+// rankings-v2 Phase 3 RED (task 3.1) — remove the rankings entry point from
+// ProfileScreen.
 //
-// ProfileScreen (athlete) exposes a "RANKINGS" entry point in the
-// ENTRENAMIENTO section that (a) navigates to /profile/rankings on tap, and
-// (b) shows the current rankingOptIn state via a trailing Switch that calls
-// RankingOptInController.enableRankingOptIn/disableRankingOptIn.
+// Spec `gym-rankings` — ProfileScreen no longer exposes a rankings entry
+// point: rankings moved to the athlete Entrenar tab (design
+// `sdd/rankings-v2/design` AD-1/AD-3). ProfileScreen's ENTRENAMIENTO section
+// MUST NOT render a rankings tile/toggle/link — the old `_RankingsTile`
+// (which pushed `/profile/rankings` and carried the opt-in Switch) is
+// removed.
 //
-// Spec `gym-rankings` — Opt-In Toggle Lifecycle: the toggle lives in the
-// profile sub-tree (design `sdd/rankings/design` — Placement).
-
-import 'dart:async';
+// This file previously asserted the tile's PRESENCE (Phase 4 v1 —
+// SCENARIO-RANK-8); Phase 3 of rankings-v2 flips those assertions to assert
+// ABSENCE, per the REMOVED requirement `gym-rankings — Rankings Reachable
+// via Profile Tile and /profile/rankings`.
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -133,135 +136,44 @@ void main() {
     ];
   }
 
-  testWidgets('RANKINGS tile is visible in the ENTRENAMIENTO section',
+  testWidgets(
+      'ProfileScreen does NOT render a Rankings tile in the ENTRENAMIENTO section',
       (tester) async {
     await tester.pumpWidget(_buildScreen(overrides: baseOverrides()));
     await tester.pumpAndSettle();
 
-    // Tiles are below the fold — scroll to them first (established pattern,
-    // see SCENARIO-530/565).
-    await tester.scrollUntilVisible(find.text('Rankings'), 50);
-    expect(find.text('Rankings'), findsOneWidget);
+    expect(find.text('Rankings'), findsNothing);
   });
 
-  testWidgets('tapping the RANKINGS tile navigates to /profile/rankings',
-      (tester) async {
-    await tester.pumpWidget(_buildScreen(overrides: baseOverrides()));
-    await tester.pumpAndSettle();
-
-    await tester.scrollUntilVisible(find.text('Rankings'), 50);
-    await tester.tap(find.text('Rankings'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('RANKINGS_SCREEN'), findsOneWidget);
-  });
-
-  testWidgets('toggle reflects rankingOptIn == false as OFF', (tester) async {
-    await tester.pumpWidget(
-      _buildScreen(overrides: baseOverrides(rankingOptIn: false)),
-    );
-    await tester.pumpAndSettle();
-
-    await tester.scrollUntilVisible(
-        find.byKey(const Key('profile_ranking_optin_switch')), 50);
-    final toggle = tester.widget<Switch>(
-      find.byKey(const Key('profile_ranking_optin_switch')),
-    );
-    expect(toggle.value, isFalse);
-  });
-
-  testWidgets('toggle reflects rankingOptIn == true as ON', (tester) async {
-    await tester.pumpWidget(
-      _buildScreen(overrides: baseOverrides(rankingOptIn: true)),
-    );
-    await tester.pumpAndSettle();
-
-    await tester.scrollUntilVisible(
-        find.byKey(const Key('profile_ranking_optin_switch')), 50);
-    final toggle = tester.widget<Switch>(
-      find.byKey(const Key('profile_ranking_optin_switch')),
-    );
-    expect(toggle.value, isTrue);
-  });
-
-  testWidgets('flipping the toggle ON calls enableRankingOptIn(uid)',
-      (tester) async {
-    await tester.pumpWidget(
-      _buildScreen(overrides: baseOverrides(rankingOptIn: false)),
-    );
-    await tester.pumpAndSettle();
-
-    await tester.scrollUntilVisible(
-        find.byKey(const Key('profile_ranking_optin_switch')), 50);
-    await tester.tap(find.byKey(const Key('profile_ranking_optin_switch')));
-    await tester.pump();
-
-    expect(fakeController.enabledCalls, equals([_uid]));
-    expect(fakeController.disabledCalls, isEmpty);
-  });
-
-  testWidgets('flipping the toggle OFF calls disableRankingOptIn(uid)',
+  testWidgets('ProfileScreen does NOT render the rankingOptIn Switch anywhere',
       (tester) async {
     await tester.pumpWidget(
       _buildScreen(overrides: baseOverrides(rankingOptIn: true)),
     );
     await tester.pumpAndSettle();
 
-    await tester.scrollUntilVisible(
-        find.byKey(const Key('profile_ranking_optin_switch')), 50);
-    await tester.tap(find.byKey(const Key('profile_ranking_optin_switch')));
-    await tester.pump();
-
-    expect(fakeController.disabledCalls, equals([_uid]));
-    expect(fakeController.enabledCalls, isEmpty);
+    expect(find.byKey(const Key('profile_ranking_optin_switch')), findsNothing);
+    expect(
+        find.byKey(const Key('profile_ranking_optin_loading')), findsNothing);
   });
 
   testWidgets(
-      'toggle shows a loading spinner while the backfill/clear is in flight',
-      (tester) async {
-    final completer = Completer<void>();
-    final asyncController = _FakeRankingOptInControllerAsync(completer.future);
-
-    await tester.pumpWidget(_buildScreen(overrides: [
-      authNotifierProvider.overrideWith(_StubAuthNotifier.new),
-      authStateChangesProvider.overrideWith((_) => Stream.value(mockUser)),
-      userProfileProvider.overrideWith((_) => Stream.value(_testProfile())),
-      pendingRequestCountProvider(_uid).overrideWith((_) => 0),
-      pendingRequestsStreamProvider(_uid).overrideWith((_) => Stream.value([])),
-      userSessionStatsProvider.overrideWith((_) async => const UserSessionStats(
-          totalSessions: 0, totalVolumeKg: 0, streak: 0)),
-      userPublicProfileProvider(_uid).overrideWith(
-        (_) => Stream.value(
-          const UserPublicProfile(uid: _uid, rankingOptIn: false),
-        ),
-      ),
-      rankingOptInControllerProvider.overrideWithValue(asyncController),
-    ]));
+      'ProfileScreen never calls enableRankingOptIn/disableRankingOptIn '
+      '(no toggle wired anywhere on the screen)', (tester) async {
+    await tester.pumpWidget(_buildScreen(overrides: baseOverrides()));
     await tester.pumpAndSettle();
 
-    await tester.scrollUntilVisible(
-        find.byKey(const Key('profile_ranking_optin_switch')), 50);
-    await tester.tap(find.byKey(const Key('profile_ranking_optin_switch')));
-    await tester.pump();
-
-    expect(
-        find.byKey(const Key('profile_ranking_optin_loading')), findsOneWidget);
-
-    completer.complete();
-    await tester.pumpAndSettle();
+    expect(fakeController.enabledCalls, isEmpty);
+    expect(fakeController.disabledCalls, isEmpty);
   });
-}
 
-class _FakeRankingOptInControllerAsync extends RankingOptInControllerBase {
-  _FakeRankingOptInControllerAsync(this._future);
-  final Future<void> _future;
+  testWidgets(
+      'other ENTRENAMIENTO tiles (Mis ejercicios) remain unaffected by the '
+      'rankings tile removal', (tester) async {
+    await tester.pumpWidget(_buildScreen(overrides: baseOverrides()));
+    await tester.pumpAndSettle();
 
-  @override
-  Future<void> enableRankingOptIn(String uid) => _future;
-
-  @override
-  Future<void> disableRankingOptIn(String uid) => _future;
-
-  @override
-  Future<void> syncGymIfDesynced(String uid) async {}
+    await tester.scrollUntilVisible(find.text('Mis ejercicios'), 50);
+    expect(find.text('Mis ejercicios'), findsOneWidget);
+  });
 }

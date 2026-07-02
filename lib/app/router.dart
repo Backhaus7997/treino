@@ -38,7 +38,6 @@ import '../features/feed/presentation/friend_requests_inbox_screen.dart';
 import '../features/profile/application/account_deletion_notifier.dart';
 import '../features/feed/presentation/public_profile_screen.dart';
 import '../features/feed/presentation/search_users_screen.dart';
-import '../features/gym_rankings/presentation/rankings_screen.dart';
 import '../features/home/home_screen.dart';
 import '../features/insights/presentation/insights_screen.dart';
 import '../features/profile/application/user_providers.dart';
@@ -535,10 +534,15 @@ GoRouter buildRouter({
                 path: 'routines',
                 builder: (_, __) => _withBg(const ProfileRoutinesScreen()),
               ),
-              // NEW — rankings (Fase 4, per-gym opt-in leaderboards).
+              // rankings — RETIRED as a pushed route (rankings-v2 Phase 3,
+              // task 3.4). Rankings relocated to the second page of the
+              // athlete Entrenar tab (design `sdd/rankings-v2/design`
+              // AD-1/AD-3). Kept REGISTERED with a redirect (not
+              // hard-removed) — a safety net for any lingering
+              // `context.push('/profile/rankings')` call or bookmark.
               GoRoute(
                 path: 'rankings',
-                builder: (_, __) => _withBg(const RankingsScreen()),
+                redirect: (_, __) => '/workout?tab=rankings',
               ),
               GoRoute(
                 path: 'settings/appearance',

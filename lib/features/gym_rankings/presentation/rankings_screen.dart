@@ -17,12 +17,13 @@ import '../domain/ranking_dimension.dart';
 /// Per-gym rankings screen — 3 dimensions (Rachas / Volumen / Lifts, lifts
 /// sub-split squat/bench/deadlift) for the current athlete's gym.
 ///
-/// Placement (this slice): still registered at `/profile/rankings` as a
-/// pushed route (kept as a safety net — Phase 3 replaces it with a redirect
-/// to `/workout?tab=rankings`), but the PRIMARY placement is now the second
-/// page of the athlete Entrenar tab (`WorkoutScreen`'s `_RankingsPage`,
-/// design `sdd/rankings-v2/design` AD-1/AD-2). All gating/body logic lives
-/// in [RankingsBody] so both hosts render identically.
+/// Placement: `/profile/rankings` is RETIRED as a pushed route and now
+/// redirects to `/workout?tab=rankings` (design `sdd/rankings-v2/design`
+/// AD-3, Phase 3 cleanup). The PRIMARY placement is the second page of the
+/// athlete Entrenar tab (`WorkoutScreen`'s `_RankingsPage`, AD-1/AD-2). This
+/// class is no longer mounted by the router — it is kept as a widget-test
+/// harness (`rankings_screen_test.dart`) that exercises the same
+/// [RankingsBody] both hosts render, so gating/body logic is verified once.
 class RankingsScreen extends StatelessWidget {
   const RankingsScreen({super.key});
 
