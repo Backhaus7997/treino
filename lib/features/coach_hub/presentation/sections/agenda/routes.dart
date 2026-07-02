@@ -23,7 +23,7 @@ const List<SidebarItem> agendaSidebarItems = [
     label: 'Agenda', // i18n: Fase W1
     route: '/agenda',
     iconBuilder: _agendaIcon,
-    group: SidebarGroup.resumen,
+    group: SidebarGroup.gestion,
   ),
 ];
 

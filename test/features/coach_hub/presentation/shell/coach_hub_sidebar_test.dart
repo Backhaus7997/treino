@@ -52,15 +52,25 @@ Future<void> _pumpSidebar(
 }
 
 void main() {
-  testWidgets('expandido → 264px, 6 headers y 19 labels [SCENARIO-750]',
-      (tester) async {
+  testWidgets(
+      'expandido → 264px, 2 headers (GESTIÓN, RECURSOS) y todos los labels '
+      'del registry [SCENARIO-750]', (tester) async {
     await _pumpSidebar(tester);
 
     final size =
         tester.getSize(find.byKey(const Key('coach_hub_sidebar_container')));
     expect(size.width, 264);
 
-    for (final header in [
+    // W2 reduce 2026-07-02: el sidebar pasó a 2 grupos activos (GESTIÓN y
+    // RECURSOS) + Ajustes pinneado abajo. Reportes (grupo CUENTA) también
+    // salió del registry — sin scope de producto todavía. Los grupos
+    // legacy siguen existiendo en el enum para no romper items futuros
+    // pero no se renderean porque no tienen items en el registry.
+    for (final header in ['GESTIÓN', 'RECURSOS']) {
+      expect(find.text(header), findsOneWidget, reason: header);
+    }
+    for (final empty in [
+      'CUENTA',
       'RESUMEN',
       'ALUMNOS',
       'PLAN',
@@ -68,7 +78,7 @@ void main() {
       'NEGOCIO',
       'COMUNICACIÓN',
     ]) {
-      expect(find.text(header), findsOneWidget, reason: header);
+      expect(find.text(empty), findsNothing, reason: 'empty group $empty');
     }
 
     for (final item in sidebarRegistry) {

@@ -30,7 +30,7 @@ const List<SidebarItem> alumnosSidebarItems = [
     label: 'Alumnos', // i18n: Fase W1
     route: '/alumnos',
     iconBuilder: _alumnosIcon,
-    group: SidebarGroup.alumnos,
+    group: SidebarGroup.gestion,
   ),
 ];
 

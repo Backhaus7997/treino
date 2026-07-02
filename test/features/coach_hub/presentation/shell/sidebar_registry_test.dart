@@ -5,14 +5,38 @@ import 'package:treino/features/coach_hub/presentation/shell/sidebar_registry.da
 
 void main() {
   group('sidebarRegistry (REQ-CHW-SIDEBAR-001)', () {
-    test('tiene exactamente 19 items [SCENARIO-750]', () {
-      // El spec dice "21" pero la enumeración real (tabla del spec + lista de
-      // rutas de W1.1.7) es 19; Solicitudes y Perfil Público quedan fuera de W1.
-      expect(sidebarRegistry.length, 19);
+    test(
+        'tiene exactamente 7 items post-W2 reduce (Dashboard, Alumnos, '
+        'Agenda, Chat, Biblioteca, Pagos, Ajustes)', () {
+      // W2 reduce 2026-07-02: se removieron 12 items del sidebar que
+      // duplicaban funcionalidad del alumno_detail o pertenecen a una
+      // futura Biblioteca (sub-tabs). Reportes también sale (sin scope
+      // definido — cuando producto lo defina se re-agrega). Sus screens y
+      // rutas siguen existiendo.
+      expect(sidebarRegistry.length, 7);
     });
 
-    test('cubre los 6 grupos no-ajustes, cada uno no vacío [SCENARIO-750]', () {
-      const nonAjustes = [
+    test('cubre los 2 grupos activos post-reduce, cada uno no vacío', () {
+      // CUENTA queda vacío porque Reportes se removió del registry —
+      // se filtra por items.isNotEmpty en el widget y no se renderea.
+      const activeGroups = [
+        SidebarGroup.gestion,
+        SidebarGroup.recursos,
+      ];
+      for (final g in activeGroups) {
+        expect(
+          sidebarRegistry.where((i) => i.group == g),
+          isNotEmpty,
+          reason: 'el grupo $g debe tener al menos un item',
+        );
+      }
+    });
+
+    test('los grupos legacy + CUENTA quedan sin items en el registry', () {
+      // El enum los mantiene para que items futuros no rompan la firma;
+      // el registry no los referencia post-reduce.
+      const emptyGroups = [
+        SidebarGroup.cuenta, // Reportes removido — sin scope todavía
         SidebarGroup.resumen,
         SidebarGroup.alumnos,
         SidebarGroup.plan,
@@ -20,11 +44,11 @@ void main() {
         SidebarGroup.negocio,
         SidebarGroup.comunicacion,
       ];
-      for (final g in nonAjustes) {
+      for (final g in emptyGroups) {
         expect(
           sidebarRegistry.where((i) => i.group == g),
-          isNotEmpty,
-          reason: 'el grupo $g debe tener al menos un item',
+          isEmpty,
+          reason: 'group $g must not appear in the reduced registry',
         );
       }
     });
@@ -41,30 +65,19 @@ void main() {
       expect(ids.toSet().length, ids.length);
     });
 
-    test('las rutas son únicas y coinciden con el set esperado', () {
+    test('las rutas son únicas y coinciden con el set esperado post-reduce',
+        () {
       final routes = sidebarRegistry.map((i) => i.route).toList();
       expect(routes.toSet().length, routes.length, reason: 'rutas duplicadas');
       expect(
         routes.toSet(),
         {
           '/dashboard',
-          '/actividad',
-          '/agenda',
           '/alumnos',
-          '/invitaciones',
-          '/cuestionario',
-          '/rutinas',
-          '/planner',
-          '/biblioteca',
-          '/templates',
-          '/nutricion',
-          '/recetas',
-          '/suplementos',
-          '/habitos',
-          '/pagos',
-          '/planes',
-          '/reportes',
+          '/agenda',
           '/chat',
+          '/biblioteca',
+          '/pagos',
           '/ajustes',
         },
       );
@@ -75,20 +88,15 @@ void main() {
         'ingleses [SCENARIO-751]', () {
       final labels = sidebarRegistry.map((i) => i.label).toSet();
 
-      // Equivalentes en castellano que DEBEN estar.
+      // Equivalentes en castellano que DEBEN estar (subset post-reduce).
       for (final esLabel in [
         'Ajustes',
         'Alumnos',
-        'Rutinas',
-        'Reportes',
         'Pagos',
-        'Recetas',
-        'Suplementos',
-        'Hábitos',
-        'Invitaciones',
         'Agenda',
         'Biblioteca',
-        'Nutrición',
+        'Chat',
+        'Dashboard',
       ]) {
         expect(labels, contains(esLabel));
       }
@@ -97,16 +105,9 @@ void main() {
       for (final enLabel in [
         'Settings',
         'Students',
-        'Routines',
-        'Reports',
         'Payments',
-        'Recipes',
-        'Supplements',
-        'Habits',
-        'Invitations',
         'Schedule',
         'Library',
-        'Nutrition',
       ]) {
         expect(labels, isNot(contains(enLabel)));
       }

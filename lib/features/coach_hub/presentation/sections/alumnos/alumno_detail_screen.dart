@@ -71,6 +71,7 @@ class AlumnoDetailScreen extends ConsumerWidget {
     'Notas privadas',
     'Archivos',
     'Seguimiento',
+    'Mediciones',
   ];
   static const _resumenIndex = 0;
   static const _entrenamientoIndex = 1;

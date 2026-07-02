@@ -41,9 +41,19 @@ class CoachHubDashboardScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return Center(
+    // Align.topCenter en vez de Center: centra horizontalmente pero pega
+    // el content al top. Con Center puro, cuando el viewport es alto y el
+    // content es corto (poca data en dev), sobraba mucho espacio en blanco
+    // arriba y abajo.
+    return Align(
+      alignment: Alignment.topCenter,
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 1280),
+        // maxWidth 1600 evita que el content se estire en 4K/5K pero
+        // aprovecha bien viewports 1440-1920 sin dejar mucho espacio muerto
+        // a los lados. Antes era 1280 (conservador para 720p/1080p) y en
+        // monitores Retina/4K quedaba pegado a la izquierda con mucho aire
+        // en la derecha.
+        constraints: const BoxConstraints(maxWidth: 1600),
         child: LayoutBuilder(
           builder: (context, constraints) {
             // Finite-height guard mirrors agenda_web_screen.dart:107-108.

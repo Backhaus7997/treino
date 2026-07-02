@@ -25,7 +25,7 @@ const List<SidebarItem> reportesSidebarItems = [
     label: 'Reportes', // i18n: Fase W1
     route: '/reportes',
     iconBuilder: _reportesIcon,
-    group: SidebarGroup.negocio,
+    group: SidebarGroup.cuenta,
   ),
 ];
 

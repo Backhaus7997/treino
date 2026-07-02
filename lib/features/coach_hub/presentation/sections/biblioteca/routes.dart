@@ -23,7 +23,7 @@ const List<SidebarItem> bibliotecaSidebarItems = [
     label: 'Biblioteca', // i18n: Fase W1
     route: '/biblioteca',
     iconBuilder: _bibliotecaIcon,
-    group: SidebarGroup.plan,
+    group: SidebarGroup.recursos,
   ),
 ];
 

@@ -23,7 +23,7 @@ const List<SidebarItem> dashboardSidebarItems = [
     label: 'Dashboard', // i18n: Fase W1
     route: '/dashboard',
     iconBuilder: _dashboardIcon,
-    group: SidebarGroup.resumen,
+    group: SidebarGroup.gestion,
   ),
 ];
 
