@@ -2243,6 +2243,22 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get dashboardAdherenceRingPlaceholder => '--';
+
+  @override
+  String get dashboardProximasSesionesEmpty =>
+      'No hay sesiones próximas confirmadas.';
+
+  @override
+  String get dashboardVencimientosTitle => 'VENCIMIENTOS — 7 DÍAS';
+
+  @override
+  String get dashboardVencimientosEmpty => 'Sin pagos vencidos.';
+
+  @override
+  String get dashboardVencimientosVerTodos => 'Ver todos los pagos';
+
+  @override
+  String get dashboardInactivosTitle => 'ALUMNOS INACTIVOS';
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -4482,4 +4498,20 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get dashboardAdherenceRingPlaceholder => '--';
+
+  @override
+  String get dashboardProximasSesionesEmpty =>
+      'No hay sesiones próximas confirmadas.';
+
+  @override
+  String get dashboardVencimientosTitle => 'VENCIMIENTOS — 7 DÍAS';
+
+  @override
+  String get dashboardVencimientosEmpty => 'Sin pagos vencidos.';
+
+  @override
+  String get dashboardVencimientosVerTodos => 'Ver todos los pagos';
+
+  @override
+  String get dashboardInactivosTitle => 'ALUMNOS INACTIVOS';
 }

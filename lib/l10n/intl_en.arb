@@ -813,5 +813,10 @@
   "dashboardKpiAdherencia": "",
   "dashboardKpiPorCobrar": "",
   "dashboardPlaceholderSoon": "",
-  "dashboardAdherenceRingPlaceholder": ""
+  "dashboardAdherenceRingPlaceholder": "",
+  "dashboardProximasSesionesEmpty": "",
+  "dashboardVencimientosTitle": "",
+  "dashboardVencimientosEmpty": "",
+  "dashboardVencimientosVerTodos": "",
+  "dashboardInactivosTitle": ""
 }

@@ -1688,5 +1688,25 @@
   "dashboardAdherenceRingPlaceholder": "--",
   "@dashboardAdherenceRingPlaceholder": {
     "description": "Placeholder value shown in the adherencia ring in the Coach Hub web dashboard WelcomeCard (no aggregate provider in V1)."
+  },
+  "dashboardProximasSesionesEmpty": "No hay sesiones próximas confirmadas.",
+  "@dashboardProximasSesionesEmpty": {
+    "description": "Empty state for the Próximas sesiones section in the Coach Hub web dashboard right column."
+  },
+  "dashboardVencimientosTitle": "VENCIMIENTOS — 7 DÍAS",
+  "@dashboardVencimientosTitle": {
+    "description": "Section title for the Vencimientos 7 días section in the Coach Hub web dashboard right column."
+  },
+  "dashboardVencimientosEmpty": "Sin pagos vencidos.",
+  "@dashboardVencimientosEmpty": {
+    "description": "Empty state for the Vencimientos 7 días section."
+  },
+  "dashboardVencimientosVerTodos": "Ver todos los pagos",
+  "@dashboardVencimientosVerTodos": {
+    "description": "Link label to navigate to /pagos from the Vencimientos section."
+  },
+  "dashboardInactivosTitle": "ALUMNOS INACTIVOS",
+  "@dashboardInactivosTitle": {
+    "description": "Section title for the Alumnos inactivos placeholder section in the Coach Hub web dashboard right column."
   }
 }

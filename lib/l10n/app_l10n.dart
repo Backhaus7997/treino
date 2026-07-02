@@ -4147,6 +4147,36 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'--'**
   String get dashboardAdherenceRingPlaceholder;
+
+  /// Empty state for the Próximas sesiones section in the Coach Hub web dashboard right column.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No hay sesiones próximas confirmadas.'**
+  String get dashboardProximasSesionesEmpty;
+
+  /// Section title for the Vencimientos 7 días section in the Coach Hub web dashboard right column.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'VENCIMIENTOS — 7 DÍAS'**
+  String get dashboardVencimientosTitle;
+
+  /// Empty state for the Vencimientos 7 días section.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Sin pagos vencidos.'**
+  String get dashboardVencimientosEmpty;
+
+  /// Link label to navigate to /pagos from the Vencimientos section.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ver todos los pagos'**
+  String get dashboardVencimientosVerTodos;
+
+  /// Section title for the Alumnos inactivos placeholder section in the Coach Hub web dashboard right column.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ALUMNOS INACTIVOS'**
+  String get dashboardInactivosTitle;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {
