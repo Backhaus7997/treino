@@ -599,6 +599,265 @@ Deleting an override MUST call `availabilityRepository.deleteOverride(trainerId,
 
 ---
 
+## Coverage Matrix — Coach Hub Biblioteca Web (PR #236, #237)
+
+| REQ | Category | Status |
+|-----|----------|--------|
+| REQ-BIBW-01 | Route replaces placeholder | Shipped in PR #236 |
+| REQ-BIBW-02 | Section contract (no Scaffold/SafeArea) | Shipped in PR #236 |
+| REQ-BIBW-03 | Ejercicios tab — data merge (catalog + custom) | Shipped in PR #236 |
+| REQ-BIBW-04 | Ejercicios tab — exercise card | Shipped in PR #236 |
+| REQ-BIBW-05 | Ejercicios tab — search (diacritic-tolerant) | Shipped in PR #236 |
+| REQ-BIBW-06 | Ejercicios tab — inline filter chips (muscle + equipment) | Shipped in PR #236 |
+| REQ-BIBW-07 | Ejercicios tab — exercise detail dialog | Shipped in PR #236 |
+| REQ-BIBW-08 | Filter predicate extraction (`exerciseMatchesFilters`) | Shipped in PR #236 |
+| REQ-BIBW-09 | Templates Rutinas tab — grid | Shipped in PR #237 |
+| REQ-BIBW-10 | Templates Rutinas tab — template read view | Shipped in PR #237 |
+| REQ-BIBW-11 | Loading and error states | Shipped in PR #237 |
+
+---
+
+## Change: coach-hub-biblioteca-web (Biblioteca Web Implementation)
+
+**Merged from**: `openspec/changes/coach-hub-biblioteca-web/spec.md`
+**Date merged**: 2026-07-02
+**Status**: Fully implemented (PR #236, #237)
+
+This change introduces the `/biblioteca` section for Coach Hub web (Fase W5.3), replacing the ProximamenteScreen placeholder with a read-only two-tab interface for browsing and filtering exercises (Ejercicios tab) and viewing trainer templates (Templates Rutinas tab). Delivered as two chained PRs: PR1 (filter extraction + Ejercicios tab) → PR2 (Templates tab + route wiring). All new files live under `coach_hub/presentation/sections/biblioteca/`. No backend, domain, or mobile changes.
+
+---
+
+### REQ-BIBW-01: Route replaces placeholder
+
+The `/biblioteca` GoRoute MUST render `BibliotecaWebScreen` instead of `ProximamenteScreen`. The existing `bibliotecaSidebarItems` registration in `sidebar_registry.dart` MUST remain unchanged. The `badgeProvider` for the biblioteca sidebar item MUST remain `null`.
+
+#### SCENARIO-BIBW-01a: Sidebar navigation reaches real screen
+
+- GIVEN the trainer is authenticated in Coach Hub web
+- WHEN they click the "Biblioteca" sidebar item under group PLAN
+- THEN the router navigates to `/biblioteca` and renders `BibliotecaWebScreen` (not `ProximamenteScreen`)
+
+#### SCENARIO-BIBW-01b: Badge provider remains null
+
+- GIVEN the sidebar registry is loaded
+- WHEN `sidebar_registry_test` iterates all sidebar items asserting `badgeProvider isNull`
+- THEN the biblioteca item passes (no badge provider added)
+
+---
+
+### REQ-BIBW-02: Section contract
+
+`BibliotecaWebScreen` MUST be a `ConsumerStatefulWidget` with `SingleTickerProviderStateMixin`. It MUST NOT declare its own `Scaffold` or `SafeArea` (the shell provides these per ADR-CHW-005). It MUST own a `TabController(length: 2)` for the two tabs. All dialogs MUST use `showDialog`/`AlertDialog`; `showModalBottomSheet` MUST NOT be used. All string literals MUST be hardcoded es-AR with a `// i18n` comment. All colors MUST come from `AppPalette.of(context)`. All icons MUST use `TreinoIcon`.
+
+#### SCENARIO-BIBW-02a: Screen renders without self Scaffold
+
+- GIVEN `BibliotecaWebScreen` is mounted inside `CoachHubScaffold`
+- WHEN the widget tree is inspected
+- THEN no `Scaffold` or `SafeArea` widget is found as a descendant of `BibliotecaWebScreen` itself
+- AND a `TabBar` with exactly 2 tabs is present ("Ejercicios", "Templates Rutinas")
+
+---
+
+### REQ-BIBW-03: Ejercicios tab — data merge
+
+The Ejercicios tab MUST display a merged list of all catalog exercises (from `exercisesProvider`) and the trainer's custom exercises (from `customExercisesForTrainerStreamProvider`). Custom exercises MUST be visually distinguished with a "CUSTOM" badge. The merge MUST be performed at the presentation layer with no modification to either provider.
+
+#### SCENARIO-BIBW-03a: Custom exercise shows CUSTOM badge
+
+- GIVEN the trainer has at least one custom exercise
+- WHEN the Ejercicios tab is displayed with no active filters
+- THEN each custom exercise card carries a "CUSTOM" badge
+- AND catalog exercises carry no such badge
+
+#### SCENARIO-BIBW-03b: Empty catalog state
+
+- GIVEN both providers return empty lists
+- WHEN the Ejercicios tab renders
+- THEN an empty-state widget is shown (no grid, no error)
+
+---
+
+### REQ-BIBW-04: Ejercicios tab — exercise card
+
+Each exercise card MUST display: a thumbnail (`assets/exercises/{id}.png`) with icon fallback if asset missing; exercise name; "Músculo · Categoría" subtitle; equipment label; rest-seconds badge. Cards MUST be arranged in a responsive grid.
+
+#### SCENARIO-BIBW-04a: Card renders with fallback icon
+
+- GIVEN an exercise whose PNG asset does not exist
+- WHEN its card is rendered
+- THEN the thumbnail shows a fallback icon (no broken image)
+- AND name, muscle, category, equipment, and rest badge are all visible
+
+---
+
+### REQ-BIBW-05: Ejercicios tab — search
+
+The Ejercicios tab MUST provide a search bar. Search MUST be diacritic-tolerant (using extracted `foldSearch`). The grid MUST update in real time. Search matches on exercise name and aliases.
+
+#### SCENARIO-BIBW-05a: Search narrows the grid
+
+- GIVEN at least 3 exercises are visible
+- WHEN the trainer types "bicep"
+- THEN only exercises whose name/alias diacritic-fold matches "bicep" remain visible
+
+#### SCENARIO-BIBW-05b: Diacritic tolerance
+
+- GIVEN an exercise named "Remo con Mancuerna"
+- WHEN the trainer types "mancuerna" (no accent)
+- THEN that card remains visible
+
+---
+
+### REQ-BIBW-06: Ejercicios tab — inline filter chips
+
+Filter chips for muscle groups and equipment MUST be inline. MUST NOT open any bottom sheet. Multiple chips within a dimension = OR. Chips across dimensions = AND. Active filter state held in web-only StateProviders.
+
+#### SCENARIO-BIBW-06a: Muscle filter chip narrows the grid
+
+- GIVEN chips for "PECHO" and "ESPALDA" are available
+- WHEN the trainer taps "PECHO"
+- THEN only exercises with Pecho as primary or secondary muscle remain visible
+- AND no bottom sheet appears
+
+#### SCENARIO-BIBW-06b: Equipment filter excludes null-equipment exercises (ADR-RER-05)
+
+- GIVEN no equipment chips are active
+- WHEN the trainer activates "MANCUERNA"
+- THEN exercises with `equipment == null` are removed from the grid
+
+#### SCENARIO-BIBW-06c: Combined search + filter (AND across dimensions)
+
+- GIVEN muscle chip "ESPALDA" is active AND search bar contains "remo"
+- WHEN the grid updates
+- THEN only exercises that match BOTH "remo" text AND Espalda muscle are shown
+
+#### SCENARIO-BIBW-06d: Multiple chips in one dimension (OR within dimension)
+
+- GIVEN "PECHO" and "HOMBROS" are both active
+- WHEN the grid renders
+- THEN exercises for Pecho OR Hombros are shown
+
+---
+
+### REQ-BIBW-07: Ejercicios tab — exercise detail dialog
+
+Tapping an exercise card MUST open an `AlertDialog` containing technique instructions and video/gif if available. MUST NOT use bottom sheet. Dialog MUST be dismissible.
+
+#### SCENARIO-BIBW-07a: Tapping card opens detail dialog with technique
+
+- GIVEN an exercise card is visible
+- WHEN the trainer taps it
+- THEN an `AlertDialog` appears with technique instructions
+- AND no bottom sheet is shown
+
+#### SCENARIO-BIBW-07b: Dialog without video
+
+- GIVEN an exercise has no `videoUrl`
+- WHEN the detail dialog opens
+- THEN the video section is absent or placeholder; no crash occurs
+
+---
+
+### REQ-BIBW-08: Filter predicate extraction
+
+`foldSearch` and `_matches` logic MUST be extracted into a shared pure function `exerciseMatchesFilters(Exercise e, {required String query, required Set<MuscleGroup> muscles, required Set<EquipmentType> equipment})`. Mobile picker's `_matches` MUST delegate to it. ADR-RER-05 (exclude null-equipment when any equipment filter active) and primary-OR-secondary muscle rule MUST be preserved verbatim.
+
+#### SCENARIO-BIBW-08a: Extracted predicate matches mobile behavior
+
+- GIVEN the same exercise list and filter state
+- WHEN `exerciseMatchesFilters` is called
+- THEN results are identical to the previous inlined behavior (mobile picker tests remain green)
+
+#### SCENARIO-BIBW-08b: ADR-RER-05 preserved in extraction
+
+- GIVEN an exercise with `equipment == null`
+- WHEN `exerciseMatchesFilters` is called with a non-empty equipment set
+- THEN the function returns `false` for that exercise
+
+---
+
+### REQ-BIBW-09: Templates Rutinas tab — grid
+
+Templates tab MUST display a responsive grid from `trainerTemplatesStreamProvider`. Each card MUST show: name; "N días/sem · N semanas"; level. MUST NOT show "N alumnos" count.
+
+#### SCENARIO-BIBW-09a: Templates grid renders from provider
+
+- GIVEN `trainerTemplatesStreamProvider` returns 3 templates
+- WHEN the Templates tab displays
+- THEN 3 cards are rendered with name, días/sem·semanas, and level
+
+#### SCENARIO-BIBW-09b: Card omits alumnos count
+
+- GIVEN a template card is rendered
+- WHEN its widget tree is inspected
+- THEN no text matching "alumnos" or athlete-count pattern is found
+
+#### SCENARIO-BIBW-09c: Empty templates state
+
+- GIVEN `trainerTemplatesStreamProvider` returns empty list
+- WHEN the tab renders
+- THEN an empty-state widget is shown
+
+---
+
+### REQ-BIBW-10: Templates Rutinas tab — template read view
+
+Tapping a template card MUST open a read-only view. Template editing MUST NOT be accessible from this screen.
+
+#### SCENARIO-BIBW-10a: Tapping template card opens read view
+
+- GIVEN a template card is visible
+- WHEN the trainer taps it
+- THEN a read-only view of the template is shown with no edit controls
+
+---
+
+### REQ-BIBW-11: Loading and error states
+
+Both tabs MUST handle loading states with a loading indicator and error states with an error message. No crash on either state.
+
+#### SCENARIO-BIBW-11a: Loading state shown during data fetch
+
+- GIVEN `exercisesProvider` is loading
+- WHEN the Ejercicios tab renders
+- THEN a loading indicator is visible (no grid, no crash)
+
+#### SCENARIO-BIBW-11b: Error state shown on provider failure
+
+- GIVEN `trainerTemplatesStreamProvider` emits an error
+- WHEN the Templates tab renders
+- THEN an error message is displayed (no crash)
+
+---
+
+### Cross-cutting constraints (coach-hub-biblioteca-web)
+
+| # | Constraint |
+|---|-----------|
+| C-BIBW-1 | All files MUST be under `coach_hub/presentation/sections/biblioteca/` |
+| C-BIBW-2 | NO `Scaffold` — `CoachHubScaffold` provides the shell (ADR-CHW-005) |
+| C-BIBW-3 | Use `AppPalette.of(context)` — MUST NOT hardcode hex colors |
+| C-BIBW-4 | Use `TreinoIcon.X` — MUST NOT use Phosphor or other icon packs |
+| C-BIBW-5 | Widgets MUST be `ConsumerStatefulWidget`; page-local state `autoDispose+family` |
+| C-BIBW-6 | Strings hardcoded Spanish + `// i18n`; MUST NOT call `AppL10n` |
+| C-BIBW-7 | Dialogs MUST use `showDialog` / `AlertDialog`; MUST NOT use `showModalBottomSheet` |
+| C-BIBW-8 | MUST NOT modify mobile files; mobile picker tests remain green |
+| C-BIBW-9 | `dart analyze` must return 0 errors; `dart format` applied; all tests green before merge |
+| C-BIBW-10 | Each PR MUST be independently shippable (PR1 extraction+Ejercicios; PR2 Templates+routes) |
+
+---
+
+### Out of Scope (coach-hub-biblioteca-web)
+
+- Custom exercise CRUD on web (follow-up; CustomExerciseRepository CRUD exists)
+- Template assign-to-athlete (W5.4)
+- Alimentos + Templates Nutrición tabs (W7 nutrition domain; NOT built)
+- Routine template editing (W5.2 routine editor)
+- "N alumnos" template count (not denormalized on Routine)
+- Live catalog sync (exercisesProvider is one-time FutureProvider; acceptable)
+
+---
+
 ## Out of Scope (Explicit)
 
 - **Badge wiring** — `badgeProvider` infrastructure is NOT added in W1. Solicitudes badge deferred to W2; Chat badge to W5; Pagos badge to W4; Agenda badge to W4.

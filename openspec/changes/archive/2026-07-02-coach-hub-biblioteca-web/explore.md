@@ -1,3 +1,4 @@
+
 # Exploration: coach-hub-biblioteca-web
 
 Fase W5.3 — Biblioteca section of Coach Hub web dashboard.

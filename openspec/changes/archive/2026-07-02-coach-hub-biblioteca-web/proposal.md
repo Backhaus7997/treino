@@ -1,3 +1,4 @@
+
 # Proposal: coach-hub-biblioteca-web
 
 Fase **W5.3** — Coach Hub WEB **Biblioteca** section (route `/biblioteca`, sidebar group PLAN).
