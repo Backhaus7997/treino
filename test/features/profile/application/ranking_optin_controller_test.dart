@@ -1,12 +1,18 @@
-// Phase 3 RED — SCENARIO-RANK-5
+// Phase 3 RED — SCENARIO-RANK-5 (+ Phase 5 window-consistency fix)
 //
 // RankingOptInController orchestrates the opt-in toggle lifecycle:
 //   - enableRankingOptIn(uid): one-time client-side backfill of
-//     lifetimeVolumeKg (Σ totalVolumeKg over the athlete's own FULL
-//     completed-session history) + bestSquatKg/bestBenchKg/bestDeadliftKg
-//     (max weightKg per MainLift family over the athlete's own FULL SetLog
-//     history), then sets rankingOptIn: true. Does NOT touch racha — it is
-//     already denormalized by SessionRepository.finish().
+//     lifetimeVolumeKg (Σ totalVolumeKg) + bestSquatKg/bestBenchKg/
+//     bestDeadliftKg (max weightKg per MainLift family), computed over the
+//     SAME bounded recent-sessions window SessionRepository.finish() uses
+//     (most recent 365 sessions by startedAt desc — see
+//     SessionRepository.counterRecomputeWindow), then sets
+//     rankingOptIn: true. Does NOT touch racha — it is already denormalized
+//     by SessionRepository.finish(). Using the SAME window as finish() is
+//     required so lifetimeVolumeKg/best*Kg do not visibly drop on the next
+//     session finish after opt-in (finish() would otherwise recompute a
+//     narrower window than the backfill used, corrupting the just-set
+//     baseline).
 //   - disableRankingOptIn(uid): clears the 4 ranking-metric fields and sets
 //     rankingOptIn: false via UserPublicProfileRepository.clearRankingMetrics.
 //
@@ -136,6 +142,74 @@ void main() {
     expect(profile.bestBenchKg, equals(80));
     // No deadlift logged in history → 0 per spec ("0 if no matching lifts")
     expect(profile.bestDeadliftKg, equals(0));
+  });
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // SCENARIO-RANK-5e: enable backfill uses the SAME bounded window as
+  // finish() — a session outside the window must NOT count, and the
+  // backfilled value must match what finish() would recompute on the very
+  // next session finish (window-consistency fix, Phase 5).
+  // ──────────────────────────────────────────────────────────────────────────
+  test(
+      'SCENARIO-RANK-5e: enableRankingOptIn backfills over the SAME bounded '
+      'window as finish() (sessions outside the window are excluded, and '
+      'finish() immediately after opt-in does not change the backfilled '
+      'value)', () async {
+    await publicProfileRepo.set(const UserPublicProfile(uid: uid));
+
+    // One session strictly OUTSIDE the recompute window (oldest by
+    // startedAt) plus [SessionRepository.counterRecomputeWindow] sessions
+    // INSIDE the window — mirrors finish()'s
+    // .orderBy('startedAt', descending: true).limit(counterRecomputeWindow).
+    await createFinishedSession(
+      startedAt: DateTime.utc(2020, 1, 1, 8, 0, 0),
+      finishedAt: DateTime.utc(2020, 1, 1, 9, 0, 0),
+      totalVolumeKg: 999999.0,
+    );
+
+    const windowSize = SessionRepository.counterRecomputeWindow;
+    for (var i = 0; i < windowSize; i++) {
+      await createFinishedSession(
+        startedAt: DateTime.utc(2026, 1, 1).add(Duration(days: i)),
+        finishedAt: DateTime.utc(2026, 1, 1).add(Duration(days: i, hours: 1)),
+        totalVolumeKg: 10.0,
+      );
+    }
+
+    await controller.enableRankingOptIn(uid);
+
+    final profile = await publicProfileRepo.get(uid);
+    // Only the windowSize in-window sessions (10.0 each) count — the
+    // out-of-window 2020 session's 999999.0 is excluded.
+    expect(profile!.lifetimeVolumeKg, equals(windowSize * 10.0));
+
+    // finish() immediately after opt-in must NOT change the just-backfilled
+    // value — proves both computations agree on the SAME window.
+    final repoWithProfile = SessionRepository(
+      firestore: firestore,
+      publicProfileRepository: publicProfileRepo,
+    );
+    final nextSession = await repoWithProfile.create(
+      uid: uid,
+      routineId: routineId,
+      routineName: routineName,
+      startedAt: DateTime.utc(2026, 1, 1).add(const Duration(days: windowSize)),
+    );
+    await repoWithProfile.finish(
+      uid: uid,
+      sessionId: nextSession.id,
+      finishedAt: DateTime.utc(2026, 1, 1)
+          .add(const Duration(days: windowSize, hours: 1)),
+      totalVolumeKg: 10.0,
+      durationMin: 45,
+      wasFullyCompleted: true,
+    );
+
+    final afterFinish = await publicProfileRepo.get(uid);
+    // Window slides by one (oldest in-window session drops out, new session
+    // enters) — net change is 0 since both are 10.0. Critically, it must NOT
+    // jump back up by 999999.0, nor drop to a bounded-vs-unbounded mismatch.
+    expect(afterFinish!.lifetimeVolumeKg, equals(windowSize * 10.0));
   });
 
   // ──────────────────────────────────────────────────────────────────────────

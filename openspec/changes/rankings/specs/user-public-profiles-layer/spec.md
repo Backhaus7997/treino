@@ -42,19 +42,21 @@ The system MUST:
 - Read `rankingOptIn` from the athlete's own `UserPublicProfile` before writing any ranking metric.
 - When `rankingOptIn == false`, skip all ranking-metric writes (no `lifetimeVolumeKg`/`best<Lift>Kg` mutation).
 - When `rankingOptIn == true`:
-  - Increment `lifetimeVolumeKg` by the finishing `Session.totalVolumeKg` using `FieldValue.increment` (or equivalent atomic increment).
-  - For each lift family (squat, bench, deadlift) with at least one matching SetLog in the finishing session, compute this session's max weight over that family and merge `best<Lift>Kg = max(storedValue, thisSessionMax)`.
+  - RECOMPUTE `lifetimeVolumeKg` as `Σ totalVolumeKg` over the SAME bounded recent-completed-session window already read for `racha`/`workoutsCount` (most recent `counterRecomputeWindow` sessions by `startedAt`, currently 365) — NOT `FieldValue.increment`. A plain increment is NOT idempotent (it would double-count volume on a best-effort retry); recomputing over the same bounded window is naturally idempotent and costs zero extra reads since that window is already fetched for the streak/workout-count recompute.
+  - For each lift family (squat, bench, deadlift) with at least one matching SetLog in that SAME window, compute the window's max weight over that family and merge `best<Lift>Kg = max(storedValue, windowMax)`.
   - Perform these writes in the same best-effort try/catch block as racha/workoutsCount (failures MUST NOT block session finish).
+  - The opt-in backfill (`RankingOptInController.enableRankingOptIn`) MUST use this SAME bounded window when computing the initial `lifetimeVolumeKg`/`best<Lift>Kg` values, so the athlete's ranking metrics do not visibly change on the next session finish immediately following opt-in.
 
 The write MUST be idempotent with respect to session-finish retries: re-processing the same finished session MUST NOT double-count volume or corrupt best-lift values.
 
 (Previously: the best-effort block only wrote `racha` and `workoutsCount`; there was no volume or best-lift denormalization.)
 
-#### Scenario: Session finish increments volume for opted-in athlete
+#### Scenario: Session finish recomputes volume for opted-in athlete
 
-- GIVEN an athlete with `rankingOptIn == true` and `lifetimeVolumeKg == 500`
-- WHEN they finish a session with `totalVolumeKg == 120`
-- THEN their `UserPublicProfile.lifetimeVolumeKg` becomes `620`
+- GIVEN an athlete with `rankingOptIn == true` whose bounded recent-session window (used for `racha`/`workoutsCount`) sums to `500` in `totalVolumeKg` BEFORE this finish
+- WHEN they finish a session with `totalVolumeKg == 120`, which enters that same window
+- THEN their `UserPublicProfile.lifetimeVolumeKg` is RECOMPUTED as the sum over the window INCLUDING this session, becoming `620`
+- AND this is a full recompute over the window, not an atomic increment
 
 #### Scenario: Session finish updates best lift only when it's a new max
 
