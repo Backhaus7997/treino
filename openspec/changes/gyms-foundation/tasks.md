@@ -106,13 +106,21 @@ Start: depends on Phase 1 only (not Phase 2). End: `UserPublicProfile.gymName` d
 
 Start: depends on Phase 2 AND Phase 3 merged (needs real gym docs + gymName field live). End: existing `treino-dev` users remapped from legacy ids to real sucursal docs, and `gymName` populated for all profiles with a `gymId`.
 
-- [ ] 4.1 **[TOUCHES PRODUCTION DATA — dev-first]** Write `scripts/backfill_gym_ids.js`: map `smart-fit-palermo`, `sportclub-belgrano` → newly seeded real `gyms/` docs; `megatlon-recoleta` reused as-is (1:1 identity, no new doc)
-- [ ] 4.2 Idempotency check built into script: re-run is a no-op (skip already-migrated users)
-- [ ] 4.3 Dual-write `users/{uid}` + `userPublicProfiles/{uid}` in the same script run
-- [ ] 4.4 **[DEV-FIRST]** Run `backfill_gym_ids.js` against `treino-dev`; manually verify affected-user count before considering prod
-- [ ] 4.5 Write `scripts/backfill_gym_names.js`: fills `UserPublicProfile.gymName` (composed label) where `gymId` exists but `gymName` is missing, resolved from `gyms/` — MUST run AFTER 4.1/4.4 (order: ids then names)
-- [ ] 4.6 Idempotency check: re-run of `backfill_gym_names.js` is a no-op for already-filled profiles
-- [ ] 4.7 **[DEV-FIRST]** Run `backfill_gym_names.js` against `treino-dev`; manually verify count of profiles updated
-- [ ] 4.8 Document verified dev counts (ids migrated, names filled) in PR description before requesting prod run approval
+**STATUS: scripts written (4.1-4.3, 4.5-4.6, 4.10 done). Dev/prod EXECUTION (4.4, 4.7, 4.8, 4.9) explicitly NOT run by this apply session — see deviation note below.**
+
+- [x] 4.1 **[TOUCHES PRODUCTION DATA — dev-first]** Write `scripts/backfill_gym_ids.js`: verifies `smart-fit-palermo`, `sportclub-belgrano`, `megatlon-recoleta` resolve 1:1 to real `gyms/` docs (Phase 1 seed already created/kept them); any OTHER stale/unknown `gymId` is mapped to `kNoGymId` rather than guessed
+- [x] 4.2 Idempotency check built into script: re-run is a no-op (already-resolving `gymId`s are left untouched, only actual mismatches are corrected)
+- [x] 4.3 Dual-write `users/{uid}` + `userPublicProfiles/{uid}` in the same script run
+- [ ] 4.4 **[DEV-FIRST — NOT EXECUTED]** Run `backfill_gym_ids.js` against `treino-dev`; manually verify affected-user count before considering prod. **Deferred to a separate, explicitly-approved execution step (see apply-progress).**
+- [x] 4.5 Write `scripts/backfill_gym_names.js`: fills `UserPublicProfile.gymName` (composed label) where `gymId` exists but `gymName` is missing, resolved from `gyms/` — documented to MUST run AFTER 4.1/4.4 (order: ids then names)
+- [x] 4.6 Idempotency check: re-run of `backfill_gym_names.js` is a no-op for already-filled profiles
+- [ ] 4.7 **[DEV-FIRST — NOT EXECUTED]** Run `backfill_gym_names.js` against `treino-dev`; manually verify count of profiles updated. **Deferred to a separate, explicitly-approved execution step (see apply-progress).**
+- [ ] 4.8 Document verified dev counts (ids migrated, names filled) in PR description before requesting prod run approval. **Blocked on 4.4/4.7 execution.**
 - [ ] 4.9 **[PROD — separate approval gate, not part of this PR's automated steps]** Run both scripts against `treino-prod` only after dev verification and maintainer sign-off; silent, no user notice (per locked decision)
-- [ ] 4.10 Quality gate: `flutter analyze` 0 issues (scripts are Node.js, no analyze impact), confirm no `firestore.rules` diff introduced anywhere in the full change
+- [x] 4.10 Quality gate: `node --check` passes for both scripts (Node.js, no `flutter analyze` impact); no Dart files touched this slice; no `firestore.rules` diff introduced
+
+### Deviations from tasks.md / design.md (Phase 4)
+
+1. **Scripts written but NOT executed against any Firebase project (dev or prod) in this apply session.** The orchestrator's instructions for this slice were explicit: write the scripts only, never run `node scripts/backfill_*.js` against a real project — execution is a separate step gated on the user's explicit OK. Tasks 4.4/4.7/4.8 (dev execution + count verification) and 4.9 (prod execution) remain unchecked pending that separate, explicitly-approved run. See apply-progress for the exact commands to run later.
+2. **Added `--dry-run` and `--allow-prod` flags** (not explicitly named in tasks.md, but required by the design's "dev-first" + "verified count" + "project guardrail" intent, and by the orchestrator's explicit brief for this slice). `--dry-run` reports would-be changes with zero writes; the project-id guardrail refuses to run against anything not matching `/dev/i` unless `--allow-prod` is passed.
+3. **`backfill_gym_ids.js`'s correction target for unresolved ids is `kNoGymId`, not a "known doc" mapping**, per the orchestrator's brief ("handle any other stale ids by mapping to a known doc or leaving `kNoGymId`") — since the only 3 known legacy ids already resolve 1:1 post-seed, there is no other known-doc mapping table to build; any further unknown id is treated conservatively as unmappable and set to `kNoGymId` rather than guessed.
