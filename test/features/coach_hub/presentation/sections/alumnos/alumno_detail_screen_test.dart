@@ -360,10 +360,10 @@ void main() {
       expect(find.widgetWithText(OutlinedButton, 'Pago'), findsOneWidget);
     });
 
-    testWidgets('tab bar muestra exactamente las 10 secciones', (tester) async {
+    testWidgets('tab bar muestra exactamente las 11 secciones', (tester) async {
       await _pump(tester,
           profile: _prof(), link: _link(TrainerLinkStatus.active));
-      expect(find.byType(Tab), findsNWidgets(10));
+      expect(find.byType(Tab), findsNWidgets(11));
       for (final t in [
         'Resumen',
         'Entrenamientos',
@@ -374,7 +374,8 @@ void main() {
         'Chat',
         'Notas privadas',
         'Archivos',
-        'Seguimiento'
+        'Seguimiento',
+        'Mediciones',
       ]) {
         expect(
           find.descendant(of: find.byType(TabBar), matching: find.text(t)),
