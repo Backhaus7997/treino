@@ -1152,8 +1152,13 @@ void main() {
             athleteBillingProvider
                 .overrideWith((ref, id) => Stream.value(null)),
           ],
-          child:
-              MaterialApp.router(theme: AppTheme.dark(), routerConfig: router),
+          child: MaterialApp.router(
+            theme: AppTheme.dark(),
+            routerConfig: router,
+            localizationsDelegates: AppL10n.localizationsDelegates,
+            supportedLocales: AppL10n.supportedLocales,
+            locale: const Locale('es', 'AR'),
+          ),
         ),
       );
       await tester.pumpAndSettle();

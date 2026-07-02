@@ -73,6 +73,10 @@ Widget _wrap(
         theme: AppTheme.dark(),
         localizationsDelegates: AppL10n.localizationsDelegates,
         supportedLocales: AppL10n.supportedLocales,
+        // Locale explícito → sino el default en test env es en_US y AppL10n
+        // resuelve las keys en el ARB inglés (que es scaffold), rompiendo
+        // los expect() en español.
+        locale: const Locale('es', 'AR'),
         home: Scaffold(body: child),
       ),
     );

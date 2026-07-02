@@ -20,6 +20,7 @@ import 'package:treino/features/gyms/domain/gym.dart';
 import 'package:treino/features/payments/application/pagos_por_cobrar_provider.dart';
 import 'package:treino/features/payments/domain/athlete_billing.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
+import 'package:treino/l10n/app_l10n.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
 import 'package:treino/features/workout/domain/session.dart';
@@ -86,6 +87,9 @@ Future<void> _pump(
       ],
       child: MaterialApp(
         theme: AppTheme.dark(),
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+        locale: const Locale('es', 'AR'),
         home: const Scaffold(body: AlumnosScreen()),
       ),
     ),
