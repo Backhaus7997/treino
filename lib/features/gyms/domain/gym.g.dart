@@ -44,4 +44,5 @@ Map<String, dynamic> _$$GymImplToJson(_$GymImpl instance) => <String, dynamic>{
 const _$GymSourceEnumMap = {
   GymSource.seed: 'seed',
   GymSource.selfService: 'self-service',
+  GymSource.googlePlaces: 'google-places',
 };
