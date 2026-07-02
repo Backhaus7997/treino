@@ -1,7 +1,12 @@
 import 'dart:developer' as developer;
 
 import 'package:cloud_firestore/cloud_firestore.dart'
-    show CollectionReference, DocumentSnapshot, FieldPath, FirebaseFirestore;
+    show
+        CollectionReference,
+        DocumentSnapshot,
+        FieldPath,
+        FirebaseFirestore,
+        SetOptions;
 
 import '../domain/gym.dart';
 
@@ -34,6 +39,15 @@ class GymRepository {
   Future<Gym?> getById(String id) async {
     final snap = await _collection.doc(id).get();
     return _fromDoc(snap);
+  }
+
+  /// Crea o actualiza `gyms/{gym.id}` con merge:true.
+  ///
+  /// Usado por el read-through cache client-side de `ResolveGymPlaceService`
+  /// (Plan B — gym-google-places): al resolver un `place_id` nuevo, el gym
+  /// se upsertea acá antes de asignarlo a `users/{uid}.gymId`.
+  Future<void> upsert(Gym gym) async {
+    await _collection.doc(gym.id).set(gym.toJson(), SetOptions(merge: true));
   }
 
   /// Batch lookup. `whereIn` está capado a 30 valores en Firestore —

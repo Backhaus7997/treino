@@ -365,6 +365,23 @@ service cloud.firestore {
     // que setear `source: 'self-service'` y `createdBy: request.auth.uid` —
     // si no, denied. Update/delete denegado del cliente — moderación va por
     // Console o un Cloud Function privilegiado en el futuro.
+    //
+    // gym-google-places (sdd change) — PLAN B (client-side resolve): the
+    // original design routed athlete-originated `google-places` docs through
+    // a `resolveGymPlace` Cloud Function (Admin SDK, bypasses rules). That CF
+    // CANNOT be deployed — GCP project `treino-dev` sits under org
+    // `code-assurance.com`, whose Domain-Restricted-Sharing policy blocks a
+    // publicly-invokable (`allUsers`) Cloud Function. The CF is SHELVED
+    // (kept in functions/src/places-search.ts, not exported from index.ts).
+    // Resolution now happens CLIENT-SIDE (ResolveGymPlaceService,
+    // lib/features/gyms/data/resolve_gym_place_service.dart), so an
+    // authenticated athlete's client now writes `gyms/{placeId}` directly —
+    // this ADDS a second `allow create` branch below for that path. The
+    // shape is intentionally narrow: `source` must be exactly
+    // 'google-places', `id` must equal the doc id (placeId), and no
+    // `createdBy`/trainer-role check applies (any authenticated user, not
+    // just trainers, can resolve a gym place). The pre-existing
+    // self-service branch (trainer-only) is unchanged.
     match /gyms/{gymId} {
       allow read: if request.auth != null;
 
@@ -380,7 +397,31 @@ service cloud.firestore {
                     && request.resource.data.lng is number
                     && request.resource.data.geohash is string;
 
-      allow update, delete: if false;
+      allow create: if request.auth != null
+                    && request.resource.data.source == 'google-places'
+                    && request.resource.data.id == gymId
+                    && request.resource.data.keys().hasAll(['id', 'name', 'lat', 'lng', 'source'])
+                    && request.resource.data.name is string
+                    && request.resource.data.name.size() > 0
+                    && request.resource.data.name.size() <= 100
+                    && request.resource.data.lat is number
+                    && request.resource.data.lng is number;
+
+      // Client-side resolve can race two concurrent selectors of the same
+      // never-before-seen placeId; the read-through cache in
+      // ResolveGymPlaceService only calls upsert() on a cache miss, so this
+      // update branch is a narrow, same-shape re-assertion (not an arbitrary
+      // edit surface) — it never changes an existing doc's `source`.
+      allow update: if request.auth != null
+                    && resource.data.source == 'google-places'
+                    && request.resource.data.source == 'google-places'
+                    && request.resource.data.id == gymId
+                    && request.resource.data.name is string
+                    && request.resource.data.name.size() > 0
+                    && request.resource.data.lat is number
+                    && request.resource.data.lng is number;
+
+      allow delete: if false;
     }
 
     match /friendships/{friendshipId} {

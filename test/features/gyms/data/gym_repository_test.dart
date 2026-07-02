@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/features/gyms/data/gym_repository.dart';
+import 'package:treino/features/gyms/domain/gym.dart';
 import 'package:treino/features/gyms/domain/gym_source.dart';
 
 // ignore_for_file: avoid_dynamic_calls
@@ -121,6 +122,51 @@ void main() {
 
       final gyms = await repo.getByIds(['found-1', 'missing', 'found-2']);
       expect(gyms.map((g) => g.id).toSet(), {'found-1', 'found-2'});
+    });
+  });
+
+  group('GymRepository.upsert', () {
+    test('escribe gyms/{gym.id} con merge:true (crea si no existe)', () async {
+      final gym = Gym(
+        id: 'ChIJ_place_1',
+        name: 'SportClub Belgrano',
+        address: 'Cabildo 1789, CABA',
+        lat: -34.5598,
+        lng: -58.4615,
+        geohash: '6d6m7',
+        source: GymSource.googlePlaces,
+        createdAt: DateTime.utc(2026, 1, 1),
+      );
+
+      await repo.upsert(gym);
+
+      final snap = await firestore.collection('gyms').doc('ChIJ_place_1').get();
+      expect(snap.exists, isTrue);
+      expect(snap.data()!['name'], 'SportClub Belgrano');
+      expect(snap.data()!['source'], 'google-places');
+    });
+
+    test('no pisa campos existentes fuera del doc escrito (merge real)',
+        () async {
+      await firestore.collection('gyms').doc('gym-x').set({
+        ..._gymDoc(name: 'Old Name', lat: 0, lng: 0),
+        'extraLegacyField': 'keep-me',
+      });
+
+      final gym = Gym(
+        id: 'gym-x',
+        name: 'Updated Name',
+        lat: 1,
+        lng: 2,
+        geohash: 'abcde',
+        source: GymSource.googlePlaces,
+        createdAt: DateTime.utc(2026, 1, 1),
+      );
+      await repo.upsert(gym);
+
+      final snap = await firestore.collection('gyms').doc('gym-x').get();
+      expect(snap.data()!['name'], 'Updated Name');
+      expect(snap.data()!['extraLegacyField'], 'keep-me');
     });
   });
 }

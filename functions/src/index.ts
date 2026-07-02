@@ -15,3 +15,12 @@ export { notifyOnReview } from "./notifications/notify-review";
 export { cleanupAssignedPlansOnUnlink } from "./cleanup-assigned-plans";
 export { addAlias } from "./add-alias";
 export { syncSessionShareOnTrainerLink } from "./sync-session-share";
+// SHELVED (gym-google-places, Plan B): resolveGymPlace cannot be deployed —
+// GCP project treino-dev sits under org code-assurance.com, whose
+// Domain-Restricted-Sharing policy blocks a publicly-invokable (allUsers)
+// Cloud Function. Gym place resolution moved client-side
+// (ResolveGymPlaceService,
+// lib/features/gyms/data/resolve_gym_place_service.dart). Restore this
+// export + redeploy if the org later allows public functions — see
+// functions/src/places-search.ts header comment.
+// export { resolveGymPlace } from "./places-search";
