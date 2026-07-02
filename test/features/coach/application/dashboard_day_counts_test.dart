@@ -1,0 +1,55 @@
+// Task 1.1 RED — direct-import test of the lifted dashboard_day_counts.dart
+// Verifies that DashboardDayCounts and dashboardDayCounts are importable
+// directly from the application layer (not via the presentation re-export).
+import 'package:flutter_test/flutter_test.dart';
+import 'package:treino/features/coach/domain/appointment.dart';
+import 'package:treino/features/coach/application/dashboard_day_counts.dart';
+
+Appointment _appt({
+  required DateTime startsAt,
+  required int durationMin,
+  AppointmentStatus status = AppointmentStatus.confirmed,
+}) {
+  return Appointment(
+    id: 't_${startsAt.millisecondsSinceEpoch}',
+    trainerId: 't',
+    athleteId: 'a',
+    athleteDisplayName: 'Alumno',
+    startsAt: startsAt,
+    durationMin: durationMin,
+    status: status,
+  );
+}
+
+void main() {
+  group('dashboard_day_counts — application layer direct import', () {
+    test('DashboardDayCounts is constructable from application import', () {
+      const counts = DashboardDayCounts(pending: 3, done: 2, cancelled: 1);
+      expect(counts.pending, 3);
+      expect(counts.done, 2);
+      expect(counts.cancelled, 1);
+    });
+
+    test('dashboardDayCounts classifies pending session correctly', () {
+      final now = DateTime.utc(2026, 6, 16, 10, 5);
+      final appt = _appt(
+        startsAt: DateTime.utc(2026, 6, 16, 10, 0),
+        durationMin: 60,
+      );
+      final counts = dashboardDayCounts([appt], now);
+      expect(counts.pending, 1);
+      expect(counts.done, 0);
+    });
+
+    test('dashboardDayCounts classifies done session correctly', () {
+      final now = DateTime.utc(2026, 6, 16, 11, 30);
+      final appt = _appt(
+        startsAt: DateTime.utc(2026, 6, 16, 10, 0),
+        durationMin: 60,
+      );
+      final counts = dashboardDayCounts([appt], now);
+      expect(counts.done, 1);
+      expect(counts.pending, 0);
+    });
+  });
+}

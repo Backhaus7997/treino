@@ -393,5 +393,71 @@
   },
   "progressionSinglePointHint": "Necesitas al menos 2 sesiones para ver la evolución.",
   "progressionEmptyExercise": "Sin datos para este ejercicio.",
-  "progressionEmpty": "Sin registros de series todavía."
+  "progressionEmpty": "Sin registros de series todavía.",
+  "dashboardGreeting": "BUENAS, {name}",
+  "@dashboardGreeting": {
+    "description": "Welcome greeting shown in the Coach Hub web dashboard WelcomeCard.",
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "dashboardSummaryLine": "Tenés {sessions} sesiones hoy, {paraRevisar} para revisar, {pagos} pagos pendientes",
+  "@dashboardSummaryLine": {
+    "description": "Dashboard WelcomeCard summary line.",
+    "placeholders": {
+      "sessions": { "type": "int" },
+      "paraRevisar": { "type": "int" },
+      "pagos": { "type": "int" }
+    }
+  },
+  "dashboardQuickActionNuevoAlumno": "+ Nuevo alumno",
+  "@dashboardQuickActionNuevoAlumno": {
+    "description": "Quick action to navigate to alumnos section."
+  },
+  "dashboardQuickActionCrearRutina": "Crear rutina",
+  "@dashboardQuickActionCrearRutina": {
+    "description": "Quick action to navigate to routine creation."
+  },
+  "dashboardQuickActionMensajes": "Mensajes ({count})",
+  "@dashboardQuickActionMensajes": {
+    "description": "Quick action showing unread message count.",
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "dashboardQuickActionImportarPlan": "Importar plan",
+  "@dashboardQuickActionImportarPlan": {
+    "description": "Quick action to navigate to the Excel plan importer."
+  },
+  "dashboardAlertBannerPlaceholder": "Próximamente: resumen de atención",
+  "@dashboardAlertBannerPlaceholder": {
+    "description": "Placeholder text shown in the alert banner section (V1)."
+  },
+  "dashboardKpiAlumnosActivos": "Alumnos activos",
+  "@dashboardKpiAlumnosActivos": {
+    "description": "KPI tile label for active trainer-athlete links."
+  },
+  "dashboardKpiIngresoMes": "Ingreso del mes",
+  "@dashboardKpiIngresoMes": {
+    "description": "KPI tile label for paid-this-month total."
+  },
+  "dashboardKpiAdherencia": "Adherencia promedio",
+  "@dashboardKpiAdherencia": {
+    "description": "KPI tile label for average adherence (placeholder in V1)."
+  },
+  "dashboardKpiPorCobrar": "Por cobrar ({count} vencimientos)",
+  "@dashboardKpiPorCobrar": {
+    "description": "KPI tile label for overdue payments.",
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "dashboardPlaceholderSoon": "Próximamente",
+  "@dashboardPlaceholderSoon": {
+    "description": "Generic coming-soon placeholder label."
+  },
+  "dashboardAdherenceRingPlaceholder": "--",
+  "@dashboardAdherenceRingPlaceholder": {
+    "description": "Placeholder value for adherencia ring (V1)."
+  }
 }

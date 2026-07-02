@@ -19,14 +19,20 @@ import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/l10n/app_l10n.dart';
 import 'package:treino/features/auth/application/auth_notifier.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
+import 'package:treino/features/chat/application/chat_providers.dart'
+    show totalUnreadCountProvider;
+import 'package:treino/features/coach/application/agenda_providers.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
+import 'package:treino/features/coach/domain/appointment.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/core/persistence/shared_prefs_provider.dart';
-import 'package:treino/features/coach_hub/application/sidebar_collapsed_provider.dart';
 import 'package:treino/features/coach_hub/presentation/sections/dashboard/coach_hub_dashboard_screen.dart';
+import 'package:treino/features/coach_hub/presentation/sections/pagos/widgets/pagos_buckets_provider.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
+import 'package:treino/features/workout/application/session_providers.dart'
+    show currentUidProvider;
 
 class _MockUser extends Mock implements User {}
 
@@ -67,6 +73,21 @@ Future<void> _pumpDashboardInShell(WidgetTester tester) async {
     trainerLinksStreamProvider
         .overrideWith((ref) => Stream.value(const <TrainerLink>[])),
     sharedPreferencesProvider.overrideWith((ref) => Future.value(sp)),
+    // Providers that the redesigned dashboard reads (PR1). Stub with empty
+    // data so the screen renders without hitting Firebase.
+    currentUidProvider.overrideWithValue('trainer-1'),
+    pagosBucketsProvider.overrideWith(
+      (ref) => const AsyncData(PagosBuckets(
+        vencidos: [],
+        porVencer: [],
+        pagados: [],
+        todos: [],
+      )),
+    ),
+    totalUnreadCountProvider.overrideWithValue(0),
+    trainerAppointmentsStreamProvider.overrideWith(
+      (ref, key) => Stream.value(const <Appointment>[]),
+    ),
   ]);
   addTearDown(container.dispose);
 
@@ -131,7 +152,9 @@ void main() {
     testWidgets('el CTA de importar plan sigue presente [SCENARIO-764]',
         (tester) async {
       await _pumpDashboardInShell(tester);
-      expect(find.text('IMPORTAR PLAN DESDE EXCEL'), findsOneWidget);
+      // The CTA moved to the welcome card quick-action row in PR1.
+      // Label now comes from dashboardQuickActionImportarPlan ("Importar plan").
+      expect(find.textContaining('Importar plan'), findsOneWidget);
     });
   });
 }

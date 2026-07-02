@@ -2148,6 +2148,54 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get profileSectionAppearance => 'Apariencia';
+
+  @override
+  String dashboardGreeting(String name) {
+    return 'BUENAS, $name';
+  }
+
+  @override
+  String dashboardSummaryLine(int sessions, int paraRevisar, int pagos) {
+    return 'Tenés $sessions sesiones hoy, $paraRevisar para revisar, $pagos pagos pendientes';
+  }
+
+  @override
+  String get dashboardQuickActionNuevoAlumno => '+ Nuevo alumno';
+
+  @override
+  String get dashboardQuickActionCrearRutina => 'Crear rutina';
+
+  @override
+  String dashboardQuickActionMensajes(int count) {
+    return 'Mensajes ($count)';
+  }
+
+  @override
+  String get dashboardQuickActionImportarPlan => 'Importar plan';
+
+  @override
+  String get dashboardAlertBannerPlaceholder =>
+      'Próximamente: resumen de atención';
+
+  @override
+  String get dashboardKpiAlumnosActivos => 'Alumnos activos';
+
+  @override
+  String get dashboardKpiIngresoMes => 'Ingreso del mes';
+
+  @override
+  String get dashboardKpiAdherencia => 'Adherencia promedio';
+
+  @override
+  String dashboardKpiPorCobrar(int count) {
+    return 'Por cobrar ($count vencimientos)';
+  }
+
+  @override
+  String get dashboardPlaceholderSoon => 'Próximamente';
+
+  @override
+  String get dashboardAdherenceRingPlaceholder => '--';
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -4292,4 +4340,52 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get profileSectionAppearance => 'Apariencia';
+
+  @override
+  String dashboardGreeting(String name) {
+    return 'BUENAS, $name';
+  }
+
+  @override
+  String dashboardSummaryLine(int sessions, int paraRevisar, int pagos) {
+    return 'Tenés $sessions sesiones hoy, $paraRevisar para revisar, $pagos pagos pendientes';
+  }
+
+  @override
+  String get dashboardQuickActionNuevoAlumno => '+ Nuevo alumno';
+
+  @override
+  String get dashboardQuickActionCrearRutina => 'Crear rutina';
+
+  @override
+  String dashboardQuickActionMensajes(int count) {
+    return 'Mensajes ($count)';
+  }
+
+  @override
+  String get dashboardQuickActionImportarPlan => 'Importar plan';
+
+  @override
+  String get dashboardAlertBannerPlaceholder =>
+      'Próximamente: resumen de atención';
+
+  @override
+  String get dashboardKpiAlumnosActivos => 'Alumnos activos';
+
+  @override
+  String get dashboardKpiIngresoMes => 'Ingreso del mes';
+
+  @override
+  String get dashboardKpiAdherencia => 'Adherencia promedio';
+
+  @override
+  String dashboardKpiPorCobrar(int count) {
+    return 'Por cobrar ($count vencimientos)';
+  }
+
+  @override
+  String get dashboardPlaceholderSoon => 'Próximamente';
+
+  @override
+  String get dashboardAdherenceRingPlaceholder => '--';
 }
