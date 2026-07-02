@@ -386,7 +386,14 @@ GoRouter buildRouter({
           // Scaffold. All remaining callers push from within the shell.
           GoRoute(
             path: '/workout',
-            pageBuilder: (_, __) => _noAnim(const WorkoutScreen()),
+            // ?tab=rankings deep-links to the second (Rankings) page of the
+            // athlete Entrenar tab — mirrors the /coach builder below
+            // (design `sdd/rankings-v2/design` AD-2). Trainer role ignores
+            // initialTab (WorkoutScreen's own role branch).
+            pageBuilder: (_, state) {
+              final tab = state.uri.queryParameters['tab'];
+              return _noAnim(WorkoutScreen(initialTab: tab));
+            },
             routes: [
               GoRoute(
                 path: 'routine/:routineId',

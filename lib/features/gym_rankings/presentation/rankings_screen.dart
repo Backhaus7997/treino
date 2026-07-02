@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
@@ -18,9 +17,23 @@ import '../domain/ranking_dimension.dart';
 /// Per-gym rankings screen — 3 dimensions (Rachas / Volumen / Lifts, lifts
 /// sub-split squat/bench/deadlift) for the current athlete's gym.
 ///
-/// Placement (this slice): `/profile/rankings`, sibling of
-/// `edit-personal`/`gym`/`routines` — relocation into the Entrenar tab is a
-/// LATER slice (design `sdd/rankings-v2/design` AD-1/AD-2, Slice 2).
+/// Placement (this slice): still registered at `/profile/rankings` as a
+/// pushed route (kept as a safety net — Phase 3 replaces it with a redirect
+/// to `/workout?tab=rankings`), but the PRIMARY placement is now the second
+/// page of the athlete Entrenar tab (`WorkoutScreen`'s `_RankingsPage`,
+/// design `sdd/rankings-v2/design` AD-1/AD-2). All gating/body logic lives
+/// in [RankingsBody] so both hosts render identically.
+class RankingsScreen extends StatelessWidget {
+  const RankingsScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) => const RankingsBody();
+}
+
+/// The rankings surface body — gym resolution, opt-in gate, leaderboards,
+/// and the slim page header (design AD-7). Composed directly by
+/// [RankingsScreen] (pushed-route placement) and by `WorkoutScreen`'s
+/// `_RankingsPage` (tab placement, the primary one as of this slice).
 ///
 /// The screen resolves the athlete's `gymId` from [userProfileProvider] —
 /// while that resolves, a loading spinner is shown. An athlete with no gym
@@ -35,49 +48,130 @@ import '../domain/ranking_dimension.dart';
 /// `userPublicProfileProvider(myUid).select((p) => p?.rankingOptIn ?? false)`
 /// — `select`-scoped so the gate does NOT rebuild on every ranking-metric
 /// counter tick, only on the opt-in bit flipping. `false` renders the
-/// invitation state (CTA to enable); `true` renders the existing
-/// [_RankingsBody] leaderboards, unchanged. The opt-in toggle itself now
-/// lives directly on this surface (invitation CTA here; the disable
-/// affordance is added in a later slice, AD-7) — `ProfileScreen` no longer
-/// hosts a separate entry point.
-class RankingsScreen extends ConsumerStatefulWidget {
-  const RankingsScreen({super.key});
+/// invitation state (CTA to enable); `true` renders the leaderboards
+/// ([_RankingsBody]) with an accessible disable affordance in the header
+/// (design AD-7, spec `gym-rankings` — Opt-In Toggle Lives on the Rankings
+/// Surface). `ProfileScreen` does not host a separate entry point.
+///
+/// AD-4 self-heal: [RankingOptInControllerBase.syncGymIfDesynced] is invoked
+/// once via `ref.read` on first build (not `watch` — this is a fire-and-
+/// forget repair, not a value the widget renders from) so already-opted-in
+/// athletes whose public `gymId` drifted get silently repaired.
+class RankingsBody extends ConsumerStatefulWidget {
+  const RankingsBody({super.key});
 
   @override
-  ConsumerState<RankingsScreen> createState() => _RankingsScreenState();
+  ConsumerState<RankingsBody> createState() => _RankingsBodyState();
 }
 
-class _RankingsScreenState extends ConsumerState<RankingsScreen> {
+class _RankingsBodyState extends ConsumerState<RankingsBody> {
   MainLiftTab _liftTab = MainLiftTab.squat;
+  bool _syncedOnce = false;
+
+  void _syncGymOnce(String uid) {
+    if (_syncedOnce || uid.isEmpty) return;
+    _syncedOnce = true;
+    // AD-4: fire-and-forget, best-effort — the controller itself swallows
+    // failures. `ref.read` (not `watch`) — this is an action, not a value
+    // this widget renders from.
+    ref.read(rankingOptInControllerProvider).syncGymIfDesynced(uid);
+  }
+
+  Future<void> _confirmDisable(String uid) async {
+    final palette = AppPalette.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: palette.bgCard,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          'DESACTIVAR RANKINGS',
+          style: GoogleFonts.barlowCondensed(
+            fontWeight: FontWeight.w700,
+            fontSize: 18,
+            color: palette.textPrimary,
+          ),
+        ),
+        content: Text(
+          'Si desactivás los rankings, tus métricas se borran de los '
+          'tableros. ¿Seguro?',
+          style: GoogleFonts.barlow(fontSize: 14, color: palette.textPrimary),
+        ),
+        actions: [
+          OutlinedButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(
+              'Cancelar',
+              style: GoogleFonts.barlowCondensed(
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+                color: palette.textPrimary,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: palette.highlight,
+              foregroundColor: palette.bg,
+            ),
+            child: Text(
+              'Desactivar',
+              style: GoogleFonts.barlowCondensed(
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await ref.read(rankingOptInControllerProvider).disableRankingOptIn(uid);
+  }
 
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final myUid = ref.watch(authStateChangesProvider).valueOrNull?.uid ?? '';
     final profileAsync = ref.watch(userProfileProvider);
+    final rankingOptIn = ref.watch(
+      userPublicProfileProvider(myUid)
+          .select((async) => async.valueOrNull?.rankingOptIn ?? false),
+    );
+
+    if (myUid.isNotEmpty && rankingOptIn) {
+      _syncGymOnce(myUid);
+    }
 
     return Column(
       children: [
         // ── Header ──────────────────────────────────────────────────────
+        // AD-7: slim `RANKINGS` title + disable affordance (leaderboards
+        // state only) — replaces the v1 back-button header now that this
+        // surface is a tab page, not exclusively a pushed route.
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-          child: GestureDetector(
-            onTap: () => context.pop(),
-            behavior: HitTestBehavior.opaque,
-            child: Row(
-              children: [
-                Icon(TreinoIcon.back, size: 20, color: palette.textPrimary),
-                const SizedBox(width: 14),
-                Text(
-                  'RANKINGS',
-                  style: GoogleFonts.barlowCondensed(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 20,
-                    color: palette.textPrimary,
-                  ),
+          child: Row(
+            children: [
+              Text(
+                'RANKINGS',
+                style: GoogleFonts.barlowCondensed(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 20,
+                  color: palette.textPrimary,
                 ),
-              ],
-            ),
+              ),
+              const Spacer(),
+              if (rankingOptIn)
+                IconButton(
+                  key: const Key('rankings_disable_affordance'),
+                  onPressed: () => _confirmDisable(myUid),
+                  icon: Icon(TreinoIcon.close,
+                      size: 20, color: palette.textMuted),
+                  tooltip: 'Desactivar rankings',
+                ),
+            ],
           ),
         ),
 
@@ -91,7 +185,10 @@ class _RankingsScreenState extends ConsumerState<RankingsScreen> {
               if (gymId == null || gymId.isEmpty || gymId == kNoGymId) {
                 return _NoGymState(palette: palette);
               }
-              return _OptInGate(
+              if (!rankingOptIn) {
+                return _InvitationState(myUid: myUid, palette: palette);
+              }
+              return _RankingsBody(
                 gymId: gymId,
                 myUid: myUid,
                 palette: palette,
@@ -102,46 +199,6 @@ class _RankingsScreenState extends ConsumerState<RankingsScreen> {
           ),
         ),
       ],
-    );
-  }
-}
-
-/// AD-6 gating wrapper — branches invitation state vs leaderboards based on
-/// the athlete's OWN `rankingOptIn` (read from the PUBLIC profile, not the
-/// private one — see [RankingsScreen] doc). Lives between the no-gym guard
-/// (above, higher precedence) and [_RankingsBody] (unchanged).
-class _OptInGate extends ConsumerWidget {
-  const _OptInGate({
-    required this.gymId,
-    required this.myUid,
-    required this.palette,
-    required this.liftTab,
-    required this.onLiftTabChanged,
-  });
-
-  final String gymId;
-  final String myUid;
-  final AppPalette palette;
-  final MainLiftTab liftTab;
-  final ValueChanged<MainLiftTab> onLiftTabChanged;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final rankingOptIn = ref.watch(
-      userPublicProfileProvider(myUid)
-          .select((async) => async.valueOrNull?.rankingOptIn ?? false),
-    );
-
-    if (!rankingOptIn) {
-      return _InvitationState(myUid: myUid, palette: palette);
-    }
-
-    return _RankingsBody(
-      gymId: gymId,
-      myUid: myUid,
-      palette: palette,
-      liftTab: liftTab,
-      onLiftTabChanged: onLiftTabChanged,
     );
   }
 }

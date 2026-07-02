@@ -136,6 +136,13 @@ void main() {
               .overrideWith((_) async => bench),
           deadliftLeaderboardProvider(gymId ?? '')
               .overrideWith((_) async => deadlift),
+          // AD-4 self-heal fires unconditionally via ref.read on first build
+          // whenever rankingOptIn == true — default to a no-op fake so tests
+          // that don't care about the self-heal itself never touch real
+          // Firestore. Tests exercising the CTA path override this again
+          // explicitly (spread AFTER baseOverrides() wins).
+          rankingOptInControllerProvider
+              .overrideWithValue(_FakeRankingOptInController()),
         ];
 
     testWidgets('renders the 3 dimension section headers', (tester) async {
@@ -310,6 +317,8 @@ void main() {
           squatLeaderboardProvider(_gymId).overrideWith((_) async => []),
           benchLeaderboardProvider(_gymId).overrideWith((_) async => []),
           deadliftLeaderboardProvider(_gymId).overrideWith((_) async => []),
+          rankingOptInControllerProvider
+              .overrideWithValue(_FakeRankingOptInController()),
         ]));
 
         controller.add(const UserPublicProfile(uid: _uid, rankingOptIn: false));
