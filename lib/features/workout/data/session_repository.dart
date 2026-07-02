@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart'
     show CollectionReference, DocumentSnapshot, FirebaseFirestore, Timestamp;
 
 import '../../../core/utils/streak_calculator.dart';
+import '../../gym_rankings/domain/main_lift_family_map.dart';
 import '../../profile/data/user_public_profile_repository.dart';
 import '../domain/session.dart';
 import '../domain/session_status.dart';
@@ -111,14 +112,63 @@ class SessionRepository {
       // (wasFullyCompleted=false), so we must exclude them here to match the
       // display filter (historial_section.dart, planProgressProvider).
       final completedList = allSessions
-          .where((s) =>
-              s.status == SessionStatus.finished && s.wasFullyCompleted)
+          .where(
+              (s) => s.status == SessionStatus.finished && s.wasFullyCompleted)
           .toList();
       final racha = computeStreak(completedList);
-      await pubRepo.updateCounters(uid, {
+      final counters = <String, Object?>{
         'workoutsCount': completedList.length,
         'racha': racha,
-      });
+      };
+
+      // Ranking-metric denormalization (REQ: Session-Finish Denormalization,
+      // spec `user-public-profiles-layer`). Gated entirely on the athlete's
+      // own rankingOptIn — reads their profile first so a non-opted-in
+      // athlete never gets ranking fields written to their doc.
+      final profile = await pubRepo.get(uid);
+      if (profile != null && profile.rankingOptIn) {
+        // RECOMPUTE (not FieldValue.increment) over the SAME completedList
+        // window already fetched above for racha/workoutsCount — this makes
+        // the write idempotent on a best-effort retry (increment would
+        // double-count volume) at zero extra reads.
+        final lifetimeVolumeKg = completedList.fold<double>(
+          0.0,
+          (sum, s) => sum + s.totalVolumeKg,
+        );
+
+        // Read setLogs per session in the SAME window (bounded — no
+        // additional full-collection scan) to compute each main-lift
+        // family's max weight, then max-merge against the stored value so
+        // the write is naturally idempotent (max is idempotent) and
+        // self-heals if the family map ever changes.
+        final logsBySession = <String, List<SetLog>>{};
+        for (final s in completedList) {
+          logsBySession[s.id] = await listSetLogs(uid: uid, sessionId: s.id);
+        }
+        final allWindowLogs = logsBySession.values.expand((l) => l).toList();
+
+        double? mergeBest(num? stored, double? windowMax) {
+          if (windowMax == null) return stored?.toDouble();
+          if (stored == null) return windowMax;
+          return stored > windowMax ? stored.toDouble() : windowMax;
+        }
+
+        counters['lifetimeVolumeKg'] = lifetimeVolumeKg;
+        counters['bestSquatKg'] = mergeBest(
+          profile.bestSquatKg,
+          familyMaxWeight(MainLift.squat, allWindowLogs),
+        );
+        counters['bestBenchKg'] = mergeBest(
+          profile.bestBenchKg,
+          familyMaxWeight(MainLift.bench, allWindowLogs),
+        );
+        counters['bestDeadliftKg'] = mergeBest(
+          profile.bestDeadliftKg,
+          familyMaxWeight(MainLift.deadlift, allWindowLogs),
+        );
+      }
+
+      await pubRepo.updateCounters(uid, counters);
     } catch (e, st) {
       developer.log(
         'SessionRepository.finish: failed to update public profile counters '
@@ -175,15 +225,10 @@ class SessionRepository {
         )
         .orderBy('finishedAt', descending: true)
         .get();
-    return snap.docs
-        .map(_sessionFromDoc)
-        .whereType<Session>()
-        .where((s) {
-          final finishedAt = s.finishedAt;
-          return finishedAt != null &&
-              finishedAt.toUtc().isBefore(startOfNextDay);
-        })
-        .toList();
+    return snap.docs.map(_sessionFromDoc).whereType<Session>().where((s) {
+      final finishedAt = s.finishedAt;
+      return finishedAt != null && finishedAt.toUtc().isBefore(startOfNextDay);
+    }).toList();
   }
 
   // ─── getActive ──────────────────────────────────────────────────────────
