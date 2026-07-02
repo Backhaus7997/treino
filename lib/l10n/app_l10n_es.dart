@@ -1907,6 +1907,53 @@ class AppL10nEs extends AppL10n {
   String get coachHubAlumnoDetailNotasLoadError => 'No pudimos cargar la nota.';
 
   @override
+  String get coachHubAlumnoDetailArchivosTitle => 'Archivos privados';
+
+  @override
+  String get coachHubAlumnoDetailArchivosSubtitle =>
+      'PDFs y fotos que subes sobre este alumno. Solo tú los ves.';
+
+  @override
+  String get coachHubAlumnoDetailArchivosUploadButton => 'SUBIR ARCHIVO';
+
+  @override
+  String get coachHubAlumnoDetailArchivosEmpty =>
+      'Todavía no subiste archivos sobre este alumno.';
+
+  @override
+  String get coachHubAlumnoDetailArchivosLoadError =>
+      'No pudimos cargar los archivos.';
+
+  @override
+  String get coachHubAlumnoDetailArchivosUploadSuccess => 'Archivo subido.';
+
+  @override
+  String get coachHubAlumnoDetailArchivosUploadError =>
+      'No pudimos subir el archivo. Inténtalo de nuevo.';
+
+  @override
+  String get coachHubAlumnoDetailArchivosUploadTooLarge =>
+      'El archivo supera el máximo de 10 MB.';
+
+  @override
+  String get coachHubAlumnoDetailArchivosOpenTooltip => 'Abrir archivo';
+
+  @override
+  String get coachHubAlumnoDetailArchivosDeleteTooltip => 'Eliminar';
+
+  @override
+  String get coachHubAlumnoDetailArchivosDeleteTitle => '¿Eliminar archivo?';
+
+  @override
+  String coachHubAlumnoDetailArchivosDeleteBody(String fileName) {
+    return '«$fileName» se va a borrar tanto del Storage como del historial. No se puede deshacer.';
+  }
+
+  @override
+  String get coachHubAlumnoDetailArchivosDeleteError =>
+      'No pudimos eliminar el archivo.';
+
+  @override
   String get feedLoadError => 'No pudimos cargar tu feed. Inténtalo de nuevo.';
 
   @override
@@ -4100,6 +4147,53 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get coachHubAlumnoDetailNotasLoadError => 'No pudimos cargar la nota.';
+
+  @override
+  String get coachHubAlumnoDetailArchivosTitle => 'Archivos privados';
+
+  @override
+  String get coachHubAlumnoDetailArchivosSubtitle =>
+      'PDFs y fotos que subís sobre este alumno. Solo vos los ves.';
+
+  @override
+  String get coachHubAlumnoDetailArchivosUploadButton => 'SUBIR ARCHIVO';
+
+  @override
+  String get coachHubAlumnoDetailArchivosEmpty =>
+      'Todavía no subiste archivos sobre este alumno.';
+
+  @override
+  String get coachHubAlumnoDetailArchivosLoadError =>
+      'No pudimos cargar los archivos.';
+
+  @override
+  String get coachHubAlumnoDetailArchivosUploadSuccess => 'Archivo subido.';
+
+  @override
+  String get coachHubAlumnoDetailArchivosUploadError =>
+      'No pudimos subir el archivo. Probá de nuevo.';
+
+  @override
+  String get coachHubAlumnoDetailArchivosUploadTooLarge =>
+      'El archivo supera el máximo de 10 MB.';
+
+  @override
+  String get coachHubAlumnoDetailArchivosOpenTooltip => 'Abrir archivo';
+
+  @override
+  String get coachHubAlumnoDetailArchivosDeleteTooltip => 'Eliminar';
+
+  @override
+  String get coachHubAlumnoDetailArchivosDeleteTitle => '¿Eliminar archivo?';
+
+  @override
+  String coachHubAlumnoDetailArchivosDeleteBody(String fileName) {
+    return '«$fileName» se va a borrar tanto del Storage como del historial. No se puede deshacer.';
+  }
+
+  @override
+  String get coachHubAlumnoDetailArchivosDeleteError =>
+      'No pudimos eliminar el archivo.';
 
   @override
   String get feedLoadError => 'No pudimos cargar tu feed. Probá de nuevo.';

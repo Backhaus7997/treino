@@ -687,6 +687,32 @@ service cloud.firestore {
       allow delete: if request.auth != null && resource.data.trainerId == request.auth.uid;
     }
 
+    // Archivos privados que el PF sube sobre un alumno (PDFs, imágenes).
+    // Mismo pattern que /athlete_notes: doc id es `{trainerId}_{athleteId}_{ts}`,
+    // trainer-only R/W, alumno NUNCA los ve. Query paginable por
+    // (trainerId, athleteId, uploadedAt desc). List gate garantiza que solo
+    // el PF vinculado lista los archivos del alumno.
+    match /athlete_files/{docId} {
+      allow read, list: if request.auth != null
+                  && request.auth.uid == resource.data.trainerId;
+      allow create: if request.auth != null
+                  && request.resource.data.trainerId == request.auth.uid
+                  && request.resource.data.athleteId is string
+                  && request.resource.data.athleteId.size() > 0
+                  && request.resource.data.fileName is string
+                  && request.resource.data.fileName.size() > 0
+                  && request.resource.data.storagePath is string
+                  && request.resource.data.downloadUrl is string
+                  && request.resource.data.sizeBytes is int
+                  && request.resource.data.sizeBytes > 0
+                  && request.resource.data.sizeBytes <= 10 * 1024 * 1024;
+      // Update no habilitado — para reemplazar contenido se borra y sube
+      // de nuevo. Evita drift entre downloadUrl y storagePath.
+      allow update: if false;
+      allow delete: if request.auth != null
+                  && request.auth.uid == resource.data.trainerId;
+    }
+
     // Payment records created by trainers against athletes (Pagos P1).
     match /payments/{paymentId} {
       allow read: if request.auth != null
