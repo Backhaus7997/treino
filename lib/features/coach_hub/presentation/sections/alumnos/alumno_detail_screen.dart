@@ -5,7 +5,9 @@ import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/chat/application/chat_providers.dart';
+import 'package:treino/features/coach/application/athlete_note_providers.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
+import 'package:treino/features/coach/domain/athlete_note.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach_hub/presentation/sections/chat/widgets/chat_detail_pane.dart';
@@ -69,6 +71,7 @@ class AlumnoDetailScreen extends ConsumerWidget {
   static const _progresoIndex = 3;
   static const _pagosIndex = 4;
   static const _chatIndex = 6;
+  static const _notasPrivadasIndex = 7;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -137,6 +140,8 @@ class AlumnoDetailScreen extends ConsumerWidget {
                     _PagosTab(athleteId: athleteId)
                   else if (i == _chatIndex)
                     _ChatTab(athleteId: athleteId)
+                  else if (i == _notasPrivadasIndex)
+                    _NotasPrivadasTab(athleteId: athleteId)
                   else
                     _TabPlaceholder(label: _tabs[i]),
               ],
@@ -1488,6 +1493,281 @@ class _SetLogsExpansion extends ConsumerWidget {
           );
         },
       ),
+    );
+  }
+}
+
+// ── _NotasPrivadasTab ─────────────────────────────────────────────────────────
+
+/// Coach Hub web — Tab «Notas privadas» del alumno detail.
+///
+/// UX (W2+):
+/// - Text area grande, editable inline (no modal/bottom sheet, hay espacio).
+/// - Botón GUARDAR habilitado solo cuando hay cambios pendientes vs lo que
+///   trae el stream (compará contra el último save).
+/// - Timestamp "Última edición ..." arriba a la derecha si hay una nota
+///   guardada previamente.
+/// - Empty state = text area vacío + hint. La regla del PF es "solo vos lo
+///   ves" — no lo mostrás al alumno en NINGÚN surface.
+///
+/// Data:
+/// - Reusa el mismo stack de mobile (`AthleteNote` + `athleteNoteProvider` +
+///   `AthleteNoteRepository`). Sin data model nuevo, sin rules nuevas.
+class _NotasPrivadasTab extends ConsumerStatefulWidget {
+  const _NotasPrivadasTab({required this.athleteId});
+
+  final String athleteId;
+
+  @override
+  ConsumerState<_NotasPrivadasTab> createState() => _NotasPrivadasTabState();
+}
+
+class _NotasPrivadasTabState extends ConsumerState<_NotasPrivadasTab> {
+  final _controller = TextEditingController();
+  final _scrollController = ScrollController();
+  String _lastSavedContent = '';
+  bool _initialized = false;
+  bool _saving = false;
+
+  @override
+  void didUpdateWidget(covariant _NotasPrivadasTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // When the parent swaps to a different athlete, Flutter reuses this
+    // State — the controller keeps the previous athlete's text and the
+    // "typing wins" gate blocks the new stream from populating it. Reset
+    // the local buffer so the new athlete's stream seeds the controller
+    // on its first emission.
+    if (oldWidget.athleteId != widget.athleteId) {
+      _initialized = false;
+      _controller.text = '';
+      _lastSavedContent = '';
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  /// Sync `_controller` with the incoming server value the FIRST time the
+  /// stream emits data — after that, we own the buffer (typing wins). If the
+  /// PF opens the tab, types "foo", and a stale re-emit comes in with an
+  /// older `note`, we DON'T overwrite what they typed. Save button drives
+  /// the reconciliation.
+  void _initFromStream(AthleteNote? note) {
+    if (_initialized) return;
+    _initialized = true;
+    final content = note?.note ?? '';
+    _controller.text = content;
+    _lastSavedContent = content;
+  }
+
+  bool get _hasChanges => _controller.text != _lastSavedContent;
+
+  Future<void> _save(String trainerUid) async {
+    if (_saving) return;
+    setState(() => _saving = true);
+    try {
+      final content = _controller.text;
+      await ref.read(athleteNoteRepositoryProvider).setNote(
+            AthleteNote(
+              trainerId: trainerUid,
+              athleteId: widget.athleteId,
+              note: content,
+              updatedAt: DateTime.now(),
+            ),
+          );
+      if (!mounted) return;
+      setState(() {
+        _lastSavedContent = content;
+      });
+      final l10n = AppL10n.of(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(l10n.coachHubAlumnoDetailNotasSaveSuccess),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } on FirebaseException catch (_) {
+      if (!mounted) return;
+      final l10n = AppL10n.of(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.coachHubAlumnoDetailNotasSaveError)),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _saving = false);
+      }
+    }
+  }
+
+  String _formatUpdatedAt(DateTime updatedAt) {
+    final local = updatedAt.toLocal();
+    final d = local.day.toString().padLeft(2, '0');
+    final m = local.month.toString().padLeft(2, '0');
+    final y = local.year.toString();
+    final hh = local.hour.toString().padLeft(2, '0');
+    final mm = local.minute.toString().padLeft(2, '0');
+    return '$d/$m/$y · $hh:$mm';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+    final trainerUid = ref.watch(currentUidProvider);
+    if (trainerUid == null) {
+      return const SizedBox.shrink();
+    }
+    final noteAsync = ref.watch(
+      athleteNoteProvider(
+        (trainerId: trainerUid, athleteId: widget.athleteId),
+      ),
+    );
+
+    return noteAsync.when(
+      loading: () => Center(
+        child: CircularProgressIndicator(color: palette.accent),
+      ),
+      error: (_, __) => Center(
+        child: Text(
+          l10n.coachHubAlumnoDetailNotasLoadError,
+          style: TextStyle(color: palette.textMuted, fontSize: 14),
+        ),
+      ),
+      data: (note) {
+        // First data emission: seed the text controller. Subsequent emissions
+        // are ignored — the PF's local buffer wins to avoid clobbering typing.
+        _initFromStream(note);
+        final updatedAt = note?.updatedAt;
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // ── Header row: title + last-updated timestamp ─────────────
+              Row(
+                children: [
+                  Text(
+                    l10n.coachHubAlumnoDetailNotasTitle,
+                    style: TextStyle(
+                      color: palette.textPrimary,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const Spacer(),
+                  if (updatedAt != null)
+                    Text(
+                      l10n.coachHubAlumnoDetailNotasUpdatedAt(
+                          _formatUpdatedAt(updatedAt)),
+                      style: TextStyle(
+                        color: palette.textMuted,
+                        fontSize: 12,
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                l10n.coachHubAlumnoDetailNotasSubtitle,
+                style: TextStyle(color: palette.textMuted, fontSize: 13),
+              ),
+              const SizedBox(height: 16),
+              // ── Editable text area ──────────────────────────────────────
+              Expanded(
+                // Rounded box that clips the scrollable content. Instead of
+                // `TextField(expands: true)` which paints outside its parent
+                // in some Flutter Web configs, we let the TextField grow to
+                // its natural content height inside a SingleChildScrollView
+                // — the SCV owns the scrolling and clips reliably against
+                // the ClipRRect ancestor.
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: palette.border),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(11),
+                    child: ColoredBox(
+                      color: palette.bgCard,
+                      child: Scrollbar(
+                        controller: _scrollController,
+                        thumbVisibility: true,
+                        thickness: 6,
+                        child: SingleChildScrollView(
+                          controller: _scrollController,
+                          padding: const EdgeInsets.fromLTRB(16, 16, 20, 16),
+                          child: TextField(
+                            controller: _controller,
+                            maxLines: null,
+                            minLines: 12,
+                            keyboardType: TextInputType.multiline,
+                            style: TextStyle(
+                              color: palette.textPrimary,
+                              fontSize: 14,
+                              height: 1.4,
+                            ),
+                            decoration: InputDecoration.collapsed(
+                              hintText: l10n.coachHubAlumnoDetailNotasHint,
+                              hintStyle: TextStyle(
+                                color: palette.textMuted,
+                                fontSize: 14,
+                              ),
+                            ),
+                            onChanged: (_) {
+                              // Trigger rebuild to toggle save enabled state.
+                              setState(() {});
+                            },
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              // ── Save button ─────────────────────────────────────────────
+              Align(
+                alignment: Alignment.centerRight,
+                child: ElevatedButton(
+                  onPressed: (_saving || !_hasChanges)
+                      ? null
+                      : () => _save(trainerUid),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: palette.accent,
+                    foregroundColor: palette.bg,
+                    disabledBackgroundColor:
+                        palette.accent.withValues(alpha: 0.3),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 24, vertical: 12),
+                    shape: const StadiumBorder(),
+                  ),
+                  child: _saving
+                      ? SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: palette.bg,
+                          ),
+                        )
+                      : Text(
+                          l10n.coachHubAlumnoDetailNotasSaveButton,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.8,
+                          ),
+                        ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

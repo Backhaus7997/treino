@@ -3524,6 +3524,54 @@ abstract class AppL10n {
   /// **'Inactivo'**
   String get coachHubAlumnosStatusInactive;
 
+  /// Coach Hub web alumno detail — title of the Notas privadas tab body.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Notas privadas'**
+  String get coachHubAlumnoDetailNotasTitle;
+
+  /// Coach Hub web alumno detail — subtitle explaining that these notes are private to the trainer, never shown to the athlete.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Anotá lo que necesites sobre este alumno. Solo vos lo ves.'**
+  String get coachHubAlumnoDetailNotasSubtitle;
+
+  /// Coach Hub web alumno detail — hint text inside the empty notes TextField.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ej: Lesión de rodilla derecha, evitar sentadilla profunda…'**
+  String get coachHubAlumnoDetailNotasHint;
+
+  /// Coach Hub web alumno detail — save button label for the notes tab.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'GUARDAR'**
+  String get coachHubAlumnoDetailNotasSaveButton;
+
+  /// Coach Hub web alumno detail — subtle header line showing when the note was last saved.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Última edición · {timestamp}'**
+  String coachHubAlumnoDetailNotasUpdatedAt(String timestamp);
+
+  /// Coach Hub web alumno detail — snackbar shown after a successful save of the private note.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Nota guardada.'**
+  String get coachHubAlumnoDetailNotasSaveSuccess;
+
+  /// Coach Hub web alumno detail — snackbar shown when Firestore write fails.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos guardar la nota. Probá de nuevo.'**
+  String get coachHubAlumnoDetailNotasSaveError;
+
+  /// Coach Hub web alumno detail — error state when the note stream errors.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cargar la nota.'**
+  String get coachHubAlumnoDetailNotasLoadError;
+
   /// Feed error branch text, replacing the hardcoded literal repeated 3x in feed_screen.dart (finding 9). Pair with coachRetryLabel for the retry CTA.
   ///
   /// In es_AR, this message translates to:

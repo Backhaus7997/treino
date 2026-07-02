@@ -1245,6 +1245,44 @@
   "@coachHubAlumnosStatusInactive": {
     "description": "Coach Hub web alumnos section — status badge for inactive athletes."
   },
+  "coachHubAlumnoDetailNotasTitle": "Notas privadas",
+  "@coachHubAlumnoDetailNotasTitle": {
+    "description": "Coach Hub web alumno detail — title of the Notas privadas tab body."
+  },
+  "coachHubAlumnoDetailNotasSubtitle": "Anotá lo que necesites sobre este alumno. Solo vos lo ves.",
+  "@coachHubAlumnoDetailNotasSubtitle": {
+    "description": "Coach Hub web alumno detail — subtitle explaining that these notes are private to the trainer, never shown to the athlete."
+  },
+  "coachHubAlumnoDetailNotasHint": "Ej: Lesión de rodilla derecha, evitar sentadilla profunda…",
+  "@coachHubAlumnoDetailNotasHint": {
+    "description": "Coach Hub web alumno detail — hint text inside the empty notes TextField."
+  },
+  "coachHubAlumnoDetailNotasSaveButton": "GUARDAR",
+  "@coachHubAlumnoDetailNotasSaveButton": {
+    "description": "Coach Hub web alumno detail — save button label for the notes tab."
+  },
+  "coachHubAlumnoDetailNotasUpdatedAt": "Última edición · {timestamp}",
+  "@coachHubAlumnoDetailNotasUpdatedAt": {
+    "description": "Coach Hub web alumno detail — subtle header line showing when the note was last saved.",
+    "placeholders": {
+      "timestamp": {
+        "type": "String",
+        "example": "12/03/2026 · 14:30"
+      }
+    }
+  },
+  "coachHubAlumnoDetailNotasSaveSuccess": "Nota guardada.",
+  "@coachHubAlumnoDetailNotasSaveSuccess": {
+    "description": "Coach Hub web alumno detail — snackbar shown after a successful save of the private note."
+  },
+  "coachHubAlumnoDetailNotasSaveError": "No pudimos guardar la nota. Probá de nuevo.",
+  "@coachHubAlumnoDetailNotasSaveError": {
+    "description": "Coach Hub web alumno detail — snackbar shown when Firestore write fails."
+  },
+  "coachHubAlumnoDetailNotasLoadError": "No pudimos cargar la nota.",
+  "@coachHubAlumnoDetailNotasLoadError": {
+    "description": "Coach Hub web alumno detail — error state when the note stream errors."
+  },
   "feedLoadError": "No pudimos cargar tu feed. Probá de nuevo.",
   "@feedLoadError": {
     "description": "Feed error branch text, replacing the hardcoded literal repeated 3x in feed_screen.dart (finding 9). Pair with coachRetryLabel for the retry CTA."

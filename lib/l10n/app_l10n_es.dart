@@ -1878,6 +1878,35 @@ class AppL10nEs extends AppL10n {
   String get coachHubAlumnosStatusInactive => 'Inactivo';
 
   @override
+  String get coachHubAlumnoDetailNotasTitle => 'Notas privadas';
+
+  @override
+  String get coachHubAlumnoDetailNotasSubtitle =>
+      'Anota lo que necesites sobre este alumno. Solo tú lo ves.';
+
+  @override
+  String get coachHubAlumnoDetailNotasHint =>
+      'Ej: Lesión de rodilla derecha, evitar sentadilla profunda…';
+
+  @override
+  String get coachHubAlumnoDetailNotasSaveButton => 'GUARDAR';
+
+  @override
+  String coachHubAlumnoDetailNotasUpdatedAt(String timestamp) {
+    return 'Última edición · $timestamp';
+  }
+
+  @override
+  String get coachHubAlumnoDetailNotasSaveSuccess => 'Nota guardada.';
+
+  @override
+  String get coachHubAlumnoDetailNotasSaveError =>
+      'No pudimos guardar la nota. Inténtalo de nuevo.';
+
+  @override
+  String get coachHubAlumnoDetailNotasLoadError => 'No pudimos cargar la nota.';
+
+  @override
   String get feedLoadError => 'No pudimos cargar tu feed. Inténtalo de nuevo.';
 
   @override
@@ -3994,6 +4023,35 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get coachHubAlumnosStatusInactive => 'Inactivo';
+
+  @override
+  String get coachHubAlumnoDetailNotasTitle => 'Notas privadas';
+
+  @override
+  String get coachHubAlumnoDetailNotasSubtitle =>
+      'Anotá lo que necesites sobre este alumno. Solo vos lo ves.';
+
+  @override
+  String get coachHubAlumnoDetailNotasHint =>
+      'Ej: Lesión de rodilla derecha, evitar sentadilla profunda…';
+
+  @override
+  String get coachHubAlumnoDetailNotasSaveButton => 'GUARDAR';
+
+  @override
+  String coachHubAlumnoDetailNotasUpdatedAt(String timestamp) {
+    return 'Última edición · $timestamp';
+  }
+
+  @override
+  String get coachHubAlumnoDetailNotasSaveSuccess => 'Nota guardada.';
+
+  @override
+  String get coachHubAlumnoDetailNotasSaveError =>
+      'No pudimos guardar la nota. Probá de nuevo.';
+
+  @override
+  String get coachHubAlumnoDetailNotasLoadError => 'No pudimos cargar la nota.';
 
   @override
   String get feedLoadError => 'No pudimos cargar tu feed. Probá de nuevo.';

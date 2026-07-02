@@ -671,8 +671,15 @@ service cloud.firestore {
     // Private per-athlete coaching note written by the trainer. Trainer-only —
     // the athlete cannot read it.
     match /athlete_notes/{docId} {
+      // Read: dueño solo (trainer). Si el doc NO existe, `resource == null` y
+      // la rule debe permitir la lectura para que el cliente vea "sin nota"
+      // en vez de un permission-denied que la UI captura como error. El docId
+      // encodea `{trainerId}_{athleteId}` así que un attacker no puede
+      // fishearse leyendo docs de otro PF: solo llegaría al doc si armara el
+      // par exacto — y si existe, el segundo check bloquea el acceso.
       allow read: if request.auth != null
-                  && request.auth.uid == resource.data.trainerId;
+                  && (resource == null
+                      || request.auth.uid == resource.data.trainerId);
       allow create, update: if request.auth != null
                   && request.resource.data.trainerId == request.auth.uid
                   && request.resource.data.athleteId is string

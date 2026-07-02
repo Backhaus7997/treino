@@ -1827,6 +1827,36 @@ class AppL10nEn extends AppL10n {
   String get coachHubAlumnosStatusInactive => 'Inactive';
 
   @override
+  String get coachHubAlumnoDetailNotasTitle => 'Private notes';
+
+  @override
+  String get coachHubAlumnoDetailNotasSubtitle =>
+      'Write down whatever you need about this athlete. Only you can see it.';
+
+  @override
+  String get coachHubAlumnoDetailNotasHint =>
+      'e.g. Right knee injury, avoid deep squats…';
+
+  @override
+  String get coachHubAlumnoDetailNotasSaveButton => 'SAVE';
+
+  @override
+  String coachHubAlumnoDetailNotasUpdatedAt(String timestamp) {
+    return 'Last edited · $timestamp';
+  }
+
+  @override
+  String get coachHubAlumnoDetailNotasSaveSuccess => 'Note saved.';
+
+  @override
+  String get coachHubAlumnoDetailNotasSaveError =>
+      'We couldn\'t save the note. Please try again.';
+
+  @override
+  String get coachHubAlumnoDetailNotasLoadError =>
+      'We couldn\'t load the note.';
+
+  @override
   String get feedLoadError => 'We couldn\'t load your feed. Please try again.';
 
   @override
