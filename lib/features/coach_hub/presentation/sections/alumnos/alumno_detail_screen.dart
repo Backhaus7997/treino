@@ -28,6 +28,7 @@ import 'package:treino/features/workout/application/session_providers.dart';
 import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/domain/routine_status.dart';
 import 'package:treino/features/workout/domain/session.dart';
+import 'package:treino/features/workout/domain/session_status.dart';
 import 'package:treino/features/workout/domain/set_log.dart';
 import 'package:treino/features/workout/presentation/widgets/exercise_progression_chart.dart';
 import 'package:treino/features/workout/presentation/widgets/session_exercise_block.dart';
@@ -70,6 +71,7 @@ class AlumnoDetailScreen extends ConsumerWidget {
   static const _entrenamientoIndex = 1;
   static const _progresoIndex = 3;
   static const _pagosIndex = 4;
+  static const _historialIndex = 5;
   static const _chatIndex = 6;
   static const _notasPrivadasIndex = 7;
 
@@ -138,6 +140,8 @@ class AlumnoDetailScreen extends ConsumerWidget {
                     _ProgresoTab(athleteId: athleteId)
                   else if (i == _pagosIndex)
                     _PagosTab(athleteId: athleteId)
+                  else if (i == _historialIndex)
+                    _HistorialTab(athleteId: athleteId)
                   else if (i == _chatIndex)
                     _ChatTab(athleteId: athleteId)
                   else if (i == _notasPrivadasIndex)
@@ -1301,10 +1305,17 @@ class _HistorialTable extends StatelessWidget {
     required this.sessions,
     required this.palette,
     required this.athleteId,
+    this.showStatusBadge = false,
   });
   final List<Session> sessions;
   final AppPalette palette;
   final String athleteId;
+
+  /// If true, the row prefixes the session name with a small status pill
+  /// (Completada / Incompleta / En curso). Used by the Historial tab where
+  /// non-completed sessions are shown; the Entrenamientos tab filters to
+  /// completed and doesn't need it.
+  final bool showStatusBadge;
 
   @override
   Widget build(BuildContext context) {
@@ -1345,6 +1356,7 @@ class _HistorialTable extends StatelessWidget {
               session: s,
               athleteId: athleteId,
               palette: palette,
+              showStatusBadge: showStatusBadge,
             ),
         ],
       ),
@@ -1359,10 +1371,12 @@ class _ExpandableSessionRow extends ConsumerStatefulWidget {
     required this.session,
     required this.athleteId,
     required this.palette,
+    this.showStatusBadge = false,
   });
   final Session session;
   final String athleteId;
   final AppPalette palette;
+  final bool showStatusBadge;
 
   @override
   ConsumerState<_ExpandableSessionRow> createState() =>
@@ -1389,14 +1403,32 @@ class _ExpandableSessionRowState extends ConsumerState<_ExpandableSessionRow> {
                 Expanded(
                   flex: 3,
                   child: Text(
-                    s.finishedAt != null ? fmtDate(s.finishedAt!) : '—',
+                    // Historial tab shows active sessions too; fall back to
+                    // startedAt when finishedAt is null so the user still
+                    // sees WHEN the athlete started it.
+                    s.finishedAt != null
+                        ? fmtDate(s.finishedAt!)
+                        : widget.showStatusBadge
+                            ? fmtDate(s.startedAt)
+                            : '—',
                     style: c,
                   ),
                 ),
                 Expanded(
                   flex: 4,
-                  child: Text(s.routineName,
-                      overflow: TextOverflow.ellipsis, style: c),
+                  child: widget.showStatusBadge
+                      ? Row(
+                          children: [
+                            _SessionStatusPill(session: s, palette: palette),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(s.routineName,
+                                  overflow: TextOverflow.ellipsis, style: c),
+                            ),
+                          ],
+                        )
+                      : Text(s.routineName,
+                          overflow: TextOverflow.ellipsis, style: c),
                 ),
                 Expanded(
                   flex: 2,
@@ -1769,5 +1801,134 @@ class _NotasPrivadasTabState extends ConsumerState<_NotasPrivadasTab> {
         );
       },
     );
+  }
+}
+
+// ── _HistorialTab ─────────────────────────────────────────────────────────────
+
+/// Coach Hub web — Tab «Historial» del alumno detail.
+///
+/// Timeline cronológico de TODAS las sesiones del alumno (finished OK,
+/// finished incompleta/abandonada, y active). Ordenadas más nuevas arriba,
+/// vienen así del `sessionsByUidProvider`.
+///
+/// Diferencia con el tab «Entrenamientos»:
+/// - Entrenamientos: últimas 20 sesiones COMPLETAS (isCompletedSession) +
+///   evolución por ejercicio.
+/// - Historial: TODAS las sesiones (sin límite, sin filtro) con badge de
+///   status para que el PF distinga completadas, incompletas y activas.
+///
+/// Reusa el mismo `_HistorialTable` + `_ExpandableSessionRow` que
+/// Entrenamientos, activando el flag `showStatusBadge`.
+class _HistorialTab extends ConsumerWidget {
+  const _HistorialTab({required this.athleteId});
+
+  final String athleteId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final palette = AppPalette.of(context);
+    final sessionsAsync = ref.watch(sessionsByUidProvider(athleteId));
+    return sessionsAsync.when(
+      loading: () => Center(
+        child: CircularProgressIndicator(color: palette.accent),
+      ),
+      error: (_, __) => Center(
+        child: Text(
+          'No pudimos cargar el historial.', // i18n: Fase W2
+          style: TextStyle(color: palette.textMuted, fontSize: 14),
+        ),
+      ),
+      data: (sessions) {
+        if (sessions.isEmpty) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+              child: Text(
+                'Este alumno todavía no registró sesiones.', // i18n: Fase W2
+                textAlign: TextAlign.center,
+                style: TextStyle(color: palette.textMuted, fontSize: 14),
+              ),
+            ),
+          );
+        }
+        return SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Historial completo · ${sessions.length} sesiones', // i18n: Fase W2
+                style: TextStyle(
+                  color: palette.textPrimary,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Todas las sesiones que registró — completas, incompletas y en curso.', // i18n: Fase W2
+                style: TextStyle(color: palette.textMuted, fontSize: 13),
+              ),
+              const SizedBox(height: 16),
+              _HistorialTable(
+                sessions: sessions,
+                palette: palette,
+                athleteId: athleteId,
+                showStatusBadge: true,
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ── _SessionStatusPill ────────────────────────────────────────────────────────
+
+/// Small pill/badge rendering the session's completion status: verde
+/// «Completa», amarillo «Incompleta», naranja «En curso». Used inside the
+/// Historial tab's session rows to distinguish state at a glance.
+class _SessionStatusPill extends StatelessWidget {
+  const _SessionStatusPill({required this.session, required this.palette});
+
+  final Session session;
+  final AppPalette palette;
+
+  @override
+  Widget build(BuildContext context) {
+    final (label, color) = _statusFor(session, palette);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(9999),
+        border: Border.all(color: color.withValues(alpha: 0.5), width: 1),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.5,
+        ),
+      ),
+    );
+  }
+
+  /// Returns (label, color) for the session's current state.
+  /// - `active` → «En curso» (rare in Historial but we show it if we see it).
+  /// - `finished + wasFullyCompleted` → «Completa».
+  /// - `finished + !wasFullyCompleted` → «Incompleta» (athlete abandoned).
+  static (String, Color) _statusFor(Session s, AppPalette palette) {
+    if (s.status == SessionStatus.active) {
+      return ('EN CURSO', palette.warning); // i18n: Fase W2
+    }
+    if (s.wasFullyCompleted) {
+      return ('COMPLETA', palette.accent); // i18n: Fase W2
+    }
+    return ('INCOMPLETA', palette.danger); // i18n: Fase W2
   }
 }
