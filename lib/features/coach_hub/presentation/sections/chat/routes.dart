@@ -24,7 +24,7 @@ const List<SidebarItem> chatSidebarItems = [
     label: 'Chat', // i18n: Fase W1
     route: '/chat',
     iconBuilder: _chatIcon,
-    group: SidebarGroup.comunicacion,
+    group: SidebarGroup.gestion,
   ),
 ];
 

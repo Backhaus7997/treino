@@ -22,7 +22,7 @@ const List<SidebarItem> pagosSidebarItems = [
     label: 'Pagos', // i18n: Fase W1
     route: '/pagos',
     iconBuilder: _pagosIcon,
-    group: SidebarGroup.negocio,
+    group: SidebarGroup.recursos,
   ),
 ];
 

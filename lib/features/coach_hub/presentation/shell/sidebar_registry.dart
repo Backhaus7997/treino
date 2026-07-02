@@ -1,22 +1,10 @@
-import 'package:treino/features/coach_hub/presentation/sections/actividad/routes.dart';
 import 'package:treino/features/coach_hub/presentation/sections/agenda/routes.dart';
 import 'package:treino/features/coach_hub/presentation/sections/ajustes/routes.dart';
 import 'package:treino/features/coach_hub/presentation/sections/alumnos/routes.dart';
 import 'package:treino/features/coach_hub/presentation/sections/biblioteca/routes.dart';
 import 'package:treino/features/coach_hub/presentation/sections/chat/routes.dart';
-import 'package:treino/features/coach_hub/presentation/sections/cuestionario/routes.dart';
 import 'package:treino/features/coach_hub/presentation/sections/dashboard/routes.dart';
-import 'package:treino/features/coach_hub/presentation/sections/habitos/routes.dart';
-import 'package:treino/features/coach_hub/presentation/sections/invitaciones/routes.dart';
-import 'package:treino/features/coach_hub/presentation/sections/nutricion/routes.dart';
 import 'package:treino/features/coach_hub/presentation/sections/pagos/routes.dart';
-import 'package:treino/features/coach_hub/presentation/sections/planes/routes.dart';
-import 'package:treino/features/coach_hub/presentation/sections/planner/routes.dart';
-import 'package:treino/features/coach_hub/presentation/sections/recetas/routes.dart';
-import 'package:treino/features/coach_hub/presentation/sections/reportes/routes.dart';
-import 'package:treino/features/coach_hub/presentation/sections/rutinas/routes.dart';
-import 'package:treino/features/coach_hub/presentation/sections/suplementos/routes.dart';
-import 'package:treino/features/coach_hub/presentation/sections/templates/routes.dart';
 
 import 'sidebar_item.dart';
 
@@ -29,41 +17,25 @@ import 'sidebar_item.dart';
 /// alfabético. Este archivo es el único punto de conflicto al agregar secciones
 /// en W2+, y se resuelve con merge aditivo.
 ///
-/// Nota de scope: la enumeración tiene **19 items**. `Solicitudes` (reemplazado
-/// por `Actividad`) y `Perfil Público` (Fase W6) están fuera de W1, ver
-/// "Out of Scope" del spec. `legacy/routes.dart` (`/upload-plan`) aporta rutas
-/// pero NO items de sidebar.
+/// **W2 reduce 2026-07-02**: el sidebar pasó de ~19 items a 8. Los items
+/// removidos (Actividad, Invitaciones, Cuestionario, Rutinas, Planner,
+/// Templates, Nutrición, Recetas, Suplementos, Hábitos, Planes comerciales)
+/// duplicaban funcionalidad del `alumno_detail` (por-alumno) o pertenecen a
+/// una futura Biblioteca (sub-tabs). Sus screens y rutas siguen existiendo
+/// (los routes se registran en `coach_hub_router.dart` por section); solo
+/// no aparecen en el sidebar. Para exponerlos de vuelta basta con
+/// re-importar el `<section>SidebarItems` acá.
 const List<SidebarItem> sidebarRegistry = [
-  // RESUMEN
+  // GESTIÓN — surfaces multi-alumno del día a día del PF
   ...dashboardSidebarItems,
-  ...actividadSidebarItems,
-  ...agendaSidebarItems,
-
-  // ALUMNOS
   ...alumnosSidebarItems,
-  ...invitacionesSidebarItems,
-  ...cuestionarioSidebarItems,
-
-  // PLAN
-  ...rutinasSidebarItems,
-  ...plannerSidebarItems,
-  ...bibliotecaSidebarItems,
-  ...templatesSidebarItems,
-
-  // WELLNESS
-  ...nutricionSidebarItems,
-  ...recetasSidebarItems,
-  ...suplementosSidebarItems,
-  ...habitosSidebarItems,
-
-  // NEGOCIO
-  ...pagosSidebarItems,
-  ...planesSidebarItems,
-  ...reportesSidebarItems,
-
-  // COMUNICACIÓN
+  ...agendaSidebarItems,
   ...chatSidebarItems,
 
-  // AJUSTES (bottom)
+  // RECURSOS — bibliotecas del PF y finanzas
+  ...bibliotecaSidebarItems,
+  ...pagosSidebarItems,
+
+  // AJUSTES (pinneado al fondo, fuera de grupo visual)
   ...ajustesSidebarItems,
 ];
