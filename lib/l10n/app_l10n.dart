@@ -3572,6 +3572,84 @@ abstract class AppL10n {
   /// **'No pudimos cargar la nota.'**
   String get coachHubAlumnoDetailNotasLoadError;
 
+  /// Coach Hub web alumno detail — title of the Archivos tab body.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Archivos privados'**
+  String get coachHubAlumnoDetailArchivosTitle;
+
+  /// Coach Hub web alumno detail — subtitle explaining privacy: only the trainer sees these files, the athlete never does.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'PDFs y fotos que subís sobre este alumno. Solo vos los ves.'**
+  String get coachHubAlumnoDetailArchivosSubtitle;
+
+  /// Coach Hub web alumno detail — primary CTA to open the file picker.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'SUBIR ARCHIVO'**
+  String get coachHubAlumnoDetailArchivosUploadButton;
+
+  /// Coach Hub web alumno detail — empty state when no files have been uploaded.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Todavía no subiste archivos sobre este alumno.'**
+  String get coachHubAlumnoDetailArchivosEmpty;
+
+  /// Coach Hub web alumno detail — error state when the athlete files stream fails.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cargar los archivos.'**
+  String get coachHubAlumnoDetailArchivosLoadError;
+
+  /// Coach Hub web alumno detail — snackbar shown after a successful upload.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Archivo subido.'**
+  String get coachHubAlumnoDetailArchivosUploadSuccess;
+
+  /// Coach Hub web alumno detail — snackbar shown when the upload fails (permission-denied, network, etc.).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos subir el archivo. Probá de nuevo.'**
+  String get coachHubAlumnoDetailArchivosUploadError;
+
+  /// Coach Hub web alumno detail — snackbar shown when the picked file exceeds the size cap.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'El archivo supera el máximo de 10 MB.'**
+  String get coachHubAlumnoDetailArchivosUploadTooLarge;
+
+  /// Coach Hub web alumno detail — tooltip for the download/open button on each file row.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Abrir archivo'**
+  String get coachHubAlumnoDetailArchivosOpenTooltip;
+
+  /// Coach Hub web alumno detail — tooltip for the delete button on each file row.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Eliminar'**
+  String get coachHubAlumnoDetailArchivosDeleteTooltip;
+
+  /// Coach Hub web alumno detail — confirmation dialog title before deleting a file.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Eliminar archivo?'**
+  String get coachHubAlumnoDetailArchivosDeleteTitle;
+
+  /// Coach Hub web alumno detail — confirmation body for delete with the file name.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'«{fileName}» se va a borrar tanto del Storage como del historial. No se puede deshacer.'**
+  String coachHubAlumnoDetailArchivosDeleteBody(String fileName);
+
+  /// Coach Hub web alumno detail — snackbar when the delete flow fails.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos eliminar el archivo.'**
+  String get coachHubAlumnoDetailArchivosDeleteError;
+
   /// Feed error branch text, replacing the hardcoded literal repeated 3x in feed_screen.dart (finding 9). Pair with coachRetryLabel for the retry CTA.
   ///
   /// In es_AR, this message translates to:

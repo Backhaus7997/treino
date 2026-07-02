@@ -1,12 +1,17 @@
 import 'package:cloud_firestore/cloud_firestore.dart' show FirebaseException;
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/chat/application/chat_providers.dart';
+import 'package:treino/features/coach/application/athlete_file_providers.dart';
 import 'package:treino/features/coach/application/athlete_note_providers.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
+import 'package:treino/features/coach/data/athlete_file_repository.dart';
+import 'package:treino/features/coach/domain/athlete_file.dart';
 import 'package:treino/features/coach/domain/athlete_note.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
@@ -74,6 +79,7 @@ class AlumnoDetailScreen extends ConsumerWidget {
   static const _historialIndex = 5;
   static const _chatIndex = 6;
   static const _notasPrivadasIndex = 7;
+  static const _archivosIndex = 8;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -146,6 +152,8 @@ class AlumnoDetailScreen extends ConsumerWidget {
                     _ChatTab(athleteId: athleteId)
                   else if (i == _notasPrivadasIndex)
                     _NotasPrivadasTab(athleteId: athleteId)
+                  else if (i == _archivosIndex)
+                    _ArchivosTab(athleteId: athleteId)
                   else
                     _TabPlaceholder(label: _tabs[i]),
               ],
@@ -1930,5 +1938,352 @@ class _SessionStatusPill extends StatelessWidget {
       return ('COMPLETA', palette.accent); // i18n: Fase W2
     }
     return ('INCOMPLETA', palette.danger); // i18n: Fase W2
+  }
+}
+
+// ── _ArchivosTab ──────────────────────────────────────────────────────────────
+
+/// Coach Hub web — Tab «Archivos» del alumno detail.
+///
+/// Carpeta privada del PF por alumno para subir PDFs e imágenes (estudios
+/// médicos, fotos de postura/lesión, planes impresos). El alumno NUNCA los
+/// ve — es una herramienta interna del PF.
+///
+/// Data: reusa `athleteFilesProvider` + `AthleteFileRepository` (Firestore
+/// para metadata + Firebase Storage para el binario). Rules trainer-only en
+/// ambos lados.
+///
+/// V1 scope:
+/// - Solo PDF + imágenes (10 MB max).
+/// - Lista simple (más nuevos arriba).
+/// - Subir → file picker → upload + set doc.
+/// - Descargar → abre `downloadUrl` en tab nueva.
+/// - Borrar → confirm dialog → borra Storage + Firestore.
+class _ArchivosTab extends ConsumerStatefulWidget {
+  const _ArchivosTab({required this.athleteId});
+
+  final String athleteId;
+
+  @override
+  ConsumerState<_ArchivosTab> createState() => _ArchivosTabState();
+}
+
+class _ArchivosTabState extends ConsumerState<_ArchivosTab> {
+  bool _uploading = false;
+
+  Future<void> _pickAndUpload(String trainerUid) async {
+    if (_uploading) return;
+    final l10n = AppL10n.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: const ['pdf', 'jpg', 'jpeg', 'png', 'webp', 'gif'],
+      withData: true, // Necesitamos bytes para putData en web.
+    );
+    if (result == null || result.files.isEmpty) return;
+    final picked = result.files.single;
+    final bytes = picked.bytes;
+    if (bytes == null) return;
+
+    setState(() => _uploading = true);
+    try {
+      final contentType = _guessContentType(picked.name, picked.extension);
+      await ref.read(athleteFileRepositoryProvider).upload(
+            trainerId: trainerUid,
+            athleteId: widget.athleteId,
+            fileName: picked.name,
+            contentType: contentType,
+            bytes: bytes,
+          );
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(l10n.coachHubAlumnoDetailArchivosUploadSuccess),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } on AthleteFileTooLargeException {
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(l10n.coachHubAlumnoDetailArchivosUploadTooLarge),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(l10n.coachHubAlumnoDetailArchivosUploadError),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _uploading = false);
+    }
+  }
+
+  Future<void> _confirmAndDelete(AthleteFile file) async {
+    final l10n = AppL10n.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.coachHubAlumnoDetailArchivosDeleteTitle),
+        content: Text(
+          l10n.coachHubAlumnoDetailArchivosDeleteBody(file.fileName),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(l10n.coachHubActionCancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(l10n.coachHubActionConfirm),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await ref.read(athleteFileRepositoryProvider).delete(file);
+    } catch (_) {
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(l10n.coachHubAlumnoDetailArchivosDeleteError),
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+    final trainerUid = ref.watch(currentUidProvider);
+    if (trainerUid == null) return const SizedBox.shrink();
+    final filesAsync = ref.watch(
+      athleteFilesProvider(
+        (trainerId: trainerUid, athleteId: widget.athleteId),
+      ),
+    );
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // ── Header ─────────────────────────────────────────────────────
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      l10n.coachHubAlumnoDetailArchivosTitle,
+                      style: TextStyle(
+                        color: palette.textPrimary,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      l10n.coachHubAlumnoDetailArchivosSubtitle,
+                      style:
+                          TextStyle(color: palette.textMuted, fontSize: 13),
+                    ),
+                  ],
+                ),
+              ),
+              ElevatedButton.icon(
+                onPressed: _uploading ? null : () => _pickAndUpload(trainerUid),
+                icon: _uploading
+                    ? SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: palette.bg,
+                        ),
+                      )
+                    : Icon(TreinoIcon.upload, size: 16, color: palette.bg),
+                label: Text(l10n.coachHubAlumnoDetailArchivosUploadButton),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: palette.accent,
+                  foregroundColor: palette.bg,
+                  disabledBackgroundColor:
+                      palette.accent.withValues(alpha: 0.3),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 18, vertical: 12),
+                  shape: const StadiumBorder(),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Expanded(
+            // Sticky-data pattern: si ya emitimos data alguna vez, la
+            // seguimos mostrando aunque el stream emita error después
+            // (ej. reconnect transient de Firestore). Solo mostramos el
+            // error state duro cuando NO hay data previa.
+            child: Builder(
+              builder: (_) {
+                if (filesAsync.hasValue) {
+                  final files = filesAsync.requireValue;
+                  if (files.isEmpty) {
+                    return Center(
+                      child: Text(
+                        l10n.coachHubAlumnoDetailArchivosEmpty,
+                        textAlign: TextAlign.center,
+                        style:
+                            TextStyle(color: palette.textMuted, fontSize: 14),
+                      ),
+                    );
+                  }
+                  return ListView.separated(
+                    itemCount: files.length,
+                    separatorBuilder: (_, __) => Divider(
+                      height: 1,
+                      color: palette.border,
+                    ),
+                    itemBuilder: (_, i) => _ArchivoRow(
+                      file: files[i],
+                      palette: palette,
+                      onDelete: () => _confirmAndDelete(files[i]),
+                    ),
+                  );
+                }
+                if (filesAsync.hasError) {
+                  return Center(
+                    child: Text(
+                      l10n.coachHubAlumnoDetailArchivosLoadError,
+                      style: TextStyle(color: palette.textMuted, fontSize: 14),
+                    ),
+                  );
+                }
+                return Center(
+                  child: CircularProgressIndicator(color: palette.accent),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Deriva contentType desde el nombre/extension del picker. Files desde
+  /// web NO siempre traen mimeType poblado (a diferencia de image_picker),
+  /// así que armamos el contentType nosotros basado en la extensión.
+  static String _guessContentType(String fileName, String? extension) {
+    final ext = (extension ?? _extFromName(fileName)).toLowerCase();
+    switch (ext) {
+      case 'pdf':
+        return 'application/pdf';
+      case 'jpg':
+      case 'jpeg':
+        return 'image/jpeg';
+      case 'png':
+        return 'image/png';
+      case 'webp':
+        return 'image/webp';
+      case 'gif':
+        return 'image/gif';
+      default:
+        return 'application/octet-stream';
+    }
+  }
+
+  static String _extFromName(String fileName) {
+    final dot = fileName.lastIndexOf('.');
+    if (dot < 0 || dot >= fileName.length - 1) return '';
+    return fileName.substring(dot + 1);
+  }
+}
+
+/// Row de un archivo dentro del tab Archivos.
+class _ArchivoRow extends StatelessWidget {
+  const _ArchivoRow({
+    required this.file,
+    required this.palette,
+    required this.onDelete,
+  });
+
+  final AthleteFile file;
+  final AppPalette palette;
+  final VoidCallback onDelete;
+
+  Future<void> _open() async {
+    final uri = Uri.tryParse(file.downloadUrl);
+    if (uri == null) return;
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppL10n.of(context);
+    final icon = switch (file.kind) {
+      AthleteFileKind.pdf => TreinoIcon.filePdf,
+      AthleteFileKind.image => TreinoIcon.image,
+      AthleteFileKind.other => TreinoIcon.file,
+    };
+    final subtitle =
+        '${_formatSize(file.sizeBytes)} · ${fmtDate(file.uploadedAt)}';
+    return InkWell(
+      onTap: _open,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+        child: Row(
+          children: [
+            Icon(icon, size: 24, color: palette.textMuted),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    file.fileName,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: palette.textPrimary,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: TextStyle(color: palette.textMuted, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+            IconButton(
+              tooltip: l10n.coachHubAlumnoDetailArchivosOpenTooltip,
+              onPressed: _open,
+              icon: Icon(TreinoIcon.download,
+                  size: 18, color: palette.textMuted),
+            ),
+            IconButton(
+              tooltip: l10n.coachHubAlumnoDetailArchivosDeleteTooltip,
+              onPressed: onDelete,
+              icon: Icon(TreinoIcon.trash, size: 18, color: palette.danger),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// KB si < 1 MB, MB con 1 decimal si mayor. Redondeo defensivo.
+  static String _formatSize(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    final kb = bytes / 1024;
+    if (kb < 1024) return '${kb.round()} KB';
+    final mb = kb / 1024;
+    return '${mb.toStringAsFixed(1)} MB';
   }
 }

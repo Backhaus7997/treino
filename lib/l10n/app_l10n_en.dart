@@ -1857,6 +1857,53 @@ class AppL10nEn extends AppL10n {
       'We couldn\'t load the note.';
 
   @override
+  String get coachHubAlumnoDetailArchivosTitle => 'Private files';
+
+  @override
+  String get coachHubAlumnoDetailArchivosSubtitle =>
+      'PDFs and photos you upload about this athlete. Only you can see them.';
+
+  @override
+  String get coachHubAlumnoDetailArchivosUploadButton => 'UPLOAD FILE';
+
+  @override
+  String get coachHubAlumnoDetailArchivosEmpty =>
+      'You haven\'t uploaded any files about this athlete yet.';
+
+  @override
+  String get coachHubAlumnoDetailArchivosLoadError =>
+      'We couldn\'t load the files.';
+
+  @override
+  String get coachHubAlumnoDetailArchivosUploadSuccess => 'File uploaded.';
+
+  @override
+  String get coachHubAlumnoDetailArchivosUploadError =>
+      'We couldn\'t upload the file. Please try again.';
+
+  @override
+  String get coachHubAlumnoDetailArchivosUploadTooLarge =>
+      'The file exceeds the 10 MB limit.';
+
+  @override
+  String get coachHubAlumnoDetailArchivosOpenTooltip => 'Open file';
+
+  @override
+  String get coachHubAlumnoDetailArchivosDeleteTooltip => 'Delete';
+
+  @override
+  String get coachHubAlumnoDetailArchivosDeleteTitle => 'Delete file?';
+
+  @override
+  String coachHubAlumnoDetailArchivosDeleteBody(String fileName) {
+    return '«$fileName» will be removed from Storage and from the history. This can\'t be undone.';
+  }
+
+  @override
+  String get coachHubAlumnoDetailArchivosDeleteError =>
+      'We couldn\'t delete the file.';
+
+  @override
   String get feedLoadError => 'We couldn\'t load your feed. Please try again.';
 
   @override

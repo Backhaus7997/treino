@@ -1283,6 +1283,64 @@
   "@coachHubAlumnoDetailNotasLoadError": {
     "description": "Coach Hub web alumno detail — error state when the note stream errors."
   },
+  "coachHubAlumnoDetailArchivosTitle": "Archivos privados",
+  "@coachHubAlumnoDetailArchivosTitle": {
+    "description": "Coach Hub web alumno detail — title of the Archivos tab body."
+  },
+  "coachHubAlumnoDetailArchivosSubtitle": "PDFs y fotos que subís sobre este alumno. Solo vos los ves.",
+  "@coachHubAlumnoDetailArchivosSubtitle": {
+    "description": "Coach Hub web alumno detail — subtitle explaining privacy: only the trainer sees these files, the athlete never does."
+  },
+  "coachHubAlumnoDetailArchivosUploadButton": "SUBIR ARCHIVO",
+  "@coachHubAlumnoDetailArchivosUploadButton": {
+    "description": "Coach Hub web alumno detail — primary CTA to open the file picker."
+  },
+  "coachHubAlumnoDetailArchivosEmpty": "Todavía no subiste archivos sobre este alumno.",
+  "@coachHubAlumnoDetailArchivosEmpty": {
+    "description": "Coach Hub web alumno detail — empty state when no files have been uploaded."
+  },
+  "coachHubAlumnoDetailArchivosLoadError": "No pudimos cargar los archivos.",
+  "@coachHubAlumnoDetailArchivosLoadError": {
+    "description": "Coach Hub web alumno detail — error state when the athlete files stream fails."
+  },
+  "coachHubAlumnoDetailArchivosUploadSuccess": "Archivo subido.",
+  "@coachHubAlumnoDetailArchivosUploadSuccess": {
+    "description": "Coach Hub web alumno detail — snackbar shown after a successful upload."
+  },
+  "coachHubAlumnoDetailArchivosUploadError": "No pudimos subir el archivo. Probá de nuevo.",
+  "@coachHubAlumnoDetailArchivosUploadError": {
+    "description": "Coach Hub web alumno detail — snackbar shown when the upload fails (permission-denied, network, etc.)."
+  },
+  "coachHubAlumnoDetailArchivosUploadTooLarge": "El archivo supera el máximo de 10 MB.",
+  "@coachHubAlumnoDetailArchivosUploadTooLarge": {
+    "description": "Coach Hub web alumno detail — snackbar shown when the picked file exceeds the size cap."
+  },
+  "coachHubAlumnoDetailArchivosOpenTooltip": "Abrir archivo",
+  "@coachHubAlumnoDetailArchivosOpenTooltip": {
+    "description": "Coach Hub web alumno detail — tooltip for the download/open button on each file row."
+  },
+  "coachHubAlumnoDetailArchivosDeleteTooltip": "Eliminar",
+  "@coachHubAlumnoDetailArchivosDeleteTooltip": {
+    "description": "Coach Hub web alumno detail — tooltip for the delete button on each file row."
+  },
+  "coachHubAlumnoDetailArchivosDeleteTitle": "¿Eliminar archivo?",
+  "@coachHubAlumnoDetailArchivosDeleteTitle": {
+    "description": "Coach Hub web alumno detail — confirmation dialog title before deleting a file."
+  },
+  "coachHubAlumnoDetailArchivosDeleteBody": "«{fileName}» se va a borrar tanto del Storage como del historial. No se puede deshacer.",
+  "@coachHubAlumnoDetailArchivosDeleteBody": {
+    "description": "Coach Hub web alumno detail — confirmation body for delete with the file name.",
+    "placeholders": {
+      "fileName": {
+        "type": "String",
+        "example": "análisis-sangre.pdf"
+      }
+    }
+  },
+  "coachHubAlumnoDetailArchivosDeleteError": "No pudimos eliminar el archivo.",
+  "@coachHubAlumnoDetailArchivosDeleteError": {
+    "description": "Coach Hub web alumno detail — snackbar when the delete flow fails."
+  },
   "feedLoadError": "No pudimos cargar tu feed. Probá de nuevo.",
   "@feedLoadError": {
     "description": "Feed error branch text, replacing the hardcoded literal repeated 3x in feed_screen.dart (finding 9). Pair with coachRetryLabel for the retry CTA."

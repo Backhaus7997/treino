@@ -161,4 +161,8 @@ class TreinoIcon {
   static const IconData sidebarReportes = PhosphorIconsRegular.chartLine;
   static const IconData sidebarChat = chat;
   static const IconData sidebarAjustes = PhosphorIconsRegular.gear;
+
+  // Alumno detail — Archivos tab (upload/download/trash/image ya existen arriba)
+  static const IconData file = PhosphorIconsRegular.file;
+  static const IconData filePdf = PhosphorIconsRegular.filePdf;
 }
