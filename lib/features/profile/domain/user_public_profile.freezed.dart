@@ -48,7 +48,35 @@ mixin _$UserPublicProfile {
 // false so existing docs without the field decode safely and no template
 // becomes public retroactively. Off = athletes only see plans the
 // trainer assigned to them one-by-one.
-  bool get sharedTemplatesWithAthletes => throw _privateConstructorUsedError;
+  bool get sharedTemplatesWithAthletes =>
+      throw _privateConstructorUsedError; // Opt-in flag an athlete controls to expose their ranking metrics
+// (lifetimeVolumeKg, best<Lift>Kg, and the already-public `racha`) on
+// per-gym leaderboards. Defaults to false so existing docs decode safely
+// and no athlete becomes rankable retroactively. Enabling backfills the
+// 4 metric fields below from the athlete's own history; disabling clears
+// them. See design `sdd/rankings/design` — Opt-In Toggle Lifecycle.
+  bool get rankingOptIn => throw _privateConstructorUsedError;
+
+  /// Denormalized lifetime training volume in kg, recomputed (not
+  /// incremented) over the same bounded window `finish()` already reads,
+  /// for idempotency on best-effort retry. Only written when
+  /// `rankingOptIn` is true. Defaults to 0 for backward-compat.
+  num get lifetimeVolumeKg => throw _privateConstructorUsedError;
+
+  /// Best squat 1RM-proxy weight (kg) across the barbell squat family,
+  /// max-merged (never overwritten downward) over the recompute window.
+  /// Null when not opted in or no matching lift logged yet.
+  num? get bestSquatKg => throw _privateConstructorUsedError;
+
+  /// Best bench press weight (kg) across the barbell bench family,
+  /// max-merged over the recompute window. Null when not opted in or no
+  /// matching lift logged yet.
+  num? get bestBenchKg => throw _privateConstructorUsedError;
+
+  /// Best deadlift weight (kg) across the barbell deadlift family
+  /// (conventional + sumo, max of the two), max-merged over the recompute
+  /// window. Null when not opted in or no matching lift logged yet.
+  num? get bestDeadliftKg => throw _privateConstructorUsedError;
 
   /// Serializes this UserPublicProfile to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -77,7 +105,12 @@ abstract class $UserPublicProfileCopyWith<$Res> {
       int? racha,
       @JsonKey(fromJson: _nonNegativeCount) int? followersCount,
       @JsonKey(fromJson: _nonNegativeCount) int? followingCount,
-      bool sharedTemplatesWithAthletes});
+      bool sharedTemplatesWithAthletes,
+      bool rankingOptIn,
+      num lifetimeVolumeKg,
+      num? bestSquatKg,
+      num? bestBenchKg,
+      num? bestDeadliftKg});
 }
 
 /// @nodoc
@@ -106,6 +139,11 @@ class _$UserPublicProfileCopyWithImpl<$Res, $Val extends UserPublicProfile>
     Object? followersCount = freezed,
     Object? followingCount = freezed,
     Object? sharedTemplatesWithAthletes = null,
+    Object? rankingOptIn = null,
+    Object? lifetimeVolumeKg = null,
+    Object? bestSquatKg = freezed,
+    Object? bestBenchKg = freezed,
+    Object? bestDeadliftKg = freezed,
   }) {
     return _then(_value.copyWith(
       uid: null == uid
@@ -152,6 +190,26 @@ class _$UserPublicProfileCopyWithImpl<$Res, $Val extends UserPublicProfile>
           ? _value.sharedTemplatesWithAthletes
           : sharedTemplatesWithAthletes // ignore: cast_nullable_to_non_nullable
               as bool,
+      rankingOptIn: null == rankingOptIn
+          ? _value.rankingOptIn
+          : rankingOptIn // ignore: cast_nullable_to_non_nullable
+              as bool,
+      lifetimeVolumeKg: null == lifetimeVolumeKg
+          ? _value.lifetimeVolumeKg
+          : lifetimeVolumeKg // ignore: cast_nullable_to_non_nullable
+              as num,
+      bestSquatKg: freezed == bestSquatKg
+          ? _value.bestSquatKg
+          : bestSquatKg // ignore: cast_nullable_to_non_nullable
+              as num?,
+      bestBenchKg: freezed == bestBenchKg
+          ? _value.bestBenchKg
+          : bestBenchKg // ignore: cast_nullable_to_non_nullable
+              as num?,
+      bestDeadliftKg: freezed == bestDeadliftKg
+          ? _value.bestDeadliftKg
+          : bestDeadliftKg // ignore: cast_nullable_to_non_nullable
+              as num?,
     ) as $Val);
   }
 }
@@ -175,7 +233,12 @@ abstract class _$$UserPublicProfileImplCopyWith<$Res>
       int? racha,
       @JsonKey(fromJson: _nonNegativeCount) int? followersCount,
       @JsonKey(fromJson: _nonNegativeCount) int? followingCount,
-      bool sharedTemplatesWithAthletes});
+      bool sharedTemplatesWithAthletes,
+      bool rankingOptIn,
+      num lifetimeVolumeKg,
+      num? bestSquatKg,
+      num? bestBenchKg,
+      num? bestDeadliftKg});
 }
 
 /// @nodoc
@@ -202,6 +265,11 @@ class __$$UserPublicProfileImplCopyWithImpl<$Res>
     Object? followersCount = freezed,
     Object? followingCount = freezed,
     Object? sharedTemplatesWithAthletes = null,
+    Object? rankingOptIn = null,
+    Object? lifetimeVolumeKg = null,
+    Object? bestSquatKg = freezed,
+    Object? bestBenchKg = freezed,
+    Object? bestDeadliftKg = freezed,
   }) {
     return _then(_$UserPublicProfileImpl(
       uid: null == uid
@@ -248,6 +316,26 @@ class __$$UserPublicProfileImplCopyWithImpl<$Res>
           ? _value.sharedTemplatesWithAthletes
           : sharedTemplatesWithAthletes // ignore: cast_nullable_to_non_nullable
               as bool,
+      rankingOptIn: null == rankingOptIn
+          ? _value.rankingOptIn
+          : rankingOptIn // ignore: cast_nullable_to_non_nullable
+              as bool,
+      lifetimeVolumeKg: null == lifetimeVolumeKg
+          ? _value.lifetimeVolumeKg
+          : lifetimeVolumeKg // ignore: cast_nullable_to_non_nullable
+              as num,
+      bestSquatKg: freezed == bestSquatKg
+          ? _value.bestSquatKg
+          : bestSquatKg // ignore: cast_nullable_to_non_nullable
+              as num?,
+      bestBenchKg: freezed == bestBenchKg
+          ? _value.bestBenchKg
+          : bestBenchKg // ignore: cast_nullable_to_non_nullable
+              as num?,
+      bestDeadliftKg: freezed == bestDeadliftKg
+          ? _value.bestDeadliftKg
+          : bestDeadliftKg // ignore: cast_nullable_to_non_nullable
+              as num?,
     ));
   }
 }
@@ -266,7 +354,12 @@ class _$UserPublicProfileImpl implements _UserPublicProfile {
       this.racha,
       @JsonKey(fromJson: _nonNegativeCount) this.followersCount,
       @JsonKey(fromJson: _nonNegativeCount) this.followingCount,
-      this.sharedTemplatesWithAthletes = false});
+      this.sharedTemplatesWithAthletes = false,
+      this.rankingOptIn = false,
+      this.lifetimeVolumeKg = 0,
+      this.bestSquatKg,
+      this.bestBenchKg,
+      this.bestDeadliftKg});
 
   factory _$UserPublicProfileImpl.fromJson(Map<String, dynamic> json) =>
       _$$UserPublicProfileImplFromJson(json);
@@ -312,10 +405,45 @@ class _$UserPublicProfileImpl implements _UserPublicProfile {
   @override
   @JsonKey()
   final bool sharedTemplatesWithAthletes;
+// Opt-in flag an athlete controls to expose their ranking metrics
+// (lifetimeVolumeKg, best<Lift>Kg, and the already-public `racha`) on
+// per-gym leaderboards. Defaults to false so existing docs decode safely
+// and no athlete becomes rankable retroactively. Enabling backfills the
+// 4 metric fields below from the athlete's own history; disabling clears
+// them. See design `sdd/rankings/design` — Opt-In Toggle Lifecycle.
+  @override
+  @JsonKey()
+  final bool rankingOptIn;
+
+  /// Denormalized lifetime training volume in kg, recomputed (not
+  /// incremented) over the same bounded window `finish()` already reads,
+  /// for idempotency on best-effort retry. Only written when
+  /// `rankingOptIn` is true. Defaults to 0 for backward-compat.
+  @override
+  @JsonKey()
+  final num lifetimeVolumeKg;
+
+  /// Best squat 1RM-proxy weight (kg) across the barbell squat family,
+  /// max-merged (never overwritten downward) over the recompute window.
+  /// Null when not opted in or no matching lift logged yet.
+  @override
+  final num? bestSquatKg;
+
+  /// Best bench press weight (kg) across the barbell bench family,
+  /// max-merged over the recompute window. Null when not opted in or no
+  /// matching lift logged yet.
+  @override
+  final num? bestBenchKg;
+
+  /// Best deadlift weight (kg) across the barbell deadlift family
+  /// (conventional + sumo, max of the two), max-merged over the recompute
+  /// window. Null when not opted in or no matching lift logged yet.
+  @override
+  final num? bestDeadliftKg;
 
   @override
   String toString() {
-    return 'UserPublicProfile(uid: $uid, displayName: $displayName, displayNameLowercase: $displayNameLowercase, avatarUrl: $avatarUrl, gymId: $gymId, gymName: $gymName, workoutsCount: $workoutsCount, racha: $racha, followersCount: $followersCount, followingCount: $followingCount, sharedTemplatesWithAthletes: $sharedTemplatesWithAthletes)';
+    return 'UserPublicProfile(uid: $uid, displayName: $displayName, displayNameLowercase: $displayNameLowercase, avatarUrl: $avatarUrl, gymId: $gymId, gymName: $gymName, workoutsCount: $workoutsCount, racha: $racha, followersCount: $followersCount, followingCount: $followingCount, sharedTemplatesWithAthletes: $sharedTemplatesWithAthletes, rankingOptIn: $rankingOptIn, lifetimeVolumeKg: $lifetimeVolumeKg, bestSquatKg: $bestSquatKg, bestBenchKg: $bestBenchKg, bestDeadliftKg: $bestDeadliftKg)';
   }
 
   @override
@@ -342,7 +470,17 @@ class _$UserPublicProfileImpl implements _UserPublicProfile {
             (identical(other.sharedTemplatesWithAthletes,
                     sharedTemplatesWithAthletes) ||
                 other.sharedTemplatesWithAthletes ==
-                    sharedTemplatesWithAthletes));
+                    sharedTemplatesWithAthletes) &&
+            (identical(other.rankingOptIn, rankingOptIn) ||
+                other.rankingOptIn == rankingOptIn) &&
+            (identical(other.lifetimeVolumeKg, lifetimeVolumeKg) ||
+                other.lifetimeVolumeKg == lifetimeVolumeKg) &&
+            (identical(other.bestSquatKg, bestSquatKg) ||
+                other.bestSquatKg == bestSquatKg) &&
+            (identical(other.bestBenchKg, bestBenchKg) ||
+                other.bestBenchKg == bestBenchKg) &&
+            (identical(other.bestDeadliftKg, bestDeadliftKg) ||
+                other.bestDeadliftKg == bestDeadliftKg));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -359,7 +497,12 @@ class _$UserPublicProfileImpl implements _UserPublicProfile {
       racha,
       followersCount,
       followingCount,
-      sharedTemplatesWithAthletes);
+      sharedTemplatesWithAthletes,
+      rankingOptIn,
+      lifetimeVolumeKg,
+      bestSquatKg,
+      bestBenchKg,
+      bestDeadliftKg);
 
   /// Create a copy of UserPublicProfile
   /// with the given fields replaced by the non-null parameter values.
@@ -390,7 +533,12 @@ abstract class _UserPublicProfile implements UserPublicProfile {
       final int? racha,
       @JsonKey(fromJson: _nonNegativeCount) final int? followersCount,
       @JsonKey(fromJson: _nonNegativeCount) final int? followingCount,
-      final bool sharedTemplatesWithAthletes}) = _$UserPublicProfileImpl;
+      final bool sharedTemplatesWithAthletes,
+      final bool rankingOptIn,
+      final num lifetimeVolumeKg,
+      final num? bestSquatKg,
+      final num? bestBenchKg,
+      final num? bestDeadliftKg}) = _$UserPublicProfileImpl;
 
   factory _UserPublicProfile.fromJson(Map<String, dynamic> json) =
       _$UserPublicProfileImpl.fromJson;
@@ -432,7 +580,40 @@ abstract class _UserPublicProfile implements UserPublicProfile {
 // becomes public retroactively. Off = athletes only see plans the
 // trainer assigned to them one-by-one.
   @override
-  bool get sharedTemplatesWithAthletes;
+  bool
+      get sharedTemplatesWithAthletes; // Opt-in flag an athlete controls to expose their ranking metrics
+// (lifetimeVolumeKg, best<Lift>Kg, and the already-public `racha`) on
+// per-gym leaderboards. Defaults to false so existing docs decode safely
+// and no athlete becomes rankable retroactively. Enabling backfills the
+// 4 metric fields below from the athlete's own history; disabling clears
+// them. See design `sdd/rankings/design` — Opt-In Toggle Lifecycle.
+  @override
+  bool get rankingOptIn;
+
+  /// Denormalized lifetime training volume in kg, recomputed (not
+  /// incremented) over the same bounded window `finish()` already reads,
+  /// for idempotency on best-effort retry. Only written when
+  /// `rankingOptIn` is true. Defaults to 0 for backward-compat.
+  @override
+  num get lifetimeVolumeKg;
+
+  /// Best squat 1RM-proxy weight (kg) across the barbell squat family,
+  /// max-merged (never overwritten downward) over the recompute window.
+  /// Null when not opted in or no matching lift logged yet.
+  @override
+  num? get bestSquatKg;
+
+  /// Best bench press weight (kg) across the barbell bench family,
+  /// max-merged over the recompute window. Null when not opted in or no
+  /// matching lift logged yet.
+  @override
+  num? get bestBenchKg;
+
+  /// Best deadlift weight (kg) across the barbell deadlift family
+  /// (conventional + sumo, max of the two), max-merged over the recompute
+  /// window. Null when not opted in or no matching lift logged yet.
+  @override
+  num? get bestDeadliftKg;
 
   /// Create a copy of UserPublicProfile
   /// with the given fields replaced by the non-null parameter values.

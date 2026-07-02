@@ -158,6 +158,98 @@ void main() {
       });
     });
 
+    // ── rankings Phase 1 — ranking opt-in + metric fields ──────────────────
+    group('SCENARIO-RANK-1 — ranking fields', () {
+      test(
+          'SCENARIO-RANK-1a: fromJson without ranking fields → rankingOptIn '
+          'defaults false, lifetimeVolumeKg defaults 0, best<Lift>Kg are null '
+          '(backward-compat for existing docs, spec: "Opted-out athlete has '
+          'no ranking metrics")', () {
+        final json = {
+          'uid': 'u1',
+          'displayName': 'Ana',
+          'displayNameLowercase': 'ana',
+          'avatarUrl': null,
+          'gymId': null,
+        };
+        final profile = UserPublicProfile.fromJson(json);
+        expect(profile.rankingOptIn, isFalse);
+        expect(profile.lifetimeVolumeKg, equals(0));
+        expect(profile.bestSquatKg, isNull);
+        expect(profile.bestBenchKg, isNull);
+        expect(profile.bestDeadliftKg, isNull);
+      });
+
+      test(
+          'SCENARIO-RANK-1b: fromJson with all ranking fields → values '
+          'preserved', () {
+        final json = {
+          'uid': 'u1',
+          'displayName': 'Ana',
+          'gymId': 'gym-001',
+          'rankingOptIn': true,
+          'lifetimeVolumeKg': 12345.5,
+          'bestSquatKg': 120.0,
+          'bestBenchKg': 90.0,
+          'bestDeadliftKg': 160.0,
+        };
+        final profile = UserPublicProfile.fromJson(json);
+        expect(profile.rankingOptIn, isTrue);
+        expect(profile.lifetimeVolumeKg, equals(12345.5));
+        expect(profile.bestSquatKg, equals(120.0));
+        expect(profile.bestBenchKg, equals(90.0));
+        expect(profile.bestDeadliftKg, equals(160.0));
+      });
+
+      test(
+          'SCENARIO-RANK-1c: existing non-ranking fields preserved when '
+          'ranking fields present', () {
+        final json = {
+          'uid': 'u2',
+          'displayName': 'Martín',
+          'gymId': 'gym-001',
+          'rankingOptIn': true,
+          'lifetimeVolumeKg': 500,
+        };
+        final profile = UserPublicProfile.fromJson(json);
+        expect(profile.uid, equals('u2'));
+        expect(profile.displayName, equals('Martín'));
+        expect(profile.gymId, equals('gym-001'));
+      });
+
+      test('SCENARIO-RANK-1d: JSON round-trip preserves ranking fields', () {
+        const profile = UserPublicProfile(
+          uid: 'u3',
+          displayName: 'Test',
+          rankingOptIn: true,
+          lifetimeVolumeKg: 999.5,
+          bestSquatKg: 100.0,
+          bestBenchKg: 80.0,
+          bestDeadliftKg: 140.0,
+        );
+        final json = profile.toJson();
+        final restored = UserPublicProfile.fromJson(json);
+        expect(restored.rankingOptIn, isTrue);
+        expect(restored.lifetimeVolumeKg, equals(999.5));
+        expect(restored.bestSquatKg, equals(100.0));
+        expect(restored.bestBenchKg, equals(80.0));
+        expect(restored.bestDeadliftKg, equals(140.0));
+        expect(restored, equals(profile));
+      });
+
+      test(
+          'SCENARIO-RANK-1e: default constructor (no args for ranking '
+          'fields) → rankingOptIn false, lifetimeVolumeKg 0, best<Lift>Kg '
+          'null', () {
+        const profile = UserPublicProfile(uid: 'u4');
+        expect(profile.rankingOptIn, isFalse);
+        expect(profile.lifetimeVolumeKg, equals(0));
+        expect(profile.bestSquatKg, isNull);
+        expect(profile.bestBenchKg, isNull);
+        expect(profile.bestDeadliftKg, isNull);
+      });
+    });
+
     // SCENARIO-253: displayNameLowercase auto-derivation is enforced at the
     // write-path layer (UserRepository private helpers), NOT by the model
     // constructor. The model accepts whatever is passed — it is a plain value
