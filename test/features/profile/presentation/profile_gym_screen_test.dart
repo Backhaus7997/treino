@@ -1,3 +1,9 @@
+// Rewritten for gym-google-places Slice 3 (Phase 3): ProfileGymScreen now
+// wraps the shared GymSearchBox (single debounced Google Places search) —
+// SCENARIO-516/517 originally covered the retired two-step brand→branch
+// picker (see git history for the prior version). This version drives the
+// screen end-to-end via placesSuggestionsProvider/selectGymActionProvider
+// mocks, mirroring gym_search_box_test.dart's widget-test conventions.
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -6,9 +12,11 @@ import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
-import 'package:treino/features/gyms/application/gym_providers.dart';
-import 'package:treino/features/gyms/domain/gym.dart';
-import 'package:treino/features/gyms/domain/gym_source.dart';
+import 'package:treino/features/gyms/application/places_providers.dart';
+import 'package:treino/features/gyms/data/places_autocomplete_service.dart';
+import 'package:treino/features/gyms/data/resolve_gym_place_service.dart';
+import 'package:treino/features/gyms/domain/gym.dart' show kNoGymId;
+import 'package:treino/features/gyms/domain/gym_suggestion.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/data/user_repository.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
@@ -27,14 +35,19 @@ class MockUser extends Mock implements User {
 
 class MockUserRepository extends Mock implements UserRepository {}
 
+class MockPlacesAutocompleteService extends Mock
+    implements PlacesAutocompleteService {}
+
+class MockResolveGymPlaceService extends Mock
+    implements ResolveGymPlaceService {}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
 const _uid = 'test-uid';
-const _currentGymId = 'sportclub-belgrano';
 
-UserProfile _profile({String? gymId = _currentGymId}) => UserProfile(
+UserProfile _profile({String? gymId}) => UserProfile(
       uid: _uid,
       email: 'test@test.com',
       displayName: 'Test User',
@@ -44,55 +57,11 @@ UserProfile _profile({String? gymId = _currentGymId}) => UserProfile(
       gymId: gymId,
     );
 
-Gym _gym({
-  required String id,
-  required String name,
-  String? brandId,
-  String? brandName,
-  String? branchName,
-  String? city,
-}) =>
-    Gym(
-      id: id,
-      name: name,
-      lat: 0,
-      lng: 0,
-      geohash: 'x',
-      source: GymSource.seed,
-      createdAt: DateTime.utc(2026, 1, 1),
-      brandId: brandId,
-      brandName: brandName,
-      branchName: branchName,
-      city: city,
-    );
-
-final _sportclubBelgrano = _gym(
-  id: 'sportclub-belgrano',
-  name: 'SportClub - Belgrano',
-  brandId: 'sportclub',
-  brandName: 'SportClub',
-  branchName: 'Belgrano',
-  city: 'CABA',
-);
-final _sportclubPilar = _gym(
-  id: 'sportclub-pilar',
-  name: 'SportClub - Pilar',
-  brandId: 'sportclub',
-  brandName: 'SportClub',
-  branchName: 'Pilar',
-  city: 'GBA',
-);
-final _megatlonRecoleta = _gym(
-  id: 'megatlon-recoleta',
-  name: 'Megatlon Recoleta',
-  brandId: 'megatlon-recoleta',
-  brandName: 'Megatlon',
-);
-
 Widget _buildScreen({
   required UserProfile profile,
-  required MockUserRepository repo,
-  Future<List<Gym>> Function(Ref)? gyms,
+  required MockUserRepository userRepo,
+  required MockPlacesAutocompleteService placesService,
+  MockResolveGymPlaceService? resolveService,
 }) {
   final mockUser = MockUser();
 
@@ -116,15 +85,12 @@ Widget _buildScreen({
     overrides: [
       authStateChangesProvider.overrideWith((_) => Stream.value(mockUser)),
       userProfileProvider.overrideWith((_) => Stream.value(profile)),
-      userRepositoryProvider.overrideWithValue(repo),
-      gymsProvider.overrideWith(
-        gyms ??
-            (ref) async => [
-                  _sportclubBelgrano,
-                  _sportclubPilar,
-                  _megatlonRecoleta,
-                ],
-      ),
+      userRepositoryProvider.overrideWithValue(userRepo),
+      placesAutocompleteServiceProvider.overrideWithValue(placesService),
+      gymSearchSessionTokenProvider.overrideWith((ref) => 'tok-fixed'),
+      gymSearchLocationBiasProvider.overrideWith((ref) async => null),
+      if (resolveService != null)
+        resolveGymPlaceServiceProvider.overrideWithValue(resolveService),
     ],
     child: MaterialApp.router(
       theme: AppTheme.dark(),
@@ -136,160 +102,195 @@ Widget _buildScreen({
   );
 }
 
-// ---------------------------------------------------------------------------
-// Tests — SCENARIO-516, SCENARIO-517 (two-step migration)
-// ---------------------------------------------------------------------------
-
 void main() {
-  late MockUserRepository mockRepo;
+  late MockUserRepository mockUserRepo;
+  late MockPlacesAutocompleteService mockPlacesService;
+  late MockResolveGymPlaceService mockResolveService;
+
+  setUpAll(() {
+    registerFallbackValue(<String, Object?>{});
+  });
 
   setUp(() {
-    mockRepo = MockUserRepository();
-    when(() => mockRepo.update(any(), any())).thenAnswer((_) async {});
+    mockUserRepo = MockUserRepository();
+    mockPlacesService = MockPlacesAutocompleteService();
+    mockResolveService = MockResolveGymPlaceService();
+    when(() => mockUserRepo.update(any(), any())).thenAnswer((_) async {});
   });
 
   group('ProfileGymScreen', () {
-    // SCENARIO-516: brand list renders (step 1)
-    testWidgets('SCENARIO-516: renders brand catalog list', (tester) async {
-      await tester.pumpWidget(
-        _buildScreen(profile: _profile(), repo: mockRepo),
-      );
+    testWidgets('typing shows debounced Autocomplete suggestions',
+        (tester) async {
+      when(() => mockPlacesService.search(
+            query: any(named: 'query'),
+            sessionToken: any(named: 'sessionToken'),
+            biasLatitude: any(named: 'biasLatitude'),
+            biasLongitude: any(named: 'biasLongitude'),
+          )).thenAnswer((_) async => const [
+            GymSuggestion(
+              placeId: 'ChIJ_1',
+              primaryText: 'SportClub Belgrano',
+              secondaryText: 'Cabildo 1789',
+            ),
+          ]);
+
+      await tester.pumpWidget(_buildScreen(
+        profile: _profile(),
+        userRepo: mockUserRepo,
+        placesService: mockPlacesService,
+      ));
       await tester.pumpAndSettle();
 
-      expect(find.text('SportClub'), findsOneWidget);
-      expect(find.text('Megatlon'), findsOneWidget);
+      await tester.enterText(find.byType(TextField), 'sport');
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pumpAndSettle();
+
+      expect(find.text('SportClub Belgrano'), findsOneWidget);
     });
 
-    // SCENARIO-517: pick chain brand → branch → confirm → UserRepository.update
     testWidgets(
-        'SCENARIO-517: selecting a branch and confirming calls UserRepository.update',
-        (tester) async {
-      await tester.pumpWidget(
-        _buildScreen(profile: _profile(gymId: null), repo: mockRepo),
-      );
+        'selecting a suggestion and confirming resolves + saves via '
+        'selectGymActionProvider', (tester) async {
+      when(() => mockPlacesService.search(
+            query: any(named: 'query'),
+            sessionToken: any(named: 'sessionToken'),
+            biasLatitude: any(named: 'biasLatitude'),
+            biasLongitude: any(named: 'biasLongitude'),
+          )).thenAnswer((_) async => const [
+            GymSuggestion(
+              placeId: 'ChIJ_1',
+              primaryText: 'SportClub Belgrano',
+              secondaryText: 'Cabildo 1789',
+            ),
+          ]);
+      when(() => mockResolveService.call(
+            placeId: any(named: 'placeId'),
+            sessionToken: any(named: 'sessionToken'),
+          )).thenAnswer((_) async => const ResolveGymPlaceResult(
+            gymId: 'ChIJ_1',
+            name: 'SportClub Belgrano',
+            address: 'Cabildo 1789',
+            source: 'google-places',
+          ));
+
+      await tester.pumpWidget(_buildScreen(
+        profile: _profile(gymId: null),
+        userRepo: mockUserRepo,
+        placesService: mockPlacesService,
+        resolveService: mockResolveService,
+      ));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('SportClub'));
+      await tester.enterText(find.byType(TextField), 'sport');
+      await tester.pump(const Duration(milliseconds: 300));
       await tester.pumpAndSettle();
 
-      expect(find.text('Belgrano'), findsOneWidget);
-      expect(find.text('Pilar'), findsOneWidget);
-
-      await tester.tap(find.text('Belgrano'));
-      await tester.pumpAndSettle();
+      await tester.tap(find.text('SportClub Belgrano'));
+      await tester.pump();
 
       await tester.tap(find.text('GUARDAR')); // i18n: Fase 6 Etapa 3
       await tester.pumpAndSettle();
 
-      verify(
-        () => mockRepo.update(_uid, {'gymId': 'sportclub-belgrano'}),
-      ).called(1);
+      verify(() => mockResolveService.call(
+            placeId: 'ChIJ_1',
+            sessionToken: 'tok-fixed',
+          )).called(1);
+      verify(() => mockUserRepo.update(_uid, {'gymId': 'ChIJ_1'})).called(1);
     });
 
-    testWidgets(
-        'selecting an independent (single-branch) brand skips step 2 directly',
-        (tester) async {
-      await tester.pumpWidget(
-        _buildScreen(profile: _profile(gymId: null), repo: mockRepo),
-      );
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.text('Megatlon'));
-      await tester.pumpAndSettle();
-
-      // No branch-level navigation — SportClub's branches never appear.
-      expect(find.text('Belgrano'), findsNothing);
-
-      await tester.tap(find.text('GUARDAR')); // i18n: Fase 6 Etapa 3
-      await tester.pumpAndSettle();
-
-      verify(
-        () => mockRepo.update(_uid, {'gymId': 'megatlon-recoleta'}),
-      ).called(1);
-    });
-
-    testWidgets('back from branch list returns to brand list', (tester) async {
-      await tester.pumpWidget(
-        _buildScreen(profile: _profile(gymId: null), repo: mockRepo),
-      );
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.text('SportClub'));
-      await tester.pumpAndSettle();
-      expect(find.text('Belgrano'), findsOneWidget);
-
-      await tester.tap(find.text('VOLVER A MARCAS'));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Belgrano'), findsNothing);
-      expect(find.text('SportClub'), findsOneWidget);
-      expect(find.text('Megatlon'), findsOneWidget);
-    });
-
-    testWidgets('error state shows retry that invalidates gymsProvider',
+    testWidgets('error state shows retry that re-issues the search',
         (tester) async {
       var attempt = 0;
-      await tester.pumpWidget(
-        _buildScreen(
-          profile: _profile(),
-          repo: mockRepo,
-          gyms: (ref) async {
-            attempt++;
-            if (attempt == 1) throw Exception('network down');
-            return [_megatlonRecoleta];
-          },
-        ),
-      );
+      when(() => mockPlacesService.search(
+            query: any(named: 'query'),
+            sessionToken: any(named: 'sessionToken'),
+            biasLatitude: any(named: 'biasLatitude'),
+            biasLongitude: any(named: 'biasLongitude'),
+          )).thenAnswer((_) async {
+        attempt++;
+        if (attempt == 1) {
+          throw const PlacesAutocompleteError('network down');
+        }
+        return const [
+          GymSuggestion(placeId: 'ChIJ_1', primaryText: 'SportClub Belgrano'),
+        ];
+      });
+
+      await tester.pumpWidget(_buildScreen(
+        profile: _profile(),
+        userRepo: mockUserRepo,
+        placesService: mockPlacesService,
+      ));
       await tester.pumpAndSettle();
 
-      expect(find.text('Megatlon'), findsNothing);
+      await tester.enterText(find.byType(TextField), 'sport');
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pumpAndSettle();
+
+      expect(find.text('SportClub Belgrano'), findsNothing);
       final retryFinder = find.text('Reintentar');
       expect(retryFinder, findsOneWidget);
 
       await tester.tap(retryFinder);
       await tester.pumpAndSettle();
 
-      expect(find.text('Megatlon'), findsOneWidget);
+      expect(find.text('SportClub Belgrano'), findsOneWidget);
     });
 
-    // "no gym" option preserved outside the two-step flow.
-    testWidgets('"no gym" option remains selectable outside the two-step flow',
+    testWidgets('"no gym" option remains selectable without a search',
         (tester) async {
-      await tester.pumpWidget(
-        _buildScreen(profile: _profile(gymId: null), repo: mockRepo),
-      );
+      await tester.pumpWidget(_buildScreen(
+        profile: _profile(gymId: null),
+        userRepo: mockUserRepo,
+        placesService: mockPlacesService,
+      ));
       await tester.pumpAndSettle();
 
       expect(find.text('OTRO GYM / SIN GYM'), findsOneWidget);
       await tester.tap(find.text('OTRO GYM / SIN GYM'));
-      await tester.pumpAndSettle();
+      await tester.pump();
 
       await tester.tap(find.text('GUARDAR')); // i18n: Fase 6 Etapa 3
       await tester.pumpAndSettle();
 
-      verify(() => mockRepo.update(_uid, {'gymId': kNoGymId})).called(1);
+      verify(() => mockUserRepo.update(_uid, {'gymId': kNoGymId})).called(1);
+      verifyNever(() => mockResolveService.call(
+            placeId: any(named: 'placeId'),
+            sessionToken: any(named: 'sessionToken'),
+          ));
     });
 
-    // Save disabled when selection == current gymId
     testWidgets(
-        'save button is disabled when pending selection equals current gymId',
-        (tester) async {
-      await tester.pumpWidget(
-        _buildScreen(
-            profile: _profile(gymId: 'sportclub-belgrano'), repo: mockRepo),
-      );
+        'save button is disabled when pending selection equals current '
+        'gymId', (tester) async {
+      await tester.pumpWidget(_buildScreen(
+        profile: _profile(gymId: null),
+        userRepo: mockUserRepo,
+        placesService: mockPlacesService,
+      ));
       await tester.pumpAndSettle();
 
-      // Drill into SportClub → Belgrano again (equals currentGymId).
-      await tester.tap(find.text('SportClub'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Belgrano'));
-      await tester.pumpAndSettle();
-
+      // No selection made — pending stays equal to the lazily-initialized
+      // current gymId (null): save disabled.
       final saveButton = tester.widget<ElevatedButton>(
         find.widgetWithText(ElevatedButton, 'GUARDAR'), // i18n: Fase 6 Etapa 3
       );
       expect(saveButton.onPressed, isNull);
+    });
+
+    testWidgets('tapping back pops the screen', (tester) async {
+      await tester.pumpWidget(_buildScreen(
+        profile: _profile(),
+        userRepo: mockUserRepo,
+        placesService: mockPlacesService,
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.text('GIMNASIO'), findsOneWidget);
+      await tester.tap(find.byType(GestureDetector).first);
+      await tester.pumpAndSettle();
+
+      expect(find.text('PROFILE_SCREEN'), findsOneWidget);
     });
   });
 }
