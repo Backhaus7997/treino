@@ -8,6 +8,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
+import 'package:treino/features/coach_hub/presentation/sections/biblioteca/widgets/template_format.dart';
 import 'package:treino/features/profile/domain/experience_level.dart';
 import 'package:treino/features/workout/domain/routine.dart';
 
@@ -82,7 +83,7 @@ class TemplateGridCard extends StatelessWidget {
             // days.length = days-per-week (each RoutineDay is one training day).
             // numWeeks = periodization weeks on the Routine (routine.dart:42).
             Text(
-              '${routine.days.length} días/sem · ${routine.numWeeks} semanas', // i18n
+              routineCadenceLabel(routine), // i18n
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: GoogleFonts.barlow(
