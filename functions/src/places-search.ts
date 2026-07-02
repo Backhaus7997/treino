@@ -1,4 +1,9 @@
 /**
+ * SHELVED: cannot deploy under org code-assurance.com (Domain Restricted
+ * Sharing blocks public invoker). App uses client-side Place Details
+ * (Plan B). Restore the index.ts export + redeploy if the org later allows
+ * public functions.
+ *
  * resolveGymPlace — Firebase Callable Cloud Function for TREINO.
  *
  * Resolves a Google Places `placeId` into a `gyms/{placeId}` Firestore

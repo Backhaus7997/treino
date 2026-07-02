@@ -317,6 +317,117 @@ test('SCENARIO-274: non-owner cannot write another user check-in', async () => {
 });
 
 // ---------------------------------------------------------------------------
+// gyms/{gymId} — google-places client-side create/update (gym-google-places,
+// Plan B pivot). resolveGymPlace CF cannot be deployed (org
+// code-assurance.com blocks public-invoker Cloud Functions), so an
+// authenticated client now writes gyms/{placeId} directly via
+// ResolveGymPlaceService. Covers the new athlete-create + same-shape-update
+// branches added to the gyms/{gymId} match block; the pre-existing
+// trainer-only self-service branch is untouched.
+// ---------------------------------------------------------------------------
+
+/** Helper: base valid google-places gym payload. */
+const validGooglePlacesGym = (id) => ({
+  id,
+  name: 'SportClub Belgrano',
+  address: 'Cabildo 1789, CABA',
+  lat: -34.5598,
+  lng: -58.4615,
+  geohash: '6d6m7',
+  source: 'google-places',
+  brandId: null,
+  brandName: null,
+  branchName: null,
+  createdAt: new Date(),
+});
+
+test('GYM-PLACES-01: any authenticated user (not just trainers) can create a google-places gym doc', async () => {
+  const athleteA = testEnv.authenticatedContext('athlete-a');
+  await assertSucceeds(
+    athleteA
+      .firestore()
+      .collection('gyms')
+      .doc('ChIJ_place_1')
+      .set(validGooglePlacesGym('ChIJ_place_1')),
+  );
+});
+
+test('GYM-PLACES-02: create is denied when request.resource.data.id does not match the doc id', async () => {
+  const athleteA = testEnv.authenticatedContext('athlete-a');
+  await assertFails(
+    athleteA
+      .firestore()
+      .collection('gyms')
+      .doc('ChIJ_place_2')
+      .set(validGooglePlacesGym('ChIJ_some_other_id')),
+  );
+});
+
+test('GYM-PLACES-03: create is denied when source is spoofed to self-service without createdBy/trainer role', async () => {
+  const athleteA = testEnv.authenticatedContext('athlete-a');
+  await assertFails(
+    athleteA
+      .firestore()
+      .collection('gyms')
+      .doc('ChIJ_place_3')
+      .set({ ...validGooglePlacesGym('ChIJ_place_3'), source: 'self-service' }),
+  );
+});
+
+test('GYM-PLACES-04: unauthenticated create is denied', async () => {
+  const anon = testEnv.unauthenticatedContext();
+  await assertFails(
+    anon
+      .firestore()
+      .collection('gyms')
+      .doc('ChIJ_place_4')
+      .set(validGooglePlacesGym('ChIJ_place_4')),
+  );
+});
+
+test('GYM-PLACES-05: same-shape update on an existing google-places doc is allowed (read-through cache race)', async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await ctx
+      .firestore()
+      .collection('gyms')
+      .doc('ChIJ_place_5')
+      .set(validGooglePlacesGym('ChIJ_place_5'));
+  });
+
+  const athleteB = testEnv.authenticatedContext('athlete-b');
+  await assertSucceeds(
+    athleteB
+      .firestore()
+      .collection('gyms')
+      .doc('ChIJ_place_5')
+      .set(validGooglePlacesGym('ChIJ_place_5'), { merge: true }),
+  );
+});
+
+test('GYM-PLACES-06: update cannot flip an existing self-service doc to google-places', async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await ctx.firestore().collection('gyms').doc('gym-legacy').set({
+      name: 'Legacy Gym',
+      lat: 0,
+      lng: 0,
+      geohash: 'abcde',
+      source: 'self-service',
+      createdBy: 'trainer-x',
+      createdAt: new Date(),
+    });
+  });
+
+  const athleteA = testEnv.authenticatedContext('athlete-a');
+  await assertFails(
+    athleteA
+      .firestore()
+      .collection('gyms')
+      .doc('gym-legacy')
+      .set(validGooglePlacesGym('gym-legacy'), { merge: true }),
+  );
+});
+
+// ---------------------------------------------------------------------------
 // routines (user-created) — SCENARIO-600..608
 // REQ-USR-004, REQ-USR-008, REQ-USR-009, REQ-USR-012, REQ-USR-013,
 // REQ-USR-014, ADR-USR-03, ADR-USR-06.

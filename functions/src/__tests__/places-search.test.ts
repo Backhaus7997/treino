@@ -1,6 +1,17 @@
 /**
  * Integration tests for the resolveGymPlace Cloud Function.
  *
+ * SHELVED (gym-google-places, Plan B): this CF cannot be deployed — GCP
+ * project treino-dev sits under org code-assurance.com, whose
+ * Domain-Restricted-Sharing policy blocks a publicly-invokable (allUsers)
+ * Cloud Function. Gym place resolution moved client-side
+ * (ResolveGymPlaceService,
+ * lib/features/gyms/data/resolve_gym_place_service.dart). This file is KEPT
+ * (not deleted) — it still exercises runResolveGymPlace/resolveGymPlace as
+ * pure-handler unit tests, useful if the org policy changes and the CF is
+ * restored. Only SCENARIO-750b was updated to assert the (intentional)
+ * NON-export from index.ts.
+ *
  * Tests run against the Firebase Local Emulator (Firestore + Auth).
  * Set FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 before running.
  *
@@ -10,7 +21,7 @@
  *
  * SCENARIOs covered:
  *   SCENARIO-750  — resolveGymPlace and runResolveGymPlace exported
- *   SCENARIO-750b — resolveGymPlace re-exported from index.ts
+ *   SCENARIO-750b — resolveGymPlace NOT re-exported from index.ts (shelved)
  *   SCENARIO-751  — read-through HIT: gyms/{placeId} already exists, no fetch call
  *   SCENARIO-752  — read-through MISS: fetch called, doc mapped + upserted
  *   SCENARIO-753  — bad/empty placeId rejected with invalid-argument
@@ -98,14 +109,14 @@ describe("SCENARIO-750: resolveGymPlace exported and configured for southamerica
 });
 
 // ---------------------------------------------------------------------------
-// SCENARIO-750b — resolveGymPlace exported from index.ts
+// SCENARIO-750b — resolveGymPlace NOT exported from index.ts (shelved)
 // ---------------------------------------------------------------------------
-describe("SCENARIO-750b: resolveGymPlace exported from index.ts", () => {
-  it("resolveGymPlace is re-exported from the functions index", async () => {
+describe("SCENARIO-750b: resolveGymPlace shelved — not exported from index.ts", () => {
+  it("resolveGymPlace is NOT re-exported from the functions index (Plan B: client-side resolve)", async () => {
     const indexModule = await import("../index");
     expect(
       (indexModule as Record<string, unknown>).resolveGymPlace,
-    ).toBeDefined();
+    ).toBeUndefined();
   });
 });
 

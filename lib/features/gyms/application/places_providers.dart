@@ -1,4 +1,3 @@
-import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
@@ -8,18 +7,24 @@ import '../../profile/application/user_providers.dart'
 import '../data/places_autocomplete_service.dart';
 import '../data/resolve_gym_place_service.dart';
 import '../domain/gym_suggestion.dart';
+import 'gym_providers.dart' show gymRepositoryProvider;
 
-/// Bundle-restricted Places Autocomplete client key. Provided at build/run
-/// time via `--dart-define=PLACES_CLIENT_KEY=<key>` — NEVER committed to the
-/// repo. Empty by default; [PlacesAutocompleteService.search] surfaces a
-/// [PlacesAutocompleteConfigError] (not a crash) when this is empty, e.g. in
-/// dev builds that forgot to pass the define.
+/// Bundle-restricted Places client key. Provided at build/run time via
+/// `--dart-define=PLACES_CLIENT_KEY=<key>` — NEVER committed to the repo.
+/// Empty by default; both [PlacesAutocompleteService.search] and
+/// [ResolveGymPlaceService.call] surface a clear config error (not a crash)
+/// when this is empty, e.g. in dev builds that forgot to pass the define.
+///
+/// Shared by BOTH Autocomplete AND Place Details resolution (Plan B pivot —
+/// see [ResolveGymPlaceService] doc comment for why Details moved
+/// client-side too, reusing the same bundle-restricted key instead of a
+/// separate server-side key held in Secret Manager).
 const String _placesClientKey =
     String.fromEnvironment('PLACES_CLIENT_KEY', defaultValue: '');
 
-/// Shared `http.Client` for Autocomplete requests. A single long-lived
-/// client (not `Provider.autoDispose`) matches the codebase's other
-/// singleton-service providers (e.g. [cloudFunctionsProvider] equivalents).
+/// Shared `http.Client` for Places requests (Autocomplete + Details). A
+/// single long-lived client (not `Provider.autoDispose`) matches the
+/// codebase's other singleton-service providers.
 final httpClientProvider = Provider<http.Client>((ref) => http.Client());
 
 /// Provider for [PlacesAutocompleteService]. Overridable in tests.
@@ -30,15 +35,22 @@ final placesAutocompleteServiceProvider = Provider<PlacesAutocompleteService>(
   ),
 );
 
-/// Provider for [ResolveGymPlaceService].
+/// Provider for [ResolveGymPlaceService] — CLIENT-SIDE (Plan B pivot).
 ///
-/// Region MUST be `southamerica-east1` to match `resolveGymPlace`'s
-/// deployment region (functions/src/places-search.ts, Slice 1) — the
-/// Firebase client default is `us-central1`. Mirrors
-/// `accountDeletionServiceProvider` (account_deletion_service.dart).
+/// The original design called a `resolveGymPlace` Cloud Function (Admin SDK
+/// + server-side key in Secret Manager, `functions/src/places-search.ts`).
+/// That CF CANNOT be deployed: GCP project `treino-dev` sits under org
+/// `code-assurance.com`, whose Domain-Restricted-Sharing policy blocks
+/// public (`allUsers`) invoker on Cloud Functions. The CF is SHELVED
+/// (kept, not exported from `functions/src/index.ts`) — resolution now
+/// happens directly from the client via [ResolveGymPlaceService], reusing
+/// [gymRepositoryProvider] for the read-through cache/upsert and the same
+/// bundle-restricted [_placesClientKey] Autocomplete already uses.
 final resolveGymPlaceServiceProvider = Provider<ResolveGymPlaceService>(
   (ref) => ResolveGymPlaceService(
-    functions: FirebaseFunctions.instanceFor(region: 'southamerica-east1'),
+    gymRepository: ref.watch(gymRepositoryProvider),
+    httpClient: ref.watch(httpClientProvider),
+    clientApiKey: _placesClientKey,
   ),
 );
 

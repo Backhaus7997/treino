@@ -1,4 +1,10 @@
 // T2.12 RED — gym-google-places Phase 2.
+// Plan B REWORK: selectGymActionProvider's external behavior (resolve then
+// update the profile gymId) is unchanged — only ResolveGymPlaceService is
+// mocked as an interface, so this file needed no structural rewrite beyond
+// matching ResolveGymPlaceFailure$Server's new (client-side) constructor
+// shape. See resolve_gym_place_service_test.dart for the client-side
+// resolve logic itself.
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -190,8 +196,8 @@ void main() {
             placeId: any(named: 'placeId'),
             sessionToken: any(named: 'sessionToken'),
           )).thenThrow(const ResolveGymPlaceFailure$Server(
-        code: 'invalid-argument',
-        message: 'bad placeId',
+        'bad placeId',
+        statusCode: 500,
       ));
 
       final container = buildContainer();
