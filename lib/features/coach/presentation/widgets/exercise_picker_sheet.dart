@@ -4,14 +4,15 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/treino_icon.dart';
-import '../../../workout/domain/muscle_group.dart';
 import '../../../workout/application/custom_exercise_providers.dart';
+import '../../../workout/application/exercise_filter.dart';
 import '../../../workout/application/exercise_providers.dart';
 import '../../../workout/application/session_providers.dart'
     show currentUidProvider;
 import '../../../workout/domain/custom_exercise.dart';
 import '../../../workout/domain/equipment_type.dart';
 import '../../../workout/domain/exercise.dart';
+import '../../../workout/domain/muscle_group.dart';
 import '../../../workout/presentation/custom_exercise_editor_screen.dart';
 import '../../../workout/presentation/exercise_detail_screen.dart';
 import '../../../../l10n/app_l10n.dart';
@@ -30,21 +31,8 @@ import 'muscle_filter_sheet.dart';
 ///
 /// ADR-RER-01, REQ-RER-001..004, REQ-RER-017.
 ///
-/// Lowercases and strips Spanish diacritics so the search field tolerates
-/// accent and case typos: "elevacion" matches "Elevación", "BICEPS" matches
-/// "Bíceps". Applied to both the query and the candidate text before matching.
-String foldSearch(String input) {
-  final lower = input.toLowerCase();
-  const from = 'áàäâãéèëêíìïîóòöôõúùüûñç';
-  const to = 'aaaaaeeeeiiiiooooouuuunc';
-  final buf = StringBuffer();
-  for (final code in lower.runes) {
-    final ch = String.fromCharCode(code);
-    final idx = from.indexOf(ch);
-    buf.write(idx >= 0 ? to[idx] : ch);
-  }
-  return buf.toString();
-}
+/// Search uses [foldSearch] from `exercise_filter.dart` — lowercases and
+/// strips Spanish diacritics (ADR-BIBW-01 extraction).
 
 Future<List<Exercise>?> showExercisePicker(
   BuildContext context, {
@@ -99,31 +87,13 @@ class _ExercisePickerSheetContentState
 
   // ── Filter predicate ───────────────────────────────────────────────────────
 
-  bool _matches(Exercise e) {
-    final q = foldSearch(_query).trim();
-    if (q.isNotEmpty) {
-      final nameMatch = foldSearch(e.name).contains(q);
-      final aliasMatch = e.aliases.any((a) => foldSearch(a).contains(q));
-      if (!nameMatch && !aliasMatch) return false;
-    }
-    // OR within muscle filter, AND across filter types. An exercise matches if
-    // EITHER its primary or its (optional) secondary muscle is in the filter,
-    // so e.g. "estocada a press" surfaces under both Cuádriceps and Hombros.
-    if (_muscleFilters.isNotEmpty) {
-      final primary = MuscleGroup.fromKey(e.muscleGroup);
-      final secondary = MuscleGroup.fromKey(e.secondaryMuscleGroup);
-      final hit = (primary != null && _muscleFilters.contains(primary)) ||
-          (secondary != null && _muscleFilters.contains(secondary));
-      if (!hit) return false;
-    }
-    // ADR-RER-05: EXCLUDE exercises with null equipment when ANY equipment
-    // filter is active. OR within equipment filter.
-    if (_equipmentFilters.isNotEmpty) {
-      if (e.equipment == null) return false;
-      if (!_equipmentFilters.contains(e.equipment)) return false;
-    }
-    return true;
-  }
+  // Thin delegate — logic lives in exercise_filter.dart (ADR-BIBW-01).
+  bool _matches(Exercise e) => exerciseMatchesFilters(
+        e,
+        query: _query,
+        muscles: _muscleFilters,
+        equipment: _equipmentFilters,
+      );
 
   // ── Actions ────────────────────────────────────────────────────────────────
 
@@ -878,21 +848,10 @@ class _CreateNewTile extends StatelessWidget {
   }
 }
 
-/// Lossy adapter — projects the fields the routine slot needs and stamps
-/// `category: 'custom'` so downstream code can distinguish custom exercises.
-Exercise _toExercise(CustomExercise c) {
-  return Exercise(
-    id: c.id,
-    name: c.name,
-    muscleGroup: c.muscleGroup,
-    secondaryMuscleGroup: c.secondaryMuscleGroup,
-    category: 'custom',
-    techniqueInstructions: null,
-    videoUrl: c.videoUrl,
-    defaultRestSeconds: c.defaultRestSeconds,
-    equipment: c.equipment,
-  );
-}
+/// Lossy adapter — delegates to [customToExercise] from exercise_filter.dart
+/// (ADR-BIBW-01 extraction). Kept as a private forwarder so all internal
+/// call-sites in this file compile without changes.
+Exercise _toExercise(CustomExercise c) => customToExercise(c);
 
 extension _FirstWhereOrNull<T> on List<T> {
   T? firstWhereOrNull(bool Function(T) test) {
