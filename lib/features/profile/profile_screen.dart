@@ -9,7 +9,9 @@ import '../../core/widgets/treino_icon.dart';
 import '../../l10n/app_l10n.dart';
 import '../auth/application/auth_providers.dart';
 import 'application/profile_stats_providers.dart';
+import 'application/ranking_optin_controller_provider.dart';
 import 'application/user_providers.dart';
+import 'application/user_public_profile_providers.dart';
 import 'domain/user_role.dart';
 import 'presentation/widgets/eliminar_cuenta_sheet.dart';
 import 'presentation/widgets/profile_avatar_card.dart';
@@ -99,6 +101,12 @@ class _AthleteProfile extends ConsumerWidget {
                   onTap: () => context.push('/profile/my-exercises'),
                 ),
               ),
+              // ── Rankings tile — navigates to the per-gym leaderboards
+              // AND carries the rankingOptIn toggle as its trailing widget
+              // (design `sdd/rankings/design` — Placement: opt-in toggle
+              // lives in the profile sub-tree, entry point next to the
+              // rest of ENTRENAMIENTO).
+              const _RankingsTile(),
             ],
           ),
           // ── Apariencia section (REQ-LM-009) ──────────────────────────────
@@ -167,6 +175,78 @@ class _AthleteProfile extends ConsumerWidget {
           ),
           const SizedBox(height: 20),
         ],
+      ),
+    );
+  }
+}
+
+// ── Rankings tile (entry point + opt-in toggle) ─────────────────────────────
+
+/// "Rankings" row in the ENTRENAMIENTO section — tapping the row (outside the
+/// trailing toggle) navigates to `/profile/rankings`; the trailing [Switch]
+/// reflects and flips `rankingOptIn` via [RankingOptInControllerBase].
+///
+/// Reads `rankingOptIn` from [userPublicProfileProvider] (own uid) rather
+/// than [userProfileProvider] — that field lives on the PUBLIC profile doc
+/// (spec `gym-rankings`), not the private one.
+class _RankingsTile extends ConsumerStatefulWidget {
+  const _RankingsTile();
+
+  @override
+  ConsumerState<_RankingsTile> createState() => _RankingsTileState();
+}
+
+class _RankingsTileState extends ConsumerState<_RankingsTile> {
+  bool _pending = false;
+
+  Future<void> _toggle(String uid, bool newValue) async {
+    setState(() => _pending = true);
+    try {
+      final controller = ref.read(rankingOptInControllerProvider);
+      if (newValue) {
+        await controller.enableRankingOptIn(uid);
+      } else {
+        await controller.disableRankingOptIn(uid);
+      }
+    } finally {
+      if (mounted) setState(() => _pending = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final myUid = ref.watch(authStateChangesProvider).valueOrNull?.uid ?? '';
+    final optIn =
+        ref.watch(userPublicProfileProvider(myUid)).valueOrNull?.rankingOptIn ??
+            false;
+
+    return Semantics(
+      button: true,
+      label: 'Rankings',
+      excludeSemantics: true,
+      child: ProfileSectionTile(
+        icon: TreinoIcon.ranking,
+        title: 'Rankings',
+        inGroup: true,
+        onTap: () => context.push('/profile/rankings'),
+        trailing: _pending
+            ? SizedBox(
+                key: const Key('profile_ranking_optin_loading'),
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: palette.accent,
+                ),
+              )
+            : Switch(
+                key: const Key('profile_ranking_optin_switch'),
+                value: optIn,
+                activeThumbColor: palette.accent,
+                onChanged:
+                    myUid.isEmpty ? null : (value) => _toggle(myUid, value),
+              ),
       ),
     );
   }

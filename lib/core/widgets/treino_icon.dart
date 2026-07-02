@@ -28,6 +28,9 @@ class TreinoIcon {
   static const IconData mapPin = PhosphorIconsRegular.mapPin;
   static const IconData bell = PhosphorIconsRegular.bell;
 
+  // Rankings (per-gym leaderboards — rachas/volumen/lifts).
+  static const IconData ranking = PhosphorIconsRegular.trophy;
+
   // Navegación
   static const IconData back = PhosphorIconsRegular.caretLeft;
   static const IconData forward = PhosphorIconsRegular.caretRight;

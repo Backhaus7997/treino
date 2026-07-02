@@ -4,6 +4,15 @@ import '../../workout/domain/session_status.dart';
 import '../../workout/domain/set_log.dart';
 import '../data/user_public_profile_repository.dart';
 
+/// Abstract surface for the opt-in toggle lifecycle — lets
+/// `ProfileScreen`'s toggle widget (and its tests) depend on an interface
+/// instead of the concrete Firestore-backed [RankingOptInController], via
+/// `rankingOptInControllerProvider`.
+abstract class RankingOptInControllerBase {
+  Future<void> enableRankingOptIn(String uid);
+  Future<void> disableRankingOptIn(String uid);
+}
+
 /// Orchestrates the `rankingOptIn` toggle lifecycle (spec `gym-rankings` —
 /// Opt-In Toggle Lifecycle, design `sdd/rankings/design`).
 ///
@@ -18,7 +27,7 @@ import '../data/user_public_profile_repository.dart';
 ///   `SessionRepository.finish()`.
 /// - [disableRankingOptIn]: clears the 4 ranking-metric fields and sets
 ///   `rankingOptIn: false` via `UserPublicProfileRepository.clearRankingMetrics`.
-class RankingOptInController {
+class RankingOptInController implements RankingOptInControllerBase {
   RankingOptInController({
     required SessionRepository sessionRepository,
     required UserPublicProfileRepository publicProfileRepository,
@@ -33,6 +42,7 @@ class RankingOptInController {
   /// failure here surfaces to the caller (does NOT swallow errors) — unlike
   /// `finish()`'s best-effort counters, an explicit user action deserves an
   /// explicit error rather than a silent no-op.
+  @override
   Future<void> enableRankingOptIn(String uid) async {
     final allSessions = await _sessionRepository.listByUid(uid);
     final completedList = allSessions
@@ -69,6 +79,7 @@ class RankingOptInController {
   /// Disables ranking opt-in for [uid], clearing all 4 ranking-metric fields
   /// so the athlete disappears from every leaderboard and their metrics are
   /// no longer publicly exposed.
+  @override
   Future<void> disableRankingOptIn(String uid) async {
     await _publicProfileRepository.clearRankingMetrics(uid);
   }
