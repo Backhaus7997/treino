@@ -365,6 +365,15 @@ service cloud.firestore {
     // que setear `source: 'self-service'` y `createdBy: request.auth.uid` —
     // si no, denied. Update/delete denegado del cliente — moderación va por
     // Console o un Cloud Function privilegiado en el futuro.
+    //
+    // gym-google-places (sdd change): athletes ahora también pueden originar
+    // un doc `gyms/{placeId}` con `source: 'google-places'`, pero SIEMPRE vía
+    // la Cloud Function `resolveGymPlace` (functions/src/places-search.ts),
+    // que usa el Admin SDK y por lo tanto bypassea estas reglas de create
+    // por completo (Admin SDK no está sujeto a Firestore Security Rules).
+    // No se agrega ninguna rama `allow create` para `source == 'google-places'`
+    // acá — el cliente nunca escribe `gyms/` directamente para este flujo,
+    // solo lee (ver `allow read` abajo). Sin cambio de lógica de reglas.
     match /gyms/{gymId} {
       allow read: if request.auth != null;
 

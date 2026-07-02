@@ -15,3 +15,4 @@ export { notifyOnReview } from "./notifications/notify-review";
 export { cleanupAssignedPlansOnUnlink } from "./cleanup-assigned-plans";
 export { addAlias } from "./add-alias";
 export { syncSessionShareOnTrainerLink } from "./sync-session-share";
+export { resolveGymPlace } from "./places-search";
