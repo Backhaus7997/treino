@@ -52,7 +52,7 @@ No hay toggle interno entre vistas — el rol es uno solo y se elige al crear la
 
 Aunque el repo viejo (`gymrankiOS` / `gymrank` Android) los tenía, en TREINO Flutter quedan **fuera**:
 
-- Ranking (global, semanal, mensual, gym)
+- Ranking global, semanal y mensual (ranking por gym, opt-in, ya está implementado — ver `/profile/rankings`: rachas/volumen/main lifts, scope per-gym, opt-in explícito del atleta)
 - Retos / Challenges
 - Missions
 - Bets

@@ -63,8 +63,13 @@ Chain strategy: pending
 
 ## Phase 5: Docs (Slice 5 — PR 5)
 
-- [ ] 5.1 Modify `docs/product.md` line 55 — remove `Ranking (global, semanal, mensual, gym)` from the "Out of scope — NO implementar" list (per-gym opt-in ranking is now implemented; global/semanal/mensual variants remain genuinely out of scope — clarify the line rather than deleting the whole bullet if any of those sub-variants are still excluded).
-- [ ] 5.2 Quality gate: `dart format .` (docs-only, no analyze/test impact expected).
+- [x] 5.1 Modify `docs/product.md` line 55 — remove `Ranking (global, semanal, mensual, gym)` from the "Out of scope — NO implementar" list (per-gym opt-in ranking is now implemented; global/semanal/mensual variants remain genuinely out of scope — clarify the line rather than deleting the whole bullet if any of those sub-variants are still excluded). Done: bullet now reads "Ranking global, semanal y mensual (ranking por gym, opt-in, ya está implementado — ver `/profile/rankings`...)" — global/weekly/monthly variants stay out of scope, per-gym opt-in variant is called out as implemented.
+- [x] 5.2 Quality gate: `dart format .` (docs-only, no analyze/test impact expected). `docs/product.md` is Markdown, not Dart — `dart format` has no effect on it; confirmed no `.dart` files touched in this slice besides the two fix commits (covered by their own gate).
+
+### Phase 5 addendum — 2 consistency fixes found during final review
+
+- [x] 5.3 FIX: `RankingOptInController.enableRankingOptIn` backfill window now matches `SessionRepository.finish()`'s bounded `counterRecomputeWindow` (365 most-recent sessions), instead of the athlete's unbounded full history — prevents `lifetimeVolumeKg`/`best<Lift>Kg` from visibly dropping on the first session finish after opt-in. Extracted shared `SessionRepository.listRecentCompletedByUid(uid)` (made `_counterRecomputeWindow` public as `counterRecomputeWindow`) so `finish()` and the backfill are guaranteed to use the identical window+filter by construction, not by duplicated magic numbers. RED test `SCENARIO-RANK-5e` added (asserts an out-of-window session's volume is excluded from backfill, and that `finish()` immediately after opt-in does not change the backfilled value).
+- [x] 5.4 FIX: `openspec/changes/rankings/specs/user-public-profiles-layer/spec.md` — Session-Finish Denormalization requirement corrected from `FieldValue.increment` prose to RECOMPUTE-over-window prose (matching the LOCKED design decision and the actual `finish()`/backfill implementation). Also documents that the opt-in backfill MUST use the same window as `finish()`.
 
 ## Rules Applied
 
