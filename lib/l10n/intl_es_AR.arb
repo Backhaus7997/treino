@@ -1564,5 +1564,71 @@
   "profileSectionAppearance": "Apariencia",
   "@profileSectionAppearance": {
     "description": "Section header label for the Appearance group in the profile screen."
+  },
+  "dashboardGreeting": "BUENAS, {name}",
+  "@dashboardGreeting": {
+    "description": "Welcome greeting shown in the Coach Hub web dashboard WelcomeCard. {name} is the trainer's first name in uppercase.",
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "dashboardSummaryLine": "Tenés {sessions} sesiones hoy, {paraRevisar} para revisar, {pagos} pagos pendientes",
+  "@dashboardSummaryLine": {
+    "description": "Dashboard WelcomeCard summary line combining sessions today, pending requests, and overdue payments.",
+    "placeholders": {
+      "sessions": { "type": "int" },
+      "paraRevisar": { "type": "int" },
+      "pagos": { "type": "int" }
+    }
+  },
+  "dashboardQuickActionNuevoAlumno": "+ Nuevo alumno",
+  "@dashboardQuickActionNuevoAlumno": {
+    "description": "Quick action button label in the Coach Hub web dashboard WelcomeCard to navigate to the alumnos section."
+  },
+  "dashboardQuickActionCrearRutina": "Crear rutina",
+  "@dashboardQuickActionCrearRutina": {
+    "description": "Quick action button label in the Coach Hub web dashboard WelcomeCard to navigate to routine creation."
+  },
+  "dashboardQuickActionMensajes": "Mensajes ({count})",
+  "@dashboardQuickActionMensajes": {
+    "description": "Quick action button label in the Coach Hub web dashboard WelcomeCard showing unread message count.",
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "dashboardQuickActionImportarPlan": "Importar plan",
+  "@dashboardQuickActionImportarPlan": {
+    "description": "Quick action button label in the Coach Hub web dashboard WelcomeCard to navigate to the Excel plan importer."
+  },
+  "dashboardAlertBannerPlaceholder": "Próximamente: resumen de atención",
+  "@dashboardAlertBannerPlaceholder": {
+    "description": "Placeholder text shown in the alert banner section of the Coach Hub web dashboard (V1, no real notification aggregation yet)."
+  },
+  "dashboardKpiAlumnosActivos": "Alumnos activos",
+  "@dashboardKpiAlumnosActivos": {
+    "description": "KPI tile label for the count of active trainer-athlete links in the Coach Hub web dashboard."
+  },
+  "dashboardKpiIngresoMes": "Ingreso del mes",
+  "@dashboardKpiIngresoMes": {
+    "description": "KPI tile label for paid-this-month total ARS in the Coach Hub web dashboard."
+  },
+  "dashboardKpiAdherencia": "Adherencia promedio",
+  "@dashboardKpiAdherencia": {
+    "description": "KPI tile label for average adherence (placeholder value in V1) in the Coach Hub web dashboard."
+  },
+  "dashboardKpiPorCobrar": "Por cobrar ({count} vencimientos)",
+  "@dashboardKpiPorCobrar": {
+    "description": "KPI tile label for overdue payments including count in the Coach Hub web dashboard.",
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "dashboardPlaceholderSoon": "Próximamente",
+  "@dashboardPlaceholderSoon": {
+    "description": "Generic coming-soon placeholder label used in Coach Hub web dashboard placeholder cards."
+  },
+  "dashboardAdherenceRingPlaceholder": "--",
+  "@dashboardAdherenceRingPlaceholder": {
+    "description": "Placeholder value shown in the adherencia ring in the Coach Hub web dashboard WelcomeCard (no aggregate provider in V1)."
   }
 }

@@ -3991,6 +3991,84 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Apariencia'**
   String get profileSectionAppearance;
+
+  /// Welcome greeting shown in the Coach Hub web dashboard WelcomeCard. {name} is the trainer's first name in uppercase.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'BUENAS, {name}'**
+  String dashboardGreeting(String name);
+
+  /// Dashboard WelcomeCard summary line combining sessions today, pending requests, and overdue payments.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tenés {sessions} sesiones hoy, {paraRevisar} para revisar, {pagos} pagos pendientes'**
+  String dashboardSummaryLine(int sessions, int paraRevisar, int pagos);
+
+  /// Quick action button label in the Coach Hub web dashboard WelcomeCard to navigate to the alumnos section.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'+ Nuevo alumno'**
+  String get dashboardQuickActionNuevoAlumno;
+
+  /// Quick action button label in the Coach Hub web dashboard WelcomeCard to navigate to routine creation.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Crear rutina'**
+  String get dashboardQuickActionCrearRutina;
+
+  /// Quick action button label in the Coach Hub web dashboard WelcomeCard showing unread message count.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Mensajes ({count})'**
+  String dashboardQuickActionMensajes(int count);
+
+  /// Quick action button label in the Coach Hub web dashboard WelcomeCard to navigate to the Excel plan importer.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Importar plan'**
+  String get dashboardQuickActionImportarPlan;
+
+  /// Placeholder text shown in the alert banner section of the Coach Hub web dashboard (V1, no real notification aggregation yet).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Próximamente: resumen de atención'**
+  String get dashboardAlertBannerPlaceholder;
+
+  /// KPI tile label for the count of active trainer-athlete links in the Coach Hub web dashboard.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Alumnos activos'**
+  String get dashboardKpiAlumnosActivos;
+
+  /// KPI tile label for paid-this-month total ARS in the Coach Hub web dashboard.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ingreso del mes'**
+  String get dashboardKpiIngresoMes;
+
+  /// KPI tile label for average adherence (placeholder value in V1) in the Coach Hub web dashboard.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Adherencia promedio'**
+  String get dashboardKpiAdherencia;
+
+  /// KPI tile label for overdue payments including count in the Coach Hub web dashboard.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Por cobrar ({count} vencimientos)'**
+  String dashboardKpiPorCobrar(int count);
+
+  /// Generic coming-soon placeholder label used in Coach Hub web dashboard placeholder cards.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Próximamente'**
+  String get dashboardPlaceholderSoon;
+
+  /// Placeholder value shown in the adherencia ring in the Coach Hub web dashboard WelcomeCard (no aggregate provider in V1).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'--'**
+  String get dashboardAdherenceRingPlaceholder;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

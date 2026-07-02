@@ -16,9 +16,16 @@ import '../../profile/application/user_public_profile_providers.dart';
 import '../../workout/application/session_providers.dart'
     show currentUidProvider;
 import '../application/agenda_providers.dart';
+import '../application/dashboard_day_counts.dart';
 import '../application/trained_today_provider.dart';
 import '../application/trainer_link_providers.dart';
 import '../domain/appointment.dart';
+
+// Re-export so the mobile test (trainer_dashboard_day_counts_test.dart) that
+// imports dashboardDayCounts/DashboardDayCounts from this file keeps compiling
+// without modification.
+export '../application/dashboard_day_counts.dart'
+    show dashboardDayCounts, DashboardDayCounts;
 import 'widgets/appointment_detail_sheet.dart';
 import '../domain/trainer_link.dart';
 import '../domain/trainer_link_status.dart';
@@ -1532,50 +1539,6 @@ class _BottomActions extends StatelessWidget {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-/// Immutable result of the "Resumen del día" classification.
-class DashboardDayCounts {
-  const DashboardDayCounts({
-    required this.pending,
-    required this.done,
-    required this.cancelled,
-  });
-
-  final int pending;
-  final int done;
-  final int cancelled;
-}
-
-/// Classifies today's appointments into pending / done / cancelled for the
-/// dashboard summary.
-///
-/// A confirmed session counts as `done` only once it has actually ended
-/// (`startsAt + durationMin`); while it has not yet ended — including while it
-/// is in progress — it counts as `pending`. [now] must be UTC, matching the
-/// UTC [Appointment.startsAt].
-DashboardDayCounts dashboardDayCounts(
-  List<Appointment> all,
-  DateTime now,
-) {
-  final todayAppts = all.where((a) => _isSameLocalDay(a.startsAt, now)).toList();
-  DateTime endOf(Appointment a) =>
-      a.startsAt.add(Duration(minutes: a.durationMin));
-  final pending = todayAppts
-      .where((a) =>
-          a.status == AppointmentStatus.confirmed && endOf(a).isAfter(now))
-      .length;
-  final done = todayAppts
-      .where((a) =>
-          a.status == AppointmentStatus.confirmed && !endOf(a).isAfter(now))
-      .length;
-  final cancelled =
-      todayAppts.where((a) => a.status == AppointmentStatus.cancelled).length;
-  return DashboardDayCounts(
-    pending: pending,
-    done: done,
-    cancelled: cancelled,
-  );
-}
 
 String _weekdayName(AppL10n l10n, int weekday) {
   switch (weekday) {

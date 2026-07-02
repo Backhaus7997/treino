@@ -2096,4 +2096,51 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get profileSectionAppearance => 'Appearance';
+
+  @override
+  String dashboardGreeting(String name) {
+    return '';
+  }
+
+  @override
+  String dashboardSummaryLine(int sessions, int paraRevisar, int pagos) {
+    return '';
+  }
+
+  @override
+  String get dashboardQuickActionNuevoAlumno => '';
+
+  @override
+  String get dashboardQuickActionCrearRutina => '';
+
+  @override
+  String dashboardQuickActionMensajes(int count) {
+    return '';
+  }
+
+  @override
+  String get dashboardQuickActionImportarPlan => '';
+
+  @override
+  String get dashboardAlertBannerPlaceholder => '';
+
+  @override
+  String get dashboardKpiAlumnosActivos => '';
+
+  @override
+  String get dashboardKpiIngresoMes => '';
+
+  @override
+  String get dashboardKpiAdherencia => '';
+
+  @override
+  String dashboardKpiPorCobrar(int count) {
+    return '';
+  }
+
+  @override
+  String get dashboardPlaceholderSoon => '';
+
+  @override
+  String get dashboardAdherenceRingPlaceholder => '';
 }

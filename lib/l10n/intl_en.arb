@@ -787,5 +787,18 @@
   "appearanceSystemDesc": "Follows the device theme",
   "appearanceLight": "Light",
   "appearanceDark": "Dark",
-  "profileSectionAppearance": "Appearance"
+  "profileSectionAppearance": "Appearance",
+  "dashboardGreeting": "",
+  "dashboardSummaryLine": "",
+  "dashboardQuickActionNuevoAlumno": "",
+  "dashboardQuickActionCrearRutina": "",
+  "dashboardQuickActionMensajes": "",
+  "dashboardQuickActionImportarPlan": "",
+  "dashboardAlertBannerPlaceholder": "",
+  "dashboardKpiAlumnosActivos": "",
+  "dashboardKpiIngresoMes": "",
+  "dashboardKpiAdherencia": "",
+  "dashboardKpiPorCobrar": "",
+  "dashboardPlaceholderSoon": "",
+  "dashboardAdherenceRingPlaceholder": ""
 }
