@@ -7,6 +7,7 @@ import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/gyms/application/gym_providers.dart';
+import '../../../../../l10n/app_l10n.dart';
 import 'package:treino/features/payments/application/pagos_por_cobrar_provider.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
@@ -19,11 +20,11 @@ import 'package:treino/features/workout/application/session_providers.dart';
 enum AlumnoEstado { activo, conDeuda, pausado, inactivo }
 
 extension AlumnoEstadoX on AlumnoEstado {
-  String get label => switch (this) {
-        AlumnoEstado.activo => 'Activo', // i18n: Fase W2
-        AlumnoEstado.conDeuda => 'Con deuda', // i18n: Fase W2
-        AlumnoEstado.pausado => 'Pausado', // i18n: Fase W2
-        AlumnoEstado.inactivo => 'Inactivo', // i18n: Fase W2
+  String label(AppL10n l10n) => switch (this) {
+        AlumnoEstado.activo => l10n.coachHubAlumnosStatusActive,
+        AlumnoEstado.conDeuda => l10n.coachHubAlumnosStatusDebt,
+        AlumnoEstado.pausado => l10n.coachHubAlumnosStatusPaused,
+        AlumnoEstado.inactivo => l10n.coachHubAlumnosStatusInactive,
       };
 
   Color color(AppPalette p) => switch (this) {
@@ -78,11 +79,11 @@ class AlumnosScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppL10n.of(context);
     final linksAsync = ref.watch(trainerLinksStreamProvider);
     return linksAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => const _CenteredMuted(
-          'No se pudieron cargar los alumnos.'), // i18n: Fase W2
+      error: (e, _) => _CenteredMuted(l10n.coachHubAlumnosLoadError),
       data: (links) {
         // Un alumno = una fila: colapsamos a su link más reciente (el stream
         // viene requestedAt DESC) y excluimos `pending` (esos son solicitudes,
@@ -104,8 +105,8 @@ class AlumnosScreen extends ConsumerWidget {
         };
         return profilesAsync.when(
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => const _CenteredMuted(
-              'No se pudieron cargar los perfiles.'), // i18n: Fase W2
+          error: (e, _) =>
+              _CenteredMuted(l10n.coachHubAlumnosProfilesLoadError),
           data: (profiles) => _RosterView(
               roster: roster, profiles: profiles, conDeudaIds: conDeudaIds),
         );
@@ -128,6 +129,7 @@ class _RosterView extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     final filtro = ref.watch(_filtroProvider);
     final query = ref.watch(_queryProvider).trim().toLowerCase();
 
@@ -162,7 +164,7 @@ class _RosterView extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            'ALUMNOS', // i18n: Fase W2
+            l10n.coachHubAlumnosTitle,
             style: TextStyle(
               color: palette.textPrimary,
               fontSize: 22,
@@ -172,7 +174,7 @@ class _RosterView extends ConsumerWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            '${roster.length} en total · $activos activos', // i18n: Fase W2
+            l10n.coachHubAlumnosSummary(roster.length, activos),
             style: TextStyle(color: palette.textMuted, fontSize: 13),
           ),
           const SizedBox(height: 18),
@@ -185,8 +187,8 @@ class _RosterView extends ConsumerWidget {
               padding: const EdgeInsets.symmetric(vertical: 40),
               child: _CenteredMuted(
                 roster.isEmpty
-                    ? 'Todavía no tenés alumnos vinculados.' // i18n: Fase W2
-                    : 'Ningún alumno coincide con el filtro.', // i18n: Fase W2
+                    ? l10n.coachHubAlumnosEmpty
+                    : l10n.coachHubAlumnosEmptyFiltered,
               ),
             )
           else ...[
@@ -211,23 +213,24 @@ class _FilterBar extends ConsumerWidget {
   final RosterFiltro filtro;
   final int Function(RosterFiltro) countFor;
 
-  // Orden de chips como el mockup; labels es-AR. // i18n: Fase W2
-  static const _chips = <(RosterFiltro, String)>[
-    (RosterFiltro.todos, 'Todos'),
-    (RosterFiltro.activos, 'Activos'),
-    (RosterFiltro.conDeuda, 'Con deuda'),
-    (RosterFiltro.pausados, 'Pausados'),
-    (RosterFiltro.inactivos, 'Inactivos'),
-  ];
+  // Orden de chips como el mockup; labels vía AppL10n.
+  List<(RosterFiltro, String)> _chips(AppL10n l10n) => [
+        (RosterFiltro.todos, l10n.coachHubAlumnosFilterAll),
+        (RosterFiltro.activos, l10n.coachHubAlumnosFilterActivos),
+        (RosterFiltro.conDeuda, l10n.coachHubAlumnosFilterConDeuda),
+        (RosterFiltro.pausados, l10n.coachHubAlumnosFilterPausados),
+        (RosterFiltro.inactivos, l10n.coachHubAlumnosFilterInactivos),
+      ];
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     return Wrap(
       spacing: 8,
       runSpacing: 8,
       children: [
-        for (final (f, label) in _chips)
+        for (final (f, label) in _chips(l10n))
           _Chip(
             label: '$label ${countFor(f)}',
             selected: f == filtro,
@@ -294,12 +297,13 @@ class _SearchFieldState extends ConsumerState<_SearchField> {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     return TextField(
       controller: _controller,
       onChanged: (v) => ref.read(_queryProvider.notifier).state = v,
       style: TextStyle(color: palette.textPrimary, fontSize: 14),
       decoration: InputDecoration(
-        hintText: 'Buscar por nombre…', // i18n: Fase W2
+        hintText: l10n.coachHubAlumnosSearchHint,
         hintStyle: TextStyle(color: palette.textMuted),
         prefixIcon: Icon(TreinoIcon.search, color: palette.textMuted, size: 18),
         isDense: true,
@@ -328,6 +332,7 @@ class _RosterHeaderRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     TextStyle s() => TextStyle(
           color: palette.textMuted,
           fontSize: 11,
@@ -338,13 +343,19 @@ class _RosterHeaderRow extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
       child: Row(
         children: [
-          // i18n: Fase W2 (encabezados de columna)
-          Expanded(flex: 4, child: Text('ALUMNO', style: s())),
-          Expanded(flex: 2, child: Text('ESTADO', style: s())),
-          Expanded(flex: 2, child: Text('ÚLTIMO ENTRENO', style: s())),
+          Expanded(
+              flex: 4,
+              child: Text(l10n.coachHubAlumnosColumnStudent, style: s())),
+          Expanded(
+              flex: 2,
+              child: Text(l10n.coachHubAlumnosColumnStatus, style: s())),
+          Expanded(
+              flex: 2,
+              child: Text(l10n.coachHubAlumnosColumnLastWorkout, style: s())),
           Expanded(
             flex: 2,
-            child: Text('ACCIONES', style: s(), textAlign: TextAlign.right),
+            child: Text(l10n.coachHubAlumnosColumnActions,
+                style: s(), textAlign: TextAlign.right),
           ),
         ],
       ),
@@ -368,7 +379,8 @@ class _RosterRow extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
-    final name = profile?.displayName ?? 'Atleta'; // i18n: Fase W2
+    final l10n = AppL10n.of(context);
+    final name = profile?.displayName ?? l10n.coachHubAlumnosNameFallback;
     final trainedToday =
         (ref.watch(finishedTodayByUidProvider(link.athleteId)).valueOrNull ??
                 const [])
@@ -425,7 +437,7 @@ class _RosterRow extends ConsumerWidget {
             Expanded(
               flex: 2,
               child: Text(
-                trainedToday ? 'Hoy' : '—', // i18n: Fase W2
+                trainedToday ? l10n.coachHubAlumnosLastWorkoutToday : '—',
                 style: TextStyle(
                   color: trainedToday ? palette.accent : palette.textMuted,
                   fontSize: 13,
@@ -480,6 +492,7 @@ class _EstadoBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppL10n.of(context);
     final color = estado.color(palette);
     return Align(
       alignment: Alignment.centerLeft,
@@ -494,7 +507,7 @@ class _EstadoBadge extends StatelessWidget {
           const SizedBox(width: 6),
           Flexible(
             child: Text(
-              estado.label,
+              estado.label(l10n),
               overflow: TextOverflow.ellipsis,
               style: TextStyle(color: color, fontSize: 13),
             ),
@@ -512,12 +525,12 @@ class _RowActions extends ConsumerWidget {
   final AppPalette palette;
 
   Future<void> _pause(BuildContext context, WidgetRef ref) async {
+    final l10n = AppL10n.of(context);
     final ok = await _confirmAction(
       context,
-      title: 'Pausar vínculo', // i18n: Fase W2
-      body:
-          'El alumno verá el plan pero no podrá registrar sesiones nuevas hasta que reanudes el vínculo.', // i18n: Fase W2
-      confirmLabel: 'Pausar', // i18n: Fase W2
+      title: l10n.coachHubDashboardPauseLinkTitle,
+      body: l10n.coachHubDashboardPauseLinkBody,
+      confirmLabel: l10n.coachHubActionPause,
     );
     if (!ok) return;
     await ref.read(trainerLinkRepositoryProvider).pause(link.id);
@@ -527,12 +540,12 @@ class _RowActions extends ConsumerWidget {
       ref.read(trainerLinkRepositoryProvider).resume(link.id);
 
   Future<void> _terminate(BuildContext context, WidgetRef ref) async {
+    final l10n = AppL10n.of(context);
     final ok = await _confirmAction(
       context,
-      title: 'Terminar vínculo', // i18n: Fase W2
-      body:
-          'Esta acción no se puede deshacer. El historial se conserva.', // i18n: Fase W2
-      confirmLabel: 'Terminar', // i18n: Fase W2
+      title: l10n.coachHubDashboardTerminateLinkTitle,
+      body: l10n.coachHubDashboardTerminateLinkBody,
+      confirmLabel: l10n.coachHubActionTerminate,
     );
     if (!ok) return;
     await ref
@@ -542,19 +555,20 @@ class _RowActions extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppL10n.of(context);
     final status = link.status;
     final buttons = <Widget>[];
     if (status == TrainerLinkStatus.active) {
       buttons.add(_IconAction(
         icon: TreinoIcon.pause,
-        tooltip: 'Pausar', // i18n: Fase W2
+        tooltip: l10n.coachHubActionPause,
         color: palette.textMuted,
         onPressed: () => _pause(context, ref),
       ));
     } else if (status == TrainerLinkStatus.paused) {
       buttons.add(_IconAction(
         icon: TreinoIcon.play,
-        tooltip: 'Reanudar', // i18n: Fase W2
+        tooltip: l10n.coachHubActionResume,
         color: palette.accent,
         onPressed: () => _resume(ref),
       ));
@@ -563,7 +577,7 @@ class _RowActions extends ConsumerWidget {
         status == TrainerLinkStatus.paused) {
       buttons.add(_IconAction(
         icon: TreinoIcon.signOut,
-        tooltip: 'Terminar', // i18n: Fase W2
+        tooltip: l10n.coachHubActionTerminate,
         color: palette.highlight,
         onPressed: () => _terminate(context, ref),
       ));
@@ -621,6 +635,7 @@ Future<bool> _confirmAction(
   required String body,
   required String confirmLabel,
 }) async {
+  final l10n = AppL10n.of(context);
   final result = await showDialog<bool>(
     context: context,
     builder: (ctx) => AlertDialog(
@@ -629,7 +644,7 @@ Future<bool> _confirmAction(
       actions: [
         TextButton(
           onPressed: () => Navigator.of(ctx).pop(false),
-          child: const Text('Cancelar'), // i18n: Fase W2
+          child: Text(l10n.coachHubActionCancel),
         ),
         TextButton(
           onPressed: () => Navigator.of(ctx).pop(true),

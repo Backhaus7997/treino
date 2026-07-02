@@ -28,19 +28,19 @@ final _statusFilterProvider = StateProvider.autoDispose<Set<TrainerLinkStatus>>(
   },
 );
 
-/// Maps a raw `terminationReason` value to its es-AR display string.
+/// Maps a raw `terminationReason` value to its localized display string.
 /// Falls back to a generic "Vínculo terminado" so unknown / null reasons
 /// never crash the historial render (REQ-CHLM-009 + defensive default).
-String _reasonDisplay(String? raw) {
+String _reasonDisplay(AppL10n l10n, String? raw) {
   switch (raw) {
     case 'declined':
-      return 'Rechazado por el PF';
+      return l10n.coachHubDashboardTerminationReasonDeclined;
     case 'cancelled-by-athlete':
-      return 'Cancelado por el atleta';
+      return l10n.coachHubDashboardTerminationReasonByAthlete;
     case 'trainer-terminated':
-      return 'Terminado por el PF';
+      return l10n.coachHubDashboardTerminationReasonByTrainer;
     default:
-      return 'Vínculo terminado';
+      return l10n.coachHubDashboardTerminationReasonFallback;
   }
 }
 
@@ -56,6 +56,7 @@ Future<bool> _confirmAction(
   required String body,
   required String confirmLabel,
 }) async {
+  final l10n = AppL10n.of(context);
   final result = await showDialog<bool>(
     context: context,
     builder: (ctx) => AlertDialog(
@@ -64,7 +65,7 @@ Future<bool> _confirmAction(
       actions: [
         TextButton(
           onPressed: () => Navigator.of(ctx).pop(false),
-          child: const Text('Cancelar'),
+          child: Text(l10n.coachHubActionCancel),
         ),
         TextButton(
           onPressed: () => Navigator.of(ctx).pop(true),
@@ -102,6 +103,7 @@ class CoachHubDashboardScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
 
     // Sin Scaffold/SafeArea ni header de marca: el shell (CoachHubScaffold)
     // provee el chrome (sidebar + top bar) y el sign-out vive en el menú de
@@ -121,7 +123,7 @@ class CoachHubDashboardScreen extends ConsumerWidget {
                 onPressed: () => context.push('/upload-plan'),
                 icon: Icon(TreinoIcon.upload, size: 18, color: palette.bg),
                 label: Text(
-                  'IMPORTAR PLAN DESDE EXCEL',
+                  l10n.coachHubDashboardImportPlanCta,
                   style: GoogleFonts.barlowCondensed(
                     fontWeight: FontWeight.w700,
                     fontSize: 13,
@@ -161,6 +163,7 @@ class _FilterChipRow extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     final filter = ref.watch(_statusFilterProvider);
 
     void toggle(TrainerLinkStatus status) {
@@ -195,9 +198,9 @@ class _FilterChipRow extends ConsumerWidget {
       spacing: 8,
       runSpacing: 8,
       children: [
-        chip(TrainerLinkStatus.active, 'ACTIVOS'),
-        chip(TrainerLinkStatus.paused, 'PAUSADOS'),
-        chip(TrainerLinkStatus.terminated, 'HISTORIAL'),
+        chip(TrainerLinkStatus.active, l10n.coachHubDashboardFilterActivos),
+        chip(TrainerLinkStatus.paused, l10n.coachHubDashboardFilterPausados),
+        chip(TrainerLinkStatus.terminated, l10n.coachHubDashboardFilterHistorial),
       ],
     );
   }
@@ -260,12 +263,12 @@ class _ActiveStudentsList extends ConsumerWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const _SectionLabel('TUS ALUMNOS'),
+            _SectionLabel(l10n.coachHubDashboardActiveHeader),
             if (active.isEmpty)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 18),
                 child: Text(
-                  'Sin alumnos activos por ahora.',
+                  l10n.coachHubDashboardEmptyActive,
                   style: TextStyle(color: palette.textMuted),
                   textAlign: TextAlign.center,
                 ),
@@ -306,12 +309,12 @@ class _PausedStudentsList extends ConsumerWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const _SectionLabel('EN PAUSA'),
+            _SectionLabel(l10n.coachHubDashboardPausedHeader),
             if (paused.isEmpty)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 18),
                 child: Text(
-                  'No hay alumnos pausados.',
+                  l10n.coachHubDashboardEmptyPaused,
                   style: TextStyle(color: palette.textMuted),
                   textAlign: TextAlign.center,
                 ),
@@ -353,12 +356,12 @@ class _HistorialList extends ConsumerWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const _SectionLabel('VÍNCULOS PASADOS'),
+            _SectionLabel(l10n.coachHubDashboardHistoryHeader),
             if (terminated.isEmpty)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 18),
                 child: Text(
-                  'Sin vínculos terminados todavía.',
+                  l10n.coachHubDashboardEmptyHistory,
                   style: TextStyle(color: palette.textMuted),
                   textAlign: TextAlign.center,
                 ),
@@ -442,10 +445,9 @@ class _StudentTile extends ConsumerWidget {
     Future<void> handlePause() async {
       final ok = await _confirmAction(
         context,
-        title: 'Pausar vínculo',
-        body:
-            'El alumno verá el plan pero no podrá registrar sesiones nuevas hasta que reanudes el vínculo.',
-        confirmLabel: 'Confirmar',
+        title: l10n.coachHubDashboardPauseLinkTitle,
+        body: l10n.coachHubDashboardPauseLinkBody,
+        confirmLabel: l10n.coachHubActionConfirm,
       );
       if (!ok) return;
       try {
@@ -453,7 +455,7 @@ class _StudentTile extends ConsumerWidget {
       } catch (_) {
         if (!context.mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No pudimos pausar el vínculo.')),
+          SnackBar(content: Text(l10n.coachHubDashboardPauseLinkError)),
         );
       }
     }
@@ -461,9 +463,9 @@ class _StudentTile extends ConsumerWidget {
     Future<void> handleTerminate() async {
       final ok = await _confirmAction(
         context,
-        title: 'Terminar vínculo',
-        body: 'Esta acción no se puede deshacer. El historial se conserva.',
-        confirmLabel: 'Confirmar',
+        title: l10n.coachHubDashboardTerminateLinkTitle,
+        body: l10n.coachHubDashboardTerminateLinkBody,
+        confirmLabel: l10n.coachHubActionConfirm,
       );
       if (!ok) return;
       try {
@@ -473,7 +475,7 @@ class _StudentTile extends ConsumerWidget {
       } catch (_) {
         if (!context.mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No pudimos terminar el vínculo.')),
+          SnackBar(content: Text(l10n.coachHubDashboardTerminateLinkError)),
         );
       }
     }
@@ -515,7 +517,9 @@ class _StudentTile extends ConsumerWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'Vinculado desde ${_formatPauseDate(link.acceptedAt ?? link.requestedAt)}',
+                  l10n.coachHubDashboardLinkedSince(
+                    _formatPauseDate(link.acceptedAt ?? link.requestedAt),
+                  ),
                   style: TextStyle(
                     color: palette.textMuted,
                     fontSize: 12,
@@ -528,12 +532,12 @@ class _StudentTile extends ConsumerWidget {
           TextButton(
             onPressed: handlePause,
             style: TextButton.styleFrom(foregroundColor: palette.textMuted),
-            child: const Text('Pausar'),
+            child: Text(l10n.coachHubActionPause),
           ),
           TextButton(
             onPressed: handleTerminate,
             style: TextButton.styleFrom(foregroundColor: palette.highlight),
-            child: const Text('Terminar vínculo'),
+            child: Text(l10n.coachHubActionTerminateLink),
           ),
         ],
       ),
@@ -558,11 +562,11 @@ class _PausedStudentTile extends ConsumerWidget {
     Future<void> handleResume() async {
       final ok = await _confirmAction(
         context,
-        title: 'Reanudar vínculo',
+        title: l10n.coachHubDashboardResumeLinkTitle,
         body: pubAsync.valueOrNull != null
-            ? '¿Reanudar el vínculo con $name?'
-            : '¿Reanudar el vínculo?',
-        confirmLabel: 'Confirmar',
+            ? l10n.coachHubDashboardResumeLinkBody(name)
+            : l10n.coachHubDashboardResumeLinkBodyFallback,
+        confirmLabel: l10n.coachHubActionConfirm,
       );
       if (!ok) return;
       try {
@@ -570,7 +574,7 @@ class _PausedStudentTile extends ConsumerWidget {
       } catch (_) {
         if (!context.mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No pudimos reanudar el vínculo.')),
+          SnackBar(content: Text(l10n.coachHubDashboardResumeLinkError)),
         );
       }
     }
@@ -578,9 +582,9 @@ class _PausedStudentTile extends ConsumerWidget {
     Future<void> handleTerminate() async {
       final ok = await _confirmAction(
         context,
-        title: 'Terminar vínculo',
-        body: 'Esta acción no se puede deshacer. El historial se conserva.',
-        confirmLabel: 'Confirmar',
+        title: l10n.coachHubDashboardTerminateLinkTitle,
+        body: l10n.coachHubDashboardTerminateLinkBody,
+        confirmLabel: l10n.coachHubActionConfirm,
       );
       if (!ok) return;
       try {
@@ -590,7 +594,7 @@ class _PausedStudentTile extends ConsumerWidget {
       } catch (_) {
         if (!context.mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No pudimos terminar el vínculo.')),
+          SnackBar(content: Text(l10n.coachHubDashboardTerminateLinkError)),
         );
       }
     }
@@ -635,8 +639,10 @@ class _PausedStudentTile extends ConsumerWidget {
                 const SizedBox(height: 2),
                 Text(
                   pausedAt != null
-                      ? 'Pausado el ${_formatPauseDate(pausedAt)}'
-                      : 'Pausado',
+                      ? l10n.coachHubDashboardPausedOn(
+                          _formatPauseDate(pausedAt),
+                        )
+                      : l10n.coachHubDashboardPausedFallback,
                   style: TextStyle(
                     color: palette.textMuted,
                     fontSize: 12,
@@ -649,12 +655,12 @@ class _PausedStudentTile extends ConsumerWidget {
           TextButton(
             onPressed: handleResume,
             style: TextButton.styleFrom(foregroundColor: palette.accent),
-            child: const Text('Reanudar'),
+            child: Text(l10n.coachHubActionResume),
           ),
           TextButton(
             onPressed: handleTerminate,
             style: TextButton.styleFrom(foregroundColor: palette.highlight),
-            child: const Text('Terminar vínculo'),
+            child: Text(l10n.coachHubActionTerminateLink),
           ),
         ],
       ),
@@ -716,7 +722,7 @@ class _TerminatedStudentTile extends ConsumerWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  _reasonDisplay(link.terminationReason),
+                  _reasonDisplay(l10n, link.terminationReason),
                   style: TextStyle(
                     color: palette.textMuted,
                     fontSize: 12,
@@ -769,7 +775,7 @@ class _PendingRequestsList extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'SOLICITUDES PENDIENTES · ${pending.length}',
+              l10n.coachHubDashboardPendingHeader(pending.length),
               style: GoogleFonts.barlowCondensed(
                 color: palette.highlight,
                 fontSize: 12,
@@ -807,6 +813,7 @@ class _PendingRequestTileState extends ConsumerState<_PendingRequestTile> {
   Future<void> _accept() async {
     if (_busy) return;
     setState(() => _busy = true);
+    final l10n = AppL10n.of(context);
     final repo = ref.read(trainerLinkRepositoryProvider);
     try {
       await repo.accept(widget.link.id);
@@ -815,13 +822,13 @@ class _PendingRequestTileState extends ConsumerState<_PendingRequestTile> {
           .logLinkAccepted(linkId: widget.link.id);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Vínculo aceptado.')),
+        SnackBar(content: Text(l10n.coachHubDashboardAcceptSuccess)),
       );
     } catch (_) {
       if (!mounted) return;
       setState(() => _busy = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No pudimos aceptar el vínculo.')),
+        SnackBar(content: Text(l10n.coachHubDashboardAcceptError)),
       );
     }
   }
@@ -829,18 +836,19 @@ class _PendingRequestTileState extends ConsumerState<_PendingRequestTile> {
   Future<void> _decline() async {
     if (_busy) return;
     setState(() => _busy = true);
+    final l10n = AppL10n.of(context);
     final repo = ref.read(trainerLinkRepositoryProvider);
     try {
       await repo.decline(widget.link.id);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Solicitud rechazada.')),
+        SnackBar(content: Text(l10n.coachHubDashboardRejectSuccess)),
       );
     } catch (_) {
       if (!mounted) return;
       setState(() => _busy = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No pudimos rechazar la solicitud.')),
+        SnackBar(content: Text(l10n.coachHubDashboardRejectError)),
       );
     }
   }
@@ -891,7 +899,7 @@ class _PendingRequestTileState extends ConsumerState<_PendingRequestTile> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'Quiere vincularse con vos',
+                  l10n.coachHubDashboardPendingContext,
                   style: TextStyle(
                     color: palette.textMuted,
                     fontSize: 12,
@@ -922,7 +930,7 @@ class _PendingRequestTileState extends ConsumerState<_PendingRequestTile> {
                 foregroundColor: palette.textMuted,
                 padding: const EdgeInsets.symmetric(horizontal: 12),
               ),
-              child: const Text('Rechazar'),
+              child: Text(l10n.coachHubActionReject),
             ),
             const SizedBox(width: 4),
             ElevatedButton(
@@ -934,7 +942,7 @@ class _PendingRequestTileState extends ConsumerState<_PendingRequestTile> {
                 padding: const EdgeInsets.symmetric(horizontal: 14),
                 shape: const StadiumBorder(),
               ),
-              child: const Text('Aceptar'),
+              child: Text(l10n.coachHubActionAccept),
             ),
           ],
         ],

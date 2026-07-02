@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
+import '../../../l10n/app_l10n.dart';
 import '../../auth/application/auth_providers.dart';
 import '../../auth/domain/auth_failure.dart';
 
@@ -53,8 +54,9 @@ class _CoachHubLoginScreenState extends ConsumerState<CoachHubLoginScreen> {
     if (!mounted) return;
     final state = ref.read(authNotifierProvider);
     if (state.hasError) {
+      final l10n = AppL10n.of(context);
       setState(() {
-        _error = _humanizeError(state.error!);
+        _error = _humanizeError(state.error!, l10n);
         _submitting = false;
       });
     } else {
@@ -66,17 +68,20 @@ class _CoachHubLoginScreenState extends ConsumerState<CoachHubLoginScreen> {
   ///
   /// Si el error es un `AuthFailure` (lo que tira `AuthService` cuando
   /// Firebase rechaza credentials), usamos su `userMessage` ya
-  /// localizado en español Rioplatense. Sino, fallback genérico.
-  String _humanizeError(Object e) {
+  /// localizado — ADR-I18N-002: `AuthFailure.userMessage` queda hardcoded
+  /// en es-AR porque el domain layer no tiene BuildContext. El fallback
+  /// genérico sí es localizable via AppL10n.
+  String _humanizeError(Object e, AppL10n l10n) {
     if (e is AuthFailure) {
       return e.userMessage;
     }
-    return 'No pudimos ingresar. Probá de nuevo.';
+    return l10n.coachHubLoginGenericError;
   }
 
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     return Scaffold(
       backgroundColor: palette.bg,
       body: Center(
@@ -120,7 +125,7 @@ class _CoachHubLoginScreenState extends ConsumerState<CoachHubLoginScreen> {
                   ),
                   const SizedBox(height: 18),
                   Text(
-                    'Ingresá con la cuenta que ya usás en la app móvil.',
+                    l10n.coachHubLoginPrompt,
                     textAlign: TextAlign.center,
                     style: GoogleFonts.barlow(
                       color: palette.textMuted,
@@ -138,13 +143,14 @@ class _CoachHubLoginScreenState extends ConsumerState<CoachHubLoginScreen> {
                       AutofillHints.email,
                     ],
                     style: TextStyle(color: palette.textPrimary),
-                    decoration: _inputDecoration(palette, 'Email'),
+                    decoration:
+                        _inputDecoration(palette, l10n.coachHubLoginEmailLabel),
                     validator: (v) {
                       if (v == null || v.trim().isEmpty) {
-                        return 'Ingresá tu email';
+                        return l10n.coachHubLoginEmailRequired;
                       }
                       if (!v.contains('@')) {
-                        return 'Email inválido';
+                        return l10n.coachHubLoginEmailInvalid;
                       }
                       return null;
                     },
@@ -155,11 +161,12 @@ class _CoachHubLoginScreenState extends ConsumerState<CoachHubLoginScreen> {
                     obscureText: true,
                     autofillHints: const [AutofillHints.password],
                     style: TextStyle(color: palette.textPrimary),
-                    decoration: _inputDecoration(palette, 'Contraseña'),
+                    decoration: _inputDecoration(
+                        palette, l10n.coachHubLoginPasswordLabel),
                     onFieldSubmitted: (_) => _submit(),
                     validator: (v) {
                       if (v == null || v.isEmpty) {
-                        return 'Ingresá tu contraseña';
+                        return l10n.coachHubLoginPasswordRequired;
                       }
                       return null;
                     },
@@ -191,7 +198,7 @@ class _CoachHubLoginScreenState extends ConsumerState<CoachHubLoginScreen> {
                             ),
                           )
                         : Text(
-                            'INGRESAR',
+                            l10n.coachHubLoginSubmit,
                             style: GoogleFonts.barlowCondensed(
                               fontWeight: FontWeight.w700,
                               fontSize: 14,
@@ -201,7 +208,7 @@ class _CoachHubLoginScreenState extends ConsumerState<CoachHubLoginScreen> {
                   ),
                   const SizedBox(height: 14),
                   Text(
-                    '¿No tenés cuenta? Creala desde la app móvil TREINO.',
+                    l10n.coachHubLoginFooter,
                     textAlign: TextAlign.center,
                     style: GoogleFonts.barlow(
                       color: palette.textMuted,

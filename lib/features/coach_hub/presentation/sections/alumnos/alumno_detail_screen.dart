@@ -29,6 +29,7 @@ import 'package:treino/features/workout/domain/session.dart';
 import 'package:treino/features/workout/domain/set_log.dart';
 import 'package:treino/features/workout/presentation/widgets/exercise_progression_chart.dart';
 import 'package:treino/features/workout/presentation/widgets/session_exercise_block.dart';
+import 'package:treino/l10n/app_l10n.dart';
 
 import '../pagos/widgets/estado_cuenta_card.dart';
 import '../pagos/widgets/marcar_pagado_actions.dart';
@@ -256,7 +257,7 @@ class _Header extends StatelessWidget {
                               _Dot(color: estado!.color(palette)),
                               const SizedBox(width: 6),
                               Text(
-                                estado!.label,
+                                estado!.label(AppL10n.of(context)),
                                 style: TextStyle(
                                     color: estado!.color(palette),
                                     fontSize: 13),

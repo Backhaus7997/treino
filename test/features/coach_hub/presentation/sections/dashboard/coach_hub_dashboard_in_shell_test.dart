@@ -88,6 +88,7 @@ Future<void> _pumpDashboardInShell(WidgetTester tester) async {
         routerConfig: router,
         localizationsDelegates: AppL10n.localizationsDelegates,
         supportedLocales: AppL10n.supportedLocales,
+        locale: const Locale('es', 'AR'),
       ),
     ),
   );
