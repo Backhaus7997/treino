@@ -15,6 +15,7 @@ export { notifyOnReview } from "./notifications/notify-review";
 export { cleanupAssignedPlansOnUnlink } from "./cleanup-assigned-plans";
 export { addAlias } from "./add-alias";
 export { syncSessionShareOnTrainerLink } from "./sync-session-share";
+export { generateDuePayments } from "./payments/generate-due-payments";
 // SHELVED (gym-google-places, Plan B): resolveGymPlace cannot be deployed —
 // GCP project treino-dev sits under org code-assurance.com, whose
 // Domain-Restricted-Sharing policy blocks a publicly-invokable (allUsers)
