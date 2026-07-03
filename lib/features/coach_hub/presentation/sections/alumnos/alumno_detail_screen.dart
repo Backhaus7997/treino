@@ -2322,7 +2322,7 @@ class _MedicionesTab extends ConsumerStatefulWidget {
 class _MedicionesTabState extends ConsumerState<_MedicionesTab> {
   _MedicionView _view = _MedicionView.antropometricas;
 
-  Future<void> _openNewAntropoDialog() async {
+  Future<void> _openAntropoDialog({Measurement? initial}) async {
     final trainerUid = ref.read(currentUidProvider);
     if (trainerUid == null) return;
     await showDialog<void>(
@@ -2330,11 +2330,12 @@ class _MedicionesTabState extends ConsumerState<_MedicionesTab> {
       builder: (_) => _NuevaMedicionDialog(
         athleteId: widget.athleteId,
         trainerUid: trainerUid,
+        initial: initial,
       ),
     );
   }
 
-  Future<void> _openNewRendimientoDialog() async {
+  Future<void> _openRendimientoDialog({PerformanceTest? initial}) async {
     final trainerUid = ref.read(currentUidProvider);
     if (trainerUid == null) return;
     await showDialog<void>(
@@ -2342,6 +2343,7 @@ class _MedicionesTabState extends ConsumerState<_MedicionesTab> {
       builder: (_) => _NuevoRendimientoDialog(
         athleteId: widget.athleteId,
         trainerUid: trainerUid,
+        initial: initial,
       ),
     );
   }
@@ -2454,8 +2456,8 @@ class _MedicionesTabState extends ConsumerState<_MedicionesTab> {
               ),
               ElevatedButton.icon(
                 onPressed: isAntropo
-                    ? _openNewAntropoDialog
-                    : _openNewRendimientoDialog,
+                    ? () => _openAntropoDialog()
+                    : () => _openRendimientoDialog(),
                 icon: const Icon(Icons.add, size: 16),
                 label: Text(isAntropo
                     ? 'NUEVA MEDICIÓN' // i18n: Fase W2
@@ -2484,11 +2486,13 @@ class _MedicionesTabState extends ConsumerState<_MedicionesTab> {
                     athleteId: widget.athleteId,
                     palette: palette,
                     onDelete: _confirmDeleteMedicion,
+                    onEdit: (m) => _openAntropoDialog(initial: m),
                   )
                 : _RendimientoList(
                     athleteId: widget.athleteId,
                     palette: palette,
                     onDelete: _confirmDeleteRendimiento,
+                    onEdit: (t) => _openRendimientoDialog(initial: t),
                   ),
           ),
         ],
@@ -2558,11 +2562,13 @@ class _AntropoList extends ConsumerWidget {
     required this.athleteId,
     required this.palette,
     required this.onDelete,
+    required this.onEdit,
   });
 
   final String athleteId;
   final AppPalette palette;
   final Future<void> Function(Measurement) onDelete;
+  final Future<void> Function(Measurement) onEdit;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -2588,6 +2594,7 @@ class _AntropoList extends ConsumerWidget {
           measurement: ms[i],
           palette: palette,
           onDelete: () => onDelete(ms[i]),
+          onEdit: () => onEdit(ms[i]),
         ),
       );
     }
@@ -2609,11 +2616,13 @@ class _RendimientoList extends ConsumerWidget {
     required this.athleteId,
     required this.palette,
     required this.onDelete,
+    required this.onEdit,
   });
 
   final String athleteId;
   final AppPalette palette;
   final Future<void> Function(PerformanceTest) onDelete;
+  final Future<void> Function(PerformanceTest) onEdit;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -2639,6 +2648,7 @@ class _RendimientoList extends ConsumerWidget {
           test: tests[i],
           palette: palette,
           onDelete: () => onDelete(tests[i]),
+          onEdit: () => onEdit(tests[i]),
         ),
       );
     }
@@ -2661,11 +2671,13 @@ class _MedicionRow extends StatefulWidget {
     required this.measurement,
     required this.palette,
     required this.onDelete,
+    required this.onEdit,
   });
 
   final Measurement measurement;
   final AppPalette palette;
   final VoidCallback onDelete;
+  final VoidCallback onEdit;
 
   @override
   State<_MedicionRow> createState() => _MedicionRowState();
@@ -2729,6 +2741,12 @@ class _MedicionRowState extends State<_MedicionRow> {
                       ),
                     ],
                   ),
+                ),
+                IconButton(
+                  tooltip: 'Editar', // i18n: Fase W2
+                  onPressed: widget.onEdit,
+                  icon: Icon(Icons.edit,
+                      size: 18, color: palette.textMuted),
                 ),
                 IconButton(
                   tooltip: 'Eliminar', // i18n: Fase W2
@@ -2869,19 +2887,26 @@ class _MedicionDetail extends StatelessWidget {
   }
 }
 
-/// Dialog modal para cargar una nueva medición antropométrica.
+/// Dialog modal para cargar (o editar) una medición antropométrica.
 ///
 /// Todos los campos son opcionales — el PF loguea solo lo que midió esa
 /// sesión. Composición corporal siempre expandida (más común); las
 /// circunferencias en 3 secciones colapsables para no abrumar.
+///
+/// PR#3 (2026-07-03): si [initial] es no-nulo → **modo edición**. El
+/// formulario arranca pre-populado con los valores actuales y guarda con
+/// `MeasurementRepository.update` preservando `id`/`recordedBy`/
+/// `athleteId`/`recordedAt`. Si es nulo → **modo crear** con `.add`.
 class _NuevaMedicionDialog extends ConsumerStatefulWidget {
   const _NuevaMedicionDialog({
     required this.athleteId,
     required this.trainerUid,
+    this.initial,
   });
 
   final String athleteId;
   final String trainerUid;
+  final Measurement? initial;
 
   @override
   ConsumerState<_NuevaMedicionDialog> createState() =>
@@ -2923,6 +2948,61 @@ class _NuevaMedicionDialogState extends ConsumerState<_NuevaMedicionDialog> {
   bool _lowerExpanded = false;
   bool _saving = false;
 
+  bool get _isEditing => widget.initial != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final initial = widget.initial;
+    if (initial == null) return;
+    // Pre-populate controllers con los valores existentes.
+    void set(TextEditingController c, double? v) {
+      if (v != null) c.text = v.toString();
+    }
+
+    set(_weightC, initial.weightKg);
+    set(_fatC, initial.fatPercentage);
+    set(_muscleC, initial.muscleMassKg);
+    set(_shouldersC, initial.shouldersCm);
+    set(_chestC, initial.chestCm);
+    set(_waistC, initial.waistCm);
+    set(_hipsC, initial.hipsCm);
+    set(_glutesC, initial.glutesCm);
+    set(_bicepsLC, initial.bicepsLCm);
+    set(_bicepsRC, initial.bicepsRCm);
+    set(_bicepsFlexedLC, initial.bicepsFlexedLCm);
+    set(_bicepsFlexedRC, initial.bicepsFlexedRCm);
+    set(_forearmLC, initial.forearmLCm);
+    set(_forearmRC, initial.forearmRCm);
+    set(_upperThighLC, initial.upperThighLCm);
+    set(_upperThighRC, initial.upperThighRCm);
+    set(_midThighLC, initial.midThighLCm);
+    set(_midThighRC, initial.midThighRCm);
+    set(_calfLC, initial.calfLCm);
+    set(_calfRC, initial.calfRCm);
+    if (initial.notes != null) _notesC.text = initial.notes!;
+
+    // Auto-expand secciones que tienen algún valor cargado, así el PF ve
+    // los campos sin tener que abrir manualmente cada sección.
+    _trunkExpanded = initial.shouldersCm != null ||
+        initial.chestCm != null ||
+        initial.waistCm != null ||
+        initial.hipsCm != null ||
+        initial.glutesCm != null;
+    _upperExpanded = initial.bicepsLCm != null ||
+        initial.bicepsRCm != null ||
+        initial.bicepsFlexedLCm != null ||
+        initial.bicepsFlexedRCm != null ||
+        initial.forearmLCm != null ||
+        initial.forearmRCm != null;
+    _lowerExpanded = initial.upperThighLCm != null ||
+        initial.upperThighRCm != null ||
+        initial.midThighLCm != null ||
+        initial.midThighRCm != null ||
+        initial.calfLCm != null ||
+        initial.calfRCm != null;
+  }
+
   @override
   void dispose() {
     for (final c in [
@@ -2951,12 +3031,15 @@ class _NuevaMedicionDialogState extends ConsumerState<_NuevaMedicionDialog> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _saving = true);
     final messenger = ScaffoldMessenger.of(context);
+    final initial = widget.initial;
     try {
+      // En edición preservamos id + recordedBy + athleteId + recordedAt
+      // (Firestore rule exige que los inmutables no cambien).
       final measurement = Measurement(
-        id: '',
+        id: initial?.id ?? '',
         athleteId: widget.athleteId,
         recordedBy: widget.trainerUid,
-        recordedAt: DateTime.now(),
+        recordedAt: initial?.recordedAt ?? DateTime.now(),
         weightKg: _parse(_weightC),
         fatPercentage: _parse(_fatC),
         muscleMassKg: _parse(_muscleC),
@@ -2979,13 +3062,20 @@ class _NuevaMedicionDialogState extends ConsumerState<_NuevaMedicionDialog> {
         calfRCm: _parse(_calfRC),
         notes: _notesC.text.trim().isEmpty ? null : _notesC.text.trim(),
       );
-      await ref.read(measurementRepositoryProvider).add(measurement);
+      final repo = ref.read(measurementRepositoryProvider);
+      if (_isEditing) {
+        await repo.update(measurement);
+      } else {
+        await repo.add(measurement);
+      }
       if (!mounted) return;
       Navigator.of(context).pop();
       messenger.showSnackBar(
-        const SnackBar(
-          content: Text('Medición guardada.'), // i18n: Fase W2
-          duration: Duration(seconds: 2),
+        SnackBar(
+          content: Text(_isEditing
+              ? 'Medición actualizada.' // i18n: Fase W2
+              : 'Medición guardada.'), // i18n: Fase W2
+          duration: const Duration(seconds: 2),
         ),
       );
     } catch (_) {
@@ -3014,7 +3104,9 @@ class _NuevaMedicionDialogState extends ConsumerState<_NuevaMedicionDialog> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                'Nueva medición', // i18n: Fase W2
+                _isEditing
+                    ? 'Editar medición' // i18n: Fase W2
+                    : 'Nueva medición', // i18n: Fase W2
                 style: TextStyle(
                   color: palette.textPrimary,
                   fontSize: 18,
@@ -3374,11 +3466,13 @@ class _RendimientoRow extends StatefulWidget {
     required this.test,
     required this.palette,
     required this.onDelete,
+    required this.onEdit,
   });
 
   final PerformanceTest test;
   final AppPalette palette;
   final VoidCallback onDelete;
+  final VoidCallback onEdit;
 
   @override
   State<_RendimientoRow> createState() => _RendimientoRowState();
@@ -3442,6 +3536,12 @@ class _RendimientoRowState extends State<_RendimientoRow> {
                       ),
                     ],
                   ),
+                ),
+                IconButton(
+                  tooltip: 'Editar', // i18n: Fase W2
+                  onPressed: widget.onEdit,
+                  icon: Icon(Icons.edit,
+                      size: 18, color: palette.textMuted),
                 ),
                 IconButton(
                   tooltip: 'Eliminar', // i18n: Fase W2
@@ -3583,19 +3683,24 @@ class _RendimientoDetail extends StatelessWidget {
   }
 }
 
-/// Dialog modal para cargar una nueva prueba de rendimiento.
+/// Dialog modal para cargar (o editar) una prueba de rendimiento.
 ///
 /// Todos los campos opcionales. Saltos siempre expandido (la sección más
 /// común según el research de PT); Sprints, 1RM y Resistencia colapsables
 /// por default para no abrumar.
+///
+/// PR#3 (2026-07-03): si [initial] es no-nulo → **modo edición**. Mismo
+/// pattern que `_NuevaMedicionDialog`.
 class _NuevoRendimientoDialog extends ConsumerStatefulWidget {
   const _NuevoRendimientoDialog({
     required this.athleteId,
     required this.trainerUid,
+    this.initial,
   });
 
   final String athleteId;
   final String trainerUid;
+  final PerformanceTest? initial;
 
   @override
   ConsumerState<_NuevoRendimientoDialog> createState() =>
@@ -3635,6 +3740,52 @@ class _NuevoRendimientoDialogState
   bool _resistExpanded = false;
   bool _saving = false;
 
+  bool get _isEditing => widget.initial != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final initial = widget.initial;
+    if (initial == null) return;
+
+    void set(TextEditingController c, double? v) {
+      if (v != null) c.text = v.toString();
+    }
+
+    set(_cmjC, initial.cmjCm);
+    set(_squatJumpC, initial.squatJumpCm);
+    set(_abalakovC, initial.abalakovCm);
+    set(_broadJumpC, initial.broadJumpCm);
+    set(_sprint10C, initial.sprint10mS);
+    set(_sprint20C, initial.sprint20mS);
+    set(_sprint30C, initial.sprint30mS);
+    set(_sprint40C, initial.sprint40mS);
+    set(_squat1rmC, initial.squat1rmKg);
+    set(_bench1rmC, initial.benchPress1rmKg);
+    set(_deadlift1rmC, initial.deadlift1rmKg);
+    set(_overhead1rmC, initial.overheadPress1rmKg);
+    set(_pullUp1rmC, initial.pullUp1rmKg);
+    set(_vo2maxC, initial.vo2maxMlKgMin);
+    set(_courseNavetteC, initial.courseNavetteLevel);
+    set(_cooperC, initial.cooperMeters);
+    set(_sitAndReachC, initial.sitAndReachCm);
+    if (initial.notes != null) _notesC.text = initial.notes!;
+
+    _sprintsExpanded = initial.sprint10mS != null ||
+        initial.sprint20mS != null ||
+        initial.sprint30mS != null ||
+        initial.sprint40mS != null;
+    _oneRmExpanded = initial.squat1rmKg != null ||
+        initial.benchPress1rmKg != null ||
+        initial.deadlift1rmKg != null ||
+        initial.overheadPress1rmKg != null ||
+        initial.pullUp1rmKg != null;
+    _resistExpanded = initial.vo2maxMlKgMin != null ||
+        initial.courseNavetteLevel != null ||
+        initial.cooperMeters != null ||
+        initial.sitAndReachCm != null;
+  }
+
   @override
   void dispose() {
     for (final c in [
@@ -3660,12 +3811,13 @@ class _NuevoRendimientoDialogState
     if (!_formKey.currentState!.validate()) return;
     setState(() => _saving = true);
     final messenger = ScaffoldMessenger.of(context);
+    final initial = widget.initial;
     try {
       final test = PerformanceTest(
-        id: '',
+        id: initial?.id ?? '',
         athleteId: widget.athleteId,
         recordedBy: widget.trainerUid,
-        recordedAt: DateTime.now(),
+        recordedAt: initial?.recordedAt ?? DateTime.now(),
         cmjCm: _parse(_cmjC),
         squatJumpCm: _parse(_squatJumpC),
         abalakovCm: _parse(_abalakovC),
@@ -3685,13 +3837,20 @@ class _NuevoRendimientoDialogState
         sitAndReachCm: _parse(_sitAndReachC),
         notes: _notesC.text.trim().isEmpty ? null : _notesC.text.trim(),
       );
-      await ref.read(performanceTestRepositoryProvider).add(test);
+      final repo = ref.read(performanceTestRepositoryProvider);
+      if (_isEditing) {
+        await repo.update(test);
+      } else {
+        await repo.add(test);
+      }
       if (!mounted) return;
       Navigator.of(context).pop();
       messenger.showSnackBar(
-        const SnackBar(
-          content: Text('Prueba guardada.'), // i18n: Fase W2
-          duration: Duration(seconds: 2),
+        SnackBar(
+          content: Text(_isEditing
+              ? 'Prueba actualizada.' // i18n: Fase W2
+              : 'Prueba guardada.'), // i18n: Fase W2
+          duration: const Duration(seconds: 2),
         ),
       );
     } catch (_) {
@@ -3719,7 +3878,9 @@ class _NuevoRendimientoDialogState
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                'Nueva prueba de rendimiento', // i18n: Fase W2
+                _isEditing
+                    ? 'Editar prueba de rendimiento' // i18n: Fase W2
+                    : 'Nueva prueba de rendimiento', // i18n: Fase W2
                 style: TextStyle(
                   color: palette.textPrimary,
                   fontSize: 18,
