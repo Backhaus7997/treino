@@ -15,7 +15,7 @@ import 'widgets/nearby_gyms_list.dart';
 import 'widgets/pinned_current_gym.dart';
 
 /// Allows the authenticated athlete to search and select a gym via Google
-/// Places Autocomplete, then persist the selection to their profile.
+/// Places Text Search (AD-12), then persist the selection to their profile.
 ///
 /// REQ-PSR-019: search + selection + `UserRepository.update({'gymId': ...})`.
 /// Reuses [GymSearchBox] — shared with `step_2_gym.dart` per spec gym-catalog
@@ -23,9 +23,9 @@ import 'widgets/pinned_current_gym.dart';
 /// contract, ADR-PSR-011).
 ///
 /// A Google Places tap only stages `_pendingGymId` locally — the resolve
-/// (`resolveGymPlace` Cloud Function call, billable) happens on explicit
-/// "GUARDAR" tap, not on every suggestion tap, to avoid unnecessary Places
-/// billing on accidental selections. `kNoGymId` needs no resolution.
+/// (client-side Details call, billable) happens on explicit "GUARDAR" tap,
+/// not on every suggestion tap, to avoid unnecessary Places billing on
+/// accidental selections. `kNoGymId` needs no resolution.
 class ProfileGymScreen extends ConsumerStatefulWidget {
   const ProfileGymScreen({super.key});
 

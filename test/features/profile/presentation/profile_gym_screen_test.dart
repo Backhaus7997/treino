@@ -1,9 +1,11 @@
 // Rewritten for gym-google-places Slice 3 (Phase 3): ProfileGymScreen now
 // wraps the shared GymSearchBox (single debounced Google Places search) —
 // SCENARIO-516/517 originally covered the retired two-step brand→branch
-// picker (see git history for the prior version). This version drives the
-// screen end-to-end via placesSuggestionsProvider/selectGymActionProvider
-// mocks, mirroring gym_search_box_test.dart's widget-test conventions.
+// picker (see git history for the prior version).
+//
+// Rewritten AGAIN for gym-selection-v2 Phase 3 (addendum, AD-12): typed
+// search now runs via PlacesTextSearchService/placesTextSearchProvider
+// instead of the retired PlacesAutocompleteService/gymSearchSessionTokenProvider.
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -16,7 +18,7 @@ import 'package:treino/core/utils/geohash.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/gyms/application/gym_providers.dart';
 import 'package:treino/features/gyms/application/places_providers.dart';
-import 'package:treino/features/gyms/data/places_autocomplete_service.dart';
+import 'package:treino/features/gyms/data/places_text_search_service.dart';
 import 'package:treino/features/gyms/data/resolve_gym_place_service.dart';
 import 'package:treino/features/gyms/domain/gym.dart';
 import 'package:treino/features/gyms/domain/gym_source.dart';
@@ -40,8 +42,8 @@ class MockUser extends Mock implements User {
 
 class MockUserRepository extends Mock implements UserRepository {}
 
-class MockPlacesAutocompleteService extends Mock
-    implements PlacesAutocompleteService {}
+class MockPlacesTextSearchService extends Mock
+    implements PlacesTextSearchService {}
 
 class MockResolveGymPlaceService extends Mock
     implements ResolveGymPlaceService {}
@@ -51,6 +53,10 @@ class MockResolveGymPlaceService extends Mock
 // ---------------------------------------------------------------------------
 
 const _uid = 'test-uid';
+
+/// Near-zero so widget tests don't have to pump the real 600ms debounce
+/// window.
+const _testDebounce = Duration(milliseconds: 1);
 
 UserProfile _profile({String? gymId}) => UserProfile(
       uid: _uid,
@@ -65,7 +71,7 @@ UserProfile _profile({String? gymId}) => UserProfile(
 Widget _buildScreen({
   required UserProfile profile,
   required MockUserRepository userRepo,
-  required MockPlacesAutocompleteService placesService,
+  required MockPlacesTextSearchService placesService,
   MockResolveGymPlaceService? resolveService,
   List<Override> extraOverrides = const [],
 }) {
@@ -92,8 +98,8 @@ Widget _buildScreen({
       authStateChangesProvider.overrideWith((_) => Stream.value(mockUser)),
       userProfileProvider.overrideWith((_) => Stream.value(profile)),
       userRepositoryProvider.overrideWithValue(userRepo),
-      placesAutocompleteServiceProvider.overrideWithValue(placesService),
-      gymSearchSessionTokenProvider.overrideWith((ref) => 'tok-fixed'),
+      placesTextSearchServiceProvider.overrideWithValue(placesService),
+      textSearchDebounceDurationProvider.overrideWithValue(_testDebounce),
       gymSearchLocationBiasProvider.overrideWith((ref) async => null),
       if (resolveService != null)
         resolveGymPlaceServiceProvider.overrideWithValue(resolveService),
@@ -101,7 +107,7 @@ Widget _buildScreen({
       // for GymSearchBox. Default every pre-existing test to the
       // not-granted state (via setForTest seam — NEVER real Geolocator,
       // confirmed testWidgets hang gotcha) so it renders only the inline
-      // affordance and never touches these tests' Autocomplete-focused
+      // affordance and never touches these tests' typed-search-focused
       // assertions. Composition-specific tests override this explicitly.
       nearbyLocationProvider.overrideWith(
         (ref) => NearbyLocationNotifier()..setDeniedForTest(),
@@ -120,7 +126,7 @@ Widget _buildScreen({
 
 void main() {
   late MockUserRepository mockUserRepo;
-  late MockPlacesAutocompleteService mockPlacesService;
+  late MockPlacesTextSearchService mockPlacesService;
   late MockResolveGymPlaceService mockResolveService;
 
   setUpAll(() {
@@ -129,24 +135,22 @@ void main() {
 
   setUp(() {
     mockUserRepo = MockUserRepository();
-    mockPlacesService = MockPlacesAutocompleteService();
+    mockPlacesService = MockPlacesTextSearchService();
     mockResolveService = MockResolveGymPlaceService();
     when(() => mockUserRepo.update(any(), any())).thenAnswer((_) async {});
   });
 
   group('ProfileGymScreen', () {
-    testWidgets('typing shows debounced Autocomplete suggestions',
-        (tester) async {
+    testWidgets('typing shows debounced Text Search results', (tester) async {
       when(() => mockPlacesService.search(
-            query: any(named: 'query'),
-            sessionToken: any(named: 'sessionToken'),
+            textQuery: any(named: 'textQuery'),
             biasLatitude: any(named: 'biasLatitude'),
             biasLongitude: any(named: 'biasLongitude'),
           )).thenAnswer((_) async => const [
             GymSuggestion(
               placeId: 'ChIJ_1',
-              primaryText: 'SportClub Belgrano',
-              secondaryText: 'Cabildo 1789',
+              primaryText: 'QIVOX Villa Warcalde',
+              secondaryText: 'Some street 123',
             ),
           ]);
 
@@ -157,26 +161,25 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      await tester.enterText(find.byType(TextField), 'sport');
-      await tester.pump(const Duration(milliseconds: 300));
+      await tester.enterText(find.byType(TextField), 'qivox');
+      await tester.pump(const Duration(milliseconds: 5));
       await tester.pumpAndSettle();
 
-      expect(find.text('SportClub Belgrano'), findsOneWidget);
+      expect(find.text('QIVOX Villa Warcalde'), findsOneWidget);
     });
 
     testWidgets(
-        'selecting a suggestion and confirming resolves + saves via '
-        'selectGymActionProvider', (tester) async {
+        'selecting a suggestion and confirming resolves (no session token) '
+        '+ saves via selectGymActionProvider', (tester) async {
       when(() => mockPlacesService.search(
-            query: any(named: 'query'),
-            sessionToken: any(named: 'sessionToken'),
+            textQuery: any(named: 'textQuery'),
             biasLatitude: any(named: 'biasLatitude'),
             biasLongitude: any(named: 'biasLongitude'),
           )).thenAnswer((_) async => const [
             GymSuggestion(
               placeId: 'ChIJ_1',
-              primaryText: 'SportClub Belgrano',
-              secondaryText: 'Cabildo 1789',
+              primaryText: 'QIVOX Villa Warcalde',
+              secondaryText: 'Some street 123',
             ),
           ]);
       when(() => mockResolveService.call(
@@ -184,8 +187,8 @@ void main() {
             sessionToken: any(named: 'sessionToken'),
           )).thenAnswer((_) async => const ResolveGymPlaceResult(
             gymId: 'ChIJ_1',
-            name: 'SportClub Belgrano',
-            address: 'Cabildo 1789',
+            name: 'QIVOX Villa Warcalde',
+            address: 'Some street 123',
             source: 'google-places',
           ));
 
@@ -197,11 +200,11 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      await tester.enterText(find.byType(TextField), 'sport');
-      await tester.pump(const Duration(milliseconds: 300));
+      await tester.enterText(find.byType(TextField), 'qivox');
+      await tester.pump(const Duration(milliseconds: 5));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('SportClub Belgrano'));
+      await tester.tap(find.text('QIVOX Villa Warcalde'));
       await tester.pump();
 
       await tester.tap(find.text('GUARDAR')); // i18n: Fase 6 Etapa 3
@@ -209,7 +212,7 @@ void main() {
 
       verify(() => mockResolveService.call(
             placeId: 'ChIJ_1',
-            sessionToken: 'tok-fixed',
+            sessionToken: null,
           )).called(1);
       verify(() => mockUserRepo.update(_uid, {'gymId': 'ChIJ_1'})).called(1);
     });
@@ -218,17 +221,16 @@ void main() {
         (tester) async {
       var attempt = 0;
       when(() => mockPlacesService.search(
-            query: any(named: 'query'),
-            sessionToken: any(named: 'sessionToken'),
+            textQuery: any(named: 'textQuery'),
             biasLatitude: any(named: 'biasLatitude'),
             biasLongitude: any(named: 'biasLongitude'),
           )).thenAnswer((_) async {
         attempt++;
         if (attempt == 1) {
-          throw const PlacesAutocompleteError('network down');
+          throw const PlacesTextSearchError('network down');
         }
         return const [
-          GymSuggestion(placeId: 'ChIJ_1', primaryText: 'SportClub Belgrano'),
+          GymSuggestion(placeId: 'ChIJ_1', primaryText: 'QIVOX Villa Warcalde'),
         ];
       });
 
@@ -239,18 +241,18 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      await tester.enterText(find.byType(TextField), 'sport');
-      await tester.pump(const Duration(milliseconds: 300));
+      await tester.enterText(find.byType(TextField), 'qivox');
+      await tester.pump(const Duration(milliseconds: 5));
       await tester.pumpAndSettle();
 
-      expect(find.text('SportClub Belgrano'), findsNothing);
+      expect(find.text('QIVOX Villa Warcalde'), findsNothing);
       final retryFinder = find.text('Reintentar');
       expect(retryFinder, findsOneWidget);
 
       await tester.tap(retryFinder);
       await tester.pumpAndSettle();
 
-      expect(find.text('SportClub Belgrano'), findsOneWidget);
+      expect(find.text('QIVOX Villa Warcalde'), findsOneWidget);
     });
 
     testWidgets('"no gym" option remains selectable without a search',
@@ -362,8 +364,8 @@ void main() {
     });
 
     testWidgets(
-        'empty query shows nearby list, non-empty query shows Autocomplete, '
-        'clearing restores nearby list', (tester) async {
+        'empty query shows nearby list, non-empty query shows Text Search '
+        'results, clearing restores nearby list', (tester) async {
       final position = Position(
         latitude: -34.5,
         longitude: -58.4,
@@ -379,14 +381,13 @@ void main() {
       final bucket = geohash5(position.latitude, position.longitude);
 
       when(() => mockPlacesService.search(
-            query: any(named: 'query'),
-            sessionToken: any(named: 'sessionToken'),
+            textQuery: any(named: 'textQuery'),
             biasLatitude: any(named: 'biasLatitude'),
             biasLongitude: any(named: 'biasLongitude'),
           )).thenAnswer((_) async => const [
             GymSuggestion(
               placeId: 'ChIJ_1',
-              primaryText: 'SportClub Belgrano',
+              primaryText: 'QIVOX Villa Warcalde',
             ),
           ]);
 
@@ -412,33 +413,32 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      // Empty query: nearby list visible, no Autocomplete results.
+      // Empty query: nearby list visible, no Text Search results.
       expect(find.text('Nearby Gym'), findsOneWidget);
-      expect(find.text('SportClub Belgrano'), findsNothing);
+      expect(find.text('QIVOX Villa Warcalde'), findsNothing);
 
-      // Non-empty query: Autocomplete replaces nearby.
-      await tester.enterText(find.byType(TextField), 'sport');
-      await tester.pump(const Duration(milliseconds: 300));
+      // Non-empty query: Text Search replaces nearby.
+      await tester.enterText(find.byType(TextField), 'qivox');
+      await tester.pump(const Duration(milliseconds: 5));
       await tester.pumpAndSettle();
 
-      expect(find.text('SportClub Belgrano'), findsOneWidget);
+      expect(find.text('QIVOX Villa Warcalde'), findsOneWidget);
       expect(find.text('Nearby Gym'), findsNothing);
 
       // Clearing restores the nearby list.
       await tester.enterText(find.byType(TextField), '');
-      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pump(const Duration(milliseconds: 5));
       await tester.pumpAndSettle();
 
       expect(find.text('Nearby Gym'), findsOneWidget);
-      expect(find.text('SportClub Belgrano'), findsNothing);
+      expect(find.text('QIVOX Villa Warcalde'), findsNothing);
     });
 
     testWidgets(
         '"No tengo gimnasio" stays visible in both empty and non-empty '
         'query states', (tester) async {
       when(() => mockPlacesService.search(
-            query: any(named: 'query'),
-            sessionToken: any(named: 'sessionToken'),
+            textQuery: any(named: 'textQuery'),
             biasLatitude: any(named: 'biasLatitude'),
             biasLongitude: any(named: 'biasLongitude'),
           )).thenAnswer((_) async => const []);
@@ -452,8 +452,8 @@ void main() {
 
       expect(find.text('OTRO GYM / SIN GYM'), findsOneWidget);
 
-      await tester.enterText(find.byType(TextField), 'sport');
-      await tester.pump(const Duration(milliseconds: 300));
+      await tester.enterText(find.byType(TextField), 'qivox');
+      await tester.pump(const Duration(milliseconds: 5));
       await tester.pumpAndSettle();
 
       expect(find.text('OTRO GYM / SIN GYM'), findsOneWidget);

@@ -9,8 +9,8 @@ import '../../application/profile_setup_notifier.dart';
 import '../../application/profile_setup_providers.dart';
 import '../widgets/gym_search_box.dart';
 
-/// Step 2: single debounced Google Places search box + `kNoGymId`
-/// ("OTRO/SIN GYM") option. Mockup: `profile-setup-2.png`.
+/// Step 2: single Google Places search box (Text Search, AD-12) +
+/// `kNoGymId` ("OTRO/SIN GYM") option. Mockup: `profile-setup-2.png`.
 ///
 /// Replaces the retired two-step brand→sucursal picker (`GymBrand`,
 /// `gymBrandsProvider`, `branchesForBrandProvider`) per spec gym-catalog

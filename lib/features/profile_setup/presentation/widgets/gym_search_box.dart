@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -11,22 +9,22 @@ import '../../../gyms/application/places_providers.dart';
 import '../../../gyms/domain/gym.dart' show kNoGymId;
 import 'gym_card.dart';
 
-/// Single debounced search box replacing the two-step brand→sucursal picker
-/// (retired `GymBrand`/`gymBrandsProvider`/`branchesForBrandProvider`).
+/// Single search box replacing the two-step brand→sucursal picker (retired
+/// `GymBrand`/`gymBrandsProvider`/`branchesForBrandProvider`).
 ///
 /// Shared by `step_2_gym.dart` (onboarding) and `profile_gym_screen.dart`
 /// (profile edit) per spec gym-catalog "Onboarding and profile-edit pickers
 /// share behavior" — both wrap this single widget so their search/loading/
 /// error/retry/no-gym behavior stays identical by construction.
 ///
-/// Debounce is a `Timer` owned by this widget (300ms), mirroring
-/// `SearchUsersScreen`'s convention (`search_users_screen.dart`) and
-/// `searchUsersProvider`'s doc comment: "Debounce lives in the screen
-/// (Timer), not here, so this provider stays pure and cacheable" — the same
-/// convention `placesSuggestionsProvider` follows (deferred here per Slice 2
-/// deviation, see `places_providers.dart`).
+/// Per design gym-selection-v2 AD-12 (Phase 3), debounce moved OUT of this
+/// widget and INTO `placesTextSearchProvider` (`places_providers.dart`) —
+/// every keystroke updates `setState` immediately (no widget-owned `Timer`
+/// anymore), and the provider itself gates the actual `searchText` network
+/// call. This lets the debounce window be test-controlled (an injectable
+/// `Duration` provider) instead of requiring real wall-clock waits in tests.
 ///
-/// Works WITHOUT location permission: `placesSuggestionsProvider` reads
+/// Works WITHOUT location permission: `placesTextSearchProvider` reads
 /// `gymSearchLocationBiasProvider`, which falls back to an unbiased search
 /// (no crash, no permission prompt) — this widget has no location-specific
 /// branching of its own.
@@ -60,20 +58,13 @@ class GymSearchBox extends ConsumerStatefulWidget {
 }
 
 class _GymSearchBoxState extends ConsumerState<GymSearchBox> {
-  Timer? _debounce;
   String _activeQuery = '';
 
-  @override
-  void dispose() {
-    _debounce?.cancel();
-    super.dispose();
-  }
-
+  // No widget-owned debounce Timer (Phase 3 / AD-12) — every keystroke
+  // updates `_activeQuery` immediately; `placesTextSearchProvider` gates the
+  // actual network call via its own debounce + minimum-length checks.
   void _onQueryChanged(String value) {
-    _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 300), () {
-      if (mounted) setState(() => _activeQuery = value.trim());
-    });
+    setState(() => _activeQuery = value.trim());
   }
 
   @override
@@ -133,7 +124,15 @@ class _SuggestionsList extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     if (query.isEmpty) return emptyQueryContent ?? const SizedBox.shrink();
 
-    final suggestionsAsync = ref.watch(placesSuggestionsProvider(query));
+    // Below the provider's minimum query length (AD-12): the provider
+    // returns `[]` without ever calling the service, but that's NOT a "sin
+    // resultados" outcome — the user simply hasn't typed enough yet. Stay
+    // quiet rather than showing a misleading empty-results message.
+    if (query.length < textSearchMinQueryLength) {
+      return const SizedBox.shrink();
+    }
+
+    final suggestionsAsync = ref.watch(placesTextSearchProvider(query));
 
     return suggestionsAsync.when(
       loading: () => const Padding(
@@ -141,7 +140,7 @@ class _SuggestionsList extends ConsumerWidget {
         child: Center(child: CircularProgressIndicator()),
       ),
       error: (_, __) => _ErrorRetry(
-        onRetry: () => ref.invalidate(placesSuggestionsProvider(query)),
+        onRetry: () => ref.invalidate(placesTextSearchProvider(query)),
       ),
       data: (suggestions) {
         if (suggestions.isEmpty) {

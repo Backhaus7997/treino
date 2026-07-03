@@ -2,10 +2,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 
+import '../../../core/utils/geohash.dart';
 import '../../profile/application/user_providers.dart'
     show userRepositoryProvider;
-import '../data/places_autocomplete_service.dart';
 import '../data/places_nearby_search_service.dart';
+import '../data/places_text_search_service.dart';
 import '../data/resolve_gym_place_service.dart';
 import '../domain/gym_suggestion.dart';
 import '../domain/nearby_gym.dart';
@@ -13,29 +14,21 @@ import 'gym_providers.dart' show gymRepositoryProvider;
 
 /// Bundle-restricted Places client key. Provided at build/run time via
 /// `--dart-define=PLACES_CLIENT_KEY=<key>` — NEVER committed to the repo.
-/// Empty by default; both [PlacesAutocompleteService.search] and
+/// Empty by default; both [PlacesTextSearchService.search] and
 /// [ResolveGymPlaceService.call] surface a clear config error (not a crash)
 /// when this is empty, e.g. in dev builds that forgot to pass the define.
 ///
-/// Shared by BOTH Autocomplete AND Place Details resolution (Plan B pivot —
+/// Shared by BOTH Text Search AND Place Details resolution (Plan B pivot —
 /// see [ResolveGymPlaceService] doc comment for why Details moved
 /// client-side too, reusing the same bundle-restricted key instead of a
 /// separate server-side key held in Secret Manager).
 const String _placesClientKey =
     String.fromEnvironment('PLACES_CLIENT_KEY', defaultValue: '');
 
-/// Shared `http.Client` for Places requests (Autocomplete + Details). A
+/// Shared `http.Client` for Places requests (Text Search + Details). A
 /// single long-lived client (not `Provider.autoDispose`) matches the
 /// codebase's other singleton-service providers.
 final httpClientProvider = Provider<http.Client>((ref) => http.Client());
-
-/// Provider for [PlacesAutocompleteService]. Overridable in tests.
-final placesAutocompleteServiceProvider = Provider<PlacesAutocompleteService>(
-  (ref) => PlacesAutocompleteService(
-    httpClient: ref.watch(httpClientProvider),
-    clientApiKey: _placesClientKey,
-  ),
-);
 
 /// Provider for [ResolveGymPlaceService] — CLIENT-SIDE (Plan B pivot).
 ///
@@ -47,7 +40,7 @@ final placesAutocompleteServiceProvider = Provider<PlacesAutocompleteService>(
 /// (kept, not exported from `functions/src/index.ts`) — resolution now
 /// happens directly from the client via [ResolveGymPlaceService], reusing
 /// [gymRepositoryProvider] for the read-through cache/upsert and the same
-/// bundle-restricted [_placesClientKey] Autocomplete already uses.
+/// bundle-restricted [_placesClientKey] Text Search already uses.
 final resolveGymPlaceServiceProvider = Provider<ResolveGymPlaceService>(
   (ref) => ResolveGymPlaceService(
     gymRepository: ref.watch(gymRepositoryProvider),
@@ -57,7 +50,7 @@ final resolveGymPlaceServiceProvider = Provider<ResolveGymPlaceService>(
 );
 
 /// Provider for [PlacesNearbySearchService]. Mirrors
-/// [placesAutocompleteServiceProvider] — same shared [httpClientProvider] +
+/// [placesTextSearchServiceProvider] — same shared [httpClientProvider] +
 /// bundle-restricted [_placesClientKey]. Overridable in tests (design AD-9
 /// item 1).
 final placesNearbySearchServiceProvider = Provider<PlacesNearbySearchService>(
@@ -67,24 +60,17 @@ final placesNearbySearchServiceProvider = Provider<PlacesNearbySearchService>(
   ),
 );
 
-/// Current Google Places Autocomplete session token.
-///
-/// Per spec gym-places-search: one token spans every keystroke of a search
-/// session and the eventual Details resolution, and a NEW token must be
-/// generated after a selection completes (or the picker reopens) — never
-/// reused across sessions. This provider generates a fresh token the first
-/// time it's read; [selectGymActionProvider] invalidates it after a
-/// successful selection so the next read mints a new one.
-///
-/// NOT autoDispose: the token must survive the `AsyncLoading` blips of
-/// [placesSuggestionsProvider] rebuilding on every keystroke — an autoDispose
-/// provider with no listeners between keystrokes would mint a new token per
-/// character, breaking the "one token per session" contract.
-final gymSearchSessionTokenProvider = Provider<String>(
-  (ref) => ref.watch(placesAutocompleteServiceProvider).newSessionToken(),
+/// Provider for [PlacesTextSearchService]. Mirrors
+/// [placesNearbySearchServiceProvider] — same shared [httpClientProvider] +
+/// bundle-restricted [_placesClientKey]. Overridable in tests (design AD-12).
+final placesTextSearchServiceProvider = Provider<PlacesTextSearchService>(
+  (ref) => PlacesTextSearchService(
+    httpClient: ref.watch(httpClientProvider),
+    clientApiKey: _placesClientKey,
+  ),
 );
 
-/// Best-effort current position for Autocomplete location bias.
+/// Best-effort current position for typed-search location bias.
 ///
 /// Per spec: bias when location permission is ALREADY granted, fall back to
 /// an unbiased search otherwise — WITHOUT prompting or blocking. Uses
@@ -93,7 +79,10 @@ final gymSearchSessionTokenProvider = Provider<String>(
 /// flow (`athleteLocationProvider`, coach discovery) owns prompting.
 ///
 /// Returns `null` on denied/restricted/unavailable/any error — never throws,
-/// per the spec's "without blocking or erroring the search" contract.
+/// per the spec's "without blocking or erroring the search" contract. Feeds
+/// [placesTextSearchProvider]'s `locationBias` the same way it fed
+/// Autocomplete's `locationBias` before the Phase 3 backend swap (AD-12) —
+/// this provider itself is UNCHANGED by that swap.
 final gymSearchLocationBiasProvider = FutureProvider.autoDispose<Position?>(
   (ref) async {
     try {
@@ -108,83 +97,47 @@ final gymSearchLocationBiasProvider = FutureProvider.autoDispose<Position?>(
   },
 );
 
-/// Debounced-by-caller Autocomplete suggestions for [query].
-///
-/// `FutureProvider.autoDispose.family` keyed on the raw query string —
-/// mirrors `searchUsersProvider` (feed/application/search_users_provider.dart):
-/// debounce is the caller's responsibility (a `Timer` in the eventual search
-/// widget, Slice 3), this provider stays pure and cacheable per keystroke.
-///
-/// Empty/blank query returns `[]` immediately without calling the service.
-final placesSuggestionsProvider =
-    FutureProvider.autoDispose.family<List<GymSuggestion>, String>(
-  (ref, query) async {
-    final trimmed = query.trim();
-    if (trimmed.isEmpty) return const [];
-
-    final service = ref.watch(placesAutocompleteServiceProvider);
-    final sessionToken = ref.watch(gymSearchSessionTokenProvider);
-    final position = await ref.watch(gymSearchLocationBiasProvider.future);
-
-    return service.search(
-      query: trimmed,
-      sessionToken: sessionToken,
-      biasLatitude: position?.latitude,
-      biasLongitude: position?.longitude,
-    );
-  },
-);
-
 /// `AsyncNotifier`-based select-gym action.
 ///
 /// Resolves the selected [GymSuggestion.placeId] via `resolveGymPlace`
 /// (server-side Details + `gyms/{placeId}` upsert), then updates
 /// `users/{uid}` with the new `gymId` — `UserRepository.update` dual-writes
 /// `gymName` from the now-existing `gyms/{gymId}` doc automatically (see
-/// `_resolveGymName`, profile/data/user_repository.dart). Resets the search
-/// session token on success so the NEXT search starts a new session (spec:
-/// "A new search starts a new session token").
+/// `_resolveGymName`, profile/data/user_repository.dart).
 ///
 /// Exposes loading/error via the inherited `AsyncValue` state — no separate
-/// error-handling plumbing needed by callers (Slice 3 UI reads
-/// `selectGymActionProvider` directly).
+/// error-handling plumbing needed by callers.
 class SelectGymAction extends AsyncNotifier<ResolveGymPlaceResult?> {
   @override
   ResolveGymPlaceResult? build() => null;
 
   /// Resolves [placeId] and persists it as the athlete's `gymId`.
   ///
-  /// [useSessionToken] (default `true`) reads and consumes
-  /// [gymSearchSessionTokenProvider] — the Autocomplete-selection path.
-  /// A nearby-originated selection has no Autocomplete session in progress
-  /// (spec gym-places-search "A nearby-originated selection resolves
-  /// without a session token"): callers pass `useSessionToken: false` so no
-  /// token is minted or sent, and [gymSearchSessionTokenProvider] is left
-  /// untouched (it still belongs to whatever Autocomplete session, if any,
-  /// is independently in progress).
+  /// [useSessionToken] is a legacy parameter from the retired
+  /// Autocomplete-session era (spec gym-places-search "A nearby-originated
+  /// selection resolves without a session token"). Per design AD-12, Text
+  /// Search has no session concept either — EVERY caller (typed search AND
+  /// nearby list) now passes `useSessionToken: false`, so [sessionToken] is
+  /// always `null` in practice. The parameter is kept (rather than removed
+  /// outright) because [ResolveGymPlaceService.call] still accepts an
+  /// optional token, and a future session-backed source is not
+  /// architecturally precluded.
   Future<void> select({
     required String uid,
     required String placeId,
-    bool useSessionToken = true,
+    bool useSessionToken = false,
   }) async {
     state = const AsyncLoading();
-    final sessionToken =
-        useSessionToken ? ref.read(gymSearchSessionTokenProvider) : null;
     state = await AsyncValue.guard(() async {
       final result = await ref.read(resolveGymPlaceServiceProvider).call(
             placeId: placeId,
-            sessionToken: sessionToken,
+            sessionToken: null,
           );
       await ref
           .read(userRepositoryProvider)
           .update(uid, {'gymId': result.gymId});
       return result;
     });
-    if (!state.hasError && useSessionToken) {
-      // Success — start a fresh session for the NEXT search (spec
-      // requirement: never reuse a token across sessions).
-      ref.invalidate(gymSearchSessionTokenProvider);
-    }
   }
 }
 
@@ -440,3 +393,158 @@ final nearbyLocationProvider =
 
   return ((minLat + maxLat) / 2, (minLon + maxLon) / 2);
 }
+
+// ── Typed search (searchText) — cost-gated, debounced, cache-first ────────
+//
+// Text Search bills as Text Search Pro (~$32/1000, no free-session model),
+// the same tier as searchNearby — unlike the retired Autocomplete's
+// free/Essentials sessions. Cost gating is therefore STRUCTURAL and
+// provider-owned (design gym-selection-v2 AD-12), verifiable by a
+// call-counting fake service — never a widget-level convention. Mirrors the
+// nearby-gyms cost-gating shape above (fire-once-settled-query + TTL cache),
+// adapted for typed search's extra debounce/min-chars gates:
+//   1. Debounce: `placesTextSearchProvider` waits
+//      [textSearchDebounceDurationProvider] after being read before it
+//      actually calls the service; if a NEWER family entry (a later
+//      keystroke's query) takes over before the wait elapses, this entry is
+//      disposed and never fires (`ref.mounted` guard).
+//   2. Minimum 3 characters: shorter (trimmed) queries return `[]`
+//      immediately, never reaching the debounce/network step.
+//   3. Cache: settled results are stashed in [textSearchCacheProvider]
+//      (`keepAlive`), keyed by `normalizedQuery|biasBucket` (biasBucket is
+//      the empty string when no location is available), with a TTL. A hit
+//      within TTL returns cached results with ZERO network call.
+
+/// One cached `searchText` result set for a `query|biasBucket` cache key,
+/// with the timestamp it was fetched at (for TTL expiry). Mirrors
+/// `_CachedNearby`.
+class _CachedTextSearch {
+  const _CachedTextSearch(this.results, this.fetchedAt);
+
+  final List<GymSuggestion> results;
+  final DateTime fetchedAt;
+}
+
+/// Cross-open cache TTL (design AD-12) — mirrors [nearbyGymsCacheTtl].
+const Duration textSearchCacheTtl = Duration(minutes: 10);
+
+/// Debounce window (design AD-12): typed search waits this long after the
+/// LAST read of a given query before actually calling the service. Widened
+/// from the retired Autocomplete widget's 300ms `Timer` — a cost-bearing
+/// backend with no free tier warrants a wider settle window. Overridable in
+/// tests (`textSearchDebounceDurationProvider.overrideWithValue(...)`) so
+/// tests never sleep the real 600ms.
+const Duration defaultTextSearchDebounceDuration = Duration(milliseconds: 600);
+
+/// Provider for the debounce duration — a plain value provider so tests can
+/// override it to a near-zero duration without touching the debounce LOGIC
+/// itself (design's "inject the debounce duration... so tests don't sleep").
+final textSearchDebounceDurationProvider = Provider<Duration>(
+  (ref) => defaultTextSearchDebounceDuration,
+);
+
+/// Minimum (trimmed) query length before a `searchText` request is ever
+/// considered (design AD-12) — shorter queries rarely narrow to a useful
+/// result set and would materially increase billed-call volume.
+const int textSearchMinQueryLength = 3;
+
+/// Tiny in-memory holder for the cache (design AD-12). Mirrors
+/// [NearbyGymsCache]'s shape exactly (`get(key, {now})`/`put(key, results,
+/// {fetchedAt})`), keyed here by a `String` cache key instead of a geohash
+/// bucket.
+class TextSearchCache {
+  final Map<String, _CachedTextSearch> _entries = {};
+
+  /// Returns the cached results for [key] if present AND fetched within
+  /// [textSearchCacheTtl] of [now]; otherwise `null` (miss).
+  List<GymSuggestion>? get(String key, {required DateTime now}) {
+    final entry = _entries[key];
+    if (entry == null) return null;
+    if (now.difference(entry.fetchedAt) > textSearchCacheTtl) return null;
+    return entry.results;
+  }
+
+  /// Stores [results] for [key]. [fetchedAt] defaults to "now" — tests pass
+  /// an explicit past timestamp to simulate an already-expired entry.
+  void put(String key, List<GymSuggestion> results, {DateTime? fetchedAt}) {
+    _entries[key] = _CachedTextSearch(results, fetchedAt ?? DateTime.now());
+  }
+}
+
+/// Provider for the cache holder. `keepAlive` (default for a plain
+/// [Provider]) so it survives the `autoDispose` family entries of
+/// [placesTextSearchProvider] being created/destroyed across queries/screen
+/// opens within one app session (design AD-12).
+final textSearchCacheProvider = Provider<TextSearchCache>(
+  (ref) => TextSearchCache(),
+);
+
+/// Builds the cache key for [query] + the current location-bias bucket:
+/// `normalizedQuery|biasBucket` (empty bucket segment when no location is
+/// available) — two different bias buckets for the same query text are
+/// treated as distinct cache entries, matching `searchText`'s bias-sensitive
+/// ranking.
+String _textSearchCacheKey(String normalizedQuery, Position? position) {
+  final bucket =
+      position == null ? '' : geohash5(position.latitude, position.longitude);
+  return '$normalizedQuery|$bucket';
+}
+
+/// Debounced, cost-gated, cache-first typed-search results for [query]
+/// (design AD-12). Replaces the retired `placesSuggestionsProvider`
+/// (Autocomplete-backed) as `GymSearchBox`'s typed-search data source.
+///
+/// `FutureProvider.autoDispose.family<List<GymSuggestion>, String>` keyed on
+/// the RAW per-keystroke query string — the WIDGET no longer owns a debounce
+/// `Timer` (design AD-12/task 3.8); every keystroke reads this family with
+/// its own query, and THIS provider is what gates the actual network call:
+///   1. Trimmed query under [textSearchMinQueryLength] → `[]`, no network,
+///      no debounce wait.
+///   2. Otherwise, wait [textSearchDebounceDurationProvider]. If THIS family
+///      entry is disposed before the wait elapses (a newer keystroke's
+///      entry superseded it — Riverpod tears down the old `autoDispose`
+///      entry once nothing depends on it), `ref.mounted` is `false` and the
+///      body returns early WITHOUT calling the service.
+///   3. After the wait, consult [textSearchCacheProvider] first — a hit
+///      within TTL returns cached results with ZERO network call. On a
+///      miss, call [PlacesTextSearchService.search] exactly once, cache the
+///      result, and return it.
+final placesTextSearchProvider =
+    FutureProvider.autoDispose.family<List<GymSuggestion>, String>(
+  (ref, query) async {
+    final trimmed = query.trim();
+    if (trimmed.length < textSearchMinQueryLength) return const [];
+
+    // `ref.mounted` isn't available on this riverpod version — track
+    // disposal manually via `onDispose` so the debounce wait below can
+    // abandon a superseded (older-keystroke) family entry without calling
+    // the service.
+    var disposed = false;
+    ref.onDispose(() => disposed = true);
+
+    final debounce = ref.watch(textSearchDebounceDurationProvider);
+    if (debounce > Duration.zero) {
+      await Future<void>.delayed(debounce);
+    }
+    // A newer keystroke's family entry superseded this one while we were
+    // waiting out the debounce — abandon silently, never call the service.
+    if (disposed) return const [];
+
+    final position = await ref.watch(gymSearchLocationBiasProvider.future);
+    final cacheKey = _textSearchCacheKey(trimmed, position);
+
+    final cache = ref.watch(textSearchCacheProvider);
+    final cached = cache.get(cacheKey, now: DateTime.now());
+    if (cached != null) return cached;
+
+    final service = ref.watch(placesTextSearchServiceProvider);
+    final results = await service.search(
+      textQuery: trimmed,
+      biasLatitude: position?.latitude,
+      biasLongitude: position?.longitude,
+    );
+
+    cache.put(cacheKey, results);
+    return results;
+  },
+);

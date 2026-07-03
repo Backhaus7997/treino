@@ -32,7 +32,7 @@ class PlacesNearbySearchError implements Exception {
 
 /// Client-side Google Places Nearby Search (New) service.
 ///
-/// Per design gym-selection-v2 AD-7: mirrors [PlacesAutocompleteService]'s
+/// Per design gym-selection-v2 AD-7: mirrors `PlacesTextSearchService`'s
 /// injection/error-split pattern exactly. `searchNearby` bills as Nearby
 /// Search Pro (no free-session model) — callers MUST NOT invoke [search]
 /// more than once per screen-open; cost gating lives in the provider layer
