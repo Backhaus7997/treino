@@ -2190,4 +2190,19 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get dashboardAdherenceRingPlaceholder => '';
+
+  @override
+  String get dashboardProximasSesionesEmpty => '';
+
+  @override
+  String get dashboardVencimientosTitle => '';
+
+  @override
+  String get dashboardVencimientosEmpty => '';
+
+  @override
+  String get dashboardVencimientosVerTodos => '';
+
+  @override
+  String get dashboardInactivosTitle => '';
 }

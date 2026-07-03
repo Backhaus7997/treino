@@ -9,6 +9,8 @@ import 'package:treino/core/analytics/analytics_service.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach/application/agenda_providers.dart';
 import 'package:treino/features/coach/application/dashboard_day_counts.dart';
+import 'package:treino/features/coach/domain/appointment.dart';
+import 'package:treino/features/payments/domain/payment.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
@@ -105,18 +107,12 @@ class _DashboardContent extends ConsumerWidget {
                 _PendingTodaySection(),
               ],
             ),
-            right: _PlaceholderCard(
-              title: 'Próximas sesiones',
-              hint: 'Las sesiones de hoy aparecerán aquí (PR2).',
-            ),
+            right: _RightColumn(),
           ),
         ] else ...[
           const _PendingTodaySection(),
           const SizedBox(height: 16),
-          const _PlaceholderCard(
-            title: 'Próximas sesiones',
-            hint: 'Las sesiones de hoy aparecerán aquí (PR2).',
-          ),
+          const _RightColumn(),
         ],
       ],
     );
@@ -433,7 +429,8 @@ class _KpiStrip extends ConsumerWidget {
 
 // ── Placeholder card ──────────────────────────────────────────────────────────
 
-/// Shared placeholder card for gaps (PR2/PR3 will replace).
+/// Shared placeholder card for gaps (PR3 will use for _AdherenceChart).
+// ignore: unused_element
 class _PlaceholderCard extends StatelessWidget {
   const _PlaceholderCard({required this.title, required this.hint});
   final String title;
@@ -460,6 +457,360 @@ class _PlaceholderCard extends StatelessWidget {
               fontSize: 13,
               fontWeight: FontWeight.w700,
               letterSpacing: 1.2,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            l10n.dashboardPlaceholderSoon,
+            style: TextStyle(color: palette.textMuted, fontSize: 13),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Right column ──────────────────────────────────────────────────────────────
+
+/// Right column container: Próximas sesiones + Vencimientos 7d + Inactivos.
+/// REQ-HOY-07, REQ-HOY-08, REQ-HOY-09.
+class _RightColumn extends StatelessWidget {
+  const _RightColumn();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _ProximasSesiones(),
+        SizedBox(height: 16),
+        _Vencimientos7d(),
+        SizedBox(height: 16),
+        _InactivosSection(),
+      ],
+    );
+  }
+}
+
+// ── Próximas sesiones (REAL) ──────────────────────────────────────────────────
+
+/// Shows next 4 confirmed future appointments. REQ-HOY-07.
+class _ProximasSesiones extends ConsumerWidget {
+  const _ProximasSesiones();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+
+    final uid = ref.watch(currentUidProvider) ?? '';
+    final now = DateTime.now().toUtc();
+    // La key de un provider .family DEBE ser estable entre builds. Usar
+    // DateTime.now() con precisión de microsegundos genera una key distinta en
+    // cada build → nueva instancia del family → AsyncLoading→data → rebuild →
+    // otra key nueva → loop infinito → pumpAndSettle nunca estabiliza (rompía
+    // TODOS los tests del dashboard en CI). Truncamos al día (estable dentro
+    // del día UTC); el filtro fino usa `now` más abajo en el .when(data:).
+    final todayStart = DateTime.utc(now.year, now.month, now.day);
+    // Ventana de 30 días desde el arranque de hoy. Key estable → sin loop.
+    final windowEnd = todayStart.add(const Duration(days: 30));
+    final appointmentsAsync = ref.watch(
+      trainerAppointmentsStreamProvider(
+        TrainerAppointmentsKey(
+          trainerId: uid,
+          fromDate: todayStart,
+          toDate: windowEnd,
+        ),
+      ),
+    );
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: palette.bgCard,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: palette.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            l10n.dashboardProximasSesionesSectionLabel,
+            style: GoogleFonts.barlowCondensed(
+              color: palette.textMuted,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.4,
+            ),
+          ),
+          const SizedBox(height: 12),
+          appointmentsAsync.when(
+            loading: () => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Center(
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: palette.accent,
+                  ),
+                ),
+              ),
+            ),
+            error: (_, __) => Text(
+              l10n.dashboardProximasSesionesEmpty,
+              style: TextStyle(color: palette.textMuted, fontSize: 13),
+            ),
+            data: (appointments) {
+              final upcoming = appointments
+                  .where(
+                    (a) =>
+                        a.status == AppointmentStatus.confirmed &&
+                        a.startsAt.isAfter(now),
+                  )
+                  .toList()
+                ..sort((a, b) => a.startsAt.compareTo(b.startsAt));
+
+              final rows = upcoming.take(4).toList();
+
+              if (rows.isEmpty) {
+                return Text(
+                  l10n.dashboardProximasSesionesEmpty,
+                  style: TextStyle(color: palette.textMuted, fontSize: 13),
+                );
+              }
+
+              return Column(
+                children: rows
+                    .map((a) => _SesionRow(appointment: a, palette: palette))
+                    .toList(),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SesionRow extends StatelessWidget {
+  const _SesionRow({required this.appointment, required this.palette});
+  final Appointment appointment;
+  final AppPalette palette;
+
+  @override
+  Widget build(BuildContext context) {
+    final local = appointment.startsAt.toLocal();
+    final hh = local.hour.toString().padLeft(2, '0');
+    final mm = local.minute.toString().padLeft(2, '0');
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 44,
+            child: Text(
+              '$hh:$mm',
+              style: TextStyle(
+                color: palette.accent,
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              appointment.athleteDisplayName,
+              style: TextStyle(
+                color: palette.textPrimary,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Vencimientos 7 días (REAL) ────────────────────────────────────────────────
+
+/// Shows vencidos from pagosBucketsProvider + "Ver todos" link. REQ-HOY-08.
+class _Vencimientos7d extends ConsumerWidget {
+  const _Vencimientos7d();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+    final bucketsAsync = ref.watch(pagosBucketsProvider);
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: palette.bgCard,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: palette.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            l10n.dashboardVencimientosTitle,
+            style: GoogleFonts.barlowCondensed(
+              color: palette.textMuted,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.4,
+            ),
+          ),
+          const SizedBox(height: 12),
+          bucketsAsync.when(
+            loading: () => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Center(
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: palette.accent,
+                  ),
+                ),
+              ),
+            ),
+            error: (_, __) => Text(
+              l10n.dashboardVencimientosEmpty,
+              style: TextStyle(color: palette.textMuted, fontSize: 13),
+            ),
+            data: (buckets) {
+              final vencidos = buckets.vencidos;
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (vencidos.isEmpty)
+                    Text(
+                      l10n.dashboardVencimientosEmpty,
+                      style: TextStyle(color: palette.textMuted, fontSize: 13),
+                    )
+                  else
+                    ...vencidos.map(
+                      (p) => _VencimientoRow(payment: p, palette: palette),
+                    ),
+                  const SizedBox(height: 12),
+                  GestureDetector(
+                    onTap: () => context.go('/pagos'),
+                    child: Text(
+                      l10n.dashboardVencimientosVerTodos,
+                      style: TextStyle(
+                        color: palette.accent,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _VencimientoRow extends ConsumerWidget {
+  const _VencimientoRow({required this.payment, required this.palette});
+  final Payment payment;
+  final AppPalette palette;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final daysOverdue = DateTime.now()
+        .toUtc()
+        .difference(
+          payment.createdAt.toUtc(),
+        )
+        .inDays;
+
+    // Payment sólo trae athleteId → resolvemos el nombre del alumno.
+    final name = ref
+            .watch(userPublicProfileProvider(payment.athleteId))
+            .valueOrNull
+            ?.displayName ??
+        '…';
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              name,
+              style: TextStyle(
+                color: palette.textPrimary,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: palette.accent.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(
+              '+$daysOverdue d',
+              style: TextStyle(
+                color: palette.accent,
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Alumnos inactivos (PLACEHOLDER V1) ───────────────────────────────────────
+
+/// Alumnos inactivos — V1 placeholder (no derived provider). REQ-HOY-09.
+class _InactivosSection extends StatelessWidget {
+  const _InactivosSection();
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: palette.bgCard,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: palette.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            l10n.dashboardInactivosTitle,
+            style: GoogleFonts.barlowCondensed(
+              color: palette.textMuted,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.4,
             ),
           ),
           const SizedBox(height: 12),

@@ -472,5 +472,25 @@
   "dashboardAdherenceRingPlaceholder": "--",
   "@dashboardAdherenceRingPlaceholder": {
     "description": "Placeholder value for adherencia ring (V1)."
+  },
+  "dashboardProximasSesionesEmpty": "No hay sesiones próximas confirmadas.",
+  "@dashboardProximasSesionesEmpty": {
+    "description": "Empty state for the Próximas sesiones section."
+  },
+  "dashboardVencimientosTitle": "VENCIMIENTOS — 7 DÍAS",
+  "@dashboardVencimientosTitle": {
+    "description": "Section title for the Vencimientos 7 días section."
+  },
+  "dashboardVencimientosEmpty": "Sin pagos vencidos.",
+  "@dashboardVencimientosEmpty": {
+    "description": "Empty state for the Vencimientos 7 días section."
+  },
+  "dashboardVencimientosVerTodos": "Ver todos los pagos",
+  "@dashboardVencimientosVerTodos": {
+    "description": "Link label to navigate to /pagos from the Vencimientos section."
+  },
+  "dashboardInactivosTitle": "ALUMNOS INACTIVOS",
+  "@dashboardInactivosTitle": {
+    "description": "Section title for the Alumnos inactivos placeholder section."
   }
 }
