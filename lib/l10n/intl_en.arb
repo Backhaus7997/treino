@@ -821,5 +821,9 @@
   "dashboardVencimientosTitle": "",
   "dashboardVencimientosEmpty": "",
   "dashboardVencimientosVerTodos": "",
-  "dashboardInactivosTitle": ""
+  "dashboardInactivosTitle": "",
+  "dashboardInactivosEmpty": "",
+  "dashboardInactivosSharingNote": "",
+  "dashboardAlertBannerAllClear": "",
+  "dashboardAlertBannerSummary": ""
 }

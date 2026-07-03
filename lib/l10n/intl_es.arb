@@ -495,5 +495,30 @@
   "dashboardInactivosTitle": "ALUMNOS INACTIVOS",
   "@dashboardInactivosTitle": {
     "description": "Section title for the Alumnos inactivos placeholder section."
+  },
+  "dashboardInactivosEmpty": "Sin alumnos inactivos",
+  "@dashboardInactivosEmpty": {
+    "description": "Empty state for the Alumnos inactivos section when all athletes trained in the last 14 days."
+  },
+  "dashboardInactivosSharingNote": "{sharing} de {total} con datos compartidos",
+  "@dashboardInactivosSharingNote": {
+    "description": "Disclaimer note showing how many athletes share data vs total active athletes.",
+    "placeholders": {
+      "sharing": { "type": "int" },
+      "total": { "type": "int" }
+    }
+  },
+  "dashboardAlertBannerAllClear": "Todo al día",
+  "@dashboardAlertBannerAllClear": {
+    "description": "Alert banner message when there are no alerts."
+  },
+  "dashboardAlertBannerSummary": "{vencidos} vencido(s) · {solicitudes} solicitud(es) · {inactivos} inactivo(s)",
+  "@dashboardAlertBannerSummary": {
+    "description": "Alert banner composed summary line.",
+    "placeholders": {
+      "vencidos": { "type": "int" },
+      "solicitudes": { "type": "int" },
+      "inactivos": { "type": "int" }
+    }
   }
 }

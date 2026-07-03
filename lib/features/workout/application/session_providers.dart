@@ -45,6 +45,31 @@ final finishedTodayByUidProvider =
   return ref.watch(sessionRepositoryProvider).listFinishedToday(uid);
 });
 
+/// Family key for [finishedInWindowByUidProvider].
+///
+/// [athleteId] is the athlete's uid. [from]/[to] MUST be day-truncated UTC
+/// values (e.g. `DateTime.utc(y, m, d)`) so the key is stable between builds
+/// and does NOT create a new family instance every frame — which would cause an
+/// infinite rebuild loop. See the critical lesson in the SDD apply prompt.
+typedef FinishedInWindowKey = ({String athleteId, DateTime from, DateTime to});
+
+/// Fetches [athleteId]'s FINISHED sessions within [from, to) (UTC), ordered by
+/// `finishedAt` descending. Bounded server-side query — powers the inactivos
+/// provider without reading the full session history per athlete.
+///
+/// IMPORTANT: [from] and [to] MUST be day-truncated UTC timestamps. If you
+/// pass `DateTime.now()` at full precision the key changes every build → new
+/// family instance → infinite rebuild loop.
+final finishedInWindowByUidProvider = FutureProvider.autoDispose
+    .family<List<Session>, FinishedInWindowKey>((ref, key) async {
+  if (key.athleteId.isEmpty) return const [];
+  return ref.watch(sessionRepositoryProvider).listFinishedInWindow(
+        key.athleteId,
+        from: key.from,
+        to: key.to,
+      );
+});
+
 /// Returns the currently active session for [uid], or null if none.
 final activeSessionProvider =
     FutureProvider.family<Session?, String>((ref, uid) async {

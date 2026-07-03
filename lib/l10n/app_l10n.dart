@@ -4195,6 +4195,31 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'ALUMNOS INACTIVOS'**
   String get dashboardInactivosTitle;
+
+  /// Empty state for the Alumnos inactivos section when all athletes trained in the last 14 days.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Sin alumnos inactivos'**
+  String get dashboardInactivosEmpty;
+
+  /// Disclaimer note showing how many athletes share data vs total active athletes. Shown below the inactivos list.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{sharing} de {total} con datos compartidos'**
+  String dashboardInactivosSharingNote(int sharing, int total);
+
+  /// Alert banner message when there are no vencidos, pending solicitudes, or inactive athletes.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Todo al día'**
+  String get dashboardAlertBannerAllClear;
+
+  /// Alert banner composed summary line showing vencidos, pending requests, and inactive athletes counts.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{vencidos} vencido(s) · {solicitudes} solicitud(es) · {inactivos} inactivo(s)'**
+  String dashboardAlertBannerSummary(
+      int vencidos, int solicitudes, int inactivos);
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {
