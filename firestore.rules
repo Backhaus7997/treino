@@ -754,6 +754,34 @@ service cloud.firestore {
                   && request.auth.uid == resource.data.trainerId;
     }
 
+    // Follow-up entries — log cronológico privado del PF sobre un alumno.
+    // Mismo patrón que athlete_files: docId `{trainerId}_{athleteId}_{ts}`,
+    // trainer-only R/W, alumno NUNCA lo ve. Update permite cambiar texto y
+    // tag pero NO los identificadores (trainerId, athleteId, recordedAt).
+    match /follow_up_entries/{docId} {
+      allow read, list: if request.auth != null
+                  && request.auth.uid == resource.data.trainerId;
+      allow create: if request.auth != null
+                  && request.resource.data.trainerId == request.auth.uid
+                  && request.resource.data.athleteId is string
+                  && request.resource.data.athleteId.size() > 0
+                  && request.resource.data.text is string
+                  && request.resource.data.text.size() > 0
+                  && request.resource.data.text.size() < 5000
+                  && request.resource.data.tag is string;
+      allow update: if request.auth != null
+                  && resource.data.trainerId == request.auth.uid
+                  && request.resource.data.trainerId == resource.data.trainerId
+                  && request.resource.data.athleteId == resource.data.athleteId
+                  && request.resource.data.recordedAt == resource.data.recordedAt
+                  && request.resource.data.text is string
+                  && request.resource.data.text.size() > 0
+                  && request.resource.data.text.size() < 5000
+                  && request.resource.data.tag is string;
+      allow delete: if request.auth != null
+                  && request.auth.uid == resource.data.trainerId;
+    }
+
     // Payment records created by trainers against athletes (Pagos P1).
     match /payments/{paymentId} {
       allow read: if request.auth != null
