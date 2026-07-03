@@ -29,6 +29,7 @@ class Payment with _$Payment {
     String? periodKey,
     @TimestampConverter() required DateTime createdAt,
     @TimestampConverter() DateTime? paidAt,
+    @TimestampConverter() DateTime? dueAt,
   }) = _Payment;
 
   factory Payment.fromJson(Map<String, Object?> json) =>

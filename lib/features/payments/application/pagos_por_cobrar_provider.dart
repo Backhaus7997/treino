@@ -190,10 +190,12 @@ final pagosPorCobrarProvider =
     switch (billing.cadence) {
       // ── mensual ─────────────────────────────────────────────────────────
       case BillingCadence.mensual:
-        final alreadyPaid = athletePayments.any(
-          (p) => p.status == PaymentStatus.paid && p.periodKey == monthKey,
+        // REQ-VENC-12: suppress virtual charge when ANY persisted doc exists
+        // for this period (paid OR pending), not just paid ones.
+        final hasDocForPeriod = athletePayments.any(
+          (p) => p.periodKey == monthKey,
         );
-        if (!alreadyPaid) {
+        if (!hasDocForPeriod) {
           results.add(CobroPendiente(
             athleteId: athleteId,
             amountArs: billing.amountArs,
@@ -204,10 +206,12 @@ final pagosPorCobrarProvider =
 
       // ── semanal ─────────────────────────────────────────────────────────
       case BillingCadence.semanal:
-        final alreadyPaid = athletePayments.any(
-          (p) => p.status == PaymentStatus.paid && p.periodKey == weekKey,
+        // REQ-VENC-12: suppress virtual charge when ANY persisted doc exists
+        // for this period (paid OR pending), not just paid ones.
+        final hasDocForPeriod = athletePayments.any(
+          (p) => p.periodKey == weekKey,
         );
-        if (!alreadyPaid) {
+        if (!hasDocForPeriod) {
           results.add(CobroPendiente(
             athleteId: athleteId,
             amountArs: billing.amountArs,

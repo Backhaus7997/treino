@@ -31,6 +31,8 @@ mixin _$Payment {
   DateTime get createdAt => throw _privateConstructorUsedError;
   @TimestampConverter()
   DateTime? get paidAt => throw _privateConstructorUsedError;
+  @TimestampConverter()
+  DateTime? get dueAt => throw _privateConstructorUsedError;
 
   /// Serializes this Payment to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -55,7 +57,8 @@ abstract class $PaymentCopyWith<$Res> {
       PaymentStatus status,
       String? periodKey,
       @TimestampConverter() DateTime createdAt,
-      @TimestampConverter() DateTime? paidAt});
+      @TimestampConverter() DateTime? paidAt,
+      @TimestampConverter() DateTime? dueAt});
 }
 
 /// @nodoc
@@ -82,6 +85,7 @@ class _$PaymentCopyWithImpl<$Res, $Val extends Payment>
     Object? periodKey = freezed,
     Object? createdAt = null,
     Object? paidAt = freezed,
+    Object? dueAt = freezed,
   }) {
     return _then(_value.copyWith(
       id: null == id
@@ -120,6 +124,10 @@ class _$PaymentCopyWithImpl<$Res, $Val extends Payment>
           ? _value.paidAt
           : paidAt // ignore: cast_nullable_to_non_nullable
               as DateTime?,
+      dueAt: freezed == dueAt
+          ? _value.dueAt
+          : dueAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
     ) as $Val);
   }
 }
@@ -140,7 +148,8 @@ abstract class _$$PaymentImplCopyWith<$Res> implements $PaymentCopyWith<$Res> {
       PaymentStatus status,
       String? periodKey,
       @TimestampConverter() DateTime createdAt,
-      @TimestampConverter() DateTime? paidAt});
+      @TimestampConverter() DateTime? paidAt,
+      @TimestampConverter() DateTime? dueAt});
 }
 
 /// @nodoc
@@ -165,6 +174,7 @@ class __$$PaymentImplCopyWithImpl<$Res>
     Object? periodKey = freezed,
     Object? createdAt = null,
     Object? paidAt = freezed,
+    Object? dueAt = freezed,
   }) {
     return _then(_$PaymentImpl(
       id: null == id
@@ -203,6 +213,10 @@ class __$$PaymentImplCopyWithImpl<$Res>
           ? _value.paidAt
           : paidAt // ignore: cast_nullable_to_non_nullable
               as DateTime?,
+      dueAt: freezed == dueAt
+          ? _value.dueAt
+          : dueAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
     ));
   }
 }
@@ -219,7 +233,8 @@ class _$PaymentImpl implements _Payment {
       required this.status,
       this.periodKey,
       @TimestampConverter() required this.createdAt,
-      @TimestampConverter() this.paidAt});
+      @TimestampConverter() this.paidAt,
+      @TimestampConverter() this.dueAt});
 
   factory _$PaymentImpl.fromJson(Map<String, dynamic> json) =>
       _$$PaymentImplFromJson(json);
@@ -244,10 +259,13 @@ class _$PaymentImpl implements _Payment {
   @override
   @TimestampConverter()
   final DateTime? paidAt;
+  @override
+  @TimestampConverter()
+  final DateTime? dueAt;
 
   @override
   String toString() {
-    return 'Payment(id: $id, trainerId: $trainerId, athleteId: $athleteId, amountArs: $amountArs, concept: $concept, status: $status, periodKey: $periodKey, createdAt: $createdAt, paidAt: $paidAt)';
+    return 'Payment(id: $id, trainerId: $trainerId, athleteId: $athleteId, amountArs: $amountArs, concept: $concept, status: $status, periodKey: $periodKey, createdAt: $createdAt, paidAt: $paidAt, dueAt: $dueAt)';
   }
 
   @override
@@ -268,13 +286,14 @@ class _$PaymentImpl implements _Payment {
                 other.periodKey == periodKey) &&
             (identical(other.createdAt, createdAt) ||
                 other.createdAt == createdAt) &&
-            (identical(other.paidAt, paidAt) || other.paidAt == paidAt));
+            (identical(other.paidAt, paidAt) || other.paidAt == paidAt) &&
+            (identical(other.dueAt, dueAt) || other.dueAt == dueAt));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
   @override
   int get hashCode => Object.hash(runtimeType, id, trainerId, athleteId,
-      amountArs, concept, status, periodKey, createdAt, paidAt);
+      amountArs, concept, status, periodKey, createdAt, paidAt, dueAt);
 
   /// Create a copy of Payment
   /// with the given fields replaced by the non-null parameter values.
@@ -302,7 +321,8 @@ abstract class _Payment implements Payment {
       required final PaymentStatus status,
       final String? periodKey,
       @TimestampConverter() required final DateTime createdAt,
-      @TimestampConverter() final DateTime? paidAt}) = _$PaymentImpl;
+      @TimestampConverter() final DateTime? paidAt,
+      @TimestampConverter() final DateTime? dueAt}) = _$PaymentImpl;
 
   factory _Payment.fromJson(Map<String, dynamic> json) = _$PaymentImpl.fromJson;
 
@@ -326,6 +346,9 @@ abstract class _Payment implements Payment {
   @override
   @TimestampConverter()
   DateTime? get paidAt;
+  @override
+  @TimestampConverter()
+  DateTime? get dueAt;
 
   /// Create a copy of Payment
   /// with the given fields replaced by the non-null parameter values.

@@ -16,8 +16,12 @@ import 'package:treino/features/payments/domain/payment.dart';
 
 /// Cuatro buckets mutuamente excluyentes derivados del stream de pagos.
 ///
-/// Boundary (ADR-PGW-002): Vencido = pending && createdAt.toUtc().isBefore(
-/// DateTime.utc(now.year, now.month, 1)). Por vencer = pending && NOT vencido.
+/// Boundary (ADR-PGW-002, updated REQ-VENC-11):
+///   Vencido = pending && (
+///     dueAt != null  → dueAt.toUtc().isBefore(now)
+///     dueAt == null  → createdAt.toUtc().isBefore(periodStart) [legacy fallback]
+///   )
+/// Por vencer = pending && NOT vencido.
 /// Cada bucket está ordenado DESC por createdAt.
 class PagosBuckets {
   const PagosBuckets({
@@ -27,10 +31,11 @@ class PagosBuckets {
     required this.todos,
   });
 
-  /// Pagos pendientes con createdAt anterior al inicio del mes actual (UTC).
+  /// Pagos pendientes cuyo dueAt (si presente) ya pasó, o cuyo createdAt es
+  /// anterior al inicio del mes actual cuando dueAt es null (legado).
   final List<Payment> vencidos;
 
-  /// Pagos pendientes del período actual (createdAt >= inicio del mes UTC).
+  /// Pagos pendientes del período actual (no vencidos).
   final List<Payment> porVencer;
 
   /// Pagos con status == paid.
@@ -65,7 +70,11 @@ final pagosBucketsProvider =
 
     for (final p in payments) {
       if (p.status == PaymentStatus.pending) {
-        if (p.createdAt.toUtc().isBefore(periodStart)) {
+        // REQ-VENC-11: dueAt-based vencido check with legacy null-dueAt fallback.
+        final isVencido = p.dueAt != null
+            ? p.dueAt!.toUtc().isBefore(now)
+            : p.createdAt.toUtc().isBefore(periodStart);
+        if (isVencido) {
           vencidos.add(p);
         } else {
           porVencer.add(p);
