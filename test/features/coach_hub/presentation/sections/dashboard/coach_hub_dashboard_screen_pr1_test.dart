@@ -19,6 +19,7 @@ import 'package:treino/features/payments/domain/payment.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
+import 'package:treino/features/coach_hub/application/inactivos_provider.dart';
 import 'package:treino/features/workout/application/session_providers.dart'
     show currentUidProvider;
 import 'package:treino/features/chat/application/chat_providers.dart'
@@ -123,16 +124,23 @@ List<Override> _baseOverrides({
     trainerAppointmentsStreamProvider.overrideWith(
       (ref, key) => Stream.value(const <Appointment>[]),
     ),
+    // Stub inactivosProvider — real provider requires Firestore.
+    inactivosProvider.overrideWith(
+      (ref) async => const InactivosResult(
+        inactiveAthleteIds: [],
+        totalSharingCount: 0,
+      ),
+    ),
   ];
 }
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 void main() {
-  // ── SCENARIO-HOY-03A — Alert banner placeholder ──────────────────────────
+  // ── SCENARIO-HOY-03A — Alert banner (real provider) ──────────────────────
 
-  group('SCENARIO-HOY-03A — alert banner placeholder', () {
-    testWidgets('banner renders a placeholder label, not a real provider',
+  group('SCENARIO-HOY-03A — alert banner real data', () {
+    testWidgets('banner renders "Todo al día" when all counts are 0',
         (tester) async {
       await tester.pumpWidget(_wrap(
         const CoachHubDashboardScreen(),
@@ -140,10 +148,10 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      // The banner placeholder text must be visible.
+      // With 0 vencidos, 0 solicitudes, 0 inactivos → "Todo al día".
       expect(
-        find.textContaining('Próximamente'),
-        findsAtLeastNWidgets(1),
+        find.textContaining('Todo al día'),
+        findsOneWidget,
       );
     });
   });

@@ -296,22 +296,7 @@ void main() {
     });
   });
 
-  // ── SCENARIO-HOY-09A — Alumnos inactivos renders as placeholder ──────────
-
-  group('SCENARIO-HOY-09A — alumnos inactivos placeholder', () {
-    testWidgets('shows placeholder label, no real provider call',
-        (tester) async {
-      await tester.pumpWidget(_wrapWide(
-        const CoachHubDashboardScreen(),
-        overrides: _baseOverrides(),
-      ));
-      await tester.pumpAndSettle();
-
-      // Section title visible
-      expect(find.textContaining('ALUMNOS INACTIVOS'), findsAtLeastNWidgets(1));
-
-      // Placeholder "Próximamente" visible
-      expect(find.textContaining('Próximamente'), findsAtLeastNWidgets(1));
-    });
-  });
+  // SCENARIO-HOY-09A (inactivos placeholder) eliminado: _InactivosSection ahora
+  // es real (dashboard-hoy-aggregates PR1). El comportamiento real está cubierto
+  // en coach_hub_dashboard_inactivos_alert_test.dart (09A+/09B/09C).
 }

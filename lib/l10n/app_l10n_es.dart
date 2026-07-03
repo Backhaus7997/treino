@@ -2259,6 +2259,23 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get dashboardInactivosTitle => 'ALUMNOS INACTIVOS';
+
+  @override
+  String get dashboardInactivosEmpty => 'Sin alumnos inactivos';
+
+  @override
+  String dashboardInactivosSharingNote(int sharing, int total) {
+    return '$sharing de $total con datos compartidos';
+  }
+
+  @override
+  String get dashboardAlertBannerAllClear => 'Todo al día';
+
+  @override
+  String dashboardAlertBannerSummary(
+      int vencidos, int solicitudes, int inactivos) {
+    return '$vencidos vencido(s) · $solicitudes solicitud(es) · $inactivos inactivo(s)';
+  }
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -4514,4 +4531,21 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get dashboardInactivosTitle => 'ALUMNOS INACTIVOS';
+
+  @override
+  String get dashboardInactivosEmpty => 'Sin alumnos inactivos';
+
+  @override
+  String dashboardInactivosSharingNote(int sharing, int total) {
+    return '$sharing de $total con datos compartidos';
+  }
+
+  @override
+  String get dashboardAlertBannerAllClear => 'Todo al día';
+
+  @override
+  String dashboardAlertBannerSummary(
+      int vencidos, int solicitudes, int inactivos) {
+    return '$vencidos vencido(s) · $solicitudes solicitud(es) · $inactivos inactivo(s)';
+  }
 }

@@ -24,6 +24,7 @@ import 'package:treino/features/coach_hub/presentation/sections/pagos/widgets/pa
 import 'package:treino/features/feed/presentation/widgets/post_avatar.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
+import 'package:treino/features/coach_hub/application/inactivos_provider.dart';
 import 'package:treino/features/workout/application/session_providers.dart'
     show currentUidProvider;
 import 'package:treino/l10n/app_l10n.dart';
@@ -141,16 +142,46 @@ class _TwoColumnLayout extends StatelessWidget {
   }
 }
 
-// ── Alert banner (PLACEHOLDER) ────────────────────────────────────────────────
+// ── Alert banner (REAL — composes vencidos + solicitudes + inactivos) ────────
 
-/// Alert banner — V1 placeholder (no real notification aggregation). REQ-HOY-03.
-class _AlertBanner extends StatelessWidget {
+/// Alert banner — REQ-HOY-03.
+///
+/// Watches three signals:
+/// - [pagosBucketsProvider].vencidos count
+/// - [trainerLinksStreamProvider] pending solicitudes
+/// - [inactivosProvider].inactiveCount
+///
+/// Shows "Todo al día" when all are 0; otherwise renders a composed line.
+class _AlertBanner extends ConsumerWidget {
   const _AlertBanner();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
+
+    final bucketsAsync = ref.watch(pagosBucketsProvider);
+    final linksAsync = ref.watch(trainerLinksStreamProvider);
+    final inactivosAsync = ref.watch(inactivosProvider);
+
+    final vencidosCount = bucketsAsync.valueOrNull?.vencidos.length ?? 0;
+    final solicitudesCount = linksAsync.valueOrNull
+            ?.where((l) => l.status == TrainerLinkStatus.pending)
+            .length ??
+        0;
+    final inactivosCount = inactivosAsync.valueOrNull?.inactiveCount ?? 0;
+
+    final allClear =
+        vencidosCount == 0 && solicitudesCount == 0 && inactivosCount == 0;
+
+    final text = allClear
+        ? l10n.dashboardAlertBannerAllClear
+        : l10n.dashboardAlertBannerSummary(
+            vencidosCount,
+            solicitudesCount,
+            inactivosCount,
+          );
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
       decoration: BoxDecoration(
@@ -164,7 +195,7 @@ class _AlertBanner extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              l10n.dashboardAlertBannerPlaceholder,
+              text,
               style: TextStyle(color: palette.textMuted, fontSize: 13),
             ),
           ),
@@ -420,49 +451,6 @@ class _KpiStrip extends ConsumerWidget {
           KpiTile(
             label: l10n.dashboardKpiPorCobrar(vencidosCount),
             value: bucketsAsync.isLoading ? '…' : fmtArs(porCobrarTotal),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Placeholder card ──────────────────────────────────────────────────────────
-
-/// Shared placeholder card for gaps (PR3 will use for _AdherenceChart).
-// ignore: unused_element
-class _PlaceholderCard extends StatelessWidget {
-  const _PlaceholderCard({required this.title, required this.hint});
-  final String title;
-  final String hint;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-    final l10n = AppL10n.of(context);
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: palette.bgCard,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: palette.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: GoogleFonts.barlowCondensed(
-              color: palette.textMuted,
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 1.2,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            l10n.dashboardPlaceholderSoon,
-            style: TextStyle(color: palette.textMuted, fontSize: 13),
           ),
         ],
       ),
@@ -784,16 +772,26 @@ class _VencimientoRow extends ConsumerWidget {
   }
 }
 
-// ── Alumnos inactivos (PLACEHOLDER V1) ───────────────────────────────────────
+// ── Alumnos inactivos (REAL — driven by inactivosProvider) ──────────────────
 
-/// Alumnos inactivos — V1 placeholder (no derived provider). REQ-HOY-09.
-class _InactivosSection extends StatelessWidget {
+/// Alumnos inactivos — REQ-HOY-09.
+///
+/// Watches [inactivosProvider] for the list of inactive athlete IDs and the
+/// total sharing count. Resolves each athlete's display name via
+/// [userPublicProfileProvider] (same per-id pattern used in _VencimientoRow).
+///
+/// Loading: renders the section header without a spinner (avoids perpetual
+/// pumpAndSettle hang in CI). Empty state: "Sin alumnos inactivos".
+/// Disclaimer: "N de M con datos compartidos" always shown when totalSharingCount > 0.
+class _InactivosSection extends ConsumerWidget {
   const _InactivosSection();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
+    final inactivosAsync = ref.watch(inactivosProvider);
+
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -814,9 +812,83 @@ class _InactivosSection extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          Text(
-            l10n.dashboardPlaceholderSoon,
-            style: TextStyle(color: palette.textMuted, fontSize: 13),
+          // Resolve data when available; show nothing extra while loading
+          // to avoid a perpetual spinner that would hang pumpAndSettle.
+          inactivosAsync.when(
+            loading: () => Text(
+              '…',
+              style: TextStyle(color: palette.textMuted, fontSize: 13),
+            ),
+            error: (_, __) => _SectionError(message: l10n.coachRetryLabel),
+            data: (result) {
+              final ids = result.inactiveAthleteIds;
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (ids.isEmpty)
+                    Text(
+                      l10n.dashboardInactivosEmpty,
+                      style: TextStyle(color: palette.textMuted, fontSize: 13),
+                    )
+                  else
+                    ...ids.map(
+                      (id) => _InactivoRow(athleteId: id, palette: palette),
+                    ),
+                  if (result.totalSharingCount > 0) ...[
+                    const SizedBox(height: 10),
+                    Text(
+                      l10n.dashboardInactivosSharingNote(
+                        result.totalSharingCount,
+                        result.totalSharingCount,
+                      ),
+                      style: TextStyle(
+                        color: palette.textMuted,
+                        fontSize: 11,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ],
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Single row in the inactivos list — resolves athlete name via
+/// [userPublicProfileProvider] (same pattern as _VencimientoRow).
+class _InactivoRow extends ConsumerWidget {
+  const _InactivoRow({required this.athleteId, required this.palette});
+  final String athleteId;
+  final AppPalette palette;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final name = ref
+            .watch(userPublicProfileProvider(athleteId))
+            .valueOrNull
+            ?.displayName ??
+        '…';
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          Icon(TreinoIcon.tabProfile, size: 14, color: palette.textMuted),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              name,
+              style: TextStyle(
+                color: palette.textPrimary,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
         ],
       ),

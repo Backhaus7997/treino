@@ -2205,4 +2205,21 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get dashboardInactivosTitle => '';
+
+  @override
+  String get dashboardInactivosEmpty => '';
+
+  @override
+  String dashboardInactivosSharingNote(int sharing, int total) {
+    return '';
+  }
+
+  @override
+  String get dashboardAlertBannerAllClear => '';
+
+  @override
+  String dashboardAlertBannerSummary(
+      int vencidos, int solicitudes, int inactivos) {
+    return '';
+  }
 }

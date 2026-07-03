@@ -186,6 +186,39 @@ class SessionRepository {
         .toList();
   }
 
+  // ─── listFinishedInWindow ────────────────────────────────────────────────
+
+  /// Returns the athlete's FINISHED sessions whose `finishedAt` falls within
+  /// the given UTC [from, to) window, ordered by `finishedAt` descending.
+  ///
+  /// Bounded server-side query: `status == finished && finishedAt >= from`.
+  /// Upper bound (`finishedAt < to`) is enforced in Dart — mirrors the pattern
+  /// from [listFinishedToday] to avoid fake_cloud_firestore's two-range query
+  /// stale-read issue. Returns `[]` immediately when [uid] is empty.
+  Future<List<Session>> listFinishedInWindow(
+    String uid, {
+    required DateTime from,
+    required DateTime to,
+  }) async {
+    if (uid.isEmpty) return const [];
+    final snap = await _sessions(uid)
+        .where('status', isEqualTo: 'finished')
+        .where(
+          'finishedAt',
+          isGreaterThanOrEqualTo: Timestamp.fromDate(from.toUtc()),
+        )
+        .orderBy('finishedAt', descending: true)
+        .get();
+    return snap.docs
+        .map(_sessionFromDoc)
+        .whereType<Session>()
+        .where((s) {
+          final f = s.finishedAt;
+          return f != null && f.toUtc().isBefore(to.toUtc());
+        })
+        .toList();
+  }
+
   // ─── getActive ──────────────────────────────────────────────────────────
 
   Future<Session?> getActive(String uid) async {
