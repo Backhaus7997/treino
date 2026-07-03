@@ -505,13 +505,20 @@ class _ProximasSesiones extends ConsumerWidget {
 
     final uid = ref.watch(currentUidProvider) ?? '';
     final now = DateTime.now().toUtc();
-    // Query a 30-day window from now so we capture upcoming sessions.
-    final windowEnd = now.add(const Duration(days: 30));
+    // La key de un provider .family DEBE ser estable entre builds. Usar
+    // DateTime.now() con precisión de microsegundos genera una key distinta en
+    // cada build → nueva instancia del family → AsyncLoading→data → rebuild →
+    // otra key nueva → loop infinito → pumpAndSettle nunca estabiliza (rompía
+    // TODOS los tests del dashboard en CI). Truncamos al día (estable dentro
+    // del día UTC); el filtro fino usa `now` más abajo en el .when(data:).
+    final todayStart = DateTime.utc(now.year, now.month, now.day);
+    // Ventana de 30 días desde el arranque de hoy. Key estable → sin loop.
+    final windowEnd = todayStart.add(const Duration(days: 30));
     final appointmentsAsync = ref.watch(
       trainerAppointmentsStreamProvider(
         TrainerAppointmentsKey(
           trainerId: uid,
-          fromDate: now,
+          fromDate: todayStart,
           toDate: windowEnd,
         ),
       ),
