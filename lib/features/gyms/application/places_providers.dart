@@ -5,8 +5,10 @@ import 'package:http/http.dart' as http;
 import '../../profile/application/user_providers.dart'
     show userRepositoryProvider;
 import '../data/places_autocomplete_service.dart';
+import '../data/places_nearby_search_service.dart';
 import '../data/resolve_gym_place_service.dart';
 import '../domain/gym_suggestion.dart';
+import '../domain/nearby_gym.dart';
 import 'gym_providers.dart' show gymRepositoryProvider;
 
 /// Bundle-restricted Places client key. Provided at build/run time via
@@ -49,6 +51,17 @@ final placesAutocompleteServiceProvider = Provider<PlacesAutocompleteService>(
 final resolveGymPlaceServiceProvider = Provider<ResolveGymPlaceService>(
   (ref) => ResolveGymPlaceService(
     gymRepository: ref.watch(gymRepositoryProvider),
+    httpClient: ref.watch(httpClientProvider),
+    clientApiKey: _placesClientKey,
+  ),
+);
+
+/// Provider for [PlacesNearbySearchService]. Mirrors
+/// [placesAutocompleteServiceProvider] — same shared [httpClientProvider] +
+/// bundle-restricted [_placesClientKey]. Overridable in tests (design AD-9
+/// item 1).
+final placesNearbySearchServiceProvider = Provider<PlacesNearbySearchService>(
+  (ref) => PlacesNearbySearchService(
     httpClient: ref.watch(httpClientProvider),
     clientApiKey: _placesClientKey,
   ),
@@ -164,3 +177,141 @@ final selectGymActionProvider =
     AsyncNotifierProvider<SelectGymAction, ResolveGymPlaceResult?>(
   SelectGymAction.new,
 );
+
+// ── Nearby gyms (searchNearby) — cost-gated, geohash-bucketed ─────────────
+//
+// searchNearby bills as Nearby Search Pro (~$32/1000, no free-session
+// model), unlike Autocomplete. Cost gating is therefore STRUCTURAL and
+// provider-owned (design gym-selection-v2 AD-2/AD-9) — never a
+// widget-level "please don't rebuild too much" convention. Two layers:
+//   1. Fire-once-per-open floor: `nearbyGymsProvider` is an
+//      `autoDispose.family` keyed by a geohash5 bucket — Riverpod memoizes
+//      the family entry for the life of the screen; rebuilds never re-fetch.
+//   2. Cross-open TTL cache: results are stashed in `nearbyGymsCacheProvider`
+//      (`keepAlive`), a `Map<geohashBucket, _CachedNearby>` with a 10-min
+//      TTL. The family provider consults the cache FIRST; a hit within TTL
+//      returns cached results with ZERO network call, even after the
+//      `autoDispose` family entry was torn down and recreated (screen
+//      closed/reopened within the same app session).
+
+/// One cached `searchNearby` result set for a geohash5 bucket, with the
+/// timestamp it was fetched at (for TTL expiry).
+class _CachedNearby {
+  const _CachedNearby(this.results, this.fetchedAt);
+
+  final List<NearbyGym> results;
+  final DateTime fetchedAt;
+}
+
+/// Cross-open cache TTL (design AD-2 layer 2). Gyms are near-static — 10
+/// minutes bounds staleness while eliminating the most common repeat cost
+/// (mis-tap / back-navigation / re-check re-opens of the same screen).
+const Duration nearbyGymsCacheTtl = Duration(minutes: 10);
+
+/// Tiny in-memory holder for the cross-open TTL cache (design AD-9 item 2).
+///
+/// Plain mutable class (not a `StateNotifier` — nothing external needs to
+/// observe cache mutations; only `nearbyGymsProvider` reads/writes it) so
+/// tests can construct one pre-seeded via [put] and override
+/// [nearbyGymsCacheProvider] with it (see `NearbyGymsCache.new` +
+/// `overrideWithValue` in provider tests).
+class NearbyGymsCache {
+  final Map<String, _CachedNearby> _entries = {};
+
+  /// Returns the cached results for [bucket] if present AND fetched within
+  /// [nearbyGymsCacheTtl] of [now]; otherwise `null` (miss — either never
+  /// fetched, or expired).
+  List<NearbyGym>? get(String bucket, {required DateTime now}) {
+    final entry = _entries[bucket];
+    if (entry == null) return null;
+    if (now.difference(entry.fetchedAt) > nearbyGymsCacheTtl) return null;
+    return entry.results;
+  }
+
+  /// Stores [results] for [bucket]. [fetchedAt] defaults to "now" — tests
+  /// pass an explicit past timestamp to simulate an already-expired entry
+  /// without a real 10-minute wait.
+  void put(String bucket, List<NearbyGym> results, {DateTime? fetchedAt}) {
+    _entries[bucket] = _CachedNearby(results, fetchedAt ?? DateTime.now());
+  }
+}
+
+/// Provider for the cross-open TTL cache holder. `keepAlive` (the default
+/// for a plain [Provider]) so it survives the `autoDispose` family entries
+/// of [nearbyGymsProvider] being created/destroyed as the screen
+/// opens/closes/reopens within one app session (design AD-9 item 2).
+final nearbyGymsCacheProvider = Provider<NearbyGymsCache>(
+  (ref) => NearbyGymsCache(),
+);
+
+/// Distance-ranked nearby gyms for a geohash5 [bucket], cost-gated per
+/// design AD-2/AD-9.
+///
+/// `FutureProvider.autoDispose.family<List<NearbyGym>, String>` keyed by a
+/// *screen-open-scoped location bucket* (`geohash5(lat, lng)`, ~4.9km cell —
+/// almost exactly the fixed 5km search radius), NOT raw lat/lng: two
+/// screen-opens in the same neighborhood resolve to the same key, which is
+/// what makes the TTL cache below effective.
+///
+/// Consults [nearbyGymsCacheProvider] first — a hit within TTL returns
+/// cached results with ZERO network call. On a miss, calls
+/// [PlacesNearbySearchService.search] exactly once, stores the result in the
+/// cache, and returns it. Riverpod memoizes this family entry for the
+/// life of the screen, so rebuilds/re-renders never re-invoke this body —
+/// the "fire-once-per-open" floor (AD-2 layer 1).
+final nearbyGymsProvider =
+    FutureProvider.autoDispose.family<List<NearbyGym>, String>(
+  (ref, bucket) async {
+    final cache = ref.watch(nearbyGymsCacheProvider);
+    final cached = cache.get(bucket, now: DateTime.now());
+    if (cached != null) return cached;
+
+    final service = ref.watch(placesNearbySearchServiceProvider);
+    final bucketLatLng = _decodeGeohashBucketCenter(bucket);
+    final results = await service.search(
+      latitude: bucketLatLng.$1,
+      longitude: bucketLatLng.$2,
+    );
+
+    cache.put(bucket, results);
+    return results;
+  },
+);
+
+/// Decodes a geohash5 bucket string back into an approximate lat/lng center
+/// — `searchNearby` needs real coordinates, not the bucket string itself.
+/// Uses the same base32 alphabet as `geohash5` (core/utils/geohash.dart);
+/// duplicated here as the inverse operation rather than adding a shared
+/// decode function with only one caller.
+(double, double) _decodeGeohashBucketCenter(String bucket) {
+  const base32 = '0123456789bcdefghjkmnpqrstuvwxyz';
+  double minLat = -90.0, maxLat = 90.0;
+  double minLon = -180.0, maxLon = 180.0;
+  var isLon = true;
+
+  for (final char in bucket.toLowerCase().split('')) {
+    final idx = base32.indexOf(char);
+    if (idx == -1) continue;
+    for (var bit = 4; bit >= 0; bit--) {
+      final value = (idx >> bit) & 1;
+      if (isLon) {
+        final mid = (minLon + maxLon) / 2;
+        if (value == 1) {
+          minLon = mid;
+        } else {
+          maxLon = mid;
+        }
+      } else {
+        final mid = (minLat + maxLat) / 2;
+        if (value == 1) {
+          minLat = mid;
+        } else {
+          maxLat = mid;
+        }
+      }
+      isLon = !isLon;
+    }
+  }
+
+  return ((minLat + maxLat) / 2, (minLon + maxLon) / 2);
+}
