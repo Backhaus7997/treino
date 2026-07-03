@@ -278,6 +278,116 @@ final nearbyGymsProvider =
   },
 );
 
+// ── nearbyLocationProvider — HYBRID location pattern (AD-1/AD-9 item 4) ────
+
+/// States for the nearby-list location flow:
+///   - `AsyncData(null)`   = initial / not-yet-checked / denied / skipped
+///   - `AsyncLoading`      = escalation in flight (rationale accepted,
+///                           `requestPermission()` + GPS acquisition running)
+///   - `AsyncData(pos)`    = granted and a `Position` is available
+///   - `AsyncError`        = hardware/service error during escalation
+///
+/// Structurally mirrors `AthleteLocationNotifier`
+/// (coach/application/trainer_discovery_providers.dart) but adds a silent
+/// [checkSilently] step: per design AD-1 (HYBRID), the nearby-gyms screen
+/// runs a silent `Geolocator.checkPermission()` on screen-open (NEVER
+/// `requestPermission()` — that would surprise the user with an OS dialog
+/// they didn't ask for). Only when the UI-driven [requestPermission]
+/// escalation runs (after the user taps the inline "Activar ubicación"
+/// affordance AND accepts the rationale sheet) does a real permission
+/// prompt fire.
+///
+/// `build()` itself performs NO Geolocator call — it starts at the same
+/// neutral `AsyncData(null)` as `AthleteLocationNotifier`. The UI is
+/// responsible for calling [checkSilently] once on screen-open. This keeps
+/// simply *constructing/reading* the provider safe under `test()` AND
+/// `testWidgets()` (never touches the plugin channel), while still letting
+/// production code run the silent check the design calls for.
+class NearbyLocationNotifier extends StateNotifier<AsyncValue<Position?>> {
+  NearbyLocationNotifier() : super(const AsyncData(null));
+
+  bool _isPermissionDenied = false;
+
+  /// Whether the last permission check/escalation resulted in a denied
+  /// state. The UI reads this to decide whether to show the inline
+  /// "Activar ubicación" affordance.
+  bool get isPermissionDenied => _isPermissionDenied;
+
+  /// Silent permission check — uses `checkPermission()` (NEVER
+  /// `requestPermission()`), so calling this never triggers a surprise OS
+  /// dialog. Call once per screen-open. On denied/restricted/unavailable/
+  /// any error, resolves to the not-granted state — never throws.
+  Future<void> checkSilently() async {
+    try {
+      final permission = await Geolocator.checkPermission();
+      final granted = permission == LocationPermission.always ||
+          permission == LocationPermission.whileInUse;
+      if (!granted) {
+        _isPermissionDenied = true;
+        state = const AsyncData(null);
+        return;
+      }
+      _isPermissionDenied = false;
+      state = AsyncData(await Geolocator.getCurrentPosition());
+    } catch (_) {
+      _isPermissionDenied = true;
+      state = const AsyncData(null);
+    }
+  }
+
+  /// Escalation: requests OS permission then acquires position. Call this
+  /// ONLY after the explicit rationale sheet
+  /// (`showLocationPermissionRationaleSheet`) was accepted by the user —
+  /// NEVER on screen-open (AD-1).
+  Future<void> requestPermission() async {
+    state = const AsyncLoading();
+    _isPermissionDenied = false;
+    try {
+      final permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        _isPermissionDenied = true;
+        state = const AsyncData(null);
+        return;
+      }
+      final pos = await Geolocator.getCurrentPosition();
+      state = AsyncData(pos);
+    } catch (e, st) {
+      state = AsyncError(e, st);
+    }
+  }
+
+  // ── Test seams ────────────────────────────────────────────────────────
+  //
+  // `Geolocator.checkPermission()` HANGS FOREVER under `testWidgets` (see
+  // test/features/profile_setup/presentation/gym_search_box_test.dart:264-305).
+  // ALL tests MUST override this provider and drive state exclusively via
+  // these seams — never let checkSilently()/requestPermission() run for
+  // real in a test.
+
+  /// Directly set a [Position] (for test overrides — never call in
+  /// production).
+  void setForTest(Position? pos) {
+    _isPermissionDenied = false;
+    state = AsyncData(pos);
+  }
+
+  /// Set denied state (for test overrides).
+  void setDeniedForTest() {
+    _isPermissionDenied = true;
+    state = const AsyncData(null);
+  }
+}
+
+/// Provider for the athlete's location as resolved for the nearby-gyms list
+/// (design AD-1/AD-9 item 4). NOT autoDispose — mirrors
+/// `athleteLocationProvider`'s scoping so the resolved position survives
+/// widget rebuilds within a screen-open.
+final nearbyLocationProvider =
+    StateNotifierProvider<NearbyLocationNotifier, AsyncValue<Position?>>(
+  (ref) => NearbyLocationNotifier(),
+);
+
 /// Decodes a geohash5 bucket string back into an approximate lat/lng center
 /// — `searchNearby` needs real coordinates, not the bucket string itself.
 /// Uses the same base32 alphabet as `geohash5` (core/utils/geohash.dart);
