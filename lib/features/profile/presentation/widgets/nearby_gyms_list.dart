@@ -11,17 +11,18 @@ import '../../../coach/presentation/widgets/location_permission_rationale_sheet.
 import '../../../gyms/application/places_providers.dart';
 import '../../../profile_setup/presentation/widgets/gym_card.dart';
 
-/// Cap on visible rows before "Ver más" (design gym-selection-v2 AD-4).
-/// The provider requests up to 20 (headroom for AD-5 dedup); this only
-/// bounds what's rendered — "Ver más" reveals already-fetched rows, never
-/// re-requests.
-const int _kVisibleCap = 8;
-
 /// Distance-ranked nearby-gyms section — the `emptyQueryContent` widget
 /// passed to [GymSearchBox] by `ProfileGymScreen` (design AD-10). Renders
 /// every state from the design's state table: location opt-in affordance,
-/// fetch loading/error/empty, and up to [_kVisibleCap] rows with "a X km"
-/// labels + "Ver más".
+/// fetch loading/error/empty, and EVERY fetched row (up to the provider's
+/// `maxResultCount: 20` request cap) with "a X km" labels.
+///
+/// Per design gym-selection-v2 AD-13 (Phase 3 addendum): renders ALL
+/// fetched results, not a smaller fixed visible subset — the retired
+/// 8-row cap + "Ver más" affordance actively hid the user's real gym
+/// (ranked #14 in a dense area) behind an extra tap during device testing.
+/// The 20 results are already fetched and already billed for; rendering
+/// them all costs zero additional API calls.
 ///
 /// Calls [NearbyLocationNotifier.checkSilently] exactly once per
 /// screen-open (on first build) — the silent half of the AD-1 hybrid
@@ -58,7 +59,6 @@ class NearbyGymsList extends ConsumerStatefulWidget {
 }
 
 class _NearbyGymsListState extends ConsumerState<NearbyGymsList> {
-  bool _expanded = false;
   bool _checkedSilently = false;
 
   @override
@@ -173,13 +173,12 @@ class _NearbyGymsListState extends ConsumerState<NearbyGymsList> {
             .toList(growable: false);
         if (deduped.isEmpty) return const SizedBox.shrink();
 
-        final visible =
-            _expanded ? deduped : deduped.take(_kVisibleCap).toList();
-        final hasMore = !_expanded && deduped.length > _kVisibleCap;
-
+        // AD-13: render every fetched (deduped) row — no visible-count cap,
+        // no "Ver más" expand step. The list already scrolls inside
+        // ProfileGymScreen's SingleChildScrollView.
         return Column(
           children: [
-            for (final gym in visible) ...[
+            for (final gym in deduped) ...[
               GymCard(
                 name: gym.name,
                 address: _addressWithDistance(
@@ -196,22 +195,6 @@ class _NearbyGymsListState extends ConsumerState<NearbyGymsList> {
               ),
               const SizedBox(height: 12),
             ],
-            if (hasMore)
-              Align(
-                alignment: Alignment.centerLeft,
-                child: TextButton(
-                  onPressed: () => setState(() => _expanded = true),
-                  style: TextButton.styleFrom(
-                    padding: EdgeInsets.zero,
-                    minimumSize: const Size(0, 32),
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                  child: Text(
-                    l10n.gymNearbyShowMore,
-                    style: TextStyle(color: palette.accent),
-                  ),
-                ),
-              ),
           ],
         );
       },

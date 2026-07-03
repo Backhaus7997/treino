@@ -167,12 +167,13 @@ void main() {
     });
 
     testWidgets(
-        'data shows up to 8 rows with "a X km" labels, current gym absent',
-        (tester) async {
+        'data shows ALL fetched rows with "a X km" labels, current gym '
+        'absent, no "Ver más" affordance (AD-13)', (tester) async {
       final fake = _FakeNearbyLocationNotifier(granted: true);
-      // 9 gyms so we can prove the cap; one shares placeId with currentGymId
-      // (dedup case verified separately below).
-      final gyms = List.generate(9, (i) => _gym('gym-$i'));
+      // 14 gyms — the exact device-testing scenario (the user's real gym
+      // ranked #14, previously buried behind the retired 8-row cap /
+      // "Ver más" affordance). All must render without extra interaction.
+      final gyms = List.generate(14, (i) => _gym('gym-$i'));
 
       await tester.pumpWidget(ProviderScope(
         overrides: [
@@ -193,13 +194,41 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      // Only 8 of the 9 rows are visible initially (AD-4 cap).
-      for (var i = 0; i < 8; i++) {
+      // All 14 rows render — no cap, no "Ver más" gate.
+      for (var i = 0; i < 14; i++) {
         expect(find.text('Gym gym-$i'), findsOneWidget);
       }
-      expect(find.text('Gym gym-8'), findsNothing);
       expect(find.textContaining('a 0.0 km'), findsWidgets);
-      expect(find.text('Ver más'), findsOneWidget);
+      expect(find.text('Ver más'), findsNothing);
+    });
+
+    testWidgets(
+        'the full maxResultCount:20 fetch renders all 20 rows without an '
+        'expand step (AD-13)', (tester) async {
+      final fake = _FakeNearbyLocationNotifier(granted: true);
+      final gyms = List.generate(20, (i) => _gym('gym-$i'));
+
+      await tester.pumpWidget(ProviderScope(
+        overrides: [
+          nearbyLocationProvider.overrideWith((ref) => fake),
+          nearbyGymsProvider(_bucket).overrideWith((ref) async => gyms),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.dark(),
+          localizationsDelegates: AppL10n.localizationsDelegates,
+          supportedLocales: AppL10n.supportedLocales,
+          locale: const Locale('es', 'AR'),
+          home: const Scaffold(
+            body: SingleChildScrollView(
+              child: NearbyGymsList(uid: 'test-uid', currentGymId: null),
+            ),
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Gym gym-19'), findsOneWidget);
+      expect(find.text('Ver más'), findsNothing);
     });
 
     testWidgets('dedup: current gym is absent from the nearby rows',
@@ -234,11 +263,12 @@ void main() {
     });
 
     testWidgets(
-        '"Ver más" reveals already-fetched rows with zero additional '
-        'provider calls', (tester) async {
+        'rendering every fetched row costs exactly one provider call — no '
+        'extra fetch is triggered by rendering more rows (AD-13)',
+        (tester) async {
       final fake = _FakeNearbyLocationNotifier(granted: true);
       var callCount = 0;
-      final gyms = List.generate(9, (i) => _gym('gym-$i'));
+      final gyms = List.generate(14, (i) => _gym('gym-$i'));
 
       await tester.pumpWidget(ProviderScope(
         overrides: [
@@ -262,15 +292,8 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      expect(find.text('Gym gym-8'), findsNothing);
+      expect(find.text('Gym gym-13'), findsOneWidget);
       expect(callCount, 1);
-
-      await tester.ensureVisible(find.text('Ver más'));
-      await tester.tap(find.text('Ver más'));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Gym gym-8'), findsOneWidget);
-      expect(callCount, 1); // no extra fetch — pure local toggle
     });
   });
 
