@@ -113,8 +113,8 @@ class _RankingsBodyState extends ConsumerState<RankingsBody> {
           ElevatedButton(
             onPressed: () => Navigator.of(ctx).pop(true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: palette.highlight,
-              foregroundColor: palette.bg,
+              backgroundColor: palette.danger,
+              foregroundColor: palette.onDanger,
             ),
             child: Text(
               'Desactivar',
