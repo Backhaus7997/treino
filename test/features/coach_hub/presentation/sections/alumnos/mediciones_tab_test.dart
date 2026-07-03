@@ -326,4 +326,63 @@ void main() {
 
     expect(repo.deletedIds, isEmpty);
   });
+
+  // ── PR#2: Toggle + subvista Rendimiento ─────────────────────────────────
+
+  testWidgets(
+      'toggle Rendimiento cambia el header y muestra empty state de pruebas',
+      (tester) async {
+    _useDesktopViewport(tester);
+    await tester.pumpWidget(_wrap(_baseOverrides(measurements: const [])));
+    await _selectMedicionesTab(tester);
+
+    // Antes del toggle: header antropométrico.
+    expect(find.text('Mediciones antropométricas'), findsOneWidget);
+    expect(find.text('Pruebas de rendimiento'), findsNothing);
+
+    // Toggle a Rendimiento.
+    await tester.tap(find.text('RENDIMIENTO'));
+    await tester.pumpAndSettle();
+
+    // Post-toggle: header rendimiento + empty state de pruebas.
+    expect(find.text('Pruebas de rendimiento'), findsOneWidget);
+    expect(find.text('Mediciones antropométricas'), findsNothing);
+    expect(
+      find.text(
+          'Este alumno todavía no tiene pruebas de rendimiento cargadas.'),
+      findsOneWidget,
+    );
+    // Botón de CTA cambia label.
+    expect(find.text('NUEVA PRUEBA'), findsOneWidget);
+  });
+
+  testWidgets(
+      'subvista Rendimiento muestra pruebas con summary line',
+      (tester) async {
+    final tests = [
+      PerformanceTest(
+        id: 't1',
+        athleteId: _athleteUid,
+        recordedBy: _trainerUid,
+        recordedAt: DateTime(2026, 3, 12),
+        cmjCm: 42,
+        sprint10mS: 1.6,
+        squat1rmKg: 120,
+      ),
+    ];
+    _useDesktopViewport(tester);
+    await tester.pumpWidget(_wrap([
+      ..._baseOverrides(measurements: const []),
+      performanceTestsForAthleteProvider
+          .overrideWith((ref, id) => Stream.value(tests)),
+    ]));
+    await _selectMedicionesTab(tester);
+    await tester.tap(find.text('RENDIMIENTO'));
+    await tester.pumpAndSettle();
+
+    // Summary line muestra los 3 markers: CMJ, Sprint 10m, Sentadilla 1RM.
+    expect(find.textContaining('CMJ 42.0 cm'), findsOneWidget);
+    expect(find.textContaining('10m 1.6s'), findsOneWidget);
+    expect(find.textContaining('Sent. 120.0 kg'), findsOneWidget);
+  });
 }
