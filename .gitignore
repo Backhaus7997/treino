@@ -65,3 +65,4 @@ docs/video-catalog-audit/drive-videos.json
 docs/video-catalog-audit/video-match-details.json
 docs/video-catalog-audit/unmatched-videos.csv
 devtools_options.yaml
+scripts/places.local.json
