@@ -9,10 +9,12 @@ import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/chat/application/chat_providers.dart';
 import 'package:treino/features/coach/application/athlete_file_providers.dart';
 import 'package:treino/features/coach/application/athlete_note_providers.dart';
+import 'package:treino/features/coach/application/follow_up_entry_providers.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/data/athlete_file_repository.dart';
 import 'package:treino/features/coach/domain/athlete_file.dart';
 import 'package:treino/features/coach/domain/athlete_note.dart';
+import 'package:treino/features/coach/domain/follow_up_entry.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach_hub/presentation/sections/chat/widgets/chat_detail_pane.dart';
@@ -83,6 +85,7 @@ class AlumnoDetailScreen extends ConsumerWidget {
   static const _chatIndex = 6;
   static const _notasPrivadasIndex = 7;
   static const _archivosIndex = 8;
+  static const _seguimientoIndex = 9;
   static const _medicionesIndex = 10;
 
   @override
@@ -158,6 +161,8 @@ class AlumnoDetailScreen extends ConsumerWidget {
                     _NotasPrivadasTab(athleteId: athleteId)
                   else if (i == _archivosIndex)
                     _ArchivosTab(athleteId: athleteId)
+                  else if (i == _seguimientoIndex)
+                    _SeguimientoTab(athleteId: athleteId)
                   else if (i == _medicionesIndex)
                     _MedicionesTab(athleteId: athleteId)
                   else
@@ -4079,6 +4084,507 @@ class _NuevoRendimientoDialogState
                 ],
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── _SeguimientoTab ──────────────────────────────────────────────────────────
+
+/// Coach Hub web — Tab «Seguimiento» del alumno detail.
+///
+/// Log cronológico privado del PF sobre un alumno. Múltiples entradas
+/// datadas con tag categórico (general/entrenamiento/nutricion/molestia/
+/// motivacion). Diferencia con Notas privadas (hoja libre única):
+/// Seguimiento es un TIMELINE de eventos/observaciones — cada entrada tiene
+/// su timestamp y tag.
+///
+/// Reusa `followUpEntriesProvider` (stream DESC) +
+/// `FollowUpEntryRepository.add/update/delete`. Trainer-only en rules.
+class _SeguimientoTab extends ConsumerStatefulWidget {
+  const _SeguimientoTab({required this.athleteId});
+
+  final String athleteId;
+
+  @override
+  ConsumerState<_SeguimientoTab> createState() => _SeguimientoTabState();
+}
+
+class _SeguimientoTabState extends ConsumerState<_SeguimientoTab> {
+  Future<void> _openDialog({FollowUpEntry? initial}) async {
+    final trainerUid = ref.read(currentUidProvider);
+    if (trainerUid == null) return;
+    await showDialog<void>(
+      context: context,
+      builder: (_) => _NuevaEntradaSeguimientoDialog(
+        athleteId: widget.athleteId,
+        trainerUid: trainerUid,
+        initial: initial,
+      ),
+    );
+  }
+
+  Future<void> _confirmDelete(FollowUpEntry entry) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('¿Eliminar entrada?'), // i18n: Fase W2
+        content: Text(
+          'La entrada del ${fmtDate(entry.recordedAt)} se va a borrar. '
+          'No se puede deshacer.', // i18n: Fase W2
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancelar'), // i18n: Fase W2
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Confirmar'), // i18n: Fase W2
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await ref.read(followUpEntryRepositoryProvider).delete(entry.id);
+    } catch (_) {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('No pudimos eliminar la entrada.'), // i18n: Fase W2
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final trainerUid = ref.watch(currentUidProvider);
+    if (trainerUid == null) return const SizedBox.shrink();
+    final entriesAsync = ref.watch(
+      followUpEntriesProvider(
+        (trainerId: trainerUid, athleteId: widget.athleteId),
+      ),
+    );
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Seguimiento privado', // i18n: Fase W2
+                      style: TextStyle(
+                        color: palette.textPrimary,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Bitácora del PF con observaciones, molestias y decisiones. Solo vos las ves.', // i18n: Fase W2
+                      style: TextStyle(
+                          color: palette.textMuted, fontSize: 13),
+                    ),
+                  ],
+                ),
+              ),
+              ElevatedButton.icon(
+                onPressed: () => _openDialog(),
+                icon: const Icon(Icons.add, size: 16),
+                label: const Text('NUEVA ENTRADA'), // i18n: Fase W2
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: palette.accent,
+                  foregroundColor: palette.bg,
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 18, vertical: 12),
+                  shape: const StadiumBorder(),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Expanded(
+            child: Builder(
+              builder: (_) {
+                if (entriesAsync.hasValue) {
+                  final entries = entriesAsync.requireValue;
+                  if (entries.isEmpty) {
+                    return Center(
+                      child: Text(
+                        'No hay entradas de seguimiento todavía.', // i18n: Fase W2
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                            color: palette.textMuted, fontSize: 14),
+                      ),
+                    );
+                  }
+                  return ListView.separated(
+                    itemCount: entries.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 8),
+                    itemBuilder: (_, i) => _SeguimientoEntryCard(
+                      entry: entries[i],
+                      palette: palette,
+                      onEdit: () => _openDialog(initial: entries[i]),
+                      onDelete: () => _confirmDelete(entries[i]),
+                    ),
+                  );
+                }
+                if (entriesAsync.hasError) {
+                  return Center(
+                    child: Text(
+                      'No pudimos cargar el seguimiento.', // i18n: Fase W2
+                      style: TextStyle(
+                          color: palette.textMuted, fontSize: 14),
+                    ),
+                  );
+                }
+                return Center(
+                  child: CircularProgressIndicator(color: palette.accent),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Card de una entrada del seguimiento.
+class _SeguimientoEntryCard extends StatelessWidget {
+  const _SeguimientoEntryCard({
+    required this.entry,
+    required this.palette,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  final FollowUpEntry entry;
+  final AppPalette palette;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: palette.bgCard,
+        border: Border.all(color: palette.border),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                fmtDate(entry.recordedAt),
+                style: TextStyle(
+                  color: palette.textPrimary,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(width: 10),
+              _TagChip(tag: entry.tag, palette: palette),
+              const Spacer(),
+              IconButton(
+                tooltip: 'Editar', // i18n: Fase W2
+                onPressed: onEdit,
+                icon:
+                    Icon(Icons.edit, size: 18, color: palette.textMuted),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(
+                    minWidth: 32, minHeight: 32),
+              ),
+              IconButton(
+                tooltip: 'Eliminar', // i18n: Fase W2
+                onPressed: onDelete,
+                icon: Icon(TreinoIcon.trash,
+                    size: 18, color: palette.danger),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(
+                    minWidth: 32, minHeight: 32),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            entry.text,
+            style: TextStyle(
+              color: palette.textPrimary,
+              fontSize: 14,
+              height: 1.4,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Chip pequeño coloreado según el tag.
+class _TagChip extends StatelessWidget {
+  const _TagChip({required this.tag, required this.palette});
+
+  final FollowUpTag tag;
+  final AppPalette palette;
+
+  static (String, Color) _labelAndColor(
+      FollowUpTag tag, AppPalette palette) {
+    switch (tag) {
+      case FollowUpTag.general:
+        return ('GENERAL', palette.textMuted);
+      case FollowUpTag.entrenamiento:
+        return ('ENTRENAMIENTO', palette.accent);
+      case FollowUpTag.nutricion:
+        return ('NUTRICIÓN', palette.warning);
+      case FollowUpTag.molestia:
+        return ('MOLESTIA', palette.danger);
+      case FollowUpTag.motivacion:
+        return ('MOTIVACIÓN', palette.highlight);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final (label, color) = _labelAndColor(tag, palette);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(9999),
+        border: Border.all(color: color.withValues(alpha: 0.4)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.5,
+        ),
+      ),
+    );
+  }
+}
+
+/// Dialog modal para crear (o editar) una entrada del seguimiento.
+class _NuevaEntradaSeguimientoDialog extends ConsumerStatefulWidget {
+  const _NuevaEntradaSeguimientoDialog({
+    required this.athleteId,
+    required this.trainerUid,
+    this.initial,
+  });
+
+  final String athleteId;
+  final String trainerUid;
+  final FollowUpEntry? initial;
+
+  @override
+  ConsumerState<_NuevaEntradaSeguimientoDialog> createState() =>
+      _NuevaEntradaSeguimientoDialogState();
+}
+
+class _NuevaEntradaSeguimientoDialogState
+    extends ConsumerState<_NuevaEntradaSeguimientoDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _textC = TextEditingController();
+  late FollowUpTag _tag;
+  bool _saving = false;
+
+  bool get _isEditing => widget.initial != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final initial = widget.initial;
+    if (initial != null) {
+      _textC.text = initial.text;
+      _tag = initial.tag;
+    } else {
+      _tag = FollowUpTag.general;
+    }
+  }
+
+  @override
+  void dispose() {
+    _textC.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (_saving) return;
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _saving = true);
+    final messenger = ScaffoldMessenger.of(context);
+    final initial = widget.initial;
+    final repo = ref.read(followUpEntryRepositoryProvider);
+    try {
+      if (_isEditing && initial != null) {
+        await repo.update(
+          initial.copyWith(text: _textC.text.trim(), tag: _tag),
+        );
+      } else {
+        await repo.add(
+          trainerId: widget.trainerUid,
+          athleteId: widget.athleteId,
+          text: _textC.text.trim(),
+          tag: _tag,
+        );
+      }
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(_isEditing
+              ? 'Entrada actualizada.' // i18n: Fase W2
+              : 'Entrada guardada.'), // i18n: Fase W2
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      messenger.showSnackBar(
+        const SnackBar(
+          content:
+              Text('No pudimos guardar la entrada.'), // i18n: Fase W2
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    return Dialog(
+      backgroundColor: palette.bg,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 560),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  _isEditing
+                      ? 'Editar entrada' // i18n: Fase W2
+                      : 'Nueva entrada de seguimiento', // i18n: Fase W2
+                  style: TextStyle(
+                    color: palette.textPrimary,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<FollowUpTag>(
+                  initialValue: _tag,
+                  onChanged: (v) {
+                    if (v != null) setState(() => _tag = v);
+                  },
+                  decoration: InputDecoration(
+                    labelText: 'Categoría', // i18n: Fase W2
+                    labelStyle: TextStyle(color: palette.textMuted),
+                    filled: true,
+                    fillColor: palette.bgCard,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: palette.border),
+                    ),
+                  ),
+                  style: TextStyle(color: palette.textPrimary, fontSize: 14),
+                  dropdownColor: palette.bgCard,
+                  items: [
+                    for (final t in FollowUpTag.values)
+                      DropdownMenuItem(
+                        value: t,
+                        child: Text(_TagChip._labelAndColor(t, palette).$1),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _textC,
+                  maxLines: 6,
+                  minLines: 4,
+                  autofocus: true,
+                  decoration: InputDecoration(
+                    labelText: 'Texto', // i18n: Fase W2
+                    hintText:
+                        'Ej: Cambio a bloque de fuerza, foco en press banca…', // i18n: Fase W2
+                    labelStyle: TextStyle(color: palette.textMuted),
+                    hintStyle: TextStyle(
+                      color: palette.textMuted.withValues(alpha: 0.6),
+                    ),
+                    filled: true,
+                    fillColor: palette.bgCard,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: palette.border),
+                    ),
+                  ),
+                  style: TextStyle(color: palette.textPrimary, fontSize: 14),
+                  validator: (v) {
+                    final s = v?.trim() ?? '';
+                    if (s.isEmpty) return 'Escribí algo'; // i18n: Fase W2
+                    if (s.length > 4900) {
+                      return 'Muy largo (max 4900 caracteres)'; // i18n: Fase W2
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: _saving
+                          ? null
+                          : () => Navigator.of(context).pop(),
+                      child: const Text('Cancelar'), // i18n: Fase W2
+                    ),
+                    const SizedBox(width: 8),
+                    ElevatedButton(
+                      onPressed: _saving ? null : _save,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: palette.accent,
+                        foregroundColor: palette.bg,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 20, vertical: 12),
+                        shape: const StadiumBorder(),
+                      ),
+                      child: _saving
+                          ? SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: palette.bg,
+                              ),
+                            )
+                          : const Text('GUARDAR'), // i18n: Fase W2
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
