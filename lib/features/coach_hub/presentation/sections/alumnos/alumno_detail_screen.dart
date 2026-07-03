@@ -25,6 +25,7 @@ import 'package:treino/features/payments/application/pagos_por_cobrar_provider.d
 import 'package:treino/features/payments/application/payment_providers.dart';
 import 'package:treino/features/payments/domain/athlete_billing.dart';
 import 'package:treino/features/performance/application/performance_test_providers.dart';
+import 'package:treino/features/performance/domain/performance_test.dart';
 import 'package:treino/features/performance/presentation/widgets/performance_progress_chart.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
@@ -2295,43 +2296,57 @@ class _ArchivoRow extends StatelessWidget {
 
 // ── _MedicionesTab ────────────────────────────────────────────────────────────
 
+/// Vistas del tab Mediciones. PR#2 (2026-07-03) sumó `rendimiento` como
+/// segunda subvista con el toggle en el header.
+enum _MedicionView { antropometricas, rendimiento }
+
 /// Coach Hub web — Tab «Mediciones» del alumno detail.
 ///
-/// PR#1 (2026-07-03): CRUD antropométricas. Ver histórico DESC + agregar
-/// una nueva medición vía dialog modal + borrar con confirm.
+/// PR#1: CRUD antropométricas.
+/// PR#2 (2026-07-03): toggle Antropo/Rendimiento + subvista Rendimiento
+/// con el mismo pattern (ver + agregar + borrar). Reusa
+/// `performanceTestsForAthleteProvider` + `PerformanceTestRepository`.
+/// PR#3 sumará editar.
 ///
-/// Reusa `measurementsForAthleteProvider` (misma lista que tab Progreso lee
-/// para el chart) + `MeasurementRepository.add/delete`. Firestore rules ya
-/// permiten trainer create/read/update/delete (ver firestore.rules line 665).
-///
-/// **Diferencia con tab Progreso**: Progreso muestra el CHART agregado
-/// (evolución) — Mediciones muestra la DATA cruda con opción de gestionar
-/// entradas.
-///
-/// PR#2 sumará el toggle Antropométricas/Rendimiento y la subvista
-/// Rendimiento. PR#3 sumará editar.
-class _MedicionesTab extends ConsumerWidget {
+/// **Diferencia con tab Progreso**: Progreso muestra CHARTS (evolución).
+/// Mediciones muestra la DATA cruda con opción de gestionar entradas.
+class _MedicionesTab extends ConsumerStatefulWidget {
   const _MedicionesTab({required this.athleteId});
 
   final String athleteId;
 
-  Future<void> _openNewDialog(BuildContext context, WidgetRef ref) async {
+  @override
+  ConsumerState<_MedicionesTab> createState() => _MedicionesTabState();
+}
+
+class _MedicionesTabState extends ConsumerState<_MedicionesTab> {
+  _MedicionView _view = _MedicionView.antropometricas;
+
+  Future<void> _openNewAntropoDialog() async {
     final trainerUid = ref.read(currentUidProvider);
     if (trainerUid == null) return;
     await showDialog<void>(
       context: context,
       builder: (_) => _NuevaMedicionDialog(
-        athleteId: athleteId,
+        athleteId: widget.athleteId,
         trainerUid: trainerUid,
       ),
     );
   }
 
-  Future<void> _confirmDelete(
-    BuildContext context,
-    WidgetRef ref,
-    Measurement m,
-  ) async {
+  Future<void> _openNewRendimientoDialog() async {
+    final trainerUid = ref.read(currentUidProvider);
+    if (trainerUid == null) return;
+    await showDialog<void>(
+      context: context,
+      builder: (_) => _NuevoRendimientoDialog(
+        athleteId: widget.athleteId,
+        trainerUid: trainerUid,
+      ),
+    );
+  }
+
+  Future<void> _confirmDeleteMedicion(Measurement m) async {
     final messenger = ScaffoldMessenger.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
@@ -2365,17 +2380,51 @@ class _MedicionesTab extends ConsumerWidget {
     }
   }
 
+  Future<void> _confirmDeleteRendimiento(PerformanceTest t) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('¿Eliminar prueba?'), // i18n: Fase W2
+        content: Text(
+          'La prueba del ${fmtDate(t.recordedAt)} se va a borrar. '
+          'No se puede deshacer.', // i18n: Fase W2
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancelar'), // i18n: Fase W2
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Confirmar'), // i18n: Fase W2
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await ref.read(performanceTestRepositoryProvider).delete(t.id);
+    } catch (_) {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('No pudimos eliminar la prueba.'), // i18n: Fase W2
+        ),
+      );
+    }
+  }
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    final measAsync = ref.watch(measurementsForAthleteProvider(athleteId));
+    final isAntropo = _view == _MedicionView.antropometricas;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // ── Header ─────────────────────────────────────────────────────
+          // ── Header con toggle ──────────────────────────────────────────
           Row(
             children: [
               Expanded(
@@ -2383,7 +2432,9 @@ class _MedicionesTab extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Mediciones antropométricas', // i18n: Fase W2
+                      isAntropo
+                          ? 'Mediciones antropométricas' // i18n: Fase W2
+                          : 'Pruebas de rendimiento', // i18n: Fase W2
                       style: TextStyle(
                         color: palette.textPrimary,
                         fontSize: 18,
@@ -2392,17 +2443,23 @@ class _MedicionesTab extends ConsumerWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Peso, composición corporal y circunferencias.', // i18n: Fase W2
-                      style:
-                          TextStyle(color: palette.textMuted, fontSize: 13),
+                      isAntropo
+                          ? 'Peso, composición corporal y circunferencias.' // i18n: Fase W2
+                          : 'Saltos, sprints, 1RM y resistencia.', // i18n: Fase W2
+                      style: TextStyle(
+                          color: palette.textMuted, fontSize: 13),
                     ),
                   ],
                 ),
               ),
               ElevatedButton.icon(
-                onPressed: () => _openNewDialog(context, ref),
+                onPressed: isAntropo
+                    ? _openNewAntropoDialog
+                    : _openNewRendimientoDialog,
                 icon: const Icon(Icons.add, size: 16),
-                label: const Text('NUEVA MEDICIÓN'), // i18n: Fase W2
+                label: Text(isAntropo
+                    ? 'NUEVA MEDICIÓN' // i18n: Fase W2
+                    : 'NUEVA PRUEBA'), // i18n: Fase W2
                 style: ElevatedButton.styleFrom(
                   backgroundColor: palette.accent,
                   foregroundColor: palette.bg,
@@ -2413,53 +2470,187 @@ class _MedicionesTab extends ConsumerWidget {
               ),
             ],
           ),
+          const SizedBox(height: 12),
+          // ── Toggle segmented ────────────────────────────────────────────
+          _MedicionesToggle(
+            view: _view,
+            palette: palette,
+            onChanged: (v) => setState(() => _view = v),
+          ),
           const SizedBox(height: 20),
           Expanded(
-            child: Builder(
-              builder: (_) {
-                if (measAsync.hasValue) {
-                  final all = measAsync.requireValue;
-                  // Provider ordena ASC por recordedAt; queremos DESC para
-                  // que "las más nuevas" aparezcan arriba.
-                  final ms = all.reversed.toList();
-                  if (ms.isEmpty) {
-                    return Center(
-                      child: Text(
-                        'Este alumno todavía no tiene mediciones cargadas.', // i18n: Fase W2
-                        textAlign: TextAlign.center,
-                        style:
-                            TextStyle(color: palette.textMuted, fontSize: 14),
-                      ),
-                    );
-                  }
-                  return ListView.separated(
-                    itemCount: ms.length,
-                    separatorBuilder: (_, __) =>
-                        Divider(height: 1, color: palette.border),
-                    itemBuilder: (_, i) => _MedicionRow(
-                      measurement: ms[i],
-                      palette: palette,
-                      onDelete: () => _confirmDelete(context, ref, ms[i]),
-                    ),
-                  );
-                }
-                if (measAsync.hasError) {
-                  return Center(
-                    child: Text(
-                      'No pudimos cargar las mediciones.', // i18n: Fase W2
-                      style: TextStyle(color: palette.textMuted, fontSize: 14),
-                    ),
-                  );
-                }
-                return Center(
-                  child: CircularProgressIndicator(color: palette.accent),
-                );
-              },
-            ),
+            child: isAntropo
+                ? _AntropoList(
+                    athleteId: widget.athleteId,
+                    palette: palette,
+                    onDelete: _confirmDeleteMedicion,
+                  )
+                : _RendimientoList(
+                    athleteId: widget.athleteId,
+                    palette: palette,
+                    onDelete: _confirmDeleteRendimiento,
+                  ),
           ),
         ],
       ),
     );
+  }
+}
+
+/// Toggle segmented del header — Antropométricas / Rendimiento.
+class _MedicionesToggle extends StatelessWidget {
+  const _MedicionesToggle({
+    required this.view,
+    required this.palette,
+    required this.onChanged,
+  });
+
+  final _MedicionView view;
+  final AppPalette palette;
+  final ValueChanged<_MedicionView> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget seg(_MedicionView v, String label) {
+      final active = view == v;
+      return Expanded(
+        child: InkWell(
+          onTap: () => onChanged(v),
+          borderRadius: BorderRadius.circular(10),
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            decoration: BoxDecoration(
+              color: active ? palette.accent.withValues(alpha: 0.15) : null,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: active ? palette.accent : palette.border,
+                width: active ? 1.5 : 1,
+              ),
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              label,
+              style: TextStyle(
+                color: active ? palette.accent : palette.textMuted,
+                fontSize: 13,
+                fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                letterSpacing: 0.4,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Row(
+      children: [
+        seg(_MedicionView.antropometricas, 'ANTROPOMÉTRICAS'), // i18n: Fase W2
+        const SizedBox(width: 8),
+        seg(_MedicionView.rendimiento, 'RENDIMIENTO'), // i18n: Fase W2
+      ],
+    );
+  }
+}
+
+/// Subvista de mediciones antropométricas.
+class _AntropoList extends ConsumerWidget {
+  const _AntropoList({
+    required this.athleteId,
+    required this.palette,
+    required this.onDelete,
+  });
+
+  final String athleteId;
+  final AppPalette palette;
+  final Future<void> Function(Measurement) onDelete;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final measAsync = ref.watch(measurementsForAthleteProvider(athleteId));
+    if (measAsync.hasValue) {
+      final all = measAsync.requireValue;
+      // Provider ordena ASC — queremos DESC para "más nuevas arriba".
+      final ms = all.reversed.toList();
+      if (ms.isEmpty) {
+        return Center(
+          child: Text(
+            'Este alumno todavía no tiene mediciones cargadas.', // i18n: Fase W2
+            textAlign: TextAlign.center,
+            style: TextStyle(color: palette.textMuted, fontSize: 14),
+          ),
+        );
+      }
+      return ListView.separated(
+        itemCount: ms.length,
+        separatorBuilder: (_, __) =>
+            Divider(height: 1, color: palette.border),
+        itemBuilder: (_, i) => _MedicionRow(
+          measurement: ms[i],
+          palette: palette,
+          onDelete: () => onDelete(ms[i]),
+        ),
+      );
+    }
+    if (measAsync.hasError) {
+      return Center(
+        child: Text(
+          'No pudimos cargar las mediciones.', // i18n: Fase W2
+          style: TextStyle(color: palette.textMuted, fontSize: 14),
+        ),
+      );
+    }
+    return Center(child: CircularProgressIndicator(color: palette.accent));
+  }
+}
+
+/// Subvista de pruebas de rendimiento.
+class _RendimientoList extends ConsumerWidget {
+  const _RendimientoList({
+    required this.athleteId,
+    required this.palette,
+    required this.onDelete,
+  });
+
+  final String athleteId;
+  final AppPalette palette;
+  final Future<void> Function(PerformanceTest) onDelete;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final testsAsync =
+        ref.watch(performanceTestsForAthleteProvider(athleteId));
+    if (testsAsync.hasValue) {
+      final all = testsAsync.requireValue;
+      final tests = all.reversed.toList();
+      if (tests.isEmpty) {
+        return Center(
+          child: Text(
+            'Este alumno todavía no tiene pruebas de rendimiento cargadas.', // i18n: Fase W2
+            textAlign: TextAlign.center,
+            style: TextStyle(color: palette.textMuted, fontSize: 14),
+          ),
+        );
+      }
+      return ListView.separated(
+        itemCount: tests.length,
+        separatorBuilder: (_, __) =>
+            Divider(height: 1, color: palette.border),
+        itemBuilder: (_, i) => _RendimientoRow(
+          test: tests[i],
+          palette: palette,
+          onDelete: () => onDelete(tests[i]),
+        ),
+      );
+    }
+    if (testsAsync.hasError) {
+      return Center(
+        child: Text(
+          'No pudimos cargar las pruebas.', // i18n: Fase W2
+          style: TextStyle(color: palette.textMuted, fontSize: 14),
+        ),
+      );
+    }
+    return Center(child: CircularProgressIndicator(color: palette.accent));
   }
 }
 
@@ -3170,6 +3361,565 @@ class _NuevaMedicionField extends StatelessWidget {
           if (parsed < 0 || parsed > 500) return 'Fuera de rango'; // i18n: Fase W2
           return null;
         },
+      ),
+    );
+  }
+}
+
+// ── Rendimiento (PR#2) ────────────────────────────────────────────────────────
+
+/// Row de una prueba de rendimiento individual.
+class _RendimientoRow extends StatefulWidget {
+  const _RendimientoRow({
+    required this.test,
+    required this.palette,
+    required this.onDelete,
+  });
+
+  final PerformanceTest test;
+  final AppPalette palette;
+  final VoidCallback onDelete;
+
+  @override
+  State<_RendimientoRow> createState() => _RendimientoRowState();
+}
+
+class _RendimientoRowState extends State<_RendimientoRow> {
+  bool _expanded = false;
+
+  /// Summary line: los 3 campos más marker del test — CMJ, Sprint 10m,
+  /// Sentadilla 1RM. Si alguno es null se omite.
+  String _summary() {
+    final t = widget.test;
+    final parts = <String>[];
+    if (t.cmjCm != null) parts.add('CMJ ${t.cmjCm} cm');
+    if (t.sprint10mS != null) parts.add('10m ${t.sprint10mS}s');
+    if (t.squat1rmKg != null) parts.add('Sent. ${t.squat1rmKg} kg');
+    if (parts.isEmpty) return 'Sin métricas cargadas'; // i18n: Fase W2
+    return parts.join(' · ');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = widget.test;
+    final palette = widget.palette;
+    return InkWell(
+      onTap: () => setState(() => _expanded = !_expanded),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  _expanded
+                      ? Icons.keyboard_arrow_down
+                      : Icons.keyboard_arrow_right,
+                  size: 22,
+                  color: palette.textMuted,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        fmtDate(t.recordedAt),
+                        style: TextStyle(
+                          color: palette.textPrimary,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        _summary(),
+                        style: TextStyle(
+                          color: palette.textMuted,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Eliminar', // i18n: Fase W2
+                  onPressed: widget.onDelete,
+                  icon: Icon(TreinoIcon.trash,
+                      size: 18, color: palette.danger),
+                ),
+              ],
+            ),
+            if (_expanded)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(30, 12, 8, 0),
+                child: _RendimientoDetail(test: t, palette: palette),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Detalle expandido de una prueba de rendimiento. Muestra solo los campos
+/// con valor cargado, agrupados por categoría (saltos / sprints / 1RM /
+/// resistencia).
+class _RendimientoDetail extends StatelessWidget {
+  const _RendimientoDetail(
+      {required this.test, required this.palette});
+
+  final PerformanceTest test;
+  final AppPalette palette;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = test;
+    final entries = <(String, String)>[
+      // Saltos
+      if (t.cmjCm != null) ('CMJ', '${t.cmjCm} cm'),
+      if (t.squatJumpCm != null) ('Squat Jump', '${t.squatJumpCm} cm'),
+      if (t.abalakovCm != null) ('Abalakov', '${t.abalakovCm} cm'),
+      if (t.broadJumpCm != null) ('Salto largo', '${t.broadJumpCm} cm'),
+      // Sprints
+      if (t.sprint10mS != null) ('Sprint 10m', '${t.sprint10mS} s'),
+      if (t.sprint20mS != null) ('Sprint 20m', '${t.sprint20mS} s'),
+      if (t.sprint30mS != null) ('Sprint 30m', '${t.sprint30mS} s'),
+      if (t.sprint40mS != null) ('Sprint 40m', '${t.sprint40mS} s'),
+      // 1RM
+      if (t.squat1rmKg != null) ('Sentadilla 1RM', '${t.squat1rmKg} kg'),
+      if (t.benchPress1rmKg != null)
+        ('Press banca 1RM', '${t.benchPress1rmKg} kg'),
+      if (t.deadlift1rmKg != null)
+        ('Peso muerto 1RM', '${t.deadlift1rmKg} kg'),
+      if (t.overheadPress1rmKg != null)
+        ('Press militar 1RM', '${t.overheadPress1rmKg} kg'),
+      if (t.pullUp1rmKg != null) ('Dominada 1RM', '${t.pullUp1rmKg} kg'),
+      // Resistencia
+      if (t.vo2maxMlKgMin != null)
+        ('VO2 máx', '${t.vo2maxMlKgMin} ml/kg/min'),
+      if (t.courseNavetteLevel != null)
+        ('Course Navette', 'nivel ${t.courseNavetteLevel}'),
+      if (t.cooperMeters != null) ('Cooper', '${t.cooperMeters} m'),
+      if (t.sitAndReachCm != null)
+        ('Sit & Reach', '${t.sitAndReachCm} cm'),
+    ];
+
+    if (entries.isEmpty && (t.notes ?? '').isEmpty) {
+      return Text(
+        'Esta prueba no tiene valores cargados.', // i18n: Fase W2
+        style: TextStyle(color: palette.textMuted, fontSize: 13),
+      );
+    }
+
+    final half = (entries.length / 2).ceil();
+    final left = entries.take(half).toList();
+    final right = entries.skip(half).toList();
+
+    Widget colFor(List<(String, String)> items) => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            for (final (label, value) in items)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: 140,
+                      child: Text(
+                        label,
+                        style: TextStyle(
+                          color: palette.textMuted,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: Text(
+                        value,
+                        style: TextStyle(
+                          color: palette.textPrimary,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: colFor(left)),
+            const SizedBox(width: 24),
+            Expanded(child: colFor(right)),
+          ],
+        ),
+        if ((t.notes ?? '').isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Text(
+            'Nota',
+            style: TextStyle(
+              color: palette.textMuted,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            t.notes!,
+            style: TextStyle(color: palette.textPrimary, fontSize: 13),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+/// Dialog modal para cargar una nueva prueba de rendimiento.
+///
+/// Todos los campos opcionales. Saltos siempre expandido (la sección más
+/// común según el research de PT); Sprints, 1RM y Resistencia colapsables
+/// por default para no abrumar.
+class _NuevoRendimientoDialog extends ConsumerStatefulWidget {
+  const _NuevoRendimientoDialog({
+    required this.athleteId,
+    required this.trainerUid,
+  });
+
+  final String athleteId;
+  final String trainerUid;
+
+  @override
+  ConsumerState<_NuevoRendimientoDialog> createState() =>
+      _NuevoRendimientoDialogState();
+}
+
+class _NuevoRendimientoDialogState
+    extends ConsumerState<_NuevoRendimientoDialog> {
+  final _formKey = GlobalKey<FormState>();
+
+  // Saltos
+  final _cmjC = TextEditingController();
+  final _squatJumpC = TextEditingController();
+  final _abalakovC = TextEditingController();
+  final _broadJumpC = TextEditingController();
+  // Sprints
+  final _sprint10C = TextEditingController();
+  final _sprint20C = TextEditingController();
+  final _sprint30C = TextEditingController();
+  final _sprint40C = TextEditingController();
+  // 1RM
+  final _squat1rmC = TextEditingController();
+  final _bench1rmC = TextEditingController();
+  final _deadlift1rmC = TextEditingController();
+  final _overhead1rmC = TextEditingController();
+  final _pullUp1rmC = TextEditingController();
+  // Resistencia
+  final _vo2maxC = TextEditingController();
+  final _courseNavetteC = TextEditingController();
+  final _cooperC = TextEditingController();
+  final _sitAndReachC = TextEditingController();
+  // Meta
+  final _notesC = TextEditingController();
+
+  bool _sprintsExpanded = false;
+  bool _oneRmExpanded = false;
+  bool _resistExpanded = false;
+  bool _saving = false;
+
+  @override
+  void dispose() {
+    for (final c in [
+      _cmjC, _squatJumpC, _abalakovC, _broadJumpC,
+      _sprint10C, _sprint20C, _sprint30C, _sprint40C,
+      _squat1rmC, _bench1rmC, _deadlift1rmC, _overhead1rmC, _pullUp1rmC,
+      _vo2maxC, _courseNavetteC, _cooperC, _sitAndReachC,
+      _notesC,
+    ]) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  double? _parse(TextEditingController c) {
+    final s = c.text.trim().replaceAll(',', '.');
+    if (s.isEmpty) return null;
+    return double.tryParse(s);
+  }
+
+  Future<void> _save() async {
+    if (_saving) return;
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _saving = true);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final test = PerformanceTest(
+        id: '',
+        athleteId: widget.athleteId,
+        recordedBy: widget.trainerUid,
+        recordedAt: DateTime.now(),
+        cmjCm: _parse(_cmjC),
+        squatJumpCm: _parse(_squatJumpC),
+        abalakovCm: _parse(_abalakovC),
+        broadJumpCm: _parse(_broadJumpC),
+        sprint10mS: _parse(_sprint10C),
+        sprint20mS: _parse(_sprint20C),
+        sprint30mS: _parse(_sprint30C),
+        sprint40mS: _parse(_sprint40C),
+        squat1rmKg: _parse(_squat1rmC),
+        benchPress1rmKg: _parse(_bench1rmC),
+        deadlift1rmKg: _parse(_deadlift1rmC),
+        overheadPress1rmKg: _parse(_overhead1rmC),
+        pullUp1rmKg: _parse(_pullUp1rmC),
+        vo2maxMlKgMin: _parse(_vo2maxC),
+        courseNavetteLevel: _parse(_courseNavetteC),
+        cooperMeters: _parse(_cooperC),
+        sitAndReachCm: _parse(_sitAndReachC),
+        notes: _notesC.text.trim().isEmpty ? null : _notesC.text.trim(),
+      );
+      await ref.read(performanceTestRepositoryProvider).add(test);
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Prueba guardada.'), // i18n: Fase W2
+          duration: Duration(seconds: 2),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('No pudimos guardar la prueba.'), // i18n: Fase W2
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    return Dialog(
+      backgroundColor: palette.bg,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 640, maxHeight: 720),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Nueva prueba de rendimiento', // i18n: Fase W2
+                style: TextStyle(
+                  color: palette.textPrimary,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Cargá los campos que hayas medido. Todos son opcionales.', // i18n: Fase W2
+                style: TextStyle(color: palette.textMuted, fontSize: 13),
+              ),
+              const SizedBox(height: 16),
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _NuevaMedicionSection(
+                          title: 'SALTOS', // i18n: Fase W2
+                          palette: palette,
+                          expanded: true,
+                          onToggle: null,
+                          children: [
+                            _NuevaMedicionField(
+                                label: 'CMJ',
+                                suffix: 'cm',
+                                controller: _cmjC,
+                                palette: palette),
+                            _NuevaMedicionField(
+                                label: 'Squat Jump',
+                                suffix: 'cm',
+                                controller: _squatJumpC,
+                                palette: palette),
+                            _NuevaMedicionField(
+                                label: 'Abalakov',
+                                suffix: 'cm',
+                                controller: _abalakovC,
+                                palette: palette),
+                            _NuevaMedicionField(
+                                label: 'Salto largo',
+                                suffix: 'cm',
+                                controller: _broadJumpC,
+                                palette: palette),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        _NuevaMedicionSection(
+                          title: 'SPRINTS', // i18n: Fase W2
+                          palette: palette,
+                          expanded: _sprintsExpanded,
+                          onToggle: () => setState(
+                              () => _sprintsExpanded = !_sprintsExpanded),
+                          children: [
+                            _NuevaMedicionField(
+                                label: 'Sprint 10m',
+                                suffix: 's',
+                                controller: _sprint10C,
+                                palette: palette),
+                            _NuevaMedicionField(
+                                label: 'Sprint 20m',
+                                suffix: 's',
+                                controller: _sprint20C,
+                                palette: palette),
+                            _NuevaMedicionField(
+                                label: 'Sprint 30m',
+                                suffix: 's',
+                                controller: _sprint30C,
+                                palette: palette),
+                            _NuevaMedicionField(
+                                label: 'Sprint 40m',
+                                suffix: 's',
+                                controller: _sprint40C,
+                                palette: palette),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        _NuevaMedicionSection(
+                          title: 'FUERZA MÁXIMA 1RM', // i18n: Fase W2
+                          palette: palette,
+                          expanded: _oneRmExpanded,
+                          onToggle: () =>
+                              setState(() => _oneRmExpanded = !_oneRmExpanded),
+                          children: [
+                            _NuevaMedicionField(
+                                label: 'Sentadilla',
+                                suffix: 'kg',
+                                controller: _squat1rmC,
+                                palette: palette),
+                            _NuevaMedicionField(
+                                label: 'Press banca',
+                                suffix: 'kg',
+                                controller: _bench1rmC,
+                                palette: palette),
+                            _NuevaMedicionField(
+                                label: 'Peso muerto',
+                                suffix: 'kg',
+                                controller: _deadlift1rmC,
+                                palette: palette),
+                            _NuevaMedicionField(
+                                label: 'Press militar',
+                                suffix: 'kg',
+                                controller: _overhead1rmC,
+                                palette: palette),
+                            _NuevaMedicionField(
+                                label: 'Dominada',
+                                suffix: 'kg',
+                                controller: _pullUp1rmC,
+                                palette: palette),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        _NuevaMedicionSection(
+                          title: 'RESISTENCIA / FLEXIBILIDAD', // i18n: Fase W2
+                          palette: palette,
+                          expanded: _resistExpanded,
+                          onToggle: () => setState(
+                              () => _resistExpanded = !_resistExpanded),
+                          children: [
+                            _NuevaMedicionField(
+                                label: 'VO2 máx',
+                                suffix: 'ml/kg/min',
+                                controller: _vo2maxC,
+                                palette: palette),
+                            _NuevaMedicionField(
+                                label: 'Course Navette',
+                                suffix: 'nivel',
+                                controller: _courseNavetteC,
+                                palette: palette),
+                            _NuevaMedicionField(
+                                label: 'Cooper',
+                                suffix: 'm',
+                                controller: _cooperC,
+                                palette: palette),
+                            _NuevaMedicionField(
+                                label: 'Sit & Reach',
+                                suffix: 'cm',
+                                controller: _sitAndReachC,
+                                palette: palette),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: _notesC,
+                          maxLines: 2,
+                          decoration: InputDecoration(
+                            labelText: 'Nota (opcional)', // i18n: Fase W2
+                            labelStyle:
+                                TextStyle(color: palette.textMuted),
+                            filled: true,
+                            fillColor: palette.bgCard,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide:
+                                  BorderSide(color: palette.border),
+                            ),
+                          ),
+                          style: TextStyle(color: palette.textPrimary),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed:
+                        _saving ? null : () => Navigator.of(context).pop(),
+                    child: const Text('Cancelar'), // i18n: Fase W2
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    onPressed: _saving ? null : _save,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: palette.accent,
+                      foregroundColor: palette.bg,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 12),
+                      shape: const StadiumBorder(),
+                    ),
+                    child: _saving
+                        ? SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: palette.bg,
+                            ),
+                          )
+                        : const Text('GUARDAR'), // i18n: Fase W2
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
