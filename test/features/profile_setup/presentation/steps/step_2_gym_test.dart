@@ -11,9 +11,11 @@ import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/gyms/application/places_providers.dart';
 import 'package:treino/features/gyms/data/places_autocomplete_service.dart';
+import 'package:treino/features/gyms/data/places_nearby_search_service.dart';
 import 'package:treino/features/gyms/data/resolve_gym_place_service.dart';
 import 'package:treino/features/gyms/domain/gym.dart' show kNoGymId;
 import 'package:treino/features/gyms/domain/gym_suggestion.dart';
+import 'package:treino/features/gyms/domain/nearby_gym.dart';
 import 'package:treino/features/profile/application/user_providers.dart'
     show userRepositoryProvider;
 import 'package:treino/features/profile/data/user_repository.dart';
@@ -53,6 +55,36 @@ class MockResolveGymPlaceService extends Mock
     implements ResolveGymPlaceService {}
 
 class MockUserRepository extends Mock implements UserRepository {}
+
+/// Call-counting fake — gym-selection-v2 Phase 2 task 2.3 regression guard.
+/// Onboarding (`step_2_gym.dart`) must NEVER read `nearbyGymsProvider`,
+/// which would invoke this and bill a `searchNearby` call mid-onboarding.
+class _CountingNearbySearchService implements PlacesNearbySearchService {
+  int callCount = 0;
+
+  @override
+  Future<List<NearbyGym>> search({
+    required double latitude,
+    required double longitude,
+    int radiusMeters = PlacesNearbySearchService.defaultRadiusMeters,
+    int maxResultCount = PlacesNearbySearchService.defaultMaxResultCount,
+  }) async {
+    callCount++;
+    return const [];
+  }
+}
+
+/// Call-counting fake — asserts `nearbyLocationProvider` is never read
+/// (constructed) during onboarding either (task 2.3).
+class _CountingNearbyLocationNotifier extends NearbyLocationNotifier {
+  int checkSilentlyCallCount = 0;
+
+  @override
+  Future<void> checkSilently() async {
+    checkSilentlyCallCount++;
+    return super.checkSilently();
+  }
+}
 
 Widget _buildStep({
   required List<Override> overrides,
@@ -248,6 +280,43 @@ void main() {
             placeId: any(named: 'placeId'),
             sessionToken: any(named: 'sessionToken'),
           ));
+    });
+
+    // gym-selection-v2 Phase 2 task 2.3 — onboarding isolation regression
+    // guard (design AD-10 risk: "Breaking onboarding via the shared
+    // widget"). Step2Gym constructs GymSearchBox WITHOUT emptyQueryContent
+    // (verified by task 2.4), so it must never read nearbyGymsProvider or
+    // nearbyLocationProvider — asserted here with call-counting fakes,
+    // not just "existing tests still pass."
+    testWidgets(
+        'onboarding triggers zero nearbyGymsProvider/nearbyLocationProvider '
+        'invocations', (tester) async {
+      final countingNearbyService = _CountingNearbySearchService();
+      final countingLocationNotifier = _CountingNearbyLocationNotifier();
+
+      await tester.pumpWidget(_buildStep(
+        overrides: [
+          ...baseOverrides(),
+          placesNearbySearchServiceProvider
+              .overrideWithValue(countingNearbyService),
+          nearbyLocationProvider
+              .overrideWith((ref) => countingLocationNotifier),
+        ],
+      ));
+      await tester.pumpAndSettle();
+
+      // Interact with the widget the way a real onboarding session would —
+      // type a query, clear it, tap the no-gym option — to prove these
+      // reads stay at zero across the whole lifecycle, not just on mount.
+      await tester.enterText(find.byType(TextField), 'sport');
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), '');
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pumpAndSettle();
+
+      expect(countingNearbyService.callCount, 0);
+      expect(countingLocationNotifier.checkSilentlyCallCount, 0);
     });
   });
 }

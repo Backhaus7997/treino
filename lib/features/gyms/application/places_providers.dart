@@ -152,9 +152,24 @@ class SelectGymAction extends AsyncNotifier<ResolveGymPlaceResult?> {
   @override
   ResolveGymPlaceResult? build() => null;
 
-  Future<void> select({required String uid, required String placeId}) async {
+  /// Resolves [placeId] and persists it as the athlete's `gymId`.
+  ///
+  /// [useSessionToken] (default `true`) reads and consumes
+  /// [gymSearchSessionTokenProvider] — the Autocomplete-selection path.
+  /// A nearby-originated selection has no Autocomplete session in progress
+  /// (spec gym-places-search "A nearby-originated selection resolves
+  /// without a session token"): callers pass `useSessionToken: false` so no
+  /// token is minted or sent, and [gymSearchSessionTokenProvider] is left
+  /// untouched (it still belongs to whatever Autocomplete session, if any,
+  /// is independently in progress).
+  Future<void> select({
+    required String uid,
+    required String placeId,
+    bool useSessionToken = true,
+  }) async {
     state = const AsyncLoading();
-    final sessionToken = ref.read(gymSearchSessionTokenProvider);
+    final sessionToken =
+        useSessionToken ? ref.read(gymSearchSessionTokenProvider) : null;
     state = await AsyncValue.guard(() async {
       final result = await ref.read(resolveGymPlaceServiceProvider).call(
             placeId: placeId,
@@ -165,7 +180,7 @@ class SelectGymAction extends AsyncNotifier<ResolveGymPlaceResult?> {
           .update(uid, {'gymId': result.gymId});
       return result;
     });
-    if (!state.hasError) {
+    if (!state.hasError && useSessionToken) {
       // Success — start a fresh session for the NEXT search (spec
       // requirement: never reuse a token across sessions).
       ref.invalidate(gymSearchSessionTokenProvider);

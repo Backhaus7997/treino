@@ -2015,6 +2015,16 @@ class AppL10nEs extends AppL10n {
       'No pudimos guardar el gimnasio. Inténtalo de nuevo.';
 
   @override
+  String get gymNearbyLocationAffordance =>
+      'Activa tu ubicación para ver gimnasios cercanos';
+
+  @override
+  String get gymNearbyShowMore => 'Ver más';
+
+  @override
+  String get gymNearbyLoadError => 'No pudimos cargar los gimnasios cercanos.';
+
+  @override
   String get feedPullToRefreshA11y => 'Desliza para actualizar';
 
   @override
@@ -4253,6 +4263,16 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get profileGymSaveError =>
       'No pudimos guardar el gimnasio. Probá de nuevo.';
+
+  @override
+  String get gymNearbyLocationAffordance =>
+      'Activar ubicación para ver gyms cercanos';
+
+  @override
+  String get gymNearbyShowMore => 'Ver más';
+
+  @override
+  String get gymNearbyLoadError => 'No pudimos cargar los gyms cercanos.';
 
   @override
   String get feedPullToRefreshA11y => 'Deslizá para actualizar';

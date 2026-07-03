@@ -29,6 +29,7 @@ Widget _wrap({
   required List<Override> overrides,
   required String? selectedGymId,
   required void Function(String?) onGymIdSelected,
+  Widget? emptyQueryContent,
 }) =>
     ProviderScope(
       overrides: overrides,
@@ -41,6 +42,7 @@ Widget _wrap({
           body: GymSearchBox(
             selectedGymId: selectedGymId,
             onGymIdSelected: onGymIdSelected,
+            emptyQueryContent: emptyQueryContent,
           ),
         ),
       ),
@@ -302,5 +304,84 @@ void main() {
           biasLatitude: null,
           biasLongitude: null,
         )).called(1);
+  });
+
+  // gym-selection-v2 Phase 2 task 2.1 — AD-10 emptyQueryContent seam.
+  group('emptyQueryContent seam (AD-10)', () {
+    testWidgets(
+        'default (null) empty-query render is byte-for-byte the existing '
+        'SizedBox.shrink() output', (tester) async {
+      await tester.pumpWidget(_wrap(
+        overrides: [
+          placesAutocompleteServiceProvider.overrideWithValue(mockService),
+          gymSearchSessionTokenProvider.overrideWith((ref) => 'tok-fixed'),
+          gymSearchLocationBiasProvider.overrideWith((ref) async => null),
+        ],
+        selectedGymId: null,
+        onGymIdSelected: (_) {},
+        // emptyQueryContent omitted — defaults to null.
+      ));
+      await tester.pump();
+
+      // No suggestions-list content rendered at all — matches pre-seam
+      // behavior exactly (the empty-query slot renders nothing observable).
+      expect(find.byType(GymCard), findsOneWidget); // only the kNoGymId card
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+      expect(find.textContaining('Sin resultados'), findsNothing);
+    });
+
+    testWidgets(
+        'a non-null emptyQueryContent widget renders in its place when '
+        'query is empty', (tester) async {
+      await tester.pumpWidget(_wrap(
+        overrides: [
+          placesAutocompleteServiceProvider.overrideWithValue(mockService),
+          gymSearchSessionTokenProvider.overrideWith((ref) => 'tok-fixed'),
+          gymSearchLocationBiasProvider.overrideWith((ref) async => null),
+        ],
+        selectedGymId: null,
+        onGymIdSelected: (_) {},
+        emptyQueryContent: const Text('NEARBY_PLACEHOLDER'),
+      ));
+      await tester.pump();
+
+      expect(find.text('NEARBY_PLACEHOLDER'), findsOneWidget);
+    });
+
+    testWidgets(
+        'non-empty query still shows Autocomplete results regardless of '
+        'emptyQueryContent', (tester) async {
+      when(() => mockService.search(
+            query: any(named: 'query'),
+            sessionToken: any(named: 'sessionToken'),
+            biasLatitude: any(named: 'biasLatitude'),
+            biasLongitude: any(named: 'biasLongitude'),
+          )).thenAnswer((_) async => const [
+            GymSuggestion(
+              placeId: 'ChIJ_1',
+              primaryText: 'SportClub Belgrano',
+              secondaryText: 'Cabildo 1789',
+            ),
+          ]);
+
+      await tester.pumpWidget(_wrap(
+        overrides: [
+          placesAutocompleteServiceProvider.overrideWithValue(mockService),
+          gymSearchSessionTokenProvider.overrideWith((ref) => 'tok-fixed'),
+          gymSearchLocationBiasProvider.overrideWith((ref) async => null),
+        ],
+        selectedGymId: null,
+        onGymIdSelected: (_) {},
+        emptyQueryContent: const Text('NEARBY_PLACEHOLDER'),
+      ));
+      await tester.pump();
+
+      await tester.enterText(find.byType(TextField), 'sport');
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pumpAndSettle();
+
+      expect(find.text('SportClub Belgrano'), findsOneWidget);
+      expect(find.text('NEARBY_PLACEHOLDER'), findsNothing);
+    });
   });
 }

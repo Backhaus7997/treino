@@ -35,6 +35,7 @@ class GymSearchBox extends ConsumerStatefulWidget {
     super.key,
     required this.selectedGymId,
     required this.onGymIdSelected,
+    this.emptyQueryContent,
   });
 
   /// Currently-selected gym id (or [kNoGymId]) — highlights the matching
@@ -45,6 +46,14 @@ class GymSearchBox extends ConsumerStatefulWidget {
   /// Called with a Google Place id on suggestion tap, or [kNoGymId] when the
   /// "OTRO GYM / SIN GYM" option is tapped.
   final void Function(String? gymId) onGymIdSelected;
+
+  /// Optional content rendered in place of the suggestions list when the
+  /// search query is empty. `null` (the default) preserves the original
+  /// `SizedBox.shrink()` behavior — design gym-selection-v2 AD-10.
+  ///
+  /// `step_2_gym.dart` (onboarding) omits this and stays byte-for-byte
+  /// unchanged; `profile_gym_screen.dart` passes the nearby-gyms list.
+  final Widget? emptyQueryContent;
 
   @override
   ConsumerState<GymSearchBox> createState() => _GymSearchBoxState();
@@ -100,6 +109,7 @@ class _GymSearchBoxState extends ConsumerState<GymSearchBox> {
           query: _activeQuery,
           selectedGymId: widget.selectedGymId,
           onSuggestionTap: widget.onGymIdSelected,
+          emptyQueryContent: widget.emptyQueryContent,
         ),
       ],
     );
@@ -111,15 +121,17 @@ class _SuggestionsList extends ConsumerWidget {
     required this.query,
     required this.selectedGymId,
     required this.onSuggestionTap,
+    required this.emptyQueryContent,
   });
 
   final String query;
   final String? selectedGymId;
   final void Function(String) onSuggestionTap;
+  final Widget? emptyQueryContent;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    if (query.isEmpty) return const SizedBox.shrink();
+    if (query.isEmpty) return emptyQueryContent ?? const SizedBox.shrink();
 
     final suggestionsAsync = ref.watch(placesSuggestionsProvider(query));
 

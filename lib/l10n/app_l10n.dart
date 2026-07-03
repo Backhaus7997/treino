@@ -3752,6 +3752,24 @@ abstract class AppL10n {
   /// **'No pudimos guardar el gimnasio. Probá de nuevo.'**
   String get profileGymSaveError;
 
+  /// gym-selection-v2 AD-1: inline affordance shown in NearbyGymsList when location permission is not granted. Tapping it triggers the rationale sheet.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Activar ubicación para ver gyms cercanos'**
+  String get gymNearbyLocationAffordance;
+
+  /// gym-selection-v2 AD-4: reveals already-fetched nearby rows beyond the initial 8 — a pure local toggle, never a re-request.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ver más'**
+  String get gymNearbyShowMore;
+
+  /// gym-selection-v2: nearbyGymsProvider fetch-error state. Paired with coachRetryLabel for the retry CTA.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cargar los gyms cercanos.'**
+  String get gymNearbyLoadError;
+
   /// Semantics/hint label for the RefreshIndicator added to feed segments (finding 1). Optional a11y label for the manual refresh gesture.
   ///
   /// In es_AR, this message translates to:
