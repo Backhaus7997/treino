@@ -79,7 +79,7 @@ final class ResolveGymPlaceFailure$Unknown extends ResolveGymPlaceFailure {
 /// `code-assurance.com`, whose Domain-Restricted-Sharing policy blocks
 /// making a Cloud Function publicly invokable (`allUsers`). Plan B moves
 /// Place Details resolution to the client, mirroring
-/// [PlacesAutocompleteService]'s pattern (bundle-restricted client key,
+/// `PlacesTextSearchService`'s pattern (bundle-restricted client key,
 /// direct HTTP call to Places API (New)).
 ///
 /// Read-through cache: [GymRepository.getById] first — if `gyms/{placeId}`
