@@ -763,10 +763,25 @@ service cloud.firestore {
                   && request.resource.data.trainerId == request.auth.uid
                   && request.resource.data.athleteId is string
                   && request.resource.data.athleteId.size() > 0;
+      // REQ-VENC-13: tightened update rule — field-level protection.
+      // Follows the `reviews` rule pattern (keys().hasOnly + per-field equality).
+      // Audited: markPaid/markManyPaid send only {status, paidAt} — still pass.
+      // dueAt is pinned equal-to-existing so clients cannot set or alter it;
+      // the CF bypasses rules via Admin SDK.
       allow update: if request.auth != null
                   && resource.data.trainerId == request.auth.uid
+                  && request.resource.data.keys().hasOnly([
+                       'id', 'trainerId', 'athleteId', 'amountArs', 'concept',
+                       'status', 'periodKey', 'createdAt', 'paidAt', 'dueAt'
+                     ])
+                  && request.resource.data.id == resource.data.id
                   && request.resource.data.trainerId == resource.data.trainerId
-                  && request.resource.data.athleteId == resource.data.athleteId;
+                  && request.resource.data.athleteId == resource.data.athleteId
+                  && request.resource.data.amountArs == resource.data.amountArs
+                  && request.resource.data.concept == resource.data.concept
+                  && request.resource.data.createdAt == resource.data.createdAt
+                  && request.resource.data.get('periodKey', null) == resource.data.get('periodKey', null)
+                  && request.resource.data.get('dueAt', null) == resource.data.get('dueAt', null);
       allow delete: if request.auth != null && resource.data.trainerId == request.auth.uid;
     }
 

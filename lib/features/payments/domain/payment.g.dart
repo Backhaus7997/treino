@@ -19,6 +19,8 @@ _$PaymentImpl _$$PaymentImplFromJson(Map<String, dynamic> json) =>
           const TimestampConverter().fromJson(json['createdAt'] as Timestamp),
       paidAt: _$JsonConverterFromJson<Timestamp, DateTime>(
           json['paidAt'], const TimestampConverter().fromJson),
+      dueAt: _$JsonConverterFromJson<Timestamp, DateTime>(
+          json['dueAt'], const TimestampConverter().fromJson),
     );
 
 Map<String, dynamic> _$$PaymentImplToJson(_$PaymentImpl instance) =>
@@ -33,6 +35,8 @@ Map<String, dynamic> _$$PaymentImplToJson(_$PaymentImpl instance) =>
       'createdAt': const TimestampConverter().toJson(instance.createdAt),
       'paidAt': _$JsonConverterToJson<Timestamp, DateTime>(
           instance.paidAt, const TimestampConverter().toJson),
+      'dueAt': _$JsonConverterToJson<Timestamp, DateTime>(
+          instance.dueAt, const TimestampConverter().toJson),
     };
 
 const _$PaymentStatusEnumMap = {
