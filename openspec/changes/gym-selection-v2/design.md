@@ -209,3 +209,58 @@ Slicing rationale: Slice 1 is pure additive infra with zero UI risk and its own 
 - Nearby tap → `select(uid, placeId)` invoked (mock `selectGymActionProvider`).
 - Regression: `step_2_gym` unchanged (no nearby list, existing tests green).
 - Location: ALWAYS override `nearbyLocationProvider` — never touch `Geolocator`.
+
+## Addendum — Phase 3 (post-verify device-testing fixes)
+
+**Trigger.** gym-selection-v2 shipped (31/31 tasks, verify PASS-WITH-WARNINGS) but device testing surfaced two real-world usability failures Slice 1/2's synthetic tests couldn't catch: (1) Autocomplete's typed search — even location-biased to the user's own zone — never surfaced his real gym (QIVOX Villa Warcalde) in 5 tries; empirically, a raw `searchText` call for "qivox" biased to the same zone returned 15 results, all QIVOX branches, closest first. (2) The nearby list's 8-row cap buried his gym at rank #14 in a yoga/pilates-dense neighborhood, so it was invisible even though it was one of the 20 already-fetched, already-paid-for results.
+
+Both fixes are approved and settled (not reopened here) — this section records the two new Architecture Decisions and updates the affected requirements.
+
+### AD-12 — Typed search backend swap: Autocomplete → Text Search (New), with structural cost gating and session-token removal
+
+**Decision.** `GymSearchBox`'s typed (non-empty-query) search moves from `PlacesAutocompleteService`/`places:autocomplete` to a new `PlacesTextSearchService` calling `POST https://places.googleapis.com/v1/places:searchText`.
+- Body: `{ textQuery, pageSize: 20, locationBias: {circle: {center, radius}} }` — `locationBias` is OMITTED (not just null-valued) when no location is available, mirroring Autocomplete's existing all-or-nothing bias contract exactly (no regression to the "search works with no location permission" invariant).
+- Headers: `X-Goog-Api-Key`, REQUIRED `X-Goog-FieldMask: places.id,places.displayName,places.formattedAddress`, `Content-Type: application/json`.
+- Response mapping: `places[].{id, displayName.text, formattedAddress}` → the EXISTING `GymSuggestion(placeId, primaryText, secondaryText)` DTO — zero changes to `GymCard`, the suggestions list rendering, or the selection callback signature. `GymSuggestion` is reused as-is; no new DTO (unlike `NearbyGym` in AD-8, which needed coordinates Text Search results don't require here).
+- **Cost gating is structural, not incidental** (Text Search Pro bills ~$32/1000, same tier as `searchNearby`): debounce ~600ms after typing stops (widened from the prior 300ms — a slower, cost-bearing backend needs a wider settle window; this lives in the PROVIDER layer via an injectable/fake-clock-controllable debounce mechanism, not a widget `Timer`, so tests never sleep real wall-clock time), a 3-character minimum before any request fires, and a cache keyed by `(normalized query, geohash5-of-bias-center-or-null)` with a ~10-minute TTL — mirroring `NearbyGymsCache`'s shape (`Map<key, (results, fetchedAt)>`, `get(key, {now})`/`put(key, results, {fetchedAt})`). One request per settled query; a call-counting fake service proves rapid keystrokes within the debounce window and a repeat of the same settled query within TTL both cost zero extra calls.
+- **Session tokens are removed from the search path.** Text Search has no session-token concept (unlike Autocomplete, which bundles keystroke-level Autocomplete calls + the eventual Details call into one billed "session"). Every selection made from `GymSearchBox`'s typed results — like every nearby-list selection since AD-9 shipped — now calls `selectGymActionProvider.select(..., useSessionToken: false)`. This makes the ENTIRE gym-selection surface (typed search + nearby list) session-token-free, not just nearby. `gymSearchSessionTokenProvider` and `PlacesAutocompleteService` become dead code with this change (their only production caller, `placesSuggestionsProvider`, is deleted) — both are DELETED, along with their dedicated tests; git history preserves them if ever needed again. `resolveGymPlaceServiceProvider`/`ResolveGymPlaceService` are UNCHANGED (already accept a nullable `sessionToken`, already used null-session for nearby).
+- `gymSearchLocationBiasProvider` (the `checkPermission()`-only, never-prompts bias lookup) is UNCHANGED and now feeds the new `placesTextSearchProvider`'s `locationBias` the same way it fed Autocomplete's `locationBias`.
+- `GymSearchBox`/onboarding (`step_2_gym.dart`) share the same `_SuggestionsList` internals, so onboarding automatically gets the fixed search — no separate onboarding-specific change, same as AD-10's seam already guaranteed for the nearby list.
+
+**Rationale.** The empirical result is unambiguous: prominence-ranked Autocomplete systematically hides chain-branch/low-review-count gyms behind well-known "flagship" locations even when location-biased to the exact same query and zone (this was ALREADY the documented root cause the whole gym-selection-v2 change was built to address for the nearby list — Phase 3 closes the gap by applying the same distance/relevance-oriented backend to typed search too). Text Search (New) ranks by relevance-to-query with an optional bias circle, which in this case behaved like a closest-first ranking for a branded query — a direct fix with no new architecture pattern (mirrors `PlacesNearbySearchService`'s shape exactly, per Project Standards). Reusing `GymSuggestion` (not inventing a new DTO) keeps the fix contained to the data-fetching layer; every downstream consumer (list rendering, tap-to-select, `ResolveGymPlaceService`) is untouched.
+
+**Rejected.**
+- *Hybrid: keep Autocomplete, add a "ver todos los resultados" button that triggers a one-off Text Search fallback.* Adds a second interaction step and a visible "why are there two search modes" seam for the user, to save fractions of a cent per query at TREINO's current scale (a handful of onboarding/profile-edit searches per day). The UX friction is not justified by the marginal cost delta between Autocomplete Essentials and Text Search Pro at this volume. Rejected.
+- *Keep `searchNearby`'s `includedPrimaryTypes`-style filter (`includedType: 'gym'`) on a Nearby-Search-shaped typed query instead of swapping to Text Search.* Empirically tested during exploration — filtering by `gym` type on a Nearby-shaped request does NOT clean up the branded-query noise; QIVOX branches still lost to prominent competitors because the ranking signal (not the type filter) was the actual defect. Rejected — doesn't fix the observed problem.
+- *Lower the character minimum below 3 / drop the debounce widening.* Both would materially increase billed-call volume on a backend with no free tier, for marginal UX gain (a 1-2 character query rarely narrows to a useful result set anyway). Rejected.
+
+### AD-13 — Nearby list: render all fetched (drop the 8-cap and "Ver más")
+
+**Decision.** `NearbyGymsList` renders ALL results returned by `nearbyGymsProvider` (up to the existing `maxResultCount: 20` request cap from AD-4/AD-7 — that request-side cap is UNCHANGED), not just the first 8. The `_kVisibleCap` constant, the `_expanded` toggle state, and the "Ver más" affordance (including the `gymNearbyShowMore` render path) are REMOVED. The list becomes scrollable (it already sits inside `ProfileGymScreen`'s `SingleChildScrollView`, so no new scroll container is needed — same composition, more rows).
+
+**Rationale.** The 20 results are already fetched and already billed for (AD-4's entire rationale for requesting 20-not-8 was "one request already returns up to 20 at no extra cost… gives dedup headroom"); artificially hiding 12 of them behind a manual expand step actively worked against the feature's purpose in the field. The user's real gym ranked #14 in a neighborhood saturated with yoga/pilates studios also tagged `gym` — a dense, plausible real-world scenario, not an edge case — and sat invisible behind "Ver más" during device testing. Rendering all fetched rows costs zero additional API calls (pure render-more-of-what-you-already-have) and directly fixes the observed failure.
+
+**Rejected.**
+- *Keep the cap but raise it to e.g. 12 or 15.* Same class of bug at a different threshold — a sufficiently dense area still buries results, just less often. Doesn't address the root cause (artificial UI limiting of already-paid-for data). Rejected.
+- *Add `includedPrimaryTypes`/stricter type filtering to `searchNearby` to suppress yoga/pilates studios before rendering.* Explored and rejected for the same empirical reason as AD-12's rejected alternative: Google's `gym` type tagging is broad enough in practice (density-tagged wellness studios) that a type filter does not reliably separate "real gym" from "yoga studio tagged gym" — it would require heuristics beyond what the Places API's type taxonomy supports, and risks false-negatives (hiding legitimate small gyms). Rendering all 20 and letting the user scroll/scan is simpler, costs nothing extra, and doesn't risk hiding a real gym. Rejected.
+
+### File-Level Change Map (Addendum)
+
+| File | Change | Notes |
+|------|--------|-------|
+| `lib/features/gyms/data/places_text_search_service.dart` | **New** | Raw-REST `searchText`; mirrors `PlacesNearbySearchService`'s injection/error-split shape (AD-12) |
+| `lib/features/gyms/data/places_autocomplete_service.dart` | **Deleted** | Dead — `placesSuggestionsProvider` (its only caller) is deleted (AD-12) |
+| `lib/features/gyms/application/places_providers.dart` | **Modified** | Remove `placesAutocompleteServiceProvider`, `gymSearchSessionTokenProvider`, `placesSuggestionsProvider`; add `placesTextSearchServiceProvider`, `textSearchCacheProvider`, `placesTextSearchProvider` (debounced, cost-gated, cache-first) (AD-12) |
+| `lib/features/profile_setup/presentation/widgets/gym_search_box.dart` | **Modified** | `_SuggestionsList` reads the new text-search provider instead of `placesSuggestionsProvider`; debounce moves to the provider layer (AD-12) |
+| `lib/features/profile/presentation/widgets/nearby_gyms_list.dart` | **Modified** | Remove `_kVisibleCap`/`_expanded`/"Ver más" — render all fetched rows (AD-13) |
+| `lib/features/gyms/domain/gym_suggestion.dart` | **Untouched** | Reused as-is for Text Search results too (AD-12) |
+| `lib/features/gyms/data/resolve_gym_place_service.dart` | **Untouched** | Already accepts nullable `sessionToken`; no change needed |
+
+### Risks & Mitigations (Addendum)
+
+| Risk | Likelihood | Mitigation |
+|------|------------|------------|
+| Text Search cost balloons per-keystroke | High impact | Structural: debounce (provider-layer, fake-clock-testable) + 3-char minimum + query/bias-keyed TTL cache, verified by a call-counting fake asserting one call per settled query |
+| Deleting `gymSearchSessionTokenProvider`/`PlacesAutocompleteService` breaks an undiscovered consumer | Med | Grepped ALL consumers before deletion (test files only, all rewritten in this same slice); `resolveGymPlaceServiceProvider` already accepts nullable token independently |
+| Removing the 8-cap causes a very-dense-area list to feel overwhelming | Low | Explicit product tradeoff accepted: findability of the user's actual gym outweighs list length: the list already scrolls inside the existing `SingleChildScrollView` |
+| `locationBias` omission logic diverges from Autocomplete's, causing a subtle no-location regression | Low | Body-construction mirrors Autocomplete's exact `if (lat != null && lng != null) 'locationBias': {...}` conditional-inclusion pattern; covered by an explicit no-location test scenario |

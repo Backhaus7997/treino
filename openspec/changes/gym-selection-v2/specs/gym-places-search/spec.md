@@ -100,16 +100,6 @@ The system MUST perform Place Details resolution directly from the client using 
 
 ## Unchanged Invariants (restated for continuity)
 
-### Requirement: Autocomplete search is location-biased when available, unbiased otherwise
-
-The system MUST bias Autocomplete results toward the user's current location when permission is granted, and MUST fall back to an unbiased search otherwise — without blocking or erroring. UNCHANGED; `searchNearby`'s mandatory-location requirement does not alter Autocomplete's null-safe bias.
-
-#### Scenario: Search succeeds with no location permission
-
-- GIVEN a user has denied location permission
-- WHEN they perform a gym search
-- THEN Autocomplete results are still returned, without bias and without a permission error
-
 ### Requirement: Selection performs a soft gym-type check
 
 The system MUST bias/prioritize but MUST NOT hard-reject a selected Place based on its Google `types`. UNCHANGED by this delta.
@@ -119,3 +109,66 @@ The system MUST bias/prioritize but MUST NOT hard-reject a selected Place based 
 - GIVEN a user selects a Place whose `types` do not include a gym-related category
 - WHEN the selection is resolved
 - THEN the gym is still created/assigned; no hard validation error blocks it
+
+## Phase 3 Addendum — Typed search backend swap + nearby render cap removal
+
+Device testing after the initial gym-selection-v2 ship revealed the typed search still could not find the user's own gym even with location bias — a 5-result Autocomplete list, prominence-ranked, never surfaced a real, nearby, correctly-typed Place across repeated tries. This addendum replaces the Autocomplete-based typed search with Text Search (New) and removes the nearby list's render cap. Design AD-12/AD-13 own the implementation decisions (cost gating, debounce, cache shape, session-token removal); this section restates the resulting behavior contract.
+
+### MODIFIED Requirement: Typed gym search is performed via Places Text Search (New), not Autocomplete
+
+The system MUST perform the athlete's typed (non-empty-query) gym search via the Places `searchText` (New) endpoint, bounded to a reasonable page size (design owns the exact bound), optionally biased toward the athlete's location when available, and MUST return results ranked closer-to-relevant/closest-first for a query rather than by generic prominence. The system MUST NOT call the Autocomplete endpoint for typed search. The system MUST fire at most one `searchText` request per settled query (debounce-gated) and MUST NOT re-fetch for a query already served within the cache TTL.
+
+(Previously: typed search ran via Places Autocomplete (New), prominence-ranked, hard-capped to Google's default suggestion count, with a session-token-bundled Details resolution. Superseded here — device testing showed prominence ranking systematically hid a real, correctly-typed, nearby Place across repeated tries; Text Search's relevance/bias-oriented ranking fixed this empirically. Nearby-list `searchNearby` behavior from the original delta above is UNCHANGED by this addendum — only typed search moves.)
+
+#### Scenario: Typed search finds a real nearby gym that Autocomplete missed
+
+- GIVEN an athlete's location is biased to their own neighborhood
+- WHEN they type a query matching their gym's brand/name
+- THEN the results include that gym, ranked at or near the top by closeness/relevance to the query
+- AND this holds even when multiple same-brand branches exist in the wider metro area
+
+#### Scenario: Typed search is debounced and cost-gated
+
+- GIVEN an athlete is actively typing a query
+- WHEN they type multiple characters in rapid succession
+- THEN no `searchText` request fires until typing settles for the configured debounce window
+- AND queries under the configured minimum character count never trigger a request
+
+#### Scenario: Repeating a settled query within the cache TTL does not re-fetch
+
+- GIVEN an athlete's typed query has already been fetched once and settled
+- WHEN the same query (with the same location-bias bucket, or the same query with no location) is issued again within the cache TTL
+- THEN no additional `searchText` request is made and the cached results are returned
+
+#### Scenario: Typed search still works with no location permission
+
+- GIVEN an athlete has denied or not granted location permission
+- WHEN they perform a typed gym search
+- THEN the `searchText` request omits the location-bias parameter entirely
+- AND results are still returned, without bias and without a permission error
+
+### MODIFIED Requirement: Selecting a typed-search result requires no session token
+
+The system MUST route a tap on a typed-search result through the same selection/resolve/write path as a nearby-list tap, WITHOUT an Autocomplete-style session token — Text Search has no session concept. A typed-search selection MUST resolve correctly with no session token present.
+
+(Previously: one Autocomplete session token spanned every keystroke's suggestion request and the eventual Details resolution, and a new token was minted after each completed selection or new search. Superseded here — Text Search never participates in a session, so this bookkeeping is removed for the entire typed-search path along with the underlying Autocomplete service and its session-token provider.)
+
+#### Scenario: Tapping a typed-search result selects and persists it without a session token
+
+- GIVEN an athlete taps a gym in the typed-search results
+- WHEN the selection is processed
+- THEN it is resolved and written to the athlete's profile through the identical path used for a nearby-list selection
+- AND the absence of a session token does not cause an error or a degraded resolution
+
+### MODIFIED Requirement: Nearby gyms list renders every fetched result, not a fixed visible cap
+
+The system MUST render every gym returned by the nearby fetch (bounded only by the existing fetch-side cap from the ADDED "Nearby gyms list is distance-ranked" requirement above), not a smaller fixed visible-count subset. The system MUST NOT require an additional user action ("ver más"/"show more") to reveal already-fetched results.
+
+(Previously: the nearby list requested up to a bounded count but rendered only a smaller fixed subset by default, revealing the rest via a "ver más" affordance with zero additional fetches. Superseded here — device testing showed a real gym ranked outside the smaller visible subset in a dense area, staying invisible behind the affordance; rendering everything already fetched removes that failure mode at no additional cost, since the larger bound was already being paid for.)
+
+#### Scenario: A nearby gym ranked outside the old visible-cap is now visible without extra interaction
+
+- GIVEN the nearby fetch returns more results than the previous fixed visible cap
+- WHEN the nearby list renders
+- THEN every fetched result is shown without requiring a "ver más"/"show more" tap
+- AND no additional `searchNearby` request is made to render the additional rows
