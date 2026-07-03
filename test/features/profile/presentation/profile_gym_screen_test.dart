@@ -8,15 +8,20 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/core/utils/geohash.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
+import 'package:treino/features/gyms/application/gym_providers.dart';
 import 'package:treino/features/gyms/application/places_providers.dart';
 import 'package:treino/features/gyms/data/places_autocomplete_service.dart';
 import 'package:treino/features/gyms/data/resolve_gym_place_service.dart';
-import 'package:treino/features/gyms/domain/gym.dart' show kNoGymId;
+import 'package:treino/features/gyms/domain/gym.dart';
+import 'package:treino/features/gyms/domain/gym_source.dart';
 import 'package:treino/features/gyms/domain/gym_suggestion.dart';
+import 'package:treino/features/gyms/domain/nearby_gym.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/data/user_repository.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
@@ -62,6 +67,7 @@ Widget _buildScreen({
   required MockUserRepository userRepo,
   required MockPlacesAutocompleteService placesService,
   MockResolveGymPlaceService? resolveService,
+  List<Override> extraOverrides = const [],
 }) {
   final mockUser = MockUser();
 
@@ -91,6 +97,16 @@ Widget _buildScreen({
       gymSearchLocationBiasProvider.overrideWith((ref) async => null),
       if (resolveService != null)
         resolveGymPlaceServiceProvider.overrideWithValue(resolveService),
+      // gym-selection-v2 Phase 2: NearbyGymsList is now the emptyQueryContent
+      // for GymSearchBox. Default every pre-existing test to the
+      // not-granted state (via setForTest seam — NEVER real Geolocator,
+      // confirmed testWidgets hang gotcha) so it renders only the inline
+      // affordance and never touches these tests' Autocomplete-focused
+      // assertions. Composition-specific tests override this explicitly.
+      nearbyLocationProvider.overrideWith(
+        (ref) => NearbyLocationNotifier()..setDeniedForTest(),
+      ),
+      ...extraOverrides,
     ],
     child: MaterialApp.router(
       theme: AppTheme.dark(),
@@ -291,6 +307,219 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('PROFILE_SCREEN'), findsOneWidget);
+    });
+  });
+
+  // gym-selection-v2 Phase 2 task 2.13 — composition cases per
+  // spec gym-selection-screen.
+  group('ProfileGymScreen composition (gym-selection-v2 Phase 2)', () {
+    Gym gym(String id, String name) => Gym(
+          id: id,
+          name: name,
+          address: 'Some address',
+          lat: -34.5,
+          lng: -58.4,
+          geohash: 'abcde',
+          source: GymSource.seed,
+          createdAt: DateTime(2025),
+        );
+
+    testWidgets('pinned card shown at top when gymId resolved', (tester) async {
+      await tester.pumpWidget(_buildScreen(
+        profile: _profile(gymId: 'gym-current'),
+        userRepo: mockUserRepo,
+        placesService: mockPlacesService,
+        extraOverrides: [
+          gymByIdProvider('gym-current')
+              .overrideWith((ref) async => gym('gym-current', 'Current Gym')),
+        ],
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Current Gym'), findsOneWidget);
+    });
+
+    testWidgets('pinned card absent when gymId is null', (tester) async {
+      await tester.pumpWidget(_buildScreen(
+        profile: _profile(gymId: null),
+        userRepo: mockUserRepo,
+        placesService: mockPlacesService,
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+    });
+
+    testWidgets('pinned card absent when gymId is kNoGymId', (tester) async {
+      await tester.pumpWidget(_buildScreen(
+        profile: _profile(gymId: kNoGymId),
+        userRepo: mockUserRepo,
+        placesService: mockPlacesService,
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+    });
+
+    testWidgets(
+        'empty query shows nearby list, non-empty query shows Autocomplete, '
+        'clearing restores nearby list', (tester) async {
+      final position = Position(
+        latitude: -34.5,
+        longitude: -58.4,
+        timestamp: DateTime(2025),
+        accuracy: 5,
+        altitude: 0,
+        altitudeAccuracy: 0,
+        heading: 0,
+        headingAccuracy: 0,
+        speed: 0,
+        speedAccuracy: 0,
+      );
+      final bucket = geohash5(position.latitude, position.longitude);
+
+      when(() => mockPlacesService.search(
+            query: any(named: 'query'),
+            sessionToken: any(named: 'sessionToken'),
+            biasLatitude: any(named: 'biasLatitude'),
+            biasLongitude: any(named: 'biasLongitude'),
+          )).thenAnswer((_) async => const [
+            GymSuggestion(
+              placeId: 'ChIJ_1',
+              primaryText: 'SportClub Belgrano',
+            ),
+          ]);
+
+      await tester.pumpWidget(_buildScreen(
+        profile: _profile(gymId: null),
+        userRepo: mockUserRepo,
+        placesService: mockPlacesService,
+        extraOverrides: [
+          nearbyLocationProvider.overrideWith(
+              (ref) => NearbyLocationNotifier()..setForTest(position)),
+          nearbyGymsProvider(bucket).overrideWith(
+            (ref) async => [
+              const NearbyGym(
+                placeId: 'nearby-1',
+                name: 'Nearby Gym',
+                address: 'Nearby address',
+                lat: -34.5,
+                lng: -58.4,
+              ),
+            ],
+          ),
+        ],
+      ));
+      await tester.pumpAndSettle();
+
+      // Empty query: nearby list visible, no Autocomplete results.
+      expect(find.text('Nearby Gym'), findsOneWidget);
+      expect(find.text('SportClub Belgrano'), findsNothing);
+
+      // Non-empty query: Autocomplete replaces nearby.
+      await tester.enterText(find.byType(TextField), 'sport');
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pumpAndSettle();
+
+      expect(find.text('SportClub Belgrano'), findsOneWidget);
+      expect(find.text('Nearby Gym'), findsNothing);
+
+      // Clearing restores the nearby list.
+      await tester.enterText(find.byType(TextField), '');
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Nearby Gym'), findsOneWidget);
+      expect(find.text('SportClub Belgrano'), findsNothing);
+    });
+
+    testWidgets(
+        '"No tengo gimnasio" stays visible in both empty and non-empty '
+        'query states', (tester) async {
+      when(() => mockPlacesService.search(
+            query: any(named: 'query'),
+            sessionToken: any(named: 'sessionToken'),
+            biasLatitude: any(named: 'biasLatitude'),
+            biasLongitude: any(named: 'biasLongitude'),
+          )).thenAnswer((_) async => const []);
+
+      await tester.pumpWidget(_buildScreen(
+        profile: _profile(gymId: null),
+        userRepo: mockUserRepo,
+        placesService: mockPlacesService,
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.text('OTRO GYM / SIN GYM'), findsOneWidget);
+
+      await tester.enterText(find.byType(TextField), 'sport');
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pumpAndSettle();
+
+      expect(find.text('OTRO GYM / SIN GYM'), findsOneWidget);
+    });
+
+    testWidgets(
+        'selecting a nearby gym replaces the active selection in the UI',
+        (tester) async {
+      final position = Position(
+        latitude: -34.5,
+        longitude: -58.4,
+        timestamp: DateTime(2025),
+        accuracy: 5,
+        altitude: 0,
+        altitudeAccuracy: 0,
+        heading: 0,
+        headingAccuracy: 0,
+        speed: 0,
+        speedAccuracy: 0,
+      );
+      final bucket = geohash5(position.latitude, position.longitude);
+
+      when(() => mockResolveService.call(
+            placeId: any(named: 'placeId'),
+            sessionToken: any(named: 'sessionToken'),
+          )).thenAnswer((_) async => const ResolveGymPlaceResult(
+            gymId: 'nearby-1',
+            name: 'Nearby Gym',
+            address: 'Nearby address',
+            source: 'google-places',
+          ));
+
+      await tester.pumpWidget(_buildScreen(
+        profile: _profile(gymId: 'gym-current'),
+        userRepo: mockUserRepo,
+        placesService: mockPlacesService,
+        resolveService: mockResolveService,
+        extraOverrides: [
+          gymByIdProvider('gym-current')
+              .overrideWith((ref) async => gym('gym-current', 'Current Gym')),
+          gymByIdProvider('nearby-1')
+              .overrideWith((ref) async => gym('nearby-1', 'Nearby Gym')),
+          nearbyLocationProvider.overrideWith(
+              (ref) => NearbyLocationNotifier()..setForTest(position)),
+          nearbyGymsProvider(bucket).overrideWith(
+            (ref) async => [
+              const NearbyGym(
+                placeId: 'nearby-1',
+                name: 'Nearby Gym',
+                address: 'Nearby address',
+                lat: -34.5,
+                lng: -58.4,
+              ),
+            ],
+          ),
+        ],
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Current Gym'), findsOneWidget);
+
+      await tester.tap(find.text('Nearby Gym'));
+      await tester.pumpAndSettle();
+
+      verify(() => mockUserRepo.update('test-uid', {'gymId': 'nearby-1'}))
+          .called(1);
     });
   });
 }
