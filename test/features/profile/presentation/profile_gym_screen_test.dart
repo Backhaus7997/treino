@@ -6,6 +6,8 @@
 // Rewritten AGAIN for gym-selection-v2 Phase 3 (addendum, AD-12): typed
 // search now runs via PlacesTextSearchService/placesTextSearchProvider
 // instead of the retired PlacesAutocompleteService/gymSearchSessionTokenProvider.
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -74,6 +76,11 @@ Widget _buildScreen({
   required MockPlacesTextSearchService placesService,
   MockResolveGymPlaceService? resolveService,
   List<Override> extraOverrides = const [],
+  // gym-selection-v2 CRITICAL-1 fix: lets a test push new profile
+  // emissions (e.g. after a mocked write) to prove `userProfileProvider`
+  // consumers (PinnedCurrentGym) re-render on the NEW value. Defaults to
+  // a fixed single-emission stream, matching every other test's behavior.
+  Stream<UserProfile>? profileStream,
 }) {
   final mockUser = MockUser();
 
@@ -96,7 +103,8 @@ Widget _buildScreen({
   return ProviderScope(
     overrides: [
       authStateChangesProvider.overrideWith((_) => Stream.value(mockUser)),
-      userProfileProvider.overrideWith((_) => Stream.value(profile)),
+      userProfileProvider
+          .overrideWith((_) => profileStream ?? Stream.value(profile)),
       userRepositoryProvider.overrideWithValue(userRepo),
       placesTextSearchServiceProvider.overrideWithValue(placesService),
       textSearchDebounceDurationProvider.overrideWithValue(_testDebounce),
@@ -486,11 +494,27 @@ void main() {
             source: 'google-places',
           ));
 
+      // gym-selection-v2 CRITICAL-1 fix: a controllable stream lets this
+      // test re-emit the profile AFTER the mocked write completes, the
+      // same way the real Firestore-backed `userProfileProvider` re-emits
+      // in production. A fixed `Stream.value(...)` (as used everywhere
+      // else in this file) can never prove the pinned card re-renders.
+      final oldProfile = _profile(gymId: 'gym-current');
+      final newProfile = oldProfile.copyWith(gymId: 'nearby-1');
+      final profileController = StreamController<UserProfile>.broadcast();
+      addTearDown(profileController.close);
+
+      when(() => mockUserRepo.update('test-uid', {'gymId': 'nearby-1'}))
+          .thenAnswer((_) async {
+        profileController.add(newProfile);
+      });
+
       await tester.pumpWidget(_buildScreen(
-        profile: _profile(gymId: 'gym-current'),
+        profile: oldProfile,
         userRepo: mockUserRepo,
         placesService: mockPlacesService,
         resolveService: mockResolveService,
+        profileStream: profileController.stream,
         extraOverrides: [
           gymByIdProvider('gym-current')
               .overrideWith((ref) async => gym('gym-current', 'Current Gym')),
@@ -511,15 +535,23 @@ void main() {
           ),
         ],
       ));
+      profileController.add(oldProfile);
       await tester.pumpAndSettle();
 
       expect(find.text('Current Gym'), findsOneWidget);
+      expect(find.text('Nearby Gym'), findsOneWidget);
 
       await tester.tap(find.text('Nearby Gym'));
       await tester.pumpAndSettle();
 
       verify(() => mockUserRepo.update('test-uid', {'gymId': 'nearby-1'}))
           .called(1);
+
+      // The pinned card must now reflect the NEW gym — proving
+      // `PinnedCurrentGym` re-renders from `userProfileProvider`'s
+      // updated `currentGymId`, not just that the repo write happened.
+      expect(find.text('Nearby Gym'), findsOneWidget);
+      expect(find.text('Current Gym'), findsNothing);
     });
   });
 }
