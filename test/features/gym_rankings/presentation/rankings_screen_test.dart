@@ -34,6 +34,7 @@ import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/gym_rankings/application/ranking_providers.dart';
 import 'package:treino/features/gym_rankings/presentation/rankings_screen.dart';
+import 'package:treino/features/gyms/domain/gym.dart' show kNoGymId;
 import 'package:treino/features/profile/application/ranking_optin_controller_provider.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
@@ -288,6 +289,19 @@ void main() {
       testWidgets(
           'gymId == kNoGymId renders the no-gym guidance state when opted '
           'out too', (tester) async {
+        await tester.pumpWidget(_buildScreen(
+          overrides: baseOverrides(gymId: kNoGymId, rankingOptIn: false),
+        ));
+        await tester.pumpAndSettle();
+
+        expect(find.byKey(const Key('rankings_no_gym_state')), findsOneWidget);
+        expect(
+            find.byKey(const Key('rankings_invitation_state')), findsNothing);
+      });
+
+      testWidgets(
+          'gymId == null renders the no-gym guidance state when opted out '
+          'too', (tester) async {
         await tester.pumpWidget(_buildScreen(
           overrides: baseOverrides(gymId: null, rankingOptIn: false),
         ));
