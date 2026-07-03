@@ -60,7 +60,7 @@ void main() {
       'finish() recomputes counters from a bounded recent window, not the full collection',
       () async {
     // Seed more finished sessions than the recompute window can hold.
-    const window = 365; // mirrors SessionRepository._counterRecomputeWindow
+    const window = SessionRepository.counterRecomputeWindow;
     await seedFinishedSessions(
       count: window + 25,
       latestDay: DateTime.utc(2026, 5, 10, 8, 0, 0),

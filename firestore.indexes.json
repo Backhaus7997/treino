@@ -236,6 +236,51 @@
         { "fieldPath": "status", "order": "ASCENDING" },
         { "fieldPath": "dueAt", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "userPublicProfiles",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "gymId", "order": "ASCENDING" },
+        { "fieldPath": "rankingOptIn", "order": "ASCENDING" },
+        { "fieldPath": "racha", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "userPublicProfiles",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "gymId", "order": "ASCENDING" },
+        { "fieldPath": "rankingOptIn", "order": "ASCENDING" },
+        { "fieldPath": "lifetimeVolumeKg", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "userPublicProfiles",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "gymId", "order": "ASCENDING" },
+        { "fieldPath": "rankingOptIn", "order": "ASCENDING" },
+        { "fieldPath": "bestSquatKg", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "userPublicProfiles",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "gymId", "order": "ASCENDING" },
+        { "fieldPath": "rankingOptIn", "order": "ASCENDING" },
+        { "fieldPath": "bestBenchKg", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "userPublicProfiles",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "gymId", "order": "ASCENDING" },
+        { "fieldPath": "rankingOptIn", "order": "ASCENDING" },
+        { "fieldPath": "bestDeadliftKg", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

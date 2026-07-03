@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart'
     show CollectionReference, DocumentSnapshot, FirebaseFirestore, Timestamp;
 
 import '../../../core/utils/streak_calculator.dart';
+import '../../gym_rankings/domain/main_lift_family_map.dart';
 import '../../profile/data/user_public_profile_repository.dart';
 import '../domain/session.dart';
 import '../domain/session_status.dart';
@@ -20,12 +21,21 @@ class SessionRepository {
   final UserPublicProfileRepository? _publicProfileRepository;
 
   /// Upper bound on how many recent sessions [finish] reads back when
-  /// recomputing the public `workoutsCount` / `racha` counters. Caps the read
-  /// cost+latency at a constant instead of growing linearly with the user's
-  /// lifetime session count on every workout completion. A streak can never
-  /// exceed this many distinct days, and the counters self-heal each finish, so
-  /// the window stays exact for any realistic athlete while bounding the read.
-  static const int _counterRecomputeWindow = 365;
+  /// recomputing the public `workoutsCount` / `racha` counters (and, when the
+  /// athlete is ranking-opted-in, `lifetimeVolumeKg`/`best<Lift>Kg`). Caps the
+  /// read cost+latency at a constant instead of growing linearly with the
+  /// user's lifetime session count on every workout completion. A streak can
+  /// never exceed this many distinct days, and the counters self-heal each
+  /// finish, so the window stays exact for any realistic athlete while
+  /// bounding the read.
+  ///
+  /// PUBLIC on purpose: [RankingOptInController.enableRankingOptIn] backfills
+  /// `lifetimeVolumeKg`/`best<Lift>Kg` via [listRecentCompletedByUid], which
+  /// MUST use this exact same window — otherwise the very next [finish] after
+  /// opt-in would recompute over a different (narrower) window than the
+  /// backfill used, causing the athlete's ranking metrics to visibly jump or
+  /// drop right after their first session finish post opt-in.
+  static const int counterRecomputeWindow = 365;
 
   // ─── Private collection getters ─────────────────────────────────────────
 
@@ -89,36 +99,69 @@ class SessionRepository {
 
     // Cross-feature: update public stats counters (best-effort, REQ-WRX-003).
     // Executes after the primary session update. Reads a BOUNDED window of the
-    // user's most recent sessions (newest-first, capped at
-    // [_counterRecomputeWindow]) and recomputes in Dart — instead of an
-    // unbounded full-collection read on every finish — then filters in Dart to
-    // avoid fake_cloud_firestore's indexed-query stale-read issue.
+    // user's most recent sessions via [listRecentCompletedByUid] (newest-first,
+    // capped at [counterRecomputeWindow]) and recomputes in Dart — instead of
+    // an unbounded full-collection read on every finish — then filters in Dart
+    // to avoid fake_cloud_firestore's indexed-query stale-read issue.
     final pubRepo = _publicProfileRepository;
     if (pubRepo == null) return;
 
     try {
-      final recentSnap = await _firestore
-          .collection('users')
-          .doc(uid)
-          .collection('sessions')
-          .orderBy('startedAt', descending: true)
-          .limit(_counterRecomputeWindow)
-          .get();
-      final allSessions =
-          recentSnap.docs.map(_sessionFromDoc).whereType<Session>().toList();
-      // Only sessions actually completed count toward the public workout count
-      // and streak. Abandoned sessions are also written with status=finished
-      // (wasFullyCompleted=false), so we must exclude them here to match the
-      // display filter (historial_section.dart, planProgressProvider).
-      final completedList = allSessions
-          .where((s) =>
-              s.status == SessionStatus.finished && s.wasFullyCompleted)
-          .toList();
+      final completedList = await listRecentCompletedByUid(uid);
       final racha = computeStreak(completedList);
-      await pubRepo.updateCounters(uid, {
+      final counters = <String, Object?>{
         'workoutsCount': completedList.length,
         'racha': racha,
-      });
+      };
+
+      // Ranking-metric denormalization (REQ: Session-Finish Denormalization,
+      // spec `user-public-profiles-layer`). Gated entirely on the athlete's
+      // own rankingOptIn — reads their profile first so a non-opted-in
+      // athlete never gets ranking fields written to their doc.
+      final profile = await pubRepo.get(uid);
+      if (profile != null && profile.rankingOptIn) {
+        // RECOMPUTE (not FieldValue.increment) over the SAME completedList
+        // window already fetched above for racha/workoutsCount — this makes
+        // the write idempotent on a best-effort retry (increment would
+        // double-count volume) at zero extra reads.
+        final lifetimeVolumeKg = completedList.fold<double>(
+          0.0,
+          (sum, s) => sum + s.totalVolumeKg,
+        );
+
+        // Read setLogs per session in the SAME window (bounded — no
+        // additional full-collection scan) to compute each main-lift
+        // family's max weight, then max-merge against the stored value so
+        // the write is naturally idempotent (max is idempotent) and
+        // self-heals if the family map ever changes.
+        final logsBySession = <String, List<SetLog>>{};
+        for (final s in completedList) {
+          logsBySession[s.id] = await listSetLogs(uid: uid, sessionId: s.id);
+        }
+        final allWindowLogs = logsBySession.values.expand((l) => l).toList();
+
+        double? mergeBest(num? stored, double? windowMax) {
+          if (windowMax == null) return stored?.toDouble();
+          if (stored == null) return windowMax;
+          return stored > windowMax ? stored.toDouble() : windowMax;
+        }
+
+        counters['lifetimeVolumeKg'] = lifetimeVolumeKg;
+        counters['bestSquatKg'] = mergeBest(
+          profile.bestSquatKg,
+          familyMaxWeight(MainLift.squat, allWindowLogs),
+        );
+        counters['bestBenchKg'] = mergeBest(
+          profile.bestBenchKg,
+          familyMaxWeight(MainLift.bench, allWindowLogs),
+        );
+        counters['bestDeadliftKg'] = mergeBest(
+          profile.bestDeadliftKg,
+          familyMaxWeight(MainLift.deadlift, allWindowLogs),
+        );
+      }
+
+      await pubRepo.updateCounters(uid, counters);
     } catch (e, st) {
       developer.log(
         'SessionRepository.finish: failed to update public profile counters '
@@ -148,6 +191,38 @@ class SessionRepository {
     return snap.docs.map(_sessionFromDoc).whereType<Session>().toList();
   }
 
+  // ─── listRecentCompletedByUid ───────────────────────────────────────────
+
+  /// Returns the athlete's most recently STARTED completed sessions, bounded
+  /// to the SAME [counterRecomputeWindow] used by [finish]'s public-counter
+  /// recompute (`racha`/`workoutsCount`/`lifetimeVolumeKg`/`best<Lift>Kg`).
+  ///
+  /// "Completed" mirrors [finish]'s own filter: `status == finished &&
+  /// wasFullyCompleted == true` — abandoned sessions (finished but not fully
+  /// completed) are excluded, matching the display filter used elsewhere
+  /// (historial_section.dart, planProgressProvider).
+  ///
+  /// This is the SAME window+filter [finish] uses internally. Any other
+  /// caller that recomputes a metric [finish] ALSO recomputes (e.g.
+  /// [RankingOptInController.enableRankingOptIn] backfilling
+  /// `lifetimeVolumeKg`/`best<Lift>Kg`) MUST call this instead of
+  /// [listByUid], or the two computations will disagree the moment the
+  /// athlete's history exceeds [counterRecomputeWindow] sessions.
+  Future<List<Session>> listRecentCompletedByUid(String uid) async {
+    final recentSnap = await _firestore
+        .collection('users')
+        .doc(uid)
+        .collection('sessions')
+        .orderBy('startedAt', descending: true)
+        .limit(counterRecomputeWindow)
+        .get();
+    final allSessions =
+        recentSnap.docs.map(_sessionFromDoc).whereType<Session>().toList();
+    return allSessions
+        .where((s) => s.status == SessionStatus.finished && s.wasFullyCompleted)
+        .toList();
+  }
+
   // ─── listFinishedToday ────────────────────────────────────────────────────
 
   /// Returns the athlete's FINISHED sessions whose `finishedAt` falls on the
@@ -175,15 +250,10 @@ class SessionRepository {
         )
         .orderBy('finishedAt', descending: true)
         .get();
-    return snap.docs
-        .map(_sessionFromDoc)
-        .whereType<Session>()
-        .where((s) {
-          final finishedAt = s.finishedAt;
-          return finishedAt != null &&
-              finishedAt.toUtc().isBefore(startOfNextDay);
-        })
-        .toList();
+    return snap.docs.map(_sessionFromDoc).whereType<Session>().where((s) {
+      final finishedAt = s.finishedAt;
+      return finishedAt != null && finishedAt.toUtc().isBefore(startOfNextDay);
+    }).toList();
   }
 
   // ─── getActive ──────────────────────────────────────────────────────────

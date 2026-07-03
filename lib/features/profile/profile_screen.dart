@@ -99,6 +99,13 @@ class _AthleteProfile extends ConsumerWidget {
                   onTap: () => context.push('/profile/my-exercises'),
                 ),
               ),
+              // Rankings entry point REMOVED (rankings-v2 Phase 3, task 3.2)
+              // — rankings relocated to the second page of the athlete
+              // Entrenar tab (design `sdd/rankings-v2/design` AD-1/AD-3).
+              // ProfileScreen no longer exposes a rankings entry point
+              // (spec `gym-rankings` — ProfileScreen no longer exposes a
+              // rankings entry point / REMOVED — Rankings Reachable via
+              // Profile Tile and /profile/rankings).
             ],
           ),
           // ── Apariencia section (REQ-LM-009) ──────────────────────────────

@@ -52,6 +52,35 @@ class UserPublicProfile with _$UserPublicProfile {
     // becomes public retroactively. Off = athletes only see plans the
     // trainer assigned to them one-by-one.
     @Default(false) bool sharedTemplatesWithAthletes,
+
+    // Opt-in flag an athlete controls to expose their ranking metrics
+    // (lifetimeVolumeKg, best<Lift>Kg, and the already-public `racha`) on
+    // per-gym leaderboards. Defaults to false so existing docs decode safely
+    // and no athlete becomes rankable retroactively. Enabling backfills the
+    // 4 metric fields below from the athlete's own history; disabling clears
+    // them. See design `sdd/rankings/design` — Opt-In Toggle Lifecycle.
+    @Default(false) bool rankingOptIn,
+
+    /// Denormalized lifetime training volume in kg, recomputed (not
+    /// incremented) over the same bounded window `finish()` already reads,
+    /// for idempotency on best-effort retry. Only written when
+    /// `rankingOptIn` is true. Defaults to 0 for backward-compat.
+    @Default(0) num lifetimeVolumeKg,
+
+    /// Best squat 1RM-proxy weight (kg) across the barbell squat family,
+    /// max-merged (never overwritten downward) over the recompute window.
+    /// Null when not opted in or no matching lift logged yet.
+    num? bestSquatKg,
+
+    /// Best bench press weight (kg) across the barbell bench family,
+    /// max-merged over the recompute window. Null when not opted in or no
+    /// matching lift logged yet.
+    num? bestBenchKg,
+
+    /// Best deadlift weight (kg) across the barbell deadlift family
+    /// (conventional + sumo, max of the two), max-merged over the recompute
+    /// window. Null when not opted in or no matching lift logged yet.
+    num? bestDeadliftKg,
   }) = _UserPublicProfile;
 
   factory UserPublicProfile.fromJson(Map<String, Object?> json) =>

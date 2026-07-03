@@ -1965,6 +1965,16 @@ class AppL10nEn extends AppL10n {
       'We couldn\'t save your gym. Please try again.';
 
   @override
+  String get gymNearbyLocationAffordance =>
+      'Turn on location to see nearby gyms';
+
+  @override
+  String get gymNearbyShowMore => 'Show more';
+
+  @override
+  String get gymNearbyLoadError => 'We couldn\'t load nearby gyms.';
+
+  @override
   String get feedPullToRefreshA11y => 'Pull to refresh';
 
   @override

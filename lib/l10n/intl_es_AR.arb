@@ -1414,6 +1414,18 @@
   "@profileGymSaveError": {
     "description": "Error snackbar when the gym save fails (currently has no catch) in profile_gym_screen (finding 28)."
   },
+  "gymNearbyLocationAffordance": "Activar ubicación para ver gyms cercanos",
+  "@gymNearbyLocationAffordance": {
+    "description": "gym-selection-v2 AD-1: inline affordance shown in NearbyGymsList when location permission is not granted. Tapping it triggers the rationale sheet."
+  },
+  "gymNearbyShowMore": "Ver más",
+  "@gymNearbyShowMore": {
+    "description": "gym-selection-v2 AD-4: reveals already-fetched nearby rows beyond the initial 8 — a pure local toggle, never a re-request."
+  },
+  "gymNearbyLoadError": "No pudimos cargar los gyms cercanos.",
+  "@gymNearbyLoadError": {
+    "description": "gym-selection-v2: nearbyGymsProvider fetch-error state. Paired with coachRetryLabel for the retry CTA."
+  },
   "feedPullToRefreshA11y": "Deslizá para actualizar",
   "@feedPullToRefreshA11y": {
     "description": "Semantics/hint label for the RefreshIndicator added to feed segments (finding 1). Optional a11y label for the manual refresh gesture."

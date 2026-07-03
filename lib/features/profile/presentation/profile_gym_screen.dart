@@ -11,9 +11,11 @@ import '../../gyms/application/places_providers.dart';
 import '../../gyms/domain/gym.dart' show kNoGymId;
 import '../../profile_setup/presentation/widgets/gym_search_box.dart';
 import '../application/user_providers.dart';
+import 'widgets/nearby_gyms_list.dart';
+import 'widgets/pinned_current_gym.dart';
 
 /// Allows the authenticated athlete to search and select a gym via Google
-/// Places Autocomplete, then persist the selection to their profile.
+/// Places Text Search (AD-12), then persist the selection to their profile.
 ///
 /// REQ-PSR-019: search + selection + `UserRepository.update({'gymId': ...})`.
 /// Reuses [GymSearchBox] — shared with `step_2_gym.dart` per spec gym-catalog
@@ -21,9 +23,9 @@ import '../application/user_providers.dart';
 /// contract, ADR-PSR-011).
 ///
 /// A Google Places tap only stages `_pendingGymId` locally — the resolve
-/// (`resolveGymPlace` Cloud Function call, billable) happens on explicit
-/// "GUARDAR" tap, not on every suggestion tap, to avoid unnecessary Places
-/// billing on accidental selections. `kNoGymId` needs no resolution.
+/// (client-side Details call, billable) happens on explicit "GUARDAR" tap,
+/// not on every suggestion tap, to avoid unnecessary Places billing on
+/// accidental selections. `kNoGymId` needs no resolution.
 class ProfileGymScreen extends ConsumerStatefulWidget {
   const ProfileGymScreen({super.key});
 
@@ -119,15 +121,34 @@ class _ProfileGymScreenState extends ConsumerState<ProfileGymScreen> {
           ),
         ),
 
-        // Search box + suggestions
+        // Pinned current gym + search box + suggestions
         Expanded(
           child: SingleChildScrollView(
             padding: EdgeInsets.fromLTRB(
                 20, 0, 20, MediaQuery.paddingOf(context).bottom),
-            child: GymSearchBox(
-              selectedGymId: _pendingGymId,
-              onGymIdSelected: (gymId) =>
-                  setState(() => _pendingGymId = gymId ?? kNoGymId),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // gym-selection-v2 AD-11: pinned above the search box,
+                // hidden by construction when currentGymId is null/kNoGymId.
+                PinnedCurrentGym(currentGymId: currentGymId),
+                GymSearchBox(
+                  selectedGymId: _pendingGymId,
+                  onGymIdSelected: (gymId) =>
+                      setState(() => _pendingGymId = gymId ?? kNoGymId),
+                  // gym-selection-v2 AD-10: nearby list backs the
+                  // empty-query state; a nearby tap resolves + persists
+                  // immediately (spec gym-places-search "nearby selection
+                  // path"), so the callback just syncs the pending
+                  // selection the screen already shows as active/highlighted.
+                  emptyQueryContent: NearbyGymsList(
+                    uid: myUid,
+                    currentGymId: currentGymId,
+                    onGymSelected: (gymId) =>
+                        setState(() => _pendingGymId = gymId),
+                  ),
+                ),
+              ],
             ),
           ),
         ),

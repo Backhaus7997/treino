@@ -1,9 +1,11 @@
 /// Sugerencia de gym de una respuesta de Google Places Autocomplete (New).
 ///
-/// Mapeada desde `suggestions[].placePrediction` — ver
-/// `PlacesAutocompleteService`. Plain DTO (NOT freezed, per design
-/// gym-google-places #348) — vive solo en memoria durante una sesión de
-/// búsqueda, nunca se persiste ni serializa a Firestore.
+/// Mapeada desde `places[]` de Places Text Search (New) — ver
+/// `PlacesTextSearchService` (gym-selection-v2 AD-12; reemplaza al
+/// retirado `PlacesAutocompleteService`, del cual esta clase conserva la
+/// forma original). Plain DTO (NOT freezed, per design gym-google-places
+/// #348) — vive solo en memoria durante una sesión de búsqueda, nunca se
+/// persiste ni serializa a Firestore.
 class GymSuggestion {
   const GymSuggestion({
     required this.placeId,
