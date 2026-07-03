@@ -25,6 +25,16 @@ class PerformanceTestRepository {
     return withId;
   }
 
+  // ─── update ─────────────────────────────────────────────────────────────
+
+  /// Actualiza los VALORES de una prueba existente. La rule de Firestore
+  /// exige que `recordedBy`, `athleteId` y el propio `id` NO cambien — el
+  /// caller es responsable de pasar el mismo doc con los nuevos números y
+  /// notes.
+  Future<void> update(PerformanceTest t) async {
+    await _collection.doc(t.id).set(t.toJson());
+  }
+
   // ─── delete ─────────────────────────────────────────────────────────────
 
   Future<void> delete(String id) async {

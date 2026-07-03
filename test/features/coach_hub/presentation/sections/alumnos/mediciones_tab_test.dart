@@ -111,9 +111,19 @@ class _StubFileRepo implements AthleteFileRepository {
 
 class _StubMeasurementRepo implements MeasurementRepository {
   final List<String> deletedIds = [];
+  final List<Measurement> added = [];
+  final List<Measurement> updated = [];
 
   @override
-  Future<Measurement> add(Measurement m) async => m;
+  Future<Measurement> add(Measurement m) async {
+    added.add(m);
+    return m;
+  }
+
+  @override
+  Future<void> update(Measurement m) async {
+    updated.add(m);
+  }
 
   @override
   Future<void> delete(String id) async {
@@ -354,6 +364,63 @@ void main() {
     );
     // Botón de CTA cambia label.
     expect(find.text('NUEVA PRUEBA'), findsOneWidget);
+  });
+
+  // ── PR#3: Editar ────────────────────────────────────────────────────────
+
+  testWidgets(
+      'tap en editar abre el dialog con título "Editar medición" '
+      'y pre-populado con los valores', (tester) async {
+    final m = _measurement(
+      id: 'm1',
+      recordedAt: DateTime(2026, 3, 12),
+      weightKg: 78,
+      fatPercentage: 15,
+    );
+    _useDesktopViewport(tester);
+    await tester.pumpWidget(_wrap(_baseOverrides(measurements: [m])));
+    await _selectMedicionesTab(tester);
+
+    // Botón editar (Icons.edit) en la row.
+    final editBtn = find.byIcon(Icons.edit);
+    expect(editBtn, findsOneWidget);
+    await tester.tap(editBtn);
+    await tester.pumpAndSettle();
+
+    // Dialog en modo edición.
+    expect(find.text('Editar medición'), findsOneWidget);
+    // Los valores del form deberían estar pre-populados. El TextFormField
+    // renderiza los valores existentes en el widget tree.
+    expect(find.text('78.0'), findsOneWidget);
+    expect(find.text('15.0'), findsOneWidget);
+  });
+
+  testWidgets(
+      'save en modo edición llama repository.update (no add)',
+      (tester) async {
+    final m = _measurement(
+      id: 'm1',
+      recordedAt: DateTime(2026, 3, 12),
+      weightKg: 78,
+    );
+    final repo = _StubMeasurementRepo();
+    _useDesktopViewport(tester);
+    await tester.pumpWidget(_wrap(
+      _baseOverrides(measurements: [m], repo: repo),
+    ));
+    await _selectMedicionesTab(tester);
+    await tester.tap(find.byIcon(Icons.edit));
+    await tester.pumpAndSettle();
+
+    // Tap en el botón GUARDAR del dialog.
+    await tester.tap(find.widgetWithText(ElevatedButton, 'GUARDAR'));
+    await tester.pumpAndSettle();
+
+    // Debería haber llamado update, NO add.
+    expect(repo.updated, hasLength(1));
+    expect(repo.updated.single.id, 'm1',
+        reason: 'update debe preservar el id original');
+    expect(repo.added, isEmpty);
   });
 
   testWidgets(

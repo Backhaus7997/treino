@@ -25,6 +25,16 @@ class MeasurementRepository {
     return withId;
   }
 
+  // ─── update ─────────────────────────────────────────────────────────────
+
+  /// Actualiza los VALORES de una medición existente. La rule de Firestore
+  /// exige que `recordedBy`, `athleteId` y el propio `id` NO cambien — el
+  /// caller es responsable de pasar el mismo doc con los nuevos números y
+  /// notes.
+  Future<void> update(Measurement m) async {
+    await _collection.doc(m.id).set(m.toJson());
+  }
+
   // ─── delete ─────────────────────────────────────────────────────────────
 
   Future<void> delete(String id) async {
