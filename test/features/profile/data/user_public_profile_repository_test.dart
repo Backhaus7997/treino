@@ -239,4 +239,77 @@ void main() {
     final result = await repo.getByIds(const []);
     expect(result, isEmpty);
   });
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // SCENARIO-RANK-4: setRankingOptIn + clearRankingMetrics
+  // (opt-in toggle lifecycle, spec `gym-rankings` — Opt-In Toggle Lifecycle)
+  // ──────────────────────────────────────────────────────────────────────────
+
+  test(
+      'SCENARIO-RANK-4a: setRankingOptIn(uid, true) merges rankingOptIn '
+      'without clobbering other fields', () async {
+    await firestore.collection('userPublicProfiles').doc('u1').set({
+      'uid': 'u1',
+      'displayName': 'Ana',
+      'displayNameLowercase': 'ana',
+      'avatarUrl': null,
+      'gymId': 'g1',
+      'workoutsCount': 5,
+      'racha': 3,
+    });
+
+    await repo.setRankingOptIn('u1', true);
+
+    final result = await repo.get('u1');
+    expect(result, isNotNull);
+    expect(result!.rankingOptIn, isTrue);
+    expect(result.displayName, equals('Ana'));
+    expect(result.gymId, equals('g1'));
+    expect(result.workoutsCount, equals(5));
+    expect(result.racha, equals(3));
+  });
+
+  test(
+      'SCENARIO-RANK-4b: setRankingOptIn(uid, false) merges rankingOptIn=false',
+      () async {
+    await repo.set(
+      const UserPublicProfile(uid: 'u1', rankingOptIn: true),
+    );
+
+    await repo.setRankingOptIn('u1', false);
+
+    final result = await repo.get('u1');
+    expect(result!.rankingOptIn, isFalse);
+  });
+
+  test(
+      'SCENARIO-RANK-4c: clearRankingMetrics resets lifetimeVolumeKg/best*Kg '
+      'to 0/absent and rankingOptIn to false without clobbering identity '
+      'fields', () async {
+    await repo.set(
+      const UserPublicProfile(
+        uid: 'u1',
+        displayName: 'Ana',
+        gymId: 'g1',
+        rankingOptIn: true,
+        lifetimeVolumeKg: 3400,
+        bestSquatKg: 110,
+        bestBenchKg: 80,
+        bestDeadliftKg: 150,
+      ),
+    );
+
+    await repo.clearRankingMetrics('u1');
+
+    final result = await repo.get('u1');
+    expect(result, isNotNull);
+    expect(result!.rankingOptIn, isFalse);
+    expect(result.lifetimeVolumeKg, equals(0));
+    expect(result.bestSquatKg, isNull);
+    expect(result.bestBenchKg, isNull);
+    expect(result.bestDeadliftKg, isNull);
+    // Identity fields untouched
+    expect(result.displayName, equals('Ana'));
+    expect(result.gymId, equals('g1'));
+  });
 }

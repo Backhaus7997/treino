@@ -385,7 +385,14 @@ GoRouter buildRouter({
           // Scaffold. All remaining callers push from within the shell.
           GoRoute(
             path: '/workout',
-            pageBuilder: (_, __) => _noAnim(const WorkoutScreen()),
+            // ?tab=rankings deep-links to the second (Rankings) page of the
+            // athlete Entrenar tab — mirrors the /coach builder below
+            // (design `sdd/rankings-v2/design` AD-2). Trainer role ignores
+            // initialTab (WorkoutScreen's own role branch).
+            pageBuilder: (_, state) {
+              final tab = state.uri.queryParameters['tab'];
+              return _noAnim(WorkoutScreen(initialTab: tab));
+            },
             routes: [
               GoRoute(
                 path: 'routine/:routineId',
@@ -526,6 +533,16 @@ GoRouter buildRouter({
               GoRoute(
                 path: 'routines',
                 builder: (_, __) => _withBg(const ProfileRoutinesScreen()),
+              ),
+              // rankings — RETIRED as a pushed route (rankings-v2 Phase 3,
+              // task 3.4). Rankings relocated to the second page of the
+              // athlete Entrenar tab (design `sdd/rankings-v2/design`
+              // AD-1/AD-3). Kept REGISTERED with a redirect (not
+              // hard-removed) — a safety net for any lingering
+              // `context.push('/profile/rankings')` call or bookmark.
+              GoRoute(
+                path: 'rankings',
+                redirect: (_, __) => '/workout?tab=rankings',
               ),
               GoRoute(
                 path: 'settings/appearance',

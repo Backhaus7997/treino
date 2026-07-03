@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart'
     show CollectionReference, FieldPath, FirebaseFirestore, SetOptions;
 
+import '../../gyms/domain/gym.dart' show kNoGymId;
 import '../domain/user_public_profile.dart';
 
 /// Repository for the `userPublicProfiles` collection.
@@ -82,6 +83,64 @@ class UserPublicProfileRepository {
   /// UserRepository. See ADR-WRS-12.
   Future<void> updateCounters(String uid, Map<String, Object?> fields) async {
     await _col.doc(uid).set(fields, SetOptions(merge: true));
+  }
+
+  /// Flips the athlete's `rankingOptIn` flag via the same partial-merge path
+  /// as [updateCounters]. Does NOT touch the 4 ranking-metric fields — the
+  /// caller (`RankingOptInController`) is responsible for backfilling them
+  /// on enable and clearing them on disable via [clearRankingMetrics]. See
+  /// design `sdd/rankings/design` — Opt-In Toggle Lifecycle.
+  Future<void> setRankingOptIn(String uid, bool value) async {
+    await _col.doc(uid).set({'rankingOptIn': value}, SetOptions(merge: true));
+  }
+
+  /// Resets all 4 ranking-metric fields to their pre-opt-in defaults and
+  /// flips `rankingOptIn` to `false`, via a partial merge so identity fields
+  /// (displayName/avatarUrl/gymId) and unrelated counters are untouched.
+  /// `best<Lift>Kg` fields are cleared to `null` (their default when not
+  /// opted in / no matching lift) rather than `0`, matching the model's
+  /// existing "null = no PR to report" semantics.
+  Future<void> clearRankingMetrics(String uid) async {
+    await _col.doc(uid).set(
+      {
+        'rankingOptIn': false,
+        'lifetimeVolumeKg': 0,
+        'bestSquatKg': null,
+        'bestBenchKg': null,
+        'bestDeadliftKg': null,
+      },
+      SetOptions(merge: true),
+    );
+  }
+
+  /// Returns up to [limit] opted-in profiles for [gymId], ordered descending
+  /// by [metricField] — the query behind every per-gym leaderboard
+  /// (`gym-rankings` spec: Streak/Volume/Main-Lift Leaderboards).
+  ///
+  /// Returns an empty list without issuing a Firestore call when [gymId] is
+  /// blank or equals [kNoGymId] — an athlete with no gym has no leaderboard
+  /// to show (spec: Gym Scoping and No-Gym Exclusion). Athletes with
+  /// `gymId == null`/`kNoGymId` never match `where('gymId', isEqualTo: ...)`
+  /// against a real gym id either, so the composite index naturally excludes
+  /// them from every OTHER gym's leaderboard too.
+  ///
+  /// A gym with zero opted-in athletes simply yields an empty snapshot — not
+  /// an error (spec: Empty States).
+  Future<List<UserPublicProfile>> leaderboard({
+    required String gymId,
+    required String metricField,
+    int limit = 20,
+  }) async {
+    if (gymId.isEmpty || gymId == kNoGymId) return const [];
+
+    final snap = await _col
+        .where('gymId', isEqualTo: gymId)
+        .where('rankingOptIn', isEqualTo: true)
+        .orderBy(metricField, descending: true)
+        .limit(limit)
+        .get();
+
+    return snap.docs.map((d) => UserPublicProfile.fromJson(d.data())).toList();
   }
 
   /// Flips the trainer's `sharedTemplatesWithAthletes` flag. When `true`,

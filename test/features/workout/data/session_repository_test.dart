@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/features/profile/data/user_public_profile_repository.dart';
+import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/features/workout/data/session_repository.dart';
 import 'package:treino/features/workout/domain/set_log.dart';
 import 'package:treino/features/workout/domain/session_status.dart';
@@ -395,6 +396,286 @@ void main() {
         .doc(sessionId)
         .get();
     expect(snap.data()?['status'], equals('finished'));
+  });
+
+  // ─── finish() ranking-metric denormalization (SCENARIO-RANK-3) ────────────
+
+  test(
+      'SCENARIO-RANK-3a: opt-in ON — lifetimeVolumeKg reflects totalVolumeKg '
+      'over the recompute window', () async {
+    await publicProfileRepo.set(
+      const UserPublicProfile(uid: uid, rankingOptIn: true),
+    );
+    final repoWithProfile = SessionRepository(
+      firestore: firestore,
+      publicProfileRepository: publicProfileRepo,
+    );
+
+    final session = await repoWithProfile.create(
+      uid: uid,
+      routineId: routineId,
+      routineName: routineName,
+      startedAt: DateTime.utc(2026, 5, 15, 8, 0, 0),
+    );
+    await repoWithProfile.finish(
+      uid: uid,
+      sessionId: session.id,
+      finishedAt: DateTime.utc(2026, 5, 15, 10, 45, 0),
+      totalVolumeKg: 120.0,
+      durationMin: 45,
+      wasFullyCompleted: true,
+    );
+
+    final profile = await publicProfileRepo.get(uid);
+    expect(profile!.lifetimeVolumeKg, equals(120.0));
+  });
+
+  test(
+      'SCENARIO-RANK-3b: opt-in ON — new squat PR raises bestSquatKg to the '
+      'new max', () async {
+    await publicProfileRepo.set(
+      const UserPublicProfile(uid: uid, rankingOptIn: true, bestSquatKg: 100),
+    );
+    final repoWithProfile = SessionRepository(
+      firestore: firestore,
+      publicProfileRepository: publicProfileRepo,
+    );
+
+    final session = await repoWithProfile.create(
+      uid: uid,
+      routineId: routineId,
+      routineName: routineName,
+      startedAt: DateTime.utc(2026, 5, 15, 8, 0, 0),
+    );
+    await repoWithProfile.addSetLog(
+      uid: uid,
+      sessionId: session.id,
+      setLog: SetLog(
+        id: '',
+        exerciseId: 'squat-barra',
+        exerciseName: 'Sentadilla (Barra)',
+        setNumber: 1,
+        reps: 5,
+        weightKg: 120,
+        completedAt: DateTime.utc(2026, 5, 15, 8, 10, 0),
+      ),
+    );
+    await repoWithProfile.finish(
+      uid: uid,
+      sessionId: session.id,
+      finishedAt: DateTime.utc(2026, 5, 15, 10, 45, 0),
+      totalVolumeKg: 600.0,
+      durationMin: 45,
+      wasFullyCompleted: true,
+    );
+
+    final profile = await publicProfileRepo.get(uid);
+    expect(profile!.bestSquatKg, equals(120));
+  });
+
+  test(
+      'SCENARIO-RANK-3c: opt-in ON — a lower-weight session does NOT lower '
+      'bestSquatKg (max-merge, not overwrite)', () async {
+    await publicProfileRepo.set(
+      const UserPublicProfile(uid: uid, rankingOptIn: true, bestSquatKg: 130),
+    );
+    final repoWithProfile = SessionRepository(
+      firestore: firestore,
+      publicProfileRepository: publicProfileRepo,
+    );
+
+    final session = await repoWithProfile.create(
+      uid: uid,
+      routineId: routineId,
+      routineName: routineName,
+      startedAt: DateTime.utc(2026, 5, 15, 8, 0, 0),
+    );
+    await repoWithProfile.addSetLog(
+      uid: uid,
+      sessionId: session.id,
+      setLog: SetLog(
+        id: '',
+        exerciseId: 'squat-barra',
+        exerciseName: 'Sentadilla (Barra)',
+        setNumber: 1,
+        reps: 5,
+        weightKg: 90,
+        completedAt: DateTime.utc(2026, 5, 15, 8, 10, 0),
+      ),
+    );
+    await repoWithProfile.finish(
+      uid: uid,
+      sessionId: session.id,
+      finishedAt: DateTime.utc(2026, 5, 15, 10, 45, 0),
+      totalVolumeKg: 450.0,
+      durationMin: 45,
+      wasFullyCompleted: true,
+    );
+
+    final profile = await publicProfileRepo.get(uid);
+    expect(profile!.bestSquatKg, equals(130));
+  });
+
+  test(
+      'SCENARIO-RANK-3d: opt-in OFF — none of the 4 ranking fields are '
+      'written or changed', () async {
+    await publicProfileRepo.set(
+      const UserPublicProfile(uid: uid, rankingOptIn: false),
+    );
+    final repoWithProfile = SessionRepository(
+      firestore: firestore,
+      publicProfileRepository: publicProfileRepo,
+    );
+
+    final session = await repoWithProfile.create(
+      uid: uid,
+      routineId: routineId,
+      routineName: routineName,
+      startedAt: DateTime.utc(2026, 5, 15, 8, 0, 0),
+    );
+    await repoWithProfile.addSetLog(
+      uid: uid,
+      sessionId: session.id,
+      setLog: SetLog(
+        id: '',
+        exerciseId: 'squat-barra',
+        exerciseName: 'Sentadilla (Barra)',
+        setNumber: 1,
+        reps: 5,
+        weightKg: 120,
+        completedAt: DateTime.utc(2026, 5, 15, 8, 10, 0),
+      ),
+    );
+    await repoWithProfile.finish(
+      uid: uid,
+      sessionId: session.id,
+      finishedAt: DateTime.utc(2026, 5, 15, 10, 45, 0),
+      totalVolumeKg: 600.0,
+      durationMin: 45,
+      wasFullyCompleted: true,
+    );
+
+    final profile = await publicProfileRepo.get(uid);
+    expect(profile!.lifetimeVolumeKg, equals(0));
+    expect(profile.bestSquatKg, isNull);
+    expect(profile.bestBenchKg, isNull);
+    expect(profile.bestDeadliftKg, isNull);
+  });
+
+  test(
+      'SCENARIO-RANK-3e: session-finish retry does not double-count volume '
+      'and leaves best-lift unchanged (idempotency)', () async {
+    await publicProfileRepo.set(
+      const UserPublicProfile(uid: uid, rankingOptIn: true),
+    );
+    final repoWithProfile = SessionRepository(
+      firestore: firestore,
+      publicProfileRepository: publicProfileRepo,
+    );
+
+    final session = await repoWithProfile.create(
+      uid: uid,
+      routineId: routineId,
+      routineName: routineName,
+      startedAt: DateTime.utc(2026, 5, 15, 8, 0, 0),
+    );
+    await repoWithProfile.addSetLog(
+      uid: uid,
+      sessionId: session.id,
+      setLog: SetLog(
+        id: '',
+        exerciseId: 'squat-barra',
+        exerciseName: 'Sentadilla (Barra)',
+        setNumber: 1,
+        reps: 5,
+        weightKg: 120,
+        completedAt: DateTime.utc(2026, 5, 15, 8, 10, 0),
+      ),
+    );
+
+    // First finish() call.
+    await repoWithProfile.finish(
+      uid: uid,
+      sessionId: session.id,
+      finishedAt: DateTime.utc(2026, 5, 15, 10, 45, 0),
+      totalVolumeKg: 600.0,
+      durationMin: 45,
+      wasFullyCompleted: true,
+    );
+
+    // Retry: same finished session, best-effort block re-invoked (e.g. an
+    // unrelated failure elsewhere caused a retry of the whole finish call).
+    await repoWithProfile.finish(
+      uid: uid,
+      sessionId: session.id,
+      finishedAt: DateTime.utc(2026, 5, 15, 10, 45, 0),
+      totalVolumeKg: 600.0,
+      durationMin: 45,
+      wasFullyCompleted: true,
+    );
+
+    final profile = await publicProfileRepo.get(uid);
+    // Volume must reflect the session's totalVolumeKg exactly once, NOT
+    // doubled by the retry.
+    expect(profile!.lifetimeVolumeKg, equals(600.0));
+    // Best lift is naturally idempotent under max-merge.
+    expect(profile.bestSquatKg, equals(120));
+  });
+
+  test(
+      'SCENARIO-RANK-3f: best-lift max-merge takes the max across '
+      'conventional and sumo deadlift in the SAME session', () async {
+    await publicProfileRepo.set(
+      const UserPublicProfile(uid: uid, rankingOptIn: true),
+    );
+    final repoWithProfile = SessionRepository(
+      firestore: firestore,
+      publicProfileRepository: publicProfileRepo,
+    );
+
+    final session = await repoWithProfile.create(
+      uid: uid,
+      routineId: routineId,
+      routineName: routineName,
+      startedAt: DateTime.utc(2026, 5, 15, 8, 0, 0),
+    );
+    await repoWithProfile.addSetLog(
+      uid: uid,
+      sessionId: session.id,
+      setLog: SetLog(
+        id: '',
+        exerciseId: 'deadlift-barra',
+        exerciseName: 'Peso muerto (Barra)',
+        setNumber: 1,
+        reps: 5,
+        weightKg: 140,
+        completedAt: DateTime.utc(2026, 5, 15, 8, 10, 0),
+      ),
+    );
+    await repoWithProfile.addSetLog(
+      uid: uid,
+      sessionId: session.id,
+      setLog: SetLog(
+        id: '',
+        exerciseId: 'sumo-deadlift-barra',
+        exerciseName: 'Peso muerto sumo (Barra)',
+        setNumber: 2,
+        reps: 5,
+        weightKg: 160,
+        completedAt: DateTime.utc(2026, 5, 15, 8, 20, 0),
+      ),
+    );
+    await repoWithProfile.finish(
+      uid: uid,
+      sessionId: session.id,
+      finishedAt: DateTime.utc(2026, 5, 15, 10, 45, 0),
+      totalVolumeKg: 1500.0,
+      durationMin: 45,
+      wasFullyCompleted: true,
+    );
+
+    final profile = await publicProfileRepo.get(uid);
+    expect(profile!.bestDeadliftKg, equals(160));
   });
 }
 

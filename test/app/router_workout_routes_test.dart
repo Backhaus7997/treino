@@ -16,6 +16,7 @@ import 'package:treino/features/workout/presentation/exercise_detail_screen.dart
 import 'package:treino/features/workout/presentation/post_workout_summary_screen.dart';
 import 'package:treino/features/workout/presentation/routine_detail_screen.dart';
 import 'package:treino/features/workout/presentation/session_detail_screen.dart';
+import 'package:treino/features/workout/workout_screen.dart';
 import 'package:treino/features/profile/domain/experience_level.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
@@ -276,6 +277,135 @@ void main() {
 
       expect(find.byType(SessionDetailScreen), findsOneWidget);
       expect(find.byType(TreinoBottomBar), findsNothing);
+    });
+  });
+
+  // ─── /workout?tab= deep-link (rankings-v2 Phase 2, task 2.5) ───────────────
+  //
+  // Design AD-2: the `/workout` route builder reads `?tab=` and forwards it
+  // as `WorkoutScreen.initialTab`, mirroring the `/coach` builder
+  // (router.dart:467-472) exactly.
+  group('/workout?tab= deep-link', () {
+    GoRouter buildRouter() => GoRouter(
+          initialLocation: '/start',
+          routes: [
+            GoRoute(path: '/start', builder: (_, __) => const Text('START')),
+            GoRoute(
+              path: '/workout',
+              pageBuilder: (context, state) {
+                final tab = state.uri.queryParameters['tab'];
+                return NoTransitionPage(
+                  child: WorkoutScreen(initialTab: tab),
+                );
+              },
+            ),
+          ],
+        );
+
+    testWidgets(
+        '/workout?tab=rankings builds WorkoutScreen with initialTab: '
+        "'rankings'", (tester) async {
+      final router = buildRouter();
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp.router(
+            theme: AppTheme.dark(),
+            localizationsDelegates: AppL10n.localizationsDelegates,
+            supportedLocales: AppL10n.supportedLocales,
+            routerConfig: router,
+          ),
+        ),
+      );
+
+      router.go('/workout?tab=rankings');
+      await tester.pump();
+
+      final screen = tester.widget<WorkoutScreen>(find.byType(WorkoutScreen));
+      expect(screen.initialTab, equals('rankings'));
+    });
+
+    testWidgets(
+        '/workout (no query param) builds WorkoutScreen with initialTab: '
+        'null', (tester) async {
+      final router = buildRouter();
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp.router(
+            theme: AppTheme.dark(),
+            localizationsDelegates: AppL10n.localizationsDelegates,
+            supportedLocales: AppL10n.supportedLocales,
+            routerConfig: router,
+          ),
+        ),
+      );
+
+      router.go('/workout');
+      await tester.pump();
+
+      final screen = tester.widget<WorkoutScreen>(find.byType(WorkoutScreen));
+      expect(screen.initialTab, isNull);
+    });
+  });
+
+  // ─── /profile/rankings redirect (rankings-v2 Phase 3, task 3.3) ───────────
+  //
+  // Design AD-3: `/profile/rankings` is retired as a pushed route but stays
+  // REGISTERED as a redirect to `/workout?tab=rankings` — a safety net for
+  // any lingering `context.push('/profile/rankings')` call or bookmark, per
+  // spec `gym-rankings` — REMOVED Requirement: Rankings Reachable via
+  // Profile Tile and /profile/rankings (route disposition: redirect, not
+  // hard-remove).
+  group('/profile/rankings redirect', () {
+    GoRouter buildRouter() => GoRouter(
+          initialLocation: '/start',
+          routes: [
+            GoRoute(path: '/start', builder: (_, __) => const Text('START')),
+            GoRoute(
+              path: '/workout',
+              pageBuilder: (context, state) {
+                final tab = state.uri.queryParameters['tab'];
+                return NoTransitionPage(
+                  child: WorkoutScreen(initialTab: tab),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/profile',
+              builder: (_, __) => const Text('PROFILE'),
+              routes: [
+                GoRoute(
+                  path: 'rankings',
+                  redirect: (_, __) => '/workout?tab=rankings',
+                ),
+              ],
+            ),
+          ],
+        );
+
+    testWidgets(
+        '/profile/rankings redirects to /workout?tab=rankings and builds '
+        'WorkoutScreen with initialTab: \'rankings\'', (tester) async {
+      final router = buildRouter();
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp.router(
+            theme: AppTheme.dark(),
+            localizationsDelegates: AppL10n.localizationsDelegates,
+            supportedLocales: AppL10n.supportedLocales,
+            routerConfig: router,
+          ),
+        ),
+      );
+
+      router.go('/profile/rankings');
+      await tester.pump();
+
+      expect(
+        router.routerDelegate.currentConfiguration.uri.toString(),
+        equals('/workout?tab=rankings'),
+      );
+      final screen = tester.widget<WorkoutScreen>(find.byType(WorkoutScreen));
+      expect(screen.initialTab, equals('rankings'));
     });
   });
 }
