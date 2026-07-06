@@ -13,6 +13,7 @@ import 'package:treino/features/chat/application/chat_providers.dart';
 import 'package:treino/features/coach/application/athlete_file_providers.dart';
 import 'package:treino/features/coach/application/agenda_providers.dart';
 import 'package:treino/features/coach/application/athlete_note_providers.dart';
+import 'package:treino/features/coach/application/profile_share_providers.dart';
 import 'package:treino/features/coach/domain/appointment.dart';
 import 'package:treino/features/coach/application/follow_up_entry_providers.dart';
 import 'package:treino/features/coach/application/nutrition_plan_providers.dart';
@@ -38,6 +39,8 @@ import 'package:treino/features/performance/application/performance_test_provide
 import 'package:treino/features/performance/domain/performance_test.dart';
 import 'package:treino/features/performance/presentation/widgets/performance_progress_chart.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
+import 'package:treino/features/profile/domain/experience_level.dart';
+import 'package:treino/features/profile/domain/gender.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/features/workout/application/assigned_routine_providers.dart';
 import 'package:treino/features/workout/application/exercise_progression_providers.dart';
@@ -760,13 +763,18 @@ class _ResumenTab extends ConsumerWidget {
           const SizedBox(height: 10),
           _ProxSesionCard(palette: palette, athleteId: athleteId),
           const SizedBox(height: 20),
-          _sectionLabel(palette, 'ÚLTIMA SESIÓN · POR EJERCICIO'), // i18n: Fase W2
+          _sectionLabel(
+              palette, 'ÚLTIMA SESIÓN · POR EJERCICIO'), // i18n: Fase W2
           const SizedBox(height: 10),
           _UltimaSessionCard(
             palette: palette,
             athleteId: athleteId,
             sessions: sessionsAsync.requireValue,
           ),
+          const SizedBox(height: 20),
+          _sectionLabel(palette, 'DATOS PERSONALES'), // i18n
+          const SizedBox(height: 10),
+          _DatosPersonalesCard(palette: palette, athleteId: athleteId),
         ],
       ),
     );
@@ -856,6 +864,182 @@ class _MetricCard extends StatelessWidget {
   }
 }
 
+// ── _DatosPersonalesCard ──────────────────────────────────────────────────────
+
+/// Tarjeta de datos personales del alumno en el tab Resumen.
+///
+/// Lee [profileShareProvider] (athlete-shared-profile, Slice 1).
+/// Mientras el alumno no opte in (doc ausente → null), muestra un estado vacío
+/// claro. Los campos nil dentro del doc se omiten silenciosamente.
+///
+/// Web read-only — no escribe `profile_shares` en esta slice.
+class _DatosPersonalesCard extends ConsumerWidget {
+  const _DatosPersonalesCard({
+    required this.palette,
+    required this.athleteId,
+  });
+
+  final AppPalette palette;
+  final String athleteId;
+
+  String _fmtBornAt(DateTime dt) {
+    final local = dt.toLocal();
+    final d = local.day.toString().padLeft(2, '0');
+    final m = local.month.toString().padLeft(2, '0');
+    final y = local.year.toString();
+    return '$d/$m/$y';
+  }
+
+  String _updatedAt(DateTime dt) {
+    final diff = DateTime.now().difference(dt.toLocal());
+    final days = diff.inDays;
+    if (days == 0) return 'actualizado hoy'; // i18n
+    if (days == 1) return 'actualizado hace 1 día'; // i18n
+    return 'actualizado hace $days días'; // i18n
+  }
+
+  String _genderLabel(Gender g) => switch (g) {
+        Gender.male => 'Masculino', // i18n
+        Gender.female => 'Femenino', // i18n
+        Gender.nonBinary => 'No binario', // i18n
+        Gender.undisclosed => 'Prefiero no decir', // i18n
+      };
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(profileShareProvider(athleteId));
+    return async.when(
+      loading: () => SizedBox(
+        height: 48,
+        child: Center(
+          child: SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(
+                strokeWidth: 2, color: palette.accent),
+          ),
+        ),
+      ),
+      error: (_, __) => _muted(
+          palette, 'No se pudieron cargar los datos personales.'), // i18n
+      data: (share) {
+        return Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: palette.bgCard,
+            border: Border.all(color: palette.border),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: share == null
+              ? Text(
+                  'El alumno no compartió sus datos personales.', // i18n
+                  style: TextStyle(color: palette.textMuted, fontSize: 13),
+                )
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (share.phone != null) ...[
+                      _DatoRow(
+                        palette: palette,
+                        label: 'Teléfono', // i18n
+                        value: share.phone!,
+                      ),
+                    ],
+                    if (share.bornAt != null) ...[
+                      _DatoRow(
+                        palette: palette,
+                        label: 'Fecha de nacimiento', // i18n
+                        value: _fmtBornAt(share.bornAt!),
+                      ),
+                    ],
+                    if (share.heightCm != null) ...[
+                      _DatoRow(
+                        palette: palette,
+                        label: 'Altura', // i18n
+                        value: '${share.heightCm} cm',
+                      ),
+                    ],
+                    if (share.bodyWeightKg != null) ...[
+                      _DatoRow(
+                        palette: palette,
+                        label: 'Peso', // i18n
+                        value: '${_trimNum(share.bodyWeightKg!)} kg',
+                      ),
+                    ],
+                    if (share.gender != null) ...[
+                      _DatoRow(
+                        palette: palette,
+                        label: 'Género', // i18n
+                        value: _genderLabel(share.gender!),
+                      ),
+                    ],
+                    if (share.experienceLevel != null) ...[
+                      _DatoRow(
+                        palette: palette,
+                        label: 'Nivel', // i18n
+                        value: share.experienceLevel!.displayNameEs,
+                      ),
+                    ],
+                    if (share.updatedAt != null) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        _updatedAt(share.updatedAt!),
+                        style: TextStyle(
+                          color: palette.textMuted,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+        );
+      },
+    );
+  }
+}
+
+class _DatoRow extends StatelessWidget {
+  const _DatoRow({
+    required this.palette,
+    required this.label,
+    required this.value,
+  });
+
+  final AppPalette palette;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 160,
+            child: Text(
+              label,
+              style: TextStyle(color: palette.textMuted, fontSize: 12),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: TextStyle(
+                color: palette.textPrimary,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 // ── _NoteCard ─────────────────────────────────────────────────────────────────
 
 /// Tarjeta de la nota fijada del PF sobre el alumno en el tab Resumen (W2 PR9).
@@ -893,8 +1077,8 @@ class _NoteCard extends ConsumerWidget {
           child: SizedBox(
             width: 18,
             height: 18,
-            child:
-                CircularProgressIndicator(strokeWidth: 2, color: palette.accent),
+            child: CircularProgressIndicator(
+                strokeWidth: 2, color: palette.accent),
           ),
         ),
       ),
@@ -989,8 +1173,8 @@ class _ProxSesionCard extends ConsumerWidget {
           child: SizedBox(
             width: 18,
             height: 18,
-            child:
-                CircularProgressIndicator(strokeWidth: 2, color: palette.accent),
+            child: CircularProgressIndicator(
+                strokeWidth: 2, color: palette.accent),
           ),
         ),
       ),
@@ -1096,8 +1280,7 @@ class _UltimaSessionCard extends ConsumerWidget {
     final lastSession = sessions.first;
     final logsAsync = ref.watch(coachSessionSetLogsProvider(
         (athleteUid: athleteId, sessionId: lastSession.id)));
-    final lastWeightAsync =
-        ref.watch(lastWeightByExerciseProvider(athleteId));
+    final lastWeightAsync = ref.watch(lastWeightByExerciseProvider(athleteId));
     final muted = TextStyle(color: palette.textMuted, fontSize: 12);
 
     return Container(
@@ -2528,8 +2711,7 @@ class _ArchivosTabState extends ConsumerState<_ArchivosTab> {
                     const SizedBox(height: 4),
                     Text(
                       l10n.coachHubAlumnoDetailArchivosSubtitle,
-                      style:
-                          TextStyle(color: palette.textMuted, fontSize: 13),
+                      style: TextStyle(color: palette.textMuted, fontSize: 13),
                     ),
                   ],
                 ),
@@ -2552,8 +2734,8 @@ class _ArchivosTabState extends ConsumerState<_ArchivosTab> {
                   foregroundColor: palette.bg,
                   disabledBackgroundColor:
                       palette.accent.withValues(alpha: 0.3),
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 18, vertical: 12),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
                   shape: const StadiumBorder(),
                 ),
               ),
@@ -2700,8 +2882,8 @@ class _ArchivoRow extends StatelessWidget {
             IconButton(
               tooltip: l10n.coachHubAlumnoDetailArchivosOpenTooltip,
               onPressed: _open,
-              icon: Icon(TreinoIcon.download,
-                  size: 18, color: palette.textMuted),
+              icon:
+                  Icon(TreinoIcon.download, size: 18, color: palette.textMuted),
             ),
             IconButton(
               tooltip: l10n.coachHubAlumnoDetailArchivosDeleteTooltip,
@@ -2878,8 +3060,7 @@ class _MedicionesTabState extends ConsumerState<_MedicionesTab> {
                       isAntropo
                           ? 'Peso, composición corporal y circunferencias.' // i18n: Fase W2
                           : 'Saltos, sprints, 1RM y resistencia.', // i18n: Fase W2
-                      style: TextStyle(
-                          color: palette.textMuted, fontSize: 13),
+                      style: TextStyle(color: palette.textMuted, fontSize: 13),
                     ),
                   ],
                 ),
@@ -2895,8 +3076,8 @@ class _MedicionesTabState extends ConsumerState<_MedicionesTab> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: palette.accent,
                   foregroundColor: palette.bg,
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 18, vertical: 12),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
                   shape: const StadiumBorder(),
                 ),
               ),
@@ -3018,8 +3199,7 @@ class _AntropoList extends ConsumerWidget {
       }
       return ListView.separated(
         itemCount: ms.length,
-        separatorBuilder: (_, __) =>
-            Divider(height: 1, color: palette.border),
+        separatorBuilder: (_, __) => Divider(height: 1, color: palette.border),
         itemBuilder: (_, i) => _MedicionRow(
           measurement: ms[i],
           palette: palette,
@@ -3056,8 +3236,7 @@ class _RendimientoList extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final testsAsync =
-        ref.watch(performanceTestsForAthleteProvider(athleteId));
+    final testsAsync = ref.watch(performanceTestsForAthleteProvider(athleteId));
     if (testsAsync.hasValue) {
       final all = testsAsync.requireValue;
       final tests = all.reversed.toList();
@@ -3072,8 +3251,7 @@ class _RendimientoList extends ConsumerWidget {
       }
       return ListView.separated(
         itemCount: tests.length,
-        separatorBuilder: (_, __) =>
-            Divider(height: 1, color: palette.border),
+        separatorBuilder: (_, __) => Divider(height: 1, color: palette.border),
         itemBuilder: (_, i) => _RendimientoRow(
           test: tests[i],
           palette: palette,
@@ -3175,14 +3353,12 @@ class _MedicionRowState extends State<_MedicionRow> {
                 IconButton(
                   tooltip: 'Editar', // i18n: Fase W2
                   onPressed: widget.onEdit,
-                  icon: Icon(Icons.edit,
-                      size: 18, color: palette.textMuted),
+                  icon: Icon(Icons.edit, size: 18, color: palette.textMuted),
                 ),
                 IconButton(
                   tooltip: 'Eliminar', // i18n: Fase W2
                   onPressed: widget.onDelete,
-                  icon: Icon(TreinoIcon.trash,
-                      size: 18, color: palette.danger),
+                  icon: Icon(TreinoIcon.trash, size: 18, color: palette.danger),
                 ),
               ],
             ),
@@ -3201,8 +3377,7 @@ class _MedicionRowState extends State<_MedicionRow> {
 /// Detalle expandido de una medición. Muestra solo los campos con valor.
 /// Layout: 2 columnas de "label: valor" para aprovechar el ancho del web.
 class _MedicionDetail extends StatelessWidget {
-  const _MedicionDetail(
-      {required this.measurement, required this.palette});
+  const _MedicionDetail({required this.measurement, required this.palette});
 
   final Measurement measurement;
   final AppPalette palette;
@@ -3231,10 +3406,8 @@ class _MedicionDetail extends StatelessWidget {
       if (m.forearmLCm != null) ('Antebrazo izq.', '${m.forearmLCm} cm'),
       if (m.forearmRCm != null) ('Antebrazo der.', '${m.forearmRCm} cm'),
       // Lower
-      if (m.upperThighLCm != null)
-        ('Muslo sup. izq.', '${m.upperThighLCm} cm'),
-      if (m.upperThighRCm != null)
-        ('Muslo sup. der.', '${m.upperThighRCm} cm'),
+      if (m.upperThighLCm != null) ('Muslo sup. izq.', '${m.upperThighLCm} cm'),
+      if (m.upperThighRCm != null) ('Muslo sup. der.', '${m.upperThighRCm} cm'),
       if (m.midThighLCm != null) ('Muslo med. izq.', '${m.midThighLCm} cm'),
       if (m.midThighRCm != null) ('Muslo med. der.', '${m.midThighRCm} cm'),
       if (m.calfLCm != null) ('Gemelo izq.', '${m.calfLCm} cm'),
@@ -3436,12 +3609,26 @@ class _NuevaMedicionDialogState extends ConsumerState<_NuevaMedicionDialog> {
   @override
   void dispose() {
     for (final c in [
-      _weightC, _fatC, _muscleC,
-      _shouldersC, _chestC, _waistC, _hipsC, _glutesC,
-      _bicepsLC, _bicepsRC, _bicepsFlexedLC, _bicepsFlexedRC,
-      _forearmLC, _forearmRC,
-      _upperThighLC, _upperThighRC, _midThighLC, _midThighRC,
-      _calfLC, _calfRC,
+      _weightC,
+      _fatC,
+      _muscleC,
+      _shouldersC,
+      _chestC,
+      _waistC,
+      _hipsC,
+      _glutesC,
+      _bicepsLC,
+      _bicepsRC,
+      _bicepsFlexedLC,
+      _bicepsFlexedRC,
+      _forearmLC,
+      _forearmRC,
+      _upperThighLC,
+      _upperThighRC,
+      _midThighLC,
+      _midThighRC,
+      _calfLC,
+      _calfRC,
       _notesC,
     ]) {
       c.dispose();
@@ -3512,8 +3699,7 @@ class _NuevaMedicionDialogState extends ConsumerState<_NuevaMedicionDialog> {
       if (!mounted) return;
       messenger.showSnackBar(
         const SnackBar(
-          content:
-              Text('No pudimos guardar la medición.'), // i18n: Fase W2
+          content: Text('No pudimos guardar la medición.'), // i18n: Fase W2
         ),
       );
     } finally {
@@ -3700,8 +3886,7 @@ class _NuevaMedicionDialogState extends ConsumerState<_NuevaMedicionDialog> {
                           maxLines: 2,
                           decoration: InputDecoration(
                             labelText: 'Nota (opcional)', // i18n: Fase W2
-                            labelStyle:
-                                TextStyle(color: palette.textMuted),
+                            labelStyle: TextStyle(color: palette.textMuted),
                             filled: true,
                             fillColor: palette.bgCard,
                             border: OutlineInputBorder(
@@ -3782,9 +3967,7 @@ class _NuevaMedicionSection extends StatelessWidget {
         children: [
           if (onToggle != null)
             Icon(
-              expanded
-                  ? Icons.keyboard_arrow_down
-                  : Icons.keyboard_arrow_right,
+              expanded ? Icons.keyboard_arrow_down : Icons.keyboard_arrow_right,
               size: 18,
               color: palette.textMuted,
             ),
@@ -3880,7 +4063,8 @@ class _NuevaMedicionField extends StatelessWidget {
           if (s.isEmpty) return null; // opcional
           final parsed = double.tryParse(s);
           if (parsed == null) return 'Número inválido'; // i18n: Fase W2
-          if (parsed < 0 || parsed > 500) return 'Fuera de rango'; // i18n: Fase W2
+          if (parsed < 0 || parsed > 500)
+            return 'Fuera de rango'; // i18n: Fase W2
           return null;
         },
       ),
@@ -3970,14 +4154,12 @@ class _RendimientoRowState extends State<_RendimientoRow> {
                 IconButton(
                   tooltip: 'Editar', // i18n: Fase W2
                   onPressed: widget.onEdit,
-                  icon: Icon(Icons.edit,
-                      size: 18, color: palette.textMuted),
+                  icon: Icon(Icons.edit, size: 18, color: palette.textMuted),
                 ),
                 IconButton(
                   tooltip: 'Eliminar', // i18n: Fase W2
                   onPressed: widget.onDelete,
-                  icon: Icon(TreinoIcon.trash,
-                      size: 18, color: palette.danger),
+                  icon: Icon(TreinoIcon.trash, size: 18, color: palette.danger),
                 ),
               ],
             ),
@@ -3997,8 +4179,7 @@ class _RendimientoRowState extends State<_RendimientoRow> {
 /// con valor cargado, agrupados por categoría (saltos / sprints / 1RM /
 /// resistencia).
 class _RendimientoDetail extends StatelessWidget {
-  const _RendimientoDetail(
-      {required this.test, required this.palette});
+  const _RendimientoDetail({required this.test, required this.palette});
 
   final PerformanceTest test;
   final AppPalette palette;
@@ -4021,19 +4202,16 @@ class _RendimientoDetail extends StatelessWidget {
       if (t.squat1rmKg != null) ('Sentadilla 1RM', '${t.squat1rmKg} kg'),
       if (t.benchPress1rmKg != null)
         ('Press banca 1RM', '${t.benchPress1rmKg} kg'),
-      if (t.deadlift1rmKg != null)
-        ('Peso muerto 1RM', '${t.deadlift1rmKg} kg'),
+      if (t.deadlift1rmKg != null) ('Peso muerto 1RM', '${t.deadlift1rmKg} kg'),
       if (t.overheadPress1rmKg != null)
         ('Press militar 1RM', '${t.overheadPress1rmKg} kg'),
       if (t.pullUp1rmKg != null) ('Dominada 1RM', '${t.pullUp1rmKg} kg'),
       // Resistencia
-      if (t.vo2maxMlKgMin != null)
-        ('VO2 máx', '${t.vo2maxMlKgMin} ml/kg/min'),
+      if (t.vo2maxMlKgMin != null) ('VO2 máx', '${t.vo2maxMlKgMin} ml/kg/min'),
       if (t.courseNavetteLevel != null)
         ('Course Navette', 'nivel ${t.courseNavetteLevel}'),
       if (t.cooperMeters != null) ('Cooper', '${t.cooperMeters} m'),
-      if (t.sitAndReachCm != null)
-        ('Sit & Reach', '${t.sitAndReachCm} cm'),
+      if (t.sitAndReachCm != null) ('Sit & Reach', '${t.sitAndReachCm} cm'),
     ];
 
     if (entries.isEmpty && (t.notes ?? '').isEmpty) {
@@ -4219,10 +4397,23 @@ class _NuevoRendimientoDialogState
   @override
   void dispose() {
     for (final c in [
-      _cmjC, _squatJumpC, _abalakovC, _broadJumpC,
-      _sprint10C, _sprint20C, _sprint30C, _sprint40C,
-      _squat1rmC, _bench1rmC, _deadlift1rmC, _overhead1rmC, _pullUp1rmC,
-      _vo2maxC, _courseNavetteC, _cooperC, _sitAndReachC,
+      _cmjC,
+      _squatJumpC,
+      _abalakovC,
+      _broadJumpC,
+      _sprint10C,
+      _sprint20C,
+      _sprint30C,
+      _sprint40C,
+      _squat1rmC,
+      _bench1rmC,
+      _deadlift1rmC,
+      _overhead1rmC,
+      _pullUp1rmC,
+      _vo2maxC,
+      _courseNavetteC,
+      _cooperC,
+      _sitAndReachC,
       _notesC,
     ]) {
       c.dispose();
@@ -4459,14 +4650,12 @@ class _NuevoRendimientoDialogState
                           maxLines: 2,
                           decoration: InputDecoration(
                             labelText: 'Nota (opcional)', // i18n: Fase W2
-                            labelStyle:
-                                TextStyle(color: palette.textMuted),
+                            labelStyle: TextStyle(color: palette.textMuted),
                             filled: true,
                             fillColor: palette.bgCard,
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(8),
-                              borderSide:
-                                  BorderSide(color: palette.border),
+                              borderSide: BorderSide(color: palette.border),
                             ),
                           ),
                           style: TextStyle(color: palette.textPrimary),
@@ -4618,8 +4807,7 @@ class _SeguimientoTabState extends ConsumerState<_SeguimientoTab> {
                     const SizedBox(height: 4),
                     Text(
                       'Bitácora del PF con observaciones, molestias y decisiones. Solo vos las ves.', // i18n: Fase W2
-                      style: TextStyle(
-                          color: palette.textMuted, fontSize: 13),
+                      style: TextStyle(color: palette.textMuted, fontSize: 13),
                     ),
                   ],
                 ),
@@ -4631,8 +4819,8 @@ class _SeguimientoTabState extends ConsumerState<_SeguimientoTab> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: palette.accent,
                   foregroundColor: palette.bg,
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 18, vertical: 12),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
                   shape: const StadiumBorder(),
                 ),
               ),
@@ -4649,8 +4837,8 @@ class _SeguimientoTabState extends ConsumerState<_SeguimientoTab> {
                       child: Text(
                         'No hay entradas de seguimiento todavía.', // i18n: Fase W2
                         textAlign: TextAlign.center,
-                        style: TextStyle(
-                            color: palette.textMuted, fontSize: 14),
+                        style:
+                            TextStyle(color: palette.textMuted, fontSize: 14),
                       ),
                     );
                   }
@@ -4669,8 +4857,7 @@ class _SeguimientoTabState extends ConsumerState<_SeguimientoTab> {
                   return Center(
                     child: Text(
                       'No pudimos cargar el seguimiento.', // i18n: Fase W2
-                      style: TextStyle(
-                          color: palette.textMuted, fontSize: 14),
+                      style: TextStyle(color: palette.textMuted, fontSize: 14),
                     ),
                   );
                 }
@@ -4728,20 +4915,16 @@ class _SeguimientoEntryCard extends StatelessWidget {
               IconButton(
                 tooltip: 'Editar', // i18n: Fase W2
                 onPressed: onEdit,
-                icon:
-                    Icon(Icons.edit, size: 18, color: palette.textMuted),
+                icon: Icon(Icons.edit, size: 18, color: palette.textMuted),
                 padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(
-                    minWidth: 32, minHeight: 32),
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
               ),
               IconButton(
                 tooltip: 'Eliminar', // i18n: Fase W2
                 onPressed: onDelete,
-                icon: Icon(TreinoIcon.trash,
-                    size: 18, color: palette.danger),
+                icon: Icon(TreinoIcon.trash, size: 18, color: palette.danger),
                 padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(
-                    minWidth: 32, minHeight: 32),
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
               ),
             ],
           ),
@@ -4767,8 +4950,7 @@ class _TagChip extends StatelessWidget {
   final FollowUpTag tag;
   final AppPalette palette;
 
-  static (String, Color) _labelAndColor(
-      FollowUpTag tag, AppPalette palette) {
+  static (String, Color) _labelAndColor(FollowUpTag tag, AppPalette palette) {
     switch (tag) {
       case FollowUpTag.general:
         return ('GENERAL', palette.textMuted);
@@ -4884,8 +5066,7 @@ class _NuevaEntradaSeguimientoDialogState
       if (!mounted) return;
       messenger.showSnackBar(
         const SnackBar(
-          content:
-              Text('No pudimos guardar la entrada.'), // i18n: Fase W2
+          content: Text('No pudimos guardar la entrada.'), // i18n: Fase W2
         ),
       );
     } finally {
@@ -4980,9 +5161,8 @@ class _NuevaEntradaSeguimientoDialogState
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
                     TextButton(
-                      onPressed: _saving
-                          ? null
-                          : () => Navigator.of(context).pop(),
+                      onPressed:
+                          _saving ? null : () => Navigator.of(context).pop(),
                       child: const Text('Cancelar'), // i18n: Fase W2
                     ),
                     const SizedBox(width: 8),
@@ -5210,8 +5390,7 @@ class _NutricionTabState extends ConsumerState<_NutricionTab> {
                     const SizedBox(height: 4),
                     Text(
                       'Armá el plan por comidas, grupos y opciones. Solo vos lo ves.', // i18n: Fase W2
-                      style: TextStyle(
-                          color: palette.textMuted, fontSize: 13),
+                      style: TextStyle(color: palette.textMuted, fontSize: 13),
                     ),
                   ],
                 ),
@@ -5221,8 +5400,8 @@ class _NutricionTabState extends ConsumerState<_NutricionTab> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: palette.accent,
                   foregroundColor: palette.bg,
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 20, vertical: 12),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                   shape: const StadiumBorder(),
                 ),
                 child: _saving
@@ -5266,8 +5445,7 @@ class _NutricionTabState extends ConsumerState<_NutricionTab> {
                         borderSide: BorderSide(color: palette.border),
                       ),
                     ),
-                    style: TextStyle(
-                        color: palette.textPrimary, fontSize: 14),
+                    style: TextStyle(color: palette.textPrimary, fontSize: 14),
                     onChanged: _updateTitle,
                   ),
                   const SizedBox(height: 16),
@@ -5406,15 +5584,14 @@ class _MealEditor extends StatelessWidget {
                       color: palette.textMuted.withValues(alpha: 0.6),
                       fontSize: 12,
                     ),
-                    prefixIcon:
-                        Icon(Icons.schedule, size: 14, color: palette.textMuted),
+                    prefixIcon: Icon(Icons.schedule,
+                        size: 14, color: palette.textMuted),
                     prefixIconConstraints:
                         const BoxConstraints(minWidth: 22, minHeight: 22),
                     border: InputBorder.none,
                     contentPadding: EdgeInsets.zero,
                   ),
-                  style:
-                      TextStyle(color: palette.textPrimary, fontSize: 12),
+                  style: TextStyle(color: palette.textPrimary, fontSize: 12),
                   onChanged: (v) => onChanged(meal.copyWith(time: v)),
                 ),
               ),
@@ -5424,8 +5601,7 @@ class _MealEditor extends StatelessWidget {
                 onPressed: onDelete,
                 icon: Icon(TreinoIcon.trash, size: 16, color: palette.danger),
                 padding: EdgeInsets.zero,
-                constraints:
-                    const BoxConstraints(minWidth: 28, minHeight: 28),
+                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
               ),
             ],
           ),
@@ -5449,8 +5625,8 @@ class _MealEditor extends StatelessWidget {
                 label: const Text('AGREGAR GRUPO'), // i18n: Fase W2
                 style: TextButton.styleFrom(
                   foregroundColor: palette.accent,
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 ),
               ),
             ),
@@ -5537,17 +5713,14 @@ class _GroupEditor extends StatelessWidget {
               _SelectionModeSelector(
                 mode: group.selectionMode,
                 palette: palette,
-                onChanged: (m) =>
-                    onChanged(group.copyWith(selectionMode: m)),
+                onChanged: (m) => onChanged(group.copyWith(selectionMode: m)),
               ),
               IconButton(
                 tooltip: 'Eliminar grupo', // i18n: Fase W2
                 onPressed: onDelete,
-                icon: Icon(TreinoIcon.trash,
-                    size: 14, color: palette.danger),
+                icon: Icon(TreinoIcon.trash, size: 14, color: palette.danger),
                 padding: EdgeInsets.zero,
-                constraints:
-                    const BoxConstraints(minWidth: 26, minHeight: 26),
+                constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
               ),
             ],
           ),
@@ -5570,8 +5743,7 @@ class _GroupEditor extends StatelessWidget {
               label: const Text('AGREGAR OPCIÓN'), // i18n: Fase W2
               style: TextButton.styleFrom(
                 foregroundColor: palette.accent,
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 textStyle: const TextStyle(fontSize: 11),
               ),
             ),
@@ -5668,8 +5840,7 @@ class _OptionRow extends StatelessWidget {
         ),
         filled: true,
         fillColor: palette.bgCard,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(6),
           borderSide: BorderSide(color: palette.border),
@@ -5682,15 +5853,15 @@ class _OptionRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textStyle =
-        TextStyle(color: palette.textPrimary, fontSize: 12);
+    final textStyle = TextStyle(color: palette.textPrimary, fontSize: 12);
     return Row(
       children: [
         Expanded(
           flex: 5,
           child: TextFormField(
             initialValue: option.name,
-            decoration: _dec('Alimento (ej: 5 discos de arroz)'), // i18n: Fase W2
+            decoration:
+                _dec('Alimento (ej: 5 discos de arroz)'), // i18n: Fase W2
             style: textStyle,
             onChanged: (v) => onChanged(option.copyWith(name: v)),
           ),
@@ -5702,8 +5873,8 @@ class _OptionRow extends StatelessWidget {
             initialValue: option.quantity ?? '',
             decoration: _dec('Cant.'), // i18n: Fase W2
             style: textStyle,
-            onChanged: (v) => onChanged(
-                option.copyWith(quantity: v.isEmpty ? null : v)),
+            onChanged: (v) =>
+                onChanged(option.copyWith(quantity: v.isEmpty ? null : v)),
           ),
         ),
         const SizedBox(width: 6),

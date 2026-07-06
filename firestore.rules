@@ -536,6 +536,27 @@ service cloud.firestore {
                        || request.resource.data.trainerId is string);
     }
 
+    // Profile share: athlete opts in to share their personal data (phone,
+    // bornAt, heightCm, bodyWeightKg, gender, experienceLevel) with ONE
+    // trainer. Doc id == athleteId. Mirrors the session_shares pattern.
+    //
+    // Slice 1 (web-only groundwork): trainer reads the doc from the Resumen
+    // tab. The doc is empty/absent until the athlete opts in via the mobile
+    // consent UI (Slice 2 — NOT in this change).
+    match /profile_shares/{athleteId} {
+      // Athlete reads their own doc; trainer reads when they are the grantee.
+      allow read: if request.auth != null
+                  && (request.auth.uid == athleteId
+                      || (resource != null
+                          && request.auth.uid == resource.data.trainerId));
+      // Only the athlete may write their own grant doc; trainerId must be a
+      // string when the doc is being created or updated (not deleted).
+      allow write: if request.auth != null
+                   && request.auth.uid == athleteId
+                   && (request.resource == null
+                       || request.resource.data.trainerId is string);
+    }
+
     // Sessions sub-collection (Fase 4 Etapa 1, REQ-SMS-014).
     // Owner R/W. Trainer granted via session_shares gets read-only access.
     match /users/{uid}/sessions/{sessionId} {
