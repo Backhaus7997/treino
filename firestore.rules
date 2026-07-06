@@ -310,23 +310,189 @@ service cloud.firestore {
     }
 
     // Public identity documents — one per user, public-readable by any
-    // authenticated user, writable only by the owner. Contains ONLY the 5
-    // public fields (uid, displayName, displayNameLowercase, avatarUrl, gymId).
+    // authenticated user, writable only by the owner. Contains ONLY the 15
+    // known fields (uid, displayName, displayNameLowercase, avatarUrl,
+    // gymId, gymName, workoutsCount, racha, followersCount, followingCount,
+    // sharedTemplatesWithAthletes, rankingOptIn, lifetimeVolumeKg,
+    // bestSquatKg, bestBenchKg, bestDeadliftKg).
     // REQ-UPP-014, REQ-UPP-015. GAP-1, GAP-2, GAP-3 from design Section C.
+    //
+    // rankings-integrity Phase 2 (PR#2) hardening — AD-3, AD-4, AD-6, AD-8:
+    //   - Field allowlist via keys().hasOnly() (was previously unchecked).
+    //   - gymId cross-doc pin against users/{uid}.gymId (an athlete cannot
+    //     self-assign to a gym they don't attend).
+    //   - The 4 ranking-metric fields (lifetimeVolumeKg, bestSquatKg,
+    //     bestBenchKg, bestDeadliftKg) become CF-write-only: a client update
+    //     may only re-assert the currently stored value, EXCEPT on the
+    //     rankingOptIn true->false disable transition, where
+    //     clearRankingMetrics is explicitly allowed to reset them to their
+    //     fixed defaults (spec gym-rankings: Opt-In Disable — Unchanged,
+    //     Client-Initiated — "deflating one's own stats is not a forgery
+    //     vector"). The server-side recompute trigger
+    //     (functions/src/ranking-aggregate.ts) writes via the Admin SDK,
+    //     which bypasses rule evaluation entirely — no rule path here
+    //     "allows" that write, it is simply not subject to rules.
+    //   - Type/range validation (AD-8): best*Kg <= 1000, lifetimeVolumeKg
+    //     <= 100_000_000 when present; rankingOptIn must be bool when
+    //     present. Bounds are defense-in-depth — the trigger is the real
+    //     authority on the true value.
     match /userPublicProfiles/{uid} {
       // Any authenticated user can read (get or list). Enables prefix-range
-      // search queries from searchByDisplayName. REQ-UPP-014.
+      // search queries from searchByDisplayName. REQ-UPP-014. Unchanged by
+      // this hardening pass (Read Access Unchanged).
       allow read: if request.auth != null;
 
-      // Only the owner can create their own doc; uid in body must match doc id.
+      // Only the owner can create their own doc; uid in body must match doc
+      // id. Field allowlist applies from create onward. gymId, when
+      // present, must match the athlete's own private gymId (AD-4). The 4
+      // ranking-metric fields must be absent or at their fixed defaults —
+      // a create cannot seed forged values (AD-3).
+      //
+      // ⚠️  getAfter(), not get(): UserRepository.update dual-writes
+      // users/{uid} and userPublicProfiles/{uid} in a SINGLE WriteBatch
+      // (e.g. profile_gym_screen's gym-change flow, RankingOptInController's
+      // gymId denormalization). Firestore rules' get() only ever sees the
+      // PRE-batch committed state — it cannot observe another write in the
+      // same batch — so pinning against get(users/{uid}) would deny every
+      // real same-batch gym change (the private doc's new value isn't
+      // visible yet when this doc's rule evaluates). getAfter() reads the
+      // POST-batch value instead, which is exactly what a same-batch
+      // dual-write needs to validate against. Note: users/{uid}.gymId is
+      // itself unrestricted/self-reported (see match /users/{uid} above —
+      // no gym-membership authority exists in this system), so this pin's
+      // real guarantee is narrower than "proves gym attendance": it only
+      // enforces that the PUBLIC gymId is consistent with whatever the
+      // athlete's OWN private doc claims, closing the "show gym B publicly
+      // while privately tied to gym A" inconsistency — not a physical-
+      // attendance proof, which no rule can provide given gymId is
+      // self-reported everywhere.
       allow create: if request.auth != null
                     && request.auth.uid == uid
-                    && request.resource.data.uid == uid;
+                    && request.resource.data.uid == uid
+                    && request.resource.data.keys().hasOnly([
+                         'uid', 'displayName', 'displayNameLowercase',
+                         'avatarUrl', 'gymId', 'gymName', 'workoutsCount',
+                         'racha', 'followersCount', 'followingCount',
+                         'sharedTemplatesWithAthletes', 'rankingOptIn',
+                         'lifetimeVolumeKg', 'bestSquatKg', 'bestBenchKg',
+                         'bestDeadliftKg'
+                       ])
+                    && (!('gymId' in request.resource.data)
+                        || request.resource.data.gymId
+                           == getAfter(/databases/$(database)/documents/users/$(uid)).data.gymId)
+                    && (!('lifetimeVolumeKg' in request.resource.data)
+                        || request.resource.data.lifetimeVolumeKg == 0)
+                    && (!('bestSquatKg' in request.resource.data)
+                        || request.resource.data.bestSquatKg == null)
+                    && (!('bestBenchKg' in request.resource.data)
+                        || request.resource.data.bestBenchKg == null)
+                    && (!('bestDeadliftKg' in request.resource.data)
+                        || request.resource.data.bestDeadliftKg == null)
+                    && (!('rankingOptIn' in request.resource.data)
+                        || request.resource.data.rankingOptIn is bool);
 
       // Only the owner can update; uid in body must not change (immutable).
+      // Field allowlist, gymId pin, CF-write-only metric pins, and
+      // type/range validation all apply here.
+      //
+      // ⚠️  COUPLING WARNING — hasOnly field list below:
+      // This list MUST contain every field a userPublicProfiles doc stores.
+      // If you add a field to UserPublicProfile, you MUST add it here too —
+      // otherwise ALL profile updates will fail with permission-denied.
       allow update: if request.auth != null
                     && request.auth.uid == uid
-                    && request.resource.data.uid == resource.data.uid;
+                    && request.resource.data.uid == resource.data.uid
+                    && request.resource.data.keys().hasOnly([
+                         'uid', 'displayName', 'displayNameLowercase',
+                         'avatarUrl', 'gymId', 'gymName', 'workoutsCount',
+                         'racha', 'followersCount', 'followingCount',
+                         'sharedTemplatesWithAthletes', 'rankingOptIn',
+                         'lifetimeVolumeKg', 'bestSquatKg', 'bestBenchKg',
+                         'bestDeadliftKg'
+                       ])
+                    // gymId Integrity (AD-4): when the write touches gymId,
+                    // it must equal the athlete's own private gymId.
+                    // getAfter(), not get() — see the create-branch comment
+                    // above: UserRepository.update dual-writes users/{uid}
+                    // and userPublicProfiles/{uid} in the SAME WriteBatch,
+                    // and get() cannot see a sibling write from that same
+                    // batch (it only sees pre-batch state). getAfter() reads
+                    // the post-batch value, so a same-batch gym change
+                    // (profile_gym_screen, RankingOptInController) is
+                    // correctly validated instead of being denied by a
+                    // stale pre-batch comparison. A missing/absent
+                    // users/{uid} doc makes getAfter() fail the whole
+                    // expression (denied) — onboarding always writes
+                    // users/{uid} in the same or an earlier batch, so this
+                    // is safe in the normal write order.
+                    && (!('gymId' in request.resource.data)
+                        || request.resource.data.gymId
+                           == getAfter(/databases/$(database)/documents/users/$(uid)).data.gymId)
+                    // rankingOptIn: bool when present (Type Validation).
+                    && (!('rankingOptIn' in request.resource.data)
+                        || request.resource.data.rankingOptIn is bool)
+                    // CF-Write-Only Ranking Metrics (AD-3) + Opt-In Disable
+                    // exception (gym-rankings spec, AD-6 resolution): each
+                    // metric may only (a) be absent from the write, (b)
+                    // equal its currently stored value, or (c) be reset to
+                    // its fixed default IF this write is also flipping
+                    // rankingOptIn from true to false — the exact shape of
+                    // UserPublicProfileRepository.clearRankingMetrics. Any
+                    // other value is denied — this is not a laundering path
+                    // for a forged metric via a disable/re-enable round
+                    // trip, since the disable-branch only tolerates the
+                    // fixed default, never an arbitrary value.
+                    && (!('lifetimeVolumeKg' in request.resource.data)
+                        || request.resource.data.lifetimeVolumeKg
+                           == resource.data.get('lifetimeVolumeKg', 0)
+                        || (request.resource.data.get('rankingOptIn', true) == false
+                            && resource.data.get('rankingOptIn', false) == true
+                            && request.resource.data.lifetimeVolumeKg == 0))
+                    && (!('bestSquatKg' in request.resource.data)
+                        || request.resource.data.bestSquatKg
+                           == resource.data.get('bestSquatKg', null)
+                        || (request.resource.data.get('rankingOptIn', true) == false
+                            && resource.data.get('rankingOptIn', false) == true
+                            && request.resource.data.bestSquatKg == null))
+                    && (!('bestBenchKg' in request.resource.data)
+                        || request.resource.data.bestBenchKg
+                           == resource.data.get('bestBenchKg', null)
+                        || (request.resource.data.get('rankingOptIn', true) == false
+                            && resource.data.get('rankingOptIn', false) == true
+                            && request.resource.data.bestBenchKg == null))
+                    && (!('bestDeadliftKg' in request.resource.data)
+                        || request.resource.data.bestDeadliftKg
+                           == resource.data.get('bestDeadliftKg', null)
+                        || (request.resource.data.get('rankingOptIn', true) == false
+                            && resource.data.get('rankingOptIn', false) == true
+                            && request.resource.data.bestDeadliftKg == null))
+                    // Type/Range Validation (AD-8): defense-in-depth bounds
+                    // when a metric is present AND is a fresh (non-pinned,
+                    // non-disable-reset) numeric write would already have
+                    // been rejected above unless it equals the stored value
+                    // or the fixed default — both of which are always within
+                    // bounds. These checks guard the stored/reasserted value
+                    // itself is well-typed, protecting against a corrupt
+                    // stored value some day being re-asserted forever.
+                    && (!('lifetimeVolumeKg' in request.resource.data)
+                        || (request.resource.data.lifetimeVolumeKg is number
+                            && request.resource.data.lifetimeVolumeKg >= 0
+                            && request.resource.data.lifetimeVolumeKg <= 100000000))
+                    && (!('bestSquatKg' in request.resource.data)
+                        || request.resource.data.bestSquatKg == null
+                        || (request.resource.data.bestSquatKg is number
+                            && request.resource.data.bestSquatKg >= 0
+                            && request.resource.data.bestSquatKg <= 1000))
+                    && (!('bestBenchKg' in request.resource.data)
+                        || request.resource.data.bestBenchKg == null
+                        || (request.resource.data.bestBenchKg is number
+                            && request.resource.data.bestBenchKg >= 0
+                            && request.resource.data.bestBenchKg <= 1000))
+                    && (!('bestDeadliftKg' in request.resource.data)
+                        || request.resource.data.bestDeadliftKg == null
+                        || (request.resource.data.bestDeadliftKg is number
+                            && request.resource.data.bestDeadliftKg >= 0
+                            && request.resource.data.bestDeadliftKg <= 1000));
 
       // Deletion denied — managed exclusively through WriteBatch from
       // server-side operations (backfill, account deletion Cloud Function).
