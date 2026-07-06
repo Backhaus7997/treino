@@ -55,6 +55,10 @@ import 'package:treino/features/workout/domain/session.dart';
 import 'package:treino/features/workout/domain/session_status.dart';
 import 'package:treino/features/workout/domain/set_log.dart';
 import 'package:treino/features/workout/presentation/widgets/exercise_progression_chart.dart';
+import 'package:treino/features/profile/application/user_providers.dart'
+    show userProfileProvider;
+import 'package:treino/features/profile/domain/user_profile.dart';
+import 'package:treino/features/profile/domain/user_role.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
 class _MockRepo extends Mock implements TrainerLinkRepository {}
@@ -218,6 +222,17 @@ AthleteNote _note({String note = 'Buena progresión', DateTime? updatedAt}) =>
       updatedAt: updatedAt ?? DateTime.utc(2026, 7, 1),
     );
 
+UserProfile _trainerProfile({String? paymentAlias = 'Pepe Coach'}) =>
+    UserProfile(
+      uid: 't1',
+      email: 'coach@test.com',
+      displayName: 'Coach Test',
+      role: UserRole.trainer,
+      createdAt: DateTime.utc(2026, 1, 1),
+      updatedAt: DateTime.utc(2026, 1, 1),
+      paymentAlias: paymentAlias,
+    );
+
 /// Future start — always after DateTime.now() in test context.
 Appointment _appointment({
   String id = 'ap1',
@@ -259,6 +274,8 @@ Future<void> _pump(
   AthleteNote? athleteNote,
   List<Appointment> appointments = const [],
   Map<String, double> lastWeightByExercise = const {},
+  // PR2 (pagos) — trainer's own profile (for paymentAlias)
+  UserProfile? trainerProfile,
 }) async {
   tester.view.physicalSize = const Size(1200, 900);
   tester.view.devicePixelRatio = 1.0;
@@ -311,6 +328,10 @@ Future<void> _pump(
         ),
         lastWeightByExerciseProvider.overrideWith(
           (ref, uid) async => lastWeightByExercise,
+        ),
+        // PR2 (pagos) — trainer profile (paymentAlias for recordar())
+        userProfileProvider.overrideWith(
+          (ref) => Stream.value(trainerProfile),
         ),
       ],
       child: MaterialApp(
@@ -1592,6 +1613,149 @@ void main() {
         find.textContaining('Próximamente: última sesión'),
         findsNothing,
       );
+    });
+  });
+
+  // ── PR2 (pagos): recordatorios + exportar CSV (alumnos-detail-finish) ─────────
+
+  group('tab Pagos: recordatorios + exportar (PR2 alumnos-detail-finish)', () {
+    testWidgets(
+        'placeholder "Próximamente: recordatorios y exportar." ya no existe (PR2-PAG)',
+        (tester) async {
+      await _pump(
+        tester,
+        profile: _prof(),
+        link: _link(TrainerLinkStatus.active),
+        trainerProfile: _trainerProfile(),
+      );
+
+      await tester.tap(find.descendant(
+          of: find.byType(TabBar), matching: find.text('Pagos')));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.textContaining('Próximamente: recordatorios y exportar.'),
+        findsNothing,
+      );
+    });
+
+    testWidgets(
+        'Exportar CSV button renders when there is payment history (PR2-PAG)',
+        (tester) async {
+      await _pump(
+        tester,
+        profile: _prof(),
+        link: _link(TrainerLinkStatus.active),
+        payments: [_pago(concept: 'Mensual julio', amountArs: 28000)],
+        trainerProfile: _trainerProfile(),
+      );
+
+      await tester.tap(find.descendant(
+          of: find.byType(TabBar), matching: find.text('Pagos')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Exportar CSV'), findsOneWidget);
+    });
+
+    testWidgets(
+        'Exportar CSV button renders even with empty history (PR2-PAG)',
+        (tester) async {
+      await _pump(
+        tester,
+        profile: _prof(),
+        link: _link(TrainerLinkStatus.active),
+        payments: const [],
+        trainerProfile: _trainerProfile(),
+      );
+
+      await tester.tap(find.descendant(
+          of: find.byType(TabBar), matching: find.text('Pagos')));
+      await tester.pumpAndSettle();
+
+      // Button always present (even with empty history, 0-row CSV is valid)
+      expect(find.text('Exportar CSV'), findsOneWidget);
+    });
+
+    testWidgets(
+        'Recordar button appears on pending payments in PagosTable (PR2-PAG)',
+        (tester) async {
+      await _pump(
+        tester,
+        profile: _prof(),
+        link: _link(TrainerLinkStatus.active),
+        payments: [
+          _pago(
+            id: 'p-pending',
+            concept: 'Clase suelta',
+            amountArs: 5000,
+            status: PaymentStatus.pending,
+          ),
+        ],
+        trainerProfile: _trainerProfile(),
+      );
+
+      await tester.tap(find.descendant(
+          of: find.byType(TabBar), matching: find.text('Pagos')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Recordar'), findsOneWidget);
+    });
+
+    testWidgets(
+        'Recordar button does NOT appear on paid payments (PR2-PAG)',
+        (tester) async {
+      await _pump(
+        tester,
+        profile: _prof(),
+        link: _link(TrainerLinkStatus.active),
+        payments: [
+          _pago(
+            id: 'p-paid',
+            concept: 'Mensual mayo',
+            amountArs: 28000,
+            status: PaymentStatus.paid,
+          ),
+        ],
+        trainerProfile: _trainerProfile(),
+      );
+
+      await tester.tap(find.descendant(
+          of: find.byType(TabBar), matching: find.text('Pagos')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Recordar'), findsNothing);
+    });
+
+    testWidgets(
+        'mix of paid + pending → Recordar only on pending row (PR2-PAG)',
+        (tester) async {
+      await _pump(
+        tester,
+        profile: _prof(),
+        link: _link(TrainerLinkStatus.active),
+        payments: [
+          _pago(
+            id: 'p1',
+            concept: 'Mensual mayo',
+            amountArs: 28000,
+            status: PaymentStatus.paid,
+          ),
+          _pago(
+            id: 'p2',
+            concept: 'Clase extra',
+            amountArs: 5000,
+            status: PaymentStatus.pending,
+          ),
+        ],
+        trainerProfile: _trainerProfile(),
+      );
+
+      await tester.tap(find.descendant(
+          of: find.byType(TabBar), matching: find.text('Pagos')));
+      await tester.pumpAndSettle();
+
+      // Exactly one Recordar button (only the pending row)
+      expect(find.text('Recordar'), findsOneWidget);
     });
   });
 }

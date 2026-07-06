@@ -13,18 +13,26 @@ import 'package:treino/features/payments/domain/payment.dart';
 import 'payment_format.dart';
 
 /// Historial de pagos de un alumno en formato tabla compacta.
+///
+/// [onRecordar] — callback opcional por fila; cuando no es null aparece
+/// el botón "Recordar" solo en filas con status `pending`.
 class PagosTable extends StatelessWidget {
   const PagosTable({
     super.key,
     required this.payments,
     required this.palette,
+    this.onRecordar,
   });
 
   final List<Payment> payments;
   final AppPalette palette;
 
+  /// Callback al presionar "Recordar" (envía recordatorio por chat); null → sin botón. // i18n
+  final void Function(Payment)? onRecordar;
+
   @override
   Widget build(BuildContext context) {
+    final hasRecordar = onRecordar != null;
     final h = TextStyle(
         color: palette.textMuted,
         fontSize: 11,
@@ -55,6 +63,7 @@ class PagosTable extends StatelessWidget {
                   flex: 3,
                   child: Text('ESTADO', style: h, textAlign: TextAlign.right),
                 ),
+                if (hasRecordar) const Expanded(flex: 3, child: SizedBox()),
               ],
             ),
           ),
@@ -93,6 +102,33 @@ class PagosTable extends StatelessWidget {
                       ),
                     ),
                   ),
+                  if (hasRecordar)
+                    Expanded(
+                      flex: 3,
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: p.status == PaymentStatus.pending
+                            ? TextButton(
+                                style: TextButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 4),
+                                  tapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                  minimumSize: Size.zero,
+                                ),
+                                onPressed: () => onRecordar!(p),
+                                child: Text(
+                                  'Recordar', // i18n
+                                  style: TextStyle(
+                                    color: palette.accent,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              )
+                            : const SizedBox.shrink(),
+                      ),
+                    ),
                 ],
               ),
             ),
