@@ -1,20 +1,18 @@
 // Phase 3 RED — SCENARIO-RANK-5 (+ Phase 5 window-consistency fix)
 // rankings-v2 Phase 1 RED — gymId/gymName denormalization + AD-4 self-heal.
+// sdd/rankings-integrity Phase 1 — enableRankingOptIn no longer computes
+// ranking metrics client-side; SCENARIO-RANK-5a/5d rewritten accordingly.
 //
 // RankingOptInController orchestrates the opt-in toggle lifecycle:
-//   - enableRankingOptIn(uid): one-time client-side backfill of
-//     lifetimeVolumeKg (Σ totalVolumeKg) + bestSquatKg/bestBenchKg/
-//     bestDeadliftKg (max weightKg per MainLift family), computed over the
-//     SAME bounded recent-sessions window SessionRepository.finish() uses
-//     (most recent 365 sessions by startedAt desc — see
-//     SessionRepository.counterRecomputeWindow), then denormalizes
-//     gymId/gymName from `users/{uid}.gymId` onto the public doc (design
-//     AD-5, rankings-v2), then sets rankingOptIn: true. Does NOT touch
-//     racha — it is already denormalized by SessionRepository.finish().
-//     Using the SAME window as finish() is required so
-//     lifetimeVolumeKg/best*Kg do not visibly drop on the next session
-//     finish after opt-in (finish() would otherwise recompute a narrower
-//     window than the backfill used, corrupting the just-set baseline).
+//   - enableRankingOptIn(uid): writes ONLY the eligibility intent —
+//     denormalizes gymId/gymName from `users/{uid}.gymId` onto the public
+//     doc (design AD-5, rankings-v2), then sets rankingOptIn: true. As of
+//     `sdd/rankings-integrity` (AD-2/AD-9), it does NOT compute or write
+//     lifetimeVolumeKg/best<Lift>Kg — the server-side recompute trigger
+//     (rankingAggregateOnOptIn, functions/src/ranking-aggregate.ts) is the
+//     sole authority for those 4 fields now, firing on the rankingOptIn
+//     false→true transition this method writes. Does NOT touch racha — it
+//     is already denormalized by SessionRepository.finish().
 //   - disableRankingOptIn(uid): clears the 4 ranking-metric fields and sets
 //     rankingOptIn: false via UserPublicProfileRepository.clearRankingMetrics.
 //     gymId/gymName are NOT cleared (design AD-5 / spec
@@ -25,11 +23,13 @@
 //
 // Spec: `gym-rankings` — Opt-In Toggle Lifecycle. `user-public-profiles-layer`
 // — Opt-In Toggle Lifecycle (gymId/gymName sync + gymName-failure tolerance).
-// Design: `sdd/rankings-v2/design` — AD-4, AD-5.
+// Design: `sdd/rankings-v2/design` — AD-4, AD-5. `sdd/rankings-integrity/design`
+// — AD-2, AD-9.
 
 import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mocktail/mocktail.dart';
 import 'package:treino/features/gyms/data/gym_repository.dart';
 import 'package:treino/features/gyms/domain/gym.dart' show kNoGymId;
 import 'package:treino/features/profile/application/ranking_optin_controller.dart';
@@ -40,6 +40,11 @@ import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
 import 'package:treino/features/workout/data/session_repository.dart';
 import 'package:treino/features/workout/domain/set_log.dart';
+
+class _MockUserPublicProfileRepository extends Mock
+    implements UserPublicProfileRepository {}
+
+class _MockUserRepository extends Mock implements UserRepository {}
 
 void main() {
   late FakeFirebaseFirestore firestore;
@@ -90,7 +95,6 @@ void main() {
       gyms: GymRepository(firestore: firestore),
     );
     controller = RankingOptInController(
-      sessionRepository: sessionRepo,
       publicProfileRepository: publicProfileRepo,
       userRepository: userRepo,
     );
@@ -119,11 +123,20 @@ void main() {
   }
 
   // ──────────────────────────────────────────────────────────────────────────
-  // SCENARIO-RANK-5a: enable backfills lifetimeVolumeKg + best-lift PRs
+  // SCENARIO-RANK-5a (rewritten, sdd/rankings-integrity Phase 1): enable no
+  // longer backfills metrics from own session history — that computation now
+  // lives server-side (rankingAggregateOnOptIn trigger, AD-2/AD-9). The
+  // fake_cloud_firestore instance used by these tests has no trigger runtime
+  // (Admin SDK-only, deployed separately), so lifetimeVolumeKg/best*Kg stay
+  // at their pre-opt-in default (absent/null) after enableRankingOptIn —
+  // proving the client itself no longer writes them, not that they're zero
+  // by computation.
   // ──────────────────────────────────────────────────────────────────────────
   test(
-      'SCENARIO-RANK-5a: enableRankingOptIn backfills lifetimeVolumeKg and '
-      'bestSquatKg/bestBenchKg/bestDeadliftKg from own history', () async {
+      'SCENARIO-RANK-5a (rewritten): enableRankingOptIn does NOT write '
+      'lifetimeVolumeKg/best*Kg even when the athlete has real training '
+      'history — metrics are left untouched, only rankingOptIn:true is set',
+      () async {
     await publicProfileRepo.set(const UserPublicProfile(uid: uid));
 
     final s1 = await createFinishedSession(
@@ -145,116 +158,16 @@ void main() {
       ),
     );
 
-    final s2 = await createFinishedSession(
-      startedAt: DateTime.utc(2026, 2, 1, 8, 0, 0),
-      finishedAt: DateTime.utc(2026, 2, 1, 9, 0, 0),
-      totalVolumeKg: 2000.0,
-    );
-    await sessionRepo.addSetLog(
-      uid: uid,
-      sessionId: s2,
-      setLog: SetLog(
-        id: '',
-        exerciseId: 'squat-barra',
-        exerciseName: 'Sentadilla (Barra)',
-        setNumber: 1,
-        reps: 3,
-        weightKg: 110,
-        completedAt: DateTime.utc(2026, 2, 1, 8, 10, 0),
-      ),
-    );
-    await sessionRepo.addSetLog(
-      uid: uid,
-      sessionId: s2,
-      setLog: SetLog(
-        id: '',
-        exerciseId: 'bench-press-barra',
-        exerciseName: 'Press de banca (Barra)',
-        setNumber: 1,
-        reps: 5,
-        weightKg: 80,
-        completedAt: DateTime.utc(2026, 2, 1, 8, 20, 0),
-      ),
-    );
-
     await controller.enableRankingOptIn(uid);
 
     final profile = await publicProfileRepo.get(uid);
     expect(profile, isNotNull);
     expect(profile!.rankingOptIn, isTrue);
-    expect(profile.lifetimeVolumeKg, equals(3400.0));
-    expect(profile.bestSquatKg, equals(110));
-    expect(profile.bestBenchKg, equals(80));
-    // No deadlift logged in history → 0 per spec ("0 if no matching lifts")
-    expect(profile.bestDeadliftKg, equals(0));
-  });
-
-  // ──────────────────────────────────────────────────────────────────────────
-  // SCENARIO-RANK-5e: enable backfill uses the SAME bounded window as
-  // finish() — a session outside the window must NOT count, and the
-  // backfilled value must match what finish() would recompute on the very
-  // next session finish (window-consistency fix, Phase 5).
-  // ──────────────────────────────────────────────────────────────────────────
-  test(
-      'SCENARIO-RANK-5e: enableRankingOptIn backfills over the SAME bounded '
-      'window as finish() (sessions outside the window are excluded, and '
-      'finish() immediately after opt-in does not change the backfilled '
-      'value)', () async {
-    await publicProfileRepo.set(const UserPublicProfile(uid: uid));
-
-    // One session strictly OUTSIDE the recompute window (oldest by
-    // startedAt) plus [SessionRepository.counterRecomputeWindow] sessions
-    // INSIDE the window — mirrors finish()'s
-    // .orderBy('startedAt', descending: true).limit(counterRecomputeWindow).
-    await createFinishedSession(
-      startedAt: DateTime.utc(2020, 1, 1, 8, 0, 0),
-      finishedAt: DateTime.utc(2020, 1, 1, 9, 0, 0),
-      totalVolumeKg: 999999.0,
-    );
-
-    const windowSize = SessionRepository.counterRecomputeWindow;
-    for (var i = 0; i < windowSize; i++) {
-      await createFinishedSession(
-        startedAt: DateTime.utc(2026, 1, 1).add(Duration(days: i)),
-        finishedAt: DateTime.utc(2026, 1, 1).add(Duration(days: i, hours: 1)),
-        totalVolumeKg: 10.0,
-      );
-    }
-
-    await controller.enableRankingOptIn(uid);
-
-    final profile = await publicProfileRepo.get(uid);
-    // Only the windowSize in-window sessions (10.0 each) count — the
-    // out-of-window 2020 session's 999999.0 is excluded.
-    expect(profile!.lifetimeVolumeKg, equals(windowSize * 10.0));
-
-    // finish() immediately after opt-in must NOT change the just-backfilled
-    // value — proves both computations agree on the SAME window.
-    final repoWithProfile = SessionRepository(
-      firestore: firestore,
-      publicProfileRepository: publicProfileRepo,
-    );
-    final nextSession = await repoWithProfile.create(
-      uid: uid,
-      routineId: routineId,
-      routineName: routineName,
-      startedAt: DateTime.utc(2026, 1, 1).add(const Duration(days: windowSize)),
-    );
-    await repoWithProfile.finish(
-      uid: uid,
-      sessionId: nextSession.id,
-      finishedAt: DateTime.utc(2026, 1, 1)
-          .add(const Duration(days: windowSize, hours: 1)),
-      totalVolumeKg: 10.0,
-      durationMin: 45,
-      wasFullyCompleted: true,
-    );
-
-    final afterFinish = await publicProfileRepo.get(uid);
-    // Window slides by one (oldest in-window session drops out, new session
-    // enters) — net change is 0 since both are 10.0. Critically, it must NOT
-    // jump back up by 999999.0, nor drop to a bounded-vs-unbounded mismatch.
-    expect(afterFinish!.lifetimeVolumeKg, equals(windowSize * 10.0));
+    // Metrics are NOT computed/written by the client anymore — they stay at
+    // the pre-opt-in default. The server-side trigger (deployed separately,
+    // not present in this fake_cloud_firestore instance) is the only writer.
+    expect(profile.lifetimeVolumeKg, equals(0));
+    expect(profile.bestSquatKg, isNull);
   });
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -306,11 +219,17 @@ void main() {
   });
 
   // ──────────────────────────────────────────────────────────────────────────
-  // SCENARIO-RANK-5d: enable with no training history backfills zeros
+  // SCENARIO-RANK-5d (rewritten, sdd/rankings-integrity Phase 1): enabling
+  // opt-in with no training history leaves ranking metrics at their true
+  // model default (lifetimeVolumeKg:0, best*Kg:null) since the client no
+  // longer writes them at all — this is the server-side trigger's job now,
+  // and a just-opted-in athlete with zero qualifying sessions is expected to
+  // show zero/empty per spec (`gym-rankings: Opting in with zero qualifying
+  // sessions shows zero, not stale or forged data`).
   // ──────────────────────────────────────────────────────────────────────────
   test(
-      'SCENARIO-RANK-5d: enableRankingOptIn with no session history backfills '
-      'lifetimeVolumeKg=0 and best*Kg=0', () async {
+      'SCENARIO-RANK-5d (rewritten): enableRankingOptIn with no session '
+      'history leaves ranking metrics at their model default', () async {
     await publicProfileRepo.set(const UserPublicProfile(uid: uid));
 
     await controller.enableRankingOptIn(uid);
@@ -318,9 +237,9 @@ void main() {
     final profile = await publicProfileRepo.get(uid);
     expect(profile!.rankingOptIn, isTrue);
     expect(profile.lifetimeVolumeKg, equals(0));
-    expect(profile.bestSquatKg, equals(0));
-    expect(profile.bestBenchKg, equals(0));
-    expect(profile.bestDeadliftKg, equals(0));
+    expect(profile.bestSquatKg, isNull);
+    expect(profile.bestBenchKg, isNull);
+    expect(profile.bestDeadliftKg, isNull);
   });
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -540,6 +459,68 @@ void main() {
       );
 
       await expectLater(controller.syncGymIfDesynced(uid), completes);
+    });
+  });
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // sdd/rankings-integrity Phase 1 (task 1.17) — enableRankingOptIn no longer
+  // computes ranking metrics client-side (design AD-2, AD-9). The server-side
+  // recompute trigger (rankingAggregateOnOptIn) is now the sole writer of the
+  // 4 ranking-metric fields; enableRankingOptIn writes ONLY gymId/gymName
+  // (unchanged AD-5 denorm path) then rankingOptIn:true — the intent, not
+  // the metrics themselves. The controller no longer takes a
+  // SessionRepository dependency at all (removed from the constructor) —
+  // the strongest possible guarantee that it cannot read session/SetLog
+  // history from this method.
+  // ──────────────────────────────────────────────────────────────────────────
+  group(
+      'RankingOptInController.enableRankingOptIn — server-authoritative '
+      'metrics (rankings-integrity)', () {
+    late _MockUserPublicProfileRepository mockPublicProfileRepo;
+    late _MockUserRepository mockUserRepo;
+    late RankingOptInController serverAuthorityController;
+
+    setUpAll(() {
+      registerFallbackValue(<String, Object?>{});
+    });
+
+    setUp(() {
+      mockPublicProfileRepo = _MockUserPublicProfileRepository();
+      mockUserRepo = _MockUserRepository();
+      serverAuthorityController = RankingOptInController(
+        publicProfileRepository: mockPublicProfileRepo,
+        userRepository: mockUserRepo,
+      );
+
+      when(() => mockUserRepo.get(uid)).thenAnswer(
+        (_) async => UserProfile(
+          uid: uid,
+          email: '$uid@treino.app',
+          displayName: 'Athlete',
+          role: UserRole.athlete,
+          createdAt: DateTime.utc(2026, 1, 1),
+          updatedAt: DateTime.utc(2026, 1, 1),
+          gymId: 'gym-123',
+        ),
+      );
+      when(() => mockUserRepo.update(any(), any())).thenAnswer((_) async {});
+      when(() => mockPublicProfileRepo.setRankingOptIn(any(), any()))
+          .thenAnswer((_) async {});
+    });
+
+    test('enableRankingOptIn writes gymId then rankingOptIn:true', () async {
+      await serverAuthorityController.enableRankingOptIn(uid);
+
+      verify(() => mockUserRepo.update(uid, {'gymId': 'gym-123'})).called(1);
+      verify(() => mockPublicProfileRepo.setRankingOptIn(uid, true)).called(1);
+    });
+
+    test(
+        'enableRankingOptIn does NOT call updateCounters at all — the '
+        'server-side trigger owns the 4 ranking-metric fields now', () async {
+      await serverAuthorityController.enableRankingOptIn(uid);
+
+      verifyNever(() => mockPublicProfileRepo.updateCounters(any(), any()));
     });
   });
 }

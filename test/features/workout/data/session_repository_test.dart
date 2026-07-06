@@ -398,127 +398,22 @@ void main() {
     expect(snap.data()?['status'], equals('finished'));
   });
 
-  // ─── finish() ranking-metric denormalization (SCENARIO-RANK-3) ────────────
+  // ─── finish() ranking-metric denormalization — REMOVED
+  // (sdd/rankings-integrity Phase 1, SCENARIO-RANK-3) ────────────────────────
+  //
+  // finish() no longer computes or writes lifetimeVolumeKg/best<Lift>Kg
+  // itself (design AD-2/AD-9, spec `gym-rankings`: Session Finish — No
+  // Longer the Client Authority for Metrics). That computation now lives
+  // server-side in recomputeMetrics (functions/src/ranking-aggregate.ts),
+  // triggered by rankingAggregateOnSession on every users/{uid}/sessions
+  // write. SCENARIO-RANK-3a/3b/3c/3e/3f (which asserted the OLD client-side
+  // compute-and-merge behavior) are replaced by SCENARIO-RANK-3g below;
+  // SCENARIO-RANK-3d (opt-in OFF -> no ranking fields written) already
+  // matched the new contract and is kept, restated for the new reason.
 
   test(
-      'SCENARIO-RANK-3a: opt-in ON — lifetimeVolumeKg reflects totalVolumeKg '
-      'over the recompute window', () async {
-    await publicProfileRepo.set(
-      const UserPublicProfile(uid: uid, rankingOptIn: true),
-    );
-    final repoWithProfile = SessionRepository(
-      firestore: firestore,
-      publicProfileRepository: publicProfileRepo,
-    );
-
-    final session = await repoWithProfile.create(
-      uid: uid,
-      routineId: routineId,
-      routineName: routineName,
-      startedAt: DateTime.utc(2026, 5, 15, 8, 0, 0),
-    );
-    await repoWithProfile.finish(
-      uid: uid,
-      sessionId: session.id,
-      finishedAt: DateTime.utc(2026, 5, 15, 10, 45, 0),
-      totalVolumeKg: 120.0,
-      durationMin: 45,
-      wasFullyCompleted: true,
-    );
-
-    final profile = await publicProfileRepo.get(uid);
-    expect(profile!.lifetimeVolumeKg, equals(120.0));
-  });
-
-  test(
-      'SCENARIO-RANK-3b: opt-in ON — new squat PR raises bestSquatKg to the '
-      'new max', () async {
-    await publicProfileRepo.set(
-      const UserPublicProfile(uid: uid, rankingOptIn: true, bestSquatKg: 100),
-    );
-    final repoWithProfile = SessionRepository(
-      firestore: firestore,
-      publicProfileRepository: publicProfileRepo,
-    );
-
-    final session = await repoWithProfile.create(
-      uid: uid,
-      routineId: routineId,
-      routineName: routineName,
-      startedAt: DateTime.utc(2026, 5, 15, 8, 0, 0),
-    );
-    await repoWithProfile.addSetLog(
-      uid: uid,
-      sessionId: session.id,
-      setLog: SetLog(
-        id: '',
-        exerciseId: 'squat-barra',
-        exerciseName: 'Sentadilla (Barra)',
-        setNumber: 1,
-        reps: 5,
-        weightKg: 120,
-        completedAt: DateTime.utc(2026, 5, 15, 8, 10, 0),
-      ),
-    );
-    await repoWithProfile.finish(
-      uid: uid,
-      sessionId: session.id,
-      finishedAt: DateTime.utc(2026, 5, 15, 10, 45, 0),
-      totalVolumeKg: 600.0,
-      durationMin: 45,
-      wasFullyCompleted: true,
-    );
-
-    final profile = await publicProfileRepo.get(uid);
-    expect(profile!.bestSquatKg, equals(120));
-  });
-
-  test(
-      'SCENARIO-RANK-3c: opt-in ON — a lower-weight session does NOT lower '
-      'bestSquatKg (max-merge, not overwrite)', () async {
-    await publicProfileRepo.set(
-      const UserPublicProfile(uid: uid, rankingOptIn: true, bestSquatKg: 130),
-    );
-    final repoWithProfile = SessionRepository(
-      firestore: firestore,
-      publicProfileRepository: publicProfileRepo,
-    );
-
-    final session = await repoWithProfile.create(
-      uid: uid,
-      routineId: routineId,
-      routineName: routineName,
-      startedAt: DateTime.utc(2026, 5, 15, 8, 0, 0),
-    );
-    await repoWithProfile.addSetLog(
-      uid: uid,
-      sessionId: session.id,
-      setLog: SetLog(
-        id: '',
-        exerciseId: 'squat-barra',
-        exerciseName: 'Sentadilla (Barra)',
-        setNumber: 1,
-        reps: 5,
-        weightKg: 90,
-        completedAt: DateTime.utc(2026, 5, 15, 8, 10, 0),
-      ),
-    );
-    await repoWithProfile.finish(
-      uid: uid,
-      sessionId: session.id,
-      finishedAt: DateTime.utc(2026, 5, 15, 10, 45, 0),
-      totalVolumeKg: 450.0,
-      durationMin: 45,
-      wasFullyCompleted: true,
-    );
-
-    final profile = await publicProfileRepo.get(uid);
-    expect(profile!.bestSquatKg, equals(130));
-  });
-
-  test(
-      'SCENARIO-RANK-3d: opt-in OFF — none of the 4 ranking fields are '
-      'written or changed', () async {
+      'SCENARIO-RANK-3d (restated): opt-in OFF — none of the 4 ranking '
+      'fields are written or changed', () async {
     await publicProfileRepo.set(
       const UserPublicProfile(uid: uid, rankingOptIn: false),
     );
@@ -563,10 +458,12 @@ void main() {
   });
 
   test(
-      'SCENARIO-RANK-3e: session-finish retry does not double-count volume '
-      'and leaves best-lift unchanged (idempotency)', () async {
+      'SCENARIO-RANK-3g (sdd/rankings-integrity Phase 1): finish() does NOT '
+      'write lifetimeVolumeKg/best<Lift>Kg even when opted in with a real '
+      'squat PR — that computation is server-side now (recomputeMetrics), '
+      'not client-side', () async {
     await publicProfileRepo.set(
-      const UserPublicProfile(uid: uid, rankingOptIn: true),
+      const UserPublicProfile(uid: uid, rankingOptIn: true, bestSquatKg: 100),
     );
     final repoWithProfile = SessionRepository(
       firestore: firestore,
@@ -592,19 +489,6 @@ void main() {
         completedAt: DateTime.utc(2026, 5, 15, 8, 10, 0),
       ),
     );
-
-    // First finish() call.
-    await repoWithProfile.finish(
-      uid: uid,
-      sessionId: session.id,
-      finishedAt: DateTime.utc(2026, 5, 15, 10, 45, 0),
-      totalVolumeKg: 600.0,
-      durationMin: 45,
-      wasFullyCompleted: true,
-    );
-
-    // Retry: same finished session, best-effort block re-invoked (e.g. an
-    // unrelated failure elsewhere caused a retry of the whole finish call).
     await repoWithProfile.finish(
       uid: uid,
       sessionId: session.id,
@@ -615,16 +499,17 @@ void main() {
     );
 
     final profile = await publicProfileRepo.get(uid);
-    // Volume must reflect the session's totalVolumeKg exactly once, NOT
-    // doubled by the retry.
-    expect(profile!.lifetimeVolumeKg, equals(600.0));
-    // Best lift is naturally idempotent under max-merge.
-    expect(profile.bestSquatKg, equals(120));
+    // The stored value is untouched by finish() — no client-side compute
+    // happens anymore. (The server-side trigger, not exercised by this
+    // fake_cloud_firestore-backed test, would be the one to recompute it.)
+    expect(profile!.bestSquatKg, equals(100));
+    expect(profile.lifetimeVolumeKg, equals(0));
   });
 
   test(
-      'SCENARIO-RANK-3f: best-lift max-merge takes the max across '
-      'conventional and sumo deadlift in the SAME session', () async {
+      'SCENARIO-RANK-3h (sdd/rankings-integrity Phase 1): finish() still '
+      'writes workoutsCount/racha exactly as before, independent of the '
+      'ranking-metric server-side recompute', () async {
     await publicProfileRepo.set(
       const UserPublicProfile(uid: uid, rankingOptIn: true),
     );
@@ -639,43 +524,18 @@ void main() {
       routineName: routineName,
       startedAt: DateTime.utc(2026, 5, 15, 8, 0, 0),
     );
-    await repoWithProfile.addSetLog(
-      uid: uid,
-      sessionId: session.id,
-      setLog: SetLog(
-        id: '',
-        exerciseId: 'deadlift-barra',
-        exerciseName: 'Peso muerto (Barra)',
-        setNumber: 1,
-        reps: 5,
-        weightKg: 140,
-        completedAt: DateTime.utc(2026, 5, 15, 8, 10, 0),
-      ),
-    );
-    await repoWithProfile.addSetLog(
-      uid: uid,
-      sessionId: session.id,
-      setLog: SetLog(
-        id: '',
-        exerciseId: 'sumo-deadlift-barra',
-        exerciseName: 'Peso muerto sumo (Barra)',
-        setNumber: 2,
-        reps: 5,
-        weightKg: 160,
-        completedAt: DateTime.utc(2026, 5, 15, 8, 20, 0),
-      ),
-    );
     await repoWithProfile.finish(
       uid: uid,
       sessionId: session.id,
       finishedAt: DateTime.utc(2026, 5, 15, 10, 45, 0),
-      totalVolumeKg: 1500.0,
+      totalVolumeKg: 600.0,
       durationMin: 45,
       wasFullyCompleted: true,
     );
 
     final profile = await publicProfileRepo.get(uid);
-    expect(profile!.bestDeadliftKg, equals(160));
+    expect(profile!.workoutsCount, equals(1));
+    expect(profile.racha, isA<int>());
   });
 }
 

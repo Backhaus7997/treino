@@ -1,9 +1,6 @@
 import 'dart:developer' as developer;
 
-import '../../gym_rankings/domain/main_lift_family_map.dart';
 import '../../gyms/domain/gym.dart' show kNoGymId;
-import '../../workout/data/session_repository.dart';
-import '../../workout/domain/set_log.dart';
 import '../data/user_public_profile_repository.dart';
 import '../data/user_repository.dart';
 
@@ -24,28 +21,21 @@ abstract class RankingOptInControllerBase {
 
 /// Orchestrates the `rankingOptIn` toggle lifecycle (spec `gym-rankings` —
 /// Opt-In Toggle Lifecycle, design `sdd/rankings/design`;
-/// `sdd/rankings-v2/design` AD-4/AD-5).
+/// `sdd/rankings-v2/design` AD-4/AD-5;
+/// `sdd/rankings-integrity/design` AD-2/AD-9).
 ///
-/// - [enableRankingOptIn]: one-time, client-side backfill of
-///   `lifetimeVolumeKg` (Σ `totalVolumeKg`) and
-///   `bestSquatKg`/`bestBenchKg`/`bestDeadliftKg` (max weight per [MainLift]
-///   family), computed over the athlete's own recent-completed-session
-///   window via [SessionRepository.listRecentCompletedByUid] — the SAME
-///   bounded window (`counterRecomputeWindow`, most recent 365 sessions by
-///   `startedAt`) that `SessionRepository.finish()` recomputes over on every
-///   session finish. Using the SAME window is REQUIRED: if the backfill used
-///   the athlete's full history while `finish()` recomputes over a narrower
-///   bounded window, the very next session finish after opt-in would
-///   silently shrink `lifetimeVolumeKg`/`best<Lift>Kg` back down to the
-///   windowed value, making the metrics visibly drop right after enabling.
-///   `racha` is NOT touched — it is already denormalized by
-///   `SessionRepository.finish()`. AFTER the metric backfill, `gymId` (and
-///   the resolved `gymName`) are denormalized from `users/{uid}.gymId` onto
-///   the public doc via [UserRepository.update] (AD-5) — the single
-///   canonical dual-write + `_resolveGymName` tolerance path, reused
-///   verbatim rather than duplicated. `setRankingOptIn(uid, true)` runs
-///   LAST, so the athlete only becomes visible on a leaderboard once BOTH
-///   metrics AND gym are already on the public doc.
+/// - [enableRankingOptIn]: writes ONLY the eligibility intent — `gymId`/
+///   `gymName` (denormalized from `users/{uid}.gymId` via
+///   [UserRepository.update], AD-5, unchanged) followed by
+///   `rankingOptIn: true` (LAST, so the athlete only becomes visible on a
+///   leaderboard once gym identity is already on the public doc). As of
+///   `sdd/rankings-integrity` (AD-2/AD-9), it no longer computes or writes
+///   `lifetimeVolumeKg`/`best<Lift>Kg` itself — the server-side recompute
+///   trigger (`rankingAggregateOnOptIn`, `functions/src/ranking-aggregate.ts`)
+///   is the sole authority for those 4 fields, firing on the
+///   `rankingOptIn` false→true transition this method just wrote and
+///   populating metrics ~1-3s later (AD-5 eventual-consistency UX). `racha`
+///   is NOT touched — it is denormalized by `SessionRepository.finish()`.
 /// - [disableRankingOptIn]: clears the 4 ranking-metric fields and sets
 ///   `rankingOptIn: false` via `UserPublicProfileRepository.clearRankingMetrics`.
 ///   `gymId`/`gymName` are NOT touched by disable.
@@ -55,63 +45,31 @@ abstract class RankingOptInControllerBase {
 ///   tolerance, so a transient failure never breaks the leaderboard render.
 class RankingOptInController implements RankingOptInControllerBase {
   RankingOptInController({
-    required SessionRepository sessionRepository,
     required UserPublicProfileRepository publicProfileRepository,
     required UserRepository userRepository,
-  })  : _sessionRepository = sessionRepository,
-        _publicProfileRepository = publicProfileRepository,
+  })  : _publicProfileRepository = publicProfileRepository,
         _userRepository = userRepository;
 
-  final SessionRepository _sessionRepository;
   final UserPublicProfileRepository _publicProfileRepository;
   final UserRepository _userRepository;
 
-  /// Enables ranking opt-in for [uid], backfilling ranking metrics from the
-  /// athlete's own bounded recent-session/SetLog window (SAME window
-  /// `finish()` uses — see [SessionRepository.listRecentCompletedByUid]) in
-  /// one client-side pass, then denormalizing `gymId`/`gymName` (AD-5). A
-  /// failure here surfaces to the caller (does NOT swallow errors) — unlike
-  /// `finish()`'s best-effort counters, an explicit user action deserves an
-  /// explicit error rather than a silent no-op. The one exception is
-  /// `gymName` resolution itself, which [UserRepository._resolveGymName]
-  /// already swallows internally (never throws) — a stale/unknown gym never
-  /// aborts opt-in.
+  /// Enables ranking opt-in for [uid]: writes the eligibility intent only.
+  ///
+  /// `sdd/rankings-integrity` AD-2/AD-9: this method no longer computes or
+  /// writes `lifetimeVolumeKg`/`best<Lift>Kg` from the athlete's own
+  /// session/SetLog history — that computation now lives server-side in
+  /// `recomputeMetrics` (`functions/src/ranking-aggregate.ts`), triggered by
+  /// the `rankingOptIn` false→true transition this method writes. Denormalizes
+  /// `gymId`/`gymName` from the private source of truth onto the public doc,
+  /// THROUGH [UserRepository.update] — the single canonical dual-write path
+  /// (resolves `gymName` via `_resolveGymName`, which itself never throws on
+  /// a null/kNoGymId/unknown id). Runs BEFORE `setRankingOptIn` so a query
+  /// never observes a stale gym for a newly-visible athlete.
+  /// `setRankingOptIn(uid, true)` runs LAST, so the athlete only becomes
+  /// visible on a leaderboard once gym identity is already on the public doc
+  /// (metrics populate ~1-3s later via the server trigger — AD-5).
   @override
   Future<void> enableRankingOptIn(String uid) async {
-    final completedList =
-        await _sessionRepository.listRecentCompletedByUid(uid);
-
-    final lifetimeVolumeKg = completedList.fold<double>(
-      0.0,
-      (sum, s) => sum + s.totalVolumeKg,
-    );
-
-    final allLogs = <SetLog>[];
-    for (final session in completedList) {
-      final logs = await _sessionRepository.listSetLogs(
-        uid: uid,
-        sessionId: session.id,
-      );
-      allLogs.addAll(logs);
-    }
-
-    final bestSquatKg = familyMaxWeight(MainLift.squat, allLogs) ?? 0;
-    final bestBenchKg = familyMaxWeight(MainLift.bench, allLogs) ?? 0;
-    final bestDeadliftKg = familyMaxWeight(MainLift.deadlift, allLogs) ?? 0;
-
-    await _publicProfileRepository.updateCounters(uid, {
-      'lifetimeVolumeKg': lifetimeVolumeKg,
-      'bestSquatKg': bestSquatKg,
-      'bestBenchKg': bestBenchKg,
-      'bestDeadliftKg': bestDeadliftKg,
-    });
-
-    // AD-5: denormalize gymId/gymName from the private source of truth onto
-    // the public doc, THROUGH UserRepository.update — the single canonical
-    // dual-write path (resolves gymName via _resolveGymName, which itself
-    // never throws on a null/kNoGymId/unknown id). Runs BEFORE
-    // setRankingOptIn so a query never observes a stale gym for a
-    // newly-visible athlete.
     final profile = await _userRepository.get(uid);
     await _userRepository.update(uid, {'gymId': profile?.gymId});
 
