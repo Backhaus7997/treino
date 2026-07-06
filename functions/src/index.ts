@@ -4,10 +4,16 @@
  * PR#1 (reviews): exports reviewAggregate trigger.
  * PR#1b (notifications): exports 4 FCM trigger functions. Fase 6 Etapa 2.
  * cleanupAssignedPlansOnUnlink: hard-deletes assigned plans when a link ends.
+ * sdd/rankings-integrity Phase 1 (PR#1): exports rankingAggregateOnSession +
+ * rankingAggregateOnOptIn — server-authoritative ranking-metric recompute.
  */
 
 export { deleteAccountHandler as deleteAccount } from "./delete-account";
 export { reviewAggregate } from "./review-aggregate";
+export {
+  rankingAggregateOnSession,
+  rankingAggregateOnOptIn,
+} from "./ranking-aggregate";
 export { notifyOnChatMessage } from "./notifications/notify-chat-message";
 export { notifyOnAppointment } from "./notifications/notify-appointment";
 export { notifyOnLinkChange } from "./notifications/notify-link-change";
