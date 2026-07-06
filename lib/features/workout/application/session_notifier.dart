@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/analytics/analytics_service.dart';
 import '../domain/routine_day.dart';
+import '../domain/routine_slot.dart';
 import '../domain/set_log.dart';
 import '../../workout/application/routine_providers.dart';
 import 'session_init.dart';
@@ -173,6 +174,9 @@ class SessionNotifier
     ];
     final sessionDay = day.copyWith(slots: presentSlots);
 
+    // No setCountOverride exists yet at build time (it is session-local and
+    // starts empty every resume — live-set-editing PR1 doesn't persist it),
+    // so the plain weekNumber-based resolution is correct here.
     final currentIndex =
         _nextIncompleteIndex(sessionDay, recoveredLogs, session.weekNumber);
     final elapsed = DateTime.now()
@@ -232,6 +236,7 @@ class SessionNotifier
         latest.day,
         newLogs,
         latest.session.weekNumber,
+        latest.plannedSetsFor,
       );
 
       state = AsyncData(latest.copyWith(
@@ -250,6 +255,27 @@ class SessionNotifier
     } finally {
       _isLoggingSet = false;
     }
+  }
+
+  /// Agrega un set extra a [slot] más allá del plan actual (live-set-editing
+  /// AD-1/AD-2). SOLO bumpea `setCountOverride[slot.exerciseId]` a
+  /// `plannedSetsFor(slot) + 1` — NO escribe ningún `setLog` acá. La fila
+  /// nueva se renderiza vacía (AD-4, sin SetSpec) y el write real ocurre
+  /// cuando el athlete la completa y dispara el `logSet` existente con
+  /// `setNumber = newCount`. La idempotencia por `exerciseId+setNumber` de
+  /// `logSet` (línea ~207) ya cubre un doble-tap sobre esa fila nueva — no se
+  /// necesita un guard nuevo.
+  Future<void> addSet(RoutineSlot slot) async {
+    final current = state.value;
+    if (current == null || _finalized) return;
+
+    final newCount = current.plannedSetsFor(slot) + 1;
+    state = AsyncData(current.copyWith(
+      setCountOverride: {
+        ...current.setCountOverride,
+        slot.exerciseId: newCount,
+      },
+    ));
   }
 
   /// Actualiza un set ya logueado con nuevos reps/peso. Llamado por el
@@ -404,15 +430,30 @@ class SessionNotifier
   }
 
   /// Returns the index of the first slot that still needs sets logged.
-  /// Uses [slot.effectiveSetsForWeek(weekNumber).length] so periodized plans
-  /// respect the correct week's prescription. (REQ-PERIOD-040)
+  ///
+  /// [plannedCountFor] resolves the session-local "sets today" for a slot
+  /// (live-set-editing AD-1/AD-5, [SITE-3]) — pass
+  /// `state.value?.plannedSetsFor` (bound method) from every call site so an
+  /// added-beyond-plan set keeps the cursor on its exercise instead of
+  /// advancing, and a removed-below-logged set doesn't wait forever. Falls
+  /// back to the raw [RoutineSlot.effectiveSetsForWeek] count via [weekNumber]
+  /// when no resolver is supplied (keeps existing call sites compiling without
+  /// forcing every caller to thread state through immediately).
   /// Single-week sessions pass weekNumber=0; effectiveSetsForWeek(0) falls
   /// back to effectiveSets semantics (REQ-PERIOD-042 backward-compat).
-  int _nextIncompleteIndex(RoutineDay day, List<SetLog> logs, int weekNumber) {
+  int _nextIncompleteIndex(
+    RoutineDay day,
+    List<SetLog> logs,
+    int weekNumber, [
+    int Function(RoutineSlot)? plannedCountFor,
+  ]) {
     for (var i = 0; i < day.slots.length; i++) {
       final slot = day.slots[i];
       final count = logs.where((l) => l.exerciseId == slot.exerciseId).length;
-      if (count < slot.effectiveSetsForWeek(weekNumber).length) return i;
+      final planned = plannedCountFor != null
+          ? plannedCountFor(slot)
+          : slot.effectiveSetsForWeek(weekNumber).length;
+      if (count < planned) return i;
     }
     return day.slots.length - 1;
   }

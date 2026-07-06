@@ -276,5 +276,152 @@ void main() {
       );
       expect(state.isExerciseDone('e1'), isTrue);
     });
+
+    // ── live-set-editing PR1: plannedSetsFor resolver (AD-1) ──────────────────
+
+    group('plannedSetsFor', () {
+      test(
+          '[AD-1] returns plan count (effectiveSetsForWeek.length) when '
+          'setCountOverride is empty', () {
+        final slot = makeSlot(exerciseId: 'e1', targetSets: 3);
+        final day = makeDay(slots: [slot]);
+        final state = SessionState(
+          session: makeSession(),
+          day: day,
+          setLogs: const [],
+          currentExerciseIndex: 0,
+          elapsedSeconds: 0,
+        );
+        expect(state.plannedSetsFor(slot), equals(3));
+      });
+
+      test(
+          '[AD-1] returns the override value when present, ignoring the plan '
+          'count entirely (plan=3, override=5 -> 5)', () {
+        final slot = makeSlot(exerciseId: 'e1', targetSets: 3);
+        final day = makeDay(slots: [slot]);
+        final state = SessionState(
+          session: makeSession(),
+          day: day,
+          setLogs: const [],
+          currentExerciseIndex: 0,
+          elapsedSeconds: 0,
+          setCountOverride: const {'e1': 5},
+        );
+        expect(state.plannedSetsFor(slot), equals(5));
+      });
+    });
+
+    // ── live-set-editing PR1: [SITE-1] isFullyCompleted honors override ──────
+
+    test(
+        '[SITE-1][AD-5] isFullyCompleted returns false when an exercise has '
+        'an added-beyond-plan set pending (3 logged, override=4)', () {
+      final slot = makeSlot(exerciseId: 'e1', targetSets: 3);
+      final day = makeDay(slots: [slot]);
+      final logs = [
+        makeSetLog(exerciseId: 'e1', setNumber: 1, id: 'l1'),
+        makeSetLog(exerciseId: 'e1', setNumber: 2, id: 'l2'),
+        makeSetLog(exerciseId: 'e1', setNumber: 3, id: 'l3'),
+      ];
+      final state = SessionState(
+        session: makeSession(),
+        day: day,
+        setLogs: logs,
+        currentExerciseIndex: 0,
+        elapsedSeconds: 0,
+        setCountOverride: const {'e1': 4},
+      );
+      expect(state.isFullyCompleted, isFalse);
+    });
+
+    // ── live-set-editing PR1: [SITE-2] isExerciseDone honors override ───────
+
+    test(
+        '[SITE-2][AD-5] isExerciseDone returns true at a reduced override '
+        'count (override=2, both remaining logged) and completedExerciseCount '
+        'reflects it', () {
+      final slot = makeSlot(exerciseId: 'e1', targetSets: 3);
+      final day = makeDay(slots: [slot]);
+      final logs = [
+        makeSetLog(exerciseId: 'e1', setNumber: 1, id: 'l1'),
+        makeSetLog(exerciseId: 'e1', setNumber: 2, id: 'l2'),
+      ];
+      final state = SessionState(
+        session: makeSession(),
+        day: day,
+        setLogs: logs,
+        currentExerciseIndex: 0,
+        elapsedSeconds: 0,
+        setCountOverride: const {'e1': 2},
+      );
+      expect(state.isExerciseDone('e1'), isTrue);
+      expect(state.completedExerciseCount, equals(1));
+    });
+
+    // ── copyWith / == / hashCode cover setCountOverride ──────────────────────
+
+    test(
+        '[AD-1] copyWith updates setCountOverride and leaves other fields intact',
+        () {
+      final day = makeDay();
+      final original = SessionState(
+        session: makeSession(),
+        day: day,
+        setLogs: const [],
+        currentExerciseIndex: 0,
+        elapsedSeconds: 0,
+      );
+      final copy = original.copyWith(setCountOverride: const {'e1': 4});
+      expect(copy.setCountOverride, equals(const {'e1': 4}));
+      expect(copy.currentExerciseIndex, equals(original.currentExerciseIndex));
+      expect(original.setCountOverride, equals(const {}));
+    });
+
+    test(
+        '[AD-1] == and hashCode treat equal setCountOverride maps as equal '
+        'regardless of insertion order', () {
+      final day = makeDay();
+      final session = makeSession();
+      final a = SessionState(
+        session: session,
+        day: day,
+        setLogs: const [],
+        currentExerciseIndex: 0,
+        elapsedSeconds: 0,
+        setCountOverride: const {'e1': 4, 'e2': 2},
+      );
+      final b = SessionState(
+        session: session,
+        day: day,
+        setLogs: const [],
+        currentExerciseIndex: 0,
+        elapsedSeconds: 0,
+        setCountOverride: const {'e2': 2, 'e1': 4},
+      );
+      expect(a, equals(b));
+      expect(a.hashCode, equals(b.hashCode));
+    });
+
+    test('[AD-1] == is false when setCountOverride differs', () {
+      final day = makeDay();
+      final session = makeSession();
+      final a = SessionState(
+        session: session,
+        day: day,
+        setLogs: const [],
+        currentExerciseIndex: 0,
+        elapsedSeconds: 0,
+        setCountOverride: const {'e1': 4},
+      );
+      final b = SessionState(
+        session: session,
+        day: day,
+        setLogs: const [],
+        currentExerciseIndex: 0,
+        elapsedSeconds: 0,
+      );
+      expect(a == b, isFalse);
+    });
   });
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../domain/routine_day.dart';
+import '../domain/routine_slot.dart';
 import '../domain/session.dart';
 import '../domain/set_log.dart';
 
@@ -17,6 +18,7 @@ class SessionState {
     required this.setLogs,
     required this.currentExerciseIndex,
     required this.elapsedSeconds,
+    this.setCountOverride = const {},
   });
 
   final Session session;
@@ -25,6 +27,13 @@ class SessionState {
   final int currentExerciseIndex;
   final int elapsedSeconds;
 
+  /// Session-local per-exercise ABSOLUTE set-count override
+  /// (exerciseId -> sets-today). Empty = no exercise was changed this
+  /// session, fall back to the plan count everywhere. Populated only via
+  /// [SessionNotifier.addSet]/`removeSet` (live-set-editing AD-1). NEVER a
+  /// delta — always the absolute count to render/gate against.
+  final Map<String, int> setCountOverride;
+
   // ── Getters derivados ────────────────────────────────────────────────────
 
   /// 0-based week number active in this session (from [session.weekNumber]).
@@ -32,10 +41,23 @@ class SessionState {
   /// effectiveSets semantics, keeping behavior identical. (REQ-PERIOD-040)
   int get activeWeek => session.weekNumber;
 
-  /// Verdadero cuando cada slot del día tiene al menos `effectiveSetsForWeek.length` logs.
+  /// The session-local "sets today" for [slot] — THE single resolver every
+  /// completion/render denominator must route through (live-set-editing
+  /// AD-1/AD-5). Returns the override when the athlete added/removed a set
+  /// for this exercise this session; otherwise falls back to the plan's
+  /// [RoutineSlot.effectiveSetsForWeek] count. Never reads the plan count
+  /// directly outside this method — every other site (isFullyCompleted,
+  /// isExerciseDone, and the 7 sites in session_notifier.dart /
+  /// session_player_screen.dart) call this instead.
+  int plannedSetsFor(RoutineSlot slot) {
+    final planned = slot.effectiveSetsForWeek(session.weekNumber).length;
+    return setCountOverride[slot.exerciseId] ?? planned;
+  }
+
+  /// Verdadero cuando cada slot del día tiene al menos `plannedSetsFor(slot)` logs.
   bool get isFullyCompleted => day.slots.every((slot) {
         final count = setsLoggedFor(slot.exerciseId);
-        return count >= slot.effectiveSetsForWeek(session.weekNumber).length;
+        return count >= plannedSetsFor(slot);
       });
 
   /// Suma de reps × weightKg sobre todos los setLogs.
@@ -51,8 +73,7 @@ class SessionState {
   /// Verdadero si el ejercicio tiene todos sus sets completados.
   bool isExerciseDone(String exerciseId) {
     final slot = day.slots.firstWhere((s) => s.exerciseId == exerciseId);
-    return setsLoggedFor(exerciseId) >=
-        slot.effectiveSetsForWeek(session.weekNumber).length;
+    return setsLoggedFor(exerciseId) >= plannedSetsFor(slot);
   }
 
   /// Cantidad de ejercicios del día con todos sus sets completados.
@@ -67,6 +88,7 @@ class SessionState {
     List<SetLog>? setLogs,
     int? currentExerciseIndex,
     int? elapsedSeconds,
+    Map<String, int>? setCountOverride,
   }) =>
       SessionState(
         session: session ?? this.session,
@@ -74,6 +96,7 @@ class SessionState {
         setLogs: setLogs ?? this.setLogs,
         currentExerciseIndex: currentExerciseIndex ?? this.currentExerciseIndex,
         elapsedSeconds: elapsedSeconds ?? this.elapsedSeconds,
+        setCountOverride: setCountOverride ?? this.setCountOverride,
       );
 
   // ── Igualdad estructural ──────────────────────────────────────────────────
@@ -87,7 +110,8 @@ class SessionState {
           day == other.day &&
           listEquals(setLogs, other.setLogs) &&
           currentExerciseIndex == other.currentExerciseIndex &&
-          elapsedSeconds == other.elapsedSeconds;
+          elapsedSeconds == other.elapsedSeconds &&
+          mapEquals(setCountOverride, other.setCountOverride);
 
   @override
   int get hashCode => Object.hash(
@@ -96,5 +120,8 @@ class SessionState {
         Object.hashAll(setLogs),
         currentExerciseIndex,
         elapsedSeconds,
+        Object.hashAllUnordered(
+          setCountOverride.entries.map((e) => Object.hash(e.key, e.value)),
+        ),
       );
 }

@@ -1152,4 +1152,281 @@ void main() {
           reason: 'All 3 slots render in single-week session');
     });
   });
+
+  // ── live-set-editing PR1: 9-site gating-math thread (AD-5) ────────────────
+
+  group('live-set-editing: session-local set count gating (sites 4-9)', () {
+    // ── [SITE-4] isStandaloneBlockComplete honors the resolver ─────────────
+    test(
+        '[SITE-4][AD-5] isStandaloneBlockComplete resolver param overrides '
+        'the raw plan count', () {
+      final slot = makeSlot(exerciseId: 'e1', targetSets: 3);
+      final logs = [
+        makeSetLog(exerciseId: 'e1', setNumber: 1, id: 'l1'),
+        makeSetLog(exerciseId: 'e1', setNumber: 2, id: 'l2'),
+        makeSetLog(exerciseId: 'e1', setNumber: 3, id: 'l3'),
+      ];
+      // No resolver → unchanged behavior (plan count, backward compat).
+      expect(isStandaloneBlockComplete(slot, logs, 0), isTrue);
+      // Resolver reporting an override of 4 → NOT complete at 3 logs.
+      expect(
+        isStandaloneBlockComplete(slot, logs, 0, (_) => 4),
+        isFalse,
+      );
+    });
+
+    // ── [SITE-5] isSupersetBlockComplete honors the resolver ────────────────
+    test(
+        '[SITE-5][AD-5] isSupersetBlockComplete reports false when an '
+        'overridden member is not done, even if all others are', () {
+      final memberA =
+          makeSlot(exerciseId: 'a1', exerciseName: 'A', targetSets: 3);
+      final memberB =
+          makeSlot(exerciseId: 'b1', exerciseName: 'B', targetSets: 3);
+      final logs = [
+        makeSetLog(exerciseId: 'a1', setNumber: 1, id: 'a1l1'),
+        makeSetLog(exerciseId: 'a1', setNumber: 2, id: 'a1l2'),
+        makeSetLog(exerciseId: 'a1', setNumber: 3, id: 'a1l3'),
+        makeSetLog(exerciseId: 'b1', setNumber: 1, id: 'b1l1'),
+        makeSetLog(exerciseId: 'b1', setNumber: 2, id: 'b1l2'),
+        makeSetLog(exerciseId: 'b1', setNumber: 3, id: 'b1l3'),
+      ];
+      final members = [memberA, memberB];
+      // No resolver → both members done at plan count → complete.
+      expect(isSupersetBlockComplete(members, logs, 0), isTrue);
+      // memberA overridden to 4 (3 logged) → block stays open.
+      expect(
+        isSupersetBlockComplete(
+          members,
+          logs,
+          0,
+          (slot) => slot.exerciseId == 'a1' ? 4 : 3,
+        ),
+        isFalse,
+      );
+    });
+
+    // ── [SITE-4] widget: added-beyond-plan exercise keeps rendering current ─
+    testWidgets(
+        '[SITE-4][REQ:workout#Added set keeps the exercise incomplete until '
+        'logged] a 3-set exercise with an added 4th set (3 logged) renders '
+        'as the interactive current block, not collapsed', (tester) async {
+      final slots = [
+        makeSlot(exerciseId: 'e1', exerciseName: 'Press', targetSets: 3),
+      ];
+      final day = makeDay(dayNumber: 1, slots: slots);
+      final logs = [
+        makeSetLog(exerciseId: 'e1', setNumber: 1, id: 'l1'),
+        makeSetLog(exerciseId: 'e1', setNumber: 2, id: 'l2'),
+        makeSetLog(exerciseId: 'e1', setNumber: 3, id: 'l3'),
+      ];
+      final state = SessionState(
+        session: makeSession(),
+        day: day,
+        setLogs: logs,
+        currentExerciseIndex: 0,
+        elapsedSeconds: 0,
+        setCountOverride: const {'e1': 4},
+      );
+      await tester.pumpWidget(
+        _wrapProvider(
+          const SessionPlayerScreen(init: _kInit),
+          _stateOverride(state),
+        ),
+      );
+      await tester.pump();
+      // The collapsed "3/3" strikethrough summary must NOT appear.
+      final pressText = tester.widget<Text>(find.text('Press'));
+      expect(pressText.style?.decoration, isNot(TextDecoration.lineThrough));
+      // Progress badge must read 3/4, not 3/3.
+      expect(find.text('3/4'), findsOneWidget);
+    });
+
+    // ── [SITE-6] _CompletedBlockSummary shows the overridden total ─────────
+    testWidgets(
+        '[SITE-6][AD-5] a collapsed completed block with a reduced override '
+        '(2/2) shows "2/2", not the raw plan count "3/3"', (tester) async {
+      final slots = [
+        makeSlot(exerciseId: 'e1', exerciseName: 'Press', targetSets: 3),
+        makeSlot(exerciseId: 'e2', exerciseName: 'Curl', targetSets: 1),
+      ];
+      final day = makeDay(dayNumber: 1, slots: slots);
+      final logs = [
+        makeSetLog(exerciseId: 'e1', setNumber: 1, id: 'l1'),
+        makeSetLog(exerciseId: 'e1', setNumber: 2, id: 'l2'),
+      ];
+      final state = SessionState(
+        session: makeSession(),
+        day: day,
+        setLogs: logs,
+        currentExerciseIndex: 1,
+        elapsedSeconds: 0,
+        setCountOverride: const {'e1': 2},
+      );
+      await tester.pumpWidget(
+        _wrapProvider(
+          const SessionPlayerScreen(init: _kInit),
+          _stateOverride(state),
+        ),
+      );
+      await tester.pump();
+      expect(find.text('2/2'), findsOneWidget);
+      expect(find.text('3/3'), findsNothing);
+    });
+
+    // ── [SITE-7] _StandaloneBlock render totalSets/isDone honor override ───
+    testWidgets(
+        '[SITE-7][AD-5] the interactive section for an override=4 exercise '
+        'renders 4 rows, not 3', (tester) async {
+      final slots = [
+        makeSlot(exerciseId: 'e1', exerciseName: 'Press', targetSets: 3),
+      ];
+      final day = makeDay(dayNumber: 1, slots: slots);
+      final state = SessionState(
+        session: makeSession(),
+        day: day,
+        setLogs: const [],
+        currentExerciseIndex: 0,
+        elapsedSeconds: 0,
+        setCountOverride: const {'e1': 4},
+      );
+      await tester.pumpWidget(
+        _wrapProvider(
+          const SessionPlayerScreen(init: _kInit),
+          _stateOverride(state),
+        ),
+      );
+      await tester.pump();
+      // Progress badge must read 0/4 — 4 rows expected, plan count (3)
+      // must not be the render bound.
+      expect(find.text('0/4'), findsOneWidget);
+    });
+
+    // ── [SITE-8] _SupersetSection round scan honors override ────────────────
+    test(
+        '[SITE-8][AD-5] superset maxRounds fold + round-bound check use the '
+        'resolver instead of the raw plan count (defensive correctness — no '
+        'add/remove UI is placed inside a superset block this change)', () {
+      final memberA = makeSlot(
+          exerciseId: 'a1', exerciseName: 'A', targetSets: 3, supersetGroup: 1);
+      final memberB = makeSlot(
+          exerciseId: 'b1', exerciseName: 'B', targetSets: 3, supersetGroup: 1);
+      final blocks = buildBlocks([memberA, memberB]);
+      expect(blocks.single.isSuperset, isTrue);
+      // Sanity: without an override, both members plan-count at 3.
+      expect(
+        isSupersetBlockComplete([memberA, memberB], const [], 0),
+        isFalse,
+      );
+      // With memberA overridden to 4, the block is still gated correctly
+      // through the same resolver path used by the round scan.
+      expect(
+        isSupersetBlockComplete(
+          [memberA, memberB],
+          const [],
+          0,
+          (slot) => slot.exerciseId == 'a1' ? 4 : 3,
+        ),
+        isFalse,
+      );
+    });
+
+    // ── [SITE-9][AD-4] null-safe spec on the added row — no RangeError ──────
+    testWidgets(
+        '[SITE-9][AD-4] an added row beyond effectiveSets.length renders '
+        'with no crash, no planned target hint, and starts bare (0 reps, '
+        '0 kg, no prefill from the previous logged set)', (tester) async {
+      final slots = [
+        makeSlot(exerciseId: 'e1', exerciseName: 'Press', targetSets: 3),
+      ];
+      final day = makeDay(dayNumber: 1, slots: slots);
+      final logs = [
+        makeSetLog(
+            exerciseId: 'e1', setNumber: 1, id: 'l1', reps: 10, weightKg: 80.0),
+        makeSetLog(
+            exerciseId: 'e1', setNumber: 2, id: 'l2', reps: 10, weightKg: 80.0),
+        makeSetLog(
+            exerciseId: 'e1', setNumber: 3, id: 'l3', reps: 10, weightKg: 80.0),
+      ];
+      final state = SessionState(
+        session: makeSession(),
+        day: day,
+        setLogs: logs,
+        currentExerciseIndex: 0,
+        elapsedSeconds: 0,
+        setCountOverride: const {'e1': 4},
+      );
+      // Must not throw a RangeError building the 4th (bare) row.
+      await tester.pumpWidget(
+        _wrapProvider(
+          const SessionPlayerScreen(init: _kInit),
+          _stateOverride(state),
+        ),
+      );
+      await tester.pump();
+      expect(tester.takeException(), isNull);
+      // Row 4 is the current pending row — no planned target hint text
+      // ("8–12 reps"-style prescription) since it has no SetSpec.
+      expect(find.textContaining('8–12 reps'), findsNothing);
+      // AD-4 regression guard: the bare row does NOT prefill from the
+      // previous logged set (80 kg) — its weight field starts empty/0.
+      expect(find.text('80 kg'), findsNothing);
+    });
+
+    // ── [AD-6] "+ agregar serie" affordance ──────────────────────────────────
+    testWidgets(
+        '[REQ:workout#Add button renders an extra loggable row] tapping '
+        '"+ agregar serie" renders one new empty row below the last, '
+        'numbered sequentially', (tester) async {
+      final slots = [
+        makeSlot(exerciseId: 'e1', exerciseName: 'Press', targetSets: 1),
+      ];
+      final day = makeDay(dayNumber: 1, slots: slots);
+      final state = SessionState(
+        session: makeSession(),
+        day: day,
+        setLogs: const [],
+        currentExerciseIndex: 0,
+        elapsedSeconds: 0,
+      );
+      await tester.pumpWidget(
+        _wrapProvider(
+          const SessionPlayerScreen(init: _kInit),
+          _stateOverride(state),
+        ),
+      );
+      await tester.pump();
+      expect(find.text('0/1'), findsOneWidget);
+      expect(find.textContaining('agregar serie'), findsOneWidget);
+    });
+
+    testWidgets(
+        '[REQ:workout#Adding a set is only available on the current/'
+        'reachable exercise] a COMPLETED/collapsed block does NOT show '
+        '"+ agregar serie" anywhere in its subtree', (tester) async {
+      final slots = [
+        makeSlot(exerciseId: 'e1', exerciseName: 'Press', targetSets: 1),
+        makeSlot(exerciseId: 'e2', exerciseName: 'Curl', targetSets: 1),
+      ];
+      final day = makeDay(dayNumber: 1, slots: slots);
+      final logs = [makeSetLog(exerciseId: 'e1', setNumber: 1)];
+      final state = SessionState(
+        session: makeSession(),
+        day: day,
+        setLogs: logs,
+        currentExerciseIndex: 1,
+        elapsedSeconds: 0,
+      );
+      await tester.pumpWidget(
+        _wrapProvider(
+          const SessionPlayerScreen(init: _kInit),
+          _stateOverride(state),
+        ),
+      );
+      await tester.pump();
+      // Only the CURRENT block (Curl) should offer "+ agregar serie" — the
+      // completed Press summary must not.
+      expect(find.textContaining('agregar serie'), findsOneWidget);
+    });
+  });
 }

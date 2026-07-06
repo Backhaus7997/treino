@@ -887,4 +887,175 @@ void main() {
       expect(state.currentExerciseIndex, equals(1));
     });
   });
+
+  // ── live-set-editing PR1: SessionNotifier.addSet (AD-1/AD-2) ──────────────
+
+  group('SessionNotifier.addSet', () {
+    test(
+        '[REQ:workout#Logging the added set persists a new document] '
+        'addSet bumps setCountOverride to plannedSetsFor(slot)+1 and does NOT '
+        'itself write a setLog', () async {
+      final repo = MockSessionRepository();
+      final routine = makeRoutine(
+        days: [
+          makeDay(slots: [makeSlot(exerciseId: 'e1', targetSets: 3)])
+        ],
+      );
+      final session = makeSession();
+
+      when(() => repo.create(
+            uid: any(named: 'uid'),
+            routineId: any(named: 'routineId'),
+            routineName: any(named: 'routineName'),
+            startedAt: any(named: 'startedAt'),
+            dayNumber: any(named: 'dayNumber'),
+            weekNumber: any(named: 'weekNumber'),
+          )).thenAnswer((_) async => session);
+
+      final container = _makeContainer(repo: repo, uid: 'u1', routine: routine);
+      addTearDown(container.dispose);
+
+      final init = FreshSession(routineId: routine.id, dayNumber: 1);
+      await container.read(sessionNotifierProvider(init).future);
+      final notifier = container.read(sessionNotifierProvider(init).notifier);
+      final slot = routine.days.first.slots.first;
+
+      await notifier.addSet(slot);
+
+      final state = container.read(sessionNotifierProvider(init)).value!;
+      expect(state.setCountOverride['e1'], equals(4));
+      expect(state.plannedSetsFor(slot), equals(4));
+      verifyNever(() => repo.addSetLog(
+            uid: any(named: 'uid'),
+            sessionId: any(named: 'sessionId'),
+            setLog: any(named: 'setLog'),
+          ));
+    });
+
+    test(
+        '[AD-2 idempotency note] two rapid addSet calls followed by two rapid '
+        'logSet calls for the same new setNumber result in exactly one '
+        'persisted doc (existing exerciseId+setNumber idempotency key)',
+        () async {
+      final repo = MockSessionRepository();
+      final routine = makeRoutine(
+        days: [
+          makeDay(slots: [makeSlot(exerciseId: 'e1', targetSets: 3)])
+        ],
+      );
+      final session = makeSession();
+
+      when(() => repo.create(
+            uid: any(named: 'uid'),
+            routineId: any(named: 'routineId'),
+            routineName: any(named: 'routineName'),
+            startedAt: any(named: 'startedAt'),
+            dayNumber: any(named: 'dayNumber'),
+            weekNumber: any(named: 'weekNumber'),
+          )).thenAnswer((_) async => session);
+      when(() => repo.addSetLog(
+            uid: any(named: 'uid'),
+            sessionId: any(named: 'sessionId'),
+            setLog: any(named: 'setLog'),
+          )).thenAnswer(
+        (inv) async => inv.namedArguments[const Symbol('setLog')] as dynamic,
+      );
+
+      final container = _makeContainer(repo: repo, uid: 'u1', routine: routine);
+      addTearDown(container.dispose);
+
+      final init = FreshSession(routineId: routine.id, dayNumber: 1);
+      await container.read(sessionNotifierProvider(init).future);
+      final notifier = container.read(sessionNotifierProvider(init).notifier);
+      final slot = routine.days.first.slots.first;
+
+      // A single "+ agregar serie" tap bumps the override to 4.
+      await notifier.addSet(slot);
+
+      final afterAdd = container.read(sessionNotifierProvider(init)).value!;
+      expect(afterAdd.setCountOverride['e1'], equals(4));
+
+      // Two rapid taps on the new row's check button — existing
+      // exerciseId+setNumber idempotency guard in logSet must prevent a
+      // duplicate doc, proving the guard composes with the override bump
+      // without needing a new guard.
+      await notifier
+          .logSet(makeSetLog(exerciseId: 'e1', setNumber: 4, id: 'l4'));
+      await notifier
+          .logSet(makeSetLog(exerciseId: 'e1', setNumber: 4, id: 'l4dupe'));
+
+      final finalState = container.read(sessionNotifierProvider(init)).value!;
+      expect(
+        finalState.setLogs.where((l) => l.setNumber == 4).length,
+        equals(1),
+      );
+      verify(() => repo.addSetLog(
+            uid: any(named: 'uid'),
+            sessionId: any(named: 'sessionId'),
+            setLog: any(named: 'setLog'),
+          )).called(1);
+    });
+
+    test(
+        '[SITE-3][REQ:workout#Next-incomplete navigation respects the '
+        'session-local count] _nextIncompleteIndex still points at an '
+        'added-beyond-plan exercise (override=4, 3 logged) instead of '
+        'advancing to the next exercise', () async {
+      final repo = MockSessionRepository();
+      final routine = makeRoutine(
+        days: [
+          makeDay(slots: [
+            makeSlot(exerciseId: 'e1', targetSets: 3),
+            makeSlot(exerciseId: 'e2', exerciseName: 'Curl', targetSets: 2),
+          ])
+        ],
+      );
+      final session = makeSession();
+
+      when(() => repo.create(
+            uid: any(named: 'uid'),
+            routineId: any(named: 'routineId'),
+            routineName: any(named: 'routineName'),
+            startedAt: any(named: 'startedAt'),
+            dayNumber: any(named: 'dayNumber'),
+            weekNumber: any(named: 'weekNumber'),
+          )).thenAnswer((_) async => session);
+      when(() => repo.addSetLog(
+            uid: any(named: 'uid'),
+            sessionId: any(named: 'sessionId'),
+            setLog: any(named: 'setLog'),
+          )).thenAnswer(
+        (inv) async => inv.namedArguments[const Symbol('setLog')] as dynamic,
+      );
+
+      final container = _makeContainer(repo: repo, uid: 'u1', routine: routine);
+      addTearDown(container.dispose);
+
+      final init = FreshSession(routineId: routine.id, dayNumber: 1);
+      await container.read(sessionNotifierProvider(init).future);
+      final notifier = container.read(sessionNotifierProvider(init).notifier);
+      final e1 = routine.days.first.slots.first;
+
+      // Log 2 of the 3 planned sets for e1 (cursor still on e1).
+      await notifier
+          .logSet(makeSetLog(exerciseId: 'e1', setNumber: 1, id: 'l1'));
+      await notifier
+          .logSet(makeSetLog(exerciseId: 'e1', setNumber: 2, id: 'l2'));
+
+      // Add a 4th set to e1 BEFORE the 3rd (planned) set is logged — override
+      // is now 4.
+      await notifier.addSet(e1);
+
+      // Log the 3rd set. Without the override fix, 3 >= plan(3) would
+      // advance the cursor to e2 (index 1). With the override (4), the
+      // cursor must stay on e1 since 3 < 4.
+      await notifier
+          .logSet(makeSetLog(exerciseId: 'e1', setNumber: 3, id: 'l3'));
+
+      final state = container.read(sessionNotifierProvider(init)).value!;
+      expect(state.currentExerciseIndex, equals(0),
+          reason: 'the added-beyond-plan set on e1 must keep the cursor on '
+              'e1, not advance to e2');
+    });
+  });
 }
