@@ -62,7 +62,7 @@
       names differ, use the actual registered names, never `PhosphorIcons.X` directly
       (per project standards). CONFIRMED: `TreinoIcon.plus` (:77) and `TreinoIcon.trash`
       (:51) both exist in `lib/core/widgets/treino_icon.dart`.
-- [ ] **0.3** `[AD-8]` Read `functions/src/ranking-aggregate.ts` end to end (already
+- [x] **0.3** `[AD-8]` Read `functions/src/ranking-aggregate.ts` end to end (already
       done in design.md — this task re-confirms at apply time in case the file changed
       since design) and record: (a) trigger fires on `users/{uid}/sessions/{sessionId}`
       writes only, NOT `setLogs` subcollection writes; (b) `recomputeMetrics` re-queries
@@ -71,6 +71,8 @@
       produces a confirmation note in the PR2 description, not a code change (see task
       3.10). DEFERRED TO PR2 (task 2.18 re-confirms immediately before that merge; not
       required to gate PR1 since PR1 makes no functions/ change).
+      VERIFIED at PR2 apply-time (2026-07-06): all 3 checks pass against the current
+      file. VERDICT: fully tolerant, no CF change needed.
 
 ---
 
@@ -291,40 +293,40 @@ Traceability: `[REQ:workout#Remove Set During Live Session]`,
 
 ### 2a — `SessionRepository.deleteSetLog`
 
-- [ ] **2.1** RED `[AD-2][REQ:workout#Confirmed removal deletes the underlying
+- [x] **2.1** RED `[AD-2][REQ:workout#Confirmed removal deletes the underlying
       document]` `session_repository_test.dart` — against `fake_cloud_firestore`, seed a
       `setLog` doc, call `deleteSetLog(uid:, sessionId:, setLogId:)` (method does not
       exist yet — RED by construction), assert the doc is gone via a subsequent
       `listSetLogs` or direct doc-get returning null/not-exists. Assert it is a HARD
       delete, not a soft-delete flag (no lingering doc with a `deleted:true` marker).
-- [ ] **2.2** GREEN `[AD-2]` `session_repository.dart` — add `Future<void> deleteSetLog({
+- [x] **2.2** GREEN `[AD-2]` `session_repository.dart` — add `Future<void> deleteSetLog({
       required String uid, required String sessionId, required String setLogId}) async =>
       _setLogs(uid, sessionId).doc(setLogId).delete();` mirroring `updateSetLog`'s shape
       (:278-283). Run 2.1 to GREEN.
 
 ### 2b — `SessionNotifier.removeSet` (race-safe, renumber, floor invariant)
 
-- [ ] **2.3** RED `[AD-2][REQ:workout#Removing an unlogged set requires no confirmation]`
+- [x] **2.3** RED `[AD-2][REQ:workout#Removing an unlogged set requires no confirmation]`
       extend `session_notifier_test.dart` — `removeSet(slot, null)` (or however an
       unlogged-pending-row removal is signaled — target `SetLog?` is `null` or an
       unpersisted placeholder) on an exercise with override=4 (3 logged, 4th
       unlogged/pending) lowers `setCountOverride[exerciseId]` to 3 and does NOT call
       `repo.deleteSetLog` (nothing was persisted). Method does not exist yet — RED by
       construction.
-- [ ] **2.4** RED `[AD-2][AD-3][REQ:workout#Confirmed removal deletes the underlying
+- [x] **2.4** RED `[AD-2][AD-3][REQ:workout#Confirmed removal deletes the underlying
       document][REQ:workout#Removing a set renumbers surviving sets]` extend
       `session_notifier_test.dart` — `removeSet(slot, target)` where `target` is a real
       logged `SetLog` (setNumber=2 of 3 logged) calls `repo.deleteSetLog` with `target.id`,
       then calls `repo.updateSetLog` for the one survivor above the gap (old setNumber=3
       → new setNumber=2), and updates local `setLogs` + `setCountOverride[exerciseId]`
       to 2 in one state emission.
-- [ ] **2.5** RED `[AD-5 floor invariant][REQ:workout#Session-Local Set Count Drives
+- [x] **2.5** RED `[AD-5 floor invariant][REQ:workout#Session-Local Set Count Drives
       Completion Gating]` extend `session_notifier_test.dart` — write-time floor: calling
       `removeSet` cannot drop `setCountOverride[exerciseId]` below the CURRENT logged
       count for that exercise after the removal completes (i.e.
       `override = max(newCount, loggedCountAfterRemoval)`) — construct a case that would
       violate the floor without the guard and assert the guard holds.
-- [ ] **2.6** RED `[AD-2 race discipline]` extend
+- [x] **2.6** RED `[AD-2 race discipline]` extend
       `session_notifier_updateset_race_test.dart` (or a new sibling
       `session_notifier_removeset_race_test.dart` mirroring its `Completer`-based
       interleave pattern) — a `logSet` completing DURING a `removeSet` await (or vice
@@ -332,7 +334,7 @@ Traceability: `[REQ:workout#Remove Set During Live Session]`,
       the stale `current` captured before the await) so neither write is silently lost.
       Mirror the exact interleave harness already proven in
       `session_notifier_updateset_race_test.dart`.
-- [ ] **2.7** GREEN `[AD-2][AD-3][AD-5]` `session_notifier.dart` — implement
+- [x] **2.7** GREEN `[AD-2][AD-3][AD-5]` `session_notifier.dart` — implement
       `removeSet(RoutineSlot slot, SetLog? target)` per design.md AD-2's sketch: re-read
       `state.value`, guard `null`/`_finalized`, resolve `uid`; if `target != null &&
       target.id.isNotEmpty`: call `repo.deleteSetLog`, then for every survivor of the
@@ -348,13 +350,13 @@ Traceability: `[REQ:workout#Remove Set During Live Session]`,
       emit `_logSetError.value = SessionLogError(action: SessionLogAction.remove,
       setLog: target ?? <sentinel/placeholder representing the pending row>)`. Run
       2.3-2.6 to GREEN.
-- [ ] **2.8** RED `[AD-2 retry]` extend `session_notifier_test.dart` —
+- [x] **2.8** RED `[AD-2 retry]` extend `session_notifier_test.dart` —
       `retryLastLogError()` re-dispatches to `removeSet` when the pending error's
       `action == SessionLogAction.remove`. Confirm RED against current code (the
       `switch` in `retryLastLogError`, :302-307, has no `remove` case — this is a
       compile-time exhaustiveness gap once the enum gains a member, so this test also
       guards that the switch was updated, not just that it dispatches correctly).
-- [ ] **2.9** GREEN `[AD-2]` `session_notifier.dart` — add `remove` to the
+- [x] **2.9** GREEN `[AD-2]` `session_notifier.dart` — add `remove` to the
       `SessionLogAction` enum (:427) and a `case SessionLogAction.remove: await
       removeSet(pending.slot, pending.setLog);` arm in `retryLastLogError`'s switch
       (:302-307) — note `SessionLogError` will need a `slot`/exercise reference alongside
@@ -365,20 +367,20 @@ Traceability: `[REQ:workout#Remove Set During Live Session]`,
 
 ### 2c — Per-row delete icon + confirm dialog
 
-- [ ] **2.10** RED `[REQ:workout#Removing an unlogged set requires no confirmation]`
+- [x] **2.10** RED `[REQ:workout#Removing an unlogged set requires no confirmation]`
       extend `session_player_screen_test.dart` — tapping the delete icon on an
       added-but-unlogged pending row removes it immediately with NO dialog shown.
       Icon does not exist yet — RED by construction.
-- [ ] **2.11** RED `[REQ:workout#Removing a logged set surfaces a confirmation]` extend
+- [x] **2.11** RED `[REQ:workout#Removing a logged set surfaces a confirmation]` extend
       `session_player_screen_test.dart` — tapping the delete icon on a LOGGED row shows
       a confirm dialog (title `Eliminar serie`, body `Se va a borrar esta serie
       registrada.`, actions `Cancelar`/`Eliminar`) and does NOT call `removeSet` until
       `Eliminar` is tapped; tapping `Cancelar` leaves the row untouched.
-- [ ] **2.12** RED `[REQ:workout#Removing a set is only available on the current/
+- [x] **2.12** RED `[REQ:workout#Removing a set is only available on the current/
       reachable exercise]` extend `session_player_screen_test.dart` — a COMPLETED/
       collapsed block does not show the per-row delete icon anywhere in its subtree
       (mirrors 1.25's forward-guard structure for the add button).
-- [ ] **2.13** GREEN `[AD-6]` `session_player_screen.dart` — add a trailing delete icon
+- [x] **2.13** GREEN `[AD-6]` `session_player_screen.dart` — add a trailing delete icon
       (the registered trash glyph confirmed in 0.2, static, not swipe) to each row of the
       interactive section (both logged rows and an added-but-unlogged pending row), never
       rendered in `_CompletedBlockSummary`'s subtree. Wire `onRemoveSet(slot, log?)`:
@@ -387,16 +389,16 @@ Traceability: `[REQ:workout#Remove Set During Live Session]`,
       pattern, same family as the abandon-session dialog) and call `notifier.removeSet
       (slot, log)` only on confirm. Theme: `AppPalette.of(context)`, spacing tokens,
       `TreinoIcon.X` only. Run 2.10-2.12 to GREEN.
-- [ ] **2.14** RED `[REQ:workout#Removing a set renumbers surviving sets]` extend
+- [x] **2.14** RED `[REQ:workout#Removing a set renumbers surviving sets]` extend
       `session_player_screen_test.dart` — after confirming removal of set 2 of a 3-logged
       exercise, the UI shows sets numbered 1 and 2 (no visible gap, no "SET 1, SET 3").
-- [ ] **2.15** GREEN — confirm 2.7's renumber (server-side via `updateSetLog`) plus
+- [x] **2.15** GREEN — confirm 2.7's renumber (server-side via `updateSetLog`) plus
       1.22's render-loop-by-index (which draws `SET idx+1` sequentially regardless of
       the underlying doc's stored `setNumber`, since the row label is positional) already
       satisfies this with no additional code change. Run 2.14 to GREEN; if it fails,
       the render loop is reading `setNumber` instead of positional index somewhere —
       fix there, not by adding new renumber logic.
-- [ ] **2.16** RED `[AD-5 mid-remove reopen guard][REQ:workout#Removed set allows
+- [x] **2.16** RED `[AD-5 mid-remove reopen guard][REQ:workout#Removed set allows
       completion at the reduced count]` extend `session_player_screen_test.dart` —
       deleting the LAST logged set of an otherwise-fully-logged 3-set exercise (2
       remain logged, override drops to 2, both logged) keeps/returns the block to
@@ -406,13 +408,13 @@ Traceability: `[REQ:workout#Remove Set During Live Session]`,
       exists). Cover both sub-cases explicitly — this is the AD-5 "removed-below-logged"
       invariant made visible in the widget layer, not just the notifier layer (2.4/2.5
       already cover the notifier side).
-- [ ] **2.17** GREEN — confirm PR1's threaded resolver (1.14/1.16/1.18) plus 2.7's floor
+- [x] **2.17** GREEN — confirm PR1's threaded resolver (1.14/1.16/1.18) plus 2.7's floor
       invariant already produce this with no additional code change. Run 2.16 to GREEN;
       if it fails, trace which of the 9 sites is still reading a stale count.
 
 ### 2d — AD-8 ranking-tolerance verification (check, not code)
 
-- [ ] **2.18** `[VERIFY]` `[AD-8][REQ:workout#Finish recompute reflects added and removed
+- [x] **2.18** `[VERIFY]` `[AD-8][REQ:workout#Finish recompute reflects added and removed
       sets]` Re-confirm task 0.3's read of `functions/src/ranking-aggregate.ts` against
       the state of that file AT THIS POINT in the change (PR2, immediately before merge)
       — no code in this repo touches that file during this change, so this task is a
@@ -425,19 +427,19 @@ Traceability: `[REQ:workout#Remove Set During Live Session]`,
 
 ### PR2 gate
 
-- [ ] **2.19** `[GATE]` `flutter analyze lib test` — 0 new issues vs. PR1's post-merge
+- [x] **2.19** `[GATE]` `flutter analyze lib test` — 0 new issues vs. PR1's post-merge
       baseline.
-- [ ] **2.20** `[GATE]` `dart format .` scoped to touched files (`session_repository.dart`,
+- [x] **2.20** `[GATE]` `dart format .` scoped to touched files (`session_repository.dart`,
       `session_notifier.dart`, `session_player_screen.dart`, and the 4 touched/new test
       files).
-- [ ] **2.21** `[GATE]` `flutter test test/features/workout/data/session_repository_test.dart
+- [x] **2.21** `[GATE]` `flutter test test/features/workout/data/session_repository_test.dart
       test/features/workout/application/session_notifier_test.dart
       test/features/workout/application/session_notifier_updateset_race_test.dart
       test/features/workout/presentation/session_player_screen_test.dart` (+ the new
       remove-race test file if created as a sibling rather than folded in) — all green.
-- [ ] **2.22** `[GATE]` `flutter test` (full suite) — green, 0 new failures vs. PR1's
+- [x] **2.22** `[GATE]` `flutter test` (full suite) — green, 0 new failures vs. PR1's
       post-merge baseline.
-- [ ] **2.23** Commit as one or two work-unit commits (2a+2b notifier/repo layer, then
+- [x] **2.23** Commit as one or two work-unit commits (2a+2b notifier/repo layer, then
       2c+2d UI/verification layer — or as one commit per reviewer preference).
       Conventional commits, no AI attribution.
 

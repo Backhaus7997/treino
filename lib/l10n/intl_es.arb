@@ -226,6 +226,7 @@
     }
   },
   "sessionPlayerTimerStartA11y": "Iniciar temporizador",
+  "sessionPlayerRemoveSetA11y": "Eliminar serie",
   "routineEditorDeleteDayA11y": "Eliminar día",
   "athleteDetailEditPlanA11y": "Editar plan",
   "athleteDetailDeletePlanA11y": "Eliminar plan",

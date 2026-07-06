@@ -3014,6 +3014,12 @@ abstract class AppL10n {
   /// **'Iniciar temporizador'**
   String get sessionPlayerTimerStartA11y;
 
+  /// Semantics label for the icon-only remove-set button in the session player (live-set-editing PR2).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Eliminar serie'**
+  String get sessionPlayerRemoveSetA11y;
+
   /// tooltip / Semantics label for the icon-only day-delete trash button in the routine editor (findings 25/26 day-header trash IconButton).
   ///
   /// In es_AR, this message translates to:

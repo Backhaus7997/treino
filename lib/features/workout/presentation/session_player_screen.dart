@@ -435,6 +435,7 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
               _logSet(entry.slot, setNumber, reps, weightKg),
           onSetUpdate: _updateSet,
           onAddSet: () => _addSet(entry.slot),
+          onRemoveSet: (log) => _onRemoveSetTapped(entry.slot, log),
         ));
       }
       out.add(const SizedBox(height: 14));
@@ -446,6 +447,33 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
   /// real ocurre cuando el athlete completa la fila nueva vía [_logSet].
   void _addSet(RoutineSlot slot) {
     ref.read(sessionNotifierProvider(widget.init).notifier).addSet(slot);
+  }
+
+  /// Elimina un set del ejercicio (live-set-editing AD-2/AD-6). [log] es
+  /// `null` para una fila pendiente/sin loguear (delete inmediato, sin
+  /// diálogo); si trae un `SetLog`, ya fue confirmado por el diálogo (data
+  /// loss) — ver [_showRemoveSetConfirm].
+  void _removeSet(RoutineSlot slot, SetLog? log) {
+    ref.read(sessionNotifierProvider(widget.init).notifier).removeSet(
+          slot,
+          log,
+        );
+  }
+
+  /// Callback wired to each row's delete icon (AD-6). Una fila SIN loguear
+  /// (log == null) se borra directo, sin diálogo. Una fila LOGUEADA muestra
+  /// el diálogo de confirmación (data loss) antes de disparar [_removeSet].
+  void _onRemoveSetTapped(RoutineSlot slot, SetLog? log) {
+    if (log == null) {
+      _removeSet(slot, null);
+      return;
+    }
+    showDialog<void>(
+      context: context,
+      builder: (_) => _RemoveSetConfirmDialog(
+        onConfirm: () => _removeSet(slot, log),
+      ),
+    );
   }
 
   // ── Build ─────────────────────────────────────────────────────────────────
@@ -808,6 +836,7 @@ class _StandaloneBlock extends StatelessWidget {
     required this.onSetCheck,
     required this.onSetUpdate,
     this.onAddSet,
+    this.onRemoveSet,
   });
 
   final _SupersetEntry entry;
@@ -829,6 +858,11 @@ class _StandaloneBlock extends StatelessWidget {
   /// "+ agregar serie" callback (AD-6). Null on blocks that shouldn't offer
   /// it — never wired for completed/future blocks (see build() below).
   final VoidCallback? onAddSet;
+
+  /// Per-row delete icon callback (AD-2/AD-6). `log` is `null` for the
+  /// pending/unlogged row. Null on blocks that shouldn't offer it — never
+  /// wired for completed/future blocks (see build() below).
+  final void Function(SetLog? log)? onRemoveSet;
 
   @override
   Widget build(BuildContext context) {
@@ -859,6 +893,7 @@ class _StandaloneBlock extends StatelessWidget {
       onSetCheck: onSetCheck,
       onSetUpdate: onSetUpdate,
       onAddSet: onAddSet,
+      onRemoveSet: onRemoveSet,
     );
   }
 }
@@ -1323,6 +1358,7 @@ class _ExerciseSection extends StatefulWidget {
     required this.onSetCheck,
     required this.onSetUpdate,
     this.onAddSet,
+    this.onRemoveSet,
   });
 
   final RoutineSlot slot;
@@ -1348,6 +1384,13 @@ class _ExerciseSection extends StatefulWidget {
   /// "+ agregar serie" callback (AD-6). Null ⇒ affordance hidden (e.g.
   /// superset members this change, or a write already in flight).
   final VoidCallback? onAddSet;
+
+  /// Per-row delete icon callback (AD-2/AD-6). `log` is `null` for the
+  /// pending/unlogged row (single tap, no confirm) — the caller decides
+  /// whether to show the confirmation dialog (see
+  /// `_SessionPlayerScreenState._onRemoveSetTapped`). Null ⇒ affordance
+  /// hidden (e.g. superset members this change).
+  final void Function(SetLog? log)? onRemoveSet;
 
   @override
   State<_ExerciseSection> createState() => _ExerciseSectionState();
@@ -1432,42 +1475,61 @@ class _ExerciseSectionState extends State<_ExerciseSection> {
       final targetSeconds = isDurationSet ? (specDurationSeconds ?? 0) : 0;
 
       final isFutureSet = !isRowDone && !isCurrent;
+      // live-set-editing AD-6: the delete icon shows on LOGGED rows and on
+      // an added-but-unlogged pending row (spec == null, beyond the plan) —
+      // NOT on a normal within-plan pending/future row.
+      final isAddedUnlogged = !isRowDone && spec == null;
+      final showRemoveIcon =
+          widget.onRemoveSet != null && (isRowDone || isAddedUnlogged);
+
+      Widget innerRow = isDurationSet
+          ? _DurationSetRow(
+              key: ValueKey('dur-$setNumber-${logged?.id ?? "pending"}'),
+              setNumber: setNumber,
+              targetSeconds: targetSeconds,
+              isDone: isRowDone,
+              onDone:
+                  isCurrent ? () => widget.onSetCheck(setNumber, 0, 0.0) : null,
+            )
+          : _RepsSetRow(
+              key: ValueKey('set-$setNumber-${logged?.id ?? "pending"}'),
+              setNumber: setNumber,
+              spec: spec,
+              mode: mode,
+              plannedReps: plannedReps,
+              // For done rows preserve the athlete's original entry so
+              // re-editing does not silently snap back to the planned
+              // value; for pending rows preload with the planned target.
+              initialReps: isRowDone ? logged.reps : plannedReps,
+              initialWeightKg: initialWeight,
+              isDone: isRowDone,
+              isExpanded: isExpanded,
+              onCheck: isCurrent
+                  ? (reps, weightKg) =>
+                      widget.onSetCheck(setNumber, reps, weightKg)
+                  : null,
+              onSetUpdate: isRowDone
+                  ? (reps, weightKg) =>
+                      widget.onSetUpdate(logged, reps, weightKg)
+                  : null,
+              onSummaryTap: isRowDone ? () => _toggleDoneRow(setNumber) : null,
+            );
+
+      if (showRemoveIcon) {
+        innerRow = Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(child: innerRow),
+            _RemoveSetIcon(
+              onTap: () => widget.onRemoveSet!(logged),
+            ),
+          ],
+        );
+      }
+
       Widget rowWidget = Padding(
         padding: EdgeInsets.only(top: rowWidgets.isEmpty ? 0 : 8),
-        child: isDurationSet
-            ? _DurationSetRow(
-                key: ValueKey('dur-$setNumber-${logged?.id ?? "pending"}'),
-                setNumber: setNumber,
-                targetSeconds: targetSeconds,
-                isDone: isRowDone,
-                onDone: isCurrent
-                    ? () => widget.onSetCheck(setNumber, 0, 0.0)
-                    : null,
-              )
-            : _RepsSetRow(
-                key: ValueKey('set-$setNumber-${logged?.id ?? "pending"}'),
-                setNumber: setNumber,
-                spec: spec,
-                mode: mode,
-                plannedReps: plannedReps,
-                // For done rows preserve the athlete's original entry so
-                // re-editing does not silently snap back to the planned
-                // value; for pending rows preload with the planned target.
-                initialReps: isRowDone ? logged.reps : plannedReps,
-                initialWeightKg: initialWeight,
-                isDone: isRowDone,
-                isExpanded: isExpanded,
-                onCheck: isCurrent
-                    ? (reps, weightKg) =>
-                        widget.onSetCheck(setNumber, reps, weightKg)
-                    : null,
-                onSetUpdate: isRowDone
-                    ? (reps, weightKg) =>
-                        widget.onSetUpdate(logged, reps, weightKg)
-                    : null,
-                onSummaryTap:
-                    isRowDone ? () => _toggleDoneRow(setNumber) : null,
-              ),
+        child: innerRow,
       );
       if (isFutureSet) {
         rowWidget = Opacity(opacity: 0.4, child: rowWidget);
@@ -1619,6 +1681,103 @@ class _AddSetButton extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+// ── _RemoveSetIcon ────────────────────────────────────────────────────────────
+
+/// Trailing delete icon per row (live-set-editing AD-2/AD-6). Static, NOT
+/// swipe — matches the exploration's accessibility/discoverability
+/// rationale. Shown on logged rows and on an added-but-unlogged pending row.
+/// The caller (`_SessionPlayerScreenState._onRemoveSetTapped`) decides
+/// whether to show the confirmation dialog based on whether the row was
+/// logged.
+class _RemoveSetIcon extends StatelessWidget {
+  const _RemoveSetIcon({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+    return Semantics(
+      button: true,
+      label: l10n.sessionPlayerRemoveSetA11y,
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Container(
+          width: 44,
+          height: 44,
+          alignment: Alignment.center,
+          child: Icon(TreinoIcon.trash, color: palette.textMuted, size: 18),
+        ),
+      ),
+    );
+  }
+}
+
+// ── _RemoveSetConfirmDialog ───────────────────────────────────────────────────
+
+/// Confirmation dialog shown before deleting a LOGGED set (data loss).
+/// live-set-editing AD-6 — same family as [_AbandonConfirmDialog].
+class _RemoveSetConfirmDialog extends StatelessWidget {
+  const _RemoveSetConfirmDialog({required this.onConfirm});
+
+  final VoidCallback onConfirm;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    return AlertDialog(
+      backgroundColor: palette.bgCard,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+      ),
+      title: Text(
+        'Eliminar serie',
+        style: GoogleFonts.barlowCondensed(
+          fontWeight: FontWeight.w700,
+          fontSize: 18,
+          color: palette.textPrimary,
+        ),
+      ),
+      content: Text(
+        'Se va a borrar esta serie registrada.',
+        style: GoogleFonts.barlow(fontSize: 14, color: palette.textPrimary),
+      ),
+      actions: [
+        OutlinedButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(
+            'Cancelar',
+            style: GoogleFonts.barlowCondensed(
+              fontWeight: FontWeight.w700,
+              fontSize: 14,
+              color: palette.textPrimary,
+            ),
+          ),
+        ),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: palette.highlight,
+          ),
+          onPressed: () {
+            Navigator.of(context).pop();
+            onConfirm();
+          },
+          child: Text(
+            'Eliminar',
+            style: GoogleFonts.barlowCondensed(
+              fontWeight: FontWeight.w700,
+              fontSize: 14,
+              color: palette.bg,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

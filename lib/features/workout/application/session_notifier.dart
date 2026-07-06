@@ -318,18 +318,123 @@ class SessionNotifier
     }
   }
 
-  /// Reintenta la última operación de log/update que falló. Lo invoca la acción
-  /// "Reintentá" del SnackBar (capa de UI). Limpia el canal de error y re-despacha
-  /// hacia logSet/updateSet, que volverán a emitir por el canal si vuelve a fallar.
+  /// Elimina un set de [slot] (live-set-editing AD-2/AD-3/AD-5).
+  ///
+  /// [target] es el `SetLog` ya persistido si la fila estaba logueada, o
+  /// `null` si es una fila pendiente/sin loguear (el "+ agregar serie" que
+  /// todavía no se completó) — en ese caso NO hay write a Firestore, solo se
+  /// baja el override.
+  ///
+  /// Sigue la misma disciplina de race que [updateSet]: re-lee `state.value`
+  /// DESPUÉS de cada await (nunca sobrescribe con el snapshot capturado antes
+  /// del await), nunca muta `state` a `AsyncError` ante un fallo (emite por
+  /// `_logSetError` en su lugar), y respeta `_finalized`.
+  ///
+  /// Si [target] existe: borra el doc vía [SessionRepository.deleteSetLog] y
+  /// renumera los sobrevivientes de ese ejercicio con `setNumber >
+  /// target.setNumber` (AD-3, denso 1..N — nunca deja un hueco visible). El
+  /// denominador de gating es SIEMPRE la cantidad de logs, nunca el
+  /// `setNumber` máximo, así que un renumber parcialmente fallido no puede
+  /// trabar la finalización (misma postura de fallo que un `logSet` fallido).
+  ///
+  /// El override nuevo queda floored al conteo de logs sobrevivientes
+  /// (AD-5): `max(plannedSetsFor(slot) - 1, loggedCountAfterRemoval)` — nunca
+  /// se puede esconder una fila ya logueada bajando el override por debajo de
+  /// lo que ya existe.
+  Future<void> removeSet(RoutineSlot slot, SetLog? target) async {
+    final current = state.value;
+    if (current == null || _finalized) return;
+
+    final uid = ref.read(currentUidProvider);
+    if (uid == null) return;
+
+    final repo = ref.read(sessionRepositoryProvider);
+    final exerciseId = slot.exerciseId;
+
+    try {
+      List<SetLog> survivorsAbove = const [];
+      if (target != null && target.id.isNotEmpty) {
+        await repo.deleteSetLog(
+          uid: uid,
+          sessionId: current.session.id,
+          setLogId: target.id,
+        );
+
+        // Renumber survivors of the SAME exercise with setNumber > the
+        // deleted one, ascending order, dense 1..N (AD-3). Bounded to
+        // survivors above the gap.
+        survivorsAbove = current.setLogs
+            .where((l) =>
+                l.exerciseId == exerciseId && l.setNumber > target.setNumber)
+            .toList(growable: false)
+          ..sort((a, b) => a.setNumber.compareTo(b.setNumber));
+        for (final survivor in survivorsAbove) {
+          await repo.updateSetLog(
+            uid: uid,
+            sessionId: current.session.id,
+            setLog: survivor.copyWith(setNumber: survivor.setNumber - 1),
+          );
+        }
+      }
+
+      // Re-leemos el estado DESPUÉS de todos los awaits: pudo cambiar durante
+      // el delete/renumber (p.ej. un logSet concurrente). Mismo patrón que
+      // logSet/updateSet.
+      final latest = state.value ?? current;
+      final renumberedIds = {for (final s in survivorsAbove) s.id};
+      final newLogs = latest.setLogs
+          .where((l) => target == null || l.id != target.id)
+          .map((l) => renumberedIds.contains(l.id)
+              ? l.copyWith(setNumber: l.setNumber - 1)
+              : l)
+          .toList(growable: false);
+      final loggedCountAfterRemoval =
+          newLogs.where((l) => l.exerciseId == exerciseId).length;
+      final lowered = latest.plannedSetsFor(slot) - 1;
+      final newCount =
+          lowered < loggedCountAfterRemoval ? loggedCountAfterRemoval : lowered;
+      final newOverride = {...latest.setCountOverride, exerciseId: newCount};
+      final newIndex = _nextIncompleteIndex(
+        latest.day,
+        newLogs,
+        latest.session.weekNumber,
+        (s) => s.exerciseId == exerciseId
+            ? newCount
+            : (latest.setCountOverride[s.exerciseId] ??
+                s.effectiveSetsForWeek(latest.session.weekNumber).length),
+      );
+
+      state = AsyncData(latest.copyWith(
+        setLogs: newLogs,
+        setCountOverride: newOverride,
+        currentExerciseIndex: newIndex,
+      ));
+    } catch (e) {
+      // Mismo canal separado que logSet/updateSet: NO mutamos `state` a
+      // AsyncError (volaría toda la sesión activa vía when() error:).
+      _logSetError.value = SessionLogError(
+        action: SessionLogAction.remove,
+        setLog: target,
+        slot: slot,
+      );
+    }
+  }
+
+  /// Reintenta la última operación de log/update/remove que falló. Lo invoca
+  /// la acción "Reintentá" del SnackBar (capa de UI). Limpia el canal de
+  /// error y re-despacha hacia logSet/updateSet/removeSet, que volverán a
+  /// emitir por el canal si vuelve a fallar.
   Future<void> retryLastLogError() async {
     final pending = _logSetError.value;
     if (pending == null) return;
     _logSetError.value = null;
     switch (pending.action) {
       case SessionLogAction.log:
-        await logSet(pending.setLog);
+        await logSet(pending.setLog!);
       case SessionLogAction.update:
-        await updateSet(pending.setLog);
+        await updateSet(pending.setLog!);
+      case SessionLogAction.remove:
+        await removeSet(pending.slot!, pending.setLog);
     }
   }
 
@@ -465,18 +570,28 @@ class SessionNotifier
 }
 
 /// Qué operación de set falló, para que el reintento despache al método correcto.
-enum SessionLogAction { log, update }
+enum SessionLogAction { log, update, remove }
 
-/// Evento de fallo de log/update de set emitido por [SessionNotifier.logSetError].
+/// Evento de fallo de log/update/remove de set emitido por
+/// [SessionNotifier.logSetError].
 ///
 /// Viaja por un canal separado del AsyncValue para que la UI pueda mostrar
 /// feedback visible (SnackBar con copy `sessionLogSetError` + acción Reintentar
-/// → [SessionNotifier.retryLastLogError]) SIN destruir la sesión activa. Lleva el
-/// [setLog] original para que el reintento re-despache la misma operación.
+/// → [SessionNotifier.retryLastLogError]) SIN destruir la sesión activa.
+///
+/// [setLog] es requerido para `log`/`update` pero puede ser `null` para
+/// `remove` (una fila pendiente/sin loguear no tiene doc que referenciar).
+/// [slot] solo es requerido por `remove` (live-set-editing AD-2) — `log`/
+/// `update` no lo necesitan porque [setLog] ya trae `exerciseId`.
 @immutable
 class SessionLogError {
-  const SessionLogError({required this.action, required this.setLog});
+  const SessionLogError({
+    required this.action,
+    required this.setLog,
+    this.slot,
+  });
 
   final SessionLogAction action;
-  final SetLog setLog;
+  final SetLog? setLog;
+  final RoutineSlot? slot;
 }

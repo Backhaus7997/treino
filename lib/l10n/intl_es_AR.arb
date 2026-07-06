@@ -871,6 +871,10 @@
   "@sessionPlayerTimerStartA11y": {
     "description": "Semantics label for the duration 'Iniciar' / timer icon control in the session player (finding 27)."
   },
+  "sessionPlayerRemoveSetA11y": "Eliminar serie",
+  "@sessionPlayerRemoveSetA11y": {
+    "description": "Semantics label for the icon-only remove-set button in the session player (live-set-editing PR2)."
+  },
   "routineEditorDeleteDayA11y": "Eliminar día",
   "@routineEditorDeleteDayA11y": {
     "description": "tooltip / Semantics label for the icon-only day-delete trash button in the routine editor (findings 25/26 day-header trash IconButton)."
