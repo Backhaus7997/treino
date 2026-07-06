@@ -1597,6 +1597,9 @@ class AppL10nEs extends AppL10n {
   String get sessionPlayerTimerStartA11y => 'Iniciar temporizador';
 
   @override
+  String get sessionPlayerRemoveSetA11y => 'Eliminar serie';
+
+  @override
   String get routineEditorDeleteDayA11y => 'Eliminar día';
 
   @override
@@ -3907,6 +3910,9 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get sessionPlayerTimerStartA11y => 'Iniciar temporizador';
+
+  @override
+  String get sessionPlayerRemoveSetA11y => 'Eliminar serie';
 
   @override
   String get routineEditorDeleteDayA11y => 'Eliminar día';

@@ -84,6 +84,23 @@ class _FinishTrackingNotifier extends SessionNotifier {
   Future<void> finishSession() async => onFinish();
 }
 
+/// Stub que registra las llamadas a removeSet (live-set-editing PR2) sin
+/// ejecutar lógica real — permite verificar que la UI del delete icon +
+/// confirm dialog dispara [SessionNotifier.removeSet] con el slot/target
+/// correctos, y solo cuando corresponde (mirrors _FinishTrackingNotifier).
+class _RemoveTrackingNotifier extends SessionNotifier {
+  _RemoveTrackingNotifier(this._state, {required this.onRemoveSet});
+  final SessionState _state;
+  final void Function(RoutineSlot slot, SetLog? target) onRemoveSet;
+
+  @override
+  Future<SessionState> build(SessionInit arg) async => _state;
+
+  @override
+  Future<void> removeSet(RoutineSlot slot, SetLog? target) async =>
+      onRemoveSet(slot, target);
+}
+
 // ── Factories de estado ───────────────────────────────────────────────────────
 
 SessionState _defaultState() => SessionState(
@@ -1427,6 +1444,274 @@ void main() {
       // Only the CURRENT block (Curl) should offer "+ agregar serie" — the
       // completed Press summary must not.
       expect(find.textContaining('agregar serie'), findsOneWidget);
+    });
+
+    // ── [AD-6] per-row delete icon + confirm dialog (live-set-editing PR2) ──
+
+    testWidgets(
+        '[REQ:workout#Removing an unlogged set requires no confirmation] '
+        'tapping the delete icon on an added-but-unlogged pending row '
+        'removes it immediately with NO dialog shown', (tester) async {
+      final slots = [
+        makeSlot(exerciseId: 'e1', exerciseName: 'Press', targetSets: 3),
+      ];
+      final day = makeDay(dayNumber: 1, slots: slots);
+      final logs = [
+        makeSetLog(exerciseId: 'e1', setNumber: 1, id: 'l1'),
+        makeSetLog(exerciseId: 'e1', setNumber: 2, id: 'l2'),
+        makeSetLog(exerciseId: 'e1', setNumber: 3, id: 'l3'),
+      ];
+      final state = SessionState(
+        session: makeSession(),
+        day: day,
+        setLogs: logs,
+        currentExerciseIndex: 0,
+        elapsedSeconds: 0,
+        setCountOverride: const {'e1': 4},
+      );
+      RoutineSlot? capturedSlot;
+      SetLog? capturedTarget;
+      var callCount = 0;
+      await tester.pumpWidget(
+        _wrapProvider(
+          const SessionPlayerScreen(init: _kInit),
+          [
+            sessionNotifierProvider.overrideWith(
+              () => _RemoveTrackingNotifier(state, onRemoveSet: (slot, t) {
+                callCount++;
+                capturedSlot = slot;
+                capturedTarget = t;
+              }),
+            ),
+          ],
+        ),
+      );
+      await tester.pump();
+
+      // Row 4 is the pending/unlogged added row — its delete icon.
+      final deleteIcons = find.byIcon(TreinoIcon.trash);
+      expect(deleteIcons, findsWidgets);
+      await tester.ensureVisible(deleteIcons.last);
+      await tester.pumpAndSettle();
+      await tester.tap(deleteIcons.last);
+      await tester.pump();
+
+      // No confirm dialog for an unlogged row.
+      expect(find.text('Eliminar serie'), findsNothing);
+      expect(callCount, equals(1));
+      expect(capturedSlot?.exerciseId, equals('e1'));
+      expect(capturedTarget, isNull);
+    });
+
+    testWidgets(
+        '[REQ:workout#Removing a logged set surfaces a confirmation] '
+        'tapping the delete icon on a LOGGED row shows a confirm dialog and '
+        'does NOT call removeSet until Eliminar is tapped; Cancelar leaves '
+        'the row untouched', (tester) async {
+      // 3 logged but the override keeps the block OPEN (current, not
+      // collapsed) — this test exercises the per-row delete icon, which
+      // only renders while the section is interactive.
+      final slots = [
+        makeSlot(exerciseId: 'e1', exerciseName: 'Press', targetSets: 3),
+      ];
+      final day = makeDay(dayNumber: 1, slots: slots);
+      final logs = [
+        makeSetLog(exerciseId: 'e1', setNumber: 1, id: 'l1'),
+        makeSetLog(exerciseId: 'e1', setNumber: 2, id: 'l2'),
+        makeSetLog(exerciseId: 'e1', setNumber: 3, id: 'l3'),
+      ];
+      final state = SessionState(
+        session: makeSession(),
+        day: day,
+        setLogs: logs,
+        currentExerciseIndex: 0,
+        elapsedSeconds: 0,
+        setCountOverride: const {'e1': 4},
+      );
+      var callCount = 0;
+      await tester.pumpWidget(
+        _wrapProvider(
+          const SessionPlayerScreen(init: _kInit),
+          [
+            sessionNotifierProvider.overrideWith(
+              () => _RemoveTrackingNotifier(
+                state,
+                onRemoveSet: (_, __) => callCount++,
+              ),
+            ),
+          ],
+        ),
+      );
+      await tester.pump();
+
+      final deleteIcons = find.byIcon(TreinoIcon.trash);
+      expect(deleteIcons, findsWidgets);
+
+      // Tap the delete icon of a LOGGED row (set 1).
+      await tester.tap(deleteIcons.first);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Eliminar serie'), findsOneWidget);
+      expect(
+          find.text('Se va a borrar esta serie registrada.'), findsOneWidget);
+      expect(callCount, equals(0),
+          reason: 'removeSet must not be called before confirmation');
+
+      // Cancelar closes the dialog without calling removeSet.
+      await tester.tap(find.text('Cancelar'));
+      await tester.pumpAndSettle();
+      expect(find.text('Eliminar serie'), findsNothing);
+      expect(callCount, equals(0));
+
+      // Re-open and confirm this time.
+      await tester.tap(deleteIcons.first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Eliminar'));
+      await tester.pumpAndSettle();
+
+      expect(callCount, equals(1));
+    });
+
+    testWidgets(
+        '[REQ:workout#Removing a set is only available on the current/'
+        'reachable exercise] a COMPLETED/collapsed block does not show the '
+        'per-row delete icon anywhere in its subtree', (tester) async {
+      final slots = [
+        makeSlot(exerciseId: 'e1', exerciseName: 'Press', targetSets: 1),
+        makeSlot(exerciseId: 'e2', exerciseName: 'Curl', targetSets: 2),
+      ];
+      final day = makeDay(dayNumber: 1, slots: slots);
+      // Press (e1) is complete → collapses. Curl (e2, current, 1 of 2
+      // logged) has its logged row's delete icon visible (a logged row
+      // always shows the icon) — proves the CURRENT block offers it while
+      // the COMPLETED Press summary does not.
+      final logs = [
+        makeSetLog(exerciseId: 'e1', setNumber: 1),
+        makeSetLog(exerciseId: 'e2', exerciseName: 'Curl', setNumber: 1),
+      ];
+      final state = SessionState(
+        session: makeSession(),
+        day: day,
+        setLogs: logs,
+        currentExerciseIndex: 1,
+        elapsedSeconds: 0,
+      );
+      await tester.pumpWidget(
+        _wrapProvider(
+          const SessionPlayerScreen(init: _kInit),
+          _stateOverride(state),
+        ),
+      );
+      await tester.pump();
+      // Only the CURRENT block (Curl, 1 logged row) should show a delete
+      // icon — the completed Press summary must not.
+      expect(find.byIcon(TreinoIcon.trash), findsOneWidget);
+    });
+
+    testWidgets(
+        '[REQ:workout#Removing a set renumbers surviving sets] after '
+        'confirming removal of set 2 of a 3-logged exercise, the UI shows '
+        'sets numbered 1 and 2 (no visible gap, no "SET 1, SET 3")',
+        (tester) async {
+      // targetSets=3 so the block stays OPEN (current, not collapsed) at 1
+      // of 2 remaining logged — this test exercises row-level renumbering,
+      // which only renders while the section is interactive.
+      final slotsOpen = [
+        makeSlot(exerciseId: 'e1', exerciseName: 'Press', targetSets: 3),
+      ];
+      final day = makeDay(dayNumber: 1, slots: slotsOpen);
+      // Simulates the state AFTER removeSet already renumbered survivor l3
+      // from setNumber 3 -> 2 and dropped the override to 2 (this test only
+      // exercises the render side — the row loop is positional, "SET idx+1",
+      // so it must show 1 and 2 regardless of the underlying doc's id).
+      final state = SessionState(
+        session: makeSession(),
+        day: day,
+        setLogs: [makeSetLog(exerciseId: 'e1', setNumber: 1, id: 'l1')],
+        currentExerciseIndex: 0,
+        elapsedSeconds: 0,
+        setCountOverride: const {'e1': 2},
+      );
+      await tester.pumpWidget(
+        _wrapProvider(
+          const SessionPlayerScreen(init: _kInit),
+          _stateOverride(state),
+        ),
+      );
+      await tester.pump();
+      expect(find.text('1/2'), findsOneWidget);
+      // Both rows render with sequential positional labels 1 and 2 — no
+      // "SET 1, SET 3" gap. The row label itself is a plain '1'/'2' Text.
+      expect(find.text('1'), findsOneWidget);
+      expect(find.text('2'), findsWidgets);
+      expect(find.text('3'), findsNothing);
+    });
+
+    testWidgets(
+        '[AD-5 mid-remove reopen guard][REQ:workout#Removed set allows '
+        'completion at the reduced count] sub-case A — not both remaining '
+        'logged: block stays current, not completed', (tester) async {
+      final slots = [
+        makeSlot(exerciseId: 'e1', exerciseName: 'Press', targetSets: 3),
+      ];
+      final day = makeDay(dayNumber: 1, slots: slots);
+
+      // override dropped to 2, only 1 of 2 remaining logged — block must
+      // stay current (not completed).
+      final stateNotBothDone = SessionState(
+        session: makeSession(),
+        day: day,
+        setLogs: [makeSetLog(exerciseId: 'e1', setNumber: 1, id: 'l1')],
+        currentExerciseIndex: 0,
+        elapsedSeconds: 0,
+        setCountOverride: const {'e1': 2},
+      );
+      await tester.pumpWidget(
+        _wrapProvider(
+          const SessionPlayerScreen(init: _kInit),
+          _stateOverride(stateNotBothDone),
+        ),
+      );
+      await tester.pump();
+      expect(find.text('1/2'), findsOneWidget);
+      final pressTextA = tester.widget<Text>(find.text('Press'));
+      expect(pressTextA.style?.decoration, isNot(TextDecoration.lineThrough),
+          reason: 'block must stay current, not collapse as completed');
+    });
+
+    testWidgets(
+        '[AD-5 mid-remove reopen guard][REQ:workout#Removed set allows '
+        'completion at the reduced count] sub-case B — both remaining '
+        'logged: block reports completed at the reduced count', (tester) async {
+      final slots = [
+        makeSlot(exerciseId: 'e1', exerciseName: 'Press', targetSets: 3),
+      ];
+      final day = makeDay(dayNumber: 1, slots: slots);
+
+      // override dropped to 2, BOTH remaining logged — block must report
+      // completed at the reduced count.
+      final stateBothDone = SessionState(
+        session: makeSession(),
+        day: day,
+        setLogs: [
+          makeSetLog(exerciseId: 'e1', setNumber: 1, id: 'l1'),
+          makeSetLog(exerciseId: 'e1', setNumber: 2, id: 'l2'),
+        ],
+        currentExerciseIndex: 0,
+        elapsedSeconds: 0,
+        setCountOverride: const {'e1': 2},
+      );
+      await tester.pumpWidget(
+        _wrapProvider(
+          const SessionPlayerScreen(init: _kInit),
+          _stateOverride(stateBothDone),
+        ),
+      );
+      await tester.pump();
+      expect(find.text('2/2'), findsOneWidget);
+      expect(find.text('3/3'), findsNothing,
+          reason: 'progress must not wait for a 3rd set that no longer '
+              'exists');
     });
   });
 }
