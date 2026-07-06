@@ -1,3 +1,6 @@
+import 'dart:convert' show utf8;
+import 'dart:typed_data' show Uint8List;
+
 import 'package:cloud_firestore/cloud_firestore.dart' show FirebaseException;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -46,8 +49,12 @@ import 'package:treino/features/workout/domain/session_status.dart';
 import 'package:treino/features/workout/domain/set_log.dart';
 import 'package:treino/features/workout/presentation/widgets/exercise_progression_chart.dart';
 import 'package:treino/features/workout/presentation/widgets/session_exercise_block.dart';
+import 'package:treino/features/profile/application/user_providers.dart'
+    show userProfileProvider;
+import 'package:treino/features/payments/domain/payment.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
+import '../../../infrastructure/browser_download.dart';
 import '../pagos/widgets/estado_cuenta_card.dart';
 import '../pagos/widgets/marcar_pagado_actions.dart';
 import '../pagos/widgets/pagos_table.dart';
@@ -1344,6 +1351,27 @@ String _cadenciaLabel(BillingCadence c) => switch (c) {
 /// un Payment pagado con el `periodKey` que corresponda para los recurrentes —
 /// misma receta que el dashboard del coach). Los recordatorios y las métricas
 /// globales (ingreso del mes/proyección) se difieren.
+/// Construye un CSV (RFC-4180) del historial de pagos del alumno. // i18n
+String _buildPagosCsv(List<Payment> payments) {
+  String esc(String s) => '"${s.replaceAll('"', '""')}"';
+  final rows = <String>['FECHA,CONCEPTO,MONTO,ESTADO,PERÍODO'];
+  for (final p in payments) {
+    final d = p.createdAt.toLocal();
+    final fecha = '${d.year}-${d.month.toString().padLeft(2, '0')}-'
+        '${d.day.toString().padLeft(2, '0')}';
+    final estado =
+        p.status == PaymentStatus.paid ? 'Pagado' : 'Pendiente'; // i18n
+    rows.add([
+      esc(fecha),
+      esc(p.concept),
+      esc(p.amountArs.toString()),
+      esc(estado),
+      esc(p.periodKey ?? ''),
+    ].join(','));
+  }
+  return rows.join('\r\n');
+}
+
 class _PagosTab extends ConsumerWidget {
   const _PagosTab({required this.athleteId});
   final String athleteId;
@@ -1406,11 +1434,42 @@ class _PagosTab extends ConsumerWidget {
           if (history.isEmpty)
             _muted(palette, 'Sin pagos registrados todavía.') // i18n: Fase W2
           else
-            PagosTable(payments: history, palette: palette),
+            PagosTable(
+              payments: history,
+              palette: palette,
+              onRecordar: (p) => recordar(
+                context,
+                ref,
+                p,
+                ref.read(userProfileProvider).valueOrNull?.paymentAlias,
+              ),
+            ),
           const SizedBox(height: 14),
-          Text(
-            'Próximamente: recordatorios y exportar.', // i18n: Fase W2
-            style: TextStyle(color: palette.textMuted, fontSize: 12),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton(
+              onPressed: () {
+                final name = ref
+                        .read(userPublicProfileProvider(athleteId))
+                        .valueOrNull
+                        ?.displayName ??
+                    'alumno';
+                triggerBrowserDownload(
+                  bytes:
+                      Uint8List.fromList(utf8.encode(_buildPagosCsv(history))),
+                  filename: 'pagos_${name.replaceAll(' ', '_')}.csv',
+                  mimeType: 'text/csv',
+                );
+              },
+              child: Text(
+                'Exportar CSV', // i18n: Fase W2
+                style: TextStyle(
+                  color: palette.accent,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                ),
+              ),
+            ),
           ),
         ],
       ),
