@@ -20,10 +20,22 @@ class FriendshipRepository {
   CollectionReference<Map<String, Object?>> get _friendships =>
       _firestore.collection('friendships');
 
-  /// Creates a pending friendship request between [myUid] and [otherUid].
+  /// Creates a friendship request between [myUid] and [otherUid].
+  ///
+  /// When [otherIsPublic] is `true`, the target user has a public profile
+  /// (Instagram-style): the friendship is created directly as `accepted`
+  /// and both counter denormalizations happen in the same call.
+  ///
+  /// When `false` (default), the friendship is created as `pending` and
+  /// the target must call [accept] to complete the flow.
+  ///
   /// Idempotent: if a doc already exists for this pair, returns the existing
   /// [Friendship] without writing. Doc ID is always `sortedDocId(myUid, otherUid)`.
-  Future<Friendship> request(String myUid, String otherUid) async {
+  Future<Friendship> request(
+    String myUid,
+    String otherUid, {
+    bool otherIsPublic = false,
+  }) async {
     final docId = Friendship.sortedDocId(myUid, otherUid);
     final ref = _friendships.doc(docId);
 
@@ -39,12 +51,49 @@ class FriendshipRepository {
       id: docId,
       uidA: uidA,
       uidB: uidB,
-      status: FriendshipStatus.pending,
+      status: otherIsPublic
+          ? FriendshipStatus.accepted
+          : FriendshipStatus.pending,
       requesterId: myUid,
       members: [uidA, uidB],
       createdAt: DateTime.now().toUtc(),
     );
     await ref.set(friendship.toJson());
+
+    if (otherIsPublic) {
+      // Auto-accept path: mirror the counter denormalization that `accept()`
+      // does when a private-profile owner approves a request. Best-effort:
+      // failures are logged but don't roll back the accepted friendship
+      // (same policy as `accept()` — ADR-WRS-12 / REQ-WRX-004).
+      final pubRepo = _publicProfileRepository;
+      if (pubRepo != null) {
+        try {
+          await pubRepo.updateCounters(myUid, {
+            'followingCount': FieldValue.increment(1),
+          });
+        } catch (e, st) {
+          developer.log(
+            'FriendshipRepository.request auto-accept: '
+            'followingCount++ for $myUid failed',
+            error: e,
+            stackTrace: st,
+          );
+        }
+        try {
+          await pubRepo.updateCounters(otherUid, {
+            'followersCount': FieldValue.increment(1),
+          });
+        } catch (e, st) {
+          developer.log(
+            'FriendshipRepository.request auto-accept: '
+            'followersCount++ for $otherUid failed',
+            error: e,
+            stackTrace: st,
+          );
+        }
+      }
+    }
+
     return friendship;
   }
 

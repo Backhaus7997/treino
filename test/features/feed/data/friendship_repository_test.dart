@@ -686,6 +686,100 @@ void main() {
       await sub.cancel();
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // Privacy — auto-accept path when target is public
+  // ---------------------------------------------------------------------------
+  group('FriendshipRepository.request — auto-accept path', () {
+    test(
+        'otherIsPublic: true → doc is created directly as accepted',
+        () async {
+      final autoRepo = FriendshipRepository(
+        firestore: firestore,
+        publicProfileRepository: publicProfileRepo,
+      );
+      final friendship =
+          await autoRepo.request('bbb', 'aaa', otherIsPublic: true);
+
+      final snap =
+          await firestore.collection('friendships').doc('aaa_bbb').get();
+      expect(snap.exists, isTrue);
+      expect(snap.data()!['status'], equals('accepted'));
+      expect(friendship.status, equals(FriendshipStatus.accepted));
+    });
+
+    test(
+        'otherIsPublic: true → increments followingCount(mine) and '
+        'followersCount(other) via UserPublicProfileRepository', () async {
+      final autoRepo = FriendshipRepository(
+        firestore: firestore,
+        publicProfileRepository: publicProfileRepo,
+      );
+      // Seed both public profiles with counters = 0 so we can observe the
+      // atomic increment mutating them to 1.
+      await firestore.collection('userPublicProfiles').doc('bbb').set(
+        {'uid': 'bbb', 'followingCount': 0, 'followersCount': 0},
+      );
+      await firestore.collection('userPublicProfiles').doc('aaa').set(
+        {'uid': 'aaa', 'followingCount': 0, 'followersCount': 0},
+      );
+
+      await autoRepo.request('bbb', 'aaa', otherIsPublic: true);
+
+      final me =
+          await firestore.collection('userPublicProfiles').doc('bbb').get();
+      final other =
+          await firestore.collection('userPublicProfiles').doc('aaa').get();
+      expect(me.data()!['followingCount'], equals(1));
+      expect(other.data()!['followersCount'], equals(1));
+    });
+
+    test(
+        'otherIsPublic: false (default) → doc is pending, no counter writes',
+        () async {
+      final autoRepo = FriendshipRepository(
+        firestore: firestore,
+        publicProfileRepository: publicProfileRepo,
+      );
+      await firestore.collection('userPublicProfiles').doc('bbb').set(
+        {'uid': 'bbb', 'followingCount': 0},
+      );
+
+      await autoRepo.request('bbb', 'aaa');
+
+      final snap =
+          await firestore.collection('friendships').doc('aaa_bbb').get();
+      expect(snap.data()!['status'], equals('pending'));
+      // Counter must not have been touched — accept() is responsible for
+      // that in the pending flow.
+      final me =
+          await firestore.collection('userPublicProfiles').doc('bbb').get();
+      expect(me.data()!['followingCount'], equals(0));
+    });
+
+    test(
+        'otherIsPublic: true is idempotent — existing accepted doc is not '
+        'recreated (no double increment)', () async {
+      final autoRepo = FriendshipRepository(
+        firestore: firestore,
+        publicProfileRepository: publicProfileRepo,
+      );
+      await firestore.collection('userPublicProfiles').doc('bbb').set(
+        {'uid': 'bbb', 'followingCount': 0, 'followersCount': 0},
+      );
+      await firestore.collection('userPublicProfiles').doc('aaa').set(
+        {'uid': 'aaa', 'followingCount': 0, 'followersCount': 0},
+      );
+
+      await autoRepo.request('bbb', 'aaa', otherIsPublic: true);
+      await autoRepo.request('bbb', 'aaa', otherIsPublic: true);
+
+      final me =
+          await firestore.collection('userPublicProfiles').doc('bbb').get();
+      // If the second call had run the counter path, this would be 2.
+      expect(me.data()!['followingCount'], equals(1));
+    });
+  });
 }
 
 // ─── Test helper: throws on any write ─────────────────────────────────────────

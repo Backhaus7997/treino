@@ -58,6 +58,14 @@ class PublicProfileScreen extends ConsumerWidget {
         data: (view) {
           final viewerUid =
               ref.watch(authStateChangesProvider).valueOrNull?.uid ?? '';
+          // Privacy gate — Instagram-style. When the target profile is
+          // private AND the viewer is neither the owner nor an ACCEPTED
+          // follower, hide detailed content (stats numbers, rutinas, actividad).
+          // Header (name / avatar / gym) and the SEGUIR button stay visible so
+          // the viewer can still send a follow request.
+          final isAcceptedFollower =
+              view.friendship?.status.name == 'accepted';
+          final gated = !view.isSelf && !view.isPublic && !isAcceptedFollower;
           return SingleChildScrollView(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -78,6 +86,7 @@ class PublicProfileScreen extends ConsumerWidget {
                             friendship: view.friendship,
                             viewerUid: viewerUid,
                             targetUid: targetUid,
+                            targetIsPublic: view.isPublic,
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -87,26 +96,31 @@ class PublicProfileScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: 20),
                 ],
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: PublicProfileStatsRow(
-                    workoutsCount: view.workoutsCount,
-                    racha: view.racha,
-                    followersCount: view.followersCount,
-                    followingCount: view.followingCount,
+                if (gated) ...[
+                  const _PrivateProfileNotice(),
+                  const SizedBox(height: 20),
+                ] else ...[
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: PublicProfileStatsRow(
+                      workoutsCount: view.workoutsCount,
+                      racha: view.racha,
+                      followersCount: view.followersCount,
+                      followingCount: view.followingCount,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 20),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: _ProfileTabPills(targetUid: targetUid),
-                ),
-                const SizedBox(height: 18),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: _ProfileTabBody(targetUid: targetUid),
-                ),
-                const SizedBox(height: 20),
+                  const SizedBox(height: 20),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: _ProfileTabPills(targetUid: targetUid),
+                  ),
+                  const SizedBox(height: 18),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: _ProfileTabBody(targetUid: targetUid),
+                  ),
+                  const SizedBox(height: 20),
+                ],
               ],
             ),
           );
@@ -134,6 +148,44 @@ class PublicProfileScreen extends ConsumerWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Notice shown when the target profile is private and the viewer is not
+/// an accepted follower. Renders a lock icon + short explanatory copy.
+class _PrivateProfileNotice extends StatelessWidget {
+  const _PrivateProfileNotice();
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 32),
+      child: Column(
+        children: [
+          Icon(TreinoIcon.lock, size: 32, color: palette.textMuted),
+          const SizedBox(height: 12),
+          Text(
+            'Perfil privado', // i18n: Fase W2
+            style: GoogleFonts.barlow(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: palette.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Seguí a esta persona para ver su actividad y sus rutinas públicas.', // i18n: Fase W2
+            textAlign: TextAlign.center,
+            style: GoogleFonts.barlow(
+              fontSize: 13,
+              color: palette.textMuted,
+              height: 1.4,
+            ),
+          ),
+        ],
       ),
     );
   }

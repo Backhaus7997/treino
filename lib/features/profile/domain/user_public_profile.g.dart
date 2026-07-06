@@ -23,6 +23,7 @@ _$UserPublicProfileImpl _$$UserPublicProfileImplFromJson(
           _nonNegativeCount((json['followingCount'] as num?)?.toInt()),
       sharedTemplatesWithAthletes:
           json['sharedTemplatesWithAthletes'] as bool? ?? false,
+      isProfilePublic: json['isProfilePublic'] as bool? ?? true,
       rankingOptIn: json['rankingOptIn'] as bool? ?? false,
       lifetimeVolumeKg: json['lifetimeVolumeKg'] as num? ?? 0,
       bestSquatKg: json['bestSquatKg'] as num?,
@@ -44,6 +45,7 @@ Map<String, dynamic> _$$UserPublicProfileImplToJson(
       'followersCount': instance.followersCount,
       'followingCount': instance.followingCount,
       'sharedTemplatesWithAthletes': instance.sharedTemplatesWithAthletes,
+      'isProfilePublic': instance.isProfilePublic,
       'rankingOptIn': instance.rankingOptIn,
       'lifetimeVolumeKg': instance.lifetimeVolumeKg,
       'bestSquatKg': instance.bestSquatKg,

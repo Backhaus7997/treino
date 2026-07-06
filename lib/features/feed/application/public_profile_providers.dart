@@ -111,6 +111,9 @@ class PublicProfileViewNotifier
       racha: profile?.racha,
       followersCount: profile?.followersCount,
       followingCount: profile?.followingCount,
+      // Missing profile → default true (matches UserPublicProfile default);
+      // legacy docs without the field decode as public and stay discoverable.
+      isPublic: profile?.isProfilePublic ?? true,
     );
   }
 }

@@ -94,6 +94,16 @@ class UserPublicProfileRepository {
     await _col.doc(uid).set({'rankingOptIn': value}, SetOptions(merge: true));
   }
 
+  /// Flips the user's `isProfilePublic` flag via a partial merge so identity
+  /// fields (displayName/avatarUrl/gymId) and unrelated counters stay
+  /// untouched. Existing `accepted` friendships are preserved (Option X):
+  /// the flag only changes the behavior of NEW follow requests.
+  Future<void> setProfilePublic(String uid, bool value) async {
+    await _col
+        .doc(uid)
+        .set({'isProfilePublic': value}, SetOptions(merge: true));
+  }
+
   /// Resets all 4 ranking-metric fields to their pre-opt-in defaults and
   /// flips `rankingOptIn` to `false`, via a partial merge so identity fields
   /// (displayName/avatarUrl/gymId) and unrelated counters are untouched.
