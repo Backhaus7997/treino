@@ -17,6 +17,7 @@ import 'presentation/widgets/profile_cuenta_section.dart';
 import 'presentation/widgets/profile_header.dart';
 import 'presentation/widgets/profile_section_tile.dart';
 import 'presentation/widgets/profile_privacy_toggle_tile.dart';
+import 'presentation/widgets/profile_share_toggle_tile.dart';
 import 'presentation/widgets/profile_trainer_section.dart';
 import 'trainer_profile_view.dart';
 
@@ -109,11 +110,19 @@ class _AthleteProfile extends ConsumerWidget {
               // Profile Tile and /profile/rankings).
             ],
           ),
-          // ── Privacidad section — Instagram-style profile visibility ─────
+          // ── Privacidad section ───────────────────────────────────────────
+          // Contains two toggles:
+          //   1. ProfilePrivacyToggleTile — Instagram-style public/private flag
+          //   2. ProfileShareToggleTile   — athlete consent to share personal
+          //      data (phone, height, weight, gender, level) with their trainer
+          //      via `profile_shares/{athleteId}` (Slice 2 of athlete-shared-profile)
           _A11ySectionGroup(
             title: 'PRIVACIDAD', // i18n: Fase W2
             palette: palette,
-            tiles: const [ProfilePrivacyToggleTile()],
+            tiles: const [
+              ProfilePrivacyToggleTile(),
+              ProfileShareToggleTile(),
+            ],
           ),
           const SizedBox(height: 12),
           // ── Apariencia section (REQ-LM-009) ──────────────────────────────

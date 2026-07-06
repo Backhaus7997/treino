@@ -18,6 +18,101 @@ void main() {
     repo = ProfileShareRepository(firestore: firestore);
   });
 
+  group('ProfileShareRepository.grant', () {
+    test('writes trainerId + snapshot fields to profile_shares/{athleteId}',
+        () async {
+      final bornAt = DateTime.utc(1995, 6, 20);
+      final updatedAt = DateTime.utc(2026, 7, 6);
+
+      await repo.grant(
+        athleteId: athleteId,
+        trainerId: trainerId,
+        phone: '+54 9 11 1234-5678',
+        bornAt: bornAt,
+        heightCm: 170,
+        bodyWeightKg: 65.5,
+        gender: Gender.female,
+        experienceLevel: ExperienceLevel.intermediate,
+        updatedAt: updatedAt,
+      );
+
+      final snap =
+          await firestore.collection('profile_shares').doc(athleteId).get();
+
+      expect(snap.exists, isTrue);
+      final data = snap.data()!;
+      expect(data['trainerId'], trainerId);
+      expect(data['phone'], '+54 9 11 1234-5678');
+      expect(data['heightCm'], 170);
+      expect(data['bodyWeightKg'], 65.5);
+      expect(data['gender'], 'female');
+      expect(data['experienceLevel'], 'intermediate');
+    });
+
+    test('grant with null fields writes only trainerId + updatedAt', () async {
+      final updatedAt = DateTime.utc(2026, 7, 6);
+
+      await repo.grant(
+        athleteId: athleteId,
+        trainerId: trainerId,
+        updatedAt: updatedAt,
+      );
+
+      final snap =
+          await firestore.collection('profile_shares').doc(athleteId).get();
+
+      expect(snap.exists, isTrue);
+      final data = snap.data()!;
+      expect(data['trainerId'], trainerId);
+      expect(data.containsKey('phone'), isFalse);
+      expect(data.containsKey('heightCm'), isFalse);
+    });
+
+    test('grant replaces existing doc (re-grant snapshot refresh)', () async {
+      // First grant
+      await repo.grant(
+        athleteId: athleteId,
+        trainerId: trainerId,
+        heightCm: 170,
+        updatedAt: DateTime.utc(2026, 7, 1),
+      );
+
+      // Second grant — new height + new updatedAt
+      final newUpdatedAt = DateTime.utc(2026, 7, 6);
+      await repo.grant(
+        athleteId: athleteId,
+        trainerId: trainerId,
+        heightCm: 175,
+        updatedAt: newUpdatedAt,
+      );
+
+      final snap =
+          await firestore.collection('profile_shares').doc(athleteId).get();
+      final data = snap.data()!;
+      expect(data['heightCm'], 175);
+    });
+  });
+
+  group('ProfileShareRepository.revoke', () {
+    test('deletes the doc when it exists', () async {
+      // Seed the doc first
+      await firestore.collection('profile_shares').doc(athleteId).set({
+        'trainerId': trainerId,
+      });
+
+      await repo.revoke(athleteId);
+
+      final snap =
+          await firestore.collection('profile_shares').doc(athleteId).get();
+      expect(snap.exists, isFalse);
+    });
+
+    test('revoke on non-existent doc does not throw', () async {
+      // Should not throw even when doc is already absent
+      await expectLater(repo.revoke(athleteId), completes);
+    });
+  });
+
   group('ProfileShareRepository.watchForAthlete', () {
     test('emits null when doc does not exist', () async {
       final stream = repo.watchForAthlete(athleteId);
