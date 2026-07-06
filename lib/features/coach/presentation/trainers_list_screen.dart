@@ -71,13 +71,10 @@ class _TrainersListScreenState extends ConsumerState<TrainersListScreen> {
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      // Custom AppBar layout instead of AppBar.title/actions: the built-in
-      // title slot only centers within the space left over between leading
-      // and actions, so an actions-only bar (no leading/back button here —
-      // this is a tab root) drags the title visually off-center toward the
-      // empty leading side. A Stack lets the title center against the FULL
-      // toolbar width while the toggle stays pinned to the trailing edge,
-      // regardless of the toggle's own width.
+      // Custom AppBar layout instead of AppBar.title/actions: title pinned to
+      // the leading (left) edge on a single line, toggle pinned to the
+      // trailing edge. A Row (title Flexible + toggle) keeps the title
+      // left-aligned and lets it ellipsize if the toggle leaves little room.
       appBar: PreferredSize(
         preferredSize: const Size.fromHeight(kToolbarHeight),
         child: Container(
@@ -86,20 +83,20 @@ class _TrainersListScreenState extends ConsumerState<TrainersListScreen> {
             bottom: false,
             child: SizedBox(
               height: kToolbarHeight,
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  Center(child: _TitleStack(palette: palette)),
-                  Positioned(
-                    right: 12,
-                    child: _ListMapToggle(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Row(
+                  children: [
+                    Expanded(child: _TitleLine(palette: palette)),
+                    const SizedBox(width: 12),
+                    _ListMapToggle(
                       showMap: showMap,
                       onChanged: (v) =>
                           ref.read(mapModeProvider.notifier).state = v,
                       mapDisabled: ref.watch(virtualOnlyFilterProvider),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -200,41 +197,35 @@ class _ModeTabScopeState extends ConsumerState<_ModeTabScope> {
   Widget build(BuildContext context) => widget.child;
 }
 
-// ── Title stack — magenta "ENCONTRÁ TU" + white "COACH" ──────────────────────
+// ── Title line — magenta "ENCONTRÁ TU" + ink "COACH" on a single line ────────
 
-class _TitleStack extends StatelessWidget {
-  const _TitleStack({required this.palette});
+class _TitleLine extends StatelessWidget {
+  const _TitleLine({required this.palette});
   final AppPalette palette;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisAlignment: MainAxisAlignment.center,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          'ENCONTRÁ TU',
-          style: GoogleFonts.barlowCondensed(
-            color: palette.highlight,
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 1.6,
-            height: 1,
+    final base = GoogleFonts.barlowCondensed(
+      fontSize: 18,
+      fontWeight: FontWeight.w700,
+      letterSpacing: 1.2,
+      height: 1,
+    );
+    return Text.rich(
+      TextSpan(
+        children: [
+          TextSpan(
+            text: 'ENCONTRÁ TU ',
+            style: base.copyWith(color: palette.highlight),
           ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          'COACH',
-          style: GoogleFonts.barlowCondensed(
-            color: palette.textPrimary,
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 1.4,
-            height: 1,
+          TextSpan(
+            text: 'COACH',
+            style: base.copyWith(color: palette.textPrimary),
           ),
-        ),
-      ],
+        ],
+      ),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
     );
   }
 }
