@@ -271,16 +271,29 @@ service cloud.firestore {
                     && request.resource.data.trainerId.size() > 0;
 
       // Update: members del vínculo pueden actualizar (accept / decline /
-      // terminate). Fields `trainerId`, `athleteId`, `requestedAt` son
-      // inmutables. Business rules (transiciones de status válidas, who
-      // can accept vs terminate) se enforce client-side en el repository;
-      // las rules dan defensa estructural.
+      // terminate / pause / resume). Fields `trainerId`, `athleteId`,
+      // `requestedAt` son inmutables. NO hasOnly aquí — el repo hace updates
+      // parciales (`.update({...})`) con timestamps condicionales
+      // (acceptedAt/pausedAt/terminatedAt/terminationReason), y un hasOnly
+      // pelearía contra ese merge shape (design.md AD-4).
       //
-      // Privacy gate (REQ-COACH-LINK-012..014): el último OR clause restringe
-      // la mutación de `sharedWithTrainer` exclusivamente al atleta. Si el
-      // request cambia el campo (`request.resource.data.sharedWithTrainer !=
-      // resource.data.sharedWithTrainer`), el auth.uid debe ser el atleta.
-      // El PF nunca puede flippear el flag.
+      // Privacy gate (REQ-COACH-LINK-012..014): el segundo-a-último OR clause
+      // restringe la mutación de `sharedWithTrainer` exclusivamente al
+      // atleta. Si el request cambia el campo, el auth.uid debe ser el
+      // atleta. El PF nunca puede flippear el flag.
+      //
+      // rules-hardening Slice D (AD-4) — actor-gated status transition.
+      // REAL status enum: pending/active/paused/terminated
+      // (trainer_link_status.dart; the coach-link-lifecycle spec's literal
+      // 'accepted' text is WRONG/stale — trainer_link_repository.dart's
+      // accept() writes status:'active'). Valid transitions:
+      //   pending  -> active      : trainer only   (accept)
+      //   pending  -> terminated  : either member   (decline / cancel)
+      //   active   -> paused      : trainer only   (pause)
+      //   paused   -> active      : trainer only   (resume)
+      //   active/paused -> terminated : either member (terminate)
+      // Closes athlete self-accept (pending->active without trainer
+      // consent) and athlete self-pause/resume.
       allow update: if request.auth != null
                     && (request.auth.uid == resource.data.trainerId
                         || request.auth.uid == resource.data.athleteId)
@@ -288,7 +301,28 @@ service cloud.firestore {
                     && request.resource.data.athleteId == resource.data.athleteId
                     && request.resource.data.requestedAt == resource.data.requestedAt
                     && (request.resource.data.sharedWithTrainer == resource.data.sharedWithTrainer
-                        || request.auth.uid == resource.data.athleteId);
+                        || request.auth.uid == resource.data.athleteId)
+                    && (
+                         request.resource.data.status == resource.data.status
+                         ||
+                         // pending → active: trainer only (accept).
+                         (resource.data.status == 'pending'
+                          && request.resource.data.status == 'active'
+                          && request.auth.uid == resource.data.trainerId)
+                         ||
+                         // pending → terminated: either member (decline / cancel).
+                         (resource.data.status == 'pending'
+                          && request.resource.data.status == 'terminated')
+                         ||
+                         // active ↔ paused: trainer only (pause / resume).
+                         (resource.data.status in ['active', 'paused']
+                          && request.resource.data.status in ['active', 'paused']
+                          && request.auth.uid == resource.data.trainerId)
+                         ||
+                         // active/paused → terminated: either member (terminate).
+                         (resource.data.status in ['active', 'paused']
+                          && request.resource.data.status == 'terminated')
+                       );
 
       // Delete denegado — terminate vía update status='terminated'.
       allow delete: if false;
@@ -304,9 +338,23 @@ service cloud.firestore {
       allow create: if request.auth != null
                     && request.auth.uid == request.resource.data.authorUid;
 
-      // Update and delete: only the original author.
-      allow update, delete: if request.auth != null
-                            && request.auth.uid == resource.data.authorUid;
+      // Update: only the original author, with a hasOnly allowlist (the
+      // exact Post.toJson shape) + identity/gym pins. Closes cross-gym feed
+      // injection (authorGymId) and identity forgery (authorUid,
+      // authorDisplayName) via update — rules-hardening Slice D, AD-4.
+      // Mutable fields remain: text, routineTag, privacy, authorAvatarUrl.
+      allow update: if request.auth != null
+                    && request.auth.uid == resource.data.authorUid
+                    && request.resource.data.keys().hasOnly(
+                         ['id', 'authorUid', 'authorDisplayName', 'authorAvatarUrl',
+                          'authorGymId', 'text', 'routineTag', 'privacy', 'createdAt'])
+                    && request.resource.data.authorUid == resource.data.authorUid
+                    && request.resource.data.authorGymId == resource.data.authorGymId
+                    && request.resource.data.authorDisplayName == resource.data.authorDisplayName;
+
+      // Delete: only the original author.
+      allow delete: if request.auth != null
+                    && request.auth.uid == resource.data.authorUid;
     }
 
     // Public identity documents — one per user, public-readable by any
@@ -644,9 +692,20 @@ service cloud.firestore {
       // NOTE on rule cost: the `get()` in the accepted branch runs only when
       // the client tries to auto-accept. The pending branch (majority path)
       // stays free of extra reads.
+      //
+      // rules-hardening Slice D (AD-4): shape validation added on top of the
+      // pre-existing requester/status checks — members.size()==2, the two
+      // members distinct, and the doc-id pinned to the deterministic
+      // sortedDocId(members) convention (Friendship.sortedDocId,
+      // friendship.dart:30). Closes self-friend and forged-membership/doc-id
+      // vectors without touching either status branch above.
       allow create: if request.auth != null
                     && request.auth.uid == request.resource.data.requesterId
                     && request.auth.uid in request.resource.data.members
+                    && request.resource.data.members.size() == 2
+                    && request.resource.data.members[0] != request.resource.data.members[1]
+                    && request.resource.data.members[0] < request.resource.data.members[1]
+                    && friendshipId == request.resource.data.members[0] + '_' + request.resource.data.members[1]
                     && (
                       request.resource.data.status == 'pending'
                       ||
@@ -692,7 +751,13 @@ service cloud.firestore {
                   && (resource == null
                       || request.auth.uid in resource.data.members);
 
+      // rules-hardening Slice D (AD-4): hasOnly allowlist added — the real
+      // create payload is exactly {chatId, members, createdAt}
+      // (ChatRepository.getOrCreate, chat_repository.dart:66-70). Blocks a
+      // member seeding a forged `lastRead` map (or any other field) at
+      // creation time.
       allow create: if request.auth != null
+                    && request.resource.data.keys().hasOnly(['chatId', 'members', 'createdAt'])
                     && request.resource.data.members.size() == 2
                     && request.auth.uid in request.resource.data.members
                     && request.resource.data.members[0] < request.resource.data.members[1]
