@@ -871,10 +871,21 @@ service cloud.firestore {
                       || request.auth.uid == resource.data.trainerId);
       // Create: either the athlete books their own slot (legacy self-booking),
       // or the trainer registers a session (new trainer-driven model 2026-06-03).
+      //
+      // rules-hardening Slice C (AD-1 option b) — Coach-Collection Create
+      // Requires Trainer Role: the trainer-create disjunct additionally
+      // requires `users/{uid}.role == 'trainer'` so an athlete-role user
+      // cannot forge an appointment naming themselves as trainerId against
+      // an arbitrary victim athlete. The gate applies ONLY to the trainer
+      // disjunct — the legacy athlete self-book disjunct (`athleteId ==
+      // auth.uid`) is UNCHANGED, preserving that live path (regression-
+      // tested: SCENARIO-CC-08). Role-check only, NOT a trainer_links
+      // relationship check — see design.md AD-1 / engram obs #413.
       allow create: if request.auth != null
                     && request.resource.data.status == 'confirmed'
                     && (request.resource.data.athleteId == request.auth.uid
-                        || request.resource.data.trainerId == request.auth.uid);
+                        || (request.resource.data.trainerId == request.auth.uid
+                            && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'trainer'));
       // Update has 3 valid paths: cancellation by member, flip cancelled→confirmed,
       // or trainer edits coaching notes.
       allow update: if request.auth != null && (
@@ -911,8 +922,14 @@ service cloud.firestore {
       allow read: if request.auth != null
                   && (request.auth.uid == resource.data.recordedBy
                       || request.auth.uid == resource.data.athleteId);
+      // rules-hardening Slice C (AD-1 option b) — Coach-Collection Create
+      // Requires Trainer Role: closes the "any athlete-role user forges a
+      // measurement naming themselves recordedBy" vector. Role-check only,
+      // NOT a trainer_links relationship check — see design.md AD-1 /
+      // engram obs #413.
       allow create: if request.auth != null
                     && request.resource.data.recordedBy == request.auth.uid
+                    && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'trainer'
                     && request.resource.data.athleteId is string
                     && request.resource.data.athleteId.size() > 0;
       allow update: if request.auth != null
@@ -929,8 +946,14 @@ service cloud.firestore {
       allow read: if request.auth != null
                   && (request.auth.uid == resource.data.recordedBy
                       || request.auth.uid == resource.data.athleteId);
+      // rules-hardening Slice C (AD-1 option b) — Coach-Collection Create
+      // Requires Trainer Role: closes the "any athlete-role user forges a
+      // performance_test naming themselves recordedBy" vector. Role-check
+      // only, NOT a trainer_links relationship check — see design.md AD-1 /
+      // engram obs #413.
       allow create: if request.auth != null
                     && request.resource.data.recordedBy == request.auth.uid
+                    && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'trainer'
                     && request.resource.data.athleteId is string
                     && request.resource.data.athleteId.size() > 0;
       allow update: if request.auth != null
@@ -947,8 +970,19 @@ service cloud.firestore {
       allow read: if request.auth != null
                   && (request.auth.uid == resource.data.trainerId
                       || request.auth.uid == resource.data.athleteId);
+      // rules-hardening Slice C (AD-1 option b) — Coach-Collection Create
+      // Requires Trainer Role: closes the "any athlete-role user forges
+      // athlete_billing naming themselves trainer" vector. This is a
+      // COMBINED create+update rule block, so the role gate is scoped to
+      // create-only via `resource == null` (create has no prior resource
+      // doc) — legit trainer UPDATES to their existing billing config are
+      // unaffected (SCENARIO-CC-06e regression test). Role-check only, NOT
+      // a trainer_links relationship check — see design.md AD-1 / engram
+      // obs #413.
       allow create, update: if request.auth != null
                   && request.resource.data.trainerId == request.auth.uid
+                  && (resource != null
+                      || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'trainer')
                   && request.resource.data.athleteId is string
                   && request.resource.data.athleteId.size() > 0;
       allow delete: if request.auth != null && resource.data.trainerId == request.auth.uid;
@@ -1057,8 +1091,14 @@ service cloud.firestore {
       allow read: if request.auth != null
                   && (request.auth.uid == resource.data.trainerId
                       || request.auth.uid == resource.data.athleteId);
+      // rules-hardening Slice C (AD-1 option b) — Coach-Collection Create
+      // Requires Trainer Role: closes the "any athlete-role user forges a
+      // payment debt naming themselves trainer" vector. Role-check only,
+      // NOT a trainer_links relationship check — see design.md AD-1 /
+      // engram obs #413.
       allow create: if request.auth != null
                   && request.resource.data.trainerId == request.auth.uid
+                  && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'trainer'
                   && request.resource.data.athleteId is string
                   && request.resource.data.athleteId.size() > 0;
       // REQ-VENC-13: tightened update rule — field-level protection.
