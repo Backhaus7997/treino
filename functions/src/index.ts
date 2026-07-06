@@ -23,6 +23,7 @@ export { addAlias } from "./add-alias";
 export { syncSessionShareOnTrainerLink } from "./sync-session-share";
 export { generateDuePayments } from "./payments/generate-due-payments";
 export { notifyOverduePayments } from "./payments/notify-overdue-payments";
+export { syncSharedProfile } from "./profile/sync-shared-profile";
 // SHELVED (gym-google-places, Plan B): resolveGymPlace cannot be deployed —
 // GCP project treino-dev sits under org code-assurance.com, whose
 // Domain-Restricted-Sharing policy blocks a publicly-invokable (allUsers)
