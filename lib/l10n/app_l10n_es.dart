@@ -2255,6 +2255,9 @@ class AppL10nEs extends AppL10n {
   String get dashboardAdherenceRingPlaceholder => '--';
 
   @override
+  String get dashboardProximaSesionManana => 'mañana';
+
+  @override
   String get dashboardProximasSesionesEmpty =>
       'No hay sesiones próximas confirmadas.';
 
@@ -4558,6 +4561,9 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get dashboardAdherenceRingPlaceholder => '--';
+
+  @override
+  String get dashboardProximaSesionManana => 'mañana';
 
   @override
   String get dashboardProximasSesionesEmpty =>

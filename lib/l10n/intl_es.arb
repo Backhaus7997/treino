@@ -476,6 +476,7 @@
   "@dashboardAdherenceRingPlaceholder": {
     "description": "Placeholder value for adherencia ring (V1)."
   },
+  "dashboardProximaSesionManana": "mañana",
   "dashboardProximasSesionesEmpty": "No hay sesiones próximas confirmadas.",
   "@dashboardProximasSesionesEmpty": {
     "description": "Empty state for the Próximas sesiones section."
