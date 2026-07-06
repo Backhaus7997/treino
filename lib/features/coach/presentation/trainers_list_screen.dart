@@ -70,20 +70,39 @@ class _TrainersListScreenState extends ConsumerState<TrainersListScreen> {
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      appBar: AppBar(
-        title: _TitleStack(palette: palette),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: _ListMapToggle(
-              showMap: showMap,
-              onChanged: (v) => ref.read(mapModeProvider.notifier).state = v,
-              mapDisabled: ref.watch(virtualOnlyFilterProvider),
+      // Custom AppBar layout instead of AppBar.title/actions: the built-in
+      // title slot only centers within the space left over between leading
+      // and actions, so an actions-only bar (no leading/back button here —
+      // this is a tab root) drags the title visually off-center toward the
+      // empty leading side. A Stack lets the title center against the FULL
+      // toolbar width while the toggle stays pinned to the trailing edge,
+      // regardless of the toggle's own width.
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(kToolbarHeight),
+        child: Container(
+          color: Colors.transparent,
+          child: SafeArea(
+            bottom: false,
+            child: SizedBox(
+              height: kToolbarHeight,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Center(child: _TitleStack(palette: palette)),
+                  Positioned(
+                    right: 12,
+                    child: _ListMapToggle(
+                      showMap: showMap,
+                      onChanged: (v) =>
+                          ref.read(mapModeProvider.notifier).state = v,
+                      mapDisabled: ref.watch(virtualOnlyFilterProvider),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-        ],
+        ),
       ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -326,7 +345,8 @@ class _ListContent extends ConsumerWidget {
           return const _EmptyState();
         }
         return ListView.builder(
-          padding: EdgeInsets.fromLTRB(16, 0, 16, MediaQuery.paddingOf(context).bottom),
+          padding: EdgeInsets.fromLTRB(
+              16, 0, 16, MediaQuery.paddingOf(context).bottom),
           itemCount: trainers.length,
           itemBuilder: (context, i) {
             final t = trainers[i];
