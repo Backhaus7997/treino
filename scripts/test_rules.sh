@@ -25,7 +25,16 @@ if [[ ! -f "${RULES_TEST_DIR}/rules.test.js" ]]; then
 fi
 
 # --- run via firebase emulators:exec -----------------------------------------
+#
+# NOTE (rules-hardening Slice B): multiple *.test.js sibling files share the
+# SAME emulator PROJECT_ID ('treino-test-rules'). Jest's default parallel
+# worker execution runs sibling test files concurrently against that one
+# shared emulator project, so one file's `afterEach(testEnv.clearFirestore())`
+# can wipe data another file just seeded moments earlier mid-test — flaky,
+# order-dependent false failures with no rule defect involved. `--runInBand`
+# forces serial execution (one file/test at a time) and eliminates the
+# collision. Confirmed via isolated runs during Slice B apply.
 cd "${SCRIPT_DIR}/.."
 firebase emulators:exec \
   --only firestore \
-  "cd scripts/rules_test && npm test"
+  "cd scripts/rules_test && npx jest --runInBand"
