@@ -796,11 +796,14 @@ service cloud.firestore {
       // Audited: markPaid/markManyPaid send only {status, paidAt} — still pass.
       // dueAt is pinned equal-to-existing so clients cannot set or alter it;
       // the CF bypasses rules via Admin SDK.
+      // lastOverdueNotifiedAt is added to hasOnly (future-proof) and pinned so
+      // clients cannot write it — the CF writes it via Admin SDK (bypasses rules).
       allow update: if request.auth != null
                   && resource.data.trainerId == request.auth.uid
                   && request.resource.data.keys().hasOnly([
                        'id', 'trainerId', 'athleteId', 'amountArs', 'concept',
-                       'status', 'periodKey', 'createdAt', 'paidAt', 'dueAt'
+                       'status', 'periodKey', 'createdAt', 'paidAt', 'dueAt',
+                       'lastOverdueNotifiedAt'
                      ])
                   && request.resource.data.id == resource.data.id
                   && request.resource.data.trainerId == resource.data.trainerId
@@ -809,7 +812,8 @@ service cloud.firestore {
                   && request.resource.data.concept == resource.data.concept
                   && request.resource.data.createdAt == resource.data.createdAt
                   && request.resource.data.get('periodKey', null) == resource.data.get('periodKey', null)
-                  && request.resource.data.get('dueAt', null) == resource.data.get('dueAt', null);
+                  && request.resource.data.get('dueAt', null) == resource.data.get('dueAt', null)
+                  && request.resource.data.get('lastOverdueNotifiedAt', null) == resource.data.get('lastOverdueNotifiedAt', null);
       allow delete: if request.auth != null && resource.data.trainerId == request.auth.uid;
     }
 

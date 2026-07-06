@@ -30,6 +30,7 @@ class Payment with _$Payment {
     @TimestampConverter() required DateTime createdAt,
     @TimestampConverter() DateTime? paidAt,
     @TimestampConverter() DateTime? dueAt,
+    @TimestampConverter() DateTime? lastOverdueNotifiedAt,
   }) = _Payment;
 
   factory Payment.fromJson(Map<String, Object?> json) =>
