@@ -2232,4 +2232,9 @@ class AppL10nEn extends AppL10n {
       int vencidos, int solicitudes, int inactivos) {
     return '';
   }
+
+  @override
+  String dashboardAdherenceValue(int pct) {
+    return '';
+  }
 }

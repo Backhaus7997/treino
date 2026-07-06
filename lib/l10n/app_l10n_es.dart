@@ -2286,6 +2286,11 @@ class AppL10nEs extends AppL10n {
       int vencidos, int solicitudes, int inactivos) {
     return '$vencidos vencido(s) · $solicitudes solicitud(es) · $inactivos inactivo(s)';
   }
+
+  @override
+  String dashboardAdherenceValue(int pct) {
+    return '$pct%';
+  }
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -4567,5 +4572,10 @@ class AppL10nEsAr extends AppL10nEs {
   String dashboardAlertBannerSummary(
       int vencidos, int solicitudes, int inactivos) {
     return '$vencidos vencido(s) · $solicitudes solicitud(es) · $inactivos inactivo(s)';
+  }
+
+  @override
+  String dashboardAdherenceValue(int pct) {
+    return '$pct%';
   }
 }

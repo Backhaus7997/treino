@@ -4220,6 +4220,12 @@ abstract class AppL10n {
   /// **'{vencidos} vencido(s) · {solicitudes} solicitud(es) · {inactivos} inactivo(s)'**
   String dashboardAlertBannerSummary(
       int vencidos, int solicitudes, int inactivos);
+
+  /// Formatted adherencia percentage value shown in the adherencia ring and KPI tile once the aggregate provider has data.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{pct}%'**
+  String dashboardAdherenceValue(int pct);
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

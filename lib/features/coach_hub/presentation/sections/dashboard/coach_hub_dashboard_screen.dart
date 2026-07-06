@@ -24,6 +24,7 @@ import 'package:treino/features/coach_hub/presentation/sections/pagos/widgets/pa
 import 'package:treino/features/feed/presentation/widgets/post_avatar.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
+import 'package:treino/features/coach_hub/application/aggregate_adherence_provider.dart';
 import 'package:treino/features/coach_hub/application/inactivos_provider.dart';
 import 'package:treino/features/workout/application/session_providers.dart'
     show currentUidProvider;
@@ -315,8 +316,8 @@ class _WelcomeCard extends ConsumerWidget {
                 ),
               ),
               const SizedBox(width: 16),
-              // Adherencia ring placeholder
-              _AdherenceRingPlaceholder(l10n: l10n, palette: palette),
+              // Adherencia ring — real aggregate (PR2).
+              const _AdherenceRing(),
             ],
           ),
         ],
@@ -354,17 +355,33 @@ class _QuickAction extends StatelessWidget {
   }
 }
 
-/// Adherencia ring — V1 placeholder (no aggregate provider). REQ-HOY-04B.
-class _AdherenceRingPlaceholder extends StatelessWidget {
-  const _AdherenceRingPlaceholder({
-    required this.l10n,
-    required this.palette,
-  });
-  final AppL10n l10n;
-  final AppPalette palette;
+/// Adherencia ring — real aggregate from [aggregateAdherenceProvider]. REQ-HOY-04B.
+///
+/// Shows "{pct}%" when data is available; "--" when null (no athlete has a plan).
+/// Loading state degrades gracefully to "--" (not a perpetual spinner) so
+/// [pumpAndSettle] does not hang in CI.
+class _AdherenceRing extends ConsumerWidget {
+  const _AdherenceRing();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+
+    // valueOrNull: resolves to null while loading → shows "--" (no spinner hang).
+    final adherence = ref.watch(aggregateAdherenceProvider).valueOrNull;
+
+    final String label;
+    final double ringValue;
+    if (adherence == null) {
+      label = l10n.dashboardAdherenceRingPlaceholder; // "--"
+      ringValue = 0;
+    } else {
+      label = l10n.dashboardAdherenceValue(adherence.round());
+      // Clamp ring value to [0, 1] for CircularProgressIndicator.
+      ringValue = (adherence / 100).clamp(0.0, 1.0);
+    }
+
     return SizedBox(
       width: 72,
       height: 72,
@@ -372,16 +389,19 @@ class _AdherenceRingPlaceholder extends StatelessWidget {
         alignment: Alignment.center,
         children: [
           CircularProgressIndicator(
-            value: 0,
+            value: ringValue,
             strokeWidth: 6,
             backgroundColor: palette.border,
-            color: palette.accent.withValues(alpha: 0.3),
+            color: adherence == null
+                ? palette.accent.withValues(alpha: 0.3)
+                : palette.accent,
           ),
           Text(
-            l10n.dashboardAdherenceRingPlaceholder,
+            label,
             style: TextStyle(
-              color: palette.textMuted,
-              fontSize: 16,
+              color:
+                  adherence == null ? palette.textMuted : palette.textPrimary,
+              fontSize: 14,
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -427,6 +447,13 @@ class _KpiStrip extends ConsumerWidget {
       vencidosCount = buckets.vencidos.length;
     });
 
+    // Adherencia aggregate — valueOrNull degrades to null (no spinner hang).
+    final adherenceAsync = ref.watch(aggregateAdherenceProvider);
+    final adherenceValue = adherenceAsync.valueOrNull;
+    final adherenceLabel = adherenceValue == null
+        ? l10n.dashboardAdherenceRingPlaceholder // "--"
+        : l10n.dashboardAdherenceValue(adherenceValue.round());
+
     final isLoading = linksAsync.isLoading || bucketsAsync.isLoading;
 
     return SingleChildScrollView(
@@ -445,7 +472,7 @@ class _KpiStrip extends ConsumerWidget {
           const SizedBox(width: 12),
           KpiTile(
             label: l10n.dashboardKpiAdherencia,
-            value: l10n.dashboardAdherenceRingPlaceholder,
+            value: adherenceLabel,
           ),
           const SizedBox(width: 12),
           KpiTile(

@@ -520,5 +520,12 @@
       "solicitudes": { "type": "int" },
       "inactivos": { "type": "int" }
     }
+  },
+  "dashboardAdherenceValue": "{pct}%",
+  "@dashboardAdherenceValue": {
+    "description": "Formatted adherencia percentage.",
+    "placeholders": {
+      "pct": { "type": "int" }
+    }
   }
 }

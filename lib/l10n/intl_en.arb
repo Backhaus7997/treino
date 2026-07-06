@@ -825,5 +825,6 @@
   "dashboardInactivosEmpty": "",
   "dashboardInactivosSharingNote": "",
   "dashboardAlertBannerAllClear": "",
-  "dashboardAlertBannerSummary": ""
+  "dashboardAlertBannerSummary": "",
+  "dashboardAdherenceValue": ""
 }

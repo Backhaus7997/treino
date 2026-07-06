@@ -1745,5 +1745,12 @@
       "solicitudes": { "type": "int" },
       "inactivos": { "type": "int" }
     }
+  },
+  "dashboardAdherenceValue": "{pct}%",
+  "@dashboardAdherenceValue": {
+    "description": "Formatted adherencia percentage value shown in the adherencia ring and KPI tile once the aggregate provider has data.",
+    "placeholders": {
+      "pct": { "type": "int" }
+    }
   }
 }
