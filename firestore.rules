@@ -502,20 +502,46 @@ service cloud.firestore {
     // Trainer public identity documents — readable by any authenticated user,
     // writable only by the owner (always written via UserRepository dual-write).
     // REQ-COACH-DISC-DATA-008, REQ-COACH-DISC-DATA-009.
+    //
+    // rules-hardening Slice B (AD-3) — averageRating/reviewCount Are
+    // CF-Write-Only: these two fields are derived aggregates written by the
+    // `reviewAggregate` Cloud Function via the Admin SDK (which bypasses
+    // rules entirely — no rule path here "allows" that write). A client
+    // write (create or update) may only (a) omit the fields, or (b) on
+    // update, re-assert the exact currently-stored value. Any other value —
+    // including seeding a value at create time — is denied. Mirrors the
+    // userPublicProfiles CF-write-only ranking-metric idiom
+    // (firestore.rules:434-468, `.get(field, null)` null-safe comparison)
+    // verbatim, without the opt-in-disable exception clause (no analogous
+    // disable flow exists for reviews).
+    //
+    // Deliberately NO keys().hasOnly() allowlist here (AD-3 divergence from
+    // the trainer-reviews spec's "Out-of-allowlist field" scenario — see
+    // tasks.md 2.7): TrainerPublicProfileRepository's write path is a
+    // partial merge with a large, evolving discovery-field set, making
+    // hasOnly a high-risk coupling trap for near-zero security value (those
+    // fields are self-attested, not a trust boundary).
     match /trainerPublicProfiles/{uid} {
       // Any authenticated user can read (SCENARIO-416).
       allow read: if request.auth != null;
 
       // Only the owner can create their own doc; uid in body must match doc id.
-      // (SCENARIO-418)
+      // (SCENARIO-418). averageRating/reviewCount must be absent or null —
+      // a create cannot seed a forged starting value (AD-3).
       allow create: if request.auth != null
                     && request.auth.uid == uid
-                    && request.resource.data.uid == uid;
+                    && request.resource.data.uid == uid
+                    && request.resource.data.get('averageRating', null) == null
+                    && request.resource.data.get('reviewCount', null) == null;
 
       // Only the owner can update; uid in body must not change (SCENARIO-418).
+      // averageRating/reviewCount must be absent or unchanged from the
+      // stored value (AD-3) — closes the raw set(merge)/update forgery path.
       allow update: if request.auth != null
                     && request.auth.uid == uid
-                    && request.resource.data.uid == resource.data.uid;
+                    && request.resource.data.uid == resource.data.uid
+                    && request.resource.data.get('averageRating', null) == resource.data.get('averageRating', null)
+                    && request.resource.data.get('reviewCount', null) == resource.data.get('reviewCount', null);
 
       // Delete denied — managed exclusively via privileged server-side operations.
       allow delete: if false;
@@ -1065,9 +1091,25 @@ service cloud.firestore {
     // Doc id is deterministic: `${linkId}_${athleteId}`.
     // REQ-RV-DATA-007. SCENARIO-580..585.
     //
+    // rules-hardening Slice B (AD-1) — Review Create Requires Real Trainer
+    // Link: `athleteId == auth.uid` + rating bounds alone are NOT sufficient
+    // to prove a real coaching relationship — any athlete could otherwise
+    // forge a 1-star (sabotage) or 5-star (self-boost-by-proxy) review for
+    // ANY trainerId with no relationship at all. The doc-id is pinned to the
+    // deterministic `${linkId}_${athleteId}` convention (mirrors
+    // Review.idFor), and the named trainer_links/{linkId} document must be a
+    // real, non-terminated relationship naming both parties. This is the
+    // same cross-doc get()-gate idiom used for role checks elsewhere in this
+    // file (e.g. the `gyms` create rule), applied here to a relationship
+    // check instead of a role.
+    //
     // Rules:
     //   read:   any authenticated user (needed for public profile display).
     //   create: athlete creates their own review (athleteId == auth.uid);
+    //           doc-id must equal `${linkId}_${athleteId}`; the named
+    //           trainer_links/{linkId} must exist with athleteId/trainerId
+    //           matching the review payload and status in [active, paused]
+    //           (a terminated link no longer proves a live relationship);
     //           rating must be 1..5; comment ≤500 chars.
     //   update: owner only; may change only rating, comment, updatedAt —
     //           preventing id/linkId/athleteId/trainerId/createdAt tampering.
@@ -1077,6 +1119,10 @@ service cloud.firestore {
 
       allow create: if request.auth != null
                     && request.auth.uid == request.resource.data.athleteId
+                    && reviewId == request.resource.data.linkId + '_' + request.resource.data.athleteId
+                    && get(/databases/$(database)/documents/trainer_links/$(request.resource.data.linkId)).data.athleteId == request.auth.uid
+                    && get(/databases/$(database)/documents/trainer_links/$(request.resource.data.linkId)).data.trainerId == request.resource.data.trainerId
+                    && get(/databases/$(database)/documents/trainer_links/$(request.resource.data.linkId)).data.status in ['active', 'paused']
                     && request.resource.data.rating >= 1
                     && request.resource.data.rating <= 5
                     && (!('comment' in request.resource.data)
