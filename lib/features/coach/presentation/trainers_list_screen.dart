@@ -9,6 +9,7 @@ import '../../gyms/application/gym_providers.dart';
 import '../../gyms/domain/gym.dart';
 import '../application/trainer_discovery_providers.dart';
 import '../domain/trainer_location.dart';
+import '../domain/trainer_specialty.dart';
 import '../../../l10n/app_l10n.dart';
 import 'widgets/location_permission_rationale_sheet.dart';
 import 'widgets/trainer_advanced_filter_chips.dart';
@@ -104,53 +105,99 @@ class _TrainersListScreenState extends ConsumerState<TrainersListScreen> {
           ),
         ),
       ),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // 1. Modo: Presencial vs Online — decisión más importante.
-          //    En modo MAPA, paddings más chicos para liberar pantalla.
-          Padding(
-            padding:
-                EdgeInsets.fromLTRB(16, showMap ? 8 : 12, 16, showMap ? 4 : 8),
-            child: const _ModeTabs(),
-          ),
-          // 2. Filtros — en MAPA, una sola row compacta combinando
-          //    distancia + precio + specialty. En LISTA, layout original
-          //    con section headers y filas separadas.
-          if (showMap)
-            const TrainerCompactFilterRow()
-          else ...[
-            _SectionHeader(palette: palette, text: 'ESPECIALIDAD'),
-            const SizedBox(height: 6),
-            TrainerSpecialtyChips(
-              selected: selected,
-              onChanged: (next) =>
-                  ref.read(selectedSpecialtyProvider.notifier).state = next,
-            ),
-            // 3. Filtros avanzados — solo en modo Presencial. En Online no
-            //    aplica distancia (sin ubicación física) y precio es info
-            //    visible en el card del PF.
-            if (!ref.watch(virtualOnlyFilterProvider)) ...[
-              const SizedBox(height: 12),
-              _SectionHeader(palette: palette, text: 'FILTROS'),
-              const SizedBox(height: 6),
-              const TrainerAdvancedFilterChips(),
+      body: DefaultTabController(
+        length: 2,
+        initialIndex: ref.read(virtualOnlyFilterProvider) ? 1 : 0,
+        child: _ModeTabScope(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // 1. Modo: Presencial vs Online — decisión más importante.
+              //    En modo MAPA, paddings más chicos para liberar pantalla.
+              //    Swipeable (mismo patrón que Entrenar↔Rankings en
+              //    WorkoutScreen — DefaultTabController + TabBar/TabBarView),
+              //    en vez del toggle tap-only anterior.
+              Padding(
+                padding: EdgeInsets.fromLTRB(
+                    16, showMap ? 8 : 12, 16, showMap ? 4 : 8),
+                child: const _ModeTabBar(),
+              ),
+              SizedBox(height: showMap ? 4 : 8),
+              Expanded(
+                child: _ModeTabView(
+                  palette: palette,
+                  selected: selected,
+                  showMap: showMap,
+                ),
+              ),
             ],
-          ],
-          SizedBox(height: showMap ? 4 : 8),
-          Expanded(
-            child: IndexedStack(
-              index: showMap ? 1 : 0,
-              children: const [
-                _ListContent(),
-                TrainersMapView(),
-              ],
-            ),
           ),
-        ],
+        ),
       ),
     );
   }
+}
+
+/// Bridges the [DefaultTabController]'s swipe/tap-driven index to
+/// [virtualOnlyFilterProvider] and preserves the auto-switch-to-MAPA/LISTA
+/// side effects that used to live in the old tap-only `_ModeTabs.onTap`
+/// (design D24 symmetry: entering ONLINE forces LISTA, returning to
+/// PRESENCIAL from ONLINE restores MAPA). Listening on the controller
+/// (rather than only on tap) is what makes the swipe gesture keep the same
+/// behavior as a tap.
+class _ModeTabScope extends ConsumerStatefulWidget {
+  const _ModeTabScope({required this.child});
+  final Widget child;
+
+  @override
+  ConsumerState<_ModeTabScope> createState() => _ModeTabScopeState();
+}
+
+class _ModeTabScopeState extends ConsumerState<_ModeTabScope> {
+  TabController? _controller;
+  bool _wasVirtualOnly = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final controller = DefaultTabController.of(context);
+    if (identical(controller, _controller)) return;
+    _controller?.removeListener(_onIndexChanged);
+    _controller = controller..addListener(_onIndexChanged);
+    _wasVirtualOnly = ref.read(virtualOnlyFilterProvider);
+  }
+
+  void _onIndexChanged() {
+    final controller = _controller;
+    // TabController fires the listener twice per swipe/tap (once mid-drag,
+    // once on settle) — only act once the index has actually settled and
+    // changed, otherwise the auto-switch side effects would double-fire.
+    if (controller == null || controller.indexIsChanging) return;
+    final nowVirtualOnly = controller.index == 1;
+    if (nowVirtualOnly == _wasVirtualOnly) return;
+
+    ref.read(virtualOnlyFilterProvider.notifier).state = nowVirtualOnly;
+    if (nowVirtualOnly) {
+      // Entrando a ONLINE: auto-switch a LISTA (el mapa no aplica a
+      // virtuales) — toggle MAPA queda disabled mientras Online ON.
+      ref.read(mapModeProvider.notifier).state = false;
+    } else if (_wasVirtualOnly) {
+      // Volviendo a PRESENCIAL viniendo de ONLINE: auto-switch a MAPA,
+      // simétrico. Si ya estabas en PRESENCIAL no se re-dispara (guard
+      // arriba ya cortó por nowVirtualOnly == _wasVirtualOnly).
+      ref.read(mapModeProvider.notifier).state = true;
+    }
+    _wasVirtualOnly = nowVirtualOnly;
+  }
+
+  @override
+  void dispose() {
+    _controller?.removeListener(_onIndexChanged);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }
 
 // ── Title stack — magenta "ENCONTRÁ TU" + white "COACH" ──────────────────────
@@ -435,18 +482,25 @@ class _ErrorState extends StatelessWidget {
 
 // ── Mode tabs (Presencial / Online) ─────────────────────────────────────────
 //
-// Segmented control binario. Controla `virtualOnlyFilterProvider`: ON cuando
-// el atleta elige "Online", OFF cuando elige "Presencial". Esta decisión es
+// Swipeable segmented control — same TabBar/TabBarView pattern as the
+// Entrenar↔Rankings pages in WorkoutScreen's `_AthleteWorkout` (design
+// `sdd/rankings-v2`). Drives `virtualOnlyFilterProvider`: ON cuando el
+// atleta elige "Online", OFF cuando elige "Presencial". Esta decisión es
 // la más importante de la pantalla — modalidad de servicio, no filtro. Por
 // eso vive arriba de todo, con peso visual distinto a los chips de abajo.
+// The tap→provider write and the MAPA/LISTA auto-switch side effects now
+// live in [_ModeTabScopeState], so they fire identically whether the user
+// taps a tab or swipes the TabBarView.
 
-class _ModeTabs extends ConsumerWidget {
-  const _ModeTabs();
+class _ModeTabBar extends StatelessWidget {
+  const _ModeTabBar();
+
+  static const _labels = <String>['PRESENCIAL', 'ONLINE'];
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    final virtualOnly = ref.watch(virtualOnlyFilterProvider);
+    final theme = Theme.of(context);
 
     return Container(
       decoration: BoxDecoration(
@@ -455,84 +509,120 @@ class _ModeTabs extends ConsumerWidget {
         border: Border.all(color: palette.border),
       ),
       padding: const EdgeInsets.all(4),
-      child: Row(
-        children: [
-          _ModeTab(
-            label: 'PRESENCIAL',
-            active: !virtualOnly,
-            onTap: () {
-              final wasVirtualOnly = ref.read(virtualOnlyFilterProvider);
-              ref.read(virtualOnlyFilterProvider.notifier).state = false;
-              // Auto-switch a MAPA solo cuando venimos de ONLINE —
-              // simétrico al tap ONLINE que auto-switchea a LISTA. Si ya
-              // estabas en PRESENCIAL y elegiste LISTA, respetamos esa
-              // elección (no forzamos MAPA en cada re-tap).
-              if (wasVirtualOnly) {
-                ref.read(mapModeProvider.notifier).state = true;
-              }
-            },
-            palette: palette,
-          ),
-          _ModeTab(
-            label: 'ONLINE',
-            active: virtualOnly,
-            onTap: () {
-              // Auto-switch a LISTA: el mapa no aplica para virtuales,
-              // así que el atleta cae directo en LISTA sin pasos extra.
-              // El toggle MAPA queda visualmente disabled mientras Online ON.
-              ref.read(virtualOnlyFilterProvider.notifier).state = true;
-              ref.read(mapModeProvider.notifier).state = false;
-            },
-            palette: palette,
-          ),
+      child: TabBar(
+        dividerColor: Colors.transparent,
+        indicatorSize: TabBarIndicatorSize.tab,
+        indicator: BoxDecoration(
+          color: palette.accent,
+          borderRadius: BorderRadius.circular(9999),
+        ),
+        splashBorderRadius: BorderRadius.circular(9999),
+        labelColor: palette.bg,
+        unselectedLabelColor: palette.textMuted,
+        labelStyle: GoogleFonts.barlowCondensed(
+          fontWeight: FontWeight.w700,
+          fontSize: 13,
+          letterSpacing: 1.2,
+        ),
+        unselectedLabelStyle: theme.textTheme.labelLarge?.copyWith(
+          fontWeight: FontWeight.w700,
+          fontSize: 13,
+          letterSpacing: 1.2,
+        ),
+        tabs: [
+          for (final l in _labels) Tab(text: l, height: 38),
         ],
       ),
     );
   }
 }
 
-class _ModeTab extends StatelessWidget {
-  const _ModeTab({
-    required this.label,
-    required this.active,
-    required this.onTap,
+/// Swipeable body — mirrors `_AthleteWorkout`'s `TabBarView` (page order
+/// never changes, all state-branching lives inside the shared
+/// [_DiscoveryBody], same as design AD-1's "child list itself never
+/// branches" rule). Both pages render the identical widget: the actual
+/// content difference (filtros avanzados, query, list items) is entirely
+/// provider-driven already (`virtualOnlyFilterProvider`), so duplicating
+/// the subtree per page would just re-render the same reactive content
+/// twice — a plain 2-page TabBarView of the same child gives the swipe
+/// gesture without duplicating logic.
+class _ModeTabView extends StatelessWidget {
+  const _ModeTabView({
     required this.palette,
+    required this.selected,
+    required this.showMap,
   });
-  final String label;
-  final bool active;
-  final VoidCallback onTap;
+
   final AppPalette palette;
+  final Set<TrainerSpecialty> selected;
+  final bool showMap;
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: Semantics(
-        button: true,
-        selected: active,
-        child: GestureDetector(
-          onTap: onTap,
-          behavior: HitTestBehavior.opaque,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 160),
-            padding: const EdgeInsets.symmetric(vertical: 10),
-            decoration: BoxDecoration(
-              color: active ? palette.accent : Colors.transparent,
-              borderRadius: BorderRadius.circular(9999),
-            ),
-            child: Center(
-              child: Text(
-                label,
-                style: GoogleFonts.barlowCondensed(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 13,
-                  letterSpacing: 1.2,
-                  color: active ? palette.bg : palette.textMuted,
-                ),
-              ),
-            ),
+    final body = _DiscoveryBody(
+      palette: palette,
+      selected: selected,
+      showMap: showMap,
+    );
+    return TabBarView(
+      children: [body, body],
+    );
+  }
+}
+
+/// Filtros + contenido (lista/mapa) — extraído del build original de
+/// [TrainersListScreen] para reuse entre las dos páginas del
+/// [_ModeTabView].
+class _DiscoveryBody extends ConsumerWidget {
+  const _DiscoveryBody({
+    required this.palette,
+    required this.selected,
+    required this.showMap,
+  });
+
+  final AppPalette palette;
+  final Set<TrainerSpecialty> selected;
+  final bool showMap;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Filtros — en MAPA, una sola row compacta combinando distancia +
+        // precio + specialty. En LISTA, layout original con section
+        // headers y filas separadas.
+        if (showMap)
+          const TrainerCompactFilterRow()
+        else ...[
+          _SectionHeader(palette: palette, text: 'ESPECIALIDAD'),
+          const SizedBox(height: 6),
+          TrainerSpecialtyChips(
+            selected: selected,
+            onChanged: (next) =>
+                ref.read(selectedSpecialtyProvider.notifier).state = next,
+          ),
+          // Filtros avanzados — solo en modo Presencial. En Online no
+          // aplica distancia (sin ubicación física) y precio es info
+          // visible en el card del PF.
+          if (!ref.watch(virtualOnlyFilterProvider)) ...[
+            const SizedBox(height: 12),
+            _SectionHeader(palette: palette, text: 'FILTROS'),
+            const SizedBox(height: 6),
+            const TrainerAdvancedFilterChips(),
+          ],
+        ],
+        SizedBox(height: showMap ? 4 : 8),
+        Expanded(
+          child: IndexedStack(
+            index: showMap ? 1 : 0,
+            children: const [
+              _ListContent(),
+              TrainersMapView(),
+            ],
           ),
         ),
-      ),
+      ],
     );
   }
 }
