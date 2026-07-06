@@ -985,7 +985,21 @@ class _ProxSesionCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final async = ref.watch(appointmentsForAthleteStreamProvider(athleteId));
+    // La regla de `appointments` exige filtrar por trainerId — Firestore rechaza
+    // un query por athleteId (watchForAthlete es del lado del alumno, no del PF).
+    // Usamos el stream del trainer (mismo que el dashboard) con ventana
+    // day-truncada ESTABLE y filtramos el alumno en memoria: sin permission-denied
+    // y sin índice nuevo.
+    final trainerId = ref.watch(currentUidProvider) ?? '';
+    final now = DateTime.now().toUtc();
+    final todayStart = DateTime.utc(now.year, now.month, now.day);
+    final async = ref.watch(trainerAppointmentsStreamProvider(
+      TrainerAppointmentsKey(
+        trainerId: trainerId,
+        fromDate: todayStart,
+        toDate: todayStart.add(const Duration(days: 60)),
+      ),
+    ));
     return async.when(
       loading: () => SizedBox(
         height: 48,
@@ -1000,9 +1014,9 @@ class _ProxSesionCard extends ConsumerWidget {
       ),
       error: (_, __) => _muted(palette, 'No se pudo cargar la agenda.'),
       data: (appointments) {
-        final now = DateTime.now();
         final upcoming = appointments
             .where((a) =>
+                a.athleteId == athleteId &&
                 a.status == AppointmentStatus.confirmed &&
                 a.startsAt.isAfter(now))
             .toList()

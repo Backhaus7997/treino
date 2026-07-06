@@ -306,8 +306,8 @@ Future<void> _pump(
         athleteNoteProvider.overrideWith(
           (ref, key) => Stream.value(athleteNote),
         ),
-        appointmentsForAthleteStreamProvider.overrideWith(
-          (ref, id) => Stream.value(appointments),
+        trainerAppointmentsStreamProvider.overrideWith(
+          (ref, key) => Stream.value(appointments),
         ),
         lastWeightByExerciseProvider.overrideWith(
           (ref, uid) async => lastWeightByExercise,
@@ -1200,8 +1200,8 @@ void main() {
             // PR9 — nuevos widgets del Resumen tab.
             athleteNoteProvider
                 .overrideWith((ref, key) => Stream.value(null)),
-            appointmentsForAthleteStreamProvider
-                .overrideWith((ref, id) => Stream.value(const [])),
+            trainerAppointmentsStreamProvider
+                .overrideWith((ref, key) => Stream.value(const [])),
             lastWeightByExerciseProvider
                 .overrideWith((ref, uid) async => const {}),
             coachSessionSetLogsProvider
