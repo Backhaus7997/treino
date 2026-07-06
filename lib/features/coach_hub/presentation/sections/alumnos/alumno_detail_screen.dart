@@ -8,7 +8,9 @@ import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/chat/application/chat_providers.dart';
 import 'package:treino/features/coach/application/athlete_file_providers.dart';
+import 'package:treino/features/coach/application/agenda_providers.dart';
 import 'package:treino/features/coach/application/athlete_note_providers.dart';
+import 'package:treino/features/coach/domain/appointment.dart';
 import 'package:treino/features/coach/application/follow_up_entry_providers.dart';
 import 'package:treino/features/coach/application/nutrition_plan_providers.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
@@ -737,11 +739,26 @@ class _ResumenTab extends ConsumerWidget {
           _sectionLabel(palette, 'ADHERENCIA · 12 SEMANAS'), // i18n: Fase W2
           const SizedBox(height: 10),
           _AdherenciaHeatmap(data: m.heatmap, palette: palette),
-          const SizedBox(height: 14),
-          Text(
-            'Próximamente: última sesión por ejercicio, datos personales, '
-            'nota fijada y próxima sesión.', // i18n: Fase W2
-            style: TextStyle(color: palette.textMuted, fontSize: 12),
+          const SizedBox(height: 20),
+          _sectionLabel(palette, 'NOTA FIJADA'), // i18n: Fase W2
+          const SizedBox(height: 10),
+          if (trainerUid != null)
+            _NoteCard(
+              palette: palette,
+              trainerId: trainerUid,
+              athleteId: athleteId,
+            ),
+          const SizedBox(height: 20),
+          _sectionLabel(palette, 'PRÓXIMA SESIÓN'), // i18n: Fase W2
+          const SizedBox(height: 10),
+          _ProxSesionCard(palette: palette, athleteId: athleteId),
+          const SizedBox(height: 20),
+          _sectionLabel(palette, 'ÚLTIMA SESIÓN · POR EJERCICIO'), // i18n: Fase W2
+          const SizedBox(height: 10),
+          _UltimaSessionCard(
+            palette: palette,
+            athleteId: athleteId,
+            sessions: sessionsAsync.requireValue,
           ),
         ],
       ),
@@ -827,6 +844,380 @@ class _MetricCard extends StatelessWidget {
             ],
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ── _NoteCard ─────────────────────────────────────────────────────────────────
+
+/// Tarjeta de la nota fijada del PF sobre el alumno en el tab Resumen (W2 PR9).
+///
+/// Reutiliza [athleteNoteProvider] — el mismo que usa [_NotasPrivadasTab].
+/// Trunca a 3 líneas + "hace X días" del updatedAt. Sin nota → estado vacío.
+class _NoteCard extends ConsumerWidget {
+  const _NoteCard({
+    required this.palette,
+    required this.trainerId,
+    required this.athleteId,
+  });
+
+  final AppPalette palette;
+  final String trainerId;
+  final String athleteId;
+
+  String _haceDias(DateTime updatedAt) {
+    final diff = DateTime.now().difference(updatedAt.toLocal());
+    final days = diff.inDays;
+    if (days == 0) return 'hoy';
+    if (days == 1) return 'hace 1 día';
+    return 'hace $days días';
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(
+      athleteNoteProvider((trainerId: trainerId, athleteId: athleteId)),
+    );
+    return async.when(
+      loading: () => SizedBox(
+        height: 48,
+        child: Center(
+          child: SizedBox(
+            width: 18,
+            height: 18,
+            child:
+                CircularProgressIndicator(strokeWidth: 2, color: palette.accent),
+          ),
+        ),
+      ),
+      error: (_, __) => _muted(palette, 'No se pudo cargar la nota.'),
+      data: (note) {
+        return Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: palette.bgCard,
+            border: Border.all(color: palette.border),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: note == null || note.note.trim().isEmpty
+              ? Text(
+                  'Sin nota fijada.', // i18n: Fase W2
+                  style: TextStyle(color: palette.textMuted, fontSize: 13),
+                )
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      note.note,
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: palette.textPrimary,
+                        fontSize: 13,
+                        height: 1.45,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      _haceDias(note.updatedAt), // i18n: Fase W2
+                      style: TextStyle(
+                        color: palette.textMuted,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+        );
+      },
+    );
+  }
+}
+
+// ── _ProxSesionCard ───────────────────────────────────────────────────────────
+
+/// Tarjeta de la próxima sesión confirmada del alumno (W2 PR9).
+///
+/// Reutiliza [appointmentsForAthleteStreamProvider] ya presente en
+/// agenda_providers.dart. Filtra: confirmed + startsAt futuro, ordena ASC,
+/// toma el primero. Sin sesiones → estado vacío.
+class _ProxSesionCard extends ConsumerWidget {
+  const _ProxSesionCard({required this.palette, required this.athleteId});
+
+  final AppPalette palette;
+  final String athleteId;
+
+  String _fmtDate(DateTime dt) {
+    final local = dt.toLocal();
+    final d = local.day.toString().padLeft(2, '0');
+    final m = local.month.toString().padLeft(2, '0');
+    final y = local.year.toString();
+    final hh = local.hour.toString().padLeft(2, '0');
+    final mm = local.minute.toString().padLeft(2, '0');
+    return '$d/$m/$y · $hh:$mm';
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    // La regla de `appointments` exige filtrar por trainerId — Firestore rechaza
+    // un query por athleteId (watchForAthlete es del lado del alumno, no del PF).
+    // Usamos el stream del trainer (mismo que el dashboard) con ventana
+    // day-truncada ESTABLE y filtramos el alumno en memoria: sin permission-denied
+    // y sin índice nuevo.
+    final trainerId = ref.watch(currentUidProvider) ?? '';
+    final now = DateTime.now().toUtc();
+    final todayStart = DateTime.utc(now.year, now.month, now.day);
+    final async = ref.watch(trainerAppointmentsStreamProvider(
+      TrainerAppointmentsKey(
+        trainerId: trainerId,
+        fromDate: todayStart,
+        toDate: todayStart.add(const Duration(days: 60)),
+      ),
+    ));
+    return async.when(
+      loading: () => SizedBox(
+        height: 48,
+        child: Center(
+          child: SizedBox(
+            width: 18,
+            height: 18,
+            child:
+                CircularProgressIndicator(strokeWidth: 2, color: palette.accent),
+          ),
+        ),
+      ),
+      error: (_, __) => _muted(palette, 'No se pudo cargar la agenda.'),
+      data: (appointments) {
+        final upcoming = appointments
+            .where((a) =>
+                a.athleteId == athleteId &&
+                a.status == AppointmentStatus.confirmed &&
+                a.startsAt.isAfter(now))
+            .toList()
+          ..sort((a, b) => a.startsAt.compareTo(b.startsAt));
+        final next = upcoming.firstOrNull;
+
+        return Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: palette.bgCard,
+            border: Border.all(color: palette.border),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: next == null
+              ? Text(
+                  'Sin sesiones próximas.', // i18n: Fase W2
+                  style: TextStyle(color: palette.textMuted, fontSize: 13),
+                )
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _fmtDate(next.startsAt), // i18n: Fase W2
+                      style: TextStyle(
+                        color: palette.textPrimary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${next.durationMin} min', // i18n: Fase W2
+                      style: TextStyle(
+                        color: palette.textMuted,
+                        fontSize: 12,
+                      ),
+                    ),
+                    if (next.noteBefore != null &&
+                        next.noteBefore!.trim().isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        next.noteBefore!,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: palette.textMuted,
+                          fontSize: 12,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+        );
+      },
+    );
+  }
+}
+
+// ── _UltimaSessionCard ────────────────────────────────────────────────────────
+
+/// Tarjeta con el desglose por ejercicio de la última sesión del alumno (W2 PR9).
+///
+/// Reutiliza [coachSessionSetLogsProvider] — el mismo que usa [_SetLogsExpansion].
+/// Incluye el mismo manejo de permission-denied (alumno no compartió historial).
+/// Opcionalmente muestra badge "+N kg" usando [lastWeightByExerciseProvider].
+class _UltimaSessionCard extends ConsumerWidget {
+  const _UltimaSessionCard({
+    required this.palette,
+    required this.athleteId,
+    required this.sessions,
+  });
+
+  final AppPalette palette;
+  final String athleteId;
+  final List<Session> sessions;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (sessions.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: palette.bgCard,
+          border: Border.all(color: palette.border),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Text(
+          'Sin sesiones registradas.', // i18n: Fase W2
+          style: TextStyle(color: palette.textMuted, fontSize: 13),
+        ),
+      );
+    }
+
+    final lastSession = sessions.first;
+    final logsAsync = ref.watch(coachSessionSetLogsProvider(
+        (athleteUid: athleteId, sessionId: lastSession.id)));
+    final lastWeightAsync =
+        ref.watch(lastWeightByExerciseProvider(athleteId));
+    final muted = TextStyle(color: palette.textMuted, fontSize: 12);
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: palette.bgCard,
+        border: Border.all(color: palette.border),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            lastSession.routineName, // i18n: Fase W2
+            style: TextStyle(
+              color: palette.textPrimary,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          logsAsync.when(
+            loading: () => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                    strokeWidth: 2, color: palette.accent),
+              ),
+            ),
+            error: (e, _) {
+              final noShare =
+                  e is FirebaseException && e.code == 'permission-denied';
+              return Text(
+                noShare
+                    ? 'El alumno no compartió su historial.' // i18n: Fase W2
+                    : 'No se pudo cargar el detalle de la sesión.', // i18n: Fase W2
+                style: muted,
+              );
+            },
+            data: (logs) {
+              if (logs.isEmpty) {
+                return Text(
+                    'Sin series registradas en esta sesión.', // i18n: Fase W2
+                    style: muted);
+              }
+              final groups = <String, List<SetLog>>{};
+              for (final log in logs) {
+                groups.putIfAbsent(log.exerciseId, () => <SetLog>[]).add(log);
+              }
+              final lastWeight = lastWeightAsync.valueOrNull;
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (final entry in groups.entries)
+                    _UltimaEjercicioRow(
+                      palette: palette,
+                      logs: entry.value,
+                      progressionKg: lastWeight?[entry.key],
+                    ),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Fila de un ejercicio en [_UltimaSessionCard]: nombre + nro de sets +
+/// badge opcional "+N kg" de progresión.
+class _UltimaEjercicioRow extends StatelessWidget {
+  const _UltimaEjercicioRow({
+    required this.palette,
+    required this.logs,
+    this.progressionKg,
+  });
+
+  final AppPalette palette;
+  final List<SetLog> logs;
+  final double? progressionKg;
+
+  @override
+  Widget build(BuildContext context) {
+    final name = logs.first.exerciseName;
+    final sets = logs.length;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              name,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: palette.textPrimary,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            '$sets × sets', // i18n: Fase W2
+            style: TextStyle(color: palette.textMuted, fontSize: 12),
+          ),
+          if (progressionKg != null) ...[
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: palette.accent.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                '${progressionKg! >= 0 ? '+' : ''}${progressionKg!.toStringAsFixed(1)} kg',
+                style: TextStyle(
+                  color: palette.accent,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
