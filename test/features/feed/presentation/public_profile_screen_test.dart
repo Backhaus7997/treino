@@ -11,6 +11,8 @@ import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/feed/application/public_profile_providers.dart';
+import 'package:treino/features/feed/domain/friendship.dart';
+import 'package:treino/features/feed/domain/friendship_status.dart';
 import 'package:treino/features/feed/domain/public_profile_view.dart';
 import 'package:treino/features/feed/presentation/public_profile_screen.dart';
 import 'package:treino/features/feed/presentation/widgets/public_profile_follow_button.dart';
@@ -53,13 +55,16 @@ PublicProfileView _view({
   String? authorAvatarUrl,
   String? authorGymId,
   bool isSelf = false,
+  bool isPublic = true,
+  dynamic friendship,
 }) =>
     PublicProfileView(
       authorDisplayName: authorDisplayName,
       authorAvatarUrl: authorAvatarUrl,
       authorGymId: authorGymId,
-      friendship: null,
+      friendship: friendship,
       isSelf: isSelf,
+      isPublic: isPublic,
     );
 
 Widget _wrap({
@@ -195,6 +200,82 @@ void main() {
 
       expect(find.text('Aún no hay actividad reciente.'), findsOneWidget);
       expect(find.text('Aún no hay rutinas públicas.'), findsNothing);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Privacy gate — Instagram-style. Header + follow button stay visible; the
+  // detailed content (stats numbers, tabs) is gated to accepted followers.
+  // ---------------------------------------------------------------------------
+  group('PublicProfileScreen — privacy gate', () {
+    Friendship acceptedFriendship() => Friendship(
+          id: 'target_viewer',
+          uidA: 'target',
+          uidB: 'viewer',
+          status: FriendshipStatus.accepted,
+          requesterId: 'viewer',
+          members: const ['target', 'viewer'],
+          createdAt: DateTime.utc(2026, 1, 1),
+        );
+
+    testWidgets(
+        'private + non-follower → hides tabs and shows "Perfil privado" notice',
+        (tester) async {
+      await tester.pumpWidget(_wrap(
+        child: const PublicProfileScreen(targetUid: 'target'),
+        view: AsyncData(_view(isPublic: false, friendship: null)),
+      ));
+      await tester.pumpAndSettle();
+
+      // Notice is visible.
+      expect(find.text('Perfil privado'), findsOneWidget);
+      // Tabs are NOT rendered.
+      expect(find.text('RUTINAS PÚBLICAS'), findsNothing);
+      expect(find.text('ACTIVIDAD'), findsNothing);
+      // Follow button IS still rendered (the whole point: allow request).
+      expect(find.byType(PublicProfileFollowButton), findsOneWidget);
+    });
+
+    testWidgets(
+        'private + accepted follower → shows tabs (gate lifted)',
+        (tester) async {
+      await tester.pumpWidget(_wrap(
+        child: const PublicProfileScreen(targetUid: 'target'),
+        view: AsyncData(
+          _view(isPublic: false, friendship: acceptedFriendship()),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Perfil privado'), findsNothing);
+      expect(find.text('RUTINAS PÚBLICAS'), findsOneWidget);
+      expect(find.text('ACTIVIDAD'), findsOneWidget);
+    });
+
+    testWidgets(
+        'private + isSelf → shows tabs (owner always sees own profile)',
+        (tester) async {
+      await tester.pumpWidget(_wrap(
+        child: const PublicProfileScreen(targetUid: 'target'),
+        view: AsyncData(_view(isPublic: false, isSelf: true)),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Perfil privado'), findsNothing);
+      expect(find.text('RUTINAS PÚBLICAS'), findsOneWidget);
+    });
+
+    testWidgets(
+        'public + non-follower → shows tabs (no gate)',
+        (tester) async {
+      await tester.pumpWidget(_wrap(
+        child: const PublicProfileScreen(targetUid: 'target'),
+        view: AsyncData(_view(isPublic: true, friendship: null)),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Perfil privado'), findsNothing);
+      expect(find.text('RUTINAS PÚBLICAS'), findsOneWidget);
     });
   });
 }

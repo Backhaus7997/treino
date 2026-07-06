@@ -21,5 +21,9 @@ class PublicProfileView with _$PublicProfileView {
     int? racha,
     int? followersCount,
     int? followingCount,
+    // Target profile visibility. Mirrors `UserPublicProfile.isProfilePublic`
+    // for the target user. Default `true` matches the model default so
+    // unauthenticated / missing-profile branches behave as pre-existing code.
+    @Default(true) bool isPublic,
   }) = _PublicProfileView;
 }

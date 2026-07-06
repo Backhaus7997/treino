@@ -16,6 +16,7 @@ import 'presentation/widgets/profile_avatar_card.dart';
 import 'presentation/widgets/profile_cuenta_section.dart';
 import 'presentation/widgets/profile_header.dart';
 import 'presentation/widgets/profile_section_tile.dart';
+import 'presentation/widgets/profile_privacy_toggle_tile.dart';
 import 'presentation/widgets/profile_trainer_section.dart';
 import 'trainer_profile_view.dart';
 
@@ -108,6 +109,13 @@ class _AthleteProfile extends ConsumerWidget {
               // Profile Tile and /profile/rankings).
             ],
           ),
+          // ── Privacidad section — Instagram-style profile visibility ─────
+          _A11ySectionGroup(
+            title: 'PRIVACIDAD', // i18n: Fase W2
+            palette: palette,
+            tiles: const [ProfilePrivacyToggleTile()],
+          ),
+          const SizedBox(height: 12),
           // ── Apariencia section (REQ-LM-009) ──────────────────────────────
           _A11ySectionGroup(
             title: l10n.profileSectionAppearance.toUpperCase(),

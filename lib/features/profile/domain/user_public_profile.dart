@@ -53,6 +53,19 @@ class UserPublicProfile with _$UserPublicProfile {
     // trainer assigned to them one-by-one.
     @Default(false) bool sharedTemplatesWithAthletes,
 
+    // Profile visibility to other users in the social feed. Default `true`
+    // preserves current behavior: pre-existing docs decode as public and
+    // stay discoverable. When flipped to `false`:
+    //   - The identity header (name / avatar / gym) remains public.
+    //   - Detailed stats (workouts, followers, following), rutinas públicas
+    //     and actividad are gated to accepted followers + the owner.
+    //   - New follow requests are created as `pending` (require approval).
+    //     Existing `accepted` friendships are preserved (see Option X of
+    //     the privacy scope discussion).
+    // When `true`, incoming follow requests are auto-accepted at write time
+    // (Instagram-style public account).
+    @Default(true) bool isProfilePublic,
+
     // Opt-in flag an athlete controls to expose their ranking metrics
     // (lifetimeVolumeKg, best<Lift>Kg, and the already-public `racha`) on
     // per-gym leaderboards. Defaults to false so existing docs decode safely

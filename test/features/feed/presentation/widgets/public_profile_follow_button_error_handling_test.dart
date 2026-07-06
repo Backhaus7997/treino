@@ -17,7 +17,11 @@ class _ThrowingFriendshipRepository extends FriendshipRepository {
   _ThrowingFriendshipRepository() : super(firestore: FakeFirebaseFirestore());
 
   @override
-  Future<Friendship> request(String myUid, String otherUid) async {
+  Future<Friendship> request(
+    String myUid,
+    String otherUid, {
+    bool otherIsPublic = false,
+  }) async {
     throw StateError('write failed');
   }
 

@@ -35,11 +35,18 @@ class PublicProfileFollowButton extends ConsumerStatefulWidget {
     required this.friendship,
     required this.viewerUid,
     required this.targetUid,
+    this.targetIsPublic = false,
   });
 
   final Friendship? friendship;
   final String viewerUid;
   final String targetUid;
+
+  /// When `true`, tapping SEGUIR auto-accepts the friendship (Instagram-style
+  /// public profile). When `false` (default — preserves the pre-privacy
+  /// behavior), the friendship is created as `pending` and the target must
+  /// approve. See [FriendshipRepository.request].
+  final bool targetIsPublic;
 
   @override
   ConsumerState<PublicProfileFollowButton> createState() =>
@@ -104,10 +111,19 @@ class _PublicProfileFollowButtonState
     // messenger survives disposal, so the SnackBar is always delivered.
     final messenger = ScaffoldMessenger.of(context);
     final l10n = AppL10n.of(context);
-    final successMessage = l10n.feedRequestSentSuccess;
+    // Auto-accept path (public target) surfaces the same "started following"
+    // copy the accept flow uses. The pending path keeps the existing
+    // "request sent" copy. i18n: Fase W2 — both strings already exist.
+    final successMessage = widget.targetIsPublic
+        ? l10n.feedRequestAcceptedSuccess
+        : l10n.feedRequestSentSuccess;
     final errorMessage = l10n.feedFriendActionError;
     try {
-      await repo.request(widget.viewerUid, widget.targetUid);
+      await repo.request(
+        widget.viewerUid,
+        widget.targetUid,
+        otherIsPublic: widget.targetIsPublic,
+      );
       // Stream providers (friendshipByPairProvider, acceptedFriendsProvider)
       // self-update via .snapshots() — no manual invalidation needed.
       // SEGUIR only creates a pending request, so myFriendsFeedProvider

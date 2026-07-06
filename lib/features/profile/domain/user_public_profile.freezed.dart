@@ -49,6 +49,18 @@ mixin _$UserPublicProfile {
 // becomes public retroactively. Off = athletes only see plans the
 // trainer assigned to them one-by-one.
   bool get sharedTemplatesWithAthletes =>
+      throw _privateConstructorUsedError; // Profile visibility to other users in the social feed. Default `true`
+// preserves current behavior: pre-existing docs decode as public and
+// stay discoverable. When flipped to `false`:
+//   - The identity header (name / avatar / gym) remains public.
+//   - Detailed stats (workouts, followers, following), rutinas públicas
+//     and actividad are gated to accepted followers + the owner.
+//   - New follow requests are created as `pending` (require approval).
+//     Existing `accepted` friendships are preserved (see Option X of
+//     the privacy scope discussion).
+// When `true`, incoming follow requests are auto-accepted at write time
+// (Instagram-style public account).
+  bool get isProfilePublic =>
       throw _privateConstructorUsedError; // Opt-in flag an athlete controls to expose their ranking metrics
 // (lifetimeVolumeKg, best<Lift>Kg, and the already-public `racha`) on
 // per-gym leaderboards. Defaults to false so existing docs decode safely
@@ -106,6 +118,7 @@ abstract class $UserPublicProfileCopyWith<$Res> {
       @JsonKey(fromJson: _nonNegativeCount) int? followersCount,
       @JsonKey(fromJson: _nonNegativeCount) int? followingCount,
       bool sharedTemplatesWithAthletes,
+      bool isProfilePublic,
       bool rankingOptIn,
       num lifetimeVolumeKg,
       num? bestSquatKg,
@@ -139,6 +152,7 @@ class _$UserPublicProfileCopyWithImpl<$Res, $Val extends UserPublicProfile>
     Object? followersCount = freezed,
     Object? followingCount = freezed,
     Object? sharedTemplatesWithAthletes = null,
+    Object? isProfilePublic = null,
     Object? rankingOptIn = null,
     Object? lifetimeVolumeKg = null,
     Object? bestSquatKg = freezed,
@@ -190,6 +204,10 @@ class _$UserPublicProfileCopyWithImpl<$Res, $Val extends UserPublicProfile>
           ? _value.sharedTemplatesWithAthletes
           : sharedTemplatesWithAthletes // ignore: cast_nullable_to_non_nullable
               as bool,
+      isProfilePublic: null == isProfilePublic
+          ? _value.isProfilePublic
+          : isProfilePublic // ignore: cast_nullable_to_non_nullable
+              as bool,
       rankingOptIn: null == rankingOptIn
           ? _value.rankingOptIn
           : rankingOptIn // ignore: cast_nullable_to_non_nullable
@@ -234,6 +252,7 @@ abstract class _$$UserPublicProfileImplCopyWith<$Res>
       @JsonKey(fromJson: _nonNegativeCount) int? followersCount,
       @JsonKey(fromJson: _nonNegativeCount) int? followingCount,
       bool sharedTemplatesWithAthletes,
+      bool isProfilePublic,
       bool rankingOptIn,
       num lifetimeVolumeKg,
       num? bestSquatKg,
@@ -265,6 +284,7 @@ class __$$UserPublicProfileImplCopyWithImpl<$Res>
     Object? followersCount = freezed,
     Object? followingCount = freezed,
     Object? sharedTemplatesWithAthletes = null,
+    Object? isProfilePublic = null,
     Object? rankingOptIn = null,
     Object? lifetimeVolumeKg = null,
     Object? bestSquatKg = freezed,
@@ -316,6 +336,10 @@ class __$$UserPublicProfileImplCopyWithImpl<$Res>
           ? _value.sharedTemplatesWithAthletes
           : sharedTemplatesWithAthletes // ignore: cast_nullable_to_non_nullable
               as bool,
+      isProfilePublic: null == isProfilePublic
+          ? _value.isProfilePublic
+          : isProfilePublic // ignore: cast_nullable_to_non_nullable
+              as bool,
       rankingOptIn: null == rankingOptIn
           ? _value.rankingOptIn
           : rankingOptIn // ignore: cast_nullable_to_non_nullable
@@ -355,6 +379,7 @@ class _$UserPublicProfileImpl implements _UserPublicProfile {
       @JsonKey(fromJson: _nonNegativeCount) this.followersCount,
       @JsonKey(fromJson: _nonNegativeCount) this.followingCount,
       this.sharedTemplatesWithAthletes = false,
+      this.isProfilePublic = true,
       this.rankingOptIn = false,
       this.lifetimeVolumeKg = 0,
       this.bestSquatKg,
@@ -405,6 +430,20 @@ class _$UserPublicProfileImpl implements _UserPublicProfile {
   @override
   @JsonKey()
   final bool sharedTemplatesWithAthletes;
+// Profile visibility to other users in the social feed. Default `true`
+// preserves current behavior: pre-existing docs decode as public and
+// stay discoverable. When flipped to `false`:
+//   - The identity header (name / avatar / gym) remains public.
+//   - Detailed stats (workouts, followers, following), rutinas públicas
+//     and actividad are gated to accepted followers + the owner.
+//   - New follow requests are created as `pending` (require approval).
+//     Existing `accepted` friendships are preserved (see Option X of
+//     the privacy scope discussion).
+// When `true`, incoming follow requests are auto-accepted at write time
+// (Instagram-style public account).
+  @override
+  @JsonKey()
+  final bool isProfilePublic;
 // Opt-in flag an athlete controls to expose their ranking metrics
 // (lifetimeVolumeKg, best<Lift>Kg, and the already-public `racha`) on
 // per-gym leaderboards. Defaults to false so existing docs decode safely
@@ -443,7 +482,7 @@ class _$UserPublicProfileImpl implements _UserPublicProfile {
 
   @override
   String toString() {
-    return 'UserPublicProfile(uid: $uid, displayName: $displayName, displayNameLowercase: $displayNameLowercase, avatarUrl: $avatarUrl, gymId: $gymId, gymName: $gymName, workoutsCount: $workoutsCount, racha: $racha, followersCount: $followersCount, followingCount: $followingCount, sharedTemplatesWithAthletes: $sharedTemplatesWithAthletes, rankingOptIn: $rankingOptIn, lifetimeVolumeKg: $lifetimeVolumeKg, bestSquatKg: $bestSquatKg, bestBenchKg: $bestBenchKg, bestDeadliftKg: $bestDeadliftKg)';
+    return 'UserPublicProfile(uid: $uid, displayName: $displayName, displayNameLowercase: $displayNameLowercase, avatarUrl: $avatarUrl, gymId: $gymId, gymName: $gymName, workoutsCount: $workoutsCount, racha: $racha, followersCount: $followersCount, followingCount: $followingCount, sharedTemplatesWithAthletes: $sharedTemplatesWithAthletes, isProfilePublic: $isProfilePublic, rankingOptIn: $rankingOptIn, lifetimeVolumeKg: $lifetimeVolumeKg, bestSquatKg: $bestSquatKg, bestBenchKg: $bestBenchKg, bestDeadliftKg: $bestDeadliftKg)';
   }
 
   @override
@@ -471,6 +510,8 @@ class _$UserPublicProfileImpl implements _UserPublicProfile {
                     sharedTemplatesWithAthletes) ||
                 other.sharedTemplatesWithAthletes ==
                     sharedTemplatesWithAthletes) &&
+            (identical(other.isProfilePublic, isProfilePublic) ||
+                other.isProfilePublic == isProfilePublic) &&
             (identical(other.rankingOptIn, rankingOptIn) ||
                 other.rankingOptIn == rankingOptIn) &&
             (identical(other.lifetimeVolumeKg, lifetimeVolumeKg) ||
@@ -498,6 +539,7 @@ class _$UserPublicProfileImpl implements _UserPublicProfile {
       followersCount,
       followingCount,
       sharedTemplatesWithAthletes,
+      isProfilePublic,
       rankingOptIn,
       lifetimeVolumeKg,
       bestSquatKg,
@@ -534,6 +576,7 @@ abstract class _UserPublicProfile implements UserPublicProfile {
       @JsonKey(fromJson: _nonNegativeCount) final int? followersCount,
       @JsonKey(fromJson: _nonNegativeCount) final int? followingCount,
       final bool sharedTemplatesWithAthletes,
+      final bool isProfilePublic,
       final bool rankingOptIn,
       final num lifetimeVolumeKg,
       final num? bestSquatKg,
@@ -581,7 +624,20 @@ abstract class _UserPublicProfile implements UserPublicProfile {
 // trainer assigned to them one-by-one.
   @override
   bool
-      get sharedTemplatesWithAthletes; // Opt-in flag an athlete controls to expose their ranking metrics
+      get sharedTemplatesWithAthletes; // Profile visibility to other users in the social feed. Default `true`
+// preserves current behavior: pre-existing docs decode as public and
+// stay discoverable. When flipped to `false`:
+//   - The identity header (name / avatar / gym) remains public.
+//   - Detailed stats (workouts, followers, following), rutinas públicas
+//     and actividad are gated to accepted followers + the owner.
+//   - New follow requests are created as `pending` (require approval).
+//     Existing `accepted` friendships are preserved (see Option X of
+//     the privacy scope discussion).
+// When `true`, incoming follow requests are auto-accepted at write time
+// (Instagram-style public account).
+  @override
+  bool
+      get isProfilePublic; // Opt-in flag an athlete controls to expose their ranking metrics
 // (lifetimeVolumeKg, best<Lift>Kg, and the already-public `racha`) on
 // per-gym leaderboards. Defaults to false so existing docs decode safely
 // and no athlete becomes rankable retroactively. Enabling backfills the

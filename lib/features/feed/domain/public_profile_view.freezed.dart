@@ -24,7 +24,11 @@ mixin _$PublicProfileView {
   int? get workoutsCount => throw _privateConstructorUsedError;
   int? get racha => throw _privateConstructorUsedError;
   int? get followersCount => throw _privateConstructorUsedError;
-  int? get followingCount => throw _privateConstructorUsedError;
+  int? get followingCount =>
+      throw _privateConstructorUsedError; // Target profile visibility. Mirrors `UserPublicProfile.isProfilePublic`
+// for the target user. Default `true` matches the model default so
+// unauthenticated / missing-profile branches behave as pre-existing code.
+  bool get isPublic => throw _privateConstructorUsedError;
 
   /// Create a copy of PublicProfileView
   /// with the given fields replaced by the non-null parameter values.
@@ -48,7 +52,8 @@ abstract class $PublicProfileViewCopyWith<$Res> {
       int? workoutsCount,
       int? racha,
       int? followersCount,
-      int? followingCount});
+      int? followingCount,
+      bool isPublic});
 
   $FriendshipCopyWith<$Res>? get friendship;
 }
@@ -77,6 +82,7 @@ class _$PublicProfileViewCopyWithImpl<$Res, $Val extends PublicProfileView>
     Object? racha = freezed,
     Object? followersCount = freezed,
     Object? followingCount = freezed,
+    Object? isPublic = null,
   }) {
     return _then(_value.copyWith(
       authorDisplayName: null == authorDisplayName
@@ -115,6 +121,10 @@ class _$PublicProfileViewCopyWithImpl<$Res, $Val extends PublicProfileView>
           ? _value.followingCount
           : followingCount // ignore: cast_nullable_to_non_nullable
               as int?,
+      isPublic: null == isPublic
+          ? _value.isPublic
+          : isPublic // ignore: cast_nullable_to_non_nullable
+              as bool,
     ) as $Val);
   }
 
@@ -150,7 +160,8 @@ abstract class _$$PublicProfileViewImplCopyWith<$Res>
       int? workoutsCount,
       int? racha,
       int? followersCount,
-      int? followingCount});
+      int? followingCount,
+      bool isPublic});
 
   @override
   $FriendshipCopyWith<$Res>? get friendship;
@@ -178,6 +189,7 @@ class __$$PublicProfileViewImplCopyWithImpl<$Res>
     Object? racha = freezed,
     Object? followersCount = freezed,
     Object? followingCount = freezed,
+    Object? isPublic = null,
   }) {
     return _then(_$PublicProfileViewImpl(
       authorDisplayName: null == authorDisplayName
@@ -216,6 +228,10 @@ class __$$PublicProfileViewImplCopyWithImpl<$Res>
           ? _value.followingCount
           : followingCount // ignore: cast_nullable_to_non_nullable
               as int?,
+      isPublic: null == isPublic
+          ? _value.isPublic
+          : isPublic // ignore: cast_nullable_to_non_nullable
+              as bool,
     ));
   }
 }
@@ -232,7 +248,8 @@ class _$PublicProfileViewImpl implements _PublicProfileView {
       this.workoutsCount,
       this.racha,
       this.followersCount,
-      this.followingCount});
+      this.followingCount,
+      this.isPublic = true});
 
   @override
   final String authorDisplayName;
@@ -252,10 +269,16 @@ class _$PublicProfileViewImpl implements _PublicProfileView {
   final int? followersCount;
   @override
   final int? followingCount;
+// Target profile visibility. Mirrors `UserPublicProfile.isProfilePublic`
+// for the target user. Default `true` matches the model default so
+// unauthenticated / missing-profile branches behave as pre-existing code.
+  @override
+  @JsonKey()
+  final bool isPublic;
 
   @override
   String toString() {
-    return 'PublicProfileView(authorDisplayName: $authorDisplayName, authorAvatarUrl: $authorAvatarUrl, authorGymId: $authorGymId, friendship: $friendship, isSelf: $isSelf, workoutsCount: $workoutsCount, racha: $racha, followersCount: $followersCount, followingCount: $followingCount)';
+    return 'PublicProfileView(authorDisplayName: $authorDisplayName, authorAvatarUrl: $authorAvatarUrl, authorGymId: $authorGymId, friendship: $friendship, isSelf: $isSelf, workoutsCount: $workoutsCount, racha: $racha, followersCount: $followersCount, followingCount: $followingCount, isPublic: $isPublic)';
   }
 
   @override
@@ -278,7 +301,9 @@ class _$PublicProfileViewImpl implements _PublicProfileView {
             (identical(other.followersCount, followersCount) ||
                 other.followersCount == followersCount) &&
             (identical(other.followingCount, followingCount) ||
-                other.followingCount == followingCount));
+                other.followingCount == followingCount) &&
+            (identical(other.isPublic, isPublic) ||
+                other.isPublic == isPublic));
   }
 
   @override
@@ -292,7 +317,8 @@ class _$PublicProfileViewImpl implements _PublicProfileView {
       workoutsCount,
       racha,
       followersCount,
-      followingCount);
+      followingCount,
+      isPublic);
 
   /// Create a copy of PublicProfileView
   /// with the given fields replaced by the non-null parameter values.
@@ -314,7 +340,8 @@ abstract class _PublicProfileView implements PublicProfileView {
       final int? workoutsCount,
       final int? racha,
       final int? followersCount,
-      final int? followingCount}) = _$PublicProfileViewImpl;
+      final int? followingCount,
+      final bool isPublic}) = _$PublicProfileViewImpl;
 
   @override
   String get authorDisplayName;
@@ -333,7 +360,12 @@ abstract class _PublicProfileView implements PublicProfileView {
   @override
   int? get followersCount;
   @override
-  int? get followingCount;
+  int?
+      get followingCount; // Target profile visibility. Mirrors `UserPublicProfile.isProfilePublic`
+// for the target user. Default `true` matches the model default so
+// unauthenticated / missing-profile branches behave as pre-existing code.
+  @override
+  bool get isPublic;
 
   /// Create a copy of PublicProfileView
   /// with the given fields replaced by the non-null parameter values.
