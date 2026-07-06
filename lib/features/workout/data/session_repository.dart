@@ -283,6 +283,21 @@ class SessionRepository {
     await _setLogs(uid, sessionId).doc(setLog.id).set(setLog.toJson());
   }
 
+  // ─── deleteSetLog ───────────────────────────────────────────────────────
+
+  /// Permanently deletes a `setLog` doc (live-set-editing AD-2). Real hard
+  /// delete — NO soft-delete flag, no tombstone. Confirmed safe by AD-8: the
+  /// ranking recompute trigger fires on `sessions/{id}` writes only (never on
+  /// `setLogs` subcollection writes) and re-queries `setLogs` fresh at finish
+  /// time, so a deleted doc is simply absent from the next recompute.
+  Future<void> deleteSetLog({
+    required String uid,
+    required String sessionId,
+    required String setLogId,
+  }) async {
+    await _setLogs(uid, sessionId).doc(setLogId).delete();
+  }
+
   // ─── listSetLogs ────────────────────────────────────────────────────────
 
   Future<List<SetLog>> listSetLogs({

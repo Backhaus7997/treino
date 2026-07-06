@@ -6,16 +6,20 @@
 // por lo que este archivo actúa como GREEN desde el principio.
 // Desviación documentada en apply-progress.md.
 
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/core/analytics/analytics_service.dart';
 import 'package:treino/features/workout/application/session_init.dart';
+import 'package:treino/features/workout/application/session_notifier.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
 import 'package:treino/features/workout/application/routine_providers.dart';
 import 'package:treino/features/workout/data/session_repository.dart';
 import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/domain/routine_slot.dart';
+import 'package:treino/features/workout/domain/set_log.dart';
 import 'package:treino/features/workout/domain/set_spec.dart';
 
 import '../../../helpers/fake_analytics_service.dart';
@@ -1056,6 +1060,383 @@ void main() {
       expect(state.currentExerciseIndex, equals(0),
           reason: 'the added-beyond-plan set on e1 must keep the cursor on '
               'e1, not advance to e2');
+    });
+  });
+
+  // ── live-set-editing PR2: SessionNotifier.removeSet (AD-2/AD-3/AD-5) ──────
+
+  group('SessionNotifier.removeSet', () {
+    test(
+        '[AD-2][REQ:workout#Removing an unlogged set requires no '
+        'confirmation] removeSet(slot, null) on an added-but-unlogged pending '
+        'row lowers setCountOverride and does NOT call repo.deleteSetLog',
+        () async {
+      final repo = MockSessionRepository();
+      final routine = makeRoutine(
+        days: [
+          makeDay(slots: [makeSlot(exerciseId: 'e1', targetSets: 3)])
+        ],
+      );
+      final session = makeSession();
+
+      when(() => repo.create(
+            uid: any(named: 'uid'),
+            routineId: any(named: 'routineId'),
+            routineName: any(named: 'routineName'),
+            startedAt: any(named: 'startedAt'),
+            dayNumber: any(named: 'dayNumber'),
+            weekNumber: any(named: 'weekNumber'),
+          )).thenAnswer((_) async => session);
+      when(() => repo.addSetLog(
+            uid: any(named: 'uid'),
+            sessionId: any(named: 'sessionId'),
+            setLog: any(named: 'setLog'),
+          )).thenAnswer(
+        (inv) async => inv.namedArguments[const Symbol('setLog')] as dynamic,
+      );
+
+      final container = _makeContainer(repo: repo, uid: 'u1', routine: routine);
+      addTearDown(container.dispose);
+
+      final init = FreshSession(routineId: routine.id, dayNumber: 1);
+      await container.read(sessionNotifierProvider(init).future);
+      final notifier = container.read(sessionNotifierProvider(init).notifier);
+      final slot = routine.days.first.slots.first;
+
+      // Log 3 of 3 planned, then add a 4th (unlogged, pending) row.
+      await notifier
+          .logSet(makeSetLog(exerciseId: 'e1', setNumber: 1, id: 'l1'));
+      await notifier
+          .logSet(makeSetLog(exerciseId: 'e1', setNumber: 2, id: 'l2'));
+      await notifier
+          .logSet(makeSetLog(exerciseId: 'e1', setNumber: 3, id: 'l3'));
+      await notifier.addSet(slot);
+      expect(
+          container
+              .read(sessionNotifierProvider(init))
+              .value!
+              .setCountOverride['e1'],
+          equals(4));
+
+      // Remove the pending (unlogged) 4th row — target is null.
+      await notifier.removeSet(slot, null);
+
+      final state = container.read(sessionNotifierProvider(init)).value!;
+      expect(state.setCountOverride['e1'], equals(3));
+      verifyNever(() => repo.deleteSetLog(
+            uid: any(named: 'uid'),
+            sessionId: any(named: 'sessionId'),
+            setLogId: any(named: 'setLogId'),
+          ));
+    });
+
+    test(
+        '[AD-2][AD-3][REQ:workout#Confirmed removal deletes the underlying '
+        'document][REQ:workout#Removing a set renumbers surviving sets] '
+        'removeSet on a logged set deletes the doc, renumbers survivors '
+        'above the gap, and updates setLogs + setCountOverride in one state '
+        'emission', () async {
+      final repo = MockSessionRepository();
+      final routine = makeRoutine(
+        days: [
+          makeDay(slots: [makeSlot(exerciseId: 'e1', targetSets: 3)])
+        ],
+      );
+      final session = makeSession();
+
+      when(() => repo.create(
+            uid: any(named: 'uid'),
+            routineId: any(named: 'routineId'),
+            routineName: any(named: 'routineName'),
+            startedAt: any(named: 'startedAt'),
+            dayNumber: any(named: 'dayNumber'),
+            weekNumber: any(named: 'weekNumber'),
+          )).thenAnswer((_) async => session);
+      when(() => repo.addSetLog(
+            uid: any(named: 'uid'),
+            sessionId: any(named: 'sessionId'),
+            setLog: any(named: 'setLog'),
+          )).thenAnswer(
+        (inv) async => inv.namedArguments[const Symbol('setLog')] as dynamic,
+      );
+      when(() => repo.deleteSetLog(
+            uid: any(named: 'uid'),
+            sessionId: any(named: 'sessionId'),
+            setLogId: any(named: 'setLogId'),
+          )).thenAnswer((_) async {});
+      when(() => repo.updateSetLog(
+            uid: any(named: 'uid'),
+            sessionId: any(named: 'sessionId'),
+            setLog: any(named: 'setLog'),
+          )).thenAnswer((_) async {});
+
+      final container = _makeContainer(repo: repo, uid: 'u1', routine: routine);
+      addTearDown(container.dispose);
+
+      final init = FreshSession(routineId: routine.id, dayNumber: 1);
+      await container.read(sessionNotifierProvider(init).future);
+      final notifier = container.read(sessionNotifierProvider(init).notifier);
+      final slot = routine.days.first.slots.first;
+
+      await notifier
+          .logSet(makeSetLog(exerciseId: 'e1', setNumber: 1, id: 'l1'));
+      await notifier
+          .logSet(makeSetLog(exerciseId: 'e1', setNumber: 2, id: 'l2'));
+      await notifier
+          .logSet(makeSetLog(exerciseId: 'e1', setNumber: 3, id: 'l3'));
+
+      final target = container
+          .read(sessionNotifierProvider(init))
+          .value!
+          .setLogs
+          .firstWhere((l) => l.id == 'l2');
+
+      await notifier.removeSet(slot, target);
+
+      verify(() => repo.deleteSetLog(
+            uid: any(named: 'uid'),
+            sessionId: any(named: 'sessionId'),
+            setLogId: 'l2',
+          )).called(1);
+      verify(() => repo.updateSetLog(
+            uid: any(named: 'uid'),
+            sessionId: any(named: 'sessionId'),
+            setLog: any(
+                named: 'setLog',
+                that:
+                    predicate<SetLog>((l) => l.id == 'l3' && l.setNumber == 2)),
+          )).called(1);
+
+      final state = container.read(sessionNotifierProvider(init)).value!;
+      expect(state.setLogs.map((l) => l.id), containsAll(<String>['l1', 'l3']));
+      expect(state.setLogs.any((l) => l.id == 'l2'), isFalse);
+      expect(
+        state.setLogs.firstWhere((l) => l.id == 'l3').setNumber,
+        equals(2),
+        reason: 'survivor above the gap must renumber from 3 to 2',
+      );
+      expect(state.setCountOverride['e1'], equals(2));
+    });
+
+    test(
+        '[AD-5 floor invariant][REQ:workout#Session-Local Set Count Drives '
+        'Completion Gating] removeSet cannot drop setCountOverride below the '
+        'current logged count after the removal completes', () async {
+      final repo = MockSessionRepository();
+      final routine = makeRoutine(
+        days: [
+          makeDay(slots: [makeSlot(exerciseId: 'e1', targetSets: 3)])
+        ],
+      );
+      final session = makeSession();
+
+      when(() => repo.create(
+            uid: any(named: 'uid'),
+            routineId: any(named: 'routineId'),
+            routineName: any(named: 'routineName'),
+            startedAt: any(named: 'startedAt'),
+            dayNumber: any(named: 'dayNumber'),
+            weekNumber: any(named: 'weekNumber'),
+          )).thenAnswer((_) async => session);
+      when(() => repo.addSetLog(
+            uid: any(named: 'uid'),
+            sessionId: any(named: 'sessionId'),
+            setLog: any(named: 'setLog'),
+          )).thenAnswer(
+        (inv) async => inv.namedArguments[const Symbol('setLog')] as dynamic,
+      );
+
+      final container = _makeContainer(repo: repo, uid: 'u1', routine: routine);
+      addTearDown(container.dispose);
+
+      final init = FreshSession(routineId: routine.id, dayNumber: 1);
+      await container.read(sessionNotifierProvider(init).future);
+      final notifier = container.read(sessionNotifierProvider(init).notifier);
+      final slot = routine.days.first.slots.first;
+
+      // Log all 3 planned sets. override is unset (falls back to plan=3).
+      await notifier
+          .logSet(makeSetLog(exerciseId: 'e1', setNumber: 1, id: 'l1'));
+      await notifier
+          .logSet(makeSetLog(exerciseId: 'e1', setNumber: 2, id: 'l2'));
+      await notifier
+          .logSet(makeSetLog(exerciseId: 'e1', setNumber: 3, id: 'l3'));
+
+      // Remove an UNLOGGED pending row (target null) — this would compute
+      // newCount = plannedSetsFor(slot) - 1 = 2, but 3 sets are already
+      // logged. The floor must clamp the override to 3 (the logged count),
+      // never allowing it to drop below what's already persisted.
+      await notifier.removeSet(slot, null);
+
+      final state = container.read(sessionNotifierProvider(init)).value!;
+      expect(state.setCountOverride['e1'], equals(3),
+          reason: 'the floor invariant must prevent the override from '
+              'dropping below the current logged count');
+    });
+  });
+
+  group('SessionNotifier.removeSet — race discipline', () {
+    test(
+        '[AD-2 race discipline] a logSet completing DURING a removeSet await '
+        'survives — removeSet re-reads state.value after its awaits instead '
+        'of overwriting with a stale pre-await snapshot', () async {
+      final repo = MockSessionRepository();
+      final routine = makeRoutine(
+        days: [
+          makeDay(slots: [makeSlot(exerciseId: 'e1', targetSets: 3)])
+        ],
+      );
+      final session = makeSession();
+
+      when(() => repo.create(
+            uid: any(named: 'uid'),
+            routineId: any(named: 'routineId'),
+            routineName: any(named: 'routineName'),
+            startedAt: any(named: 'startedAt'),
+            dayNumber: any(named: 'dayNumber'),
+            weekNumber: any(named: 'weekNumber'),
+          )).thenAnswer((_) async => session);
+      when(() => repo.addSetLog(
+            uid: any(named: 'uid'),
+            sessionId: any(named: 'sessionId'),
+            setLog: any(named: 'setLog'),
+          )).thenAnswer(
+        (inv) async => inv.namedArguments[const Symbol('setLog')] as dynamic,
+      );
+      when(() => repo.updateSetLog(
+            uid: any(named: 'uid'),
+            sessionId: any(named: 'sessionId'),
+            setLog: any(named: 'setLog'),
+          )).thenAnswer((_) async {});
+
+      // Gate deleteSetLog so we can deterministically interleave a logSet
+      // while removeSet is still awaiting the delete write.
+      final deleteGate = Completer<void>();
+      when(() => repo.deleteSetLog(
+            uid: any(named: 'uid'),
+            sessionId: any(named: 'sessionId'),
+            setLogId: any(named: 'setLogId'),
+          )).thenAnswer((_) => deleteGate.future);
+
+      final container = _makeContainer(repo: repo, uid: 'u1', routine: routine);
+      addTearDown(container.dispose);
+
+      final init = FreshSession(routineId: routine.id, dayNumber: 1);
+      await container.read(sessionNotifierProvider(init).future);
+      final notifier = container.read(sessionNotifierProvider(init).notifier);
+      final slot = routine.days.first.slots.first;
+
+      await notifier
+          .logSet(makeSetLog(exerciseId: 'e1', setNumber: 1, id: 'l1'));
+      await notifier
+          .logSet(makeSetLog(exerciseId: 'e1', setNumber: 2, id: 'l2'));
+
+      final target = container
+          .read(sessionNotifierProvider(init))
+          .value!
+          .setLogs
+          .firstWhere((l) => l.id == 'l2');
+
+      // Start removeSet on l2 — it awaits the gated deleteSetLog and would
+      // snapshot state.value (2 logs) BEFORE the await resolves.
+      final removeFuture = notifier.removeSet(slot, target);
+
+      // While removeSet is in flight, a new set (id 'l3') is logged and lands
+      // in state. logSet has no gate, so this completes first.
+      await notifier
+          .logSet(makeSetLog(exerciseId: 'e1', setNumber: 3, id: 'l3'));
+      expect(
+        container.read(sessionNotifierProvider(init)).value!.setLogs,
+        hasLength(3),
+        reason: 'logSet must have appended l3 before removeSet resolves',
+      );
+
+      // Now let removeSet finish.
+      deleteGate.complete();
+      await removeFuture;
+
+      final logs = container.read(sessionNotifierProvider(init)).value!.setLogs;
+
+      // The concurrently-logged l3 must survive removeSet's re-read.
+      expect(logs.any((l) => l.id == 'l3'), isTrue,
+          reason: 'removeSet must not drop the concurrently logged l3');
+      expect(logs.any((l) => l.id == 'l2'), isFalse,
+          reason: 'l2 must still be removed');
+    });
+  });
+
+  group('SessionNotifier.retryLastLogError — remove dispatch', () {
+    test(
+        '[AD-2 retry] retryLastLogError re-dispatches to removeSet when the '
+        'pending error action is SessionLogAction.remove', () async {
+      final repo = MockSessionRepository();
+      final routine = makeRoutine(
+        days: [
+          makeDay(slots: [makeSlot(exerciseId: 'e1', targetSets: 3)])
+        ],
+      );
+      final session = makeSession();
+
+      when(() => repo.create(
+            uid: any(named: 'uid'),
+            routineId: any(named: 'routineId'),
+            routineName: any(named: 'routineName'),
+            startedAt: any(named: 'startedAt'),
+            dayNumber: any(named: 'dayNumber'),
+            weekNumber: any(named: 'weekNumber'),
+          )).thenAnswer((_) async => session);
+      when(() => repo.addSetLog(
+            uid: any(named: 'uid'),
+            sessionId: any(named: 'sessionId'),
+            setLog: any(named: 'setLog'),
+          )).thenAnswer(
+        (inv) async => inv.namedArguments[const Symbol('setLog')] as dynamic,
+      );
+
+      // First deleteSetLog call fails; the retry's call succeeds.
+      var deleteCallCount = 0;
+      when(() => repo.deleteSetLog(
+            uid: any(named: 'uid'),
+            sessionId: any(named: 'sessionId'),
+            setLogId: any(named: 'setLogId'),
+          )).thenAnswer((_) async {
+        deleteCallCount++;
+        if (deleteCallCount == 1) {
+          throw Exception('simulated network failure');
+        }
+      });
+
+      final container = _makeContainer(repo: repo, uid: 'u1', routine: routine);
+      addTearDown(container.dispose);
+
+      final init = FreshSession(routineId: routine.id, dayNumber: 1);
+      await container.read(sessionNotifierProvider(init).future);
+      final notifier = container.read(sessionNotifierProvider(init).notifier);
+      final slot = routine.days.first.slots.first;
+
+      await notifier
+          .logSet(makeSetLog(exerciseId: 'e1', setNumber: 1, id: 'l1'));
+      final target =
+          container.read(sessionNotifierProvider(init)).value!.setLogs.first;
+
+      // First attempt fails — emits SessionLogError(action: remove).
+      await notifier.removeSet(slot, target);
+      expect(notifier.logSetError.value, isNotNull);
+      expect(
+          notifier.logSetError.value!.action, equals(SessionLogAction.remove));
+
+      // Retry re-dispatches to removeSet, which now succeeds.
+      await notifier.retryLastLogError();
+
+      expect(notifier.logSetError.value, isNull,
+          reason: 'a successful retry must clear the error channel');
+      verify(() => repo.deleteSetLog(
+            uid: any(named: 'uid'),
+            sessionId: any(named: 'sessionId'),
+            setLogId: target.id,
+          )).called(2);
+      final state = container.read(sessionNotifierProvider(init)).value!;
+      expect(state.setLogs.any((l) => l.id == target.id), isFalse);
     });
   });
 }

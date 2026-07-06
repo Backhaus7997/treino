@@ -248,6 +248,44 @@ void main() {
     expect(snap.exists, isTrue);
   });
 
+  // ─── deleteSetLog() (live-set-editing PR2, AD-2) ─────────────────────────
+
+  test(
+      '[AD-2][REQ:workout#Confirmed removal deletes the underlying document] '
+      'deleteSetLog hard-deletes the doc — no soft-delete flag, no lingering '
+      'doc', () async {
+    final sessionId = await createActiveSession();
+    final completedAt = DateTime.utc(2026, 5, 18, 10, 5, 0);
+
+    final persisted = await repo.addSetLog(
+      uid: uid,
+      sessionId: sessionId,
+      setLog: buildSetLog(setNumber: 1, completedAt: completedAt),
+    );
+
+    await repo.deleteSetLog(
+      uid: uid,
+      sessionId: sessionId,
+      setLogId: persisted.id,
+    );
+
+    final snap = await firestore
+        .collection('users')
+        .doc(uid)
+        .collection('sessions')
+        .doc(sessionId)
+        .collection('setLogs')
+        .doc(persisted.id)
+        .get();
+
+    expect(snap.exists, isFalse,
+        reason: 'deleteSetLog must be a hard delete — no lingering doc with '
+            'a deleted:true marker or any other soft-delete flag');
+
+    final remaining = await repo.listSetLogs(uid: uid, sessionId: sessionId);
+    expect(remaining, isEmpty);
+  });
+
   // ─── listSetLogs() ────────────────────────────────────────────────────────
 
   test('SCENARIO-249: listSetLogs returns logs ordered setNumber ASC',
