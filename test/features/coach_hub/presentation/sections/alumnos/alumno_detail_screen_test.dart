@@ -13,8 +13,12 @@ import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/locale_resolver.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/features/coach/application/agenda_providers.dart';
+import 'package:treino/features/coach/application/athlete_note_providers.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/data/trainer_link_repository.dart';
+import 'package:treino/features/coach/domain/appointment.dart';
+import 'package:treino/features/coach/domain/athlete_note.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach_hub/presentation/sections/alumnos/alumno_detail_screen.dart';
@@ -206,6 +210,33 @@ SetLog _setLog({
       completedAt: DateTime.utc(2026, 1, 1),
     );
 
+AthleteNote _note({String note = 'Buena progresión', DateTime? updatedAt}) =>
+    AthleteNote(
+      trainerId: 't1',
+      athleteId: 'a1',
+      note: note,
+      updatedAt: updatedAt ?? DateTime.utc(2026, 7, 1),
+    );
+
+/// Future start — always after DateTime.now() in test context.
+Appointment _appointment({
+  String id = 'ap1',
+  DateTime? startsAt,
+  int durationMin = 60,
+  AppointmentStatus status = AppointmentStatus.confirmed,
+  String? noteBefore,
+}) =>
+    Appointment(
+      id: id,
+      trainerId: 't1',
+      athleteId: 'a1',
+      athleteDisplayName: 'Sofía',
+      startsAt: startsAt ?? DateTime.now().toUtc().add(const Duration(days: 3)),
+      durationMin: durationMin,
+      status: status,
+      noteBefore: noteBefore,
+    );
+
 Future<void> _pump(
   WidgetTester tester, {
   UserPublicProfile? profile,
@@ -224,6 +255,10 @@ Future<void> _pump(
   // PR2 — exercise progression overrides
   List<ExerciseListEntry>? exerciseList,
   ExerciseProgression? exerciseProgression,
+  // PR9 — Resumen tab: nota fijada, próxima sesión, última sesión
+  AthleteNote? athleteNote,
+  List<Appointment> appointments = const [],
+  Map<String, double> lastWeightByExercise = const {},
 }) async {
   tester.view.physicalSize = const Size(1200, 900);
   tester.view.devicePixelRatio = 1.0;
@@ -266,6 +301,16 @@ Future<void> _pump(
                 exerciseId: key.exerciseId,
                 exerciseName: '',
               ),
+        ),
+        // PR9 — nota fijada, próxima sesión, última sesión por ejercicio
+        athleteNoteProvider.overrideWith(
+          (ref, key) => Stream.value(athleteNote),
+        ),
+        appointmentsForAthleteStreamProvider.overrideWith(
+          (ref, id) => Stream.value(appointments),
+        ),
+        lastWeightByExerciseProvider.overrideWith(
+          (ref, uid) async => lastWeightByExercise,
         ),
       ],
       child: MaterialApp(
@@ -1152,6 +1197,15 @@ void main() {
             // El header (W2 PR7) lee el billing del alumno.
             athleteBillingProvider
                 .overrideWith((ref, id) => Stream.value(null)),
+            // PR9 — nuevos widgets del Resumen tab.
+            athleteNoteProvider
+                .overrideWith((ref, key) => Stream.value(null)),
+            appointmentsForAthleteStreamProvider
+                .overrideWith((ref, id) => Stream.value(const [])),
+            lastWeightByExerciseProvider
+                .overrideWith((ref, uid) async => const {}),
+            coachSessionSetLogsProvider
+                .overrideWith((ref, key) async => const []),
           ],
           child: MaterialApp.router(
             theme: AppTheme.dark(),
@@ -1353,6 +1407,197 @@ void main() {
       // The section label is always rendered as hardcoded 'EVOLUCIÓN POR EJERCICIO'
       // regardless of locale — never sourced from AppL10n.
       expect(find.text('EVOLUCIÓN POR EJERCICIO'), findsOneWidget);
+    });
+  });
+
+  // ── PR9: Resumen tab — nota fijada, próxima sesión, última sesión ──────────
+
+  group('Resumen tab — nota fijada (W2 PR9)', () {
+    testWidgets('muestra el texto de la nota truncado a 3 líneas (PR9)',
+        (tester) async {
+      await _pump(
+        tester,
+        profile: _prof(),
+        link: _link(TrainerLinkStatus.active),
+        athleteNote: _note(note: 'Buena progresión en press banca.'),
+      );
+
+      // Resumen es el tab default — no hace falta tapear.
+      expect(find.text('NOTA FIJADA'), findsOneWidget);
+      expect(find.textContaining('Buena progresión'), findsOneWidget);
+    });
+
+    testWidgets('sin nota → estado vacío "Sin nota fijada." (PR9)',
+        (tester) async {
+      await _pump(
+        tester,
+        profile: _prof(),
+        link: _link(TrainerLinkStatus.active),
+        athleteNote: null,
+      );
+
+      expect(find.text('NOTA FIJADA'), findsOneWidget);
+      expect(find.text('Sin nota fijada.'), findsOneWidget);
+    });
+
+    testWidgets('nota con texto vacío → estado vacío (PR9)', (tester) async {
+      await _pump(
+        tester,
+        profile: _prof(),
+        link: _link(TrainerLinkStatus.active),
+        athleteNote: _note(note: '   '),
+      );
+
+      expect(find.text('Sin nota fijada.'), findsOneWidget);
+    });
+
+    testWidgets('muestra "hoy" si updatedAt es reciente (PR9)', (tester) async {
+      await _pump(
+        tester,
+        profile: _prof(),
+        link: _link(TrainerLinkStatus.active),
+        athleteNote: _note(updatedAt: DateTime.now().toUtc()),
+      );
+
+      expect(find.text('hoy'), findsOneWidget);
+    });
+  });
+
+  group('Resumen tab — próxima sesión (W2 PR9)', () {
+    testWidgets('con sesión futura confirmada → muestra la fecha (PR9)',
+        (tester) async {
+      await _pump(
+        tester,
+        profile: _prof(),
+        link: _link(TrainerLinkStatus.active),
+        appointments: [_appointment(durationMin: 45)],
+      );
+
+      expect(find.text('PRÓXIMA SESIÓN'), findsOneWidget);
+      expect(find.text('45 min'), findsOneWidget);
+    });
+
+    testWidgets('sin sesiones futuras → estado vacío (PR9)', (tester) async {
+      await _pump(
+        tester,
+        profile: _prof(),
+        link: _link(TrainerLinkStatus.active),
+        appointments: const [],
+      );
+
+      expect(find.text('PRÓXIMA SESIÓN'), findsOneWidget);
+      expect(find.text('Sin sesiones próximas.'), findsOneWidget);
+    });
+
+    testWidgets('sesión cancelled no aparece como próxima (PR9)',
+        (tester) async {
+      await _pump(
+        tester,
+        profile: _prof(),
+        link: _link(TrainerLinkStatus.active),
+        appointments: [
+          _appointment(status: AppointmentStatus.cancelled),
+        ],
+      );
+
+      expect(find.text('Sin sesiones próximas.'), findsOneWidget);
+    });
+
+    testWidgets('sesión pasada (confirmed) no aparece como próxima (PR9)',
+        (tester) async {
+      await _pump(
+        tester,
+        profile: _prof(),
+        link: _link(TrainerLinkStatus.active),
+        appointments: [
+          _appointment(
+            startsAt: DateTime.utc(2020, 1, 1), // en el pasado
+            status: AppointmentStatus.confirmed,
+          ),
+        ],
+      );
+
+      expect(find.text('Sin sesiones próximas.'), findsOneWidget);
+    });
+
+    testWidgets('muestra noteBefore si existe (PR9)', (tester) async {
+      await _pump(
+        tester,
+        profile: _prof(),
+        link: _link(TrainerLinkStatus.active),
+        appointments: [
+          _appointment(noteBefore: 'Traer bandas de resistencia'),
+        ],
+      );
+
+      expect(find.textContaining('Traer bandas'), findsOneWidget);
+    });
+  });
+
+  group('Resumen tab — última sesión por ejercicio (W2 PR9)', () {
+    testWidgets('sin sesiones → estado vacío "Sin sesiones registradas." (PR9)',
+        (tester) async {
+      await _pump(
+        tester,
+        profile: _prof(),
+        link: _link(TrainerLinkStatus.active),
+        sessions: const [],
+      );
+
+      expect(find.text('ÚLTIMA SESIÓN · POR EJERCICIO'), findsOneWidget);
+      expect(find.text('Sin sesiones registradas.'), findsOneWidget);
+    });
+
+    testWidgets(
+        'con sesión y setLogs → muestra nombre de ejercicio y sets (PR9)',
+        (tester) async {
+      await _pump(
+        tester,
+        profile: _prof(),
+        link: _link(TrainerLinkStatus.active),
+        sessions: [_session(routineName: 'Push - Pecho')],
+        setLogs: [
+          _setLog(exerciseName: 'Press banca', setNumber: 1),
+          _setLog(exerciseName: 'Press banca', setNumber: 2),
+          _setLog(exerciseName: 'Press banca', setNumber: 3),
+        ],
+      );
+
+      expect(find.text('ÚLTIMA SESIÓN · POR EJERCICIO'), findsOneWidget);
+      expect(find.textContaining('Press banca'), findsOneWidget);
+      expect(find.text('3 × sets'), findsOneWidget);
+    });
+
+    testWidgets(
+        'alumno no compartió historial → mensaje "no compartió" (PR9)',
+        (tester) async {
+      await _pump(
+        tester,
+        profile: _prof(),
+        link: _link(TrainerLinkStatus.active),
+        sessions: [_session()],
+        sessionsError: FirebaseException(
+            plugin: 'cloud_firestore', code: 'permission-denied'),
+      );
+
+      // El error de sessionsByUidProvider hace que _ResumenTab entero muestre
+      // "No se pudo cargar el resumen." — el card de última sesión nunca se
+      // renderiza porque el tab gatea antes del build.
+      expect(find.text('No se pudo cargar el resumen.'), findsOneWidget);
+    });
+
+    testWidgets('placeholder viejo ya no existe en Resumen (PR9)',
+        (tester) async {
+      await _pump(
+        tester,
+        profile: _prof(),
+        link: _link(TrainerLinkStatus.active),
+      );
+
+      expect(
+        find.textContaining('Próximamente: última sesión'),
+        findsNothing,
+      );
     });
   });
 }
