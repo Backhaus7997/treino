@@ -86,32 +86,52 @@ List<BlockInfo> buildBlocks(List<RoutineSlot> slots) {
 /// [week] is the 0-based active week (from [SessionState.activeWeek]).
 /// Single-week sessions pass 0; effectiveSetsForWeek(0) falls back to
 /// effectiveSets semantics. (REQ-PERIOD-040)
-bool isStandaloneBlockComplete(
-    RoutineSlot slot, List<SetLog> allLogs, int week) {
+///
+/// [plannedCountFor] is the live-set-editing resolver ([SITE-4], AD-5) —
+/// pass `state.plannedSetsFor` from real call sites so an added/removed set
+/// is reflected in the completion denominator. Optional and defaults to the
+/// raw plan count (`slot.effectiveSetsForWeek(week).length`) when omitted,
+/// keeping this signature backward-compatible for callers that predate
+/// live-set-editing.
+bool isStandaloneBlockComplete(RoutineSlot slot, List<SetLog> allLogs, int week,
+    [int Function(RoutineSlot)? plannedCountFor]) {
   final logged = allLogs.where((l) => l.exerciseId == slot.exerciseId).length;
-  return logged >= slot.effectiveSetsForWeek(week).length;
+  final planned = plannedCountFor != null
+      ? plannedCountFor(slot)
+      : slot.effectiveSetsForWeek(week).length;
+  return logged >= planned;
 }
 
 /// Returns true if a superset block (round-robin) is fully completed.
-/// Complete = every member has effectiveSetsForWeek(week).length logs.
+/// Complete = every member has [plannedCountFor] (or the raw plan count)
+/// logs. See [isStandaloneBlockComplete] for [plannedCountFor] semantics
+/// ([SITE-5], AD-5).
 bool isSupersetBlockComplete(
-    List<RoutineSlot> members, List<SetLog> allLogs, int week) {
+    List<RoutineSlot> members, List<SetLog> allLogs, int week,
+    [int Function(RoutineSlot)? plannedCountFor]) {
   return members.every((slot) {
     final logged = allLogs.where((l) => l.exerciseId == slot.exerciseId).length;
-    return logged >= slot.effectiveSetsForWeek(week).length;
+    final planned = plannedCountFor != null
+        ? plannedCountFor(slot)
+        : slot.effectiveSetsForWeek(week).length;
+    return logged >= planned;
   });
 }
 
 /// Determines the [BlockStatus] for each block given the current logs.
 /// The "current" block is the first non-completed one.
 /// [week] threads through to the slot-complete helpers. (REQ-PERIOD-040)
+/// [plannedCountFor] threads the live-set-editing resolver through to both
+/// helpers (AD-5) — see [isStandaloneBlockComplete].
 List<BlockStatus> computeBlockStatuses(
-    List<BlockInfo> blocks, List<SetLog> allLogs, int week) {
+    List<BlockInfo> blocks, List<SetLog> allLogs, int week,
+    [int Function(RoutineSlot)? plannedCountFor]) {
   var foundCurrent = false;
   return blocks.map((block) {
     final complete = block.isSuperset
-        ? isSupersetBlockComplete(block.slots, allLogs, week)
-        : isStandaloneBlockComplete(block.slots.first, allLogs, week);
+        ? isSupersetBlockComplete(block.slots, allLogs, week, plannedCountFor)
+        : isStandaloneBlockComplete(
+            block.slots.first, allLogs, week, plannedCountFor);
     if (complete) return BlockStatus.completed;
     if (!foundCurrent) {
       foundCurrent = true;
@@ -125,7 +145,11 @@ List<BlockStatus> computeBlockStatuses(
 /// For range sets we use repsMax (the top of the range).
 /// For single sets we use reps.
 /// Document: rep-range logging uses repsMax to represent "aimed for the top".
-int plannedRepsForSpec(SetSpec spec, ExerciseMode mode) {
+///
+/// [spec] is null for an added-beyond-plan row (live-set-editing AD-4) — a
+/// bare row has no prescription, so this returns 0 (no planned target).
+int plannedRepsForSpec(SetSpec? spec, ExerciseMode mode) {
+  if (spec == null) return 0;
   if (mode == ExerciseMode.duration) return 0;
   if (spec.reps != null) return spec.reps!;
   if (spec.repsMax != null) return spec.repsMax!;
@@ -135,7 +159,11 @@ int plannedRepsForSpec(SetSpec spec, ExerciseMode mode) {
 
 /// Human-readable display for planned reps (e.g. "10" or "8–12").
 /// Failure sets ([SetType.failure]) display "Al fallo" regardless of mode.
-String repsDisplayText(SetSpec spec, ExerciseMode mode) {
+///
+/// [spec] is null for an added-beyond-plan row (AD-4) — returns an empty
+/// string so no prescription hint text renders for a bare row.
+String repsDisplayText(SetSpec? spec, ExerciseMode mode) {
+  if (spec == null) return '';
   if (spec.type == SetType.failure) return 'Al fallo';
   if (mode == ExerciseMode.duration) {
     final secs = spec.durationSeconds ?? 0;
@@ -366,7 +394,12 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
     // so effectiveSetsForWeek(0) falls back to effectiveSets (REQ-PERIOD-042).
     final week = state.session.weekNumber;
     final blocks = buildBlocks(state.day.slots);
-    final statuses = computeBlockStatuses(blocks, state.setLogs, week);
+    // live-set-editing AD-5: single resolver every gating/render denominator
+    // routes through. Bound method closes over `state`, so callers never
+    // read the raw plan count directly.
+    final plannedCountFor = state.plannedSetsFor;
+    final statuses =
+        computeBlockStatuses(blocks, state.setLogs, week, plannedCountFor);
     final out = <Widget>[];
 
     for (var blockIdx = 0; blockIdx < blocks.length; blockIdx++) {
@@ -385,6 +418,7 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
           onActivate: () => setState(() => _activatedBlocks.add(idx)),
           allLogs: state.setLogs,
           week: week,
+          plannedCountFor: plannedCountFor,
           onSetCheck: _logSet,
           onSetUpdate: _updateSet,
         ));
@@ -396,14 +430,22 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
           activated: activated,
           onActivate: () => setState(() => _activatedBlocks.add(idx)),
           week: week,
+          plannedCountFor: plannedCountFor,
           onSetCheck: (setNumber, reps, weightKg) =>
               _logSet(entry.slot, setNumber, reps, weightKg),
           onSetUpdate: _updateSet,
+          onAddSet: () => _addSet(entry.slot),
         ));
       }
       out.add(const SizedBox(height: 14));
     }
     return out;
+  }
+
+  /// Agrega un set extra al ejercicio (live-set-editing AD-1/AD-6). El write
+  /// real ocurre cuando el athlete completa la fila nueva vía [_logSet].
+  void _addSet(RoutineSlot slot) {
+    ref.read(sessionNotifierProvider(widget.init).notifier).addSet(slot);
   }
 
   // ── Build ─────────────────────────────────────────────────────────────────
@@ -762,8 +804,10 @@ class _StandaloneBlock extends StatelessWidget {
     required this.activated,
     required this.onActivate,
     required this.week,
+    required this.plannedCountFor,
     required this.onSetCheck,
     required this.onSetUpdate,
+    this.onAddSet,
   });
 
   final _SupersetEntry entry;
@@ -775,15 +819,23 @@ class _StandaloneBlock extends StatelessWidget {
 
   /// 0-based active week; single-week sessions use 0. (REQ-PERIOD-040)
   final int week;
+
+  /// live-set-editing AD-5 resolver ([SITE-6], [SITE-7]) — "sets today" for a
+  /// slot, honoring any session-local add/remove override.
+  final int Function(RoutineSlot) plannedCountFor;
   final void Function(int setNumber, int reps, double weightKg) onSetCheck;
   final void Function(SetLog existing, int reps, double weightKg) onSetUpdate;
+
+  /// "+ agregar serie" callback (AD-6). Null on blocks that shouldn't offer
+  /// it — never wired for completed/future blocks (see build() below).
+  final VoidCallback? onAddSet;
 
   @override
   Widget build(BuildContext context) {
     if (status == BlockStatus.completed) {
       return _CompletedBlockSummary(
         exerciseName: entry.slot.exerciseName,
-        totalSets: entry.slot.effectiveSetsForWeek(week).length,
+        totalSets: plannedCountFor(entry.slot),
       );
     }
     if (status == BlockStatus.future && !activated) {
@@ -794,17 +846,19 @@ class _StandaloneBlock extends StatelessWidget {
     }
     // current, o future destrabado → interactivo.
     final loggedCount = entry.logs.length;
-    final totalSets = entry.slot.effectiveSetsForWeek(week).length;
+    final totalSets = plannedCountFor(entry.slot);
     final isDone = loggedCount >= totalSets;
     return _ExerciseSection(
       slot: entry.slot,
       logsForExercise: entry.logs,
       currentSetNumber: isDone ? null : loggedCount + 1,
       week: week,
+      totalSets: totalSets,
       techniqueInstructions: entry.technique,
       videoUrl: entry.videoUrl,
       onSetCheck: onSetCheck,
       onSetUpdate: onSetUpdate,
+      onAddSet: onAddSet,
     );
   }
 }
@@ -822,6 +876,7 @@ class _SupersetBlock extends StatelessWidget {
     required this.onActivate,
     required this.allLogs,
     required this.week,
+    required this.plannedCountFor,
     required this.onSetCheck,
     required this.onSetUpdate,
   });
@@ -836,6 +891,12 @@ class _SupersetBlock extends StatelessWidget {
 
   /// 0-based active week; single-week sessions use 0. (REQ-PERIOD-040)
   final int week;
+
+  /// live-set-editing AD-5 resolver ([SITE-5], [SITE-8]) — see
+  /// [_StandaloneBlock.plannedCountFor]. Superset add/remove UI is out of
+  /// scope this change (design.md AD-5 superset note); the gating switch is
+  /// applied uniformly for correctness only.
+  final int Function(RoutineSlot) plannedCountFor;
   final void Function(
       RoutineSlot slot, int setNumber, int reps, double weightKg) onSetCheck;
   final void Function(SetLog existing, int reps, double weightKg) onSetUpdate;
@@ -852,6 +913,7 @@ class _SupersetBlock extends StatelessWidget {
     return _SupersetSection(
       entries: entries,
       week: week,
+      plannedCountFor: plannedCountFor,
       onSetCheck: onSetCheck,
       onSetUpdate: onSetUpdate,
     );
@@ -1133,6 +1195,7 @@ class _SupersetSection extends StatelessWidget {
   const _SupersetSection({
     required this.entries,
     required this.week,
+    required this.plannedCountFor,
     required this.onSetCheck,
     required this.onSetUpdate,
   });
@@ -1141,6 +1204,10 @@ class _SupersetSection extends StatelessWidget {
 
   /// 0-based active week; single-week sessions use 0. (REQ-PERIOD-040)
   final int week;
+
+  /// live-set-editing AD-5 resolver ([SITE-8]) — see
+  /// [_StandaloneBlock.plannedCountFor].
+  final int Function(RoutineSlot) plannedCountFor;
   final void Function(
       RoutineSlot slot, int setNumber, int reps, double weightKg) onSetCheck;
   final void Function(SetLog existing, int reps, double weightKg) onSetUpdate;
@@ -1151,10 +1218,7 @@ class _SupersetSection extends StatelessWidget {
 
     // Vueltas totales = el ejercicio más largo del bloque.
     final maxRounds = entries.fold<int>(
-        0,
-        (m, e) => e.slot.effectiveSetsForWeek(week).length > m
-            ? e.slot.effectiveSetsForWeek(week).length
-            : m);
+        0, (m, e) => plannedCountFor(e.slot) > m ? plannedCountFor(e.slot) : m);
 
     // Scan round-robin: la celda activa es el primer par (vuelta, ejercicio)
     // que aún no fue logueado.
@@ -1164,7 +1228,7 @@ class _SupersetSection extends StatelessWidget {
     outer:
     for (var round = 1; round <= maxRounds; round++) {
       for (final e in entries) {
-        if (round > e.slot.effectiveSetsForWeek(week).length) continue;
+        if (round > plannedCountFor(e.slot)) continue;
         if (e.logs.length < round) {
           activeId = e.slot.exerciseId;
           activeSet = round;
@@ -1184,11 +1248,14 @@ class _SupersetSection extends StatelessWidget {
         logsForExercise: e.logs,
         currentSetNumber: e.slot.exerciseId == activeId ? activeSet : null,
         week: week,
+        totalSets: plannedCountFor(e.slot),
         techniqueInstructions: e.technique,
         videoUrl: e.videoUrl,
         onSetCheck: (setNumber, reps, weightKg) =>
             onSetCheck(e.slot, setNumber, reps, weightKg),
         onSetUpdate: onSetUpdate,
+        // Superset add/remove UI is out of scope this change (AD-5 note).
+        onAddSet: null,
       ));
       if (i != entries.length - 1) children.add(const SizedBox(height: 8));
     }
@@ -1250,10 +1317,12 @@ class _ExerciseSection extends StatefulWidget {
     required this.logsForExercise,
     required this.currentSetNumber,
     required this.week,
+    required this.totalSets,
     required this.techniqueInstructions,
     required this.videoUrl,
     required this.onSetCheck,
     required this.onSetUpdate,
+    this.onAddSet,
   });
 
   final RoutineSlot slot;
@@ -1264,11 +1333,21 @@ class _ExerciseSection extends StatefulWidget {
 
   /// 0-based active week; single-week sessions use 0. (REQ-PERIOD-040)
   final int week;
+
+  /// live-set-editing AD-5/[SITE-9] resolved "sets today" — the render loop
+  /// bound. Replaces the previous direct read of
+  /// `slot.effectiveSetsForWeek(week).length`, so an add/remove is reflected
+  /// in the number of rows drawn, not just the completion math.
+  final int totalSets;
   final List<String>? techniqueInstructions;
   final String? videoUrl;
 
   final void Function(int setNumber, int reps, double weightKg) onSetCheck;
   final void Function(SetLog existing, int reps, double weightKg) onSetUpdate;
+
+  /// "+ agregar serie" callback (AD-6). Null ⇒ affordance hidden (e.g.
+  /// superset members this change, or a write already in flight).
+  final VoidCallback? onAddSet;
 
   @override
   State<_ExerciseSection> createState() => _ExerciseSectionState();
@@ -1312,7 +1391,10 @@ class _ExerciseSectionState extends State<_ExerciseSection> {
     final l10n = AppL10n.of(context);
     final effectiveSets = widget.slot.effectiveSetsForWeek(widget.week);
     final loggedCount = widget.logsForExercise.length;
-    final totalSets = effectiveSets.length;
+    // live-set-editing [SITE-9]: the render loop bound is the resolved
+    // session-local count, NOT effectiveSets.length — an added-beyond-plan
+    // row must draw even though it has no SetSpec.
+    final totalSets = widget.totalSets;
     final isDone = loggedCount >= totalSets;
     final mode = widget.slot.effectiveExerciseMode;
 
@@ -1321,7 +1403,10 @@ class _ExerciseSectionState extends State<_ExerciseSection> {
     final rowWidgets = <Widget>[];
     for (var idx = 0; idx < totalSets; idx++) {
       final setNumber = idx + 1;
-      final spec = effectiveSets[idx];
+      // AD-4: idx beyond the plan's effectiveSets has no SetSpec — an added
+      // row is bare free-entry, never synthesized from the previous set.
+      final SetSpec? spec =
+          idx < effectiveSets.length ? effectiveSets[idx] : null;
       final logged = widget.logsForExercise
           .where((l) => l.setNumber == setNumber)
           .firstOrNull;
@@ -1332,13 +1417,19 @@ class _ExerciseSectionState extends State<_ExerciseSection> {
 
       // For duration sets, the logged weight is 0.
       // For reps sets, the logged weight comes from the log or planned spec.
-      final plannedWeight = spec.weightKg ?? widget.slot.targetWeightKg ?? 0.0;
+      // spec == null (added row) → no planned target → 0, never prefilled
+      // from the previous logged set (AD-4 rejected-alternative guard).
+      final plannedWeight = spec == null
+          ? 0.0
+          : spec.weightKg ?? widget.slot.targetWeightKg ?? 0.0;
       final initialWeight = isRowDone ? logged.weightKg : plannedWeight;
       final plannedReps = plannedRepsForSpec(spec, mode);
 
-      final isDurationSet = mode == ExerciseMode.duration ||
-          (spec.durationSeconds != null && spec.durationSeconds! > 0);
-      final targetSeconds = isDurationSet ? (spec.durationSeconds ?? 0) : 0;
+      final specDurationSeconds = spec?.durationSeconds;
+      final isDurationSet = spec != null &&
+          (mode == ExerciseMode.duration ||
+              (specDurationSeconds != null && specDurationSeconds > 0));
+      final targetSeconds = isDurationSet ? (specDurationSeconds ?? 0) : 0;
 
       final isFutureSet = !isRowDone && !isCurrent;
       Widget rowWidget = Padding(
@@ -1472,7 +1563,61 @@ class _ExerciseSectionState extends State<_ExerciseSection> {
           ],
           const SizedBox(height: 12),
           ...rowWidgets,
+          if (widget.onAddSet != null) ...[
+            const SizedBox(height: 8),
+            _AddSetButton(onTap: widget.onAddSet!),
+          ],
         ],
+      ),
+    );
+  }
+}
+
+// ── _AddSetButton ─────────────────────────────────────────────────────────────
+
+/// "+ agregar serie" (live-set-editing AD-6). Botón sutil full-width al pie
+/// del bloque interactivo de un ejercicio. Al tocar, dispara
+/// [SessionNotifier.addSet] — la fila nueva se renderiza vacía (AD-4) y el
+/// write real ocurre cuando el athlete la completa vía el check existente.
+class _AddSetButton extends StatelessWidget {
+  const _AddSetButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(9999),
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 44),
+          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            color: palette.bg,
+            borderRadius: BorderRadius.circular(9999),
+            border: Border.all(color: palette.border),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(TreinoIcon.plus, size: 16, color: palette.accent),
+              const SizedBox(width: 8),
+              Text(
+                'agregar serie',
+                style: GoogleFonts.barlowCondensed(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                  letterSpacing: 0.6,
+                  color: palette.accent,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -1503,7 +1648,10 @@ class _RepsSetRow extends StatefulWidget {
   });
 
   final int setNumber;
-  final SetSpec spec;
+
+  /// Null for an added-beyond-plan row (live-set-editing AD-4) — a bare row
+  /// has no prescription. [_repsDisplayText] and [_summaryReps] guard this.
+  final SetSpec? spec;
   final ExerciseMode mode;
   final int plannedReps;
 
