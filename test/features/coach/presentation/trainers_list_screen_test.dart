@@ -20,7 +20,7 @@ Widget _wrap(Widget child, {List<Override> overrides = const []}) =>
 
 void main() {
   group('TrainersListScreen — toggle MAPA/Lista', () {
-    testWidgets('header muestra "ENCONTRÁ TU COACH" en stack magenta + blanco',
+    testWidgets('header muestra "ENCONTRÁ TU COACH" en una sola línea',
         (tester) async {
       await tester.pumpWidget(_wrap(
         const TrainersListScreen(),
@@ -30,8 +30,7 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      expect(find.text('ENCONTRÁ TU'), findsOneWidget);
-      expect(find.text('COACH'), findsOneWidget);
+      expect(find.textContaining('ENCONTRÁ TU COACH'), findsOneWidget);
     });
 
     testWidgets('header tiene toggle MAPA / LISTA visible', (tester) async {
