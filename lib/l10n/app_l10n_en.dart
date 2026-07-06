@@ -2202,6 +2202,9 @@ class AppL10nEn extends AppL10n {
   String get dashboardAdherenceRingPlaceholder => '';
 
   @override
+  String get dashboardProximaSesionManana => 'tomorrow';
+
+  @override
   String get dashboardProximasSesionesEmpty => '';
 
   @override

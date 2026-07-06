@@ -218,6 +218,31 @@ void main() {
     });
   });
 
+  // ── SCENARIO-HOY-07C — Próximas sesiones: prefijo de día (no-hoy) ──────────
+
+  group('SCENARIO-HOY-07C — próximas sesiones day prefix', () {
+    testWidgets('non-today session shows "mañana" day prefix', (tester) async {
+      // +1 día en hora LOCAL → siempre "mañana" sin importar la TZ del CI.
+      final tomorrow = DateTime.now().add(const Duration(days: 1));
+      final appointments = [
+        _confirmedAppointment(
+          id: 't1',
+          athleteDisplayName: 'Manana Alumno',
+          startsAt: tomorrow,
+        ),
+      ];
+
+      await tester.pumpWidget(_wrapWide(
+        const CoachHubDashboardScreen(),
+        overrides: _baseOverrides(appointments: appointments),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('mañana'), findsOneWidget);
+      expect(find.textContaining('Manana Alumno'), findsOneWidget);
+    });
+  });
+
   // ── SCENARIO-HOY-07B — Próximas sesiones empty state ──────────────────────
 
   group('SCENARIO-HOY-07B — próximas sesiones empty state', () {

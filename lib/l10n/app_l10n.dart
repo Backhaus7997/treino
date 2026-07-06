@@ -4166,6 +4166,12 @@ abstract class AppL10n {
   /// **'--'**
   String get dashboardAdherenceRingPlaceholder;
 
+  /// Prefijo de dia para una proxima sesion que ocurre manana (dashboard Hoy, columna derecha de proximas sesiones).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'mañana'**
+  String get dashboardProximaSesionManana;
+
   /// Empty state for the Próximas sesiones section in the Coach Hub web dashboard right column.
   ///
   /// In es_AR, this message translates to:

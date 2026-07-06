@@ -616,22 +616,44 @@ class _SesionRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppL10n.of(context);
     final local = appointment.startsAt.toLocal();
     final hh = local.hour.toString().padLeft(2, '0');
     final mm = local.minute.toString().padLeft(2, '0');
+    final time = '$hh:$mm';
+
+    // La lista de próximas sesiones abarca hasta 30 días. Cuando la sesión no
+    // es hoy, prefijamos el día ("mañana · 09:00" / "14/7 · 09:00") para que el
+    // orden no se lea salteado — mostrar solo HH:mm confundía sesiones de días
+    // distintos (se ordenan por fecha completa, no solo por hora).
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final sessionDay = DateTime(local.year, local.month, local.day);
+    final daysAhead = sessionDay.difference(today).inDays;
+    final String label;
+    if (daysAhead <= 0) {
+      label = time;
+    } else if (daysAhead == 1) {
+      label = '${l10n.dashboardProximaSesionManana} · $time';
+    } else {
+      label = '${local.day}/${local.month} · $time';
+    }
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Row(
         children: [
           SizedBox(
-            width: 44,
+            width: 104,
             child: Text(
-              '$hh:$mm',
+              label,
               style: TextStyle(
                 color: palette.accent,
                 fontWeight: FontWeight.w700,
                 fontSize: 13,
               ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
           const SizedBox(width: 8),
