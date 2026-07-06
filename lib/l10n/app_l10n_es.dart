@@ -2284,7 +2284,30 @@ class AppL10nEs extends AppL10n {
   @override
   String dashboardAlertBannerSummary(
       int vencidos, int solicitudes, int inactivos) {
-    return '$vencidos vencido(s) · $solicitudes solicitud(es) · $inactivos inactivo(s)';
+    String _temp0 = intl.Intl.pluralLogic(
+      vencidos,
+      locale: localeName,
+      other: '$vencidos vencidos',
+      one: '1 vencido',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      solicitudes,
+      locale: localeName,
+      other: '$solicitudes solicitudes',
+      one: '1 solicitud',
+    );
+    String _temp2 = intl.Intl.pluralLogic(
+      inactivos,
+      locale: localeName,
+      other: '$inactivos inactivos',
+      one: '1 inactivo',
+    );
+    return '$_temp0 · $_temp1 · $_temp2';
+  }
+
+  @override
+  String dashboardAdherenceValue(int pct) {
+    return '$pct%';
   }
 }
 
@@ -4566,6 +4589,29 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String dashboardAlertBannerSummary(
       int vencidos, int solicitudes, int inactivos) {
-    return '$vencidos vencido(s) · $solicitudes solicitud(es) · $inactivos inactivo(s)';
+    String _temp0 = intl.Intl.pluralLogic(
+      vencidos,
+      locale: localeName,
+      other: '$vencidos vencidos',
+      one: '1 vencido',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      solicitudes,
+      locale: localeName,
+      other: '$solicitudes solicitudes',
+      one: '1 solicitud',
+    );
+    String _temp2 = intl.Intl.pluralLogic(
+      inactivos,
+      locale: localeName,
+      other: '$inactivos inactivos',
+      one: '1 inactivo',
+    );
+    return '$_temp0 · $_temp1 · $_temp2';
+  }
+
+  @override
+  String dashboardAdherenceValue(int pct) {
+    return '$pct%';
   }
 }

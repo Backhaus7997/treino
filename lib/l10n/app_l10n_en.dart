@@ -2230,6 +2230,29 @@ class AppL10nEn extends AppL10n {
   @override
   String dashboardAlertBannerSummary(
       int vencidos, int solicitudes, int inactivos) {
+    String _temp0 = intl.Intl.pluralLogic(
+      vencidos,
+      locale: localeName,
+      other: '$vencidos overdue',
+      one: '1 overdue',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      solicitudes,
+      locale: localeName,
+      other: '$solicitudes requests',
+      one: '1 request',
+    );
+    String _temp2 = intl.Intl.pluralLogic(
+      inactivos,
+      locale: localeName,
+      other: '$inactivos inactive',
+      one: '1 inactive',
+    );
+    return '$_temp0 · $_temp1 · $_temp2';
+  }
+
+  @override
+  String dashboardAdherenceValue(int pct) {
     return '';
   }
 }

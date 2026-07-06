@@ -4217,9 +4217,15 @@ abstract class AppL10n {
   /// Alert banner composed summary line showing vencidos, pending requests, and inactive athletes counts.
   ///
   /// In es_AR, this message translates to:
-  /// **'{vencidos} vencido(s) · {solicitudes} solicitud(es) · {inactivos} inactivo(s)'**
+  /// **'{vencidos, plural, =1{1 vencido} other{{vencidos} vencidos}} · {solicitudes, plural, =1{1 solicitud} other{{solicitudes} solicitudes}} · {inactivos, plural, =1{1 inactivo} other{{inactivos} inactivos}}'**
   String dashboardAlertBannerSummary(
       int vencidos, int solicitudes, int inactivos);
+
+  /// Formatted adherencia percentage value shown in the adherencia ring and KPI tile once the aggregate provider has data.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{pct}%'**
+  String dashboardAdherenceValue(int pct);
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {
