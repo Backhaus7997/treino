@@ -782,6 +782,31 @@ service cloud.firestore {
                   && request.auth.uid == resource.data.trainerId;
     }
 
+    // Nutrition plan — un plan por par PF↔alumno, docId `{trainerId}_{athleteId}`.
+    // Trainer-only R/W. El alumno NO lo ve en mobile todavía (feature scoped
+    // aparte). Update preserva trainerId y athleteId. `meals` es un list —
+    // no validamos la estructura en rules (validación se hace client-side).
+    match /nutrition_plans/{docId} {
+      allow read, list: if request.auth != null
+                  && request.auth.uid == resource.data.trainerId;
+      allow create: if request.auth != null
+                  && request.resource.data.trainerId == request.auth.uid
+                  && request.resource.data.athleteId is string
+                  && request.resource.data.athleteId.size() > 0
+                  && request.resource.data.title is string
+                  && request.resource.data.title.size() < 200
+                  && request.resource.data.meals is list;
+      allow update: if request.auth != null
+                  && resource.data.trainerId == request.auth.uid
+                  && request.resource.data.trainerId == resource.data.trainerId
+                  && request.resource.data.athleteId == resource.data.athleteId
+                  && request.resource.data.title is string
+                  && request.resource.data.title.size() < 200
+                  && request.resource.data.meals is list;
+      allow delete: if request.auth != null
+                  && request.auth.uid == resource.data.trainerId;
+    }
+
     // Payment records created by trainers against athletes (Pagos P1).
     match /payments/{paymentId} {
       allow read: if request.auth != null

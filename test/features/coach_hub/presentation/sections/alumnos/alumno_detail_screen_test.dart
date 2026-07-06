@@ -553,15 +553,9 @@ void main() {
           find.text('ANTROPOMETRÍA'), findsNothing); // gateado, no se muestra
     });
 
-    testWidgets('tab placeholder muestra "Próximamente."', (tester) async {
-      await _pump(tester,
-          profile: _prof(), link: _link(TrainerLinkStatus.active));
-
-      await tester.tap(find.text('Nutrición'));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Próximamente.'), findsOneWidget);
-    });
+    // Removed: "tab placeholder muestra 'Próximamente.'" — al implementar
+    // Nutrición (última tab pendiente) ningún tab cae ya al fallback
+    // `_TabPlaceholder`. Todos los tabs tienen su implementación real.
 
     testWidgets(
         'Resumen (tab default) muestra las 4 métricas + heatmap (W2 PR4)',
