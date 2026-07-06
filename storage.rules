@@ -38,22 +38,33 @@ service firebase.storage {
     //
     // Path: /chatMedia/{chatId}/{userId}/{file}
     //
-    // ⚠️  TRADEOFF — no membership check:
-    // Firebase Storage rules cannot call get() on Firestore documents in the
-    // same request, so we cannot verify that userId is actually a member of
-    // chatId without a Firestore read. Instead we rely on:
-    //   1. The path containing the owner's uid — a client must be authenticated
-    //      AS that uid to write (auth.uid == userId).
-    //   2. The Firestore message-create rule which verifies membership and
-    //      requires a valid mediaUrl before the doc is written.
-    //   3. Download URLs use an unguessable ?token= parameter — the same
-    //      privacy posture as /customExerciseVideos (see ADR there).
+    // Membership gate (rules-hardening Slice A / AD-2): chatId is
+    // deterministic (ChatRepository.chatIdFor = sorted([a,b]).join('_')) and
+    // uids are enumerable (userPublicProfiles is world-readable), so a plain
+    // `request.auth != null` read let any authenticated account reconstruct
+    // and download/list another pair's private media. Storage rules CAN call
+    // firestore.get() cross-service (the old in-file comment claiming
+    // otherwise was outdated) — `get` is now gated by `chats/{chatId}.members`
+    // membership, and `list` is closed unconditionally (Storage `list` cannot
+    // be scoped per-object, so per-uid folder enumeration would still leak
+    // other users' media paths even with the `get` gate in place).
+    //
+    // NOTE: the literal `(default)` database name is required here — Storage
+    // rules have no `$(database)` wildcard (that binds from the Firestore
+    // `match /databases/{database}/documents` header, which does not exist
+    // in this rules file).
     //
     // Size limits: images < 15 MB, videos < 100 MB (server-side guard mirrors
     // the client-side guard in ChatMediaUploadService).
     match /chatMedia/{chatId}/{userId}/{file=**} {
-      // Any authenticated user can download (needed for both chat members).
-      allow read: if request.auth != null;
+      // Only members of this chat can download individual media objects.
+      allow get: if request.auth != null
+                 && request.auth.uid in
+                    firestore.get(/databases/(default)/documents/chats/$(chatId)).data.members;
+
+      // list is unconditionally closed — never expose the folder listing,
+      // not even to members.
+      allow list: if false;
 
       // Only the owner can upload; content type and size are allowlisted.
       allow write: if request.auth != null

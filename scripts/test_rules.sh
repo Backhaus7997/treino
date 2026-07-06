@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # scripts/test_rules.sh
 #
-# Manual smoke-test for Firestore security rules covering posts and friendships.
+# Manual smoke-test for Firestore + Storage security rules (posts,
+# friendships, chatMedia, and the rest of scripts/rules_test/*.test.js).
 # Requires the Firebase emulator to be running:
 #
 #   bash scripts/emulator.sh   (or firebase emulators:start)
@@ -9,7 +10,8 @@
 # Then run:
 #   bash scripts/test_rules.sh
 #
-# Covers SCENARIO-130, SCENARIO-131, SCENARIO-132 (REQ-PFM-009, REQ-PFM-010).
+# Covers SCENARIO-130, SCENARIO-131, SCENARIO-132 (REQ-PFM-009, REQ-PFM-010),
+# and SCENARIO-CHATMEDIA-* (rules-hardening Slice A, storage chatMedia).
 # NOT part of CI — this is a manual PR checklist item (reconsider at Fase 6).
 
 set -euo pipefail
@@ -27,5 +29,5 @@ fi
 # --- run via firebase emulators:exec -----------------------------------------
 cd "${SCRIPT_DIR}/.."
 firebase emulators:exec \
-  --only firestore \
+  --only firestore,storage \
   "cd scripts/rules_test && npm test"
