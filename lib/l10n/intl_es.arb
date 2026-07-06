@@ -512,7 +512,7 @@
   "@dashboardAlertBannerAllClear": {
     "description": "Alert banner message when there are no alerts."
   },
-  "dashboardAlertBannerSummary": "{vencidos} vencido(s) · {solicitudes} solicitud(es) · {inactivos} inactivo(s)",
+  "dashboardAlertBannerSummary": "{vencidos, plural, =1{1 vencido} other{{vencidos} vencidos}} · {solicitudes, plural, =1{1 solicitud} other{{solicitudes} solicitudes}} · {inactivos, plural, =1{1 inactivo} other{{inactivos} inactivos}}",
   "@dashboardAlertBannerSummary": {
     "description": "Alert banner composed summary line.",
     "placeholders": {

@@ -825,6 +825,6 @@
   "dashboardInactivosEmpty": "",
   "dashboardInactivosSharingNote": "",
   "dashboardAlertBannerAllClear": "",
-  "dashboardAlertBannerSummary": "",
+  "dashboardAlertBannerSummary": "{vencidos, plural, =1{1 overdue} other{{vencidos} overdue}} · {solicitudes, plural, =1{1 request} other{{solicitudes} requests}} · {inactivos, plural, =1{1 inactive} other{{inactivos} inactive}}",
   "dashboardAdherenceValue": ""
 }

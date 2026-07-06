@@ -4217,7 +4217,7 @@ abstract class AppL10n {
   /// Alert banner composed summary line showing vencidos, pending requests, and inactive athletes counts.
   ///
   /// In es_AR, this message translates to:
-  /// **'{vencidos} vencido(s) · {solicitudes} solicitud(es) · {inactivos} inactivo(s)'**
+  /// **'{vencidos, plural, =1{1 vencido} other{{vencidos} vencidos}} · {solicitudes, plural, =1{1 solicitud} other{{solicitudes} solicitudes}} · {inactivos, plural, =1{1 inactivo} other{{inactivos} inactivos}}'**
   String dashboardAlertBannerSummary(
       int vencidos, int solicitudes, int inactivos);
 
