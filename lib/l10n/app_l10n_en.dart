@@ -1548,7 +1548,7 @@ class AppL10nEn extends AppL10n {
   String get sessionPlayerTimerStartA11y => 'Start timer';
 
   @override
-  String get sessionPlayerRemoveSetA11y => 'Delete set';
+  String get sessionPlayerRemoveSetA11y => 'Remove set';
 
   @override
   String get routineEditorDeleteDayA11y => 'Delete day';

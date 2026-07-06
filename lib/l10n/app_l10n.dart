@@ -3014,7 +3014,7 @@ abstract class AppL10n {
   /// **'Iniciar temporizador'**
   String get sessionPlayerTimerStartA11y;
 
-  /// Semantics label for the per-row delete-set icon in the session player (live-set-editing AD-6).
+  /// Semantics label for the icon-only remove-set button in the session player (live-set-editing PR2).
   ///
   /// In es_AR, this message translates to:
   /// **'Eliminar serie'**

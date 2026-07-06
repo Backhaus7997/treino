@@ -604,6 +604,7 @@
     }
   },
   "sessionPlayerTimerStartA11y": "Start timer",
+  "sessionPlayerRemoveSetA11y": "Remove set",
   "routineEditorDeleteDayA11y": "Delete day",
   "routineEditorEditDayNameA11y": "",
   "athleteDetailEditPlanA11y": "Edit plan",
