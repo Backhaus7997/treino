@@ -29,9 +29,24 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
   /// body silhouette. Defaults to today; changes when the athlete taps a
   /// weekday circle in [_WeekStripCard] (the SEMANA card doubles as the
   /// day selector — no separate day-strip inside the muscles card anymore).
-  /// Independent of `weeklyInsightsProvider`'s week window — the heat-map is
-  /// per-day, the rest of the screen stays weekly.
+  /// Independent of the shown week's window — the heat-map is per-day, the
+  /// rest of the screen stays weekly.
   late DateTime _selectedDay = _todayOnly();
+
+  /// [UX-week-day-selector] Monday 00:00 local of the week currently shown
+  /// by the SEMANA card. Defaults to the current week; paged by the ‹ ›
+  /// chevrons. Independent of `_selectedDay` — paging does NOT force-change
+  /// the muscles card unless the selected day falls outside the new week.
+  late DateTime _shownWeekStart = mondayOfWeek(DateTime.now().toLocal());
+
+  /// [UX-week-day-selector] `true` once the athlete has paged away from the
+  /// current week at least once. Gates the brand-new-account `_EmptyState`:
+  /// that illustration only makes sense on first render of the CURRENT week
+  /// with zero sessions ("you've never trained, start now"). Once the
+  /// athlete is actively browsing past weeks, a week with 0 sessions is
+  /// legitimate data ("you skipped this week") — the week card (0/5) must
+  /// render instead, not the "start training" CTA.
+  bool _hasPagedAway = false;
 
   static DateTime _todayOnly() {
     final now = DateTime.now();
@@ -46,10 +61,40 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
     setState(() => _selectedDay = day);
   }
 
+  /// [UX-week-day-selector] Pages the SEMANA card by [deltaWeeks] weeks
+  /// (negative = previous, positive = next). Next-week paging is blocked at
+  /// the current week — no future weeks. No back-limit: the athlete can page
+  /// back indefinitely (bounded in practice by how far back they've trained;
+  /// each week's data is fetched on demand).
+  ///
+  /// [UX-week-day-selector] If [_selectedDay] falls within the newly shown
+  /// week, it's kept as-is (still valid, no change needed). If it falls
+  /// OUTSIDE the new week, the muscles card is intentionally left alone —
+  /// selection persists until the athlete explicitly taps a day in the new
+  /// week. This avoids a jarring auto-jump of the card below while paging.
+  void _pageWeek(int deltaWeeks) {
+    final candidate = DateTime(
+      _shownWeekStart.year,
+      _shownWeekStart.month,
+      _shownWeekStart.day + deltaWeeks * 7,
+    );
+    final currentWeekStart = mondayOfWeek(DateTime.now().toLocal());
+    if (candidate.isAfter(currentWeekStart)) return;
+    setState(() {
+      _shownWeekStart = candidate;
+      _hasPagedAway = true;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    final async = ref.watch(weeklyInsightsProvider);
+    final uid = ref.watch(currentUidProvider) ?? '';
+    final async = ref.watch(
+      athleteWeekInsightsProvider((uid: uid, weekStart: _shownWeekStart)),
+    );
+    final isCurrentWeek =
+        _shownWeekStart == mondayOfWeek(DateTime.now().toLocal());
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -61,10 +106,17 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
               child: CircularProgressIndicator(color: palette.accent),
             ),
             error: (_, __) => _ErrorState(
-              onRetry: () => ref.invalidate(weeklyInsightsProvider),
+              onRetry: () => ref.invalidate(
+                athleteWeekInsightsProvider(
+                  (uid: uid, weekStart: _shownWeekStart),
+                ),
+              ),
             ),
             data: (insights) {
-              if (insights == null || insights.sessionsCount == 0) {
+              if (insights == null ||
+                  (insights.sessionsCount == 0 &&
+                      isCurrentWeek &&
+                      !_hasPagedAway)) {
                 return const _EmptyState();
               }
               return ListView(
@@ -76,6 +128,9 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                     insights: insights,
                     selectedDay: _selectedDay,
                     onDaySelected: _onDaySelected,
+                    isCurrentWeek: isCurrentWeek,
+                    onPreviousWeek: () => _pageWeek(-1),
+                    onNextWeek: () => _pageWeek(1),
                   ),
                   const SizedBox(height: 14),
                   _DailyMusclesCard(selectedDay: _selectedDay),
@@ -211,6 +266,9 @@ class _WeekStripCard extends StatelessWidget {
     required this.insights,
     required this.selectedDay,
     required this.onDaySelected,
+    required this.isCurrentWeek,
+    required this.onPreviousWeek,
+    required this.onNextWeek,
   });
   final WeeklyInsights insights;
 
@@ -219,6 +277,12 @@ class _WeekStripCard extends StatelessWidget {
   /// weekday circle drives [onDaySelected].
   final DateTime selectedDay;
   final ValueChanged<DateTime> onDaySelected;
+
+  /// [UX-week-day-selector] `true` when [insights] is the CURRENT week —
+  /// disables the › (next week) chevron, since future weeks don't exist.
+  final bool isCurrentWeek;
+  final VoidCallback onPreviousWeek;
+  final VoidCallback onNextWeek;
 
   static const _dayLabels = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
 
@@ -242,9 +306,19 @@ class _WeekStripCard extends StatelessWidget {
         children: [
           Row(
             children: [
+              // [UX-week-day-selector] ‹ previous week. No back-limit — the
+              // athlete can page back indefinitely; each week's data is
+              // fetched on demand via `athleteWeekInsightsProvider`.
+              IconButton(
+                key: const Key('week-strip-previous-week'),
+                icon: Icon(TreinoIcon.chevronLeft, color: palette.textMuted),
+                onPressed: onPreviousWeek,
+                tooltip: 'Semana anterior',
+              ),
               Expanded(
                 child: Text(
                   _formatRange(insights.weekStart, insights.weekEnd),
+                  textAlign: TextAlign.center,
                   style: GoogleFonts.barlowCondensed(
                     fontWeight: FontWeight.w700,
                     fontSize: 12,
@@ -252,6 +326,17 @@ class _WeekStripCard extends StatelessWidget {
                     color: palette.textMuted,
                   ),
                 ),
+              ),
+              // [UX-week-day-selector] › next week — disabled (null onTap)
+              // on the current week, since there are no future weeks yet.
+              IconButton(
+                key: const Key('week-strip-next-week'),
+                icon: Icon(TreinoIcon.chevronRight,
+                    color: isCurrentWeek
+                        ? palette.textMuted.withValues(alpha: 0.3)
+                        : palette.textMuted),
+                onPressed: isCurrentWeek ? null : onNextWeek,
+                tooltip: 'Semana siguiente',
               ),
               Text(
                 '${insights.sessionsCount} / ${insights.plannedSessionsCount}',
@@ -428,14 +513,21 @@ class _DayChip extends StatelessWidget {
 
 // ── Card: MÚSCULOS DEL DÍA (per-day heat-map) ────────────────────────────────
 
-/// [AD5][REQ:heat-map-per-day][UX-week-day-selector] Replaces the old
-/// week-accumulated "MÚSCULOS DE LA SEMANA" card. Each day starts blank; the
-/// silhouette only paints the muscles trained on [selectedDay] — no
-/// carry-over from other days (fixes the chest-Monday-bleeds-into-Tuesday
+/// [AD5][REQ:heat-map-per-day][UX-week-day-selector][UX-back-view] Replaces
+/// the old week-accumulated "MÚSCULOS DE LA SEMANA" card. Each day starts
+/// blank; the silhouette only paints the muscles trained on [selectedDay] —
+/// no carry-over from other days (fixes the chest-Monday-bleeds-into-Tuesday
 /// bug). The day-strip navigator that used to live INSIDE this card was
 /// removed — the SEMANA card above is now the single day selector for the
 /// whole screen (see `_WeekStripCard`). `DayStripNavigator`/`DayStripLabels`
 /// stay in the codebase — the coach's `DailyHeatmapSection` still uses them.
+///
+/// [UX-back-view] `BodySilhouettePlaceholder(showBack: true)` — the athlete
+/// can now see BACK muscles (espalda) too, not just the front silhouette.
+/// Layout is a `Column` (silhouette full-width, list below) rather than the
+/// old `Row` (silhouette beside the list) — the front+back pair needs more
+/// horizontal room than a single body did, and stacking mirrors how home's
+/// `EstaSemanaCard` already lays out its own `showBack: true` silhouette.
 class _DailyMusclesCard extends ConsumerWidget {
   const _DailyMusclesCard({required this.selectedDay});
 
@@ -476,31 +568,33 @@ class _DailyMusclesCard extends ConsumerWidget {
               child: Center(child: CircularProgressIndicator()),
             ),
             error: (_, __) => const SizedBox.shrink(),
-            data: (dayInsights) => Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
+            // [UX-back-view] `showBack: true` renders bodyfront + bodyback
+            // side by side — that pair needs more horizontal room than the
+            // old single-body 160px column had next to it. Stacked
+            // (silhouettes full-width ABOVE the sets list) instead of the
+            // old Row-beside-list layout, mirroring how home's
+            // `EstaSemanaCard` lays out the same `showBack: true` silhouette
+            // (full-width, own row, nothing beside it) — avoids a
+            // RenderFlex overflow at narrow widths.
+            data: (dayInsights) => Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 BodySilhouettePlaceholder(
-                  width: 160,
-                  height: 240,
+                  width: double.infinity,
+                  height: 220,
+                  showBack: true,
                   setsByGroup: dayInsights.setsByGroup,
                   label: dayInsights.isEmpty ? l10n.insightsDayEmptyHint : null,
                 ),
-                const SizedBox(width: 18),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      for (final group in MuscleGroupDisplay.displayOrder)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 4),
-                          child: _MuscleSetsRow(
-                            group: group,
-                            sets: dayInsights.setsByGroup[group] ?? 0,
-                          ),
-                        ),
-                    ],
+                const SizedBox(height: 14),
+                for (final group in MuscleGroupDisplay.displayOrder)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: _MuscleSetsRow(
+                      group: group,
+                      sets: dayInsights.setsByGroup[group] ?? 0,
+                    ),
                   ),
-                ),
               ],
             ),
           ),
