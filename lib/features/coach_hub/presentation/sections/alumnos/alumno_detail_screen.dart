@@ -1557,8 +1557,19 @@ String _cadenciaLabel(BillingCadence c) => switch (c) {
 /// misma receta que el dashboard del coach). Los recordatorios y las métricas
 /// globales (ingreso del mes/proyección) se difieren.
 /// Construye un CSV (RFC-4180) del historial de pagos del alumno. // i18n
-String _buildPagosCsv(List<Payment> payments) {
-  String esc(String s) => '"${s.replaceAll('"', '""')}"';
+///
+/// Neutraliza inyección de fórmulas (CSV injection): una celda que arranca con
+/// = + - @ (o tab/CR) la interpretan Excel/Sheets como FÓRMULA. `concept` es
+/// texto libre, así que prefijamos esas celdas con comilla simple para forzar
+/// que se traten como texto literal.
+@visibleForTesting
+String buildPagosCsv(List<Payment> payments) {
+  String esc(String s) {
+    // CSV-injection guard (OWASP): prefix a formula-trigger lead with a quote.
+    final v = s.isNotEmpty && '=+-@\t\r'.contains(s[0]) ? "'$s" : s;
+    return '"${v.replaceAll('"', '""')}"';
+  }
+
   final rows = <String>['FECHA,CONCEPTO,MONTO,ESTADO,PERÍODO'];
   for (final p in payments) {
     final d = p.createdAt.toLocal();
@@ -1661,7 +1672,7 @@ class _PagosTab extends ConsumerWidget {
                     'alumno';
                 triggerBrowserDownload(
                   bytes:
-                      Uint8List.fromList(utf8.encode(_buildPagosCsv(history))),
+                      Uint8List.fromList(utf8.encode(buildPagosCsv(history))),
                   filename: 'pagos_${name.replaceAll(' ', '_')}.csv',
                   mimeType: 'text/csv',
                 );
