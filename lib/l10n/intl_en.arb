@@ -835,5 +835,15 @@
   "dashboardInactivosEmpty": "",
   "dashboardAlertBannerAllClear": "",
   "dashboardAlertBannerSummary": "{vencidos, plural, =1{1 overdue} other{{vencidos} overdue}} · {solicitudes, plural, =1{1 request} other{{solicitudes} requests}} · {inactivos, plural, =1{1 inactive} other{{inactivos} inactive}}",
-  "dashboardAdherenceValue": ""
+  "dashboardAdherenceValue": "",
+  "insightsMonthlyReportTile": "Monthly Report",
+  "monthlyReportTitle": "MONTHLY REPORT",
+  "monthlyReportMetricWorkouts": "Workouts",
+  "monthlyReportMetricDuration": "Duration",
+  "monthlyReportMetricVolume": "Volume",
+  "monthlyReportMetricSets": "Sets",
+  "monthlyReportDurationUnit": "min",
+  "monthlyReportVolumeUnit": "kg",
+  "monthlyReportEmptyHint": "No data in the last 12 months.",
+  "monthlyReportLoadError": "We couldn't load your monthly report. Try again."
 }
