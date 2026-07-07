@@ -889,6 +889,10 @@ class AppL10nEn extends AppL10n {
       'No pudimos cargar la actividad de hoy.';
 
   @override
+  String get dashboardSinActividadReciente =>
+      'Sin actividad en los últimos días.';
+
+  @override
   String get dashboardSinCobros => 'Sin cobros pendientes.';
 
   @override
@@ -1918,6 +1922,15 @@ class AppL10nEn extends AppL10n {
       'We couldn\'t load your insights. Please try again.';
 
   @override
+  String get insightsDayStripTodayLabel => 'TODAY';
+
+  @override
+  String get insightsDayEmptyHint => 'No workout logged this day.';
+
+  @override
+  String get coachDailyHeatmapSectionTitle => 'MUSCLES OF THE DAY';
+
+  @override
   String get profileLoadError =>
       'We couldn\'t load your profile. Please try again.';
 
@@ -2239,11 +2252,6 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get dashboardInactivosEmpty => '';
-
-  @override
-  String dashboardInactivosSharingNote(int sharing, int total) {
-    return '';
-  }
 
   @override
   String get dashboardAlertBannerAllClear => '';

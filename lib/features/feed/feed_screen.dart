@@ -60,7 +60,10 @@ class _FeedHeader extends ConsumerWidget {
     final pendingRequests =
         uid == null ? 0 : ref.watch(pendingRequestCountProvider(uid));
     // REQ-CHATUNREAD-005: count of chats with unread messages for the badge.
-    final unreadChats = ref.watch(totalUnreadCountProvider);
+    // Only user↔user (social) chats feed this badge — messages from the
+    // athlete's coach live under the COACH tab badge. See
+    // `unreadFromCoachProvider` / `unreadFromFriendsProvider`.
+    final unreadChats = ref.watch(unreadFromFriendsProvider);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),

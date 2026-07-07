@@ -3,6 +3,7 @@ import 'dart:developer' as developer;
 import 'package:cloud_firestore/cloud_firestore.dart'
     show CollectionReference, DocumentSnapshot, FirebaseFirestore, Timestamp;
 
+import '../../../core/utils/argentina_time.dart';
 import '../../../core/utils/streak_calculator.dart';
 import '../../profile/data/user_public_profile_repository.dart';
 import '../domain/session.dart';
@@ -192,8 +193,12 @@ class SessionRepository {
   /// trainer dashboard's "Entrenaron hoy" list does NOT pull each athlete's
   /// full session history. [now] is injectable for deterministic tests.
   Future<List<Session>> listFinishedToday(String uid, {DateTime? now}) async {
-    final today = (now ?? DateTime.now()).toUtc();
-    final startOfDay = DateTime.utc(today.year, today.month, today.day);
+    // "Today" is the Argentina calendar day (UTC-3, no DST), NOT the UTC day:
+    // a session finished at 23:00 ART belongs to today even though in UTC it is
+    // already tomorrow. Bounds are ART-midnight (= 03:00 UTC) as UTC instants.
+    final artNow = toArgentina((now ?? DateTime.now()).toUtc());
+    final startOfDay = DateTime.utc(artNow.year, artNow.month, artNow.day)
+        .add(argentinaUtcOffset);
     final startOfNextDay = startOfDay.add(const Duration(days: 1));
     // Apply the lower bound on the server (status + finishedAt >= startOfDay)
     // so the read stays bounded to recent sessions, then enforce the upper

@@ -38,8 +38,7 @@ void main() {
       'startedAt': Timestamp.fromDate(
         (finishedAt ?? now).subtract(const Duration(hours: 1)),
       ),
-      'finishedAt':
-          finishedAt == null ? null : Timestamp.fromDate(finishedAt),
+      'finishedAt': finishedAt == null ? null : Timestamp.fromDate(finishedAt),
       'totalVolumeKg': 0.0,
       'durationMin': 0,
       'status': status,
@@ -48,37 +47,46 @@ void main() {
     });
   }
 
-  test('listFinishedToday returns only today\'s finished sessions, newest-first',
+  test('listFinishedToday buckets by the ART calendar day, newest-first',
       () async {
-    // Two finished today (different hours).
+    // now = 2026-06-16 12:00 UTC = 09:00 ART → ART "today" is 2026-06-16,
+    // i.e. the UTC window [Jun 16 03:00, Jun 17 03:00).
     await seedSession(
       id: 'today-early',
       status: 'finished',
-      finishedAt: DateTime.utc(2026, 6, 16, 8, 0, 0),
+      finishedAt: DateTime.utc(2026, 6, 16, 8, 0, 0), // 05:00 ART — today
     );
     await seedSession(
       id: 'today-late',
       status: 'finished',
-      finishedAt: DateTime.utc(2026, 6, 16, 20, 30, 0),
+      finishedAt: DateTime.utc(2026, 6, 16, 20, 30, 0), // 17:30 ART — today
     );
-    // Finished yesterday — must be excluded.
+    // 01:00 UTC Jun 17 == 22:00 ART Jun 16 → still TODAY in ART. This is the
+    // case the old UTC-day math dropped (it read it as tomorrow).
     await seedSession(
-      id: 'yesterday',
+      id: 'art-today-evening',
       status: 'finished',
-      finishedAt: DateTime.utc(2026, 6, 15, 23, 59, 0),
+      finishedAt: DateTime.utc(2026, 6, 17, 1, 0, 0),
     );
-    // Finished tomorrow (edge) — must be excluded.
+    // 02:00 UTC Jun 16 == 23:00 ART Jun 15 → yesterday ART, excluded.
     await seedSession(
-      id: 'tomorrow',
+      id: 'art-yesterday',
       status: 'finished',
-      finishedAt: DateTime.utc(2026, 6, 17, 0, 0, 0),
+      finishedAt: DateTime.utc(2026, 6, 16, 2, 0, 0),
     );
-    // Active session today — must be excluded (wrong status).
+    // 04:00 UTC Jun 17 == 01:00 ART Jun 17 → tomorrow ART, excluded.
+    await seedSession(
+      id: 'art-tomorrow',
+      status: 'finished',
+      finishedAt: DateTime.utc(2026, 6, 17, 4, 0, 0),
+    );
+    // Active session — excluded (wrong status).
     await seedSession(id: 'active', status: 'active');
 
     final results = await repo.listFinishedToday(uid, now: now);
 
-    expect(results.map((s) => s.id), ['today-late', 'today-early']);
+    expect(results.map((s) => s.id),
+        ['art-today-evening', 'today-late', 'today-early']);
   });
 
   test('listFinishedToday returns empty list when nothing finished today',

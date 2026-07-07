@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../coach/application/trainer_link_providers.dart'
+    show currentAthleteLinkProvider;
 import '../../coach/domain/trainer_link.dart';
 import '../../profile/application/user_providers.dart' show firestoreProvider;
 import '../../workout/application/session_providers.dart'
@@ -124,11 +126,69 @@ final hasUnreadFromProvider =
 /// Derives from the existing [chatsForCurrentUserProvider] stream — zero new
 /// Firestore listeners. Returns 0 when uid is null or the stream is in
 /// loading/error state so consumers never render stale counts.
+///
+/// Historical scope: before user↔user chats existed (post PR #XXX), the only
+/// 1-1 chat was athlete↔coach, so "total unread" == "unread from my coach".
+/// Now social chats coexist, so use [unreadFromCoachProvider] or
+/// [unreadFromFriendsProvider] instead to badge the correct surface.
+/// Kept for callers where "any unread" is the intent (e.g. the Coach Hub web
+/// dashboard, where the "other" is always an athlete).
 final totalUnreadCountProvider = Provider.autoDispose<int>((ref) {
   final uid = ref.watch(currentUidProvider);
   if (uid == null) return 0;
   return ref.watch(chatsForCurrentUserProvider).maybeWhen(
         data: (chats) => chats.where((c) => chatHasUnread(c, uid)).length,
+        orElse: () => 0,
+      );
+});
+
+/// Count of unread chats where the OTHER member is the athlete's coach.
+///
+/// Alimenta el badge de la tab COACH en el bottom nav del alumno: solo
+/// mensajes del PF deben contarse ahí. Chats con otros alumnos (social) NO
+/// se cuentan — su badge vive en el ícono de chat del header del FEED, ver
+/// [unreadFromFriendsProvider].
+///
+/// Returns 0 when:
+/// - uid is null,
+/// - the athlete has no active [TrainerLink] (currentAthleteLinkProvider
+///   emits null),
+/// - the chat stream is loading/error,
+/// - or there is no chat with the coach yet.
+final unreadFromCoachProvider = Provider.autoDispose<int>((ref) {
+  final uid = ref.watch(currentUidProvider);
+  if (uid == null) return 0;
+  final link = ref.watch(currentAthleteLinkProvider).valueOrNull;
+  if (link == null) return 0;
+  final coachUid = link.trainerId;
+  return ref.watch(chatsForCurrentUserProvider).maybeWhen(
+        data: (chats) => chats
+            .where((c) => c.members.contains(coachUid) && chatHasUnread(c, uid))
+            .length,
+        orElse: () => 0,
+      );
+});
+
+/// Count of unread chats where the OTHER member is NOT the athlete's coach
+/// — i.e. social chats between users (alumno↔alumno via the feed).
+///
+/// Alimenta el badge del ícono de chat en el header del FEED. Complemento
+/// exacto de [unreadFromCoachProvider] cuando el usuario es un alumno con
+/// PF vinculado; para todos los demás (sin coach, PF viendo su bandeja),
+/// coincide con [totalUnreadCountProvider].
+///
+/// Returns 0 when uid is null or the chat stream is loading/error.
+final unreadFromFriendsProvider = Provider.autoDispose<int>((ref) {
+  final uid = ref.watch(currentUidProvider);
+  if (uid == null) return 0;
+  final link = ref.watch(currentAthleteLinkProvider).valueOrNull;
+  final coachUid = link?.trainerId;
+  return ref.watch(chatsForCurrentUserProvider).maybeWhen(
+        data: (chats) => chats
+            .where((c) =>
+                (coachUid == null || !c.members.contains(coachUid)) &&
+                chatHasUnread(c, uid))
+            .length,
         orElse: () => 0,
       );
 });

@@ -21,8 +21,13 @@ import '../presentation/sections/alumnos/resumen_metrics.dart'
 /// **Aggregate**: arithmetic average of per-athlete non-null values.
 ///   Returns `null` when NO athlete has an active plan (weeklyTarget == 0 for all).
 ///
-/// **Security gate**: only athletes with `status == active && sharedWithTrainer == true`
-///   are considered. Athletes who haven't opted in are invisible — intentional.
+/// **Security gate**: only athletes with `status == active` are considered.
+///   The Firestore `session_shares/{athleteId}` document — written by the
+///   `syncSessionShareOnTrainerLink` Cloud Function on `status === 'active'` —
+///   is what actually authorises reading an athlete's sessions. The
+///   `sharedWithTrainer` flag was never wired (its setter has zero callers in
+///   lib/) and always defaults `false`, making the old `&& sharedWithTrainer`
+///   gate permanently dead. Active status is the correct and authorised gate.
 ///
 /// **Stable key**: window boundaries are day-truncated UTC so the
 ///   [finishedInWindowByUidProvider] family key is stable between builds
@@ -42,17 +47,14 @@ final aggregateAdherenceProvider =
 
   final links = linksAsync.valueOrNull ?? const [];
 
-  // Filter to active + sharing athletes only (security gate).
+  // Filter to active athletes only (security gate — see class doc).
   final sharingAthleteIds = links
-      .where(
-        (l) =>
-            l.status == TrainerLinkStatus.active && l.sharedWithTrainer == true,
-      )
+      .where((l) => l.status == TrainerLinkStatus.active)
       .map((l) => l.athleteId)
       .toSet()
       .toList();
 
-  // No active+sharing athletes → no data.
+  // No active athletes → no data.
   if (sharingAthleteIds.isEmpty) return null;
 
   // Day-truncated stable window boundaries (30-day adherence window).
