@@ -125,7 +125,7 @@ void main() {
         (tester) async {
       await tester.pumpWidget(_wrapProvider(const FeedScreen(), [
         ...baseOverrides,
-        totalUnreadCountProvider.overrideWith((_) => 3),
+        unreadFromFriendsProvider.overrideWith((_) => 3),
       ]));
       await tester.pump();
 
@@ -136,7 +136,7 @@ void main() {
         (tester) async {
       await tester.pumpWidget(_wrapProvider(const FeedScreen(), [
         ...baseOverrides,
-        totalUnreadCountProvider.overrideWith((_) => 0),
+        unreadFromFriendsProvider.overrideWith((_) => 0),
       ]));
       await tester.pump();
 
