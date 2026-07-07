@@ -40,6 +40,7 @@ import '../features/feed/presentation/public_profile_screen.dart';
 import '../features/feed/presentation/search_users_screen.dart';
 import '../features/home/home_screen.dart';
 import '../features/insights/presentation/insights_screen.dart';
+import '../features/insights/presentation/monthly_report_screen.dart';
 import '../features/profile/application/user_providers.dart';
 import '../features/profile/domain/user_profile_trainer_completeness.dart';
 import '../features/profile/domain/user_role.dart';
@@ -467,6 +468,13 @@ GoRouter buildRouter({
               GoRoute(
                 path: 'insights',
                 builder: (_, __) => _withBg(const InsightsScreen()),
+                routes: [
+                  GoRoute(
+                    path: 'monthly',
+                    builder: (_, __) =>
+                        _withBg(const _MonthlyReportRouteHost()),
+                  ),
+                ],
               ),
             ],
           ),
@@ -595,6 +603,19 @@ Widget _immersive(Widget child) => Scaffold(
       backgroundColor: Colors.transparent,
       body: AppBackground(child: SafeArea(child: child)),
     );
+
+/// Resuelve el uid actual y monta [MonthlyReportScreen] (AD6/PR5a).
+/// uid explícito (no currentUidProvider directo en el screen) para que la
+/// misma pantalla pueda reusarse desde una vista de coach sin cambios.
+class _MonthlyReportRouteHost extends ConsumerWidget {
+  const _MonthlyReportRouteHost();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final uid = ref.watch(currentUidProvider) ?? '';
+    return MonthlyReportScreen(uid: uid);
+  }
+}
 
 /// Resuelve athleteId (currentUid) y trainerId (active link) y monta
 /// AthleteAgendaScreen. Loading state mientras se resuelve el link.

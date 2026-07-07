@@ -2330,6 +2330,37 @@ class AppL10nEs extends AppL10n {
   String dashboardAdherenceValue(int pct) {
     return '$pct%';
   }
+
+  @override
+  String get insightsMonthlyReportTile => 'Reporte mensual';
+
+  @override
+  String get monthlyReportTitle => 'REPORTE MENSUAL';
+
+  @override
+  String get monthlyReportMetricWorkouts => 'Entrenos';
+
+  @override
+  String get monthlyReportMetricDuration => 'Duración';
+
+  @override
+  String get monthlyReportMetricVolume => 'Volumen';
+
+  @override
+  String get monthlyReportMetricSets => 'Sets';
+
+  @override
+  String get monthlyReportDurationUnit => 'min';
+
+  @override
+  String get monthlyReportVolumeUnit => 'kg';
+
+  @override
+  String get monthlyReportEmptyHint => 'Sin datos en los últimos 12 meses.';
+
+  @override
+  String get monthlyReportLoadError =>
+      'No pudimos cargar tu reporte mensual. Probá de nuevo.';
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -4656,4 +4687,35 @@ class AppL10nEsAr extends AppL10nEs {
   String dashboardAdherenceValue(int pct) {
     return '$pct%';
   }
+
+  @override
+  String get insightsMonthlyReportTile => 'Reporte mensual';
+
+  @override
+  String get monthlyReportTitle => 'REPORTE MENSUAL';
+
+  @override
+  String get monthlyReportMetricWorkouts => 'Entrenos';
+
+  @override
+  String get monthlyReportMetricDuration => 'Duración';
+
+  @override
+  String get monthlyReportMetricVolume => 'Volumen';
+
+  @override
+  String get monthlyReportMetricSets => 'Sets';
+
+  @override
+  String get monthlyReportDurationUnit => 'min';
+
+  @override
+  String get monthlyReportVolumeUnit => 'kg';
+
+  @override
+  String get monthlyReportEmptyHint => 'Sin datos en los últimos 12 meses.';
+
+  @override
+  String get monthlyReportLoadError =>
+      'No pudimos cargar tu reporte mensual. Probá de nuevo.';
 }

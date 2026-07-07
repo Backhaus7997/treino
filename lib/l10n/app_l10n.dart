@@ -4268,6 +4268,66 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'{pct}%'**
   String dashboardAdherenceValue(int pct);
+
+  /// [AD6/PR5a] Tile label on InsightsScreen navigating to the Monthly Report screen — Hevy parity 'Monthly Report' entry in Statistics.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Reporte mensual'**
+  String get insightsMonthlyReportTile;
+
+  /// [AD6/PR5a] Header title for the Monthly Report screen.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'REPORTE MENSUAL'**
+  String get monthlyReportTitle;
+
+  /// [AD6/PR5a] Workouts metric chip/stat-card label in the Monthly Report chart and summary cards.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Entrenos'**
+  String get monthlyReportMetricWorkouts;
+
+  /// [AD6/PR5a] Duration metric chip/stat-card label in the Monthly Report chart and summary cards.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Duración'**
+  String get monthlyReportMetricDuration;
+
+  /// [AD6/PR5a] Volume metric chip/stat-card label in the Monthly Report chart and summary cards.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Volumen'**
+  String get monthlyReportMetricVolume;
+
+  /// [AD6/PR5a] Sets metric chip/stat-card label in the Monthly Report chart and summary cards.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Sets'**
+  String get monthlyReportMetricSets;
+
+  /// [AD6/PR5a] Unit suffix for the Duration summary stat card.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'min'**
+  String get monthlyReportDurationUnit;
+
+  /// [AD6/PR5a] Unit suffix for the Volume summary stat card.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'kg'**
+  String get monthlyReportVolumeUnit;
+
+  /// [AD6/PR5a] Empty state shown in the Monthly Report bar chart when all 12 months are zero across every metric.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Sin datos en los últimos 12 meses.'**
+  String get monthlyReportEmptyHint;
+
+  /// [AD6/PR5a] Error state for the Monthly Report screen's provider load failure. Paired with coachRetryLabel for the retry CTA.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cargar tu reporte mensual. Probá de nuevo.'**
+  String get monthlyReportLoadError;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

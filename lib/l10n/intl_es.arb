@@ -534,5 +534,15 @@
     "placeholders": {
       "pct": { "type": "int" }
     }
-  }
+  },
+  "insightsMonthlyReportTile": "Reporte mensual",
+  "monthlyReportTitle": "REPORTE MENSUAL",
+  "monthlyReportMetricWorkouts": "Entrenos",
+  "monthlyReportMetricDuration": "Duración",
+  "monthlyReportMetricVolume": "Volumen",
+  "monthlyReportMetricSets": "Sets",
+  "monthlyReportDurationUnit": "min",
+  "monthlyReportVolumeUnit": "kg",
+  "monthlyReportEmptyHint": "Sin datos en los últimos 12 meses.",
+  "monthlyReportLoadError": "No pudimos cargar tu reporte mensual. Probá de nuevo."
 }

@@ -2276,4 +2276,35 @@ class AppL10nEn extends AppL10n {
   String dashboardAdherenceValue(int pct) {
     return '';
   }
+
+  @override
+  String get insightsMonthlyReportTile => 'Monthly Report';
+
+  @override
+  String get monthlyReportTitle => 'MONTHLY REPORT';
+
+  @override
+  String get monthlyReportMetricWorkouts => 'Workouts';
+
+  @override
+  String get monthlyReportMetricDuration => 'Duration';
+
+  @override
+  String get monthlyReportMetricVolume => 'Volume';
+
+  @override
+  String get monthlyReportMetricSets => 'Sets';
+
+  @override
+  String get monthlyReportDurationUnit => 'min';
+
+  @override
+  String get monthlyReportVolumeUnit => 'kg';
+
+  @override
+  String get monthlyReportEmptyHint => 'No data in the last 12 months.';
+
+  @override
+  String get monthlyReportLoadError =>
+      'We couldn\'t load your monthly report. Try again.';
 }

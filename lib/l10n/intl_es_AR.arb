@@ -1780,5 +1780,45 @@
     "placeholders": {
       "pct": { "type": "int" }
     }
+  },
+  "insightsMonthlyReportTile": "Reporte mensual",
+  "@insightsMonthlyReportTile": {
+    "description": "[AD6/PR5a] Tile label on InsightsScreen navigating to the Monthly Report screen — Hevy parity 'Monthly Report' entry in Statistics."
+  },
+  "monthlyReportTitle": "REPORTE MENSUAL",
+  "@monthlyReportTitle": {
+    "description": "[AD6/PR5a] Header title for the Monthly Report screen."
+  },
+  "monthlyReportMetricWorkouts": "Entrenos",
+  "@monthlyReportMetricWorkouts": {
+    "description": "[AD6/PR5a] Workouts metric chip/stat-card label in the Monthly Report chart and summary cards."
+  },
+  "monthlyReportMetricDuration": "Duración",
+  "@monthlyReportMetricDuration": {
+    "description": "[AD6/PR5a] Duration metric chip/stat-card label in the Monthly Report chart and summary cards."
+  },
+  "monthlyReportMetricVolume": "Volumen",
+  "@monthlyReportMetricVolume": {
+    "description": "[AD6/PR5a] Volume metric chip/stat-card label in the Monthly Report chart and summary cards."
+  },
+  "monthlyReportMetricSets": "Sets",
+  "@monthlyReportMetricSets": {
+    "description": "[AD6/PR5a] Sets metric chip/stat-card label in the Monthly Report chart and summary cards."
+  },
+  "monthlyReportDurationUnit": "min",
+  "@monthlyReportDurationUnit": {
+    "description": "[AD6/PR5a] Unit suffix for the Duration summary stat card."
+  },
+  "monthlyReportVolumeUnit": "kg",
+  "@monthlyReportVolumeUnit": {
+    "description": "[AD6/PR5a] Unit suffix for the Volume summary stat card."
+  },
+  "monthlyReportEmptyHint": "Sin datos en los últimos 12 meses.",
+  "@monthlyReportEmptyHint": {
+    "description": "[AD6/PR5a] Empty state shown in the Monthly Report bar chart when all 12 months are zero across every metric."
+  },
+  "monthlyReportLoadError": "No pudimos cargar tu reporte mensual. Probá de nuevo.",
+  "@monthlyReportLoadError": {
+    "description": "[AD6/PR5a] Error state for the Monthly Report screen's provider load failure. Paired with coachRetryLabel for the retry CTA."
   }
 }
