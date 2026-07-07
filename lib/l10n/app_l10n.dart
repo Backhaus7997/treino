@@ -63,7 +63,7 @@ import 'app_l10n_es.dart';
 /// property.
 abstract class AppL10n {
   AppL10n(String locale)
-      : localeName = intl.Intl.canonicalizedLocale(locale.toString());
+    : localeName = intl.Intl.canonicalizedLocale(locale.toString());
 
   final String localeName;
 
@@ -85,17 +85,17 @@ abstract class AppL10n {
   /// of delegates is preferred or required.
   static const List<LocalizationsDelegate<dynamic>> localizationsDelegates =
       <LocalizationsDelegate<dynamic>>[
-    delegate,
-    GlobalMaterialLocalizations.delegate,
-    GlobalCupertinoLocalizations.delegate,
-    GlobalWidgetsLocalizations.delegate,
-  ];
+        delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+      ];
 
   /// A list of this localizations delegate's supported locales.
   static const List<Locale> supportedLocales = <Locale>[
     Locale('en'),
     Locale('es'),
-    Locale('es', 'AR')
+    Locale('es', 'AR'),
   ];
 
   /// Home first-run empty-state title for an athlete with no routine (usability finding 6).
@@ -4124,6 +4124,30 @@ abstract class AppL10n {
   /// **'Sets'**
   String get muscleDistributionSetsLabel;
 
+  /// [PR4] Section header for the per-exercise Personal Records list (Heaviest Weight/1RM/Best Set Volume/Best Session Volume with first-achieved date), shown below the progression chart.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'RÉCORDS PERSONALES'**
+  String get personalRecordsSectionTitle;
+
+  /// [PR4] Section header for the most-frequent-exercises list (Hevy's 'Main exercises'), ranked by session count within the selected chart period.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'EJERCICIOS MÁS FRECUENTES'**
+  String get mostFrequentExercisesSectionTitle;
+
+  /// [PR4] Session-count label shown next to each exercise row in the most-frequent-exercises list.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{count, plural, =0{Sin sesiones} =1{1 sesión} other{{count} sesiones}}'**
+  String mostFrequentExercisesSessionCount(int count);
+
+  /// [PR4] Empty state shown when the most-frequent-exercises list has zero entries for the selected period.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No hay datos todavía.'**
+  String get mostFrequentExercisesEmpty;
+
   /// Section header above the trainer-assigned plans in the Profile › Mis Rutinas screen.
   ///
   /// In es_AR, this message translates to:
@@ -4327,13 +4351,76 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'{vencidos, plural, =1{1 vencido} other{{vencidos} vencidos}} · {solicitudes, plural, =1{1 solicitud} other{{solicitudes} solicitudes}} · {inactivos, plural, =1{1 inactivo} other{{inactivos} inactivos}}'**
   String dashboardAlertBannerSummary(
-      int vencidos, int solicitudes, int inactivos);
+    int vencidos,
+    int solicitudes,
+    int inactivos,
+  );
 
   /// Formatted adherencia percentage value shown in the adherencia ring and KPI tile once the aggregate provider has data.
   ///
   /// In es_AR, this message translates to:
   /// **'{pct}%'**
   String dashboardAdherenceValue(int pct);
+
+  /// [AD6/PR5a] Tile label on InsightsScreen navigating to the Monthly Report screen — Hevy parity 'Monthly Report' entry in Statistics.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Reporte mensual'**
+  String get insightsMonthlyReportTile;
+
+  /// [AD6/PR5a] Header title for the Monthly Report screen.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'REPORTE MENSUAL'**
+  String get monthlyReportTitle;
+
+  /// [AD6/PR5a] Workouts metric chip/stat-card label in the Monthly Report chart and summary cards.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Entrenos'**
+  String get monthlyReportMetricWorkouts;
+
+  /// [AD6/PR5a] Duration metric chip/stat-card label in the Monthly Report chart and summary cards.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Duración'**
+  String get monthlyReportMetricDuration;
+
+  /// [AD6/PR5a] Volume metric chip/stat-card label in the Monthly Report chart and summary cards.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Volumen'**
+  String get monthlyReportMetricVolume;
+
+  /// [AD6/PR5a] Sets metric chip/stat-card label in the Monthly Report chart and summary cards.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Sets'**
+  String get monthlyReportMetricSets;
+
+  /// [AD6/PR5a] Unit suffix for the Duration summary stat card.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'min'**
+  String get monthlyReportDurationUnit;
+
+  /// [AD6/PR5a] Unit suffix for the Volume summary stat card.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'kg'**
+  String get monthlyReportVolumeUnit;
+
+  /// [AD6/PR5a] Empty state shown in the Monthly Report bar chart when all 12 months are zero across every metric.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Sin datos en los últimos 12 meses.'**
+  String get monthlyReportEmptyHint;
+
+  /// [AD6/PR5a] Error state for the Monthly Report screen's provider load failure. Paired with coachRetryLabel for the retry CTA.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cargar tu reporte mensual. Probá de nuevo.'**
+  String get monthlyReportLoadError;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {
@@ -4374,8 +4461,9 @@ AppL10n lookupAppL10n(Locale locale) {
   }
 
   throw FlutterError(
-      'AppL10n.delegate failed to load unsupported locale "$locale". This is likely '
-      'an issue with the localizations generation tool. Please file an issue '
-      'on GitHub with a reproducible sample app and the gen-l10n configuration '
-      'that was used.');
+    'AppL10n.delegate failed to load unsupported locale "$locale". This is likely '
+    'an issue with the localizations generation tool. Please file an issue '
+    'on GitHub with a reproducible sample app and the gen-l10n configuration '
+    'that was used.',
+  );
 }

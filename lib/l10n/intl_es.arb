@@ -427,6 +427,17 @@
   "muscleDistributionDurationLabel": "Duración",
   "muscleDistributionVolumeLabel": "Volumen",
   "muscleDistributionSetsLabel": "Sets",
+  "personalRecordsSectionTitle": "RÉCORDS PERSONALES",
+  "mostFrequentExercisesSectionTitle": "EJERCICIOS MÁS FRECUENTES",
+  "mostFrequentExercisesSessionCount": "{count, plural, =0{Sin sesiones} =1{1 sesión} other{{count} sesiones}}",
+  "@mostFrequentExercisesSessionCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "mostFrequentExercisesEmpty": "No hay datos todavía.",
   "dashboardGreeting": "BUENAS, {name}",
   "@dashboardGreeting": {
     "description": "Welcome greeting shown in the Coach Hub web dashboard WelcomeCard.",
@@ -537,5 +548,15 @@
     "placeholders": {
       "pct": { "type": "int" }
     }
-  }
+  },
+  "insightsMonthlyReportTile": "Reporte mensual",
+  "monthlyReportTitle": "REPORTE MENSUAL",
+  "monthlyReportMetricWorkouts": "Entrenos",
+  "monthlyReportMetricDuration": "Duración",
+  "monthlyReportMetricVolume": "Volumen",
+  "monthlyReportMetricSets": "Sets",
+  "monthlyReportDurationUnit": "min",
+  "monthlyReportVolumeUnit": "kg",
+  "monthlyReportEmptyHint": "Sin datos en los últimos 12 meses.",
+  "monthlyReportLoadError": "No pudimos cargar tu reporte mensual. Probá de nuevo."
 }

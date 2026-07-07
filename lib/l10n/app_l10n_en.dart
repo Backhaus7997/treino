@@ -2174,6 +2174,27 @@ class AppL10nEn extends AppL10n {
   String get muscleDistributionSetsLabel => 'Sets';
 
   @override
+  String get personalRecordsSectionTitle => 'PERSONAL RECORDS';
+
+  @override
+  String get mostFrequentExercisesSectionTitle => 'MOST FREQUENT EXERCISES';
+
+  @override
+  String mostFrequentExercisesSessionCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count sessions',
+      one: '1 session',
+      zero: 'No sessions',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get mostFrequentExercisesEmpty => 'No data yet.';
+
+  @override
   String get profileRoutinesAssignedHeader => '';
 
   @override
@@ -2282,7 +2303,10 @@ class AppL10nEn extends AppL10n {
 
   @override
   String dashboardAlertBannerSummary(
-      int vencidos, int solicitudes, int inactivos) {
+    int vencidos,
+    int solicitudes,
+    int inactivos,
+  ) {
     String _temp0 = intl.Intl.pluralLogic(
       vencidos,
       locale: localeName,
@@ -2308,4 +2332,35 @@ class AppL10nEn extends AppL10n {
   String dashboardAdherenceValue(int pct) {
     return '';
   }
+
+  @override
+  String get insightsMonthlyReportTile => 'Monthly Report';
+
+  @override
+  String get monthlyReportTitle => 'MONTHLY REPORT';
+
+  @override
+  String get monthlyReportMetricWorkouts => 'Workouts';
+
+  @override
+  String get monthlyReportMetricDuration => 'Duration';
+
+  @override
+  String get monthlyReportMetricVolume => 'Volume';
+
+  @override
+  String get monthlyReportMetricSets => 'Sets';
+
+  @override
+  String get monthlyReportDurationUnit => 'min';
+
+  @override
+  String get monthlyReportVolumeUnit => 'kg';
+
+  @override
+  String get monthlyReportEmptyHint => 'No data in the last 12 months.';
+
+  @override
+  String get monthlyReportLoadError =>
+      'We couldn\'t load your monthly report. Try again.';
 }

@@ -1656,6 +1656,27 @@
   "@muscleDistributionSetsLabel": {
     "description": "[AD4] Sets stat card label under the muscle distribution radar."
   },
+  "personalRecordsSectionTitle": "RÉCORDS PERSONALES",
+  "@personalRecordsSectionTitle": {
+    "description": "[PR4] Section header for the per-exercise Personal Records list (Heaviest Weight/1RM/Best Set Volume/Best Session Volume with first-achieved date), shown below the progression chart."
+  },
+  "mostFrequentExercisesSectionTitle": "EJERCICIOS MÁS FRECUENTES",
+  "@mostFrequentExercisesSectionTitle": {
+    "description": "[PR4] Section header for the most-frequent-exercises list (Hevy's 'Main exercises'), ranked by session count within the selected chart period."
+  },
+  "mostFrequentExercisesSessionCount": "{count, plural, =0{Sin sesiones} =1{1 sesión} other{{count} sesiones}}",
+  "@mostFrequentExercisesSessionCount": {
+    "description": "[PR4] Session-count label shown next to each exercise row in the most-frequent-exercises list.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "mostFrequentExercisesEmpty": "No hay datos todavía.",
+  "@mostFrequentExercisesEmpty": {
+    "description": "[PR4] Empty state shown when the most-frequent-exercises list has zero entries for the selected period."
+  },
   "profileRoutinesAssignedHeader": "RUTINAS ASIGNADAS POR TU PF",
   "@profileRoutinesAssignedHeader": {
     "description": "Section header above the trainer-assigned plans in the Profile › Mis Rutinas screen."
@@ -1817,5 +1838,45 @@
     "placeholders": {
       "pct": { "type": "int" }
     }
+  },
+  "insightsMonthlyReportTile": "Reporte mensual",
+  "@insightsMonthlyReportTile": {
+    "description": "[AD6/PR5a] Tile label on InsightsScreen navigating to the Monthly Report screen — Hevy parity 'Monthly Report' entry in Statistics."
+  },
+  "monthlyReportTitle": "REPORTE MENSUAL",
+  "@monthlyReportTitle": {
+    "description": "[AD6/PR5a] Header title for the Monthly Report screen."
+  },
+  "monthlyReportMetricWorkouts": "Entrenos",
+  "@monthlyReportMetricWorkouts": {
+    "description": "[AD6/PR5a] Workouts metric chip/stat-card label in the Monthly Report chart and summary cards."
+  },
+  "monthlyReportMetricDuration": "Duración",
+  "@monthlyReportMetricDuration": {
+    "description": "[AD6/PR5a] Duration metric chip/stat-card label in the Monthly Report chart and summary cards."
+  },
+  "monthlyReportMetricVolume": "Volumen",
+  "@monthlyReportMetricVolume": {
+    "description": "[AD6/PR5a] Volume metric chip/stat-card label in the Monthly Report chart and summary cards."
+  },
+  "monthlyReportMetricSets": "Sets",
+  "@monthlyReportMetricSets": {
+    "description": "[AD6/PR5a] Sets metric chip/stat-card label in the Monthly Report chart and summary cards."
+  },
+  "monthlyReportDurationUnit": "min",
+  "@monthlyReportDurationUnit": {
+    "description": "[AD6/PR5a] Unit suffix for the Duration summary stat card."
+  },
+  "monthlyReportVolumeUnit": "kg",
+  "@monthlyReportVolumeUnit": {
+    "description": "[AD6/PR5a] Unit suffix for the Volume summary stat card."
+  },
+  "monthlyReportEmptyHint": "Sin datos en los últimos 12 meses.",
+  "@monthlyReportEmptyHint": {
+    "description": "[AD6/PR5a] Empty state shown in the Monthly Report bar chart when all 12 months are zero across every metric."
+  },
+  "monthlyReportLoadError": "No pudimos cargar tu reporte mensual. Probá de nuevo.",
+  "@monthlyReportLoadError": {
+    "description": "[AD6/PR5a] Error state for the Monthly Report screen's provider load failure. Paired with coachRetryLabel for the retry CTA."
   }
 }

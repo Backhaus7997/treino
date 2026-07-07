@@ -21,7 +21,9 @@ import '../../performance/presentation/log_performance_test_screen.dart';
 import '../../performance/presentation/widgets/performance_progress_chart.dart';
 import '../../profile/application/user_providers.dart' show userProfileProvider;
 import '../../profile/application/user_public_profile_providers.dart';
+import '../../insights/domain/chart_period.dart';
 import '../../workout/application/assigned_routine_providers.dart';
+import '../../workout/application/exercise_frequency_providers.dart';
 import '../../workout/application/routine_providers.dart'
     show routineRepositoryProvider;
 import '../../workout/application/session_providers.dart'
@@ -33,6 +35,8 @@ import '../../workout/domain/set_log.dart';
 import '../../workout/presentation/widgets/exercise_progression_chart.dart'
     show ExerciseProgressionChartLabels;
 import '../../workout/presentation/widgets/exercise_progression_section.dart';
+import '../../workout/presentation/widgets/most_frequent_exercises_list.dart';
+import '../../workout/presentation/widgets/personal_records_list.dart';
 import '../../workout/presentation/widgets/session_exercise_block.dart';
 import 'package:cloud_firestore/cloud_firestore.dart' show FirebaseException;
 
@@ -1677,37 +1681,129 @@ class _DailyHeatmapSection extends StatelessWidget {
 /// Thin AppL10n-resolving wrapper around the shared [ExerciseProgressionSection]
 /// (AD1 dedupe — see exercise_progression_section.dart). All user-visible
 /// strings come from [AppL10n] (REQ-PROG-10B).
-class _ProgressionSection extends StatelessWidget {
+///
+/// [PR4] Also owns the [_exerciseSelection] notifier shared with
+/// [_MostFrequentExercisesSection] below it — tapping a row there selects
+/// the exercise here (navigable to the existing exercise progression/detail).
+class _ProgressionSection extends StatefulWidget {
   const _ProgressionSection({required this.athleteId});
   final String athleteId;
+
+  @override
+  State<_ProgressionSection> createState() => _ProgressionSectionState();
+}
+
+class _ProgressionSectionState extends State<_ProgressionSection> {
+  final _exerciseSelection = ValueNotifier<String?>(null);
+
+  @override
+  void dispose() {
+    _exerciseSelection.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppL10n.of(context);
 
-    return ExerciseProgressionSection(
-      athleteId: athleteId,
-      labels: ExerciseProgressionSectionLabels(
-        sectionTitle: l10n.progressionSectionTitle,
-        loadingText: 'Cargando…',
-        emptyStateText: l10n.progressionEmpty,
-        chartLabels: ExerciseProgressionChartLabels(
-          heaviestWeightLabel: l10n.progressionMetricPr,
-          oneRepMaxLabel: l10n.progressionMetricOneRepMax,
-          bestSetVolumeLabel: l10n.progressionMetricBestSetVolume,
-          bestSessionVolumeLabel: l10n.progressionMetricVolume,
-          volumeUnit: 'kg·reps',
-          weightUnit: 'kg',
-          frequencyLabel: (n) => l10n.progressionFrequency(n),
-          singlePointHint: l10n.progressionSinglePointHint,
-          emptyHint: l10n.progressionEmptyExercise,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ExerciseProgressionSection(
+          athleteId: widget.athleteId,
+          externalExerciseSelection: _exerciseSelection,
+          labels: ExerciseProgressionSectionLabels(
+            sectionTitle: l10n.progressionSectionTitle,
+            loadingText: 'Cargando…',
+            emptyStateText: l10n.progressionEmpty,
+            chartLabels: ExerciseProgressionChartLabels(
+              heaviestWeightLabel: l10n.progressionMetricPr,
+              oneRepMaxLabel: l10n.progressionMetricOneRepMax,
+              bestSetVolumeLabel: l10n.progressionMetricBestSetVolume,
+              bestSessionVolumeLabel: l10n.progressionMetricVolume,
+              volumeUnit: 'kg·reps',
+              weightUnit: 'kg',
+              frequencyLabel: (n) => l10n.progressionFrequency(n),
+              singlePointHint: l10n.progressionSinglePointHint,
+              emptyHint: l10n.progressionEmptyExercise,
+            ),
+            periodLabels: ChartPeriodLabels(
+              last30dLabel: l10n.progressionPeriodLast30Days,
+              thisWeekLabel: l10n.progressionPeriodThisWeek,
+              monthLabel: l10n.progressionPeriodMonth,
+            ),
+            localeName: l10n.localeName,
+            personalRecordsLabels: PersonalRecordsListLabels(
+              sectionTitle: l10n.personalRecordsSectionTitle,
+              heaviestWeightLabel: l10n.progressionMetricPr,
+              oneRepMaxLabel: l10n.progressionMetricOneRepMax,
+              bestSetVolumeLabel: l10n.progressionMetricBestSetVolume,
+              bestSessionVolumeLabel: l10n.progressionMetricVolume,
+              volumeUnit: 'kg·reps',
+              weightUnit: 'kg',
+              emptyText: l10n.progressionEmptyExercise,
+              localeName: l10n.localeName,
+            ),
+          ),
         ),
-        periodLabels: ChartPeriodLabels(
-          last30dLabel: l10n.progressionPeriodLast30Days,
-          thisWeekLabel: l10n.progressionPeriodThisWeek,
-          monthLabel: l10n.progressionPeriodMonth,
+        const SizedBox(height: 24),
+        _MostFrequentExercisesSection(
+          athleteId: widget.athleteId,
+          onSelectExercise: (id) => _exerciseSelection.value = id,
         ),
-        localeName: l10n.localeName,
+      ],
+    );
+  }
+}
+
+/// [PR4] Most-frequent-exercises section shown below [_ProgressionSection].
+///
+/// Thin AppL10n-resolving wrapper around the shared
+/// [MostFrequentExercisesList] (same dedup convention as
+/// [ExerciseProgressionSection]). Tapping a row calls [onSelectExercise] to
+/// drive the sibling progression section's exercise selection.
+class _MostFrequentExercisesSection extends ConsumerStatefulWidget {
+  const _MostFrequentExercisesSection({
+    required this.athleteId,
+    required this.onSelectExercise,
+  });
+
+  final String athleteId;
+  final void Function(String exerciseId) onSelectExercise;
+
+  @override
+  ConsumerState<_MostFrequentExercisesSection> createState() =>
+      _MostFrequentExercisesSectionState();
+}
+
+class _MostFrequentExercisesSectionState
+    extends ConsumerState<_MostFrequentExercisesSection> {
+  ChartPeriod _selectedPeriod = ChartPeriod.defaultPeriod;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppL10n.of(context);
+    final entriesAsync = ref.watch(exerciseFrequencyProvider(
+        (athleteUid: widget.athleteId, period: _selectedPeriod)));
+
+    return entriesAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (e, _) => const SizedBox.shrink(),
+      data: (entries) => MostFrequentExercisesList(
+        entries: entries,
+        selectedPeriod: _selectedPeriod,
+        onSelectExercise: widget.onSelectExercise,
+        onSelectPeriod: (p) => setState(() => _selectedPeriod = p),
+        labels: MostFrequentExercisesListLabels(
+          sectionTitle: l10n.mostFrequentExercisesSectionTitle,
+          sessionCountLabel: (n) => l10n.mostFrequentExercisesSessionCount(n),
+          emptyText: l10n.mostFrequentExercisesEmpty,
+          periodLabels: ChartPeriodLabels(
+            last30dLabel: l10n.progressionPeriodLast30Days,
+            thisWeekLabel: l10n.progressionPeriodThisWeek,
+            monthLabel: l10n.progressionPeriodMonth,
+          ),
+        ),
       ),
     );
   }

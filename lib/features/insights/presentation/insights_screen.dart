@@ -143,6 +143,8 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                   const _MuscleDistributionSection(),
                   const SizedBox(height: 14),
                   _VolumeBarCard(insights: insights),
+                  const SizedBox(height: 14),
+                  const _MonthlyReportTile(),
                   const SizedBox(height: 20),
                   _VolverButton(),
                 ],
@@ -867,6 +869,47 @@ class _VolumeBarRow extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ── Tile: Reporte mensual (AD6/PR5a entry point) ─────────────────────────────
+
+class _MonthlyReportTile extends StatelessWidget {
+  const _MonthlyReportTile();
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+
+    return GestureDetector(
+      onTap: () => context.push('/home/insights/monthly'),
+      child: Container(
+        decoration: BoxDecoration(
+          color: palette.bgCard,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        padding: const EdgeInsets.all(18),
+        child: Row(
+          children: [
+            Icon(TreinoIcon.chartBar, color: palette.accent, size: 22),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                l10n.insightsMonthlyReportTile,
+                style: GoogleFonts.barlowCondensed(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 15,
+                  letterSpacing: 0.6,
+                  color: palette.textPrimary,
+                ),
+              ),
+            ),
+            Icon(TreinoIcon.forward, color: palette.textMuted, size: 18),
+          ],
+        ),
+      ),
     );
   }
 }

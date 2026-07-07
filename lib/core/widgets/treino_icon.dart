@@ -43,6 +43,10 @@ class TreinoIcon {
   static const IconData clock = PhosphorIconsRegular.clock;
   static const IconData timer = PhosphorIconsRegular.timer;
 
+  // Comparación mes-a-mes (Monthly Report summary cards).
+  static const IconData trendUp = PhosphorIconsRegular.trendUp;
+  static const IconData trendDown = PhosphorIconsRegular.trendDown;
+
   // Acciones de usuario
   static const IconData chat = PhosphorIconsRegular.chatCircle;
   static const IconData check = PhosphorIconsFill.checkCircle;
