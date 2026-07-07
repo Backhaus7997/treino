@@ -14,12 +14,13 @@
  *     deterministic ids from a previous CF run AND legacy auto-id docs created
  *     manually by the trainer, preventing double-billing.
  *
- * periodKey / dueAt:
- *   - mensual  → periodKey `YYYY-MM`; dueAt = last day of month 23:59:59 UTC
- *   - semanal  → periodKey `YYYY-Www`; dueAt = Sunday 23:59:59 UTC of ISO week
+ * periodKey / dueAt (computed in ART wall-clock, not UTC — see argentinaNow):
+ *   - mensual  → periodKey `YYYY-MM`; dueAt = last day of month 23:59:59 ART
+ *   - semanal  → periodKey `YYYY-Www`; dueAt = Sunday 23:59:59 ART of ISO week
  *
- * The ISO-week math is a TypeScript port of pagos_por_cobrar_provider.dart
- * lines 20-45 so the client and CF always agree on periodKey.
+ * The ISO-week + ART math is a TypeScript port of pagos_por_cobrar_provider.dart
+ * so the client and CF always agree on periodKey. Argentina is UTC-3 year-round
+ * (no DST since 2009) so the two sides stay byte-identical via a fixed offset.
  *
  * Deployed to southamerica-east1 (matches all other TREINO CFs).
  */
@@ -119,6 +120,28 @@ export function isoWeekPeriodKey(date: Date): string {
 }
 
 // ---------------------------------------------------------------------------
+// Argentina wall-clock — mirrors Dart argentinaNow (pagos_por_cobrar_provider)
+//
+// Argentina has observed UTC-3 year-round with NO daylight saving since 2009,
+// so a constant offset is correct AND keeps this CF byte-identical with the
+// client. Period keys / dueAt are CALENDAR concepts and MUST derive from ART:
+// between 21:00–23:59 ART the UTC day is already tomorrow, so a UTC-derived key
+// buckets a payment into the wrong month/week and the client (2nd writer) picks
+// a different key → double-bill. Instants stay UTC.
+// ---------------------------------------------------------------------------
+
+/** Argentina's fixed UTC offset in milliseconds (UTC-3, no DST). */
+export const ARG_UTC_OFFSET_MS = 3 * 60 * 60 * 1000;
+
+/**
+ * `now` shifted into Argentina wall-clock, as a Date whose getUTC* accessors
+ * read as ART. Feed this (not raw `now`) to every period-key / dueAt calc.
+ */
+export function argentinaNow(now: Date): Date {
+  return new Date(now.getTime() - ARG_UTC_OFFSET_MS);
+}
+
+// ---------------------------------------------------------------------------
 // Spanish month names — mirrors Dart _kMeses (1-indexed)
 // ---------------------------------------------------------------------------
 
@@ -182,26 +205,33 @@ export async function generateDuePaymentsHandler(
     return { created, skipped, scanned };
   }
 
-  // ── 2. Pre-compute period keys and dueAt values from `now` (UTC) ──────────
-  const y = now.getUTCFullYear();
-  const m = now.getUTCMonth() + 1; // 1-based month
+  // ── 2. Pre-compute period keys and dueAt from `now` in ART wall-clock ─────
+  // Period keys and dueAt are CALENDAR concepts → derive them from ART, never
+  // raw UTC `now` (see argentinaNow). The instants written per-doc below
+  // (createdAt = serverTimestamp) stay true UTC.
+  const nowArt = argentinaNow(now);
+  const y = nowArt.getUTCFullYear();
+  const m = nowArt.getUTCMonth() + 1; // 1-based month (ART)
 
   // mensual
   const monthKey = `${y}-${m.toString().padStart(2, "0")}`;
-  // dueAt for mensual = last day of month 23:59:59 UTC.
-  // Date.UTC(y, m, 0) gives the last day of month m (day 0 of month m+1).
-  const mensualDueAt = new Date(Date.UTC(y, m, 0, 23, 59, 59));
+  // dueAt for mensual = last day of month 23:59:59 ART, expressed as a UTC
+  // instant. Date.UTC(y, m, 0) gives the last day of month m (day 0 of month
+  // m+1) at 23:59:59 UTC; + ARG_UTC_OFFSET_MS re-anchors it to 23:59:59 ART.
+  const mensualDueAt = new Date(
+    Date.UTC(y, m, 0, 23, 59, 59) + ARG_UTC_OFFSET_MS,
+  );
 
   // semanal
-  const weekKey = isoWeekPeriodKey(now);
-  const weekNum = isoWeekNumber(now);
-  // dueAt for semanal = Sunday 23:59:59 UTC of the ISO week.
+  const weekKey = isoWeekPeriodKey(nowArt);
+  const weekNum = isoWeekNumber(nowArt);
+  // dueAt for semanal = Sunday 23:59:59 ART of the ISO week, as a UTC instant.
   // ISO week starts Monday; Sunday is day 7 (Monday + 6 days).
-  // Find Monday of this ISO week first.
-  const dayOfWeek = now.getUTCDay(); // 0=Sun..6=Sat
+  // Find Monday of this ISO week first (in ART wall-clock).
+  const dayOfWeek = nowArt.getUTCDay(); // 0=Sun..6=Sat
   const mondayBased = dayOfWeek === 0 ? 7 : dayOfWeek;
-  const mondayOfWeek = new Date(now);
-  mondayOfWeek.setUTCDate(now.getUTCDate() - (mondayBased - 1));
+  const mondayOfWeek = new Date(nowArt);
+  mondayOfWeek.setUTCDate(nowArt.getUTCDate() - (mondayBased - 1));
   mondayOfWeek.setUTCHours(0, 0, 0, 0);
   const sundayOfWeek = new Date(mondayOfWeek);
   sundayOfWeek.setUTCDate(mondayOfWeek.getUTCDate() + 6);
@@ -213,10 +243,10 @@ export async function generateDuePaymentsHandler(
       23,
       59,
       59,
-    ),
+    ) + ARG_UTC_OFFSET_MS,
   );
 
-  // concept strings — mirror Dart client
+  // concept strings — mirror Dart client (ART calendar)
   const mensualConcept = `Mensual ${MESES[m]} ${y}`;
   const semanaConcept = `Semana ${weekNum.toString().padStart(2, "0")}`;
 

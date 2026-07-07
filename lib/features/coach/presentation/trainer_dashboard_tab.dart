@@ -1022,8 +1022,9 @@ class _CobroPendienteRow extends ConsumerWidget {
         switch (cobro.cadence) {
           case BillingCadence.mensual:
           case BillingCadence.semanal:
-            // Derive periodKey from concept cadence
-            final now2 = DateTime.now().toUtc();
+            // Derive periodKey in ART: the bucket identity is a calendar
+            // concept and MUST match the CF (createdAt/paidAt below stay UTC).
+            final now2 = argentinaNow();
             final periodKey = cobro.cadence == BillingCadence.mensual
                 ? '${now2.year}-${now2.month.toString().padLeft(2, '0')}'
                 : isoWeekPeriodKey(now2);
