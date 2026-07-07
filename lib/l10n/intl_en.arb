@@ -864,5 +864,6 @@
   "monthlyReportDurationUnit": "min",
   "monthlyReportVolumeUnit": "kg",
   "monthlyReportEmptyHint": "No data in the last 12 months.",
-  "monthlyReportLoadError": "We couldn't load your monthly report. Try again."
+  "monthlyReportLoadError": "We couldn't load your monthly report. Try again.",
+  "workoutDaysCalendarStreak": ""
 }

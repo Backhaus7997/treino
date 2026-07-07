@@ -5,6 +5,7 @@ import 'package:mocktail/mocktail.dart';
 
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/insights/presentation/monthly_report_screen.dart';
+import 'package:treino/features/insights/presentation/widgets/monthly_report_chart.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
 import 'package:treino/features/workout/data/session_repository.dart';
 import 'package:treino/features/workout/domain/session_status.dart';
@@ -72,5 +73,112 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Reintentar'), findsOneWidget);
+  });
+
+  testWidgets(
+      'renders the workout-days streak calendar below the summary cards '
+      'for the selected month', (tester) async {
+    final repo = MockSessionRepository();
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    when(() => repo.listByUid('u1')).thenAnswer((_) async => [
+          makeSession(
+            id: 's1',
+            startedAt: today,
+            status: SessionStatus.finished,
+            durationMin: 45,
+          ),
+          makeSession(
+            id: 's2',
+            startedAt: today.subtract(const Duration(days: 1)),
+            status: SessionStatus.finished,
+          ),
+        ]);
+    when(() => repo.listSetLogs(uid: 'u1', sessionId: any(named: 'sessionId')))
+        .thenAnswer((_) async => [makeSetLog()]);
+
+    await tester.pumpWidget(wrap(
+      const SizedBox.shrink(),
+      overrides: [sessionRepositoryProvider.overrideWithValue(repo)],
+    ));
+    await tester.pumpAndSettle();
+
+    // Trap: the report screen's ListView is scrollable — the calendar
+    // section sits below the fold, so it must be scrolled into view before
+    // asserting on it (bitten twice already per PR5b instructions).
+    final streakFinder = find.textContaining('Racha de');
+    await tester.scrollUntilVisible(
+      streakFinder,
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+
+    expect(streakFinder, findsOneWidget);
+    expect(find.text('Racha de 2 días'), findsOneWidget);
+  });
+
+  testWidgets(
+      'selecting a different month re-fetches and updates the calendar '
+      "trained-day marks (not just a no-crash smoke check)", (tester) async {
+    final repo = MockSessionRepository();
+    final now = DateTime.now();
+    final olderMonth = DateTime(now.year, now.month - 2);
+
+    when(() => repo.listByUid('u1')).thenAnswer((_) async => [
+          // Only trains in the OLDER month — the current month (default
+          // selection) has zero trained days.
+          makeSession(
+            id: 's1',
+            startedAt: DateTime(olderMonth.year, olderMonth.month, 10),
+            status: SessionStatus.finished,
+          ),
+        ]);
+    when(() => repo.listSetLogs(uid: 'u1', sessionId: any(named: 'sessionId')))
+        .thenAnswer((_) async => [makeSetLog()]);
+
+    await tester.pumpWidget(wrap(
+      const SizedBox.shrink(),
+      overrides: [sessionRepositoryProvider.overrideWithValue(repo)],
+    ));
+    await tester.pumpAndSettle();
+
+    // Default selection is the current (most recent) month → 0 trained days
+    // marked, streak is 0 (session is in a different month, not
+    // yesterday/today).
+    await tester.scrollUntilVisible(
+      find.textContaining('Racha de'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Racha de 0 días'), findsOneWidget);
+    expect(find.byKey(const ValueKey('workout-day-trained')), findsNothing);
+
+    // Scroll the chart itself into view before grabbing its state — the
+    // ListView is lazy, so widgets below the fold aren't built yet.
+    await tester.scrollUntilVisible(
+      find.byType(MonthlyReportChart),
+      -300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+
+    // Switch the selected month via the chart's test hook (same seam
+    // `onMonthSelected` uses) to the older month that HAS a trained day.
+    final chartState = tester.state<MonthlyReportChartState>(
+      find.byType(MonthlyReportChart),
+    );
+    chartState.debugSelectMonth(olderMonth);
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('workout-day-trained')),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('workout-day-trained')), findsOneWidget);
   });
 }
