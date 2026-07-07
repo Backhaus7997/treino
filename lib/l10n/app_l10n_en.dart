@@ -2150,6 +2150,30 @@ class AppL10nEn extends AppL10n {
   String get progressionPeriodMonth => 'This month';
 
   @override
+  String get muscleDistributionSectionTitle => 'MUSCLE DISTRIBUTION';
+
+  @override
+  String get muscleDistributionCurrentLabel => 'Current';
+
+  @override
+  String get muscleDistributionPreviousLabel => 'Previous';
+
+  @override
+  String get muscleDistributionEmptyState => 'No data for this period.';
+
+  @override
+  String get muscleDistributionWorkoutsLabel => 'Workouts';
+
+  @override
+  String get muscleDistributionDurationLabel => 'Duration';
+
+  @override
+  String get muscleDistributionVolumeLabel => 'Volume';
+
+  @override
+  String get muscleDistributionSetsLabel => 'Sets';
+
+  @override
   String get profileRoutinesAssignedHeader => '';
 
   @override

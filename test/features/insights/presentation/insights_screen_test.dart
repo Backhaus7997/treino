@@ -6,6 +6,7 @@ import 'package:treino/features/insights/application/insights_providers.dart';
 import 'package:treino/features/insights/domain/muscle_group.dart';
 import 'package:treino/features/insights/domain/weekly_insights.dart';
 import 'package:treino/features/insights/presentation/insights_screen.dart';
+import 'package:treino/features/insights/presentation/widgets/muscle_distribution_radar.dart';
 import 'package:treino/features/workout/application/exercise_providers.dart';
 import 'package:treino/features/workout/application/routine_providers.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
@@ -489,6 +490,139 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(_countMasksContaining(tester, 'assets/body/bodyfront.png'), 1);
     expect(_countMasksContaining(tester, 'assets/body/bodyback.png'), 1);
+  });
+
+  testWidgets(
+      'SCENARIO-RADAR-SCREEN-01: DISTRIBUCIÓN MUSCULAR section renders the '
+      'MuscleDistributionRadar below the daily muscles card, with the '
+      'current-period radar populated from finished sessions', (tester) async {
+    final repo = MockSessionRepository();
+    final now = DateTime.now();
+    final todayOnly = DateTime(now.year, now.month, now.day);
+
+    when(() => repo.listByUid('u1')).thenAnswer((_) async => [
+          makeSession(
+            id: 's1',
+            startedAt: todayOnly.add(const Duration(hours: 9)),
+            status: SessionStatus.finished,
+            routineId: 'r1',
+          ),
+        ]);
+    when(() => repo.listSetLogs(uid: 'u1', sessionId: 's1'))
+        .thenAnswer((_) async => [makeSetLog(id: 'l1', exerciseId: 'e-chest')]);
+
+    final overrides = <Override>[
+      currentUidProvider.overrideWithValue('u1'),
+      sessionRepositoryProvider.overrideWithValue(repo),
+      exercisesProvider.overrideWith((ref) async => [
+            const Exercise(
+              id: 'e-chest',
+              name: 'Press',
+              muscleGroup: 'chest',
+              category: 'compound',
+            ),
+          ]),
+      routineByIdProvider('r1').overrideWith((ref) async => null),
+    ];
+
+    await tester.pumpWidget(_wrap(const InsightsScreen(), overrides));
+    await tester.pumpAndSettle();
+
+    // The section title + radar widget live below the fold (ListView is
+    // lazy) — scroll until visible BEFORE asserting presence.
+    await tester.scrollUntilVisible(
+      find.text('DISTRIBUCIÓN MUSCULAR'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('DISTRIBUCIÓN MUSCULAR'), findsOneWidget);
+    expect(find.byType(MuscleDistributionRadar), findsOneWidget);
+    // 1 finished session in the current period → non-empty radar, legend
+    // present (Actual/Anterior), empty-state text absent.
+    expect(find.text('Actual'), findsOneWidget);
+    expect(find.text('Anterior'), findsOneWidget);
+    expect(find.text('Sin datos para este período.'), findsNothing);
+  });
+
+  testWidgets(
+      'SCENARIO-RADAR-SCREEN-02: switching the period selector re-fetches '
+      'the radar for the new period — both current and previous windows '
+      'get plotted for the selected period', (tester) async {
+    final repo = MockSessionRepository();
+    final now = DateTime.now();
+    final todayOnly = DateTime(now.year, now.month, now.day);
+    // A session inside "this week" (current window for BOTH last30d and
+    // thisWeek periods) plus one 40 days ago — inside last30d's PREVIOUS
+    // window, but outside thisWeek's previous window (prior calendar week).
+    final recentDay = todayOnly;
+    final olderDay = DateTime(todayOnly.year, todayOnly.month - 1,
+        todayOnly.day - 10 < 1 ? 1 : todayOnly.day - 10);
+
+    when(() => repo.listByUid('u1')).thenAnswer((_) async => [
+          makeSession(
+            id: 's-recent',
+            startedAt: recentDay.add(const Duration(hours: 9)),
+            status: SessionStatus.finished,
+            routineId: 'r1',
+          ),
+          makeSession(
+            id: 's-older',
+            startedAt: olderDay.add(const Duration(hours: 9)),
+            status: SessionStatus.finished,
+            routineId: 'r1',
+          ),
+        ]);
+    when(() => repo.listSetLogs(uid: 'u1', sessionId: 's-recent'))
+        .thenAnswer((_) async => [makeSetLog(id: 'l1', exerciseId: 'e-chest')]);
+    when(() => repo.listSetLogs(uid: 'u1', sessionId: 's-older'))
+        .thenAnswer((_) async => [makeSetLog(id: 'l2', exerciseId: 'e-legs')]);
+
+    final overrides = <Override>[
+      currentUidProvider.overrideWithValue('u1'),
+      sessionRepositoryProvider.overrideWithValue(repo),
+      exercisesProvider.overrideWith((ref) async => [
+            const Exercise(
+              id: 'e-chest',
+              name: 'Press',
+              muscleGroup: 'chest',
+              category: 'compound',
+            ),
+            const Exercise(
+              id: 'e-legs',
+              name: 'Sentadilla',
+              muscleGroup: 'quads',
+              category: 'compound',
+            ),
+          ]),
+      routineByIdProvider('r1').overrideWith((ref) async => null),
+    ];
+
+    await tester.pumpWidget(_wrap(const InsightsScreen(), overrides));
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(
+      find.text('DISTRIBUCIÓN MUSCULAR'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+
+    // Default period pill shows "Últimos 30 días" (ChartPeriod.last30d).
+    expect(find.text('Últimos 30 días'), findsOneWidget);
+
+    // Open the period selector and switch to "Esta semana" — re-fetches via
+    // a new MuscleDistributionKey (different ChartPeriod), still renders
+    // the radar without throwing.
+    await tester.tap(find.text('Últimos 30 días'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Esta semana').last);
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('Esta semana'), findsOneWidget);
+    expect(find.byType(MuscleDistributionRadar), findsOneWidget);
   });
 }
 

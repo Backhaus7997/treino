@@ -4076,6 +4076,54 @@ abstract class AppL10n {
   /// **'Este mes'**
   String get progressionPeriodMonth;
 
+  /// [AD4] Section header for the muscle distribution radar on the athlete Insights screen.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'DISTRIBUCIÓN MUSCULAR'**
+  String get muscleDistributionSectionTitle;
+
+  /// [AD4] Legend entry for the current-period radar series (Hevy: 'Current').
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Actual'**
+  String get muscleDistributionCurrentLabel;
+
+  /// [AD4] Legend entry for the previous-period radar series (Hevy: 'Previous').
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Anterior'**
+  String get muscleDistributionPreviousLabel;
+
+  /// [AD4] Shown instead of the radar chart when MuscleDistributionInsights.isEmpty (both current and previous windows have zero sets).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Sin datos para este período.'**
+  String get muscleDistributionEmptyState;
+
+  /// [AD4] Workouts stat card label under the muscle distribution radar.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Entrenos'**
+  String get muscleDistributionWorkoutsLabel;
+
+  /// [AD4] Duration stat card label under the muscle distribution radar.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Duración'**
+  String get muscleDistributionDurationLabel;
+
+  /// [AD4] Volume stat card label under the muscle distribution radar.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Volumen'**
+  String get muscleDistributionVolumeLabel;
+
+  /// [AD4] Sets stat card label under the muscle distribution radar.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Sets'**
+  String get muscleDistributionSetsLabel;
+
   /// Section header above the trainer-assigned plans in the Profile › Mis Rutinas screen.
   ///
   /// In es_AR, this message translates to:

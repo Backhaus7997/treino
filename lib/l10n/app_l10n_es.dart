@@ -2202,6 +2202,30 @@ class AppL10nEs extends AppL10n {
   String get progressionPeriodMonth => 'Este mes';
 
   @override
+  String get muscleDistributionSectionTitle => 'DISTRIBUCIÓN MUSCULAR';
+
+  @override
+  String get muscleDistributionCurrentLabel => 'Actual';
+
+  @override
+  String get muscleDistributionPreviousLabel => 'Anterior';
+
+  @override
+  String get muscleDistributionEmptyState => 'Sin datos para este período.';
+
+  @override
+  String get muscleDistributionWorkoutsLabel => 'Entrenos';
+
+  @override
+  String get muscleDistributionDurationLabel => 'Duración';
+
+  @override
+  String get muscleDistributionVolumeLabel => 'Volumen';
+
+  @override
+  String get muscleDistributionSetsLabel => 'Sets';
+
+  @override
   String get profileRoutinesAssignedHeader => 'RUTINAS ASIGNADAS POR TU PF';
 
   @override
@@ -4534,6 +4558,30 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get progressionPeriodMonth => 'Este mes';
+
+  @override
+  String get muscleDistributionSectionTitle => 'DISTRIBUCIÓN MUSCULAR';
+
+  @override
+  String get muscleDistributionCurrentLabel => 'Actual';
+
+  @override
+  String get muscleDistributionPreviousLabel => 'Anterior';
+
+  @override
+  String get muscleDistributionEmptyState => 'Sin datos para este período.';
+
+  @override
+  String get muscleDistributionWorkoutsLabel => 'Entrenos';
+
+  @override
+  String get muscleDistributionDurationLabel => 'Duración';
+
+  @override
+  String get muscleDistributionVolumeLabel => 'Volumen';
+
+  @override
+  String get muscleDistributionSetsLabel => 'Sets';
 
   @override
   String get profileRoutinesAssignedHeader => 'RUTINAS ASIGNADAS POR TU PF';
