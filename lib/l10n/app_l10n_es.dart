@@ -2280,11 +2280,6 @@ class AppL10nEs extends AppL10n {
   String get dashboardInactivosEmpty => 'Sin alumnos inactivos';
 
   @override
-  String dashboardInactivosSharingNote(int sharing, int total) {
-    return '$sharing de $total con datos compartidos';
-  }
-
-  @override
   String get dashboardAlertBannerAllClear => 'Todo al día';
 
   @override
@@ -4589,11 +4584,6 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get dashboardInactivosEmpty => 'Sin alumnos inactivos';
-
-  @override
-  String dashboardInactivosSharingNote(int sharing, int total) {
-    return '$sharing de $total con datos compartidos';
-  }
 
   @override
   String get dashboardAlertBannerAllClear => 'Todo al día';

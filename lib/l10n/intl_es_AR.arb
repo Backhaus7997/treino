@@ -1733,14 +1733,6 @@
   "@dashboardInactivosEmpty": {
     "description": "Empty state for the Alumnos inactivos section when all athletes trained in the last 14 days."
   },
-  "dashboardInactivosSharingNote": "{sharing} de {total} con datos compartidos",
-  "@dashboardInactivosSharingNote": {
-    "description": "Disclaimer note showing how many athletes share data vs total active athletes. Shown below the inactivos list.",
-    "placeholders": {
-      "sharing": { "type": "int" },
-      "total": { "type": "int" }
-    }
-  },
   "dashboardAlertBannerAllClear": "Todo al día",
   "@dashboardAlertBannerAllClear": {
     "description": "Alert banner message when there are no vencidos, pending solicitudes, or inactive athletes."

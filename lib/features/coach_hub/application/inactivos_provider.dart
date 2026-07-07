@@ -9,18 +9,14 @@ import '../../workout/application/session_providers.dart'
 /// Result exposed by [inactivosProvider].
 ///
 /// - [inactiveAthleteIds]: IDs of athletes who have NO finished session in the
-///   last 14 days (and are active + sharing with the trainer).
+///   last 14 days (and are active with the trainer).
 /// - [inactiveCount]: convenience alias for `inactiveAthleteIds.length`.
-/// - [totalSharingCount]: total active + sharing athletes (denominator for the
-///   "N de M" disclaimer in the UI).
 class InactivosResult {
   const InactivosResult({
     required this.inactiveAthleteIds,
-    required this.totalSharingCount,
   });
 
   final List<String> inactiveAthleteIds;
-  final int totalSharingCount;
   int get inactiveCount => inactiveAthleteIds.length;
 }
 
@@ -29,8 +25,13 @@ class InactivosResult {
 /// **Definition**: an athlete is INACTIVE when they have NO finished session
 /// in the last 14 calendar days (UTC). The window is `[todayStart - 14d, todayStart + 1d)`.
 ///
-/// **Security gate**: only athletes with `status == active && sharedWithTrainer == true`
-/// are considered. Athletes who haven't opted in are invisible — intentional.
+/// **Security gate**: only athletes with `status == active` are considered.
+/// The Firestore `session_shares/{athleteId}` document — written by the
+/// `syncSessionShareOnTrainerLink` Cloud Function on `status === 'active'` —
+/// is what actually authorises reading an athlete's sessions. The
+/// `sharedWithTrainer` flag was never wired (its setter has zero callers in
+/// lib/) and always defaults `false`, making the old gate permanently dead.
+/// Active status is the correct and authorised gate.
 ///
 /// **Stable key**: the window boundaries are day-truncated so the
 /// [finishedInWindowByUidProvider] family key is stable between builds.
@@ -45,23 +46,17 @@ final inactivosProvider =
   if (linksAsync.isLoading && !linksAsync.hasValue) {
     return const InactivosResult(
       inactiveAthleteIds: [],
-      totalSharingCount: 0,
     );
   }
 
   final links = linksAsync.valueOrNull ?? const [];
 
-  // Filter to active + sharing athletes only (security gate).
+  // Filter to active athletes only (security gate — see class doc).
   final sharingAthleteIds = links
-      .where(
-        (l) =>
-            l.status == TrainerLinkStatus.active && l.sharedWithTrainer == true,
-      )
+      .where((l) => l.status == TrainerLinkStatus.active)
       .map((l) => l.athleteId)
       .toSet()
       .toList();
-
-  final totalSharingCount = sharingAthleteIds.length;
 
   // Day-truncated stable window boundaries.
   final now = DateTime.now().toUtc();
@@ -79,13 +74,10 @@ final inactivosProvider =
 
   final results = await Future.wait(futures);
 
-  final inactiveIds = results
-      .where((r) => !r.hasSession)
-      .map((r) => r.athleteId)
-      .toList();
+  final inactiveIds =
+      results.where((r) => !r.hasSession).map((r) => r.athleteId).toList();
 
   return InactivosResult(
     inactiveAthleteIds: inactiveIds,
-    totalSharingCount: totalSharingCount,
   );
 });
