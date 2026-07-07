@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:mocktail/mocktail.dart';
 
 import 'package:treino/app/theme/app_theme.dart';
@@ -12,6 +13,7 @@ import 'package:treino/features/workout/domain/session_status.dart';
 import 'package:treino/features/workout/domain/set_log.dart';
 import 'package:treino/features/workout/presentation/widgets/exercise_progression_chart.dart';
 import 'package:treino/features/workout/presentation/widgets/exercise_progression_section.dart';
+import 'package:treino/features/workout/presentation/widgets/personal_records_list.dart';
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
@@ -61,6 +63,21 @@ ChartPeriodLabels _periodLabels() => const ChartPeriodLabels(
       monthLabel: 'Este mes',
     );
 
+/// [PR4] Plain-string label bag for [PersonalRecordsList] — shared by all 3
+/// factories below (mirrors [_chartLabels]/[_periodLabels]'s convention).
+PersonalRecordsListLabels _personalRecordsLabels() =>
+    const PersonalRecordsListLabels(
+      sectionTitle: 'RÉCORDS PERSONALES',
+      heaviestWeightLabel: 'Peso máximo',
+      oneRepMaxLabel: '1RM',
+      bestSetVolumeLabel: 'Mejor serie',
+      bestSessionVolumeLabel: 'Volumen',
+      volumeUnit: 'kg·reps',
+      weightUnit: 'kg',
+      emptyText: 'Sin datos suficientes para este ejercicio.',
+      localeName: 'es_AR',
+    );
+
 /// Generic label bag — used by tests that don't care about per-shell
 /// divergence (empty state, picker rendering).
 ExerciseProgressionSectionLabels _labels() => ExerciseProgressionSectionLabels(
@@ -71,6 +88,7 @@ ExerciseProgressionSectionLabels _labels() => ExerciseProgressionSectionLabels(
       chartLabels: _chartLabels(),
       periodLabels: _periodLabels(),
       localeName: 'es_AR',
+      personalRecordsLabels: _personalRecordsLabels(),
     );
 
 /// Mirrors the MOBILE coach shell's real `_ProgressionSection` wrapper
@@ -86,6 +104,7 @@ ExerciseProgressionSectionLabels _mobileLabels() =>
       chartLabels: _chartLabels(),
       periodLabels: _periodLabels(),
       localeName: 'es_AR',
+      personalRecordsLabels: _personalRecordsLabels(),
     );
 
 /// Mirrors the WEB coach_hub shell's real `_ProgressionTabSection` wrapper
@@ -100,6 +119,7 @@ ExerciseProgressionSectionLabels _webLabels() =>
       chartLabels: _chartLabels(),
       periodLabels: _periodLabels(),
       localeName: 'es_AR',
+      personalRecordsLabels: _personalRecordsLabels(),
     );
 
 Widget _wrap({
@@ -118,6 +138,10 @@ Widget _wrap({
 
 void main() {
   late _MockSessionRepository repo;
+
+  setUpAll(() async {
+    await initializeDateFormatting('es_AR');
+  });
 
   setUp(() {
     repo = _MockSessionRepository();

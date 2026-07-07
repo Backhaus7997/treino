@@ -8,11 +8,16 @@ import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../workout/application/session_providers.dart'
     show currentUidProvider;
+import '../../workout/presentation/widgets/exercise_progression_section.dart'
+    show ChartPeriodLabels, ChartPeriodSelector;
 import '../application/day_insights_providers.dart';
 import '../application/insights_providers.dart';
+import '../application/muscle_distribution_providers.dart';
+import '../domain/chart_period.dart';
 import '../domain/muscle_group.dart';
 import '../domain/weekly_insights.dart';
 import 'widgets/body_silhouette_placeholder.dart';
+import 'widgets/muscle_distribution_radar.dart';
 
 /// Pantalla de Insights — agregados semanales por grupo muscular.
 /// Mockup: `insights.png`. Acceso natural desde la card "Esta Semana"
@@ -134,6 +139,8 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                   ),
                   const SizedBox(height: 14),
                   _DailyMusclesCard(selectedDay: _selectedDay),
+                  const SizedBox(height: 14),
+                  const _MuscleDistributionSection(),
                   const SizedBox(height: 14),
                   _VolumeBarCard(insights: insights),
                   const SizedBox(height: 14),
@@ -656,6 +663,100 @@ class _MuscleSetsRow extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ── Card: DISTRIBUCIÓN MUSCULAR (radar) ──────────────────────────────────────
+
+/// [AD4][REQ:muscle-radar] Current-vs-previous 6-axis muscle distribution
+/// radar. Owns its own [ChartPeriod] selection (independent of the SEMANA
+/// card above, which is a fixed weekly window) — reuses [ChartPeriodSelector]
+/// / [ChartPeriodLabels] from PR1c, same `_selectedPeriod` state pattern as
+/// `_ExerciseProgressionSectionState`. Defaults to [ChartPeriod.last30d].
+class _MuscleDistributionSection extends ConsumerStatefulWidget {
+  const _MuscleDistributionSection();
+
+  @override
+  ConsumerState<_MuscleDistributionSection> createState() =>
+      _MuscleDistributionSectionState();
+}
+
+class _MuscleDistributionSectionState
+    extends ConsumerState<_MuscleDistributionSection> {
+  ChartPeriod _selectedPeriod = ChartPeriod.defaultPeriod;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+    final uid = ref.watch(currentUidProvider) ?? '';
+
+    final periodLabels = ChartPeriodLabels(
+      last30dLabel: l10n.progressionPeriodLast30Days,
+      thisWeekLabel: l10n.progressionPeriodThisWeek,
+      monthLabel: l10n.progressionPeriodMonth,
+    );
+
+    final radarLabels = MuscleDistributionLabels(
+      currentLabel: l10n.muscleDistributionCurrentLabel,
+      previousLabel: l10n.muscleDistributionPreviousLabel,
+      emptyStateText: l10n.muscleDistributionEmptyState,
+      workoutsLabel: l10n.muscleDistributionWorkoutsLabel,
+      durationLabel: l10n.muscleDistributionDurationLabel,
+      volumeLabel: l10n.muscleDistributionVolumeLabel,
+      setsLabel: l10n.muscleDistributionSetsLabel,
+      durationUnit: 'min',
+      volumeUnit: 'kg',
+    );
+
+    final insightsAsync = ref.watch(
+      muscleDistributionInsightsProvider((uid: uid, period: _selectedPeriod)),
+    );
+
+    return Container(
+      decoration: BoxDecoration(
+        color: palette.bgCard,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      padding: const EdgeInsets.all(18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  l10n.muscleDistributionSectionTitle,
+                  style: GoogleFonts.barlowCondensed(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                    letterSpacing: 1.2,
+                    color: palette.textMuted,
+                  ),
+                ),
+              ),
+              ChartPeriodSelector(
+                selected: _selectedPeriod,
+                labels: periodLabels,
+                onSelect: (p) => setState(() => _selectedPeriod = p),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          insightsAsync.when(
+            loading: () => const SizedBox(
+              height: 240,
+              child: Center(child: CircularProgressIndicator()),
+            ),
+            error: (_, __) => const SizedBox.shrink(),
+            data: (insights) => MuscleDistributionRadar(
+              insights: insights,
+              labels: radarLabels,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
