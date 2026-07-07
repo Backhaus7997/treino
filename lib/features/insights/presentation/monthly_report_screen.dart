@@ -7,24 +7,23 @@ import 'package:intl/intl.dart' as intl;
 import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
+import '../application/month_radar_providers.dart';
 import '../application/monthly_report_providers.dart';
 import '../application/workout_days_providers.dart';
 import '../domain/monthly_report.dart';
 import 'widgets/monthly_report_chart.dart';
 import 'widgets/monthly_report_summary_cards.dart';
+import 'widgets/muscle_distribution_radar.dart';
 import 'widgets/workout_days_calendar.dart';
 
 /// Monthly Report screen (Hevy "June Report" parity, AD6/PR5a) — 12-month
-/// bar chart + metric tabs + summary cards for the selected month, plus the
-/// workout-days streak calendar (AD6/PR5b).
+/// bar chart + metric tabs + summary cards for the selected month, the
+/// workout-days streak calendar (AD6/PR5b), and the month-vs-month muscle
+/// distribution radar (AD6/PR5c).
 ///
 /// [uid] is explicit (not read from [currentUidProvider]) so this screen can
 /// later be reused for coach-side surfacing without change, same pattern as
 /// [athleteMonthlyReportProvider].
-///
-/// The trailing [Column] in the data branch is the extension point for
-/// PR5c (month-vs-month radar) to append its own card — NOT built here, per
-/// design's pre-split.
 class MonthlyReportScreen extends ConsumerStatefulWidget {
   const MonthlyReportScreen({super.key, required this.uid});
 
@@ -116,10 +115,16 @@ class _MonthlyReportScreenState extends ConsumerState<MonthlyReportScreen> {
                     month: selectedPoint.month,
                     l10n: l10n,
                   ),
-                  // ── Extension point for PR5c ─────────────────────────────
-                  // PR5c (month-vs-month radar) appends its own card HERE —
-                  // intentionally left as a sibling in this ListView, not
-                  // built in this slice.
+                  const SizedBox(height: 14),
+                  // [AD6/PR5c] Month-vs-month muscle distribution radar —
+                  // reuses MuscleDistributionRadar with a calendar-month
+                  // window anchored at the selected month (Hevy "June
+                  // Report" Muscle Distribution section).
+                  _MonthRadarSection(
+                    uid: widget.uid,
+                    month: selectedPoint.month,
+                    l10n: l10n,
+                  ),
                 ],
               );
             },
@@ -236,6 +241,89 @@ class _WorkoutDaysSection extends ConsumerWidget {
       ),
     );
   }
+}
+
+// ── Month-vs-month muscle distribution radar section ─────────────────────────
+
+/// [AD6/PR5c] Loads [athleteMonthRadarInsightsProvider] for [uid]/[month]
+/// and renders [MuscleDistributionRadar] with month-name legend labels
+/// (e.g. "May 2026" / "Jun 2026") instead of the generic "Actual"/"Anterior"
+/// pair the athlete-insights radar uses — same widget, different labels,
+/// per the shared-widget dedup invariant (AD1/spec requirement 11).
+///
+/// Re-fetches whenever [month] changes (the selected bar in
+/// [MonthlyReportChart] above), same re-fetch-on-selection pattern as
+/// [_WorkoutDaysSection].
+class _MonthRadarSection extends ConsumerWidget {
+  const _MonthRadarSection({
+    required this.uid,
+    required this.month,
+    required this.l10n,
+  });
+
+  final String uid;
+  final DateTime month;
+  final AppL10n l10n;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final palette = AppPalette.of(context);
+    final async = ref.watch(
+      athleteMonthRadarInsightsProvider((uid: uid, month: month)),
+    );
+
+    return async.when(
+      loading: () => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Center(
+          child: CircularProgressIndicator(color: palette.accent),
+        ),
+      ),
+      error: (_, __) => const SizedBox.shrink(),
+      data: (insights) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            l10n.muscleDistributionSectionTitle,
+            style: GoogleFonts.barlowCondensed(
+              fontWeight: FontWeight.w700,
+              fontSize: 16,
+              letterSpacing: 0.8,
+              color: palette.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 12),
+          MuscleDistributionRadar(
+            insights: insights,
+            labels: MuscleDistributionLabels(
+              currentLabel: _monthLegendLabel(month, l10n.localeName),
+              previousLabel: _monthLegendLabel(
+                DateTime(month.year, month.month - 1, 1),
+                l10n.localeName,
+              ),
+              emptyStateText: l10n.muscleDistributionEmptyState,
+              workoutsLabel: l10n.muscleDistributionWorkoutsLabel,
+              durationLabel: l10n.muscleDistributionDurationLabel,
+              volumeLabel: l10n.muscleDistributionVolumeLabel,
+              setsLabel: l10n.muscleDistributionSetsLabel,
+              durationUnit: l10n.monthlyReportDurationUnit,
+              volumeUnit: l10n.monthlyReportVolumeUnit,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Short month-name legend label, e.g. "May 2026" / "Jun 2026" — Capitalized
+/// first letter (intl lower-cases month abbreviations by default), same
+/// capitalize-first-letter convention as [_monthTitle].
+String _monthLegendLabel(DateTime month, String localeName) {
+  final formatted = intl.DateFormat('MMM yyyy', localeName).format(month);
+  return formatted.isEmpty
+      ? formatted
+      : formatted[0].toUpperCase() + formatted.substring(1);
 }
 
 // ── Error state ───────────────────────────────────────────────────────────────
