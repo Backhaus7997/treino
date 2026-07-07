@@ -130,33 +130,36 @@ class _DailyHeatmapSectionState extends State<DailyHeatmapSection> {
                   child: Center(child: CircularProgressIndicator()),
                 ),
                 error: (_, __) => const SizedBox.shrink(),
-                data: (dayInsights) => Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
+                // [UX-back-view] `showBack: true` renders bodyfront +
+                // bodyback side by side — that pair needs more horizontal
+                // room than the old single-body 160px column had next to
+                // it. Stacked (silhouette full-width ABOVE the sets list)
+                // instead of the old Row-beside-list layout, mirroring how
+                // the athlete's own `_DailyMusclesCard` (and home's
+                // `EstaSemanaCard`) lay out the same `showBack: true`
+                // silhouette — avoids a RenderFlex overflow at narrow
+                // widths.
+                data: (dayInsights) => Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     BodySilhouettePlaceholder(
-                      width: 160,
-                      height: 240,
+                      width: double.infinity,
+                      height: 220,
+                      showBack: true,
                       setsByGroup: dayInsights.setsByGroup,
                       label: dayInsights.isEmpty
                           ? labels.dayStripLabels.emptyDayHint
                           : null,
                     ),
-                    const SizedBox(width: 18),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          for (final group in MuscleGroupDisplay.displayOrder)
-                            Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 4),
-                              child: _MuscleSetsRow(
-                                group: group,
-                                sets: dayInsights.setsByGroup[group] ?? 0,
-                              ),
-                            ),
-                        ],
+                    const SizedBox(height: 14),
+                    for (final group in MuscleGroupDisplay.displayOrder)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: _MuscleSetsRow(
+                          group: group,
+                          sets: dayInsights.setsByGroup[group] ?? 0,
+                        ),
                       ),
-                    ),
                   ],
                 ),
               ),
