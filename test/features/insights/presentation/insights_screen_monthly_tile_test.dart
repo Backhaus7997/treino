@@ -27,7 +27,7 @@ void main() {
       routes: [
         GoRoute(
           path: '/home/insights',
-          builder: (_, __) => const InsightsScreen(),
+          builder: (_, __) => const Scaffold(body: InsightsScreen()),
         ),
         GoRoute(
           path: '/home/insights/monthly',
@@ -79,14 +79,23 @@ void main() {
     // The screen's ListView builds lazily — the tile sits below the fold in
     // the test viewport, so scroll it into existence BEFORE asserting.
     final tileFinder = find.text('Reporte mensual', skipOffstage: false);
-    await tester.scrollUntilVisible(
-      tileFinder,
-      200,
-      scrollable: find.byType(Scrollable).first,
+    // Scroll programmatically: gesture-based scrollUntilVisible gets its
+    // drags swallowed by the RadarChart's pan handling, so jump the outer
+    // ListView's position until the lazily-built tile exists.
+    final scrollState = tester.state<ScrollableState>(
+      find
+          .descendant(
+              of: find.byType(ListView), matching: find.byType(Scrollable))
+          .first,
     );
-    await tester.pumpAndSettle();
+    for (var i = 0; i < 20 && tileFinder.evaluate().isEmpty; i++) {
+      scrollState.position.jumpTo(scrollState.position.maxScrollExtent);
+      await tester.pumpAndSettle();
+    }
     expect(tileFinder, findsOneWidget);
 
+    await tester.ensureVisible(tileFinder);
+    await tester.pumpAndSettle();
     await tester.tap(tileFinder);
     await tester.pumpAndSettle();
 
