@@ -1562,13 +1562,21 @@
   "@progressionSectionTitle": {
     "description": "Section header for the per-exercise progression chart in the coach's athlete detail screen."
   },
-  "progressionMetricPr": "PR",
+  "progressionMetricPr": "Peso máximo",
   "@progressionMetricPr": {
-    "description": "Label for the PR (personal record = max weight) metric chip in the progression chart."
+    "description": "[AD3] Label for the Heaviest Weight metric chip (max weightKg per session) in the progression chart. Renamed from the mislabeled 'PR' — key kept for l10n stability, value updated."
+  },
+  "progressionMetricOneRepMax": "1RM",
+  "@progressionMetricOneRepMax": {
+    "description": "[AD2] Label for the Epley-estimated one-rep-max metric chip in the progression chart."
+  },
+  "progressionMetricBestSetVolume": "Mejor serie",
+  "@progressionMetricBestSetVolume": {
+    "description": "[AD3] Label for the Best Set Volume metric chip (max reps×weightKg of a single set) in the progression chart."
   },
   "progressionMetricVolume": "Volumen",
   "@progressionMetricVolume": {
-    "description": "Label for the Volume metric chip in the progression chart."
+    "description": "Label for the Best Session Volume metric chip (Σ reps×weightKg per session) in the progression chart."
   },
   "progressionFrequency": "{count, plural, =0{Sin sesiones en las últimas 8 semanas} =1{1 sesión en las últimas 8 semanas} other{{count} sesiones en las últimas 8 semanas}}",
   "@progressionFrequency": {

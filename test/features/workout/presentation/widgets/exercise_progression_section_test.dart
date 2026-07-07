@@ -40,22 +40,55 @@ SetLog _log(
       completedAt: DateTime(2025, 1, 1),
     );
 
+ExerciseProgressionChartLabels _chartLabels() => ExerciseProgressionChartLabels(
+      heaviestWeightLabel: 'Peso máximo',
+      oneRepMaxLabel: '1RM',
+      bestSetVolumeLabel: 'Mejor serie',
+      bestSessionVolumeLabel: 'Volumen',
+      volumeUnit: 'kg·reps',
+      weightUnit: 'kg',
+      frequencyLabel: (n) => n == 1
+          ? '1 sesión en las últimas 8 semanas'
+          : '$n sesiones en las últimas 8 semanas',
+      singlePointHint: 'Necesitás al menos 2 sesiones para ver la evolución.',
+      emptyHint: 'Sin datos suficientes para este ejercicio.',
+    );
+
+/// Generic label bag — used by tests that don't care about per-shell
+/// divergence (empty state, picker rendering).
 ExerciseProgressionSectionLabels _labels() => ExerciseProgressionSectionLabels(
       sectionTitle: 'EVOLUCIÓN POR EJERCICIO',
       loadingText: 'Cargando…',
       exerciseListErrorText: 'No se pudo cargar la evolución.',
       emptyStateText: 'Sin registros de series todavía.',
-      chartLabels: ExerciseProgressionChartLabels(
-        prLabel: 'PR',
-        volumeLabel: 'Volumen',
-        volumeUnit: 'kg·reps',
-        prUnit: 'kg',
-        frequencyLabel: (n) => n == 1
-            ? '1 sesión en las últimas 8 semanas'
-            : '$n sesiones en las últimas 8 semanas',
-        singlePointHint: 'Necesitás al menos 2 sesiones para ver la evolución.',
-        emptyHint: 'Sin datos suficientes para este ejercicio.',
-      ),
+      chartLabels: _chartLabels(),
+      localeName: 'es_AR',
+    );
+
+/// Mirrors the MOBILE coach shell's real `_ProgressionSection` wrapper
+/// (athlete_detail_screen.dart): `exerciseListErrorText` is null — mobile
+/// silently swallows exercise-list load errors (SizedBox.shrink), no l10n
+/// key exists for it (see apply-progress WARNING-2, obs #434).
+ExerciseProgressionSectionLabels _mobileLabels() =>
+    ExerciseProgressionSectionLabels(
+      sectionTitle: 'EVOLUCIÓN POR EJERCICIO',
+      loadingText: 'Cargando…',
+      exerciseListErrorText: null,
+      emptyStateText: 'Sin registros de series todavía.',
+      chartLabels: _chartLabels(),
+      localeName: 'es_AR',
+    );
+
+/// Mirrors the WEB coach_hub shell's real `_ProgressionTabSection` wrapper
+/// (alumno_detail_screen.dart): `exerciseListErrorText` is a real hardcoded
+/// Spanish string, distinct from mobile's null.
+ExerciseProgressionSectionLabels _webLabels() =>
+    ExerciseProgressionSectionLabels(
+      sectionTitle: 'EVOLUCIÓN POR EJERCICIO',
+      loadingText: 'Cargando…',
+      exerciseListErrorText: 'No se pudo cargar la evolución.',
+      emptyStateText: 'Sin registros de series todavía.',
+      chartLabels: _chartLabels(),
       localeName: 'es_AR',
     );
 
@@ -135,14 +168,25 @@ void main() {
     expect(find.text('Sentadilla'), findsOneWidget);
     expect(find.text('Press banca'), findsOneWidget);
     // Default selection is the most-recently-logged exercise (squat first)
-    expect(find.text('PR'), findsOneWidget); // chart metric chip
+    // [AD3] "Peso máximo" replaces the old mislabeled "PR" chip label.
+    expect(find.text('Peso máximo'), findsOneWidget); // chart metric chip
   });
 
   // Dedup contract: same data -> same render regardless of caller context.
   // This is the core AD1 behavioral invariant: both shells must produce an
-  // identical widget tree for identical (athleteId, providers, labels).
+  // identical widget tree for identical (athleteId, providers) given each
+  // shell's OWN real, differing label bag.
+  //
+  // Strengthened per verify-report WARNING-1 (obs #434): previously this
+  // test instantiated the widget twice with the SAME label bag, which could
+  // not catch label-bag-shaped regressions. Now Instance A uses the mobile
+  // shell's real bag (exerciseListErrorText: null) and Instance B uses the
+  // web shell's real bag (exerciseListErrorText: non-null) — both must
+  // still render the section title + picker identically given identical
+  // provider data, proving the shared widget's core layout/behavior is
+  // caller-agnostic even when label bags genuinely diverge.
   testWidgets(
-      'DEDUP-CONTRACT: same data renders identically across two independent instantiations',
+      'DEDUP-CONTRACT: identical data renders identically across the two shells\' real (differing) label bags',
       (tester) async {
     final session = _s('s1', DateTime(2025, 1, 10));
 
@@ -156,32 +200,71 @@ void main() {
       sessionsByUidProvider('a1').overrideWith((ref) async => [session]),
     ];
 
-    // Instance A — simulates the mobile coach shell call site.
+    // Instance A — mobile coach shell's real label bag.
     await tester.pumpWidget(_wrap(
       overrides: overrides,
       child: ExerciseProgressionSection(
         athleteId: 'a1',
-        labels: _labels(),
+        labels: _mobileLabels(),
       ),
     ));
     await tester.pumpAndSettle();
-    final aTitle = find.text('EVOLUCIÓN POR EJERCICIO');
-    final aChip = find.text('Sentadilla');
-    expect(aTitle, findsOneWidget);
-    expect(aChip, findsOneWidget);
+    expect(find.text('EVOLUCIÓN POR EJERCICIO'), findsOneWidget);
+    expect(find.text('Sentadilla'), findsOneWidget);
+    expect(find.text('Peso máximo'), findsOneWidget);
 
-    // Instance B — simulates the web coach_hub shell call site, same data.
+    // Instance B — web coach_hub shell's real label bag, same provider data.
     await tester.pumpWidget(_wrap(
       overrides: overrides,
       child: ExerciseProgressionSection(
         athleteId: 'a1',
-        labels: _labels(),
+        labels: _webLabels(),
       ),
     ));
     await tester.pumpAndSettle();
-    final bTitle = find.text('EVOLUCIÓN POR EJERCICIO');
-    final bChip = find.text('Sentadilla');
-    expect(bTitle, findsOneWidget);
-    expect(bChip, findsOneWidget);
+    expect(find.text('EVOLUCIÓN POR EJERCICIO'), findsOneWidget);
+    expect(find.text('Sentadilla'), findsOneWidget);
+    expect(find.text('Peso máximo'), findsOneWidget);
+  });
+
+  // Regression guard for the divergent field itself: mobile's null
+  // errorText must silently swallow (SizedBox.shrink), web's non-null
+  // errorText must render its text — proving the label-bag injection
+  // point is actually exercised, not just structurally present.
+  testWidgets(
+      'exerciseListErrorText divergence: mobile bag swallows error, web bag shows it',
+      (tester) async {
+    when(() => repo.listSetLogs(uid: 'a1', sessionId: any(named: 'sessionId')))
+        .thenThrow(Exception('boom'));
+
+    // Mobile: null errorText → no error text rendered.
+    await tester.pumpWidget(_wrap(
+      overrides: [
+        sessionRepositoryProvider.overrideWithValue(repo),
+        sessionsByUidProvider('a1')
+            .overrideWith((ref) async => [_s('s1', DateTime(2025, 1, 10))]),
+      ],
+      child: ExerciseProgressionSection(
+        athleteId: 'a1',
+        labels: _mobileLabels(),
+      ),
+    ));
+    await tester.pumpAndSettle();
+    expect(find.text('No se pudo cargar la evolución.'), findsNothing);
+
+    // Web: non-null errorText → error text rendered.
+    await tester.pumpWidget(_wrap(
+      overrides: [
+        sessionRepositoryProvider.overrideWithValue(repo),
+        sessionsByUidProvider('a1')
+            .overrideWith((ref) async => [_s('s1', DateTime(2025, 1, 10))]),
+      ],
+      child: ExerciseProgressionSection(
+        athleteId: 'a1',
+        labels: _webLabels(),
+      ),
+    ));
+    await tester.pumpAndSettle();
+    expect(find.text('No se pudo cargar la evolución.'), findsOneWidget);
   });
 }

@@ -9,20 +9,24 @@ import 'package:treino/l10n/app_l10n.dart';
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 ExerciseProgressionChartLabels _labels({
-  String prLabel = 'PR',
-  String volumeLabel = 'Volumen',
+  String heaviestWeightLabel = 'Peso máximo',
+  String oneRepMaxLabel = '1RM',
+  String bestSetVolumeLabel = 'Mejor serie',
+  String bestSessionVolumeLabel = 'Volumen',
   String volumeUnit = 'kg·reps',
-  String prUnit = 'kg',
+  String weightUnit = 'kg',
   String Function(int)? frequencyLabel,
   String singlePointHint =
       'Necesitás al menos 2 sesiones para ver la evolución.',
   String emptyHint = 'Sin datos para este ejercicio.',
 }) =>
     ExerciseProgressionChartLabels(
-      prLabel: prLabel,
-      volumeLabel: volumeLabel,
+      heaviestWeightLabel: heaviestWeightLabel,
+      oneRepMaxLabel: oneRepMaxLabel,
+      bestSetVolumeLabel: bestSetVolumeLabel,
+      bestSessionVolumeLabel: bestSessionVolumeLabel,
       volumeUnit: volumeUnit,
-      prUnit: prUnit,
+      weightUnit: weightUnit,
       frequencyLabel:
           frequencyLabel ?? (n) => '$n sesiones en las últimas 8 semanas',
       singlePointHint: singlePointHint,
@@ -40,6 +44,24 @@ Widget _wrap(Widget child) => MaterialApp(
       home: Scaffold(body: SingleChildScrollView(child: child)),
     );
 
+ExerciseProgression _progression({
+  List<ProgressionPoint> heaviestWeightSeries = const [],
+  List<ProgressionPoint> oneRepMaxSeries = const [],
+  List<ProgressionPoint> bestSetVolumeSeries = const [],
+  List<ProgressionPoint> bestSessionVolumeSeries = const [],
+  int frequencyLast8Weeks = 0,
+}) =>
+    ExerciseProgression(
+      exerciseId: 'squat',
+      exerciseName: 'Sentadilla',
+      heaviestWeightSeries: heaviestWeightSeries,
+      oneRepMaxSeries: oneRepMaxSeries,
+      bestSetVolumeSeries: bestSetVolumeSeries,
+      bestSessionVolumeSeries: bestSessionVolumeSeries,
+      personalRecords: const [],
+      frequencyLast8Weeks: frequencyLast8Weeks,
+    );
+
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 void main() {
@@ -47,11 +69,15 @@ void main() {
     // T10 — ≥2 points → LineChart rendered
     testWidgets('SCENARIO-PROG-07C: ≥2 points renders LineChart',
         (tester) async {
-      final progression = ExerciseProgression(
-        exerciseId: 'squat',
-        exerciseName: 'Sentadilla',
-        prSeries: [_pt(5, 80.0), _pt(10, 90.0), _pt(15, 95.0)],
-        volumeSeries: [_pt(5, 400.0), _pt(10, 285.0), _pt(15, 475.0)],
+      final progression = _progression(
+        heaviestWeightSeries: [_pt(5, 80.0), _pt(10, 90.0), _pt(15, 95.0)],
+        oneRepMaxSeries: [_pt(5, 93.3), _pt(10, 99.0), _pt(15, 108.7)],
+        bestSetVolumeSeries: [_pt(5, 400.0), _pt(10, 270.0), _pt(15, 340.0)],
+        bestSessionVolumeSeries: [
+          _pt(5, 400.0),
+          _pt(10, 285.0),
+          _pt(15, 475.0)
+        ],
         frequencyLast8Weeks: 3,
       );
 
@@ -65,19 +91,21 @@ void main() {
 
       // LineChart widget is present when ≥2 data points
       expect(find.byType(ExerciseProgressionChart), findsOneWidget);
-      // Metric chips are shown
-      expect(find.text('PR'), findsAtLeastNWidgets(1));
+      // All 4 metric chips are shown
+      expect(find.text('Peso máximo'), findsAtLeastNWidgets(1));
+      expect(find.text('1RM'), findsAtLeastNWidgets(1));
+      expect(find.text('Mejor serie'), findsAtLeastNWidgets(1));
       expect(find.text('Volumen'), findsAtLeastNWidgets(1));
     });
 
     // T11 — 1 point → no line, show value + hint
     testWidgets('SCENARIO-PROG-07B: 1 point shows value + hint, no trend line',
         (tester) async {
-      final progression = ExerciseProgression(
-        exerciseId: 'squat',
-        exerciseName: 'Sentadilla',
-        prSeries: [_pt(5, 70.0)],
-        volumeSeries: [_pt(5, 350.0)],
+      final progression = _progression(
+        heaviestWeightSeries: [_pt(5, 70.0)],
+        oneRepMaxSeries: [_pt(5, 81.7)],
+        bestSetVolumeSeries: [_pt(5, 350.0)],
+        bestSessionVolumeSeries: [_pt(5, 350.0)],
         frequencyLast8Weeks: 1,
       );
 
@@ -118,14 +146,15 @@ void main() {
       expect(find.text('Sin datos para este ejercicio.'), findsOneWidget);
     });
 
-    // T13 — PR chip default + Frecuencia stat above chip row
-    testWidgets('SCENARIO-PROG-06A/C: PR is default, Frecuencia stat displayed',
+    // T13 — Heaviest Weight chip default + Frecuencia stat above chip row
+    testWidgets(
+        'SCENARIO-PROG-06A/C: Heaviest Weight is default (renamed from PR), Frecuencia stat displayed',
         (tester) async {
-      final progression = ExerciseProgression(
-        exerciseId: 'squat',
-        exerciseName: 'Sentadilla',
-        prSeries: [_pt(5, 80.0), _pt(10, 90.0)],
-        volumeSeries: [_pt(5, 400.0), _pt(10, 285.0)],
+      final progression = _progression(
+        heaviestWeightSeries: [_pt(5, 80.0), _pt(10, 90.0)],
+        oneRepMaxSeries: [_pt(5, 93.3), _pt(10, 99.0)],
+        bestSetVolumeSeries: [_pt(5, 400.0), _pt(10, 270.0)],
+        bestSessionVolumeSeries: [_pt(5, 400.0), _pt(10, 285.0)],
         frequencyLast8Weeks: 5,
       );
 
@@ -141,8 +170,9 @@ void main() {
 
       // Frecuencia stat is shown (not a chart line)
       expect(find.textContaining('5 sesiones'), findsAtLeastNWidgets(1));
-      // PR chip exists
-      expect(find.text('PR'), findsAtLeastNWidgets(1));
+      // Heaviest Weight chip exists and its series value (90 = default
+      // metric) is rendered as the active single/multi-point view.
+      expect(find.text('Peso máximo'), findsAtLeastNWidgets(1));
     });
 
     // T14 — NO AppL10n import guard
@@ -194,14 +224,14 @@ void main() {
       expect(selected, 'bench');
     });
 
-    // SCENARIO-PROG-06B: switching to Volumen reflows chart
-    testWidgets('SCENARIO-PROG-06B: tap Volumen chip reflows chart',
+    // SCENARIO-PROG-06B: switching metric chips reflows the chart
+    testWidgets('SCENARIO-PROG-06B: tap another metric chip reflows chart',
         (tester) async {
-      final progression = ExerciseProgression(
-        exerciseId: 'squat',
-        exerciseName: 'Sentadilla',
-        prSeries: [_pt(5, 80.0), _pt(10, 90.0)],
-        volumeSeries: [_pt(5, 400.0), _pt(10, 285.0)],
+      final progression = _progression(
+        heaviestWeightSeries: [_pt(5, 80.0), _pt(10, 90.0)],
+        oneRepMaxSeries: [_pt(5, 93.3), _pt(10, 99.0)],
+        bestSetVolumeSeries: [_pt(5, 400.0), _pt(10, 270.0)],
+        bestSessionVolumeSeries: [_pt(5, 400.0), _pt(10, 285.0)],
         frequencyLast8Weeks: 2,
       );
 
@@ -214,11 +244,21 @@ void main() {
       ));
       await tester.pump();
 
-      // Tap Volumen chip
+      // Tap Volumen (Best Session Volume) chip
       await tester.tap(find.text('Volumen'));
       await tester.pump();
 
       // Chart still shows (no crash on metric switch)
+      expect(find.byType(ExerciseProgressionChart), findsOneWidget);
+
+      // Tap 1RM chip
+      await tester.tap(find.text('1RM'));
+      await tester.pump();
+      expect(find.byType(ExerciseProgressionChart), findsOneWidget);
+
+      // Tap Mejor serie (Best Set Volume) chip
+      await tester.tap(find.text('Mejor serie'));
+      await tester.pump();
       expect(find.byType(ExerciseProgressionChart), findsOneWidget);
     });
   });

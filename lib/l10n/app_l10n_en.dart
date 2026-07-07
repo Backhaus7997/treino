@@ -2094,7 +2094,13 @@ class AppL10nEn extends AppL10n {
   String get progressionSectionTitle => 'PROGRESS BY EXERCISE';
 
   @override
-  String get progressionMetricPr => 'PR';
+  String get progressionMetricPr => 'Heaviest weight';
+
+  @override
+  String get progressionMetricOneRepMax => '1RM';
+
+  @override
+  String get progressionMetricBestSetVolume => 'Best set';
 
   @override
   String get progressionMetricVolume => 'Volume';

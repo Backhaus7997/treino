@@ -1764,10 +1764,12 @@ class _ProgressionTabSection extends StatelessWidget {
             'No se pudo cargar la evolución.', // i18n: Fase W2
         emptyStateText: 'Sin registros de series todavía.', // i18n: Fase W2
         chartLabels: ExerciseProgressionChartLabels(
-          prLabel: 'PR', // i18n: Fase W2
-          volumeLabel: 'Volumen', // i18n: Fase W2
+          heaviestWeightLabel: 'Peso máximo', // i18n: Fase W2
+          oneRepMaxLabel: '1RM', // i18n: Fase W2
+          bestSetVolumeLabel: 'Mejor serie', // i18n: Fase W2
+          bestSessionVolumeLabel: 'Volumen', // i18n: Fase W2
           volumeUnit: 'kg·reps', // i18n: Fase W2
-          prUnit: 'kg', // i18n: Fase W2
+          weightUnit: 'kg', // i18n: Fase W2
           frequencyLabel: (n) => n == 1
               ? '1 sesión en las últimas 8 semanas' // i18n: Fase W2
               : '$n sesiones en las últimas 8 semanas', // i18n: Fase W2

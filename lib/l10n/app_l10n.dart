@@ -3986,13 +3986,25 @@ abstract class AppL10n {
   /// **'EVOLUCIÓN POR EJERCICIO'**
   String get progressionSectionTitle;
 
-  /// Label for the PR (personal record = max weight) metric chip in the progression chart.
+  /// [AD3] Label for the Heaviest Weight metric chip (max weightKg per session) in the progression chart. Renamed from the mislabeled 'PR' — key kept for l10n stability, value updated.
   ///
   /// In es_AR, this message translates to:
-  /// **'PR'**
+  /// **'Peso máximo'**
   String get progressionMetricPr;
 
-  /// Label for the Volume metric chip in the progression chart.
+  /// [AD2] Label for the Epley-estimated one-rep-max metric chip in the progression chart.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'1RM'**
+  String get progressionMetricOneRepMax;
+
+  /// [AD3] Label for the Best Set Volume metric chip (max reps×weightKg of a single set) in the progression chart.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Mejor serie'**
+  String get progressionMetricBestSetVolume;
+
+  /// Label for the Best Session Volume metric chip (Σ reps×weightKg per session) in the progression chart.
   ///
   /// In es_AR, this message translates to:
   /// **'Volumen'**

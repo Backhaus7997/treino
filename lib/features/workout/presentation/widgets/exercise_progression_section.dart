@@ -23,6 +23,10 @@ import 'exercise_progression_chart.dart';
 /// Wraps [ExerciseProgressionChartLabels] plus the section-level strings
 /// (title, loading, error, empty state) so the whole section can be
 /// label-injected without importing AppL10n.
+///
+/// [AD3] [chartLabels] now carries 4 distinct metric labels (Heaviest
+/// Weight/1RM/Best Set Volume/Best Session Volume) instead of the original
+/// 2 (PR/Volumen) — see exercise_progression_chart.dart.
 class ExerciseProgressionSectionLabels {
   const ExerciseProgressionSectionLabels({
     required this.sectionTitle,

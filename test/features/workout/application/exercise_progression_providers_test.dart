@@ -103,7 +103,7 @@ void main() {
         exerciseProgressionProvider((athleteUid: '', exerciseId: 'squat'))
             .future);
 
-    expect(result.prSeries, isEmpty);
+    expect(result.heaviestWeightSeries, isEmpty);
     verifyNever(() => repo.listSetLogs(
         uid: any(named: 'uid'), sessionId: any(named: 'sessionId')));
   });
@@ -143,8 +143,9 @@ void main() {
     expect(deadliftIdx, lessThan(benchIdx));
   });
 
-  // Happy path: PR aggregated correctly through provider
-  test('SCENARIO-PROG-01A via provider: PR series correctly aggregated',
+  // Happy path: Heaviest Weight aggregated correctly through provider
+  test(
+      'SCENARIO-PROG-01A via provider: Heaviest Weight series correctly aggregated',
       () async {
     final s1 = _s('s1', DateTime(2025, 1, 5));
     final s2 = _s('s2', DateTime(2025, 1, 10));
@@ -163,9 +164,9 @@ void main() {
             .future);
 
     expect(result, isA<ExerciseProgression>());
-    expect(result.prSeries.length, 2);
+    expect(result.heaviestWeightSeries.length, 2);
     // ASC: s1 first (80), s2 second (95)
-    expect(result.prSeries[0].value, 80.0);
-    expect(result.prSeries[1].value, 95.0);
+    expect(result.heaviestWeightSeries[0].value, 80.0);
+    expect(result.heaviestWeightSeries[1].value, 95.0);
   });
 }

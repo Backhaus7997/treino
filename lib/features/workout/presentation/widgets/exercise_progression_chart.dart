@@ -25,28 +25,42 @@ String _shortDate(DateTime dt, String localeName) =>
 /// The widget accepts this instead of an AppL10n instance so that it can be
 /// used from both the mobile surface (strings from AppL10n) and the web surface
 /// (hardcoded Spanish strings) without any platform-conditional import.
+///
+/// [AD3] Extended from the original 2-metric bag (PR/Volumen) to 4 distinct
+/// client-computed metrics: Heaviest Weight (renamed from the mislabeled
+/// "PR" — now "Peso máximo"), 1RM (AD2), Best Set Volume, Best Session
+/// Volume (was "Volumen").
 class ExerciseProgressionChartLabels {
   const ExerciseProgressionChartLabels({
-    required this.prLabel,
-    required this.volumeLabel,
+    required this.heaviestWeightLabel,
+    required this.oneRepMaxLabel,
+    required this.bestSetVolumeLabel,
+    required this.bestSessionVolumeLabel,
     required this.volumeUnit,
-    required this.prUnit,
+    required this.weightUnit,
     required this.frequencyLabel,
     required this.singlePointHint,
     required this.emptyHint,
   });
 
-  /// E.g. 'PR'
-  final String prLabel;
+  /// E.g. 'Peso máximo' — renamed from the mislabeled 'PR' (AD3).
+  final String heaviestWeightLabel;
 
-  /// E.g. 'Volumen'
-  final String volumeLabel;
+  /// E.g. '1RM' — Epley-estimated one-rep max (AD2).
+  final String oneRepMaxLabel;
 
-  /// E.g. 'kg·reps' — RD5: must NOT be plain 'kg'
+  /// E.g. 'Mejor serie' — max(reps×weightKg) of a single set (AD3).
+  final String bestSetVolumeLabel;
+
+  /// E.g. 'Volumen' — Σ(reps×weightKg) per session (was 'Volumen'/PR-era).
+  final String bestSessionVolumeLabel;
+
+  /// E.g. 'kg·reps' — RD5: must NOT be plain 'kg'. Used by both volume
+  /// metrics (Best Set Volume, Best Session Volume).
   final String volumeUnit;
 
-  /// E.g. 'kg'
-  final String prUnit;
+  /// E.g. 'kg'. Used by both weight metrics (Heaviest Weight, 1RM).
+  final String weightUnit;
 
   /// Converts a session count to a Frecuencia string.
   /// E.g. (n) => '$n sesiones en las últimas 8 semanas'
@@ -61,13 +75,15 @@ class ExerciseProgressionChartLabels {
 
 // ── Metric enum ───────────────────────────────────────────────────────────────
 
-enum _Metric { pr, volume }
+/// [AD3] The 4 client-computed metrics selectable via chip row.
+enum _Metric { heaviestWeight, oneRepMax, bestSetVolume, bestSessionVolume }
 
 // ── Public chart widget ───────────────────────────────────────────────────────
 
 /// Progression line chart — label-injected, NEVER imports AppL10n.
 ///
-/// - PR chip selected by default (SCENARIO-PROG-06A).
+/// - Heaviest Weight chip selected by default (SCENARIO-PROG-06A; renamed
+///   from the old mislabeled "PR" default per AD3).
 /// - <2 points → no line rendered (SCENARIO-PROG-07B/C).
 /// - 0 points → emptyHint shown (SCENARIO-PROG-07A).
 /// - Frecuencia stat shown ABOVE the chip row (SCENARIO-PROG-06C).
@@ -92,14 +108,31 @@ class ExerciseProgressionChart extends StatefulWidget {
 }
 
 class _ExerciseProgressionChartState extends State<ExerciseProgressionChart> {
-  _Metric _selected = _Metric.pr;
+  _Metric _selected = _Metric.heaviestWeight;
 
-  List<ProgressionPoint> get _activeSeries => _selected == _Metric.pr
-      ? widget.progression.prSeries
-      : widget.progression.volumeSeries;
+  List<ProgressionPoint> get _activeSeries {
+    switch (_selected) {
+      case _Metric.heaviestWeight:
+        return widget.progression.heaviestWeightSeries;
+      case _Metric.oneRepMax:
+        return widget.progression.oneRepMaxSeries;
+      case _Metric.bestSetVolume:
+        return widget.progression.bestSetVolumeSeries;
+      case _Metric.bestSessionVolume:
+        return widget.progression.bestSessionVolumeSeries;
+    }
+  }
 
-  String get _activeUnit =>
-      _selected == _Metric.pr ? widget.labels.prUnit : widget.labels.volumeUnit;
+  String get _activeUnit {
+    switch (_selected) {
+      case _Metric.heaviestWeight:
+      case _Metric.oneRepMax:
+        return widget.labels.weightUnit;
+      case _Metric.bestSetVolume:
+      case _Metric.bestSessionVolume:
+        return widget.labels.volumeUnit;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -131,8 +164,10 @@ class _ExerciseProgressionChartState extends State<ExerciseProgressionChart> {
           // ── Metric chip row ───────────────────────────────────────────
           _MetricChipRow(
             selected: _selected,
-            prLabel: labels.prLabel,
-            volumeLabel: labels.volumeLabel,
+            heaviestWeightLabel: labels.heaviestWeightLabel,
+            oneRepMaxLabel: labels.oneRepMaxLabel,
+            bestSetVolumeLabel: labels.bestSetVolumeLabel,
+            bestSessionVolumeLabel: labels.bestSessionVolumeLabel,
             palette: palette,
             onSelect: (m) => setState(() => _selected = m),
           ),
@@ -169,15 +204,19 @@ class _ExerciseProgressionChartState extends State<ExerciseProgressionChart> {
 class _MetricChipRow extends StatelessWidget {
   const _MetricChipRow({
     required this.selected,
-    required this.prLabel,
-    required this.volumeLabel,
+    required this.heaviestWeightLabel,
+    required this.oneRepMaxLabel,
+    required this.bestSetVolumeLabel,
+    required this.bestSessionVolumeLabel,
     required this.palette,
     required this.onSelect,
   });
 
   final _Metric selected;
-  final String prLabel;
-  final String volumeLabel;
+  final String heaviestWeightLabel;
+  final String oneRepMaxLabel;
+  final String bestSetVolumeLabel;
+  final String bestSessionVolumeLabel;
   final AppPalette palette;
   final void Function(_Metric) onSelect;
 
@@ -188,17 +227,31 @@ class _MetricChipRow extends StatelessWidget {
       child: Row(
         children: [
           _Chip(
-            label: prLabel,
-            isSelected: selected == _Metric.pr,
+            label: heaviestWeightLabel,
+            isSelected: selected == _Metric.heaviestWeight,
             palette: palette,
-            onTap: () => onSelect(_Metric.pr),
+            onTap: () => onSelect(_Metric.heaviestWeight),
           ),
           const SizedBox(width: 6),
           _Chip(
-            label: volumeLabel,
-            isSelected: selected == _Metric.volume,
+            label: oneRepMaxLabel,
+            isSelected: selected == _Metric.oneRepMax,
             palette: palette,
-            onTap: () => onSelect(_Metric.volume),
+            onTap: () => onSelect(_Metric.oneRepMax),
+          ),
+          const SizedBox(width: 6),
+          _Chip(
+            label: bestSetVolumeLabel,
+            isSelected: selected == _Metric.bestSetVolume,
+            palette: palette,
+            onTap: () => onSelect(_Metric.bestSetVolume),
+          ),
+          const SizedBox(width: 6),
+          _Chip(
+            label: bestSessionVolumeLabel,
+            isSelected: selected == _Metric.bestSessionVolume,
+            palette: palette,
+            onTap: () => onSelect(_Metric.bestSessionVolume),
           ),
         ],
       ),

@@ -780,7 +780,9 @@
   "avatarCropperDone": "",
   "avatarCropperCancel": "",
   "progressionSectionTitle": "PROGRESS BY EXERCISE",
-  "progressionMetricPr": "PR",
+  "progressionMetricPr": "Heaviest weight",
+  "progressionMetricOneRepMax": "1RM",
+  "progressionMetricBestSetVolume": "Best set",
   "progressionMetricVolume": "Volume",
   "progressionFrequency": "{count, plural, =0{No sessions in the last 8 weeks} =1{1 session in the last 8 weeks} other{{count} sessions in the last 8 weeks}}",
   "@progressionFrequency": {

@@ -2146,7 +2146,13 @@ class AppL10nEs extends AppL10n {
   String get progressionSectionTitle => 'EVOLUCIÓN POR EJERCICIO';
 
   @override
-  String get progressionMetricPr => 'PR';
+  String get progressionMetricPr => 'Peso máximo';
+
+  @override
+  String get progressionMetricOneRepMax => '1RM';
+
+  @override
+  String get progressionMetricBestSetVolume => 'Mejor serie';
 
   @override
   String get progressionMetricVolume => 'Volumen';
@@ -4457,7 +4463,13 @@ class AppL10nEsAr extends AppL10nEs {
   String get progressionSectionTitle => 'EVOLUCIÓN POR EJERCICIO';
 
   @override
-  String get progressionMetricPr => 'PR';
+  String get progressionMetricPr => 'Peso máximo';
+
+  @override
+  String get progressionMetricOneRepMax => '1RM';
+
+  @override
+  String get progressionMetricBestSetVolume => 'Mejor serie';
 
   @override
   String get progressionMetricVolume => 'Volumen';

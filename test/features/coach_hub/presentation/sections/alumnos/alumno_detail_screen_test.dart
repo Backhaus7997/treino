@@ -1213,8 +1213,7 @@ void main() {
             athleteBillingProvider
                 .overrideWith((ref, id) => Stream.value(null)),
             // PR9 — nuevos widgets del Resumen tab.
-            athleteNoteProvider
-                .overrideWith((ref, key) => Stream.value(null)),
+            athleteNoteProvider.overrideWith((ref, key) => Stream.value(null)),
             trainerAppointmentsStreamProvider
                 .overrideWith((ref, key) => Stream.value(const [])),
             lastWeightByExerciseProvider
@@ -1374,14 +1373,23 @@ void main() {
       final progression = ExerciseProgression(
         exerciseId: 'squat',
         exerciseName: 'Sentadilla',
-        prSeries: [
+        heaviestWeightSeries: [
           ProgressionPoint(date: DateTime.utc(2026, 1, 1), value: 90),
           ProgressionPoint(date: DateTime.utc(2026, 1, 8), value: 95),
         ],
-        volumeSeries: [
+        oneRepMaxSeries: [
+          ProgressionPoint(date: DateTime.utc(2026, 1, 1), value: 105),
+          ProgressionPoint(date: DateTime.utc(2026, 1, 8), value: 110.833),
+        ],
+        bestSetVolumeSeries: [
           ProgressionPoint(date: DateTime.utc(2026, 1, 1), value: 450),
           ProgressionPoint(date: DateTime.utc(2026, 1, 8), value: 475),
         ],
+        bestSessionVolumeSeries: [
+          ProgressionPoint(date: DateTime.utc(2026, 1, 1), value: 450),
+          ProgressionPoint(date: DateTime.utc(2026, 1, 8), value: 475),
+        ],
+        personalRecords: const [],
         frequencyLast8Weeks: 3,
       );
 
@@ -1583,8 +1591,7 @@ void main() {
       expect(find.text('3 × sets'), findsOneWidget);
     });
 
-    testWidgets(
-        'alumno no compartió historial → mensaje "no compartió" (PR9)',
+    testWidgets('alumno no compartió historial → mensaje "no compartió" (PR9)',
         (tester) async {
       await _pump(
         tester,
@@ -1657,8 +1664,7 @@ void main() {
       expect(find.text('Exportar CSV'), findsOneWidget);
     });
 
-    testWidgets(
-        'Exportar CSV button renders even with empty history (PR2-PAG)',
+    testWidgets('Exportar CSV button renders even with empty history (PR2-PAG)',
         (tester) async {
       await _pump(
         tester,
@@ -1701,8 +1707,7 @@ void main() {
       expect(find.text('Recordar'), findsOneWidget);
     });
 
-    testWidgets(
-        'Recordar button does NOT appear on paid payments (PR2-PAG)',
+    testWidgets('Recordar button does NOT appear on paid payments (PR2-PAG)',
         (tester) async {
       await _pump(
         tester,
