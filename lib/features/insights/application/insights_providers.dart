@@ -8,29 +8,44 @@ import '../../workout/domain/session_status.dart';
 import '../domain/muscle_group.dart';
 import '../domain/weekly_insights.dart';
 
-/// Calcula los agregados de la semana actual del usuario para la pantalla
-/// de Insights. autoDispose: se re-evalúa cada vez que se monta la pantalla.
-final weeklyInsightsProvider =
-    FutureProvider.autoDispose<WeeklyInsights?>((ref) async {
-  final uid = ref.watch(currentUidProvider);
-  if (uid == null) return null;
+/// [UX-week-day-selector] Family key for [athleteWeekInsightsProvider].
+/// Explicit [uid] (NOT `currentUidProvider`) and explicit [weekStart] (must
+/// already be normalized to a Monday 00:00 local via [mondayOfWeek]) — same
+/// pattern `athleteDayInsightsProvider` uses so the SAME provider can serve
+/// the athlete's own paged week view.
+typedef AthleteWeekInsightsKey = ({String uid, DateTime weekStart});
+
+/// [UX-week-day-selector] Per-week aggregate for [key.uid], for the week
+/// starting [key.weekStart] (Monday 00:00 local) — generalizes the old
+/// hardwired "current week only" `weeklyInsightsProvider` so the SEMANA card
+/// can page to past weeks. `streak` and `monthSessionsCount` are computed
+/// from the FULL session history regardless of which week is shown (they are
+/// not week-scoped concepts), matching the original provider's semantics.
+final athleteWeekInsightsProvider = FutureProvider.autoDispose
+    .family<WeeklyInsights?, AthleteWeekInsightsKey>((ref, key) async {
+  if (key.uid.isEmpty) return null;
 
   final repo = ref.read(sessionRepositoryProvider);
 
-  // Rango de semana — lunes 00:00 local hasta el siguiente lunes (exclusivo).
-  // Aritmética de calendario (no Duration) para que el borde caiga en
-  // medianoche local incluso atravesando un cambio de horario (DST).
-  final now = DateTime.now().toLocal();
-  final weekStart = _mondayOfWeek(now);
+  // Rango de semana — lunes 00:00 local (ya normalizado por el caller) hasta
+  // el siguiente lunes (exclusivo). Aritmética de calendario (no Duration)
+  // para que el borde caiga en medianoche local incluso atravesando un
+  // cambio de horario (DST).
+  final weekStart = DateTime(
+    key.weekStart.year,
+    key.weekStart.month,
+    key.weekStart.day,
+  );
   final weekEndExclusive =
       DateTime(weekStart.year, weekStart.month, weekStart.day + 7);
+  final now = DateTime.now().toLocal();
 
   // Todas las sessions del usuario (listByUid ya viene ordenado DESC por
   // startedAt en SessionRepository).
-  final allSessions = await repo.listByUid(uid);
+  final allSessions = await repo.listByUid(key.uid);
   final mostRecentSession = allSessions.isNotEmpty ? allSessions.first : null;
 
-  // Filtro a esta semana + finished.
+  // Filtro a la semana pedida + finished.
   final weekSessions = allSessions.where((s) {
     final started = s.startedAt.toLocal();
     return !started.isBefore(weekStart) &&
@@ -77,7 +92,7 @@ final weeklyInsightsProvider =
   // colapsar N round-trips seriales en un batch.
   final setsByGroup = <MuscleGroupDisplay, int>{};
   final logsPerSession = await Future.wait(
-    weekSessions.map((s) => repo.listSetLogs(uid: uid, sessionId: s.id)),
+    weekSessions.map((s) => repo.listSetLogs(uid: key.uid, sessionId: s.id)),
   );
   for (final logs in logsPerSession) {
     for (final log in logs) {
@@ -135,9 +150,29 @@ final weeklyInsightsProvider =
   );
 });
 
+/// Calcula los agregados de la SEMANA ACTUAL del usuario logueado. Delgado
+/// wrapper sobre [athleteWeekInsightsProvider] con `weekStart` fijo a "esta
+/// semana" — mantenido para consumers existentes (home's `EstaSemanaCard`)
+/// que no necesitan pagear semanas. autoDispose: se re-evalúa cada vez que
+/// se monta la pantalla.
+final weeklyInsightsProvider =
+    FutureProvider.autoDispose<WeeklyInsights?>((ref) async {
+  final uid = ref.watch(currentUidProvider);
+  if (uid == null) return null;
+
+  final weekStart = mondayOfWeek(DateTime.now().toLocal());
+  return ref.watch(
+    athleteWeekInsightsProvider((uid: uid, weekStart: weekStart)).future,
+  );
+});
+
 // ── Week helpers ──────────────────────────────────────────────────────────────
 
-DateTime _mondayOfWeek(DateTime now) {
+/// [UX-week-day-selector] Monday 00:00 local of the week containing [now].
+/// Public (was `_mondayOfWeek`) so the SEMANA card's paging logic
+/// (`insights_screen.dart`) can compute prior/next week boundaries with the
+/// same calendar-arithmetic, DST-safe rule.
+DateTime mondayOfWeek(DateTime now) {
   final daysFromMonday = now.weekday - DateTime.monday;
   // Resta de días vía constructor de calendario para normalizar el borde a
   // medianoche local aun cuando la semana cruza un cambio de horario (DST).

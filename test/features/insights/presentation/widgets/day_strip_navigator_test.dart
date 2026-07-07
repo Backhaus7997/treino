@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/insights/domain/day_insights.dart';
@@ -100,6 +101,78 @@ void main() {
       ));
 
       expect(find.byIcon(TreinoIcon.checkCircleFill), findsNothing);
+    });
+
+    testWidgets(
+        'selected day outline uses palette.highlight, distinct from the '
+        'trained/today marker color (palette.accent) — proves selection '
+        'feedback is visually separate from the trained state', (tester) async {
+      final today = DateTime(2026, 7, 7);
+      // Select a day that is NEITHER today NOR trained, so any border color
+      // we see is caused ONLY by the isSelected flag.
+      final days = _sevenDays(today: today, trainedIndex: 3);
+      final selected = days[1].day; // untrained, not today
+
+      await tester.pumpWidget(_wrap(
+        DayStripNavigator(
+          days: days,
+          selectedDay: selected,
+          onDaySelected: (_) {},
+          labels: _labels,
+        ),
+      ));
+
+      // The OUTER-most Container is the selection ring — it wraps the
+      // trained/today marker Container, so both stay visible at once.
+      final selectedTile = tester.widget<Container>(
+        find
+            .descendant(
+              of: find.byKey(ValueKey(selected)),
+              matching: find.byType(Container),
+            )
+            .first,
+      );
+      final decoration = selectedTile.decoration as BoxDecoration;
+      final border = decoration.border as Border;
+
+      expect(border.top.color, AppPalette.mintMagenta.highlight);
+      expect(border.top.color, isNot(AppPalette.mintMagenta.accent));
+    });
+
+    testWidgets(
+        'selected day AND today are the SAME day → both markers render '
+        'simultaneously (today\'s mint outline nested inside the magenta '
+        'selection ring, not replaced by it)', (tester) async {
+      final today = DateTime(2026, 7, 7);
+      final days = _sevenDays(today: today); // last tile == today
+      final todayDay = days.last.day;
+
+      await tester.pumpWidget(_wrap(
+        DayStripNavigator(
+          days: days,
+          selectedDay: todayDay,
+          onDaySelected: (_) {},
+          labels: _labels,
+        ),
+      ));
+
+      final containers = tester
+          .widgetList<Container>(find.descendant(
+            of: find.byKey(ValueKey(todayDay)),
+            matching: find.byType(Container),
+          ))
+          .toList();
+
+      // Outer ring (selection, magenta) + inner circle (today, mint) — two
+      // distinct Containers, two distinct border colors.
+      expect(containers.length, 2);
+      final outerBorder =
+          (containers[0].decoration as BoxDecoration).border as Border;
+      final innerBorder =
+          (containers[1].decoration as BoxDecoration).border as Border;
+
+      expect(outerBorder.top.color, AppPalette.mintMagenta.highlight);
+      expect(innerBorder.top.color, AppPalette.mintMagenta.accent);
     });
   });
 }

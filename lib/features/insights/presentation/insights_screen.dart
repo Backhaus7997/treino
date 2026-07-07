@@ -13,8 +13,6 @@ import '../application/insights_providers.dart';
 import '../domain/muscle_group.dart';
 import '../domain/weekly_insights.dart';
 import 'widgets/body_silhouette_placeholder.dart';
-import 'widgets/day_strip_labels.dart';
-import 'widgets/day_strip_navigator.dart';
 
 /// Pantalla de Insights — agregados semanales por grupo muscular.
 /// Mockup: `insights.png`. Acceso natural desde la card "Esta Semana"
@@ -27,21 +25,76 @@ class InsightsScreen extends ConsumerStatefulWidget {
 }
 
 class _InsightsScreenState extends ConsumerState<InsightsScreen> {
-  /// [REQ:heat-map-per-day] Day currently shown by the body silhouette +
-  /// day-strip. Defaults to today; changes when the athlete taps a tile in
-  /// [DayStripNavigator]. Independent of `weeklyInsightsProvider`'s week
-  /// window — the heat-map is per-day, the rest of the screen stays weekly.
+  /// [REQ:heat-map-per-day][UX-week-day-selector] Day currently shown by the
+  /// body silhouette. Defaults to today; changes when the athlete taps a
+  /// weekday circle in [_WeekStripCard] (the SEMANA card doubles as the
+  /// day selector — no separate day-strip inside the muscles card anymore).
+  /// Independent of the shown week's window — the heat-map is per-day, the
+  /// rest of the screen stays weekly.
   late DateTime _selectedDay = _todayOnly();
+
+  /// [UX-week-day-selector] Monday 00:00 local of the week currently shown
+  /// by the SEMANA card. Defaults to the current week; paged by the ‹ ›
+  /// chevrons. Independent of `_selectedDay` — paging does NOT force-change
+  /// the muscles card unless the selected day falls outside the new week.
+  late DateTime _shownWeekStart = mondayOfWeek(DateTime.now().toLocal());
+
+  /// [UX-week-day-selector] `true` once the athlete has paged away from the
+  /// current week at least once. Gates the brand-new-account `_EmptyState`:
+  /// that illustration only makes sense on first render of the CURRENT week
+  /// with zero sessions ("you've never trained, start now"). Once the
+  /// athlete is actively browsing past weeks, a week with 0 sessions is
+  /// legitimate data ("you skipped this week") — the week card (0/5) must
+  /// render instead, not the "start training" CTA.
+  bool _hasPagedAway = false;
 
   static DateTime _todayOnly() {
     final now = DateTime.now();
     return DateTime(now.year, now.month, now.day);
   }
 
+  /// [UX-week-day-selector] Future days of the current week are NOT
+  /// selectable — `_DayChip` already de-emphasizes them and no-ops the tap,
+  /// but this is the last line of defense against any programmatic call.
+  void _onDaySelected(DateTime day) {
+    if (day.isAfter(_todayOnly())) return;
+    setState(() => _selectedDay = day);
+  }
+
+  /// [UX-week-day-selector] Pages the SEMANA card by [deltaWeeks] weeks
+  /// (negative = previous, positive = next). Next-week paging is blocked at
+  /// the current week — no future weeks. No back-limit: the athlete can page
+  /// back indefinitely (bounded in practice by how far back they've trained;
+  /// each week's data is fetched on demand).
+  ///
+  /// [UX-week-day-selector] If [_selectedDay] falls within the newly shown
+  /// week, it's kept as-is (still valid, no change needed). If it falls
+  /// OUTSIDE the new week, the muscles card is intentionally left alone —
+  /// selection persists until the athlete explicitly taps a day in the new
+  /// week. This avoids a jarring auto-jump of the card below while paging.
+  void _pageWeek(int deltaWeeks) {
+    final candidate = DateTime(
+      _shownWeekStart.year,
+      _shownWeekStart.month,
+      _shownWeekStart.day + deltaWeeks * 7,
+    );
+    final currentWeekStart = mondayOfWeek(DateTime.now().toLocal());
+    if (candidate.isAfter(currentWeekStart)) return;
+    setState(() {
+      _shownWeekStart = candidate;
+      _hasPagedAway = true;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    final async = ref.watch(weeklyInsightsProvider);
+    final uid = ref.watch(currentUidProvider) ?? '';
+    final async = ref.watch(
+      athleteWeekInsightsProvider((uid: uid, weekStart: _shownWeekStart)),
+    );
+    final isCurrentWeek =
+        _shownWeekStart == mondayOfWeek(DateTime.now().toLocal());
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -53,10 +106,17 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
               child: CircularProgressIndicator(color: palette.accent),
             ),
             error: (_, __) => _ErrorState(
-              onRetry: () => ref.invalidate(weeklyInsightsProvider),
+              onRetry: () => ref.invalidate(
+                athleteWeekInsightsProvider(
+                  (uid: uid, weekStart: _shownWeekStart),
+                ),
+              ),
             ),
             data: (insights) {
-              if (insights == null || insights.sessionsCount == 0) {
+              if (insights == null ||
+                  (insights.sessionsCount == 0 &&
+                      isCurrentWeek &&
+                      !_hasPagedAway)) {
                 return const _EmptyState();
               }
               return ListView(
@@ -64,12 +124,16 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                     20, 12, 20, 20 + MediaQuery.paddingOf(context).bottom),
                 physics: const AlwaysScrollableScrollPhysics(),
                 children: [
-                  _WeekStripCard(insights: insights),
-                  const SizedBox(height: 14),
-                  _DailyMusclesCard(
+                  _WeekStripCard(
+                    insights: insights,
                     selectedDay: _selectedDay,
-                    onDaySelected: (day) => setState(() => _selectedDay = day),
+                    onDaySelected: _onDaySelected,
+                    isCurrentWeek: isCurrentWeek,
+                    onPreviousWeek: () => _pageWeek(-1),
+                    onNextWeek: () => _pageWeek(1),
                   ),
+                  const SizedBox(height: 14),
+                  _DailyMusclesCard(selectedDay: _selectedDay),
                   const SizedBox(height: 14),
                   _VolumeBarCard(insights: insights),
                   const SizedBox(height: 20),
@@ -198,8 +262,27 @@ class _ErrorState extends StatelessWidget {
 // ── Card: SEMANA + tira L-D ──────────────────────────────────────────────────
 
 class _WeekStripCard extends StatelessWidget {
-  const _WeekStripCard({required this.insights});
+  const _WeekStripCard({
+    required this.insights,
+    required this.selectedDay,
+    required this.onDaySelected,
+    required this.isCurrentWeek,
+    required this.onPreviousWeek,
+    required this.onNextWeek,
+  });
   final WeeklyInsights insights;
+
+  /// [UX-week-day-selector] The day currently shown by the muscles card
+  /// below. This card doubles as the day selector — tapping a past/today
+  /// weekday circle drives [onDaySelected].
+  final DateTime selectedDay;
+  final ValueChanged<DateTime> onDaySelected;
+
+  /// [UX-week-day-selector] `true` when [insights] is the CURRENT week —
+  /// disables the › (next week) chevron, since future weeks don't exist.
+  final bool isCurrentWeek;
+  final VoidCallback onPreviousWeek;
+  final VoidCallback onNextWeek;
 
   static const _dayLabels = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
 
@@ -207,7 +290,10 @@ class _WeekStripCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final today = DateTime.now().toLocal();
+    final todayOnly = DateTime(today.year, today.month, today.day);
     final todayIndex = today.weekday - DateTime.monday;
+    final selectedOnly =
+        DateTime(selectedDay.year, selectedDay.month, selectedDay.day);
 
     return Container(
       decoration: BoxDecoration(
@@ -220,9 +306,19 @@ class _WeekStripCard extends StatelessWidget {
         children: [
           Row(
             children: [
+              // [UX-week-day-selector] ‹ previous week. No back-limit — the
+              // athlete can page back indefinitely; each week's data is
+              // fetched on demand via `athleteWeekInsightsProvider`.
+              IconButton(
+                key: const Key('week-strip-previous-week'),
+                icon: Icon(TreinoIcon.chevronLeft, color: palette.textMuted),
+                onPressed: onPreviousWeek,
+                tooltip: 'Semana anterior',
+              ),
               Expanded(
                 child: Text(
                   _formatRange(insights.weekStart, insights.weekEnd),
+                  textAlign: TextAlign.center,
                   style: GoogleFonts.barlowCondensed(
                     fontWeight: FontWeight.w700,
                     fontSize: 12,
@@ -230,6 +326,17 @@ class _WeekStripCard extends StatelessWidget {
                     color: palette.textMuted,
                   ),
                 ),
+              ),
+              // [UX-week-day-selector] › next week — disabled (null onTap)
+              // on the current week, since there are no future weeks yet.
+              IconButton(
+                key: const Key('week-strip-next-week'),
+                icon: Icon(TreinoIcon.chevronRight,
+                    color: isCurrentWeek
+                        ? palette.textMuted.withValues(alpha: 0.3)
+                        : palette.textMuted),
+                onPressed: isCurrentWeek ? null : onNextWeek,
+                tooltip: 'Semana siguiente',
               ),
               Text(
                 '${insights.sessionsCount} / ${insights.plannedSessionsCount}',
@@ -262,19 +369,32 @@ class _WeekStripCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          // Chips por día
+          // Chips por día — también funcionan como selector del día
+          // mostrado en la card MÚSCULOS DEL DÍA.
           Row(
             children: [
               for (var i = 0; i < 7; i++)
-                Expanded(
-                  child: Center(
-                    child: _DayChip(
-                      trained: insights.daysTrained[i],
-                      isToday: i == todayIndex,
-                      dayOfMonth: insights.weekStart.add(Duration(days: i)).day,
+                Builder(builder: (context) {
+                  final day = DateTime(
+                    insights.weekStart.year,
+                    insights.weekStart.month,
+                    insights.weekStart.day + i,
+                  );
+                  final isFuture = day.isAfter(todayOnly);
+                  return Expanded(
+                    child: Center(
+                      child: _DayChip(
+                        key: ValueKey(day),
+                        trained: insights.daysTrained[i],
+                        isToday: i == todayIndex,
+                        isSelected: day == selectedOnly,
+                        isFuture: isFuture,
+                        dayOfMonth: day.day,
+                        onTap: isFuture ? null : () => onDaySelected(day),
+                      ),
                     ),
-                  ),
-                ),
+                  );
+                }),
             ],
           ),
         ],
@@ -283,22 +403,40 @@ class _WeekStripCard extends StatelessWidget {
   }
 }
 
+/// [UX-week-day-selector] Weekday circle in the SEMANA card. Doubles as the
+/// day selector for the MÚSCULOS DEL DÍA card below: tapping selects
+/// [dayOfMonth]'s day (past days and today only — [onTap] is `null` for
+/// future days, which also render de-emphasized via reduced opacity).
+///
+/// [isSelected] draws an OUTER ring in `palette.highlight` (magenta) —
+/// deliberately distinct from the `isToday`/trained marker, which stays
+/// `palette.accent` (mint). This keeps "today" and "selected" visually
+/// separable even when they're the same day (default selection = today).
 class _DayChip extends StatelessWidget {
   const _DayChip({
+    super.key,
     required this.trained,
     required this.isToday,
+    required this.isSelected,
+    required this.isFuture,
     required this.dayOfMonth,
+    required this.onTap,
   });
 
   final bool trained;
   final bool isToday;
+  final bool isSelected;
+  final bool isFuture;
   final int dayOfMonth;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+
+    Widget circle;
     if (trained) {
-      return Container(
+      circle = Container(
         width: 36,
         height: 36,
         decoration: BoxDecoration(
@@ -312,9 +450,8 @@ class _DayChip extends StatelessWidget {
           size: 18,
         ),
       );
-    }
-    if (isToday) {
-      return Container(
+    } else if (isToday) {
+      circle = Container(
         width: 36,
         height: 36,
         decoration: BoxDecoration(
@@ -331,41 +468,70 @@ class _DayChip extends StatelessWidget {
           ),
         ),
       );
-    }
-    return Container(
-      width: 36,
-      height: 36,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border: Border.all(color: palette.border, width: 1),
-      ),
-      alignment: Alignment.center,
-      child: Text(
-        '$dayOfMonth',
-        style: GoogleFonts.barlowCondensed(
-          fontWeight: FontWeight.w600,
-          fontSize: 14,
-          color: palette.textMuted,
+    } else {
+      circle = Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(color: palette.border, width: 1),
         ),
-      ),
+        alignment: Alignment.center,
+        child: Text(
+          '$dayOfMonth',
+          style: GoogleFonts.barlowCondensed(
+            fontWeight: FontWeight.w600,
+            fontSize: 14,
+            color: palette.textMuted,
+          ),
+        ),
+      );
+    }
+
+    if (isSelected) {
+      circle = Container(
+        padding: const EdgeInsets.all(3),
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(color: palette.highlight, width: 2),
+        ),
+        child: circle,
+      );
+    }
+
+    if (isFuture) {
+      circle = Opacity(opacity: 0.4, child: circle);
+    }
+
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: circle,
     );
   }
 }
 
-// ── Card: MÚSCULOS DEL DÍA (per-day heat-map + day-strip) ────────────────────
+// ── Card: MÚSCULOS DEL DÍA (per-day heat-map) ────────────────────────────────
 
-/// [AD5][REQ:heat-map-per-day] Replaces the old week-accumulated
-/// "MÚSCULOS DE LA SEMANA" card. Each day starts blank; the silhouette only
-/// paints the muscles trained on [selectedDay] — no carry-over from other
-/// days in the strip (fixes the chest-Monday-bleeds-into-Tuesday bug).
+/// [AD5][REQ:heat-map-per-day][UX-week-day-selector][UX-back-view] Replaces
+/// the old week-accumulated "MÚSCULOS DE LA SEMANA" card. Each day starts
+/// blank; the silhouette only paints the muscles trained on [selectedDay] —
+/// no carry-over from other days (fixes the chest-Monday-bleeds-into-Tuesday
+/// bug). The day-strip navigator that used to live INSIDE this card was
+/// removed — the SEMANA card above is now the single day selector for the
+/// whole screen (see `_WeekStripCard`). `DayStripNavigator`/`DayStripLabels`
+/// stay in the codebase — the coach's `DailyHeatmapSection` still uses them.
+///
+/// [UX-back-view] `BodySilhouettePlaceholder(showBack: true)` — the athlete
+/// can now see BACK muscles (espalda) too, not just the front silhouette.
+/// Layout is a `Column` (silhouette full-width, list below) rather than the
+/// old `Row` (silhouette beside the list) — the front+back pair needs more
+/// horizontal room than a single body did, and stacking mirrors how home's
+/// `EstaSemanaCard` already lays out its own `showBack: true` silhouette.
 class _DailyMusclesCard extends ConsumerWidget {
-  const _DailyMusclesCard({
-    required this.selectedDay,
-    required this.onDaySelected,
-  });
+  const _DailyMusclesCard({required this.selectedDay});
 
   final DateTime selectedDay;
-  final ValueChanged<DateTime> onDaySelected;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -373,7 +539,6 @@ class _DailyMusclesCard extends ConsumerWidget {
     final l10n = AppL10n.of(context);
     final uid = ref.watch(currentUidProvider) ?? '';
 
-    final stripAsync = ref.watch(athleteLast7DaysInsightsProvider(uid));
     final selectedAsync = ref.watch(
       athleteDayInsightsProvider((uid: uid, day: selectedDay)),
     );
@@ -397,54 +562,39 @@ class _DailyMusclesCard extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 14),
-          stripAsync.when(
-            loading: () => const SizedBox(
-              height: 64,
-              child: Center(child: CircularProgressIndicator()),
-            ),
-            error: (_, __) => const SizedBox.shrink(),
-            data: (days) => DayStripNavigator(
-              days: days,
-              selectedDay: selectedDay,
-              onDaySelected: onDaySelected,
-              labels: DayStripLabels(
-                todayLabel: l10n.insightsDayStripTodayLabel,
-                emptyDayHint: l10n.insightsDayEmptyHint,
-              ),
-            ),
-          ),
-          const SizedBox(height: 14),
           selectedAsync.when(
             loading: () => const SizedBox(
               height: 240,
               child: Center(child: CircularProgressIndicator()),
             ),
             error: (_, __) => const SizedBox.shrink(),
-            data: (dayInsights) => Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
+            // [UX-back-view] `showBack: true` renders bodyfront + bodyback
+            // side by side — that pair needs more horizontal room than the
+            // old single-body 160px column had next to it. Stacked
+            // (silhouettes full-width ABOVE the sets list) instead of the
+            // old Row-beside-list layout, mirroring how home's
+            // `EstaSemanaCard` lays out the same `showBack: true` silhouette
+            // (full-width, own row, nothing beside it) — avoids a
+            // RenderFlex overflow at narrow widths.
+            data: (dayInsights) => Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 BodySilhouettePlaceholder(
-                  width: 160,
-                  height: 240,
+                  width: double.infinity,
+                  height: 220,
+                  showBack: true,
                   setsByGroup: dayInsights.setsByGroup,
                   label: dayInsights.isEmpty ? l10n.insightsDayEmptyHint : null,
                 ),
-                const SizedBox(width: 18),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      for (final group in MuscleGroupDisplay.displayOrder)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 4),
-                          child: _MuscleSetsRow(
-                            group: group,
-                            sets: dayInsights.setsByGroup[group] ?? 0,
-                          ),
-                        ),
-                    ],
+                const SizedBox(height: 14),
+                for (final group in MuscleGroupDisplay.displayOrder)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: _MuscleSetsRow(
+                      group: group,
+                      sets: dayInsights.setsByGroup[group] ?? 0,
+                    ),
                   ),
-                ),
               ],
             ),
           ),
