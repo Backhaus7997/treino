@@ -17,6 +17,7 @@ import '../../workout/application/session_providers.dart'
     show currentUidProvider;
 import '../application/agenda_providers.dart';
 import '../application/dashboard_day_counts.dart';
+import '../application/recent_activity_provider.dart';
 import '../application/trained_today_provider.dart';
 import '../application/trainer_link_providers.dart';
 import '../domain/appointment.dart';
@@ -81,10 +82,7 @@ class TrainerDashboardTab extends ConsumerWidget {
           label: AppL10n.of(context).dashboardActividadRecienteSectionLabel,
         ),
         const SizedBox(height: 8),
-        _PlaceholderCard(
-          palette: palette,
-          message: AppL10n.of(context).dashboardProximamente,
-        ),
+        const _ActividadRecienteList(),
         const SizedBox(height: 20),
         _PagosPorCobrarSection(palette: palette),
         const SizedBox(height: 20),
@@ -289,7 +287,9 @@ class _PendingRequestCardState extends ConsumerState<_PendingRequestCard> {
     setState(() => _busy = true);
     try {
       await ref.read(trainerLinkRepositoryProvider).accept(widget.link.id);
-      ref.read(analyticsServiceProvider).logLinkAccepted(linkId: widget.link.id);
+      ref
+          .read(analyticsServiceProvider)
+          .logLinkAccepted(linkId: widget.link.id);
     } catch (_) {
       if (mounted) setState(() => _busy = false);
     }
@@ -740,7 +740,8 @@ class _EntrenaronHoyList extends ConsumerWidget {
     final todayAsync = ref.watch(trainedTodayProvider);
 
     if (todayAsync.isLoading && !todayAsync.hasValue) {
-      return _PlaceholderCard(palette: palette, message: l10n.dashboardCargando);
+      return _PlaceholderCard(
+          palette: palette, message: l10n.dashboardCargando);
     }
     if (todayAsync.hasError && !todayAsync.hasValue) {
       return _PlaceholderCard(
@@ -848,6 +849,135 @@ class _EntrenaronHoyRow extends ConsumerWidget {
   }
 }
 
+// ── Actividad reciente ────────────────────────────────────────────────────────
+
+class _ActividadRecienteList extends ConsumerWidget {
+  const _ActividadRecienteList();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+    final activityAsync = ref.watch(recentActivityProvider);
+
+    if (activityAsync.isLoading && !activityAsync.hasValue) {
+      return _PlaceholderCard(
+          palette: palette, message: l10n.dashboardCargando);
+    }
+    if (activityAsync.hasError && !activityAsync.hasValue) {
+      return _PlaceholderCard(
+        palette: palette,
+        message: l10n.dashboardErrorActividad,
+      );
+    }
+
+    final entries = activityAsync.valueOrNull ?? const [];
+    if (entries.isEmpty) {
+      return _PlaceholderCard(
+        palette: palette,
+        message: l10n.dashboardSinActividadReciente,
+      );
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: palette.bgCard,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: palette.border, width: 1),
+      ),
+      child: Column(
+        children: [
+          for (int i = 0; i < entries.length; i++) ...[
+            if (i > 0)
+              Divider(
+                color: palette.border,
+                height: 1,
+                thickness: 1,
+                indent: 14,
+                endIndent: 14,
+              ),
+            _ActividadRecienteRow(entry: entries[i]),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _ActividadRecienteRow extends ConsumerWidget {
+  const _ActividadRecienteRow({required this.entry});
+  final RecentActivityEntry entry;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final palette = AppPalette.of(context);
+    final profileAsync = ref.watch(userPublicProfileProvider(entry.athleteId));
+    final rawName = profileAsync.valueOrNull?.displayName ?? '';
+    final showName = rawName.isEmpty || _looksLikeUid(rawName)
+        ? AppL10n.of(context).dashboardAlumnoFallback
+        : rawName;
+    final initials = _initials(showName);
+    final session = entry.session;
+
+    return InkWell(
+      onTap: () => context.push('/coach/athlete/${entry.athleteId}'),
+      borderRadius: BorderRadius.circular(16),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Row(
+          children: [
+            _AvatarInitials(initials: initials, palette: palette),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    showName,
+                    style: GoogleFonts.barlow(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                      color: palette.textPrimary,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    // Date (not time-of-day) — differentiates this rolling feed
+                    // from the "Entrenaron hoy" today snapshot above.
+                    '${session.routineName} · ${_formatArtDate(session.finishedAt!)}',
+                    style: GoogleFonts.barlow(
+                      fontWeight: FontWeight.w400,
+                      fontSize: 12,
+                      color: palette.textMuted,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              '${session.totalVolumeKg.toStringAsFixed(0)} kg',
+              style: GoogleFonts.barlowCondensed(
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+                color: palette.textMuted,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Formats a UTC instant as its ART calendar date, `d/M` (e.g. "15/7").
+String _formatArtDate(DateTime finishedAt) {
+  final art = toArgentina(finishedAt.toUtc());
+  return '${art.day}/${art.month}';
+}
+
 // ── Pagos por cobrar section ──────────────────────────────────────────────────
 
 class _PagosPorCobrarSection extends ConsumerWidget {
@@ -900,7 +1030,8 @@ class _PagosPorCobrarList extends ConsumerWidget {
     final cobrosAsync = ref.watch(pagosPorCobrarProvider);
 
     if (cobrosAsync.isLoading && !cobrosAsync.hasValue) {
-      return _PlaceholderCard(palette: palette, message: l10n.dashboardCargando);
+      return _PlaceholderCard(
+          palette: palette, message: l10n.dashboardCargando);
     }
     if (cobrosAsync.hasError && !cobrosAsync.hasValue) {
       return _PlaceholderCard(
@@ -1022,8 +1153,9 @@ class _CobroPendienteRow extends ConsumerWidget {
         switch (cobro.cadence) {
           case BillingCadence.mensual:
           case BillingCadence.semanal:
-            // Derive periodKey from concept cadence
-            final now2 = DateTime.now().toUtc();
+            // Derive periodKey in ART: the bucket identity is a calendar
+            // concept and MUST match the CF (createdAt/paidAt below stay UTC).
+            final now2 = argentinaNow();
             final periodKey = cobro.cadence == BillingCadence.mensual
                 ? '${now2.year}-${now2.month.toString().padLeft(2, '0')}'
                 : isoWeekPeriodKey(now2);

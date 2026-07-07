@@ -94,10 +94,14 @@ service cloud.firestore {
       // CREATE branch 2 (NEW): athlete self-authored — 6 conditions, all must pass.
       // REQ-USR-004, REQ-USR-009, REQ-USR-012, REQ-USR-014, ADR-USR-03, ADR-USR-06.
       // SCENARIO-600..604.
+      //
+      // Visibility clamped to {'private', 'public'} — the athlete may opt in
+      // at create time to share the routine on their public profile. `shared`
+      // stays trainer-assigned only (that path is branch 1 above).
       allow create: if request.auth != null
                     && request.resource.data.source == 'user-created'
                     && request.resource.data.createdBy == request.auth.uid   // anti-spoofing (REQ-USR-014)
-                    && request.resource.data.visibility == 'private'         // MVP forces private (REQ-USR-012)
+                    && request.resource.data.visibility in ['private', 'public']
                     && !('assignedBy' in request.resource.data)              // must be absent (REQ-USR-004)
                     && !('assignedTo' in request.resource.data)              // must be absent (REQ-USR-004)
                     && request.resource.data.createdAt is timestamp;
@@ -119,13 +123,16 @@ service cloud.firestore {
       //   - Only the owner (createdBy == auth.uid) may update.
       //   - source must remain 'user-created' (cannot escalate to system/trainer).
       //   - createdBy must not change (immutable owner identity).
-      //   - visibility must not change (MVP forces private, REQ-USR-012).
+      //   - visibility MAY change between 'private' and 'public' (REQ-USR-012
+      //     reopened to support the "share to my public profile" feature —
+      //     Instagram-style retroactive visibility toggle). The value must
+      //     stay in {'private', 'public'}; 'shared' is trainer-assigned only.
       //   - createdAt must not change (audit field, immutable post-create).
       //   - assignedBy and assignedTo must be absent — user-created routines
       //     must never acquire trainer-assignment fields via a client write.
-      //   - Only 'name', 'level', 'days' are the allowed mutable content keys
-      //     (plus any subset). The payload must not contain keys outside the
-      //     full known field set (hasOnly guard).
+      //   - Only 'name', 'level', 'days', 'numWeeks', 'visibility' are the
+      //     allowed mutable content keys (plus any subset). The payload must
+      //     not contain keys outside the full known field set (hasOnly guard).
       //
       // ⚠️  COUPLING WARNING — hasOnly field list below:
       // This list MUST contain every field a user-created routine doc stores.
@@ -138,9 +145,10 @@ service cloud.firestore {
                     // Immutable identity fields must not change.
                     && request.resource.data.createdBy == resource.data.createdBy
                     && request.resource.data.source == resource.data.source
-                    && request.resource.data.visibility == resource.data.visibility
                     && request.resource.data.createdAt == resource.data.createdAt
                     && request.resource.data.status == resource.data.status
+                    // Visibility may toggle but only within the owner-safe set.
+                    && request.resource.data.visibility in ['private', 'public']
                     // Trainer-assignment fields must be absent (anti-hijack).
                     && !('assignedBy' in request.resource.data)
                     && !('assignedTo' in request.resource.data)
@@ -150,10 +158,10 @@ service cloud.firestore {
                          ['name', 'level', 'days',
                           'source', 'createdBy', 'visibility', 'createdAt', 'status',
                           'split', 'estimatedMinutesPerDay', 'imageUrl', 'numWeeks'])
-                    // The diff must touch ONLY content fields (name/level/days).
+                    // The diff must touch ONLY content fields (name/level/days/
+                    // numWeeks/visibility).
                     && request.resource.data.diff(resource.data).affectedKeys()
-                         // + numWeeks (periodization) — repo always sends it.
-                         .hasOnly(['name', 'level', 'days', 'numWeeks']);
+                         .hasOnly(['name', 'level', 'days', 'numWeeks', 'visibility']);
 
       // UPDATE path 3: trainer edits content of a trainer-assigned plan.
       //

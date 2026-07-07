@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' show User;
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart' show SemanticsFlag;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -276,6 +277,96 @@ void main() {
 
       expect(find.text('Perfil privado'), findsNothing);
       expect(find.text('RUTINAS PÚBLICAS'), findsOneWidget);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // MENSAJE button — gated by friendship.status == accepted (Option B).
+  // ---------------------------------------------------------------------------
+  group('PublicProfileScreen — MENSAJE button gate', () {
+    Friendship acceptedFriendship() => Friendship(
+          id: 'target_viewer',
+          uidA: 'target',
+          uidB: 'viewer',
+          status: FriendshipStatus.accepted,
+          requesterId: 'viewer',
+          members: const ['target', 'viewer'],
+          createdAt: DateTime.utc(2026, 1, 1),
+        );
+
+    Friendship pendingFriendship() => Friendship(
+          id: 'target_viewer',
+          uidA: 'target',
+          uidB: 'viewer',
+          status: FriendshipStatus.pending,
+          requesterId: 'viewer',
+          members: const ['target', 'viewer'],
+          createdAt: DateTime.utc(2026, 1, 1),
+        );
+
+    /// Reads the semantic node of the MENSAJE button — we match by label
+    /// rather than by widget type since the button is a private widget.
+    /// `enabled` semantic flag mirrors the widget's own `enabled` state.
+    bool messageButtonSemanticEnabled(WidgetTester tester) {
+      final finder = find.bySemanticsLabel('Mensaje');
+      if (finder.evaluate().isEmpty) return false;
+      final node = tester.getSemantics(finder);
+      return node.hasFlag(SemanticsFlag.isEnabled);
+    }
+
+    testWidgets(
+        'no friendship → MENSAJE is disabled (a11y label announces disabled)',
+        (tester) async {
+      await tester.pumpWidget(_wrap(
+        child: const PublicProfileScreen(targetUid: 'target'),
+        view: AsyncData(_view(friendship: null)),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.text('MENSAJE'), findsOneWidget);
+      // The a11y label used by the disabled path exists in l10n; asserting
+      // its presence is the tightest a11y-safe check we can do without
+      // pulling the l10n key here.
+      expect(messageButtonSemanticEnabled(tester), isFalse);
+    });
+
+    testWidgets(
+        'pending friendship → MENSAJE stays disabled (not accepted yet)',
+        (tester) async {
+      await tester.pumpWidget(_wrap(
+        child: const PublicProfileScreen(targetUid: 'target'),
+        view: AsyncData(_view(friendship: pendingFriendship())),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.text('MENSAJE'), findsOneWidget);
+      expect(messageButtonSemanticEnabled(tester), isFalse);
+    });
+
+    testWidgets(
+        'accepted friendship → MENSAJE is enabled',
+        (tester) async {
+      await tester.pumpWidget(_wrap(
+        child: const PublicProfileScreen(targetUid: 'target'),
+        view: AsyncData(_view(friendship: acceptedFriendship())),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.text('MENSAJE'), findsOneWidget);
+      expect(messageButtonSemanticEnabled(tester), isTrue);
+    });
+
+    testWidgets(
+        'isSelf → MENSAJE row is not rendered at all (own profile)',
+        (tester) async {
+      await tester.pumpWidget(_wrap(
+        child: const PublicProfileScreen(targetUid: 'target'),
+        view: AsyncData(_view(isSelf: true)),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.text('MENSAJE'), findsNothing);
+      expect(find.text('SEGUIR'), findsNothing);
     });
   });
 }

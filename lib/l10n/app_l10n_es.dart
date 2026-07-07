@@ -921,6 +921,10 @@ class AppL10nEs extends AppL10n {
       'No pudimos cargar la actividad de hoy.';
 
   @override
+  String get dashboardSinActividadReciente =>
+      'Sin actividad en los últimos días.';
+
+  @override
   String get dashboardSinCobros => 'Sin cobros pendientes.';
 
   @override
@@ -1968,6 +1972,15 @@ class AppL10nEs extends AppL10n {
       'No pudimos cargar tus insights. Inténtalo de nuevo.';
 
   @override
+  String get insightsDayStripTodayLabel => 'HOY';
+
+  @override
+  String get insightsDayEmptyHint => 'No entrenaste este día.';
+
+  @override
+  String get coachDailyHeatmapSectionTitle => 'MÚSCULOS DEL DÍA';
+
+  @override
   String get profileLoadError =>
       'No pudimos cargar tu perfil. Inténtalo de nuevo.';
 
@@ -2293,11 +2306,6 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get dashboardInactivosEmpty => 'Sin alumnos inactivos';
-
-  @override
-  String dashboardInactivosSharingNote(int sharing, int total) {
-    return '$sharing de $total con datos compartidos';
-  }
 
   @override
   String get dashboardAlertBannerAllClear => 'Todo al día';
@@ -3278,6 +3286,10 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get dashboardErrorActividad =>
       'No pudimos cargar la actividad de hoy.';
+
+  @override
+  String get dashboardSinActividadReciente =>
+      'Sin actividad en los últimos días.';
 
   @override
   String get dashboardSinCobros => 'Sin cobros pendientes.';
@@ -4328,6 +4340,15 @@ class AppL10nEsAr extends AppL10nEs {
       'No pudimos cargar tus insights. Probá de nuevo.';
 
   @override
+  String get insightsDayStripTodayLabel => 'HOY';
+
+  @override
+  String get insightsDayEmptyHint => 'No entrenaste este día.';
+
+  @override
+  String get coachDailyHeatmapSectionTitle => 'MÚSCULOS DEL DÍA';
+
+  @override
   String get profileLoadError => 'No pudimos cargar tu perfil. Probá de nuevo.';
 
   @override
@@ -4650,11 +4671,6 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get dashboardInactivosEmpty => 'Sin alumnos inactivos';
-
-  @override
-  String dashboardInactivosSharingNote(int sharing, int total) {
-    return '$sharing de $total con datos compartidos';
-  }
 
   @override
   String get dashboardAlertBannerAllClear => 'Todo al día';

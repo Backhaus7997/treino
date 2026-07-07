@@ -13,14 +13,20 @@ class TreinoBottomBar extends StatelessWidget {
     required this.currentIndex,
     required this.onTap,
     this.coachUnreadCount = 0,
+    this.feedUnreadCount = 0,
   });
 
   final int currentIndex;
   final ValueChanged<int> onTap;
 
-  /// Count of unread chats shown as a badge on the COACH tab (index 3).
-  /// Pass 0 (default) to hide the badge.
+  /// Count of unread chats with the athlete's coach — shown as a badge on
+  /// the COACH tab (index 3). Pass 0 (default) to hide the badge.
   final int coachUnreadCount;
+
+  /// Count of unread chats with friends (user↔user, social) — shown as a
+  /// badge on the FEED tab (index 1) so the user sees the alert without
+  /// having to open the tab first. Pass 0 (default) to hide the badge.
+  final int feedUnreadCount;
 
   static const List<_TabSpec> _items = [
     _TabSpec(
@@ -103,8 +109,16 @@ class TreinoBottomBar extends StatelessWidget {
                         children: List.generate(_items.length, (i) {
                           final item = _items[i];
                           final active = i == currentIndex;
-                          // Index 3 = COACH tab — show unread badge when > 0.
-                          final badgeCount = i == 3 ? coachUnreadCount : 0;
+                          // Index 1 = FEED (social chats), index 3 = COACH
+                          // (chats with the athlete's linked trainer). The
+                          // two badges are mutually exclusive by construction
+                          // — see `unreadFromFriendsProvider` and
+                          // `unreadFromCoachProvider`.
+                          final badgeCount = switch (i) {
+                            1 => feedUnreadCount,
+                            3 => coachUnreadCount,
+                            _ => 0,
+                          };
                           return Expanded(
                             child: GestureDetector(
                               behavior: HitTestBehavior.opaque,

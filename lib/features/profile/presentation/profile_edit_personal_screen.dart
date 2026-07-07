@@ -37,7 +37,9 @@ enum _SaveState { idle, uploading, saving, error }
 ///
 /// REQ-PSR-015: form pre-populated from [userProfileProvider].
 /// REQ-PSR-016: save calls [UserRepository.update] with partial + pops.
-/// REQ-PSR-017: inline validators — displayName, bodyWeightKg, heightCm.
+/// REQ-PSR-017: inline validators — displayName, bodyWeightKg, heightCm, phone.
+/// Datos personales: phone + bornAt (private; shared with the trainer only via
+/// the profile_share opt-in — never propagated to userPublicProfiles).
 /// REQ-PSR-018: avatar reuses [avatarUploadServiceProvider]. // i18n: Fase 6 Etapa 3
 class ProfileEditPersonalScreen extends ConsumerStatefulWidget {
   const ProfileEditPersonalScreen({super.key});
@@ -52,12 +54,14 @@ class _ProfileEditPersonalScreenState
   final _formKey = GlobalKey<FormState>();
 
   late final TextEditingController _nameCtrl;
+  late final TextEditingController _phoneCtrl;
   late final TextEditingController _weightCtrl;
   late final TextEditingController _heightCtrl;
 
   UserProfile? _initialProfile;
   Gender? _selectedGender;
   ExperienceLevel? _selectedExperience;
+  DateTime? _selectedBornAt;
 
   // Avatar — either the existing URL or a newly-picked local path
   String? _existingAvatarUrl;
@@ -75,6 +79,7 @@ class _ProfileEditPersonalScreenState
   void initState() {
     super.initState();
     _nameCtrl = TextEditingController();
+    _phoneCtrl = TextEditingController();
     _weightCtrl = TextEditingController();
     _heightCtrl = TextEditingController();
     // Attempt eager seeding — works in production where the stream is warm.
@@ -89,17 +94,20 @@ class _ProfileEditPersonalScreenState
     _initialProfile = profile;
     _existingAvatarUrl = profile.avatarUrl;
     _nameCtrl.text = profile.displayName ?? '';
+    _phoneCtrl.text = profile.phone ?? '';
     _weightCtrl.text =
         profile.bodyWeightKg != null ? profile.bodyWeightKg!.toString() : '';
     _heightCtrl.text =
         profile.heightCm != null ? profile.heightCm!.toString() : '';
     _selectedGender = profile.gender;
     _selectedExperience = profile.experienceLevel;
+    _selectedBornAt = profile.bornAt;
   }
 
   @override
   void dispose() {
     _nameCtrl.dispose();
+    _phoneCtrl.dispose();
     _weightCtrl.dispose();
     _heightCtrl.dispose();
     _saveState.dispose();
@@ -140,6 +148,37 @@ class _ProfileEditPersonalScreenState
     }
     return null;
   }
+
+  String? _validatePhone(String? value) {
+    if (value == null || value.trim().isEmpty) return null; // optional field
+    // Loose format: 8–15 digits once separators (+ space - ( )) are stripped.
+    final digits = value.replaceAll(RegExp(r'[\s\-()+]'), '');
+    if (!RegExp(r'^\d{8,15}$').hasMatch(digits)) {
+      return 'Teléfono inválido'; // i18n: Fase 6 Etapa 3
+    }
+    return null;
+  }
+
+  /// Opens a date picker bounded to a plausible birth-date range (no future
+  /// dates). Stored as a date-only UTC value.
+  Future<void> _pickBornAt() async {
+    if (_isBusy) return;
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedBornAt ?? DateTime(now.year - 25, 1, 1),
+      firstDate: DateTime(1920),
+      lastDate: now,
+      helpText: 'Fecha de nacimiento', // i18n: Fase 6 Etapa 3
+    );
+    if (picked != null && mounted) {
+      setState(() => _selectedBornAt =
+          DateTime.utc(picked.year, picked.month, picked.day));
+    }
+  }
+
+  String _formatBornAt(DateTime d) => '${d.day.toString().padLeft(2, '0')}/'
+      '${d.month.toString().padLeft(2, '0')}/${d.year}';
 
   /// True while an avatar upload or Firestore update is in flight.
   /// Used to gate the save handler, the header back-tap and the avatar
@@ -243,6 +282,11 @@ class _ProfileEditPersonalScreenState
       partial['displayName'] = newName;
     }
 
+    final newPhone = _phoneCtrl.text.trim();
+    if (newPhone != (_initialProfile?.phone ?? '')) {
+      partial['phone'] = newPhone.isEmpty ? null : newPhone;
+    }
+
     final newWeight = double.tryParse(_weightCtrl.text.replaceAll(',', '.'));
     if (newWeight != _initialProfile?.bodyWeightKg) {
       partial['bodyWeightKg'] = newWeight;
@@ -259,6 +303,13 @@ class _ProfileEditPersonalScreenState
 
     if (_selectedExperience != _initialProfile?.experienceLevel) {
       partial['experienceLevel'] = _selectedExperience?.toJson();
+    }
+
+    if (_selectedBornAt != _initialProfile?.bornAt) {
+      // cloud_firestore serializes a DateTime to Timestamp on write; the domain
+      // reads it back via @TimestampConverter. phone/bornAt stay private (not in
+      // _publicFields), so they never reach userPublicProfiles.
+      partial['bornAt'] = _selectedBornAt;
     }
 
     // Compare against the persisted URL (from the initial profile), not
@@ -311,12 +362,14 @@ class _ProfileEditPersonalScreenState
     if (_nameCtrl.text.trim() != (_initialProfile?.displayName ?? '')) {
       return true;
     }
+    if (_phoneCtrl.text.trim() != (_initialProfile?.phone ?? '')) return true;
     if (_pendingLocalPath != null) return true;
     // An avatar already uploaded but not yet persisted (e.g. upload succeeded
     // but the Firestore update failed) still counts as a pending change.
     if (_existingAvatarUrl != _initialProfile?.avatarUrl) return true;
     if (_selectedGender != _initialProfile?.gender) return true;
     if (_selectedExperience != _initialProfile?.experienceLevel) return true;
+    if (_selectedBornAt != _initialProfile?.bornAt) return true;
     final w = double.tryParse(_weightCtrl.text.replaceAll(',', '.'));
     if (w != _initialProfile?.bodyWeightKg) return true;
     final h = int.tryParse(_heightCtrl.text.trim());
@@ -485,6 +538,43 @@ class _ProfileEditPersonalScreenState
                       palette: palette,
                       hint: 'Tu nombre', // i18n: Fase 6 Etapa 3
                     ),
+                  ),
+                  const SizedBox(height: 18),
+
+                  // Phone (private — shared with the trainer only via opt-in)
+                  _FieldLabel(
+                      label: 'TELÉFONO', // i18n: Fase 6 Etapa 3
+                      palette: palette),
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    key: const Key('edit_personal_phone_field'),
+                    controller: _phoneCtrl,
+                    validator: _validatePhone,
+                    keyboardType: TextInputType.phone,
+                    style: GoogleFonts.barlow(
+                      color: palette.textPrimary,
+                      fontSize: 14,
+                    ),
+                    decoration: _inputDecoration(
+                      palette: palette,
+                      hint: '+54 9 11 1234 5678', // i18n: Fase 6 Etapa 3
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+
+                  // Birth date
+                  _FieldLabel(
+                      label: 'FECHA DE NACIMIENTO', // i18n: Fase 6 Etapa 3
+                      palette: palette),
+                  const SizedBox(height: 8),
+                  _DateField(
+                    key: const Key('edit_personal_born_at_field'),
+                    formatted: _selectedBornAt == null
+                        ? null
+                        : _formatBornAt(_selectedBornAt!),
+                    hint: 'DD/MM/AAAA', // i18n: Fase 6 Etapa 3
+                    onTap: _pickBornAt,
+                    palette: palette,
                   ),
                   const SizedBox(height: 18),
 
@@ -971,6 +1061,53 @@ class _FieldLabel extends StatelessWidget {
         fontSize: 12,
         fontWeight: FontWeight.w700,
         letterSpacing: 1.4,
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Date field (tap to open the picker)
+// ---------------------------------------------------------------------------
+
+/// Tappable field that mimics the text-input styling: shows the formatted date,
+/// or a muted [hint] when empty. Opens the date picker on tap via [onTap].
+class _DateField extends StatelessWidget {
+  const _DateField({
+    super.key,
+    required this.formatted,
+    required this.hint,
+    required this.onTap,
+    required this.palette,
+  });
+
+  final String? formatted;
+  final String hint;
+  final VoidCallback onTap;
+  final AppPalette palette;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasValue = formatted != null;
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        height: 46,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        decoration: BoxDecoration(
+          color: palette.bgCard,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: palette.textMuted.withValues(alpha: 0.2)),
+        ),
+        alignment: Alignment.centerLeft,
+        child: Text(
+          hasValue ? formatted! : hint,
+          style: GoogleFonts.barlow(
+            color: hasValue ? palette.textPrimary : palette.textMuted,
+            fontSize: 14,
+          ),
+        ),
       ),
     );
   }

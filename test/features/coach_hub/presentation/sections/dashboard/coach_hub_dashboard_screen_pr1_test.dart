@@ -128,7 +128,6 @@ List<Override> _baseOverrides({
     inactivosProvider.overrideWith(
       (ref) async => const InactivosResult(
         inactiveAthleteIds: [],
-        totalSharingCount: 0,
       ),
     ),
   ];

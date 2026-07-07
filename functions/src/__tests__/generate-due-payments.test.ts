@@ -8,7 +8,7 @@
  *   SCENARIO-VENC-02 — mensual active link → creates correct pending doc with
  *                       deterministic id, periodKey, and last-day dueAt
  *   SCENARIO-VENC-04 — semanal active link → creates correct pending doc with
- *                       YYYY-Www periodKey and Sunday 23:59:59 UTC dueAt
+ *                       YYYY-Www periodKey and Sunday 23:59:59 ART dueAt
  *   SCENARIO-VENC-05 — idempotent re-run on same period → created:0, no dup
  *   SCENARIO-VENC-07 — skip when a PAID doc already covers the period
  *   SCENARIO-VENC-06 — skip when a LEGACY auto-id pending doc covers the period
@@ -18,7 +18,10 @@
  */
 
 import * as admin from "firebase-admin";
-import { generateDuePaymentsHandler } from "../payments/generate-due-payments";
+import {
+  generateDuePaymentsHandler,
+  ARG_UTC_OFFSET_MS,
+} from "../payments/generate-due-payments";
 
 process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
 process.env.GCLOUD_PROJECT = "treino-dev";
@@ -134,8 +137,12 @@ describe("SCENARIO-VENC-02: mensual active link → creates correct pending doc"
     expect(data.status).toBe("pending");
     expect(data.concept).toBe("Mensual Julio 2026");
 
-    // dueAt: last day of July 2026 = July 31 23:59:59 UTC
-    const expectedDueAt = new Date(Date.UTC(2026, 7, 0, 23, 59, 59)); // Date.UTC(y, m, 0) = last day of previous month
+    // dueAt: last day of July 2026 = July 31 23:59:59 ART, expressed as a UTC
+    // instant (= Aug 1 02:59:59 UTC). Period boundaries are ART-anchored;
+    // + ARG_UTC_OFFSET_MS re-expresses the ART wall-clock end of month in UTC.
+    const expectedDueAt = new Date(
+      Date.UTC(2026, 7, 0, 23, 59, 59) + ARG_UTC_OFFSET_MS,
+    );
     const dueAt = (data.dueAt as admin.firestore.Timestamp).toDate();
     expect(dueAt.getTime()).toBe(expectedDueAt.getTime());
   });
@@ -163,7 +170,7 @@ describe("SCENARIO-VENC-04: semanal active link → creates correct pending doc"
     );
   });
 
-  it("creates a pending payment with YYYY-Www periodKey and Sunday 23:59:59 UTC dueAt", async () => {
+  it("creates a pending payment with YYYY-Www periodKey and Sunday 23:59:59 ART dueAt", async () => {
     await seedLink(trainerId, athleteId);
     await seedBilling(trainerId, athleteId, "semanal");
 
@@ -179,8 +186,11 @@ describe("SCENARIO-VENC-04: semanal active link → creates correct pending doc"
     expect(data.status).toBe("pending");
     expect(data.concept).toBe("Semana 27");
 
-    // dueAt: Sunday 2026-07-05 23:59:59 UTC (end of ISO week 27)
-    const expectedDueAt = new Date(Date.UTC(2026, 6, 5, 23, 59, 59));
+    // dueAt: Sunday 2026-07-05 23:59:59 ART (= 2026-07-06 02:59:59 UTC), end of
+    // ISO week 27. Period boundaries are ART-anchored (Argentina is UTC-3).
+    const expectedDueAt = new Date(
+      Date.UTC(2026, 6, 5, 23, 59, 59) + ARG_UTC_OFFSET_MS,
+    );
     const dueAt = (data.dueAt as admin.firestore.Timestamp).toDate();
     expect(dueAt.getTime()).toBe(expectedDueAt.getTime());
   });
@@ -396,5 +406,55 @@ describe("REQ-VENC-03: non-active trainer_link → ignored", () => {
 
     expect(result.created).toBe(0);
     expect(result.scanned).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// SCENARIO-VENC-ART — UTC/ART month boundary → key into the ART month
+//
+// Regression for the double-billing bug: at 22:00 ART on the last day of a
+// month the UTC day is already the 1st of next month. The CF must key the
+// payment to the ART month (the client "marcar pagado", the 2nd writer, does
+// the same) or the two sides pick different periodKeys and bill twice.
+// ---------------------------------------------------------------------------
+
+describe("SCENARIO-VENC-ART: 22:00 ART on month-end → ART-month periodKey", () => {
+  const trainerId = "trainer-venc-art";
+  const athleteId = "athlete-venc-art";
+  // Jan 31 2026 22:00 ART == Feb 1 2026 01:00 UTC. Raw UTC would give "2026-02".
+  const now = new Date(Date.UTC(2026, 1, 1, 1, 0, 0));
+
+  const expectedPeriodKey = "2026-01";
+  const expectedDocId = `${trainerId}_${athleteId}_${expectedPeriodKey}`;
+
+  afterEach(async () => {
+    await cleanupDocs(
+      db().collection("trainer_links").doc(`${trainerId}_${athleteId}`),
+      db().collection("athlete_billing").doc(`${trainerId}_${athleteId}`),
+      db().collection("payments").doc(expectedDocId),
+    );
+  });
+
+  it("keys into January (ART), not UTC-next February, with January concept + dueAt", async () => {
+    await seedLink(trainerId, athleteId);
+    await seedBilling(trainerId, athleteId, "mensual");
+
+    const result = await generateDuePaymentsHandler(testApp, now);
+
+    expect(result.created).toBe(1);
+
+    const snap = await db().collection("payments").doc(expectedDocId).get();
+    expect(snap.exists).toBe(true);
+
+    const data = snap.data()!;
+    expect(data.periodKey).toBe(expectedPeriodKey);
+    expect(data.concept).toBe("Mensual Enero 2026");
+
+    // dueAt: Jan 31 23:59:59 ART (= Feb 1 02:59:59 UTC).
+    const expectedDueAt = new Date(
+      Date.UTC(2026, 1, 0, 23, 59, 59) + ARG_UTC_OFFSET_MS,
+    );
+    const dueAt = (data.dueAt as admin.firestore.Timestamp).toDate();
+    expect(dueAt.getTime()).toBe(expectedDueAt.getTime());
   });
 });

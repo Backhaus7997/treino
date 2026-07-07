@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/utils/argentina_time.dart';
 import '../../coach/application/trainer_link_providers.dart'
     show trainerLinksStreamProvider;
 import '../../coach/domain/trainer_link_status.dart';
@@ -10,6 +11,12 @@ import '../domain/athlete_billing.dart';
 import '../domain/payment.dart';
 import 'billing_providers.dart' show athleteBillingProvider;
 import 'payment_providers.dart' show trainerPaymentsProvider;
+
+// The ART wall-clock helpers moved to core/utils/argentina_time.dart. Re-export
+// them so the payment writers/readers that import them from here (mi_cuota,
+// trainer_dashboard, marcar_pagado) keep compiling unchanged.
+export '../../../core/utils/argentina_time.dart'
+    show argentinaNow, argentinaUtcOffset, toArgentina;
 
 // ── ISO week helper ───────────────────────────────────────────────────────────
 
@@ -132,8 +139,8 @@ final pagosPorCobrarProvider =
 
   final allPayments = paymentsAsync.valueOrNull ?? const [];
 
-  // ── 3. Compute now once ───────────────────────────────────────────────────
-  final now = DateTime.now().toUtc();
+  // ── 3. Compute now once (ART — period keys are calendar concepts) ─────────
+  final now = argentinaNow();
   final currentYear = now.year;
   final currentMonth = now.month;
   final currentWeek = _isoWeekNumber(now);

@@ -131,6 +131,14 @@ class _RoutineDetailScreenState extends ConsumerState<RoutineDetailScreen> {
           ),
         ),
         const Positioned(top: 0, left: 0, child: _BackBar()),
+        // Edit affordance only for the owner of a user-created routine —
+        // trainer-assigned plans and system templates render read-only.
+        // Sits opposite the back button, same chip treatment for parity.
+        Positioned(
+          top: 0,
+          right: 0,
+          child: _EditBar(routineAsync: routineAsync),
+        ),
       ],
     );
   }
@@ -161,6 +169,57 @@ class _BackBar extends StatelessWidget {
             icon: Icon(TreinoIcon.back, color: palette.textPrimary),
             onPressed: () =>
                 context.canPop() ? context.pop() : context.go('/workout'),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Top-right edit affordance. Renders ONLY when the current viewer is the
+/// owner of a user-created routine — trainer-assigned plans, trainer
+/// templates, and system routines stay read-only from the detail screen.
+///
+/// Tap navigates to `/workout/my-routine-editor` with the routine id as
+/// extra, which reuses the SelfCreating edit path (`RoutineEditorScreen`
+/// hydrates from Firestore). The editor is where the "Compartir en mi
+/// perfil" toggle lives (routine visibility). Isolating the mutation
+/// surface to the editor avoids duplicating the toggle in two places
+/// (detail vs editor) that would then need to stay in sync.
+class _EditBar extends ConsumerWidget {
+  const _EditBar({required this.routineAsync});
+
+  final AsyncValue<Routine?> routineAsync;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final routine = routineAsync.valueOrNull;
+    if (routine == null) return const SizedBox.shrink();
+    if (routine.source != RoutineSource.userCreated) {
+      return const SizedBox.shrink();
+    }
+    final currentUid = ref.watch(currentUidProvider);
+    if (currentUid == null || currentUid != routine.createdBy) {
+      return const SizedBox.shrink();
+    }
+
+    final palette = AppPalette.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(right: 12, top: 8),
+      child: Material(
+        color: palette.scrimDark.withValues(alpha: 0.35),
+        shape: const CircleBorder(),
+        clipBehavior: Clip.antiAlias,
+        child: Semantics(
+          button: true,
+          label: 'Editar rutina', // i18n: Fase W2
+          child: IconButton(
+            tooltip: 'Editar rutina', // i18n: Fase W2
+            icon: Icon(Icons.edit, color: palette.textPrimary),
+            onPressed: () => context.push(
+              '/workout/my-routine-editor',
+              extra: routine.id,
+            ),
           ),
         ),
       ),
@@ -1078,6 +1137,18 @@ class _StartSessionCTABar extends ConsumerWidget {
       userProfileProvider.select((async) => async.valueOrNull?.role),
     );
     if (role == UserRole.trainer) return const SizedBox.shrink();
+    // Read-only view of someone else's public user-created routine
+    // (surfaced from the "RUTINAS PÚBLICAS" tab of another user's public
+    // profile). Starting a session against another athlete's routine would
+    // log it against them, so hide the CTA. Trainer-assigned plans and
+    // trainer templates still show EMPEZAR — those flows predate this
+    // check and are intentional.
+    if (routine.source == RoutineSource.userCreated) {
+      final currentUid = ref.watch(currentUidProvider);
+      if (currentUid != null && currentUid != routine.createdBy) {
+        return const SizedBox.shrink();
+      }
+    }
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
     return Padding(

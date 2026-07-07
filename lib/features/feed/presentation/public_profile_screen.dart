@@ -7,10 +7,17 @@ import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../auth/application/auth_providers.dart';
+import '../../chat/application/chat_providers.dart';
+import '../../workout/application/user_routines_providers.dart';
+import '../application/post_providers.dart';
 import '../application/public_profile_providers.dart';
+import '../domain/friendship.dart';
+import '../domain/friendship_status.dart';
+import 'widgets/post_card.dart';
 import 'widgets/public_profile_follow_button.dart';
 import 'widgets/public_profile_hero.dart';
 import 'widgets/public_profile_stats_row.dart';
+import '../../workout/presentation/widgets/routine_card.dart';
 
 /// Which tab is selected inside the public profile screen.
 /// Private to this file — the screen and `_ProfileTabPills` are the only
@@ -66,7 +73,15 @@ class PublicProfileScreen extends ConsumerWidget {
           final isAcceptedFollower =
               view.friendship?.status.name == 'accepted';
           final gated = !view.isSelf && !view.isPublic && !isAcceptedFollower;
+          // Bottom inset so the last post/routine clears the floating
+          // TreinoBottomBar (WhatsApp-style: extendBody + translucent pill).
+          // Composition: pill height (72) + top margin (8) + bottom safe
+          // area + a small breathing gap. Without this the last card sits
+          // behind the bar and can't be fully read even on scroll.
+          final bottomInset =
+              MediaQuery.paddingOf(context).bottom + 88;
           return SingleChildScrollView(
+            padding: EdgeInsets.only(bottom: bottomInset),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -90,7 +105,13 @@ class PublicProfileScreen extends ConsumerWidget {
                           ),
                         ),
                         const SizedBox(width: 12),
-                        const Expanded(child: _MessageButtonStub()),
+                        Expanded(
+                          child: _MessageButton(
+                            friendship: view.friendship,
+                            viewerUid: viewerUid,
+                            targetUid: targetUid,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -191,40 +212,109 @@ class _PrivateProfileNotice extends StatelessWidget {
   }
 }
 
-class _MessageButtonStub extends StatelessWidget {
-  const _MessageButtonStub();
+/// MENSAJE pill on the public profile screen. Gated by friendship state
+/// (Option B — Instagram DMs model): only enabled when the viewer and the
+/// target are accepted followers of each other.
+///
+/// When enabled, tapping the pill calls `ChatRepository.getOrCreate` and
+/// pushes `/coach/chat/{chatId}?other={targetUid}` — the same route already
+/// used by `chat_list_screen.dart`, `athlete_coach_view.dart` and
+/// `athlete_detail_screen.dart`. The route is misnamed "/coach/" for
+/// historical reasons but it's actually generic between any two uids.
+class _MessageButton extends ConsumerStatefulWidget {
+  const _MessageButton({
+    required this.friendship,
+    required this.viewerUid,
+    required this.targetUid,
+  });
+
+  final Friendship? friendship;
+  final String viewerUid;
+  final String targetUid;
+
+  @override
+  ConsumerState<_MessageButton> createState() => _MessageButtonState();
+}
+
+class _MessageButtonState extends ConsumerState<_MessageButton> {
+  bool _busy = false;
+
+  bool get _isAcceptedFriend =>
+      widget.friendship?.status == FriendshipStatus.accepted;
+
+  Future<void> _onTap() async {
+    if (_busy || !_isAcceptedFriend) return;
+    setState(() => _busy = true);
+    // Capture the router + messenger BEFORE the await — same protocol as
+    // PublicProfileFollowButton: the route may pop mid-write, after which
+    // `context` is unmounted. Router + root messenger both survive disposal.
+    final router = GoRouter.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final chat = await ref
+          .read(chatRepositoryProvider)
+          .getOrCreate(selfId: widget.viewerUid, otherId: widget.targetUid);
+      router.push('/coach/chat/${chat.chatId}?other=${widget.targetUid}');
+    } catch (_) {
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text(
+              'No pudimos abrir el chat. Probá de nuevo.', // i18n: Fase W2
+            ),
+          ),
+        );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
+    final enabled = _isAcceptedFriend && !_busy;
+    final textColor = enabled ? palette.textPrimary : palette.textMuted;
     return Semantics(
       button: true,
-      enabled: false,
-      label: l10n.publicProfileMessageDisabledA11y,
+      enabled: enabled,
+      label: enabled
+          ? 'Mensaje' // i18n: Fase W2
+          : l10n.publicProfileMessageDisabledA11y,
       child: ExcludeSemantics(
         child: Opacity(
-          opacity: 0.6,
+          opacity: enabled ? 1.0 : 0.6,
           child: GestureDetector(
-            onTap: null,
+            onTap: enabled ? _onTap : null,
             behavior: HitTestBehavior.opaque,
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
               decoration: BoxDecoration(
                 color: Colors.transparent,
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(color: palette.border, width: 1),
               ),
               child: Center(
-                child: Text(
-                  'MENSAJE',
-                  style: GoogleFonts.barlowCondensed(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13,
-                    letterSpacing: 1.0,
-                    color: palette.textMuted,
-                  ),
-                ),
+                child: _busy
+                    ? SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: palette.textMuted,
+                        ),
+                      )
+                    : Text(
+                        'MENSAJE',
+                        style: GoogleFonts.barlowCondensed(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                          letterSpacing: 1.0,
+                          color: textColor,
+                        ),
+                      ),
               ),
             ),
           ),
@@ -319,19 +409,105 @@ class _ProfileTabBody extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final tab = ref.watch(_profileTabProvider(targetUid));
-    final palette = AppPalette.of(context);
-
-    final copy = switch (tab) {
-      _ProfileTab.rutinas => 'Aún no hay rutinas públicas.',
-      _ProfileTab.actividad => 'Aún no hay actividad reciente.',
+    return switch (tab) {
+      _ProfileTab.rutinas => _RutinasTabBody(targetUid: targetUid),
+      _ProfileTab.actividad => _ActividadTabBody(targetUid: targetUid),
     };
+  }
+}
 
-    // Placeholder: real content wired in Fase 5 (routines) / Fase 4 (activity).
+class _RutinasTabBody extends ConsumerWidget {
+  const _RutinasTabBody({required this.targetUid});
+
+  final String targetUid;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final palette = AppPalette.of(context);
+    final routines = ref.watch(publicRoutinesByUserProvider(targetUid));
+
+    if (routines.isEmpty) {
+      return _EmptyState(
+        palette: palette,
+        text: 'Aún no hay rutinas públicas.', // i18n: Fase W2
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final routine in routines)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: RoutineCard(routine: routine),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ActividadTabBody extends ConsumerWidget {
+  const _ActividadTabBody({required this.targetUid});
+
+  final String targetUid;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final palette = AppPalette.of(context);
+    final postsAsync = ref.watch(visiblePostsByAuthorProvider(targetUid));
+
+    return postsAsync.when(
+      data: (posts) {
+        if (posts.isEmpty) {
+          return _EmptyState(
+            palette: palette,
+            text: 'Aún no hay actividad reciente.', // i18n: Fase W2
+          );
+        }
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (final post in posts)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: PostCard(post: post),
+                ),
+            ],
+          ),
+        );
+      },
+      loading: () => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 32),
+        child: Center(
+          child: CircularProgressIndicator(color: palette.accent),
+        ),
+      ),
+      error: (_, __) => _EmptyState(
+        palette: palette,
+        text: 'No pudimos cargar la actividad.', // i18n: Fase W2
+      ),
+    );
+  }
+}
+
+class _EmptyState extends StatelessWidget {
+  const _EmptyState({required this.palette, required this.text});
+
+  final AppPalette palette;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 20),
       child: Center(
         child: Text(
-          copy,
+          text,
           style: GoogleFonts.barlow(
             fontSize: 14,
             color: palette.textMuted,

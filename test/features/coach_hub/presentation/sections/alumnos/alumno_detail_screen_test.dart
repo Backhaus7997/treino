@@ -45,7 +45,9 @@ import 'package:treino/features/profile/domain/experience_level.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/features/workout/application/assigned_routine_providers.dart';
 import 'package:treino/features/workout/application/exercise_progression_providers.dart';
+import 'package:treino/features/workout/application/exercise_providers.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
+import 'package:treino/features/workout/data/session_repository.dart';
 import 'package:treino/features/workout/domain/exercise_progression.dart';
 import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/domain/routine_day.dart';
@@ -64,6 +66,17 @@ import 'package:treino/l10n/app_l10n.dart';
 class _MockRepo extends Mock implements TrainerLinkRepository {}
 
 class _MockPaymentRepo extends Mock implements PaymentRepository {}
+
+class _MockSessionRepository extends Mock implements SessionRepository {}
+
+/// Default stub for [SessionRepository] used by the daily heat-map section
+/// (AD5, PR2b) in tests that don't exercise it directly — `listByUid` for
+/// any uid resolves to an empty list (blank silhouette, no trained days).
+SessionRepository _emptySessionRepository() {
+  final repo = _MockSessionRepository();
+  when(() => repo.listByUid(any())).thenAnswer((_) async => []);
+  return repo;
+}
 
 UserPublicProfile _prof({String name = 'Sofía', int wc = 38, int racha = 14}) =>
     UserPublicProfile(
@@ -276,6 +289,10 @@ Future<void> _pump(
   Map<String, double> lastWeightByExercise = const {},
   // PR2 (pagos) — trainer's own profile (for paymentAlias)
   UserProfile? trainerProfile,
+  // PR2b — daily heat-map section (AD5): backs athleteDayInsightsProvider /
+  // athleteLast7DaysInsightsProvider. Defaults to an empty-history mock so
+  // existing tests that don't care about this section keep passing.
+  SessionRepository? sessionRepository,
 }) async {
   tester.view.physicalSize = const Size(1200, 900);
   tester.view.devicePixelRatio = 1.0;
@@ -333,6 +350,11 @@ Future<void> _pump(
         userProfileProvider.overrideWith(
           (ref) => Stream.value(trainerProfile),
         ),
+        // PR2b — daily heat-map section (AD5).
+        sessionRepositoryProvider.overrideWithValue(
+          sessionRepository ?? _emptySessionRepository(),
+        ),
+        exercisesProvider.overrideWith((ref) async => const []),
       ],
       child: MaterialApp(
         // l10n EXACTO como CoachHubApp (W2 PR8): delegates + supportedLocales +
@@ -1433,6 +1455,34 @@ void main() {
     });
   });
 
+  // ── PR2b: Entrenamientos tab — heat-map diario (AD5) ──────────────────────
+
+  group('tab Entrenamientos: heat-map diario (PR2b, AD5)', () {
+    testWidgets(
+        'SCENARIO-DAILY-HEATMAP-COACH-WEB-01: renders the web wrapper\'s '
+        'hardcoded-Spanish section title, driven by the alumno\'s athleteId '
+        '(a1) — proves no currentUidProvider leak (trainer uid is t1)',
+        (tester) async {
+      final repo = _MockSessionRepository();
+      when(() => repo.listByUid('a1')).thenAnswer((_) async => []);
+
+      await _pump(
+        tester,
+        profile: _prof(),
+        link: _link(TrainerLinkStatus.active),
+        sessionRepository: repo,
+      );
+
+      await tester.tap(find.descendant(
+          of: find.byType(TabBar), matching: find.text('Entrenamientos')));
+      await tester.pumpAndSettle();
+
+      // Web wrapper injects hardcoded Spanish labels — distinct bag from the
+      // mobile wrapper's AppL10n-sourced strings (dedup-contract style).
+      expect(find.text('MÚSCULOS DEL DÍA'), findsOneWidget);
+    });
+  });
+
   // ── PR9: Resumen tab — nota fijada, próxima sesión, última sesión ──────────
 
   group('Resumen tab — nota fijada (W2 PR9)', () {
@@ -1602,10 +1652,14 @@ void main() {
             plugin: 'cloud_firestore', code: 'permission-denied'),
       );
 
-      // El error de sessionsByUidProvider hace que _ResumenTab entero muestre
-      // "No se pudo cargar el resumen." — el card de última sesión nunca se
-      // renderiza porque el tab gatea antes del build.
-      expect(find.text('No se pudo cargar el resumen.'), findsOneWidget);
+      // Un permission-denied en sessionsByUidProvider (link pausado → el CF
+      // borró session_shares) NO tumba el Resumen entero: el tab renderiza el
+      // resto (métricas, plan, datos) y el card de última sesión avisa que el
+      // alumno no comparte su historial, en vez del engañoso "sin sesiones" o
+      // un error de tab completo.
+      expect(find.text('No se pudo cargar el resumen.'), findsNothing);
+      expect(find.text('ÚLTIMA SESIÓN · POR EJERCICIO'), findsOneWidget);
+      expect(find.text('El alumno no compartió su historial.'), findsWidgets);
     });
 
     testWidgets('placeholder viejo ya no existe en Resumen (PR9)',

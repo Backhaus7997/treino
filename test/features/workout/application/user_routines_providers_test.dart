@@ -145,4 +145,147 @@ void main() {
       expect(results[1][0].id, equals('r-athlete-b'));
     });
   });
+
+  // ── publicRoutinesByUserProvider ─────────────────────────────────────────
+  //
+  // Derived from `userCreatedRoutinesProvider`; keeps only routines the user
+  // explicitly marked `visibility: public`. Powers the "RUTINAS PÚBLICAS"
+  // tab on someone else's public profile.
+
+  group('publicRoutinesByUserProvider', () {
+    Future<void> seedWithVisibility({
+      required FakeFirebaseFirestore firestore,
+      required String id,
+      required String createdBy,
+      required String visibility,
+      DateTime? createdAt,
+    }) async {
+      await firestore.collection('routines').doc(id).set({
+        'id': id,
+        'name': 'Rutina $id',
+        'split': 'Full Body',
+        'level': 'beginner',
+        'days': <dynamic>[],
+        'estimatedMinutesPerDay': null,
+        'imageUrl': null,
+        'source': 'user-created',
+        'visibility': visibility,
+        'createdBy': createdBy,
+        'status': 'active',
+        if (createdAt != null) 'createdAt': createdAt,
+      });
+    }
+
+    test('empty when uid is empty', () async {
+      final firestore = FakeFirebaseFirestore();
+      final repo = RoutineRepository(firestore: firestore);
+      final container = makeContainer(repo);
+      addTearDown(container.dispose);
+
+      // Prime source stream before reading derived provider.
+      final sub = container.listen(userCreatedRoutinesProvider(''), (_, __) {});
+      await container.read(userCreatedRoutinesProvider('').future);
+      expect(container.read(publicRoutinesByUserProvider('')), isEmpty);
+      sub.close();
+    });
+
+    test('mixed visibilities → only public rows survive', () async {
+      final firestore = FakeFirebaseFirestore();
+      await seedWithVisibility(
+        firestore: firestore,
+        id: 'r-priv',
+        createdBy: 'me',
+        visibility: 'private',
+        createdAt: DateTime.utc(2026, 1, 1),
+      );
+      await seedWithVisibility(
+        firestore: firestore,
+        id: 'r-pub-1',
+        createdBy: 'me',
+        visibility: 'public',
+        createdAt: DateTime.utc(2026, 1, 2),
+      );
+      await seedWithVisibility(
+        firestore: firestore,
+        id: 'r-shared',
+        createdBy: 'me',
+        visibility: 'shared',
+        createdAt: DateTime.utc(2026, 1, 3),
+      );
+      await seedWithVisibility(
+        firestore: firestore,
+        id: 'r-pub-2',
+        createdBy: 'me',
+        visibility: 'public',
+        createdAt: DateTime.utc(2026, 1, 4),
+      );
+
+      final repo = RoutineRepository(firestore: firestore);
+      final container = makeContainer(repo);
+      addTearDown(container.dispose);
+
+      final sub =
+          container.listen(userCreatedRoutinesProvider('me'), (_, __) {});
+      await container.read(userCreatedRoutinesProvider('me').future);
+
+      final public = container.read(publicRoutinesByUserProvider('me'));
+      expect(public.map((r) => r.id), unorderedEquals(['r-pub-1', 'r-pub-2']));
+      sub.close();
+    });
+
+    test('no public routines → empty', () async {
+      final firestore = FakeFirebaseFirestore();
+      await seedWithVisibility(
+        firestore: firestore,
+        id: 'r-priv',
+        createdBy: 'me',
+        visibility: 'private',
+        createdAt: DateTime.utc(2026, 1, 1),
+      );
+
+      final repo = RoutineRepository(firestore: firestore);
+      final container = makeContainer(repo);
+      addTearDown(container.dispose);
+
+      final sub =
+          container.listen(userCreatedRoutinesProvider('me'), (_, __) {});
+      await container.read(userCreatedRoutinesProvider('me').future);
+
+      expect(container.read(publicRoutinesByUserProvider('me')), isEmpty);
+      sub.close();
+    });
+
+    test(
+        'per-user isolation: routines created by another uid are excluded',
+        () async {
+      // Regression guard: filter must respect `createdBy`, not just visibility.
+      final firestore = FakeFirebaseFirestore();
+      await seedWithVisibility(
+        firestore: firestore,
+        id: 'r-mine',
+        createdBy: 'me',
+        visibility: 'public',
+        createdAt: DateTime.utc(2026, 1, 1),
+      );
+      await seedWithVisibility(
+        firestore: firestore,
+        id: 'r-theirs',
+        createdBy: 'other',
+        visibility: 'public',
+        createdAt: DateTime.utc(2026, 1, 1),
+      );
+
+      final repo = RoutineRepository(firestore: firestore);
+      final container = makeContainer(repo);
+      addTearDown(container.dispose);
+
+      final sub =
+          container.listen(userCreatedRoutinesProvider('me'), (_, __) {});
+      await container.read(userCreatedRoutinesProvider('me').future);
+
+      final mine = container.read(publicRoutinesByUserProvider('me'));
+      expect(mine.map((r) => r.id), ['r-mine']);
+      sub.close();
+    });
+  });
 }
