@@ -663,9 +663,15 @@ class _ResumenTab extends ConsumerWidget {
         routinesAsync.isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
-    if (sessionsAsync.hasError ||
-        measAsync.hasError ||
-        routinesAsync.hasError) {
+    // measurements (trainer-owned) y routines SIEMPRE son legibles → si alguna
+    // falla es un error real del resumen. Las SESIONES, en cambio, dependen de
+    // `session_shares`, que el CF borra cuando el link no está `active` (p.ej.
+    // pausado) → un permission-denied ahí NO es un error del resumen: lo
+    // degradamos a "sin sesiones" y renderizamos igual todo lo que sí se puede
+    // (mediciones, plan, próxima sesión, nota, datos personales). Los widgets
+    // dependientes de sesiones (adherencia, última sesión) muestran su propio
+    // estado vacío.
+    if (measAsync.hasError || routinesAsync.hasError) {
       return _muted(palette, 'No se pudo cargar el resumen.'); // i18n: Fase W2
     }
 
@@ -674,8 +680,9 @@ class _ResumenTab extends ConsumerWidget {
     final active =
         actives.where((r) => r.assignedBy == trainerUid).firstOrNull ??
             actives.firstOrNull;
+    final sessions = sessionsAsync.valueOrNull ?? const [];
     final m = ResumenMetrics.compute(
-      sessions: sessionsAsync.requireValue,
+      sessions: sessions,
       measurements: measAsync.requireValue,
       weeklyTarget: active?.days.length ?? 0,
       now: DateTime.now(),
@@ -769,7 +776,7 @@ class _ResumenTab extends ConsumerWidget {
           _UltimaSessionCard(
             palette: palette,
             athleteId: athleteId,
-            sessions: sessionsAsync.requireValue,
+            sessionsAsync: sessionsAsync,
           ),
           const SizedBox(height: 20),
           _sectionLabel(palette, 'DATOS PERSONALES'), // i18n
@@ -1253,28 +1260,48 @@ class _UltimaSessionCard extends ConsumerWidget {
   const _UltimaSessionCard({
     required this.palette,
     required this.athleteId,
-    required this.sessions,
+    required this.sessionsAsync,
   });
 
   final AppPalette palette;
   final String athleteId;
-  final List<Session> sessions;
+  final AsyncValue<List<Session>> sessionsAsync;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Caja bordeada reutilizable para los estados de texto (error / vacío).
+    Widget box(Widget child) => Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: palette.bgCard,
+            border: Border.all(color: palette.border),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: child,
+        );
+
+    // Las sesiones dependen de `session_shares`, que el CF borra cuando el link
+    // no está `active` (p.ej. pausado) → ahí la lista da permission-denied. Eso
+    // NO es un fallo real: significa que el alumno no está compartiendo su
+    // historial ahora. Lo decimos explícitamente en vez de un engañoso «sin
+    // sesiones registradas» (que implicaría que nunca entrenó).
+    if (sessionsAsync.hasError) {
+      final e = sessionsAsync.error;
+      final noShare = e is FirebaseException && e.code == 'permission-denied';
+      return box(Text(
+        noShare
+            ? 'El alumno no compartió su historial.' // i18n: Fase W2
+            : 'No se pudo cargar la última sesión.', // i18n: Fase W2
+        style: TextStyle(color: palette.textMuted, fontSize: 13),
+      ));
+    }
+
+    final sessions = sessionsAsync.valueOrNull ?? const <Session>[];
     if (sessions.isEmpty) {
-      return Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: palette.bgCard,
-          border: Border.all(color: palette.border),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Text(
-          'Sin sesiones registradas.', // i18n: Fase W2
-          style: TextStyle(color: palette.textMuted, fontSize: 13),
-        ),
-      );
+      return box(Text(
+        'Sin sesiones registradas.', // i18n: Fase W2
+        style: TextStyle(color: palette.textMuted, fontSize: 13),
+      ));
     }
 
     final lastSession = sessions.first;
@@ -1283,14 +1310,8 @@ class _UltimaSessionCard extends ConsumerWidget {
     final lastWeightAsync = ref.watch(lastWeightByExerciseProvider(athleteId));
     final muted = TextStyle(color: palette.textMuted, fontSize: 12);
 
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: palette.bgCard,
-        border: Border.all(color: palette.border),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
+    return box(
+      Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
@@ -2460,9 +2481,14 @@ class _HistorialTab extends ConsumerWidget {
       loading: () => Center(
         child: CircularProgressIndicator(color: palette.accent),
       ),
-      error: (_, __) => Center(
+      // Un link pausado borra session_shares → permission-denied. No es un
+      // fallo de carga: el alumno dejó de compartir. Lo decimos claro, igual
+      // que Entrenamientos y el card de última sesión del Resumen.
+      error: (e, _) => Center(
         child: Text(
-          'No pudimos cargar el historial.', // i18n: Fase W2
+          e is FirebaseException && e.code == 'permission-denied'
+              ? 'El alumno no compartió su historial.' // i18n: Fase W2
+              : 'No pudimos cargar el historial.', // i18n: Fase W2
           style: TextStyle(color: palette.textMuted, fontSize: 14),
         ),
       ),

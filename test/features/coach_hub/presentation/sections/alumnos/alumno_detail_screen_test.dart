@@ -1213,8 +1213,7 @@ void main() {
             athleteBillingProvider
                 .overrideWith((ref, id) => Stream.value(null)),
             // PR9 — nuevos widgets del Resumen tab.
-            athleteNoteProvider
-                .overrideWith((ref, key) => Stream.value(null)),
+            athleteNoteProvider.overrideWith((ref, key) => Stream.value(null)),
             trainerAppointmentsStreamProvider
                 .overrideWith((ref, key) => Stream.value(const [])),
             lastWeightByExerciseProvider
@@ -1583,8 +1582,7 @@ void main() {
       expect(find.text('3 × sets'), findsOneWidget);
     });
 
-    testWidgets(
-        'alumno no compartió historial → mensaje "no compartió" (PR9)',
+    testWidgets('alumno no compartió historial → mensaje "no compartió" (PR9)',
         (tester) async {
       await _pump(
         tester,
@@ -1595,10 +1593,14 @@ void main() {
             plugin: 'cloud_firestore', code: 'permission-denied'),
       );
 
-      // El error de sessionsByUidProvider hace que _ResumenTab entero muestre
-      // "No se pudo cargar el resumen." — el card de última sesión nunca se
-      // renderiza porque el tab gatea antes del build.
-      expect(find.text('No se pudo cargar el resumen.'), findsOneWidget);
+      // Un permission-denied en sessionsByUidProvider (link pausado → el CF
+      // borró session_shares) NO tumba el Resumen entero: el tab renderiza el
+      // resto (métricas, plan, datos) y el card de última sesión avisa que el
+      // alumno no comparte su historial, en vez del engañoso "sin sesiones" o
+      // un error de tab completo.
+      expect(find.text('No se pudo cargar el resumen.'), findsNothing);
+      expect(find.text('ÚLTIMA SESIÓN · POR EJERCICIO'), findsOneWidget);
+      expect(find.text('El alumno no compartió su historial.'), findsWidgets);
     });
 
     testWidgets('placeholder viejo ya no existe en Resumen (PR9)',
@@ -1657,8 +1659,7 @@ void main() {
       expect(find.text('Exportar CSV'), findsOneWidget);
     });
 
-    testWidgets(
-        'Exportar CSV button renders even with empty history (PR2-PAG)',
+    testWidgets('Exportar CSV button renders even with empty history (PR2-PAG)',
         (tester) async {
       await _pump(
         tester,
@@ -1701,8 +1702,7 @@ void main() {
       expect(find.text('Recordar'), findsOneWidget);
     });
 
-    testWidgets(
-        'Recordar button does NOT appear on paid payments (PR2-PAG)',
+    testWidgets('Recordar button does NOT appear on paid payments (PR2-PAG)',
         (tester) async {
       await _pump(
         tester,
