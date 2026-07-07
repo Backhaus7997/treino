@@ -9,7 +9,7 @@ import '../../workout/domain/session_status.dart';
 import '../domain/athlete_billing.dart';
 import '../domain/payment.dart';
 import 'billing_providers.dart' show athleteBillingPairProvider;
-import 'pagos_por_cobrar_provider.dart' show isoWeekPeriodKey;
+import 'pagos_por_cobrar_provider.dart' show argentinaNow, isoWeekPeriodKey;
 import 'payment_providers.dart' show athletePaymentsProvider;
 
 // ── ISO week helper (mirrors pagos_por_cobrar_provider) ───────────────────────
@@ -100,8 +100,8 @@ final miCuotaProvider = Provider.autoDispose<AsyncValue<MiCuotaState?>>((ref) {
   }
   final payments = paymentsAsync.valueOrNull ?? const <Payment>[];
 
-  // ── 3. Now ─────────────────────────────────────────────────────────────────
-  final now = DateTime.now().toUtc();
+  // ── 3. Now (ART — period keys + concept strings are calendar concepts) ─────
+  final now = argentinaNow();
   final monthKey = '${now.year}-${now.month.toString().padLeft(2, '0')}';
   final weekKey = isoWeekPeriodKey(now);
 
