@@ -9,6 +9,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart' as intl;
 
 import '../../../../app/theme/app_palette.dart';
+import '../../application/exercise_progression_aggregator.dart';
 import '../../domain/exercise_progression.dart';
 
 // ── Short date helper ─────────────────────────────────────────────────────────
@@ -17,6 +18,22 @@ import '../../domain/exercise_progression.dart';
 /// fields directly — no toLocal() — matching the UTC convention of the app.
 String _shortDate(DateTime dt, String localeName) =>
     intl.DateFormat('d MMM', localeName).format(dt);
+
+// ── Display-value formatter ───────────────────────────────────────────────────
+
+/// Formats a metric value for display.
+///
+/// [AD2] The 1RM (oneRepMax) series is the only computed series with
+/// genuinely fractional values (Epley estimate). Per design, it must be
+/// rounded to the nearest 0.5 kg AT DISPLAY ONLY before formatting. The other
+/// 3 series (Heaviest Weight, Best Set Volume, Best Session Volume) are left
+/// untouched — they are already whole/half-kg-plate values by construction.
+String _formatMetricValue(double value, {required bool isOneRepMax}) {
+  final display = isOneRepMax ? roundToNearestHalfKg(value) : value;
+  return display % 1 == 0
+      ? display.toStringAsFixed(0)
+      : display.toStringAsFixed(1);
+}
 
 // ── Label bag ─────────────────────────────────────────────────────────────────
 
@@ -185,6 +202,7 @@ class _ExerciseProgressionChartState extends State<ExerciseProgressionChart> {
               unit: _activeUnit,
               hint: labels.singlePointHint,
               palette: palette,
+              isOneRepMax: _selected == _Metric.oneRepMax,
             )
           else
             _ProgressLineChart(
@@ -192,6 +210,7 @@ class _ExerciseProgressionChartState extends State<ExerciseProgressionChart> {
               unit: _activeUnit,
               localeName: widget.localeName,
               palette: palette,
+              isOneRepMax: _selected == _Metric.oneRepMax,
             ),
         ],
       ),
@@ -306,6 +325,7 @@ class _SinglePointView extends StatelessWidget {
     required this.unit,
     required this.hint,
     required this.palette,
+    required this.isOneRepMax,
   });
 
   final ProgressionPoint point;
@@ -313,11 +333,13 @@ class _SinglePointView extends StatelessWidget {
   final String hint;
   final AppPalette palette;
 
+  /// [AD2] Whether this point belongs to the 1RM series — the only series
+  /// requiring 0.5kg display rounding.
+  final bool isOneRepMax;
+
   @override
   Widget build(BuildContext context) {
-    final valStr = point.value % 1 == 0
-        ? point.value.toStringAsFixed(0)
-        : point.value.toStringAsFixed(1);
+    final valStr = _formatMetricValue(point.value, isOneRepMax: isOneRepMax);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -363,12 +385,17 @@ class _ProgressLineChart extends StatelessWidget {
     required this.unit,
     required this.localeName,
     required this.palette,
+    required this.isOneRepMax,
   });
 
   final List<ProgressionPoint> points;
   final String unit;
   final String localeName;
   final AppPalette palette;
+
+  /// [AD2] Whether [points] belongs to the 1RM series — the only series
+  /// requiring 0.5kg display rounding.
+  final bool isOneRepMax;
 
   @override
   Widget build(BuildContext context) {
@@ -453,9 +480,8 @@ class _ProgressLineChart extends StatelessWidget {
                   final isNear = yLabels
                       .any((y) => (y - value).abs() < (maxY - minY) * 0.05);
                   if (!isNear) return const SizedBox.shrink();
-                  final label = value % 1 == 0
-                      ? value.toStringAsFixed(0)
-                      : value.toStringAsFixed(1);
+                  final label =
+                      _formatMetricValue(value, isOneRepMax: isOneRepMax);
                   return SideTitleWidget(
                     meta: meta,
                     child: Text(label,
@@ -484,9 +510,8 @@ class _ProgressLineChart extends StatelessWidget {
                 final idx = spot.x.round();
                 final date =
                     (idx >= 0 && idx < points.length) ? points[idx].date : null;
-                final valStr = spot.y % 1 == 0
-                    ? spot.y.toStringAsFixed(0)
-                    : spot.y.toStringAsFixed(1);
+                final valStr =
+                    _formatMetricValue(spot.y, isOneRepMax: isOneRepMax);
                 final dateStr =
                     date != null ? '\n${_shortDate(date, localeName)}' : '';
                 return LineTooltipItem(

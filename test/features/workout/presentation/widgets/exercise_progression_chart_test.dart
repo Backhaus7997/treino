@@ -224,6 +224,38 @@ void main() {
       expect(selected, 'bench');
     });
 
+    // CRITICAL-1 fixup (AD2/AD3 verify #434): 1RM display must be rounded to
+    // the nearest 0.5 kg, not the raw Epley double.
+    testWidgets(
+        'AD2 fixup: single-point 1RM value is rounded to nearest 0.5 kg',
+        (tester) async {
+      final progression = _progression(
+        heaviestWeightSeries: [_pt(5, 100.0)],
+        // 100 * (1 + 5/30) = 116.6667 -> rounds to 116.5
+        oneRepMaxSeries: [_pt(5, 116.6667)],
+        bestSetVolumeSeries: [_pt(5, 500.0)],
+        bestSessionVolumeSeries: [_pt(5, 500.0)],
+        frequencyLast8Weeks: 1,
+      );
+
+      await tester.pumpWidget(_wrap(
+        ExerciseProgressionChart(
+          progression: progression,
+          labels: _labels(),
+          localeName: 'es_AR',
+        ),
+      ));
+      await tester.pump();
+
+      // Switch to 1RM chip
+      await tester.tap(find.text('1RM'));
+      await tester.pump();
+
+      // Rounded to 116.5, NOT the raw 116.7 (toStringAsFixed(1) of raw value)
+      expect(find.text('116.5'), findsOneWidget);
+      expect(find.text('116.7'), findsNothing);
+    });
+
     // SCENARIO-PROG-06B: switching metric chips reflows the chart
     testWidgets('SCENARIO-PROG-06B: tap another metric chip reflows chart',
         (tester) async {
