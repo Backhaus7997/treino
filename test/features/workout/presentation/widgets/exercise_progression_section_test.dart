@@ -54,6 +54,13 @@ ExerciseProgressionChartLabels _chartLabels() => ExerciseProgressionChartLabels(
       emptyHint: 'Sin datos suficientes para este ejercicio.',
     );
 
+/// [AD7] Plain-string period-selector label bag.
+ChartPeriodLabels _periodLabels() => const ChartPeriodLabels(
+      last30dLabel: 'Últimos 30 días',
+      thisWeekLabel: 'Esta semana',
+      monthLabel: 'Este mes',
+    );
+
 /// Generic label bag — used by tests that don't care about per-shell
 /// divergence (empty state, picker rendering).
 ExerciseProgressionSectionLabels _labels() => ExerciseProgressionSectionLabels(
@@ -62,6 +69,7 @@ ExerciseProgressionSectionLabels _labels() => ExerciseProgressionSectionLabels(
       exerciseListErrorText: 'No se pudo cargar la evolución.',
       emptyStateText: 'Sin registros de series todavía.',
       chartLabels: _chartLabels(),
+      periodLabels: _periodLabels(),
       localeName: 'es_AR',
     );
 
@@ -76,6 +84,7 @@ ExerciseProgressionSectionLabels _mobileLabels() =>
       exerciseListErrorText: null,
       emptyStateText: 'Sin registros de series todavía.',
       chartLabels: _chartLabels(),
+      periodLabels: _periodLabels(),
       localeName: 'es_AR',
     );
 
@@ -89,6 +98,7 @@ ExerciseProgressionSectionLabels _webLabels() =>
       exerciseListErrorText: 'No se pudo cargar la evolución.',
       emptyStateText: 'Sin registros de series todavía.',
       chartLabels: _chartLabels(),
+      periodLabels: _periodLabels(),
       localeName: 'es_AR',
     );
 
@@ -266,5 +276,71 @@ void main() {
     ));
     await tester.pumpAndSettle();
     expect(find.text('No se pudo cargar la evolución.'), findsOneWidget);
+  });
+
+  // [AD7] Period selector — default is last30d, all 3 period labels shown.
+  group('[AD7] period selector', () {
+    testWidgets('defaults to last30d label, all 3 period options rendered',
+        (tester) async {
+      final session = _s('s1', DateTime(2025, 1, 10));
+
+      when(() => repo.listSetLogs(uid: 'a1', sessionId: 's1'))
+          .thenAnswer((_) async => [
+                _log('s1', 'squat', 'Sentadilla', 5, 90),
+              ]);
+
+      await tester.pumpWidget(_wrap(
+        overrides: [
+          sessionRepositoryProvider.overrideWithValue(repo),
+          sessionsByUidProvider('a1').overrideWith((ref) async => [session]),
+        ],
+        child: ExerciseProgressionSection(
+          athleteId: 'a1',
+          labels: _labels(),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      // Default period label visible (Hevy-style pill/selector).
+      expect(find.text('Últimos 30 días'), findsOneWidget);
+    });
+
+    testWidgets(
+        'tapping the period selector opens options, selecting one '
+        'switches the active period', (tester) async {
+      final session = _s('s1', DateTime(2025, 1, 10));
+
+      when(() => repo.listSetLogs(uid: 'a1', sessionId: 's1'))
+          .thenAnswer((_) async => [
+                _log('s1', 'squat', 'Sentadilla', 5, 90),
+              ]);
+
+      await tester.pumpWidget(_wrap(
+        overrides: [
+          sessionRepositoryProvider.overrideWithValue(repo),
+          sessionsByUidProvider('a1').overrideWith((ref) async => [session]),
+        ],
+        child: ExerciseProgressionSection(
+          athleteId: 'a1',
+          labels: _labels(),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      // Open the selector.
+      await tester.tap(find.text('Últimos 30 días'));
+      await tester.pumpAndSettle();
+
+      // The other 2 options must be selectable.
+      expect(find.text('Esta semana'), findsOneWidget);
+      expect(find.text('Este mes'), findsOneWidget);
+
+      await tester.tap(find.text('Esta semana'));
+      await tester.pumpAndSettle();
+
+      // Active label switched.
+      expect(find.text('Esta semana'), findsOneWidget);
+      expect(find.text('Últimos 30 días'), findsNothing);
+    });
   });
 }
