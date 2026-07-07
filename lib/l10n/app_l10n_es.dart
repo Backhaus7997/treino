@@ -2202,6 +2202,30 @@ class AppL10nEs extends AppL10n {
   String get progressionPeriodMonth => 'Este mes';
 
   @override
+  String get muscleDistributionSectionTitle => 'DISTRIBUCIÓN MUSCULAR';
+
+  @override
+  String get muscleDistributionCurrentLabel => 'Actual';
+
+  @override
+  String get muscleDistributionPreviousLabel => 'Anterior';
+
+  @override
+  String get muscleDistributionEmptyState => 'Sin datos para este período.';
+
+  @override
+  String get muscleDistributionWorkoutsLabel => 'Entrenos';
+
+  @override
+  String get muscleDistributionDurationLabel => 'Duración';
+
+  @override
+  String get muscleDistributionVolumeLabel => 'Volumen';
+
+  @override
+  String get muscleDistributionSetsLabel => 'Sets';
+
+  @override
   String get personalRecordsSectionTitle => 'RÉCORDS PERSONALES';
 
   @override
@@ -2333,7 +2357,10 @@ class AppL10nEs extends AppL10n {
 
   @override
   String dashboardAlertBannerSummary(
-      int vencidos, int solicitudes, int inactivos) {
+    int vencidos,
+    int solicitudes,
+    int inactivos,
+  ) {
     String _temp0 = intl.Intl.pluralLogic(
       vencidos,
       locale: localeName,
@@ -4588,6 +4615,30 @@ class AppL10nEsAr extends AppL10nEs {
   String get progressionPeriodMonth => 'Este mes';
 
   @override
+  String get muscleDistributionSectionTitle => 'DISTRIBUCIÓN MUSCULAR';
+
+  @override
+  String get muscleDistributionCurrentLabel => 'Actual';
+
+  @override
+  String get muscleDistributionPreviousLabel => 'Anterior';
+
+  @override
+  String get muscleDistributionEmptyState => 'Sin datos para este período.';
+
+  @override
+  String get muscleDistributionWorkoutsLabel => 'Entrenos';
+
+  @override
+  String get muscleDistributionDurationLabel => 'Duración';
+
+  @override
+  String get muscleDistributionVolumeLabel => 'Volumen';
+
+  @override
+  String get muscleDistributionSetsLabel => 'Sets';
+
+  @override
   String get personalRecordsSectionTitle => 'RÉCORDS PERSONALES';
 
   @override
@@ -4719,7 +4770,10 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String dashboardAlertBannerSummary(
-      int vencidos, int solicitudes, int inactivos) {
+    int vencidos,
+    int solicitudes,
+    int inactivos,
+  ) {
     String _temp0 = intl.Intl.pluralLogic(
       vencidos,
       locale: localeName,
