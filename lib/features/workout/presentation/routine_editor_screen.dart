@@ -407,6 +407,13 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
   /// inner lists (REQ-PERIOD-013). Capped at 16 (REQ-PERIOD-011).
   int _numWeeks = 1;
 
+  /// Whether this user-created routine is shared on the athlete's public
+  /// profile ("RUTINAS PÚBLICAS" tab). Defaults to `false` (private) — the
+  /// same default as before the toggle existed, so nothing changes for users
+  /// who don't opt in. Only meaningful in [SelfCreating] mode; ignored by
+  /// trainer flows.
+  bool _sharedOnProfile = false;
+
   bool _submitting = false;
 
   /// True while the existing routine is being fetched from Firestore.
@@ -539,6 +546,9 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
       // Defensive clamp — a hand-edited doc can't exceed the editor cap nor
       // drop below one week (REQ-PERIOD-011/018).
       _numWeeks = routine.numWeeks.clamp(1, _kMaxWeeks);
+      // Restore the athlete's routine-visibility toggle. Only meaningful in
+      // SelfCreating mode; trainer flows ignore this state.
+      _sharedOnProfile = routine.visibility == RoutineVisibility.public;
       // split is shown in trainer modes — restore it so the field is populated.
       if (routine.split != null) {
         _splitController.text = routine.split!;
@@ -1405,7 +1415,9 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
             level: ExperienceLevel.beginner,
             days: days,
             source: RoutineSource.userCreated,
-            visibility: RoutineVisibility.private,
+            visibility: _sharedOnProfile
+                ? RoutineVisibility.public
+                : RoutineVisibility.private,
             numWeeks: _numWeeks,
           );
           await repo.createUserOwned(uid: uid, draft: draft);
@@ -1424,7 +1436,9 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
             level: ExperienceLevel.beginner,
             days: days,
             source: RoutineSource.userCreated,
-            visibility: RoutineVisibility.private,
+            visibility: _sharedOnProfile
+                ? RoutineVisibility.public
+                : RoutineVisibility.private,
             numWeeks: _numWeeks,
           );
           await repo.updateUserOwned(uid: uid, draft: draft);
@@ -1718,6 +1732,24 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                               ],
                             ],
                           ),
+
+                          // ── Row: Share on public profile — SelfCreating only
+                          //
+                          // Toggle that flips the routine's `visibility`
+                          // between `private` (default) and `public`. When
+                          // public, the routine shows in the "RUTINAS
+                          // PÚBLICAS" tab of the athlete's public profile.
+                          if (!_isTrainerMode) ...[
+                            const SizedBox(height: 12),
+                            _ShareOnProfileTile(
+                              value: _sharedOnProfile,
+                              palette: palette,
+                              onChanged: (v) {
+                                _markDirty();
+                                setState(() => _sharedOnProfile = v);
+                              },
+                            ),
+                          ],
 
                           // ── Row: Level — trainer modes only ─────────────────
                           if (_isTrainerMode) ...[
@@ -3928,6 +3960,82 @@ class _SectionLabel extends StatelessWidget {
         fontSize: 12,
         letterSpacing: 1.2,
         color: palette.textMuted,
+      ),
+    );
+  }
+}
+
+/// SelfCreating-only tile that toggles `Routine.visibility` between
+/// `private` and `public`. When public, the routine surfaces in the
+/// "RUTINAS PÚBLICAS" tab of the athlete's public profile screen.
+///
+/// Copy is intentionally descriptive ("Compartir en mi perfil") rather
+/// than technical ("público/privado") — the term "privado" already means
+/// "profile privacy" in this app after PR #273, and reusing it here for a
+/// different concept was confusing users during smoke.
+class _ShareOnProfileTile extends StatelessWidget {
+  const _ShareOnProfileTile({
+    required this.value,
+    required this.palette,
+    required this.onChanged,
+  });
+
+  final bool value;
+  final AppPalette palette;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      toggled: value,
+      label: 'Compartir rutina en mi perfil', // i18n: Fase W2
+      excludeSemantics: true,
+      child: GestureDetector(
+        onTap: () => onChanged(!value),
+        behavior: HitTestBehavior.opaque,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: palette.bgCard,
+            border: Border.all(color: palette.border),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Compartir en mi perfil', // i18n: Fase W2
+                      style: GoogleFonts.barlow(
+                        color: palette.textPrimary,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      value
+                          ? 'Cualquiera que vea tu perfil podrá encontrar esta rutina.' // i18n: Fase W2
+                          : 'Nadie más va a ver esta rutina.', // i18n: Fase W2
+                      style: GoogleFonts.barlow(
+                        color: palette.textMuted,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Switch.adaptive(
+                value: value,
+                onChanged: onChanged,
+                activeThumbColor: palette.accent,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

@@ -67,13 +67,21 @@ class RoutineRepository {
     // they're nullable freezed fields, which would cause permission-denied
     // even though the values are null. REQ-USR-004 + the rule check
     // `!('assignedBy' in request.resource.data)`.
+    //
+    // `visibility` is clamped to {'private','public'} — the athlete can
+    // opt-in at create time to share the routine on their public profile.
+    // `shared` remains trainer-assigned only, and any other unexpected
+    // value is coerced back to `private` (defensive).
+    final visibilityStr = draft.visibility == RoutineVisibility.public
+        ? 'public'
+        : 'private';
     final json = draft.toJson()
       ..remove('id')
       ..remove('assignedBy')
       ..remove('assignedTo')
       ..['source'] = 'user-created'
       ..['createdBy'] = uid
-      ..['visibility'] = 'private'
+      ..['visibility'] = visibilityStr
       ..['status'] = 'active'
       ..['createdAt'] = FieldValue.serverTimestamp();
 
@@ -82,7 +90,9 @@ class RoutineRepository {
       id: ref.id,
       source: RoutineSource.userCreated,
       createdBy: uid,
-      visibility: RoutineVisibility.private,
+      visibility: visibilityStr == 'public'
+          ? RoutineVisibility.public
+          : RoutineVisibility.private,
       status: RoutineStatus.active,
     );
   }
@@ -143,9 +153,14 @@ class RoutineRepository {
     }
 
     // Build update payload with ONLY the content fields the athlete controls.
-    // Omitting createdBy, createdAt, source, visibility, status, id,
-    // assignedBy, and assignedTo keeps the update within the narrow
-    // owner-update Firestore rule.
+    // Omitting createdBy, createdAt, source, status, id, assignedBy, and
+    // assignedTo keeps the update within the narrow owner-update Firestore
+    // rule.
+    //
+    // `visibility` IS included in this payload since REQ-USR-012 was
+    // reopened to let the athlete flip a routine between `private` and
+    // `public` retroactively (Instagram-style). The rule caps the accepted
+    // values at `{'private', 'public'}` — `shared` remains trainer-only.
     //
     // ⚠️  COUPLING WARNING — field list below:
     // If you add a field to the Routine model that athletes should be able to
@@ -158,6 +173,8 @@ class RoutineRepository {
       'days': draft.days.map((d) => d.toJson()).toList(),
       // Periodization: authored week count (mirror in firestore.rules hasOnly).
       'numWeeks': draft.numWeeks,
+      // Owner can toggle between private and public — rule enforces the set.
+      'visibility': draft.visibility.toJson(),
     };
 
     await _collection.doc(draft.id).update(json);
