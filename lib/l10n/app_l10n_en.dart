@@ -2094,7 +2094,13 @@ class AppL10nEn extends AppL10n {
   String get progressionSectionTitle => 'PROGRESS BY EXERCISE';
 
   @override
-  String get progressionMetricPr => 'PR';
+  String get progressionMetricPr => 'Heaviest weight';
+
+  @override
+  String get progressionMetricOneRepMax => '1RM';
+
+  @override
+  String get progressionMetricBestSetVolume => 'Best set';
 
   @override
   String get progressionMetricVolume => 'Volume';
@@ -2120,6 +2126,15 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get progressionEmpty => 'No set records yet.';
+
+  @override
+  String get progressionPeriodLast30Days => 'Last 30 days';
+
+  @override
+  String get progressionPeriodThisWeek => 'This week';
+
+  @override
+  String get progressionPeriodMonth => 'This month';
 
   @override
   String get profileRoutinesAssignedHeader => '';

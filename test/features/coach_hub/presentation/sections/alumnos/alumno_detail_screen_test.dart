@@ -1373,14 +1373,23 @@ void main() {
       final progression = ExerciseProgression(
         exerciseId: 'squat',
         exerciseName: 'Sentadilla',
-        prSeries: [
+        heaviestWeightSeries: [
           ProgressionPoint(date: DateTime.utc(2026, 1, 1), value: 90),
           ProgressionPoint(date: DateTime.utc(2026, 1, 8), value: 95),
         ],
-        volumeSeries: [
+        oneRepMaxSeries: [
+          ProgressionPoint(date: DateTime.utc(2026, 1, 1), value: 105),
+          ProgressionPoint(date: DateTime.utc(2026, 1, 8), value: 110.833),
+        ],
+        bestSetVolumeSeries: [
           ProgressionPoint(date: DateTime.utc(2026, 1, 1), value: 450),
           ProgressionPoint(date: DateTime.utc(2026, 1, 8), value: 475),
         ],
+        bestSessionVolumeSeries: [
+          ProgressionPoint(date: DateTime.utc(2026, 1, 1), value: 450),
+          ProgressionPoint(date: DateTime.utc(2026, 1, 8), value: 475),
+        ],
+        personalRecords: const [],
         frequencyLast8Weeks: 3,
       );
 

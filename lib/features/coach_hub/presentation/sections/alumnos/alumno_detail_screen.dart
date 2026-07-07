@@ -1796,10 +1796,12 @@ class _ProgressionTabSection extends StatelessWidget {
             'No se pudo cargar la evolución.', // i18n: Fase W2
         emptyStateText: 'Sin registros de series todavía.', // i18n: Fase W2
         chartLabels: ExerciseProgressionChartLabels(
-          prLabel: 'PR', // i18n: Fase W2
-          volumeLabel: 'Volumen', // i18n: Fase W2
+          heaviestWeightLabel: 'Peso máximo', // i18n: Fase W2
+          oneRepMaxLabel: '1RM', // i18n: Fase W2
+          bestSetVolumeLabel: 'Mejor serie', // i18n: Fase W2
+          bestSessionVolumeLabel: 'Volumen', // i18n: Fase W2
           volumeUnit: 'kg·reps', // i18n: Fase W2
-          prUnit: 'kg', // i18n: Fase W2
+          weightUnit: 'kg', // i18n: Fase W2
           frequencyLabel: (n) => n == 1
               ? '1 sesión en las últimas 8 semanas' // i18n: Fase W2
               : '$n sesiones en las últimas 8 semanas', // i18n: Fase W2
@@ -1807,6 +1809,11 @@ class _ProgressionTabSection extends StatelessWidget {
               'Necesitás al menos 2 sesiones para ver la evolución.', // i18n: Fase W2
           emptyHint:
               'Sin datos suficientes para este ejercicio.', // i18n: Fase W2
+        ),
+        periodLabels: const ChartPeriodLabels(
+          last30dLabel: 'Últimos 30 días', // i18n: Fase W2
+          thisWeekLabel: 'Esta semana', // i18n: Fase W2
+          monthLabel: 'Este mes', // i18n: Fase W2
         ),
         localeName: 'es_AR', // hardcoded for web Coach Hub (i18n: Fase W2)
       ),

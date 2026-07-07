@@ -3986,13 +3986,25 @@ abstract class AppL10n {
   /// **'EVOLUCIÓN POR EJERCICIO'**
   String get progressionSectionTitle;
 
-  /// Label for the PR (personal record = max weight) metric chip in the progression chart.
+  /// [AD3] Label for the Heaviest Weight metric chip (max weightKg per session) in the progression chart. Renamed from the mislabeled 'PR' — key kept for l10n stability, value updated.
   ///
   /// In es_AR, this message translates to:
-  /// **'PR'**
+  /// **'Peso máximo'**
   String get progressionMetricPr;
 
-  /// Label for the Volume metric chip in the progression chart.
+  /// [AD2] Label for the Epley-estimated one-rep-max metric chip in the progression chart.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'1RM'**
+  String get progressionMetricOneRepMax;
+
+  /// [AD3] Label for the Best Set Volume metric chip (max reps×weightKg of a single set) in the progression chart.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Mejor serie'**
+  String get progressionMetricBestSetVolume;
+
+  /// Label for the Best Session Volume metric chip (Σ reps×weightKg per session) in the progression chart.
   ///
   /// In es_AR, this message translates to:
   /// **'Volumen'**
@@ -4021,6 +4033,24 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Sin registros de series todavía.'**
   String get progressionEmpty;
+
+  /// [AD7] Label for the rolling 30-day chart period option (default) in the progression period selector.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Últimos 30 días'**
+  String get progressionPeriodLast30Days;
+
+  /// [AD7] Label for the current-calendar-week chart period option in the progression period selector.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Esta semana'**
+  String get progressionPeriodThisWeek;
+
+  /// [AD7] Label for the current-calendar-month chart period option in the progression period selector.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Este mes'**
+  String get progressionPeriodMonth;
 
   /// Section header above the trainer-assigned plans in the Profile › Mis Rutinas screen.
   ///

@@ -398,7 +398,9 @@
   "coachSessionSetLogsLoadError": "No pudimos cargar los sets. Intenta de nuevo.",
   "coachAthleteNoSharePlaceholder": "El alumno no ha compartido su historial todavía.",
   "progressionSectionTitle": "EVOLUCIÓN POR EJERCICIO",
-  "progressionMetricPr": "PR",
+  "progressionMetricPr": "Peso máximo",
+  "progressionMetricOneRepMax": "1RM",
+  "progressionMetricBestSetVolume": "Mejor serie",
   "progressionMetricVolume": "Volumen",
   "progressionFrequency": "{count, plural, =0{Sin sesiones en las últimas 8 semanas} =1{1 sesión en las últimas 8 semanas} other{{count} sesiones en las últimas 8 semanas}}",
   "@progressionFrequency": {
@@ -411,6 +413,9 @@
   "progressionSinglePointHint": "Necesitas al menos 2 sesiones para ver la evolución.",
   "progressionEmptyExercise": "Sin datos para este ejercicio.",
   "progressionEmpty": "Sin registros de series todavía.",
+  "progressionPeriodLast30Days": "Últimos 30 días",
+  "progressionPeriodThisWeek": "Esta semana",
+  "progressionPeriodMonth": "Este mes",
   "dashboardGreeting": "BUENAS, {name}",
   "@dashboardGreeting": {
     "description": "Welcome greeting shown in the Coach Hub web dashboard WelcomeCard.",

@@ -162,11 +162,190 @@ abstract class _ProgressionPoint implements ProgressionPoint {
 }
 
 /// @nodoc
+mixin _$PersonalRecord {
+  ProgressionRecordType get recordType => throw _privateConstructorUsedError;
+  double get value => throw _privateConstructorUsedError;
+  DateTime get achievedAt => throw _privateConstructorUsedError;
+
+  /// Create a copy of PersonalRecord
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  $PersonalRecordCopyWith<PersonalRecord> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+
+/// @nodoc
+abstract class $PersonalRecordCopyWith<$Res> {
+  factory $PersonalRecordCopyWith(
+          PersonalRecord value, $Res Function(PersonalRecord) then) =
+      _$PersonalRecordCopyWithImpl<$Res, PersonalRecord>;
+  @useResult
+  $Res call(
+      {ProgressionRecordType recordType, double value, DateTime achievedAt});
+}
+
+/// @nodoc
+class _$PersonalRecordCopyWithImpl<$Res, $Val extends PersonalRecord>
+    implements $PersonalRecordCopyWith<$Res> {
+  _$PersonalRecordCopyWithImpl(this._value, this._then);
+
+  // ignore: unused_field
+  final $Val _value;
+  // ignore: unused_field
+  final $Res Function($Val) _then;
+
+  /// Create a copy of PersonalRecord
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? recordType = null,
+    Object? value = null,
+    Object? achievedAt = null,
+  }) {
+    return _then(_value.copyWith(
+      recordType: null == recordType
+          ? _value.recordType
+          : recordType // ignore: cast_nullable_to_non_nullable
+              as ProgressionRecordType,
+      value: null == value
+          ? _value.value
+          : value // ignore: cast_nullable_to_non_nullable
+              as double,
+      achievedAt: null == achievedAt
+          ? _value.achievedAt
+          : achievedAt // ignore: cast_nullable_to_non_nullable
+              as DateTime,
+    ) as $Val);
+  }
+}
+
+/// @nodoc
+abstract class _$$PersonalRecordImplCopyWith<$Res>
+    implements $PersonalRecordCopyWith<$Res> {
+  factory _$$PersonalRecordImplCopyWith(_$PersonalRecordImpl value,
+          $Res Function(_$PersonalRecordImpl) then) =
+      __$$PersonalRecordImplCopyWithImpl<$Res>;
+  @override
+  @useResult
+  $Res call(
+      {ProgressionRecordType recordType, double value, DateTime achievedAt});
+}
+
+/// @nodoc
+class __$$PersonalRecordImplCopyWithImpl<$Res>
+    extends _$PersonalRecordCopyWithImpl<$Res, _$PersonalRecordImpl>
+    implements _$$PersonalRecordImplCopyWith<$Res> {
+  __$$PersonalRecordImplCopyWithImpl(
+      _$PersonalRecordImpl _value, $Res Function(_$PersonalRecordImpl) _then)
+      : super(_value, _then);
+
+  /// Create a copy of PersonalRecord
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? recordType = null,
+    Object? value = null,
+    Object? achievedAt = null,
+  }) {
+    return _then(_$PersonalRecordImpl(
+      recordType: null == recordType
+          ? _value.recordType
+          : recordType // ignore: cast_nullable_to_non_nullable
+              as ProgressionRecordType,
+      value: null == value
+          ? _value.value
+          : value // ignore: cast_nullable_to_non_nullable
+              as double,
+      achievedAt: null == achievedAt
+          ? _value.achievedAt
+          : achievedAt // ignore: cast_nullable_to_non_nullable
+              as DateTime,
+    ));
+  }
+}
+
+/// @nodoc
+
+class _$PersonalRecordImpl implements _PersonalRecord {
+  const _$PersonalRecordImpl(
+      {required this.recordType,
+      required this.value,
+      required this.achievedAt});
+
+  @override
+  final ProgressionRecordType recordType;
+  @override
+  final double value;
+  @override
+  final DateTime achievedAt;
+
+  @override
+  String toString() {
+    return 'PersonalRecord(recordType: $recordType, value: $value, achievedAt: $achievedAt)';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$PersonalRecordImpl &&
+            (identical(other.recordType, recordType) ||
+                other.recordType == recordType) &&
+            (identical(other.value, value) || other.value == value) &&
+            (identical(other.achievedAt, achievedAt) ||
+                other.achievedAt == achievedAt));
+  }
+
+  @override
+  int get hashCode => Object.hash(runtimeType, recordType, value, achievedAt);
+
+  /// Create a copy of PersonalRecord
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$PersonalRecordImplCopyWith<_$PersonalRecordImpl> get copyWith =>
+      __$$PersonalRecordImplCopyWithImpl<_$PersonalRecordImpl>(
+          this, _$identity);
+}
+
+abstract class _PersonalRecord implements PersonalRecord {
+  const factory _PersonalRecord(
+      {required final ProgressionRecordType recordType,
+      required final double value,
+      required final DateTime achievedAt}) = _$PersonalRecordImpl;
+
+  @override
+  ProgressionRecordType get recordType;
+  @override
+  double get value;
+  @override
+  DateTime get achievedAt;
+
+  /// Create a copy of PersonalRecord
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$PersonalRecordImplCopyWith<_$PersonalRecordImpl> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+
+/// @nodoc
 mixin _$ExerciseProgression {
   String get exerciseId => throw _privateConstructorUsedError;
   String get exerciseName => throw _privateConstructorUsedError;
-  List<ProgressionPoint> get prSeries => throw _privateConstructorUsedError;
-  List<ProgressionPoint> get volumeSeries => throw _privateConstructorUsedError;
+  List<ProgressionPoint> get heaviestWeightSeries =>
+      throw _privateConstructorUsedError;
+  List<ProgressionPoint> get oneRepMaxSeries =>
+      throw _privateConstructorUsedError;
+  List<ProgressionPoint> get bestSetVolumeSeries =>
+      throw _privateConstructorUsedError;
+  List<ProgressionPoint> get bestSessionVolumeSeries =>
+      throw _privateConstructorUsedError;
+  List<PersonalRecord> get personalRecords =>
+      throw _privateConstructorUsedError;
   int get frequencyLast8Weeks => throw _privateConstructorUsedError;
 
   /// Create a copy of ExerciseProgression
@@ -185,8 +364,11 @@ abstract class $ExerciseProgressionCopyWith<$Res> {
   $Res call(
       {String exerciseId,
       String exerciseName,
-      List<ProgressionPoint> prSeries,
-      List<ProgressionPoint> volumeSeries,
+      List<ProgressionPoint> heaviestWeightSeries,
+      List<ProgressionPoint> oneRepMaxSeries,
+      List<ProgressionPoint> bestSetVolumeSeries,
+      List<ProgressionPoint> bestSessionVolumeSeries,
+      List<PersonalRecord> personalRecords,
       int frequencyLast8Weeks});
 }
 
@@ -207,8 +389,11 @@ class _$ExerciseProgressionCopyWithImpl<$Res, $Val extends ExerciseProgression>
   $Res call({
     Object? exerciseId = null,
     Object? exerciseName = null,
-    Object? prSeries = null,
-    Object? volumeSeries = null,
+    Object? heaviestWeightSeries = null,
+    Object? oneRepMaxSeries = null,
+    Object? bestSetVolumeSeries = null,
+    Object? bestSessionVolumeSeries = null,
+    Object? personalRecords = null,
     Object? frequencyLast8Weeks = null,
   }) {
     return _then(_value.copyWith(
@@ -220,14 +405,26 @@ class _$ExerciseProgressionCopyWithImpl<$Res, $Val extends ExerciseProgression>
           ? _value.exerciseName
           : exerciseName // ignore: cast_nullable_to_non_nullable
               as String,
-      prSeries: null == prSeries
-          ? _value.prSeries
-          : prSeries // ignore: cast_nullable_to_non_nullable
+      heaviestWeightSeries: null == heaviestWeightSeries
+          ? _value.heaviestWeightSeries
+          : heaviestWeightSeries // ignore: cast_nullable_to_non_nullable
               as List<ProgressionPoint>,
-      volumeSeries: null == volumeSeries
-          ? _value.volumeSeries
-          : volumeSeries // ignore: cast_nullable_to_non_nullable
+      oneRepMaxSeries: null == oneRepMaxSeries
+          ? _value.oneRepMaxSeries
+          : oneRepMaxSeries // ignore: cast_nullable_to_non_nullable
               as List<ProgressionPoint>,
+      bestSetVolumeSeries: null == bestSetVolumeSeries
+          ? _value.bestSetVolumeSeries
+          : bestSetVolumeSeries // ignore: cast_nullable_to_non_nullable
+              as List<ProgressionPoint>,
+      bestSessionVolumeSeries: null == bestSessionVolumeSeries
+          ? _value.bestSessionVolumeSeries
+          : bestSessionVolumeSeries // ignore: cast_nullable_to_non_nullable
+              as List<ProgressionPoint>,
+      personalRecords: null == personalRecords
+          ? _value.personalRecords
+          : personalRecords // ignore: cast_nullable_to_non_nullable
+              as List<PersonalRecord>,
       frequencyLast8Weeks: null == frequencyLast8Weeks
           ? _value.frequencyLast8Weeks
           : frequencyLast8Weeks // ignore: cast_nullable_to_non_nullable
@@ -247,8 +444,11 @@ abstract class _$$ExerciseProgressionImplCopyWith<$Res>
   $Res call(
       {String exerciseId,
       String exerciseName,
-      List<ProgressionPoint> prSeries,
-      List<ProgressionPoint> volumeSeries,
+      List<ProgressionPoint> heaviestWeightSeries,
+      List<ProgressionPoint> oneRepMaxSeries,
+      List<ProgressionPoint> bestSetVolumeSeries,
+      List<ProgressionPoint> bestSessionVolumeSeries,
+      List<PersonalRecord> personalRecords,
       int frequencyLast8Weeks});
 }
 
@@ -267,8 +467,11 @@ class __$$ExerciseProgressionImplCopyWithImpl<$Res>
   $Res call({
     Object? exerciseId = null,
     Object? exerciseName = null,
-    Object? prSeries = null,
-    Object? volumeSeries = null,
+    Object? heaviestWeightSeries = null,
+    Object? oneRepMaxSeries = null,
+    Object? bestSetVolumeSeries = null,
+    Object? bestSessionVolumeSeries = null,
+    Object? personalRecords = null,
     Object? frequencyLast8Weeks = null,
   }) {
     return _then(_$ExerciseProgressionImpl(
@@ -280,14 +483,26 @@ class __$$ExerciseProgressionImplCopyWithImpl<$Res>
           ? _value.exerciseName
           : exerciseName // ignore: cast_nullable_to_non_nullable
               as String,
-      prSeries: null == prSeries
-          ? _value._prSeries
-          : prSeries // ignore: cast_nullable_to_non_nullable
+      heaviestWeightSeries: null == heaviestWeightSeries
+          ? _value._heaviestWeightSeries
+          : heaviestWeightSeries // ignore: cast_nullable_to_non_nullable
               as List<ProgressionPoint>,
-      volumeSeries: null == volumeSeries
-          ? _value._volumeSeries
-          : volumeSeries // ignore: cast_nullable_to_non_nullable
+      oneRepMaxSeries: null == oneRepMaxSeries
+          ? _value._oneRepMaxSeries
+          : oneRepMaxSeries // ignore: cast_nullable_to_non_nullable
               as List<ProgressionPoint>,
+      bestSetVolumeSeries: null == bestSetVolumeSeries
+          ? _value._bestSetVolumeSeries
+          : bestSetVolumeSeries // ignore: cast_nullable_to_non_nullable
+              as List<ProgressionPoint>,
+      bestSessionVolumeSeries: null == bestSessionVolumeSeries
+          ? _value._bestSessionVolumeSeries
+          : bestSessionVolumeSeries // ignore: cast_nullable_to_non_nullable
+              as List<ProgressionPoint>,
+      personalRecords: null == personalRecords
+          ? _value._personalRecords
+          : personalRecords // ignore: cast_nullable_to_non_nullable
+              as List<PersonalRecord>,
       frequencyLast8Weeks: null == frequencyLast8Weeks
           ? _value.frequencyLast8Weeks
           : frequencyLast8Weeks // ignore: cast_nullable_to_non_nullable
@@ -302,30 +517,63 @@ class _$ExerciseProgressionImpl implements _ExerciseProgression {
   const _$ExerciseProgressionImpl(
       {required this.exerciseId,
       required this.exerciseName,
-      required final List<ProgressionPoint> prSeries,
-      required final List<ProgressionPoint> volumeSeries,
+      required final List<ProgressionPoint> heaviestWeightSeries,
+      required final List<ProgressionPoint> oneRepMaxSeries,
+      required final List<ProgressionPoint> bestSetVolumeSeries,
+      required final List<ProgressionPoint> bestSessionVolumeSeries,
+      required final List<PersonalRecord> personalRecords,
       required this.frequencyLast8Weeks})
-      : _prSeries = prSeries,
-        _volumeSeries = volumeSeries;
+      : _heaviestWeightSeries = heaviestWeightSeries,
+        _oneRepMaxSeries = oneRepMaxSeries,
+        _bestSetVolumeSeries = bestSetVolumeSeries,
+        _bestSessionVolumeSeries = bestSessionVolumeSeries,
+        _personalRecords = personalRecords;
 
   @override
   final String exerciseId;
   @override
   final String exerciseName;
-  final List<ProgressionPoint> _prSeries;
+  final List<ProgressionPoint> _heaviestWeightSeries;
   @override
-  List<ProgressionPoint> get prSeries {
-    if (_prSeries is EqualUnmodifiableListView) return _prSeries;
+  List<ProgressionPoint> get heaviestWeightSeries {
+    if (_heaviestWeightSeries is EqualUnmodifiableListView)
+      return _heaviestWeightSeries;
     // ignore: implicit_dynamic_type
-    return EqualUnmodifiableListView(_prSeries);
+    return EqualUnmodifiableListView(_heaviestWeightSeries);
   }
 
-  final List<ProgressionPoint> _volumeSeries;
+  final List<ProgressionPoint> _oneRepMaxSeries;
   @override
-  List<ProgressionPoint> get volumeSeries {
-    if (_volumeSeries is EqualUnmodifiableListView) return _volumeSeries;
+  List<ProgressionPoint> get oneRepMaxSeries {
+    if (_oneRepMaxSeries is EqualUnmodifiableListView) return _oneRepMaxSeries;
     // ignore: implicit_dynamic_type
-    return EqualUnmodifiableListView(_volumeSeries);
+    return EqualUnmodifiableListView(_oneRepMaxSeries);
+  }
+
+  final List<ProgressionPoint> _bestSetVolumeSeries;
+  @override
+  List<ProgressionPoint> get bestSetVolumeSeries {
+    if (_bestSetVolumeSeries is EqualUnmodifiableListView)
+      return _bestSetVolumeSeries;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(_bestSetVolumeSeries);
+  }
+
+  final List<ProgressionPoint> _bestSessionVolumeSeries;
+  @override
+  List<ProgressionPoint> get bestSessionVolumeSeries {
+    if (_bestSessionVolumeSeries is EqualUnmodifiableListView)
+      return _bestSessionVolumeSeries;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(_bestSessionVolumeSeries);
+  }
+
+  final List<PersonalRecord> _personalRecords;
+  @override
+  List<PersonalRecord> get personalRecords {
+    if (_personalRecords is EqualUnmodifiableListView) return _personalRecords;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(_personalRecords);
   }
 
   @override
@@ -333,7 +581,7 @@ class _$ExerciseProgressionImpl implements _ExerciseProgression {
 
   @override
   String toString() {
-    return 'ExerciseProgression(exerciseId: $exerciseId, exerciseName: $exerciseName, prSeries: $prSeries, volumeSeries: $volumeSeries, frequencyLast8Weeks: $frequencyLast8Weeks)';
+    return 'ExerciseProgression(exerciseId: $exerciseId, exerciseName: $exerciseName, heaviestWeightSeries: $heaviestWeightSeries, oneRepMaxSeries: $oneRepMaxSeries, bestSetVolumeSeries: $bestSetVolumeSeries, bestSessionVolumeSeries: $bestSessionVolumeSeries, personalRecords: $personalRecords, frequencyLast8Weeks: $frequencyLast8Weeks)';
   }
 
   @override
@@ -345,9 +593,16 @@ class _$ExerciseProgressionImpl implements _ExerciseProgression {
                 other.exerciseId == exerciseId) &&
             (identical(other.exerciseName, exerciseName) ||
                 other.exerciseName == exerciseName) &&
-            const DeepCollectionEquality().equals(other._prSeries, _prSeries) &&
             const DeepCollectionEquality()
-                .equals(other._volumeSeries, _volumeSeries) &&
+                .equals(other._heaviestWeightSeries, _heaviestWeightSeries) &&
+            const DeepCollectionEquality()
+                .equals(other._oneRepMaxSeries, _oneRepMaxSeries) &&
+            const DeepCollectionEquality()
+                .equals(other._bestSetVolumeSeries, _bestSetVolumeSeries) &&
+            const DeepCollectionEquality().equals(
+                other._bestSessionVolumeSeries, _bestSessionVolumeSeries) &&
+            const DeepCollectionEquality()
+                .equals(other._personalRecords, _personalRecords) &&
             (identical(other.frequencyLast8Weeks, frequencyLast8Weeks) ||
                 other.frequencyLast8Weeks == frequencyLast8Weeks));
   }
@@ -357,8 +612,11 @@ class _$ExerciseProgressionImpl implements _ExerciseProgression {
       runtimeType,
       exerciseId,
       exerciseName,
-      const DeepCollectionEquality().hash(_prSeries),
-      const DeepCollectionEquality().hash(_volumeSeries),
+      const DeepCollectionEquality().hash(_heaviestWeightSeries),
+      const DeepCollectionEquality().hash(_oneRepMaxSeries),
+      const DeepCollectionEquality().hash(_bestSetVolumeSeries),
+      const DeepCollectionEquality().hash(_bestSessionVolumeSeries),
+      const DeepCollectionEquality().hash(_personalRecords),
       frequencyLast8Weeks);
 
   /// Create a copy of ExerciseProgression
@@ -375,8 +633,11 @@ abstract class _ExerciseProgression implements ExerciseProgression {
   const factory _ExerciseProgression(
       {required final String exerciseId,
       required final String exerciseName,
-      required final List<ProgressionPoint> prSeries,
-      required final List<ProgressionPoint> volumeSeries,
+      required final List<ProgressionPoint> heaviestWeightSeries,
+      required final List<ProgressionPoint> oneRepMaxSeries,
+      required final List<ProgressionPoint> bestSetVolumeSeries,
+      required final List<ProgressionPoint> bestSessionVolumeSeries,
+      required final List<PersonalRecord> personalRecords,
       required final int frequencyLast8Weeks}) = _$ExerciseProgressionImpl;
 
   @override
@@ -384,9 +645,15 @@ abstract class _ExerciseProgression implements ExerciseProgression {
   @override
   String get exerciseName;
   @override
-  List<ProgressionPoint> get prSeries;
+  List<ProgressionPoint> get heaviestWeightSeries;
   @override
-  List<ProgressionPoint> get volumeSeries;
+  List<ProgressionPoint> get oneRepMaxSeries;
+  @override
+  List<ProgressionPoint> get bestSetVolumeSeries;
+  @override
+  List<ProgressionPoint> get bestSessionVolumeSeries;
+  @override
+  List<PersonalRecord> get personalRecords;
   @override
   int get frequencyLast8Weeks;
 

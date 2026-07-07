@@ -15,14 +15,51 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
+import '../../../../core/widgets/treino_icon.dart';
+import '../../../insights/domain/chart_period.dart';
 import '../../application/exercise_progression_providers.dart';
 import 'exercise_progression_chart.dart';
+
+/// [AD7] Plain-string label bag for the chart period selector — one label
+/// per [ChartPeriod] variant. NEVER imports AppL10n (same R3 rule as the
+/// rest of this file's label bags).
+class ChartPeriodLabels {
+  const ChartPeriodLabels({
+    required this.last30dLabel,
+    required this.thisWeekLabel,
+    required this.monthLabel,
+  });
+
+  /// E.g. 'Últimos 30 días' — [ChartPeriod.last30d] (default).
+  final String last30dLabel;
+
+  /// E.g. 'Esta semana' — [ChartPeriod.thisWeek].
+  final String thisWeekLabel;
+
+  /// E.g. 'Este mes' — [ChartPeriod.month].
+  final String monthLabel;
+
+  String labelFor(ChartPeriod period) {
+    switch (period) {
+      case ChartPeriod.last30d:
+        return last30dLabel;
+      case ChartPeriod.thisWeek:
+        return thisWeekLabel;
+      case ChartPeriod.month:
+        return monthLabel;
+    }
+  }
+}
 
 /// Plain-string label bag for [ExerciseProgressionSection].
 ///
 /// Wraps [ExerciseProgressionChartLabels] plus the section-level strings
 /// (title, loading, error, empty state) so the whole section can be
 /// label-injected without importing AppL10n.
+///
+/// [AD3] [chartLabels] now carries 4 distinct metric labels (Heaviest
+/// Weight/1RM/Best Set Volume/Best Session Volume) instead of the original
+/// 2 (PR/Volumen) — see exercise_progression_chart.dart.
 class ExerciseProgressionSectionLabels {
   const ExerciseProgressionSectionLabels({
     required this.sectionTitle,
@@ -30,6 +67,7 @@ class ExerciseProgressionSectionLabels {
     this.exerciseListErrorText,
     required this.emptyStateText,
     required this.chartLabels,
+    required this.periodLabels,
     required this.localeName,
   });
 
@@ -49,6 +87,9 @@ class ExerciseProgressionSectionLabels {
 
   /// Labels forwarded to [ExerciseProgressionChart].
   final ExerciseProgressionChartLabels chartLabels;
+
+  /// [AD7] Labels for the chart period selector.
+  final ChartPeriodLabels periodLabels;
 
   /// Locale name for date formatting (e.g. 'es_AR', 'en').
   final String localeName;
@@ -78,6 +119,9 @@ class ExerciseProgressionSection extends ConsumerStatefulWidget {
 class _ExerciseProgressionSectionState
     extends ConsumerState<ExerciseProgressionSection> {
   String? _selectedExerciseId;
+
+  /// [AD7] Defaults to [ChartPeriod.defaultPeriod] (last30d).
+  ChartPeriod _selectedPeriod = ChartPeriod.defaultPeriod;
 
   @override
   Widget build(BuildContext context) {
@@ -138,12 +182,24 @@ class _ExerciseProgressionSectionState
                 ),
                 const SizedBox(height: 12),
 
+                // ── Period selector ────────────────────────────────────
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: ChartPeriodSelector(
+                    selected: _selectedPeriod,
+                    labels: labels.periodLabels,
+                    onSelect: (p) => setState(() => _selectedPeriod = p),
+                  ),
+                ),
+                const SizedBox(height: 8),
+
                 // ── Progression chart ─────────────────────────────────
                 _ProgressionChartLoader(
                   athleteId: widget.athleteId,
                   exerciseId: effectiveId,
                   chartLabels: labels.chartLabels,
                   localeName: labels.localeName,
+                  period: _selectedPeriod,
                 ),
               ],
             );
@@ -161,6 +217,7 @@ class _ProgressionChartLoader extends ConsumerWidget {
     required this.exerciseId,
     required this.chartLabels,
     required this.localeName,
+    required this.period,
   });
 
   final String athleteId;
@@ -168,11 +225,14 @@ class _ProgressionChartLoader extends ConsumerWidget {
   final ExerciseProgressionChartLabels chartLabels;
   final String localeName;
 
+  /// [AD7] Selected chart period — bounds the returned series.
+  final ChartPeriod period;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final progressionAsync = ref.watch(
       exerciseProgressionProvider(
-          (athleteUid: athleteId, exerciseId: exerciseId)),
+          (athleteUid: athleteId, exerciseId: exerciseId, period: period)),
     );
 
     return progressionAsync.when(
@@ -182,6 +242,76 @@ class _ProgressionChartLoader extends ConsumerWidget {
         progression: progression,
         labels: chartLabels,
         localeName: localeName,
+      ),
+    );
+  }
+}
+
+// ── Period selector ──────────────────────────────────────────────────────────
+
+/// [AD7] Hevy-style period selector pill — tap to pick [ChartPeriod.last30d]
+/// (default) / [ChartPeriod.thisWeek] / [ChartPeriod.month].
+class ChartPeriodSelector extends StatelessWidget {
+  const ChartPeriodSelector({
+    super.key,
+    required this.selected,
+    required this.labels,
+    required this.onSelect,
+  });
+
+  final ChartPeriod selected;
+  final ChartPeriodLabels labels;
+  final void Function(ChartPeriod) onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+
+    return PopupMenuButton<ChartPeriod>(
+      initialValue: selected,
+      onSelected: onSelect,
+      color: palette.bgCard,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: palette.border),
+      ),
+      itemBuilder: (context) => ChartPeriod.values
+          .map(
+            (p) => PopupMenuItem<ChartPeriod>(
+              value: p,
+              child: Text(
+                labels.labelFor(p),
+                style: GoogleFonts.barlow(
+                  fontSize: 13,
+                  fontWeight: p == selected ? FontWeight.w700 : FontWeight.w400,
+                  color: p == selected ? palette.accent : palette.textPrimary,
+                ),
+              ),
+            ),
+          )
+          .toList(),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: palette.bgCard,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: palette.border),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              labels.labelFor(selected),
+              style: GoogleFonts.barlow(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: palette.textPrimary,
+              ),
+            ),
+            const SizedBox(width: 4),
+            Icon(TreinoIcon.chevronDown, size: 14, color: palette.textMuted),
+          ],
+        ),
       ),
     );
   }
