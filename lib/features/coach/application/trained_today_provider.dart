@@ -24,7 +24,8 @@ class TrainedTodayEntry {
 /// Derives the list of athletes who have completed at least one session today.
 ///
 /// - Watches [trainerLinksStreamProvider]; passes through loading/error.
-/// - Considers only active links where `sharedWithTrainer == true`.
+/// - Considers all active links; per-athlete session reads are gated by
+///   session_shares at the rules layer, so non-sharing athletes are skipped.
 /// - For each qualifying athlete, watches [sessionsByUidProvider(athleteId)].
 ///   If all athletes are still loading with no data yet, returns loading.
 ///   Individual athlete errors are skipped (that athlete is omitted).
@@ -47,12 +48,14 @@ final trainedTodayProvider =
 
   final links = linksAsync.valueOrNull ?? const [];
 
-  // Deduplicate athlete IDs from active + sharing links.
+  // Active links only. Access to each athlete's sessions is enforced at the
+  // rules layer via session_shares (written by the CF when the link is active
+  // and the athlete opted in); non-sharing athletes surface as permission-denied
+  // and are skipped below. The old `sharedWithTrainer == true` gate was DEAD —
+  // setSharedWithTrainer has zero callers, so the flag was always false and this
+  // list was ALWAYS empty (same dead gate the dashboard aggregates had).
   final athleteIds = links
-      .where(
-        (l) =>
-            l.status == TrainerLinkStatus.active && l.sharedWithTrainer == true,
-      )
+      .where((l) => l.status == TrainerLinkStatus.active)
       .map((l) => l.athleteId)
       .toSet()
       .toList();
