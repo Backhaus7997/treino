@@ -4052,6 +4052,30 @@ abstract class AppL10n {
   /// **'Este mes'**
   String get progressionPeriodMonth;
 
+  /// [PR4] Section header for the per-exercise Personal Records list (Heaviest Weight/1RM/Best Set Volume/Best Session Volume with first-achieved date), shown below the progression chart.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'RÉCORDS PERSONALES'**
+  String get personalRecordsSectionTitle;
+
+  /// [PR4] Section header for the most-frequent-exercises list (Hevy's 'Main exercises'), ranked by session count within the selected chart period.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'EJERCICIOS MÁS FRECUENTES'**
+  String get mostFrequentExercisesSectionTitle;
+
+  /// [PR4] Session-count label shown next to each exercise row in the most-frequent-exercises list.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{count, plural, =0{Sin sesiones} =1{1 sesión} other{{count} sesiones}}'**
+  String mostFrequentExercisesSessionCount(int count);
+
+  /// [PR4] Empty state shown when the most-frequent-exercises list has zero entries for the selected period.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No hay datos todavía.'**
+  String get mostFrequentExercisesEmpty;
+
   /// Section header above the trainer-assigned plans in the Profile › Mis Rutinas screen.
   ///
   /// In es_AR, this message translates to:

@@ -28,6 +28,7 @@ import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach_hub/presentation/sections/chat/widgets/chat_detail_pane.dart';
 import 'package:treino/features/gyms/application/gym_providers.dart';
+import 'package:treino/features/insights/domain/chart_period.dart';
 import 'package:treino/features/measurements/application/measurement_providers.dart';
 import 'package:treino/features/measurements/domain/measurement.dart';
 import 'package:treino/features/measurements/presentation/widgets/measurement_progress_chart.dart';
@@ -43,6 +44,7 @@ import 'package:treino/features/profile/domain/experience_level.dart';
 import 'package:treino/features/profile/domain/gender.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/features/workout/application/assigned_routine_providers.dart';
+import 'package:treino/features/workout/application/exercise_frequency_providers.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
 import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/domain/routine_status.dart';
@@ -52,6 +54,8 @@ import 'package:treino/features/workout/domain/set_log.dart';
 import 'package:treino/features/workout/presentation/widgets/exercise_progression_chart.dart'
     show ExerciseProgressionChartLabels;
 import 'package:treino/features/workout/presentation/widgets/exercise_progression_section.dart';
+import 'package:treino/features/workout/presentation/widgets/most_frequent_exercises_list.dart';
+import 'package:treino/features/workout/presentation/widgets/personal_records_list.dart';
 import 'package:treino/features/workout/presentation/widgets/session_exercise_block.dart';
 import 'package:treino/features/profile/application/user_providers.dart'
     show userProfileProvider;
@@ -1744,7 +1748,11 @@ class _EntrenamientoTab extends ConsumerWidget {
 ///
 /// Firestore access: trainer READ on setLogs is granted by firestore.rules:507-520
 /// (mirrors the session-share predicate: owner OR linked trainer).
-class _ProgressionTabSection extends StatelessWidget {
+///
+/// [PR4] Also owns the [_exerciseSelection] notifier shared with
+/// [_MostFrequentExercisesTabSection] below it — tapping a row there selects
+/// the exercise here (navigable to the existing exercise progression/detail).
+class _ProgressionTabSection extends StatefulWidget {
   const _ProgressionTabSection({
     required this.athleteId,
     required this.palette,
@@ -1754,36 +1762,123 @@ class _ProgressionTabSection extends StatelessWidget {
   final AppPalette palette;
 
   @override
+  State<_ProgressionTabSection> createState() => _ProgressionTabSectionState();
+}
+
+class _ProgressionTabSectionState extends State<_ProgressionTabSection> {
+  final _exerciseSelection = ValueNotifier<String?>(null);
+
+  @override
+  void dispose() {
+    _exerciseSelection.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return ExerciseProgressionSection(
-      athleteId: athleteId,
-      labels: ExerciseProgressionSectionLabels(
-        sectionTitle: 'EVOLUCIÓN POR EJERCICIO', // i18n: Fase W2
-        loadingText: 'Cargando…', // i18n: Fase W2
-        exerciseListErrorText:
-            'No se pudo cargar la evolución.', // i18n: Fase W2
-        emptyStateText: 'Sin registros de series todavía.', // i18n: Fase W2
-        chartLabels: ExerciseProgressionChartLabels(
-          heaviestWeightLabel: 'Peso máximo', // i18n: Fase W2
-          oneRepMaxLabel: '1RM', // i18n: Fase W2
-          bestSetVolumeLabel: 'Mejor serie', // i18n: Fase W2
-          bestSessionVolumeLabel: 'Volumen', // i18n: Fase W2
-          volumeUnit: 'kg·reps', // i18n: Fase W2
-          weightUnit: 'kg', // i18n: Fase W2
-          frequencyLabel: (n) => n == 1
-              ? '1 sesión en las últimas 8 semanas' // i18n: Fase W2
-              : '$n sesiones en las últimas 8 semanas', // i18n: Fase W2
-          singlePointHint:
-              'Necesitás al menos 2 sesiones para ver la evolución.', // i18n: Fase W2
-          emptyHint:
-              'Sin datos suficientes para este ejercicio.', // i18n: Fase W2
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ExerciseProgressionSection(
+          athleteId: widget.athleteId,
+          externalExerciseSelection: _exerciseSelection,
+          labels: ExerciseProgressionSectionLabels(
+            sectionTitle: 'EVOLUCIÓN POR EJERCICIO', // i18n: Fase W2
+            loadingText: 'Cargando…', // i18n: Fase W2
+            exerciseListErrorText:
+                'No se pudo cargar la evolución.', // i18n: Fase W2
+            emptyStateText: 'Sin registros de series todavía.', // i18n: Fase W2
+            chartLabels: ExerciseProgressionChartLabels(
+              heaviestWeightLabel: 'Peso máximo', // i18n: Fase W2
+              oneRepMaxLabel: '1RM', // i18n: Fase W2
+              bestSetVolumeLabel: 'Mejor serie', // i18n: Fase W2
+              bestSessionVolumeLabel: 'Volumen', // i18n: Fase W2
+              volumeUnit: 'kg·reps', // i18n: Fase W2
+              weightUnit: 'kg', // i18n: Fase W2
+              frequencyLabel: (n) => n == 1
+                  ? '1 sesión en las últimas 8 semanas' // i18n: Fase W2
+                  : '$n sesiones en las últimas 8 semanas', // i18n: Fase W2
+              singlePointHint:
+                  'Necesitás al menos 2 sesiones para ver la evolución.', // i18n: Fase W2
+              emptyHint:
+                  'Sin datos suficientes para este ejercicio.', // i18n: Fase W2
+            ),
+            periodLabels: const ChartPeriodLabels(
+              last30dLabel: 'Últimos 30 días', // i18n: Fase W2
+              thisWeekLabel: 'Esta semana', // i18n: Fase W2
+              monthLabel: 'Este mes', // i18n: Fase W2
+            ),
+            localeName: 'es_AR', // hardcoded for web Coach Hub (i18n: Fase W2)
+            personalRecordsLabels: const PersonalRecordsListLabels(
+              sectionTitle: 'RÉCORDS PERSONALES', // i18n: Fase W2
+              heaviestWeightLabel: 'Peso máximo', // i18n: Fase W2
+              oneRepMaxLabel: '1RM', // i18n: Fase W2
+              bestSetVolumeLabel: 'Mejor serie', // i18n: Fase W2
+              bestSessionVolumeLabel: 'Volumen', // i18n: Fase W2
+              volumeUnit: 'kg·reps', // i18n: Fase W2
+              weightUnit: 'kg', // i18n: Fase W2
+              emptyText:
+                  'Sin datos suficientes para este ejercicio.', // i18n: Fase W2
+              localeName: 'es_AR', // i18n: Fase W2
+            ),
+          ),
         ),
-        periodLabels: const ChartPeriodLabels(
-          last30dLabel: 'Últimos 30 días', // i18n: Fase W2
-          thisWeekLabel: 'Esta semana', // i18n: Fase W2
-          monthLabel: 'Este mes', // i18n: Fase W2
+        const SizedBox(height: 24),
+        _MostFrequentExercisesTabSection(
+          athleteId: widget.athleteId,
+          onSelectExercise: (id) => _exerciseSelection.value = id,
         ),
-        localeName: 'es_AR', // hardcoded for web Coach Hub (i18n: Fase W2)
+      ],
+    );
+  }
+}
+
+/// [PR4] Web-surface most-frequent-exercises section shown below
+/// [_ProgressionTabSection]. Hardcoded Spanish labels — same convention as
+/// the rest of this file (`// i18n: Fase W2`).
+class _MostFrequentExercisesTabSection extends ConsumerStatefulWidget {
+  const _MostFrequentExercisesTabSection({
+    required this.athleteId,
+    required this.onSelectExercise,
+  });
+
+  final String athleteId;
+  final void Function(String exerciseId) onSelectExercise;
+
+  @override
+  ConsumerState<_MostFrequentExercisesTabSection> createState() =>
+      _MostFrequentExercisesTabSectionState();
+}
+
+class _MostFrequentExercisesTabSectionState
+    extends ConsumerState<_MostFrequentExercisesTabSection> {
+  ChartPeriod _selectedPeriod = ChartPeriod.defaultPeriod;
+
+  @override
+  Widget build(BuildContext context) {
+    final entriesAsync = ref.watch(exerciseFrequencyProvider(
+        (athleteUid: widget.athleteId, period: _selectedPeriod)));
+
+    return entriesAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (e, _) => const SizedBox.shrink(),
+      data: (entries) => MostFrequentExercisesList(
+        entries: entries,
+        selectedPeriod: _selectedPeriod,
+        onSelectExercise: widget.onSelectExercise,
+        onSelectPeriod: (p) => setState(() => _selectedPeriod = p),
+        labels: MostFrequentExercisesListLabels(
+          sectionTitle: 'EJERCICIOS MÁS FRECUENTES', // i18n: Fase W2
+          sessionCountLabel: (n) => n == 1
+              ? '1 sesión' // i18n: Fase W2
+              : '$n sesiones', // i18n: Fase W2
+          emptyText: 'No hay datos todavía.', // i18n: Fase W2
+          periodLabels: const ChartPeriodLabels(
+            last30dLabel: 'Últimos 30 días', // i18n: Fase W2
+            thisWeekLabel: 'Esta semana', // i18n: Fase W2
+            monthLabel: 'Este mes', // i18n: Fase W2
+          ),
+        ),
       ),
     );
   }

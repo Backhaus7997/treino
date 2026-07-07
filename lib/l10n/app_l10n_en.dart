@@ -2137,6 +2137,27 @@ class AppL10nEn extends AppL10n {
   String get progressionPeriodMonth => 'This month';
 
   @override
+  String get personalRecordsSectionTitle => 'PERSONAL RECORDS';
+
+  @override
+  String get mostFrequentExercisesSectionTitle => 'MOST FREQUENT EXERCISES';
+
+  @override
+  String mostFrequentExercisesSessionCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count sessions',
+      one: '1 session',
+      zero: 'No sessions',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get mostFrequentExercisesEmpty => 'No data yet.';
+
+  @override
   String get profileRoutinesAssignedHeader => '';
 
   @override

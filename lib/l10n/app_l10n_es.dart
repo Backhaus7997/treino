@@ -2189,6 +2189,27 @@ class AppL10nEs extends AppL10n {
   String get progressionPeriodMonth => 'Este mes';
 
   @override
+  String get personalRecordsSectionTitle => 'RÉCORDS PERSONALES';
+
+  @override
+  String get mostFrequentExercisesSectionTitle => 'EJERCICIOS MÁS FRECUENTES';
+
+  @override
+  String mostFrequentExercisesSessionCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count sesiones',
+      one: '1 sesión',
+      zero: 'Sin sesiones',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get mostFrequentExercisesEmpty => 'No hay datos todavía.';
+
+  @override
   String get profileRoutinesAssignedHeader => 'RUTINAS ASIGNADAS POR TU PF';
 
   @override
@@ -4513,6 +4534,27 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get progressionPeriodMonth => 'Este mes';
+
+  @override
+  String get personalRecordsSectionTitle => 'RÉCORDS PERSONALES';
+
+  @override
+  String get mostFrequentExercisesSectionTitle => 'EJERCICIOS MÁS FRECUENTES';
+
+  @override
+  String mostFrequentExercisesSessionCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count sesiones',
+      one: '1 sesión',
+      zero: 'Sin sesiones',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get mostFrequentExercisesEmpty => 'No hay datos todavía.';
 
   @override
   String get profileRoutinesAssignedHeader => 'RUTINAS ASIGNADAS POR TU PF';
