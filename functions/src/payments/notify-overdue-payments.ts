@@ -12,11 +12,13 @@
  *     already available by 10:00.
  *   - 10:00 is within respectful hours for a push notification.
  *
- * Algorithm — Approach B (per-link, zero new index):
+ * Algorithm — Approach B (per-link):
  *   1. Fetch active trainer_links.
  *   2. Per link, query payments where trainerId=X && athleteId=Y &&
- *      status=pending && dueAt<=now — covered by existing composite
- *      index (trainerId, status, dueAt).
+ *      status=pending && dueAt<=now — REQUIRES the composite index
+ *      (trainerId, athleteId, status, dueAt) in firestore.indexes.json
+ *      (3 equality + 1 range; the Firestore emulator does NOT enforce it,
+ *      so jest passing does NOT prove the index exists).
  *   3. For each overdue payment, apply anti-spam check.
  *   4. If notifying: resolve trainer displayName, call sendFcm, update
  *      lastOverdueNotifiedAt via Admin SDK (bypasses Firestore rules).
@@ -115,7 +117,7 @@ export async function notifyOverduePaymentsHandler(
     }
 
     // ── 2a. Query overdue pending payments for this link ──────────────────
-    // Covered by existing composite index (trainerId ASC, status ASC, dueAt ASC).
+    // Requires composite index (trainerId, athleteId, status, dueAt) — firestore.indexes.json.
     const overdueSnap = await db
       .collection("payments")
       .where("trainerId", "==", trainerId)
