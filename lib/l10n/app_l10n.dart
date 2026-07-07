@@ -4034,6 +4034,24 @@ abstract class AppL10n {
   /// **'Sin registros de series todavía.'**
   String get progressionEmpty;
 
+  /// [AD7] Label for the rolling 30-day chart period option (default) in the progression period selector.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Últimos 30 días'**
+  String get progressionPeriodLast30Days;
+
+  /// [AD7] Label for the current-calendar-week chart period option in the progression period selector.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Esta semana'**
+  String get progressionPeriodThisWeek;
+
+  /// [AD7] Label for the current-calendar-month chart period option in the progression period selector.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Este mes'**
+  String get progressionPeriodMonth;
+
   /// Section header above the trainer-assigned plans in the Profile › Mis Rutinas screen.
   ///
   /// In es_AR, this message translates to:

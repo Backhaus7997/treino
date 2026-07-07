@@ -1,3 +1,4 @@
+import '../../insights/domain/chart_period.dart';
 import '../domain/exercise_progression.dart';
 import '../domain/session.dart';
 import '../domain/set_log.dart';
@@ -55,6 +56,14 @@ List<PersonalRecord> derivePersonalRecords(
 ///                already bounded to the last 60 (caller's responsibility).
 /// [logsBySession] map from sessionId → list of SetLogs for that session.
 /// [now]          injectable reference time for the 8-week Frecuencia window.
+/// [periodWindow] [AD7] optional current-period window (see [ChartPeriod]).
+///                When non-null, sessions with `startedAt` outside
+///                `[currentStart, currentEnd]` (inclusive, by calendar day)
+///                are excluded from all 4 series. When null (default), ALL
+///                scanned sessions are included — backward-compatible with
+///                callers that don't yet select a period.
+///                [frequencyLast8Weeks] is NEVER affected by this filter —
+///                it is an independent `now`-relative 56-day stat.
 ///
 /// [AD3] Returns [ExerciseProgression] with 4 distinct client-computed
 /// series (all ASC by startedAt):
@@ -77,6 +86,7 @@ ExerciseProgression aggregateExerciseProgression({
   required List<Session> sessionsDesc,
   required Map<String, List<SetLog>> logsBySession,
   required DateTime now,
+  ChartPeriodWindow? periodWindow,
 }) {
   // Guard: empty exerciseId → no-op, zero reads
   if (exerciseId.isEmpty) {
@@ -85,8 +95,29 @@ ExerciseProgression aggregateExerciseProgression({
 
   final cutoff = now.subtract(const Duration(days: 56));
 
-  // Reverse DESC→ASC once — traverse in ascending date order for output
-  final sessionsAsc = sessionsDesc.reversed.toList();
+  // Reverse DESC→ASC once — traverse in ascending date order for output.
+  // [AD7] `sessionsAsc` is what the 4 metric series iterate over (subject to
+  // periodWindow filtering below). `frecuencia` deliberately uses this
+  // UNFILTERED list separately — Frecuencia is an independent "last 8 weeks"
+  // stat, not scoped to the display period selector.
+  final sessionsAscUnfiltered = sessionsDesc.reversed.toList();
+  var sessionsAsc = sessionsAscUnfiltered;
+
+  // [AD7] Filter to the selected period's CURRENT window, inclusive by
+  // calendar day. Comparing against end-of-day of currentEnd so a session
+  // logged later that same day (any time-of-day) is still included.
+  if (periodWindow != null) {
+    final start = periodWindow.currentStart;
+    final endExclusive = DateTime(
+      periodWindow.currentEnd.year,
+      periodWindow.currentEnd.month,
+      periodWindow.currentEnd.day + 1,
+    );
+    sessionsAsc = sessionsAsc
+        .where((s) =>
+            !s.startedAt.isBefore(start) && s.startedAt.isBefore(endExclusive))
+        .toList();
+  }
 
   final heaviestWeightPoints = <ProgressionPoint>[];
   final oneRepMaxPoints = <ProgressionPoint>[];
@@ -141,8 +172,16 @@ ExerciseProgression aggregateExerciseProgression({
       oneRepMaxPoints
           .add(ProgressionPoint(date: session.startedAt, value: maxOneRepMax));
     }
+  }
 
-    // Frecuencia: count sessions with startedAt >= cutoff (inclusive lower bound)
+  // [AD7] Frecuencia: count sessions with startedAt >= cutoff (inclusive
+  // lower bound), matching [exerciseId]'s logs — computed over the
+  // UNFILTERED session list, independent of periodWindow (see comment above
+  // `sessionsAscUnfiltered`).
+  for (final session in sessionsAscUnfiltered) {
+    final logs = logsBySession[session.id] ?? const [];
+    final hasExerciseLog = logs.any((l) => l.exerciseId == exerciseId);
+    if (!hasExerciseLog) continue;
     if (!session.startedAt.isBefore(cutoff)) {
       frecuencia++;
     }

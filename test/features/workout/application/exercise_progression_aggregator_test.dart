@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:treino/features/insights/domain/chart_period.dart';
 import 'package:treino/features/workout/application/exercise_progression_aggregator.dart';
 import 'package:treino/features/workout/domain/exercise_progression.dart';
 import 'package:treino/features/workout/domain/session.dart';
@@ -492,6 +493,114 @@ void main() {
       ]);
       expect(records.first.value, 95.0);
       expect(records.first.achievedAt, d3);
+    });
+  });
+
+  group('[AD7] periodWindow filtering', () {
+    // Sessions on Jan 5 / Jan 10 / Jan 15 (s3/Jan 15 has NO squat logs in the
+    // shared fixture). A window covering ONLY Jan 8..20 must exclude Jan 5's
+    // session (s1) from every series — only s2 (Jan 10) has squat data left.
+    test('sessions outside the period window are excluded from all series',
+        () {
+      final window = ChartPeriodWindow(
+        currentStart: DateTime(2025, 1, 8),
+        currentEnd: DateTime(2025, 1, 20),
+        previousStart: DateTime(2024, 12, 1),
+        previousEnd: DateTime(2025, 1, 7),
+      );
+
+      final result = aggregateExerciseProgression(
+        exerciseId: 'squat',
+        sessionsDesc: _sessionsDesc,
+        logsBySession: _logsBySession,
+        now: DateTime(2025, 1, 20),
+        periodWindow: window,
+      );
+
+      expect(result.heaviestWeightSeries.length, 1);
+      expect(result.heaviestWeightSeries.single.date, _s2.startedAt);
+    });
+
+    test('a window boundary day (currentStart) is INCLUSIVE', () {
+      final window = ChartPeriodWindow(
+        currentStart: DateTime(2025, 1, 5), // exactly s1's day
+        currentEnd: DateTime(2025, 1, 20),
+        previousStart: DateTime(2024, 12, 1),
+        previousEnd: DateTime(2025, 1, 4),
+      );
+
+      final result = aggregateExerciseProgression(
+        exerciseId: 'squat',
+        sessionsDesc: _sessionsDesc,
+        logsBySession: _logsBySession,
+        now: DateTime(2025, 1, 20),
+        periodWindow: window,
+      );
+
+      // s1 (Jan 5, boundary day) + s2 (Jan 10) have squat logs; s3 has none.
+      expect(result.heaviestWeightSeries.length, 2);
+    });
+
+    test('a window boundary day (currentEnd) is INCLUSIVE', () {
+      final window = ChartPeriodWindow(
+        currentStart: DateTime(2025, 1, 1),
+        currentEnd: DateTime(2025, 1, 10), // exactly s2's day
+        previousStart: DateTime(2024, 12, 1),
+        previousEnd: DateTime(2024, 12, 31),
+      );
+
+      final result = aggregateExerciseProgression(
+        exerciseId: 'squat',
+        sessionsDesc: _sessionsDesc,
+        logsBySession: _logsBySession,
+        now: DateTime(2025, 1, 20),
+        periodWindow: window,
+      );
+
+      // s1 (Jan 5) + s2 (Jan 10, boundary day) have squat logs.
+      expect(result.heaviestWeightSeries.length, 2);
+    });
+
+    test('null periodWindow (default) keeps ALL sessions — backward compat',
+        () {
+      final result = aggregateExerciseProgression(
+        exerciseId: 'squat',
+        sessionsDesc: _sessionsDesc,
+        logsBySession: _logsBySession,
+        now: DateTime(2025, 1, 20),
+      );
+
+      // s1 + s2 have squat logs; s3's logs list is empty (fixture data).
+      expect(result.heaviestWeightSeries.length, 2);
+    });
+
+    test('frequencyLast8Weeks is unaffected by periodWindow (still uses the '
+        '56-day `now`-relative cutoff, not the period window)', () {
+      final window = ChartPeriodWindow(
+        currentStart: DateTime(2025, 1, 8),
+        currentEnd: DateTime(2025, 1, 20),
+        previousStart: DateTime(2024, 12, 1),
+        previousEnd: DateTime(2025, 1, 7),
+      );
+
+      final withWindow = aggregateExerciseProgression(
+        exerciseId: 'squat',
+        sessionsDesc: _sessionsDesc,
+        logsBySession: _logsBySession,
+        now: DateTime(2025, 1, 20),
+        periodWindow: window,
+      );
+      final withoutWindow = aggregateExerciseProgression(
+        exerciseId: 'squat',
+        sessionsDesc: _sessionsDesc,
+        logsBySession: _logsBySession,
+        now: DateTime(2025, 1, 20),
+      );
+
+      // Frecuencia counts sessions regardless of the display period window —
+      // it is an independent "last 8 weeks" stat, not filtered by the chart
+      // period selector.
+      expect(withWindow.frequencyLast8Weeks, withoutWindow.frequencyLast8Weeks);
     });
   });
 }

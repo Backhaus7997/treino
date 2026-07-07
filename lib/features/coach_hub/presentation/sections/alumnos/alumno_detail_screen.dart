@@ -1778,6 +1778,11 @@ class _ProgressionTabSection extends StatelessWidget {
           emptyHint:
               'Sin datos suficientes para este ejercicio.', // i18n: Fase W2
         ),
+        periodLabels: const ChartPeriodLabels(
+          last30dLabel: 'Últimos 30 días', // i18n: Fase W2
+          thisWeekLabel: 'Esta semana', // i18n: Fase W2
+          monthLabel: 'Este mes', // i18n: Fase W2
+        ),
         localeName: 'es_AR', // hardcoded for web Coach Hub (i18n: Fase W2)
       ),
     );

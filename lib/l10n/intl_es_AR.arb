@@ -1599,6 +1599,18 @@
   "@progressionEmpty": {
     "description": "Empty state shown when the athlete has no setLogs at all (exercise picker not shown)."
   },
+  "progressionPeriodLast30Days": "Últimos 30 días",
+  "@progressionPeriodLast30Days": {
+    "description": "[AD7] Label for the rolling 30-day chart period option (default) in the progression period selector."
+  },
+  "progressionPeriodThisWeek": "Esta semana",
+  "@progressionPeriodThisWeek": {
+    "description": "[AD7] Label for the current-calendar-week chart period option in the progression period selector."
+  },
+  "progressionPeriodMonth": "Este mes",
+  "@progressionPeriodMonth": {
+    "description": "[AD7] Label for the current-calendar-month chart period option in the progression period selector."
+  },
   "profileRoutinesAssignedHeader": "RUTINAS ASIGNADAS POR TU PF",
   "@profileRoutinesAssignedHeader": {
     "description": "Section header above the trainer-assigned plans in the Profile › Mis Rutinas screen."
