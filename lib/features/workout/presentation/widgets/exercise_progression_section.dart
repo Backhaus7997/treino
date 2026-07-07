@@ -19,6 +19,7 @@ import '../../../../core/widgets/treino_icon.dart';
 import '../../../insights/domain/chart_period.dart';
 import '../../application/exercise_progression_providers.dart';
 import 'exercise_progression_chart.dart';
+import 'personal_records_list.dart';
 
 /// [AD7] Plain-string label bag for the chart period selector — one label
 /// per [ChartPeriod] variant. NEVER imports AppL10n (same R3 rule as the
@@ -69,6 +70,7 @@ class ExerciseProgressionSectionLabels {
     required this.chartLabels,
     required this.periodLabels,
     required this.localeName,
+    required this.personalRecordsLabels,
   });
 
   /// E.g. 'EVOLUCIÓN POR EJERCICIO'
@@ -93,6 +95,10 @@ class ExerciseProgressionSectionLabels {
 
   /// Locale name for date formatting (e.g. 'es_AR', 'en').
   final String localeName;
+
+  /// [AD3] Labels for the per-exercise [PersonalRecordsList] shown below the
+  /// progression chart.
+  final PersonalRecordsListLabels personalRecordsLabels;
 }
 
 /// Per-exercise progression section — shared between the mobile coach shell
@@ -106,10 +112,19 @@ class ExerciseProgressionSection extends ConsumerStatefulWidget {
     super.key,
     required this.athleteId,
     required this.labels,
+    this.externalExerciseSelection,
   });
 
   final String athleteId;
   final ExerciseProgressionSectionLabels labels;
+
+  /// [PR4] Optional external-selection hook — when a sibling widget (e.g.
+  /// [MostFrequentExercisesList]) wants to drive which exercise this section
+  /// displays (navigable to the existing exercise progression/detail),
+  /// it calls `.value = exerciseId` on this notifier. Purely additive: when
+  /// null (default), the section behaves exactly as before, owning its own
+  /// selection state internally.
+  final ValueNotifier<String?>? externalExerciseSelection;
 
   @override
   ConsumerState<ExerciseProgressionSection> createState() =>
@@ -122,6 +137,25 @@ class _ExerciseProgressionSectionState
 
   /// [AD7] Defaults to [ChartPeriod.defaultPeriod] (last30d).
   ChartPeriod _selectedPeriod = ChartPeriod.defaultPeriod;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.externalExerciseSelection?.addListener(_onExternalSelection);
+  }
+
+  @override
+  void dispose() {
+    widget.externalExerciseSelection?.removeListener(_onExternalSelection);
+    super.dispose();
+  }
+
+  void _onExternalSelection() {
+    final id = widget.externalExerciseSelection?.value;
+    if (id != null) {
+      setState(() => _selectedExerciseId = id);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -200,6 +234,7 @@ class _ExerciseProgressionSectionState
                   chartLabels: labels.chartLabels,
                   localeName: labels.localeName,
                   period: _selectedPeriod,
+                  personalRecordsLabels: labels.personalRecordsLabels,
                 ),
               ],
             );
@@ -210,7 +245,9 @@ class _ExerciseProgressionSectionState
   }
 }
 
-/// Loads and renders [ExerciseProgressionChart] for one exercise.
+/// Loads and renders [ExerciseProgressionChart] + [PersonalRecordsList] for
+/// one exercise — both are derived from the same [exerciseProgressionProvider]
+/// read (single Firestore-backed fetch, see [ExerciseProgression]).
 class _ProgressionChartLoader extends ConsumerWidget {
   const _ProgressionChartLoader({
     required this.athleteId,
@@ -218,6 +255,7 @@ class _ProgressionChartLoader extends ConsumerWidget {
     required this.chartLabels,
     required this.localeName,
     required this.period,
+    required this.personalRecordsLabels,
   });
 
   final String athleteId;
@@ -227,6 +265,9 @@ class _ProgressionChartLoader extends ConsumerWidget {
 
   /// [AD7] Selected chart period — bounds the returned series.
   final ChartPeriod period;
+
+  /// [AD3] Labels for the [PersonalRecordsList] shown below the chart.
+  final PersonalRecordsListLabels personalRecordsLabels;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -238,10 +279,20 @@ class _ProgressionChartLoader extends ConsumerWidget {
     return progressionAsync.when(
       loading: () => const SizedBox.shrink(),
       error: (e, _) => const SizedBox.shrink(),
-      data: (progression) => ExerciseProgressionChart(
-        progression: progression,
-        labels: chartLabels,
-        localeName: localeName,
+      data: (progression) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ExerciseProgressionChart(
+            progression: progression,
+            labels: chartLabels,
+            localeName: localeName,
+          ),
+          const SizedBox(height: 14),
+          PersonalRecordsList(
+            records: progression.personalRecords,
+            labels: personalRecordsLabels,
+          ),
+        ],
       ),
     );
   }

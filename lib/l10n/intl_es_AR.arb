@@ -1624,6 +1624,27 @@
   "@progressionPeriodMonth": {
     "description": "[AD7] Label for the current-calendar-month chart period option in the progression period selector."
   },
+  "personalRecordsSectionTitle": "RÉCORDS PERSONALES",
+  "@personalRecordsSectionTitle": {
+    "description": "[PR4] Section header for the per-exercise Personal Records list (Heaviest Weight/1RM/Best Set Volume/Best Session Volume with first-achieved date), shown below the progression chart."
+  },
+  "mostFrequentExercisesSectionTitle": "EJERCICIOS MÁS FRECUENTES",
+  "@mostFrequentExercisesSectionTitle": {
+    "description": "[PR4] Section header for the most-frequent-exercises list (Hevy's 'Main exercises'), ranked by session count within the selected chart period."
+  },
+  "mostFrequentExercisesSessionCount": "{count, plural, =0{Sin sesiones} =1{1 sesión} other{{count} sesiones}}",
+  "@mostFrequentExercisesSessionCount": {
+    "description": "[PR4] Session-count label shown next to each exercise row in the most-frequent-exercises list.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "mostFrequentExercisesEmpty": "No hay datos todavía.",
+  "@mostFrequentExercisesEmpty": {
+    "description": "[PR4] Empty state shown when the most-frequent-exercises list has zero entries for the selected period."
+  },
   "profileRoutinesAssignedHeader": "RUTINAS ASIGNADAS POR TU PF",
   "@profileRoutinesAssignedHeader": {
     "description": "Section header above the trainer-assigned plans in the Profile › Mis Rutinas screen."

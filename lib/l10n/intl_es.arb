@@ -419,6 +419,17 @@
   "progressionPeriodLast30Days": "Últimos 30 días",
   "progressionPeriodThisWeek": "Esta semana",
   "progressionPeriodMonth": "Este mes",
+  "personalRecordsSectionTitle": "RÉCORDS PERSONALES",
+  "mostFrequentExercisesSectionTitle": "EJERCICIOS MÁS FRECUENTES",
+  "mostFrequentExercisesSessionCount": "{count, plural, =0{Sin sesiones} =1{1 sesión} other{{count} sesiones}}",
+  "@mostFrequentExercisesSessionCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "mostFrequentExercisesEmpty": "No hay datos todavía.",
   "dashboardGreeting": "BUENAS, {name}",
   "@dashboardGreeting": {
     "description": "Welcome greeting shown in the Coach Hub web dashboard WelcomeCard.",
