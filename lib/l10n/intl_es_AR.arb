@@ -328,6 +328,7 @@
   "dashboardSinTurnosProximos": "No tenés turnos próximos confirmados.",
   "dashboardNadieEntreno": "Nadie entrenó hoy todavía.",
   "dashboardErrorActividad": "No pudimos cargar la actividad de hoy.",
+  "dashboardSinActividadReciente": "Sin actividad en los últimos días.",
   "dashboardSinCobros": "Sin cobros pendientes.",
   "dashboardErrorCobros": "No pudimos cargar los cobros.",
   "dashboardHolaSinNombre": "HOLA",

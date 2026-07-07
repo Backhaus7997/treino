@@ -1808,6 +1808,12 @@ abstract class AppL10n {
   /// **'No pudimos cargar la actividad de hoy.'**
   String get dashboardErrorActividad;
 
+  /// No description provided for @dashboardSinActividadReciente.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Sin actividad en los últimos días.'**
+  String get dashboardSinActividadReciente;
+
   /// No description provided for @dashboardSinCobros.
   ///
   /// In es_AR, this message translates to:
