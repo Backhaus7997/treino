@@ -51,5 +51,24 @@ void main() {
       expect(counts.done, 1);
       expect(counts.pending, 0);
     });
+
+    test('appointments are bucketed by the ART day, spanning UTC midnight', () {
+      // now = 2026-06-17 02:00 UTC == 23:00 ART Jun 16 → ART "today" is Jun 16.
+      final now = DateTime.utc(2026, 6, 17, 2, 0);
+      // Both appointments are ART Jun 16 (today) but straddle UTC midnight.
+      final noon = _appt(
+        startsAt: DateTime.utc(2026, 6, 16, 15, 0), // 12:00 ART Jun 16
+        durationMin: 60,
+        status: AppointmentStatus.cancelled,
+      );
+      final lateEvening = _appt(
+        startsAt: DateTime.utc(2026, 6, 17, 1, 30), // 22:30 ART Jun 16
+        durationMin: 60,
+        status: AppointmentStatus.cancelled,
+      );
+      final counts = dashboardDayCounts([noon, lateEvening], now);
+      // ART bucketing counts BOTH; the old UTC-day math would drop the noon one.
+      expect(counts.cancelled, 2);
+    });
   });
 }

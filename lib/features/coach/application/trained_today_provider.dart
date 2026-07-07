@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/utils/argentina_time.dart';
 import '../../workout/application/session_providers.dart'
     show finishedTodayByUidProvider;
 import '../../workout/domain/session.dart';
@@ -60,7 +61,8 @@ final trainedTodayProvider =
       .toSet()
       .toList();
 
-  final now = DateTime.now().toUtc();
+  // ART wall-clock: "today" is the Argentina calendar day, not UTC.
+  final now = argentinaNow();
 
   final entries = <TrainedTodayEntry>[];
   bool anyLoading = false;
@@ -79,16 +81,17 @@ final trainedTodayProvider =
     final sessions = sessionsAsync.valueOrNull ?? const [];
 
     // The provider already scopes to today's finished sessions; we still pick
-    // the most-recent and re-check the UTC day defensively.
+    // the most-recent and re-check the ART calendar day defensively (a session
+    // finished at 23:00 ART is today, though in UTC it is already tomorrow).
     Session? best;
     for (final s in sessions) {
       if (s.status != SessionStatus.finished) continue;
       final finished = s.finishedAt;
       if (finished == null) continue;
-      final utc = finished.toUtc();
-      if (utc.year != now.year ||
-          utc.month != now.month ||
-          utc.day != now.day) {
+      final art = toArgentina(finished.toUtc());
+      if (art.year != now.year ||
+          art.month != now.month ||
+          art.day != now.day) {
         continue;
       }
       if (best == null || finished.isAfter(best.finishedAt!)) {
