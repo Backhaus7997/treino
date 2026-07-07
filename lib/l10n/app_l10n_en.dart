@@ -1924,6 +1924,9 @@ class AppL10nEn extends AppL10n {
   String get insightsDayEmptyHint => 'No workout logged this day.';
 
   @override
+  String get coachDailyHeatmapSectionTitle => 'MUSCLES OF THE DAY';
+
+  @override
   String get profileLoadError =>
       'We couldn\'t load your profile. Please try again.';
 

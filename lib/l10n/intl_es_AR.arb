@@ -1365,6 +1365,10 @@
   "@insightsDayEmptyHint": {
     "description": "Hint shown under the body silhouette when the selected day in the day-strip has no finished session — the muñeco renders blank (charts-redesign PR2, AD5/REQ:heat-map-per-day)."
   },
+  "coachDailyHeatmapSectionTitle": "MÚSCULOS DEL DÍA",
+  "@coachDailyHeatmapSectionTitle": {
+    "description": "Section header for the shared DailyHeatmapSection (per-day body heat-map + day-strip) in the coach's mobile athlete detail screen (charts-redesign PR2b, AD5)."
+  },
   "profileLoadError": "No pudimos cargar tu perfil. Probá de nuevo.",
   "@profileLoadError": {
     "description": "Error state for profile_edit_personal_screen's profile load (finding 13) and reusable for the trainer-edit gyms section error (finding 14). Pair with coachRetryLabel."

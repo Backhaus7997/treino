@@ -337,6 +337,7 @@
   "insightsLoadError": "No pudimos cargar tus insights. Inténtalo de nuevo.",
   "insightsDayStripTodayLabel": "HOY",
   "insightsDayEmptyHint": "No entrenaste este día.",
+  "coachDailyHeatmapSectionTitle": "MÚSCULOS DEL DÍA",
   "profileLoadError": "No pudimos cargar tu perfil. Inténtalo de nuevo.",
   "sessionDetailNoSets": "Esta sesión no tiene sets registrados.",
   "sessionLogSetError": "No pudimos guardar la serie. Inténtalo de nuevo.",

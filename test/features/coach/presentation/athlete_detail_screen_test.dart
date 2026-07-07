@@ -6,14 +6,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/coach/presentation/athlete_detail_screen.dart';
 import 'package:treino/l10n/app_l10n.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/features/workout/application/assigned_routine_providers.dart';
+import 'package:treino/features/workout/application/exercise_providers.dart';
 import 'package:treino/features/workout/application/session_providers.dart'
-    show currentUidProvider, sessionsByUidProvider, coachSessionSetLogsProvider;
+    show
+        currentUidProvider,
+        sessionsByUidProvider,
+        coachSessionSetLogsProvider,
+        sessionRepositoryProvider;
+import 'package:treino/features/workout/data/session_repository.dart';
 import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/domain/routine_source.dart';
 import 'package:treino/features/workout/domain/routine_visibility.dart';
@@ -21,6 +28,8 @@ import 'package:treino/features/profile/domain/experience_level.dart';
 import 'package:treino/features/workout/domain/session.dart';
 import 'package:treino/features/workout/domain/session_status.dart';
 import 'package:treino/features/workout/domain/set_log.dart';
+
+class _MockSessionRepository extends Mock implements SessionRepository {}
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -409,6 +418,48 @@ void main() {
 
       expect(
           find.text('Esta sesión no tiene sets registrados.'), findsOneWidget);
+    });
+  });
+
+  // ── PR2b — Daily heat-map section wrapper (AD5) ───────────────────────────
+
+  group('AthleteDetailScreen — daily heat-map section (PR2b, AD5)', () {
+    setUpAll(() {
+      registerFallbackValue(
+          _makeSession(id: 'fallback', wasFullyCompleted: true));
+    });
+
+    testWidgets(
+        'SCENARIO-DAILY-HEATMAP-COACH-01: renders the mobile wrapper\'s '
+        'AppL10n section title, driven by the alumno\'s athleteId',
+        (tester) async {
+      final repo = _MockSessionRepository();
+      when(() => repo.listByUid('athlete-1')).thenAnswer((_) async => []);
+
+      await _pumpScreen(
+        tester,
+        athleteId: 'athlete-1',
+        overrides: [
+          currentUidProvider.overrideWithValue('trainer-1'),
+          userPublicProfileProvider('athlete-1').overrideWith(
+            (ref) => Stream.value(_makeProfile('athlete-1', 'Martín García')),
+          ),
+          assignedRoutinesProvider('athlete-1').overrideWith(
+            (ref) async => const [],
+          ),
+          sessionsByUidProvider('athlete-1').overrideWith(
+            (ref) async => const [],
+          ),
+          sessionRepositoryProvider.overrideWithValue(repo),
+          exercisesProvider.overrideWith((ref) async => const []),
+        ],
+      );
+
+      await tester.pumpAndSettle();
+
+      // The wrapper injects l10n.coachDailyHeatmapSectionTitle — proves the
+      // AD5 label bag reaches the shared DailyHeatmapSection correctly.
+      expect(find.text('MÚSCULOS DEL DÍA'), findsOneWidget);
     });
   });
 }
