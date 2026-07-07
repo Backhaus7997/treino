@@ -1968,6 +1968,12 @@ class AppL10nEs extends AppL10n {
       'No pudimos cargar tus insights. Inténtalo de nuevo.';
 
   @override
+  String get insightsDayStripTodayLabel => 'HOY';
+
+  @override
+  String get insightsDayEmptyHint => 'No entrenaste este día.';
+
+  @override
   String get profileLoadError =>
       'No pudimos cargar tu perfil. Inténtalo de nuevo.';
 
@@ -4290,6 +4296,12 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get insightsLoadError =>
       'No pudimos cargar tus insights. Probá de nuevo.';
+
+  @override
+  String get insightsDayStripTodayLabel => 'HOY';
+
+  @override
+  String get insightsDayEmptyHint => 'No entrenaste este día.';
 
   @override
   String get profileLoadError => 'No pudimos cargar tu perfil. Probá de nuevo.';

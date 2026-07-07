@@ -1357,6 +1357,14 @@
   "@insightsLoadError": {
     "description": "Insights error branch message, paired with a Reintentar (coachRetryLabel) button calling ref.invalidate(weeklyInsightsProvider) (finding 12)."
   },
+  "insightsDayStripTodayLabel": "HOY",
+  "@insightsDayStripTodayLabel": {
+    "description": "Label shown on today's tile in the per-day heat-map day-strip (charts-redesign PR2, AD5/REQ:heat-map-per-day), replacing the weekday letter."
+  },
+  "insightsDayEmptyHint": "No entrenaste este día.",
+  "@insightsDayEmptyHint": {
+    "description": "Hint shown under the body silhouette when the selected day in the day-strip has no finished session — the muñeco renders blank (charts-redesign PR2, AD5/REQ:heat-map-per-day)."
+  },
   "profileLoadError": "No pudimos cargar tu perfil. Probá de nuevo.",
   "@profileLoadError": {
     "description": "Error state for profile_edit_personal_screen's profile load (finding 13) and reusable for the trainer-edit gyms section error (finding 14). Pair with coachRetryLabel."

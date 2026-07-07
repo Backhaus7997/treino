@@ -6,19 +6,40 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
+import '../../workout/application/session_providers.dart'
+    show currentUidProvider;
+import '../application/day_insights_providers.dart';
 import '../application/insights_providers.dart';
 import '../domain/muscle_group.dart';
 import '../domain/weekly_insights.dart';
 import 'widgets/body_silhouette_placeholder.dart';
+import 'widgets/day_strip_labels.dart';
+import 'widgets/day_strip_navigator.dart';
 
 /// Pantalla de Insights — agregados semanales por grupo muscular.
 /// Mockup: `insights.png`. Acceso natural desde la card "Esta Semana"
 /// del Home (tap en el body → `context.push('/workout/insights')`).
-class InsightsScreen extends ConsumerWidget {
+class InsightsScreen extends ConsumerStatefulWidget {
   const InsightsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<InsightsScreen> createState() => _InsightsScreenState();
+}
+
+class _InsightsScreenState extends ConsumerState<InsightsScreen> {
+  /// [REQ:heat-map-per-day] Day currently shown by the body silhouette +
+  /// day-strip. Defaults to today; changes when the athlete taps a tile in
+  /// [DayStripNavigator]. Independent of `weeklyInsightsProvider`'s week
+  /// window — the heat-map is per-day, the rest of the screen stays weekly.
+  late DateTime _selectedDay = _todayOnly();
+
+  static DateTime _todayOnly() {
+    final now = DateTime.now();
+    return DateTime(now.year, now.month, now.day);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final async = ref.watch(weeklyInsightsProvider);
 
@@ -45,7 +66,10 @@ class InsightsScreen extends ConsumerWidget {
                 children: [
                   _WeekStripCard(insights: insights),
                   const SizedBox(height: 14),
-                  _MusclesCard(insights: insights),
+                  _DailyMusclesCard(
+                    selectedDay: _selectedDay,
+                    onDaySelected: (day) => setState(() => _selectedDay = day),
+                  ),
                   const SizedBox(height: 14),
                   _VolumeBarCard(insights: insights),
                   const SizedBox(height: 20),
@@ -328,15 +352,31 @@ class _DayChip extends StatelessWidget {
   }
 }
 
-// ── Card: MÚSCULOS DE LA SEMANA ──────────────────────────────────────────────
+// ── Card: MÚSCULOS DEL DÍA (per-day heat-map + day-strip) ────────────────────
 
-class _MusclesCard extends StatelessWidget {
-  const _MusclesCard({required this.insights});
-  final WeeklyInsights insights;
+/// [AD5][REQ:heat-map-per-day] Replaces the old week-accumulated
+/// "MÚSCULOS DE LA SEMANA" card. Each day starts blank; the silhouette only
+/// paints the muscles trained on [selectedDay] — no carry-over from other
+/// days in the strip (fixes the chest-Monday-bleeds-into-Tuesday bug).
+class _DailyMusclesCard extends ConsumerWidget {
+  const _DailyMusclesCard({
+    required this.selectedDay,
+    required this.onDaySelected,
+  });
+
+  final DateTime selectedDay;
+  final ValueChanged<DateTime> onDaySelected;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+    final uid = ref.watch(currentUidProvider) ?? '';
+
+    final stripAsync = ref.watch(athleteLast7DaysInsightsProvider(uid));
+    final selectedAsync = ref.watch(
+      athleteDayInsightsProvider((uid: uid, day: selectedDay)),
+    );
 
     return Container(
       decoration: BoxDecoration(
@@ -348,7 +388,7 @@ class _MusclesCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'MÚSCULOS DE LA SEMANA',
+            'MÚSCULOS DEL DÍA',
             style: GoogleFonts.barlowCondensed(
               fontWeight: FontWeight.w700,
               fontSize: 12,
@@ -357,32 +397,56 @@ class _MusclesCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 14),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              BodySilhouettePlaceholder(
-                width: 160,
-                height: 240,
-                setsByGroup: insights.setsByGroup,
-                targetByGroup: insights.targetByGroup,
+          stripAsync.when(
+            loading: () => const SizedBox(
+              height: 64,
+              child: Center(child: CircularProgressIndicator()),
+            ),
+            error: (_, __) => const SizedBox.shrink(),
+            data: (days) => DayStripNavigator(
+              days: days,
+              selectedDay: selectedDay,
+              onDaySelected: onDaySelected,
+              labels: DayStripLabels(
+                todayLabel: l10n.insightsDayStripTodayLabel,
+                emptyDayHint: l10n.insightsDayEmptyHint,
               ),
-              const SizedBox(width: 18),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    for (final group in MuscleGroupDisplay.displayOrder)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 4),
-                        child: _MuscleSetsRow(
-                          group: group,
-                          sets: insights.setsByGroup[group] ?? 0,
-                        ),
-                      ),
-                  ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          selectedAsync.when(
+            loading: () => const SizedBox(
+              height: 240,
+              child: Center(child: CircularProgressIndicator()),
+            ),
+            error: (_, __) => const SizedBox.shrink(),
+            data: (dayInsights) => Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                BodySilhouettePlaceholder(
+                  width: 160,
+                  height: 240,
+                  setsByGroup: dayInsights.setsByGroup,
+                  label: dayInsights.isEmpty ? l10n.insightsDayEmptyHint : null,
                 ),
-              ),
-            ],
+                const SizedBox(width: 18),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      for (final group in MuscleGroupDisplay.displayOrder)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: _MuscleSetsRow(
+                            group: group,
+                            sets: dayInsights.setsByGroup[group] ?? 0,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),

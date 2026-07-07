@@ -3674,6 +3674,18 @@ abstract class AppL10n {
   /// **'No pudimos cargar tus insights. Probá de nuevo.'**
   String get insightsLoadError;
 
+  /// Label shown on today's tile in the per-day heat-map day-strip (charts-redesign PR2, AD5/REQ:heat-map-per-day), replacing the weekday letter.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'HOY'**
+  String get insightsDayStripTodayLabel;
+
+  /// Hint shown under the body silhouette when the selected day in the day-strip has no finished session — the muñeco renders blank (charts-redesign PR2, AD5/REQ:heat-map-per-day).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No entrenaste este día.'**
+  String get insightsDayEmptyHint;
+
   /// Error state for profile_edit_personal_screen's profile load (finding 13) and reusable for the trainer-edit gyms section error (finding 14). Pair with coachRetryLabel.
   ///
   /// In es_AR, this message translates to:
