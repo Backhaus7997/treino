@@ -1,8 +1,13 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../auth/application/auth_providers.dart';
 import '../../profile/application/user_providers.dart' show firestoreProvider;
+import '../../profile/application/user_public_profile_providers.dart';
 import '../data/post_repository.dart';
+import '../domain/friendship_status.dart';
 import '../domain/post.dart';
+import '../domain/post_privacy.dart';
+import 'public_profile_providers.dart';
 
 final postRepositoryProvider = Provider<PostRepository>(
   (ref) => PostRepository(firestore: ref.watch(firestoreProvider)),
@@ -45,7 +50,85 @@ final feedForGymProvider =
 });
 
 /// All posts authored by a given UID.
+///
+/// `autoDispose` so that when a consumer un-mounts (e.g. the viewer leaves
+/// the public profile screen) the future is torn down and the next visit
+/// re-issues the underlying `posts.where(authorUid == uid).get()` query
+/// instead of serving a stale cached list. Without `autoDispose` a viewer
+/// who opened the profile BEFORE the target posted would never see new
+/// posts appear on subsequent visits.
 final postsByAuthorProvider =
-    FutureProvider.family<List<Post>, String>((ref, uid) {
+    FutureProvider.autoDispose.family<List<Post>, String>((ref, uid) {
   return ref.watch(postRepositoryProvider).byAuthor(uid);
 });
+
+/// Posts authored by [targetUid], visible to the current viewer per each
+/// post's [PostPrivacy] rule (Option X):
+/// - `public` → always visible
+/// - `friends` → visible if the viewer is an accepted follower OR is self
+/// - `gym` → visible if viewer.gymId == target.authorGymId OR is self
+///
+/// Returned newest-first (post_repository.byAuthor returns unordered, we
+/// sort here). Empty list when viewer is unauthenticated. Powers the
+/// "ACTIVIDAD" tab of another user's public profile screen.
+///
+/// Client-side filter is safe here because the volume is bounded by uid —
+/// no user is expected to have thousands of own posts, and the alternative
+/// (three separate parallel queries per privacy tier) would issue more reads
+/// than needed while adding complexity to reconcile the timelines.
+final visiblePostsByAuthorProvider =
+    FutureProvider.autoDispose.family<List<Post>, String>(
+  (ref, targetUid) async {
+    final viewerAuth = await ref.watch(authStateChangesProvider.future);
+    if (viewerAuth == null) return const [];
+    final viewerUid = viewerAuth.uid;
+    final isSelf = viewerUid == targetUid;
+
+    final all =
+        await ref.watch(postsByAuthorProvider(targetUid).future);
+    if (all.isEmpty) return const [];
+
+    // Fast paths: viewer is the target user OR every post is public.
+    if (isSelf) {
+      final sorted = List<Post>.of(all)
+        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return sorted;
+    }
+
+    // Relationship signals — only fetched when there is at least one
+    // non-public post; keeps the common case cheap.
+    final needsRelationships =
+        all.any((p) => p.privacy != PostPrivacy.public);
+    var isAcceptedFriend = false;
+    String? viewerGymId;
+    if (needsRelationships) {
+      final friendship = await ref.watch(
+        friendshipByPairProvider(
+          (viewerUid: viewerUid, targetUid: targetUid),
+        ).future,
+      );
+      isAcceptedFriend = friendship?.status == FriendshipStatus.accepted;
+      final viewerProfile =
+          await ref.watch(userPublicProfileProvider(viewerUid).future);
+      viewerGymId = viewerProfile?.gymId;
+    }
+
+    final visible = <Post>[];
+    for (final post in all) {
+      switch (post.privacy) {
+        case PostPrivacy.public:
+          visible.add(post);
+        case PostPrivacy.friends:
+          if (isAcceptedFriend) visible.add(post);
+        case PostPrivacy.gym:
+          if (viewerGymId != null &&
+              post.authorGymId != null &&
+              viewerGymId == post.authorGymId) {
+            visible.add(post);
+          }
+      }
+    }
+    visible.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return visible;
+  },
+);

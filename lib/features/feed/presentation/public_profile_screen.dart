@@ -8,12 +8,16 @@ import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../auth/application/auth_providers.dart';
 import '../../chat/application/chat_providers.dart';
+import '../../workout/application/user_routines_providers.dart';
+import '../application/post_providers.dart';
 import '../application/public_profile_providers.dart';
 import '../domain/friendship.dart';
 import '../domain/friendship_status.dart';
+import 'widgets/post_card.dart';
 import 'widgets/public_profile_follow_button.dart';
 import 'widgets/public_profile_hero.dart';
 import 'widgets/public_profile_stats_row.dart';
+import '../../workout/presentation/widgets/routine_card.dart';
 
 /// Which tab is selected inside the public profile screen.
 /// Private to this file — the screen and `_ProfileTabPills` are the only
@@ -69,7 +73,15 @@ class PublicProfileScreen extends ConsumerWidget {
           final isAcceptedFollower =
               view.friendship?.status.name == 'accepted';
           final gated = !view.isSelf && !view.isPublic && !isAcceptedFollower;
+          // Bottom inset so the last post/routine clears the floating
+          // TreinoBottomBar (WhatsApp-style: extendBody + translucent pill).
+          // Composition: pill height (72) + top margin (8) + bottom safe
+          // area + a small breathing gap. Without this the last card sits
+          // behind the bar and can't be fully read even on scroll.
+          final bottomInset =
+              MediaQuery.paddingOf(context).bottom + 88;
           return SingleChildScrollView(
+            padding: EdgeInsets.only(bottom: bottomInset),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -397,19 +409,105 @@ class _ProfileTabBody extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final tab = ref.watch(_profileTabProvider(targetUid));
-    final palette = AppPalette.of(context);
-
-    final copy = switch (tab) {
-      _ProfileTab.rutinas => 'Aún no hay rutinas públicas.',
-      _ProfileTab.actividad => 'Aún no hay actividad reciente.',
+    return switch (tab) {
+      _ProfileTab.rutinas => _RutinasTabBody(targetUid: targetUid),
+      _ProfileTab.actividad => _ActividadTabBody(targetUid: targetUid),
     };
+  }
+}
 
-    // Placeholder: real content wired in Fase 5 (routines) / Fase 4 (activity).
+class _RutinasTabBody extends ConsumerWidget {
+  const _RutinasTabBody({required this.targetUid});
+
+  final String targetUid;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final palette = AppPalette.of(context);
+    final routines = ref.watch(publicRoutinesByUserProvider(targetUid));
+
+    if (routines.isEmpty) {
+      return _EmptyState(
+        palette: palette,
+        text: 'Aún no hay rutinas públicas.', // i18n: Fase W2
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final routine in routines)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: RoutineCard(routine: routine),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ActividadTabBody extends ConsumerWidget {
+  const _ActividadTabBody({required this.targetUid});
+
+  final String targetUid;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final palette = AppPalette.of(context);
+    final postsAsync = ref.watch(visiblePostsByAuthorProvider(targetUid));
+
+    return postsAsync.when(
+      data: (posts) {
+        if (posts.isEmpty) {
+          return _EmptyState(
+            palette: palette,
+            text: 'Aún no hay actividad reciente.', // i18n: Fase W2
+          );
+        }
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (final post in posts)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: PostCard(post: post),
+                ),
+            ],
+          ),
+        );
+      },
+      loading: () => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 32),
+        child: Center(
+          child: CircularProgressIndicator(color: palette.accent),
+        ),
+      ),
+      error: (_, __) => _EmptyState(
+        palette: palette,
+        text: 'No pudimos cargar la actividad.', // i18n: Fase W2
+      ),
+    );
+  }
+}
+
+class _EmptyState extends StatelessWidget {
+  const _EmptyState({required this.palette, required this.text});
+
+  final AppPalette palette;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 20),
       child: Center(
         child: Text(
-          copy,
+          text,
           style: GoogleFonts.barlow(
             fontSize: 14,
             color: palette.textMuted,

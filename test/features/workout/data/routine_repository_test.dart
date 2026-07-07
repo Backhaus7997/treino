@@ -243,8 +243,14 @@ void main() {
   group('createUserOwned', () {
     test(
         'SCENARIO-USR-005: sets source=user-created, createdBy=uid, '
-        'visibility=private, status=active', () async {
-      final draft = _minimalDraft();
+        'visibility from draft (private by default), status=active',
+        () async {
+      // Explicit private draft — REQ-USR-012 was reopened; the repo now
+      // respects `draft.visibility` clamped to {private,public} rather than
+      // hardcoding private. A draft without an explicit value is treated
+      // as private by the repo (see `createUserOwned` clamp).
+      final draft = _minimalDraft()
+          .copyWith(visibility: RoutineVisibility.private);
 
       final saved = await repo.createUserOwned(uid: 'athlete-a', draft: draft);
 
@@ -254,6 +260,38 @@ void main() {
       expect(data['createdBy'], equals('athlete-a'));
       expect(data['visibility'], equals('private'));
       expect(data['status'], equals('active'));
+    });
+
+    test(
+        'REQ-USR-012 (reopened): draft.visibility=public → persisted as public',
+        () async {
+      // The athlete may opt in at create time to share the routine on their
+      // public profile. `_ShareOnProfileTile` sets visibility to public.
+      final draft = _minimalDraft()
+          .copyWith(visibility: RoutineVisibility.public);
+
+      final saved = await repo.createUserOwned(uid: 'athlete-a', draft: draft);
+
+      final snap = await firestore.collection('routines').doc(saved.id).get();
+      expect(snap.data()!['visibility'], equals('public'));
+      expect(saved.visibility, equals(RoutineVisibility.public));
+    });
+
+    test(
+        'defensive clamp: draft.visibility=shared coerces to private '
+        '(shared is trainer-only)', () async {
+      // Guard: even if a client somehow submits `shared`, the repo must
+      // downgrade to `private` before write — the rule would reject
+      // `shared` anyway, but this keeps the failure to a client error
+      // rather than a permission-denied surprise.
+      final draft = _minimalDraft()
+          .copyWith(visibility: RoutineVisibility.shared);
+
+      final saved = await repo.createUserOwned(uid: 'athlete-a', draft: draft);
+
+      final snap = await firestore.collection('routines').doc(saved.id).get();
+      expect(snap.data()!['visibility'], equals('private'));
+      expect(saved.visibility, equals(RoutineVisibility.private));
     });
 
     test(
@@ -488,12 +526,17 @@ void main() {
     }) async {
       final saved = await repo.createUserOwned(
         uid: uid,
+        // Explicit private — freezed Routine defaults to public, and after
+        // REQ-USR-012 was reopened the repo respects `draft.visibility`.
+        // Without this, the seed would land as public and break tests that
+        // assert the routine starts private.
         draft: const Routine(
           id: '',
           name: 'Rutina Original',
           split: null,
           level: ExperienceLevel.beginner,
           days: [],
+          visibility: RoutineVisibility.private,
         ),
       );
       return saved.id;
@@ -538,6 +581,65 @@ void main() {
       // Returned routine has the updated name.
       expect(result.id, equals(id));
       expect(result.name, equals('Rutina Editada'));
+    });
+
+    test(
+        'REQ-USR-012 (reopened): update flips visibility private→public → '
+        'persisted', () async {
+      // Simulates the athlete flipping the "Compartir en mi perfil" toggle
+      // on an existing user-created routine. Before this change the repo
+      // stripped visibility from the update payload; now it is included
+      // and the Firestore rule accepts the transition.
+      final id = await seedUserRoutine();
+
+      final updatedDraft = Routine(
+        id: id,
+        name: 'Rutina Original',
+        split: null,
+        level: ExperienceLevel.beginner,
+        days: const [],
+        source: RoutineSource.userCreated,
+        visibility: RoutineVisibility.public,
+      );
+      await repo.updateUserOwned(uid: 'athlete-a', draft: updatedDraft);
+
+      final after =
+          (await firestore.collection('routines').doc(id).get()).data()!;
+      expect(after['visibility'], equals('public'),
+          reason: 'owner opt-in to publish must reach Firestore');
+    });
+
+    test(
+        'REQ-USR-012 (reopened): update flips visibility public→private → '
+        'persisted (opt-out)', () async {
+      // Reverse direction: an athlete may un-share a previously public
+      // routine and it must go back to private in the doc.
+      final saved = await repo.createUserOwned(
+        uid: 'athlete-a',
+        draft: const Routine(
+          id: '',
+          name: 'Publica ya',
+          split: null,
+          level: ExperienceLevel.beginner,
+          days: [],
+          visibility: RoutineVisibility.public,
+        ),
+      );
+
+      final draftPrivate = Routine(
+        id: saved.id,
+        name: 'Publica ya',
+        split: null,
+        level: ExperienceLevel.beginner,
+        days: const [],
+        source: RoutineSource.userCreated,
+        visibility: RoutineVisibility.private,
+      );
+      await repo.updateUserOwned(uid: 'athlete-a', draft: draftPrivate);
+
+      final after =
+          (await firestore.collection('routines').doc(saved.id).get()).data()!;
+      expect(after['visibility'], equals('private'));
     });
 
     test('SCENARIO-USR-018b: payload does NOT include assignedBy or assignedTo',
