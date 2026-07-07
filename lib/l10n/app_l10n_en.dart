@@ -2315,4 +2315,9 @@ class AppL10nEn extends AppL10n {
   @override
   String get monthlyReportLoadError =>
       'We couldn\'t load your monthly report. Try again.';
+
+  @override
+  String workoutDaysCalendarStreak(int n) {
+    return '';
+  }
 }

@@ -2369,6 +2369,11 @@ class AppL10nEs extends AppL10n {
   @override
   String get monthlyReportLoadError =>
       'No pudimos cargar tu reporte mensual. Probá de nuevo.';
+
+  @override
+  String workoutDaysCalendarStreak(int n) {
+    return 'Racha de $n días';
+  }
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -4734,4 +4739,9 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get monthlyReportLoadError =>
       'No pudimos cargar tu reporte mensual. Probá de nuevo.';
+
+  @override
+  String workoutDaysCalendarStreak(int n) {
+    return 'Racha de $n días';
+  }
 }

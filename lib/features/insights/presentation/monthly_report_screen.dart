@@ -8,20 +8,23 @@ import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
 import '../application/monthly_report_providers.dart';
+import '../application/workout_days_providers.dart';
 import '../domain/monthly_report.dart';
 import 'widgets/monthly_report_chart.dart';
 import 'widgets/monthly_report_summary_cards.dart';
+import 'widgets/workout_days_calendar.dart';
 
 /// Monthly Report screen (Hevy "June Report" parity, AD6/PR5a) — 12-month
-/// bar chart + metric tabs + summary cards for the selected month.
+/// bar chart + metric tabs + summary cards for the selected month, plus the
+/// workout-days streak calendar (AD6/PR5b).
 ///
 /// [uid] is explicit (not read from [currentUidProvider]) so this screen can
 /// later be reused for coach-side surfacing without change, same pattern as
 /// [athleteMonthlyReportProvider].
 ///
 /// The trailing [Column] in the data branch is the extension point for
-/// PR5b (workout-days streak calendar) and PR5c (month-vs-month radar) to
-/// append their own cards — NOT built here, per design's pre-split.
+/// PR5c (month-vs-month radar) to append its own card — NOT built here, per
+/// design's pre-split.
 class MonthlyReportScreen extends ConsumerStatefulWidget {
   const MonthlyReportScreen({super.key, required this.uid});
 
@@ -107,10 +110,15 @@ class _MonthlyReportScreenState extends ConsumerState<MonthlyReportScreen> {
                       volumeUnit: l10n.monthlyReportVolumeUnit,
                     ),
                   ),
-                  // ── Extension point for PR5b/PR5c ───────────────────────
-                  // PR5b (workout-days streak calendar) and PR5c
-                  // (month-vs-month radar) append their own cards HERE —
-                  // intentionally left as siblings in this ListView, not
+                  const SizedBox(height: 14),
+                  _WorkoutDaysSection(
+                    uid: widget.uid,
+                    month: selectedPoint.month,
+                    l10n: l10n,
+                  ),
+                  // ── Extension point for PR5c ─────────────────────────────
+                  // PR5c (month-vs-month radar) appends its own card HERE —
+                  // intentionally left as a sibling in this ListView, not
                   // built in this slice.
                 ],
               );
@@ -183,6 +191,48 @@ class _Header extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ── Workout-days streak calendar section ─────────────────────────────────────
+
+/// [AD6/PR5b] Loads [athleteWorkoutDaysProvider] for [uid]/[month] and
+/// renders [WorkoutDaysCalendar]. Re-fetches whenever [month] changes (the
+/// selected bar in [MonthlyReportChart] above), via the provider's family
+/// key — same re-fetch-on-selection pattern as the summary cards.
+class _WorkoutDaysSection extends ConsumerWidget {
+  const _WorkoutDaysSection({
+    required this.uid,
+    required this.month,
+    required this.l10n,
+  });
+
+  final String uid;
+  final DateTime month;
+  final AppL10n l10n;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final palette = AppPalette.of(context);
+    final async = ref.watch(
+      athleteWorkoutDaysProvider((uid: uid, month: month)),
+    );
+
+    return async.when(
+      loading: () => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Center(
+          child: CircularProgressIndicator(color: palette.accent),
+        ),
+      ),
+      error: (_, __) => const SizedBox.shrink(),
+      data: (data) => WorkoutDaysCalendar(
+        data: data,
+        labels: WorkoutDaysCalendarLabels(
+          streakLabelBuilder: l10n.workoutDaysCalendarStreak,
+        ),
       ),
     );
   }

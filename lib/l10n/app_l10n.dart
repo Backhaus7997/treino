@@ -4346,6 +4346,12 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'No pudimos cargar tu reporte mensual. Probá de nuevo.'**
   String get monthlyReportLoadError;
+
+  /// [AD6/PR5b] Week-streak indicator text shown next to the flame icon above the workout-days calendar. Reuses computeStreak's day-count value (same 'racha' terminology as the rest of the app, e.g. esta_semana_card.dart) — NOT a separate week-based streak calculation. Zero is a valid, always-rendered value (not hidden).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Racha de {n} días'**
+  String workoutDaysCalendarStreak(int n);
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

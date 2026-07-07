@@ -1825,5 +1825,14 @@
   "monthlyReportLoadError": "No pudimos cargar tu reporte mensual. Probá de nuevo.",
   "@monthlyReportLoadError": {
     "description": "[AD6/PR5a] Error state for the Monthly Report screen's provider load failure. Paired with coachRetryLabel for the retry CTA."
+  },
+  "workoutDaysCalendarStreak": "Racha de {n} días",
+  "@workoutDaysCalendarStreak": {
+    "description": "[AD6/PR5b] Week-streak indicator text shown next to the flame icon above the workout-days calendar. Reuses computeStreak's day-count value (same 'racha' terminology as the rest of the app, e.g. esta_semana_card.dart) — NOT a separate week-based streak calculation. Zero is a valid, always-rendered value (not hidden).",
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
   }
 }
