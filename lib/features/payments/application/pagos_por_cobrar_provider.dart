@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/utils/argentina_time.dart';
 import '../../coach/application/trainer_link_providers.dart'
     show trainerLinksStreamProvider;
 import '../../coach/domain/trainer_link_status.dart';
@@ -10,6 +11,12 @@ import '../domain/athlete_billing.dart';
 import '../domain/payment.dart';
 import 'billing_providers.dart' show athleteBillingProvider;
 import 'payment_providers.dart' show trainerPaymentsProvider;
+
+// The ART wall-clock helpers moved to core/utils/argentina_time.dart. Re-export
+// them so the payment writers/readers that import them from here (mi_cuota,
+// trainer_dashboard, marcar_pagado) keep compiling unchanged.
+export '../../../core/utils/argentina_time.dart'
+    show argentinaNow, argentinaUtcOffset, toArgentina;
 
 // ── ISO week helper ───────────────────────────────────────────────────────────
 
@@ -43,29 +50,6 @@ int _isoWeekYear(DateTime date) =>
 /// build the key the same way or weekly charges double-bill across year-end.
 String isoWeekPeriodKey(DateTime date) =>
     '${_isoWeekYear(date)}-W${_isoWeekNumber(date).toString().padLeft(2, '0')}';
-
-// ── Argentina wall-clock ──────────────────────────────────────────────────────
-
-/// Argentina's fixed UTC offset. The country has observed UTC-3 year-round with
-/// NO daylight saving since 2009, so a constant offset is correct — and it keeps
-/// this Dart client byte-identical with the `generateDuePayments` Cloud Function.
-const argentinaUtcOffset = Duration(hours: 3);
-
-/// "Now" in Argentina wall-clock, as a UTC-flagged [DateTime] whose calendar
-/// fields (year/month/day/weekday) read as ART.
-///
-/// Period keys ([isoWeekPeriodKey] and the `YYYY-MM` month key) are CALENDAR
-/// concepts and MUST derive from this — never `DateTime.now().toUtc()`. Between
-/// 21:00–23:59 ART the UTC day is already tomorrow, so a UTC-derived key buckets
-/// a payment into the wrong month/week; the CF and client would then pick
-/// different keys and double-bill. Instants (createdAt/paidAt) stay true UTC —
-/// only the bucket identity shifts to ART.
-DateTime argentinaNow() => toArgentina(DateTime.now().toUtc());
-
-/// Shifts a UTC instant into Argentina wall-clock (UTC-3, no DST). Exposed so
-/// period-key derivation can be unit-tested at fixed boundary instants without
-/// depending on the real clock.
-DateTime toArgentina(DateTime utc) => utc.subtract(argentinaUtcOffset);
 
 // ── Spanish month names ───────────────────────────────────────────────────────
 

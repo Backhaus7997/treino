@@ -9,6 +9,7 @@
 /// continues to compile without modification.
 library;
 
+import '../../../core/utils/argentina_time.dart';
 import '../domain/appointment.dart';
 
 /// Immutable result of the "Resumen del día" classification.
@@ -29,13 +30,13 @@ class DashboardDayCounts {
 ///
 /// A confirmed session counts as `done` only once it has actually ended
 /// (`startsAt + durationMin`); while it has not yet ended — including while it
-/// is in progress — it counts as `pending`. [now] must be UTC, matching the
-/// UTC [Appointment.startsAt].
+/// is in progress — it counts as `pending`. [now] must be UTC (matching the UTC
+/// [Appointment.startsAt]); "today" is bucketed by the Argentina calendar day.
 DashboardDayCounts dashboardDayCounts(
   List<Appointment> all,
   DateTime now,
 ) {
-  final todayAppts = all.where((a) => _isSameLocalDay(a.startsAt, now)).toList();
+  final todayAppts = all.where((a) => _isSameArtDay(a.startsAt, now)).toList();
   DateTime endOf(Appointment a) =>
       a.startsAt.add(Duration(minutes: a.durationMin));
   final pending = todayAppts
@@ -55,6 +56,12 @@ DashboardDayCounts dashboardDayCounts(
   );
 }
 
-bool _isSameLocalDay(DateTime a, DateTime b) {
-  return a.year == b.year && a.month == b.month && a.day == b.day;
+// "Same day" in the Argentina calendar (UTC-3, no DST): an appointment at
+// 23:00 ART shares the day with a 10:00 ART one, though their UTC days differ.
+bool _isSameArtDay(DateTime a, DateTime b) {
+  final aArt = toArgentina(a.toUtc());
+  final bArt = toArgentina(b.toUtc());
+  return aArt.year == bArt.year &&
+      aArt.month == bArt.month &&
+      aArt.day == bArt.day;
 }
