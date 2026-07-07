@@ -1918,6 +1918,12 @@ class AppL10nEn extends AppL10n {
       'We couldn\'t load your insights. Please try again.';
 
   @override
+  String get insightsDayStripTodayLabel => 'TODAY';
+
+  @override
+  String get insightsDayEmptyHint => 'No workout logged this day.';
+
+  @override
   String get profileLoadError =>
       'We couldn\'t load your profile. Please try again.';
 

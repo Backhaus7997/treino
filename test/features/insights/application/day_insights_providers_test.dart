@@ -9,7 +9,6 @@ import 'package:treino/features/workout/application/session_providers.dart';
 import 'package:treino/features/workout/data/session_repository.dart';
 import 'package:treino/features/workout/domain/exercise.dart';
 import 'package:treino/features/workout/domain/session_status.dart';
-import 'package:treino/features/workout/domain/set_log.dart';
 
 import '../../workout/application/stub_factories.dart';
 

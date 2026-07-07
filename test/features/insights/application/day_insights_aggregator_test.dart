@@ -2,7 +2,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/features/insights/application/day_insights_aggregator.dart';
 import 'package:treino/features/insights/domain/muscle_group.dart';
 import 'package:treino/features/workout/domain/session_status.dart';
-import 'package:treino/features/workout/domain/set_log.dart';
 
 import '../../workout/application/stub_factories.dart';
 
