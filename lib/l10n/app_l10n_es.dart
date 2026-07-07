@@ -2180,6 +2180,15 @@ class AppL10nEs extends AppL10n {
   String get progressionEmpty => 'Sin registros de series todavía.';
 
   @override
+  String get progressionPeriodLast30Days => 'Últimos 30 días';
+
+  @override
+  String get progressionPeriodThisWeek => 'Esta semana';
+
+  @override
+  String get progressionPeriodMonth => 'Este mes';
+
+  @override
   String get profileRoutinesAssignedHeader => 'RUTINAS ASIGNADAS POR TU PF';
 
   @override
@@ -4495,6 +4504,15 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get progressionEmpty => 'Sin registros de series todavía.';
+
+  @override
+  String get progressionPeriodLast30Days => 'Últimos 30 días';
+
+  @override
+  String get progressionPeriodThisWeek => 'Esta semana';
+
+  @override
+  String get progressionPeriodMonth => 'Este mes';
 
   @override
   String get profileRoutinesAssignedHeader => 'RUTINAS ASIGNADAS POR TU PF';

@@ -413,6 +413,9 @@
   "progressionSinglePointHint": "Necesitas al menos 2 sesiones para ver la evolución.",
   "progressionEmptyExercise": "Sin datos para este ejercicio.",
   "progressionEmpty": "Sin registros de series todavía.",
+  "progressionPeriodLast30Days": "Últimos 30 días",
+  "progressionPeriodThisWeek": "Esta semana",
+  "progressionPeriodMonth": "Este mes",
   "dashboardGreeting": "BUENAS, {name}",
   "@dashboardGreeting": {
     "description": "Welcome greeting shown in the Coach Hub web dashboard WelcomeCard.",

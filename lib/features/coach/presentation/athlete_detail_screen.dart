@@ -1666,6 +1666,11 @@ class _ProgressionSection extends StatelessWidget {
           singlePointHint: l10n.progressionSinglePointHint,
           emptyHint: l10n.progressionEmptyExercise,
         ),
+        periodLabels: ChartPeriodLabels(
+          last30dLabel: l10n.progressionPeriodLast30Days,
+          thisWeekLabel: l10n.progressionPeriodThisWeek,
+          monthLabel: l10n.progressionPeriodMonth,
+        ),
         localeName: l10n.localeName,
       ),
     );
