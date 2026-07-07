@@ -28,7 +28,7 @@ void main() {
           localizationsDelegates: AppL10n.localizationsDelegates,
           supportedLocales: AppL10n.supportedLocales,
           locale: const Locale('es', 'AR'),
-          home: Scaffold(body: MonthlyReportScreen(uid: 'u1')),
+          home: const Scaffold(body: MonthlyReportScreen(uid: 'u1')),
         ),
       );
 

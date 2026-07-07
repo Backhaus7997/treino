@@ -23,22 +23,6 @@ MonthlyReportChartLabels _labels({
       emptyHint: emptyHint,
     );
 
-MonthlyReportPoint _pt(
-  int year,
-  int month, {
-  int workoutsCount = 0,
-  int durationMin = 0,
-  double volumeKg = 0,
-  int setsCount = 0,
-}) =>
-    MonthlyReportPoint(
-      month: DateTime(year, month, 1),
-      workoutsCount: workoutsCount,
-      durationMin: durationMin,
-      volumeKg: volumeKg,
-      setsCount: setsCount,
-    );
-
 MonthlyReport _report12({int Function(int index)? workoutsCountAt}) {
   final points = List.generate(12, (i) {
     final month = DateTime(2025, 6 + i, 1);
