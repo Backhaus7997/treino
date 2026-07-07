@@ -3692,6 +3692,12 @@ abstract class AppL10n {
   /// **'No entrenaste este día.'**
   String get insightsDayEmptyHint;
 
+  /// Section header for the shared DailyHeatmapSection (per-day body heat-map + day-strip) in the coach's mobile athlete detail screen (charts-redesign PR2b, AD5).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'MÚSCULOS DEL DÍA'**
+  String get coachDailyHeatmapSectionTitle;
+
   /// Error state for profile_edit_personal_screen's profile load (finding 13) and reusable for the trainer-edit gyms section error (finding 14). Pair with coachRetryLabel.
   ///
   /// In es_AR, this message translates to:

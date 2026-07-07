@@ -28,6 +28,8 @@ import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach_hub/presentation/sections/chat/widgets/chat_detail_pane.dart';
 import 'package:treino/features/gyms/application/gym_providers.dart';
+import 'package:treino/features/insights/presentation/widgets/daily_heatmap_section.dart';
+import 'package:treino/features/insights/presentation/widgets/day_strip_labels.dart';
 import 'package:treino/features/measurements/application/measurement_providers.dart';
 import 'package:treino/features/measurements/domain/measurement.dart';
 import 'package:treino/features/measurements/presentation/widgets/measurement_progress_chart.dart';
@@ -1757,8 +1759,44 @@ class _EntrenamientoTab extends ConsumerWidget {
             },
           ),
           const SizedBox(height: 24),
+          _DailyHeatmapTabSection(athleteId: athleteId),
+          const SizedBox(height: 24),
           _ProgressionTabSection(athleteId: athleteId, palette: palette),
         ],
+      ),
+    );
+  }
+}
+
+// ── Músculos del día (PR2b) ───────────────────────────────────────────────────
+
+/// Web-surface daily heat-map section.
+///
+/// Thin wrapper around the shared [DailyHeatmapSection] (AD5 dedupe — see
+/// daily_heatmap_section.dart) with hardcoded Spanish labels, same pattern as
+/// [_ProgressionTabSection].
+///
+/// All user-visible strings are hardcoded Spanish — the web Coach Hub does
+/// NOT use AppL10n. Marked `// i18n: Fase W2` for future extraction.
+///
+/// Firestore access: trainer READ on `users/{uid}/sessions`+`setLogs` is
+/// already granted by firestore.rules:786-807 (same predicate the mobile
+/// coach shell relies on) — no rules change needed.
+class _DailyHeatmapTabSection extends StatelessWidget {
+  const _DailyHeatmapTabSection({required this.athleteId});
+
+  final String athleteId;
+
+  @override
+  Widget build(BuildContext context) {
+    return DailyHeatmapSection(
+      athleteId: athleteId,
+      labels: const DailyHeatmapSectionLabels(
+        sectionTitle: 'MÚSCULOS DEL DÍA', // i18n: Fase W2
+        dayStripLabels: DayStripLabels(
+          todayLabel: 'HOY', // i18n: Fase W2
+          emptyDayHint: 'No entrenó este día.', // i18n: Fase W2
+        ),
       ),
     );
   }

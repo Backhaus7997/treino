@@ -716,6 +716,7 @@
   "insightsLoadError": "We couldn't load your insights. Please try again.",
   "insightsDayStripTodayLabel": "TODAY",
   "insightsDayEmptyHint": "No workout logged this day.",
+  "coachDailyHeatmapSectionTitle": "MUSCLES OF THE DAY",
   "profileLoadError": "We couldn't load your profile. Please try again.",
   "sessionDetailNoSets": "This session has no logged sets.",
   "sessionLogSetError": "We couldn't save the set. Please try again.",

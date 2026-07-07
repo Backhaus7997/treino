@@ -14,6 +14,8 @@ import '../application/athlete_note_providers.dart';
 import '../domain/athlete_note.dart';
 import '../../payments/application/billing_providers.dart';
 import '../../payments/domain/athlete_billing.dart';
+import '../../insights/presentation/widgets/daily_heatmap_section.dart';
+import '../../insights/presentation/widgets/day_strip_labels.dart';
 import '../../performance/application/performance_test_providers.dart';
 import '../../performance/presentation/log_performance_test_screen.dart';
 import '../../performance/presentation/widgets/performance_progress_chart.dart';
@@ -1613,6 +1615,10 @@ class _EntrenamientosSection extends ConsumerWidget {
           },
         ),
 
+        // ── Daily heat-map section ──────────────────────────────────────────
+        const SizedBox(height: 24),
+        _DailyHeatmapSection(athleteId: athleteId),
+
         // ── Exercise progression section ──────────────────────────────────
         const SizedBox(height: 24),
         _ProgressionSection(athleteId: athleteId),
@@ -1630,6 +1636,36 @@ class _EntrenamientosSection extends ConsumerWidget {
         border: Border.all(color: palette.border),
       ),
       child: child,
+    );
+  }
+}
+
+// ── Daily heat-map section (PR2b) ─────────────────────────────────────────────
+
+/// Per-day body heat-map + day-strip + per-day summary shown in
+/// [_EntrenamientosSection], for the coach viewing THIS alumno.
+///
+/// Thin AppL10n-resolving wrapper around the shared [DailyHeatmapSection]
+/// (AD5 dedupe — see daily_heatmap_section.dart, same pattern as
+/// [_ProgressionSection]/AD1). [athleteId] flows straight into the shared
+/// section's provider calls — never `currentUidProvider`.
+class _DailyHeatmapSection extends StatelessWidget {
+  const _DailyHeatmapSection({required this.athleteId});
+  final String athleteId;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppL10n.of(context);
+
+    return DailyHeatmapSection(
+      athleteId: athleteId,
+      labels: DailyHeatmapSectionLabels(
+        sectionTitle: l10n.coachDailyHeatmapSectionTitle,
+        dayStripLabels: DayStripLabels(
+          todayLabel: l10n.insightsDayStripTodayLabel,
+          emptyDayHint: l10n.insightsDayEmptyHint,
+        ),
+      ),
     );
   }
 }

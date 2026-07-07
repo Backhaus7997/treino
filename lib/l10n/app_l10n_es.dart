@@ -1978,6 +1978,9 @@ class AppL10nEs extends AppL10n {
   String get insightsDayEmptyHint => 'No entrenaste este día.';
 
   @override
+  String get coachDailyHeatmapSectionTitle => 'MÚSCULOS DEL DÍA';
+
+  @override
   String get profileLoadError =>
       'No pudimos cargar tu perfil. Inténtalo de nuevo.';
 
@@ -4310,6 +4313,9 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get insightsDayEmptyHint => 'No entrenaste este día.';
+
+  @override
+  String get coachDailyHeatmapSectionTitle => 'MÚSCULOS DEL DÍA';
 
   @override
   String get profileLoadError => 'No pudimos cargar tu perfil. Probá de nuevo.';
