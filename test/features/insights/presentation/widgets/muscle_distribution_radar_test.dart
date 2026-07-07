@@ -54,8 +54,8 @@ void main() {
 
     testWidgets('non-empty insights → renders RadarChart with 2 dataSets',
         (tester) async {
-      final insights = MuscleDistributionInsights(
-        currentSetsByAxis: const {
+      const insights = MuscleDistributionInsights(
+        currentSetsByAxis: {
           RadarAxis.chest: 10,
           RadarAxis.back: 8,
           RadarAxis.core: 4,
@@ -63,7 +63,7 @@ void main() {
           RadarAxis.arms: 6,
           RadarAxis.legs: 12,
         },
-        previousSetsByAxis: const {
+        previousSetsByAxis: {
           RadarAxis.chest: 6,
           RadarAxis.back: 4,
         },
@@ -90,9 +90,9 @@ void main() {
 
     testWidgets('stat cards render current value + previous arrow',
         (tester) async {
-      final insights = MuscleDistributionInsights(
-        currentSetsByAxis: const {RadarAxis.chest: 10},
-        previousSetsByAxis: const {RadarAxis.chest: 6},
+      const insights = MuscleDistributionInsights(
+        currentSetsByAxis: {RadarAxis.chest: 10},
+        previousSetsByAxis: {RadarAxis.chest: 6},
         currentWorkouts: 4,
         previousWorkouts: 3,
         currentDurationMin: 180,
