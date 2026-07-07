@@ -1,8 +1,11 @@
-// RED tests for _InactivosSection (real provider) and _AlertBanner (real provider).
+// Tests for _InactivosSection (real provider) and _AlertBanner (real provider).
 //
-// SCENARIO-HOY-09A+: inactivos list shows real athlete names, empty state,
-//                     and "N de M" disclaimer.
+// SCENARIO-HOY-09A+: inactivos list shows real athlete names and empty state.
 // SCENARIO-HOY-03A+: alert banner composes vencidos + solicitudes + inactivos.
+//
+// Note: SCENARIO-HOY-09C ("N de M" disclaimer) was removed because the
+// disclaimer is gone. The `sharedWithTrainer` gate was never wired; the correct
+// gate is `status == active` (matches what Firestore session_shares authorises).
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -115,10 +118,10 @@ List<Override> _baseOverrides({
     ),
     // Stub inactivosProvider — avoid real Firestore in widget tests.
     inactivosProvider.overrideWith(
-      (ref) async => inactivosResult ??
+      (ref) async =>
+          inactivosResult ??
           const InactivosResult(
             inactiveAthleteIds: [],
-            totalSharingCount: 0,
           ),
     ),
     // Resolve public profiles for athlete names.
@@ -142,7 +145,6 @@ void main() {
         overrides: _baseOverrides(
           inactivosResult: const InactivosResult(
             inactiveAthleteIds: ['a1', 'a2'],
-            totalSharingCount: 3,
           ),
           athleteNames: {
             'a1': 'Ana López',
@@ -160,8 +162,7 @@ void main() {
 
   // ── SCENARIO-HOY-09B — Inactivos: empty state ─────────────────────────────
 
-  group('SCENARIO-HOY-09B — inactivos section shows empty state when none',
-      () {
+  group('SCENARIO-HOY-09B — inactivos section shows empty state when none', () {
     testWidgets('shows "Sin alumnos inactivos" when all are active',
         (tester) async {
       await tester.pumpWidget(_wrapWide(
@@ -169,7 +170,6 @@ void main() {
         overrides: _baseOverrides(
           inactivosResult: const InactivosResult(
             inactiveAthleteIds: [],
-            totalSharingCount: 2,
           ),
         ),
       ));
@@ -179,40 +179,18 @@ void main() {
     });
   });
 
-  // ── SCENARIO-HOY-09C — Inactivos: "N de M" sharing disclaimer ────────────
-
-  group('SCENARIO-HOY-09C — inactivos section shows "N de M" disclaimer', () {
-    testWidgets('shows sharing note when not all athletes share', (tester) async {
-      await tester.pumpWidget(_wrapWide(
-        const CoachHubDashboardScreen(),
-        overrides: _baseOverrides(
-          inactivosResult: const InactivosResult(
-            inactiveAthleteIds: ['a1'],
-            totalSharingCount: 2,
-          ),
-          athleteNames: {'a1': 'Ana López'},
-        ),
-      ));
-      await tester.pumpAndSettle();
-
-      // "N de M con datos compartidos" — verify the disclaimer is present.
-      expect(find.textContaining('de'), findsAtLeastNWidgets(1));
-      expect(find.textContaining('compartidos'), findsOneWidget);
-    });
-  });
-
   // ── SCENARIO-HOY-03A+ — Alert banner: all clear ───────────────────────────
 
   group('SCENARIO-HOY-03A+ — alert banner shows "Todo al día" when no alerts',
       () {
-    testWidgets('renders "Todo al día" when 0 vencidos + 0 solicitudes + 0 inactivos',
+    testWidgets(
+        'renders "Todo al día" when 0 vencidos + 0 solicitudes + 0 inactivos',
         (tester) async {
       await tester.pumpWidget(_wrapWide(
         const CoachHubDashboardScreen(),
         overrides: _baseOverrides(
           inactivosResult: const InactivosResult(
             inactiveAthleteIds: [],
-            totalSharingCount: 0,
           ),
         ),
       ));
@@ -225,7 +203,8 @@ void main() {
   // ── SCENARIO-HOY-03B — Alert banner: composed summary ────────────────────
 
   group('SCENARIO-HOY-03B — alert banner shows composed summary', () {
-    testWidgets('renders composed summary with non-zero counts', (tester) async {
+    testWidgets('renders composed summary with non-zero counts',
+        (tester) async {
       final payments = [
         Payment(
           id: 'p1',
@@ -254,7 +233,6 @@ void main() {
           links: links,
           inactivosResult: const InactivosResult(
             inactiveAthleteIds: ['c1'],
-            totalSharingCount: 1,
           ),
           athleteNames: {'a1': 'Alumno A1', 'c1': 'Inactive C1'},
         ),

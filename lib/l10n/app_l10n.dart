@@ -4214,12 +4214,6 @@ abstract class AppL10n {
   /// **'Sin alumnos inactivos'**
   String get dashboardInactivosEmpty;
 
-  /// Disclaimer note showing how many athletes share data vs total active athletes. Shown below the inactivos list.
-  ///
-  /// In es_AR, this message translates to:
-  /// **'{sharing} de {total} con datos compartidos'**
-  String dashboardInactivosSharingNote(int sharing, int total);
-
   /// Alert banner message when there are no vencidos, pending solicitudes, or inactive athletes.
   ///
   /// In es_AR, this message translates to:

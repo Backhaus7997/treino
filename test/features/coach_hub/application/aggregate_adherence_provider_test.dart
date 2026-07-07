@@ -1,12 +1,16 @@
-// RED tests for aggregateAdherenceProvider (dashboard-hoy-aggregates PR2).
+// Tests for aggregateAdherenceProvider (dashboard-hoy-aggregates PR2).
 //
 // Covers:
 //   - SCENARIO-ADH-01: average of non-null per-athlete values.
 //   - SCENARIO-ADH-02: null when all athletes lack a plan (weeklyTarget == 0).
-//   - SCENARIO-ADH-03: respects the active+sharedWithTrainer security gate.
-//   - SCENARIO-ADH-04: excludes non-sharing athletes from the aggregate.
+//   - SCENARIO-ADH-03: respects the active security gate (non-active links excluded).
+//   - SCENARIO-ADH-04: active athletes regardless of sharedWithTrainer are included.
 //   - SCENARIO-ADH-05: empty link list → null (no fan-out).
 //   - SCENARIO-ADH-06: athlete with plan but zero completed sessions → 0%.
+//
+// Gate change (dashboard-sharedwithtrainer-gate-fix): the predicate is now
+// `status == active` only. `sharedWithTrainer` was never wired and always
+// defaults `false`, making the old `&& sharedWithTrainer` gate permanently dead.
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -221,13 +225,13 @@ void main() {
     });
   });
 
-  // SCENARIO-ADH-03: respects the active+sharedWithTrainer security gate.
-  group('SCENARIO-ADH-03 — security gate: only active+sharing athletes', () {
-    test('inactive or non-sharing links are excluded from the aggregate',
+  // SCENARIO-ADH-03: respects the active security gate (non-active excluded).
+  group('SCENARIO-ADH-03 — security gate: only active athletes considered', () {
+    test('paused and pending links are excluded; active ones are included',
         () async {
-      // Only 'a1' (active+sharing) → aggregate reflects only a1.
-      // 'a2' is active but NOT sharing → excluded.
-      // 'a3' is paused+sharing → excluded (status != active).
+      // 'a1' is active+sharing → included.
+      // 'a2' is active+NOT sharing → INCLUDED (gate fix: status==active is sufficient).
+      // 'a3' is paused → excluded (status != active).
       final container = _buildContainer(
         links: [
           _activeSharing('a1'),
@@ -270,22 +274,21 @@ void main() {
       );
       addTearDown(container.dispose);
 
-      // Should not throw; returns a value driven only by a1.
+      // Both a1 and a2 are active → result is non-null (a3 is paused, excluded).
       final result = await _readAdherence(container);
-      // a1 has a plan → result is non-null.
       expect(result, isNotNull);
     });
   });
 
-  // SCENARIO-ADH-04: excludes non-sharing athletes from the aggregate.
-  group('SCENARIO-ADH-04 — non-sharing athletes do not affect aggregate', () {
+  // SCENARIO-ADH-04: active athletes regardless of sharedWithTrainer are included.
+  group(
+      'SCENARIO-ADH-04 — active athletes included regardless of sharedWithTrainer',
+      () {
     test(
-        'trainer with 3 athletes but only 1 sharing → aggregate = solo athlete',
+        'trainer with 3 active athletes (mixed sharedWithTrainer) → all included',
         () async {
-      // a1: sharing, has plan.
-      // a2, a3: not sharing.
-      // If a2/a3 were included, they'd inflate or distort the average.
-      // With only a1, we should get a non-null value.
+      // All three are active; sharedWithTrainer varies.
+      // All should feed the aggregate.
       final container = _buildContainer(
         links: [
           _activeSharing('a1'),
@@ -299,13 +302,18 @@ void main() {
                       const Duration(days: 1),
                     )),
           ],
+          'a2': [],
+          'a3': [],
         },
         routinesByAthleteId: {
           'a1': [_routineWithDays('a1', 3)],
+          'a2': [_routineWithDays('a2', 3)],
+          'a3': [_routineWithDays('a3', 3)],
         },
       );
       addTearDown(container.dispose);
 
+      // All three active → aggregate is non-null (a1 has session, a2/a3 0%).
       final result = await _readAdherence(container);
       expect(result, isNotNull);
     });

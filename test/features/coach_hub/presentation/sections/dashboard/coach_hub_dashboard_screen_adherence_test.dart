@@ -82,7 +82,6 @@ List<Override> _overrides({double? adherenceValue}) => [
       inactivosProvider.overrideWith(
         (ref) async => const InactivosResult(
           inactiveAthleteIds: [],
-          totalSharingCount: 0,
         ),
       ),
       aggregateAdherenceProvider.overrideWith(

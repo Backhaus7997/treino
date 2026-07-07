@@ -825,13 +825,12 @@ class _VencimientoRow extends ConsumerWidget {
 
 /// Alumnos inactivos — REQ-HOY-09.
 ///
-/// Watches [inactivosProvider] for the list of inactive athlete IDs and the
-/// total sharing count. Resolves each athlete's display name via
-/// [userPublicProfileProvider] (same per-id pattern used in _VencimientoRow).
+/// Watches [inactivosProvider] for the list of inactive athlete IDs.
+/// Resolves each athlete's display name via [userPublicProfileProvider]
+/// (same per-id pattern used in _VencimientoRow).
 ///
 /// Loading: renders the section header without a spinner (avoids perpetual
 /// pumpAndSettle hang in CI). Empty state: "Sin alumnos inactivos".
-/// Disclaimer: "N de M con datos compartidos" always shown when totalSharingCount > 0.
 class _InactivosSection extends ConsumerWidget {
   const _InactivosSection();
 
@@ -883,20 +882,6 @@ class _InactivosSection extends ConsumerWidget {
                     ...ids.map(
                       (id) => _InactivoRow(athleteId: id, palette: palette),
                     ),
-                  if (result.totalSharingCount > 0) ...[
-                    const SizedBox(height: 10),
-                    Text(
-                      l10n.dashboardInactivosSharingNote(
-                        result.totalSharingCount,
-                        result.totalSharingCount,
-                      ),
-                      style: TextStyle(
-                        color: palette.textMuted,
-                        fontSize: 11,
-                        fontStyle: FontStyle.italic,
-                      ),
-                    ),
-                  ],
                 ],
               );
             },
