@@ -889,6 +889,10 @@ class AppL10nEn extends AppL10n {
       'No pudimos cargar la actividad de hoy.';
 
   @override
+  String get dashboardSinActividadReciente =>
+      'Sin actividad en los últimos días.';
+
+  @override
   String get dashboardSinCobros => 'Sin cobros pendientes.';
 
   @override
