@@ -1808,6 +1808,12 @@ abstract class AppL10n {
   /// **'No pudimos cargar la actividad de hoy.'**
   String get dashboardErrorActividad;
 
+  /// No description provided for @dashboardSinActividadReciente.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Sin actividad en los últimos días.'**
+  String get dashboardSinActividadReciente;
+
   /// No description provided for @dashboardSinCobros.
   ///
   /// In es_AR, this message translates to:
@@ -3674,6 +3680,24 @@ abstract class AppL10n {
   /// **'No pudimos cargar tus insights. Probá de nuevo.'**
   String get insightsLoadError;
 
+  /// Label shown on today's tile in the per-day heat-map day-strip (charts-redesign PR2, AD5/REQ:heat-map-per-day), replacing the weekday letter.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'HOY'**
+  String get insightsDayStripTodayLabel;
+
+  /// Hint shown under the body silhouette when the selected day in the day-strip has no finished session — the muñeco renders blank (charts-redesign PR2, AD5/REQ:heat-map-per-day).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No entrenaste este día.'**
+  String get insightsDayEmptyHint;
+
+  /// Section header for the shared DailyHeatmapSection (per-day body heat-map + day-strip) in the coach's mobile athlete detail screen (charts-redesign PR2b, AD5).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'MÚSCULOS DEL DÍA'**
+  String get coachDailyHeatmapSectionTitle;
+
   /// Error state for profile_edit_personal_screen's profile load (finding 13) and reusable for the trainer-edit gyms section error (finding 14). Pair with coachRetryLabel.
   ///
   /// In es_AR, this message translates to:
@@ -4267,12 +4291,6 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Sin alumnos inactivos'**
   String get dashboardInactivosEmpty;
-
-  /// Disclaimer note showing how many athletes share data vs total active athletes. Shown below the inactivos list.
-  ///
-  /// In es_AR, this message translates to:
-  /// **'{sharing} de {total} con datos compartidos'**
-  String dashboardInactivosSharingNote(int sharing, int total);
 
   /// Alert banner message when there are no vencidos, pending solicitudes, or inactive athletes.
   ///

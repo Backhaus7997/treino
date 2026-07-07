@@ -10,7 +10,7 @@ import '../features/auth/presentation/register_screen.dart';
 import '../features/auth/presentation/splash_screen.dart';
 import '../features/auth/presentation/welcome_screen.dart';
 import '../features/chat/application/chat_providers.dart'
-    show totalUnreadCountProvider;
+    show unreadFromCoachProvider, unreadFromFriendsProvider;
 import '../features/chat/presentation/chat_list_screen.dart';
 import '../features/chat/presentation/chat_screen.dart';
 import '../features/coach/coach_screen.dart';
@@ -655,7 +655,11 @@ class _ShellScaffoldState extends ConsumerState<_ShellScaffold> {
 
   @override
   Widget build(BuildContext context) {
-    final coachUnreadCount = ref.watch(totalUnreadCountProvider);
+    // Two mutually-exclusive badges: COACH shows unread from the athlete's
+    // linked trainer, FEED shows unread from friends (user↔user chats).
+    // Prevents the "1 on COACH when it's actually a friend messaging" bug.
+    final coachUnreadCount = ref.watch(unreadFromCoachProvider);
+    final feedUnreadCount = ref.watch(unreadFromFriendsProvider);
     return Scaffold(
       extendBody: true,
       // bottom: false — the body must reach the physical bottom edge so the
@@ -669,6 +673,7 @@ class _ShellScaffoldState extends ConsumerState<_ShellScaffold> {
       bottomNavigationBar: TreinoBottomBar(
         currentIndex: _currentIndex,
         coachUnreadCount: coachUnreadCount,
+        feedUnreadCount: feedUnreadCount,
         onTap: (i) {
           // Pop any open popup (modal bottom sheet, dialog) on the SHELL
           // navigator so it animates closed when the user switches tabs —

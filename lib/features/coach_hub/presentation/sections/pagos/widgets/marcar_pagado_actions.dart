@@ -14,7 +14,7 @@ import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/features/chat/application/chat_providers.dart'
     show chatForOtherUidProvider, chatRepositoryProvider;
 import 'package:treino/features/payments/application/pagos_por_cobrar_provider.dart'
-    show CobroPendiente, isoWeekPeriodKey;
+    show CobroPendiente, argentinaNow, isoWeekPeriodKey;
 import 'package:treino/features/payments/application/payment_providers.dart'
     show paymentRepositoryProvider;
 import 'package:treino/features/payments/domain/athlete_billing.dart';
@@ -91,16 +91,20 @@ Future<void> marcarPagado(
   if (trainerId == null) return;
   final repo = ref.read(paymentRepositoryProvider);
   final now = DateTime.now().toUtc();
+  // paidAt/createdAt stay in true UTC (`now`); the periodKey is an ART-calendar
+  // concept and MUST match the CF + the mobile writer (see argentinaNow), or a
+  // charge near a month/week boundary duplicates.
+  final nowArt = argentinaNow();
   try {
     switch (cobro.cadence) {
       case BillingCadence.suelto:
         await repo.markManyPaid(cobro.pendingPaymentIds, now);
       case BillingCadence.mensual:
         await repo.add(paidPaymentFor(trainerId, cobro, now,
-            '${now.year}-${now.month.toString().padLeft(2, '0')}'));
+            '${nowArt.year}-${nowArt.month.toString().padLeft(2, '0')}'));
       case BillingCadence.semanal:
-        await repo
-            .add(paidPaymentFor(trainerId, cobro, now, isoWeekPeriodKey(now)));
+        await repo.add(
+            paidPaymentFor(trainerId, cobro, now, isoWeekPeriodKey(nowArt)));
       case BillingCadence.porSesion:
         await repo.add(paidPaymentFor(trainerId, cobro, now, null));
     }

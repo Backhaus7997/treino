@@ -29,6 +29,8 @@ import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach_hub/presentation/sections/chat/widgets/chat_detail_pane.dart';
 import 'package:treino/features/gyms/application/gym_providers.dart';
 import 'package:treino/features/insights/domain/chart_period.dart';
+import 'package:treino/features/insights/presentation/widgets/daily_heatmap_section.dart';
+import 'package:treino/features/insights/presentation/widgets/day_strip_labels.dart';
 import 'package:treino/features/measurements/application/measurement_providers.dart';
 import 'package:treino/features/measurements/domain/measurement.dart';
 import 'package:treino/features/measurements/presentation/widgets/measurement_progress_chart.dart';
@@ -668,9 +670,15 @@ class _ResumenTab extends ConsumerWidget {
         routinesAsync.isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
-    if (sessionsAsync.hasError ||
-        measAsync.hasError ||
-        routinesAsync.hasError) {
+    // measurements (trainer-owned) y routines SIEMPRE son legibles → si alguna
+    // falla es un error real del resumen. Las SESIONES, en cambio, dependen de
+    // `session_shares`, que el CF borra cuando el link no está `active` (p.ej.
+    // pausado) → un permission-denied ahí NO es un error del resumen: lo
+    // degradamos a "sin sesiones" y renderizamos igual todo lo que sí se puede
+    // (mediciones, plan, próxima sesión, nota, datos personales). Los widgets
+    // dependientes de sesiones (adherencia, última sesión) muestran su propio
+    // estado vacío.
+    if (measAsync.hasError || routinesAsync.hasError) {
       return _muted(palette, 'No se pudo cargar el resumen.'); // i18n: Fase W2
     }
 
@@ -679,8 +687,9 @@ class _ResumenTab extends ConsumerWidget {
     final active =
         actives.where((r) => r.assignedBy == trainerUid).firstOrNull ??
             actives.firstOrNull;
+    final sessions = sessionsAsync.valueOrNull ?? const [];
     final m = ResumenMetrics.compute(
-      sessions: sessionsAsync.requireValue,
+      sessions: sessions,
       measurements: measAsync.requireValue,
       weeklyTarget: active?.days.length ?? 0,
       now: DateTime.now(),
@@ -774,7 +783,7 @@ class _ResumenTab extends ConsumerWidget {
           _UltimaSessionCard(
             palette: palette,
             athleteId: athleteId,
-            sessions: sessionsAsync.requireValue,
+            sessionsAsync: sessionsAsync,
           ),
           const SizedBox(height: 20),
           _sectionLabel(palette, 'DATOS PERSONALES'), // i18n
@@ -1258,28 +1267,48 @@ class _UltimaSessionCard extends ConsumerWidget {
   const _UltimaSessionCard({
     required this.palette,
     required this.athleteId,
-    required this.sessions,
+    required this.sessionsAsync,
   });
 
   final AppPalette palette;
   final String athleteId;
-  final List<Session> sessions;
+  final AsyncValue<List<Session>> sessionsAsync;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Caja bordeada reutilizable para los estados de texto (error / vacío).
+    Widget box(Widget child) => Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: palette.bgCard,
+            border: Border.all(color: palette.border),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: child,
+        );
+
+    // Las sesiones dependen de `session_shares`, que el CF borra cuando el link
+    // no está `active` (p.ej. pausado) → ahí la lista da permission-denied. Eso
+    // NO es un fallo real: significa que el alumno no está compartiendo su
+    // historial ahora. Lo decimos explícitamente en vez de un engañoso «sin
+    // sesiones registradas» (que implicaría que nunca entrenó).
+    if (sessionsAsync.hasError) {
+      final e = sessionsAsync.error;
+      final noShare = e is FirebaseException && e.code == 'permission-denied';
+      return box(Text(
+        noShare
+            ? 'El alumno no compartió su historial.' // i18n: Fase W2
+            : 'No se pudo cargar la última sesión.', // i18n: Fase W2
+        style: TextStyle(color: palette.textMuted, fontSize: 13),
+      ));
+    }
+
+    final sessions = sessionsAsync.valueOrNull ?? const <Session>[];
     if (sessions.isEmpty) {
-      return Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: palette.bgCard,
-          border: Border.all(color: palette.border),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Text(
-          'Sin sesiones registradas.', // i18n: Fase W2
-          style: TextStyle(color: palette.textMuted, fontSize: 13),
-        ),
-      );
+      return box(Text(
+        'Sin sesiones registradas.', // i18n: Fase W2
+        style: TextStyle(color: palette.textMuted, fontSize: 13),
+      ));
     }
 
     final lastSession = sessions.first;
@@ -1288,14 +1317,8 @@ class _UltimaSessionCard extends ConsumerWidget {
     final lastWeightAsync = ref.watch(lastWeightByExerciseProvider(athleteId));
     final muted = TextStyle(color: palette.textMuted, fontSize: 12);
 
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: palette.bgCard,
-        border: Border.all(color: palette.border),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
+    return box(
+      Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
@@ -1540,8 +1563,19 @@ String _cadenciaLabel(BillingCadence c) => switch (c) {
 /// misma receta que el dashboard del coach). Los recordatorios y las métricas
 /// globales (ingreso del mes/proyección) se difieren.
 /// Construye un CSV (RFC-4180) del historial de pagos del alumno. // i18n
-String _buildPagosCsv(List<Payment> payments) {
-  String esc(String s) => '"${s.replaceAll('"', '""')}"';
+///
+/// Neutraliza inyección de fórmulas (CSV injection): una celda que arranca con
+/// = + - @ (o tab/CR) la interpretan Excel/Sheets como FÓRMULA. `concept` es
+/// texto libre, así que prefijamos esas celdas con comilla simple para forzar
+/// que se traten como texto literal.
+@visibleForTesting
+String buildPagosCsv(List<Payment> payments) {
+  String esc(String s) {
+    // CSV-injection guard (OWASP): prefix a formula-trigger lead with a quote.
+    final v = s.isNotEmpty && '=+-@\t\r'.contains(s[0]) ? "'$s" : s;
+    return '"${v.replaceAll('"', '""')}"';
+  }
+
   final rows = <String>['FECHA,CONCEPTO,MONTO,ESTADO,PERÍODO'];
   for (final p in payments) {
     final d = p.createdAt.toLocal();
@@ -1644,7 +1678,7 @@ class _PagosTab extends ConsumerWidget {
                     'alumno';
                 triggerBrowserDownload(
                   bytes:
-                      Uint8List.fromList(utf8.encode(_buildPagosCsv(history))),
+                      Uint8List.fromList(utf8.encode(buildPagosCsv(history))),
                   filename: 'pagos_${name.replaceAll(' ', '_')}.csv',
                   mimeType: 'text/csv',
                 );
@@ -1729,8 +1763,44 @@ class _EntrenamientoTab extends ConsumerWidget {
             },
           ),
           const SizedBox(height: 24),
+          _DailyHeatmapTabSection(athleteId: athleteId),
+          const SizedBox(height: 24),
           _ProgressionTabSection(athleteId: athleteId, palette: palette),
         ],
+      ),
+    );
+  }
+}
+
+// ── Músculos del día (PR2b) ───────────────────────────────────────────────────
+
+/// Web-surface daily heat-map section.
+///
+/// Thin wrapper around the shared [DailyHeatmapSection] (AD5 dedupe — see
+/// daily_heatmap_section.dart) with hardcoded Spanish labels, same pattern as
+/// [_ProgressionTabSection].
+///
+/// All user-visible strings are hardcoded Spanish — the web Coach Hub does
+/// NOT use AppL10n. Marked `// i18n: Fase W2` for future extraction.
+///
+/// Firestore access: trainer READ on `users/{uid}/sessions`+`setLogs` is
+/// already granted by firestore.rules:786-807 (same predicate the mobile
+/// coach shell relies on) — no rules change needed.
+class _DailyHeatmapTabSection extends StatelessWidget {
+  const _DailyHeatmapTabSection({required this.athleteId});
+
+  final String athleteId;
+
+  @override
+  Widget build(BuildContext context) {
+    return DailyHeatmapSection(
+      athleteId: athleteId,
+      labels: const DailyHeatmapSectionLabels(
+        sectionTitle: 'MÚSCULOS DEL DÍA', // i18n: Fase W2
+        dayStripLabels: DayStripLabels(
+          todayLabel: 'HOY', // i18n: Fase W2
+          emptyDayHint: 'No entrenó este día.', // i18n: Fase W2
+        ),
       ),
     );
   }
@@ -2473,9 +2543,14 @@ class _HistorialTab extends ConsumerWidget {
       loading: () => Center(
         child: CircularProgressIndicator(color: palette.accent),
       ),
-      error: (_, __) => Center(
+      // Un link pausado borra session_shares → permission-denied. No es un
+      // fallo de carga: el alumno dejó de compartir. Lo decimos claro, igual
+      // que Entrenamientos y el card de última sesión del Resumen.
+      error: (e, _) => Center(
         child: Text(
-          'No pudimos cargar el historial.', // i18n: Fase W2
+          e is FirebaseException && e.code == 'permission-denied'
+              ? 'El alumno no compartió su historial.' // i18n: Fase W2
+              : 'No pudimos cargar el historial.', // i18n: Fase W2
           style: TextStyle(color: palette.textMuted, fontSize: 14),
         ),
       ),

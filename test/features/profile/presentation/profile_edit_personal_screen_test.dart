@@ -59,6 +59,8 @@ UserProfile _profile({
   Gender? gender = Gender.male,
   ExperienceLevel? experienceLevel = ExperienceLevel.intermediate,
   String? gymId,
+  String? phone,
+  DateTime? bornAt,
 }) =>
     UserProfile(
       uid: 'uid-test',
@@ -73,6 +75,8 @@ UserProfile _profile({
       gender: gender,
       experienceLevel: experienceLevel,
       gymId: gymId,
+      phone: phone,
+      bornAt: bornAt,
     );
 
 /// Creates a [MockUser] with a fixed uid for use in tests that need an
@@ -295,6 +299,93 @@ void main() {
       expect(captured[0], equals('uid-test'));
       final partial = captured[1] as Map<String, Object?>;
       expect(partial['displayName'], equals('Carlos R.'));
+    });
+  });
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // Phone + birth date (datos-personales entry)
+  // ──────────────────────────────────────────────────────────────────────────
+  group('phone + bornAt', () {
+    testWidgets('pre-populates the phone and birth-date fields',
+        (tester) async {
+      await tester.pumpWidget(
+        _buildScreen(
+          profile: _profile(
+            phone: '+54 9 11 1234 5678',
+            bornAt: DateTime.utc(1998, 5, 20),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final phoneField = tester.widget<TextFormField>(
+        find.byKey(const Key('edit_personal_phone_field')),
+      );
+      expect(phoneField.controller?.text, equals('+54 9 11 1234 5678'));
+      expect(find.text('20/05/1998'), findsOneWidget);
+    });
+
+    testWidgets('empty birth date shows the placeholder', (tester) async {
+      await tester.pumpWidget(_buildScreen(profile: _profile()));
+      await tester.pumpAndSettle();
+      expect(find.text('DD/MM/AAAA'), findsOneWidget);
+    });
+
+    testWidgets('an invalid phone blocks the save and shows an error',
+        (tester) async {
+      final repo = MockUserRepository();
+      when(() => repo.update(any(), any())).thenAnswer((_) async {});
+
+      await tester.pumpWidget(
+        _buildScreen(
+          profile: _profile(),
+          userRepository: repo,
+          authenticated: true,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+          find.byKey(const Key('edit_personal_phone_field')), 'abc123');
+      await tester.pump();
+
+      await tester
+          .ensureVisible(find.byKey(const Key('edit_personal_save_button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('edit_personal_save_button')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Teléfono inválido'), findsOneWidget);
+      verifyNever(() => repo.update(any(), any()));
+    });
+
+    testWidgets('save sends a valid new phone in the partial', (tester) async {
+      final repo = MockUserRepository();
+      when(() => repo.update(any(), any())).thenAnswer((_) async {});
+
+      await tester.pumpWidget(
+        _buildScreen(
+          profile: _profile(), // no phone yet
+          userRepository: repo,
+          authenticated: true,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+          find.byKey(const Key('edit_personal_phone_field')), '+5491112345678');
+      await tester.pump();
+
+      await tester
+          .ensureVisible(find.byKey(const Key('edit_personal_save_button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('edit_personal_save_button')));
+      await tester.pumpAndSettle();
+
+      final captured =
+          verify(() => repo.update(captureAny(), captureAny())).captured;
+      final partial = captured[1] as Map<String, Object?>;
+      expect(partial['phone'], equals('+5491112345678'));
     });
   });
 

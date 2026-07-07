@@ -335,6 +335,9 @@
   "feedLoadError": "No pudimos cargar tu feed. Inténtalo de nuevo.",
   "createPostLoadError": "No pudimos abrir el editor. Inténtalo de nuevo.",
   "insightsLoadError": "No pudimos cargar tus insights. Inténtalo de nuevo.",
+  "insightsDayStripTodayLabel": "HOY",
+  "insightsDayEmptyHint": "No entrenaste este día.",
+  "coachDailyHeatmapSectionTitle": "MÚSCULOS DEL DÍA",
   "profileLoadError": "No pudimos cargar tu perfil. Inténtalo de nuevo.",
   "sessionDetailNoSets": "Esta sesión no tiene sets registrados.",
   "sessionLogSetError": "No pudimos guardar la serie. Inténtalo de nuevo.",
@@ -517,14 +520,6 @@
   "dashboardInactivosEmpty": "Sin alumnos inactivos",
   "@dashboardInactivosEmpty": {
     "description": "Empty state for the Alumnos inactivos section when all athletes trained in the last 14 days."
-  },
-  "dashboardInactivosSharingNote": "{sharing} de {total} con datos compartidos",
-  "@dashboardInactivosSharingNote": {
-    "description": "Disclaimer note showing how many athletes share data vs total active athletes.",
-    "placeholders": {
-      "sharing": { "type": "int" },
-      "total": { "type": "int" }
-    }
   },
   "dashboardAlertBannerAllClear": "Todo al día",
   "@dashboardAlertBannerAllClear": {

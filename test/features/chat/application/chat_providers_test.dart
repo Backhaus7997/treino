@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/features/chat/application/chat_providers.dart';
 import 'package:treino/features/chat/data/chat_repository.dart';
 import 'package:treino/features/chat/domain/chat.dart';
+import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
@@ -469,6 +470,159 @@ void main() {
       // Y solo hay un doc en Firestore
       final all = await firestore.collection('chats').get();
       expect(all.docs.length, 1);
+    });
+  });
+
+  // ── unreadFromCoachProvider / unreadFromFriendsProvider ─────────────────
+  //
+  // Both providers derive from `chatsForCurrentUserProvider` and
+  // `currentAthleteLinkProvider`. They partition unread chats by "the OTHER
+  // member is my coach" vs "is anyone else". Together their sum equals
+  // `totalUnreadCountProvider` (when the athlete has a coach) so consumers
+  // can trust each badge counts what its surface says.
+
+  group('unreadFromCoachProvider / unreadFromFriendsProvider', () {
+    final base = DateTime.utc(2026, 6, 1, 10, 0);
+    final before = base.subtract(const Duration(minutes: 5));
+
+    Chat unreadChatWith(String otherUid, String uid, String chatId) => Chat(
+          chatId: chatId,
+          members: [uid, otherUid],
+          createdAt: DateTime.utc(2026, 1, 1),
+          lastMessageAt: base,
+          lastMessageSenderId: otherUid,
+          lastRead: {uid: before},
+        );
+
+    Chat readChatWith(String otherUid, String uid, String chatId) => Chat(
+          chatId: chatId,
+          members: [uid, otherUid],
+          createdAt: DateTime.utc(2026, 1, 1),
+          lastMessageAt: before,
+          lastMessageSenderId: otherUid,
+          lastRead: {uid: base},
+        );
+
+    ProviderContainer makeSplitContainer({
+      required List<Chat> chats,
+      String? uid,
+      String? coachUid,
+    }) {
+      final container = ProviderContainer(overrides: [
+        currentUidProvider.overrideWith((ref) => uid),
+        chatsForCurrentUserProvider.overrideWith(
+          (ref) => Stream.value(chats),
+        ),
+        currentAthleteLinkProvider.overrideWith((ref) async => coachUid == null
+            ? null
+            : makeLink(trainerId: coachUid, athleteId: uid ?? 'me')),
+      ]);
+      addTearDown(container.dispose);
+      return container;
+    }
+
+    test(
+        'coach + 1 friend unread, 1 read → coach: 1, friends: 1',
+        () async {
+      const me = 'me';
+      const coach = 'coach';
+      const friend = 'friend';
+      const friend2 = 'friend2';
+      final chats = [
+        unreadChatWith(coach, me, 'c1'),
+        unreadChatWith(friend, me, 'c2'),
+        readChatWith(friend2, me, 'c3'),
+      ];
+      final container =
+          makeSplitContainer(chats: chats, uid: me, coachUid: coach);
+
+      final subA = container.listen(unreadFromCoachProvider, (_, __) {});
+      final subB = container.listen(unreadFromFriendsProvider, (_, __) {});
+      await container.read(chatsForCurrentUserProvider.future);
+      await container.read(currentAthleteLinkProvider.future);
+
+      expect(container.read(unreadFromCoachProvider), 1);
+      expect(container.read(unreadFromFriendsProvider), 1);
+      subA.close();
+      subB.close();
+    });
+
+    test(
+        'no coach link → coach: 0, friends: full unread count',
+        () async {
+      const me = 'me';
+      const friend = 'friend';
+      final chats = [
+        unreadChatWith(friend, me, 'c1'),
+        unreadChatWith('friend2', me, 'c2'),
+      ];
+      final container = makeSplitContainer(chats: chats, uid: me);
+
+      final subA = container.listen(unreadFromCoachProvider, (_, __) {});
+      final subB = container.listen(unreadFromFriendsProvider, (_, __) {});
+      await container.read(chatsForCurrentUserProvider.future);
+      await container.read(currentAthleteLinkProvider.future);
+
+      expect(container.read(unreadFromCoachProvider), 0);
+      expect(container.read(unreadFromFriendsProvider), 2);
+      subA.close();
+      subB.close();
+    });
+
+    test(
+        'only coach chat unread → coach: 1, friends: 0 (no leak to feed)',
+        () async {
+      const me = 'me';
+      const coach = 'coach';
+      final chats = [unreadChatWith(coach, me, 'c1')];
+      final container =
+          makeSplitContainer(chats: chats, uid: me, coachUid: coach);
+
+      final subA = container.listen(unreadFromCoachProvider, (_, __) {});
+      final subB = container.listen(unreadFromFriendsProvider, (_, __) {});
+      await container.read(chatsForCurrentUserProvider.future);
+      await container.read(currentAthleteLinkProvider.future);
+
+      expect(container.read(unreadFromCoachProvider), 1);
+      expect(container.read(unreadFromFriendsProvider), 0);
+      subA.close();
+      subB.close();
+    });
+
+    test(
+        'only friend chat unread → coach: 0, friends: 1 (repro of the bug)',
+        () async {
+      // This is the exact reproduction of the smoke bug: an alumno with a
+      // linked coach gets a message from another alumno. Before the split,
+      // the badge on the COACH tab lit up as if the message were from the
+      // coach. Post-split it MUST NOT.
+      const me = 'me';
+      const coach = 'coach';
+      const friend = 'friend';
+      final chats = [unreadChatWith(friend, me, 'c1')];
+      final container =
+          makeSplitContainer(chats: chats, uid: me, coachUid: coach);
+
+      final subA = container.listen(unreadFromCoachProvider, (_, __) {});
+      final subB = container.listen(unreadFromFriendsProvider, (_, __) {});
+      await container.read(chatsForCurrentUserProvider.future);
+      await container.read(currentAthleteLinkProvider.future);
+
+      expect(container.read(unreadFromCoachProvider), 0);
+      expect(container.read(unreadFromFriendsProvider), 1);
+      subA.close();
+      subB.close();
+    });
+
+    test('null uid → both 0', () async {
+      final container = makeSplitContainer(chats: const [], uid: null);
+      final subA = container.listen(unreadFromCoachProvider, (_, __) {});
+      final subB = container.listen(unreadFromFriendsProvider, (_, __) {});
+      await Future.delayed(Duration.zero);
+      expect(container.read(unreadFromCoachProvider), 0);
+      expect(container.read(unreadFromFriendsProvider), 0);
+      subA.close();
+      subB.close();
     });
   });
 }

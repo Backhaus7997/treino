@@ -1,5 +1,11 @@
-// RED tests for inactivosProvider.
+// Tests for inactivosProvider.
 // Verifies the fan-out logic against ProviderContainer overrides.
+//
+// Gate change (dashboard-sharedwithtrainer-gate-fix): the security gate is now
+// `status == active` only. The `sharedWithTrainer` flag was never wired and
+// always defaults `false`, so the old `&& sharedWithTrainer` predicate made
+// the dashboard permanently dead. Active-but-not-"sharing" athletes are now
+// INCLUDED (they are authorised via session_shares CF on status === 'active').
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -107,8 +113,7 @@ void main() {
       );
       addTearDown(container.dispose);
 
-      final result =
-          await _readInactivos(container);
+      final result = await _readInactivos(container);
 
       expect(result.inactiveAthleteIds, contains('a1'));
       expect(result.inactiveAthleteIds, isNot(contains('a2')));
@@ -132,14 +137,44 @@ void main() {
       final result = await _readInactivos(container);
 
       expect(result.inactiveCount, 2);
-      expect(result.totalSharingCount, 3);
     });
 
-    test('athletes not sharing are excluded (security gate)', () async {
+    // Gate fix: active athletes with sharedWithTrainer == false are now INCLUDED.
+    // The `sharedWithTrainer` flag was never wired; the Firestore
+    // session_shares document is what actually authorises access and it is
+    // written by the CF on `status === 'active'`, not on sharedWithTrainer.
+    test('active athlete with sharedWithTrainer==false is INCLUDED (gate fix)',
+        () async {
       final container = _buildContainer(
         links: [
           _activeSharing('a1'),
-          _activeNotSharing('a2'), // not sharing — invisible
+          _activeNotSharing('a2'), // active but sharedWithTrainer == false
+        ],
+        sessionsByAthleteId: {
+          'a1': [_finishedSession('a1')],
+          'a2': [], // no session → should be inactive
+        },
+      );
+      addTearDown(container.dispose);
+
+      final result = await _readInactivos(container);
+
+      // Both are active → a2 (no session) must appear as inactive.
+      expect(result.inactiveAthleteIds, contains('a2'));
+      expect(result.inactiveAthleteIds, isNot(contains('a1')));
+    });
+
+    test('non-active links (e.g. pending) are excluded', () async {
+      final container = _buildContainer(
+        links: [
+          _activeSharing('a1'),
+          TrainerLink(
+            id: 'link-pending',
+            trainerId: 'trainer-1',
+            athleteId: 'a2',
+            status: TrainerLinkStatus.pending,
+            requestedAt: DateTime.utc(2026, 1, 1),
+          ),
         ],
         sessionsByAthleteId: {
           'a1': [],
@@ -150,8 +185,7 @@ void main() {
 
       final result = await _readInactivos(container);
 
-      // a2 is not sharing → not counted in totalSharingCount or inactivos
-      expect(result.totalSharingCount, 1);
+      // a2 is pending (not active) → excluded
       expect(result.inactiveAthleteIds, contains('a1'));
       expect(result.inactiveAthleteIds, isNot(contains('a2')));
     });
@@ -172,7 +206,7 @@ void main() {
       expect(result.inactiveCount, 0);
     });
 
-    test('no active+sharing links → empty result', () async {
+    test('no active links → empty result', () async {
       final container = _buildContainer(
         links: const [],
         sessionsByAthleteId: const {},
@@ -182,7 +216,6 @@ void main() {
       final result = await _readInactivos(container);
 
       expect(result.inactiveAthleteIds, isEmpty);
-      expect(result.totalSharingCount, 0);
     });
   });
 }
