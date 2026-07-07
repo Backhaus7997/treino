@@ -9,9 +9,13 @@ import 'day_strip_labels.dart';
 /// [AD5][REQ:heat-map-per-day] Hevy-style "last 7 days" day-strip. One tile
 /// per day (oldest first, today last) — tapping a tile selects that day's
 /// [DayInsights] for the heat-map above it. Trained days show a filled
-/// check; the selected day is outlined in `palette.accent`; today (when not
-/// selected/trained) shows [DayStripLabels.todayLabel] instead of the
-/// weekday letter.
+/// check in `palette.accent`; today (when not trained) shows an outline in
+/// `palette.accent` plus [DayStripLabels.todayLabel] instead of the weekday
+/// letter. The selected day draws an OUTER ring in `palette.highlight`
+/// (magenta) around the whole circle — layered independently of the
+/// trained/today marker so both stay visible at once (eg. today selected
+/// by default still shows its own mint outline, with the magenta ring
+/// around it).
 ///
 /// AppL10n-free by design (same pattern as `ChartPeriodSelector` from PR1c) —
 /// both coach shells inject their own [DayStripLabels].
@@ -93,9 +97,48 @@ class _DayTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final circleColor = trained ? palette.accent : Colors.transparent;
-    final borderColor = isSelected
-        ? palette.accent
-        : (trained ? palette.accent : palette.border);
+    final borderColor = trained ? palette.accent : palette.border;
+
+    Widget circle = Container(
+      width: 32,
+      height: 32,
+      decoration: BoxDecoration(
+        color: circleColor,
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: isToday && !trained ? palette.accent : borderColor,
+          width: isToday && !trained ? 1.5 : 1,
+        ),
+      ),
+      alignment: Alignment.center,
+      child: trained
+          ? Icon(
+              TreinoIcon.checkCircleFill,
+              color: palette.bg,
+              size: 16,
+            )
+          : Text(
+              '${day.day}',
+              style: GoogleFonts.barlowCondensed(
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+                color: isToday ? palette.accent : palette.textMuted,
+              ),
+            ),
+    );
+
+    // [UX-week-day-selector] Outer ring in `palette.highlight` — layered
+    // OUTSIDE the trained/today marker so both stay visible simultaneously.
+    if (isSelected) {
+      circle = Container(
+        padding: const EdgeInsets.all(3),
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(color: palette.highlight, width: 2),
+        ),
+        child: circle,
+      );
+    }
 
     return GestureDetector(
       onTap: onTap,
@@ -112,33 +155,7 @@ class _DayTile extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 6),
-          Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              color: circleColor,
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: borderColor,
-                width: isSelected ? 2 : 1,
-              ),
-            ),
-            alignment: Alignment.center,
-            child: trained
-                ? Icon(
-                    TreinoIcon.checkCircleFill,
-                    color: palette.bg,
-                    size: 16,
-                  )
-                : Text(
-                    '${day.day}',
-                    style: GoogleFonts.barlowCondensed(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 13,
-                      color: palette.textMuted,
-                    ),
-                  ),
-          ),
+          circle,
         ],
       ),
     );
