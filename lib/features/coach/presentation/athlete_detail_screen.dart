@@ -27,9 +27,10 @@ import '../../workout/application/session_providers.dart'
 import '../../workout/domain/routine.dart';
 import '../../workout/domain/session.dart';
 import '../../workout/domain/session_status.dart';
-import '../../workout/application/exercise_progression_providers.dart';
 import '../../workout/domain/set_log.dart';
-import '../../workout/presentation/widgets/exercise_progression_chart.dart';
+import '../../workout/presentation/widgets/exercise_progression_chart.dart'
+    show ExerciseProgressionChartLabels;
+import '../../workout/presentation/widgets/exercise_progression_section.dart';
 import '../../workout/presentation/widgets/session_exercise_block.dart';
 import 'package:cloud_firestore/cloud_firestore.dart' show FirebaseException;
 
@@ -1637,117 +1638,24 @@ class _EntrenamientosSection extends ConsumerWidget {
 
 /// Per-exercise progression section shown in [_EntrenamientosSection].
 ///
-/// Watches [athleteExerciseListProvider] to show an exercise picker row and
-/// [exerciseProgressionProvider] to show the progression chart for the
-/// selected exercise. All user-visible strings come from [AppL10n] (REQ-PROG-10B).
-class _ProgressionSection extends ConsumerStatefulWidget {
+/// Thin AppL10n-resolving wrapper around the shared [ExerciseProgressionSection]
+/// (AD1 dedupe — see exercise_progression_section.dart). All user-visible
+/// strings come from [AppL10n] (REQ-PROG-10B).
+class _ProgressionSection extends StatelessWidget {
   const _ProgressionSection({required this.athleteId});
   final String athleteId;
 
   @override
-  ConsumerState<_ProgressionSection> createState() =>
-      _ProgressionSectionState();
-}
-
-class _ProgressionSectionState extends ConsumerState<_ProgressionSection> {
-  String? _selectedExerciseId;
-
-  @override
   Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
-    final exerciseListAsync =
-        ref.watch(athleteExerciseListProvider(widget.athleteId));
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // ── Section header ──────────────────────────────────────────────
-        Text(
-          l10n.progressionSectionTitle,
-          style: GoogleFonts.barlowCondensed(
-            fontWeight: FontWeight.w700,
-            fontSize: 12,
-            letterSpacing: 1.2,
-            color: palette.textMuted,
-          ),
-        ),
-        const SizedBox(height: 12),
-
-        exerciseListAsync.when(
-          loading: () => Text(
-            'Cargando…',
-            style: GoogleFonts.barlow(fontSize: 13, color: palette.textMuted),
-          ),
-          error: (e, _) => const SizedBox.shrink(),
-          data: (exercises) {
-            // SCENARIO-PROG-08A: no exercises → empty state, no picker
-            if (exercises.isEmpty) {
-              return Text(
-                l10n.progressionEmpty,
-                style:
-                    GoogleFonts.barlow(fontSize: 13, color: palette.textMuted),
-              );
-            }
-
-            // SCENARIO-PROG-05B: default to most-recently-logged exercise
-            final effectiveId =
-                _selectedExerciseId ?? exercises.first.exerciseId;
-
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // ── Exercise picker chip row ──────────────────────────
-                ExercisePickerRow(
-                  exercises: exercises,
-                  selectedId: effectiveId,
-                  onSelect: (id) => setState(() => _selectedExerciseId = id),
-                ),
-                const SizedBox(height: 12),
-
-                // ── Progression chart ─────────────────────────────────
-                _ProgressionChartLoader(
-                  athleteId: widget.athleteId,
-                  exerciseId: effectiveId,
-                  palette: palette,
-                  l10n: l10n,
-                ),
-              ],
-            );
-          },
-        ),
-      ],
-    );
-  }
-}
-
-/// Loads and renders [ExerciseProgressionChart] for one exercise.
-class _ProgressionChartLoader extends ConsumerWidget {
-  const _ProgressionChartLoader({
-    required this.athleteId,
-    required this.exerciseId,
-    required this.palette,
-    required this.l10n,
-  });
-
-  final String athleteId;
-  final String exerciseId;
-  final AppPalette palette;
-  final AppL10n l10n;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final progressionAsync = ref.watch(
-      exerciseProgressionProvider(
-          (athleteUid: athleteId, exerciseId: exerciseId)),
-    );
-
-    return progressionAsync.when(
-      loading: () => const SizedBox.shrink(),
-      error: (e, _) => const SizedBox.shrink(),
-      data: (progression) => ExerciseProgressionChart(
-        progression: progression,
-        labels: ExerciseProgressionChartLabels(
+    return ExerciseProgressionSection(
+      athleteId: athleteId,
+      labels: ExerciseProgressionSectionLabels(
+        sectionTitle: l10n.progressionSectionTitle,
+        loadingText: 'Cargando…',
+        emptyStateText: l10n.progressionEmpty,
+        chartLabels: ExerciseProgressionChartLabels(
           prLabel: l10n.progressionMetricPr,
           volumeLabel: l10n.progressionMetricVolume,
           volumeUnit: 'kg·reps',

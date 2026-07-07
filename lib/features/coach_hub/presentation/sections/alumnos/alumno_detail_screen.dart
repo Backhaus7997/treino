@@ -43,14 +43,15 @@ import 'package:treino/features/profile/domain/experience_level.dart';
 import 'package:treino/features/profile/domain/gender.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/features/workout/application/assigned_routine_providers.dart';
-import 'package:treino/features/workout/application/exercise_progression_providers.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
 import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/domain/routine_status.dart';
 import 'package:treino/features/workout/domain/session.dart';
 import 'package:treino/features/workout/domain/session_status.dart';
 import 'package:treino/features/workout/domain/set_log.dart';
-import 'package:treino/features/workout/presentation/widgets/exercise_progression_chart.dart';
+import 'package:treino/features/workout/presentation/widgets/exercise_progression_chart.dart'
+    show ExerciseProgressionChartLabels;
+import 'package:treino/features/workout/presentation/widgets/exercise_progression_section.dart';
 import 'package:treino/features/workout/presentation/widgets/session_exercise_block.dart';
 import 'package:treino/features/profile/application/user_providers.dart'
     show userProfileProvider;
@@ -1735,15 +1736,15 @@ class _EntrenamientoTab extends ConsumerWidget {
 
 /// Web-surface exercise-progression section.
 ///
-/// Wires [athleteExerciseListProvider] + [exerciseProgressionProvider] into
-/// [ExercisePickerRow] + [ExerciseProgressionChart].
+/// Thin wrapper around the shared [ExerciseProgressionSection] (AD1 dedupe —
+/// see exercise_progression_section.dart) with hardcoded Spanish labels.
 ///
 /// All user-visible strings are hardcoded Spanish — the web Coach Hub does NOT
 /// use AppL10n. Marked `// i18n: Fase W2` for future extraction.
 ///
 /// Firestore access: trainer READ on setLogs is granted by firestore.rules:507-520
 /// (mirrors the session-share predicate: owner OR linked trainer).
-class _ProgressionTabSection extends ConsumerStatefulWidget {
+class _ProgressionTabSection extends StatelessWidget {
   const _ProgressionTabSection({
     required this.athleteId,
     required this.palette,
@@ -1753,107 +1754,16 @@ class _ProgressionTabSection extends ConsumerStatefulWidget {
   final AppPalette palette;
 
   @override
-  ConsumerState<_ProgressionTabSection> createState() =>
-      _ProgressionTabSectionState();
-}
-
-class _ProgressionTabSectionState
-    extends ConsumerState<_ProgressionTabSection> {
-  String? _selectedExerciseId;
-
-  @override
   Widget build(BuildContext context) {
-    final palette = widget.palette;
-    final exerciseListAsync =
-        ref.watch(athleteExerciseListProvider(widget.athleteId));
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        // Section label — hardcoded Spanish (i18n: Fase W2).
-        Text(
-          'EVOLUCIÓN POR EJERCICIO', // i18n: Fase W2
-          style: TextStyle(
-            color: palette.textMuted,
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0.8,
-          ),
-        ),
-        const SizedBox(height: 10),
-        exerciseListAsync.when(
-          loading: () => Text('Cargando…', // i18n: Fase W2
-              style: TextStyle(color: palette.textMuted, fontSize: 13)),
-          error: (_, __) => Text(
+    return ExerciseProgressionSection(
+      athleteId: athleteId,
+      labels: ExerciseProgressionSectionLabels(
+        sectionTitle: 'EVOLUCIÓN POR EJERCICIO', // i18n: Fase W2
+        loadingText: 'Cargando…', // i18n: Fase W2
+        exerciseListErrorText:
             'No se pudo cargar la evolución.', // i18n: Fase W2
-            style: TextStyle(color: palette.textMuted, fontSize: 13),
-          ),
-          data: (exercises) {
-            if (exercises.isEmpty) {
-              return Text(
-                'Sin registros de series todavía.', // i18n: Fase W2
-                style: TextStyle(color: palette.textMuted, fontSize: 13),
-              );
-            }
-
-            // Default selection: most-recently-logged exercise (first in list).
-            final effectiveId =
-                _selectedExerciseId ?? exercises.first.exerciseId;
-
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                ExercisePickerRow(
-                  exercises: exercises,
-                  selectedId: effectiveId,
-                  onSelect: (id) => setState(() => _selectedExerciseId = id),
-                ),
-                const SizedBox(height: 12),
-                _ProgressionChartLoader(
-                  athleteId: widget.athleteId,
-                  exerciseId: effectiveId,
-                  palette: palette,
-                ),
-              ],
-            );
-          },
-        ),
-      ],
-    );
-  }
-}
-
-/// Watches [exerciseProgressionProvider] for the selected exercise and renders
-/// [ExerciseProgressionChart] with hardcoded Spanish labels.
-class _ProgressionChartLoader extends ConsumerWidget {
-  const _ProgressionChartLoader({
-    required this.athleteId,
-    required this.exerciseId,
-    required this.palette,
-  });
-
-  final String athleteId;
-  final String exerciseId;
-  final AppPalette palette;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final progressionAsync = ref.watch(
-      exerciseProgressionProvider(
-          (athleteUid: athleteId, exerciseId: exerciseId)),
-    );
-
-    return progressionAsync.when(
-      loading: () => Text('Cargando…', // i18n: Fase W2
-          style: TextStyle(color: palette.textMuted, fontSize: 13)),
-      error: (_, __) => Text(
-        'No se pudo cargar la evolución.', // i18n: Fase W2
-        style: TextStyle(color: palette.textMuted, fontSize: 13),
-      ),
-      data: (progression) => ExerciseProgressionChart(
-        progression: progression,
-        localeName: 'es_AR', // hardcoded for web Coach Hub (i18n: Fase W2)
-        labels: ExerciseProgressionChartLabels(
+        emptyStateText: 'Sin registros de series todavía.', // i18n: Fase W2
+        chartLabels: ExerciseProgressionChartLabels(
           prLabel: 'PR', // i18n: Fase W2
           volumeLabel: 'Volumen', // i18n: Fase W2
           volumeUnit: 'kg·reps', // i18n: Fase W2
@@ -1866,6 +1776,7 @@ class _ProgressionChartLoader extends ConsumerWidget {
           emptyHint:
               'Sin datos suficientes para este ejercicio.', // i18n: Fase W2
         ),
+        localeName: 'es_AR', // hardcoded for web Coach Hub (i18n: Fase W2)
       ),
     );
   }
