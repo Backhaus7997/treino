@@ -63,7 +63,7 @@ import 'app_l10n_es.dart';
 /// property.
 abstract class AppL10n {
   AppL10n(String locale)
-    : localeName = intl.Intl.canonicalizedLocale(locale.toString());
+      : localeName = intl.Intl.canonicalizedLocale(locale.toString());
 
   final String localeName;
 
@@ -85,17 +85,17 @@ abstract class AppL10n {
   /// of delegates is preferred or required.
   static const List<LocalizationsDelegate<dynamic>> localizationsDelegates =
       <LocalizationsDelegate<dynamic>>[
-        delegate,
-        GlobalMaterialLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-      ];
+    delegate,
+    GlobalMaterialLocalizations.delegate,
+    GlobalCupertinoLocalizations.delegate,
+    GlobalWidgetsLocalizations.delegate,
+  ];
 
   /// A list of this localizations delegate's supported locales.
   static const List<Locale> supportedLocales = <Locale>[
     Locale('en'),
     Locale('es'),
-    Locale('es', 'AR'),
+    Locale('es', 'AR')
   ];
 
   /// Home first-run empty-state title for an athlete with no routine (usability finding 6).
@@ -4351,10 +4351,7 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'{vencidos, plural, =1{1 vencido} other{{vencidos} vencidos}} · {solicitudes, plural, =1{1 solicitud} other{{solicitudes} solicitudes}} · {inactivos, plural, =1{1 inactivo} other{{inactivos} inactivos}}'**
   String dashboardAlertBannerSummary(
-    int vencidos,
-    int solicitudes,
-    int inactivos,
-  );
+      int vencidos, int solicitudes, int inactivos);
 
   /// Formatted adherencia percentage value shown in the adherencia ring and KPI tile once the aggregate provider has data.
   ///
@@ -4427,6 +4424,72 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Racha de {n} días'**
   String workoutDaysCalendarStreak(int n);
+
+  /// [stats-hub] Section heading above the tile list on InsightsScreen, between the daily-muscles card and the ESTADÍSTICAS AVANZADAS tiles (Hevy 'Statistics' parity, obs #445).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Estadísticas avanzadas'**
+  String get insightsAdvancedStatsHeading;
+
+  /// [stats-hub] Tile title on InsightsScreen navigating to MuscleDistributionScreen.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Distribución muscular'**
+  String get insightsTileMuscleDistributionTitle;
+
+  /// [stats-hub] One-line subtitle under the Distribución muscular tile.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Comparativa actual vs. período anterior'**
+  String get insightsTileMuscleDistributionSubtitle;
+
+  /// [stats-hub] Header title for the dedicated MuscleDistributionScreen.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'DISTRIBUCIÓN MUSCULAR'**
+  String get muscleDistributionScreenTitle;
+
+  /// [stats-hub] Tile title on InsightsScreen navigating to FrequentExercisesScreen (athlete's own uid).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ejercicios frecuentes'**
+  String get insightsTileFrequentExercisesTitle;
+
+  /// [stats-hub] One-line subtitle under the Ejercicios frecuentes tile.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tus ejercicios más entrenados'**
+  String get insightsTileFrequentExercisesSubtitle;
+
+  /// [stats-hub] Header title for the dedicated FrequentExercisesScreen.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'EJERCICIOS FRECUENTES'**
+  String get frequentExercisesScreenTitle;
+
+  /// [stats-hub] One-line subtitle under the Reporte mensual tile (title reuses insightsMonthlyReportTile).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Resumen de entrenos por mes'**
+  String get insightsTileMonthlyReportSubtitle;
+
+  /// [stats-hub] Tile title on InsightsScreen navigating to VolumeByGroupScreen.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Volumen por grupo'**
+  String get insightsTileVolumeByGroupTitle;
+
+  /// [stats-hub] One-line subtitle under the Volumen por grupo tile.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Sets vs. objetivo por grupo muscular'**
+  String get insightsTileVolumeByGroupSubtitle;
+
+  /// [stats-hub] Header title for the dedicated VolumeByGroupScreen.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'VOLUMEN POR GRUPO'**
+  String get volumeByGroupScreenTitle;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {
@@ -4467,9 +4530,8 @@ AppL10n lookupAppL10n(Locale locale) {
   }
 
   throw FlutterError(
-    'AppL10n.delegate failed to load unsupported locale "$locale". This is likely '
-    'an issue with the localizations generation tool. Please file an issue '
-    'on GitHub with a reproducible sample app and the gen-l10n configuration '
-    'that was used.',
-  );
+      'AppL10n.delegate failed to load unsupported locale "$locale". This is likely '
+      'an issue with the localizations generation tool. Please file an issue '
+      'on GitHub with a reproducible sample app and the gen-l10n configuration '
+      'that was used.');
 }

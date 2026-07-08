@@ -39,8 +39,11 @@ import '../features/profile/application/account_deletion_notifier.dart';
 import '../features/feed/presentation/public_profile_screen.dart';
 import '../features/feed/presentation/search_users_screen.dart';
 import '../features/home/home_screen.dart';
+import '../features/insights/presentation/frequent_exercises_screen.dart';
 import '../features/insights/presentation/insights_screen.dart';
 import '../features/insights/presentation/monthly_report_screen.dart';
+import '../features/insights/presentation/muscle_distribution_screen.dart';
+import '../features/insights/presentation/volume_by_group_screen.dart';
 import '../features/profile/application/user_providers.dart';
 import '../features/profile/domain/user_profile_trainer_completeness.dart';
 import '../features/profile/domain/user_role.dart';
@@ -474,6 +477,25 @@ GoRouter buildRouter({
                     builder: (_, __) =>
                         _withBg(const _MonthlyReportRouteHost()),
                   ),
+                  // [stats-hub] Tile destinations from the ESTADÍSTICAS
+                  // AVANZADAS list (obs #445) — same route-host pattern as
+                  // monthly (resolve currentUidProvider once, pass explicit
+                  // uid down so each screen stays reusable).
+                  GoRoute(
+                    path: 'muscle-distribution',
+                    builder: (_, __) =>
+                        _withBg(const _MuscleDistributionRouteHost()),
+                  ),
+                  GoRoute(
+                    path: 'frequent-exercises',
+                    builder: (_, __) =>
+                        _withBg(const _FrequentExercisesRouteHost()),
+                  ),
+                  GoRoute(
+                    path: 'volume-by-group',
+                    builder: (_, __) =>
+                        _withBg(const _VolumeByGroupRouteHost()),
+                  ),
                 ],
               ),
             ],
@@ -614,6 +636,42 @@ class _MonthlyReportRouteHost extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final uid = ref.watch(currentUidProvider) ?? '';
     return MonthlyReportScreen(uid: uid);
+  }
+}
+
+/// [stats-hub] Resuelve el uid actual y monta [MuscleDistributionScreen] —
+/// mismo patrón que [_MonthlyReportRouteHost] (obs #445).
+class _MuscleDistributionRouteHost extends ConsumerWidget {
+  const _MuscleDistributionRouteHost();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final uid = ref.watch(currentUidProvider) ?? '';
+    return MuscleDistributionScreen(uid: uid);
+  }
+}
+
+/// [stats-hub] Resuelve el uid actual y monta [FrequentExercisesScreen] —
+/// mismo patrón que [_MonthlyReportRouteHost] (obs #445).
+class _FrequentExercisesRouteHost extends ConsumerWidget {
+  const _FrequentExercisesRouteHost();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final uid = ref.watch(currentUidProvider) ?? '';
+    return FrequentExercisesScreen(uid: uid);
+  }
+}
+
+/// [stats-hub] Resuelve el uid actual y monta [VolumeByGroupScreen] — mismo
+/// patrón que [_MonthlyReportRouteHost] (obs #445).
+class _VolumeByGroupRouteHost extends ConsumerWidget {
+  const _VolumeByGroupRouteHost();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final uid = ref.watch(currentUidProvider) ?? '';
+    return VolumeByGroupScreen(uid: uid);
   }
 }
 

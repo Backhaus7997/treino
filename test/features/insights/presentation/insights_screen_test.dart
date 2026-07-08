@@ -1,18 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/insights/application/insights_providers.dart';
 import 'package:treino/features/insights/domain/muscle_group.dart';
 import 'package:treino/features/insights/domain/weekly_insights.dart';
 import 'package:treino/features/insights/presentation/insights_screen.dart';
-import 'package:treino/features/insights/presentation/widgets/muscle_distribution_radar.dart';
 import 'package:treino/features/workout/application/exercise_providers.dart';
 import 'package:treino/features/workout/application/routine_providers.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
 import 'package:treino/features/workout/data/session_repository.dart';
 import 'package:treino/features/workout/domain/exercise.dart';
 import 'package:treino/features/workout/domain/session_status.dart';
+import 'package:treino/l10n/app_l10n.dart';
 
 import '../../../helpers/test_app_wrapper.dart';
 import '../../workout/application/stub_factories.dart';
@@ -492,10 +494,17 @@ void main() {
     expect(_countMasksContaining(tester, 'assets/body/bodyback.png'), 1);
   });
 
+  // SCENARIO-RADAR-SCREEN-01/02: MOVED to
+  // test/features/insights/presentation/muscle_distribution_screen_test.dart
+  // (stats-hub, obs #445) — the inline `_MuscleDistributionSection` was
+  // promoted to a dedicated `MuscleDistributionScreen`, reached from the
+  // hub's "ESTADÍSTICAS AVANZADAS" tile list instead of being inline.
+
   testWidgets(
-      'SCENARIO-RADAR-SCREEN-01: DISTRIBUCIÓN MUSCULAR section renders the '
-      'MuscleDistributionRadar below the daily muscles card, with the '
-      'current-period radar populated from finished sessions', (tester) async {
+      'SCENARIO-HUB-TILES-01: the ESTADÍSTICAS AVANZADAS tile list renders '
+      'below the daily muscles card with all 4 tiles (Distribución '
+      'muscular, Ejercicios frecuentes, Reporte mensual, Volumen por '
+      'grupo)', (tester) async {
     final repo = MockSessionRepository();
     final now = DateTime.now();
     final todayOnly = DateTime(now.year, now.month, now.day);
@@ -528,56 +537,40 @@ void main() {
     await tester.pumpWidget(_wrap(const InsightsScreen(), overrides));
     await tester.pumpAndSettle();
 
-    // The section title + radar widget live below the fold (ListView is
-    // lazy) — scroll until visible BEFORE asserting presence.
     await tester.scrollUntilVisible(
-      find.text('DISTRIBUCIÓN MUSCULAR'),
+      find.text('Estadísticas avanzadas'),
       200,
       scrollable: find.byType(Scrollable).first,
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('DISTRIBUCIÓN MUSCULAR'), findsOneWidget);
-    expect(find.byType(MuscleDistributionRadar), findsOneWidget);
-    // 1 finished session in the current period → non-empty radar, legend
-    // present (Actual/Anterior), empty-state text absent.
-    expect(find.text('Actual'), findsOneWidget);
-    expect(find.text('Anterior'), findsOneWidget);
-    expect(find.text('Sin datos para este período.'), findsNothing);
+    expect(find.text('Estadísticas avanzadas'), findsOneWidget);
+    expect(find.text('Distribución muscular'), findsOneWidget);
+    expect(find.text('Ejercicios frecuentes'), findsOneWidget);
+    expect(find.text('Reporte mensual'), findsOneWidget);
+    expect(find.text('Volumen por grupo'), findsOneWidget);
+    // Inline sections must be GONE — moved to dedicated screens.
+    expect(find.text('DISTRIBUCIÓN MUSCULAR'), findsNothing);
+    expect(find.text('VOLUMEN POR GRUPO'), findsNothing);
   });
 
   testWidgets(
-      'SCENARIO-RADAR-SCREEN-02: switching the period selector re-fetches '
-      'the radar for the new period — both current and previous windows '
-      'get plotted for the selected period', (tester) async {
+      'SCENARIO-HUB-TILES-02: tapping each tile pushes its dedicated route',
+      (tester) async {
     final repo = MockSessionRepository();
     final now = DateTime.now();
     final todayOnly = DateTime(now.year, now.month, now.day);
-    // A session inside "this week" (current window for BOTH last30d and
-    // thisWeek periods) plus one 40 days ago — inside last30d's PREVIOUS
-    // window, but outside thisWeek's previous window (prior calendar week).
-    final recentDay = todayOnly;
-    final olderDay = DateTime(todayOnly.year, todayOnly.month - 1,
-        todayOnly.day - 10 < 1 ? 1 : todayOnly.day - 10);
 
     when(() => repo.listByUid('u1')).thenAnswer((_) async => [
           makeSession(
-            id: 's-recent',
-            startedAt: recentDay.add(const Duration(hours: 9)),
-            status: SessionStatus.finished,
-            routineId: 'r1',
-          ),
-          makeSession(
-            id: 's-older',
-            startedAt: olderDay.add(const Duration(hours: 9)),
+            id: 's1',
+            startedAt: todayOnly.add(const Duration(hours: 9)),
             status: SessionStatus.finished,
             routineId: 'r1',
           ),
         ]);
-    when(() => repo.listSetLogs(uid: 'u1', sessionId: 's-recent'))
+    when(() => repo.listSetLogs(uid: 'u1', sessionId: 's1'))
         .thenAnswer((_) async => [makeSetLog(id: 'l1', exerciseId: 'e-chest')]);
-    when(() => repo.listSetLogs(uid: 'u1', sessionId: 's-older'))
-        .thenAnswer((_) async => [makeSetLog(id: 'l2', exerciseId: 'e-legs')]);
 
     final overrides = <Override>[
       currentUidProvider.overrideWithValue('u1'),
@@ -589,40 +582,104 @@ void main() {
               muscleGroup: 'chest',
               category: 'compound',
             ),
-            const Exercise(
-              id: 'e-legs',
-              name: 'Sentadilla',
-              muscleGroup: 'quads',
-              category: 'compound',
-            ),
           ]),
       routineByIdProvider('r1').overrideWith((ref) async => null),
     ];
 
-    await tester.pumpWidget(_wrap(const InsightsScreen(), overrides));
+    final router = GoRouter(
+      initialLocation: '/home/insights',
+      routes: [
+        GoRoute(
+          path: '/home/insights',
+          builder: (_, __) => const InsightsScreen(),
+        ),
+        GoRoute(
+          path: '/home/insights/muscle-distribution',
+          builder: (_, __) => const Scaffold(
+            body: Text('muscle-distribution-route'),
+          ),
+        ),
+        GoRoute(
+          path: '/home/insights/frequent-exercises',
+          builder: (_, __) => const Scaffold(
+            body: Text('frequent-exercises-route'),
+          ),
+        ),
+        GoRoute(
+          path: '/home/insights/monthly',
+          builder: (_, __) => const Scaffold(
+            body: Text('monthly-route'),
+          ),
+        ),
+        GoRoute(
+          path: '/home/insights/volume-by-group',
+          builder: (_, __) => const Scaffold(
+            body: Text('volume-by-group-route'),
+          ),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: overrides,
+        child: MaterialApp.router(
+          theme: AppTheme.dark(),
+          routerConfig: router,
+          localizationsDelegates: AppL10n.localizationsDelegates,
+          supportedLocales: AppL10n.supportedLocales,
+          locale: const Locale('es', 'AR'),
+        ),
+      ),
+    );
     await tester.pumpAndSettle();
 
     await tester.scrollUntilVisible(
-      find.text('DISTRIBUCIÓN MUSCULAR'),
+      find.text('Distribución muscular'),
       200,
       scrollable: find.byType(Scrollable).first,
     );
     await tester.pumpAndSettle();
-
-    // Default period pill shows "Últimos 30 días" (ChartPeriod.last30d).
-    expect(find.text('Últimos 30 días'), findsOneWidget);
-
-    // Open the period selector and switch to "Esta semana" — re-fetches via
-    // a new MuscleDistributionKey (different ChartPeriod), still renders
-    // the radar without throwing.
-    await tester.tap(find.text('Últimos 30 días'));
+    await tester.tap(find.text('Distribución muscular'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Esta semana').last);
-    await tester.pumpAndSettle();
+    expect(find.text('muscle-distribution-route'), findsOneWidget);
 
-    expect(tester.takeException(), isNull);
-    expect(find.text('Esta semana'), findsOneWidget);
-    expect(find.byType(MuscleDistributionRadar), findsOneWidget);
+    router.go('/home/insights');
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Ejercicios frecuentes'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Ejercicios frecuentes'));
+    await tester.pumpAndSettle();
+    expect(find.text('frequent-exercises-route'), findsOneWidget);
+
+    router.go('/home/insights');
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Reporte mensual'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Reporte mensual'));
+    await tester.pumpAndSettle();
+    expect(find.text('monthly-route'), findsOneWidget);
+
+    router.go('/home/insights');
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Volumen por grupo'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Volumen por grupo'));
+    await tester.pumpAndSettle();
+    expect(find.text('volume-by-group-route'), findsOneWidget);
   });
 }
 

@@ -1887,5 +1887,49 @@
         "type": "int"
       }
     }
+  },
+  "insightsAdvancedStatsHeading": "Estadísticas avanzadas",
+  "@insightsAdvancedStatsHeading": {
+    "description": "[stats-hub] Section heading above the tile list on InsightsScreen, between the daily-muscles card and the ESTADÍSTICAS AVANZADAS tiles (Hevy 'Statistics' parity, obs #445)."
+  },
+  "insightsTileMuscleDistributionTitle": "Distribución muscular",
+  "@insightsTileMuscleDistributionTitle": {
+    "description": "[stats-hub] Tile title on InsightsScreen navigating to MuscleDistributionScreen."
+  },
+  "insightsTileMuscleDistributionSubtitle": "Comparativa actual vs. período anterior",
+  "@insightsTileMuscleDistributionSubtitle": {
+    "description": "[stats-hub] One-line subtitle under the Distribución muscular tile."
+  },
+  "muscleDistributionScreenTitle": "DISTRIBUCIÓN MUSCULAR",
+  "@muscleDistributionScreenTitle": {
+    "description": "[stats-hub] Header title for the dedicated MuscleDistributionScreen."
+  },
+  "insightsTileFrequentExercisesTitle": "Ejercicios frecuentes",
+  "@insightsTileFrequentExercisesTitle": {
+    "description": "[stats-hub] Tile title on InsightsScreen navigating to FrequentExercisesScreen (athlete's own uid)."
+  },
+  "insightsTileFrequentExercisesSubtitle": "Tus ejercicios más entrenados",
+  "@insightsTileFrequentExercisesSubtitle": {
+    "description": "[stats-hub] One-line subtitle under the Ejercicios frecuentes tile."
+  },
+  "frequentExercisesScreenTitle": "EJERCICIOS FRECUENTES",
+  "@frequentExercisesScreenTitle": {
+    "description": "[stats-hub] Header title for the dedicated FrequentExercisesScreen."
+  },
+  "insightsTileMonthlyReportSubtitle": "Resumen de entrenos por mes",
+  "@insightsTileMonthlyReportSubtitle": {
+    "description": "[stats-hub] One-line subtitle under the Reporte mensual tile (title reuses insightsMonthlyReportTile)."
+  },
+  "insightsTileVolumeByGroupTitle": "Volumen por grupo",
+  "@insightsTileVolumeByGroupTitle": {
+    "description": "[stats-hub] Tile title on InsightsScreen navigating to VolumeByGroupScreen."
+  },
+  "insightsTileVolumeByGroupSubtitle": "Sets vs. objetivo por grupo muscular",
+  "@insightsTileVolumeByGroupSubtitle": {
+    "description": "[stats-hub] One-line subtitle under the Volumen por grupo tile."
+  },
+  "volumeByGroupScreenTitle": "VOLUMEN POR GRUPO",
+  "@volumeByGroupScreenTitle": {
+    "description": "[stats-hub] Header title for the dedicated VolumeByGroupScreen."
   }
 }

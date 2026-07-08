@@ -2357,10 +2357,7 @@ class AppL10nEs extends AppL10n {
 
   @override
   String dashboardAlertBannerSummary(
-    int vencidos,
-    int solicitudes,
-    int inactivos,
-  ) {
+      int vencidos, int solicitudes, int inactivos) {
     String _temp0 = intl.Intl.pluralLogic(
       vencidos,
       locale: localeName,
@@ -2422,6 +2419,42 @@ class AppL10nEs extends AppL10n {
   String workoutDaysCalendarStreak(int n) {
     return 'Racha de $n días';
   }
+
+  @override
+  String get insightsAdvancedStatsHeading => 'Estadísticas avanzadas';
+
+  @override
+  String get insightsTileMuscleDistributionTitle => 'Distribución muscular';
+
+  @override
+  String get insightsTileMuscleDistributionSubtitle =>
+      'Comparativa actual vs. período anterior';
+
+  @override
+  String get muscleDistributionScreenTitle => 'DISTRIBUCIÓN MUSCULAR';
+
+  @override
+  String get insightsTileFrequentExercisesTitle => 'Ejercicios frecuentes';
+
+  @override
+  String get insightsTileFrequentExercisesSubtitle =>
+      'Tus ejercicios más entrenados';
+
+  @override
+  String get frequentExercisesScreenTitle => 'EJERCICIOS FRECUENTES';
+
+  @override
+  String get insightsTileMonthlyReportSubtitle => 'Resumen de entrenos por mes';
+
+  @override
+  String get insightsTileVolumeByGroupTitle => 'Volumen por grupo';
+
+  @override
+  String get insightsTileVolumeByGroupSubtitle =>
+      'Sets vs. objetivo por grupo muscular';
+
+  @override
+  String get volumeByGroupScreenTitle => 'VOLUMEN POR GRUPO';
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -4775,10 +4808,7 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String dashboardAlertBannerSummary(
-    int vencidos,
-    int solicitudes,
-    int inactivos,
-  ) {
+      int vencidos, int solicitudes, int inactivos) {
     String _temp0 = intl.Intl.pluralLogic(
       vencidos,
       locale: localeName,
@@ -4840,4 +4870,40 @@ class AppL10nEsAr extends AppL10nEs {
   String workoutDaysCalendarStreak(int n) {
     return 'Racha de $n días';
   }
+
+  @override
+  String get insightsAdvancedStatsHeading => 'Estadísticas avanzadas';
+
+  @override
+  String get insightsTileMuscleDistributionTitle => 'Distribución muscular';
+
+  @override
+  String get insightsTileMuscleDistributionSubtitle =>
+      'Comparativa actual vs. período anterior';
+
+  @override
+  String get muscleDistributionScreenTitle => 'DISTRIBUCIÓN MUSCULAR';
+
+  @override
+  String get insightsTileFrequentExercisesTitle => 'Ejercicios frecuentes';
+
+  @override
+  String get insightsTileFrequentExercisesSubtitle =>
+      'Tus ejercicios más entrenados';
+
+  @override
+  String get frequentExercisesScreenTitle => 'EJERCICIOS FRECUENTES';
+
+  @override
+  String get insightsTileMonthlyReportSubtitle => 'Resumen de entrenos por mes';
+
+  @override
+  String get insightsTileVolumeByGroupTitle => 'Volumen por grupo';
+
+  @override
+  String get insightsTileVolumeByGroupSubtitle =>
+      'Sets vs. objetivo por grupo muscular';
+
+  @override
+  String get volumeByGroupScreenTitle => 'VOLUMEN POR GRUPO';
 }
