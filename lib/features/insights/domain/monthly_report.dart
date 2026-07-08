@@ -2,6 +2,16 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 
 part 'monthly_report.freezed.dart';
 
+class MonthlyReportDayPoint {
+  const MonthlyReportDayPoint({
+    required this.day,
+    required this.durationMin,
+  });
+
+  final DateTime day;
+  final int durationMin;
+}
+
 /// [AD6] A single calendar-month bucket for the monthly report bar chart
 /// (Hevy "June Report" parity).
 ///

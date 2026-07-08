@@ -275,6 +275,63 @@ void main() {
       // 5 minutos = 300 segundos, tolerancia ±2s
       expect(state.elapsedSeconds, closeTo(300, 2));
     });
+
+    test('stale resume uses recovered set timeline, not overnight wall time',
+        () async {
+      final repo = MockSessionRepository();
+      final routine = makeRoutine(
+        days: [
+          makeDay(slots: [makeSlot(exerciseId: 'e1', targetSets: 1)])
+        ],
+      );
+      final startedAt = DateTime.now().subtract(const Duration(days: 2));
+      final session = makeSession(id: 's42', startedAt: startedAt);
+      final setLogs = [
+        makeSetLog(
+          exerciseId: 'e1',
+          setNumber: 1,
+          id: 'l1',
+          completedAt: startedAt.add(const Duration(minutes: 40)),
+        ),
+      ];
+
+      when(() => repo.getActive('u1')).thenAnswer((_) async => session);
+      when(() => repo.listSetLogs(uid: 'u1', sessionId: 's42'))
+          .thenAnswer((_) async => setLogs);
+      when(() => repo.finish(
+            uid: any(named: 'uid'),
+            sessionId: any(named: 'sessionId'),
+            finishedAt: any(named: 'finishedAt'),
+            wasFullyCompleted: any(named: 'wasFullyCompleted'),
+            totalVolumeKg: any(named: 'totalVolumeKg'),
+            durationMin: any(named: 'durationMin'),
+          )).thenAnswer((_) async {});
+
+      final container = _makeContainer(
+        repo: repo,
+        uid: 'u1',
+        routine: routine,
+      );
+      addTearDown(container.dispose);
+
+      const init = ResumeSession(sessionId: 's42');
+      final state = await container.read(sessionNotifierProvider(init).future);
+
+      expect(state.elapsedSeconds, const Duration(minutes: 40).inSeconds);
+
+      await container
+          .read(sessionNotifierProvider(init).notifier)
+          .finishSession();
+
+      verify(() => repo.finish(
+            uid: 'u1',
+            sessionId: 's42',
+            finishedAt: any(named: 'finishedAt'),
+            wasFullyCompleted: true,
+            totalVolumeKg: any(named: 'totalVolumeKg'),
+            durationMin: 40,
+          )).called(1);
+    });
   });
 
   // ── logSet (SCENARIO-259..264) ────────────────────────────────────────────

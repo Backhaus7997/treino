@@ -2352,10 +2352,25 @@ class AppL10nEn extends AppL10n {
   String get monthlyReportDurationUnit => 'min';
 
   @override
+  String get monthlyReportDurationHoursUnit => 'h';
+
+  @override
   String get monthlyReportVolumeUnit => 'kg';
 
   @override
   String get monthlyReportEmptyHint => 'No data in the last 12 months.';
+
+  @override
+  String get monthlyReportByMonthLabel => 'BY MONTH';
+
+  @override
+  String get monthlyReportByDayLabel => 'BY DAY';
+
+  @override
+  String get monthlyReportDailyEmptyHint => 'No trained minutes in this month.';
+
+  @override
+  String get monthlyReportDailyTooltipDayLabel => 'Day';
 
   @override
   String get monthlyReportLoadError =>

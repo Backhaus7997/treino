@@ -357,6 +357,30 @@ GoRouter buildRouter({
           return _withBg(ChatScreen(chatId: chatId, otherUid: otherUid));
         },
       ),
+      GoRoute(
+        // Statistics hub — fullscreen, no bottom nav. Reached from Home's
+        // "Esta semana" card, but it should behave like a pushed report page.
+        path: '/home/insights',
+        builder: (_, __) => _immersive(const InsightsScreen()),
+      ),
+      GoRoute(
+        // Statistics hub detail screens — fullscreen, no bottom nav. They are
+        // bare Columns, so wrap them in _immersive instead of shell _withBg.
+        path: '/home/insights/monthly',
+        builder: (_, __) => _immersive(const _MonthlyReportRouteHost()),
+      ),
+      GoRoute(
+        path: '/home/insights/muscle-distribution',
+        builder: (_, __) => _immersive(const _MuscleDistributionRouteHost()),
+      ),
+      GoRoute(
+        path: '/home/insights/frequent-exercises',
+        builder: (_, __) => _immersive(const _FrequentExercisesRouteHost()),
+      ),
+      GoRoute(
+        path: '/home/insights/volume-by-group',
+        builder: (_, __) => _immersive(const _VolumeByGroupRouteHost()),
+      ),
 
       // ShellRoute with the existing 5 tabs.
       // Use `pageBuilder` (not `builder`) so the shell itself uses an
@@ -467,38 +491,6 @@ GoRouter buildRouter({
           GoRoute(
             path: '/home',
             pageBuilder: (_, __) => _noAnim(const HomeScreen()),
-            routes: [
-              GoRoute(
-                path: 'insights',
-                builder: (_, __) => _withBg(const InsightsScreen()),
-                routes: [
-                  GoRoute(
-                    path: 'monthly',
-                    builder: (_, __) =>
-                        _withBg(const _MonthlyReportRouteHost()),
-                  ),
-                  // [stats-hub] Tile destinations from the ESTADÍSTICAS
-                  // AVANZADAS list (obs #445) — same route-host pattern as
-                  // monthly (resolve currentUidProvider once, pass explicit
-                  // uid down so each screen stays reusable).
-                  GoRoute(
-                    path: 'muscle-distribution',
-                    builder: (_, __) =>
-                        _withBg(const _MuscleDistributionRouteHost()),
-                  ),
-                  GoRoute(
-                    path: 'frequent-exercises',
-                    builder: (_, __) =>
-                        _withBg(const _FrequentExercisesRouteHost()),
-                  ),
-                  GoRoute(
-                    path: 'volume-by-group',
-                    builder: (_, __) =>
-                        _withBg(const _VolumeByGroupRouteHost()),
-                  ),
-                ],
-              ),
-            ],
           ),
           GoRoute(
             path: '/coach',

@@ -2406,10 +2406,26 @@ class AppL10nEs extends AppL10n {
   String get monthlyReportDurationUnit => 'min';
 
   @override
+  String get monthlyReportDurationHoursUnit => 'h';
+
+  @override
   String get monthlyReportVolumeUnit => 'kg';
 
   @override
   String get monthlyReportEmptyHint => 'Sin datos en los últimos 12 meses.';
+
+  @override
+  String get monthlyReportByMonthLabel => 'POR MES';
+
+  @override
+  String get monthlyReportByDayLabel => 'POR DÍA';
+
+  @override
+  String get monthlyReportDailyEmptyHint =>
+      'Sin minutos entrenados en este mes.';
+
+  @override
+  String get monthlyReportDailyTooltipDayLabel => 'Día';
 
   @override
   String get monthlyReportLoadError =>
@@ -4857,10 +4873,26 @@ class AppL10nEsAr extends AppL10nEs {
   String get monthlyReportDurationUnit => 'min';
 
   @override
+  String get monthlyReportDurationHoursUnit => 'h';
+
+  @override
   String get monthlyReportVolumeUnit => 'kg';
 
   @override
   String get monthlyReportEmptyHint => 'Sin datos en los últimos 12 meses.';
+
+  @override
+  String get monthlyReportByMonthLabel => 'POR MES';
+
+  @override
+  String get monthlyReportByDayLabel => 'POR DÍA';
+
+  @override
+  String get monthlyReportDailyEmptyHint =>
+      'Sin minutos entrenados en este mes.';
+
+  @override
+  String get monthlyReportDailyTooltipDayLabel => 'Día';
 
   @override
   String get monthlyReportLoadError =>

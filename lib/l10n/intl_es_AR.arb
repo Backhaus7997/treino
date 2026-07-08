@@ -1865,7 +1865,11 @@
   },
   "monthlyReportDurationUnit": "min",
   "@monthlyReportDurationUnit": {
-    "description": "[AD6/PR5a] Unit suffix for the Duration summary stat card."
+    "description": "[AD6/PR5a] Unit suffix for duration values displayed in minutes."
+  },
+  "monthlyReportDurationHoursUnit": "h",
+  "@monthlyReportDurationHoursUnit": {
+    "description": "[AD6] Unit suffix for monthly duration totals displayed in hours."
   },
   "monthlyReportVolumeUnit": "kg",
   "@monthlyReportVolumeUnit": {
@@ -1874,6 +1878,22 @@
   "monthlyReportEmptyHint": "Sin datos en los últimos 12 meses.",
   "@monthlyReportEmptyHint": {
     "description": "[AD6/PR5a] Empty state shown in the Monthly Report bar chart when all 12 months are zero across every metric."
+  },
+  "monthlyReportByMonthLabel": "POR MES",
+  "@monthlyReportByMonthLabel": {
+    "description": "[AD6] Segmented control label that shows the monthly report grouped by calendar month."
+  },
+  "monthlyReportByDayLabel": "POR DÍA",
+  "@monthlyReportByDayLabel": {
+    "description": "[AD6] Segmented control label that shows the monthly report grouped by day."
+  },
+  "monthlyReportDailyEmptyHint": "Sin minutos entrenados en este mes.",
+  "@monthlyReportDailyEmptyHint": {
+    "description": "[AD6] Empty state shown in the daily duration chart when the selected month has no trained minutes."
+  },
+  "monthlyReportDailyTooltipDayLabel": "Día",
+  "@monthlyReportDailyTooltipDayLabel": {
+    "description": "[AD6] Prefix used in daily duration chart tooltips before the calendar day number."
   },
   "monthlyReportLoadError": "No pudimos cargar tu reporte mensual. Probá de nuevo.",
   "@monthlyReportLoadError": {

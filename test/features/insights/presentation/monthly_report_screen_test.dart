@@ -107,8 +107,9 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    // 40 + 25 = 65 min — active session's 999 must be excluded.
-    expect(find.text('65'), findsOneWidget);
+    // 40 + 25 = 65 min = 1.1 h — active session's 999 must be excluded.
+    expect(find.text('1.1'), findsOneWidget);
+    expect(find.text('h'), findsOneWidget);
   });
 
   testWidgets('shows error state + retry on load failure', (tester) async {
@@ -126,6 +127,35 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Reintentar'), findsOneWidget);
+  });
+
+  testWidgets('switching to POR DÍA renders the daily duration chart',
+      (tester) async {
+    final repo = MockSessionRepository();
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    when(() => repo.listByUid('u1')).thenAnswer((_) async => [
+          makeSession(
+            id: 's1',
+            startedAt: today,
+            status: SessionStatus.finished,
+            durationMin: 45,
+          ),
+        ]);
+    when(() => repo.listSetLogs(uid: 'u1', sessionId: any(named: 'sessionId')))
+        .thenAnswer((_) async => [makeSetLog()]);
+
+    await tester.pumpWidget(wrap(
+      const SizedBox.shrink(),
+      overrides: [sessionRepositoryProvider.overrideWithValue(repo)],
+    ));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('POR DÍA'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(DailyDurationChart), findsOneWidget);
   });
 
   testWidgets(

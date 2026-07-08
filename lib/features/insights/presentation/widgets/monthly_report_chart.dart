@@ -258,12 +258,28 @@ class _Bars extends StatelessWidget {
       case MonthlyReportMetric.workouts:
         return p.workoutsCount;
       case MonthlyReportMetric.duration:
-        return p.durationMin;
+        return p.durationMin / 60;
       case MonthlyReportMetric.volume:
         return p.volumeKg;
       case MonthlyReportMetric.sets:
         return p.setsCount;
     }
+  }
+
+  String _formatValue(MonthlyReportPoint point) {
+    final value = _valueOf(point);
+    if (metric == MonthlyReportMetric.duration) {
+      final hours = value.toDouble();
+      return hours % 1 == 0
+          ? hours.toStringAsFixed(0)
+          : hours.toStringAsFixed(1);
+    }
+    if (metric == MonthlyReportMetric.volume && value is double) {
+      return value % 1 == 0
+          ? value.toStringAsFixed(0)
+          : value.toStringAsFixed(1);
+    }
+    return value.toString();
   }
 
   String _monthAbbrev(DateTime month) =>
@@ -291,7 +307,7 @@ class _Bars extends StatelessWidget {
               getTooltipItem: (group, groupIndex, rod, rodIndex) {
                 final point = points[group.x.toInt()];
                 return BarTooltipItem(
-                  '${_valueOf(point)}\n${_monthAbbrev(point.month)}',
+                  '${_formatValue(point)}\n${_monthAbbrev(point.month)}',
                   GoogleFonts.barlow(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
@@ -359,6 +375,173 @@ class _Bars extends StatelessWidget {
                 ],
               ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Daily duration chart ─────────────────────────────────────────────────────
+
+class DailyDurationChart extends StatelessWidget {
+  const DailyDurationChart({
+    super.key,
+    required this.points,
+    required this.emptyHint,
+    required this.dayLabel,
+    required this.minutesUnit,
+  });
+
+  final List<MonthlyReportDayPoint> points;
+  final String emptyHint;
+  final String dayLabel;
+  final String minutesUnit;
+
+  bool get _allZero => points.every((p) => p.durationMin == 0);
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: palette.bgCard,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: palette.border),
+      ),
+      child: _allZero
+          ? Padding(
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              child: Text(
+                emptyHint,
+                style:
+                    GoogleFonts.barlow(fontSize: 13, color: palette.textMuted),
+              ),
+            )
+          : _DailyBars(
+              points: points,
+              palette: palette,
+              dayLabel: dayLabel,
+              minutesUnit: minutesUnit,
+            ),
+    );
+  }
+}
+
+class _DailyBars extends StatelessWidget {
+  const _DailyBars({
+    required this.points,
+    required this.palette,
+    required this.dayLabel,
+    required this.minutesUnit,
+  });
+
+  final List<MonthlyReportDayPoint> points;
+  final AppPalette palette;
+  final String dayLabel;
+  final String minutesUnit;
+
+  @override
+  Widget build(BuildContext context) {
+    final values = points.map((p) => p.durationMin.toDouble()).toList();
+    final maxVal = values.reduce((a, b) => a > b ? a : b);
+    // Keep generous headroom so a dominant day still defines the visual scale
+    // without pushing its tooltip outside the chart/card bounds.
+    final maxY = maxVal <= 0 ? 1.0 : maxVal * 1.45;
+    final chartWidth = points.length * 26.0;
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: SizedBox(
+        width: chartWidth,
+        height: 200,
+        child: BarChart(
+          BarChartData(
+            maxY: maxY,
+            minY: 0,
+            alignment: BarChartAlignment.spaceAround,
+            barTouchData: BarTouchData(
+              handleBuiltInTouches: true,
+              touchExtraThreshold: const EdgeInsets.symmetric(
+                horizontal: 8,
+                vertical: 28,
+              ),
+              touchTooltipData: BarTouchTooltipData(
+                getTooltipColor: (_) => palette.bgCard,
+                tooltipBorder: BorderSide(color: palette.border),
+                tooltipBorderRadius: BorderRadius.circular(8),
+                tooltipMargin: 38,
+                fitInsideHorizontally: true,
+                fitInsideVertically: true,
+                getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                  final point = points[group.x.toInt()];
+                  return BarTooltipItem(
+                    '$dayLabel ${point.day.day}\n'
+                    '${point.durationMin} $minutesUnit',
+                    GoogleFonts.barlow(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: palette.textPrimary,
+                    ),
+                  );
+                },
+              ),
+            ),
+            titlesData: FlTitlesData(
+              topTitles:
+                  const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              rightTitles:
+                  const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              leftTitles:
+                  const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              bottomTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: true,
+                  reservedSize: 24,
+                  getTitlesWidget: (value, meta) {
+                    final idx = value.round();
+                    if (idx < 0 || idx >= points.length) {
+                      return const SizedBox.shrink();
+                    }
+                    return SideTitleWidget(
+                      meta: meta,
+                      child: Text(
+                        '${points[idx].day.day}',
+                        style: GoogleFonts.barlowCondensed(
+                          fontSize: 10,
+                          color: palette.textMuted,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+            gridData: FlGridData(
+              show: true,
+              drawHorizontalLine: true,
+              drawVerticalLine: false,
+              getDrawingHorizontalLine: (_) =>
+                  FlLine(color: palette.border, strokeWidth: 1),
+            ),
+            borderData: FlBorderData(show: false),
+            barGroups: [
+              for (var i = 0; i < points.length; i++)
+                BarChartGroupData(
+                  x: i,
+                  barRods: [
+                    BarChartRodData(
+                      toY: points[i].durationMin.toDouble(),
+                      color: palette.highlight,
+                      width: 10,
+                      borderRadius: BorderRadius.circular(5),
+                    ),
+                  ],
+                ),
+            ],
+          ),
         ),
       ),
     );

@@ -27,6 +27,7 @@ const int monthlyReportWindowSize = 12;
 MonthlyReport aggregateMonthlyReport({
   required List<Session> sessions,
   required Map<String, int> setsCountBySessionId,
+  required Map<String, int> durationMinBySessionId,
   required DateTime now,
 }) {
   final anchor = DateTime(now.year, now.month);
@@ -59,7 +60,8 @@ MonthlyReport aggregateMonthlyReport({
     if (key < windowStartKey || key > windowEndKey) continue;
 
     workoutsByKey[key] = (workoutsByKey[key] ?? 0) + 1;
-    durationByKey[key] = (durationByKey[key] ?? 0) + session.durationMin;
+    durationByKey[key] =
+        (durationByKey[key] ?? 0) + (durationMinBySessionId[session.id] ?? 0);
     volumeByKey[key] = (volumeByKey[key] ?? 0) + session.totalVolumeKg;
     setsByKey[key] =
         (setsByKey[key] ?? 0) + (setsCountBySessionId[session.id] ?? 0);
@@ -77,4 +79,33 @@ MonthlyReport aggregateMonthlyReport({
   }).toList();
 
   return MonthlyReport(points: points);
+}
+
+List<MonthlyReportDayPoint> aggregateDailyDurationReport({
+  required List<Session> sessions,
+  required Map<String, int> durationMinBySessionId,
+  required DateTime month,
+}) {
+  final monthStart = DateTime(month.year, month.month);
+  final dayCount = DateTime(month.year, month.month + 1, 0).day;
+  final durationByDay = <int, int>{};
+
+  for (final session in sessions) {
+    if (session.status != SessionStatus.finished) continue;
+    final started = session.startedAt.toLocal();
+    if (started.year != monthStart.year || started.month != monthStart.month) {
+      continue;
+    }
+
+    durationByDay[started.day] = (durationByDay[started.day] ?? 0) +
+        (durationMinBySessionId[session.id] ?? 0);
+  }
+
+  return List.generate(dayCount, (i) {
+    final day = i + 1;
+    return MonthlyReportDayPoint(
+      day: DateTime(monthStart.year, monthStart.month, day),
+      durationMin: durationByDay[day] ?? 0,
+    );
+  });
 }
