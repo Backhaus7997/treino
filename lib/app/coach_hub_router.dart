@@ -22,6 +22,7 @@ import '../features/coach_hub/presentation/sections/planes/routes.dart';
 import '../features/coach_hub/presentation/sections/planner/routes.dart';
 import '../features/coach_hub/presentation/sections/recetas/routes.dart';
 import '../features/coach_hub/presentation/sections/reportes/routes.dart';
+import '../features/coach_hub/presentation/sections/routine_editor/routes.dart';
 import '../features/coach_hub/presentation/sections/rutinas/routes.dart';
 import '../features/coach_hub/presentation/sections/suplementos/routes.dart';
 import '../features/coach_hub/presentation/sections/templates/routes.dart';
@@ -118,6 +119,7 @@ final List<RouteBase> _signedInRoutes = [
   ...chatRoutes,
   ...ajustesRoutes,
   ...legacyRoutes, // /upload-plan, /upload-plan/preview
+  ...routineEditorRoutes, // /routine-editor/:athleteId
 ];
 
 /// Build del GoRouter del Coach Hub (ADR-CHW-001, ADR-CHW-008).
