@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach_hub/presentation/sections/agenda/agenda_web_screen.dart';
+import 'package:treino/features/coach_hub/presentation/shell/coach_hub_page.dart';
 import 'package:treino/features/coach_hub/presentation/shell/sidebar_item.dart';
 
 /// Rutas e item de sidebar de la sección «Agenda» del Coach Hub web.
@@ -13,7 +14,7 @@ import 'package:treino/features/coach_hub/presentation/shell/sidebar_item.dart';
 final List<RouteBase> agendaRoutes = [
   GoRoute(
     path: '/agenda',
-    builder: (_, __) => const AgendaWebScreen(), // i18n
+    pageBuilder: (_, __) => coachHubPage(const AgendaWebScreen()), // i18n
   ),
 ];
 
