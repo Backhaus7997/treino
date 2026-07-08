@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/utils/handle_derivation.dart';
+import '../../../../core/widgets/motion/treino_shimmer.dart';
 import '../../../feed/presentation/widgets/post_avatar.dart';
 import '../../../gyms/application/gym_providers.dart';
 import '../../../gyms/domain/gym_display_name.dart';
@@ -34,7 +35,9 @@ class ProfileAvatarCard extends ConsumerWidget {
     return profileAsync.when(
       data: (profile) => _CardBody(profile: profile, palette: palette),
       loading: () => _CardSkeleton(palette: palette),
-      error: (_, __) => _CardSkeleton(palette: palette),
+      // Error NO shimmerea: el stream ya falló (p. ej. offline) — un barrido
+      // infinito quemaría batería y mentiría ("sigue cargando").
+      error: (_, __) => _CardSkeleton(palette: palette, shimmer: false),
     );
   }
 }
@@ -49,7 +52,11 @@ class _CardBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (profile == null) return _CardSkeleton(palette: palette);
+    // profile == null es un estado ESTABLE (dato resuelto, sin perfil), no
+    // transitorio — sin shimmer: nada está cargando.
+    if (profile == null) {
+      return _CardSkeleton(palette: palette, shimmer: false);
+    }
 
     final uid = profile.uid as String?;
     final displayName = profile.displayName as String?;
@@ -188,61 +195,68 @@ class _GymChip extends ConsumerWidget {
 // ── Skeleton (loading / error / null profile) ─────────────────────────────────
 
 class _CardSkeleton extends StatelessWidget {
-  const _CardSkeleton({required this.palette});
+  const _CardSkeleton({required this.palette, this.shimmer = true});
 
   final AppPalette palette;
 
+  /// `false` cuando el skeleton representa un estado estable (error del
+  /// stream, perfil null) — se propaga a [TreinoShimmer.enabled].
+  final bool shimmer;
+
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: palette.bgCard,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: palette.textMuted.withValues(alpha: 0.12),
+    return TreinoShimmer(
+      enabled: shimmer,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: palette.bgCard,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: palette.textMuted.withValues(alpha: 0.12),
+            ),
           ),
-        ),
-        child: Row(
-          children: [
-            // Avatar placeholder
-            Container(
-              width: 64,
-              height: 64,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: palette.textMuted.withValues(alpha: 0.12),
+          child: Row(
+            children: [
+              // Avatar placeholder
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: palette.textMuted.withValues(alpha: 0.12),
+                ),
               ),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    height: 16,
-                    width: 120,
-                    decoration: BoxDecoration(
-                      color: palette.textMuted.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(4),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      height: 16,
+                      width: 120,
+                      decoration: BoxDecoration(
+                        color: palette.textMuted.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    height: 12,
-                    width: 80,
-                    decoration: BoxDecoration(
-                      color: palette.textMuted.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(4),
+                    const SizedBox(height: 8),
+                    Container(
+                      height: 12,
+                      width: 80,
+                      decoration: BoxDecoration(
+                        color: palette.textMuted.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

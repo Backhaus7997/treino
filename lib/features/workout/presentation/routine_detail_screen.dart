@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
+import '../../../core/widgets/motion/treino_shimmer.dart';
 import '../../../core/analytics/analytics_service.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
@@ -1256,62 +1257,64 @@ class _RoutineLoadingSkeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    return SingleChildScrollView(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            height: 320,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  palette.accent.withValues(alpha: 0.3),
-                  palette.bg,
+    return TreinoShimmer(
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              height: 320,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    palette.accent.withValues(alpha: 0.3),
+                    palette.bg,
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 18),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(height: 12, width: 100, color: palette.bgCard),
+                  const SizedBox(height: 8),
+                  Container(height: 36, width: 180, color: palette.bgCard),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: List.generate(
+                      3,
+                      (_) => Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          child: Container(height: 40, color: palette.bgCard),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  ...List.generate(
+                    4,
+                    (_) => Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Container(
+                        height: 76,
+                        decoration: BoxDecoration(
+                          color: palette.bgCard,
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
-          ),
-          const SizedBox(height: 18),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(height: 12, width: 100, color: palette.bgCard),
-                const SizedBox(height: 8),
-                Container(height: 36, width: 180, color: palette.bgCard),
-                const SizedBox(height: 14),
-                Row(
-                  children: List.generate(
-                    3,
-                    (_) => Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        child: Container(height: 40, color: palette.bgCard),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 18),
-                ...List.generate(
-                  4,
-                  (_) => Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: Container(
-                      height: 76,
-                      decoration: BoxDecoration(
-                        color: palette.bgCard,
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

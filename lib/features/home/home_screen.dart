@@ -250,6 +250,11 @@ class _HomeHeaderSkeleton extends StatelessWidget {
     final l10n = AppL10n.of(context);
     // Announce the loading state so screen readers don't land on a silent,
     // empty 56px surface while the profile header resolves.
+    //
+    // Sin TreinoShimmer a propósito (TREINO Motion PR2): este skeleton es un
+    // spacer transparente sin cajas pintadas — con BlendMode.srcATop el
+    // barrido no pintaría ni un píxel, pero el controller correría igual
+    // (createShader + ShaderMaskLayer por frame). Trabajo muerto.
     return Semantics(
       label: l10n.commonLoading,
       liveRegion: true,

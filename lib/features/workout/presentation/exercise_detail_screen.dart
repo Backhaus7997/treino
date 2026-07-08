@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
+import '../../../core/widgets/motion/treino_shimmer.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
 import '../application/exercise_providers.dart';
@@ -564,38 +565,40 @@ class _ExerciseLoadingSkeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    return SingleChildScrollView(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(height: 320, color: palette.espresso),
-          const SizedBox(height: 20),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  height: 80,
-                  decoration: BoxDecoration(
-                    color: palette.bgCard,
-                    borderRadius: BorderRadius.circular(20),
+    return TreinoShimmer(
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(height: 320, color: palette.espresso),
+            const SizedBox(height: 20),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    height: 80,
+                    decoration: BoxDecoration(
+                      color: palette.bgCard,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 20),
-                Container(height: 12, width: 100, color: palette.bgCard),
-                const SizedBox(height: 12),
-                Container(
-                  height: 160,
-                  decoration: BoxDecoration(
-                    color: palette.bgCard,
-                    borderRadius: BorderRadius.circular(20),
+                  const SizedBox(height: 20),
+                  Container(height: 12, width: 100, color: palette.bgCard),
+                  const SizedBox(height: 12),
+                  Container(
+                    height: 160,
+                    decoration: BoxDecoration(
+                      color: palette.bgCard,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
