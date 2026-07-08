@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
+import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../workout/application/exercise_frequency_providers.dart';
@@ -58,28 +59,39 @@ class _FrequentExercisesScreenState
                 20, 12, 20, 20 + MediaQuery.paddingOf(context).bottom),
             physics: const AlwaysScrollableScrollPhysics(),
             children: [
-              entriesAsync.when(
-                loading: () => const SizedBox(
-                  height: 120,
-                  child: Center(child: CircularProgressIndicator()),
+              // TREINO Motion PR2: cross-fade loading→data/error (key =
+              // branch del `.when()`; sin keys distintas no anima).
+              TreinoStateSwitcher(
+                childKey: ValueKey(
+                  entriesAsync.when(
+                    loading: () => 'loading',
+                    error: (_, __) => 'error',
+                    data: (_) => 'data',
+                  ),
                 ),
-                error: (_, __) => const SizedBox.shrink(),
-                data: (entries) => MostFrequentExercisesList(
-                  entries: entries,
-                  selectedPeriod: _selectedPeriod,
-                  // NON-NAVIGATING (see class doc) — no athlete-side
-                  // exercise progression destination exists yet.
-                  onSelectExercise: (_) {},
-                  onSelectPeriod: (p) => setState(() => _selectedPeriod = p),
-                  labels: MostFrequentExercisesListLabels(
-                    sectionTitle: l10n.mostFrequentExercisesSectionTitle,
-                    sessionCountLabel: (n) =>
-                        l10n.mostFrequentExercisesSessionCount(n),
-                    emptyText: l10n.mostFrequentExercisesEmpty,
-                    periodLabels: ChartPeriodLabels(
-                      last30dLabel: l10n.progressionPeriodLast30Days,
-                      thisWeekLabel: l10n.progressionPeriodThisWeek,
-                      monthLabel: l10n.progressionPeriodMonth,
+                child: entriesAsync.when(
+                  loading: () => const SizedBox(
+                    height: 120,
+                    child: Center(child: CircularProgressIndicator()),
+                  ),
+                  error: (_, __) => const SizedBox.shrink(),
+                  data: (entries) => MostFrequentExercisesList(
+                    entries: entries,
+                    selectedPeriod: _selectedPeriod,
+                    // NON-NAVIGATING (see class doc) — no athlete-side
+                    // exercise progression destination exists yet.
+                    onSelectExercise: (_) {},
+                    onSelectPeriod: (p) => setState(() => _selectedPeriod = p),
+                    labels: MostFrequentExercisesListLabels(
+                      sectionTitle: l10n.mostFrequentExercisesSectionTitle,
+                      sessionCountLabel: (n) =>
+                          l10n.mostFrequentExercisesSessionCount(n),
+                      emptyText: l10n.mostFrequentExercisesEmpty,
+                      periodLabels: ChartPeriodLabels(
+                        last30dLabel: l10n.progressionPeriodLast30Days,
+                        thisWeekLabel: l10n.progressionPeriodThisWeek,
+                        monthLabel: l10n.progressionPeriodMonth,
+                      ),
                     ),
                   ),
                 ),

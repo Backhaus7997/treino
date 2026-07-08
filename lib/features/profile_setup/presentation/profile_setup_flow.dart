@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/theme/app_background.dart';
+import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../../core/widgets/treino_icon.dart';
@@ -137,8 +138,8 @@ class _ProfileSetupFlowState extends ConsumerState<ProfileSetupFlow> {
         if (!_pageController.hasClients) return;
         _pageController.animateToPage(
           next,
-          duration: const Duration(milliseconds: 280),
-          curve: Curves.easeOutCubic,
+          duration: AppMotion.slow,
+          curve: AppMotion.standard,
         );
       },
     );

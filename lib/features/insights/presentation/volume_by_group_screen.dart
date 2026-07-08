@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
+import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
 import '../application/insights_providers.dart';
@@ -38,34 +39,45 @@ class VolumeByGroupScreen extends ConsumerWidget {
       children: [
         _Header(title: l10n.volumeByGroupScreenTitle),
         Expanded(
-          child: async.when(
-            loading: () => Center(
-              child: CircularProgressIndicator(color: palette.accent),
-            ),
-            error: (_, __) => _ErrorState(
-              onRetry: () => ref.invalidate(
-                athleteWeekInsightsProvider((uid: uid, weekStart: weekStart)),
+          // TREINO Motion PR2: cross-fade loading→data/error (key = branch
+          // del `.when()`; sin keys distintas no anima).
+          child: TreinoStateSwitcher(
+            childKey: ValueKey(
+              async.when(
+                loading: () => 'loading',
+                error: (_, __) => 'error',
+                data: (_) => 'data',
               ),
             ),
-            data: (insights) => insights == null
-                ? Center(
-                    child: Text(
-                      l10n.insightsLoadError,
-                      textAlign: TextAlign.center,
-                      style: GoogleFonts.barlow(
-                        fontSize: 14,
-                        color: palette.textMuted,
+            child: async.when(
+              loading: () => Center(
+                child: CircularProgressIndicator(color: palette.accent),
+              ),
+              error: (_, __) => _ErrorState(
+                onRetry: () => ref.invalidate(
+                  athleteWeekInsightsProvider((uid: uid, weekStart: weekStart)),
+                ),
+              ),
+              data: (insights) => insights == null
+                  ? Center(
+                      child: Text(
+                        l10n.insightsLoadError,
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.barlow(
+                          fontSize: 14,
+                          color: palette.textMuted,
+                        ),
                       ),
+                    )
+                  : ListView(
+                      padding: EdgeInsets.fromLTRB(20, 12, 20,
+                          20 + MediaQuery.paddingOf(context).bottom),
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      children: [
+                        _VolumeBarCard(insights: insights),
+                      ],
                     ),
-                  )
-                : ListView(
-                    padding: EdgeInsets.fromLTRB(
-                        20, 12, 20, 20 + MediaQuery.paddingOf(context).bottom),
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    children: [
-                      _VolumeBarCard(insights: insights),
-                    ],
-                  ),
+            ),
           ),
         ),
       ],

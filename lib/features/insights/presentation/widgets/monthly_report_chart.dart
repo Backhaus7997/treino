@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart' as intl;
 
+import '../../../../app/theme/app_motion.dart';
 import '../../../../app/theme/app_palette.dart';
 import '../../domain/monthly_report.dart';
 
@@ -294,6 +295,12 @@ class _Bars extends StatelessWidget {
     return SizedBox(
       height: 200,
       child: BarChart(
+        // TREINO Motion PR2: anima el morph de las barras al cambiar de
+        // métrica (chips) con los tokens del sistema. fl_chart 1.x expone
+        // `duration`/`curve` (los viejos `swapAnimation*` están deprecados).
+        // `resolve` respeta reduce-motion (→ Duration.zero).
+        duration: AppMotion.resolve(context, AppMotion.base),
+        curve: AppMotion.standard,
         BarChartData(
           maxY: maxY,
           minY: 0,
@@ -458,6 +465,9 @@ class _DailyBars extends StatelessWidget {
         width: chartWidth,
         height: 200,
         child: BarChart(
+          // TREINO Motion PR2 — mismos tokens que el chart mensual de arriba.
+          duration: AppMotion.resolve(context, AppMotion.base),
+          curve: AppMotion.standard,
           BarChartData(
             maxY: maxY,
             minY: 0,

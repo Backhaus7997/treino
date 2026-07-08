@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
+import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../workout/presentation/widgets/exercise_progression_section.dart'
@@ -104,15 +105,26 @@ class _MuscleDistributionScreenState
                       ],
                     ),
                     const SizedBox(height: 14),
-                    insightsAsync.when(
-                      loading: () => const SizedBox(
-                        height: 240,
-                        child: Center(child: CircularProgressIndicator()),
+                    // TREINO Motion PR2: cross-fade loading→data/error (key =
+                    // branch del `.when()`; sin keys distintas no anima).
+                    TreinoStateSwitcher(
+                      childKey: ValueKey(
+                        insightsAsync.when(
+                          loading: () => 'loading',
+                          error: (_, __) => 'error',
+                          data: (_) => 'data',
+                        ),
                       ),
-                      error: (_, __) => const SizedBox.shrink(),
-                      data: (insights) => MuscleDistributionRadar(
-                        insights: insights,
-                        labels: radarLabels,
+                      child: insightsAsync.when(
+                        loading: () => const SizedBox(
+                          height: 240,
+                          child: Center(child: CircularProgressIndicator()),
+                        ),
+                        error: (_, __) => const SizedBox.shrink(),
+                        data: (insights) => MuscleDistributionRadar(
+                          insights: insights,
+                          labels: radarLabels,
+                        ),
                       ),
                     ),
                   ],

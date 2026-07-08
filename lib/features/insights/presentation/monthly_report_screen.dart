@@ -4,7 +4,10 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart' as intl;
 
+import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
+import '../../../core/widgets/motion/treino_fade_slide_in.dart';
+import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
 import '../application/month_radar_providers.dart';
@@ -51,99 +54,140 @@ class _MonthlyReportScreenState extends ConsumerState<MonthlyReportScreen> {
       children: [
         _Header(title: l10n.monthlyReportTitle),
         Expanded(
-          child: async.when(
-            loading: () => Center(
-              child: CircularProgressIndicator(color: palette.accent),
-            ),
-            error: (_, __) => _ErrorState(
-              message: l10n.monthlyReportLoadError,
-              retryLabel: l10n.coachRetryLabel,
-              onRetry: () => ref.invalidate(
-                athleteMonthlyReportProvider(widget.uid),
+          // TREINO Motion PR2: cross-fade loading→data/error (key = branch
+          // del `.when()`; estados distintos → keys distintas, si no el
+          // switcher no anima).
+          child: TreinoStateSwitcher(
+            childKey: ValueKey(
+              async.when(
+                loading: () => 'loading',
+                error: (_, __) => 'error',
+                data: (_) => 'data',
               ),
             ),
-            data: (report) {
-              final selectedMonth = _resolveSelectedMonth(report);
-              final selectedPoint = report.points.firstWhere(
-                (p) => p.month == selectedMonth,
-                orElse: () => report.points.last,
-              );
-              final previousPoint = _previousPointFor(report, selectedPoint);
+            child: async.when(
+              loading: () => Center(
+                child: CircularProgressIndicator(color: palette.accent),
+              ),
+              error: (_, __) => _ErrorState(
+                message: l10n.monthlyReportLoadError,
+                retryLabel: l10n.coachRetryLabel,
+                onRetry: () => ref.invalidate(
+                  athleteMonthlyReportProvider(widget.uid),
+                ),
+              ),
+              data: (report) {
+                final selectedMonth = _resolveSelectedMonth(report);
+                final selectedPoint = report.points.firstWhere(
+                  (p) => p.month == selectedMonth,
+                  orElse: () => report.points.last,
+                );
+                final previousPoint = _previousPointFor(report, selectedPoint);
 
-              return ListView(
-                padding: EdgeInsets.fromLTRB(
-                    20, 12, 20, 20 + MediaQuery.paddingOf(context).bottom),
-                physics: const AlwaysScrollableScrollPhysics(),
-                children: [
-                  Text(
-                    _monthTitle(selectedPoint.month, l10n.localeName),
-                    style: GoogleFonts.barlowCondensed(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 20,
-                      letterSpacing: 0.6,
-                      color: palette.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  _GranularitySwitch(
-                    selected: _granularity,
-                    monthLabel: l10n.monthlyReportByMonthLabel,
-                    dayLabel: l10n.monthlyReportByDayLabel,
-                    onSelect: (value) => setState(() => _granularity = value),
-                  ),
-                  const SizedBox(height: 12),
-                  if (_granularity == _MonthlyReportGranularity.month)
-                    MonthlyReportChart(
-                      report: report,
-                      labels: MonthlyReportChartLabels(
-                        workoutsLabel: l10n.monthlyReportMetricWorkouts,
-                        durationLabel: l10n.monthlyReportMetricDuration,
-                        volumeLabel: l10n.monthlyReportMetricVolume,
-                        setsLabel: l10n.monthlyReportMetricSets,
-                        emptyHint: l10n.monthlyReportEmptyHint,
+                // TREINO Motion PR3: entrada fade+slide staggerada de las
+                // secciones. Seguro acá porque `ListView(children:)` es
+                // EAGER — nunca en builders lazy (ítems reciclados
+                // re-animarían). One-shot: cambiar de mes o de granularidad
+                // (setState) NO re-anima — el TreinoFadeSlideIn de cada
+                // posición conserva su State (el if/else del chart mantiene
+                // el mismo runtimeType en la misma posición).
+                return ListView(
+                  padding: EdgeInsets.fromLTRB(
+                      20, 12, 20, 20 + MediaQuery.paddingOf(context).bottom),
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  children: [
+                    TreinoFadeSlideIn(
+                      delay: AppMotion.stagger(0),
+                      child: Text(
+                        _monthTitle(selectedPoint.month, l10n.localeName),
+                        style: GoogleFonts.barlowCondensed(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 20,
+                          letterSpacing: 0.6,
+                          color: palette.textPrimary,
+                        ),
                       ),
-                      localeName: l10n.localeName,
-                      onMonthSelected: (m) =>
-                          setState(() => _selectedMonth = m),
-                    )
-                  else
-                    _DailyDurationSection(
-                      uid: widget.uid,
-                      month: selectedPoint.month,
-                      emptyHint: l10n.monthlyReportDailyEmptyHint,
                     ),
-                  const SizedBox(height: 14),
-                  MonthlyReportSummaryCards(
-                    selectedMonth: selectedPoint,
-                    previousMonth: previousPoint,
-                    labels: MonthlyReportSummaryLabels(
-                      workoutsLabel: l10n.monthlyReportMetricWorkouts,
-                      durationLabel: l10n.monthlyReportMetricDuration,
-                      volumeLabel: l10n.monthlyReportMetricVolume,
-                      setsLabel: l10n.monthlyReportMetricSets,
-                      durationUnit: l10n.monthlyReportDurationHoursUnit,
-                      volumeUnit: l10n.monthlyReportVolumeUnit,
+                    const SizedBox(height: 14),
+                    TreinoFadeSlideIn(
+                      delay: AppMotion.stagger(1),
+                      child: _GranularitySwitch(
+                        selected: _granularity,
+                        monthLabel: l10n.monthlyReportByMonthLabel,
+                        dayLabel: l10n.monthlyReportByDayLabel,
+                        onSelect: (value) =>
+                            setState(() => _granularity = value),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 14),
-                  _WorkoutDaysSection(
-                    uid: widget.uid,
-                    month: selectedPoint.month,
-                    l10n: l10n,
-                  ),
-                  const SizedBox(height: 14),
-                  // [AD6/PR5c] Month-vs-month muscle distribution radar —
-                  // reuses MuscleDistributionRadar with a calendar-month
-                  // window anchored at the selected month (Hevy "June
-                  // Report" Muscle Distribution section).
-                  _MonthRadarSection(
-                    uid: widget.uid,
-                    month: selectedPoint.month,
-                    l10n: l10n,
-                  ),
-                ],
-              );
-            },
+                    const SizedBox(height: 12),
+                    if (_granularity == _MonthlyReportGranularity.month)
+                      TreinoFadeSlideIn(
+                        delay: AppMotion.stagger(2),
+                        child: MonthlyReportChart(
+                          report: report,
+                          labels: MonthlyReportChartLabels(
+                            workoutsLabel: l10n.monthlyReportMetricWorkouts,
+                            durationLabel: l10n.monthlyReportMetricDuration,
+                            volumeLabel: l10n.monthlyReportMetricVolume,
+                            setsLabel: l10n.monthlyReportMetricSets,
+                            emptyHint: l10n.monthlyReportEmptyHint,
+                          ),
+                          localeName: l10n.localeName,
+                          onMonthSelected: (m) =>
+                              setState(() => _selectedMonth = m),
+                        ),
+                      )
+                    else
+                      TreinoFadeSlideIn(
+                        delay: AppMotion.stagger(2),
+                        child: _DailyDurationSection(
+                          uid: widget.uid,
+                          month: selectedPoint.month,
+                          emptyHint: l10n.monthlyReportDailyEmptyHint,
+                        ),
+                      ),
+                    const SizedBox(height: 14),
+                    TreinoFadeSlideIn(
+                      delay: AppMotion.stagger(3),
+                      child: MonthlyReportSummaryCards(
+                        selectedMonth: selectedPoint,
+                        previousMonth: previousPoint,
+                        labels: MonthlyReportSummaryLabels(
+                          workoutsLabel: l10n.monthlyReportMetricWorkouts,
+                          durationLabel: l10n.monthlyReportMetricDuration,
+                          volumeLabel: l10n.monthlyReportMetricVolume,
+                          setsLabel: l10n.monthlyReportMetricSets,
+                          durationUnit: l10n.monthlyReportDurationHoursUnit,
+                          volumeUnit: l10n.monthlyReportVolumeUnit,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    TreinoFadeSlideIn(
+                      delay: AppMotion.stagger(4),
+                      child: _WorkoutDaysSection(
+                        uid: widget.uid,
+                        month: selectedPoint.month,
+                        l10n: l10n,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    // [AD6/PR5c] Month-vs-month muscle distribution radar —
+                    // reuses MuscleDistributionRadar with a calendar-month
+                    // window anchored at the selected month (Hevy "June
+                    // Report" Muscle Distribution section).
+                    TreinoFadeSlideIn(
+                      delay: AppMotion.stagger(5),
+                      child: _MonthRadarSection(
+                        uid: widget.uid,
+                        month: selectedPoint.month,
+                        l10n: l10n,
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
           ),
         ),
       ],

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
+import '../../app/theme/app_motion.dart';
 import '../../app/theme/app_palette.dart';
 import '../../app/theme/app_theme.dart';
 import 'treino_icon.dart';
@@ -137,8 +138,7 @@ class _FirebaseStorageVideoPlayerState
     // Use the real aspect ratio the controller reports (portrait clips are
     // < 1, landscape > 1). Guarded by _CappedAspectRatio so portrait videos
     // do not overflow the chat list vertically.
-    final aspect =
-        c.value.aspectRatio > 0 ? c.value.aspectRatio : 16 / 9;
+    final aspect = c.value.aspectRatio > 0 ? c.value.aspectRatio : 16 / 9;
     return ClipRRect(
       borderRadius: BorderRadius.circular(12),
       child: _CappedAspectRatio(
@@ -161,14 +161,14 @@ class _FirebaseStorageVideoPlayerState
               ),
               AnimatedOpacity(
                 opacity: isPlaying ? 0 : 1,
-                duration: const Duration(milliseconds: 180),
+                duration: AppMotion.fast,
                 child: Container(
                     color: Colors.black
                         .withValues(alpha: 0.22)), // intentional: media surface
               ),
               AnimatedOpacity(
                 opacity: isPlaying ? 0 : 1,
-                duration: const Duration(milliseconds: 180),
+                duration: AppMotion.fast,
                 child: const _PlayOverlay(),
               ),
               Positioned(
@@ -280,9 +280,8 @@ class _CappedAspectRatio extends StatelessWidget {
       builder: (context, constraints) {
         // Prefer the tightest available width; if unbounded, fall back to a
         // sane default so the layout still resolves.
-        final width = constraints.maxWidth.isFinite
-            ? constraints.maxWidth
-            : 320.0;
+        final width =
+            constraints.maxWidth.isFinite ? constraints.maxWidth : 320.0;
         final naturalHeight = width / aspectRatio;
         final height = naturalHeight > maxHeight ? maxHeight : naturalHeight;
         // Recompute width from the clamped height to keep the aspect ratio
