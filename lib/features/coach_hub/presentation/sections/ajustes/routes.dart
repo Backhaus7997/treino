@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach_hub/presentation/sections/ajustes/ajustes_screen.dart';
+import 'package:treino/features/coach_hub/presentation/shell/coach_hub_page.dart';
 import 'package:treino/features/coach_hub/presentation/shell/sidebar_item.dart';
 
 /// Rutas e item de sidebar de la sección «Ajustes» (Configuración) del Coach
@@ -12,7 +13,9 @@ import 'package:treino/features/coach_hub/presentation/shell/sidebar_item.dart';
 /// no choquen en `coach_hub_router.dart` ni en `sidebar_registry.dart`
 /// (ADR-CHW-002).
 final List<RouteBase> ajustesRoutes = [
-  GoRoute(path: '/ajustes', builder: (_, __) => const AjustesScreen()),
+  GoRoute(
+      path: '/ajustes',
+      pageBuilder: (_, __) => coachHubPage(const AjustesScreen())),
 ];
 
 const List<SidebarItem> ajustesSidebarItems = [

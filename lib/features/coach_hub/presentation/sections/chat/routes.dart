@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach_hub/presentation/sections/chat/chat_section_screen.dart';
+import 'package:treino/features/coach_hub/presentation/shell/coach_hub_page.dart';
 import 'package:treino/features/coach_hub/presentation/shell/sidebar_item.dart';
 
 /// Rutas e item de sidebar de la sección «Chat» del Coach Hub web.
@@ -14,7 +15,7 @@ import 'package:treino/features/coach_hub/presentation/shell/sidebar_item.dart';
 final List<RouteBase> chatRoutes = [
   GoRoute(
     path: '/chat',
-    builder: (_, __) => const ChatSectionScreen(),
+    pageBuilder: (_, __) => coachHubPage(const ChatSectionScreen()),
   ),
 ];
 

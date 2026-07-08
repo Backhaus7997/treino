@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
+import 'package:treino/features/coach_hub/presentation/shell/coach_hub_page.dart';
 import 'package:treino/features/coach_hub/presentation/shell/proximamente_screen.dart';
 import 'package:treino/features/coach_hub/presentation/shell/sidebar_item.dart';
 
@@ -13,8 +14,8 @@ import 'package:treino/features/coach_hub/presentation/shell/sidebar_item.dart';
 final List<RouteBase> actividadRoutes = [
   GoRoute(
     path: '/actividad',
-    builder: (_, __) =>
-        const ProximamenteScreen(label: 'Actividad'), // i18n: Fase W1
+    pageBuilder: (_, __) => coachHubPage(
+        const ProximamenteScreen(label: 'Actividad')), // i18n: Fase W1
   ),
   // TODO(W2+): wire real screen
 ];
