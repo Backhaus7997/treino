@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
@@ -2006,8 +2007,8 @@ class _RepsSetRowState extends State<_RepsSetRow> {
         children: [
           summaryRow,
           AnimatedSize(
-            duration: const Duration(milliseconds: 200),
-            curve: Curves.easeInOut,
+            duration: AppMotion.base,
+            curve: AppMotion.emphasized,
             alignment: Alignment.topCenter,
             child: widget.isExpanded
                 ? expandedPanel

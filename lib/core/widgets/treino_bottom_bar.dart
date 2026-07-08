@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../app/theme/app_motion.dart';
 import '../../app/theme/app_palette.dart';
 import 'treino_icon.dart';
 
@@ -97,8 +98,8 @@ class TreinoBottomBar extends StatelessWidget {
                   return Stack(
                     children: [
                       AnimatedPositioned(
-                        duration: const Duration(milliseconds: 320),
-                        curve: Curves.easeOutCubic,
+                        duration: AppMotion.slow,
+                        curve: AppMotion.standard,
                         left: tabWidth * currentIndex + 8,
                         top: 8,
                         bottom: 8,
@@ -208,7 +209,7 @@ class _TabContent extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = active ? palette.bg : palette.textMuted;
     return AnimatedDefaultTextStyle(
-      duration: const Duration(milliseconds: 220),
+      duration: AppMotion.base,
       style: GoogleFonts.barlowCondensed(
         color: color,
         fontSize: 10,
@@ -231,9 +232,9 @@ class _TabContent extends StatelessWidget {
               clipBehavior: Clip.none,
               children: [
                 AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 220),
-                  switchInCurve: Curves.easeOutCubic,
-                  switchOutCurve: Curves.easeInCubic,
+                  duration: AppMotion.base,
+                  switchInCurve: AppMotion.standard,
+                  switchOutCurve: AppMotion.exit,
                   child: Icon(
                     active ? spec.iconActive : spec.icon,
                     key: ValueKey<bool>(active),

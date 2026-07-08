@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../../app/theme/app_motion.dart';
 import '../../../../app/theme/app_palette.dart';
 
 /// Card seleccionable de un nivel de experiencia en el step 3.
@@ -29,8 +30,8 @@ class ExperienceCard extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          curve: Curves.easeOutCubic,
+          duration: AppMotion.fast,
+          curve: AppMotion.standard,
           width: double.infinity,
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(

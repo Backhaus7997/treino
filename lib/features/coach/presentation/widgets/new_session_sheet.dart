@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../../app/theme/app_motion.dart';
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/treino_icon.dart';
 import '../../../../l10n/app_l10n.dart';
@@ -580,8 +581,8 @@ class _Pill extends StatelessWidget {
       child: GestureDetector(
         onTap: onTap,
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          curve: Curves.easeInOut,
+          duration: AppMotion.fast,
+          curve: AppMotion.emphasized,
           padding: const EdgeInsets.symmetric(vertical: 10),
           decoration: BoxDecoration(
             color: selected ? palette.accent : Colors.transparent,
@@ -636,7 +637,7 @@ class _WeekdayChips extends StatelessWidget {
         return GestureDetector(
           onTap: () => onToggle(entry.wd),
           child: AnimatedContainer(
-            duration: const Duration(milliseconds: 150),
+            duration: AppMotion.fast,
             width: 36,
             height: 36,
             decoration: BoxDecoration(
