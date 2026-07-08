@@ -143,5 +143,58 @@ void main() {
 
       expect(find.byKey(const Key('profile_avatar_pencil')), findsNothing);
     });
+
+    // ── "Ver mi perfil público" — tap opens own public profile ──────────────
+
+    testWidgets(
+        'tapping the card navigates to /feed/profile/{uid} (own public profile)',
+        (tester) async {
+      // Router with a stub destination so we can assert the navigation landed.
+      final router = GoRouter(
+        initialLocation: '/profile',
+        routes: [
+          GoRoute(
+            path: '/profile',
+            builder: (_, __) => const Scaffold(body: ProfileAvatarCard()),
+          ),
+          GoRoute(
+            path: '/feed/profile/:uid',
+            builder: (_, state) => Scaffold(
+              body: Center(
+                child: Text('PUBLIC:${state.pathParameters['uid']}'),
+              ),
+            ),
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(_buildCard(profile: _profile(), router: router));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('MARIA GOMEZ'));
+      await tester.pumpAndSettle();
+
+      // Landed on the public profile route with the current user's uid.
+      expect(find.text('PUBLIC:uid-test'), findsOneWidget);
+    });
+
+    testWidgets('renders a chevron affordance signalling the card is tappable',
+        (tester) async {
+      await tester.pumpWidget(_buildCard(profile: _profile()));
+      await tester.pumpAndSettle();
+
+      expect(find.byIcon(Icons.chevron_right), findsOneWidget);
+    });
+
+    testWidgets('exposes a "Ver mi perfil público" semantics button label',
+        (tester) async {
+      await tester.pumpWidget(_buildCard(profile: _profile()));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.bySemanticsLabel('Ver mi perfil público'),
+        findsOneWidget,
+      );
+    });
   });
 }

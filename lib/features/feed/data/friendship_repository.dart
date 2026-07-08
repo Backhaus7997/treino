@@ -1,21 +1,14 @@
-import 'dart:developer' as developer;
-
 import 'package:cloud_firestore/cloud_firestore.dart'
-    show CollectionReference, DocumentSnapshot, FieldValue, FirebaseFirestore;
+    show CollectionReference, DocumentSnapshot, FirebaseFirestore;
 
-import '../../../features/profile/data/user_public_profile_repository.dart';
 import '../domain/friendship.dart';
 import '../domain/friendship_status.dart';
 
 class FriendshipRepository {
-  FriendshipRepository({
-    required FirebaseFirestore firestore,
-    UserPublicProfileRepository? publicProfileRepository,
-  })  : _firestore = firestore,
-        _publicProfileRepository = publicProfileRepository;
+  FriendshipRepository({required FirebaseFirestore firestore})
+      : _firestore = firestore;
 
   final FirebaseFirestore _firestore;
-  final UserPublicProfileRepository? _publicProfileRepository;
 
   CollectionReference<Map<String, Object?>> get _friendships =>
       _firestore.collection('friendships');
@@ -60,39 +53,11 @@ class FriendshipRepository {
     );
     await ref.set(friendship.toJson());
 
-    if (otherIsPublic) {
-      // Auto-accept path: mirror the counter denormalization that `accept()`
-      // does when a private-profile owner approves a request. Best-effort:
-      // failures are logged but don't roll back the accepted friendship
-      // (same policy as `accept()` — ADR-WRS-12 / REQ-WRX-004).
-      final pubRepo = _publicProfileRepository;
-      if (pubRepo != null) {
-        try {
-          await pubRepo.updateCounters(myUid, {
-            'followingCount': FieldValue.increment(1),
-          });
-        } catch (e, st) {
-          developer.log(
-            'FriendshipRepository.request auto-accept: '
-            'followingCount++ for $myUid failed',
-            error: e,
-            stackTrace: st,
-          );
-        }
-        try {
-          await pubRepo.updateCounters(otherUid, {
-            'followersCount': FieldValue.increment(1),
-          });
-        } catch (e, st) {
-          developer.log(
-            'FriendshipRepository.request auto-accept: '
-            'followersCount++ for $otherUid failed',
-            error: e,
-            stackTrace: st,
-          );
-        }
-      }
-    }
+    // Follow counters (followingCount / followersCount) are maintained
+    // server-side by the `maintainFollowCounters` Cloud Function, which fires
+    // on this write. The client no longer touches them — the previous
+    // best-effort client increments drifted on failure and were asymmetric on
+    // unfollow (phantom followers). See W-SOCIAL-COUNTERS-01.
 
     return friendship;
   }
@@ -100,10 +65,10 @@ class FriendshipRepository {
   /// Accepts a pending friendship. Throws [StateError] if [myUid] is the
   /// original requester (cannot self-accept per SCENARIO-125).
   ///
-  /// After accepting, performs a best-effort self-refresh write to
-  /// `userPublicProfiles/{myUid}` to increment [followingCount].
-  /// If the public profile write fails, it is logged and swallowed —
-  /// the primary accept is not affected. (REQ-WRX-004 / ADR-WRS-12)
+  /// Follow counters are maintained server-side by the
+  /// `maintainFollowCounters` Cloud Function on the resulting
+  /// `pending → accepted` write — the client no longer touches them
+  /// (W-SOCIAL-COUNTERS-01).
   Future<void> accept(String friendshipId, String myUid) async {
     final snap = await _friendships.doc(friendshipId).get();
     if (!snap.exists) {
@@ -117,26 +82,6 @@ class FriendshipRepository {
     await _friendships
         .doc(friendshipId)
         .update({'status': FriendshipStatus.accepted.toJson()});
-
-    // Cross-feature: increment followingCount for myUid (best-effort)
-    final pubRepo = _publicProfileRepository;
-    if (pubRepo == null) return;
-
-    try {
-      // Atomic server-side increment avoids the lost-update race that a
-      // read-modify-write would suffer under concurrent accepts/deletes (or a
-      // racing counter write to the same userPublicProfiles doc).
-      await pubRepo.updateCounters(myUid, {
-        'followingCount': FieldValue.increment(1),
-      });
-    } catch (e, st) {
-      developer.log(
-        'FriendshipRepository.accept: failed to increment public profile '
-        'counters for $myUid',
-        error: e,
-        stackTrace: st,
-      );
-    }
   }
 
   /// Returns the list of UIDs that [uid] is friends with (status = accepted).
@@ -185,37 +130,16 @@ class FriendshipRepository {
     return all.where((f) => f.requesterId != uid).toList();
   }
 
-  /// Permanently removes a friendship document.
+  /// Permanently removes a friendship document (unfollow / cancel request).
   ///
-  /// [myUid] identifies the caller for the self-refresh counter decrement
-  /// written to `userPublicProfiles/{myUid}`. The decrement is best-effort:
-  /// if the public profile write fails, the friendship is still deleted and
-  /// the error is captured via `developer.log` (REQ-WRX-010 / ADR-WRS-12).
+  /// [myUid] is kept in the signature for call-site clarity and future use.
+  /// Follow counters are decremented server-side by the
+  /// `maintainFollowCounters` Cloud Function when an `accepted` friendship is
+  /// deleted — and, unlike the old client path, it decrements BOTH sides
+  /// (no phantom follower). Deleting a `pending` doc is a counter no-op.
+  /// (W-SOCIAL-COUNTERS-01)
   Future<void> delete(String friendshipId, String myUid) async {
     await _friendships.doc(friendshipId).delete();
-
-    // Cross-feature: decrement self-refresh counter for myUid (best-effort)
-    final pubRepo = _publicProfileRepository;
-    if (pubRepo == null) return;
-
-    try {
-      // Atomic server-side decrement avoids the lost-update race that a
-      // read-modify-write would suffer under concurrent accepts/deletes. Note:
-      // a server-side increment cannot clamp at zero, so the floor is no longer
-      // enforced here — followingCount is only ever decremented for a friendship
-      // the caller actually had (and therefore previously counted), so it cannot
-      // legitimately go negative.
-      await pubRepo.updateCounters(myUid, {
-        'followingCount': FieldValue.increment(-1),
-      });
-    } catch (e, st) {
-      developer.log(
-        'FriendshipRepository.delete: failed to decrement public profile '
-        'counters for $myUid',
-        error: e,
-        stackTrace: st,
-      );
-    }
   }
 
   /// Returns the friendship document between [uidA] and [uidB], or null if none
