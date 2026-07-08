@@ -263,7 +263,7 @@ describe("notifyOnFriendshipHandler — integration", () => {
     expect(callArg.tokens).toContain("alice-token");
     expect(callArg.tokens).not.toContain("bob-token");
     expect(callArg.notification?.body).toBe("Bruno aceptó tu solicitud");
-    expect(callArg.data?.deepLink).toBe(`/profile/${bob}`);
+    expect(callArg.data?.deepLink).toBe(`/feed/profile/${bob}`);
     expect(callArg.data?.kind).toBe("request-accepted");
   });
 
