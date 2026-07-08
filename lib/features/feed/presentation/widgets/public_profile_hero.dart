@@ -27,6 +27,12 @@ class PublicProfileHero extends ConsumerWidget {
     final gymAsync = gymId == null ? null : ref.watch(gymByIdProvider(gymId));
     final gymName = gymDisplayNameFromGym(gymAsync?.valueOrNull);
 
+    // The parent screen extends its body behind the transparent AppBar so
+    // this gradient reaches the very top. Add the status-bar inset + the
+    // AppBar height as top padding so the avatar clears the floating back
+    // arrow and the notch instead of hiding under them.
+    final topInset = MediaQuery.paddingOf(context).top + kToolbarHeight;
+
     return Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -39,7 +45,7 @@ class PublicProfileHero extends ConsumerWidget {
         ),
       ),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+        padding: EdgeInsets.fromLTRB(20, topInset + 8, 20, 20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [

@@ -51,6 +51,11 @@ class PublicProfileScreen extends ConsumerWidget {
     // rather than popping.
     return Scaffold(
       backgroundColor: Colors.transparent,
+      // Extend the body behind the transparent AppBar so the hero's mint
+      // gradient fills the very top of the screen — the back arrow then
+      // floats over the gradient instead of sitting on a separate bar that
+      // breaks the color continuity.
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
