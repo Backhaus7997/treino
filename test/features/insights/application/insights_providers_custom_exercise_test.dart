@@ -49,8 +49,7 @@ void main() {
       days: [
         makeDay(slots: [
           // El slot lleva el muscleGroup denormalizado del ejercicio custom.
-          makeSlot(
-              exerciseId: 'e-custom', muscleGroup: 'back', targetSets: 3),
+          makeSlot(exerciseId: 'e-custom', muscleGroup: 'back', targetSets: 3),
         ]),
       ],
     );
