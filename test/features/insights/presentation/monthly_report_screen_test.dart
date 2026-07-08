@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:intl/intl.dart' as intl;
 import 'package:mocktail/mocktail.dart';
 
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/insights/presentation/monthly_report_screen.dart';
 import 'package:treino/features/insights/presentation/widgets/monthly_report_chart.dart';
+import 'package:treino/features/workout/application/exercise_providers.dart';
+import 'package:treino/features/workout/application/routine_providers.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
 import 'package:treino/features/workout/data/session_repository.dart';
 import 'package:treino/features/workout/domain/session_status.dart';
@@ -23,7 +26,14 @@ void main() {
 
   Widget wrap(Widget child, {required List<Override> overrides}) =>
       ProviderScope(
-        overrides: overrides,
+        overrides: [
+          // Defaults so the month-vs-month radar section (AD6/PR5c) doesn't
+          // hit real Firebase resolving routines/exercises — individual
+          // tests can still override these explicitly if needed.
+          exercisesProvider.overrideWith((ref) async => []),
+          routineByIdProvider('r1').overrideWith((ref) async => null),
+          ...overrides,
+        ],
         child: MaterialApp(
           theme: AppTheme.dark(),
           localizationsDelegates: AppL10n.localizationsDelegates,
@@ -56,6 +66,49 @@ void main() {
     expect(find.text('REPORTE MENSUAL'), findsOneWidget);
     expect(find.text('Entrenos'), findsWidgets);
     expect(find.text('Duración'), findsWidgets);
+  });
+
+  testWidgets(
+      'Duration cross-check: the summary card sums Session.durationMin '
+      'consistently for the selected month, matching the aggregator '
+      '(AD6/PR5c pinning test — not just presence of the label)',
+      (tester) async {
+    final repo = MockSessionRepository();
+    final now = DateTime.now();
+    final monthStart = DateTime(now.year, now.month, 1);
+
+    when(() => repo.listByUid('u1')).thenAnswer((_) async => [
+          makeSession(
+            id: 's1',
+            startedAt: monthStart,
+            status: SessionStatus.finished,
+            durationMin: 40,
+          ),
+          makeSession(
+            id: 's2',
+            startedAt: DateTime(monthStart.year, monthStart.month, 2),
+            status: SessionStatus.finished,
+            durationMin: 25,
+          ),
+          // A non-finished session's duration must NOT be counted.
+          makeSession(
+            id: 's3',
+            startedAt: DateTime(monthStart.year, monthStart.month, 3),
+            status: SessionStatus.active,
+            durationMin: 999,
+          ),
+        ]);
+    when(() => repo.listSetLogs(uid: 'u1', sessionId: any(named: 'sessionId')))
+        .thenAnswer((_) async => [makeSetLog()]);
+
+    await tester.pumpWidget(wrap(
+      const SizedBox.shrink(),
+      overrides: [sessionRepositoryProvider.overrideWithValue(repo)],
+    ));
+    await tester.pumpAndSettle();
+
+    // 40 + 25 = 65 min — active session's 999 must be excluded.
+    expect(find.text('65'), findsOneWidget);
   });
 
   testWidgets('shows error state + retry on load failure', (tester) async {
@@ -181,4 +234,99 @@ void main() {
 
     expect(find.byKey(const ValueKey('workout-day-trained')), findsOneWidget);
   });
+
+  testWidgets(
+      'renders the month-vs-month muscle distribution radar below the '
+      'workout-days calendar, with month-name legend labels (AD6/PR5c)',
+      (tester) async {
+    final repo = MockSessionRepository();
+    final now = DateTime.now();
+    final currentMonthStart = DateTime(now.year, now.month, 1);
+
+    when(() => repo.listByUid('u1')).thenAnswer((_) async => [
+          makeSession(
+            id: 's1',
+            startedAt: currentMonthStart,
+            status: SessionStatus.finished,
+            durationMin: 45,
+          ),
+        ]);
+    when(() => repo.listSetLogs(uid: 'u1', sessionId: any(named: 'sessionId')))
+        .thenAnswer((_) async => [makeSetLog()]);
+
+    await tester.pumpWidget(wrap(
+      const SizedBox.shrink(),
+      overrides: [sessionRepositoryProvider.overrideWithValue(repo)],
+    ));
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(
+      find.text('DISTRIBUCIÓN MUSCULAR'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('DISTRIBUCIÓN MUSCULAR'), findsOneWidget);
+    // Legend shows the selected month's short name, not the generic
+    // "Actual"/"Anterior" labels used by the athlete-insights radar.
+    final expectedCurrentLabel =
+        intl.DateFormat('MMM yyyy', 'es_AR').format(currentMonthStart);
+    expect(
+      find.text(_capitalize(expectedCurrentLabel)),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets(
+      'switching the selected month updates the radar legend to that '
+      "month's name (real data-delta, not a smoke check)", (tester) async {
+    final repo = MockSessionRepository();
+    final now = DateTime.now();
+    final olderMonth = DateTime(now.year, now.month - 2);
+
+    when(() => repo.listByUid('u1')).thenAnswer((_) async => [
+          makeSession(
+            id: 's1',
+            startedAt: DateTime(olderMonth.year, olderMonth.month, 10),
+            status: SessionStatus.finished,
+          ),
+        ]);
+    when(() => repo.listSetLogs(uid: 'u1', sessionId: any(named: 'sessionId')))
+        .thenAnswer((_) async => [makeSetLog()]);
+
+    await tester.pumpWidget(wrap(
+      const SizedBox.shrink(),
+      overrides: [sessionRepositoryProvider.overrideWithValue(repo)],
+    ));
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(
+      find.byType(MonthlyReportChart),
+      -300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+
+    final chartState = tester.state<MonthlyReportChartState>(
+      find.byType(MonthlyReportChart),
+    );
+    chartState.debugSelectMonth(olderMonth);
+    await tester.pumpAndSettle();
+
+    final expectedLabel =
+        intl.DateFormat('MMM yyyy', 'es_AR').format(olderMonth);
+
+    await tester.scrollUntilVisible(
+      find.text(_capitalize(expectedLabel)),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text(_capitalize(expectedLabel)), findsOneWidget);
+  });
 }
+
+String _capitalize(String s) =>
+    s.isEmpty ? s : s[0].toUpperCase() + s.substring(1);
