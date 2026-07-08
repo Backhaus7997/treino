@@ -8,6 +8,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../../app/theme/app_motion.dart';
 import '../../../../app/theme/app_palette.dart';
 import '../../domain/muscle_distribution_insights.dart';
 import '../../domain/radar_axis.dart';
@@ -183,6 +184,12 @@ class _Radar extends StatelessWidget {
     return SizedBox(
       height: 240,
       child: RadarChart(
+        // TREINO Motion PR2: anima el morph del polígono al cambiar de
+        // período con los tokens del sistema. fl_chart 1.x expone
+        // `duration`/`curve` (los viejos `swapAnimation*` están deprecados).
+        // `resolve` respeta reduce-motion (→ Duration.zero).
+        duration: AppMotion.resolve(context, AppMotion.base),
+        curve: AppMotion.standard,
         RadarChartData(
           radarShape: RadarShape.polygon,
           tickCount: 4,

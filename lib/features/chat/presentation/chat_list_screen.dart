@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
+import '../../../core/widgets/motion/treino_shimmer.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../feed/presentation/widgets/post_avatar.dart';
@@ -106,7 +107,9 @@ class _ChatRow extends ConsumerWidget {
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         child: pubAsync.when(
           loading: () => _RowSkeleton(palette: palette),
-          error: (_, __) => _RowSkeleton(palette: palette),
+          // Error NO shimmerea: offline → stream error → un barrido infinito
+          // quemaría batería y mentiría ("sigue cargando" cuando ya falló).
+          error: (_, __) => _RowSkeleton(palette: palette, shimmer: false),
           data: (pub) {
             // When userPublicProfiles/{uid} is deleted (account deletion cascade),
             // pub is null → show "Usuario eliminado" per ADR-ACCDEL-005.
@@ -181,26 +184,33 @@ class _ChatRow extends ConsumerWidget {
 }
 
 class _RowSkeleton extends StatelessWidget {
-  const _RowSkeleton({required this.palette});
+  const _RowSkeleton({required this.palette, this.shimmer = true});
   final AppPalette palette;
+
+  /// `false` cuando el skeleton se muestra por un estado de error (nada
+  /// está cargando) — se propaga a [TreinoShimmer.enabled].
+  final bool shimmer;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        CircleAvatar(radius: 24, backgroundColor: palette.bgCard),
-        const SizedBox(width: 14),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(width: 120, height: 14, color: palette.bgCard),
-              const SizedBox(height: 8),
-              Container(width: 200, height: 12, color: palette.bgCard),
-            ],
+    return TreinoShimmer(
+      enabled: shimmer,
+      child: Row(
+        children: [
+          CircleAvatar(radius: 24, backgroundColor: palette.bgCard),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(width: 120, height: 14, color: palette.bgCard),
+                const SizedBox(height: 8),
+                Container(width: 200, height: 12, color: palette.bgCard),
+              ],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

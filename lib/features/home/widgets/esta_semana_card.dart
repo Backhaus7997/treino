@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
+import '../../../core/widgets/motion/treino_shimmer.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../insights/application/insights_providers.dart';
 import '../../insights/domain/weekly_insights.dart';
@@ -81,25 +82,27 @@ class _Skeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    return Padding(
-      padding: const EdgeInsets.all(18),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'ESTA SEMANA',
-            style: GoogleFonts.barlowCondensed(
-              fontWeight: FontWeight.w700,
-              fontSize: 14,
-              letterSpacing: 1.4,
-              color: palette.textPrimary,
+    return TreinoShimmer(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'ESTA SEMANA',
+              style: GoogleFonts.barlowCondensed(
+                fontWeight: FontWeight.w700,
+                fontSize: 14,
+                letterSpacing: 1.4,
+                color: palette.textPrimary,
+              ),
             ),
-          ),
-          const SizedBox(height: 14),
-          Center(
-            child: CircularProgressIndicator(color: palette.accent),
-          ),
-        ],
+            const SizedBox(height: 14),
+            Center(
+              child: CircularProgressIndicator(color: palette.accent),
+            ),
+          ],
+        ),
       ),
     );
   }

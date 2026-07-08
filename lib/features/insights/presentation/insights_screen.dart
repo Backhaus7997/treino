@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
+import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../workout/application/session_providers.dart'
@@ -101,48 +102,60 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
       children: [
         _InsightsHeader(),
         Expanded(
-          child: async.when(
-            loading: () => Center(
-              child: CircularProgressIndicator(color: palette.accent),
-            ),
-            error: (_, __) => _ErrorState(
-              onRetry: () => ref.invalidate(
-                athleteWeekInsightsProvider(
-                  (uid: uid, weekStart: _shownWeekStart),
-                ),
+          // TREINO Motion PR2: cross-fade loading→data/error en vez de corte
+          // seco. La key refleja el branch que el `.when()` de abajo eligió —
+          // estados distintos DEBEN tener key distinta o el switcher no anima.
+          child: TreinoStateSwitcher(
+            childKey: ValueKey(
+              async.when(
+                loading: () => 'loading',
+                error: (_, __) => 'error',
+                data: (_) => 'data',
               ),
             ),
-            data: (insights) {
-              if (insights == null ||
-                  (insights.sessionsCount == 0 &&
-                      isCurrentWeek &&
-                      !_hasPagedAway)) {
-                return const _EmptyState();
-              }
-              return ListView(
-                padding: EdgeInsets.fromLTRB(
-                    20, 12, 20, 20 + MediaQuery.paddingOf(context).bottom),
-                physics: const AlwaysScrollableScrollPhysics(),
-                children: [
-                  _WeekStripCard(
-                    insights: insights,
-                    selectedDay: _selectedDay,
-                    onDaySelected: _onDaySelected,
-                    isCurrentWeek: isCurrentWeek,
-                    onPreviousWeek: () => _pageWeek(-1),
-                    onNextWeek: () => _pageWeek(1),
+            child: async.when(
+              loading: () => Center(
+                child: CircularProgressIndicator(color: palette.accent),
+              ),
+              error: (_, __) => _ErrorState(
+                onRetry: () => ref.invalidate(
+                  athleteWeekInsightsProvider(
+                    (uid: uid, weekStart: _shownWeekStart),
                   ),
-                  const SizedBox(height: 14),
-                  _DailyMusclesCard(selectedDay: _selectedDay),
-                  const SizedBox(height: 20),
-                  const _AdvancedStatsHeading(),
-                  const SizedBox(height: 12),
-                  const _StatsHubTileList(),
-                  const SizedBox(height: 20),
-                  _VolverButton(),
-                ],
-              );
-            },
+                ),
+              ),
+              data: (insights) {
+                if (insights == null ||
+                    (insights.sessionsCount == 0 &&
+                        isCurrentWeek &&
+                        !_hasPagedAway)) {
+                  return const _EmptyState();
+                }
+                return ListView(
+                  padding: EdgeInsets.fromLTRB(
+                      20, 12, 20, 20 + MediaQuery.paddingOf(context).bottom),
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  children: [
+                    _WeekStripCard(
+                      insights: insights,
+                      selectedDay: _selectedDay,
+                      onDaySelected: _onDaySelected,
+                      isCurrentWeek: isCurrentWeek,
+                      onPreviousWeek: () => _pageWeek(-1),
+                      onNextWeek: () => _pageWeek(1),
+                    ),
+                    const SizedBox(height: 14),
+                    _DailyMusclesCard(selectedDay: _selectedDay),
+                    const SizedBox(height: 20),
+                    const _AdvancedStatsHeading(),
+                    const SizedBox(height: 12),
+                    const _StatsHubTileList(),
+                    const SizedBox(height: 20),
+                    _VolverButton(),
+                  ],
+                );
+              },
+            ),
           ),
         ),
       ],
