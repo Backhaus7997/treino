@@ -1718,7 +1718,24 @@ class _EntrenamientoTab extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _sectionLabel(palette, 'RUTINA ACTIVA'), // i18n: Fase W2
+          Row(
+            children: [
+              Expanded(child: _sectionLabel(palette, 'RUTINA ACTIVA')), // i18n
+              TextButton.icon(
+                onPressed: () =>
+                    context.push('/routine-editor/$athleteId'), // i18n
+                icon: Icon(TreinoIcon.plus, size: 16, color: palette.accent),
+                label: Text(
+                  'Asignar rutina', // i18n: Fase W2
+                  style: TextStyle(
+                    color: palette.accent,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 10),
           routinesAsync.when(
             loading: () => _muted(palette, 'Cargando…'), // i18n: Fase W2

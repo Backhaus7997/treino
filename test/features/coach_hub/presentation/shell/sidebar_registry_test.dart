@@ -6,14 +6,17 @@ import 'package:treino/features/coach_hub/presentation/shell/sidebar_registry.da
 void main() {
   group('sidebarRegistry (REQ-CHW-SIDEBAR-001)', () {
     test(
-        'tiene exactamente 7 items post-W2 reduce (Dashboard, Alumnos, '
-        'Agenda, Chat, Biblioteca, Pagos, Ajustes)', () {
+        'tiene exactamente 8 items (7 post-W2 reduce + Rutinas): Dashboard, '
+        'Alumnos, Agenda, Chat, Biblioteca, Rutinas, Pagos, Ajustes', () {
       // W2 reduce 2026-07-02: se removieron 12 items del sidebar que
       // duplicaban funcionalidad del alumno_detail o pertenecen a una
       // futura Biblioteca (sub-tabs). Reportes también sale (sin scope
       // definido — cuando producto lo defina se re-agrega). Sus screens y
       // rutas siguen existiendo.
-      expect(sidebarRegistry.length, 7);
+      //
+      // Rutinas se re-agregó al grupo RECURSOS como entrada del editor de
+      // rutinas web (elegí alumno → editor), llevando el total de 7 a 8.
+      expect(sidebarRegistry.length, 8);
     });
 
     test('cubre los 2 grupos activos post-reduce, cada uno no vacío', () {
@@ -77,6 +80,7 @@ void main() {
           '/agenda',
           '/chat',
           '/biblioteca',
+          '/rutinas',
           '/pagos',
           '/ajustes',
         },
