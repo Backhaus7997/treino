@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:treino/app/theme/app_motion.dart';
 import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/core/persistence/shared_prefs_provider.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
@@ -58,8 +59,8 @@ class CoachHubSidebar extends ConsumerWidget {
     return AnimatedContainer(
       key: const Key('coach_hub_sidebar_container'),
       width: collapsed ? collapsedWidth : expandedWidth,
-      duration: const Duration(milliseconds: 200),
-      curve: Curves.easeOut,
+      duration: AppMotion.base,
+      curve: AppMotion.standard,
       // Clip durante la animación de ancho: al colapsar/expandir (o al resize
       // entre desktop y compact) el ancho anima pero el layout de las filas
       // cambia al instante, así que sin clip las filas desbordarían unos px.

@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_background.dart';
+import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
 import '../../../core/analytics/analytics_service.dart';
 import '../../../core/widgets/treino_icon.dart';
@@ -1276,8 +1277,8 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
             if (key.currentContext != null) {
               Scrollable.ensureVisible(
                 key.currentContext!,
-                duration: const Duration(milliseconds: 350),
-                curve: Curves.easeInOut,
+                duration: AppMotion.slow,
+                curve: AppMotion.emphasized,
                 alignment: 0.1,
               );
             }

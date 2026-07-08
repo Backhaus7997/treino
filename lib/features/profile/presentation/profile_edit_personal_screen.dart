@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
 import '../../../core/image/avatar_cropper.dart';
 import '../../../core/widgets/treino_icon.dart';
@@ -853,7 +854,7 @@ class _GenderSelector extends StatelessWidget {
         return GestureDetector(
           onTap: () => onChanged(isSelected ? null : choice.value),
           child: AnimatedContainer(
-            duration: const Duration(milliseconds: 150),
+            duration: AppMotion.fast,
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
             decoration: BoxDecoration(
               color: isSelected ? palette.accent : Colors.transparent,
@@ -921,7 +922,7 @@ class _ExperienceLevelSelector extends StatelessWidget {
           child: GestureDetector(
             onTap: () => onChanged(isSelected ? null : choice.value),
             child: AnimatedContainer(
-              duration: const Duration(milliseconds: 150),
+              duration: AppMotion.fast,
               width: double.infinity,
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(

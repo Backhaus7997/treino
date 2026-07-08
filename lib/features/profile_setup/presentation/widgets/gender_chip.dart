@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../../app/theme/app_motion.dart';
 import '../../../../app/theme/app_palette.dart';
 
 /// Chip seleccionable de género en el step 3. Tres opciones: femenino, masculino,
@@ -28,8 +29,8 @@ class GenderChip extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(9999),
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          curve: Curves.easeOutCubic,
+          duration: AppMotion.fast,
+          curve: AppMotion.standard,
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
           decoration: BoxDecoration(
             color: selected ? palette.accent : Colors.transparent,
