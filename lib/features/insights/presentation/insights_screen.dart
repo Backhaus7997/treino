@@ -8,16 +8,11 @@ import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../workout/application/session_providers.dart'
     show currentUidProvider;
-import '../../workout/presentation/widgets/exercise_progression_section.dart'
-    show ChartPeriodLabels, ChartPeriodSelector;
 import '../application/day_insights_providers.dart';
 import '../application/insights_providers.dart';
-import '../application/muscle_distribution_providers.dart';
-import '../domain/chart_period.dart';
 import '../domain/muscle_group.dart';
 import '../domain/weekly_insights.dart';
 import 'widgets/body_silhouette_placeholder.dart';
-import 'widgets/muscle_distribution_radar.dart';
 
 /// Pantalla de Insights — agregados semanales por grupo muscular.
 /// Mockup: `insights.png`. Acceso natural desde la card "Esta Semana"
@@ -139,12 +134,10 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                   ),
                   const SizedBox(height: 14),
                   _DailyMusclesCard(selectedDay: _selectedDay),
-                  const SizedBox(height: 14),
-                  const _MuscleDistributionSection(),
-                  const SizedBox(height: 14),
-                  _VolumeBarCard(insights: insights),
-                  const SizedBox(height: 14),
-                  const _MonthlyReportTile(),
+                  const SizedBox(height: 20),
+                  const _AdvancedStatsHeading(),
+                  const SizedBox(height: 12),
+                  const _StatsHubTileList(),
                   const SizedBox(height: 20),
                   _VolverButton(),
                 ],
@@ -667,224 +660,99 @@ class _MuscleSetsRow extends StatelessWidget {
   }
 }
 
-// ── Card: DISTRIBUCIÓN MUSCULAR (radar) ──────────────────────────────────────
+// ── ESTADÍSTICAS AVANZADAS heading + tile list (stats-hub, obs #445) ────────
 
-/// [AD4][REQ:muscle-radar] Current-vs-previous 6-axis muscle distribution
-/// radar. Owns its own [ChartPeriod] selection (independent of the SEMANA
-/// card above, which is a fixed weekly window) — reuses [ChartPeriodSelector]
-/// / [ChartPeriodLabels] from PR1c, same `_selectedPeriod` state pattern as
-/// `_ExerciseProgressionSectionState`. Defaults to [ChartPeriod.last30d].
-class _MuscleDistributionSection extends ConsumerStatefulWidget {
-  const _MuscleDistributionSection();
-
-  @override
-  ConsumerState<_MuscleDistributionSection> createState() =>
-      _MuscleDistributionSectionState();
-}
-
-class _MuscleDistributionSectionState
-    extends ConsumerState<_MuscleDistributionSection> {
-  ChartPeriod _selectedPeriod = ChartPeriod.defaultPeriod;
+/// Section heading above the tile list — same label style as the card
+/// titles above it (SEMANA / MÚSCULOS DEL DÍA), just larger since it's a
+/// section break rather than a card header.
+class _AdvancedStatsHeading extends StatelessWidget {
+  const _AdvancedStatsHeading();
 
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
-    final uid = ref.watch(currentUidProvider) ?? '';
-
-    final periodLabels = ChartPeriodLabels(
-      last30dLabel: l10n.progressionPeriodLast30Days,
-      thisWeekLabel: l10n.progressionPeriodThisWeek,
-      monthLabel: l10n.progressionPeriodMonth,
-    );
-
-    final radarLabels = MuscleDistributionLabels(
-      currentLabel: l10n.muscleDistributionCurrentLabel,
-      previousLabel: l10n.muscleDistributionPreviousLabel,
-      emptyStateText: l10n.muscleDistributionEmptyState,
-      workoutsLabel: l10n.muscleDistributionWorkoutsLabel,
-      durationLabel: l10n.muscleDistributionDurationLabel,
-      volumeLabel: l10n.muscleDistributionVolumeLabel,
-      setsLabel: l10n.muscleDistributionSetsLabel,
-      durationUnit: 'min',
-      volumeUnit: 'kg',
-    );
-
-    final insightsAsync = ref.watch(
-      muscleDistributionInsightsProvider((uid: uid, period: _selectedPeriod)),
-    );
-
-    return Container(
-      decoration: BoxDecoration(
-        color: palette.bgCard,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      padding: const EdgeInsets.all(18),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  l10n.muscleDistributionSectionTitle,
-                  style: GoogleFonts.barlowCondensed(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 12,
-                    letterSpacing: 1.2,
-                    color: palette.textMuted,
-                  ),
-                ),
-              ),
-              ChartPeriodSelector(
-                selected: _selectedPeriod,
-                labels: periodLabels,
-                onSelect: (p) => setState(() => _selectedPeriod = p),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          insightsAsync.when(
-            loading: () => const SizedBox(
-              height: 240,
-              child: Center(child: CircularProgressIndicator()),
-            ),
-            error: (_, __) => const SizedBox.shrink(),
-            data: (insights) => MuscleDistributionRadar(
-              insights: insights,
-              labels: radarLabels,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Card: VOLUMEN POR GRUPO ──────────────────────────────────────────────────
-
-class _VolumeBarCard extends StatelessWidget {
-  const _VolumeBarCard({required this.insights});
-  final WeeklyInsights insights;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-    final hasTarget = insights.targetByGroup.isNotEmpty;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: palette.bgCard,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      padding: const EdgeInsets.all(18),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'VOLUMEN POR GRUPO',
-            style: GoogleFonts.barlowCondensed(
-              fontWeight: FontWeight.w700,
-              fontSize: 12,
-              letterSpacing: 1.2,
-              color: palette.textMuted,
-            ),
-          ),
-          const SizedBox(height: 14),
-          if (!hasTarget)
-            Text(
-              'Necesitás una rutina asignada para ver tu volumen objetivo.',
-              style: GoogleFonts.barlow(
-                fontWeight: FontWeight.w400,
-                fontSize: 13,
-                color: palette.textMuted,
-              ),
-            )
-          else
-            for (final group in MuscleGroupDisplay.displayOrder)
-              if ((insights.targetByGroup[group] ?? 0) > 0)
-                Padding(
-                  padding: const EdgeInsets.only(top: 14),
-                  child: _VolumeBarRow(
-                    label: group.displayLabel,
-                    done: insights.setsByGroup[group] ?? 0,
-                    target: insights.targetByGroup[group]!,
-                  ),
-                ),
-        ],
-      ),
-    );
-  }
-}
-
-class _VolumeBarRow extends StatelessWidget {
-  const _VolumeBarRow({
-    required this.label,
-    required this.done,
-    required this.target,
-  });
-
-  final String label;
-  final int done;
-  final int target;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-    final ratio = target == 0 ? 0.0 : (done / target).clamp(0.0, 1.0);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                label,
-                style: GoogleFonts.barlowCondensed(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 13,
-                  letterSpacing: 0.8,
-                  color: palette.textPrimary,
-                ),
-              ),
-            ),
-            Text(
-              '$done / $target sets',
-              style: GoogleFonts.barlow(
-                fontWeight: FontWeight.w500,
-                fontSize: 12,
-                color: palette.textMuted,
-              ),
-            ),
-          ],
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Text(
+        l10n.insightsAdvancedStatsHeading,
+        style: GoogleFonts.barlowCondensed(
+          fontWeight: FontWeight.w700,
+          fontSize: 16,
+          letterSpacing: 1.0,
+          color: palette.textPrimary,
         ),
-        const SizedBox(height: 8),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(9999),
-          child: LinearProgressIndicator(
-            value: ratio,
-            minHeight: 8,
-            backgroundColor: palette.bg,
-            valueColor: AlwaysStoppedAnimation(palette.accent),
-          ),
+      ),
+    );
+  }
+}
+
+/// [stats-hub][REQ:445] Hevy "Statistics" tile list — replaces the inline
+/// radar/volume sections that used to live directly on this screen. Each
+/// tile opens a DEDICATED full screen (see obs #445): Distribución
+/// muscular, Ejercicios frecuentes (athlete's own uid), Reporte mensual,
+/// Volumen por grupo.
+class _StatsHubTileList extends StatelessWidget {
+  const _StatsHubTileList();
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppL10n.of(context);
+    return Column(
+      children: [
+        _StatTile(
+          icon: TreinoIcon.chartBar,
+          title: l10n.insightsTileMuscleDistributionTitle,
+          subtitle: l10n.insightsTileMuscleDistributionSubtitle,
+          onTap: () => context.push('/home/insights/muscle-distribution'),
+        ),
+        const SizedBox(height: 12),
+        _StatTile(
+          icon: TreinoIcon.dumbbell,
+          title: l10n.insightsTileFrequentExercisesTitle,
+          subtitle: l10n.insightsTileFrequentExercisesSubtitle,
+          onTap: () => context.push('/home/insights/frequent-exercises'),
+        ),
+        const SizedBox(height: 12),
+        _StatTile(
+          icon: TreinoIcon.calendar,
+          title: l10n.insightsMonthlyReportTile,
+          subtitle: l10n.insightsTileMonthlyReportSubtitle,
+          onTap: () => context.push('/home/insights/monthly'),
+        ),
+        const SizedBox(height: 12),
+        _StatTile(
+          icon: TreinoIcon.scales,
+          title: l10n.insightsTileVolumeByGroupTitle,
+          subtitle: l10n.insightsTileVolumeByGroupSubtitle,
+          onTap: () => context.push('/home/insights/volume-by-group'),
         ),
       ],
     );
   }
 }
 
-// ── Tile: Reporte mensual (AD6/PR5a entry point) ─────────────────────────────
+/// Single row in the "ESTADÍSTICAS AVANZADAS" tile list — icon + title +
+/// one-line subtitle + trailing chevron (Hevy "Statistics" row parity).
+class _StatTile extends StatelessWidget {
+  const _StatTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
 
-class _MonthlyReportTile extends StatelessWidget {
-  const _MonthlyReportTile();
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    final l10n = AppL10n.of(context);
 
     return GestureDetector(
-      onTap: () => context.push('/home/insights/monthly'),
+      onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
           color: palette.bgCard,
@@ -893,17 +761,31 @@ class _MonthlyReportTile extends StatelessWidget {
         padding: const EdgeInsets.all(18),
         child: Row(
           children: [
-            Icon(TreinoIcon.chartBar, color: palette.accent, size: 22),
+            Icon(icon, color: palette.accent, size: 22),
             const SizedBox(width: 12),
             Expanded(
-              child: Text(
-                l10n.insightsMonthlyReportTile,
-                style: GoogleFonts.barlowCondensed(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 15,
-                  letterSpacing: 0.6,
-                  color: palette.textPrimary,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: GoogleFonts.barlowCondensed(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 15,
+                      letterSpacing: 0.6,
+                      color: palette.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: GoogleFonts.barlow(
+                      fontWeight: FontWeight.w400,
+                      fontSize: 12,
+                      color: palette.textMuted,
+                    ),
+                  ),
+                ],
               ),
             ),
             Icon(TreinoIcon.forward, color: palette.textMuted, size: 18),

@@ -2303,10 +2303,7 @@ class AppL10nEn extends AppL10n {
 
   @override
   String dashboardAlertBannerSummary(
-    int vencidos,
-    int solicitudes,
-    int inactivos,
-  ) {
+      int vencidos, int solicitudes, int inactivos) {
     String _temp0 = intl.Intl.pluralLogic(
       vencidos,
       locale: localeName,
@@ -2368,4 +2365,40 @@ class AppL10nEn extends AppL10n {
   String workoutDaysCalendarStreak(int n) {
     return '';
   }
+
+  @override
+  String get insightsAdvancedStatsHeading => 'Advanced statistics';
+
+  @override
+  String get insightsTileMuscleDistributionTitle => 'Muscle distribution';
+
+  @override
+  String get insightsTileMuscleDistributionSubtitle =>
+      'Current vs. previous period comparison';
+
+  @override
+  String get muscleDistributionScreenTitle => 'MUSCLE DISTRIBUTION';
+
+  @override
+  String get insightsTileFrequentExercisesTitle => 'Frequent exercises';
+
+  @override
+  String get insightsTileFrequentExercisesSubtitle =>
+      'Your most-trained exercises';
+
+  @override
+  String get frequentExercisesScreenTitle => 'FREQUENT EXERCISES';
+
+  @override
+  String get insightsTileMonthlyReportSubtitle => 'Monthly workout summary';
+
+  @override
+  String get insightsTileVolumeByGroupTitle => 'Volume by muscle group';
+
+  @override
+  String get insightsTileVolumeByGroupSubtitle =>
+      'Sets vs. target per muscle group';
+
+  @override
+  String get volumeByGroupScreenTitle => 'VOLUME BY GROUP';
 }

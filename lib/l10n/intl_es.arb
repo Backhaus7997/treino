@@ -559,5 +559,16 @@
   "monthlyReportVolumeUnit": "kg",
   "monthlyReportEmptyHint": "Sin datos en los últimos 12 meses.",
   "monthlyReportLoadError": "No pudimos cargar tu reporte mensual. Probá de nuevo.",
-  "workoutDaysCalendarStreak": "Racha de {n} días"
+  "workoutDaysCalendarStreak": "Racha de {n} días",
+  "insightsAdvancedStatsHeading": "Estadísticas avanzadas",
+  "insightsTileMuscleDistributionTitle": "Distribución muscular",
+  "insightsTileMuscleDistributionSubtitle": "Comparativa actual vs. período anterior",
+  "muscleDistributionScreenTitle": "DISTRIBUCIÓN MUSCULAR",
+  "insightsTileFrequentExercisesTitle": "Ejercicios frecuentes",
+  "insightsTileFrequentExercisesSubtitle": "Tus ejercicios más entrenados",
+  "frequentExercisesScreenTitle": "EJERCICIOS FRECUENTES",
+  "insightsTileMonthlyReportSubtitle": "Resumen de entrenos por mes",
+  "insightsTileVolumeByGroupTitle": "Volumen por grupo",
+  "insightsTileVolumeByGroupSubtitle": "Sets vs. objetivo por grupo muscular",
+  "volumeByGroupScreenTitle": "VOLUMEN POR GRUPO"
 }

@@ -54,8 +54,8 @@ void main() {
       final monday = _mondayOfThisWeek();
       // Inside: exactly Monday 00:00 and Sunday 23:59:59.999.
       final atWeekStart = monday;
-      final atWeekEndBoundary =
-          monday.add(const Duration(days: 6, hours: 23, minutes: 59, seconds: 59));
+      final atWeekEndBoundary = monday
+          .add(const Duration(days: 6, hours: 23, minutes: 59, seconds: 59));
       // Outside: 1ms before weekStart, and next Monday 00:00 (exclusive end).
       final justBeforeStart = monday.subtract(const Duration(milliseconds: 1));
       final nextMonday = monday.add(const Duration(days: 7));
@@ -183,7 +183,8 @@ void main() {
         id: 'rNew',
         days: [
           makeDay(slots: [
-            makeSlot(exerciseId: 'e-chest', muscleGroup: 'chest', targetSets: 4),
+            makeSlot(
+                exerciseId: 'e-chest', muscleGroup: 'chest', targetSets: 4),
           ]),
         ],
       );
