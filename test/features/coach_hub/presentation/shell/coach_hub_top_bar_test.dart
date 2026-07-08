@@ -1,9 +1,7 @@
 // Tests for CoachHubTopBar (W1.3.3, REQ-CHW-TOPBAR-001, SCENARIO-760).
 //
-// The top bar reads sidebarCollapsedProvider (gated by sharedPreferences) and
-// userProfileProvider, and embeds CoachHubBreadcrumb (needs GoRouterState), so
-// it is pumped inside a GoRouter + ProviderScope at a desktop width (toggle
-// enabled).
+// Pumped inside a GoRouter + ProviderScope for parity with how the real shell
+// mounts it (userProfileProvider drives the avatar initial).
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -12,8 +10,6 @@ import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/persistence/shared_prefs_provider.dart';
-import 'package:treino/features/coach_hub/application/sidebar_collapsed_provider.dart';
-import 'package:treino/features/coach_hub/presentation/shell/coach_hub_breadcrumb.dart';
 import 'package:treino/features/coach_hub/presentation/shell/coach_hub_top_bar.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
@@ -62,20 +58,11 @@ Future<void> _pumpTopBar(WidgetTester tester, {UserProfile? profile}) async {
 
 void main() {
   group('CoachHubTopBar (REQ-CHW-TOPBAR-001)', () {
-    testWidgets('toggle del sidebar presente y habilitado en desktop',
-        (tester) async {
+    testWidgets(
+        'el toggle del sidebar ya NO vive en el top bar (se movió al '
+        'propio sidebar)', (tester) async {
       await _pumpTopBar(tester);
-      final toggle = find.ancestor(
-        of: find.byTooltip('Contraer/expandir menú'),
-        matching: find.byType(IconButton),
-      );
-      expect(toggle, findsOneWidget);
-      expect(tester.widget<IconButton>(toggle).onPressed, isNotNull);
-    });
-
-    testWidgets('breadcrumb embebido', (tester) async {
-      await _pumpTopBar(tester);
-      expect(find.byType(CoachHubBreadcrumb), findsOneWidget);
+      expect(find.byTooltip('Contraer/expandir menú'), findsNothing);
     });
 
     testWidgets('campana presente a la derecha (inerte)', (tester) async {
