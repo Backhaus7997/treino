@@ -17,6 +17,7 @@ export {
 export { notifyOnChatMessage } from "./notifications/notify-chat-message";
 export { notifyOnAppointment } from "./notifications/notify-appointment";
 export { notifyOnLinkChange } from "./notifications/notify-link-change";
+export { notifyOnFriendship } from "./notifications/notify-friendship";
 export { notifyOnReview } from "./notifications/notify-review";
 export { cleanupAssignedPlansOnUnlink } from "./cleanup-assigned-plans";
 export { addAlias } from "./add-alias";
