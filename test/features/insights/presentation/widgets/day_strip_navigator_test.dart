@@ -17,6 +17,11 @@ const _labels = DayStripLabels(
   emptyDayHint: 'Sin sesión este día.',
 );
 
+DateTime _todayOnly() {
+  final now = DateTime.now();
+  return DateTime(now.year, now.month, now.day);
+}
+
 List<DayInsights> _sevenDays({required DateTime today, int trainedIndex = -1}) {
   return List.generate(7, (i) {
     final day = DateTime(today.year, today.month, today.day - (6 - i));
@@ -31,7 +36,7 @@ List<DayInsights> _sevenDays({required DateTime today, int trainedIndex = -1}) {
 void main() {
   group('DayStripNavigator', () {
     testWidgets('renders 7 day tiles', (tester) async {
-      final today = DateTime(2026, 7, 7);
+      final today = _todayOnly();
       await tester.pumpWidget(_wrap(
         DayStripNavigator(
           days: _sevenDays(today: today),
@@ -47,7 +52,7 @@ void main() {
 
     testWidgets('tapping a day tile invokes onDaySelected with that day',
         (tester) async {
-      final today = DateTime(2026, 7, 7);
+      final today = _todayOnly();
       DateTime? tapped;
       final days = _sevenDays(today: today, trainedIndex: 3);
       final tappedDay = days[3].day;
@@ -70,7 +75,7 @@ void main() {
     testWidgets(
         'exactly ONE trained day tile renders the check-fill icon — '
         'proves per-day state, not week-wide painting', (tester) async {
-      final today = DateTime(2026, 7, 7);
+      final today = _todayOnly();
       final days = _sevenDays(today: today, trainedIndex: 3);
 
       await tester.pumpWidget(_wrap(
@@ -88,7 +93,7 @@ void main() {
     });
 
     testWidgets('no trained days → zero check icons rendered', (tester) async {
-      final today = DateTime(2026, 7, 7);
+      final today = _todayOnly();
       final days = _sevenDays(today: today); // trainedIndex: -1 → none
 
       await tester.pumpWidget(_wrap(
@@ -107,7 +112,7 @@ void main() {
         'selected day outline uses palette.highlight, distinct from the '
         'trained/today marker color (palette.accent) — proves selection '
         'feedback is visually separate from the trained state', (tester) async {
-      final today = DateTime(2026, 7, 7);
+      final today = _todayOnly();
       // Select a day that is NEITHER today NOR trained, so any border color
       // we see is caused ONLY by the isSelected flag.
       final days = _sevenDays(today: today, trainedIndex: 3);
@@ -143,7 +148,7 @@ void main() {
         'selected day AND today are the SAME day → both markers render '
         'simultaneously (today\'s mint outline nested inside the magenta '
         'selection ring, not replaced by it)', (tester) async {
-      final today = DateTime(2026, 7, 7);
+      final today = _todayOnly();
       final days = _sevenDays(today: today); // last tile == today
       final todayDay = days.last.day;
 
