@@ -229,104 +229,11 @@ void main() {
     });
   });
 
-  // ===========================================================================
-  // feed-40 — accept increments followingCount from 0 when profile is absent
-  // ===========================================================================
-  group('feed-40 — accept increments followingCount with no prior profile', () {
-    late FakeFirebaseFirestore firestore;
-    late UserPublicProfileRepository publicProfileRepo;
-
-    setUp(() {
-      firestore = FakeFirebaseFirestore();
-      publicProfileRepo = UserPublicProfileRepository(firestore: firestore);
-    });
-
-    test(
-        'creates userPublicProfiles/{myUid} with followingCount=1 when the '
-        'profile does not yet exist (?? 0 branch)', () async {
-      // Pending request: bbb (requester) → aaa (recipient). aaa accepts.
-      await firestore.collection('friendships').doc('aaa_bbb').set(
-            _makeFriendship(
-              id: 'aaa_bbb',
-              uidA: 'aaa',
-              uidB: 'bbb',
-              requesterId: 'bbb',
-            ).toJson(),
-          );
-      // No userPublicProfiles/aaa doc seeded — currentFollowing must default 0.
-
-      final repo = FriendshipRepository(
-        firestore: firestore,
-        publicProfileRepository: publicProfileRepo,
-      );
-      await repo.accept('aaa_bbb', 'aaa');
-
-      // Friendship accepted.
-      final friendshipSnap =
-          await firestore.collection('friendships').doc('aaa_bbb').get();
-      expect(friendshipSnap.data()!['status'], equals('accepted'));
-
-      // Public profile created with followingCount = 0 + 1 = 1.
-      final profileSnap =
-          await firestore.collection('userPublicProfiles').doc('aaa').get();
-      expect(profileSnap.exists, isTrue);
-      expect(profileSnap.data()!['followingCount'], equals(1));
-    });
-  });
-
-  // ===========================================================================
-  // feed-41 — delete decrements followingCount atomically (FieldValue.increment)
-  // ===========================================================================
-  group('feed-41 — delete decrements followingCount atomically', () {
-    late FakeFirebaseFirestore firestore;
-    late UserPublicProfileRepository publicProfileRepo;
-
-    setUp(() {
-      firestore = FakeFirebaseFirestore();
-      publicProfileRepo = UserPublicProfileRepository(firestore: firestore);
-    });
-
-    test('deleting a friendship decrements followingCount by one (1 -> 0)',
-        () async {
-      await firestore.collection('friendships').doc('aaa_bbb').set(
-            _makeFriendship(
-              id: 'aaa_bbb',
-              uidA: 'aaa',
-              uidB: 'bbb',
-              requesterId: 'aaa',
-              status: FriendshipStatus.accepted,
-            ).toJson(),
-          );
-      // The caller currently follows one peer.
-      await firestore.collection('userPublicProfiles').doc('aaa').set({
-        'uid': 'aaa',
-        'followersCount': 0,
-        'followingCount': 1,
-      });
-
-      final repo = FriendshipRepository(
-        firestore: firestore,
-        publicProfileRepository: publicProfileRepo,
-      );
-      await repo.delete('aaa_bbb', 'aaa');
-
-      // Friendship removed.
-      final friendshipSnap =
-          await firestore.collection('friendships').doc('aaa_bbb').get();
-      expect(friendshipSnap.exists, isFalse);
-
-      // Atomically decremented to 0. NOTE: delete now uses
-      // FieldValue.increment(-1) for race-safety (avoids the lost-update race a
-      // read-modify-write would suffer), which cannot clamp at zero. The
-      // non-negative floor is therefore NOT enforced at the repo layer — a
-      // decrement only runs for a friendship the caller actually had (and
-      // previously counted). Audit follow-up: if a defensive floor is wanted,
-      // clamp on read (max(0, followingCount)).
-      final profileSnap =
-          await firestore.collection('userPublicProfiles').doc('aaa').get();
-      expect(profileSnap.data()!['followingCount'], equals(0));
-    });
-  });
+  // NOTE: feed-40 / feed-41 (client-side followingCount increment on accept
+  // and decrement on delete) were REMOVED — follow counters moved to the
+  // `maintainFollowCounters` Cloud Function (W-SOCIAL-COUNTERS-01). Those
+  // scenarios are now covered in functions/src/__tests__/
+  // maintain-follow-counters.test.ts.
 
   // ===========================================================================
   // feed-42 — acceptedFriendsOf returns the OTHER member, excludes pending

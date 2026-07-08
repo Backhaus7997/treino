@@ -3,17 +3,14 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/features/feed/data/friendship_repository.dart';
 import 'package:treino/features/feed/domain/friendship.dart';
 import 'package:treino/features/feed/domain/friendship_status.dart';
-import 'package:treino/features/profile/data/user_public_profile_repository.dart';
 
 void main() {
   late FakeFirebaseFirestore firestore;
   late FriendshipRepository repo;
-  late UserPublicProfileRepository publicProfileRepo;
 
   setUp(() {
     firestore = FakeFirebaseFirestore();
     repo = FriendshipRepository(firestore: firestore);
-    publicProfileRepo = UserPublicProfileRepository(firestore: firestore);
   });
 
   // ---------------------------------------------------------------------------
@@ -126,40 +123,10 @@ void main() {
           .set(friendship.toJson());
     }
 
-    // SCENARIO-322 success: accept() increments followingCount for myUid
+    // SCENARIO-322: accept() flips status to accepted (counter maintenance moved
+    // to the maintainFollowCounters Cloud Function).
     test(
-        'SCENARIO-322: accept() triggers self-refresh write to userPublicProfiles/myUid',
-        () async {
-      await seedFriendshipForAccept(
-        id: 'aaa_bbb',
-        requesterId: 'bbb',
-        uidA: 'aaa',
-        uidB: 'bbb',
-      );
-      // myUid 'aaa' currently has followingCount: 2
-      await firestore.collection('userPublicProfiles').doc('aaa').set({
-        'uid': 'aaa',
-        'followersCount': 1,
-        'followingCount': 2,
-      });
-
-      final repoWithProfile = FriendshipRepository(
-        firestore: firestore,
-        publicProfileRepository: publicProfileRepo,
-      );
-      await repoWithProfile.accept('aaa_bbb', 'aaa');
-
-      final profileSnap =
-          await firestore.collection('userPublicProfiles').doc('aaa').get();
-      expect(profileSnap.exists, isTrue);
-      final data = profileSnap.data()!;
-      // followingCount incremented by 1 (was 2, now 3)
-      expect(data['followingCount'], equals(3));
-    });
-
-    // SCENARIO-322 failure: when public profile write throws, accept() resolves
-    test(
-        'SCENARIO-322 failure: when public profile write throws, accept() resolves without rethrowing',
+        'SCENARIO-322: accept() flips friendship status to accepted',
         () async {
       await seedFriendshipForAccept(
         id: 'aaa_bbb',
@@ -168,17 +135,7 @@ void main() {
         uidB: 'bbb',
       );
 
-      final throwingRepo = _ThrowingPublicProfileRepository();
-      final repoWithThrowingProfile = FriendshipRepository(
-        firestore: firestore,
-        publicProfileRepository: throwingRepo,
-      );
-
-      // Must not throw — primary accept() succeeds
-      await expectLater(
-        repoWithThrowingProfile.accept('aaa_bbb', 'aaa'),
-        completes,
-      );
+      await repo.accept('aaa_bbb', 'aaa');
 
       // Friendship doc was accepted
       final snap =
@@ -290,93 +247,9 @@ void main() {
               createdAt: now,
             ).toJson(),
           );
-      // Seed public profile for myUid so decrement can read current count
-      await firestore.collection('userPublicProfiles').doc('aaa').set({
-        'uid': 'aaa',
-        'followersCount': 2,
-        'followingCount': 3,
-      });
 
-      final repoWithProfile = FriendshipRepository(
-        firestore: firestore,
-        publicProfileRepository: publicProfileRepo,
-      );
-      await repoWithProfile.delete('aaa_bbb', 'aaa');
+      await repo.delete('aaa_bbb', 'aaa');
 
-      final snap =
-          await firestore.collection('friendships').doc('aaa_bbb').get();
-      expect(snap.exists, isFalse);
-    });
-
-    // SCENARIO-323 success: delete decrements self-refresh counter for myUid
-    test(
-        'SCENARIO-323: delete triggers self-refresh write to userPublicProfiles/myUid with decremented count',
-        () async {
-      final now = DateTime.utc(2026, 1, 1);
-      await firestore.collection('friendships').doc('aaa_bbb').set(
-            Friendship(
-              id: 'aaa_bbb',
-              uidA: 'aaa',
-              uidB: 'bbb',
-              status: FriendshipStatus.accepted,
-              requesterId: 'aaa',
-              members: ['aaa', 'bbb'],
-              createdAt: now,
-            ).toJson(),
-          );
-      // myUid 'aaa' currently has followingCount: 5
-      await firestore.collection('userPublicProfiles').doc('aaa').set({
-        'uid': 'aaa',
-        'followersCount': 3,
-        'followingCount': 5,
-      });
-
-      final repoWithProfile = FriendshipRepository(
-        firestore: firestore,
-        publicProfileRepository: publicProfileRepo,
-      );
-      await repoWithProfile.delete('aaa_bbb', 'aaa');
-
-      final profileSnap =
-          await firestore.collection('userPublicProfiles').doc('aaa').get();
-      expect(profileSnap.exists, isTrue);
-      final data = profileSnap.data()!;
-      // followingCount decremented by 1 (was 5, now 4)
-      expect(data['followingCount'], equals(4));
-    });
-
-    // SCENARIO-323 failure: when public profile write throws, delete still
-    // resolves successfully (primary op is not affected)
-    test(
-        'SCENARIO-323 failure: when public profile write throws, delete resolves without rethrowing',
-        () async {
-      final now = DateTime.utc(2026, 1, 1);
-      await firestore.collection('friendships').doc('aaa_bbb').set(
-            Friendship(
-              id: 'aaa_bbb',
-              uidA: 'aaa',
-              uidB: 'bbb',
-              status: FriendshipStatus.accepted,
-              requesterId: 'aaa',
-              members: ['aaa', 'bbb'],
-              createdAt: now,
-            ).toJson(),
-          );
-
-      // Use a throwing repo to simulate failure
-      final throwingRepo = _ThrowingPublicProfileRepository();
-      final repoWithThrowingProfile = FriendshipRepository(
-        firestore: firestore,
-        publicProfileRepository: throwingRepo,
-      );
-
-      // Must not throw — primary delete succeeds
-      await expectLater(
-        repoWithThrowingProfile.delete('aaa_bbb', 'aaa'),
-        completes,
-      );
-
-      // The friendship doc was still deleted
       final snap =
           await firestore.collection('friendships').doc('aaa_bbb').get();
       expect(snap.exists, isFalse);
@@ -694,10 +567,7 @@ void main() {
     test(
         'otherIsPublic: true → doc is created directly as accepted',
         () async {
-      final autoRepo = FriendshipRepository(
-        firestore: firestore,
-        publicProfileRepository: publicProfileRepo,
-      );
+      final autoRepo = FriendshipRepository(firestore: firestore);
       final friendship =
           await autoRepo.request('bbb', 'aaa', otherIsPublic: true);
 
@@ -709,87 +579,33 @@ void main() {
     });
 
     test(
-        'otherIsPublic: true → increments followingCount(mine) and '
-        'followersCount(other) via UserPublicProfileRepository', () async {
-      final autoRepo = FriendshipRepository(
-        firestore: firestore,
-        publicProfileRepository: publicProfileRepo,
-      );
-      // Seed both public profiles with counters = 0 so we can observe the
-      // atomic increment mutating them to 1.
-      await firestore.collection('userPublicProfiles').doc('bbb').set(
-        {'uid': 'bbb', 'followingCount': 0, 'followersCount': 0},
-      );
-      await firestore.collection('userPublicProfiles').doc('aaa').set(
-        {'uid': 'aaa', 'followingCount': 0, 'followersCount': 0},
-      );
-
-      await autoRepo.request('bbb', 'aaa', otherIsPublic: true);
-
-      final me =
-          await firestore.collection('userPublicProfiles').doc('bbb').get();
-      final other =
-          await firestore.collection('userPublicProfiles').doc('aaa').get();
-      expect(me.data()!['followingCount'], equals(1));
-      expect(other.data()!['followersCount'], equals(1));
-    });
-
-    test(
-        'otherIsPublic: false (default) → doc is pending, no counter writes',
+        'otherIsPublic: false (default) → doc is created as pending',
         () async {
-      final autoRepo = FriendshipRepository(
-        firestore: firestore,
-        publicProfileRepository: publicProfileRepo,
-      );
-      await firestore.collection('userPublicProfiles').doc('bbb').set(
-        {'uid': 'bbb', 'followingCount': 0},
-      );
+      final autoRepo = FriendshipRepository(firestore: firestore);
 
       await autoRepo.request('bbb', 'aaa');
 
       final snap =
           await firestore.collection('friendships').doc('aaa_bbb').get();
       expect(snap.data()!['status'], equals('pending'));
-      // Counter must not have been touched — accept() is responsible for
-      // that in the pending flow.
-      final me =
-          await firestore.collection('userPublicProfiles').doc('bbb').get();
-      expect(me.data()!['followingCount'], equals(0));
     });
 
     test(
         'otherIsPublic: true is idempotent — existing accepted doc is not '
-        'recreated (no double increment)', () async {
-      final autoRepo = FriendshipRepository(
-        firestore: firestore,
-        publicProfileRepository: publicProfileRepo,
-      );
-      await firestore.collection('userPublicProfiles').doc('bbb').set(
-        {'uid': 'bbb', 'followingCount': 0, 'followersCount': 0},
-      );
-      await firestore.collection('userPublicProfiles').doc('aaa').set(
-        {'uid': 'aaa', 'followingCount': 0, 'followersCount': 0},
-      );
+        'recreated', () async {
+      final autoRepo = FriendshipRepository(firestore: firestore);
 
-      await autoRepo.request('bbb', 'aaa', otherIsPublic: true);
-      await autoRepo.request('bbb', 'aaa', otherIsPublic: true);
+      final first =
+          await autoRepo.request('bbb', 'aaa', otherIsPublic: true);
+      final second =
+          await autoRepo.request('bbb', 'aaa', otherIsPublic: true);
 
-      final me =
-          await firestore.collection('userPublicProfiles').doc('bbb').get();
-      // If the second call had run the counter path, this would be 2.
-      expect(me.data()!['followingCount'], equals(1));
+      // Idempotent: same doc id, still accepted, no duplicate created.
+      expect(second.id, equals(first.id));
+      expect(second.status, equals(FriendshipStatus.accepted));
+      final snap =
+          await firestore.collection('friendships').doc('aaa_bbb').get();
+      expect(snap.data()!['status'], equals('accepted'));
     });
   });
-}
-
-// ─── Test helper: throws on any write ─────────────────────────────────────────
-
-class _ThrowingPublicProfileRepository extends UserPublicProfileRepository {
-  _ThrowingPublicProfileRepository()
-      : super(firestore: FakeFirebaseFirestore());
-
-  @override
-  Future<void> updateCounters(String uid, Map<String, Object?> fields) {
-    throw Exception('Simulated public profile write failure');
-  }
 }
