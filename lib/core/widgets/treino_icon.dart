@@ -90,6 +90,8 @@ class TreinoIcon {
   static const IconData chevronRight = PhosphorIconsRegular.caretRight;
   static const IconData chevronDown = PhosphorIconsRegular.caretDown;
   static const IconData chevronUp = PhosphorIconsRegular.caretUp;
+  // Hamburger clásico (3 líneas) — toggle de sidebar/menú.
+  static const IconData menu = PhosphorIconsRegular.list;
 
   // Gym / spaces
   static const IconData gym = PhosphorIconsRegular.buildings;
