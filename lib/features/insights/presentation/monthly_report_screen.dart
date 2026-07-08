@@ -38,6 +38,7 @@ class _MonthlyReportScreenState extends ConsumerState<MonthlyReportScreen> {
   /// Defaults to the last (most recent/current) month once the report
   /// loads — set on first successful data emission.
   DateTime? _selectedMonth;
+  _MonthlyReportGranularity _granularity = _MonthlyReportGranularity.month;
 
   @override
   Widget build(BuildContext context) {
@@ -84,18 +85,33 @@ class _MonthlyReportScreenState extends ConsumerState<MonthlyReportScreen> {
                     ),
                   ),
                   const SizedBox(height: 14),
-                  MonthlyReportChart(
-                    report: report,
-                    labels: MonthlyReportChartLabels(
-                      workoutsLabel: l10n.monthlyReportMetricWorkouts,
-                      durationLabel: l10n.monthlyReportMetricDuration,
-                      volumeLabel: l10n.monthlyReportMetricVolume,
-                      setsLabel: l10n.monthlyReportMetricSets,
-                      emptyHint: l10n.monthlyReportEmptyHint,
-                    ),
-                    localeName: l10n.localeName,
-                    onMonthSelected: (m) => setState(() => _selectedMonth = m),
+                  _GranularitySwitch(
+                    selected: _granularity,
+                    monthLabel: l10n.monthlyReportByMonthLabel,
+                    dayLabel: l10n.monthlyReportByDayLabel,
+                    onSelect: (value) => setState(() => _granularity = value),
                   ),
+                  const SizedBox(height: 12),
+                  if (_granularity == _MonthlyReportGranularity.month)
+                    MonthlyReportChart(
+                      report: report,
+                      labels: MonthlyReportChartLabels(
+                        workoutsLabel: l10n.monthlyReportMetricWorkouts,
+                        durationLabel: l10n.monthlyReportMetricDuration,
+                        volumeLabel: l10n.monthlyReportMetricVolume,
+                        setsLabel: l10n.monthlyReportMetricSets,
+                        emptyHint: l10n.monthlyReportEmptyHint,
+                      ),
+                      localeName: l10n.localeName,
+                      onMonthSelected: (m) =>
+                          setState(() => _selectedMonth = m),
+                    )
+                  else
+                    _DailyDurationSection(
+                      uid: widget.uid,
+                      month: selectedPoint.month,
+                      emptyHint: l10n.monthlyReportDailyEmptyHint,
+                    ),
                   const SizedBox(height: 14),
                   MonthlyReportSummaryCards(
                     selectedMonth: selectedPoint,
@@ -105,7 +121,7 @@ class _MonthlyReportScreenState extends ConsumerState<MonthlyReportScreen> {
                       durationLabel: l10n.monthlyReportMetricDuration,
                       volumeLabel: l10n.monthlyReportMetricVolume,
                       setsLabel: l10n.monthlyReportMetricSets,
-                      durationUnit: l10n.monthlyReportDurationUnit,
+                      durationUnit: l10n.monthlyReportDurationHoursUnit,
                       volumeUnit: l10n.monthlyReportVolumeUnit,
                     ),
                   ),
@@ -152,6 +168,8 @@ class _MonthlyReportScreenState extends ConsumerState<MonthlyReportScreen> {
   }
 }
 
+enum _MonthlyReportGranularity { month, day }
+
 void _safePopOrInsights(BuildContext context) {
   if (context.canPop()) {
     context.pop();
@@ -165,6 +183,85 @@ String _monthTitle(DateTime month, String localeName) {
   return formatted.isEmpty
       ? formatted
       : formatted[0].toUpperCase() + formatted.substring(1);
+}
+
+// ── Granularity switch ───────────────────────────────────────────────────────
+
+class _GranularitySwitch extends StatelessWidget {
+  const _GranularitySwitch({
+    required this.selected,
+    required this.monthLabel,
+    required this.dayLabel,
+    required this.onSelect,
+  });
+
+  final _MonthlyReportGranularity selected;
+  final String monthLabel;
+  final String dayLabel;
+  final ValueChanged<_MonthlyReportGranularity> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+
+    return Row(
+      children: [
+        _GranularityButton(
+          label: monthLabel,
+          isSelected: selected == _MonthlyReportGranularity.month,
+          palette: palette,
+          onTap: () => onSelect(_MonthlyReportGranularity.month),
+        ),
+        const SizedBox(width: 8),
+        _GranularityButton(
+          label: dayLabel,
+          isSelected: selected == _MonthlyReportGranularity.day,
+          palette: palette,
+          onTap: () => onSelect(_MonthlyReportGranularity.day),
+        ),
+      ],
+    );
+  }
+}
+
+class _GranularityButton extends StatelessWidget {
+  const _GranularityButton({
+    required this.label,
+    required this.isSelected,
+    required this.palette,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool isSelected;
+  final AppPalette palette;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? palette.accent : palette.bgCard,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? palette.accent : palette.border,
+          ),
+        ),
+        child: Text(
+          label,
+          style: GoogleFonts.barlowCondensed(
+            fontWeight: FontWeight.w700,
+            fontSize: 12,
+            letterSpacing: 0.8,
+            color: isSelected ? palette.bg : palette.textMuted,
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 // ── Header ────────────────────────────────────────────────────────────────────
@@ -238,6 +335,52 @@ class _WorkoutDaysSection extends ConsumerWidget {
         labels: WorkoutDaysCalendarLabels(
           streakLabelBuilder: l10n.workoutDaysCalendarStreak,
         ),
+      ),
+    );
+  }
+}
+
+class _DailyDurationSection extends ConsumerWidget {
+  const _DailyDurationSection({
+    required this.uid,
+    required this.month,
+    required this.emptyHint,
+  });
+
+  final String uid;
+  final DateTime month;
+  final String emptyHint;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+    final async = ref.watch(
+      athleteDailyDurationReportProvider((uid: uid, month: month)),
+    );
+
+    return async.when(
+      loading: () => Container(
+        height: 228,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: palette.bgCard,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: palette.border),
+        ),
+        child: CircularProgressIndicator(color: palette.accent),
+      ),
+      error: (_, __) => DailyDurationChart(
+        points: const [],
+        emptyHint: emptyHint,
+        dayLabel: l10n.monthlyReportDailyTooltipDayLabel,
+        minutesUnit: l10n.monthlyReportDurationUnit,
+      ),
+      data: (points) => DailyDurationChart(
+        points: points,
+        emptyHint: emptyHint,
+        dayLabel: l10n.monthlyReportDailyTooltipDayLabel,
+        minutesUnit: l10n.monthlyReportDurationUnit,
       ),
     );
   }

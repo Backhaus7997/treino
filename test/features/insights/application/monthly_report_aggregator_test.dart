@@ -38,6 +38,9 @@ void main() {
       final report = aggregateMonthlyReport(
         sessions: sessions,
         setsCountBySessionId: setsCountBySessionId,
+        durationMinBySessionId: {
+          for (final session in sessions) session.id: session.durationMin,
+        },
         now: now,
       );
 
@@ -64,6 +67,7 @@ void main() {
       final report = aggregateMonthlyReport(
         sessions: const [],
         setsCountBySessionId: const {},
+        durationMinBySessionId: const {},
         now: now,
       );
 
@@ -77,6 +81,7 @@ void main() {
       final report = aggregateMonthlyReport(
         sessions: const [],
         setsCountBySessionId: const {},
+        durationMinBySessionId: const {},
         now: now,
       );
 
@@ -98,6 +103,9 @@ void main() {
       final report = aggregateMonthlyReport(
         sessions: sessions,
         setsCountBySessionId: const {},
+        durationMinBySessionId: {
+          for (final session in sessions) session.id: session.durationMin,
+        },
         now: now,
       );
 
@@ -119,6 +127,9 @@ void main() {
       final report = aggregateMonthlyReport(
         sessions: sessions,
         setsCountBySessionId: const {},
+        durationMinBySessionId: {
+          for (final session in sessions) session.id: session.durationMin,
+        },
         now: now,
       );
 
@@ -138,6 +149,9 @@ void main() {
       final report = aggregateMonthlyReport(
         sessions: sessions,
         setsCountBySessionId: const {},
+        durationMinBySessionId: {
+          for (final session in sessions) session.id: session.durationMin,
+        },
         now: now,
       );
 
@@ -156,12 +170,38 @@ void main() {
       final report = aggregateMonthlyReport(
         sessions: sessions,
         setsCountBySessionId: const {},
+        durationMinBySessionId: {
+          for (final session in sessions) session.id: session.durationMin,
+        },
         now: now,
       );
 
       for (final p in report.points) {
         expect(p.workoutsCount, 0);
       }
+    });
+
+    test('daily duration report returns every day in selected month', () {
+      final month = DateTime(2026, 6, 1);
+      final sessions = [
+        _session('s1', DateTime(2026, 6, 1), durationMin: 40),
+        _session('s2', DateTime(2026, 6, 1, 18), durationMin: 25),
+        _session('s3', DateTime(2026, 6, 2), durationMin: 50),
+        _session('s4', DateTime(2026, 7, 1), durationMin: 90),
+      ];
+
+      final points = aggregateDailyDurationReport(
+        sessions: sessions,
+        durationMinBySessionId: {
+          for (final session in sessions) session.id: session.durationMin,
+        },
+        month: month,
+      );
+
+      expect(points.length, 30);
+      expect(points[0].durationMin, 65);
+      expect(points[1].durationMin, 50);
+      expect(points.last.durationMin, 0);
     });
   });
 }

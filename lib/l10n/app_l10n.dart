@@ -4395,11 +4395,17 @@ abstract class AppL10n {
   /// **'Sets'**
   String get monthlyReportMetricSets;
 
-  /// [AD6/PR5a] Unit suffix for the Duration summary stat card.
+  /// [AD6/PR5a] Unit suffix for duration values displayed in minutes.
   ///
   /// In es_AR, this message translates to:
   /// **'min'**
   String get monthlyReportDurationUnit;
+
+  /// [AD6] Unit suffix for monthly duration totals displayed in hours.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'h'**
+  String get monthlyReportDurationHoursUnit;
 
   /// [AD6/PR5a] Unit suffix for the Volume summary stat card.
   ///
@@ -4412,6 +4418,30 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Sin datos en los últimos 12 meses.'**
   String get monthlyReportEmptyHint;
+
+  /// [AD6] Segmented control label that shows the monthly report grouped by calendar month.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'POR MES'**
+  String get monthlyReportByMonthLabel;
+
+  /// [AD6] Segmented control label that shows the monthly report grouped by day.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'POR DÍA'**
+  String get monthlyReportByDayLabel;
+
+  /// [AD6] Empty state shown in the daily duration chart when the selected month has no trained minutes.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Sin minutos entrenados en este mes.'**
+  String get monthlyReportDailyEmptyHint;
+
+  /// [AD6] Prefix used in daily duration chart tooltips before the calendar day number.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Día'**
+  String get monthlyReportDailyTooltipDayLabel;
 
   /// [AD6/PR5a] Error state for the Monthly Report screen's provider load failure. Paired with coachRetryLabel for the retry CTA.
   ///

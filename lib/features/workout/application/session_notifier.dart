@@ -9,6 +9,7 @@ import '../domain/routine_slot.dart';
 import '../domain/set_log.dart';
 import '../../workout/application/routine_providers.dart';
 import 'session_init.dart';
+import 'session_duration.dart';
 import 'session_providers.dart';
 import 'session_state.dart';
 
@@ -20,6 +21,8 @@ class SessionNotifier
     extends AutoDisposeFamilyAsyncNotifier<SessionState, SessionInit> {
   Timer? _timer;
   bool _finalized = false;
+  int _elapsedBaseSeconds = 0;
+  DateTime? _elapsedBaseAt;
 
   /// Canal de error SEPARADO del AsyncValue.
   ///
@@ -107,6 +110,7 @@ class SessionNotifier
       dayNumber: dayNumber,
       weekNumber: clampedWeek,
     );
+    _resetElapsedBaseline(elapsedSeconds: 0, at: session.startedAt);
 
     // REQ-WPRES-021 (ADR-WPRES-09): filter slots by presence BEFORE building
     // session state so buildBlocks, isFullyCompleted, _nextIncompleteIndex,
@@ -179,10 +183,13 @@ class SessionNotifier
     // so the plain weekNumber-based resolution is correct here.
     final currentIndex =
         _nextIncompleteIndex(sessionDay, recoveredLogs, session.weekNumber);
-    final elapsed = DateTime.now()
-        .difference(session.startedAt)
-        .inSeconds
-        .clamp(0, 1 << 31);
+    final now = DateTime.now();
+    final elapsed = sanitizedActiveSessionElapsedSeconds(
+      session: session,
+      setLogs: recoveredLogs,
+      now: now,
+    );
+    _resetElapsedBaseline(elapsedSeconds: elapsed, at: now);
 
     return SessionState(
       session: session,
@@ -523,8 +530,7 @@ class SessionNotifier
   void _onTick(Timer _) {
     final current = state.value;
     if (current == null || _finalized) return;
-    final elapsed =
-        DateTime.now().difference(current.session.startedAt).inSeconds;
+    final elapsed = _elapsedSecondsNow();
     state = AsyncData(current.copyWith(elapsedSeconds: elapsed));
   }
 
@@ -565,7 +571,27 @@ class SessionNotifier
 
   int _durationMin(int elapsedSeconds) {
     if (elapsedSeconds <= 0) return 1;
-    return (elapsedSeconds + 59) ~/ 60;
+    final bounded = elapsedSeconds.clamp(0, maxWorkoutDuration.inSeconds);
+    return (bounded + 59) ~/ 60;
+  }
+
+  void _resetElapsedBaseline({
+    required int elapsedSeconds,
+    required DateTime at,
+  }) {
+    _elapsedBaseSeconds = elapsedSeconds.clamp(
+      0,
+      maxWorkoutDuration.inSeconds,
+    );
+    _elapsedBaseAt = at;
+  }
+
+  int _elapsedSecondsNow() {
+    final baseAt = _elapsedBaseAt;
+    if (baseAt == null) return 0;
+    final elapsed =
+        _elapsedBaseSeconds + DateTime.now().difference(baseAt).inSeconds;
+    return elapsed.clamp(0, maxWorkoutDuration.inSeconds);
   }
 }
 

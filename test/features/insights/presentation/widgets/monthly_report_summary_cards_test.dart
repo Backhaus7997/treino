@@ -14,7 +14,7 @@ MonthlyReportSummaryLabels _labels({
   String durationLabel = 'Duración',
   String volumeLabel = 'Volumen',
   String setsLabel = 'Sets',
-  String durationUnit = 'min',
+  String durationUnit = 'h',
   String volumeUnit = 'kg',
 }) =>
     MonthlyReportSummaryLabels(
@@ -67,7 +67,7 @@ void main() {
       ));
 
       expect(find.text('12'), findsOneWidget);
-      expect(find.text('480'), findsOneWidget);
+      expect(find.text('8'), findsOneWidget);
       expect(find.text('12000'), findsOneWidget);
       expect(find.text('96'), findsOneWidget);
     });
