@@ -42,34 +42,48 @@ void main() {
       expect(counter, equals(1));
     });
 
-    testWidgets('REQ-HOME-CTA-003: null onPressed — no crash on tap',
-        (tester) async {
+    testWidgets(
+        'REQ-HOME-CTA-003: null onPressed — no crash on tap y sin gesture '
+        '(TreinoTappable devuelve el child pelado)', (tester) async {
       await tester.pumpWidget(_wrap(
         const HomeCTAButton(label: 'GO', onPressed: null),
       ));
       await tester.pump();
-      await tester.tap(find.byType(HomeCTAButton));
+      await tester.tap(find.byType(HomeCTAButton), warnIfMissed: false);
       await tester.pump();
-      // No exception means pass.
-      final btn = tester.widget<ElevatedButton>(find.byType(ElevatedButton));
-      expect(btn.onPressed, isNull);
+      // No exception means pass. Disabled → TreinoTappable no monta gesture.
+      expect(
+        find.descendant(
+          of: find.byType(HomeCTAButton),
+          matching: find.byType(GestureDetector),
+        ),
+        findsNothing,
+      );
     });
 
     testWidgets(
         'REQ-HOME-CTA-004: style — StadiumBorder, accent bg, Barlow Condensed w700',
         (tester) async {
       await tester.pumpWidget(_wrap(
-        const HomeCTAButton(label: 'GO', onPressed: null),
+        HomeCTAButton(label: 'GO', onPressed: () {}),
       ));
       await tester.pump();
 
-      final btn = tester.widget<ElevatedButton>(find.byType(ElevatedButton));
-      final resolvedShape = btn.style?.shape?.resolve(<WidgetState>{});
-      expect(resolvedShape, isA<StadiumBorder>());
+      // TREINO Motion PR3: el pill ahora es un Container con ShapeDecoration
+      // (TreinoTappable + scale reemplazan al ElevatedButton + ripple).
+      final container = tester.widget<Container>(
+        find
+            .descendant(
+              of: find.byType(HomeCTAButton),
+              matching: find.byType(Container),
+            )
+            .first,
+      );
+      final decoration = container.decoration! as ShapeDecoration;
+      expect(decoration.shape, isA<StadiumBorder>());
 
       const palette = AppPalette.mintMagenta;
-      final resolvedBg = btn.style?.backgroundColor?.resolve(<WidgetState>{});
-      expect(resolvedBg, equals(palette.accent));
+      expect(decoration.color, equals(palette.accent));
 
       // Text uses Barlow Condensed w700
       final textWidget = tester.widget<Text>(find.text('GO'));

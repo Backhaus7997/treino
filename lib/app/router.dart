@@ -59,6 +59,7 @@ import '../features/profile/profile_screen.dart';
 import '../features/profile_setup/presentation/profile_setup_flow.dart';
 import '../features/workout/workout_screen.dart';
 import 'theme/app_background.dart';
+import 'theme/app_motion.dart';
 
 const _kTabs = ['/workout', '/feed', '/home', '/coach', '/profile'];
 
@@ -360,26 +361,32 @@ GoRouter buildRouter({
       GoRoute(
         // Statistics hub — fullscreen, no bottom nav. Reached from Home's
         // "Esta semana" card, but it should behave like a pushed report page.
+        // TREINO Motion PR3: _report (fade + subida sutil, "abrir informe").
         path: '/home/insights',
-        builder: (_, __) => _immersive(const InsightsScreen()),
+        pageBuilder: (_, state) =>
+            _report(state.pageKey, _immersive(const InsightsScreen())),
       ),
       GoRoute(
         // Statistics hub detail screens — fullscreen, no bottom nav. They are
         // bare Columns, so wrap them in _immersive instead of shell _withBg.
         path: '/home/insights/monthly',
-        builder: (_, __) => _immersive(const _MonthlyReportRouteHost()),
+        pageBuilder: (_, state) =>
+            _report(state.pageKey, _immersive(const _MonthlyReportRouteHost())),
       ),
       GoRoute(
         path: '/home/insights/muscle-distribution',
-        builder: (_, __) => _immersive(const _MuscleDistributionRouteHost()),
+        pageBuilder: (_, state) => _report(
+            state.pageKey, _immersive(const _MuscleDistributionRouteHost())),
       ),
       GoRoute(
         path: '/home/insights/frequent-exercises',
-        builder: (_, __) => _immersive(const _FrequentExercisesRouteHost()),
+        pageBuilder: (_, state) => _report(
+            state.pageKey, _immersive(const _FrequentExercisesRouteHost())),
       ),
       GoRoute(
         path: '/home/insights/volume-by-group',
-        builder: (_, __) => _immersive(const _VolumeByGroupRouteHost()),
+        pageBuilder: (_, state) =>
+            _report(state.pageKey, _immersive(const _VolumeByGroupRouteHost())),
       ),
 
       // ShellRoute with the existing 5 tabs.
@@ -596,6 +603,47 @@ CustomTransitionPage<void> _noAnim(Widget child) => CustomTransitionPage(
       transitionDuration: Duration.zero,
       reverseTransitionDuration: Duration.zero,
       transitionsBuilder: (_, __, ___, child) => child,
+    );
+
+/// Transición "abrir informe" (TREINO Motion PR3) — fade + subida sutil
+/// (4% de la altura), estilo Hevy, para las rutas del hub de insights y sus
+/// reportes. SOLO esas 5 rutas: el resto de la app conserva el default de
+/// plataforma a propósito (CupertinoPage da swipe-back en iOS; decidimos no
+/// perderlo globalmente). Estas pantallas son fullscreen con botón de volver
+/// explícito, así que perder el swipe-back acá es un tradeoff aceptado.
+///
+/// Curvas: [AppMotion.standard] de ida, [AppMotion.exit] de vuelta (via
+/// `reverseCurve` — se aplica cuando la animación corre en reversa al hacer
+/// pop). Reduce-motion → child directo, sin transición.
+///
+/// [key] DEBE ser `state.pageKey`: a diferencia de `builder:` (que lo asigna
+/// solo), una page custom sin key no se distingue de la page actual y el
+/// `push()` imperativo entre estas rutas no navega. `_noAnim` se salva
+/// porque sus rutas solo se alcanzan con `go()`.
+CustomTransitionPage<void> _report(LocalKey key, Widget child) =>
+    CustomTransitionPage(
+      key: key,
+      child: child,
+      transitionDuration: AppMotion.slow,
+      reverseTransitionDuration: AppMotion.slow,
+      transitionsBuilder: (context, animation, _, child) {
+        if (AppMotion.reduceMotion(context)) return child;
+        final curved = CurvedAnimation(
+          parent: animation,
+          curve: AppMotion.standard,
+          reverseCurve: AppMotion.exit,
+        );
+        return FadeTransition(
+          opacity: curved,
+          child: SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(0, 0.04),
+              end: Offset.zero,
+            ).animate(curved),
+            child: child,
+          ),
+        );
+      },
     );
 
 /// Wraps any shell sub-route's widget with [AppBackground] so the pushed

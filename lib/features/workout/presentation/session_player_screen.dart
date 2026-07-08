@@ -8,6 +8,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
+import '../../../core/widgets/motion/treino_tappable.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../profile/application/user_providers.dart';
@@ -1642,6 +1643,10 @@ class _ExerciseSectionState extends State<_ExerciseSection> {
 /// del bloque interactivo de un ejercicio. Al tocar, dispara
 /// [SessionNotifier.addSet] — la fila nueva se renderiza vacía (AD-4) y el
 /// write real ocurre cuando el athlete la completa vía el check existente.
+///
+/// TREINO Motion PR3: TreinoTappable reemplaza al Material+InkWell — el
+/// scale de presión sustituye al ripple como feedback (reemplazo limpio,
+/// un solo manejador de tap).
 class _AddSetButton extends StatelessWidget {
   const _AddSetButton({required this.onTap});
 
@@ -1650,36 +1655,32 @@ class _AddSetButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(9999),
-        child: Container(
-          constraints: const BoxConstraints(minHeight: 44),
-          alignment: Alignment.center,
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          decoration: BoxDecoration(
-            color: palette.bg,
-            borderRadius: BorderRadius.circular(9999),
-            border: Border.all(color: palette.border),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(TreinoIcon.plus, size: 16, color: palette.accent),
-              const SizedBox(width: 8),
-              Text(
-                'agregar serie',
-                style: GoogleFonts.barlowCondensed(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 13,
-                  letterSpacing: 0.6,
-                  color: palette.accent,
-                ),
+    return TreinoTappable(
+      onTap: onTap,
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 44),
+        alignment: Alignment.center,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: palette.bg,
+          borderRadius: BorderRadius.circular(9999),
+          border: Border.all(color: palette.border),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(TreinoIcon.plus, size: 16, color: palette.accent),
+            const SizedBox(width: 8),
+            Text(
+              'agregar serie',
+              style: GoogleFonts.barlowCondensed(
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+                letterSpacing: 0.6,
+                color: palette.accent,
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -1947,9 +1948,11 @@ class _RepsSetRowState extends State<_RepsSetRow> {
           Semantics(
             button: true,
             label: l10n.sessionPlayerSetCompleteA11y(widget.setNumber),
-            child: GestureDetector(
+            // TREINO Motion PR3: TreinoTappable reemplaza al GestureDetector
+            // (absorbe su onTap) — el check de set es EL tap más frecuente
+            // de una sesión, feedback de presión obligado.
+            child: TreinoTappable(
               onTap: widget.isDone ? widget.onSummaryTap : _onCheckTap,
-              behavior: HitTestBehavior.opaque,
               child: Container(
                 width: 44,
                 height: 44,
@@ -2275,9 +2278,11 @@ class _DurationSetRowState extends State<_DurationSetRow> {
             Semantics(
               button: true,
               label: l10n.sessionPlayerTimerStartA11y,
-              child: GestureDetector(
+              // TREINO Motion PR3: TreinoTappable reemplaza al
+              // GestureDetector (absorbe su onTap). onTap null cuando no es
+              // interactivo → child pelado, mismo no-op que antes.
+              child: TreinoTappable(
                 onTap: isInteractive ? _startTimer : null,
-                behavior: HitTestBehavior.opaque,
                 child: Container(
                   constraints:
                       const BoxConstraints(minWidth: 44, minHeight: 44),
