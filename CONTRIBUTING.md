@@ -121,6 +121,31 @@ flutter run
 - `R` → hot restart (reinicia state)
 - `q` → quit
 
+### Build de distribución (TestFlight / Play Store)
+
+Los builds de distribución también tienen que inyectar `PLACES_CLIENT_KEY`
+(igual que `flutter run`), o los gyms cercanos quedan rotos en producción. Usá
+los scripts, que la pasan solos y fallan si falta la key:
+
+```bash
+./scripts/build-ios.sh        # → build/ios/ipa/  (subir a TestFlight con Transporter)
+./scripts/build-android.sh    # → build/app/outputs/bundle/release/app-release.aab
+```
+
+> ⚠️ **Trampa de Xcode**: NO archives directo desde Xcode (Product → Archive).
+> Xcode **no lee los dart-define** por defecto, así que subirías un build con la
+> key VACÍA y sin aviso. Buildeá siempre con `./scripts/build-ios.sh` (o
+> `flutter build ipa --dart-define-from-file=scripts/places.local.json`).
+
+Antes de shipear a una store, además:
+- **Restringí la key** en la consola (hoy queda "Application restrictions:
+  None"). Ojo: la app llama a Places por REST crudo, así que una restricción
+  "iOS apps"/"Android apps" puede rechazar las llamadas si el código no manda
+  los headers de identidad (`X-Ios-Bundle-Identifier`, etc.) — verificá antes.
+  Como mínimo, restringí la **API** a "Places API (New)".
+- Si algún día buildeás por **CI**, el `places.local.json` no existe ahí:
+  meté la key como *secret* del CI y que el comando de build la pase.
+
 ---
 
 ## 4. Configuración personal
