@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -605,46 +606,57 @@ CustomTransitionPage<void> _noAnim(Widget child) => CustomTransitionPage(
       transitionsBuilder: (_, __, ___, child) => child,
     );
 
-/// Transición "abrir informe" (TREINO Motion PR3) — fade + subida sutil
-/// (4% de la altura), estilo Hevy, para las rutas del hub de insights y sus
-/// reportes. SOLO esas 5 rutas: el resto de la app conserva el default de
-/// plataforma a propósito (CupertinoPage da swipe-back en iOS; decidimos no
-/// perderlo globalmente). Estas pantallas son fullscreen con botón de volver
-/// explícito, así que perder el swipe-back acá es un tradeoff aceptado.
+/// Página "abrir informe" para las 5 rutas del hub de insights y sus reportes:
+/// la transición NATIVA de iOS (slide horizontal) MÁS un fade encima, estilo
+/// Hevy. La clave es que la transición nativa aporta el gesto de **swipe-back**
+/// (deslizar de izquierda a derecha para volver) — un [CustomTransitionPage]
+/// NO puede darlo, porque el back-gesture vive dentro de [CupertinoPageRoute].
+/// Por eso [_ReportPage] extiende esa ruta y sólo le suma el fade: estas
+/// pantallas quedan consistentes con el resto de la app (swipe-back) sin perder
+/// identidad de movimiento. Reduce-motion → sin fade, queda la transición
+/// nativa (igual que cualquier otra ruta `builder:`).
 ///
-/// Curvas: [AppMotion.standard] de ida, [AppMotion.exit] de vuelta (via
-/// `reverseCurve` — se aplica cuando la animación corre en reversa al hacer
-/// pop). Reduce-motion → child directo, sin transición.
-///
-/// [key] DEBE ser `state.pageKey`: a diferencia de `builder:` (que lo asigna
-/// solo), una page custom sin key no se distingue de la page actual y el
-/// `push()` imperativo entre estas rutas no navega. `_noAnim` se salva
-/// porque sus rutas solo se alcanzan con `go()`.
-CustomTransitionPage<void> _report(LocalKey key, Widget child) =>
-    CustomTransitionPage(
-      key: key,
-      child: child,
-      transitionDuration: AppMotion.slow,
-      reverseTransitionDuration: AppMotion.slow,
-      transitionsBuilder: (context, animation, _, child) {
-        if (AppMotion.reduceMotion(context)) return child;
-        final curved = CurvedAnimation(
-          parent: animation,
-          curve: AppMotion.standard,
-          reverseCurve: AppMotion.exit,
-        );
-        return FadeTransition(
-          opacity: curved,
-          child: SlideTransition(
-            position: Tween<Offset>(
-              begin: const Offset(0, 0.04),
-              end: Offset.zero,
-            ).animate(curved),
-            child: child,
-          ),
-        );
-      },
+/// [key] DEBE ser `state.pageKey`: una page custom sin key no se distingue de
+/// la actual y el `push()` imperativo entre estas rutas no navega.
+Page<void> _report(LocalKey key, Widget child) =>
+    _ReportPage(key: key, child: child);
+
+/// [Page] de go_router que crea una [_ReportPageRoute] (CupertinoPageRoute +
+/// fade). Ver [_report].
+class _ReportPage extends Page<void> {
+  const _ReportPage({required LocalKey super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Route<void> createRoute(BuildContext context) => _ReportPageRoute(this);
+}
+
+/// [CupertinoPageRoute] (slide nativo + gesto de swipe-back) con un fade
+/// encima. Ver [_report].
+class _ReportPageRoute extends CupertinoPageRoute<void> {
+  _ReportPageRoute(_ReportPage page)
+      : super(builder: (_) => page.child, settings: page);
+
+  @override
+  Widget buildTransitions(
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
+    // `super` = slide nativo de Cupertino + el back-gesture detector (el gesto
+    // de volver-deslizando queda ADENTRO de `native`). Le ponemos el fade por
+    // fuera: la opacidad no absorbe punteros, así el gesto sigue funcionando.
+    final native =
+        super.buildTransitions(context, animation, secondaryAnimation, child);
+    if (AppMotion.reduceMotion(context)) return native;
+    return FadeTransition(
+      opacity: animation.drive(CurveTween(curve: AppMotion.standard)),
+      child: native,
     );
+  }
+}
 
 /// Wraps any shell sub-route's widget with [AppBackground] so the pushed
 /// route fully covers the tab root content underneath it during/after the
