@@ -21,7 +21,11 @@ import 'package:treino/features/workout/application/session_providers.dart'
 import 'package:treino/features/workout/data/routine_repository.dart';
 import 'package:treino/features/workout/domain/custom_exercise.dart';
 import 'package:treino/features/workout/domain/routine.dart';
+import 'package:treino/features/workout/domain/routine_day.dart';
+import 'package:treino/features/workout/domain/routine_slot.dart';
 import 'package:treino/features/workout/domain/routine_source.dart';
+import 'package:treino/features/workout/domain/routine_visibility.dart';
+import 'package:treino/features/workout/domain/set_spec.dart';
 
 import '../../../../../fixtures/exercises.dart';
 
@@ -51,9 +55,12 @@ List<Override> _overrides({RoutineRepository? repo}) {
   ];
 }
 
+/// Pumps the editor. With [routineId] the edit route is pushed (edit mode);
+/// without it, the create route (as before).
 Future<void> _pumpEditor(
   WidgetTester tester, {
   RoutineRepository? repo,
+  String? routineId,
 }) async {
   // Desktop viewport — Coach Hub web dialogs (exercise picker) assume it.
   tester.view.physicalSize = const Size(1400, 900);
@@ -81,6 +88,15 @@ Future<void> _pumpEditor(
           ),
         ),
       ),
+      GoRoute(
+        path: '/routine-editor/:athleteId/:routineId',
+        builder: (_, state) => Scaffold(
+          body: RoutineEditorWebScreen(
+            athleteId: state.pathParameters['athleteId']!,
+            routineId: state.pathParameters['routineId'],
+          ),
+        ),
+      ),
     ],
   );
 
@@ -92,9 +108,44 @@ Future<void> _pumpEditor(
   );
   await tester.pumpAndSettle();
 
-  router.push('/routine-editor/$_athleteId');
+  router.push(
+    routineId == null
+        ? '/routine-editor/$_athleteId'
+        : '/routine-editor/$_athleteId/$routineId',
+  );
   await tester.pumpAndSettle();
 }
+
+/// A web-editable (simple, single-week, reps) routine — the kind edit mode
+/// accepts.
+Routine _simpleRoutine({String id = 'r1', String name = 'Fuerza base'}) =>
+    Routine(
+      id: id,
+      name: name,
+      split: 'Full Body',
+      level: ExperienceLevel.intermediate,
+      source: RoutineSource.trainerAssigned,
+      assignedBy: _trainerId,
+      assignedTo: _athleteId,
+      days: const [
+        RoutineDay(
+          dayNumber: 1,
+          name: 'Día A',
+          slots: [
+            RoutineSlot(
+              exerciseId: 'bench-press',
+              exerciseName: 'Press de Banca',
+              muscleGroup: 'chest',
+              targetSets: 1,
+              targetRepsMin: 8,
+              targetRepsMax: 8,
+              restSeconds: 90,
+              sets: [SetSpec(reps: 8, weightKg: 60)],
+            ),
+          ],
+        ),
+      ],
+    );
 
 /// Fills name + split and adds one exercise (via the mocked exercise picker
 /// data) to the first day, then sets valid reps on its single default set.
@@ -243,6 +294,9 @@ void main() {
       expect(routine.source, RoutineSource.trainerAssigned);
       expect(routine.assignedBy, _trainerId);
       expect(routine.assignedTo, _athleteId);
+      // firestore.rules rejects 'public' on a trainer-assigned create — the
+      // plan must be private (the model default 'public' would be denied).
+      expect(routine.visibility, RoutineVisibility.private);
       expect(routine.numWeeks, 1);
       expect(routine.days, hasLength(1));
 
@@ -309,6 +363,75 @@ void main() {
 
       expect(find.text('¿Descartar los cambios?'), findsNothing);
       expect(find.text('AlumnoDetail'), findsOneWidget);
+    });
+  });
+
+  group('RoutineEditorWebScreen — edit mode', () {
+    testWidgets('loads and populates an existing web-editable routine',
+        (tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.getById(any())).thenAnswer((_) async => _simpleRoutine());
+      await _pumpEditor(tester, repo: repo, routineId: 'r1');
+
+      expect(find.text('Editar rutina'), findsOneWidget); // header
+      expect(find.text('Fuerza base'), findsOneWidget); // name field
+      expect(find.text('Día A'), findsOneWidget); // day name
+      expect(find.text('Press de Banca'), findsOneWidget); // slot
+      expect(find.text('Guardar cambios'), findsOneWidget); // submit label
+    });
+
+    testWidgets(
+        'saving calls updateAssigned on the same doc, not createAssigned',
+        (tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.getById(any())).thenAnswer((_) async => _simpleRoutine());
+      when(() => repo.updateAssigned(
+            uid: any(named: 'uid'),
+            draft: any(named: 'draft'),
+          )).thenAnswer((i) async => i.namedArguments[#draft] as Routine);
+      await _pumpEditor(tester, repo: repo, routineId: 'r1');
+
+      await tester.enterText(
+          find.byKey(const Key('routine_editor_name_field')), 'Fuerza v2');
+      await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
+      await tester.pumpAndSettle();
+
+      final draft = verify(() => repo.updateAssigned(
+            uid: any(named: 'uid'),
+            draft: captureAny(named: 'draft'),
+          )).captured.single as Routine;
+      expect(draft.id, 'r1'); // UPDATE on the same document, not a new one
+      expect(draft.name, 'Fuerza v2');
+      expect(draft.numWeeks, 1);
+      verifyNever(() => repo.createAssigned(any()));
+    });
+
+    testWidgets(
+        'refuses a periodized routine and does not save (no truncation)',
+        (tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.getById(any()))
+          .thenAnswer((_) async => _simpleRoutine().copyWith(numWeeks: 4));
+      await _pumpEditor(tester, repo: repo, routineId: 'r1');
+
+      expect(find.textContaining('periodización'), findsOneWidget);
+      expect(find.text('Volver'), findsOneWidget);
+      expect(find.text('Guardar cambios'), findsNothing); // form/footer hidden
+      expect(find.text('Fuerza base'), findsNothing); // not populated
+      verifyNever(() => repo.updateAssigned(
+            uid: any(named: 'uid'),
+            draft: any(named: 'draft'),
+          ));
+    });
+
+    testWidgets('shows a not-found message when the routine is missing',
+        (tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.getById(any())).thenAnswer((_) async => null);
+      await _pumpEditor(tester, repo: repo, routineId: 'ghost');
+
+      expect(find.text('No encontramos la rutina.'), findsOneWidget);
+      expect(find.text('Guardar cambios'), findsNothing);
     });
   });
 }

@@ -27,6 +27,7 @@ import 'package:treino/features/coach/domain/nutrition_plan_presets.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach_hub/presentation/sections/chat/widgets/chat_detail_pane.dart';
+import 'package:treino/features/coach_hub/presentation/sections/routine_editor/routine_web_editability.dart';
 import 'package:treino/features/gyms/application/gym_providers.dart';
 import 'package:treino/features/insights/domain/chart_period.dart';
 import 'package:treino/features/insights/presentation/widgets/daily_heatmap_section.dart';
@@ -1752,7 +1753,8 @@ class _EntrenamientoTab extends ConsumerWidget {
                 return _muted(
                     palette, 'Sin rutina activa asignada.'); // i18n: Fase W2
               }
-              return _RutinaCard(routine: active, palette: palette);
+              return _RutinaCard(
+                  routine: active, palette: palette, athleteId: athleteId);
             },
           ),
           const SizedBox(height: 20),
@@ -1972,12 +1974,21 @@ class _MostFrequentExercisesTabSectionState
 }
 
 class _RutinaCard extends StatelessWidget {
-  const _RutinaCard({required this.routine, required this.palette});
+  const _RutinaCard({
+    required this.routine,
+    required this.palette,
+    required this.athleteId,
+  });
   final Routine routine;
   final AppPalette palette;
+  final String athleteId;
 
   @override
   Widget build(BuildContext context) {
+    // Only web-authored (simple) routines can be edited here; periodized /
+    // superset plans from mobile would be truncated on save, so we route the
+    // trainer to the mobile app instead (see isRoutineWebEditable).
+    final editable = isRoutineWebEditable(routine);
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -1988,13 +1999,39 @@ class _RutinaCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            routine.name,
-            style: TextStyle(
-              color: palette.textPrimary,
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-            ),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  routine.name,
+                  style: TextStyle(
+                    color: palette.textPrimary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              if (editable)
+                TextButton.icon(
+                  onPressed: () =>
+                      context.push('/routine-editor/$athleteId/${routine.id}'),
+                  icon: Icon(TreinoIcon.edit, size: 15, color: palette.accent),
+                  label: Text('Editar', // i18n: Fase W2
+                      style: TextStyle(
+                          color: palette.accent,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13)),
+                  style: TextButton.styleFrom(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                )
+              else
+                Text('Editá en la app', // i18n: Fase W2
+                    style: TextStyle(color: palette.textMuted, fontSize: 12)),
+            ],
           ),
           const SizedBox(height: 4),
           Text(

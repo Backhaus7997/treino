@@ -22,18 +22,25 @@ import '../../../../workout/domain/routine.dart';
 import '../../../../workout/domain/routine_day.dart';
 import '../../../../workout/domain/routine_slot.dart';
 import '../../../../workout/domain/routine_source.dart';
+import '../../../../workout/domain/routine_visibility.dart';
 import '../../../../workout/domain/set_spec.dart';
 import '../../widgets/exercise_picker_dialog.dart';
+import 'routine_web_editability.dart';
 
-/// Web MVP del editor de rutinas — asigna una rutina nueva a UN alumno
+/// Web MVP del editor de rutinas — crea o edita la rutina de UN alumno
 /// (mirrors mobile's `RoutineEditorScreen(TrainerAssigning)`, alcance reducido
 /// a pedido: **una sola semana, sets normales** — sin supersets, sin
-/// periodización por semana, sin modos duración/rango de reps, sin editar una
-/// rutina EXISTENTE (evita el riesgo de truncar silenciosamente una rutina
-/// multi-semana creada en mobile al re-guardarla desde acá). El editor
+/// periodización por semana, sin modos duración/rango de reps). El editor
 /// completo de mobile (~4900 líneas entre editor + picker) tiene un sistema
 /// de periodización real (REQ-PERIOD-*, ADR-WPRES-*); portarlo entero es un
 /// desarrollo mucho más grande, deferido a propósito.
+///
+/// **Modo edición** (`routineId != null`): carga la rutina y la abre en el
+/// form. Como `updateAssigned` pisa el array `days` entero, editar una rutina
+/// con periodización/supersets desde acá la truncaría silenciosamente — por eso
+/// [isRoutineWebEditable] actúa de compuerta: si la rutina usa campos avanzados,
+/// el editor NO la carga y muestra un aviso para editarla en la app mobile.
+/// Las rutinas creadas en web son siempre simples, así que se editan sin drama.
 ///
 /// La `Routine` que este editor escribe es 100% válida para el modelo de
 /// dominio completo (numWeeks: 1, weeklySets/activeWeeks vacíos = "todas las
@@ -41,9 +48,18 @@ import '../../widgets/exercise_picker_dialog.dart';
 /// editarla sin problema; lo que este editor NO expone es control fino sobre
 /// esos campos avanzados.
 class RoutineEditorWebScreen extends ConsumerStatefulWidget {
-  const RoutineEditorWebScreen({super.key, required this.athleteId});
+  const RoutineEditorWebScreen({
+    super.key,
+    required this.athleteId,
+    this.routineId,
+  });
 
   final String athleteId;
+
+  /// When non-null, the editor loads this existing routine and saves via
+  /// `updateAssigned` instead of `createAssigned`. Only routines that pass
+  /// [isRoutineWebEditable] are loaded; advanced ones are refused.
+  final String? routineId;
 
   @override
   ConsumerState<RoutineEditorWebScreen> createState() =>
@@ -83,6 +99,100 @@ class _RoutineEditorWebScreenState
   bool _submitting = false;
   bool _isDirty = false;
   String? _errorMessage;
+
+  // ── Edit mode ─────────────────────────────────────────────────────────────
+  bool get _isEditing => widget.routineId != null;
+
+  /// The routine being edited (its identity fields are preserved on save).
+  Routine? _loadedRoutine;
+
+  /// True while the existing routine is being fetched (edit mode only).
+  bool _loading = false;
+
+  /// Non-null when the form can't be shown: routine not found, or it uses
+  /// advanced fields the web editor would truncate ([isRoutineWebEditable]).
+  String? _fatalMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    if (_isEditing) {
+      _loading = true;
+      _load();
+    }
+  }
+
+  Future<void> _load() async {
+    try {
+      final routine =
+          await ref.read(routineRepositoryProvider).getById(widget.routineId!);
+      if (!mounted) return;
+      if (routine == null) {
+        setState(() {
+          _loading = false;
+          _fatalMessage = 'No encontramos la rutina.'; // i18n
+        });
+        return;
+      }
+      // GATE: refuse to load a routine we'd silently truncate on save.
+      if (!isRoutineWebEditable(routine)) {
+        setState(() {
+          _loading = false;
+          _fatalMessage =
+              'Esta rutina tiene periodización o supersets. Editala desde la app mobile para no perder esa configuración.'; // i18n
+        });
+        return;
+      }
+      setState(() {
+        _loadedRoutine = routine;
+        _populate(routine);
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _fatalMessage = 'No pudimos cargar la rutina. Probá de nuevo.'; // i18n
+      });
+    }
+  }
+
+  /// Fills the form from an existing (web-editable) routine.
+  void _populate(Routine routine) {
+    _nameCtrl.text = routine.name;
+    _splitCtrl.text = routine.split ?? '';
+    _level = routine.level;
+    _days
+      ..clear()
+      ..addAll(routine.days.map(_editorDayFrom));
+    if (_days.isEmpty) {
+      _days.add(_EditorDay(dayNumber: 1, name: 'Día 1')); // i18n
+    }
+  }
+
+  _EditorDay _editorDayFrom(RoutineDay day) {
+    return _EditorDay(dayNumber: day.dayNumber, name: day.name)
+      ..slots = day.slots.map(_editorSlotFrom).toList();
+  }
+
+  _EditorSlot _editorSlotFrom(RoutineSlot slot) {
+    final sets = slot.effectiveSets
+        .map((s) => _EditorSet()
+          ..reps = s.reps
+          ..weightKg = s.weightKg)
+        .toList();
+    return _EditorSlot()
+      // Synthesize a minimal Exercise from the slot's denormalized fields —
+      // _buildSlot only reads id/name/muscleGroup, so category is a filler.
+      ..exercise = Exercise(
+        id: slot.exerciseId,
+        name: slot.exerciseName,
+        muscleGroup: slot.muscleGroup,
+        category: '',
+      )
+      ..restSeconds = slot.restSeconds
+      ..sets = sets.isEmpty ? [_EditorSet()] : sets;
+  }
 
   @override
   void dispose() {
@@ -268,31 +378,53 @@ class _RoutineEditorWebScreenState
       _errorMessage = null;
     });
 
-    final routine = Routine(
-      id: '',
-      name: _nameCtrl.text.trim(),
-      split: _splitCtrl.text.trim(),
-      level: _level,
-      days: _days
-          .map((d) => RoutineDay(
-                dayNumber: d.dayNumber,
-                name: d.name,
-                slots: d.slots
-                    .where((s) => s.exercise != null)
-                    .map(_buildSlot)
-                    .toList(),
-              ))
-          .toList(),
-      source: RoutineSource.trainerAssigned,
-      assignedBy: trainerUid,
-      assignedTo: widget.athleteId,
-    );
+    final days = _days
+        .map((d) => RoutineDay(
+              dayNumber: d.dayNumber,
+              name: d.name,
+              slots: d.slots
+                  .where((s) => s.exercise != null)
+                  .map(_buildSlot)
+                  .toList(),
+            ))
+        .toList();
 
+    final repo = ref.read(routineRepositoryProvider);
     try {
-      await ref.read(routineRepositoryProvider).createAssigned(routine);
+      if (_isEditing) {
+        // Preserve the loaded routine's identity (id, assignedBy/To, source,
+        // createdAt, …). updateAssigned only writes name/split/level/days/
+        // numWeeks — the guard [isRoutineWebEditable] already ensured the plan
+        // had no advanced `days` data to lose.
+        final draft = _loadedRoutine!.copyWith(
+          name: _nameCtrl.text.trim(),
+          split: _splitCtrl.text.trim(),
+          level: _level,
+          days: days,
+          numWeeks: 1,
+        );
+        await repo.updateAssigned(uid: trainerUid, draft: draft);
+      } else {
+        final routine = Routine(
+          id: '',
+          name: _nameCtrl.text.trim(),
+          split: _splitCtrl.text.trim(),
+          level: _level,
+          days: days,
+          source: RoutineSource.trainerAssigned,
+          assignedBy: trainerUid,
+          assignedTo: widget.athleteId,
+          // REQUIRED by firestore.rules: a trainer-assigned plan must be
+          // 'private' or 'shared' — the model default 'public' is rejected on
+          // create (it's only valid for system templates). Mirrors mobile's
+          // assignTemplateToAthlete.
+          visibility: RoutineVisibility.private,
+        );
+        await repo.createAssigned(routine);
+      }
       // assignedRoutinesProvider is a one-shot FutureProvider (not a stream) —
       // invalidate so the athlete detail's "Rutina activa" card picks up the
-      // new plan on return.
+      // change on return.
       ref.invalidate(assignedRoutinesProvider(widget.athleteId));
       if (mounted) context.pop();
     } catch (_) {
@@ -375,7 +507,7 @@ class _RoutineEditorWebScreenState
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Nueva rutina', // i18n
+                        _isEditing ? 'Editar rutina' : 'Nueva rutina', // i18n
                         style: GoogleFonts.barlowCondensed(
                           fontWeight: FontWeight.w700,
                           fontSize: 20,
@@ -395,132 +527,155 @@ class _RoutineEditorWebScreenState
             ),
           ),
           Divider(height: 1, color: palette.border),
-          // ── Form ────────────────────────────────────────────────────────
+          // ── Body: loading spinner / blocked notice / the form ───────────
           Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
-              child: Align(
-                alignment: Alignment.topCenter,
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 720),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      if (_errorMessage != null) ...[
-                        _ErrorBanner(message: _errorMessage!, palette: palette),
-                        const SizedBox(height: 16),
-                      ],
-                      _FieldLabel('NOMBRE', palette), // i18n
-                      const SizedBox(height: 6),
-                      TextField(
-                        key: const Key('routine_editor_name_field'),
-                        controller: _nameCtrl,
-                        onChanged: (_) => _markDirty(),
-                        style: GoogleFonts.barlow(color: palette.textPrimary),
-                        decoration: _inputDecoration(
-                            palette, 'Ej: Fuerza 4x semana'), // i18n
-                      ),
-                      const SizedBox(height: 16),
-                      _FieldLabel('SPLIT', palette), // i18n
-                      const SizedBox(height: 6),
-                      TextField(
-                        key: const Key('routine_editor_split_field'),
-                        controller: _splitCtrl,
-                        onChanged: (_) => _markDirty(),
-                        style: GoogleFonts.barlow(color: palette.textPrimary),
-                        decoration: _inputDecoration(
-                            palette, 'Ej: Push/Pull/Legs'), // i18n
-                      ),
-                      const SizedBox(height: 16),
-                      _FieldLabel('NIVEL', palette), // i18n
-                      const SizedBox(height: 8),
-                      _LevelSelector(
-                        selected: _level,
+            child: _loading
+                ? const Center(child: CircularProgressIndicator())
+                : _fatalMessage != null
+                    ? _FatalMessage(
+                        message: _fatalMessage!,
                         palette: palette,
-                        onChanged: (l) {
-                          _markDirty();
-                          setState(() => _level = l);
-                        },
-                      ),
-                      const SizedBox(height: 24),
-                      _FieldLabel('DÍAS', palette), // i18n
-                      const SizedBox(height: 8),
-                      for (var i = 0; i < _days.length; i++) ...[
-                        _DayCard(
-                          day: _days[i],
-                          palette: palette,
-                          canRemove: _days.length > 1,
-                          onNameChanged: (v) => _onDayNameChanged(i, v),
-                          onRemove: () => _removeDay(i),
-                          onAddExercises: () => _addExercisesToDay(i),
-                          onRemoveSlot: (s) => _removeSlot(i, s),
-                          onMoveSlot: (s, dir) => _moveSlot(i, s, dir),
-                          onRestChanged: (s, v) => _onRestChanged(i, s, v),
-                          onAddSet: (s) => _addSet(i, s),
-                          onRemoveSet: (s, set) => _removeSet(i, s, set),
-                          onSetRepsChanged: (s, set, v) =>
-                              _onSetRepsChanged(i, s, set, v),
-                          onSetWeightChanged: (s, set, v) =>
-                              _onSetWeightChanged(i, s, set, v),
-                        ),
-                        const SizedBox(height: 12),
-                      ],
-                      if (_days.length < _kMaxDays)
-                        OutlinedButton.icon(
-                          key: const Key('routine_editor_add_day_button'),
-                          onPressed: _addDay,
-                          icon: Icon(TreinoIcon.plus,
-                              size: 18, color: palette.accent),
-                          label: Text('Agregar día', // i18n
-                              style: GoogleFonts.barlowCondensed(
-                                  color: palette.accent,
-                                  fontWeight: FontWeight.w700)),
-                          style: OutlinedButton.styleFrom(
-                            side: BorderSide(color: palette.accent),
-                            padding: const EdgeInsets.symmetric(vertical: 14),
+                        onBack: _onBackTap,
+                      )
+                    : SingleChildScrollView(
+                        padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+                        child: Align(
+                          alignment: Alignment.topCenter,
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 720),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                if (_errorMessage != null) ...[
+                                  _ErrorBanner(
+                                      message: _errorMessage!,
+                                      palette: palette),
+                                  const SizedBox(height: 16),
+                                ],
+                                _FieldLabel('NOMBRE', palette), // i18n
+                                const SizedBox(height: 6),
+                                TextField(
+                                  key: const Key('routine_editor_name_field'),
+                                  controller: _nameCtrl,
+                                  onChanged: (_) => _markDirty(),
+                                  style: GoogleFonts.barlow(
+                                      color: palette.textPrimary),
+                                  decoration: _inputDecoration(
+                                      palette, 'Ej: Fuerza 4x semana'), // i18n
+                                ),
+                                const SizedBox(height: 16),
+                                _FieldLabel('SPLIT', palette), // i18n
+                                const SizedBox(height: 6),
+                                TextField(
+                                  key: const Key('routine_editor_split_field'),
+                                  controller: _splitCtrl,
+                                  onChanged: (_) => _markDirty(),
+                                  style: GoogleFonts.barlow(
+                                      color: palette.textPrimary),
+                                  decoration: _inputDecoration(
+                                      palette, 'Ej: Push/Pull/Legs'), // i18n
+                                ),
+                                const SizedBox(height: 16),
+                                _FieldLabel('NIVEL', palette), // i18n
+                                const SizedBox(height: 8),
+                                _LevelSelector(
+                                  selected: _level,
+                                  palette: palette,
+                                  onChanged: (l) {
+                                    _markDirty();
+                                    setState(() => _level = l);
+                                  },
+                                ),
+                                const SizedBox(height: 24),
+                                _FieldLabel('DÍAS', palette), // i18n
+                                const SizedBox(height: 8),
+                                for (var i = 0; i < _days.length; i++) ...[
+                                  _DayCard(
+                                    day: _days[i],
+                                    palette: palette,
+                                    canRemove: _days.length > 1,
+                                    onNameChanged: (v) =>
+                                        _onDayNameChanged(i, v),
+                                    onRemove: () => _removeDay(i),
+                                    onAddExercises: () => _addExercisesToDay(i),
+                                    onRemoveSlot: (s) => _removeSlot(i, s),
+                                    onMoveSlot: (s, dir) =>
+                                        _moveSlot(i, s, dir),
+                                    onRestChanged: (s, v) =>
+                                        _onRestChanged(i, s, v),
+                                    onAddSet: (s) => _addSet(i, s),
+                                    onRemoveSet: (s, set) =>
+                                        _removeSet(i, s, set),
+                                    onSetRepsChanged: (s, set, v) =>
+                                        _onSetRepsChanged(i, s, set, v),
+                                    onSetWeightChanged: (s, set, v) =>
+                                        _onSetWeightChanged(i, s, set, v),
+                                  ),
+                                  const SizedBox(height: 12),
+                                ],
+                                if (_days.length < _kMaxDays)
+                                  OutlinedButton.icon(
+                                    key: const Key(
+                                        'routine_editor_add_day_button'),
+                                    onPressed: _addDay,
+                                    icon: Icon(TreinoIcon.plus,
+                                        size: 18, color: palette.accent),
+                                    label: Text('Agregar día', // i18n
+                                        style: GoogleFonts.barlowCondensed(
+                                            color: palette.accent,
+                                            fontWeight: FontWeight.w700)),
+                                    style: OutlinedButton.styleFrom(
+                                      side: BorderSide(color: palette.accent),
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 14),
+                                    ),
+                                  ),
+                              ],
+                            ),
                           ),
                         ),
-                    ],
+                      ),
+          ),
+          // ── Footer (hidden while loading or when blocked) ───────────────
+          if (!_loading && _fatalMessage == null)
+            Container(
+              padding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
+              decoration: BoxDecoration(
+                border: Border(top: BorderSide(color: palette.border)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: _submitting ? null : _onBackTap,
+                    child: Text('Cancelar', // i18n
+                        style: GoogleFonts.barlow(color: palette.textMuted)),
                   ),
-                ),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    key: const Key('routine_editor_submit_button'),
+                    onPressed: _submitting ? null : _submit,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: palette.accent,
+                      foregroundColor: palette.bg,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(9999)),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 24, vertical: 14),
+                    ),
+                    child: Text(
+                      _submitting
+                          ? 'Guardando…'
+                          : _isEditing
+                              ? 'Guardar cambios'
+                              : 'Asignar rutina', // i18n
+                      style: GoogleFonts.barlowCondensed(
+                          fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ),
-          // ── Footer ──────────────────────────────────────────────────────
-          Container(
-            padding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
-            decoration: BoxDecoration(
-              border: Border(top: BorderSide(color: palette.border)),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                TextButton(
-                  onPressed: _submitting ? null : _onBackTap,
-                  child: Text('Cancelar', // i18n
-                      style: GoogleFonts.barlow(color: palette.textMuted)),
-                ),
-                const SizedBox(width: 8),
-                ElevatedButton(
-                  key: const Key('routine_editor_submit_button'),
-                  onPressed: _submitting ? null : _submit,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: palette.accent,
-                    foregroundColor: palette.bg,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(9999)),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 24, vertical: 14),
-                  ),
-                  child: Text(
-                    _submitting ? 'Guardando…' : 'Asignar rutina', // i18n
-                    style: GoogleFonts.barlowCondensed(
-                        fontWeight: FontWeight.w700),
-                  ),
-                ),
-              ],
-            ),
-          ),
         ],
       ),
     );
@@ -591,6 +746,53 @@ class _ErrorBanner extends StatelessWidget {
                 style: GoogleFonts.barlow(color: palette.danger, fontSize: 13)),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ── Fatal notice (not-found / advanced-routine block) ───────────────────────
+
+class _FatalMessage extends StatelessWidget {
+  const _FatalMessage({
+    required this.message,
+    required this.palette,
+    required this.onBack,
+  });
+
+  final String message;
+  final AppPalette palette;
+  final VoidCallback onBack;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 420),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(TreinoIcon.warning, color: palette.textMuted, size: 32),
+            const SizedBox(height: 12),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.barlow(color: palette.textMuted, fontSize: 14),
+            ),
+            const SizedBox(height: 16),
+            OutlinedButton(
+              onPressed: onBack,
+              style: OutlinedButton.styleFrom(
+                side: BorderSide(color: palette.border),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              ),
+              child: Text('Volver', // i18n
+                  style: GoogleFonts.barlowCondensed(
+                      color: palette.textPrimary, fontWeight: FontWeight.w700)),
+            ),
+          ],
+        ),
       ),
     );
   }
