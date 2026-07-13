@@ -25,6 +25,7 @@ import 'package:treino/features/workout/domain/routine_day.dart';
 import 'package:treino/features/workout/domain/routine_slot.dart';
 import 'package:treino/features/workout/domain/routine_source.dart';
 import 'package:treino/features/workout/domain/routine_visibility.dart';
+import 'package:treino/features/workout/domain/set_enums.dart';
 import 'package:treino/features/workout/domain/set_spec.dart';
 
 import '../../../../../fixtures/exercises.dart';
@@ -141,6 +142,38 @@ Routine _simpleRoutine({String id = 'r1', String name = 'Fuerza base'}) =>
               targetRepsMax: 8,
               restSeconds: 90,
               sets: [SetSpec(reps: 8, weightKg: 60)],
+            ),
+          ],
+        ),
+      ],
+    );
+
+/// A web-editable routine that uses a rep RANGE + a coaching note (Fase 1).
+Routine _rangeRoutine({String id = 'r2'}) => Routine(
+      id: id,
+      name: 'Hipertrofia',
+      split: 'PPL',
+      level: ExperienceLevel.intermediate,
+      source: RoutineSource.trainerAssigned,
+      assignedBy: _trainerId,
+      assignedTo: _athleteId,
+      visibility: RoutineVisibility.private,
+      days: const [
+        RoutineDay(
+          dayNumber: 1,
+          name: 'Día A',
+          slots: [
+            RoutineSlot(
+              exerciseId: 'bench-press',
+              exerciseName: 'Press de Banca',
+              muscleGroup: 'chest',
+              targetSets: 1,
+              targetRepsMin: 8,
+              targetRepsMax: 12,
+              restSeconds: 90,
+              repMode: RepMode.range,
+              notes: 'Controlá la bajada',
+              sets: [SetSpec(repsMin: 8, repsMax: 12, weightKg: 60)],
             ),
           ],
         ),
@@ -432,6 +465,141 @@ void main() {
 
       expect(find.text('No encontramos la rutina.'), findsOneWidget);
       expect(find.text('Guardar cambios'), findsNothing);
+    });
+  });
+
+  group('RoutineEditorWebScreen — rep ranges + notes (Fase 1)', () {
+    testWidgets('switching to "Rango" saves a min-max range routine',
+        (tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.createAssigned(any())).thenAnswer(
+        (i) async => i.positionalArguments.first as Routine,
+      );
+      await _pumpEditor(tester, repo: repo);
+
+      await tester.enterText(
+          find.byKey(const Key('routine_editor_name_field')), 'Hipertrofia');
+      await tester.enterText(
+          find.byKey(const Key('routine_editor_split_field')), 'PPL');
+      await tester.tap(find.text('Agregar ejercicio'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Press de Banca'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Agregar (1)'));
+      await tester.pumpAndSettle();
+
+      // Toggle to range mode → the set row swaps its 'reps' field for mín/máx.
+      await tester.tap(find.text('Rango'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.ancestor(
+            of: find.text('mín'), matching: find.byType(TextFormField)),
+        '8',
+      );
+      await tester.enterText(
+        find.ancestor(
+            of: find.text('máx'), matching: find.byType(TextFormField)),
+        '12',
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
+      await tester.pumpAndSettle();
+
+      final routine = verify(() => repo.createAssigned(captureAny()))
+          .captured
+          .single as Routine;
+      final slot = routine.days.single.slots.single;
+      expect(slot.repMode, RepMode.range);
+      expect(slot.sets.single.repsMin, 8);
+      expect(slot.sets.single.repsMax, 12);
+      expect(slot.sets.single.reps, isNull);
+    });
+
+    testWidgets('a coaching note is persisted on the slot', (tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.createAssigned(any())).thenAnswer(
+        (i) async => i.positionalArguments.first as Routine,
+      );
+      await _pumpEditor(tester, repo: repo);
+      await _fillMinimalValidForm(tester);
+
+      await tester.enterText(
+        find.ancestor(
+            of: find.text('Notas para el alumno (opcional)'),
+            matching: find.byType(TextFormField)),
+        'Bajá despacio la barra',
+      );
+      await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
+      await tester.pumpAndSettle();
+
+      final routine = verify(() => repo.createAssigned(captureAny()))
+          .captured
+          .single as Routine;
+      expect(routine.days.single.slots.single.notes, 'Bajá despacio la barra');
+    });
+
+    testWidgets('invalid range (mín > máx) blocks submit', (tester) async {
+      final repo = _MockRoutineRepository();
+      await _pumpEditor(tester, repo: repo);
+
+      await tester.enterText(
+          find.byKey(const Key('routine_editor_name_field')), 'Hipertrofia');
+      await tester.enterText(
+          find.byKey(const Key('routine_editor_split_field')), 'PPL');
+      await tester.tap(find.text('Agregar ejercicio'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Press de Banca'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Agregar (1)'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Rango'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.ancestor(
+            of: find.text('mín'), matching: find.byType(TextFormField)),
+        '12',
+      );
+      await tester.enterText(
+        find.ancestor(
+            of: find.text('máx'), matching: find.byType(TextFormField)),
+        '8',
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('rango de reps inválido'), findsOneWidget);
+      verifyNever(() => repo.createAssigned(any()));
+    });
+
+    testWidgets('edit mode loads a range routine and re-saves it as a range',
+        (tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.getById(any())).thenAnswer((_) async => _rangeRoutine());
+      when(() => repo.updateAssigned(
+            uid: any(named: 'uid'),
+            draft: any(named: 'draft'),
+          )).thenAnswer((i) async => i.namedArguments[#draft] as Routine);
+      await _pumpEditor(tester, repo: repo, routineId: 'r2');
+
+      expect(find.text('Controlá la bajada'), findsOneWidget); // notes loaded
+      expect(find.text('12'), findsWidgets); // range max loaded into a field
+
+      await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
+      await tester.pumpAndSettle();
+
+      final draft = verify(() => repo.updateAssigned(
+            uid: any(named: 'uid'),
+            draft: captureAny(named: 'draft'),
+          )).captured.single as Routine;
+      final slot = draft.days.single.slots.single;
+      expect(slot.repMode, RepMode.range);
+      expect(slot.sets.single.repsMin, 8);
+      expect(slot.sets.single.repsMax, 12);
+      expect(slot.notes, 'Controlá la bajada');
     });
   });
 }

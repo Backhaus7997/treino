@@ -23,6 +23,7 @@ import '../../../../workout/domain/routine_day.dart';
 import '../../../../workout/domain/routine_slot.dart';
 import '../../../../workout/domain/routine_source.dart';
 import '../../../../workout/domain/routine_visibility.dart';
+import '../../../../workout/domain/set_enums.dart';
 import '../../../../workout/domain/set_spec.dart';
 import '../../widgets/exercise_picker_dialog.dart';
 import 'routine_web_editability.dart';
@@ -70,12 +71,16 @@ class RoutineEditorWebScreen extends ConsumerStatefulWidget {
 
 class _EditorSet {
   double? weightKg;
-  int? reps;
+  int? reps; // used when repMode == single
+  int? repsMin; // used when repMode == range
+  int? repsMax; // used when repMode == range
 }
 
 class _EditorSlot {
   Exercise? exercise;
   int restSeconds = 0;
+  RepMode repMode = RepMode.single;
+  String notes = '';
   List<_EditorSet> sets = [_EditorSet()];
 }
 
@@ -176,9 +181,16 @@ class _RoutineEditorWebScreenState
   }
 
   _EditorSlot _editorSlotFrom(RoutineSlot slot) {
-    final sets = slot.effectiveSets
+    final effective = slot.effectiveSets;
+    // Derive the mode from the actual set data — robust against a stale repMode
+    // field (matches mobile's _repModeFromHydratedSets rationale).
+    final isRange =
+        effective.any((s) => s.repsMin != null || s.repsMax != null);
+    final sets = effective
         .map((s) => _EditorSet()
           ..reps = s.reps
+          ..repsMin = s.repsMin
+          ..repsMax = s.repsMax
           ..weightKg = s.weightKg)
         .toList();
     return _EditorSlot()
@@ -191,6 +203,8 @@ class _RoutineEditorWebScreenState
         category: '',
       )
       ..restSeconds = slot.restSeconds
+      ..repMode = isRange ? RepMode.range : RepMode.single
+      ..notes = slot.notes ?? ''
       ..sets = sets.isEmpty ? [_EditorSet()] : sets;
   }
 
@@ -286,6 +300,8 @@ class _RoutineEditorWebScreenState
       final last = sets.isEmpty ? null : sets.last;
       sets.add(_EditorSet()
         ..reps = last?.reps
+        ..repsMin = last?.repsMin
+        ..repsMax = last?.repsMax
         ..weightKg = last?.weightKg);
     });
   }
@@ -301,6 +317,47 @@ class _RoutineEditorWebScreenState
     _markDirty();
     setState(() => _days[dayIndex].slots[slotIndex].sets[setIndex].reps =
         int.tryParse(v.trim()));
+  }
+
+  void _onSetRepsMinChanged(
+      int dayIndex, int slotIndex, int setIndex, String v) {
+    _markDirty();
+    setState(() => _days[dayIndex].slots[slotIndex].sets[setIndex].repsMin =
+        int.tryParse(v.trim()));
+  }
+
+  void _onSetRepsMaxChanged(
+      int dayIndex, int slotIndex, int setIndex, String v) {
+    _markDirty();
+    setState(() => _days[dayIndex].slots[slotIndex].sets[setIndex].repsMax =
+        int.tryParse(v.trim()));
+  }
+
+  /// Toggles an exercise between fixed reps and a min–max range. Values carry
+  /// across the switch so the trainer doesn't retype (seed min/max from reps
+  /// and vice versa).
+  void _setSlotRepMode(int dayIndex, int slotIndex, RepMode mode) {
+    final slot = _days[dayIndex].slots[slotIndex];
+    if (slot.repMode == mode) return;
+    _markDirty();
+    setState(() {
+      slot.repMode = mode;
+      for (final s in slot.sets) {
+        if (mode == RepMode.range) {
+          s.repsMin ??= s.reps;
+          s.repsMax ??= s.reps;
+        } else {
+          s.reps ??= s.repsMin ?? s.repsMax;
+        }
+      }
+    });
+  }
+
+  // No setState: the notes TextField holds its own text and notes isn't
+  // rendered anywhere else (mirrors _markDirty's own no-rebuild rationale).
+  void _onNotesChanged(int dayIndex, int slotIndex, String value) {
+    _markDirty();
+    _days[dayIndex].slots[slotIndex].notes = value;
   }
 
   void _onSetWeightChanged(
@@ -330,8 +387,14 @@ class _RoutineEditorWebScreenState
       }
       for (final slot in day.slots) {
         for (final set in slot.sets) {
-          if (set.reps == null || set.reps! <= 0) {
-            return '${slot.exercise?.name ?? 'Un ejercicio'} tiene una serie sin reps.'; // i18n
+          final name = slot.exercise?.name ?? 'Un ejercicio'; // i18n
+          if (slot.repMode == RepMode.range) {
+            final min = set.repsMin, max = set.repsMax;
+            if (min == null || min <= 0 || max == null || max < min) {
+              return '$name tiene un rango de reps inválido (mín ≤ máx).'; // i18n
+            }
+          } else if (set.reps == null || set.reps! <= 0) {
+            return '$name tiene una serie sin reps.'; // i18n
           }
         }
       }
@@ -343,23 +406,49 @@ class _RoutineEditorWebScreenState
 
   RoutineSlot _buildSlot(_EditorSlot slot) {
     final exercise = slot.exercise!;
+    final isRange = slot.repMode == RepMode.range;
+
+    // Legacy field derivation mirrors mobile's buildRoutineSlot: for a range,
+    // targetRepsMin/Max span the per-set mins/maxes and targetReps stays empty.
+    final int targetRepsMin;
+    final int targetRepsMax;
+    final List<int> targetReps;
+    if (isRange) {
+      final mins = slot.sets.map((s) => s.repsMin ?? 0).toList();
+      final maxs = slot.sets.map((s) => s.repsMax ?? 0).toList();
+      targetRepsMin = mins.isEmpty ? 0 : mins.reduce((a, b) => a < b ? a : b);
+      targetRepsMax = maxs.isEmpty ? 0 : maxs.reduce((a, b) => a > b ? a : b);
+      targetReps = const [];
+    } else {
+      final reps = slot.sets.map((s) => s.reps ?? 0).toList();
+      targetRepsMin = reps.isEmpty ? 0 : reps.reduce((a, b) => a < b ? a : b);
+      targetRepsMax = reps.isEmpty ? 0 : reps.reduce((a, b) => a > b ? a : b);
+      targetReps = reps;
+    }
+
     final specs = slot.sets
-        .map((s) => SetSpec(reps: s.reps, weightKg: s.weightKg))
+        .map((s) => isRange
+            ? SetSpec(
+                repsMin: s.repsMin, repsMax: s.repsMax, weightKg: s.weightKg)
+            : SetSpec(reps: s.reps, weightKg: s.weightKg))
         .toList();
-    final reps = specs.map((s) => s.reps ?? 0).toList();
+    final notes = slot.notes.trim();
+
     return RoutineSlot(
       exerciseId: exercise.id,
       exerciseName: exercise.name,
       muscleGroup: exercise.muscleGroup,
       targetSets: specs.length,
-      targetRepsMin: reps.isEmpty ? 0 : reps.reduce((a, b) => a < b ? a : b),
-      targetRepsMax: reps.isEmpty ? 0 : reps.reduce((a, b) => a > b ? a : b),
+      targetRepsMin: targetRepsMin,
+      targetRepsMax: targetRepsMax,
       restSeconds: slot.restSeconds,
       targetWeightKg: specs.isEmpty ? null : specs.first.weightKg,
-      targetReps: reps,
+      targetReps: targetReps,
+      repMode: slot.repMode,
+      notes: notes.isEmpty ? null : notes,
       sets: specs,
-      // exerciseMode/repMode default to reps/single; weeklySets/activeWeeks
-      // default to empty ([] = single-week / "present in all weeks").
+      // exerciseMode defaults to reps; weeklySets/activeWeeks default to empty
+      // ([] = single-week / "present in all weeks").
     );
   }
 
@@ -608,8 +697,16 @@ class _RoutineEditorWebScreenState
                                         _removeSet(i, s, set),
                                     onSetRepsChanged: (s, set, v) =>
                                         _onSetRepsChanged(i, s, set, v),
+                                    onSetRepsMinChanged: (s, set, v) =>
+                                        _onSetRepsMinChanged(i, s, set, v),
+                                    onSetRepsMaxChanged: (s, set, v) =>
+                                        _onSetRepsMaxChanged(i, s, set, v),
                                     onSetWeightChanged: (s, set, v) =>
                                         _onSetWeightChanged(i, s, set, v),
+                                    onRepModeChanged: (s, mode) =>
+                                        _setSlotRepMode(i, s, mode),
+                                    onNotesChanged: (s, v) =>
+                                        _onNotesChanged(i, s, v),
                                   ),
                                   const SizedBox(height: 12),
                                 ],
@@ -858,7 +955,11 @@ class _DayCard extends StatelessWidget {
     required this.onAddSet,
     required this.onRemoveSet,
     required this.onSetRepsChanged,
+    required this.onSetRepsMinChanged,
+    required this.onSetRepsMaxChanged,
     required this.onSetWeightChanged,
+    required this.onRepModeChanged,
+    required this.onNotesChanged,
   });
 
   final _EditorDay day;
@@ -875,7 +976,13 @@ class _DayCard extends StatelessWidget {
   final void Function(int slotIndex, int setIndex, String value)
       onSetRepsChanged;
   final void Function(int slotIndex, int setIndex, String value)
+      onSetRepsMinChanged;
+  final void Function(int slotIndex, int setIndex, String value)
+      onSetRepsMaxChanged;
+  final void Function(int slotIndex, int setIndex, String value)
       onSetWeightChanged;
+  final void Function(int slotIndex, RepMode mode) onRepModeChanged;
+  final void Function(int slotIndex, String value) onNotesChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -929,7 +1036,11 @@ class _DayCard extends StatelessWidget {
               onAddSet: () => onAddSet(i),
               onRemoveSet: (set) => onRemoveSet(i, set),
               onSetRepsChanged: (set, v) => onSetRepsChanged(i, set, v),
+              onSetRepsMinChanged: (set, v) => onSetRepsMinChanged(i, set, v),
+              onSetRepsMaxChanged: (set, v) => onSetRepsMaxChanged(i, set, v),
               onSetWeightChanged: (set, v) => onSetWeightChanged(i, set, v),
+              onRepModeChanged: (mode) => onRepModeChanged(i, mode),
+              onNotesChanged: (v) => onNotesChanged(i, v),
             ),
           ],
           const SizedBox(height: 10),
@@ -967,7 +1078,11 @@ class _SlotCard extends StatelessWidget {
     required this.onAddSet,
     required this.onRemoveSet,
     required this.onSetRepsChanged,
+    required this.onSetRepsMinChanged,
+    required this.onSetRepsMaxChanged,
     required this.onSetWeightChanged,
+    required this.onRepModeChanged,
+    required this.onNotesChanged,
   });
 
   final _EditorSlot slot;
@@ -981,7 +1096,11 @@ class _SlotCard extends StatelessWidget {
   final VoidCallback onAddSet;
   final void Function(int setIndex) onRemoveSet;
   final void Function(int setIndex, String value) onSetRepsChanged;
+  final void Function(int setIndex, String value) onSetRepsMinChanged;
+  final void Function(int setIndex, String value) onSetRepsMaxChanged;
   final void Function(int setIndex, String value) onSetWeightChanged;
+  final ValueChanged<RepMode> onRepModeChanged;
+  final ValueChanged<String> onNotesChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -1029,6 +1148,26 @@ class _SlotCard extends StatelessWidget {
               ),
             ],
           ),
+          const SizedBox(height: 6),
+          // Reps fijas vs rango (mín–máx) — Fase 1 paridad con mobile.
+          Row(
+            children: [
+              _ModeChip(
+                label: 'Reps', // i18n
+                selected: slot.repMode == RepMode.single,
+                palette: palette,
+                onTap: () => onRepModeChanged(RepMode.single),
+              ),
+              const SizedBox(width: 6),
+              _ModeChip(
+                label: 'Rango', // i18n
+                selected: slot.repMode == RepMode.range,
+                palette: palette,
+                onTap: () => onRepModeChanged(RepMode.range),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
           Row(
             children: [
               Text('Descanso (seg)', // i18n
@@ -1054,9 +1193,12 @@ class _SlotCard extends StatelessWidget {
               index: i,
               set: slot.sets[i],
               palette: palette,
+              repMode: slot.repMode,
               canRemove: slot.sets.length > 1,
               onRemove: () => onRemoveSet(i),
               onRepsChanged: (v) => onSetRepsChanged(i, v),
+              onRepsMinChanged: (v) => onSetRepsMinChanged(i, v),
+              onRepsMaxChanged: (v) => onSetRepsMaxChanged(i, v),
               onWeightChanged: (v) => onSetWeightChanged(i, v),
             ),
           Align(
@@ -1069,6 +1211,23 @@ class _SlotCard extends StatelessWidget {
                       color: palette.accent,
                       fontWeight: FontWeight.w700,
                       fontSize: 12)),
+            ),
+          ),
+          // Coaching note for this exercise (optional). Located in tests via
+          // its hint, not a Key — a Key would collide across slots.
+          TextFormField(
+            initialValue: slot.notes,
+            onChanged: onNotesChanged,
+            maxLength: 200,
+            minLines: 1,
+            maxLines: 3,
+            style: GoogleFonts.barlow(color: palette.textPrimary, fontSize: 13),
+            decoration: InputDecoration(
+              isDense: true,
+              hintText: 'Notas para el alumno (opcional)', // i18n
+              hintStyle:
+                  GoogleFonts.barlow(color: palette.textMuted, fontSize: 12),
+              counterText: '',
             ),
           ),
         ],
@@ -1084,22 +1243,29 @@ class _SetRow extends StatelessWidget {
     required this.index,
     required this.set,
     required this.palette,
+    required this.repMode,
     required this.canRemove,
     required this.onRemove,
     required this.onRepsChanged,
+    required this.onRepsMinChanged,
+    required this.onRepsMaxChanged,
     required this.onWeightChanged,
   });
 
   final int index;
   final _EditorSet set;
   final AppPalette palette;
+  final RepMode repMode;
   final bool canRemove;
   final VoidCallback onRemove;
   final ValueChanged<String> onRepsChanged;
+  final ValueChanged<String> onRepsMinChanged;
+  final ValueChanged<String> onRepsMaxChanged;
   final ValueChanged<String> onWeightChanged;
 
   @override
   Widget build(BuildContext context) {
+    final isRange = repMode == RepMode.range;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 3),
       child: Row(
@@ -1110,37 +1276,34 @@ class _SetRow extends StatelessWidget {
                 style: GoogleFonts.barlowCondensed(
                     color: palette.textMuted, fontWeight: FontWeight.w700)),
           ),
-          Expanded(
-            child: TextFormField(
-              initialValue: set.reps?.toString() ?? '',
-              keyboardType: TextInputType.number,
-              onChanged: onRepsChanged,
-              style:
-                  GoogleFonts.barlow(color: palette.textPrimary, fontSize: 13),
-              decoration: InputDecoration(
-                isDense: true,
-                hintText: 'reps', // i18n
-                hintStyle:
-                    GoogleFonts.barlow(color: palette.textMuted, fontSize: 12),
-              ),
+          if (isRange) ...[
+            Expanded(
+              child: _numberField(
+                  initial: set.repsMin?.toString() ?? '',
+                  hint: 'mín', // i18n
+                  onChanged: onRepsMinChanged),
             ),
-          ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _numberField(
+                  initial: set.repsMax?.toString() ?? '',
+                  hint: 'máx', // i18n
+                  onChanged: onRepsMaxChanged),
+            ),
+          ] else
+            Expanded(
+              child: _numberField(
+                  initial: set.reps?.toString() ?? '',
+                  hint: 'reps', // i18n
+                  onChanged: onRepsChanged),
+            ),
           const SizedBox(width: 8),
           Expanded(
-            child: TextFormField(
-              initialValue: set.weightKg?.toString() ?? '',
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
-              onChanged: onWeightChanged,
-              style:
-                  GoogleFonts.barlow(color: palette.textPrimary, fontSize: 13),
-              decoration: InputDecoration(
-                isDense: true,
-                hintText: 'kg', // i18n
-                hintStyle:
-                    GoogleFonts.barlow(color: palette.textMuted, fontSize: 12),
-              ),
-            ),
+            child: _numberField(
+                initial: set.weightKg?.toString() ?? '',
+                hint: 'kg', // i18n
+                decimal: true,
+                onChanged: onWeightChanged),
           ),
           IconButton(
             tooltip: 'Quitar set', // i18n
@@ -1149,6 +1312,66 @@ class _SetRow extends StatelessWidget {
             visualDensity: VisualDensity.compact,
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _numberField({
+    required String initial,
+    required String hint,
+    required ValueChanged<String> onChanged,
+    bool decimal = false,
+  }) {
+    return TextFormField(
+      initialValue: initial,
+      keyboardType: decimal
+          ? const TextInputType.numberWithOptions(decimal: true)
+          : TextInputType.number,
+      onChanged: onChanged,
+      style: GoogleFonts.barlow(color: palette.textPrimary, fontSize: 13),
+      decoration: InputDecoration(
+        isDense: true,
+        hintText: hint,
+        hintStyle: GoogleFonts.barlow(color: palette.textMuted, fontSize: 12),
+      ),
+    );
+  }
+}
+
+// ── Rep-mode chip (Reps fijas / Rango) ───────────────────────────────────────
+
+class _ModeChip extends StatelessWidget {
+  const _ModeChip({
+    required this.label,
+    required this.selected,
+    required this.palette,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final AppPalette palette;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+        decoration: BoxDecoration(
+          color: selected ? palette.accent : palette.bgCard,
+          borderRadius: BorderRadius.circular(9999),
+          border: Border.all(color: selected ? palette.accent : palette.border),
+        ),
+        child: Text(
+          label,
+          style: GoogleFonts.barlowCondensed(
+            color: selected ? palette.bg : palette.textMuted,
+            fontWeight: FontWeight.w700,
+            fontSize: 12,
+          ),
+        ),
       ),
     );
   }
