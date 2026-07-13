@@ -6,3 +6,5 @@
 library;
 
 export 'primitives.dart';
+export 'components/treino_button_tokens.dart';
+export 'components/treino_card_tokens.dart';
