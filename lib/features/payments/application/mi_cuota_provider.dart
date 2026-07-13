@@ -98,7 +98,15 @@ final miCuotaProvider = Provider.autoDispose<AsyncValue<MiCuotaState?>>((ref) {
   if (paymentsAsync.hasError && !paymentsAsync.hasValue) {
     return AsyncValue.error(paymentsAsync.error!, paymentsAsync.stackTrace!);
   }
-  final payments = paymentsAsync.valueOrNull ?? const <Payment>[];
+  // Scope to the ACTIVE trainer. athletePaymentsProvider streams every payment
+  // addressed to this athlete across ALL trainers (a terminated link's
+  // included), so without this filter a previous trainer's pending charge would
+  // surface under "Tu cuota" attributed to the current one. This also keeps the
+  // mensual/semanal paid-checks and the porSesion paidAt floor below from
+  // honouring a prior trainer's payments.
+  final payments = (paymentsAsync.valueOrNull ?? const <Payment>[])
+      .where((p) => p.trainerId == trainerId)
+      .toList();
 
   // ── 3. Now (ART — period keys + concept strings are calendar concepts) ─────
   final now = argentinaNow();
