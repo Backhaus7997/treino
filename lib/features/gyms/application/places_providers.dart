@@ -12,18 +12,21 @@ import '../domain/gym_suggestion.dart';
 import '../domain/nearby_gym.dart';
 import 'gym_providers.dart' show gymRepositoryProvider;
 
-/// Bundle-restricted Places client key. Provided at build/run time via
-/// `--dart-define=PLACES_CLIENT_KEY=<key>` — NEVER committed to the repo.
-/// Empty by default; both [PlacesTextSearchService.search] and
-/// [ResolveGymPlaceService.call] surface a clear config error (not a crash)
-/// when this is empty, e.g. in dev builds that forgot to pass the define.
+/// Client key de Google Places. **DEBE estar RESTRINGIDA** en Google Cloud
+/// Console (project treino-dev → Credentials): API restriction = "Places API
+/// (New)". Un client key NO es un secreto — viaja en el binario de la app de
+/// todos modos, así que la protección real es la restricción de la key, no
+/// esconderla. Por eso va committeada como default acá: TODO build anda sin
+/// flags (flutter run, Xcode Archive, CI). `--dart-define=PLACES_CLIENT_KEY`
+/// la sigue pisando si se pasa (útil para rotarla sin recompilar el default).
 ///
-/// Shared by BOTH Text Search AND Place Details resolution (Plan B pivot —
-/// see [ResolveGymPlaceService] doc comment for why Details moved
-/// client-side too, reusing the same bundle-restricted key instead of a
-/// separate server-side key held in Secret Manager).
-const String _placesClientKey =
-    String.fromEnvironment('PLACES_CLIENT_KEY', defaultValue: '');
+/// Compartida por Text Search Y Place Details resolution (Plan B pivot — ver
+/// [ResolveGymPlaceService]).
+const String _placesClientKey = String.fromEnvironment(
+  'PLACES_CLIENT_KEY',
+  // ⬇️ PEGÁ ACÁ tu key RESTRINGIDA de Places (entre las comillas).
+  defaultValue: 'AIzaSyCQv4N2hTBppGlnJOdKrQViVUsi6yDYsgA',
+);
 
 /// Shared `http.Client` for Places requests (Text Search + Details). A
 /// single long-lived client (not `Provider.autoDispose`) matches the

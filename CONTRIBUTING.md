@@ -72,29 +72,17 @@ flutter analyze
 
 ## 3. Correr la app
 
-### Setup por única vez — key de Google Places (gimnasios)
+### Gimnasios (Google Places) — sin setup
 
-La feature de gimnasios (buscar gym / gyms cercanos) usa Google Places, que
-necesita una API key en tiempo de build. Sin ella, esas búsquedas fallan con
-"No pudimos cargar los gyms cercanos" (el resto de la app anda igual).
+La feature de gimnasios usa Google Places con un **client key restringido** que
+va **committeado en el código** (`lib/features/gyms/application/places_providers.dart`).
+No es un secreto: un client key viaja en el binario de la app de todos modos, así
+que la protección real es la **restricción** de la key en Google Cloud Console
+(API restriction = "Places API (New)"), no esconderla. Por eso `flutter run` y los
+builds andan **sin ningún setup extra**.
 
-```bash
-cp scripts/places.local.example.json scripts/places.local.json
-# editá scripts/places.local.json y pegá tu PLACES_CLIENT_KEY
-```
-
-La key se saca de Google Cloud Console → proyecto `treino-dev` → APIs &
-Services → Credentials. `scripts/places.local.json` está **gitignoreado** — la
-key nunca se commitea. Después corré la app con el wrapper, que inyecta la key
-sola:
-
-```bash
-./scripts/run.sh --release -d <device-id>   # equivale a flutter run --dart-define-from-file=scripts/places.local.json ...
-```
-
-> También podés pasarla suelta: `flutter run --dart-define=PLACES_CLIENT_KEY=<key>`.
-> Y ojo: restringí la key al bundle de iOS en la consola (por defecto queda sin
-> restricción de aplicación).
+> Para rotar la key sin recompilar el default, se puede pisar en build-time con
+> `--dart-define=PLACES_CLIENT_KEY=<key>`.
 
 ### iOS (simulador)
 ```bash
