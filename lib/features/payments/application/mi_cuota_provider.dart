@@ -3,43 +3,21 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../coach/application/trainer_link_providers.dart'
     show currentAthleteLinkProvider;
 import '../../coach/domain/trainer_link_status.dart';
-import '../../workout/application/session_providers.dart'
-    show sessionsByUidProvider;
-import '../../workout/domain/session_status.dart';
 import '../domain/athlete_billing.dart';
 import '../domain/payment.dart';
-import 'billing_providers.dart' show athleteBillingPairProvider;
-import 'pagos_por_cobrar_provider.dart' show argentinaNow, isoWeekPeriodKey;
 import 'payment_providers.dart' show athletePaymentsProvider;
-
-// ── ISO week helper (mirrors pagos_por_cobrar_provider) ───────────────────────
-
-int _isoWeekNumber(DateTime date) {
-  final thursday = date.subtract(Duration(days: date.weekday - 4));
-  final jan4 = DateTime.utc(thursday.year, 1, 4);
-  final week1Monday = jan4.subtract(Duration(days: jan4.weekday - 1));
-  return ((thursday.difference(week1Monday).inDays) ~/ 7) + 1;
-}
-
-const _kMeses = <String>[
-  '',
-  'Enero',
-  'Febrero',
-  'Marzo',
-  'Abril',
-  'Mayo',
-  'Junio',
-  'Julio',
-  'Agosto',
-  'Septiembre',
-  'Octubre',
-  'Noviembre',
-  'Diciembre',
-];
 
 // ── Result types ──────────────────────────────────────────────────────────────
 
-/// One charge the athlete currently owes their trainer.
+/// One charge the athlete currently owes their trainer — always backed by a
+/// real pending `Payment` doc (never a computed/virtual amount).
+///
+/// Slice 1 (2026-07) — payments decoupled from training and made 100%
+/// manual: this used to also synthesize a virtual charge for
+/// `mensual`/`semanal` cadences (missing-period check) and for `porSesion`
+/// (counting the athlete's finished `Session`s). Both were removed —
+/// [BillingCadence] is now informative-only metadata the trainer sets (the
+/// reference rate), and no longer drives any calculation here.
 class MiCuotaItem {
   const MiCuotaItem({
     required this.amountArs,
@@ -48,6 +26,9 @@ class MiCuotaItem {
   });
 
   final int amountArs;
+
+  /// Always [BillingCadence.suelto] — the only cadence this provider still
+  /// produces, since every item now maps 1:1 to a real pending `Payment` doc.
   final BillingCadence cadence;
   final String concept;
 }
@@ -58,7 +39,7 @@ class MiCuotaItem {
 class MiCuotaState {
   const MiCuotaState({required this.items});
 
-  /// Empty when the athlete is up to date or has no billing configured.
+  /// Empty when the athlete has no pending real `Payment` docs.
   final List<MiCuotaItem> items;
 
   int get totalArs => items.fold(0, (sum, i) => sum + i.amountArs);
@@ -67,8 +48,15 @@ class MiCuotaState {
 
 // ── Provider ──────────────────────────────────────────────────────────────────
 
-/// Athlete vantage of [pagosPorCobrarProvider]: derives what the viewer owes
-/// their active trainer based on the billing cadence the trainer configured.
+/// Athlete vantage of [pagosPorCobrarProvider]: surfaces the athlete's real
+/// pending `Payment` docs — no computed or virtual charges.
+///
+/// Slice 1 (2026-07): previously derived a recurring charge from the active
+/// trainer's [AthleteBilling] cadence (mensual/semanal missing-period check,
+/// porSesion finished-session count). That auto-generation coupled billing to
+/// training. It is gone — the trainer now creates/marks every charge by hand,
+/// and this provider just reads the resulting ledger: any `Payment` with
+/// `status == pending` addressed to this athlete IS what's owed, full stop.
 ///
 /// Returns `data(null)` when there is no active link (nothing to show).
 final miCuotaProvider = Provider.autoDispose<AsyncValue<MiCuotaState?>>((ref) {
@@ -87,9 +75,6 @@ final miCuotaProvider = Provider.autoDispose<AsyncValue<MiCuotaState?>>((ref) {
     return const AsyncValue.data(null);
   }
 
-  final trainerId = link.trainerId;
-  final athleteId = link.athleteId;
-
   // ── 2. Payments addressed to this athlete ──────────────────────────────────
   final paymentsAsync = ref.watch(athletePaymentsProvider);
   if (paymentsAsync.isLoading && !paymentsAsync.hasValue) {
@@ -98,128 +83,24 @@ final miCuotaProvider = Provider.autoDispose<AsyncValue<MiCuotaState?>>((ref) {
   if (paymentsAsync.hasError && !paymentsAsync.hasValue) {
     return AsyncValue.error(paymentsAsync.error!, paymentsAsync.stackTrace!);
   }
-  // Scope to the ACTIVE trainer. athletePaymentsProvider streams every payment
-  // addressed to this athlete across ALL trainers (a terminated link's
-  // included), so without this filter a previous trainer's pending charge would
-  // surface under "Tu cuota" attributed to the current one. This also keeps the
-  // mensual/semanal paid-checks and the porSesion paidAt floor below from
-  // honouring a prior trainer's payments.
+  // Scope to the ACTIVE trainer (fix #333). athletePaymentsProvider streams
+  // every payment addressed to this athlete across ALL trainers (a terminated
+  // link's included), so without this filter a previous trainer's pending
+  // charge would surface under "Tu cuota" attributed to the current one.
   final payments = (paymentsAsync.valueOrNull ?? const <Payment>[])
-      .where((p) => p.trainerId == trainerId)
+      .where((p) => p.trainerId == link.trainerId)
       .toList();
 
-  // ── 3. Now (ART — period keys + concept strings are calendar concepts) ─────
-  final now = argentinaNow();
-  final monthKey = '${now.year}-${now.month.toString().padLeft(2, '0')}';
-  final weekKey = isoWeekPeriodKey(now);
-
-  final items = <MiCuotaItem>[];
-
-  // ── 4. One-off pending charges (any cadence, even no config) ────────────────
-  final pendingOneOff =
-      payments.where((p) => p.status == PaymentStatus.pending).toList();
-  for (final p in pendingOneOff) {
-    items.add(MiCuotaItem(
-      amountArs: p.amountArs,
-      cadence: BillingCadence.suelto,
-      concept: p.concept,
-    ));
-  }
-
-  // ── 5. Recurring cadence charge ─────────────────────────────────────────────
-  final billingAsync = ref.watch(
-    athleteBillingPairProvider((trainerId: trainerId, athleteId: athleteId)),
-  );
-  if (billingAsync.isLoading && !billingAsync.hasValue) {
-    // Still surface the one-off charges if we already have them.
-    if (items.isNotEmpty) return AsyncValue.data(MiCuotaState(items: items));
-    return const AsyncValue.loading();
-  }
-  if (billingAsync.hasError && !billingAsync.hasValue) {
-    // Still surface the one-off charges if we already have them.
-    if (items.isNotEmpty) return AsyncValue.data(MiCuotaState(items: items));
-    return AsyncValue.error(billingAsync.error!, billingAsync.stackTrace!);
-  }
-
-  final billing = billingAsync.valueOrNull;
-  if (billing != null) {
-    switch (billing.cadence) {
-      case BillingCadence.mensual:
-        final paid = payments.any(
-          (p) => p.status == PaymentStatus.paid && p.periodKey == monthKey,
-        );
-        if (!paid) {
-          items.add(MiCuotaItem(
-            amountArs: billing.amountArs,
-            cadence: BillingCadence.mensual,
-            concept: 'Mensual ${_kMeses[now.month]} ${now.year}',
-          ));
-        }
-
-      case BillingCadence.semanal:
-        final paid = payments.any(
-          (p) => p.status == PaymentStatus.paid && p.periodKey == weekKey,
-        );
-        if (!paid) {
-          items.add(MiCuotaItem(
-            amountArs: billing.amountArs,
-            cadence: BillingCadence.semanal,
-            concept: 'Semana ${_isoWeekNumber(now).toString().padLeft(2, '0')}',
-          ));
-        }
-
-      case BillingCadence.porSesion:
-        // Athlete always sees their own sessions — no share gate here.
-        final sessionsAsync = ref.watch(sessionsByUidProvider(athleteId));
-        if (sessionsAsync.isLoading && !sessionsAsync.hasValue) {
-          if (items.isNotEmpty) {
-            return AsyncValue.data(MiCuotaState(items: items));
-          }
-          return const AsyncValue.loading();
-        }
-        if (sessionsAsync.hasError && !sessionsAsync.hasValue) {
-          if (items.isNotEmpty) {
-            return AsyncValue.data(MiCuotaState(items: items));
-          }
-          return AsyncValue.error(
-            sessionsAsync.error!,
-            sessionsAsync.stackTrace!,
-          );
-        }
-        final sessions = sessionsAsync.valueOrNull ?? const [];
-
-        // Billing window floor: start no earlier than when the relationship
-        // began (link.acceptedAt) so sessions finished before linking to this
-        // trainer are not charged. Falls back to epoch only when missing.
-        final epoch = DateTime.utc(1970);
-        var lastPaidAt = link.acceptedAt?.toUtc() ?? epoch;
-        for (final p in payments) {
-          if (p.status == PaymentStatus.paid && p.paidAt != null) {
-            if (p.paidAt!.isAfter(lastPaidAt)) lastPaidAt = p.paidAt!;
-          }
-        }
-
-        var count = 0;
-        for (final s in sessions) {
-          if (s.status != SessionStatus.finished) continue;
-          final finished = s.finishedAt;
-          if (finished == null) continue;
-          if (finished.toUtc().isAfter(lastPaidAt)) count++;
-        }
-
-        if (count > 0) {
-          items.add(MiCuotaItem(
-            amountArs: count * billing.amountArs,
-            cadence: BillingCadence.porSesion,
-            concept: '$count ${count == 1 ? 'sesión' : 'sesiones'}',
-          ));
-        }
-
-      case BillingCadence.suelto:
-        // No recurring charge — one-offs handled above.
-        break;
-    }
-  }
+  // ── 3. Real pending charges only (any cadence, even no config) ─────────────
+  final items = <MiCuotaItem>[
+    for (final p in payments)
+      if (p.status == PaymentStatus.pending)
+        MiCuotaItem(
+          amountArs: p.amountArs,
+          cadence: BillingCadence.suelto,
+          concept: p.concept,
+        ),
+  ];
 
   return AsyncValue.data(MiCuotaState(items: items));
 });

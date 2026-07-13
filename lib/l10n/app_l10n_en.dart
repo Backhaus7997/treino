@@ -816,6 +816,15 @@ class AppL10nEn extends AppL10n {
   String get dashboardConceptoHint => 'Ej: Clase de verano';
 
   @override
+  String get dashboardVenceElLabel => 'VENCE EL (OPCIONAL)';
+
+  @override
+  String get dashboardVenceElHint => 'Sin fecha de vencimiento';
+
+  @override
+  String get dashboardVenceElQuitar => 'Quitar fecha de vencimiento';
+
+  @override
   String get dashboardSeleccionaAlumnoHint => 'Seleccioná un alumno';
 
   @override

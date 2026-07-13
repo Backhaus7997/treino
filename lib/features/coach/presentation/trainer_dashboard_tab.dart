@@ -1284,6 +1284,12 @@ class _AddSueltoSheetState extends ConsumerState<_AddSueltoSheet> {
   String? _selectedAthleteId;
   final _amountController = TextEditingController();
   final _conceptController = TextEditingController();
+
+  /// ART calendar day the charge is due (optional). Only y/m/d are meaningful;
+  /// [_submit] expands it to 23:59:59 ART so "vence el 15" is not overdue at
+  /// 00:01 of the 15th. `null` → no dueAt (valid: the charge never shows in
+  /// Vencidos via dueAt and the overdue-reminder CF skips it).
+  DateTime? _dueDate;
   bool _saving = false;
 
   @override
@@ -1428,6 +1434,65 @@ class _AddSueltoSheetState extends ConsumerState<_AddSueltoSheet> {
               ),
             ),
           ),
+          const SizedBox(height: 14),
+          Text(
+            l10n.dashboardVenceElLabel,
+            style: GoogleFonts.barlowCondensed(
+              fontWeight: FontWeight.w700,
+              fontSize: 11,
+              letterSpacing: 1.2,
+              color: palette.textMuted,
+            ),
+          ),
+          const SizedBox(height: 8),
+          InkWell(
+            onTap: _pickDueDate,
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+              decoration: BoxDecoration(
+                color: palette.bg,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: palette.border),
+              ),
+              child: Row(
+                children: [
+                  Icon(TreinoIcon.calendar, size: 16, color: palette.textMuted),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      _dueDate == null
+                          ? l10n.dashboardVenceElHint
+                          : _formatDueDate(_dueDate!),
+                      style: GoogleFonts.barlow(
+                        fontSize: 14,
+                        color: _dueDate == null
+                            ? palette.textMuted
+                            : palette.textPrimary,
+                      ),
+                    ),
+                  ),
+                  if (_dueDate != null)
+                    Semantics(
+                      button: true,
+                      label: l10n.dashboardVenceElQuitar,
+                      child: GestureDetector(
+                        onTap: () => setState(() => _dueDate = null),
+                        behavior: HitTestBehavior.opaque,
+                        child: Padding(
+                          padding: const EdgeInsets.all(2),
+                          child: Icon(
+                            TreinoIcon.close,
+                            size: 16,
+                            color: palette.textMuted,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
           const SizedBox(height: 20),
           SizedBox(
             width: double.infinity,
@@ -1466,6 +1531,28 @@ class _AddSueltoSheetState extends ConsumerState<_AddSueltoSheet> {
     );
   }
 
+  /// dd/MM/yyyy — same idiom as payment_format.dart's fmtFecha.
+  static String _formatDueDate(DateTime d) =>
+      '${d.day.toString().padLeft(2, '0')}/'
+      '${d.month.toString().padLeft(2, '0')}/${d.year}';
+
+  Future<void> _pickDueDate() async {
+    // "Today" as an ART calendar day: between 21:00–23:59 ART the UTC day is
+    // already tomorrow, so a UTC-derived floor would block picking today.
+    final todayArt = argentinaNow();
+    final floor = DateTime(todayArt.year, todayArt.month, todayArt.day);
+    final initial = _dueDate ?? floor;
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial.isBefore(floor) ? floor : initial,
+      firstDate: floor,
+      lastDate: floor.add(const Duration(days: 365)),
+    );
+    if (picked != null && mounted) {
+      setState(() => _dueDate = picked);
+    }
+  }
+
   Future<void> _submit() async {
     final l10n = AppL10n.of(context);
     final athleteId = _selectedAthleteId;
@@ -1491,6 +1578,16 @@ class _AddSueltoSheetState extends ConsumerState<_AddSueltoSheet> {
 
     try {
       final now = DateTime.now().toUtc();
+      // dueAt = end of the chosen ART calendar day, as a UTC instant — the
+      // same normalization the old generateDuePayments CF used
+      // (23:59:59 ART == +3h in UTC). Keeps "vence el 15" from reading as
+      // overdue at 00:01 ART of the 15th in the Vencidos bucket and in the
+      // notifyOverduePayments reminder CF.
+      final dueDate = _dueDate;
+      final dueAt = dueDate == null
+          ? null
+          : DateTime.utc(dueDate.year, dueDate.month, dueDate.day, 23, 59, 59)
+              .add(argentinaUtcOffset);
       await ref.read(paymentRepositoryProvider).add(Payment(
             id: '',
             trainerId: widget.trainerId,
@@ -1499,6 +1596,7 @@ class _AddSueltoSheetState extends ConsumerState<_AddSueltoSheet> {
             concept: concept,
             status: PaymentStatus.pending,
             createdAt: now,
+            dueAt: dueAt,
           ));
 
       if (mounted) {
@@ -1516,6 +1614,19 @@ class _AddSueltoSheetState extends ConsumerState<_AddSueltoSheet> {
       }
     }
   }
+}
+
+/// Test-only harness that renders `_AddSueltoSheet` directly, bypassing the
+/// dashboard + bottom-sheet plumbing. Exported for widget tests only.
+///
+/// @visibleForTesting
+class AddSueltoSheetTestHarness extends StatelessWidget {
+  const AddSueltoSheetTestHarness({super.key, required this.trainerId});
+
+  final String trainerId;
+
+  @override
+  Widget build(BuildContext context) => _AddSueltoSheet(trainerId: trainerId);
 }
 
 /// Dropdown widget to pick an active athlete by name.

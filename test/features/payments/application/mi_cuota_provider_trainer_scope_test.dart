@@ -7,8 +7,6 @@ import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/payments/application/billing_providers.dart'
     show athleteBillingPairProvider;
 import 'package:treino/features/payments/application/mi_cuota_provider.dart';
-import 'package:treino/features/payments/application/pagos_por_cobrar_provider.dart'
-    show argentinaNow;
 import 'package:treino/features/payments/application/payment_providers.dart'
     show athletePaymentsProvider;
 import 'package:treino/features/payments/domain/athlete_billing.dart';
@@ -103,52 +101,6 @@ void main() {
         expect(state!.items, hasLength(1));
         expect(state.items.single.concept, equals('Clase suelta'));
         expect(state.totalArs, equals(8000));
-      },
-    );
-
-    test(
-      "a previous trainer's paid month does not settle the active mensual cuota",
-      () async {
-        // Match the month key the provider derives from argentinaNow().
-        final now = argentinaNow();
-        final monthKey = '${now.year}-${now.month.toString().padLeft(2, '0')}';
-
-        final container = _container(
-          billing: AthleteBilling(
-            trainerId: _currentTrainerId,
-            athleteId: _athleteId,
-            amountArs: 12000,
-            cadence: BillingCadence.mensual,
-            updatedAt: DateTime.utc(2026, 6, 1),
-          ),
-          payments: [
-            // Old trainer paid THIS month — must not satisfy the new trainer's
-            // mensual charge.
-            Payment(
-              id: 'p-old-paid',
-              trainerId: _oldTrainerId,
-              athleteId: _athleteId,
-              amountArs: 5000,
-              concept: 'Mensual (anterior)',
-              status: PaymentStatus.paid,
-              periodKey: monthKey,
-              createdAt: DateTime.utc(2026, 6, 1),
-              paidAt: DateTime.utc(2026, 6, 2),
-            ),
-          ],
-        );
-        addTearDown(container.dispose);
-
-        final state = await _readSettled(container);
-
-        expect(state, isNotNull);
-        final mensual = state!.items
-            .where((i) => i.cadence == BillingCadence.mensual)
-            .toList();
-        // The active trainer's mensual charge stands: the old trainer's paid
-        // payment was filtered out before the paid-check.
-        expect(mensual, hasLength(1));
-        expect(mensual.single.amountArs, equals(12000));
       },
     );
   });

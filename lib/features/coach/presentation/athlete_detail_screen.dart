@@ -1166,6 +1166,15 @@ class _CobroConfigSheetState extends ConsumerState<_CobroConfigSheet> {
               letterSpacing: 1.2,
             ),
           ),
+          const SizedBox(height: 8),
+          Text(
+            'Es tu tarifa de referencia para este alumno. No genera cobros '
+            'automáticos: cada cobro lo registrás vos a mano desde Pagos.',
+            style: GoogleFonts.barlow(
+              fontSize: 12,
+              color: palette.textMuted,
+            ),
+          ),
           const SizedBox(height: 18),
 
           // ── Precio ──────────────────────────────────────────────────
