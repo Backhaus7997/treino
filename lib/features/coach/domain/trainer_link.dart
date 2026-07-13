@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 import '../../profile/data/timestamp_converter.dart';
+import 'trainer_link_entitlement.dart';
 import 'trainer_link_status.dart';
 
 part 'trainer_link.freezed.dart';
@@ -29,6 +30,16 @@ class TrainerLink with _$TrainerLink {
     // consume this flag to gate PF reads on `sessions/{athleteId}/*`.
     // REQ-COACH-LINK-001 + REQ-COACH-LINK-002.
     @Default(false) bool sharedWithTrainer,
+
+    // ── Paywall entitlement overlay (Fase 7 PR1, ADR-1) ──────────────────
+    // Ortogonal a `status` — ver trainer_link_entitlement.dart. Default
+    // `entitled` cuando el campo está ausente (sin backfill, docs viejos
+    // decodifican como entitled). CF-write-only (firestore.rules pin);
+    // solo el downgrade CF y acceptTrainerLink/reactivation CF lo escriben.
+    @Default(TrainerLinkEntitlement.entitled)
+    TrainerLinkEntitlement entitlement,
+    @TimestampConverter() DateTime? blockedAt,
+    String? blockedReason,
   }) = _TrainerLink;
 
   factory TrainerLink.fromJson(Map<String, Object?> json) =>

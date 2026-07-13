@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 import '../../coach/domain/trainer_location.dart';
+import '../../coach/domain/trainer_subscription.dart';
 import '../data/timestamp_converter.dart';
 import 'experience_level.dart';
 import 'gender.dart';
@@ -87,6 +88,15 @@ class UserProfile with _$UserProfile {
     // multi without selection shows the empty CTA). Setting/unsetting is
     // toggled from the overflow menu of each card in MisRutinasSection.
     String? activeRoutineId,
+
+    // ── Paywall subscription (Fase 7 PR1) ──────────────────────────────
+    // Suscripción del PF a TREINO. `null`/ausente ⇒ Free (sin backfill,
+    // ver trainer_subscription.dart). CF-write-only (firestore.rules pin);
+    // el cliente nunca escribe `subscription` ni `weightedLoad`.
+    // `weightedLoad` es la carga ponderada denormalizada (activos=1.0,
+    // pausados=0.5) que el CF mantiene para que UI/rules lean sin agregar.
+    TrainerSubscription? subscription,
+    double? weightedLoad,
   }) = _UserProfile;
 
   factory UserProfile.fromJson(Map<String, Object?> json) =>

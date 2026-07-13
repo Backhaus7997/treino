@@ -87,7 +87,15 @@ mixin _$UserProfile {
 // plan. Null when no active routine is set (single routine auto-activates,
 // multi without selection shows the empty CTA). Setting/unsetting is
 // toggled from the overflow menu of each card in MisRutinasSection.
-  String? get activeRoutineId => throw _privateConstructorUsedError;
+  String? get activeRoutineId =>
+      throw _privateConstructorUsedError; // ── Paywall subscription (Fase 7 PR1) ──────────────────────────────
+// Suscripción del PF a TREINO. `null`/ausente ⇒ Free (sin backfill,
+// ver trainer_subscription.dart). CF-write-only (firestore.rules pin);
+// el cliente nunca escribe `subscription` ni `weightedLoad`.
+// `weightedLoad` es la carga ponderada denormalizada (activos=1.0,
+// pausados=0.5) que el CF mantiene para que UI/rules lean sin agregar.
+  TrainerSubscription? get subscription => throw _privateConstructorUsedError;
+  double? get weightedLoad => throw _privateConstructorUsedError;
 
   /// Serializes this UserProfile to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -132,7 +140,11 @@ abstract class $UserProfileCopyWith<$Res> {
       List<TrainerLocation> trainerLocations,
       List<String> trainerGeohashes,
       bool trainerOffersOnline,
-      String? activeRoutineId});
+      String? activeRoutineId,
+      TrainerSubscription? subscription,
+      double? weightedLoad});
+
+  $TrainerSubscriptionCopyWith<$Res>? get subscription;
 }
 
 /// @nodoc
@@ -177,6 +189,8 @@ class _$UserProfileCopyWithImpl<$Res, $Val extends UserProfile>
     Object? trainerGeohashes = null,
     Object? trainerOffersOnline = null,
     Object? activeRoutineId = freezed,
+    Object? subscription = freezed,
+    Object? weightedLoad = freezed,
   }) {
     return _then(_value.copyWith(
       uid: null == uid
@@ -287,7 +301,29 @@ class _$UserProfileCopyWithImpl<$Res, $Val extends UserProfile>
           ? _value.activeRoutineId
           : activeRoutineId // ignore: cast_nullable_to_non_nullable
               as String?,
+      subscription: freezed == subscription
+          ? _value.subscription
+          : subscription // ignore: cast_nullable_to_non_nullable
+              as TrainerSubscription?,
+      weightedLoad: freezed == weightedLoad
+          ? _value.weightedLoad
+          : weightedLoad // ignore: cast_nullable_to_non_nullable
+              as double?,
     ) as $Val);
+  }
+
+  /// Create a copy of UserProfile
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @pragma('vm:prefer-inline')
+  $TrainerSubscriptionCopyWith<$Res>? get subscription {
+    if (_value.subscription == null) {
+      return null;
+    }
+
+    return $TrainerSubscriptionCopyWith<$Res>(_value.subscription!, (value) {
+      return _then(_value.copyWith(subscription: value) as $Val);
+    });
   }
 }
 
@@ -326,7 +362,12 @@ abstract class _$$UserProfileImplCopyWith<$Res>
       List<TrainerLocation> trainerLocations,
       List<String> trainerGeohashes,
       bool trainerOffersOnline,
-      String? activeRoutineId});
+      String? activeRoutineId,
+      TrainerSubscription? subscription,
+      double? weightedLoad});
+
+  @override
+  $TrainerSubscriptionCopyWith<$Res>? get subscription;
 }
 
 /// @nodoc
@@ -369,6 +410,8 @@ class __$$UserProfileImplCopyWithImpl<$Res>
     Object? trainerGeohashes = null,
     Object? trainerOffersOnline = null,
     Object? activeRoutineId = freezed,
+    Object? subscription = freezed,
+    Object? weightedLoad = freezed,
   }) {
     return _then(_$UserProfileImpl(
       uid: null == uid
@@ -479,6 +522,14 @@ class __$$UserProfileImplCopyWithImpl<$Res>
           ? _value.activeRoutineId
           : activeRoutineId // ignore: cast_nullable_to_non_nullable
               as String?,
+      subscription: freezed == subscription
+          ? _value.subscription
+          : subscription // ignore: cast_nullable_to_non_nullable
+              as TrainerSubscription?,
+      weightedLoad: freezed == weightedLoad
+          ? _value.weightedLoad
+          : weightedLoad // ignore: cast_nullable_to_non_nullable
+              as double?,
     ));
   }
 }
@@ -513,7 +564,9 @@ class _$UserProfileImpl implements _UserProfile {
       final List<TrainerLocation> trainerLocations = const <TrainerLocation>[],
       final List<String> trainerGeohashes = const <String>[],
       this.trainerOffersOnline = false,
-      this.activeRoutineId})
+      this.activeRoutineId,
+      this.subscription,
+      this.weightedLoad})
       : _trainerLocations = trainerLocations,
         _trainerGeohashes = trainerGeohashes;
 
@@ -632,10 +685,20 @@ class _$UserProfileImpl implements _UserProfile {
 // toggled from the overflow menu of each card in MisRutinasSection.
   @override
   final String? activeRoutineId;
+// ── Paywall subscription (Fase 7 PR1) ──────────────────────────────
+// Suscripción del PF a TREINO. `null`/ausente ⇒ Free (sin backfill,
+// ver trainer_subscription.dart). CF-write-only (firestore.rules pin);
+// el cliente nunca escribe `subscription` ni `weightedLoad`.
+// `weightedLoad` es la carga ponderada denormalizada (activos=1.0,
+// pausados=0.5) que el CF mantiene para que UI/rules lean sin agregar.
+  @override
+  final TrainerSubscription? subscription;
+  @override
+  final double? weightedLoad;
 
   @override
   String toString() {
-    return 'UserProfile(uid: $uid, email: $email, displayName: $displayName, role: $role, createdAt: $createdAt, updatedAt: $updatedAt, gymId: $gymId, bodyWeightKg: $bodyWeightKg, heightCm: $heightCm, gender: $gender, experienceLevel: $experienceLevel, avatarUrl: $avatarUrl, firstName: $firstName, lastName: $lastName, phone: $phone, bornAt: $bornAt, trainerBio: $trainerBio, trainerSpecialty: $trainerSpecialty, trainerMonthlyRate: $trainerMonthlyRate, paymentAlias: $paymentAlias, trainerLatitude: $trainerLatitude, trainerLongitude: $trainerLongitude, trainerGeohash: $trainerGeohash, trainerLocations: $trainerLocations, trainerGeohashes: $trainerGeohashes, trainerOffersOnline: $trainerOffersOnline, activeRoutineId: $activeRoutineId)';
+    return 'UserProfile(uid: $uid, email: $email, displayName: $displayName, role: $role, createdAt: $createdAt, updatedAt: $updatedAt, gymId: $gymId, bodyWeightKg: $bodyWeightKg, heightCm: $heightCm, gender: $gender, experienceLevel: $experienceLevel, avatarUrl: $avatarUrl, firstName: $firstName, lastName: $lastName, phone: $phone, bornAt: $bornAt, trainerBio: $trainerBio, trainerSpecialty: $trainerSpecialty, trainerMonthlyRate: $trainerMonthlyRate, paymentAlias: $paymentAlias, trainerLatitude: $trainerLatitude, trainerLongitude: $trainerLongitude, trainerGeohash: $trainerGeohash, trainerLocations: $trainerLocations, trainerGeohashes: $trainerGeohashes, trainerOffersOnline: $trainerOffersOnline, activeRoutineId: $activeRoutineId, subscription: $subscription, weightedLoad: $weightedLoad)';
   }
 
   @override
@@ -689,7 +752,11 @@ class _$UserProfileImpl implements _UserProfile {
             (identical(other.trainerOffersOnline, trainerOffersOnline) ||
                 other.trainerOffersOnline == trainerOffersOnline) &&
             (identical(other.activeRoutineId, activeRoutineId) ||
-                other.activeRoutineId == activeRoutineId));
+                other.activeRoutineId == activeRoutineId) &&
+            (identical(other.subscription, subscription) ||
+                other.subscription == subscription) &&
+            (identical(other.weightedLoad, weightedLoad) ||
+                other.weightedLoad == weightedLoad));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -722,7 +789,9 @@ class _$UserProfileImpl implements _UserProfile {
         const DeepCollectionEquality().hash(_trainerLocations),
         const DeepCollectionEquality().hash(_trainerGeohashes),
         trainerOffersOnline,
-        activeRoutineId
+        activeRoutineId,
+        subscription,
+        weightedLoad
       ]);
 
   /// Create a copy of UserProfile
@@ -769,7 +838,9 @@ abstract class _UserProfile implements UserProfile {
       final List<TrainerLocation> trainerLocations,
       final List<String> trainerGeohashes,
       final bool trainerOffersOnline,
-      final String? activeRoutineId}) = _$UserProfileImpl;
+      final String? activeRoutineId,
+      final TrainerSubscription? subscription,
+      final double? weightedLoad}) = _$UserProfileImpl;
 
   factory _UserProfile.fromJson(Map<String, dynamic> json) =
       _$UserProfileImpl.fromJson;
@@ -864,7 +935,17 @@ abstract class _UserProfile implements UserProfile {
 // multi without selection shows the empty CTA). Setting/unsetting is
 // toggled from the overflow menu of each card in MisRutinasSection.
   @override
-  String? get activeRoutineId;
+  String?
+      get activeRoutineId; // ── Paywall subscription (Fase 7 PR1) ──────────────────────────────
+// Suscripción del PF a TREINO. `null`/ausente ⇒ Free (sin backfill,
+// ver trainer_subscription.dart). CF-write-only (firestore.rules pin);
+// el cliente nunca escribe `subscription` ni `weightedLoad`.
+// `weightedLoad` es la carga ponderada denormalizada (activos=1.0,
+// pausados=0.5) que el CF mantiene para que UI/rules lean sin agregar.
+  @override
+  TrainerSubscription? get subscription;
+  @override
+  double? get weightedLoad;
 
   /// Create a copy of UserProfile
   /// with the given fields replaced by the non-null parameter values.

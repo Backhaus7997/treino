@@ -38,7 +38,16 @@ mixin _$TrainerLink {
 // so legacy docs without the key decode safely; Etapa 6 will
 // consume this flag to gate PF reads on `sessions/{athleteId}/*`.
 // REQ-COACH-LINK-001 + REQ-COACH-LINK-002.
-  bool get sharedWithTrainer => throw _privateConstructorUsedError;
+  bool get sharedWithTrainer =>
+      throw _privateConstructorUsedError; // ── Paywall entitlement overlay (Fase 7 PR1, ADR-1) ──────────────────
+// Ortogonal a `status` — ver trainer_link_entitlement.dart. Default
+// `entitled` cuando el campo está ausente (sin backfill, docs viejos
+// decodifican como entitled). CF-write-only (firestore.rules pin);
+// solo el downgrade CF y acceptTrainerLink/reactivation CF lo escriben.
+  TrainerLinkEntitlement get entitlement => throw _privateConstructorUsedError;
+  @TimestampConverter()
+  DateTime? get blockedAt => throw _privateConstructorUsedError;
+  String? get blockedReason => throw _privateConstructorUsedError;
 
   /// Serializes this TrainerLink to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -66,7 +75,10 @@ abstract class $TrainerLinkCopyWith<$Res> {
       @TimestampConverter() DateTime? terminatedAt,
       String? terminationReason,
       @TimestampConverter() DateTime? pausedAt,
-      bool sharedWithTrainer});
+      bool sharedWithTrainer,
+      TrainerLinkEntitlement entitlement,
+      @TimestampConverter() DateTime? blockedAt,
+      String? blockedReason});
 }
 
 /// @nodoc
@@ -94,6 +106,9 @@ class _$TrainerLinkCopyWithImpl<$Res, $Val extends TrainerLink>
     Object? terminationReason = freezed,
     Object? pausedAt = freezed,
     Object? sharedWithTrainer = null,
+    Object? entitlement = null,
+    Object? blockedAt = freezed,
+    Object? blockedReason = freezed,
   }) {
     return _then(_value.copyWith(
       id: null == id
@@ -136,6 +151,18 @@ class _$TrainerLinkCopyWithImpl<$Res, $Val extends TrainerLink>
           ? _value.sharedWithTrainer
           : sharedWithTrainer // ignore: cast_nullable_to_non_nullable
               as bool,
+      entitlement: null == entitlement
+          ? _value.entitlement
+          : entitlement // ignore: cast_nullable_to_non_nullable
+              as TrainerLinkEntitlement,
+      blockedAt: freezed == blockedAt
+          ? _value.blockedAt
+          : blockedAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+      blockedReason: freezed == blockedReason
+          ? _value.blockedReason
+          : blockedReason // ignore: cast_nullable_to_non_nullable
+              as String?,
     ) as $Val);
   }
 }
@@ -158,7 +185,10 @@ abstract class _$$TrainerLinkImplCopyWith<$Res>
       @TimestampConverter() DateTime? terminatedAt,
       String? terminationReason,
       @TimestampConverter() DateTime? pausedAt,
-      bool sharedWithTrainer});
+      bool sharedWithTrainer,
+      TrainerLinkEntitlement entitlement,
+      @TimestampConverter() DateTime? blockedAt,
+      String? blockedReason});
 }
 
 /// @nodoc
@@ -184,6 +214,9 @@ class __$$TrainerLinkImplCopyWithImpl<$Res>
     Object? terminationReason = freezed,
     Object? pausedAt = freezed,
     Object? sharedWithTrainer = null,
+    Object? entitlement = null,
+    Object? blockedAt = freezed,
+    Object? blockedReason = freezed,
   }) {
     return _then(_$TrainerLinkImpl(
       id: null == id
@@ -226,6 +259,18 @@ class __$$TrainerLinkImplCopyWithImpl<$Res>
           ? _value.sharedWithTrainer
           : sharedWithTrainer // ignore: cast_nullable_to_non_nullable
               as bool,
+      entitlement: null == entitlement
+          ? _value.entitlement
+          : entitlement // ignore: cast_nullable_to_non_nullable
+              as TrainerLinkEntitlement,
+      blockedAt: freezed == blockedAt
+          ? _value.blockedAt
+          : blockedAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+      blockedReason: freezed == blockedReason
+          ? _value.blockedReason
+          : blockedReason // ignore: cast_nullable_to_non_nullable
+              as String?,
     ));
   }
 }
@@ -243,7 +288,10 @@ class _$TrainerLinkImpl implements _TrainerLink {
       @TimestampConverter() this.terminatedAt,
       this.terminationReason,
       @TimestampConverter() this.pausedAt,
-      this.sharedWithTrainer = false});
+      this.sharedWithTrainer = false,
+      this.entitlement = TrainerLinkEntitlement.entitled,
+      @TimestampConverter() this.blockedAt,
+      this.blockedReason});
 
   factory _$TrainerLinkImpl.fromJson(Map<String, dynamic> json) =>
       _$$TrainerLinkImplFromJson(json);
@@ -278,10 +326,23 @@ class _$TrainerLinkImpl implements _TrainerLink {
   @override
   @JsonKey()
   final bool sharedWithTrainer;
+// ── Paywall entitlement overlay (Fase 7 PR1, ADR-1) ──────────────────
+// Ortogonal a `status` — ver trainer_link_entitlement.dart. Default
+// `entitled` cuando el campo está ausente (sin backfill, docs viejos
+// decodifican como entitled). CF-write-only (firestore.rules pin);
+// solo el downgrade CF y acceptTrainerLink/reactivation CF lo escriben.
+  @override
+  @JsonKey()
+  final TrainerLinkEntitlement entitlement;
+  @override
+  @TimestampConverter()
+  final DateTime? blockedAt;
+  @override
+  final String? blockedReason;
 
   @override
   String toString() {
-    return 'TrainerLink(id: $id, trainerId: $trainerId, athleteId: $athleteId, status: $status, requestedAt: $requestedAt, acceptedAt: $acceptedAt, terminatedAt: $terminatedAt, terminationReason: $terminationReason, pausedAt: $pausedAt, sharedWithTrainer: $sharedWithTrainer)';
+    return 'TrainerLink(id: $id, trainerId: $trainerId, athleteId: $athleteId, status: $status, requestedAt: $requestedAt, acceptedAt: $acceptedAt, terminatedAt: $terminatedAt, terminationReason: $terminationReason, pausedAt: $pausedAt, sharedWithTrainer: $sharedWithTrainer, entitlement: $entitlement, blockedAt: $blockedAt, blockedReason: $blockedReason)';
   }
 
   @override
@@ -306,7 +367,13 @@ class _$TrainerLinkImpl implements _TrainerLink {
             (identical(other.pausedAt, pausedAt) ||
                 other.pausedAt == pausedAt) &&
             (identical(other.sharedWithTrainer, sharedWithTrainer) ||
-                other.sharedWithTrainer == sharedWithTrainer));
+                other.sharedWithTrainer == sharedWithTrainer) &&
+            (identical(other.entitlement, entitlement) ||
+                other.entitlement == entitlement) &&
+            (identical(other.blockedAt, blockedAt) ||
+                other.blockedAt == blockedAt) &&
+            (identical(other.blockedReason, blockedReason) ||
+                other.blockedReason == blockedReason));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -322,7 +389,10 @@ class _$TrainerLinkImpl implements _TrainerLink {
       terminatedAt,
       terminationReason,
       pausedAt,
-      sharedWithTrainer);
+      sharedWithTrainer,
+      entitlement,
+      blockedAt,
+      blockedReason);
 
   /// Create a copy of TrainerLink
   /// with the given fields replaced by the non-null parameter values.
@@ -351,7 +421,10 @@ abstract class _TrainerLink implements TrainerLink {
       @TimestampConverter() final DateTime? terminatedAt,
       final String? terminationReason,
       @TimestampConverter() final DateTime? pausedAt,
-      final bool sharedWithTrainer}) = _$TrainerLinkImpl;
+      final bool sharedWithTrainer,
+      final TrainerLinkEntitlement entitlement,
+      @TimestampConverter() final DateTime? blockedAt,
+      final String? blockedReason}) = _$TrainerLinkImpl;
 
   factory _TrainerLink.fromJson(Map<String, dynamic> json) =
       _$TrainerLinkImpl.fromJson;
@@ -384,7 +457,19 @@ abstract class _TrainerLink implements TrainerLink {
 // consume this flag to gate PF reads on `sessions/{athleteId}/*`.
 // REQ-COACH-LINK-001 + REQ-COACH-LINK-002.
   @override
-  bool get sharedWithTrainer;
+  bool
+      get sharedWithTrainer; // ── Paywall entitlement overlay (Fase 7 PR1, ADR-1) ──────────────────
+// Ortogonal a `status` — ver trainer_link_entitlement.dart. Default
+// `entitled` cuando el campo está ausente (sin backfill, docs viejos
+// decodifican como entitled). CF-write-only (firestore.rules pin);
+// solo el downgrade CF y acceptTrainerLink/reactivation CF lo escriben.
+  @override
+  TrainerLinkEntitlement get entitlement;
+  @override
+  @TimestampConverter()
+  DateTime? get blockedAt;
+  @override
+  String? get blockedReason;
 
   /// Create a copy of TrainerLink
   /// with the given fields replaced by the non-null parameter values.
