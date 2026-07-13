@@ -83,7 +83,13 @@ final miCuotaProvider = Provider.autoDispose<AsyncValue<MiCuotaState?>>((ref) {
   if (paymentsAsync.hasError && !paymentsAsync.hasValue) {
     return AsyncValue.error(paymentsAsync.error!, paymentsAsync.stackTrace!);
   }
-  final payments = paymentsAsync.valueOrNull ?? const <Payment>[];
+  // Scope to the ACTIVE trainer (fix #333). athletePaymentsProvider streams
+  // every payment addressed to this athlete across ALL trainers (a terminated
+  // link's included), so without this filter a previous trainer's pending
+  // charge would surface under "Tu cuota" attributed to the current one.
+  final payments = (paymentsAsync.valueOrNull ?? const <Payment>[])
+      .where((p) => p.trainerId == link.trainerId)
+      .toList();
 
   // ── 3. Real pending charges only (any cadence, even no config) ─────────────
   final items = <MiCuotaItem>[
