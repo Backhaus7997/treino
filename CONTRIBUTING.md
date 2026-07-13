@@ -72,6 +72,30 @@ flutter analyze
 
 ## 3. Correr la app
 
+### Setup por única vez — key de Google Places (gimnasios)
+
+La feature de gimnasios (buscar gym / gyms cercanos) usa Google Places, que
+necesita una API key en tiempo de build. Sin ella, esas búsquedas fallan con
+"No pudimos cargar los gyms cercanos" (el resto de la app anda igual).
+
+```bash
+cp scripts/places.local.example.json scripts/places.local.json
+# editá scripts/places.local.json y pegá tu PLACES_CLIENT_KEY
+```
+
+La key se saca de Google Cloud Console → proyecto `treino-dev` → APIs &
+Services → Credentials. `scripts/places.local.json` está **gitignoreado** — la
+key nunca se commitea. Después corré la app con el wrapper, que inyecta la key
+sola:
+
+```bash
+./scripts/run.sh --release -d <device-id>   # equivale a flutter run --dart-define-from-file=scripts/places.local.json ...
+```
+
+> También podés pasarla suelta: `flutter run --dart-define=PLACES_CLIENT_KEY=<key>`.
+> Y ojo: restringí la key al bundle de iOS en la consola (por defecto queda sin
+> restricción de aplicación).
+
 ### iOS (simulador)
 ```bash
 open -a Simulator              # bootea un simulator si no hay
