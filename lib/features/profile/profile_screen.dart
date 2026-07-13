@@ -3,8 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../app/theme/app_motion.dart';
 import '../../app/theme/app_palette.dart';
 import '../../core/utils/k_formatter.dart';
+import '../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../core/widgets/treino_icon.dart';
 import '../../l10n/app_l10n.dart';
 import '../auth/application/auth_providers.dart';
@@ -62,53 +64,70 @@ class _AthleteProfile extends ConsumerWidget {
           // title block. header:true lets VoiceOver/TalkBack treat it as a
           // navigable heading. (Per-section-title headings are handled by
           // _A11ySectionGroup below.)
-          Semantics(header: true, child: const ProfileHeader()),
+          TreinoFadeSlideIn(
+            child: Semantics(header: true, child: const ProfileHeader()),
+          ),
           // Avatar card BEFORE stats — mockup parity 2026-06-01 polish pass.
           // Visual hierarchy: header → identity (who I am) → stats (what I did).
           // a11y: MergeSemantics fuses the avatar image node (PostAvatar, no
           // label of its own) with the name/handle/gym text into one identity
           // node, so the avatar is announced with the user's name instead of
           // surfacing as an empty image node.
-          const MergeSemantics(child: ProfileAvatarCard()),
-          _OwnProfileStatsRow(palette: palette, theme: theme),
-          const ProfileCuentaSection(),
+          TreinoFadeSlideIn(
+            delay: AppMotion.stagger(1),
+            child: const MergeSemantics(child: ProfileAvatarCard()),
+          ),
+          TreinoFadeSlideIn(
+            delay: AppMotion.stagger(2),
+            child: _OwnProfileStatsRow(palette: palette, theme: theme),
+          ),
+          TreinoFadeSlideIn(
+            delay: AppMotion.stagger(3),
+            child: const ProfileCuentaSection(),
+          ),
           // Sección "ENTRENADOR" condicional — solo visible cuando
           // role == trainer. Tile que abre /profile/edit-trainer para
           // editar perfil público multi-location (Fase 6 Etapa 0 PR#3).
-          const ProfileTrainerSection(),
+          TreinoFadeSlideIn(
+            delay: AppMotion.stagger(4),
+            child: const ProfileTrainerSection(),
+          ),
           // ── Entrenamiento — acceso del alumno a sus ejercicios custom ────
           // Reusa MyExercisesScreen (/profile/my-exercises) que ya existía
           // solo para el entrenador. El backend (users/{uid}/customExercises)
           // es uid-keyed → funciona para el alumno sin cambios.
-          _A11ySectionGroup(
-            title: 'ENTRENAMIENTO',
-            palette: palette,
-            tiles: [
-              // a11y: button:true + label gives the bare-GestureDetector tile a
-              // button role; excludeSemantics drops the child subtree (raw
-              // title Text + unlabeled chevron) so VoiceOver announces one
-              // clean "Mis ejercicios, button" node. No AppL10n key exists for
-              // this label yet (deferred to i18n Fase 6 Etapa 3) — reuse the
-              // visible title so the announcement matches the screen.
-              Semantics(
-                button: true,
-                label: 'Mis ejercicios',
-                excludeSemantics: true,
-                child: ProfileSectionTile(
-                  icon: TreinoIcon.sparkle,
-                  title: 'Mis ejercicios',
-                  inGroup: true,
-                  onTap: () => context.push('/profile/my-exercises'),
+          TreinoFadeSlideIn(
+            delay: AppMotion.stagger(5),
+            child: _A11ySectionGroup(
+              title: 'ENTRENAMIENTO',
+              palette: palette,
+              tiles: [
+                // a11y: button:true + label gives the bare-GestureDetector tile a
+                // button role; excludeSemantics drops the child subtree (raw
+                // title Text + unlabeled chevron) so VoiceOver announces one
+                // clean "Mis ejercicios, button" node. No AppL10n key exists for
+                // this label yet (deferred to i18n Fase 6 Etapa 3) — reuse the
+                // visible title so the announcement matches the screen.
+                Semantics(
+                  button: true,
+                  label: 'Mis ejercicios',
+                  excludeSemantics: true,
+                  child: ProfileSectionTile(
+                    icon: TreinoIcon.sparkle,
+                    title: 'Mis ejercicios',
+                    inGroup: true,
+                    onTap: () => context.push('/profile/my-exercises'),
+                  ),
                 ),
-              ),
-              // Rankings entry point REMOVED (rankings-v2 Phase 3, task 3.2)
-              // — rankings relocated to the second page of the athlete
-              // Entrenar tab (design `sdd/rankings-v2/design` AD-1/AD-3).
-              // ProfileScreen no longer exposes a rankings entry point
-              // (spec `gym-rankings` — ProfileScreen no longer exposes a
-              // rankings entry point / REMOVED — Rankings Reachable via
-              // Profile Tile and /profile/rankings).
-            ],
+                // Rankings entry point REMOVED (rankings-v2 Phase 3, task 3.2)
+                // — rankings relocated to the second page of the athlete
+                // Entrenar tab (design `sdd/rankings-v2/design` AD-1/AD-3).
+                // ProfileScreen no longer exposes a rankings entry point
+                // (spec `gym-rankings` — ProfileScreen no longer exposes a
+                // rankings entry point / REMOVED — Rankings Reachable via
+                // Profile Tile and /profile/rankings).
+              ],
+            ),
           ),
           // ── Privacidad section ───────────────────────────────────────────
           // Contains two toggles:
@@ -116,78 +135,88 @@ class _AthleteProfile extends ConsumerWidget {
           //   2. ProfileShareToggleTile   — athlete consent to share personal
           //      data (phone, height, weight, gender, level) with their trainer
           //      via `profile_shares/{athleteId}` (Slice 2 of athlete-shared-profile)
-          _A11ySectionGroup(
-            title: 'PRIVACIDAD', // i18n: Fase W2
-            palette: palette,
-            tiles: const [
-              ProfilePrivacyToggleTile(),
-              ProfileShareToggleTile(),
-            ],
+          TreinoFadeSlideIn(
+            delay: AppMotion.stagger(6),
+            child: _A11ySectionGroup(
+              title: 'PRIVACIDAD', // i18n: Fase W2
+              palette: palette,
+              tiles: const [
+                ProfilePrivacyToggleTile(),
+                ProfileShareToggleTile(),
+              ],
+            ),
           ),
           const SizedBox(height: 12),
           // ── Apariencia section (REQ-LM-009) ──────────────────────────────
-          _A11ySectionGroup(
-            title: l10n.profileSectionAppearance.toUpperCase(),
-            palette: palette,
-            tiles: [
-              Semantics(
-                button: true,
-                label: l10n.appearanceTitle,
-                excludeSemantics: true,
-                child: ProfileSectionTile(
-                  icon: TreinoIcon.appearance,
-                  title: l10n.appearanceTitle,
-                  inGroup: true,
-                  onTap: () => context.push('/profile/settings/appearance'),
+          TreinoFadeSlideIn(
+            delay: AppMotion.stagger(7),
+            child: _A11ySectionGroup(
+              title: l10n.profileSectionAppearance.toUpperCase(),
+              palette: palette,
+              tiles: [
+                Semantics(
+                  button: true,
+                  label: l10n.appearanceTitle,
+                  excludeSemantics: true,
+                  child: ProfileSectionTile(
+                    icon: TreinoIcon.appearance,
+                    title: l10n.appearanceTitle,
+                    inGroup: true,
+                    onTap: () => context.push('/profile/settings/appearance'),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
           const SizedBox(height: 12),
           // ── Sesión section — PR#4 v2 pivot 2026-05-28 ────────────────────
           // Sign-out + account deletion grouped in one boxed section, mockup
           // parity polish 2026-06-01. Settings as a dedicated surface stays
           // deferred to a future SDD (notifications, theme, language).
-          _A11ySectionGroup(
-            title: 'SESIÓN', // i18n: Fase 6 Etapa 3
-            palette: palette,
-            tiles: [
-              // a11y: button role + label, chevron/raw text excluded.
-              Semantics(
-                button: true,
-                label: l10n.authProfileSignOut, // 'Cerrar sesión'
-                excludeSemantics: true,
-                child: ProfileSectionTile(
-                  icon: TreinoIcon.signOut,
-                  title: 'Cerrar sesión', // i18n: Fase 6 Etapa 3
-                  inGroup: true,
-                  onTap: () =>
-                      ref.read(authNotifierProvider.notifier).signOut(),
-                ),
-              ),
-              Semantics(
-                button: true,
-                label: l10n.eliminarCuentaSheetTitle, // 'Eliminar cuenta'
-                excludeSemantics: true,
-                child: ProfileSectionTile(
-                  icon: TreinoIcon.trash,
-                  title: 'Eliminar cuenta', // i18n: Fase 6 Etapa 3
-                  destructive: true,
-                  inGroup: true,
-                  onTap: () => showModalBottomSheet<void>(
-                    context: context,
-                    useRootNavigator: true,
-                    backgroundColor: palette.bgCard,
-                    shape: const RoundedRectangleBorder(
-                      borderRadius:
-                          BorderRadius.vertical(top: Radius.circular(18)),
-                    ),
-                    isScrollControlled: true,
-                    builder: (_) => const EliminarCuentaSheet(),
+          TreinoFadeSlideIn(
+            delay: AppMotion.stagger(8),
+            child: _A11ySectionGroup(
+              title: 'SESIÓN', // i18n: Fase 6 Etapa 3
+              palette: palette,
+              tiles: [
+                // a11y: button role + label, chevron/raw text excluded.
+                Semantics(
+                  button: true,
+                  label: l10n.authProfileSignOut, // 'Cerrar sesión'
+                  excludeSemantics: true,
+                  child: ProfileSectionTile(
+                    icon: TreinoIcon.signOut,
+                    title: 'Cerrar sesión', // i18n: Fase 6 Etapa 3
+                    inGroup: true,
+                    onTap: () =>
+                        ref.read(authNotifierProvider.notifier).signOut(),
                   ),
                 ),
-              ),
-            ],
+                Semantics(
+                  button: true,
+                  label: l10n.eliminarCuentaSheetTitle, // 'Eliminar cuenta'
+                  excludeSemantics: true,
+                  child: ProfileSectionTile(
+                    icon: TreinoIcon.trash,
+                    title: 'Eliminar cuenta', // i18n: Fase 6 Etapa 3
+                    destructive: true,
+                    inGroup: true,
+                    onTap: () => showModalBottomSheet<void>(
+                      context: context,
+                      useRootNavigator: true,
+                      backgroundColor: palette.bgCard,
+                      shape: const RoundedRectangleBorder(
+                        borderRadius: BorderRadius.vertical(
+                          top: Radius.circular(18),
+                        ),
+                      ),
+                      isScrollControlled: true,
+                      builder: (_) => const EliminarCuentaSheet(),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 20),
         ],
@@ -287,10 +316,7 @@ class _A11ySectionGroup extends StatelessWidget {
 // ── Stats row ─────────────────────────────────────────────────────────────────
 
 class _OwnProfileStatsRow extends ConsumerWidget {
-  const _OwnProfileStatsRow({
-    required this.palette,
-    required this.theme,
-  });
+  const _OwnProfileStatsRow({required this.palette, required this.theme});
 
   final AppPalette palette;
   final ThemeData theme;
@@ -308,9 +334,7 @@ class _OwnProfileStatsRow extends ConsumerWidget {
         decoration: BoxDecoration(
           color: palette.bgCard,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: palette.textMuted.withValues(alpha: 0.12),
-          ),
+          border: Border.all(color: palette.textMuted.withValues(alpha: 0.12)),
         ),
         padding: const EdgeInsets.symmetric(vertical: 14),
         child: IntrinsicHeight(

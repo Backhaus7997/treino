@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/theme/app_palette.dart';
+import '../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../core/widgets/treino_icon.dart';
 import '../../../profile/domain/experience_level.dart';
 import '../../domain/routine.dart';
@@ -34,9 +35,8 @@ class RoutineCard extends StatelessWidget {
         ? palette.highlight
         : palette.accent;
 
-    return GestureDetector(
+    return TreinoTappable(
       onTap: () => context.push('/workout/routine/${routine.id}'),
-      behavior: HitTestBehavior.opaque,
       child: Container(
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
@@ -67,11 +67,7 @@ class RoutineCard extends StatelessWidget {
                   width: 1,
                 ),
               ),
-              child: Icon(
-                TreinoIcon.tabWorkout,
-                color: tint,
-                size: 20,
-              ),
+              child: Icon(TreinoIcon.tabWorkout, color: tint, size: 20),
             ),
             const SizedBox(height: 12),
             Text(

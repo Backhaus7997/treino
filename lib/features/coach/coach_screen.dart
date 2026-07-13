@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/widgets/motion/treino_state_switcher.dart';
 import '../profile/application/user_providers.dart';
 import '../profile/domain/user_role.dart';
 import 'athlete_coach_view.dart';
@@ -21,16 +22,17 @@ class CoachScreen extends ConsumerWidget {
     // null on error (provider collapses error to value(null)), or the role
     // when the doc resolves.
     final UserRole? role = ref.watch(
-      userProfileProvider.select(
-        (async) => async.valueOrNull?.role,
-      ),
+      userProfileProvider.select((async) => async.valueOrNull?.role),
     );
 
-    return switch (role) {
-      UserRole.athlete => const AthleteCoachView(),
-      UserRole.trainer => TrainerCoachView(initialTab: initialTab),
-      null => const _CoachLoadingView(),
-    };
+    return TreinoStateSwitcher(
+      childKey: ValueKey(role?.name ?? 'loading'),
+      child: switch (role) {
+        UserRole.athlete => const AthleteCoachView(),
+        UserRole.trainer => TrainerCoachView(initialTab: initialTab),
+        null => const _CoachLoadingView(),
+      },
+    );
   }
 }
 

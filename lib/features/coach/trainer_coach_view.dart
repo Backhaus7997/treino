@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../app/theme/app_palette.dart';
+import '../../core/widgets/motion/treino_state_switcher.dart';
 import '../../core/widgets/treino_icon.dart';
 import '../chat/application/chat_providers.dart';
 import '../profile/application/user_public_profile_providers.dart';
@@ -71,16 +72,16 @@ class TrainerCoachView extends StatelessWidget {
                 fontWeight: FontWeight.w700,
                 letterSpacing: 0.5,
               ),
-              tabs: [
-                for (final l in _labels) Tab(text: l, height: 40),
-              ],
+              tabs: [for (final l in _labels) Tab(text: l, height: 40)],
               // Close any open popup (e.g. agenda day sheet) when the trainer
               // switches sub-tabs. Pop both navigators because showModalBottomSheet
               // defaults to useRootNavigator: false (local navigator).
               onTap: (_) {
                 Navigator.of(context).popUntil((route) => route is! PopupRoute);
-                Navigator.of(context, rootNavigator: true)
-                    .popUntil((route) => route is! PopupRoute);
+                Navigator.of(
+                  context,
+                  rootNavigator: true,
+                ).popUntil((route) => route is! PopupRoute);
               },
             ),
           ),
@@ -115,55 +116,69 @@ class _AlumnosTab extends ConsumerWidget {
     final palette = AppPalette.of(context);
     final linksAsync = ref.watch(trainerLinksStreamProvider);
 
-    return linksAsync.when(
-      loading: () => Center(
-        child: CircularProgressIndicator(color: palette.accent),
-      ),
-      error: (_, __) => Center(
-        child: Text(
-          'No pudimos cargar tus alumnos.',
-          style: GoogleFonts.barlow(fontSize: 14, color: palette.textMuted),
+    return TreinoStateSwitcher(
+      childKey: ValueKey(
+        linksAsync.when(
+          data: (_) => 'data',
+          loading: () => 'loading',
+          error: (_, __) => 'error',
         ),
       ),
-      data: (links) {
-        final visible = links
-            .where((l) =>
-                l.status == TrainerLinkStatus.active ||
-                l.status == TrainerLinkStatus.paused)
-            .toList();
-        if (visible.isEmpty) {
-          return Center(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(TreinoIcon.users, size: 48, color: palette.textMuted),
-                  const SizedBox(height: 18),
-                  Text(
-                    'Sin alumnos activos todavía.',
-                    style: GoogleFonts.barlow(
-                      fontWeight: FontWeight.w400,
-                      fontSize: 14,
-                      color: palette.textMuted,
+      child: linksAsync.when(
+        loading: () =>
+            Center(child: CircularProgressIndicator(color: palette.accent)),
+        error: (_, __) => Center(
+          child: Text(
+            'No pudimos cargar tus alumnos.',
+            style: GoogleFonts.barlow(fontSize: 14, color: palette.textMuted),
+          ),
+        ),
+        data: (links) {
+          final visible = links
+              .where(
+                (l) =>
+                    l.status == TrainerLinkStatus.active ||
+                    l.status == TrainerLinkStatus.paused,
+              )
+              .toList();
+          if (visible.isEmpty) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(TreinoIcon.users, size: 48, color: palette.textMuted),
+                    const SizedBox(height: 18),
+                    Text(
+                      'Sin alumnos activos todavía.',
+                      style: GoogleFonts.barlow(
+                        fontWeight: FontWeight.w400,
+                        fontSize: 14,
+                        color: palette.textMuted,
+                      ),
+                      textAlign: TextAlign.center,
                     ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
+                  ],
+                ),
               ),
+            );
+          }
+          return ListView.separated(
+            // Bottom inset clears the shell's floating nav bar (extendBody:true).
+            padding: EdgeInsets.fromLTRB(
+              20,
+              12,
+              20,
+              20 + MediaQuery.paddingOf(context).bottom,
             ),
+            physics: const AlwaysScrollableScrollPhysics(),
+            itemCount: visible.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 12),
+            itemBuilder: (_, i) => _ActiveAlumnoCard(link: visible[i]),
           );
-        }
-        return ListView.separated(
-          // Bottom inset clears the shell's floating nav bar (extendBody:true).
-          padding: EdgeInsets.fromLTRB(
-              20, 12, 20, 20 + MediaQuery.paddingOf(context).bottom),
-          physics: const AlwaysScrollableScrollPhysics(),
-          itemCount: visible.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 12),
-          itemBuilder: (_, i) => _ActiveAlumnoCard(link: visible[i]),
-        );
-      },
+        },
+      ),
     );
   }
 }
@@ -259,10 +274,7 @@ class _ActiveAlumnoCard extends ConsumerWidget {
                   ? 'Vínculo pausado · ${_formatAcceptedAt(link)}'
                   : 'Vinculado desde ${_formatAcceptedAt(link)}',
               statusBadge: isPaused
-                  ? _StatusBadge(
-                      label: 'PAUSADO',
-                      color: palette.textMuted,
-                    )
+                  ? _StatusBadge(label: 'PAUSADO', color: palette.textMuted)
                   : null,
               hasUnread: hasUnread,
               unreadDotKey: Key('unread-dot-${link.athleteId}'),
@@ -468,10 +480,7 @@ class _UserHeader extends StatelessWidget {
             ],
           ),
         ),
-        if (statusBadge != null) ...[
-          const SizedBox(width: 8),
-          statusBadge!,
-        ],
+        if (statusBadge != null) ...[const SizedBox(width: 8), statusBadge!],
       ],
     );
   }

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/core/widgets/motion/treino_tappable.dart';
 import 'package:treino/features/profile/domain/experience_level.dart';
 import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/domain/routine_day.dart';
@@ -15,13 +16,7 @@ Routine makeRoutine({
   ExperienceLevel level = ExperienceLevel.beginner,
   List<RoutineDay> days = const [],
 }) =>
-    Routine(
-      id: id,
-      name: name,
-      split: 'Full Body',
-      level: level,
-      days: days,
-    );
+    Routine(id: id, name: name, split: 'Full Body', level: level, days: days);
 
 RoutineSlot _makeSlot(int i) => RoutineSlot(
       exerciseId: 'ex-$i',
@@ -49,6 +44,14 @@ Widget _wrap(Widget w, {List<Override> overrides = const []}) => ProviderScope(
 
 void main() {
   group('RoutineCard', () {
+    testWidgets('uses TreinoTappable for press feedback', (tester) async {
+      final routine = makeRoutine();
+      await tester.pumpWidget(_wrap(RoutineCard(routine: routine)));
+      await tester.pump();
+
+      expect(find.byType(TreinoTappable), findsOneWidget);
+    });
+
     testWidgets('name is rendered UPPERCASE', (tester) async {
       final routine = makeRoutine(name: 'full body');
       await tester.pumpWidget(_wrap(RoutineCard(routine: routine)));
@@ -57,22 +60,21 @@ void main() {
     });
 
     testWidgets(
-        'subtitle shows "{LevelEs} · {N} ej." — 2 days (5+3 slots) → "Principiante · 8 ej."',
-        (tester) async {
-      final routine = makeRoutine(
-        level: ExperienceLevel.beginner,
-        days: [
-          makeDayWithSlots(5),
-          makeDayWithSlots(3),
-        ],
-      );
-      await tester.pumpWidget(_wrap(RoutineCard(routine: routine)));
-      await tester.pump();
-      expect(find.text('Principiante · 8 ej.'), findsOneWidget);
-    });
+      'subtitle shows "{LevelEs} · {N} ej." — 2 days (5+3 slots) → "Principiante · 8 ej."',
+      (tester) async {
+        final routine = makeRoutine(
+          level: ExperienceLevel.beginner,
+          days: [makeDayWithSlots(5), makeDayWithSlots(3)],
+        );
+        await tester.pumpWidget(_wrap(RoutineCard(routine: routine)));
+        await tester.pump();
+        expect(find.text('Principiante · 8 ej.'), findsOneWidget);
+      },
+    );
 
-    testWidgets('subtitle for zero-day routine → "{LevelEs} · 0 ej."',
-        (tester) async {
+    testWidgets('subtitle for zero-day routine → "{LevelEs} · 0 ej."', (
+      tester,
+    ) async {
       final routine = makeRoutine(
         level: ExperienceLevel.intermediate,
         days: const [],
@@ -82,8 +84,9 @@ void main() {
       expect(find.text('Intermedio · 0 ej.'), findsOneWidget);
     });
 
-    testWidgets('Icon widget present; no Image widget (imageUrl null)',
-        (tester) async {
+    testWidgets('Icon widget present; no Image widget (imageUrl null)', (
+      tester,
+    ) async {
       final routine = makeRoutine();
       await tester.pumpWidget(_wrap(RoutineCard(routine: routine)));
       await tester.pump();
@@ -98,16 +101,13 @@ void main() {
           GoRoute(
             path: '/',
             builder: (context, state) => Scaffold(
-              body: RoutineCard(
-                routine: makeRoutine(id: 'my-routine-id'),
-              ),
+              body: RoutineCard(routine: makeRoutine(id: 'my-routine-id')),
             ),
           ),
           GoRoute(
             path: '/workout/routine/:id',
-            builder: (_, state) => Scaffold(
-              body: Text('detail-${state.pathParameters['id']}'),
-            ),
+            builder: (_, state) =>
+                Scaffold(body: Text('detail-${state.pathParameters['id']}')),
           ),
         ],
       );

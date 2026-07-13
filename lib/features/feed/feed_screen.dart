@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../app/theme/app_palette.dart';
+import '../../core/widgets/motion/treino_state_switcher.dart';
 import '../../core/widgets/treino_icon.dart';
 import '../../l10n/app_l10n.dart';
 import '../chat/application/chat_providers.dart';
@@ -88,19 +89,12 @@ class _FeedHeader extends ConsumerWidget {
               onTap: () => context.push('/profile/friend-requests'),
               behavior: HitTestBehavior.opaque,
               child: ConstrainedBox(
-                constraints: const BoxConstraints(
-                  minWidth: 44,
-                  minHeight: 44,
-                ),
+                constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
                 child: Center(
                   child: Stack(
                     clipBehavior: Clip.none,
                     children: [
-                      Icon(
-                        TreinoIcon.bell,
-                        size: 20,
-                        color: palette.textMuted,
-                      ),
+                      Icon(TreinoIcon.bell, size: 20, color: palette.textMuted),
                       if (pendingRequests > 0)
                         Positioned(
                           top: -4,
@@ -143,19 +137,12 @@ class _FeedHeader extends ConsumerWidget {
               onTap: () => context.push('/feed/messages'),
               behavior: HitTestBehavior.opaque,
               child: ConstrainedBox(
-                constraints: const BoxConstraints(
-                  minWidth: 44,
-                  minHeight: 44,
-                ),
+                constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
                 child: Center(
                   child: Stack(
                     clipBehavior: Clip.none,
                     children: [
-                      Icon(
-                        TreinoIcon.chat,
-                        size: 20,
-                        color: palette.textMuted,
-                      ),
+                      Icon(TreinoIcon.chat, size: 20, color: palette.textMuted),
                       if (unreadChats > 0)
                         Positioned(
                           top: -4,
@@ -196,10 +183,7 @@ class _FeedHeader extends ConsumerWidget {
               onTap: () => context.push('/feed/search'),
               behavior: HitTestBehavior.opaque,
               child: ConstrainedBox(
-                constraints: const BoxConstraints(
-                  minWidth: 44,
-                  minHeight: 44,
-                ),
+                constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
                 child: Center(
                   child: Icon(
                     TreinoIcon.search,
@@ -218,10 +202,7 @@ class _FeedHeader extends ConsumerWidget {
               onTap: () => context.push('/feed/create'),
               behavior: HitTestBehavior.opaque,
               child: ConstrainedBox(
-                constraints: const BoxConstraints(
-                  minWidth: 44,
-                  minHeight: 44,
-                ),
+                constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
                 child: Center(
                   child: Container(
                     width: 36,
@@ -300,39 +281,47 @@ class _FeedAsyncBody<T> extends StatelessWidget {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
 
-    return async.when(
-      data: (data) => Semantics(
-        label: l10n.feedPullToRefreshA11y,
-        child: RefreshIndicator(
-          color: palette.accent,
-          onRefresh: onRefresh,
-          child: dataBuilder(context, data),
+    return TreinoStateSwitcher(
+      childKey: ValueKey(
+        async.when(
+          data: (_) => 'data',
+          loading: () => 'loading',
+          error: (_, __) => 'error',
         ),
       ),
-      loading: () => Center(
-        child: CircularProgressIndicator(color: palette.accent),
-      ),
-      error: (_, __) => Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                l10n.feedLoadError,
-                style: GoogleFonts.barlow(
-                  fontSize: 14,
-                  color: palette.textMuted,
+      child: async.when(
+        data: (data) => Semantics(
+          label: l10n.feedPullToRefreshA11y,
+          child: RefreshIndicator(
+            color: palette.accent,
+            onRefresh: onRefresh,
+            child: dataBuilder(context, data),
+          ),
+        ),
+        loading: () =>
+            Center(child: CircularProgressIndicator(color: palette.accent)),
+        error: (_, __) => Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  l10n.feedLoadError,
+                  style: GoogleFonts.barlow(
+                    fontSize: 14,
+                    color: palette.textMuted,
+                  ),
+                  textAlign: TextAlign.center,
                 ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 16),
-              TextButton(
-                onPressed: onRetry,
-                style: TextButton.styleFrom(foregroundColor: palette.accent),
-                child: Text(l10n.coachRetryLabel),
-              ),
-            ],
+                const SizedBox(height: 16),
+                TextButton(
+                  onPressed: onRetry,
+                  style: TextButton.styleFrom(foregroundColor: palette.accent),
+                  child: Text(l10n.coachRetryLabel),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -353,9 +342,7 @@ class _AmigosBody extends ConsumerWidget {
         if (posts.isEmpty) {
           return _scrollableEmptyState(
             context,
-            const FeedEmptyState(
-              message: 'Aún no hay posts de tus amigos',
-            ),
+            const FeedEmptyState(message: 'Aún no hay posts de tus amigos'),
           );
         }
         return _feedPostList(context, posts);
@@ -377,17 +364,13 @@ class _MiGymBody extends ConsumerWidget {
         if (posts == null) {
           return _scrollableEmptyState(
             context,
-            const FeedEmptyState(
-              message: 'Todavía no estás en un gym',
-            ),
+            const FeedEmptyState(message: 'Todavía no estás en un gym'),
           );
         }
         if (posts.isEmpty) {
           return _scrollableEmptyState(
             context,
-            const FeedEmptyState(
-              message: 'Tu gym todavía no tiene posts',
-            ),
+            const FeedEmptyState(message: 'Tu gym todavía no tiene posts'),
           );
         }
         return _feedPostList(context, posts);
@@ -409,9 +392,7 @@ class _PublicoBody extends ConsumerWidget {
         if (posts.isEmpty) {
           return _scrollableEmptyState(
             context,
-            const FeedEmptyState(
-              message: 'Aún no hay posts públicos',
-            ),
+            const FeedEmptyState(message: 'Aún no hay posts públicos'),
           );
         }
         return _feedPostList(context, posts);

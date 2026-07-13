@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
+import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/motion/treino_shimmer.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
@@ -48,29 +49,32 @@ class ChatListScreen extends ConsumerWidget {
           ),
         ),
       ),
-      body: chatsAsync.when(
-        loading: () => Center(
-          child: CircularProgressIndicator(color: palette.accent),
+      body: TreinoStateSwitcher(
+        childKey: ValueKey(
+          chatsAsync.when(
+            data: (_) => 'data',
+            loading: () => 'loading',
+            error: (_, __) => 'error',
+          ),
         ),
-        error: (_, __) => _ErrorState(
-          onRetry: () => ref.invalidate(chatsForCurrentUserProvider),
+        child: chatsAsync.when(
+          loading: () =>
+              Center(child: CircularProgressIndicator(color: palette.accent)),
+          error: (_, __) => _ErrorState(
+            onRetry: () => ref.invalidate(chatsForCurrentUserProvider),
+          ),
+          data: (chats) {
+            if (chats.isEmpty) return const _EmptyState();
+            return ListView.separated(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              itemCount: chats.length,
+              separatorBuilder: (_, __) =>
+                  Divider(height: 1, color: palette.border, indent: 76),
+              itemBuilder: (_, i) =>
+                  _ChatRow(chat: chats[i], currentUid: currentUid ?? ''),
+            );
+          },
         ),
-        data: (chats) {
-          if (chats.isEmpty) return const _EmptyState();
-          return ListView.separated(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            itemCount: chats.length,
-            separatorBuilder: (_, __) => Divider(
-              height: 1,
-              color: palette.border,
-              indent: 76,
-            ),
-            itemBuilder: (_, i) => _ChatRow(
-              chat: chats[i],
-              currentUid: currentUid ?? '',
-            ),
-          );
-        },
       ),
     );
   }
@@ -154,10 +158,7 @@ class _ChatRow extends ConsumerWidget {
                   const SizedBox(width: 12),
                   Text(
                     _relativeTime(chat.lastMessageAt!, l10n),
-                    style: TextStyle(
-                      color: palette.textMuted,
-                      fontSize: 12,
-                    ),
+                    style: TextStyle(color: palette.textMuted, fontSize: 12),
                   ),
                 ],
                 if (hasUnread) ...[
