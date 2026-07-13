@@ -213,7 +213,7 @@ existentes.
 
 El sistema DEBE crear `lib/app/theme/tokens/motion_tokens.dart` con
 `AppMotionTokens` que re-exporte los valores de `AppMotion` con nombres de dominio
-semántico (ej. `cardEntry`, `stateSwitch`, `pageTransition`).
+semántico (ej. `contentEnter`, `stateSwitch`, `pageTransition`).
 `AppMotion` original NO DEBE modificarse (cero ruptura de las 93 ocurrencias).
 
 #### Escenario: valores iguales a AppMotion
@@ -240,7 +240,7 @@ NO DEBE introducir lógica nueva de accesibilidad.
 #### Escenario: reduceMotion delegado
 
 - DADO un `BuildContext` con `MediaQuery.disableAnimations = true`
-- CUANDO se llama `AppMotionTokens.resolve(context, AppMotionTokens.cardEntry)`
+- CUANDO se llama `AppMotionTokens.resolve(context, AppMotionTokens.contentEnter)`
 - ENTONCES retorna `Duration.zero`
 
 ---
