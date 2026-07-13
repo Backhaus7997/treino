@@ -121,33 +121,32 @@ void main() {
       );
     });
 
-    test('a real rep-range set (repsMin/repsMax) → not editable', () {
+    test('a rep-range set (repsMin/repsMax) IS editable (Fase 1)', () {
       expect(
         isRoutineWebEditable(_routine(
             slot: _slot(sets: const [SetSpec(repsMin: 8, repsMax: 12)]))),
-        isFalse,
+        isTrue,
       );
     });
 
-    test('a duration set → not editable', () {
+    test('an explicit range rep mode IS editable (Fase 1)', () {
+      expect(
+        isRoutineWebEditable(_routine(slot: _slot(repMode: RepMode.range))),
+        isTrue,
+      );
+    });
+
+    test('a slot with coaching notes IS editable (Fase 1)', () {
+      expect(
+        isRoutineWebEditable(_routine(slot: _slot(notes: 'tempo 3-1-1'))),
+        isTrue,
+      );
+    });
+
+    test('a duration set → not editable (Fase 2, still out of scope)', () {
       expect(
         isRoutineWebEditable(
             _routine(slot: _slot(sets: const [SetSpec(durationSeconds: 30)]))),
-        isFalse,
-      );
-    });
-
-    test('an explicit range rep mode → not editable', () {
-      expect(
-        isRoutineWebEditable(_routine(slot: _slot(repMode: RepMode.range))),
-        isFalse,
-      );
-    });
-
-    test('a slot with coaching notes → not editable (notes would be dropped)',
-        () {
-      expect(
-        isRoutineWebEditable(_routine(slot: _slot(notes: 'tempo 3-1-1'))),
         isFalse,
       );
     });
