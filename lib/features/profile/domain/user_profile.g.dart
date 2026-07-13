@@ -45,6 +45,11 @@ _$UserProfileImpl _$$UserProfileImplFromJson(Map<String, dynamic> json) =>
           const <String>[],
       trainerOffersOnline: json['trainerOffersOnline'] as bool? ?? false,
       activeRoutineId: json['activeRoutineId'] as String?,
+      subscription: json['subscription'] == null
+          ? null
+          : TrainerSubscription.fromJson(
+              json['subscription'] as Map<String, dynamic>),
+      weightedLoad: (json['weightedLoad'] as num?)?.toDouble(),
     );
 
 Map<String, dynamic> _$$UserProfileImplToJson(_$UserProfileImpl instance) =>
@@ -78,6 +83,8 @@ Map<String, dynamic> _$$UserProfileImplToJson(_$UserProfileImpl instance) =>
       'trainerGeohashes': instance.trainerGeohashes,
       'trainerOffersOnline': instance.trainerOffersOnline,
       'activeRoutineId': instance.activeRoutineId,
+      'subscription': instance.subscription?.toJson(),
+      'weightedLoad': instance.weightedLoad,
     };
 
 const _$UserRoleEnumMap = {

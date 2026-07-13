@@ -18,6 +18,15 @@ service cloud.firestore {
       // Update: only the owner can update, and the four immutable fields
       // MUST equal their previous values. Trainers via Admin SDK only;
       // email changes via FirebaseAuth re-verification flow.
+      //
+      // Paywall Fase 7 PR1 (design §5.1): `subscription` (whole map) and
+      // `weightedLoad` are CF-write-only. Follows the `payments` field-pin
+      // idiom (firestore.rules ~1112-1134) — pinned equal-to-existing via
+      // get(...,null) so absence on both sides is a no-op match. The owner
+      // can still freely update every OTHER field on their own doc; only
+      // these two paywall fields are locked out. Admin SDK (CFs) bypass
+      // rules entirely, so createPreapproval/mpWebhook/downgrade/reactivation
+      // CFs write them normally.
       allow update: if request.auth != null
                     && request.auth.uid == uid
                     // uid: identity — must equal doc id forever.
@@ -27,7 +36,10 @@ service cloud.firestore {
                     // email: must use FirebaseAuth.updateEmail re-verification.
                     && request.resource.data.email == resource.data.email
                     // createdAt: audit field — preserves analytics integrity.
-                    && request.resource.data.createdAt == resource.data.createdAt;
+                    && request.resource.data.createdAt == resource.data.createdAt
+                    // subscription/weightedLoad: CF-write-only (paywall Fase 7).
+                    && request.resource.data.get('subscription', null) == resource.data.get('subscription', null)
+                    && request.resource.data.get('weightedLoad', null) == resource.data.get('weightedLoad', null);
 
       // Delete denied — account deletion goes through privileged Cloud Function.
       allow delete: if false;
@@ -289,6 +301,15 @@ service cloud.firestore {
       // request cambia el campo (`request.resource.data.sharedWithTrainer !=
       // resource.data.sharedWithTrainer`), el auth.uid debe ser el atleta.
       // El PF nunca puede flippear el flag.
+      //
+      // Paywall Fase 7 PR1 (design §5.2, entitlement half only): `entitlement`,
+      // `blockedAt`, `blockedReason` son CF-write-only — pinneados
+      // equal-to-existing via get(...,null) (mismo idioma que `payments`,
+      // firestore.rules ~1112-1134). Solo el downgrade CF y
+      // acceptTrainerLink/reactivation CF (Admin SDK, bypasea rules) los
+      // escriben. El lock de promoción status pending→active queda para PR4
+      // junto con el CF que reemplaza el accept() client-side — agregarlo acá
+      // rompería el accept() actual antes de que su reemplazo exista.
       allow update: if request.auth != null
                     && (request.auth.uid == resource.data.trainerId
                         || request.auth.uid == resource.data.athleteId)
@@ -296,7 +317,10 @@ service cloud.firestore {
                     && request.resource.data.athleteId == resource.data.athleteId
                     && request.resource.data.requestedAt == resource.data.requestedAt
                     && (request.resource.data.sharedWithTrainer == resource.data.sharedWithTrainer
-                        || request.auth.uid == resource.data.athleteId);
+                        || request.auth.uid == resource.data.athleteId)
+                    && request.resource.data.get('entitlement', null) == resource.data.get('entitlement', null)
+                    && request.resource.data.get('blockedAt', null) == resource.data.get('blockedAt', null)
+                    && request.resource.data.get('blockedReason', null) == resource.data.get('blockedReason', null);
 
       // Delete denegado — terminate vía update status='terminated'.
       allow delete: if false;
