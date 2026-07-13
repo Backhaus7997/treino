@@ -4,15 +4,10 @@ import 'package:treino/features/coach/application/trainer_link_providers.dart'
     show currentAthleteLinkProvider;
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
-import 'package:treino/features/payments/application/billing_providers.dart'
-    show athleteBillingPairProvider;
 import 'package:treino/features/payments/application/mi_cuota_provider.dart';
 import 'package:treino/features/payments/application/payment_providers.dart'
     show athletePaymentsProvider;
-import 'package:treino/features/payments/domain/athlete_billing.dart';
 import 'package:treino/features/payments/domain/payment.dart';
-import 'package:treino/features/workout/application/session_providers.dart'
-    show sessionsByUidProvider;
 
 // Regression test for the HIGH-severity bug in [miCuotaProvider]: when a
 // watched stream errored with no prior value, the loading guard
@@ -22,6 +17,11 @@ import 'package:treino/features/workout/application/session_providers.dart'
 //
 // The fix mirrors pagosPorCobrarProvider: a hasError && !hasValue branch after
 // each ref.watch that re-emits AsyncValue.error.
+//
+// Slice 1 (2026-07): miCuotaProvider no longer watches billing config or
+// Sessions (see mi_cuota_provider_boundary_test.dart), so those overrides
+// were dropped from this harness — only the two streams it still reads
+// (the link, the athlete's payments) are exercised here.
 
 const _trainerId = 'tB';
 const _athleteId = 'aB';
@@ -47,10 +47,6 @@ void main() {
             athletePaymentsProvider.overrideWith(
               (ref) => Stream<List<Payment>>.error(Exception('boom')),
             ),
-            athleteBillingPairProvider.overrideWith(
-              (ref, pair) => Stream<AthleteBilling?>.value(null),
-            ),
-            sessionsByUidProvider.overrideWith((ref, uid) async => const []),
           ],
         );
         addTearDown(container.dispose);
@@ -80,10 +76,6 @@ void main() {
             athletePaymentsProvider.overrideWith(
               (ref) => Stream<List<Payment>>.value(const []),
             ),
-            athleteBillingPairProvider.overrideWith(
-              (ref, pair) => Stream<AthleteBilling?>.value(null),
-            ),
-            sessionsByUidProvider.overrideWith((ref, uid) async => const []),
           ],
         );
         addTearDown(container.dispose);

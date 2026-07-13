@@ -1670,6 +1670,24 @@ abstract class AppL10n {
   /// **'Ej: Clase de verano'**
   String get dashboardConceptoHint;
 
+  /// No description provided for @dashboardVenceElLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'VENCE EL (OPCIONAL)'**
+  String get dashboardVenceElLabel;
+
+  /// No description provided for @dashboardVenceElHint.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Sin fecha de vencimiento'**
+  String get dashboardVenceElHint;
+
+  /// No description provided for @dashboardVenceElQuitar.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Quitar fecha de vencimiento'**
+  String get dashboardVenceElQuitar;
+
   /// No description provided for @dashboardSeleccionaAlumnoHint.
   ///
   /// In es_AR, this message translates to:

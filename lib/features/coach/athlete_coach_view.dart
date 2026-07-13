@@ -709,6 +709,14 @@ class _CuotaSection extends ConsumerWidget {
                 ),
             ],
           ),
+          const SizedBox(height: 6),
+          Text(
+            'Cobros que tu PF registró a mano. No es un cálculo automático.',
+            style: GoogleFonts.barlow(
+              fontSize: 11,
+              color: palette.textMuted,
+            ),
+          ),
           const SizedBox(height: 10),
           if (state.isEmpty)
             Row(

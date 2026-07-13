@@ -71,8 +71,7 @@ ProviderContainer _trainerContainer({
       trainerLinksStreamProvider.overrideWith((ref) => Stream.value(links)),
       trainerPaymentsProvider.overrideWith((ref) => Stream.value(payments)),
       athleteBillingProvider.overrideWith(
-        (ref, athleteId) =>
-            Stream.value(billingByAthlete[athleteId]),
+        (ref, athleteId) => Stream.value(billingByAthlete[athleteId]),
       ),
     ],
   );
@@ -137,7 +136,8 @@ void main() {
             createdAt: DateTime.utc(2026, 6, 1),
           ),
         );
-        final id = (await firestore.collection('payments').get()).docs.single.id;
+        final id =
+            (await firestore.collection('payments').get()).docs.single.id;
 
         // Pass a LOCAL DateTime; the repo must store the UTC-converted instant.
         final localPaidAt = DateTime(2026, 6, 16, 10, 0);
@@ -220,11 +220,9 @@ void main() {
         ),
       );
 
-      final data = (await firestore
-              .collection('athlete_billing')
-              .doc('tA_aA')
-              .get())
-          .data()!;
+      final data =
+          (await firestore.collection('athlete_billing').doc('tA_aA').get())
+              .data()!;
       expect(data['amountArs'], equals(9000));
       expect(data['cadence'], equals('semanal'));
       // Merge must preserve the unrelated field.
@@ -234,13 +232,18 @@ void main() {
 
   // ── Logic layer: pagosPorCobrarProvider ───────────────────────────────────
   group('pagosPorCobrarProvider', () {
-    // payments-17
+    // payments-17 — Slice 1 (2026-07): pagosPorCobrarProvider no longer
+    // derives ANY mensual/semanal charge from AthleteBilling (see
+    // pagos_por_cobrar_coexistence_test.dart for the full auto-generation
+    // regression coverage). A paid Payment for the month is not even read by
+    // the mensual/semanal path anymore — this test now just pins that a paid
+    // doc never surfaces as "owed" (only pending docs do).
     test(
-      'mensual charge is suppressed once a paid payment exists for this month',
+      'a paid payment for the month does not surface as owed, and no mensual '
+      'charge is ever derived from the billing cadence',
       () async {
         final now = DateTime.now().toUtc();
-        final monthKey =
-            '${now.year}-${now.month.toString().padLeft(2, '0')}';
+        final monthKey = '${now.year}-${now.month.toString().padLeft(2, '0')}';
 
         final container = _trainerContainer(
           links: [_activeLink()],
@@ -272,11 +275,12 @@ void main() {
         final results = await _readPagos(container, 'aA');
 
         expect(results, isNotNull);
-        // No mensual recurring charge: deduped by current monthKey.
-        final mensual = results!
-            .where((c) => c.cadence == BillingCadence.mensual)
-            .toList();
+        // No mensual cadence ever appears — the provider no longer produces it.
+        final mensual =
+            results!.where((c) => c.cadence == BillingCadence.mensual).toList();
         expect(mensual, isEmpty);
+        // And the paid doc itself doesn't surface as an owed charge.
+        expect(results, isEmpty);
       },
     );
 
@@ -289,12 +293,9 @@ void main() {
         final container = _trainerContainer(
           links: [_activeLink()],
           payments: [
-            _pending(
-                id: 'p1', amountArs: 1000, concept: 'A', createdAt: now),
-            _pending(
-                id: 'p2', amountArs: 2000, concept: 'B', createdAt: now),
-            _pending(
-                id: 'p3', amountArs: 500, concept: 'C', createdAt: now),
+            _pending(id: 'p1', amountArs: 1000, concept: 'A', createdAt: now),
+            _pending(id: 'p2', amountArs: 2000, concept: 'B', createdAt: now),
+            _pending(id: 'p3', amountArs: 500, concept: 'C', createdAt: now),
           ],
           // No recurring config: only the aggregated one-offs should surface.
           billingByAthlete: const {'aA': null},
@@ -304,9 +305,8 @@ void main() {
         final results = await _readPagos(container, 'aA');
 
         expect(results, isNotNull);
-        final suelto = results!
-            .where((c) => c.cadence == BillingCadence.suelto)
-            .toList();
+        final suelto =
+            results!.where((c) => c.cadence == BillingCadence.suelto).toList();
         expect(suelto, hasLength(1));
         expect(suelto.single.amountArs, equals(3500));
         expect(suelto.single.concept, equals('3 cobros pendientes'));
