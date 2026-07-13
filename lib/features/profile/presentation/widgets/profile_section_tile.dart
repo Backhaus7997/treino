@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
+import '../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../core/widgets/treino_icon.dart';
 
 /// A reusable row tile used in the CUENTA section and the Settings screen.
@@ -47,9 +48,8 @@ class ProfileSectionTile extends StatelessWidget {
     final iconColor = destructive ? palette.danger : palette.accent;
     final titleColor = destructive ? palette.danger : palette.textPrimary;
 
-    final row = GestureDetector(
+    final row = TreinoTappable(
       onTap: onTap,
-      behavior: HitTestBehavior.opaque,
       child: Padding(
         padding: EdgeInsets.symmetric(
           horizontal: inGroup ? 14 : 12,
@@ -116,9 +116,7 @@ class ProfileSectionTile extends StatelessWidget {
         decoration: BoxDecoration(
           color: palette.bgCard,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: palette.textMuted.withValues(alpha: 0.12),
-          ),
+          border: Border.all(color: palette.textMuted.withValues(alpha: 0.12)),
         ),
         child: row,
       ),

@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../app/theme/app_palette.dart';
+import '../../core/widgets/motion/treino_state_switcher.dart';
 import '../../core/widgets/treino_icon.dart';
 import '../chat/application/chat_providers.dart';
 import '../payments/application/mi_cuota_provider.dart';
@@ -78,8 +79,9 @@ class _AthleteCoachViewState extends ConsumerState<AthleteCoachView> {
     // there is at least one subscriber. ADR-RV-006.
     Review? existingReview;
     try {
-      existingReview =
-          await ref.read(userReviewForLinkProvider(reviewKey).future);
+      existingReview = await ref.read(
+        userReviewForLinkProvider(reviewKey).future,
+      );
     } catch (_) {
       // If the stream errors, skip the prompt.
       return;
@@ -135,32 +137,40 @@ class _AthleteCoachViewState extends ConsumerState<AthleteCoachView> {
       }
     });
 
-    return linkAsync.when(
-      loading: () => Center(
-        child: CircularProgressIndicator(color: palette.accent),
-      ),
-      error: (_, __) => Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Text(
-            AppL10n.of(context).athleteCoachViewLinkError,
-            style: GoogleFonts.barlow(fontSize: 14, color: palette.textMuted),
-            textAlign: TextAlign.center,
-          ),
+    return TreinoStateSwitcher(
+      childKey: ValueKey(
+        linkAsync.when(
+          data: (link) => link == null ? 'discovery' : 'link',
+          loading: () => 'loading',
+          error: (_, __) => 'error',
         ),
       ),
-      data: (link) {
-        // Sin vínculo → el athlete ve la discovery directamente (entry
-        // natural al flow de elegir PF). El botón "PEDIR VÍNCULO" vive
-        // dentro de TrainerPublicProfile y al disparar request crea el
-        // doc en `trainer_links`; al volver a esta tab, linkAsync emite
-        // pending y mostramos la card.
-        if (link == null) return const TrainersListScreen();
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: _LinkStateCard(link: link),
-        );
-      },
+      child: linkAsync.when(
+        loading: () =>
+            Center(child: CircularProgressIndicator(color: palette.accent)),
+        error: (_, __) => Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Text(
+              AppL10n.of(context).athleteCoachViewLinkError,
+              style: GoogleFonts.barlow(fontSize: 14, color: palette.textMuted),
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
+        data: (link) {
+          // Sin vínculo → el athlete ve la discovery directamente (entry
+          // natural al flow de elegir PF). El botón "PEDIR VÍNCULO" vive
+          // dentro de TrainerPublicProfile y al disparar request crea el
+          // doc en `trainer_links`; al volver a esta tab, linkAsync emite
+          // pending y mostramos la card.
+          if (link == null) return const TrainersListScreen();
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: _LinkStateCard(link: link),
+          );
+        },
+      ),
     );
   }
 }
@@ -181,7 +191,11 @@ class _LinkStateCard extends ConsumerWidget {
       // + bottom inset: the floating bar overlays the body (extendBody),
       // so the last item needs room to scroll out from behind it.
       padding: EdgeInsets.fromLTRB(
-          0, 20, 0, 20 + MediaQuery.paddingOf(context).bottom),
+        0,
+        20,
+        0,
+        20 + MediaQuery.paddingOf(context).bottom,
+      ),
       physics: const AlwaysScrollableScrollPhysics(),
       children: [
         Container(
@@ -207,7 +221,10 @@ class _LinkStateCard extends ConsumerWidget {
               ),
               const SizedBox(height: 14),
               _TrainerHeader(
-                  pubAsync: pubAsync, link: link, hasUnread: hasUnread),
+                pubAsync: pubAsync,
+                link: link,
+                hasUnread: hasUnread,
+              ),
               if (link.status == TrainerLinkStatus.active) ...[
                 const SizedBox(height: 14),
                 _ShareInfo(palette: palette),
@@ -287,10 +304,7 @@ class _TrainerHeader extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: palette.accent,
                         shape: BoxShape.circle,
-                        border: Border.all(
-                          color: palette.bgCard,
-                          width: 1.5,
-                        ),
+                        border: Border.all(color: palette.bgCard, width: 1.5),
                       ),
                     ),
                   ),

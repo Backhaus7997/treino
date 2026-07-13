@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/motion/treino_shimmer.dart';
+import '../../../core/widgets/motion/treino_tappable.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../insights/application/insights_providers.dart';
 import '../../insights/domain/weekly_insights.dart';
@@ -16,9 +17,11 @@ import '../../insights/presentation/widgets/body_silhouette_placeholder.dart';
 /// a result < 1 belongs to the last week of the previous ISO year, and a
 /// result of 53 in a year without 53 ISO weeks is week 1 of the next year.
 int isoWeekNumber(DateTime date) {
-  final dayOfYear = DateTime(date.year, date.month, date.day)
-          .difference(DateTime(date.year, 1, 1))
-          .inDays +
+  final dayOfYear = DateTime(
+        date.year,
+        date.month,
+        date.day,
+      ).difference(DateTime(date.year, 1, 1)).inDays +
       1;
   final weekday = date.weekday; // 1..7 (Mon..Sun)
   final woy = ((dayOfYear - weekday + 10) / 7).floor();
@@ -55,9 +58,8 @@ class EstaSemanaCard extends ConsumerWidget {
     final palette = AppPalette.of(context);
     final async = ref.watch(weeklyInsightsProvider);
 
-    return GestureDetector(
+    return TreinoTappable(
       onTap: () => context.push('/home/insights'),
-      behavior: HitTestBehavior.opaque,
       child: Container(
         decoration: BoxDecoration(
           color: palette.bgCard,
@@ -98,9 +100,7 @@ class _Skeleton extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 14),
-            Center(
-              child: CircularProgressIndicator(color: palette.accent),
-            ),
+            Center(child: CircularProgressIndicator(color: palette.accent)),
           ],
         ),
       ),
@@ -133,10 +133,7 @@ class _ErrorFallback extends StatelessWidget {
           const SizedBox(height: 14),
           Text(
             'No pudimos cargar tus insights.',
-            style: GoogleFonts.barlow(
-              fontSize: 13,
-              color: palette.textMuted,
-            ),
+            style: GoogleFonts.barlow(fontSize: 13, color: palette.textMuted),
           ),
         ],
       ),
@@ -221,17 +218,11 @@ class _Loaded extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: _PeriodCard(
-                  label: 'SEMANA',
-                  count: wi.sessionsCount,
-                ),
+                child: _PeriodCard(label: 'SEMANA', count: wi.sessionsCount),
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: _PeriodCard(
-                  label: 'MES',
-                  count: wi.monthSessionsCount,
-                ),
+                child: _PeriodCard(label: 'MES', count: wi.monthSessionsCount),
               ),
             ],
           ),
@@ -276,21 +267,14 @@ class _EmptyState extends StatelessWidget {
           const SizedBox(height: 18),
           Center(
             child: ExcludeSemantics(
-              child: Icon(
-                TreinoIcon.streak,
-                size: 64,
-                color: palette.accent,
-              ),
+              child: Icon(TreinoIcon.streak, size: 64, color: palette.accent),
             ),
           ),
           const SizedBox(height: 18),
           Text(
             'Cada entrenamiento alimenta tu racha. Hacé el primero y empezá a construir tu progreso.',
             textAlign: TextAlign.center,
-            style: GoogleFonts.barlow(
-              fontSize: 13,
-              color: palette.textMuted,
-            ),
+            style: GoogleFonts.barlow(fontSize: 13, color: palette.textMuted),
           ),
           const SizedBox(height: 18),
           SizedBox(
@@ -425,10 +409,7 @@ class _StreakSubtext extends StatelessWidget {
 
     return Text(
       text,
-      style: GoogleFonts.barlow(
-        fontSize: 13,
-        color: palette.textMuted,
-      ),
+      style: GoogleFonts.barlow(fontSize: 13, color: palette.textMuted),
     );
   }
 }
@@ -571,10 +552,7 @@ class _PeriodCard extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             'entrenos',
-            style: GoogleFonts.barlow(
-              fontSize: 12,
-              color: palette.textMuted,
-            ),
+            style: GoogleFonts.barlow(fontSize: 12, color: palette.textMuted),
           ),
         ],
       ),

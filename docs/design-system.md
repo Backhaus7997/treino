@@ -57,6 +57,44 @@ Sólo estos valores: `8 · 12 · 14 · 18 · 20` px. **No** usar 4 / 16 / 24.
 | `r-lg` | `20` | Hero cards |
 | `r-full` | `9999` (full pill) | CTAs principales |
 
+## Motion
+
+El movimiento vive en `AppMotion` y en los widgets de
+`lib/core/widgets/motion/`. No hardcodear duraciones ni curvas en widgets.
+
+### Tokens
+
+| Token | Uso |
+|---|---|
+| `AppMotion.micro` | presión/tap, toggles, selección chica |
+| `AppMotion.fast` | cambios chicos de card/container |
+| `AppMotion.base` | loading → data/error, expand/collapse, switchers |
+| `AppMotion.slow` | tabs, rutas especiales, scroll animado |
+| `AppMotion.standard` | entrada/default |
+| `AppMotion.emphasized` | movimiento más grande o de orientación |
+| `AppMotion.exit` | salida |
+
+### Componentes
+
+- `TreinoStateSwitcher`: obligatorio para cambios async visibles
+  (`loading/error/data`) salvo que el estado sea intencionalmente invisible.
+- `TreinoFadeSlideIn`: entrada one-shot de secciones en pantallas eager
+  (`ListView(children: [...])`, `Column`, cards principales).
+- `TreinoTappable`: feedback de presión para CTAs, cards y tiles propios.
+- `TreinoShimmer`: skeletons de carga reales; apagar con `enabled: false`
+  en error/null estable.
+
+### Reglas
+
+- Respetar siempre `AppMotion.reduceMotion` o usar componentes que ya lo hagan.
+- No usar `TreinoFadeSlideIn` dentro de `ListView.builder`/`.separated`: al
+  reciclarse el item se reanima durante el scroll.
+- No animar por decorar. Animar cambios de estado mental: aparición,
+  selección, feedback de tap, carga, expansión y navegación especial.
+- No usar loops infinitos salvo loading real o caso justificado y acotado.
+- Preferir animaciones implícitas. Si usás `AnimationController`, debe vivir
+  en un widget hoja y liberar en `dispose()`.
+
 ## Tema
 
 - **Modo oscuro siempre** (`Brightness.dark`). No hay light theme.

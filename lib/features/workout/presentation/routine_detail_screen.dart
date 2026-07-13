@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
+import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/motion/treino_shimmer.dart';
 import '../../../core/analytics/analytics_service.dart';
 import '../../../core/widgets/treino_icon.dart';
@@ -79,55 +80,72 @@ class _RoutineDetailScreenState extends ConsumerState<RoutineDetailScreen> {
     return Stack(
       children: [
         Positioned.fill(
-          child: routineAsync.when(
-            data: (routine) {
-              if (routine == null) {
-                return _NotFoundState(
-                    label: AppL10n.of(context).routineDetailNotFound);
-              }
-              // `clamp(0, length - 1)` throws when length == 0 — empty-check
-              // BEFORE clamping.
-              if (routine.days.isEmpty) {
-                return _EmptyState(
-                    message: AppL10n.of(context).routineDetailNoDaysConfigured);
-              }
-              final dayIndex =
-                  selectedDayIndex.clamp(0, routine.days.length - 1);
-              final day = routine.days[dayIndex];
-              return _RoutineDetailContent(
-                routine: routine,
-                day: day,
-                selectedDayIndex: dayIndex,
-                selectedWeekIndex: selectedWeekIndex,
-                onSelectDay: (i) => setState(() => selectedDayIndex = i),
-                onSelectWeek: (i) => setState(() => selectedWeekIndex = i),
-                onSlotTap: (slot) {
-                  // Pass the routine owner's uid as `ownerId` so the detail
-                  // screen can fall back to that owner's customExercises
-                  // subcollection when the slot references a custom exercise
-                  // instead of a public-catalogue one (see slotExerciseProvider).
-                  // Trainer-assigned plans → the trainer (assignedBy); athlete
-                  // self-created routines → the athlete (createdBy). Without the
-                  // createdBy fallback, an athlete's own custom exercise resolves
-                  // to null → "Ejercicio no encontrado".
-                  final ownerId = routine.assignedBy ?? routine.createdBy;
-                  // `name` is the slot's display name, carried through so
-                  // slotExerciseProvider can do a name/alias fallback when
-                  // `exerciseId` drifted from the catalogue.
-                  final nameParam =
-                      'name=${Uri.encodeQueryComponent(slot.exerciseName)}';
-                  final target = ownerId != null && ownerId.isNotEmpty
-                      ? '/workout/exercise/${slot.exerciseId}?ownerId=$ownerId&$nameParam'
-                      : '/workout/exercise/${slot.exerciseId}?$nameParam';
-                  context.push(target);
+          child: TreinoStateSwitcher(
+            childKey: ValueKey(
+              routineAsync.when(
+                data: (routine) {
+                  if (routine == null) return 'not-found';
+                  if (routine.days.isEmpty) return 'empty';
+                  return 'data';
                 },
-              );
-            },
-            loading: () => const _RoutineLoadingSkeleton(),
-            error: (_, __) => _ErrorState(
-              message: AppL10n.of(context).routineDetailLoadError,
-              onRetry: () =>
-                  ref.invalidate(routineByIdProvider(widget.routineId)),
+                loading: () => 'loading',
+                error: (_, __) => 'error',
+              ),
+            ),
+            child: routineAsync.when(
+              data: (routine) {
+                if (routine == null) {
+                  return _NotFoundState(
+                    label: AppL10n.of(context).routineDetailNotFound,
+                  );
+                }
+                // `clamp(0, length - 1)` throws when length == 0 — empty-check
+                // BEFORE clamping.
+                if (routine.days.isEmpty) {
+                  return _EmptyState(
+                    message: AppL10n.of(context).routineDetailNoDaysConfigured,
+                  );
+                }
+                final dayIndex = selectedDayIndex.clamp(
+                  0,
+                  routine.days.length - 1,
+                );
+                final day = routine.days[dayIndex];
+                return _RoutineDetailContent(
+                  routine: routine,
+                  day: day,
+                  selectedDayIndex: dayIndex,
+                  selectedWeekIndex: selectedWeekIndex,
+                  onSelectDay: (i) => setState(() => selectedDayIndex = i),
+                  onSelectWeek: (i) => setState(() => selectedWeekIndex = i),
+                  onSlotTap: (slot) {
+                    // Pass the routine owner's uid as `ownerId` so the detail
+                    // screen can fall back to that owner's customExercises
+                    // subcollection when the slot references a custom exercise
+                    // instead of a public-catalogue one (see slotExerciseProvider).
+                    // Trainer-assigned plans → the trainer (assignedBy); athlete
+                    // self-created routines → the athlete (createdBy). Without the
+                    // createdBy fallback, an athlete's own custom exercise resolves
+                    // to null → "Ejercicio no encontrado".
+                    final ownerId = routine.assignedBy ?? routine.createdBy;
+                    // `name` is the slot's display name, carried through so
+                    // slotExerciseProvider can do a name/alias fallback when
+                    // `exerciseId` drifted from the catalogue.
+                    final nameParam =
+                        'name=${Uri.encodeQueryComponent(slot.exerciseName)}';
+                    final target = ownerId != null && ownerId.isNotEmpty
+                        ? '/workout/exercise/${slot.exerciseId}?ownerId=$ownerId&$nameParam'
+                        : '/workout/exercise/${slot.exerciseId}?$nameParam';
+                    context.push(target);
+                  },
+                );
+              },
+              loading: () => const _RoutineLoadingSkeleton(),
+              error: (_, __) => _ErrorState(
+                message: AppL10n.of(context).routineDetailLoadError,
+                onRetry: () =>
+                    ref.invalidate(routineByIdProvider(widget.routineId)),
+              ),
             ),
           ),
         ),
@@ -217,10 +235,8 @@ class _EditBar extends ConsumerWidget {
           child: IconButton(
             tooltip: 'Editar rutina', // i18n: Fase W2
             icon: Icon(Icons.edit, color: palette.textPrimary),
-            onPressed: () => context.push(
-              '/workout/my-routine-editor',
-              extra: routine.id,
-            ),
+            onPressed: () =>
+                context.push('/workout/my-routine-editor', extra: routine.id),
           ),
         ),
       ),
@@ -289,7 +305,7 @@ class _RoutineDetailContent extends ConsumerWidget {
     final slots = isPeriodized
         ? [
             for (final s in day.slots)
-              if (s.isPresentInWeek(viewedWeek)) s
+              if (s.isPresentInWeek(viewedWeek)) s,
           ]
         : day.slots;
 
@@ -305,23 +321,27 @@ class _RoutineDetailContent extends ConsumerWidget {
           scan++;
         }
         if (items.length >= 2) {
-          widgets.add(_SupersetBlock(
-            items: items,
-            onSlotTap: onSlotTap,
-            viewedWeek: viewedWeek,
-          ));
+          widgets.add(
+            _SupersetBlock(
+              items: items,
+              onSlotTap: onSlotTap,
+              viewedWeek: viewedWeek,
+            ),
+          );
           widgets.add(const SizedBox(height: 12));
           i = scan;
           continue;
         }
       }
       final slot = slots[i];
-      widgets.add(_SlotRowWithLastWeight(
-        slot: slot,
-        index: i + 1,
-        week: viewedWeek,
-        onTap: () => onSlotTap(slot),
-      ));
+      widgets.add(
+        _SlotRowWithLastWeight(
+          slot: slot,
+          index: i + 1,
+          week: viewedWeek,
+          onTap: () => onSlotTap(slot),
+        ),
+      );
       widgets.add(const SizedBox(height: 12));
       i++;
     }
@@ -339,8 +359,10 @@ class _RoutineDetailContent extends ConsumerWidget {
     required String emptyWeekMessage,
   }) {
     // Build the list (filtering applied inside _buildExerciseList when needed).
-    final exerciseWidgets =
-        _buildExerciseList(viewedWeek, isPeriodized: isPeriodized);
+    final exerciseWidgets = _buildExerciseList(
+      viewedWeek,
+      isPeriodized: isPeriodized,
+    );
     if (isPeriodized && exerciseWidgets.isEmpty) {
       // All slots absent for this week → informational message (not a lock).
       return [_EmptyState(message: emptyWeekMessage)];
@@ -371,7 +393,11 @@ class _RoutineDetailContent extends ConsumerWidget {
         ),
         SliverPadding(
           padding: EdgeInsets.fromLTRB(
-              20, 0, 20, MediaQuery.paddingOf(context).bottom),
+            20,
+            0,
+            20,
+            MediaQuery.paddingOf(context).bottom,
+          ),
           sliver: SliverList(
             delegate: SliverChildListDelegate([
               const SizedBox(height: 20),
@@ -592,10 +618,7 @@ class _HeroStrip extends ConsumerWidget {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            palette.accent.withValues(alpha: 0.85),
-            palette.bg,
-          ],
+          colors: [palette.accent.withValues(alpha: 0.85), palette.bg],
         ),
       ),
     );
@@ -771,9 +794,7 @@ class _StatRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: tiles.map<Widget>((t) => Expanded(child: t)).toList(),
-    );
+    return Row(children: tiles.map<Widget>((t) => Expanded(child: t)).toList());
   }
 }
 
@@ -901,10 +922,9 @@ class _PeriodizedCTABar extends ConsumerWidget {
     // routineByIdProvider — key uses only String fields for structural equality.
     final dayNumbers =
         routine.days.map((d) => d.dayNumber).toList(growable: false);
-    final progressAsync = ref.watch(planProgressProvider((
-      uid: uid,
-      routineId: routine.id,
-    )));
+    final progressAsync = ref.watch(
+      planProgressProvider((uid: uid, routineId: routine.id)),
+    );
 
     return progressAsync.when(
       loading: () => const SizedBox(height: 56),
@@ -972,8 +992,10 @@ class _PeriodizedCTABar extends ConsumerWidget {
           dayNumbers,
           requiredPairs: requiredPairs,
         );
-        final alreadyDone =
-            progress.completed.contains((week: viewedWeek, day: viewedDay));
+        final alreadyDone = progress.completed.contains((
+          week: viewedWeek,
+          day: viewedDay,
+        ));
 
         // Already completed this (week, day).
         if (alreadyDone) {
@@ -1163,9 +1185,7 @@ class _StartSessionCTABar extends ConsumerWidget {
                       routineId: routine.id,
                       routineName: routine.name,
                     );
-                context.push(
-                  '/workout/session/${routine.id}/${day.dayNumber}',
-                );
+                context.push('/workout/session/${routine.id}/${day.dayNumber}');
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: palette.accent,
@@ -1268,10 +1288,7 @@ class _RoutineLoadingSkeleton extends StatelessWidget {
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
-                  colors: [
-                    palette.accent.withValues(alpha: 0.3),
-                    palette.bg,
-                  ],
+                  colors: [palette.accent.withValues(alpha: 0.3), palette.bg],
                 ),
               ),
             ),

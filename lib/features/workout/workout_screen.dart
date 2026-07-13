@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../app/theme/app_motion.dart';
 import '../../app/theme/app_palette.dart';
+import '../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../gym_rankings/presentation/rankings_screen.dart' show RankingsBody;
 import '../profile/application/user_providers.dart';
 import '../profile/domain/user_role.dart';
@@ -98,9 +100,7 @@ class _AthleteWorkout extends StatelessWidget {
                 fontWeight: FontWeight.w700,
                 letterSpacing: 0.5,
               ),
-              tabs: [
-                for (final l in _labels) Tab(text: l, height: 40),
-              ],
+              tabs: [for (final l in _labels) Tab(text: l, height: 40)],
             ),
           ),
           const SizedBox(height: 8),
@@ -108,10 +108,7 @@ class _AthleteWorkout extends StatelessWidget {
             child: TabBarView(
               // Swipeable per spec `gym-rankings` — Rankings Placement
               // ("reachable by horizontal swipe and/or a top tab control").
-              children: [
-                _TuEntrenoPage(),
-                _RankingsPage(),
-              ],
+              children: [_TuEntrenoPage(), _RankingsPage()],
             ),
           ),
         ],
@@ -145,27 +142,46 @@ class _TuEntrenoPageState extends State<_TuEntrenoPage>
         // + bottom inset: the floating bar overlays the body (extendBody),
         // so the last item needs room to scroll out from behind it.
         padding: EdgeInsets.fromLTRB(
-            0, 20, 0, 20 + MediaQuery.paddingOf(context).bottom),
+          0,
+          20,
+          0,
+          20 + MediaQuery.paddingOf(context).bottom,
+        ),
         physics: const AlwaysScrollableScrollPhysics(),
-        children: const [
-          MiPlanSection(),
-          SizedBox(height: 12),
+        children: [
+          TreinoFadeSlideIn(
+            delay: AppMotion.stagger(0),
+            child: const MiPlanSection(),
+          ),
+          const SizedBox(height: 12),
           // Trainer-shared templates surface — invisible if the athlete has
           // no active link or the trainer hasn't opted in. Sits between
           // "Mi plan" (their assigned routine) and "Plantillas" (catalog)
           // because conceptually it's still "stuff your trainer made for
           // you", just non-assigned.
-          TrainerTemplatesSection(),
-          SizedBox(height: 12),
+          TreinoFadeSlideIn(
+            delay: AppMotion.stagger(1),
+            child: const TrainerTemplatesSection(),
+          ),
+          const SizedBox(height: 12),
           // Athlete-authored routines (athlete-self-routines SDD).
           // Belongs after TrainerTemplates because both are "my plans"
           // (trainer-sourced first, then self-made), then the public
           // catalog Plantillas, then Historial.
-          MisRutinasSection(),
-          SizedBox(height: 12),
-          PlantillasSection(),
-          SizedBox(height: 12),
-          HistorialSection(),
+          TreinoFadeSlideIn(
+            delay: AppMotion.stagger(2),
+            child: const MisRutinasSection(),
+          ),
+          const SizedBox(height: 12),
+          TreinoFadeSlideIn(
+            delay: AppMotion.stagger(3),
+            child: const PlantillasSection(),
+          ),
+          const SizedBox(height: 12),
+          TreinoFadeSlideIn(
+            delay: AppMotion.stagger(4),
+            child: const HistorialSection(),
+          ),
         ],
       ),
     );

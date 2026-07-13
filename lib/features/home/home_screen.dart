@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../app/theme/app_motion.dart';
 import '../../app/theme/app_palette.dart';
+import '../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../core/widgets/treino_icon.dart';
 import '../../l10n/app_l10n.dart';
 import '../coach/presentation/trainer_dashboard_tab.dart';
@@ -102,17 +104,29 @@ class _AthleteHome extends ConsumerWidget {
         // + bottom inset: the floating bar overlays the body (extendBody),
         // so the last item needs room to scroll out from behind it.
         padding: EdgeInsets.fromLTRB(
-            0, 20, 0, 20 + MediaQuery.paddingOf(context).bottom),
+          0,
+          20,
+          0,
+          20 + MediaQuery.paddingOf(context).bottom,
+        ),
         physics: const AlwaysScrollableScrollPhysics(),
         children: [
-          headerOrSkeleton,
+          TreinoFadeSlideIn(
+            delay: AppMotion.stagger(0),
+            child: headerOrSkeleton,
+          ),
           const SizedBox(height: 20),
-          if (hasNoRoutine)
-            const _AthleteFirstRunCard()
-          else
-            const EmpezarEntrenamientoCard(),
+          TreinoFadeSlideIn(
+            delay: AppMotion.stagger(1),
+            child: hasNoRoutine
+                ? const _AthleteFirstRunCard()
+                : const EmpezarEntrenamientoCard(),
+          ),
           const SizedBox(height: 12),
-          const EstaSemanaCard(),
+          TreinoFadeSlideIn(
+            delay: AppMotion.stagger(2),
+            child: const EstaSemanaCard(),
+          ),
         ],
       ),
     );
@@ -150,14 +164,16 @@ class _AthleteFirstRunCard extends StatelessWidget {
           children: [
             Text(
               l10n.homeAthleteFirstRunTitle,
-              style: theme.textTheme.titleMedium
-                  ?.copyWith(color: palette.textPrimary),
+              style: theme.textTheme.titleMedium?.copyWith(
+                color: palette.textPrimary,
+              ),
             ),
             const SizedBox(height: 8),
             Text(
               l10n.homeAthleteFirstRunBody,
-              style: theme.textTheme.bodyMedium
-                  ?.copyWith(color: palette.textMuted),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: palette.textMuted,
+              ),
             ),
             const SizedBox(height: 18),
             HomeCTAButton(

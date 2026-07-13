@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/athlete_coach_view.dart';
 import 'package:treino/features/coach/coach_screen.dart';
@@ -38,8 +39,9 @@ ProviderContainer _container({UserProfile? profile}) => ProviderContainer(
         // Stubs para los providers de coach que las views nuevas observan.
         // Sin esto los streams quedan abiertos y pumpAndSettle nunca termina.
         currentAthleteLinkProvider.overrideWith((ref) async => null),
-        trainerLinksStreamProvider
-            .overrideWith((ref) => Stream.value(const <TrainerLink>[])),
+        trainerLinksStreamProvider.overrideWith(
+          (ref) => Stream.value(const <TrainerLink>[]),
+        ),
       ],
     );
 
@@ -49,8 +51,9 @@ ProviderContainer _loadingContainer() => ProviderContainer(
           (ref) => const Stream<UserProfile?>.empty(),
         ),
         currentAthleteLinkProvider.overrideWith((ref) async => null),
-        trainerLinksStreamProvider
-            .overrideWith((ref) => Stream.value(const <TrainerLink>[])),
+        trainerLinksStreamProvider.overrideWith(
+          (ref) => Stream.value(const <TrainerLink>[]),
+        ),
       ],
     );
 
@@ -67,48 +70,62 @@ Widget _wrap(ProviderContainer container) => UncontrolledProviderScope(
 
 void main() {
   group('CoachScreen dispatch', () {
-    testWidgets(
-        'athlete profile → AthleteCoachView rendered, TrainerCoachView absent',
-        (tester) async {
+    testWidgets('wraps role dispatch in TreinoStateSwitcher', (tester) async {
       final c = _container(profile: _athleteProfile());
       addTearDown(c.dispose);
 
       await tester.pumpWidget(_wrap(c));
-      await tester.pumpAndSettle();
-
-      expect(find.byType(AthleteCoachView), findsOneWidget);
-      expect(find.byType(TrainerCoachView), findsNothing);
-    });
-
-    testWidgets(
-        'trainer profile → TrainerCoachView rendered, AthleteCoachView absent',
-        (tester) async {
-      final c = _container(profile: _trainerProfile());
-      addTearDown(c.dispose);
-
-      await tester.pumpWidget(_wrap(c));
-      await tester.pumpAndSettle();
-
-      expect(find.byType(TrainerCoachView), findsOneWidget);
-      expect(find.byType(AthleteCoachView), findsNothing);
-    });
-
-    testWidgets(
-        'AsyncLoading (empty stream) → neither view rendered, no exception',
-        (tester) async {
-      final c = _loadingContainer();
-      addTearDown(c.dispose);
-
-      await tester.pumpWidget(_wrap(c));
-      // Do NOT pumpAndSettle — the stream never completes, so we just pump once
       await tester.pump();
 
-      expect(find.byType(AthleteCoachView), findsNothing);
-      expect(find.byType(TrainerCoachView), findsNothing);
+      expect(find.byType(TreinoStateSwitcher), findsWidgets);
     });
 
-    testWidgets('null profile → neither view rendered, no exception',
-        (tester) async {
+    testWidgets(
+      'athlete profile → AthleteCoachView rendered, TrainerCoachView absent',
+      (tester) async {
+        final c = _container(profile: _athleteProfile());
+        addTearDown(c.dispose);
+
+        await tester.pumpWidget(_wrap(c));
+        await tester.pumpAndSettle();
+
+        expect(find.byType(AthleteCoachView), findsOneWidget);
+        expect(find.byType(TrainerCoachView), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'trainer profile → TrainerCoachView rendered, AthleteCoachView absent',
+      (tester) async {
+        final c = _container(profile: _trainerProfile());
+        addTearDown(c.dispose);
+
+        await tester.pumpWidget(_wrap(c));
+        await tester.pumpAndSettle();
+
+        expect(find.byType(TrainerCoachView), findsOneWidget);
+        expect(find.byType(AthleteCoachView), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'AsyncLoading (empty stream) → neither view rendered, no exception',
+      (tester) async {
+        final c = _loadingContainer();
+        addTearDown(c.dispose);
+
+        await tester.pumpWidget(_wrap(c));
+        // Do NOT pumpAndSettle — the stream never completes, so we just pump once
+        await tester.pump();
+
+        expect(find.byType(AthleteCoachView), findsNothing);
+        expect(find.byType(TrainerCoachView), findsNothing);
+      },
+    );
+
+    testWidgets('null profile → neither view rendered, no exception', (
+      tester,
+    ) async {
       final c = _container(profile: null);
       addTearDown(c.dispose);
 
