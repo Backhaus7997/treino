@@ -1,12 +1,11 @@
 import '../../../../workout/domain/routine.dart';
-import '../../../../workout/domain/set_enums.dart';
 
 /// Whether [routine] can be safely edited in the web editor.
 ///
-/// The web editor models single-week, reps-based sets — reps OR a min–max
-/// range, weight, rest, plus per-exercise coaching notes (Fase 1 parity). It
-/// does NOT yet capture: duration-based exercises (Fase 2), supersets
-/// ([RoutineSlot.supersetGroup], Fase 3), or per-week periodization
+/// The web editor models single-week exercises — reps (single or min–max
+/// range), duration (timed), weight, rest, plus per-exercise coaching notes
+/// (Fases 1-2 parity). It does NOT yet capture: supersets
+/// ([RoutineSlot.supersetGroup], Fase 3) or per-week periodization
 /// ([RoutineSlot.weeklySets] / [RoutineSlot.activeWeeks] / multi-week
 /// [Routine.numWeeks], Fase 4).
 ///
@@ -25,16 +24,6 @@ bool isRoutineWebEditable(Routine routine) {
       if (slot.supersetGroup != null) return false;
       if (slot.weeklySets.isNotEmpty) return false;
       if (slot.activeWeeks.isNotEmpty) return false;
-      // Duration is still out of scope (Fase 2). Reps — single or range — and
-      // notes ARE supported, so they no longer block. Raw `exerciseMode` plus
-      // the per-set `durationSeconds` check below catch both explicit and
-      // legacy (synthesized) duration slots.
-      if (slot.exerciseMode != ExerciseMode.reps) return false;
-      for (final set in slot.effectiveSets) {
-        if (set.durationSeconds != null && set.durationSeconds! > 0) {
-          return false;
-        }
-      }
     }
   }
   return true;

@@ -98,11 +98,11 @@ void main() {
       );
     });
 
-    test('duration-based exercise → not editable', () {
+    test('a duration-based exercise IS editable (Fase 2)', () {
       expect(
         isRoutineWebEditable(
             _routine(slot: _slot(exerciseMode: ExerciseMode.duration))),
-        isFalse,
+        isTrue,
       );
     });
 
@@ -143,11 +143,11 @@ void main() {
       );
     });
 
-    test('a duration set → not editable (Fase 2, still out of scope)', () {
+    test('a duration set IS editable (Fase 2)', () {
       expect(
         isRoutineWebEditable(
             _routine(slot: _slot(sets: const [SetSpec(durationSeconds: 30)]))),
-        isFalse,
+        isTrue,
       );
     });
   });

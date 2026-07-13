@@ -28,26 +28,23 @@ import '../../../../workout/domain/set_spec.dart';
 import '../../widgets/exercise_picker_dialog.dart';
 import 'routine_web_editability.dart';
 
-/// Web MVP del editor de rutinas — crea o edita la rutina de UN alumno
-/// (mirrors mobile's `RoutineEditorScreen(TrainerAssigning)`, alcance reducido
-/// a pedido: **una sola semana, sets normales** — sin supersets, sin
-/// periodización por semana, sin modos duración/rango de reps). El editor
-/// completo de mobile (~4900 líneas entre editor + picker) tiene un sistema
-/// de periodización real (REQ-PERIOD-*, ADR-WPRES-*); portarlo entero es un
-/// desarrollo mucho más grande, deferido a propósito.
+/// Editor de rutinas web — crea o edita la rutina de UN alumno (mirrors
+/// mobile's `RoutineEditorScreen(TrainerAssigning)`). Soporta, por ejercicio:
+/// reps fijas o rango (mín–máx), duración (por tiempo) y notas para el alumno
+/// (paridad Fases 1-2). Todavía NO: supersets (Fase 3) ni periodización
+/// multi-semana (Fase 4) — esas rutinas se siguen editando en mobile.
 ///
 /// **Modo edición** (`routineId != null`): carga la rutina y la abre en el
 /// form. Como `updateAssigned` pisa el array `days` entero, editar una rutina
-/// con periodización/supersets desde acá la truncaría silenciosamente — por eso
-/// [isRoutineWebEditable] actúa de compuerta: si la rutina usa campos avanzados,
-/// el editor NO la carga y muestra un aviso para editarla en la app mobile.
-/// Las rutinas creadas en web son siempre simples, así que se editan sin drama.
+/// con supersets/periodización desde acá la truncaría silenciosamente — por eso
+/// [isRoutineWebEditable] actúa de compuerta: si la rutina usa un campo aún no
+/// soportado, el editor NO la carga y muestra un aviso para editarla en mobile.
+/// Las rutinas creadas en web están siempre dentro de scope, así que
+/// round-tripean sin drama.
 ///
 /// La `Routine` que este editor escribe es 100% válida para el modelo de
 /// dominio completo (numWeeks: 1, weeklySets/activeWeeks vacíos = "todas las
-/// semanas", exerciseMode/repMode en sus defaults) — mobile puede leerla y
-/// editarla sin problema; lo que este editor NO expone es control fino sobre
-/// esos campos avanzados.
+/// semanas") — mobile puede leerla y editarla sin problema.
 class RoutineEditorWebScreen extends ConsumerStatefulWidget {
   const RoutineEditorWebScreen({
     super.key,
@@ -74,11 +71,13 @@ class _EditorSet {
   int? reps; // used when repMode == single
   int? repsMin; // used when repMode == range
   int? repsMax; // used when repMode == range
+  int? durationSeconds; // used when exerciseMode == duration
 }
 
 class _EditorSlot {
   Exercise? exercise;
   int restSeconds = 0;
+  ExerciseMode exerciseMode = ExerciseMode.reps;
   RepMode repMode = RepMode.single;
   String notes = '';
   List<_EditorSet> sets = [_EditorSet()];
@@ -182,15 +181,17 @@ class _RoutineEditorWebScreenState
 
   _EditorSlot _editorSlotFrom(RoutineSlot slot) {
     final effective = slot.effectiveSets;
-    // Derive the mode from the actual set data — robust against a stale repMode
-    // field (matches mobile's _repModeFromHydratedSets rationale).
-    final isRange =
+    // Derive the mode from the actual set data — robust against stale
+    // exerciseMode/repMode fields (mirrors mobile's _repModeFromHydratedSets).
+    final isDuration = effective.any((s) => (s.durationSeconds ?? 0) > 0);
+    final isRange = !isDuration &&
         effective.any((s) => s.repsMin != null || s.repsMax != null);
     final sets = effective
         .map((s) => _EditorSet()
           ..reps = s.reps
           ..repsMin = s.repsMin
           ..repsMax = s.repsMax
+          ..durationSeconds = s.durationSeconds
           ..weightKg = s.weightKg)
         .toList();
     return _EditorSlot()
@@ -203,6 +204,7 @@ class _RoutineEditorWebScreenState
         category: '',
       )
       ..restSeconds = slot.restSeconds
+      ..exerciseMode = isDuration ? ExerciseMode.duration : ExerciseMode.reps
       ..repMode = isRange ? RepMode.range : RepMode.single
       ..notes = slot.notes ?? ''
       ..sets = sets.isEmpty ? [_EditorSet()] : sets;
@@ -302,6 +304,7 @@ class _RoutineEditorWebScreenState
         ..reps = last?.reps
         ..repsMin = last?.repsMin
         ..repsMax = last?.repsMax
+        ..durationSeconds = last?.durationSeconds
         ..weightKg = last?.weightKg);
     });
   }
@@ -333,21 +336,37 @@ class _RoutineEditorWebScreenState
         int.tryParse(v.trim()));
   }
 
-  /// Toggles an exercise between fixed reps and a min–max range. Values carry
-  /// across the switch so the trainer doesn't retype (seed min/max from reps
-  /// and vice versa).
-  void _setSlotRepMode(int dayIndex, int slotIndex, RepMode mode) {
+  void _onSetDurationChanged(
+      int dayIndex, int slotIndex, int setIndex, String v) {
+    _markDirty();
+    setState(() => _days[dayIndex]
+        .slots[slotIndex]
+        .sets[setIndex]
+        .durationSeconds = int.tryParse(v.trim()));
+  }
+
+  /// Switches an exercise between fixed reps, a min–max range, and duration.
+  /// Reps ↔ range values carry across so the trainer doesn't retype.
+  void _setSlotMode(
+    int dayIndex,
+    int slotIndex,
+    ExerciseMode exerciseMode,
+    RepMode repMode,
+  ) {
     final slot = _days[dayIndex].slots[slotIndex];
-    if (slot.repMode == mode) return;
+    if (slot.exerciseMode == exerciseMode && slot.repMode == repMode) return;
     _markDirty();
     setState(() {
-      slot.repMode = mode;
-      for (final s in slot.sets) {
-        if (mode == RepMode.range) {
-          s.repsMin ??= s.reps;
-          s.repsMax ??= s.reps;
-        } else {
-          s.reps ??= s.repsMin ?? s.repsMax;
+      slot.exerciseMode = exerciseMode;
+      slot.repMode = repMode;
+      if (exerciseMode == ExerciseMode.reps) {
+        for (final s in slot.sets) {
+          if (repMode == RepMode.range) {
+            s.repsMin ??= s.reps;
+            s.repsMax ??= s.reps;
+          } else {
+            s.reps ??= s.repsMin ?? s.repsMax;
+          }
         }
       }
     });
@@ -388,7 +407,11 @@ class _RoutineEditorWebScreenState
       for (final slot in day.slots) {
         for (final set in slot.sets) {
           final name = slot.exercise?.name ?? 'Un ejercicio'; // i18n
-          if (slot.repMode == RepMode.range) {
+          if (slot.exerciseMode == ExerciseMode.duration) {
+            if (set.durationSeconds == null || set.durationSeconds! <= 0) {
+              return '$name tiene una serie sin duración.'; // i18n
+            }
+          } else if (slot.repMode == RepMode.range) {
             final min = set.repsMin, max = set.repsMax;
             if (min == null || min <= 0 || max == null || max < min) {
               return '$name tiene un rango de reps inválido (mín ≤ máx).'; // i18n
@@ -406,14 +429,21 @@ class _RoutineEditorWebScreenState
 
   RoutineSlot _buildSlot(_EditorSlot slot) {
     final exercise = slot.exercise!;
-    final isRange = slot.repMode == RepMode.range;
+    final isDuration = slot.exerciseMode == ExerciseMode.duration;
+    final isRange = !isDuration && slot.repMode == RepMode.range;
 
-    // Legacy field derivation mirrors mobile's buildRoutineSlot: for a range,
-    // targetRepsMin/Max span the per-set mins/maxes and targetReps stays empty.
+    // Legacy field derivation mirrors mobile's buildRoutineSlot.
     final int targetRepsMin;
     final int targetRepsMax;
     final List<int> targetReps;
-    if (isRange) {
+    int? durationSeconds;
+    if (isDuration) {
+      targetRepsMin = 0;
+      targetRepsMax = 0;
+      targetReps = const [];
+      durationSeconds =
+          slot.sets.isEmpty ? null : slot.sets.first.durationSeconds;
+    } else if (isRange) {
       final mins = slot.sets.map((s) => s.repsMin ?? 0).toList();
       final maxs = slot.sets.map((s) => s.repsMax ?? 0).toList();
       targetRepsMin = mins.isEmpty ? 0 : mins.reduce((a, b) => a < b ? a : b);
@@ -426,12 +456,14 @@ class _RoutineEditorWebScreenState
       targetReps = reps;
     }
 
-    final specs = slot.sets
-        .map((s) => isRange
-            ? SetSpec(
-                repsMin: s.repsMin, repsMax: s.repsMax, weightKg: s.weightKg)
-            : SetSpec(reps: s.reps, weightKg: s.weightKg))
-        .toList();
+    final specs = slot.sets.map((s) {
+      if (isDuration) return SetSpec(durationSeconds: s.durationSeconds);
+      if (isRange) {
+        return SetSpec(
+            repsMin: s.repsMin, repsMax: s.repsMax, weightKg: s.weightKg);
+      }
+      return SetSpec(reps: s.reps, weightKg: s.weightKg);
+    }).toList();
     final notes = slot.notes.trim();
 
     return RoutineSlot(
@@ -442,13 +474,14 @@ class _RoutineEditorWebScreenState
       targetRepsMin: targetRepsMin,
       targetRepsMax: targetRepsMax,
       restSeconds: slot.restSeconds,
-      targetWeightKg: specs.isEmpty ? null : specs.first.weightKg,
+      targetWeightKg: isDuration || specs.isEmpty ? null : specs.first.weightKg,
       targetReps: targetReps,
+      durationSeconds: durationSeconds,
+      exerciseMode: slot.exerciseMode,
       repMode: slot.repMode,
       notes: notes.isEmpty ? null : notes,
       sets: specs,
-      // exerciseMode defaults to reps; weeklySets/activeWeeks default to empty
-      // ([] = single-week / "present in all weeks").
+      // weeklySets/activeWeeks default to empty ([] = single-week / all weeks).
     );
   }
 
@@ -701,10 +734,12 @@ class _RoutineEditorWebScreenState
                                         _onSetRepsMinChanged(i, s, set, v),
                                     onSetRepsMaxChanged: (s, set, v) =>
                                         _onSetRepsMaxChanged(i, s, set, v),
+                                    onSetDurationChanged: (s, set, v) =>
+                                        _onSetDurationChanged(i, s, set, v),
                                     onSetWeightChanged: (s, set, v) =>
                                         _onSetWeightChanged(i, s, set, v),
-                                    onRepModeChanged: (s, mode) =>
-                                        _setSlotRepMode(i, s, mode),
+                                    onModeChanged: (s, em, rm) =>
+                                        _setSlotMode(i, s, em, rm),
                                     onNotesChanged: (s, v) =>
                                         _onNotesChanged(i, s, v),
                                   ),
@@ -957,8 +992,9 @@ class _DayCard extends StatelessWidget {
     required this.onSetRepsChanged,
     required this.onSetRepsMinChanged,
     required this.onSetRepsMaxChanged,
+    required this.onSetDurationChanged,
     required this.onSetWeightChanged,
-    required this.onRepModeChanged,
+    required this.onModeChanged,
     required this.onNotesChanged,
   });
 
@@ -980,8 +1016,11 @@ class _DayCard extends StatelessWidget {
   final void Function(int slotIndex, int setIndex, String value)
       onSetRepsMaxChanged;
   final void Function(int slotIndex, int setIndex, String value)
+      onSetDurationChanged;
+  final void Function(int slotIndex, int setIndex, String value)
       onSetWeightChanged;
-  final void Function(int slotIndex, RepMode mode) onRepModeChanged;
+  final void Function(int slotIndex, ExerciseMode exerciseMode, RepMode repMode)
+      onModeChanged;
   final void Function(int slotIndex, String value) onNotesChanged;
 
   @override
@@ -1038,8 +1077,9 @@ class _DayCard extends StatelessWidget {
               onSetRepsChanged: (set, v) => onSetRepsChanged(i, set, v),
               onSetRepsMinChanged: (set, v) => onSetRepsMinChanged(i, set, v),
               onSetRepsMaxChanged: (set, v) => onSetRepsMaxChanged(i, set, v),
+              onSetDurationChanged: (set, v) => onSetDurationChanged(i, set, v),
               onSetWeightChanged: (set, v) => onSetWeightChanged(i, set, v),
-              onRepModeChanged: (mode) => onRepModeChanged(i, mode),
+              onModeChanged: (em, rm) => onModeChanged(i, em, rm),
               onNotesChanged: (v) => onNotesChanged(i, v),
             ),
           ],
@@ -1080,8 +1120,9 @@ class _SlotCard extends StatelessWidget {
     required this.onSetRepsChanged,
     required this.onSetRepsMinChanged,
     required this.onSetRepsMaxChanged,
+    required this.onSetDurationChanged,
     required this.onSetWeightChanged,
-    required this.onRepModeChanged,
+    required this.onModeChanged,
     required this.onNotesChanged,
   });
 
@@ -1098,8 +1139,9 @@ class _SlotCard extends StatelessWidget {
   final void Function(int setIndex, String value) onSetRepsChanged;
   final void Function(int setIndex, String value) onSetRepsMinChanged;
   final void Function(int setIndex, String value) onSetRepsMaxChanged;
+  final void Function(int setIndex, String value) onSetDurationChanged;
   final void Function(int setIndex, String value) onSetWeightChanged;
-  final ValueChanged<RepMode> onRepModeChanged;
+  final void Function(ExerciseMode exerciseMode, RepMode repMode) onModeChanged;
   final ValueChanged<String> onNotesChanged;
 
   @override
@@ -1149,21 +1191,32 @@ class _SlotCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 6),
-          // Reps fijas vs rango (mín–máx) — Fase 1 paridad con mobile.
+          // Modo del ejercicio: reps fijas / rango (mín–máx) / tiempo (paridad
+          // con mobile, Fases 1-2). exerciseMode + repMode combinados en 3 chips.
           Row(
             children: [
               _ModeChip(
                 label: 'Reps', // i18n
-                selected: slot.repMode == RepMode.single,
+                selected: slot.exerciseMode == ExerciseMode.reps &&
+                    slot.repMode == RepMode.single,
                 palette: palette,
-                onTap: () => onRepModeChanged(RepMode.single),
+                onTap: () => onModeChanged(ExerciseMode.reps, RepMode.single),
               ),
               const SizedBox(width: 6),
               _ModeChip(
                 label: 'Rango', // i18n
-                selected: slot.repMode == RepMode.range,
+                selected: slot.exerciseMode == ExerciseMode.reps &&
+                    slot.repMode == RepMode.range,
                 palette: palette,
-                onTap: () => onRepModeChanged(RepMode.range),
+                onTap: () => onModeChanged(ExerciseMode.reps, RepMode.range),
+              ),
+              const SizedBox(width: 6),
+              _ModeChip(
+                label: 'Tiempo', // i18n
+                selected: slot.exerciseMode == ExerciseMode.duration,
+                palette: palette,
+                onTap: () =>
+                    onModeChanged(ExerciseMode.duration, RepMode.single),
               ),
             ],
           ),
@@ -1193,12 +1246,14 @@ class _SlotCard extends StatelessWidget {
               index: i,
               set: slot.sets[i],
               palette: palette,
+              exerciseMode: slot.exerciseMode,
               repMode: slot.repMode,
               canRemove: slot.sets.length > 1,
               onRemove: () => onRemoveSet(i),
               onRepsChanged: (v) => onSetRepsChanged(i, v),
               onRepsMinChanged: (v) => onSetRepsMinChanged(i, v),
               onRepsMaxChanged: (v) => onSetRepsMaxChanged(i, v),
+              onDurationChanged: (v) => onSetDurationChanged(i, v),
               onWeightChanged: (v) => onSetWeightChanged(i, v),
             ),
           Align(
@@ -1243,29 +1298,34 @@ class _SetRow extends StatelessWidget {
     required this.index,
     required this.set,
     required this.palette,
+    required this.exerciseMode,
     required this.repMode,
     required this.canRemove,
     required this.onRemove,
     required this.onRepsChanged,
     required this.onRepsMinChanged,
     required this.onRepsMaxChanged,
+    required this.onDurationChanged,
     required this.onWeightChanged,
   });
 
   final int index;
   final _EditorSet set;
   final AppPalette palette;
+  final ExerciseMode exerciseMode;
   final RepMode repMode;
   final bool canRemove;
   final VoidCallback onRemove;
   final ValueChanged<String> onRepsChanged;
   final ValueChanged<String> onRepsMinChanged;
   final ValueChanged<String> onRepsMaxChanged;
+  final ValueChanged<String> onDurationChanged;
   final ValueChanged<String> onWeightChanged;
 
   @override
   Widget build(BuildContext context) {
-    final isRange = repMode == RepMode.range;
+    final isDuration = exerciseMode == ExerciseMode.duration;
+    final isRange = !isDuration && repMode == RepMode.range;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 3),
       child: Row(
@@ -1276,35 +1336,45 @@ class _SetRow extends StatelessWidget {
                 style: GoogleFonts.barlowCondensed(
                     color: palette.textMuted, fontWeight: FontWeight.w700)),
           ),
-          if (isRange) ...[
+          if (isDuration)
+            // Duration exercises (planks, cardio) have no weight — just seconds.
             Expanded(
               child: _numberField(
-                  initial: set.repsMin?.toString() ?? '',
-                  hint: 'mín', // i18n
-                  onChanged: onRepsMinChanged),
-            ),
+                  initial: set.durationSeconds?.toString() ?? '',
+                  hint: 'seg', // i18n
+                  onChanged: onDurationChanged),
+            )
+          else ...[
+            if (isRange) ...[
+              Expanded(
+                child: _numberField(
+                    initial: set.repsMin?.toString() ?? '',
+                    hint: 'mín', // i18n
+                    onChanged: onRepsMinChanged),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _numberField(
+                    initial: set.repsMax?.toString() ?? '',
+                    hint: 'máx', // i18n
+                    onChanged: onRepsMaxChanged),
+              ),
+            ] else
+              Expanded(
+                child: _numberField(
+                    initial: set.reps?.toString() ?? '',
+                    hint: 'reps', // i18n
+                    onChanged: onRepsChanged),
+              ),
             const SizedBox(width: 8),
             Expanded(
               child: _numberField(
-                  initial: set.repsMax?.toString() ?? '',
-                  hint: 'máx', // i18n
-                  onChanged: onRepsMaxChanged),
+                  initial: set.weightKg?.toString() ?? '',
+                  hint: 'kg', // i18n
+                  decimal: true,
+                  onChanged: onWeightChanged),
             ),
-          ] else
-            Expanded(
-              child: _numberField(
-                  initial: set.reps?.toString() ?? '',
-                  hint: 'reps', // i18n
-                  onChanged: onRepsChanged),
-            ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: _numberField(
-                initial: set.weightKg?.toString() ?? '',
-                hint: 'kg', // i18n
-                decimal: true,
-                onChanged: onWeightChanged),
-          ),
+          ],
           IconButton(
             tooltip: 'Quitar set', // i18n
             icon: Icon(TreinoIcon.close, size: 14, color: palette.textMuted),

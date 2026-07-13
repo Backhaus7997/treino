@@ -180,6 +180,38 @@ Routine _rangeRoutine({String id = 'r2'}) => Routine(
       ],
     );
 
+/// A web-editable routine that uses a DURATION exercise (Fase 2).
+Routine _durationRoutine({String id = 'r3'}) => Routine(
+      id: id,
+      name: 'Core',
+      split: 'Full Body',
+      level: ExperienceLevel.beginner,
+      source: RoutineSource.trainerAssigned,
+      assignedBy: _trainerId,
+      assignedTo: _athleteId,
+      visibility: RoutineVisibility.private,
+      days: const [
+        RoutineDay(
+          dayNumber: 1,
+          name: 'Día A',
+          slots: [
+            RoutineSlot(
+              exerciseId: 'plank',
+              exerciseName: 'Plancha',
+              muscleGroup: 'core',
+              targetSets: 1,
+              targetRepsMin: 0,
+              targetRepsMax: 0,
+              restSeconds: 30,
+              exerciseMode: ExerciseMode.duration,
+              durationSeconds: 60,
+              sets: [SetSpec(durationSeconds: 60)],
+            ),
+          ],
+        ),
+      ],
+    );
+
 /// Fills name + split and adds one exercise (via the mocked exercise picker
 /// data) to the first day, then sets valid reps on its single default set.
 Future<void> _fillMinimalValidForm(WidgetTester tester) async {
@@ -600,6 +632,102 @@ void main() {
       expect(slot.sets.single.repsMin, 8);
       expect(slot.sets.single.repsMax, 12);
       expect(slot.notes, 'Controlá la bajada');
+    });
+  });
+
+  group('RoutineEditorWebScreen — duración (Fase 2)', () {
+    testWidgets('"Tiempo" saves a duration exercise (seconds, no reps)',
+        (tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.createAssigned(any())).thenAnswer(
+        (i) async => i.positionalArguments.first as Routine,
+      );
+      await _pumpEditor(tester, repo: repo);
+
+      await tester.enterText(
+          find.byKey(const Key('routine_editor_name_field')), 'Core');
+      await tester.enterText(
+          find.byKey(const Key('routine_editor_split_field')), 'Full Body');
+      await tester.tap(find.text('Agregar ejercicio'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Press de Banca'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Agregar (1)'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Tiempo'));
+      await tester.pumpAndSettle();
+
+      // 'seg' (exact) matches only the duration field hint, not 'Descanso (seg)'.
+      await tester.enterText(
+        find.ancestor(
+            of: find.text('seg'), matching: find.byType(TextFormField)),
+        '60',
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
+      await tester.pumpAndSettle();
+
+      final routine = verify(() => repo.createAssigned(captureAny()))
+          .captured
+          .single as Routine;
+      final slot = routine.days.single.slots.single;
+      expect(slot.exerciseMode, ExerciseMode.duration);
+      expect(slot.sets.single.durationSeconds, 60);
+      expect(slot.sets.single.reps, isNull);
+    });
+
+    testWidgets('a duration set without seconds blocks submit', (tester) async {
+      final repo = _MockRoutineRepository();
+      await _pumpEditor(tester, repo: repo);
+
+      await tester.enterText(
+          find.byKey(const Key('routine_editor_name_field')), 'Core');
+      await tester.enterText(
+          find.byKey(const Key('routine_editor_split_field')), 'Full Body');
+      await tester.tap(find.text('Agregar ejercicio'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Press de Banca'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Agregar (1)'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Tiempo'));
+      await tester.pumpAndSettle();
+
+      // Seconds left empty.
+      await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('sin duración'), findsOneWidget);
+      verifyNever(() => repo.createAssigned(any()));
+    });
+
+    testWidgets(
+        'edit mode loads a duration routine and re-saves it as duration',
+        (tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.getById(any()))
+          .thenAnswer((_) async => _durationRoutine());
+      when(() => repo.updateAssigned(
+            uid: any(named: 'uid'),
+            draft: any(named: 'draft'),
+          )).thenAnswer((i) async => i.namedArguments[#draft] as Routine);
+      await _pumpEditor(tester, repo: repo, routineId: 'r3');
+
+      expect(find.text('60'), findsWidgets); // seconds loaded into the field
+      expect(find.text('reps'), findsNothing); // not in reps mode
+
+      await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
+      await tester.pumpAndSettle();
+
+      final draft = verify(() => repo.updateAssigned(
+            uid: any(named: 'uid'),
+            draft: captureAny(named: 'draft'),
+          )).captured.single as Routine;
+      final slot = draft.days.single.slots.single;
+      expect(slot.exerciseMode, ExerciseMode.duration);
+      expect(slot.sets.single.durationSeconds, 60);
     });
   });
 }
