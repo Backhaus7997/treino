@@ -41,8 +41,8 @@ UserPublicProfile _pub(String uid, String name) => UserPublicProfile(
 
 // ─── Test harness ─────────────────────────────────────────────────────────────
 
-/// Pumps RutinasScreen behind a GoRouter so its `context.push('/routine-editor/…')`
-/// has somewhere to go. The editor route renders a marker text we can assert on.
+/// Pumps RutinasScreen behind a GoRouter so its `context.push('/rutinas/:id')`
+/// has somewhere to go. That route renders a marker text we can assert on.
 /// Each link's athleteId gets a stubbed public profile.
 Future<void> _pumpRutinas(
   WidgetTester tester, {
@@ -65,9 +65,9 @@ Future<void> _pumpRutinas(
         builder: (_, __) => const Scaffold(body: RutinasScreen()),
       ),
       GoRoute(
-        path: '/routine-editor/:athleteId',
+        path: '/rutinas/:athleteId',
         builder: (_, state) => Scaffold(
-          body: Text('EDITOR ${state.pathParameters['athleteId']}'),
+          body: Text('ROUTINES ${state.pathParameters['athleteId']}'),
         ),
       ),
     ],
@@ -148,7 +148,7 @@ void main() {
       );
     });
 
-    testWidgets('tapping an athlete navigates to the editor for that athlete',
+    testWidgets('tapping an athlete opens that athlete\'s routines list',
         (tester) async {
       await _pumpRutinas(tester, links: [
         _link(id: '1', status: TrainerLinkStatus.active, athleteId: 'a1'),
@@ -159,7 +159,7 @@ void main() {
       await tester.tap(find.text('Ana Activa'));
       await tester.pumpAndSettle();
 
-      expect(find.text('EDITOR a1'), findsOneWidget);
+      expect(find.text('ROUTINES a1'), findsOneWidget);
     });
   });
 }

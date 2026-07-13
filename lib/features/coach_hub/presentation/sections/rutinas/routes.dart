@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
+import 'package:treino/features/coach_hub/presentation/sections/rutinas/athlete_routines_screen.dart';
 import 'package:treino/features/coach_hub/presentation/sections/rutinas/rutinas_screen.dart';
 import 'package:treino/features/coach_hub/presentation/shell/coach_hub_page.dart';
 import 'package:treino/features/coach_hub/presentation/shell/sidebar_item.dart';
@@ -17,6 +18,13 @@ final List<RouteBase> rutinasRoutes = [
   GoRoute(
     path: '/rutinas',
     pageBuilder: (_, __) => coachHubPage(const RutinasScreen()),
+  ),
+  GoRoute(
+    // Rutinas ya asignadas a un alumno → crear nueva o editar existentes.
+    path: '/rutinas/:athleteId',
+    pageBuilder: (_, state) => coachHubPage(
+      AthleteRoutinesScreen(athleteId: state.pathParameters['athleteId']!),
+    ),
   ),
 ];
 

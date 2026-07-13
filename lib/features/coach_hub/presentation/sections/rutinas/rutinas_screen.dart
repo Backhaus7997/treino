@@ -16,12 +16,12 @@ import 'package:treino/features/profile/application/user_public_profile_provider
 
 /// Sección «Rutinas» del Coach Hub web.
 ///
-/// Una rutina se asigna a UN alumno, así que el editor necesita un destino.
+/// Una rutina se asigna a UN alumno, así que el flujo necesita un destino.
 /// El sidebar es global (no está parado sobre ningún alumno), por eso esta
 /// pantalla es el punto de entrada: lista los alumnos vinculados y, al tocar
-/// uno, abre el editor (`/routine-editor/:athleteId`) para asignarle una
-/// rutina. Mismo flujo que mobile ("Asignar rutina" → alumno → editor),
-/// expuesto también desde el menú lateral.
+/// uno, abre sus rutinas (`/rutinas/:athleteId`) donde el PF ve las que ya le
+/// cargó y puede crear o editar. Mismo espíritu que mobile, expuesto desde el
+/// menú lateral.
 class RutinasScreen extends ConsumerWidget {
   const RutinasScreen({super.key});
 
@@ -110,7 +110,7 @@ class _AthleteRowState extends ConsumerState<_AthleteRow> {
       onExit: (_) => setState(() => _hovered = false),
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: () => context.push('/routine-editor/${widget.athleteId}'),
+        onTap: () => context.push('/rutinas/${widget.athleteId}'),
         child: Container(
           margin: const EdgeInsets.only(bottom: 8),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
