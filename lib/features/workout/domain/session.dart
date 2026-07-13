@@ -30,3 +30,11 @@ class Session with _$Session {
   factory Session.fromJson(Map<String, Object?> json) =>
       _$SessionFromJson(json);
 }
+
+extension SessionCounting on Session {
+  /// Cuenta como entrenamiento HECHO: terminado de verdad, no abandonado.
+  /// Abandonar guarda `status=finished` con `wasFullyCompleted=false`
+  /// (ver `SessionNotifier.abandonSession`), así que `status` solo no alcanza.
+  bool get countsAsWorkout =>
+      status == SessionStatus.finished && wasFullyCompleted;
+}

@@ -18,6 +18,7 @@ class WeeklyInsights {
     required this.targetByGroup,
     this.streak = 0,
     this.monthSessionsCount = 0,
+    this.hasEverCompletedAnyWorkout = false,
   });
 
   /// Lunes 00:00 hora local de la semana actual.
@@ -56,6 +57,14 @@ class WeeklyInsights {
   /// Se basa en el mes de `startedAt.toLocal()`, no en ventana de 30 días.
   final int monthSessionsCount;
 
+  /// `true` si el usuario completó AL MENOS un entrenamiento alguna vez
+  /// (`Session.countsAsWorkout`), sin importar si la semana mostrada tiene
+  /// sesiones. Desacopla el hub de reportes históricos (`_StatsHubTileList`)
+  /// del `_EmptyState` de onboarding: una semana en 0 no implica cuenta
+  /// nueva. Derivado de la MISMA lectura de sesiones que ya hace este
+  /// provider — no agrega un fetch extra.
+  final bool hasEverCompletedAnyWorkout;
+
   WeeklyInsights copyWith({
     DateTime? weekStart,
     DateTime? weekEnd,
@@ -66,6 +75,7 @@ class WeeklyInsights {
     Map<MuscleGroupDisplay, int>? targetByGroup,
     int? streak,
     int? monthSessionsCount,
+    bool? hasEverCompletedAnyWorkout,
   }) =>
       WeeklyInsights(
         weekStart: weekStart ?? this.weekStart,
@@ -77,6 +87,8 @@ class WeeklyInsights {
         targetByGroup: targetByGroup ?? this.targetByGroup,
         streak: streak ?? this.streak,
         monthSessionsCount: monthSessionsCount ?? this.monthSessionsCount,
+        hasEverCompletedAnyWorkout:
+            hasEverCompletedAnyWorkout ?? this.hasEverCompletedAnyWorkout,
       );
 
   @override
@@ -91,7 +103,8 @@ class WeeklyInsights {
           mapEquals(other.setsByGroup, setsByGroup) &&
           mapEquals(other.targetByGroup, targetByGroup) &&
           other.streak == streak &&
-          other.monthSessionsCount == monthSessionsCount;
+          other.monthSessionsCount == monthSessionsCount &&
+          other.hasEverCompletedAnyWorkout == hasEverCompletedAnyWorkout;
 
   @override
   int get hashCode => Object.hash(
@@ -104,6 +117,7 @@ class WeeklyInsights {
         _stableMapHash(targetByGroup),
         streak,
         monthSessionsCount,
+        hasEverCompletedAnyWorkout,
       );
 
   /// MapEntry tiene identity-based hash, así que iteramos ordenado por

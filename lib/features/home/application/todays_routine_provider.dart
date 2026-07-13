@@ -7,7 +7,6 @@ import '../../workout/application/user_routines_providers.dart';
 import '../../workout/domain/routine.dart';
 import '../../workout/domain/routine_day.dart';
 import '../../workout/domain/session.dart';
-import '../../workout/domain/session_status.dart';
 import 'active_routine_provider.dart';
 
 /// Resolved "what to train today" snapshot for the home `EmpezarEntrenamientoCard`.
@@ -85,7 +84,7 @@ final todaysRoutineProvider = FutureProvider.autoDispose<TodaysRoutine?>(
     final sessions = await ref.watch(sessionsByUidProvider(uid).future);
     Session? lastFinished;
     for (final s in sessions) {
-      if (s.routineId == routine.id && s.status == SessionStatus.finished) {
+      if (s.routineId == routine.id && s.countsAsWorkout) {
         lastFinished = s;
         break;
       }

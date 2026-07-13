@@ -3,7 +3,9 @@ import 'package:treino/core/utils/streak_calculator.dart';
 import 'package:treino/features/workout/domain/session.dart';
 import 'package:treino/features/workout/domain/session_status.dart';
 
-// Helper to make a finished session on a given local date.
+// Helper to make a COMPLETED (not abandoned) finished session on a given
+// local date. `wasFullyCompleted: true` is required — `status: finished`
+// alone also matches an abandoned session (see Session.countsAsWorkout).
 Session _finishedOn(DateTime localDate, {String id = 's'}) => Session(
       id: id,
       uid: 'u1',
@@ -11,6 +13,7 @@ Session _finishedOn(DateTime localDate, {String id = 's'}) => Session(
       routineName: 'Test',
       startedAt: localDate,
       status: SessionStatus.finished,
+      wasFullyCompleted: true,
     );
 
 void main() {
@@ -94,6 +97,30 @@ void main() {
       ];
       final result = computeStreak(sessions, now: today);
       expect(result, 1);
+    });
+
+    // Bug fix (abandoned-session-streak-reports): an abandoned session
+    // (status=finished, wasFullyCompleted=false — see
+    // `SessionNotifier.abandonSession`) must NOT count towards the streak.
+    test('abandoned session today does NOT reactivate/count the streak', () {
+      final today = DateTime(2026, 5, 14);
+      final sessions = [
+        Session(
+          id: 'abandoned-today',
+          uid: 'u1',
+          routineId: 'r1',
+          routineName: 'Test',
+          startedAt: DateTime(2026, 5, 14),
+          status: SessionStatus.finished,
+          wasFullyCompleted: false,
+        ),
+        _finishedOn(DateTime(2026, 5, 12), id: 's2'),
+        _finishedOn(DateTime(2026, 5, 11), id: 's3'),
+      ];
+      final result = computeStreak(sessions, now: today);
+      // Today's session is abandoned (doesn't count) and yesterday (5/13) has
+      // no session at all → gap breaks the chain → streak is 0, NOT 1 or 3.
+      expect(result, 0);
     });
   });
 }

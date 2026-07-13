@@ -51,6 +51,7 @@ void main() {
             id: 's1',
             startedAt: now,
             status: SessionStatus.finished,
+            wasFullyCompleted: true,
             durationMin: 45,
           ),
         ]);
@@ -82,12 +83,14 @@ void main() {
             id: 's1',
             startedAt: monthStart,
             status: SessionStatus.finished,
+            wasFullyCompleted: true,
             durationMin: 40,
           ),
           makeSession(
             id: 's2',
             startedAt: DateTime(monthStart.year, monthStart.month, 2),
             status: SessionStatus.finished,
+            wasFullyCompleted: true,
             durationMin: 25,
           ),
           // A non-finished session's duration must NOT be counted.
@@ -140,6 +143,7 @@ void main() {
             id: 's1',
             startedAt: today,
             status: SessionStatus.finished,
+            wasFullyCompleted: true,
             durationMin: 45,
           ),
         ]);
@@ -169,12 +173,14 @@ void main() {
             id: 's1',
             startedAt: today,
             status: SessionStatus.finished,
+            wasFullyCompleted: true,
             durationMin: 45,
           ),
           makeSession(
             id: 's2',
             startedAt: today.subtract(const Duration(days: 1)),
             status: SessionStatus.finished,
+            wasFullyCompleted: true,
           ),
         ]);
     when(() => repo.listSetLogs(uid: 'u1', sessionId: any(named: 'sessionId')))
@@ -215,6 +221,7 @@ void main() {
             id: 's1',
             startedAt: DateTime(olderMonth.year, olderMonth.month, 10),
             status: SessionStatus.finished,
+            wasFullyCompleted: true,
           ),
         ]);
     when(() => repo.listSetLogs(uid: 'u1', sessionId: any(named: 'sessionId')))
@@ -278,6 +285,7 @@ void main() {
             id: 's1',
             startedAt: currentMonthStart,
             status: SessionStatus.finished,
+            wasFullyCompleted: true,
             durationMin: 45,
           ),
         ]);
@@ -320,6 +328,7 @@ void main() {
             id: 's1',
             startedAt: DateTime(olderMonth.year, olderMonth.month, 10),
             status: SessionStatus.finished,
+            wasFullyCompleted: true,
           ),
         ]);
     when(() => repo.listSetLogs(uid: 'u1', sessionId: any(named: 'sessionId')))

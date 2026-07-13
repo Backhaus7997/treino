@@ -42,17 +42,20 @@ void main() {
               id: 's1',
               startedAt: DateTime(2026, 6, 1),
               status: SessionStatus.finished,
+              wasFullyCompleted: true,
             ),
             makeSession(
               id: 's2',
               startedAt: DateTime(2026, 6, 30),
               status: SessionStatus.finished,
+              wasFullyCompleted: true,
             ),
             // Outside the selected month → excluded.
             makeSession(
               id: 's3',
               startedAt: DateTime(2026, 5, 15),
               status: SessionStatus.finished,
+              wasFullyCompleted: true,
             ),
           ]);
 
@@ -80,11 +83,15 @@ void main() {
       final today = DateTime(now.year, now.month, now.day);
       when(() => repo.listByUid('u1')).thenAnswer((_) async => [
             makeSession(
-                id: 's1', startedAt: today, status: SessionStatus.finished),
+                id: 's1',
+                startedAt: today,
+                status: SessionStatus.finished,
+                wasFullyCompleted: true),
             makeSession(
               id: 's2',
               startedAt: today.subtract(const Duration(days: 1)),
               status: SessionStatus.finished,
+              wasFullyCompleted: true,
             ),
           ]);
 

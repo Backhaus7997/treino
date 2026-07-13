@@ -48,6 +48,7 @@ Session _todaySession(String athleteId) {
     startedAt: now,
     finishedAt: now,
     status: SessionStatus.finished,
+    wasFullyCompleted: true,
   );
 }
 
@@ -106,6 +107,34 @@ void main() {
       final entries = await _read(container);
 
       expect(entries.map((e) => e.athleteId), contains('a1'));
+    });
+
+    // Bug fix (abandoned-session-streak-reports): abandonSession() saves
+    // status=finished with wasFullyCompleted=false — an abandon today must
+    // NOT make the athlete appear in "Entrenaron hoy".
+    test("today's abandoned session does NOT count as trained today", () async {
+      final now = DateTime.now().toUtc();
+      final abandonedToday = Session(
+        id: 'abandoned-a1',
+        uid: 'a1',
+        routineId: 'r1',
+        routineName: 'Rutina',
+        startedAt: now,
+        finishedAt: now,
+        status: SessionStatus.finished,
+        wasFullyCompleted: false,
+      );
+      final container = _buildContainer(
+        links: [_link('a1', sharedWithTrainer: true)],
+        sessionsByAthleteId: {
+          'a1': [abandonedToday],
+        },
+      );
+      addTearDown(container.dispose);
+
+      final entries = await _read(container);
+
+      expect(entries.map((e) => e.athleteId), isNot(contains('a1')));
     });
 
     // Regression for the dead gate: an active athlete with sharedWithTrainer

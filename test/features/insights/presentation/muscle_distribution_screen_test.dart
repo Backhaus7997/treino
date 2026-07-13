@@ -52,6 +52,7 @@ void main() {
             id: 's1',
             startedAt: todayOnly.add(const Duration(hours: 9)),
             status: SessionStatus.finished,
+            wasFullyCompleted: true,
             routineId: 'r1',
           ),
         ]);
@@ -105,12 +106,14 @@ void main() {
             id: 's-recent',
             startedAt: recentDay.add(const Duration(hours: 9)),
             status: SessionStatus.finished,
+            wasFullyCompleted: true,
             routineId: 'r1',
           ),
           makeSession(
             id: 's-older',
             startedAt: olderDay.add(const Duration(hours: 9)),
             status: SessionStatus.finished,
+            wasFullyCompleted: true,
             routineId: 'r1',
           ),
         ]);

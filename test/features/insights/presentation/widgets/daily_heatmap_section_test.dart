@@ -68,6 +68,7 @@ void main() {
       uid: alumnoUid,
       startedAt: todayOnly.add(const Duration(hours: 9)),
       status: SessionStatus.finished,
+      wasFullyCompleted: true,
       routineId: 'r1',
     );
 
@@ -156,6 +157,7 @@ void main() {
             uid: alumnoUid,
             startedAt: todayOnly.add(const Duration(hours: 9)),
             status: SessionStatus.finished,
+            wasFullyCompleted: true,
             routineId: 'r1',
           ),
         ]);

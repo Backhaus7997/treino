@@ -65,24 +65,28 @@ void main() {
               id: 's-start',
               startedAt: atWeekStart,
               status: SessionStatus.finished,
+              wasFullyCompleted: true,
               routineId: 'r1',
             ),
             makeSession(
               id: 's-end',
               startedAt: atWeekEndBoundary,
               status: SessionStatus.finished,
+              wasFullyCompleted: true,
               routineId: 'r1',
             ),
             makeSession(
               id: 's-before',
               startedAt: justBeforeStart,
               status: SessionStatus.finished,
+              wasFullyCompleted: true,
               routineId: 'r1',
             ),
             makeSession(
               id: 's-next',
               startedAt: nextMonday,
               status: SessionStatus.finished,
+              wasFullyCompleted: true,
               routineId: 'r1',
             ),
           ]);
@@ -124,6 +128,7 @@ void main() {
               id: 's1',
               startedAt: now,
               status: SessionStatus.finished,
+              wasFullyCompleted: true,
               routineId: 'r1',
             ),
           ]);
@@ -165,12 +170,14 @@ void main() {
               id: 's-new',
               startedAt: newer,
               status: SessionStatus.finished,
+              wasFullyCompleted: true,
               routineId: 'rNew',
             ),
             makeSession(
               id: 's-old',
               startedAt: older,
               status: SessionStatus.finished,
+              wasFullyCompleted: true,
               routineId: 'rOld',
             ),
           ]);
@@ -227,12 +234,14 @@ void main() {
               id: 'sA',
               startedAt: dayA,
               status: SessionStatus.finished,
+              wasFullyCompleted: true,
               routineId: 'r1',
             ),
             makeSession(
               id: 'sB',
               startedAt: dayB,
               status: SessionStatus.finished,
+              wasFullyCompleted: true,
               routineId: 'r1',
             ),
           ]);
@@ -307,6 +316,7 @@ void main() {
             uid: 'A',
             startedAt: now,
             status: SessionStatus.finished,
+            wasFullyCompleted: true,
             routineId: 'r1',
           ),
         ];

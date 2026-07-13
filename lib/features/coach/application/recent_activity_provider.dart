@@ -4,7 +4,6 @@ import '../../../core/utils/argentina_time.dart';
 import '../../workout/application/session_providers.dart'
     show finishedInWindowByUidProvider;
 import '../../workout/domain/session.dart';
-import '../../workout/domain/session_status.dart';
 import '../domain/trainer_link_status.dart';
 import 'trainer_link_providers.dart' show trainerLinksStreamProvider;
 
@@ -77,7 +76,7 @@ final recentActivityProvider =
     }
 
     for (final s in sessionsAsync.valueOrNull ?? const <Session>[]) {
-      if (s.status != SessionStatus.finished || s.finishedAt == null) continue;
+      if (!s.countsAsWorkout || s.finishedAt == null) continue;
       entries.add(RecentActivityEntry(athleteId: athleteId, session: s));
     }
   }

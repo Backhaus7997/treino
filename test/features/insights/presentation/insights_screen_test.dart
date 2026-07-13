@@ -68,12 +68,14 @@ void main() {
       id: 's-today',
       startedAt: todayOnly.add(const Duration(hours: 9)),
       status: SessionStatus.finished,
+      wasFullyCompleted: true,
       routineId: 'r1',
     );
     final pastSession = makeSession(
       id: 's-past',
       startedAt: pastDay.add(const Duration(hours: 9)),
       status: SessionStatus.finished,
+      wasFullyCompleted: true,
       routineId: 'r1',
     );
 
@@ -203,6 +205,7 @@ void main() {
       id: 's-today',
       startedAt: todayOnly.add(const Duration(hours: 9)),
       status: SessionStatus.finished,
+      wasFullyCompleted: true,
       routineId: 'r1',
     );
 
@@ -277,12 +280,14 @@ void main() {
       id: 's-current',
       startedAt: currentWeekStart.add(const Duration(hours: 9)),
       status: SessionStatus.finished,
+      wasFullyCompleted: true,
       routineId: 'r1',
     );
     final prevWeekSession = makeSession(
       id: 's-prev',
       startedAt: prevWeekStart.add(const Duration(hours: 9)),
       status: SessionStatus.finished,
+      wasFullyCompleted: true,
       routineId: 'r1',
     );
 
@@ -348,6 +353,7 @@ void main() {
             id: 's1',
             startedAt: todayOnly.add(const Duration(hours: 9)),
             status: SessionStatus.finished,
+            wasFullyCompleted: true,
             routineId: 'r1',
           ),
         ]);
@@ -397,12 +403,14 @@ void main() {
       id: 's-current',
       startedAt: todayOnly.add(const Duration(hours: 9)),
       status: SessionStatus.finished,
+      wasFullyCompleted: true,
       routineId: 'r1',
     );
     final prevWeekSession = makeSession(
       id: 's-prev-mon',
       startedAt: prevWeekMonday.add(const Duration(hours: 9)),
       status: SessionStatus.finished,
+      wasFullyCompleted: true,
       routineId: 'r1',
     );
 
@@ -465,6 +473,7 @@ void main() {
             id: 's1',
             startedAt: todayOnly.add(const Duration(hours: 9)),
             status: SessionStatus.finished,
+            wasFullyCompleted: true,
             routineId: 'r1',
           ),
         ]);
@@ -530,6 +539,7 @@ void main() {
             id: 's1',
             startedAt: todayOnly.add(const Duration(hours: 9)),
             status: SessionStatus.finished,
+            wasFullyCompleted: true,
             routineId: 'r1',
           ),
         ]);
@@ -570,6 +580,78 @@ void main() {
     expect(find.text('VOLUMEN POR GRUPO'), findsNothing);
   });
 
+  // Bug fix (abandoned-session-streak-reports): the report hub
+  // (`_StatsHubTileList`) must NOT be gated behind THIS week having
+  // sessions — an athlete with history but a quiet current week must still
+  // reach their historical reports, not the onboarding CTA.
+  testWidgets(
+      'SCENARIO-EMPTY-GATE-01: athlete WITH history but 0 sessions THIS '
+      'week → sees the reports hub, not the onboarding empty state',
+      (tester) async {
+    final repo = MockSessionRepository();
+    final now = DateTime.now();
+    // A completed session from far in the past — outside the current week,
+    // so `sessionsCount` for the shown week is 0, but the athlete DID train
+    // before (`hasEverCompletedAnyWorkout` must be true).
+    final longAgo = DateTime(now.year - 1, 1, 15, 9);
+
+    when(() => repo.listByUid('u1')).thenAnswer((_) async => [
+          makeSession(
+            id: 's-old',
+            startedAt: longAgo,
+            status: SessionStatus.finished,
+            wasFullyCompleted: true,
+            routineId: 'r1',
+          ),
+        ]);
+    when(() => repo.listSetLogs(uid: 'u1', sessionId: 's-old'))
+        .thenAnswer((_) async => const []);
+
+    final overrides = <Override>[
+      currentUidProvider.overrideWithValue('u1'),
+      sessionRepositoryProvider.overrideWithValue(repo),
+      exercisesProvider.overrideWith((ref) async => const []),
+      routineByIdProvider('r1').overrideWith((ref) async => null),
+    ];
+
+    await tester.pumpWidget(_wrap(const InsightsScreen(), overrides));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Empezá a entrenar para ver tus insights.'), findsNothing);
+
+    await tester.scrollUntilVisible(
+      find.text('Estadísticas avanzadas'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Estadísticas avanzadas'), findsOneWidget);
+    expect(find.text('Distribución muscular'), findsOneWidget);
+  });
+
+  // Bug fix (abandoned-session-streak-reports): a truly brand-new account
+  // (never completed a workout) must still see the onboarding CTA.
+  testWidgets(
+      'SCENARIO-EMPTY-GATE-02: brand-new account with no workouts ever → '
+      'sees the onboarding empty state', (tester) async {
+    final repo = MockSessionRepository();
+    when(() => repo.listByUid('u1')).thenAnswer((_) async => const []);
+
+    final overrides = <Override>[
+      currentUidProvider.overrideWithValue('u1'),
+      sessionRepositoryProvider.overrideWithValue(repo),
+      exercisesProvider.overrideWith((ref) async => const []),
+    ];
+
+    await tester.pumpWidget(_wrap(const InsightsScreen(), overrides));
+    await tester.pumpAndSettle();
+
+    expect(
+        find.text('Empezá a entrenar para ver tus insights.'), findsOneWidget);
+    expect(find.text('Estadísticas avanzadas'), findsNothing);
+  });
+
   testWidgets(
       'SCENARIO-HUB-TILES-02: tapping each tile pushes its dedicated route',
       (tester) async {
@@ -582,6 +664,7 @@ void main() {
             id: 's1',
             startedAt: todayOnly.add(const Duration(hours: 9)),
             status: SessionStatus.finished,
+            wasFullyCompleted: true,
             routineId: 'r1',
           ),
         ]);

@@ -11,6 +11,7 @@ Session _finishedOn(DateTime localDate, {String id = 's'}) => Session(
       routineName: 'Test',
       startedAt: localDate,
       status: SessionStatus.finished,
+      wasFullyCompleted: true,
     );
 
 void main() {

@@ -87,6 +87,7 @@ void main() {
               id: 's-finished',
               startedAt: now,
               status: SessionStatus.finished,
+              wasFullyCompleted: true,
               routineId: 'r1',
             ),
           ]);
@@ -106,6 +107,47 @@ void main() {
       verifyNever(() => repo.listSetLogs(uid: 'u1', sessionId: 's-active'));
     });
 
+    // Bug fix (abandoned-session-streak-reports): a session with
+    // status=finished but wasFullyCompleted=false was saved by
+    // `SessionNotifier.abandonSession` — it must NOT count towards the
+    // week's sessionsCount, same as an active (unfinished) session.
+    test(
+        'SCENARIO-403b: excluye sesiones abandonadas (finished + '
+        'wasFullyCompleted=false)', () async {
+      final repo = MockSessionRepository();
+      final now = DateTime.now();
+      when(() => repo.listByUid('u1')).thenAnswer((_) async => [
+            makeSession(
+              id: 's-abandoned',
+              startedAt: now,
+              status: SessionStatus.finished,
+              wasFullyCompleted: false,
+              routineId: 'r1',
+            ),
+            makeSession(
+              id: 's-completed',
+              startedAt: now,
+              status: SessionStatus.finished,
+              wasFullyCompleted: true,
+              routineId: 'r1',
+            ),
+          ]);
+      when(() => repo.listSetLogs(uid: 'u1', sessionId: 's-completed'))
+          .thenAnswer((_) async => const []);
+
+      final container = ProviderContainer(overrides: [
+        currentUidProvider.overrideWithValue('u1'),
+        sessionRepositoryProvider.overrideWithValue(repo),
+        exercisesProvider.overrideWith((ref) async => const <Exercise>[]),
+        routineByIdProvider('r1').overrideWith((ref) async => null),
+      ]);
+      addTearDown(container.dispose);
+
+      final result = await container.read(weeklyInsightsProvider.future);
+      expect(result!.sessionsCount, 1);
+      verifyNever(() => repo.listSetLogs(uid: 'u1', sessionId: 's-abandoned'));
+    });
+
     test('SCENARIO-404: agrupa SetLogs por muscleGroup → MuscleGroupDisplay',
         () async {
       final repo = MockSessionRepository();
@@ -115,6 +157,7 @@ void main() {
               id: 's1',
               startedAt: now,
               status: SessionStatus.finished,
+              wasFullyCompleted: true,
               routineId: 'r1',
             ),
           ]);
@@ -164,6 +207,7 @@ void main() {
               id: 's1',
               startedAt: now,
               status: SessionStatus.finished,
+              wasFullyCompleted: true,
               routineId: 'r1',
             ),
           ]);
@@ -215,12 +259,14 @@ void main() {
               id: 's-mon',
               startedAt: monday,
               status: SessionStatus.finished,
+              wasFullyCompleted: true,
               routineId: 'r1',
             ),
             makeSession(
               id: 's-wed',
               startedAt: wednesday,
               status: SessionStatus.finished,
+              wasFullyCompleted: true,
               routineId: 'r1',
             ),
           ]);
@@ -259,6 +305,7 @@ void main() {
               id: 's1',
               startedAt: now,
               status: SessionStatus.finished,
+              wasFullyCompleted: true,
               routineId: 'r1',
             ),
           ]);

@@ -34,6 +34,7 @@ void main() {
             id: 's1',
             startedAt: now,
             status: SessionStatus.finished,
+            wasFullyCompleted: true,
             routineId: 'r1',
           ),
         ]);

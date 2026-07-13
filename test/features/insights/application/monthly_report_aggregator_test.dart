@@ -17,6 +17,7 @@ Session _session(
       routineName: 'Rutina A',
       startedAt: startedAt,
       status: status,
+      wasFullyCompleted: status == SessionStatus.finished,
       durationMin: durationMin,
       totalVolumeKg: totalVolumeKg,
     );

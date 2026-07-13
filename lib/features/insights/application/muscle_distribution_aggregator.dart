@@ -1,5 +1,4 @@
 import '../../workout/domain/session.dart';
-import '../../workout/domain/session_status.dart';
 import '../../workout/domain/set_log.dart';
 import '../domain/chart_period.dart';
 import '../domain/muscle_distribution_insights.dart';
@@ -46,8 +45,7 @@ MuscleDistributionInsights aggregateMuscleDistribution({
       !s.startedAt.isBefore(periodWindow.previousStart) &&
       s.startedAt.isBefore(previousEndExclusive);
 
-  final finished =
-      sessionsDesc.where((s) => s.status == SessionStatus.finished).toList();
+  final finished = sessionsDesc.where((s) => s.countsAsWorkout).toList();
   final currentSessions = finished.where(inCurrent).toList();
   final previousSessions = finished.where(inPrevious).toList();
 

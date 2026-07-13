@@ -52,6 +52,7 @@ void main() {
       finishedAt: DateTime(now.year, now.month, now.day, 11),
       durationMin: 60,
       status: SessionStatus.finished,
+      wasFullyCompleted: true,
     );
     when(() => repo.listByUid('u1')).thenAnswer((_) async => [session]);
     when(() => repo.listSetLogs(uid: 'u1', sessionId: 's-today'))

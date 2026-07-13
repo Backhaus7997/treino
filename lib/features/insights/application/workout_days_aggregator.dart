@@ -1,5 +1,4 @@
 import '../../workout/domain/session.dart';
-import '../../workout/domain/session_status.dart';
 
 /// [AD6] Pure function — returns the set of unique local calendar dates
 /// within [month] on which [sessions] recorded at least one
@@ -20,7 +19,7 @@ Set<DateTime> trainedDaysInMonth(List<Session> sessions, DateTime month) {
   final result = <DateTime>{};
 
   for (final session in sessions) {
-    if (session.status != SessionStatus.finished) continue;
+    if (!session.countsAsWorkout) continue;
     final started = session.startedAt.toLocal();
     if (started.year != month.year || started.month != month.month) continue;
     result.add(DateTime(started.year, started.month, started.day));
