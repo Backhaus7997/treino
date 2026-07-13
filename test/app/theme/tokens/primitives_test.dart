@@ -21,10 +21,6 @@ void main() {
       expect(AppColorPrimitives.ink900, const Color(0xFF0F1513));
     });
 
-    test('ink800 == #1A1A1A', () {
-      expect(AppColorPrimitives.ink800, const Color(0xFF1A1A1A));
-    });
-
     test('bone == #FFFFFF', () {
       expect(AppColorPrimitives.bone, const Color(0xFFFFFFFF));
     });
@@ -109,7 +105,6 @@ void main() {
         AppColorPrimitives.magenta500,
         AppColorPrimitives.ink950,
         AppColorPrimitives.ink900,
-        AppColorPrimitives.ink800,
         AppColorPrimitives.bone,
         AppColorPrimitives.sage500,
         AppColorPrimitives.espresso500,

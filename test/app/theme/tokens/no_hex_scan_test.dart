@@ -16,6 +16,15 @@ import 'package:flutter_test/flutter_test.dart';
 ///
 /// La allowlist NO incluye app_palette.dart porque WU-02 eliminó todos
 /// sus hex literals (ahora referencia primitivos).
+///
+/// ALCANCE DEL SCANNER (deliberado):
+///   ✓ Color(0x...)          — hex ARGB inline con cualquier longitud de dígitos
+///   ✓ Color.fromARGB(...)   — constructor con componentes enteros
+///   ✓ Color.fromRGBO(...)   — constructor con componentes + opacidad
+///   ✗ Colors.*              — constantes del SDK de Flutter (intencional; no
+///                             son literales definidos en el proyecto)
+///   ✗ withOpacity/withValues — modificadores de opacidad (intencional; operan
+///                             sobre tokens existentes, no introducen hex crudo)
 void main() {
   group('no_hex_scan — prohibición de Color(0x...) fuera de allowlist', () {
     /// Allowlist de rutas relativas a lib/ que pueden contener hex inline.
@@ -35,7 +44,13 @@ void main() {
         return;
       }
 
-      final hexPattern = RegExp(r'Color\(0x[0-9A-Fa-f]{8}\)');
+      // Detecta cualquiera de las tres formas de hardcodear colores hex:
+      //   1. Color(0x...)        — ARGB hex con cualquier cantidad de dígitos
+      //   2. Color.fromARGB(...) — constructor por componentes enteros
+      //   3. Color.fromRGBO(...) — constructor por componentes + opacidad double
+      final hexPattern = RegExp(
+        r'Color\(0x[0-9A-Fa-f]+\)|Color\.fromARGB\(|Color\.fromRGBO\(',
+      );
       offenders = [];
 
       for (final entity in libDir.listSync(recursive: true)) {
@@ -60,14 +75,17 @@ void main() {
       }
     });
 
-    test('ningún archivo fuera de la allowlist contiene Color(0x...)', () {
+    test(
+        'ningún archivo fuera de la allowlist contiene '
+        'Color(0x...) / Color.fromARGB / Color.fromRGBO', () {
       expect(
         offenders,
         isEmpty,
         reason:
             'Archivos con hex literal fuera de allowlist:\n${offenders.join('\n')}\n\n'
-            'Para corregir: reemplazá los Color(0x...) por referencias a '
-            'AppColorPrimitives en lib/app/theme/tokens/primitives.dart.',
+            'Para corregir: reemplazá los Color(0x...) / Color.fromARGB / '
+            'Color.fromRGBO por referencias a AppColorPrimitives en '
+            'lib/app/theme/tokens/primitives.dart.',
       );
     });
 

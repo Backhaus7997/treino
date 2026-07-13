@@ -32,9 +32,6 @@ abstract final class AppColorPrimitives {
   /// `#0F1513` — Ink profundo con tinte mint, fondo de card dark.
   static const Color ink900 = Color(0xFF0F1513);
 
-  /// `#1A1A1A` — Ink medio, superficies elevadas dark.
-  static const Color ink800 = Color(0xFF1A1A1A);
-
   // ---------------------------------------------------------------------------
   // Familia Bone (texto claro)
   // ---------------------------------------------------------------------------

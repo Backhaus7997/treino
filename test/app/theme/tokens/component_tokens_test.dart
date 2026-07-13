@@ -3,7 +3,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/tokens/components/treino_button_tokens.dart';
 import 'package:treino/app/theme/tokens/components/treino_card_tokens.dart';
-import 'package:treino/app/theme/tokens/primitives.dart';
 
 /// Widget helper que inyecta [AppPalette] en el árbol.
 Widget _withTheme({required AppPalette palette, required Widget child}) {
@@ -17,7 +16,7 @@ Widget _withTheme({required AppPalette palette, required Widget child}) {
 
 void main() {
   group('TreinoButtonTokens — dark', () {
-    testWidgets('background == AppPalette.accent en dark', (tester) async {
+    testWidgets('background == accent dark (0xFF2CE5A2)', (tester) async {
       late Color background;
       await tester.pumpWidget(
         _withTheme(
@@ -30,11 +29,11 @@ void main() {
           ),
         ),
       );
-      expect(background, AppPalette.mintMagenta.accent);
+      // Valor pinado: mint500 = #2CE5A2. Si el token cambia, este test falla.
+      expect(background, const Color(0xFF2CE5A2));
     });
 
-    testWidgets('foreground == AppColorPrimitives.ink950 en dark',
-        (tester) async {
+    testWidgets('foreground == ink950 (0xFF0A0A0A) en dark', (tester) async {
       late Color foreground;
       await tester.pumpWidget(
         _withTheme(
@@ -47,29 +46,25 @@ void main() {
           ),
         ),
       );
-      // foreground sobre accent debe ser ink (oscuro) para contraste
-      expect(foreground, AppColorPrimitives.ink950);
+      // foreground sobre accent debe ser ink (oscuro) para contraste WCAG AA.
+      // Valor pinado: ink950 = #0A0A0A.
+      expect(foreground, const Color(0xFF0A0A0A));
     });
 
-    test('borderRadius es un double no negativo', () {
-      expect(TreinoButtonTokens.borderRadius, isA<double>());
-      expect(TreinoButtonTokens.borderRadius, greaterThanOrEqualTo(0));
-    });
-
-    test('borderRadius referencia AppRadius (== AppRadius.sm)', () {
-      expect(TreinoButtonTokens.borderRadius, AppRadius.sm);
+    test('borderRadius == 12.0 (AppRadius.sm pinado)', () {
+      // Valor pinado: AppRadius.sm = 12.0. Si la escala de radios cambia, falla.
+      expect(TreinoButtonTokens.borderRadius, 12.0);
     });
 
     test('NO contiene hex inline (compilación con primitivos)', () {
       // Si el archivo hubiera usado Color(0xFF...) directamente, no pasaría
-      // el no_hex_scan_test. Aquí simplemente verificamos que el token
-      // existe y se puede instanciar, lo que implica compilación exitosa.
-      expect(TreinoButtonTokens.borderRadius, isNotNull);
+      // el no_hex_scan_test. Aquí verificamos el valor concreto como contrato.
+      expect(TreinoButtonTokens.borderRadius, 12.0);
     });
   });
 
   group('TreinoButtonTokens — light', () {
-    testWidgets('background == AppPalette.accent en light', (tester) async {
+    testWidgets('background == accent light (0xFF2CE5A2)', (tester) async {
       late Color background;
       await tester.pumpWidget(
         _withTheme(
@@ -82,12 +77,13 @@ void main() {
           ),
         ),
       );
-      expect(background, AppPalette.mintMagentaLight.accent);
+      // Valor pinado: mint500 = #2CE5A2 (mismo en dark y light — acento de marca).
+      expect(background, const Color(0xFF2CE5A2));
     });
   });
 
   group('TreinoCardTokens — dark', () {
-    testWidgets('background == AppPalette.bgCard en dark', (tester) async {
+    testWidgets('background == bgCard dark (0xFF0F1513)', (tester) async {
       late Color background;
       await tester.pumpWidget(
         _withTheme(
@@ -100,10 +96,11 @@ void main() {
           ),
         ),
       );
-      expect(background, AppPalette.mintMagenta.bgCard);
+      // Valor pinado: ink900 = #0F1513. Si el fondo de card cambia, falla.
+      expect(background, const Color(0xFF0F1513));
     });
 
-    testWidgets('border == AppPalette.border en dark', (tester) async {
+    testWidgets('border == border dark (0x1AFFFFFF)', (tester) async {
       late Color border;
       await tester.pumpWidget(
         _withTheme(
@@ -116,20 +113,22 @@ void main() {
           ),
         ),
       );
-      expect(border, AppPalette.mintMagenta.border);
+      // Valor pinado: white10 = 0x1AFFFFFF (~10% alpha). Si cambia, falla.
+      expect(border, const Color(0x1AFFFFFF));
     });
 
     test('boxShadow es lista vacía (sin sombra)', () {
       expect(TreinoCardTokens.boxShadow, isEmpty);
     });
 
-    test('borderRadius referencia AppRadius (== AppRadius.md)', () {
-      expect(TreinoCardTokens.borderRadius, AppRadius.md);
+    test('borderRadius == 16.0 (AppRadius.md pinado)', () {
+      // Valor pinado: AppRadius.md = 16.0. Si la escala de radios cambia, falla.
+      expect(TreinoCardTokens.borderRadius, 16.0);
     });
   });
 
   group('TreinoCardTokens — light', () {
-    testWidgets('background == AppPalette.bgCard en light', (tester) async {
+    testWidgets('background == bgCard light (0xFFFFFFFF)', (tester) async {
       late Color background;
       await tester.pumpWidget(
         _withTheme(
@@ -142,10 +141,11 @@ void main() {
           ),
         ),
       );
-      expect(background, AppPalette.mintMagentaLight.bgCard);
+      // Valor pinado: white = #FFFFFF. Si el fondo de card light cambia, falla.
+      expect(background, const Color(0xFFFFFFFF));
     });
 
-    testWidgets('border == AppPalette.border en light', (tester) async {
+    testWidgets('border == border light (0x1A000000)', (tester) async {
       late Color border;
       await tester.pumpWidget(
         _withTheme(
@@ -158,7 +158,8 @@ void main() {
           ),
         ),
       );
-      expect(border, AppPalette.mintMagentaLight.border);
+      // Valor pinado: black10 = 0x1A000000 (~10% alpha). Si cambia, falla.
+      expect(border, const Color(0x1A000000));
     });
   });
 }
