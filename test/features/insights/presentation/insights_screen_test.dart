@@ -123,10 +123,9 @@ void main() {
     await tester.pumpWidget(_wrap(const InsightsScreen(), overrides));
     await tester.pumpAndSettle();
 
-    // Today's card (default selection) must show PECHO with 1 SET and
-    // CUÁDRICEPS with 0 — the quad set was logged in the PAST day, so it
-    // must not bleed into today's per-day silhouette/list. `find.ancestor`
-    // with `.first` picks the INNERMOST matching Row (the _MuscleSetsRow).
+    // Today's card (default selection) must show PECHO with 1 SET.
+    // `find.ancestor` with `.first` picks the INNERMOST matching Row (the
+    // _MuscleSetsRow).
     final pechoRowFinder =
         find.ancestor(of: find.text('PECHO'), matching: find.byType(Row)).first;
     expect(
@@ -137,13 +136,30 @@ void main() {
     final cuadricepsRowFinder = find
         .ancestor(of: find.text('CUÁDRICEPS'), matching: find.byType(Row))
         .first;
+
+    // The "no bleed" assertion (CUÁDRICEPS = 0 on today's view) is only valid
+    // when the seeded "past" session actually landed on a DIFFERENT day than
+    // today. On a Monday `hasPastDayThisWeek` is false, so `pastDay` collapses
+    // onto today (see the `pastDay` computation above) — both sessions are
+    // then legitimately today's, and today's view correctly shows quads = 1.
+    // Guarding here (instead of after) is the date-bomb fix: on a Monday the
+    // old code asserted quads = 0 against data where the quad set WAS today,
+    // failing ~1 day in 7. Mirrors the PR#307 day-strip date-bomb fix.
+    if (!hasPastDayThisWeek) {
+      expect(
+        find.descendant(of: cuadricepsRowFinder, matching: find.text('1')),
+        findsOneWidget,
+        reason: "on a Monday the seeded 'past' session is today, so today's "
+            'view legitimately shows the quad set',
+      );
+      return;
+    }
+
     expect(
       find.descendant(of: cuadricepsRowFinder, matching: find.text('0')),
       findsOneWidget,
       reason: 'the past day\'s leg session must not bleed into today\'s view',
     );
-
-    if (!hasPastDayThisWeek) return;
 
     // Now tap the PAST day's weekday circle in the SEMANA card — the
     // display must FLIP: quads=1, chest=0. This proves the week card's
