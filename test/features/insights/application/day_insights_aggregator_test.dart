@@ -34,11 +34,13 @@ void main() {
         id: 's-mon',
         startedAt: monday.add(const Duration(hours: 10)),
         status: SessionStatus.finished,
+        wasFullyCompleted: true,
       );
       final tuesdaySession = makeSession(
         id: 's-tue',
         startedAt: tuesday.add(const Duration(hours: 10)),
         status: SessionStatus.finished,
+        wasFullyCompleted: true,
       );
 
       final setLogsBySessionId = {
@@ -97,6 +99,7 @@ void main() {
         id: 's1',
         startedAt: day.add(const Duration(hours: 10)),
         status: SessionStatus.finished,
+        wasFullyCompleted: true,
       );
 
       final result = aggregateDayInsights(
@@ -120,11 +123,13 @@ void main() {
         id: 's1',
         startedAt: day.add(const Duration(hours: 8)),
         status: SessionStatus.finished,
+        wasFullyCompleted: true,
       );
       final s2 = makeSession(
         id: 's2',
         startedAt: day.add(const Duration(hours: 18)),
         status: SessionStatus.finished,
+        wasFullyCompleted: true,
       );
 
       final result = aggregateDayInsights(

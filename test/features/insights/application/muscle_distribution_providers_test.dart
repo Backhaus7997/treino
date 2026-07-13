@@ -27,6 +27,7 @@ Session _s(String id, DateTime dt, {String routineId = 'r'}) => Session(
       routineName: 'R',
       startedAt: dt,
       status: SessionStatus.finished,
+      wasFullyCompleted: true,
       durationMin: 30,
       totalVolumeKg: 500,
     );

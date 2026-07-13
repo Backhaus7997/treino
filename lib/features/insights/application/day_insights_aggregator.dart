@@ -1,5 +1,4 @@
 import '../../workout/domain/session.dart';
-import '../../workout/domain/session_status.dart';
 import '../../workout/domain/set_log.dart';
 import '../domain/day_insights.dart';
 import '../domain/muscle_group.dart';
@@ -28,7 +27,7 @@ DayInsights aggregateDayInsights({
   final dayOnly = DateTime(day.year, day.month, day.day);
 
   final daySessions = sessions.where((s) {
-    if (s.status != SessionStatus.finished) return false;
+    if (!s.countsAsWorkout) return false;
     final started = s.startedAt.toLocal();
     return started.year == dayOnly.year &&
         started.month == dayOnly.month &&

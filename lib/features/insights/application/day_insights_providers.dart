@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../workout/application/exercise_providers.dart';
 import '../../workout/application/routine_providers.dart';
 import '../../workout/application/session_providers.dart';
-import '../../workout/domain/session_status.dart';
+import '../../workout/domain/session.dart';
 import '../domain/day_insights.dart';
 import 'day_insights_aggregator.dart';
 
@@ -34,7 +34,7 @@ final athleteDayInsightsProvider = FutureProvider.autoDispose
   final allSessions = await repo.listByUid(key.uid);
 
   final daySessions = allSessions.where((s) {
-    if (s.status != SessionStatus.finished) return false;
+    if (!s.countsAsWorkout) return false;
     final started = s.startedAt.toLocal();
     return started.year == key.day.year &&
         started.month == key.day.month &&

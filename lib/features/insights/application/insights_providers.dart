@@ -4,7 +4,7 @@ import '../../../core/utils/streak_calculator.dart';
 import '../../workout/application/exercise_providers.dart';
 import '../../workout/application/routine_providers.dart';
 import '../../workout/application/session_providers.dart';
-import '../../workout/domain/session_status.dart';
+import '../../workout/domain/session.dart';
 import '../domain/muscle_group.dart';
 import '../domain/weekly_insights.dart';
 
@@ -50,7 +50,7 @@ final athleteWeekInsightsProvider = FutureProvider.autoDispose
     final started = s.startedAt.toLocal();
     return !started.isBefore(weekStart) &&
         started.isBefore(weekEndExclusive) &&
-        s.status == SessionStatus.finished;
+        s.countsAsWorkout;
   }).toList();
 
   // Días entrenados (0=lun..6=dom).
@@ -131,10 +131,16 @@ final athleteWeekInsightsProvider = FutureProvider.autoDispose
   // monthSessionsCount — sesiones finished en el mes calendario actual.
   // ADR-WRS-03: mes calendario, NOT ventana de 30 días.
   final monthSessionsCount = allSessions.where((s) {
-    if (s.status != SessionStatus.finished) return false;
+    if (!s.countsAsWorkout) return false;
     final local = s.startedAt.toLocal();
     return local.year == now.year && local.month == now.month;
   }).length;
+
+  // Bug fix (abandoned-session-streak-reports): "entrenó alguna vez" se
+  // deriva de la MISMA lectura `allSessions` de arriba — sin fetch extra.
+  // Desacopla el hub de reportes históricos del `_EmptyState` de onboarding
+  // en insights_screen.dart: una semana en 0 no implica cuenta nueva.
+  final hasEverCompletedAnyWorkout = allSessions.any((s) => s.countsAsWorkout);
 
   return WeeklyInsights(
     weekStart: weekStart,
@@ -147,6 +153,7 @@ final athleteWeekInsightsProvider = FutureProvider.autoDispose
     targetByGroup: targetByGroup,
     streak: streak,
     monthSessionsCount: monthSessionsCount,
+    hasEverCompletedAnyWorkout: hasEverCompletedAnyWorkout,
   );
 });
 

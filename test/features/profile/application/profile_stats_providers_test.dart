@@ -47,12 +47,14 @@ void main() {
               id: 's1',
               startedAt: today,
               status: SessionStatus.finished,
+              wasFullyCompleted: true,
               totalVolumeKg: 1200.0,
             ),
             makeSession(
               id: 's2',
               startedAt: yesterday,
               status: SessionStatus.finished,
+              wasFullyCompleted: true,
               totalVolumeKg: 800.0,
             ),
           ]);
@@ -74,6 +76,7 @@ void main() {
             makeSession(
               id: 's1',
               status: SessionStatus.finished,
+              wasFullyCompleted: true,
               totalVolumeKg: 500.0,
             ),
             makeSession(

@@ -51,6 +51,7 @@ Session _session({
   required int dayNumber,
   int weekNumber = 0,
   SessionStatus status = SessionStatus.finished,
+  bool wasFullyCompleted = true,
   DateTime? startedAt,
 }) =>
     Session(
@@ -61,6 +62,7 @@ Session _session({
       startedAt: startedAt ?? DateTime(2026, 6, 18, 10),
       finishedAt: status == SessionStatus.finished ? startedAt : null,
       status: status,
+      wasFullyCompleted: wasFullyCompleted,
       dayNumber: dayNumber,
       weekNumber: weekNumber,
     );

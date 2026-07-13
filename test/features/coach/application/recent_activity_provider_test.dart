@@ -40,6 +40,7 @@ Session _session(String id, {required DateTime finishedAt}) => Session(
       startedAt: finishedAt,
       finishedAt: finishedAt,
       status: SessionStatus.finished,
+      wasFullyCompleted: true,
     );
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────

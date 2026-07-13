@@ -47,11 +47,13 @@ void main() {
               id: 's1',
               startedAt: today,
               status: SessionStatus.finished,
+              wasFullyCompleted: true,
             ),
             makeSession(
               id: 's2',
               startedAt: yesterday,
               status: SessionStatus.finished,
+              wasFullyCompleted: true,
             ),
           ]);
       when(() => repo.listSetLogs(
@@ -81,11 +83,13 @@ void main() {
               id: 's1',
               startedAt: yesterday.add(const Duration(hours: 10)),
               status: SessionStatus.finished,
+              wasFullyCompleted: true,
             ),
             makeSession(
               id: 's2',
               startedAt: dayBefore.add(const Duration(hours: 10)),
               status: SessionStatus.finished,
+              wasFullyCompleted: true,
             ),
           ]);
       when(() => repo.listSetLogs(
@@ -113,11 +117,13 @@ void main() {
               id: 's1',
               startedAt: today,
               status: SessionStatus.finished,
+              wasFullyCompleted: true,
             ),
             makeSession(
               id: 's2',
               startedAt: twoDaysAgo,
               status: SessionStatus.finished,
+              wasFullyCompleted: true,
             ),
           ]);
       when(() => repo.listSetLogs(
@@ -182,11 +188,13 @@ void main() {
               id: 's-this',
               startedAt: thisMonthDate,
               status: SessionStatus.finished,
+              wasFullyCompleted: true,
             ),
             makeSession(
               id: 's-prev',
               startedAt: prevMonthDate,
               status: SessionStatus.finished,
+              wasFullyCompleted: true,
             ),
           ]);
       when(() => repo.listSetLogs(
@@ -238,6 +246,7 @@ void main() {
                 startedAt:
                     DateTime(now.year, now.month, (i + 1).clamp(1, 28), 10),
                 status: SessionStatus.finished,
+                wasFullyCompleted: true,
               ),
           ]);
       when(() => repo.listSetLogs(

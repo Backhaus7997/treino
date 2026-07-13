@@ -2,7 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/utils/streak_calculator.dart';
 import '../../workout/application/session_providers.dart';
-import '../../workout/domain/session_status.dart';
+import '../../workout/domain/session.dart';
 import '../domain/user_session_stats.dart';
 
 /// Computes aggregate stats for the currently signed-in user's own profile.
@@ -23,8 +23,7 @@ final userSessionStatsProvider =
   final repo = ref.watch(sessionRepositoryProvider);
   final sessions = await repo.listByUid(uid);
 
-  final finished =
-      sessions.where((s) => s.status == SessionStatus.finished).toList();
+  final finished = sessions.where((s) => s.countsAsWorkout).toList();
 
   return UserSessionStats(
     totalSessions: finished.length,

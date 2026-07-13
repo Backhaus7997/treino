@@ -1,5 +1,4 @@
 import '../../workout/domain/session.dart';
-import '../../workout/domain/session_status.dart';
 import '../domain/monthly_report.dart';
 
 /// How many calendar-month bars the report shows — Hevy parity ("June
@@ -54,7 +53,7 @@ MonthlyReport aggregateMonthlyReport({
   final windowEndKey = keyOf(months.last);
 
   for (final session in sessions) {
-    if (session.status != SessionStatus.finished) continue;
+    if (!session.countsAsWorkout) continue;
     final started = session.startedAt.toLocal();
     final key = keyOf(DateTime(started.year, started.month));
     if (key < windowStartKey || key > windowEndKey) continue;
@@ -91,7 +90,7 @@ List<MonthlyReportDayPoint> aggregateDailyDurationReport({
   final durationByDay = <int, int>{};
 
   for (final session in sessions) {
-    if (session.status != SessionStatus.finished) continue;
+    if (!session.countsAsWorkout) continue;
     final started = session.startedAt.toLocal();
     if (started.year != monthStart.year || started.month != monthStart.month) {
       continue;

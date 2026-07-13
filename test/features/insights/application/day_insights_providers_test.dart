@@ -61,12 +61,14 @@ void main() {
         id: 's-mon',
         startedAt: monday,
         status: SessionStatus.finished,
+        wasFullyCompleted: true,
         routineId: 'r1',
       );
       final tuesdaySession = makeSession(
         id: 's-tue',
         startedAt: tuesday,
         status: SessionStatus.finished,
+        wasFullyCompleted: true,
         routineId: 'r1',
       );
 

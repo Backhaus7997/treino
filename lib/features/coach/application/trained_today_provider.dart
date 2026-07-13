@@ -4,7 +4,6 @@ import '../../../core/utils/argentina_time.dart';
 import '../../workout/application/session_providers.dart'
     show finishedTodayByUidProvider;
 import '../../workout/domain/session.dart';
-import '../../workout/domain/session_status.dart';
 import '../domain/trainer_link_status.dart';
 import 'trainer_link_providers.dart' show trainerLinksStreamProvider;
 
@@ -85,7 +84,7 @@ final trainedTodayProvider =
     // finished at 23:00 ART is today, though in UTC it is already tomorrow).
     Session? best;
     for (final s in sessions) {
-      if (s.status != SessionStatus.finished) continue;
+      if (!s.countsAsWorkout) continue;
       final finished = s.finishedAt;
       if (finished == null) continue;
       final art = toArgentina(finished.toUtc());

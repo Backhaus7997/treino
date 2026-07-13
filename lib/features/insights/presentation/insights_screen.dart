@@ -128,8 +128,17 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                 ),
               ),
               data: (insights) {
+                // Bug fix (abandoned-session-streak-reports): el CTA de
+                // onboarding es SOLO para una cuenta que nunca completó un
+                // entrenamiento. Antes se gateaba por `sessionsCount == 0`
+                // de la semana mostrada, así que un atleta con historial
+                // pero 0 sesiones ESTA semana no podía llegar a sus reportes
+                // históricos (`_StatsHubTileList` vive dentro de esta misma
+                // pantalla). `_hasPagedAway` se preserva sin cambios: pagear
+                // a una semana pasada en 0 ya mostraba la week card, no el
+                // CTA.
                 if (insights == null ||
-                    (insights.sessionsCount == 0 &&
+                    (!insights.hasEverCompletedAnyWorkout &&
                         isCurrentWeek &&
                         !_hasPagedAway)) {
                   return const _EmptyState();

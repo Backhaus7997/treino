@@ -1,5 +1,4 @@
 import '../../features/workout/domain/session.dart';
-import '../../features/workout/domain/session_status.dart';
 
 /// Computes the current training streak for [sessions].
 ///
@@ -17,9 +16,10 @@ int computeStreak(List<Session> sessions, {DateTime? now}) {
   final todayLocal = (now ?? DateTime.now()).toLocal();
   final todayDate = DateTime(todayLocal.year, todayLocal.month, todayLocal.day);
 
-  // Build a set of unique local dates with at least one finished session.
-  final trainedDates =
-      sessions.where((s) => s.status == SessionStatus.finished).map((s) {
+  // Build a set of unique local dates with at least one completed session.
+  // Abandoned sessions (status=finished, wasFullyCompleted=false) must NOT
+  // count towards the streak.
+  final trainedDates = sessions.where((s) => s.countsAsWorkout).map((s) {
     final local = s.startedAt.toLocal();
     return DateTime(local.year, local.month, local.day);
   }).toSet();

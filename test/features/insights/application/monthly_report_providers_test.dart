@@ -55,6 +55,7 @@ void main() {
         id: 's1',
         startedAt: now,
         status: SessionStatus.finished,
+        wasFullyCompleted: true,
         durationMin: 45,
         totalVolumeKg: 2000,
       );
