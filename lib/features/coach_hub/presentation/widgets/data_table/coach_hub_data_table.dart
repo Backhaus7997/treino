@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../../../../../app/theme/app_motion.dart';
 import '../../../../../app/theme/app_palette.dart';
+import '../../../../../app/theme/tokens/components/treino_focus_tokens.dart';
 import '../../../../../app/theme/tokens/components/treino_table_tokens.dart';
 import '../../../../../core/widgets/motion/treino_shimmer.dart';
+import '../treino_interactive_state.dart';
 
 /// Modelo de columna para [CoachHubDataTable].
 @immutable
@@ -47,6 +49,9 @@ class CoachHubRow {
 ///
 /// Estados soportados:
 /// - Normal: filas con hover alternado (TreinoTableTokens).
+/// - Fila con `onRowTap`: focusable, activable por teclado (Enter/Space) y
+///   expone Semantics(button: true) — vía TreinoInteractiveState
+///   (fuente única de verdad, ADR-SH-002).
 /// - Loading: TreinoShimmer skeleton rows.
 /// - Vacío: EmptyState slot con mensaje configurable.
 /// - Error: mensaje de error + botón retry.
@@ -304,8 +309,11 @@ class _DataRows extends StatelessWidget {
   }
 }
 
-/// Fila de datos individual con hover.
-class _DataRow extends StatefulWidget {
+/// Fila de datos individual — estado de interacción vía
+/// [TreinoInteractiveState] (fuente única de verdad, ADR-SH-002): cuando
+/// `onTap` existe, la fila es focusable, activable por teclado (Enter/Space)
+/// y expone Semantics(button: true). Sin `onTap` → fila estática, sin hover.
+class _DataRow extends StatelessWidget {
   const _DataRow({
     required this.row,
     required this.columns,
@@ -321,40 +329,34 @@ class _DataRow extends StatefulWidget {
   final VoidCallback? onTap;
 
   @override
-  State<_DataRow> createState() => _DataRowState();
-}
-
-class _DataRowState extends State<_DataRow> {
-  bool _hovered = false;
-
-  @override
   Widget build(BuildContext context) {
-    Color bg;
-    if (_hovered) {
-      bg = widget.tokens.rowHoverBackground;
-    } else if (widget.isAlt) {
-      bg = widget.tokens.rowAltBackground;
-    } else {
-      bg = widget.tokens.rowBackground;
-    }
+    final focusTokens = TreinoFocusTokens.of(context);
 
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      cursor: widget.onTap != null
-          ? SystemMouseCursors.click
-          : SystemMouseCursors.basic,
-      child: AnimatedContainer(
-        duration: AppMotion.resolve(context, AppMotion.fast),
-        curve: AppMotion.standard,
-        color: bg,
-        height: TreinoTableTokens.rowHeight,
-        child: GestureDetector(
-          onTap: widget.onTap,
-          behavior: HitTestBehavior.opaque,
+    return TreinoInteractiveState(
+      onTap: onTap,
+      builder: (ctx, states) {
+        Color bg;
+        if (states.hovered) {
+          bg = tokens.rowHoverBackground;
+        } else if (isAlt) {
+          bg = tokens.rowAltBackground;
+        } else {
+          bg = tokens.rowBackground;
+        }
+
+        return AnimatedContainer(
+          key: Key('data_table_row_${row.id}'),
+          duration: AppMotion.resolve(ctx, AppMotion.fast),
+          curve: AppMotion.standard,
+          decoration: BoxDecoration(
+            color: bg,
+            border:
+                states.focused ? Border.all(color: focusTokens.ring) : null,
+          ),
+          height: TreinoTableTokens.rowHeight,
           child: Row(
             children: [
-              for (final col in widget.columns)
+              for (final col in columns)
                 Expanded(
                   flex: col.flex,
                   child: Padding(
@@ -363,12 +365,12 @@ class _DataRowState extends State<_DataRow> {
                       vertical: TreinoTableTokens.cellPaddingV,
                     ),
                     child: Text(
-                      widget.row.cells[col.key] ?? '',
+                      row.cells[col.key] ?? '',
                       style: TextStyle(
                         fontFamily: 'Barlow',
                         fontWeight: FontWeight.w400,
                         fontSize: 14,
-                        color: AppPalette.of(context).textPrimary,
+                        color: AppPalette.of(ctx).textPrimary,
                       ),
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -376,8 +378,8 @@ class _DataRowState extends State<_DataRow> {
                 ),
             ],
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }

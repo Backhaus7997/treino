@@ -1,5 +1,6 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/data_table/coach_hub_data_table.dart';
@@ -165,23 +166,38 @@ void main() {
     });
 
     // -------------------------------------------------------------------------
-    // Hover fila: no crashea
+    // Hover fila: decoration usa background de hover (token real)
     // -------------------------------------------------------------------------
-    testWidgets('hover fila → no crashea [SCENARIO-CK-DT-08]', (tester) async {
+    testWidgets(
+        'hover fila con onRowTap → decoration usa background de hover '
+        '[SCENARIO-CK-DT-08]', (tester) async {
       await tester.pumpWidget(_wrap(
         CoachHubDataTable(
           columns: _columns,
           rows: _rows,
+          onRowTap: (_) {},
         ),
       ));
       await tester.pump();
+
+      Color decorationColor() {
+        final container = tester.widget<AnimatedContainer>(
+          find.byKey(const Key('data_table_row_1')),
+        );
+        return (container.decoration! as BoxDecoration).color!;
+      }
+
+      final normalColor = decorationColor();
 
       final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
       await gesture.addPointer(location: Offset.zero);
       addTearDown(gesture.removePointer);
       await gesture.moveTo(tester.getCenter(find.text('Ana García')));
       await tester.pump();
-      expect(find.text('Ana García'), findsOneWidget);
+
+      final hoverColor = decorationColor();
+      expect(hoverColor, isNot(equals(normalColor)),
+          reason: 'el color de fondo debe cambiar realmente en hover');
     });
 
     // -------------------------------------------------------------------------
@@ -201,6 +217,66 @@ void main() {
       await tester.tap(find.text('Ana García'));
       await tester.pump();
       expect(tappedId, '1');
+    });
+
+    // -------------------------------------------------------------------------
+    // onRowTap: fila focusable, Enter activa, expone Semantics(button)
+    // -------------------------------------------------------------------------
+    testWidgets(
+        'onRowTap → fila focusable, Enter activa, Semantics(button) '
+        '[SCENARIO-CK-DT-11]', (tester) async {
+      final handle = tester.ensureSemantics();
+      String? tappedId;
+      await tester.pumpWidget(_wrap(
+        CoachHubDataTable(
+          columns: _columns,
+          rows: _rows,
+          onRowTap: (id) => tappedId = id,
+        ),
+      ));
+      await tester.pump();
+
+      final semantics = tester.getSemantics(
+        find.byKey(const Key('data_table_row_1')),
+      );
+      expect(semantics.flagsCollection.isButton, isTrue,
+          reason: 'fila con onRowTap debe exponer Semantics(button: true)');
+
+      final focusNode = Focus.of(
+        tester.element(find.byKey(const Key('data_table_row_1'))),
+      );
+      focusNode.requestFocus();
+      await tester.pump();
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pump();
+      expect(tappedId, '1', reason: 'Enter debe activar onRowTap');
+
+      handle.dispose();
+    });
+
+    // -------------------------------------------------------------------------
+    // Sin onRowTap: fila no focusable, sin Semantics(button)
+    // -------------------------------------------------------------------------
+    testWidgets(
+        'sin onRowTap → fila no expone Semantics(button) '
+        '[SCENARIO-CK-DT-12]', (tester) async {
+      final handle = tester.ensureSemantics();
+      await tester.pumpWidget(_wrap(
+        CoachHubDataTable(
+          columns: _columns,
+          rows: _rows,
+        ),
+      ));
+      await tester.pump();
+
+      final semantics = tester.getSemantics(
+        find.byKey(const Key('data_table_row_1')),
+      );
+      expect(semantics.flagsCollection.isButton, isFalse,
+          reason: 'fila sin onRowTap no debe ser interactiva');
+
+      handle.dispose();
     });
 
     // -------------------------------------------------------------------------
