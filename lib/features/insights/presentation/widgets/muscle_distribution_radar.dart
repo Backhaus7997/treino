@@ -196,16 +196,25 @@ class _Radar extends StatelessWidget {
           radarBorderData: BorderSide(color: palette.border),
           gridBorderData: BorderSide(color: palette.border),
           tickBorderData: BorderSide(color: palette.border, width: 0),
+          // fl_chart apila las etiquetas de los ticks sobre el eje VERTICAL,
+          // arrancando en el centro — o sea, encima del polígono. Con 4 ticks
+          // quedaban 4 números pisando el gráfico, ilegibles y sin aportar:
+          // un radar se lee por FORMA (actual vs anterior), no por magnitud
+          // absoluta, y los sets exactos ya están en las stat cards de abajo.
+          // `tickCount` no puede ser 0 (fl_chart assertea >= 1), así que la
+          // única forma de ocultarlos es el estilo.
+          ticksTextStyle: const TextStyle(color: Colors.transparent),
           titleTextStyle: GoogleFonts.barlowCondensed(
             fontWeight: FontWeight.w700,
             fontSize: 11,
             letterSpacing: 0.6,
             color: palette.textMuted,
           ),
-          getTitle: (index, angle) => RadarChartTitle(
-            text: axes[index].displayLabel,
-            angle: angle,
-          ),
+          // SIN `angle:` — el default de RadarChartTitle es 0 (horizontal).
+          // Pasarle el ángulo del eje rotaba cada etiqueta con su eje, y la de
+          // abajo (HOMBROS, a 180°) quedaba literalmente cabeza abajo.
+          getTitle: (index, _) =>
+              RadarChartTitle(text: axes[index].displayLabel),
           dataSets: [
             RadarDataSet(
               dataEntries: previousEntries,
@@ -238,50 +247,70 @@ class _StatCardGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: _StatCard(
-            label: labels.workoutsLabel,
-            currentValue: '${insights.currentWorkouts}',
-            previousValue: '${insights.previousWorkouts}',
+    // IntrinsicHeight + stretch: las 4 cards comparten la altura de la más
+    // alta. Sin esto, cada hijo del Row se dimensiona por su propio contenido
+    // y una card con el valor más largo quedaba visiblemente más alta que las
+    // otras tres. El formato compacto de abajo evita el wrap en la práctica;
+    // esto lo garantiza pase lo que pase con los datos.
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: _StatCard(
+              label: labels.workoutsLabel,
+              currentValue: '${insights.currentWorkouts}',
+              previousValue: '${insights.previousWorkouts}',
+            ),
           ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: _StatCard(
-            label: labels.durationLabel,
-            currentValue:
-                '${insights.currentDurationMin} ${labels.durationUnit}',
-            previousValue:
-                '${insights.previousDurationMin} ${labels.durationUnit}',
+          const SizedBox(width: 8),
+          Expanded(
+            child: _StatCard(
+              label: labels.durationLabel,
+              currentValue:
+                  '${insights.currentDurationMin} ${labels.durationUnit}',
+              previousValue:
+                  '${insights.previousDurationMin} ${labels.durationUnit}',
+            ),
           ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: _StatCard(
-            label: labels.volumeLabel,
-            currentValue:
-                '${_formatVolume(insights.currentVolumeKg)} ${labels.volumeUnit}',
-            previousValue:
-                '${_formatVolume(insights.previousVolumeKg)} ${labels.volumeUnit}',
+          const SizedBox(width: 8),
+          Expanded(
+            child: _StatCard(
+              label: labels.volumeLabel,
+              currentValue:
+                  '${_formatVolume(insights.currentVolumeKg)} ${labels.volumeUnit}',
+              previousValue:
+                  '${_formatVolume(insights.previousVolumeKg)} ${labels.volumeUnit}',
+            ),
           ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: _StatCard(
-            label: labels.setsLabel,
-            currentValue: '${insights.currentSets}',
-            previousValue: '${insights.previousSets}',
+          const SizedBox(width: 8),
+          Expanded(
+            child: _StatCard(
+              label: labels.setsLabel,
+              currentValue: '${insights.currentSets}',
+              previousValue: '${insights.previousSets}',
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
 
-String _formatVolume(double value) =>
-    value % 1 == 0 ? value.toStringAsFixed(0) : value.toStringAsFixed(1);
+/// Volumen compacto para que entre en UNA línea en un cuarto del ancho de
+/// pantalla: `20770` → `20.8k`. Un volumen real de gimnasio pasa los 5 dígitos
+/// enseguida, y con la unidad al lado (`20770 kg`) wrappeaba a dos líneas y
+/// estiraba esa card por encima de las otras tres.
+///
+/// El corte en 10k es deliberado: por debajo, el número entra entero y se
+/// prefiere la precisión exacta.
+String _formatVolume(double value) {
+  if (value >= 10000) {
+    final k = (value / 1000).toStringAsFixed(1);
+    return '${k.endsWith('.0') ? k.substring(0, k.length - 2) : k}k';
+  }
+  return value % 1 == 0 ? value.toStringAsFixed(0) : value.toStringAsFixed(1);
+}
 
 /// One stat card: current value big, previous value small with a `→` arrow
 /// (Hevy-style "→ prev" delta hint).
@@ -318,8 +347,14 @@ class _StatCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 4),
+          // maxLines 1 + ellipsis: red de seguridad. El formato compacto ya
+          // evita el wrap para volúmenes reales, pero un valor inesperadamente
+          // largo debe recortarse, NUNCA saltar de línea — eso es lo que
+          // desparejaba las alturas.
           Text(
             currentValue,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: GoogleFonts.barlowCondensed(
               fontWeight: FontWeight.w700,
               fontSize: 16,
@@ -328,6 +363,8 @@ class _StatCard extends StatelessWidget {
           ),
           Text(
             '→ $previousValue',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: GoogleFonts.barlow(fontSize: 10, color: palette.textMuted),
           ),
         ],
