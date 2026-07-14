@@ -33,3 +33,36 @@ final measurementsForAthleteProvider = StreamProvider.autoDispose
             all.toList()..sort((a, b) => a.recordedAt.compareTo(b.recordedAt)),
       );
 });
+
+/// Live stream de TODAS las mediciones de [athleteId], desde la óptica del
+/// PROPIO atleta — sin importar quién las registró.
+///
+/// Contraparte de [measurementsForAthleteProvider], que es la óptica del
+/// ENTRENADOR y sólo ve las que él mismo cargó (`recordedBy == trainerUid`).
+/// Un atleta que llamara a aquél con su propio uid obtendría la query
+/// `recordedBy == suUid`, que devuelve vacío para todo lo que le cargó su PF.
+///
+/// Query de un solo campo (`athleteId ==`), permitida por la regla de lectura
+/// `recordedBy == uid || athleteId == uid` (firestore.rules). NO requiere
+/// índice compuesto.
+///
+/// ⚠️ SÓLO válido cuando el caller ES el atleta ([athleteId] == uid
+/// autenticado). Un entrenador que lo llame con el uid de su alumno recibe
+/// PERMISSION_DENIED: la query no satisface la rama `recordedBy == uid` y
+/// Firestore no puede probar la otra. Ver
+/// [MeasurementRepository.watchForAthlete].
+///
+/// Ordena por [Measurement.recordedAt] ascendente client-side — el contrato que
+/// espera [MeasurementProgressChart].
+final ownMeasurementsProvider = StreamProvider.autoDispose
+    .family<List<Measurement>, String>((ref, athleteId) {
+  if (athleteId.isEmpty) return Stream.value(const []);
+
+  return ref
+      .watch(measurementRepositoryProvider)
+      .watchForAthlete(athleteId)
+      .map(
+        (all) =>
+            all.toList()..sort((a, b) => a.recordedAt.compareTo(b.recordedAt)),
+      );
+});

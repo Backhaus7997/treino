@@ -2513,6 +2513,42 @@ class AppL10nEs extends AppL10n {
       'No pudimos cargar tu distribución muscular. Inténtalo de nuevo.';
 
   @override
+  String get insightsTileAnthropometryTitle => 'Antropometría';
+
+  @override
+  String get insightsTileAnthropometrySubtitle =>
+      'Peso y medidas corporales en el tiempo';
+
+  @override
+  String get anthropometryScreenTitle => 'ANTROPOMETRÍA';
+
+  @override
+  String get anthropometryEmptyState =>
+      'Todavía no tienes mediciones cargadas. Las registra tu entrenador.';
+
+  @override
+  String get anthropometryNeedsMoreData =>
+      'Con una sola medición no hay progreso que mostrar. Falta al menos una más.';
+
+  @override
+  String get insightsTilePerformanceTitle => 'Rendimiento';
+
+  @override
+  String get insightsTilePerformanceSubtitle =>
+      'Saltos, velocidad, fuerza y resistencia';
+
+  @override
+  String get performanceScreenTitle => 'RENDIMIENTO';
+
+  @override
+  String get performanceEmptyState =>
+      'Todavía no tienes evaluaciones cargadas. Las registra tu entrenador.';
+
+  @override
+  String get performanceNeedsMoreData =>
+      'Con una sola evaluación no hay progreso que mostrar. Falta al menos una más.';
+
+  @override
   String get insightsTileFrequentExercisesTitle => 'Ejercicios frecuentes';
 
   @override
@@ -5041,6 +5077,42 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get muscleDistributionLoadError =>
       'No pudimos cargar tu distribución muscular. Probá de nuevo.';
+
+  @override
+  String get insightsTileAnthropometryTitle => 'Antropometría';
+
+  @override
+  String get insightsTileAnthropometrySubtitle =>
+      'Peso y medidas corporales en el tiempo';
+
+  @override
+  String get anthropometryScreenTitle => 'ANTROPOMETRÍA';
+
+  @override
+  String get anthropometryEmptyState =>
+      'Todavía no tenés mediciones cargadas. Las registra tu entrenador.';
+
+  @override
+  String get anthropometryNeedsMoreData =>
+      'Con una sola medición no hay progreso que mostrar. Falta al menos una más.';
+
+  @override
+  String get insightsTilePerformanceTitle => 'Rendimiento';
+
+  @override
+  String get insightsTilePerformanceSubtitle =>
+      'Saltos, velocidad, fuerza y resistencia';
+
+  @override
+  String get performanceScreenTitle => 'RENDIMIENTO';
+
+  @override
+  String get performanceEmptyState =>
+      'Todavía no tenés evaluaciones cargadas. Las registra tu entrenador.';
+
+  @override
+  String get performanceNeedsMoreData =>
+      'Con una sola evaluación no hay progreso que mostrar. Falta al menos una más.';
 
   @override
   String get insightsTileFrequentExercisesTitle => 'Ejercicios frecuentes';

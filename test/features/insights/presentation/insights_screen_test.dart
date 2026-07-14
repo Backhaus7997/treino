@@ -716,6 +716,18 @@ void main() {
             body: Text('volume-by-group-route'),
           ),
         ),
+        GoRoute(
+          path: '/home/insights/anthropometry',
+          builder: (_, __) => const Scaffold(
+            body: Text('anthropometry-route'),
+          ),
+        ),
+        GoRoute(
+          path: '/home/insights/performance',
+          builder: (_, __) => const Scaffold(
+            body: Text('performance-route'),
+          ),
+        ),
       ],
     );
     addTearDown(router.dispose);
@@ -779,6 +791,32 @@ void main() {
     await tester.tap(find.text('Volumen por grupo'));
     await tester.pumpAndSettle();
     expect(find.text('volume-by-group-route'), findsOneWidget);
+
+    // Antropometría y Rendimiento: los datos los carga el PF, pero hasta ahora
+    // el alumno no tenía NINGUNA pantalla para verlos.
+    router.go('/home/insights');
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Antropometría'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Antropometría'));
+    await tester.pumpAndSettle();
+    expect(find.text('anthropometry-route'), findsOneWidget);
+
+    router.go('/home/insights');
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Rendimiento'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Rendimiento'));
+    await tester.pumpAndSettle();
+    expect(find.text('performance-route'), findsOneWidget);
   });
 }
 

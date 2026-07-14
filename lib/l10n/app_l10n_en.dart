@@ -2458,6 +2458,42 @@ class AppL10nEn extends AppL10n {
       'We couldn\'t load your muscle distribution. Try again.';
 
   @override
+  String get insightsTileAnthropometryTitle => 'Anthropometry';
+
+  @override
+  String get insightsTileAnthropometrySubtitle =>
+      'Body weight and measurements over time';
+
+  @override
+  String get anthropometryScreenTitle => 'ANTHROPOMETRY';
+
+  @override
+  String get anthropometryEmptyState =>
+      'You have no measurements yet. Your trainer records them.';
+
+  @override
+  String get anthropometryNeedsMoreData =>
+      'A single measurement is not enough to show progress. At least one more is needed.';
+
+  @override
+  String get insightsTilePerformanceTitle => 'Performance';
+
+  @override
+  String get insightsTilePerformanceSubtitle =>
+      'Jumps, speed, strength and endurance';
+
+  @override
+  String get performanceScreenTitle => 'PERFORMANCE';
+
+  @override
+  String get performanceEmptyState =>
+      'You have no assessments yet. Your trainer records them.';
+
+  @override
+  String get performanceNeedsMoreData =>
+      'A single assessment is not enough to show progress. At least one more is needed.';
+
+  @override
   String get insightsTileFrequentExercisesTitle => 'Frequent exercises';
 
   @override
