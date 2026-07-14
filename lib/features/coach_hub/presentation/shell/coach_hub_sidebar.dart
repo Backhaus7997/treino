@@ -196,9 +196,13 @@ class _GroupHeader extends StatelessWidget {
 
 /// Fila clickeable de un [SidebarItem] — píldora animada (ADR-SH-004).
 ///
-/// Activo: fondo `bgCard` + acento a la izquierda + label semibold accent.
-/// Hover (vía [TreinoInteractiveState]): fondo `accent` al 8% de opacidad.
-/// El cambio de fondo anima con [AppMotionTokens.cardStateChange].
+/// **Variante activa (REQ-SH-003a)**: píldora completa — el mockup
+/// (`docs/web-trainer/screens/sidebar/sidebar.png`) muestra fondo relleno
+/// (`bgCard`) en todo el ancho de la fila, SIN barra lateral. Activo: fondo
+/// `bgCard` + label/ícono en `accent` semibold. Hover (vía
+/// [TreinoInteractiveState]): fondo `accent` al 8% de opacidad. El cambio de
+/// fondo anima con [AppMotionTokens.cardStateChange] (interrumpible,
+/// respeta reduce-motion vía `AppMotionTokens.resolve`).
 class _SidebarItemRow extends StatelessWidget {
   const _SidebarItemRow({
     required this.item,
@@ -248,16 +252,6 @@ class _SidebarItemRow extends StatelessWidget {
             mainAxisAlignment:
                 collapsed ? MainAxisAlignment.center : MainAxisAlignment.start,
             children: [
-              if (active && !collapsed)
-                Container(
-                  width: 3,
-                  height: 20,
-                  margin: const EdgeInsets.only(right: 8),
-                  decoration: BoxDecoration(
-                    color: tokens.activeForeground,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
               Icon(item.iconBuilder(), size: 20, color: fg),
               if (!collapsed) ...[
                 const SizedBox(width: 12),

@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/app/theme/tokens/components/coach_hub_layout_tokens.dart';
+import 'package:treino/app/theme/tokens/components/coach_hub_sidebar_item_tokens.dart';
+import 'package:treino/app/theme/tokens/components/treino_badge_tokens.dart';
 import 'package:treino/core/persistence/shared_prefs_provider.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
@@ -137,13 +139,38 @@ void main() {
     expect(alumnosText.style?.fontWeight, FontWeight.w400);
 
     // La píldora activa vive dentro de un AnimatedContainer (motion token).
-    expect(
-      find.ancestor(
-        of: find.text('Dashboard'),
-        matching: find.byType(AnimatedContainer),
-      ),
-      findsWidgets,
+    final pillFinder = find.ancestor(
+      of: find.text('Dashboard'),
+      matching: find.byType(AnimatedContainer),
     );
+    expect(pillFinder, findsWidgets);
+
+    // REQ-SH-003a: variante elegida = píldora completa (relleno bgCard en
+    // todo el ancho de la fila), no barra lateral. El AnimatedContainer más
+    // interno (el que aplica el fondo/radius) debe tener el color/radio del
+    // token activo.
+    final tokens = CoachHubSidebarItemTokens.of(
+      tester.element(find.text('Dashboard')),
+    );
+    final pill = tester.widget<AnimatedContainer>(pillFinder.first);
+    final decoration = pill.decoration as BoxDecoration;
+    expect(decoration.color, tokens.activeBackground);
+    expect(
+      decoration.borderRadius,
+      BorderRadius.circular(CoachHubSidebarItemTokens.borderRadius),
+    );
+
+    // NO debe existir la barra lateral de 3px de acento — variante
+    // descartada por REQ-SH-003a (el mockup muestra relleno completo).
+    final leftBar = find.byWidgetPredicate(
+      (w) =>
+          w is Container &&
+          w.constraints == null &&
+          (w.decoration is BoxDecoration) &&
+          ((w.decoration as BoxDecoration).borderRadius ==
+              BorderRadius.circular(2)),
+    );
+    expect(leftBar, findsNothing);
   });
 
   testWidgets(
@@ -268,5 +295,22 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('3'), findsOneWidget);
+
+    // El badge usa los tokens semánticos (highlight magenta + texto claro),
+    // no colores hardcodeados — ADR-SH-003/mockup sidebar.png.
+    final badgeTokens =
+        TreinoBadgeTokens.of(tester.element(find.text('3')));
+    final badgeContainer = tester.widget<Container>(
+      find
+          .ancestor(
+            of: find.text('3'),
+            matching: find.byType(Container),
+          )
+          .first,
+    );
+    final badgeDecoration = badgeContainer.decoration as BoxDecoration;
+    expect(badgeDecoration.color, badgeTokens.background);
+    final badgeText = tester.widget<Text>(find.text('3'));
+    expect(badgeText.style?.color, badgeTokens.foreground);
   });
 }
