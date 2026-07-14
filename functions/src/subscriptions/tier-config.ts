@@ -22,18 +22,20 @@ export const TIER_WEIGHT_LIMITS: Record<SubscriptionTier, number> = {
 
 /**
  * Price table in ARS. Server-authoritative — NEVER trust a client-supplied
- * amount.
+ * amount. `free` has no price (never charged).
  *
- * ⚠️ PLACEHOLDER VALUES — GATE B (business decision, blocks PR3 go-live, NOT
- * PR1 merge). The real Plan 1 / Plan 2 monthly + annual prices and the annual
- * discount % are an open product/ops decision. Do NOT deploy the subscribe
- * flow (PR3) with these placeholders. `free` has no price (never charged).
+ * Precios definidos con estudio de mercado AR (competidores: ACTrainers,
+ * EntrenadorPro, Rutify, Fibrit). Posicionamiento medio-alto — arriba de
+ * ACTrainers/EntrenadorPro (producto más completo), debajo de Fibrit
+ * (outlier). El anual da 2 meses gratis (~17% off): `monthly × 10`.
+ *
+ *   Plan 1 (3-7 alumnos):  $12.000/mes · $120.000/año
+ *   Plan 2 (8-15 alumnos): $22.000/mes · $220.000/año
  */
 export const TIER_PRICES_ARS: Record<
   Exclude<SubscriptionTier, "free">,
   Record<SubscriptionCycle, number>
 > = {
-  // TODO(GATE-B): replace with real ARS prices before PR3 go-live.
-  plan1: { monthly: 0, annual: 0 },
-  plan2: { monthly: 0, annual: 0 },
+  plan1: { monthly: 12000, annual: 120000 },
+  plan2: { monthly: 22000, annual: 220000 },
 };
