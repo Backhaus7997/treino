@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../../app/theme/app_palette.dart';
 import 'widgets/chat_detail_pane.dart';
 import 'widgets/chat_empty_pane.dart';
 import 'widgets/chat_list_pane.dart';
@@ -35,6 +36,7 @@ class ChatSectionScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final palette = AppPalette.of(context);
     final selectedChatId = ref.watch(selectedChatIdProvider);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -43,7 +45,7 @@ class ChatSectionScreen extends ConsumerWidget {
           width: _listPaneWidth,
           child: ChatListPane(selectedChatId: selectedChatId),
         ),
-        const VerticalDivider(width: 1),
+        VerticalDivider(width: 1, color: palette.border),
         Expanded(
           child: selectedChatId == null
               ? const ChatEmptyPane()

@@ -128,23 +128,21 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        final btn = tester.widget<IconButton>(
+        // Chat redesign (mockup): el botón de adjuntar es un GestureDetector
+        // circular con "+" (antes IconButton con clip). Habilitado = onTap
+        // no-null.
+        final btn = tester.widget<GestureDetector>(
           find.byKey(const Key('chat_composer_attach_button')),
         );
-        expect(btn.onPressed, isNotNull,
-            reason: 'V2 must ENABLE the attach button');
-        // Tooltip lives on the Tooltip widget wrapping the button, not on
-        // the IconButton itself.
-        expect(find.text('Adjuntar foto'), findsNothing,
-            reason: 'Tooltip text is not rendered until hover; just confirm '
-                'the Tooltip widget with that message is in the tree.');
+        expect(btn.onTap, isNotNull,
+            reason: 'debe estar habilitado (foto+video)');
+        // Tooltip lives on the Tooltip widget wrapping the button.
         final tooltips =
             tester.widgetList<Tooltip>(find.byType(Tooltip)).toList();
         expect(
-          tooltips.any((t) => t.message == 'Adjuntar foto'),
+          tooltips.any((t) => t.message == 'Adjuntar foto o video'),
           isTrue,
-          reason: 'V2 tooltip should say "Adjuntar foto" '
-              '(not the V1 "Próximamente")',
+          reason: 'el tooltip refleja foto + video',
         );
       },
     );

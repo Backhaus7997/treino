@@ -10,6 +10,7 @@ import '../../../../../profile/application/user_public_profile_providers.dart';
 import '../../../../../workout/application/session_providers.dart'
     show currentUidProvider;
 import '../chat_section_screen.dart' show selectedChatIdProvider;
+import 'avatar_color.dart';
 
 /// Panel izquierdo del split-pane: lista de conversaciones del PF.
 ///
@@ -17,14 +18,71 @@ import '../chat_section_screen.dart' show selectedChatIdProvider;
 /// `userPublicProfileProvider`) — el PF logueado en web ve sus mismos chats
 /// que en mobile porque la query Firestore es `chats where members array-
 /// contains uid`.
-class ChatListPane extends ConsumerWidget {
+class ChatListPane extends ConsumerStatefulWidget {
   const ChatListPane({super.key, required this.selectedChatId});
 
   /// chatId actualmente seleccionado, para resaltar la row activa.
   final String? selectedChatId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ChatListPane> createState() => _ChatListPaneState();
+}
+
+class _ChatListPaneState extends ConsumerState<ChatListPane> {
+  final _searchCtrl = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  /// Renderiza la lista preservando el ÚLTIMO dato bueno durante reloads o
+  /// errores transitorios. Sin esto, al cambiar de chat el StreamProvider
+  /// re-emite loading/error por un frame y la lista parpadea a vacío/"no
+  /// pudimos cargar" (bug reportado). `valueOrNull` sobrevive esos estados.
+  Widget _buildList(
+    AsyncValue<List<Chat>> chatsAsync,
+    String? uid,
+    AppPalette palette,
+  ) {
+    final chats = chatsAsync.valueOrNull;
+
+    // Solo mostramos loading/error si NUNCA hubo datos (primer load real).
+    if (chats == null) {
+      if (chatsAsync.isLoading) {
+        return Center(child: CircularProgressIndicator(color: palette.accent));
+      }
+      return _ErrorState();
+    }
+
+    if (chats.isEmpty) return const _EmptyListState();
+    if (uid == null) return const SizedBox.shrink();
+
+    final filtered = _query.isEmpty
+        ? chats
+        : chats
+            .where(
+                (c) => (c.lastMessageText ?? '').toLowerCase().contains(_query))
+            .toList();
+    if (filtered.isEmpty) return const _NoMatchState();
+
+    return ListView.builder(
+      itemCount: filtered.length,
+      itemBuilder: (context, index) {
+        final chat = filtered[index];
+        return _ChatRow(
+          chat: chat,
+          currentUid: uid,
+          isSelected: chat.chatId == widget.selectedChatId,
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final uid = ref.watch(currentUidProvider);
     final chatsAsync = ref.watch(chatsForCurrentUserProvider);
@@ -34,41 +92,45 @@ class ChatListPane extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // Buscador de conversación (mockup). Filtra por el último mensaje
+          // client-side; el nombre del otro user vive en un provider async por
+          // fila, así que buscar por nombre requeriría resolverlos todos —
+          // fuera de scope de este pulido visual.
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 18, 20, 12),
-            child: Text(
-              'CHAT', // i18n: Fase W2
-              style: GoogleFonts.barlowCondensed(
-                fontWeight: FontWeight.w700,
-                fontSize: 14,
-                letterSpacing: 1.4,
-                color: palette.textPrimary,
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+            child: TextField(
+              controller: _searchCtrl,
+              onChanged: (v) => setState(() => _query = v.trim().toLowerCase()),
+              style:
+                  GoogleFonts.barlow(fontSize: 13, color: palette.textPrimary),
+              decoration: InputDecoration(
+                hintText: 'Buscar conversación', // i18n: Fase W2
+                hintStyle:
+                    GoogleFonts.barlow(fontSize: 13, color: palette.textMuted),
+                prefixIcon:
+                    Icon(Icons.search, size: 18, color: palette.textMuted),
+                isDense: true,
+                filled: true,
+                fillColor: palette.bg,
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(color: palette.border),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(color: palette.border),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(color: palette.accent),
+                ),
               ),
             ),
           ),
-          const Divider(height: 1),
           Expanded(
-            child: chatsAsync.when(
-              loading: () => Center(
-                child: CircularProgressIndicator(color: palette.accent),
-              ),
-              error: (_, __) => _ErrorState(),
-              data: (chats) {
-                if (chats.isEmpty) return const _EmptyListState();
-                if (uid == null) return const SizedBox.shrink();
-                return ListView.builder(
-                  itemCount: chats.length,
-                  itemBuilder: (context, index) {
-                    final chat = chats[index];
-                    return _ChatRow(
-                      chat: chat,
-                      currentUid: uid,
-                      isSelected: chat.chatId == selectedChatId,
-                    );
-                  },
-                );
-              },
-            ),
+            child: _buildList(chatsAsync, uid, palette),
           ),
         ],
       ),
@@ -125,7 +187,9 @@ class _ChatRow extends ConsumerWidget {
           children: [
             CircleAvatar(
               radius: 22,
-              backgroundColor: palette.bgCard,
+              // Mockup: avatares de color por usuario (inicial en blanco)
+              // cuando no hay foto.
+              backgroundColor: avatarColorFor(otherUid),
               backgroundImage: pubAsync.maybeWhen(
                 data: (p) => (p?.avatarUrl != null && p!.avatarUrl!.isNotEmpty)
                     ? NetworkImage(p.avatarUrl!)
@@ -142,7 +206,7 @@ class _ChatRow extends ConsumerWidget {
                             style: GoogleFonts.barlowCondensed(
                               fontWeight: FontWeight.w700,
                               fontSize: 16,
-                              color: palette.textMuted,
+                              color: Colors.white,
                             ),
                           )
                         : null,
@@ -208,12 +272,22 @@ class _ChatRow extends ConsumerWidget {
                       ),
                       if (hasUnread) ...[
                         const SizedBox(width: 6),
+                        // Mockup: badge circular mint con "●" (el conteo real
+                        // por-chat no está en el modelo hoy; se muestra el
+                        // indicador de no-leído como badge, no un puntito).
                         Container(
-                          width: 8,
-                          height: 8,
+                          constraints: const BoxConstraints(minWidth: 18),
+                          height: 18,
+                          alignment: Alignment.center,
+                          padding: const EdgeInsets.symmetric(horizontal: 5),
                           decoration: BoxDecoration(
                             color: palette.accent,
-                            shape: BoxShape.circle,
+                            borderRadius: BorderRadius.circular(9999),
+                          ),
+                          child: Icon(
+                            Icons.circle,
+                            size: 6,
+                            color: palette.bg,
                           ),
                         ),
                       ],
@@ -278,6 +352,21 @@ class _ErrorState extends StatelessWidget {
           fontSize: 13,
           color: palette.textMuted,
         ),
+      ),
+    );
+  }
+}
+
+class _NoMatchState extends StatelessWidget {
+  const _NoMatchState();
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    return Center(
+      child: Text(
+        'Sin resultados.', // i18n: Fase W2
+        style: GoogleFonts.barlow(fontSize: 13, color: palette.textMuted),
       ),
     );
   }

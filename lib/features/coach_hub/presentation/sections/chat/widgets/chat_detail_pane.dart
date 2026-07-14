@@ -13,6 +13,7 @@ import '../../../../../chat/domain/message.dart';
 import '../../../../../profile/application/user_public_profile_providers.dart';
 import '../../../../../workout/application/session_providers.dart'
     show currentUidProvider;
+import 'avatar_color.dart';
 import 'chat_message_bubble.dart';
 
 /// Panel derecho del split-pane: header con el otro user + lista invertida
@@ -228,7 +229,7 @@ class _ChatDetailPaneState extends ConsumerState<ChatDetailPane> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _Header(chatId: widget.chatId),
-          const Divider(height: 1),
+          Divider(height: 1, color: palette.border),
           Expanded(
             child: messagesAsync.when(
               loading: () => Center(
@@ -250,7 +251,7 @@ class _ChatDetailPaneState extends ConsumerState<ChatDetailPane> {
               ),
             ),
           ),
-          const Divider(height: 1),
+          Divider(height: 1, color: palette.border),
           if (_uploading)
             LinearProgressIndicator(
               value: _uploadProgress > 0 ? _uploadProgress : null,
@@ -283,18 +284,18 @@ class _Header extends ConsumerWidget {
     final palette = AppPalette.of(context);
     final uid = ref.watch(currentUidProvider);
     final chatsAsync = ref.watch(chatsForCurrentUserProvider);
-    final otherUid = chatsAsync.maybeWhen(
-      data: (chats) {
-        for (final c in chats) {
-          if (c.chatId != chatId) continue;
-          final others = c.members.where((m) => m != uid).toList();
-          if (others.isNotEmpty) return others.first;
-          return c.members.isNotEmpty ? c.members.first : null;
-        }
-        return null;
-      },
-      orElse: () => null,
-    );
+    // `valueOrNull` preserva la lista previa durante reloads/errores
+    // transitorios → el header no parpadea a "Usuario eliminado" al cambiar
+    // de chat (mismo bug que la lista).
+    String? otherUid;
+    for (final c in (chatsAsync.valueOrNull ?? const [])) {
+      if (c.chatId != chatId) continue;
+      final others = c.members.where((m) => m != uid).toList();
+      otherUid = others.isNotEmpty
+          ? others.first
+          : (c.members.isNotEmpty ? c.members.first : null);
+      break;
+    }
 
     final pubAsync = otherUid != null
         ? ref.watch(userPublicProfileProvider(otherUid))
@@ -307,7 +308,8 @@ class _Header extends ConsumerWidget {
         children: [
           CircleAvatar(
             radius: 18,
-            backgroundColor: palette.bg,
+            // Mockup: avatar de color por usuario (inicial blanca).
+            backgroundColor: avatarColorFor(otherUid ?? ''),
             backgroundImage: pubAsync.maybeWhen(
               data: (p) => (p?.avatarUrl != null && p!.avatarUrl!.isNotEmpty)
                   ? NetworkImage(p.avatarUrl!)
@@ -324,7 +326,7 @@ class _Header extends ConsumerWidget {
                           style: GoogleFonts.barlowCondensed(
                             fontWeight: FontWeight.w700,
                             fontSize: 14,
-                            color: palette.textMuted,
+                            color: Colors.white,
                           ),
                         )
                       : null,
@@ -448,25 +450,34 @@ class _Composer extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          // Botón "Adjuntar" — V2 habilitado (foto). Se deshabilita mientras
-          // hay upload o send en curso para evitar dobles envíos.
+          // Botón "Adjuntar" — mockup: círculo con "+". Se deshabilita
+          // mientras hay upload o send en curso para evitar dobles envíos.
           Tooltip(
-            message: 'Adjuntar foto', // i18n: Fase W2
-            child: IconButton(
+            message: 'Adjuntar foto o video', // i18n: Fase W2
+            child: GestureDetector(
               key: const Key('chat_composer_attach_button'),
-              icon: Icon(
-                TreinoIcon.attach,
-                size: 20,
-                color: sending
-                    ? palette.textMuted.withValues(alpha: 0.4)
-                    : palette.accent,
+              onTap: sending ? null : onAttach,
+              behavior: HitTestBehavior.opaque,
+              child: Container(
+                width: 40,
+                height: 40,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: palette.bg,
+                  border: Border.all(color: palette.border),
+                ),
+                child: Icon(
+                  Icons.add,
+                  size: 22,
+                  color: sending
+                      ? palette.textMuted.withValues(alpha: 0.4)
+                      : palette.accent,
+                ),
               ),
-              onPressed: sending ? null : onAttach,
-              constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-              padding: EdgeInsets.zero,
             ),
           ),
-          const SizedBox(width: 6),
+          const SizedBox(width: 8),
           Expanded(
             child: TextField(
               key: const Key('chat_composer_field'),
@@ -507,26 +518,34 @@ class _Composer extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(width: 6),
-          IconButton(
+          const SizedBox(width: 8),
+          // Botón enviar — mockup: cuadro mint sólido con el avión en el
+          // color de fondo. Redondeado, no un IconButton suelto.
+          GestureDetector(
             key: const Key('chat_send_button'),
-            icon: sending
-                ? SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: palette.accent,
-                    ),
-                  )
-                : Icon(
-                    TreinoIcon.send,
-                    size: 20,
-                    color: palette.accent,
-                  ),
-            onPressed: sending ? null : onSend,
-            constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-            padding: EdgeInsets.zero,
+            onTap: sending ? null : onSend,
+            behavior: HitTestBehavior.opaque,
+            child: Container(
+              width: 44,
+              height: 44,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: sending
+                    ? palette.accent.withValues(alpha: 0.5)
+                    : palette.accent,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: sending
+                  ? SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: palette.bg,
+                      ),
+                    )
+                  : Icon(TreinoIcon.send, size: 20, color: palette.bg),
+            ),
           ),
         ],
       ),
