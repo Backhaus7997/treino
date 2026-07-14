@@ -3,21 +3,31 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_motion.dart';
 import 'package:treino/app/theme/app_palette.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:treino/core/persistence/shared_prefs_provider.dart';
+import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach_hub/application/sidebar_collapsed_provider.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/treino_interactive_state.dart';
+import 'package:treino/features/profile/application/user_providers.dart';
 
 import 'sidebar_item.dart';
 import 'sidebar_registry.dart';
 
-/// Sidebar del Coach Hub web (REQ-CHW-SIDEBAR-001..003).
+/// Sidebar del Coach Hub web (REQ-SH-001..006, ADR-SH-004).
 ///
-/// Renderiza `sidebarRegistry` agrupado por [SidebarGroup], con header por
-/// grupo (oculto al colapsar) y `Ajustes` pinneado abajo. Ancho animado
-/// 264↔72 px. El estado colapsado viene de `sidebarCollapsedProvider`, gateado
-/// por `sharedPreferencesProvider` (optimistic-expanded mientras resuelve).
+/// Renderiza `sidebarRegistry` agrupado por [SidebarGroup] con header por
+/// grupo (oculto al colapsar) y `Ajustes` pinneado al footer, junto al
+/// toggle dedicado y al perfil del usuario. Ancho animado
+/// 240↔72 px (`CoachHubLayoutTokens`). El estado colapsado viene de
+/// `sidebarCollapsedProvider`, gateado por `sharedPreferencesProvider`
+/// (optimistic-expanded mientras resuelve).
 class CoachHubSidebar extends ConsumerWidget {
-  const CoachHubSidebar({super.key, this.collapsedOverride});
+  const CoachHubSidebar({
+    super.key,
+    this.collapsedOverride,
+    this.itemsOverride,
+  });
 
   /// Si es no-nulo, fuerza el estado colapsado e ignora
   /// `sidebarCollapsedProvider`. El `CoachHubScaffold` lo pasa en `true` en
@@ -25,8 +35,9 @@ class CoachHubSidebar extends ConsumerWidget {
   /// guardado del usuario se preserva al volver a desktop.
   final bool? collapsedOverride;
 
-  static const double expandedWidth = 264;
-  static const double collapsedWidth = 72;
+  /// Si es no-nulo, reemplaza `sidebarRegistry` — solo para tests (eg.
+  /// verificar el render de badges sin depender del wiring real de W1+).
+  final List<SidebarItem>? itemsOverride;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -36,31 +47,34 @@ class CoachHubSidebar extends ConsumerWidget {
           orElse: () => false,
         );
     final collapsed = collapsedOverride ?? stored;
-    // El toggle vive DENTRO del sidebar, fusionado con el header del primer
-    // grupo (GESTIÓN) — sin fila propia arriba. Deshabilitado cuando el estado
-    // está forzado (viewport compact, donde `collapsedOverride` es no-nulo) o
-    // cuando prefs todavía no resolvió.
+    // El toggle vive DENTRO del footer (REQ-SH-006) — deshabilitado cuando el
+    // estado está forzado (viewport compact, donde `collapsedOverride` es
+    // no-nulo) o cuando prefs todavía no resolvió.
     final canToggle = collapsedOverride == null &&
         ref.watch(sharedPreferencesProvider).hasValue;
     final location = GoRouterState.of(context).uri.toString();
+    final items = itemsOverride ?? sidebarRegistry;
 
     final groups = <SidebarGroup, List<SidebarItem>>{};
     for (final group in SidebarGroup.values) {
       if (group == SidebarGroup.ajustes) continue;
-      final items =
-          sidebarRegistry.where((item) => item.group == group).toList();
-      if (items.isNotEmpty) groups[group] = items;
+      final items0 = items.where((item) => item.group == group).toList();
+      if (items0.isNotEmpty) groups[group] = items0;
     }
     final groupEntries = groups.entries.toList();
-    final ajustesItems = sidebarRegistry
-        .where((item) => item.group == SidebarGroup.ajustes)
-        .toList();
+    final ajustesItems =
+        items.where((item) => item.group == SidebarGroup.ajustes).toList();
+    final ajustesItem = ajustesItems.isEmpty ? null : ajustesItems.first;
+
+    var staggerIndex = 0;
 
     return AnimatedContainer(
       key: const Key('coach_hub_sidebar_container'),
-      width: collapsed ? collapsedWidth : expandedWidth,
-      duration: AppMotion.base,
-      curve: AppMotion.standard,
+      width: collapsed
+          ? CoachHubLayoutTokens.sidebarCollapsedWidth
+          : CoachHubLayoutTokens.sidebarExpandedWidth,
+      duration: AppMotionTokens.resolve(context, AppMotionTokens.contentEnter),
+      curve: AppMotionTokens.reposition,
       // Clip durante la animación de ancho: al colapsar/expandir (o al resize
       // entre desktop y compact) el ancho anima pero el layout de las filas
       // cambia al instante, así que sin clip las filas desbordarían unos px.
@@ -72,44 +86,40 @@ class CoachHubSidebar extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          _SidebarHeader(collapsed: collapsed),
+          Container(height: 1, color: palette.border),
           Expanded(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(vertical: 12),
+              padding: const EdgeInsets.symmetric(vertical: AppSpacing.s12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   for (var i = 0; i < groupEntries.length; i++) ...[
-                    // El primer header (GESTIÓN) aloja el toggle — siempre
-                    // visible (incluso colapsado, para poder re-expandir). Los
-                    // demás headers siguen ocultándose al colapsar.
-                    if (i == 0)
-                      _GroupHeaderToggle(
-                        label: groupEntries[i].key.label,
-                        collapsed: collapsed,
-                        canToggle: canToggle,
-                        onToggle: () => ref
-                            .read(sidebarCollapsedProvider.notifier)
-                            .toggle(),
-                      )
-                    else if (!collapsed)
-                      _GroupHeader(label: groupEntries[i].key.label),
+                    if (i > 0) Container(height: 1, color: palette.border),
+                    if (!collapsed) _GroupHeader(label: groupEntries[i].key.label),
                     for (final item in groupEntries[i].value)
-                      _SidebarRow(
+                      _SidebarItemRow(
                         item: item,
                         collapsed: collapsed,
                         active: _isActive(location, item.route),
+                        delay: AppMotion.stagger(staggerIndex++),
+                        badgeCount: item.badgeProvider == null
+                            ? null
+                            : ref.watch(item.badgeProvider!),
                       ),
                   ],
                 ],
               ),
             ),
           ),
-          for (final item in ajustesItems)
-            _SidebarRow(
-              item: item,
-              collapsed: collapsed,
-              active: _isActive(location, item.route),
-            ),
+          _SidebarFooter(
+            collapsed: collapsed,
+            canToggle: canToggle,
+            onToggle: () => ref.read(sidebarCollapsedProvider.notifier).toggle(),
+            ajustesItem: ajustesItem,
+            ajustesActive:
+                ajustesItem != null && _isActive(location, ajustesItem.route),
+          ),
         ],
       ),
     );
@@ -119,7 +129,40 @@ class CoachHubSidebar extends ConsumerWidget {
       location == route || location.startsWith('$route/');
 }
 
-/// Header de grupo (RESUMEN, ALUMNOS, …). Sólo visible expandido.
+/// Header del sidebar: logotipo TREINO (REQ-SH-002). Oculto (sin texto)
+/// cuando el sidebar está colapsado.
+class _SidebarHeader extends StatelessWidget {
+  const _SidebarHeader({required this.collapsed});
+
+  final bool collapsed;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    return Container(
+      constraints: const BoxConstraints(minHeight: 60),
+      alignment: collapsed ? Alignment.center : Alignment.centerLeft,
+      padding: EdgeInsets.symmetric(
+        horizontal: collapsed ? 0 : AppSpacing.s20,
+      ),
+      child: collapsed
+          ? const SizedBox.shrink()
+          : Text(
+              'TREINO',
+              style: TextStyle(
+                fontFamily: AppFonts.barlowCondensed,
+                fontWeight: AppFonts.w700,
+                fontSize: 20,
+                letterSpacing: 1,
+                color: palette.accent,
+              ),
+            ),
+    );
+  }
+}
+
+/// Header de grupo (GESTIÓN, RECURSOS, …). Solo visible expandido — ya NO
+/// aloja el toggle (REQ-SH-004/006: el toggle se mudó al footer).
 class _GroupHeader extends StatelessWidget {
   const _GroupHeader({required this.label});
 
@@ -129,13 +172,19 @@ class _GroupHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 18, 14, 8),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.s14,
+        AppSpacing.s18,
+        AppSpacing.s14,
+        AppSpacing.s8,
+      ),
       child: Text(
         label,
         style: TextStyle(
+          fontFamily: AppFonts.barlowCondensed,
           color: palette.textMuted,
           fontSize: 12,
-          fontWeight: FontWeight.w600,
+          fontWeight: AppFonts.w700,
           letterSpacing: 1,
         ),
       ),
@@ -143,19 +192,183 @@ class _GroupHeader extends StatelessWidget {
   }
 }
 
-/// Header del PRIMER grupo (GESTIÓN): además del label, aloja el toggle
-/// contraer/expandir del sidebar — ícono hamburguesa clásico, sin fila propia.
-/// A diferencia de [_GroupHeader], sigue visible colapsado (solo el ícono,
-/// centrado) porque es el único punto para volver a expandir el sidebar.
-class _GroupHeaderToggle extends StatelessWidget {
-  const _GroupHeaderToggle({
-    required this.label,
+/// Fila clickeable de un [SidebarItem] — píldora animada (ADR-SH-004).
+///
+/// Activo: fondo `bgCard` + acento a la izquierda + label semibold accent.
+/// Hover (vía [TreinoInteractiveState]): fondo `accent` al 8% de opacidad.
+/// El cambio de fondo anima con [AppMotionTokens.cardStateChange].
+class _SidebarItemRow extends StatelessWidget {
+  const _SidebarItemRow({
+    required this.item,
+    required this.collapsed,
+    required this.active,
+    required this.delay,
+    required this.badgeCount,
+  });
+
+  final SidebarItem item;
+  final bool collapsed;
+  final bool active;
+  final Duration delay;
+  final int? badgeCount;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = CoachHubSidebarItemTokens.of(context);
+    final fg = active ? tokens.activeForeground : tokens.inactiveForeground;
+
+    final row = TreinoInteractiveState(
+      onTap: () => context.go(item.route),
+      builder: (ctx, states) {
+        final background = active
+            ? tokens.activeBackground
+            : states.hovered
+                ? tokens.hoverBackground
+                : Colors.transparent;
+
+        return AnimatedContainer(
+          duration: AppMotionTokens.resolve(
+            ctx,
+            AppMotionTokens.cardStateChange,
+          ),
+          curve: AppMotionTokens.enter,
+          height: CoachHubLayoutTokens.sidebarItemHeight,
+          margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          padding: EdgeInsets.symmetric(
+            horizontal: CoachHubSidebarItemTokens.paddingH,
+          ),
+          decoration: BoxDecoration(
+            color: background,
+            borderRadius:
+                BorderRadius.circular(CoachHubSidebarItemTokens.borderRadius),
+          ),
+          child: Row(
+            mainAxisAlignment: collapsed
+                ? MainAxisAlignment.center
+                : MainAxisAlignment.start,
+            children: [
+              if (active && !collapsed)
+                Container(
+                  width: 3,
+                  height: 20,
+                  margin: const EdgeInsets.only(right: 8),
+                  decoration: BoxDecoration(
+                    color: tokens.activeForeground,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              Icon(item.iconBuilder(), size: 20, color: fg),
+              if (!collapsed) ...[
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    item.label,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontFamily: AppFonts.barlow,
+                      color: fg,
+                      fontSize: 14,
+                      fontWeight: active ? AppFonts.w600 : AppFonts.w400,
+                    ),
+                  ),
+                ),
+                if (badgeCount != null && badgeCount! > 0) _Badge(count: badgeCount!),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+
+    return TreinoFadeSlideIn(delay: delay, distance: AppMotion.slideSm, child: row);
+  }
+}
+
+/// Badge numérico (Pagos/Chat) — 16px círculo `highlight`, Barlow 700 10px.
+class _Badge extends StatelessWidget {
+  const _Badge({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = TreinoBadgeTokens.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(left: 8),
+      child: Container(
+        constraints: const BoxConstraints(
+          minWidth: TreinoBadgeTokens.size,
+          minHeight: TreinoBadgeTokens.size,
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: tokens.background,
+          borderRadius: BorderRadius.circular(TreinoBadgeTokens.borderRadius),
+        ),
+        child: Text(
+          '$count',
+          style: TextStyle(
+            fontFamily: AppFonts.barlow,
+            fontWeight: AppFonts.w700,
+            fontSize: 10,
+            color: tokens.foreground,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Footer del sidebar: Ajustes pinneado, toggle dedicado y perfil del
+/// usuario (REQ-SH-005/006, ADR-SH-004).
+class _SidebarFooter extends StatelessWidget {
+  const _SidebarFooter({
+    required this.collapsed,
+    required this.canToggle,
+    required this.onToggle,
+    required this.ajustesItem,
+    required this.ajustesActive,
+  });
+
+  final bool collapsed;
+  final bool canToggle;
+  final VoidCallback onToggle;
+  final SidebarItem? ajustesItem;
+  final bool ajustesActive;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (ajustesItem != null)
+          _SidebarItemRow(
+            item: ajustesItem!,
+            collapsed: collapsed,
+            active: ajustesActive,
+            delay: Duration.zero,
+            badgeCount: null,
+          ),
+        Container(height: 1, color: palette.border),
+        _ToggleRow(collapsed: collapsed, canToggle: canToggle, onToggle: onToggle),
+        Container(height: 1, color: palette.border),
+        _ProfileRow(collapsed: collapsed),
+      ],
+    );
+  }
+}
+
+/// Botón dedicado de contraer/expandir — REQ-SH-006. Tooltip contextual
+/// (cambia según el estado actual).
+class _ToggleRow extends StatelessWidget {
+  const _ToggleRow({
     required this.collapsed,
     required this.canToggle,
     required this.onToggle,
   });
 
-  final String label;
   final bool collapsed;
   final bool canToggle;
   final VoidCallback onToggle;
@@ -163,113 +376,108 @@ class _GroupHeaderToggle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    final toggleButton = IconButton(
-      tooltip: 'Contraer/expandir menú', // i18n: Fase W1
-      icon: Icon(TreinoIcon.menu, size: 20, color: palette.textMuted),
-      padding: EdgeInsets.zero,
-      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-      visualDensity: VisualDensity.compact,
-      onPressed: canToggle ? onToggle : null,
+    final tooltip = collapsed ? 'Expandir menú' : 'Contraer menú'; // i18n: Fase W1
+
+    final button = Tooltip(
+      message: tooltip,
+      child: IconButton(
+        key: const Key('sidebar_toggle_button'),
+        icon: Icon(TreinoIcon.menu, size: 20, color: palette.textMuted),
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+        visualDensity: VisualDensity.compact,
+        onPressed: canToggle ? onToggle : null,
+      ),
     );
 
-    if (collapsed) {
-      return Padding(
-        padding: const EdgeInsets.fromLTRB(8, 14, 8, 8),
-        child: Center(child: toggleButton),
-      );
-    }
-
     return Padding(
-      // Left padding (14) matches _GroupHeader — el label queda alineado con
-      // el de RECURSOS; el toggle va al final de la fila.
-      padding: const EdgeInsets.fromLTRB(14, 14, 8, 8),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              label,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: palette.textMuted,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 1,
-              ),
-            ),
-          ),
-          toggleButton,
-        ],
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: collapsed ? Center(child: button) : Padding(
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s14),
+        child: Align(alignment: Alignment.centerLeft, child: button),
       ),
     );
   }
 }
 
-/// Fila clickeable de un [SidebarItem]. Hover usa `palette.borderHover`
-/// (ADR-CHW-006); el item activo se resalta con `accent` + `bgCard`.
-class _SidebarRow extends StatefulWidget {
-  const _SidebarRow({
-    required this.item,
-    required this.collapsed,
-    required this.active,
-  });
+/// Fila de perfil del footer: avatar + nombre + subtítulo + chevron
+/// (REQ-SH-005). Colapsado: solo el avatar, centrado.
+///
+/// Subtítulo estático (placeholder) — sin nueva capa de datos en Fase 1.
+class _ProfileRow extends ConsumerWidget {
+  const _ProfileRow({required this.collapsed});
 
-  final SidebarItem item;
   final bool collapsed;
-  final bool active;
 
   @override
-  State<_SidebarRow> createState() => _SidebarRowState();
-}
-
-class _SidebarRowState extends State<_SidebarRow> {
-  bool _hovered = false;
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
-    final fg = widget.active ? palette.accent : palette.textMuted;
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () => context.go(widget.item.route),
-        child: Container(
-          margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          decoration: BoxDecoration(
-            color: widget.active ? palette.bgCard : palette.bg,
-            border: Border.all(
-              // Borde invisible (color bg) en reposo → sin layout shift al
-              // hacer hover; sin literal transparente.
-              color: _hovered ? palette.borderHover : palette.bg,
-            ),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Row(
-            mainAxisAlignment: widget.collapsed
-                ? MainAxisAlignment.center
-                : MainAxisAlignment.start,
-            children: [
-              Icon(widget.item.iconBuilder(), size: 20, color: fg),
-              if (!widget.collapsed) ...[
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    widget.item.label,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: fg,
-                      fontSize: 14,
-                      fontWeight:
-                          widget.active ? FontWeight.w600 : FontWeight.w400,
-                    ),
+    final displayName =
+        ref.watch(userProfileProvider).valueOrNull?.displayName?.trim();
+    final hasName = displayName != null && displayName.isNotEmpty;
+    final initial = hasName ? displayName.substring(0, 1).toUpperCase() : '?';
+    final name = hasName ? displayName : 'Mi cuenta'; // i18n: Fase W1
+
+    final avatar = CircleAvatar(
+      radius: CoachHubLayoutTokens.sidebarAvatarDiameter / 2,
+      backgroundColor: palette.bgCard,
+      child: Text(
+        initial,
+        style: TextStyle(
+          fontFamily: AppFonts.barlow,
+          fontWeight: AppFonts.w700,
+          color: palette.accent,
+        ),
+      ),
+    );
+
+    if (collapsed) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.s12),
+        child: Center(child: avatar),
+      );
+    }
+
+    return Padding(
+      key: const Key('sidebar_profile_row'),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.s14,
+        vertical: AppSpacing.s12,
+      ),
+      child: Row(
+        children: [
+          avatar,
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  name,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontFamily: AppFonts.barlow,
+                    fontWeight: AppFonts.w600,
+                    fontSize: 14,
+                    color: palette.textPrimary,
+                  ),
+                ),
+                Text(
+                  'Cuenta profesional', // i18n: Fase W1 — placeholder estático
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontFamily: AppFonts.barlow,
+                    fontWeight: AppFonts.w400,
+                    fontSize: 12,
+                    color: palette.textMuted,
                   ),
                 ),
               ],
-            ],
+            ),
           ),
-        ),
+          Icon(TreinoIcon.chevronDown, size: 16, color: palette.textMuted),
+        ],
       ),
     );
   }
