@@ -390,6 +390,90 @@ class AppointmentRepository {
     return paymentRef.id;
   }
 
+  // ─── billAppointments ─────────────────────────────────────────────────────
+  //
+  // MONEY-CRITICAL (Slice 2b, batch billing from the agenda): creates ONE
+  // [payment] and links it to EVERY appointment in [appointments] atomically
+  // via a single Firestore transaction — either ALL writes land or NONE does.
+  // Mirrors [billAppointment]'s atomicity contract, generalized to N docs.
+  //
+  // Firestore transactions require ALL reads before ANY write (the SDK
+  // throws if `txn.get()` is called after `txn.set()`/`txn.update()`), so
+  // this method does two full passes over [appointments] inside the
+  // transaction: (1) re-read every appointment's LIVE doc (never the
+  // possibly-stale objects in [appointments]) and validate ALL of them
+  // in-memory — confirmed, not yet billed, and belonging to the same
+  // athlete+trainer as [payment]; (2) only if EVERY appointment passes, write
+  // the Payment + link all N appointments to it. Throwing during the
+  // validation pass (before any write call) means the transaction commits
+  // NOTHING — a single bad turno aborts the whole lote, matching the
+  // single-turno guarantee.
+  //
+  // Throws [AppointmentNotFoundException], [AppointmentAlreadyBilledException],
+  // [AppointmentNotConfirmedException], or [AppointmentAthleteMismatchException]
+  // — whichever the FIRST invalid appointment in iteration order hits.
+  // Returns the new Payment's id.
+
+  Future<String> billAppointments({
+    required List<Appointment> appointments,
+    required Payment payment,
+  }) async {
+    assert(appointments.isNotEmpty,
+        'billAppointments: appointments must not be empty');
+    assert(
+      appointments.every((a) => a.trainerId == payment.trainerId),
+      'billAppointments: every appointment.trainerId must match payment.trainerId',
+    );
+    assert(
+      appointments.every((a) => a.athleteId == payment.athleteId),
+      'billAppointments: every appointment.athleteId must match payment.athleteId '
+      '(a batch bills exactly one athlete)',
+    );
+
+    final appointmentRefs = [
+      for (final appt in appointments) _appointments.doc(appt.id),
+    ];
+    final paymentRef = _firestore.collection('payments').doc();
+    final paymentToWrite = payment.copyWith(id: paymentRef.id);
+
+    await _firestore.runTransaction<void>((txn) async {
+      // ── Pass 1: ALL reads first (Firestore transaction requirement) ──────
+      final snaps = <DocumentSnapshot<Map<String, Object?>>>[];
+      for (final ref in appointmentRefs) {
+        snaps.add(await txn.get(ref));
+      }
+
+      // ── Pass 2: validate ALL in-memory before writing ANY ────────────────
+      for (var i = 0; i < snaps.length; i++) {
+        final snap = snaps[i];
+        final appointmentId = appointments[i].id;
+
+        if (!snap.exists) {
+          throw AppointmentNotFoundException(appointmentId);
+        }
+        final data = snap.data()!;
+        if (data['paymentId'] != null) {
+          throw AppointmentAlreadyBilledException(appointmentId);
+        }
+        if (data['status'] != 'confirmed') {
+          throw AppointmentNotConfirmedException(appointmentId);
+        }
+        if (data['athleteId'] != payment.athleteId ||
+            data['trainerId'] != payment.trainerId) {
+          throw AppointmentAthleteMismatchException(appointmentId);
+        }
+      }
+
+      // ── Writes: every appointment validated → safe to commit the lote ────
+      txn.set(paymentRef, paymentToWrite.toJson());
+      for (final ref in appointmentRefs) {
+        txn.update(ref, {'paymentId': paymentRef.id});
+      }
+    });
+
+    return paymentRef.id;
+  }
+
   // ─── watchForAthlete ──────────────────────────────────────────────────────
   //
   // SCENARIO-494: streams confirmed appointments for athleteId.
