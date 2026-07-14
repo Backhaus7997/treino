@@ -9,10 +9,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../../app/theme/app_palette.dart';
+import '../../../../../core/utils/argentina_time.dart'
+    show argentinaNow, argentinaUtcOffset;
+import '../../../../../core/widgets/treino_icon.dart';
 import '../../../../coach/application/agenda_providers.dart';
+import '../../../../coach/domain/agenda_exceptions.dart';
 import '../../../../coach/domain/appointment.dart';
 import '../../../../coach/presentation/agenda_formatters.dart';
+import '../../../../payments/application/billing_providers.dart'
+    show athleteBillingProvider;
+import '../../../../payments/domain/payment.dart';
 import '../../../../profile/application/user_public_profile_providers.dart';
+import '../pagos/widgets/payment_format.dart' show fmtArs;
 import 'agenda_web_helpers.dart';
 
 // ─── AppointmentDetailDialog ──────────────────────────────────────────────────
@@ -48,6 +56,19 @@ class _AppointmentDetailDialogState
   late final TextEditingController _afterController;
   bool _saving = false;
 
+  // ── Cobrar (Slice 2a — Agenda→cobro bridge) ───────────────────────────────
+  final _amountController = TextEditingController();
+  final _conceptController = TextEditingController();
+  bool _showCobrarForm = false;
+  bool _billing = false;
+  String? _billingError;
+
+  /// ART calendar day the charge is due (optional) — same idiom as
+  /// _AddSueltoSheet (Slice 1): only y/m/d are meaningful, [_confirmCobrar]
+  /// expands it to 23:59:59 ART so "vence el 15" is not overdue at 00:01 of
+  /// the 15th.
+  DateTime? _dueDate;
+
   @override
   void initState() {
     super.initState();
@@ -61,6 +82,8 @@ class _AppointmentDetailDialogState
   void dispose() {
     _beforeController.dispose();
     _afterController.dispose();
+    _amountController.dispose();
+    _conceptController.dispose();
     super.dispose();
   }
 
@@ -161,10 +184,317 @@ class _AppointmentDetailDialogState
     }
   }
 
+  // ── Cobrar (Slice 2a) ─────────────────────────────────────────────────────
+
+  void _openCobrarForm() {
+    final appt = widget.appointment;
+    // Prefill from the athlete's reference rate AT THIS MOMENT — no reactive
+    // re-prefill afterwards, so it never clobbers a value the trainer is
+    // mid-typing. No config → field starts empty (task's designed fallback).
+    final billing =
+        ref.read(athleteBillingProvider(appt.athleteId)).valueOrNull;
+    _amountController.text =
+        billing != null ? billing.amountArs.toString() : '';
+    _conceptController.text =
+        'Sesión ${AgendaFormatters.formatDate(appt.startsAt)}'; // i18n
+    setState(() {
+      _showCobrarForm = true;
+      _billingError = null;
+    });
+  }
+
+  void _closeCobrarForm() {
+    setState(() {
+      _showCobrarForm = false;
+      _billingError = null;
+      _dueDate = null;
+      _amountController.clear();
+      _conceptController.clear();
+    });
+  }
+
+  Future<void> _pickDueDate() async {
+    // "Today" as an ART calendar day — same rationale as _AddSueltoSheet:
+    // between 21:00–23:59 ART the UTC day is already tomorrow, so a
+    // UTC-derived floor would block picking today.
+    final todayArt = argentinaNow();
+    final floor = DateTime(todayArt.year, todayArt.month, todayArt.day);
+    final initial = _dueDate ?? floor;
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial.isBefore(floor) ? floor : initial,
+      firstDate: floor,
+      lastDate: floor.add(const Duration(days: 365)),
+    );
+    if (picked != null && mounted) {
+      setState(() => _dueDate = picked);
+    }
+  }
+
+  Future<void> _confirmCobrar() async {
+    if (_billing) return;
+    final appt = widget.appointment;
+    final amount = int.tryParse(_amountController.text.trim());
+    final concept = _conceptController.text.trim();
+
+    if (amount == null || amount <= 0) {
+      setState(() => _billingError = 'Ingresá un monto válido.'); // i18n
+      return;
+    }
+    if (concept.isEmpty) {
+      setState(() => _billingError = 'Completá todos los campos.'); // i18n
+      return;
+    }
+
+    setState(() {
+      _billing = true;
+      _billingError = null;
+    });
+
+    // dueAt = end of the chosen ART calendar day, as a UTC instant — same
+    // normalization as _AddSueltoSheet (Slice 1).
+    final dueDate = _dueDate;
+    final dueAt = dueDate == null
+        ? null
+        : DateTime.utc(dueDate.year, dueDate.month, dueDate.day, 23, 59, 59)
+            .add(argentinaUtcOffset);
+
+    final payment = Payment(
+      id: '',
+      trainerId: widget.trainerId,
+      athleteId: appt.athleteId,
+      amountArs: amount,
+      concept: concept,
+      status: PaymentStatus.pending,
+      createdAt: DateTime.now().toUtc(),
+      dueAt: dueAt,
+    );
+
+    try {
+      await ref.read(appointmentRepositoryProvider).billAppointment(
+            appointment: appt,
+            payment: payment,
+          );
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Turno cobrado.')), // i18n
+      );
+    } on AppointmentAlreadyBilledException {
+      if (!mounted) return;
+      setState(() {
+        _billing = false;
+        _billingError =
+            'Este turno ya fue cobrado. Cerrá y volvé a abrirlo para ver el estado actualizado.'; // i18n
+      });
+    } on AppointmentNotConfirmedException {
+      if (!mounted) return;
+      setState(() {
+        _billing = false;
+        _billingError = 'Este turno ya no está confirmado.'; // i18n
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _billing = false;
+        _billingError =
+            'No pudimos registrar el cobro. Probá de nuevo.'; // i18n
+      });
+    }
+  }
+
+  Widget _buildCobrarForm(AppPalette palette, Appointment appt) {
+    final billing =
+        ref.watch(athleteBillingProvider(appt.athleteId)).valueOrNull;
+
+    InputDecoration deco(String hint) => InputDecoration(
+          hintText: hint,
+          hintStyle: TextStyle(color: palette.textMuted),
+          filled: true,
+          fillColor: palette.bg,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: palette.border),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: palette.border),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: palette.accent, width: 1.5),
+          ),
+        );
+
+    Widget label(String text) => Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Text(
+            text,
+            style: GoogleFonts.barlowCondensed(
+              fontWeight: FontWeight.w700,
+              fontSize: 11,
+              letterSpacing: 1.2,
+              color: palette.textMuted,
+            ),
+          ),
+        );
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: palette.bg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: palette.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          label('MONTO (ARS)'), // i18n
+          TextField(
+            controller: _amountController,
+            keyboardType: TextInputType.number,
+            style: GoogleFonts.barlow(fontSize: 14, color: palette.textPrimary),
+            decoration: deco('Ej: 5000'), // i18n
+          ),
+          if (billing != null) ...[
+            const SizedBox(height: 6),
+            Text(
+              'Tarifa de referencia: ${fmtArs(billing.amountArs)}', // i18n
+              style: GoogleFonts.barlow(fontSize: 12, color: palette.textMuted),
+            ),
+          ],
+          const SizedBox(height: 14),
+          label('CONCEPTO'), // i18n
+          TextField(
+            controller: _conceptController,
+            style: GoogleFonts.barlow(fontSize: 14, color: palette.textPrimary),
+            decoration: deco('Ej: Sesión 15/07/2026'), // i18n
+          ),
+          const SizedBox(height: 14),
+          label('VENCE EL (OPCIONAL)'), // i18n
+          InkWell(
+            onTap: _pickDueDate,
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+              decoration: BoxDecoration(
+                color: palette.bg,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: palette.border),
+              ),
+              child: Row(
+                children: [
+                  Icon(TreinoIcon.calendar, size: 16, color: palette.textMuted),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      _dueDate == null
+                          ? 'Sin fecha de vencimiento' // i18n
+                          : AgendaFormatters.formatDate(_dueDate!),
+                      style: GoogleFonts.barlow(
+                        fontSize: 14,
+                        color: _dueDate == null
+                            ? palette.textMuted
+                            : palette.textPrimary,
+                      ),
+                    ),
+                  ),
+                  if (_dueDate != null)
+                    Semantics(
+                      button: true,
+                      label: 'Quitar fecha de vencimiento', // i18n
+                      child: GestureDetector(
+                        onTap: () => setState(() => _dueDate = null),
+                        behavior: HitTestBehavior.opaque,
+                        child: Padding(
+                          padding: const EdgeInsets.all(2),
+                          child: Icon(TreinoIcon.close,
+                              size: 16, color: palette.textMuted),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          if (_billingError != null) ...[
+            const SizedBox(height: 10),
+            Text(
+              _billingError!,
+              style: TextStyle(color: palette.danger, fontSize: 12),
+            ),
+          ],
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: _billing ? null : _closeCobrarForm,
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: palette.border),
+                    foregroundColor: palette.textPrimary,
+                    minimumSize: const Size.fromHeight(44),
+                    shape: const StadiumBorder(),
+                  ),
+                  child: Text(
+                    'Cancelar', // i18n
+                    style: GoogleFonts.barlowCondensed(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: _billing ? null : _confirmCobrar,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: palette.accent,
+                    foregroundColor: palette.bg,
+                    minimumSize: const Size.fromHeight(44),
+                    shape: const StadiumBorder(),
+                    disabledBackgroundColor:
+                        palette.accent.withValues(alpha: 0.3),
+                  ),
+                  child: _billing
+                      ? SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: palette.bg,
+                          ),
+                        )
+                      : Text(
+                          'CONFIRMAR COBRO', // i18n
+                          style: GoogleFonts.barlowCondensed(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                            letterSpacing: 0.8,
+                          ),
+                        ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final appt = widget.appointment;
+
+    // Pre-warm the athlete's reference-rate stream from the moment the
+    // dialog opens, so it's already resolved by the time the trainer taps
+    // COBRAR — _openCobrarForm reads it via ref.read() (synchronous), and a
+    // StreamProvider that had NEVER been watched before would still read as
+    // AsyncLoading right after its first subscription (the first event needs
+    // at least one microtask turn to arrive).
+    ref.watch(athleteBillingProvider(appt.athleteId));
 
     final end = appt.startsAt.add(Duration(minutes: appt.durationMin));
     final timeLabel =
@@ -364,6 +694,61 @@ class _AppointmentDetailDialogState
                         ),
                       ),
               ),
+
+              // ── Cobrar (Slice 2a — Agenda→cobro bridge) ───────────────
+              // Available regardless of isPast — billing a session normally
+              // happens AFTER it took place. Cancelled turns never show this
+              // (guarded by the outer confirmed check).
+              if (appt.status == AppointmentStatus.confirmed) ...[
+                const SizedBox(height: 12),
+                if (appt.paymentId != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: palette.accent.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: palette.accent),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(TreinoIcon.checkCircleFill,
+                            size: 18, color: palette.accent),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Cobrado', // i18n
+                          style: GoogleFonts.barlowCondensed(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 14,
+                            letterSpacing: 0.8,
+                            color: palette.accent,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                else if (!_showCobrarForm)
+                  OutlinedButton(
+                    onPressed: _openCobrarForm,
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(color: palette.accent),
+                      foregroundColor: palette.accent,
+                      minimumSize: const Size.fromHeight(48),
+                      shape: const StadiumBorder(),
+                    ),
+                    child: Text(
+                      'COBRAR', // i18n
+                      style: GoogleFonts.barlowCondensed(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                        letterSpacing: 1.4,
+                      ),
+                    ),
+                  )
+                else
+                  _buildCobrarForm(palette, appt),
+              ],
 
               // ── Cancelar ─────────────────────────────────────────────
               if (!widget.isPast) ...[

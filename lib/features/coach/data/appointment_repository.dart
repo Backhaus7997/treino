@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../../payments/domain/payment.dart';
 import '../domain/agenda_exceptions.dart';
 import '../domain/appointment.dart';
 
@@ -311,6 +312,82 @@ class AppointmentRepository {
       'noteBefore': noteBefore,
       'noteAfter': noteAfter,
     });
+  }
+
+  // ─── markBilled ───────────────────────────────────────────────────────────
+  //
+  // Slice 2a (Agenda→cobro bridge, per-turno). Standalone helper that just
+  // links an appointment to an already-created Payment id. Prefer
+  // [billAppointment] for the normal "create Payment + link it" flow — that
+  // one wraps BOTH writes in a single Firestore transaction so they can never
+  // diverge (see its doc comment). This method exists for direct unit tests
+  // of the "mark" half in isolation and for a manual re-link if ever needed.
+  // firestore.rules enforces set-once on `paymentId` (Path 3 of the
+  // appointments update rule) — a second call with a DIFFERENT paymentId on an
+  // already-billed doc will be rejected server-side.
+
+  Future<void> markBilled({
+    required String appointmentId,
+    required String paymentId,
+  }) async {
+    await _appointments.doc(appointmentId).update({'paymentId': paymentId});
+  }
+
+  // ─── billAppointment ──────────────────────────────────────────────────────
+  //
+  // MONEY-CRITICAL (Slice 2a): creates [payment] and links it to [appointment]
+  // atomically via a single Firestore transaction — either BOTH writes land or
+  // NEITHER does. This avoids the "Payment created but appointment left
+  // unmarked" half-done state that two independent awaited calls could leave
+  // behind on a mid-flow failure (which would risk a second trainer re-billing
+  // the same session).
+  //
+  // Re-reads the appointment doc inside the transaction (not the possibly
+  // stale [appointment] passed in) to close a double-submit / stale-dialog
+  // race: throws [AppointmentAlreadyBilledException] if `paymentId` is
+  // already set, and [AppointmentNotConfirmedException] if the live status
+  // isn't `confirmed` anymore (e.g. cancelled concurrently). Returns the new
+  // Payment's id.
+  //
+  // The Payment's own id is generated client-side (`_firestore.collection
+  // ('payments').doc()` — a local auto-id, no network round trip) so it can
+  // be embedded in both writes before the transaction ever starts.
+
+  Future<String> billAppointment({
+    required Appointment appointment,
+    required Payment payment,
+  }) async {
+    assert(
+      payment.trainerId == appointment.trainerId,
+      'billAppointment: payment.trainerId must match appointment.trainerId',
+    );
+    assert(
+      payment.athleteId == appointment.athleteId,
+      'billAppointment: payment.athleteId must match appointment.athleteId',
+    );
+
+    final appointmentRef = _appointments.doc(appointment.id);
+    final paymentRef = _firestore.collection('payments').doc();
+    final paymentToWrite = payment.copyWith(id: paymentRef.id);
+
+    await _firestore.runTransaction<void>((txn) async {
+      final snap = await txn.get(appointmentRef);
+      if (!snap.exists) {
+        throw AppointmentNotFoundException(appointment.id);
+      }
+      final data = snap.data()!;
+      if (data['paymentId'] != null) {
+        throw AppointmentAlreadyBilledException(appointment.id);
+      }
+      if (data['status'] != 'confirmed') {
+        throw AppointmentNotConfirmedException(appointment.id);
+      }
+
+      txn.set(paymentRef, paymentToWrite.toJson());
+      txn.update(appointmentRef, {'paymentId': paymentRef.id});
+    });
+
+    return paymentRef.id;
   }
 
   // ─── watchForAthlete ──────────────────────────────────────────────────────

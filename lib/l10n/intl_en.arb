@@ -142,6 +142,34 @@
       }
     }
   },
+  "agendaCobrarCta": "CHARGE",
+  "agendaCobradoLabel": "Charged",
+  "agendaCobrarMontoLabel": "AMOUNT (ARS)",
+  "agendaCobrarConceptoLabel": "CONCEPT",
+  "agendaCobrarVenceElLabel": "DUE DATE (OPTIONAL)",
+  "agendaCobrarVenceElHint": "No due date",
+  "agendaCobrarVenceElQuitar": "Remove due date",
+  "agendaCobrarConfirmCta": "CONFIRM CHARGE",
+  "agendaCobrarCompletaCampos": "Fill in all fields.",
+  "agendaCobrarMontoInvalido": "Enter a valid amount.",
+  "agendaCobrarSuccess": "Session charged.",
+  "agendaCobrarError": "We couldn't register the charge. Try again.",
+  "agendaCobrarConceptoDefault": "Session {date}",
+  "@agendaCobrarConceptoDefault": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "agendaCobrarTarifaReferencia": "Reference rate: {amount}",
+  "@agendaCobrarTarifaReferencia": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
   "workoutSummaryHeaderCompleted": "",
   "workoutSummaryHeaderAbandoned": "",
   "workoutStatDuration": "",

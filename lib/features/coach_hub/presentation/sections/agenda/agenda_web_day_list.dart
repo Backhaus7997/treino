@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../../app/theme/app_palette.dart';
+import '../../../../../core/widgets/treino_icon.dart';
 import '../../../../coach/application/agenda_providers.dart';
 import '../../../../coach/domain/appointment.dart';
 import '../../../../coach/presentation/agenda_formatters.dart';
@@ -184,6 +185,18 @@ class AppointmentCard extends ConsumerWidget {
                 color: palette.textMuted,
               ),
             ),
+            // "Cobrado" indicator (Slice 2a — Agenda→cobro bridge). // i18n
+            if (appt.paymentId != null) ...[
+              const SizedBox(width: 8),
+              Tooltip(
+                message: 'Cobrado', // i18n
+                child: Icon(
+                  TreinoIcon.money,
+                  size: 14,
+                  color: palette.accent,
+                ),
+              ),
+            ],
           ],
         ),
       ),

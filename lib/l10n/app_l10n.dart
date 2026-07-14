@@ -842,6 +842,90 @@ abstract class AppL10n {
   /// **'Reservado por {athleteName}'**
   String agendaSlotBookedByLabel(String athleteName);
 
+  /// No description provided for @agendaCobrarCta.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'COBRAR'**
+  String get agendaCobrarCta;
+
+  /// No description provided for @agendaCobradoLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cobrado'**
+  String get agendaCobradoLabel;
+
+  /// No description provided for @agendaCobrarMontoLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'MONTO (ARS)'**
+  String get agendaCobrarMontoLabel;
+
+  /// No description provided for @agendaCobrarConceptoLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CONCEPTO'**
+  String get agendaCobrarConceptoLabel;
+
+  /// No description provided for @agendaCobrarVenceElLabel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'VENCE EL (OPCIONAL)'**
+  String get agendaCobrarVenceElLabel;
+
+  /// No description provided for @agendaCobrarVenceElHint.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Sin fecha de vencimiento'**
+  String get agendaCobrarVenceElHint;
+
+  /// No description provided for @agendaCobrarVenceElQuitar.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Quitar fecha de vencimiento'**
+  String get agendaCobrarVenceElQuitar;
+
+  /// No description provided for @agendaCobrarConfirmCta.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CONFIRMAR COBRO'**
+  String get agendaCobrarConfirmCta;
+
+  /// No description provided for @agendaCobrarCompletaCampos.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Completá todos los campos.'**
+  String get agendaCobrarCompletaCampos;
+
+  /// No description provided for @agendaCobrarMontoInvalido.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ingresá un monto válido.'**
+  String get agendaCobrarMontoInvalido;
+
+  /// No description provided for @agendaCobrarSuccess.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Turno cobrado.'**
+  String get agendaCobrarSuccess;
+
+  /// No description provided for @agendaCobrarError.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos registrar el cobro. Probá de nuevo.'**
+  String get agendaCobrarError;
+
+  /// No description provided for @agendaCobrarConceptoDefault.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Sesión {date}'**
+  String agendaCobrarConceptoDefault(String date);
+
+  /// No description provided for @agendaCobrarTarifaReferencia.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tarifa de referencia: {amount}'**
+  String agendaCobrarTarifaReferencia(String amount);
+
   /// No description provided for @workoutSummaryHeaderCompleted.
   ///
   /// In es_AR, this message translates to:

@@ -34,3 +34,38 @@ class BookingTooFarAheadException implements Exception {
   @override
   String toString() => 'BookingTooFarAheadException()';
 }
+
+/// Thrown by `AppointmentRepository.billAppointment` when the appointment
+/// already has a non-null `paymentId` — guards against re-cobro from a
+/// double-submit or a stale/reopened detail dialog (Slice 2a, money-critical).
+class AppointmentAlreadyBilledException implements Exception {
+  const AppointmentAlreadyBilledException(this.appointmentId);
+  final String appointmentId;
+
+  @override
+  String toString() =>
+      'AppointmentAlreadyBilledException(appointmentId=$appointmentId)';
+}
+
+/// Thrown by `AppointmentRepository.billAppointment` when the appointment
+/// doc no longer exists at commit time (Slice 2a).
+class AppointmentNotFoundException implements Exception {
+  const AppointmentNotFoundException(this.appointmentId);
+  final String appointmentId;
+
+  @override
+  String toString() =>
+      'AppointmentNotFoundException(appointmentId=$appointmentId)';
+}
+
+/// Thrown by `AppointmentRepository.billAppointment` when the appointment's
+/// live status isn't `confirmed` anymore (e.g. cancelled concurrently in
+/// another tab) — a cancelled session must never be billed (Slice 2a).
+class AppointmentNotConfirmedException implements Exception {
+  const AppointmentNotConfirmedException(this.appointmentId);
+  final String appointmentId;
+
+  @override
+  String toString() =>
+      'AppointmentNotConfirmedException(appointmentId=$appointmentId)';
+}

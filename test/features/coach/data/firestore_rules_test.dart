@@ -134,5 +134,44 @@ void main() {
       },
       skip: 'emulator required — run with firebase emulators:exec',
     );
+
+    // Slice 2a (Agenda→cobro bridge, money-critical): Path 3 of the
+    // appointments update rule now also lets the trainer link a Payment via
+    // `paymentId`, with a set-once guard. See firestore.rules lines ~935-951.
+    test(
+      'SCENARIO-841: trainer sets paymentId on own confirmed appointment '
+      '(Slice 2a) — null → value permitted',
+      () {
+        // Requires emulator. Validates Path 3 permits
+        // request.auth.uid == resource.data.trainerId to update ONLY
+        // paymentId (null → a Payment id) while status/athleteId/trainerId/
+        // startsAt stay pinned equal to resource.data.
+      },
+      skip: 'emulator required — run with firebase emulators:exec',
+    );
+
+    test(
+      'SCENARIO-842: paymentId is set-once — re-billing with a different id, '
+      'or clearing it back to null, is denied',
+      () {
+        // Requires emulator. Validates Path 3's set-once clause: once
+        // resource.data.paymentId is non-null, request.resource.data.paymentId
+        // must equal it exactly — a different Payment id or null is denied.
+        // MONEY-CRITICAL: closes the "swap which Payment covers this
+        // session" / accidental-unbilling vector.
+      },
+      skip: 'emulator required — run with firebase emulators:exec',
+    );
+
+    test(
+      'SCENARIO-843: a non-trainer (athlete or third party) cannot set '
+      'paymentId on an appointment they do not own',
+      () {
+        // Requires emulator. Validates Path 3's outer
+        // `request.auth.uid == resource.data.trainerId` gate — an athlete or
+        // unrelated uid attempting to set paymentId is denied.
+      },
+      skip: 'emulator required — run with firebase emulators:exec',
+    );
   });
 }

@@ -399,6 +399,53 @@ class AppL10nEs extends AppL10n {
   }
 
   @override
+  String get agendaCobrarCta => 'COBRAR';
+
+  @override
+  String get agendaCobradoLabel => 'Cobrado';
+
+  @override
+  String get agendaCobrarMontoLabel => 'MONTO (ARS)';
+
+  @override
+  String get agendaCobrarConceptoLabel => 'CONCEPTO';
+
+  @override
+  String get agendaCobrarVenceElLabel => 'VENCE EL (OPCIONAL)';
+
+  @override
+  String get agendaCobrarVenceElHint => 'Sin fecha de vencimiento';
+
+  @override
+  String get agendaCobrarVenceElQuitar => 'Quitar fecha de vencimiento';
+
+  @override
+  String get agendaCobrarConfirmCta => 'CONFIRMAR COBRO';
+
+  @override
+  String get agendaCobrarCompletaCampos => 'Completa todos los campos.';
+
+  @override
+  String get agendaCobrarMontoInvalido => 'Ingresa un monto válido.';
+
+  @override
+  String get agendaCobrarSuccess => 'Turno cobrado.';
+
+  @override
+  String get agendaCobrarError =>
+      'No pudimos registrar el cobro. Inténtalo de nuevo.';
+
+  @override
+  String agendaCobrarConceptoDefault(String date) {
+    return 'Sesión $date';
+  }
+
+  @override
+  String agendaCobrarTarifaReferencia(String amount) {
+    return 'Tarifa de referencia: $amount';
+  }
+
+  @override
   String get workoutSummaryHeaderCompleted => 'BUEN ENTRENO';
 
   @override
@@ -2874,6 +2921,53 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String agendaSlotBookedByLabel(String athleteName) {
     return 'Reservado por $athleteName';
+  }
+
+  @override
+  String get agendaCobrarCta => 'COBRAR';
+
+  @override
+  String get agendaCobradoLabel => 'Cobrado';
+
+  @override
+  String get agendaCobrarMontoLabel => 'MONTO (ARS)';
+
+  @override
+  String get agendaCobrarConceptoLabel => 'CONCEPTO';
+
+  @override
+  String get agendaCobrarVenceElLabel => 'VENCE EL (OPCIONAL)';
+
+  @override
+  String get agendaCobrarVenceElHint => 'Sin fecha de vencimiento';
+
+  @override
+  String get agendaCobrarVenceElQuitar => 'Quitar fecha de vencimiento';
+
+  @override
+  String get agendaCobrarConfirmCta => 'CONFIRMAR COBRO';
+
+  @override
+  String get agendaCobrarCompletaCampos => 'Completá todos los campos.';
+
+  @override
+  String get agendaCobrarMontoInvalido => 'Ingresá un monto válido.';
+
+  @override
+  String get agendaCobrarSuccess => 'Turno cobrado.';
+
+  @override
+  String get agendaCobrarError =>
+      'No pudimos registrar el cobro. Probá de nuevo.';
+
+  @override
+  String agendaCobrarConceptoDefault(String date) {
+    return 'Sesión $date';
+  }
+
+  @override
+  String agendaCobrarTarifaReferencia(String amount) {
+    return 'Tarifa de referencia: $amount';
   }
 
   @override

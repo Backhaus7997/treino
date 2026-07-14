@@ -237,6 +237,34 @@
   "agendaNoUpcomingSessions": "Tu entrenador todavía no te agendó sesiones.",
   "agendaSaveError": "No pudimos guardar. Inténtalo de nuevo.",
   "agendaSaveSuccess": "Horario guardado.",
+  "agendaCobrarCta": "COBRAR",
+  "agendaCobradoLabel": "Cobrado",
+  "agendaCobrarMontoLabel": "MONTO (ARS)",
+  "agendaCobrarConceptoLabel": "CONCEPTO",
+  "agendaCobrarVenceElLabel": "VENCE EL (OPCIONAL)",
+  "agendaCobrarVenceElHint": "Sin fecha de vencimiento",
+  "agendaCobrarVenceElQuitar": "Quitar fecha de vencimiento",
+  "agendaCobrarConfirmCta": "CONFIRMAR COBRO",
+  "agendaCobrarCompletaCampos": "Completa todos los campos.",
+  "agendaCobrarMontoInvalido": "Ingresa un monto válido.",
+  "agendaCobrarSuccess": "Turno cobrado.",
+  "agendaCobrarError": "No pudimos registrar el cobro. Inténtalo de nuevo.",
+  "agendaCobrarConceptoDefault": "Sesión {date}",
+  "@agendaCobrarConceptoDefault": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "agendaCobrarTarifaReferencia": "Tarifa de referencia: {amount}",
+  "@agendaCobrarTarifaReferencia": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
   "coachHubSectionLoadError": "No pudimos cargar esta sección.",
   "coachHubSignOutError": "No pudimos cerrar sesión. Inténtalo de nuevo.",
   "coachHubLoginPrompt": "Ingresa con la cuenta que ya usas en la app móvil.",

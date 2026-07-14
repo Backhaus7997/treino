@@ -386,6 +386,53 @@ class AppL10nEn extends AppL10n {
   }
 
   @override
+  String get agendaCobrarCta => 'CHARGE';
+
+  @override
+  String get agendaCobradoLabel => 'Charged';
+
+  @override
+  String get agendaCobrarMontoLabel => 'AMOUNT (ARS)';
+
+  @override
+  String get agendaCobrarConceptoLabel => 'CONCEPT';
+
+  @override
+  String get agendaCobrarVenceElLabel => 'DUE DATE (OPTIONAL)';
+
+  @override
+  String get agendaCobrarVenceElHint => 'No due date';
+
+  @override
+  String get agendaCobrarVenceElQuitar => 'Remove due date';
+
+  @override
+  String get agendaCobrarConfirmCta => 'CONFIRM CHARGE';
+
+  @override
+  String get agendaCobrarCompletaCampos => 'Fill in all fields.';
+
+  @override
+  String get agendaCobrarMontoInvalido => 'Enter a valid amount.';
+
+  @override
+  String get agendaCobrarSuccess => 'Session charged.';
+
+  @override
+  String get agendaCobrarError =>
+      'We couldn\'t register the charge. Try again.';
+
+  @override
+  String agendaCobrarConceptoDefault(String date) {
+    return 'Session $date';
+  }
+
+  @override
+  String agendaCobrarTarifaReferencia(String amount) {
+    return 'Reference rate: $amount';
+  }
+
+  @override
   String get workoutSummaryHeaderCompleted => '';
 
   @override
