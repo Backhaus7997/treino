@@ -30,6 +30,7 @@ import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:treino/app/theme/app_palette.dart';
+import 'package:treino/app/theme/tokens/primitives.dart';
 import 'package:treino/core/persistence/shared_prefs_provider.dart';
 import 'package:treino/features/auth/application/auth_notifier.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
@@ -78,18 +79,22 @@ UserProfile _trainerProfile() => UserProfile(
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Carga de fuentes TTF reales desde test/fonts/
-// Registramos los bytes bajo las familias "Barlow" y "BarlowCondensed" para que
-// Flutter las encuentre cuando el tema las declare via fontFamily/fontFamilyFallback.
+// Registramos los bytes bajo los nombres de familia EXACTOS que los widgets
+// resuelven en runtime: AppFonts.barlow ("Barlow") y AppFonts.barlowCondensed
+// ("Barlow Condensed", con espacio — el mismo nombre que registra google_fonts
+// para GoogleFonts.barlowCondensed()). Si el nombre de familia no coincide
+// exactamente, Flutter no encuentra la fuente y renderiza tofu (glifos vacíos)
+// aunque el FontLoader haya cargado el TTF correcto.
 // ──────────────────────────────────────────────────────────────────────────────
 Future<void> _loadTestFonts() async {
-  await _loadFontFamily('Barlow', [
+  await _loadFontFamily(AppFonts.barlow, [
     'test/fonts/Barlow-Regular.ttf',
     'test/fonts/Barlow-Medium.ttf',
     'test/fonts/Barlow-SemiBold.ttf',
     'test/fonts/Barlow-Bold.ttf',
   ]);
 
-  await _loadFontFamily('BarlowCondensed', [
+  await _loadFontFamily(AppFonts.barlowCondensed, [
     'test/fonts/BarlowCondensed-Regular.ttf',
     'test/fonts/BarlowCondensed-Bold.ttf',
   ]);
@@ -123,14 +128,14 @@ ThemeData _evidenceTheme({required AppPalette palette, required bool dark}) {
 
   // TextTheme con Barlow (cargada desde TTF local) en lugar de GoogleFonts.barlow.
   final textTheme = base.textTheme.apply(
-    fontFamily: 'Barlow',
+    fontFamily: AppFonts.barlow,
     bodyColor: palette.textPrimary,
     displayColor: palette.textPrimary,
   );
 
-  // Headings con BarlowCondensed Bold (igual que AppTheme).
+  // Headings con Barlow Condensed Bold (igual que AppTheme).
   const condensedStyle = TextStyle(
-    fontFamily: 'BarlowCondensed',
+    fontFamily: AppFonts.barlowCondensed,
     fontWeight: FontWeight.w700,
     letterSpacing: 0.5,
   );
