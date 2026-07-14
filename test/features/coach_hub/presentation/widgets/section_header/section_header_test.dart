@@ -177,7 +177,8 @@ void main() {
       final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
       await gesture.addPointer(location: Offset.zero);
       addTearDown(gesture.removePointer);
-      await gesture.moveTo(tester.getCenter(find.byKey(const Key('sh_action'))));
+      await gesture
+          .moveTo(tester.getCenter(find.byKey(const Key('sh_action'))));
       await tester.pump();
 
       expect(decoration(), TextDecoration.underline,

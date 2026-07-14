@@ -156,8 +156,7 @@ class _ChipItem extends StatelessWidget {
           curve: AppMotion.standard,
           decoration: BoxDecoration(
             color: bg,
-            borderRadius:
-                BorderRadius.circular(TreinoChipTokens.borderRadius),
+            borderRadius: BorderRadius.circular(TreinoChipTokens.borderRadius),
             border: borderColor != null
                 ? Border.all(color: borderColor)
                 : Border.all(color: Colors.transparent),

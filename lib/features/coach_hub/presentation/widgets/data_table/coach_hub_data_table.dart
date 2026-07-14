@@ -350,8 +350,7 @@ class _DataRow extends StatelessWidget {
           curve: AppMotion.standard,
           decoration: BoxDecoration(
             color: bg,
-            border:
-                states.focused ? Border.all(color: focusTokens.ring) : null,
+            border: states.focused ? Border.all(color: focusTokens.ring) : null,
           ),
           height: TreinoTableTokens.rowHeight,
           child: Row(

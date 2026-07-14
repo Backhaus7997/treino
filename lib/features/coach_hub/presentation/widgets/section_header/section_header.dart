@@ -148,8 +148,7 @@ class _ActionButton extends StatelessWidget {
           key: const Key('sh_action'),
           padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
           decoration: BoxDecoration(
-            border:
-                states.focused ? Border.all(color: focusTokens.ring) : null,
+            border: states.focused ? Border.all(color: focusTokens.ring) : null,
           ),
           child: Text(
             label,
