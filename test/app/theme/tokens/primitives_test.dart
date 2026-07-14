@@ -97,6 +97,11 @@ void main() {
       expect(AppColorPrimitives.black60, const Color(0x99000000));
     });
 
+    test('transparent == 0x00000000', () {
+      expect(AppColorPrimitives.transparent, const Color(0x00000000));
+      expect(AppColorPrimitives.transparent, Colors.transparent);
+    });
+
     test('todos los miembros son static const (sin BuildContext)', () {
       // Si el acceso falla en este contexto sin widget tree, el test explota.
       // El hecho de que compile y ejecute confirma que no requiere BuildContext.
@@ -124,6 +129,7 @@ void main() {
         AppColorPrimitives.black10,
         AppColorPrimitives.black20,
         AppColorPrimitives.black60,
+        AppColorPrimitives.transparent,
       ];
       expect(values, everyElement(isA<Color>()));
     });
@@ -135,6 +141,11 @@ void main() {
     test('s14 == 14.0', () => expect(AppSpacing.s14, 14.0));
     test('s18 == 18.0', () => expect(AppSpacing.s18, 18.0));
     test('s20 == 20.0', () => expect(AppSpacing.s20, 20.0));
+
+    test(
+      'hairline == 4.0 (única excepción sub-8, micro-gap)',
+      () => expect(AppSpacing.hairline, 4.0),
+    );
   });
 
   group('AppRadius — radios del sistema', () {

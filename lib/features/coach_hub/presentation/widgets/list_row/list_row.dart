@@ -106,7 +106,7 @@ class TreinoListRow extends StatelessWidget {
               children: [
                 if (leading != null) ...[
                   leading!,
-                  const SizedBox(width: 12),
+                  const SizedBox(width: AppSpacing.s12),
                 ],
                 Expanded(
                   child: Column(
@@ -126,7 +126,7 @@ class TreinoListRow extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                       ),
                       if (subtitle != null) ...[
-                        const SizedBox(height: 2),
+                        const SizedBox(height: AppSpacing.hairline),
                         Text(
                           subtitle!,
                           style: TextStyle(
@@ -144,7 +144,7 @@ class TreinoListRow extends StatelessWidget {
                   ),
                 ),
                 if (trailing != null) ...[
-                  const SizedBox(width: 12),
+                  const SizedBox(width: AppSpacing.s12),
                   trailing!,
                 ],
               ],

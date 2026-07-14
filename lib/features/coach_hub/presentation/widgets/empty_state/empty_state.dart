@@ -98,7 +98,7 @@ class TreinoEmptyState extends StatelessWidget {
                 size: TreinoEmptyStateTokens.iconSize,
                 color: tokens.iconColor,
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: AppSpacing.s12),
               Text(
                 title,
                 textAlign: TextAlign.center,
@@ -110,7 +110,7 @@ class TreinoEmptyState extends StatelessWidget {
                 ),
               ),
               if (description != null) ...[
-                const SizedBox(height: 4),
+                const SizedBox(height: AppSpacing.hairline),
                 Text(
                   description!,
                   textAlign: TextAlign.center,
@@ -123,7 +123,7 @@ class TreinoEmptyState extends StatelessWidget {
                 ),
               ],
               if (ctaLabel != null) ...[
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpacing.s12),
                 TextButton(
                   onPressed: onCtaTap,
                   child: Text(
@@ -157,7 +157,9 @@ class _SkeletonContent extends StatelessWidget {
       child: Center(
         child: Padding(
           key: const Key('empty_state_skeleton'),
-          padding: const EdgeInsets.all(32),
+          // Composición documentada: s20 + s12 (sin token único de 32 en la
+          // escala cerrada — ver AppSpacing).
+          padding: const EdgeInsets.all(AppSpacing.s20 + AppSpacing.s12),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -169,7 +171,7 @@ class _SkeletonContent extends StatelessWidget {
                   shape: BoxShape.circle,
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: AppSpacing.s12),
               Container(
                 width: 160,
                 height: 16,

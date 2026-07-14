@@ -179,7 +179,7 @@ class _ChipItem extends StatelessWidget {
             borderRadius: BorderRadius.circular(TreinoChipTokens.borderRadius),
             border: borderColor != null
                 ? Border.all(color: borderColor)
-                : Border.all(color: Colors.transparent),
+                : Border.all(color: AppColorPrimitives.transparent),
             boxShadow: states.focused
                 ? [
                     BoxShadow(
@@ -206,7 +206,7 @@ class _ChipItem extends StatelessWidget {
                 ),
               ),
               if (badgeCount != null) ...[
-                const SizedBox(width: 6),
+                const SizedBox(width: AppSpacing.hairline),
                 Container(
                   width: TreinoBadgeTokens.size,
                   height: TreinoBadgeTokens.size,

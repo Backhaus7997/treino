@@ -100,7 +100,7 @@ class TreinoSectionHeader extends StatelessWidget {
           ),
         ),
         if (count != null) ...[
-          const SizedBox(width: 6),
+          const SizedBox(width: AppSpacing.hairline),
           Text(
             '$count',
             style: TextStyle(
@@ -161,7 +161,7 @@ class _ActionButton extends StatelessWidget {
       builder: (ctx, states) {
         return Container(
           key: const Key('sh_action'),
-          padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
+          padding: const EdgeInsets.all(AppSpacing.s8),
           decoration: BoxDecoration(
             border: states.focused ? Border.all(color: focusTokens.ring) : null,
           ),

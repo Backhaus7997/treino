@@ -149,18 +149,18 @@ class TreinoDialog extends StatelessWidget {
                 borderRadius:
                     BorderRadius.circular(TreinoDialogTokens.borderRadius),
                 child: Padding(
-                  padding: const EdgeInsets.all(20),
+                  padding: const EdgeInsets.all(AppSpacing.s20),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _Header(title: title, tokens: tokens),
                       if (body != null) ...[
-                        const SizedBox(height: 12),
+                        const SizedBox(height: AppSpacing.s12),
                         body!,
                       ],
                       if (errorMessage != null) ...[
-                        const SizedBox(height: 12),
+                        const SizedBox(height: AppSpacing.s12),
                         Text(
                           errorMessage!,
                           style: TextStyle(
@@ -171,7 +171,7 @@ class TreinoDialog extends StatelessWidget {
                         ),
                       ],
                       if (primaryLabel != null || secondaryLabel != null) ...[
-                        const SizedBox(height: 20),
+                        const SizedBox(height: AppSpacing.s20),
                         _Actions(
                           primaryLabel: primaryLabel,
                           onPrimaryTap: onPrimaryTap,
@@ -265,7 +265,7 @@ class _Actions extends StatelessWidget {
             label: secondaryLabel!,
           ),
         if (primaryLabel != null) ...[
-          const SizedBox(width: 8),
+          const SizedBox(width: AppSpacing.s8),
           _DialogActionButton(
             actionKey: const Key('dialog_primary_button'),
             onTap: loading ? null : onPrimaryTap,
@@ -313,7 +313,10 @@ class _DialogActionButton extends StatelessWidget {
 
         return Container(
           key: actionKey,
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.s8,
+            vertical: AppSpacing.s8,
+          ),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(6),
             color: highlighted ? color.withValues(alpha: 0.08) : null,

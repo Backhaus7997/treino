@@ -269,7 +269,7 @@ class _HeaderCell extends StatelessWidget {
             ),
           ),
           if (column.sortable && isSorted) ...[
-            const SizedBox(width: 4),
+            const SizedBox(width: AppSpacing.hairline),
             AnimatedRotation(
               key: Key('sort_indicator_${column.key}'),
               turns: sortAscending ? 0 : 0.5,
@@ -282,7 +282,7 @@ class _HeaderCell extends StatelessWidget {
             ),
           ],
           if (column.sortable && !isSorted) ...[
-            const SizedBox(width: 4),
+            const SizedBox(width: AppSpacing.hairline),
             Icon(
               TreinoIcon.sortable,
               size: 12,
@@ -450,7 +450,7 @@ class _SkeletonRows extends StatelessWidget {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: AppSpacing.s12),
                   Expanded(
                     child: Container(
                       height: 14,
@@ -487,7 +487,7 @@ class _ErrorState extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(TreinoIcon.errorState, size: 32, color: palette.danger),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.s8),
           Text(
             message,
             style: TextStyle(
@@ -498,7 +498,7 @@ class _ErrorState extends StatelessWidget {
             textAlign: TextAlign.center,
           ),
           if (onRetry != null) ...[
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.s12),
             TextButton(
               key: const Key('data_table_retry'),
               onPressed: onRetry,

@@ -116,6 +116,14 @@ abstract final class AppColorPrimitives {
   static const Color black60 = Color(0x99000000);
 
   // ---------------------------------------------------------------------------
+  // Transparente (evita `Colors.transparent` crudo en el kit)
+  // ---------------------------------------------------------------------------
+
+  /// `0x00000000` — Transparente absoluto. Usar en vez de `Colors.transparent`
+  /// crudo en decoraciones del kit (ej. `Border.all` invisible).
+  static const Color transparent = Color(0x00000000);
+
+  // ---------------------------------------------------------------------------
   // Familia Paper (fondos claros)
   // ---------------------------------------------------------------------------
 
@@ -134,6 +142,10 @@ abstract final class AppColorPrimitives {
 ///
 /// Escala CERRADA: `8 · 12 · 14 · 18 · 20`. No existen `s4`, `s16` ni `s24`.
 /// Ver `docs/design-system.md` — escala de espaciado.
+///
+/// Única excepción: [hairline], para separaciones ópticas genuinamente
+/// sub-8 (ej. ícono-a-texto). No crear más micro-tokens ad-hoc — usar
+/// [hairline] en todo el kit en vez de números crudos como `2`, `4` o `6`.
 abstract final class AppSpacing {
   /// `8.0` — Espaciado mínimo (chips, gap interno de rows densas).
   static const double s8 = 8.0;
@@ -149,6 +161,12 @@ abstract final class AppSpacing {
 
   /// `20.0` — Espaciado grande (padding de hero cards, secciones amplias).
   static const double s20 = 20.0;
+
+  /// `4.0` — Micro-gap EXCEPCIONAL, fuera de la escala cerrada. Reservado a
+  /// separaciones ópticas sub-8 entre elementos (ej. valor-a-label,
+  /// ícono-a-texto, título-a-subtítulo). Nunca usar para padding — el
+  /// padding siempre resuelve a un valor de la escala cerrada.
+  static const double hairline = 4.0;
 }
 
 /// Capa 1 — Tokens de radio de borde del sistema de diseño TREINO.

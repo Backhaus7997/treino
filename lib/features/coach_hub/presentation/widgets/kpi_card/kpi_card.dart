@@ -145,7 +145,7 @@ class _SkeletonContent extends StatelessWidget {
                   BorderRadius.circular(TreinoKpiCardTokens.borderRadius / 2),
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.s8),
           // Skeleton del label
           Container(
             width: 120,
@@ -195,7 +195,7 @@ class _CardContent extends StatelessWidget {
             color: tokens.valueColor,
           ),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: AppSpacing.hairline),
         Text(
           label,
           style: TextStyle(
@@ -206,7 +206,7 @@ class _CardContent extends StatelessWidget {
           ),
         ),
         if (delta != null) ...[
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.s8),
           Text(
             delta!,
             style: TextStyle(
