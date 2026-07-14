@@ -1,8 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/widget_previews.dart';
 
 import '../../../../../app/theme/tokens/components/treino_focus_tokens.dart';
 import '../../../../../app/theme/tokens/components/treino_section_header_tokens.dart';
+import '../preview_wrapper.dart';
 import '../treino_interactive_state.dart';
+
+/// Previews del kit — Finding W3.
+@Preview(name: 'SectionHeader — normal', wrapper: coachHubPreviewWrapper)
+Widget sectionHeaderPreview() =>
+    const TreinoSectionHeader(title: 'Mis alumnos', count: 24);
+
+@Preview(name: 'SectionHeader — con acción', wrapper: coachHubPreviewWrapper)
+Widget sectionHeaderActionPreview() => TreinoSectionHeader(
+      title: 'Mis alumnos',
+      count: 24,
+      action: TreinoSectionHeaderAction(label: 'Ver todos', onTap: () {}),
+    );
 
 /// Datos de la acción opcional del [TreinoSectionHeader].
 @immutable

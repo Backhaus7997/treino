@@ -1,8 +1,29 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/widget_previews.dart';
 
 import '../../../../../app/theme/tokens/components/treino_empty_state_tokens.dart';
+import '../../../../../app/theme/tokens/primitives.dart';
 import '../../../../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../../../../core/widgets/motion/treino_shimmer.dart';
+import '../../../../../core/widgets/treino_icon.dart';
+import '../preview_wrapper.dart';
+
+/// Previews del kit — Finding W3.
+@Preview(name: 'EmptyState — normal', wrapper: coachHubPreviewWrapper)
+Widget emptyStatePreview() => TreinoEmptyState(
+      icon: TreinoIcon.emptyState,
+      title: 'Sin alumnos todavía',
+      description: 'Invitá a tu primer alumno para empezar.',
+      ctaLabel: 'Invitar alumno',
+      onCtaTap: () {},
+    );
+
+@Preview(name: 'EmptyState — loading', wrapper: coachHubPreviewWrapper)
+Widget emptyStateLoadingPreview() => const TreinoEmptyState(
+      icon: TreinoIcon.emptyState,
+      title: '',
+      loading: true,
+    );
 
 /// Estado vacío genérico del kit Coach Hub Web — Fase 1.
 ///
@@ -67,7 +88,8 @@ class TreinoEmptyState extends StatelessWidget {
     return TreinoFadeSlideIn(
       child: Center(
         child: Padding(
-          padding: const EdgeInsets.all(32),
+          key: const Key('empty_state_content'),
+          padding: const EdgeInsets.all(AppSpacing.s20),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [

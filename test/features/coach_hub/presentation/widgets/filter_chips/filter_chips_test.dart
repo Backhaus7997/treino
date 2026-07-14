@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/app/theme/tokens/primitives.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/filter_chips/filter_chips.dart';
 
 /// Envuelve en MaterialApp con tema dado.
@@ -32,6 +33,17 @@ void main() {
       for (final o in _options) {
         expect(find.text(o), findsOneWidget);
       }
+      // Spacing en escala 8/12/14/18/20 — Finding W4 (no vertical:6 crudo).
+      final chip = tester.widget<AnimatedContainer>(
+        find.byKey(const Key('filter_chip_Activos')),
+      );
+      expect(
+        chip.padding,
+        const EdgeInsets.symmetric(
+          horizontal: AppSpacing.s12,
+          vertical: AppSpacing.s8,
+        ),
+      );
     });
 
     // -------------------------------------------------------------------------

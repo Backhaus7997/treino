@@ -1,9 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/widget_previews.dart';
 
 import '../../../../../app/theme/app_motion.dart';
 import '../../../../../app/theme/tokens/components/treino_list_row_tokens.dart';
 import '../../../../../core/widgets/motion/treino_shimmer.dart';
+import '../preview_wrapper.dart';
 import '../treino_interactive_state.dart';
+
+/// Previews del kit — Finding W3.
+@Preview(name: 'ListRow — normal', wrapper: coachHubPreviewWrapper)
+Widget listRowPreview() => const TreinoListRow(
+      title: 'Ana García',
+      subtitle: 'Activo · 12 sesiones',
+    );
+
+@Preview(name: 'ListRow — loading', wrapper: coachHubPreviewWrapper)
+Widget listRowLoadingPreview() => const TreinoListRow(title: '', loading: true);
 
 /// Fila de lista genérica del kit Coach Hub Web — Fase 1.
 ///

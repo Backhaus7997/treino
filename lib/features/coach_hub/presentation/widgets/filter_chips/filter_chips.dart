@@ -1,10 +1,30 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/widget_previews.dart';
 
 import '../../../../../app/theme/app_motion.dart';
 import '../../../../../app/theme/tokens/components/treino_chip_tokens.dart';
 import '../../../../../app/theme/tokens/components/treino_badge_tokens.dart';
 import '../../../../../app/theme/tokens/components/treino_focus_tokens.dart';
+import '../../../../../app/theme/tokens/primitives.dart';
+import '../preview_wrapper.dart';
 import '../treino_interactive_state.dart';
+
+/// Previews del kit — Finding W3.
+@Preview(name: 'FilterChips — normal', wrapper: coachHubPreviewWrapper)
+Widget filterChipsPreview() => TreinoFilterChips(
+      options: const ['Activos', 'Inactivos', 'Pendientes'],
+      selected: const {'Activos'},
+      badgeCounts: const {'Activos': 12},
+      onChanged: (_) {},
+    );
+
+@Preview(name: 'FilterChips — disabled', wrapper: coachHubPreviewWrapper)
+Widget filterChipsDisabledPreview() => TreinoFilterChips(
+      options: const ['Activos', 'Inactivos'],
+      selected: const {'Activos'},
+      disabled: true,
+      onChanged: (_) {},
+    );
 
 /// FilterChips del kit Coach Hub Web — Fase 1.
 ///
@@ -169,7 +189,10 @@ class _ChipItem extends StatelessWidget {
                   ]
                 : null,
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.s12,
+            vertical: AppSpacing.s8,
+          ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [

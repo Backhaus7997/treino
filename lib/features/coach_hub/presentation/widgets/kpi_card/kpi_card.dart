@@ -1,10 +1,25 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/widget_previews.dart';
 
 import '../../../../../app/theme/app_motion.dart';
 import '../../../../../app/theme/app_palette.dart';
 import '../../../../../app/theme/tokens/components/treino_kpi_card_tokens.dart';
 import '../../../../../core/widgets/motion/treino_shimmer.dart';
+import '../preview_wrapper.dart';
 import '../treino_interactive_state.dart';
+
+/// Previews del kit — Finding W3.
+@Preview(name: 'KpiCard — normal', wrapper: coachHubPreviewWrapper)
+Widget kpiCardPreview() => const KpiCard(
+      value: '1.234',
+      label: 'Alumnos activos',
+      delta: '+12%',
+      deltaPositive: true,
+    );
+
+@Preview(name: 'KpiCard — loading', wrapper: coachHubPreviewWrapper)
+Widget kpiCardLoadingPreview() =>
+    const KpiCard(value: '', label: '', loading: true);
 
 /// KPI Card del kit Coach Hub Web — Fase 1.
 ///
