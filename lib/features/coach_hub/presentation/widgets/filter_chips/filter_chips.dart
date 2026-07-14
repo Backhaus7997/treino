@@ -1,16 +1,19 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../../../../../app/theme/app_motion.dart';
 import '../../../../../app/theme/tokens/components/treino_chip_tokens.dart';
 import '../../../../../app/theme/tokens/components/treino_badge_tokens.dart';
 import '../../../../../app/theme/tokens/components/treino_focus_tokens.dart';
+import '../treino_interactive_state.dart';
 
 /// FilterChips del kit Coach Hub Web — Fase 1.
 ///
 /// Grupo de chips de filtro con soporte de:
 /// - Single y multi-select.
-/// - Estados: normal, selected, hover (web), disabled, focus (ring teclado).
+/// - Estados: normal, selected, hover (web), disabled, focus (ring teclado)
+///   — vía TreinoInteractiveState (fuente única de verdad, ADR-SH-002).
+/// - Focusable y activable por teclado (Enter/Space), expone
+///   Semantics(button: true) por chip.
 /// - Badges numéricos opcionales por opción.
 /// - Animación de selección via AppMotionTokens (micro/fast).
 /// - Tokens: TreinoChipTokens.of(context) — nunca hex inline.
@@ -92,8 +95,10 @@ class TreinoFilterChips extends StatelessWidget {
   }
 }
 
-/// Chip individual con estado hover, focus y animación.
-class _ChipItem extends StatefulWidget {
+/// Chip individual — estado de interacción vía [TreinoInteractiveState]
+/// (fuente única de verdad, ADR-SH-002): hover/focus/pressed + Semantics
+/// + activación por teclado (Enter/Space).
+class _ChipItem extends StatelessWidget {
   const _ChipItem({
     required this.label,
     required this.isSelected,
@@ -109,142 +114,101 @@ class _ChipItem extends StatefulWidget {
   final VoidCallback? onTap;
 
   @override
-  State<_ChipItem> createState() => _ChipItemState();
-}
-
-class _ChipItemState extends State<_ChipItem> {
-  bool _hovered = false;
-  final _focusNode = FocusNode();
-
-  // Mapa de acciones de teclado
-  late final Map<Type, Action<Intent>> _actions = {
-    ActivateIntent: CallbackAction<ActivateIntent>(
-      onInvoke: (_) {
-        widget.onTap?.call();
-        return null;
-      },
-    ),
-  };
-
-  static const _shortcuts = {
-    SingleActivator(LogicalKeyboardKey.space): ActivateIntent(),
-    SingleActivator(LogicalKeyboardKey.enter): ActivateIntent(),
-  };
-
-  @override
-  void dispose() {
-    _focusNode.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     final tokens = TreinoChipTokens.of(context);
     final badgeTokens = TreinoBadgeTokens.of(context);
     final focusTokens = TreinoFocusTokens.of(context);
 
-    final isDisabled = widget.isDisabled || widget.onTap == null;
+    return TreinoInteractiveState(
+      onTap: onTap,
+      builder: (ctx, states) {
+        final disabled = states.disabled || isDisabled;
 
-    // Resolver colores de fondo
-    Color bg;
-    if (isDisabled) {
-      bg = tokens.defaultBackground;
-    } else if (widget.isSelected) {
-      bg = tokens.selectedBackground;
-    } else if (_hovered) {
-      bg = tokens.hoverBackground;
-    } else {
-      bg = tokens.defaultBackground;
-    }
+        // Resolver colores de fondo
+        Color bg;
+        if (disabled) {
+          bg = tokens.defaultBackground;
+        } else if (isSelected) {
+          bg = tokens.selectedBackground;
+        } else if (states.hovered) {
+          bg = tokens.hoverBackground;
+        } else {
+          bg = tokens.defaultBackground;
+        }
 
-    // Resolver colores de texto
-    Color fg;
-    if (isDisabled) {
-      fg = tokens.disabledForeground;
-    } else if (widget.isSelected) {
-      fg = tokens.selectedForeground;
-    } else {
-      fg = tokens.defaultForeground;
-    }
+        // Resolver colores de texto
+        Color fg;
+        if (disabled) {
+          fg = tokens.disabledForeground;
+        } else if (isSelected) {
+          fg = tokens.selectedForeground;
+        } else {
+          fg = tokens.defaultForeground;
+        }
 
-    // Border color (solo en selected)
-    final borderColor =
-        widget.isSelected && !isDisabled ? tokens.selectedBorder : null;
+        // Border color (solo en selected)
+        final borderColor =
+            isSelected && !disabled ? tokens.selectedBorder : null;
 
-    final chip = AnimatedContainer(
-      duration: AppMotion.resolve(context, AppMotion.micro),
-      curve: AppMotion.standard,
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(TreinoChipTokens.borderRadius),
-        border: borderColor != null
-            ? Border.all(color: borderColor)
-            : Border.all(color: Colors.transparent),
-        boxShadow: _focusNode.hasFocus && !isDisabled
-            ? [
-                BoxShadow(
-                  color: focusTokens.ring.withValues(alpha: 0.5),
-                  spreadRadius: TreinoFocusTokens.ringWidth,
-                ),
-              ]
-            : null,
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            widget.label,
-            style: TextStyle(
-              fontFamily: 'Barlow',
-              fontWeight: widget.isSelected ? FontWeight.w600 : FontWeight.w400,
-              fontSize: 14,
-              color: fg,
-            ),
+        return AnimatedContainer(
+          key: Key('filter_chip_$label'),
+          duration: AppMotion.resolve(ctx, AppMotion.micro),
+          curve: AppMotion.standard,
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius:
+                BorderRadius.circular(TreinoChipTokens.borderRadius),
+            border: borderColor != null
+                ? Border.all(color: borderColor)
+                : Border.all(color: Colors.transparent),
+            boxShadow: states.focused
+                ? [
+                    BoxShadow(
+                      color: focusTokens.ring.withValues(alpha: 0.5),
+                      spreadRadius: TreinoFocusTokens.ringWidth,
+                    ),
+                  ]
+                : null,
           ),
-          if (widget.badgeCount != null) ...[
-            const SizedBox(width: 6),
-            Container(
-              width: TreinoBadgeTokens.size,
-              height: TreinoBadgeTokens.size,
-              decoration: BoxDecoration(
-                color: badgeTokens.background,
-                borderRadius:
-                    BorderRadius.circular(TreinoBadgeTokens.borderRadius),
-              ),
-              alignment: Alignment.center,
-              child: Text(
-                widget.badgeCount!.toString(),
-                style: const TextStyle(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
                   fontFamily: 'Barlow',
-                  fontWeight: FontWeight.w700,
-                  fontSize: 10,
-                  color: Colors.white,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                  fontSize: 14,
+                  color: fg,
                 ),
               ),
-            ),
-          ],
-        ],
-      ),
-    );
-
-    if (isDisabled) return chip;
-
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      cursor: SystemMouseCursors.click,
-      child: FocusableActionDetector(
-        focusNode: _focusNode,
-        actions: _actions,
-        shortcuts: _shortcuts,
-        onFocusChange: (_) => setState(() {}),
-        child: GestureDetector(
-          onTap: widget.onTap,
-          behavior: HitTestBehavior.opaque,
-          child: chip,
-        ),
-      ),
+              if (badgeCount != null) ...[
+                const SizedBox(width: 6),
+                Container(
+                  width: TreinoBadgeTokens.size,
+                  height: TreinoBadgeTokens.size,
+                  decoration: BoxDecoration(
+                    color: badgeTokens.background,
+                    borderRadius:
+                        BorderRadius.circular(TreinoBadgeTokens.borderRadius),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    badgeCount!.toString(),
+                    style: TextStyle(
+                      fontFamily: 'Barlow',
+                      fontWeight: FontWeight.w700,
+                      fontSize: 10,
+                      color: badgeTokens.foreground,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        );
+      },
     );
   }
 }

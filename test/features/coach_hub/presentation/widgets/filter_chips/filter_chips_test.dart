@@ -85,7 +85,7 @@ void main() {
       await tester.pumpWidget(_wrap(
         TreinoFilterChips(
           options: _options,
-          selected: {'Activos'},
+          selected: const {'Activos'},
           multiSelect: true,
           onChanged: (s) => lastSelected = s,
         ),
@@ -135,9 +135,11 @@ void main() {
     });
 
     // -------------------------------------------------------------------------
-    // Hover via mouse — no crashea
+    // Hover: decoration usa background de hover (token real, no smoke-only)
     // -------------------------------------------------------------------------
-    testWidgets('hover → no crashea [SCENARIO-CK-FC-07]', (tester) async {
+    testWidgets(
+        'hover → decoration usa background de hover (token real) '
+        '[SCENARIO-CK-FC-07]', (tester) async {
       await tester.pumpWidget(_wrap(
         TreinoFilterChips(
           options: _options,
@@ -147,12 +149,24 @@ void main() {
       ));
       await tester.pump();
 
+      Color decorationColor() {
+        final container = tester.widget<AnimatedContainer>(
+          find.byKey(const Key('filter_chip_Activos')),
+        );
+        return (container.decoration! as BoxDecoration).color!;
+      }
+
+      final normalColor = decorationColor();
+
       final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
       await gesture.addPointer(location: Offset.zero);
       addTearDown(gesture.removePointer);
       await gesture.moveTo(tester.getCenter(find.text('Activos')));
       await tester.pump();
-      expect(find.text('Activos'), findsOneWidget);
+
+      final hoverColor = decorationColor();
+      expect(hoverColor, isNot(equals(normalColor)),
+          reason: 'el color de fondo debe cambiar realmente en hover');
     });
 
     // -------------------------------------------------------------------------
@@ -177,6 +191,63 @@ void main() {
       await tester.pump();
       // Al menos una opción fue seleccionada (la primera focuseada)
       expect(lastSelected, isNotEmpty);
+    });
+
+    // -------------------------------------------------------------------------
+    // Focus + Enter activa chip, y expone Semantics(button)
+    // -------------------------------------------------------------------------
+    testWidgets(
+        'focus + Enter activa chip, expone Semantics(button) '
+        '[SCENARIO-CK-FC-11]', (tester) async {
+      final handle = tester.ensureSemantics();
+      Set<String> lastSelected = {};
+      await tester.pumpWidget(_wrap(
+        TreinoFilterChips(
+          options: _options,
+          selected: const {},
+          onChanged: (s) => lastSelected = s,
+        ),
+      ));
+      await tester.pump();
+
+      final semantics = tester.getSemantics(
+        find.byKey(const Key('filter_chip_Activos')),
+      );
+      expect(semantics.flagsCollection.isButton, isTrue,
+          reason: 'chip interactivo debe exponer Semantics(button: true)');
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pump();
+      expect(lastSelected, isNotEmpty, reason: 'Enter debe activar el chip');
+
+      handle.dispose();
+    });
+
+    // -------------------------------------------------------------------------
+    // Disabled: no es focusable ni activable por teclado
+    // -------------------------------------------------------------------------
+    testWidgets(
+        'disabled → no focusable, Enter no dispara onChanged '
+        '[SCENARIO-CK-FC-12]', (tester) async {
+      var called = false;
+      await tester.pumpWidget(_wrap(
+        TreinoFilterChips(
+          options: _options,
+          selected: const {},
+          onChanged: (_) => called = true,
+          disabled: true,
+        ),
+      ));
+      await tester.pump();
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pump();
+      expect(called, isFalse,
+          reason: 'chip disabled no debe activarse por teclado');
     });
 
     // -------------------------------------------------------------------------
@@ -209,7 +280,7 @@ void main() {
       await tester.pumpWidget(_wrap(
         TreinoFilterChips(
           options: _options,
-          selected: {'Activos'},
+          selected: const {'Activos'},
           multiSelect: false,
           onChanged: (s) => lastSelected = s,
         ),
