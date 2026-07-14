@@ -179,7 +179,7 @@ class _ChipItem extends StatelessWidget {
             borderRadius: BorderRadius.circular(TreinoChipTokens.borderRadius),
             border: borderColor != null
                 ? Border.all(color: borderColor)
-                : Border.all(color: AppColorPrimitives.transparent),
+                : Border.all(color: TreinoChipTokens.transparentBorder),
             boxShadow: states.focused
                 ? [
                     BoxShadow(

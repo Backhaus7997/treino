@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/app/theme/tokens/components/treino_chip_tokens.dart';
 import 'package:treino/app/theme/tokens/primitives.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/filter_chips/filter_chips.dart';
 
@@ -301,6 +302,36 @@ void main() {
       await tester.tap(find.text('Inactivos'));
       await tester.pump();
       expect(lastSelected, equals({'Inactivos'}));
+    });
+
+    // -------------------------------------------------------------------------
+    // Borde transparente vía token de componente — Finding H1: el widget no
+    // debe referenciar AppColorPrimitives (capa 1) directamente, sino consumir
+    // el token expuesto en TreinoChipTokens (capa 3).
+    // -------------------------------------------------------------------------
+    testWidgets(
+        'chip no seleccionado → borde transparente vía TreinoChipTokens '
+        '[SCENARIO-CK-FC-13]', (tester) async {
+      await tester.pumpWidget(_wrap(
+        TreinoFilterChips(
+          options: _options,
+          selected: const {},
+          onChanged: (_) {},
+        ),
+      ));
+      await tester.pump();
+
+      final container = tester.widget<AnimatedContainer>(
+        find.byKey(const Key('filter_chip_Activos')),
+      );
+      final decoration = container.decoration! as BoxDecoration;
+      expect(
+        decoration.border,
+        Border.all(color: TreinoChipTokens.transparentBorder),
+        reason: 'el borde por defecto debe venir del token de componente '
+            'TreinoChipTokens.transparentBorder, no de AppColorPrimitives '
+            'importado directamente en el widget',
+      );
     });
   });
 }
