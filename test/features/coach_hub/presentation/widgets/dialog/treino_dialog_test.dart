@@ -95,6 +95,80 @@ void main() {
     });
 
     // -------------------------------------------------------------------------
+    // Botón primario → activable por teclado (Enter), Semantics(button)
+    // -------------------------------------------------------------------------
+    testWidgets(
+        'primario → focusable, Enter (teclado) activa, Semantics(button) '
+        '[SCENARIO-CK-DL-11]', (tester) async {
+      final handle = tester.ensureSemantics();
+      var pressed = 0;
+      await tester.pumpWidget(_wrap(
+        (ctx) => TreinoDialog(
+          title: 'Confirmar',
+          primaryLabel: 'Confirmar',
+          onPrimaryTap: () => pressed++,
+        ),
+      ));
+      await tester.tap(find.byKey(const Key('open_dialog')));
+      await tester.pumpAndSettle();
+
+      final semantics = tester.getSemantics(
+        find.byKey(const Key('dialog_primary_button')),
+      );
+      expect(semantics.flagsCollection.isButton, isTrue,
+          reason: 'botón primario debe exponer Semantics(button: true)');
+
+      final focusNode = Focus.of(
+        tester.element(find.byKey(const Key('dialog_primary_button'))),
+      );
+      focusNode.requestFocus();
+      await tester.pump();
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pump();
+      expect(pressed, 1, reason: 'Enter debe activar el botón primario');
+
+      handle.dispose();
+    });
+
+    // -------------------------------------------------------------------------
+    // Botón secundario → activable por teclado (Space), Semantics(button)
+    // -------------------------------------------------------------------------
+    testWidgets(
+        'secundario → focusable, Space (teclado) activa, Semantics(button) '
+        '[SCENARIO-CK-DL-12]', (tester) async {
+      final handle = tester.ensureSemantics();
+      var pressed = 0;
+      await tester.pumpWidget(_wrap(
+        (ctx) => TreinoDialog(
+          title: 'Confirmar',
+          secondaryLabel: 'Cancelar',
+          onSecondaryTap: () => pressed++,
+        ),
+      ));
+      await tester.tap(find.byKey(const Key('open_dialog')));
+      await tester.pumpAndSettle();
+
+      final semantics = tester.getSemantics(
+        find.byKey(const Key('dialog_secondary_button')),
+      );
+      expect(semantics.flagsCollection.isButton, isTrue,
+          reason: 'botón secundario debe exponer Semantics(button: true)');
+
+      final focusNode = Focus.of(
+        tester.element(find.byKey(const Key('dialog_secondary_button'))),
+      );
+      focusNode.requestFocus();
+      await tester.pump();
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.space);
+      await tester.pump();
+      expect(pressed, 1, reason: 'Space debe activar el botón secundario');
+
+      handle.dispose();
+    });
+
+    // -------------------------------------------------------------------------
     // Destructive: el botón primario usa el color danger (TreinoDialogTokens)
     // -------------------------------------------------------------------------
     testWidgets(
@@ -110,15 +184,16 @@ void main() {
       await tester.tap(find.byKey(const Key('open_dialog')));
       await tester.pumpAndSettle();
 
-      final button = tester.widget<TextButton>(
-        find.byKey(const Key('dialog_primary_button')),
+      final text = tester.widget<Text>(
+        find.descendant(
+          of: find.byKey(const Key('dialog_primary_button')),
+          matching: find.text('Eliminar'),
+        ),
       );
       final palette = AppPalette.of(
         tester.element(find.byKey(const Key('dialog_primary_button'))),
       );
-      final resolvedColor =
-          button.style?.foregroundColor?.resolve(<WidgetState>{});
-      expect(resolvedColor, palette.danger);
+      expect(text.style?.color, palette.danger);
     });
 
     // -------------------------------------------------------------------------
