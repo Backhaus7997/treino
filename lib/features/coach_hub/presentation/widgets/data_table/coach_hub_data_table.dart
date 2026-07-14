@@ -274,7 +274,7 @@ class _HeaderCell extends StatelessWidget {
               turns: sortAscending ? 0 : 0.5,
               duration: AppMotion.resolve(context, AppMotion.fast),
               child: Icon(
-                Icons.arrow_upward,
+                TreinoIcon.sortAscending,
                 size: 12,
                 color: tokens.sortIndicatorColor,
               ),
@@ -283,7 +283,7 @@ class _HeaderCell extends StatelessWidget {
           if (column.sortable && !isSorted) ...[
             const SizedBox(width: 4),
             Icon(
-              Icons.unfold_more,
+              TreinoIcon.sortable,
               size: 12,
               color: tokens.headerTextColor.withValues(alpha: 0.5),
             ),
@@ -484,7 +484,7 @@ class _ErrorState extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.error_outline, size: 32, color: palette.danger),
+          Icon(TreinoIcon.errorState, size: 32, color: palette.danger),
           const SizedBox(height: 8),
           Text(
             message,

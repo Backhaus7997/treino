@@ -69,6 +69,12 @@ void main() {
       await tester.pump();
       // El indicador de sort debe estar presente en la columna 'Nombre'
       expect(find.byKey(const Key('sort_indicator_name')), findsOneWidget);
+      // El indicador de orden activo usa el ícono semántico TreinoIcon
+      // (no Icons.arrow_upward crudo) — Finding C4.
+      expect(find.byIcon(TreinoIcon.sortAscending), findsOneWidget);
+      // La columna 'Sesiones' es sortable pero no está ordenada: debe
+      // mostrar el ícono semántico de "ordenable" (caret doble).
+      expect(find.byIcon(TreinoIcon.sortable), findsOneWidget);
     });
 
     // -------------------------------------------------------------------------
@@ -198,6 +204,9 @@ void main() {
       ));
       await tester.pump();
       expect(find.text('Error al cargar'), findsOneWidget);
+      // El ícono del estado error usa el ícono semántico TreinoIcon
+      // (no Icons.error_outline crudo) — Finding C4.
+      expect(find.byIcon(TreinoIcon.errorState), findsOneWidget);
       await tester.tap(find.byKey(const Key('data_table_retry')));
       await tester.pump();
       expect(retryCalled, isTrue);
