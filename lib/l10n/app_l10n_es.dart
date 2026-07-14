@@ -2344,6 +2344,9 @@ class AppL10nEs extends AppL10n {
   }
 
   @override
+  String get dashboardGreetingPrefix => 'BUENAS, ';
+
+  @override
   String dashboardSummaryLine(int sessions, int paraRevisar, int pagos) {
     return 'Tenés $sessions sesiones hoy, $paraRevisar para revisar, $pagos pagos pendientes';
   }
@@ -4865,6 +4868,9 @@ class AppL10nEsAr extends AppL10nEs {
   String dashboardGreeting(String name) {
     return 'BUENAS, $name';
   }
+
+  @override
+  String get dashboardGreetingPrefix => 'BUENAS, ';
 
   @override
   String dashboardSummaryLine(int sessions, int paraRevisar, int pagos) {

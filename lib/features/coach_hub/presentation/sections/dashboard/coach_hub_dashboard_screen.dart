@@ -281,7 +281,7 @@ class _WelcomeCard extends ConsumerWidget {
             text: TextSpan(
               children: [
                 TextSpan(
-                  text: 'BUENAS, ', // i18n: Fase W3
+                  text: l10n.dashboardGreetingPrefix,
                   style: GoogleFonts.barlowCondensed(
                     color: palette.textPrimary,
                     fontSize: 30,
@@ -321,7 +321,7 @@ class _WelcomeCard extends ConsumerWidget {
                   children: [
                     _QuickAction(
                       label: l10n.dashboardQuickActionNuevoAlumno,
-                      icon: Icons.add,
+                      icon: TreinoIcon.plus,
                       primary: true,
                       onTap: () => context.go('/alumnos'),
                     ),
@@ -337,7 +337,7 @@ class _WelcomeCard extends ConsumerWidget {
                     ),
                     _QuickAction(
                       label: l10n.dashboardQuickActionImportarPlan,
-                      icon: Icons.upload_file_outlined,
+                      icon: TreinoIcon.upload,
                       onTap: () => context.push('/upload-plan'),
                     ),
                   ],
@@ -521,7 +521,7 @@ class _KpiStrip extends ConsumerWidget {
           child: _DashboardKpiCard(
             label: l10n.dashboardKpiIngresoMes,
             value: bucketsAsync.isLoading ? '…' : fmtArs(ingresoMes),
-            icon: Icons.trending_up,
+            icon: TreinoIcon.trendUp,
             palette: palette,
           ),
         ),
@@ -530,7 +530,7 @@ class _KpiStrip extends ConsumerWidget {
           child: _DashboardKpiCard(
             label: l10n.dashboardKpiAdherencia,
             value: adherenceLabel,
-            icon: Icons.favorite_outline,
+            icon: TreinoIcon.equipCardio,
             palette: palette,
           ),
         ),
@@ -607,6 +607,8 @@ class _DashboardKpiCard extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: GoogleFonts.barlowCondensed(
               color: palette.textPrimary,
               fontSize: 26,
