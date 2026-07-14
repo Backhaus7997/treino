@@ -5,6 +5,8 @@ import '../../../../../app/theme/app_palette.dart';
 import '../../../../../app/theme/tokens/components/treino_focus_tokens.dart';
 import '../../../../../app/theme/tokens/components/treino_table_tokens.dart';
 import '../../../../../core/widgets/motion/treino_shimmer.dart';
+import '../../../../../core/widgets/treino_icon.dart';
+import '../empty_state/empty_state.dart';
 import '../treino_interactive_state.dart';
 
 /// Modelo de columna para [CoachHubDataTable].
@@ -78,6 +80,10 @@ class CoachHubDataTable extends StatelessWidget {
     required this.rows,
     this.loading = false,
     this.emptyMessage,
+    this.emptyIcon = TreinoIcon.emptyState,
+    this.emptyDescription,
+    this.emptyCtaLabel,
+    this.onEmptyCtaTap,
     this.errorMessage,
     this.onRetry,
     this.sortColumnKey,
@@ -96,7 +102,23 @@ class CoachHubDataTable extends StatelessWidget {
   final bool loading;
 
   /// Mensaje a mostrar cuando [rows] está vacío y no hay error ni loading.
+  /// Se pasa como `title` a [TreinoEmptyState] (fuente única de verdad,
+  /// Finding C3).
   final String? emptyMessage;
+
+  /// Ícono del estado vacío. Pasa a [TreinoEmptyState.icon].
+  final IconData emptyIcon;
+
+  /// Descripción opcional debajo del título del estado vacío. Pasa a
+  /// [TreinoEmptyState.description].
+  final String? emptyDescription;
+
+  /// Texto del CTA opcional del estado vacío. Pasa a
+  /// [TreinoEmptyState.ctaLabel].
+  final String? emptyCtaLabel;
+
+  /// Callback del CTA del estado vacío. Ignorado si [emptyCtaLabel] es null.
+  final VoidCallback? onEmptyCtaTap;
 
   /// Mensaje de error. Si no-null, muestra el estado error.
   final String? errorMessage;
@@ -144,7 +166,13 @@ class CoachHubDataTable extends StatelessWidget {
             else if (errorMessage != null)
               _ErrorState(message: errorMessage!, onRetry: onRetry)
             else if (rows.isEmpty)
-              _EmptyState(message: emptyMessage)
+              TreinoEmptyState(
+                icon: emptyIcon,
+                title: emptyMessage ?? 'Sin datos',
+                description: emptyDescription,
+                ctaLabel: emptyCtaLabel,
+                onCtaTap: onEmptyCtaTap,
+              )
             else
               _DataRows(
                 columns: columns,
@@ -436,31 +464,6 @@ class _SkeletonRows extends StatelessWidget {
             ),
           ],
         ],
-      ),
-    );
-  }
-}
-
-/// Estado vacío.
-class _EmptyState extends StatelessWidget {
-  const _EmptyState({this.message});
-
-  final String? message;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-    return Padding(
-      padding: const EdgeInsets.all(32),
-      child: Center(
-        child: Text(
-          message ?? 'Sin datos',
-          style: TextStyle(
-            fontFamily: 'Barlow',
-            fontSize: 14,
-            color: palette.textMuted,
-          ),
-        ),
       ),
     );
   }

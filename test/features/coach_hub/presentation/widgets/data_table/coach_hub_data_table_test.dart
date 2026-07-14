@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/data_table/coach_hub_data_table.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/empty_state/empty_state.dart';
 
 /// Envuelve en MaterialApp con tema dado.
 Widget _wrap(Widget widget, {ThemeData? theme}) => MaterialApp(
@@ -140,7 +142,43 @@ void main() {
         ),
       ));
       await tester.pump();
+      // El slot vacío debe embeber el componente compartido TreinoEmptyState
+      // (no una implementación privada) — Finding C3.
+      expect(find.byType(TreinoEmptyState), findsOneWidget);
       expect(find.text('Sin alumnos'), findsOneWidget);
+    });
+
+    // -------------------------------------------------------------------------
+    // Estado vacío: passthrough de icon/description/CTA a TreinoEmptyState
+    // -------------------------------------------------------------------------
+    testWidgets(
+        'rows vacíos con icon/description/CTA → passthrough a '
+        'TreinoEmptyState [SCENARIO-CK-DT-13]', (tester) async {
+      var ctaTapped = false;
+      await tester.pumpWidget(_wrap(
+        CoachHubDataTable(
+          columns: _columns,
+          rows: const [],
+          emptyMessage: 'Sin alumnos',
+          emptyIcon: TreinoIcon.users,
+          emptyDescription: 'Invitá a tu primer alumno.',
+          emptyCtaLabel: 'Invitar',
+          onEmptyCtaTap: () => ctaTapped = true,
+        ),
+      ));
+      await tester.pump();
+
+      final emptyState = tester.widget<TreinoEmptyState>(
+        find.byType(TreinoEmptyState),
+      );
+      expect(emptyState.icon, TreinoIcon.users);
+      expect(emptyState.title, 'Sin alumnos');
+      expect(emptyState.description, 'Invitá a tu primer alumno.');
+      expect(emptyState.ctaLabel, 'Invitar');
+
+      await tester.tap(find.text('Invitar'));
+      await tester.pump();
+      expect(ctaTapped, isTrue);
     });
 
     // -------------------------------------------------------------------------
