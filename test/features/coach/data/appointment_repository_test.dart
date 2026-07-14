@@ -642,6 +642,272 @@ void main() {
     );
   });
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // Slice 2b — cobro por lote desde la agenda: billAppointments()
+  // MONEY-CRITICAL: pins the atomic create-ONE-Payment+link-N-appointments
+  // transaction — all-or-nothing across the whole lote.
+  // ─────────────────────────────────────────────────────────────────────────
+
+  group('billAppointments()', () {
+    const otherAthleteId = 'athlete2';
+    const otherTrainerId = 'trainer2';
+
+    Appointment confirmedApptAt(
+      String id,
+      DateTime at, {
+      String athlete = athleteId,
+      String trainer = trainerId,
+    }) =>
+        Appointment(
+          id: id,
+          trainerId: trainer,
+          athleteId: athlete,
+          athleteDisplayName: athleteDisplayName,
+          startsAt: at,
+          durationMin: durationMin,
+          status: AppointmentStatus.confirmed,
+        );
+
+    Payment lotePayment({int amountArs = 15000, String? concept}) => Payment(
+          id: '',
+          trainerId: trainerId,
+          athleteId: athleteId,
+          amountArs: amountArs,
+          concept: concept ?? '3 sesiones',
+          status: PaymentStatus.pending,
+          createdAt: DateTime.utc(2026, 7, 1),
+        );
+
+    /// Seeds 3 confirmed same-athlete appointments and returns them.
+    Future<List<Appointment>> seedThree() async {
+      final appts = [
+        confirmedApptAt('lote-1', DateTime.utc(2026, 7, 1, 9, 0)),
+        confirmedApptAt('lote-2', DateTime.utc(2026, 7, 1, 10, 0)),
+        confirmedApptAt('lote-3', DateTime.utc(2026, 7, 1, 11, 0)),
+      ];
+      for (final a in appts) {
+        await firestore.collection('appointments').doc(a.id).set(a.toJson());
+      }
+      return appts;
+    }
+
+    test(
+      'N turnos same-athlete → crea 1 Payment (monto, concepto, athleteId '
+      'correctos) y marca los N turnos con ese paymentId',
+      () async {
+        final appts = await seedThree();
+
+        final paymentId = await repo.billAppointments(
+          appointments: appts,
+          payment: lotePayment(amountArs: 15000, concept: '3 sesiones'),
+        );
+
+        // Exactamente 1 Payment creado.
+        final payments = await firestore.collection('payments').get();
+        expect(payments.docs, hasLength(1));
+        final paymentData = payments.docs.single.data();
+        expect(paymentData['id'], equals(paymentId));
+        expect(paymentData['athleteId'], equals(athleteId));
+        expect(paymentData['trainerId'], equals(trainerId));
+        expect(paymentData['amountArs'], equals(15000));
+        expect(paymentData['concept'], equals('3 sesiones'));
+        expect(paymentData['status'], equals('pending'));
+
+        // Los 3 turnos quedan marcados con el MISMO paymentId.
+        for (final a in appts) {
+          final snap =
+              await firestore.collection('appointments').doc(a.id).get();
+          expect(snap.data()!['paymentId'], equals(paymentId));
+        }
+      },
+    );
+
+    test(
+      'lote que incluye un turno ya cobrado → aborta TODO el lote: no crea '
+      'el Payment ni marca ninguno de los otros turnos',
+      () async {
+        final appts = await seedThree();
+        // El 2do turno ya tiene un paymentId de un cobro previo.
+        await firestore.collection('appointments').doc('lote-2').update({
+          'paymentId': 'payment-previo',
+        });
+
+        await expectLater(
+          repo.billAppointments(appointments: appts, payment: lotePayment()),
+          throwsA(isA<AppointmentAlreadyBilledException>()),
+        );
+
+        // Nada se escribió: ni el Payment...
+        final payments = await firestore.collection('payments').get();
+        expect(payments.docs, isEmpty);
+
+        // ...ni el paymentId de los turnos que SÍ eran válidos (lote-1, lote-3).
+        final snap1 =
+            await firestore.collection('appointments').doc('lote-1').get();
+        expect(snap1.data()!['paymentId'], isNull);
+        final snap3 =
+            await firestore.collection('appointments').doc('lote-3').get();
+        expect(snap3.data()!['paymentId'], isNull);
+
+        // El ya-cobrado conserva su paymentId original (no se pisó).
+        final snap2 =
+            await firestore.collection('appointments').doc('lote-2').get();
+        expect(snap2.data()!['paymentId'], equals('payment-previo'));
+      },
+    );
+
+    test(
+      'lote que incluye un turno no confirmado (cancelado concurrentemente) '
+      '→ aborta TODO el lote, no escribe nada',
+      () async {
+        final appts = await seedThree();
+        await firestore.collection('appointments').doc('lote-3').update({
+          'status': 'cancelled',
+        });
+
+        await expectLater(
+          repo.billAppointments(appointments: appts, payment: lotePayment()),
+          throwsA(isA<AppointmentNotConfirmedException>()),
+        );
+
+        final payments = await firestore.collection('payments').get();
+        expect(payments.docs, isEmpty);
+        final snap1 =
+            await firestore.collection('appointments').doc('lote-1').get();
+        expect(snap1.data()!['paymentId'], isNull);
+      },
+    );
+
+    test(
+      'lote que incluye un turno inexistente → aborta TODO el lote, no '
+      'escribe nada',
+      () async {
+        final appts = await seedThree();
+        final withMissing = [
+          ...appts,
+          confirmedApptAt('lote-does-not-exist', DateTime.utc(2026, 7, 1, 12)),
+        ];
+
+        await expectLater(
+          repo.billAppointments(
+              appointments: withMissing, payment: lotePayment()),
+          throwsA(isA<AppointmentNotFoundException>()),
+        );
+
+        final payments = await firestore.collection('payments').get();
+        expect(payments.docs, isEmpty);
+      },
+    );
+
+    // NOTE on the next 2 tests: billAppointments has TWO independent guards
+    // against a mixed-athlete/mixed-trainer lote —
+    //   (1) a debug-only `assert()` on the Appointment OBJECTS the caller
+    //       passes in (fails fast in dev/tests, compiled OUT of release
+    //       builds), and
+    //   (2) the in-transaction re-validation against the LIVE Firestore doc
+    //       (runs in every build mode — the actual production safety net).
+    // To pin (2) specifically (not just re-trigger (1)), the Appointment
+    // OBJECT passed to billAppointments must itself claim the SAME
+    // athleteId/trainerId as the payment (so the assert passes), while the
+    // Firestore doc seeded at that id disagrees — simulating a caller/UI bug
+    // that would slip straight through in a release build if (2) didn't
+    // exist.
+    test(
+      'lote con un doc LIVE de OTRO alumno, mientras el objeto que pasa el '
+      'caller "miente" y declara el mismo athleteId que el payment (bypassea '
+      'el assert de debug) → la revalidación server-side dentro de la '
+      'transacción lo detecta igual: aborta TODO el lote, no escribe nada',
+      () async {
+        final appts = await seedThree();
+
+        // Doc LIVE en Firestore: pertenece a otro athleteId.
+        final liveForeign = confirmedApptAt(
+          'lote-foreign',
+          DateTime.utc(2026, 7, 1, 13, 0),
+          athlete: otherAthleteId,
+        );
+        await firestore
+            .collection('appointments')
+            .doc(liveForeign.id)
+            .set(liveForeign.toJson());
+
+        // Objeto que pasa el caller para ESE MISMO id: declara el athleteId
+        // del payment (pasa el assert), pero la doc real dice otra cosa.
+        final claimedSameAthlete =
+            confirmedApptAt(liveForeign.id, DateTime.utc(2026, 7, 1, 13, 0));
+
+        await expectLater(
+          repo.billAppointments(
+            appointments: [...appts, claimedSameAthlete],
+            payment: lotePayment(), // payment.athleteId == athleteId
+          ),
+          throwsA(isA<AppointmentAthleteMismatchException>()),
+        );
+
+        final payments = await firestore.collection('payments').get();
+        expect(payments.docs, isEmpty);
+        for (final a in appts) {
+          final snap =
+              await firestore.collection('appointments').doc(a.id).get();
+          expect(snap.data()!['paymentId'], isNull);
+        }
+      },
+    );
+
+    test(
+      'lote con un doc LIVE de OTRO trainer, objeto pasado por el caller '
+      '"miente" y declara el mismo trainerId que el payment (bypassea el '
+      'assert de debug) → la revalidación server-side lo detecta igual: '
+      'aborta TODO el lote, no escribe nada',
+      () async {
+        final appts = await seedThree();
+
+        final liveForeign = confirmedApptAt(
+          'lote-foreign-trainer',
+          DateTime.utc(2026, 7, 1, 13, 0),
+          trainer: otherTrainerId,
+        );
+        await firestore
+            .collection('appointments')
+            .doc(liveForeign.id)
+            .set(liveForeign.toJson());
+
+        final claimedSameTrainer =
+            confirmedApptAt(liveForeign.id, DateTime.utc(2026, 7, 1, 13, 0));
+
+        await expectLater(
+          repo.billAppointments(
+            appointments: [...appts, claimedSameTrainer],
+            payment: lotePayment(), // payment.trainerId == trainerId
+          ),
+          throwsA(isA<AppointmentAthleteMismatchException>()),
+        );
+
+        final payments = await firestore.collection('payments').get();
+        expect(payments.docs, isEmpty);
+      },
+    );
+
+    test('N=1 (lote de un solo turno) funciona igual que el caso general',
+        () async {
+      final appt =
+          confirmedApptAt('lote-single', DateTime.utc(2026, 7, 1, 9, 0));
+      await firestore
+          .collection('appointments')
+          .doc(appt.id)
+          .set(appt.toJson());
+
+      final paymentId = await repo.billAppointments(
+        appointments: [appt],
+        payment: lotePayment(amountArs: 5000, concept: '1 sesión'),
+      );
+
+      final snap =
+          await firestore.collection('appointments').doc(appt.id).get();
+      expect(snap.data()!['paymentId'], equals(paymentId));
+    });
+  });
+
   group('markBilled()', () {
     test('(a) sets paymentId on the appointment doc', () async {
       final appt = Appointment.create(
