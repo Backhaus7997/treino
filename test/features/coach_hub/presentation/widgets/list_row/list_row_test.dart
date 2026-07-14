@@ -1,5 +1,6 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/app/theme/tokens/components/treino_list_row_tokens.dart';
@@ -79,9 +80,11 @@ void main() {
     });
 
     // -------------------------------------------------------------------------
-    // Hover → no crashea
+    // Hover → background usa el token real de hover (no smoke-only)
     // -------------------------------------------------------------------------
-    testWidgets('hover → no crashea [SCENARIO-CK-LR-05]', (tester) async {
+    testWidgets(
+        'hover → decoration usa background de hover (token real) '
+        '[SCENARIO-CK-LR-05]', (tester) async {
       await tester.pumpWidget(_wrap(
         TreinoListRow(
           key: const Key('row'),
@@ -91,12 +94,32 @@ void main() {
       ));
       await tester.pump();
 
+      Color rowColor() {
+        final container = tester.widget<AnimatedContainer>(
+          find.descendant(
+            of: find.byKey(const Key('row')),
+            matching: find.byType(AnimatedContainer),
+          ),
+        );
+        return (container.decoration! as BoxDecoration).color!;
+      }
+
+      final normalColor = rowColor();
+
       final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
       await gesture.addPointer(location: Offset.zero);
       addTearDown(gesture.removePointer);
       await gesture.moveTo(tester.getCenter(find.byKey(const Key('row'))));
       await tester.pump();
-      expect(find.byKey(const Key('row')), findsOneWidget);
+
+      final hoverColor = rowColor();
+      final tokens = TreinoListRowTokens.of(
+        tester.element(find.byKey(const Key('row'))),
+      );
+      expect(hoverColor, equals(tokens.hoverBackground),
+          reason: 'el background debe usar el token real de hover');
+      expect(hoverColor, isNot(equals(normalColor)),
+          reason: 'el color de fondo debe cambiar realmente en hover');
     });
 
     // -------------------------------------------------------------------------
@@ -141,6 +164,61 @@ void main() {
 
       await gesture.up();
       await tester.pump();
+    });
+
+    // -------------------------------------------------------------------------
+    // Accesibilidad de teclado: focusable + activable + Semantics(button)
+    // -------------------------------------------------------------------------
+    testWidgets(
+        'onTap provisto → focusable, Enter (teclado) activa onTap '
+        '[SCENARIO-CK-LR-13]', (tester) async {
+      var tapped = 0;
+      await tester.pumpWidget(_wrap(
+        TreinoListRow(
+          key: const Key('row'),
+          title: 'Ana García',
+          onTap: () => tapped++,
+        ),
+      ));
+      await tester.pump();
+
+      final focusNode = Focus.of(
+        tester.element(find.descendant(
+          of: find.byKey(const Key('row')),
+          matching: find.byType(AnimatedContainer),
+        )),
+      );
+      focusNode.requestFocus();
+      await tester.pump();
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pump();
+      expect(tapped, 1, reason: 'Enter debe activar onTap');
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.space);
+      await tester.pump();
+      expect(tapped, 2, reason: 'Space también debe activar onTap');
+    });
+
+    testWidgets(
+        'onTap provisto → expone Semantics(button: true) [SCENARIO-CK-LR-14]',
+        (tester) async {
+      final handle = tester.ensureSemantics();
+
+      await tester.pumpWidget(_wrap(
+        TreinoListRow(
+          key: const Key('row'),
+          title: 'Ana García',
+          onTap: () {},
+        ),
+      ));
+      await tester.pump();
+
+      final semantics = tester.getSemantics(find.byKey(const Key('row')));
+      expect(semantics.flagsCollection.isButton, isTrue,
+          reason: 'ListRow interactiva debe exponer Semantics(button: true)');
+
+      handle.dispose();
     });
 
     // -------------------------------------------------------------------------
