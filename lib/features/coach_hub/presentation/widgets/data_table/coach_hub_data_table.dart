@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/widget_previews.dart';
 
 import '../../../../../app/theme/app_motion.dart';
 import '../../../../../app/theme/app_palette.dart';
@@ -8,7 +9,32 @@ import '../../../../../app/theme/tokens/primitives.dart';
 import '../../../../../core/widgets/motion/treino_shimmer.dart';
 import '../../../../../core/widgets/treino_icon.dart';
 import '../empty_state/empty_state.dart';
+import '../preview_wrapper.dart';
 import '../treino_interactive_state.dart';
+
+/// Previews del kit — Finding W3.
+@Preview(name: 'DataTable — normal', wrapper: coachHubPreviewWrapper)
+Widget coachHubDataTablePreview() => CoachHubDataTable(
+      columns: const [
+        CoachHubColumn(key: 'name', label: 'Nombre', sortable: true),
+        CoachHubColumn(key: 'status', label: 'Estado'),
+      ],
+      rows: const [
+        CoachHubRow(id: '1', cells: {'name': 'Ana García', 'status': 'Activo'}),
+        CoachHubRow(
+          id: '2',
+          cells: {'name': 'Carlos López', 'status': 'Inactivo'},
+        ),
+      ],
+      onRowTap: (_) {},
+    );
+
+@Preview(name: 'DataTable — vacío', wrapper: coachHubPreviewWrapper)
+Widget coachHubDataTableEmptyPreview() => const CoachHubDataTable(
+      columns: [CoachHubColumn(key: 'name', label: 'Nombre')],
+      rows: [],
+      emptyMessage: 'Sin alumnos todavía',
+    );
 
 /// Modelo de columna para [CoachHubDataTable].
 @immutable

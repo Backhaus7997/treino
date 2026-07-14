@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/widget_previews.dart';
 
 import '../../../../../app/theme/app_palette.dart';
 import '../../../../../app/theme/tokens/components/treino_dialog_tokens.dart';
@@ -7,7 +8,30 @@ import '../../../../../app/theme/tokens/components/treino_focus_tokens.dart';
 import '../../../../../app/theme/tokens/motion_tokens.dart';
 import '../../../../../app/theme/tokens/primitives.dart';
 import '../../../../../core/widgets/treino_icon.dart';
+import '../preview_wrapper.dart';
 import '../treino_interactive_state.dart';
+
+/// Previews del kit — Finding W3.
+@Preview(name: 'Dialog — normal', wrapper: coachHubPreviewWrapper)
+Widget treinoDialogPreview() => TreinoDialog(
+      title: 'Confirmar baja',
+      body: const Text('¿Seguro que querés dar de baja al alumno?'),
+      primaryLabel: 'Confirmar',
+      secondaryLabel: 'Cancelar',
+      onPrimaryTap: () {},
+      onSecondaryTap: () {},
+    );
+
+@Preview(name: 'Dialog — destructive', wrapper: coachHubPreviewWrapper)
+Widget treinoDialogDestructivePreview() => TreinoDialog(
+      title: 'Eliminar alumno',
+      body: const Text('Esta acción no se puede deshacer.'),
+      primaryLabel: 'Eliminar',
+      secondaryLabel: 'Cancelar',
+      destructive: true,
+      onPrimaryTap: () {},
+      onSecondaryTap: () {},
+    );
 
 /// Abre un [TreinoDialog] (o cualquier widget) con la anatomía y motion del
 /// kit Coach Hub Web — Fase 1.

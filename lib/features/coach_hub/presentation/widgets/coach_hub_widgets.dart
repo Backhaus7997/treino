@@ -4,9 +4,11 @@
 /// de interacción compartido (`TreinoInteractiveState`, ADR-SH-002). Preferir
 /// este barrel en vez de importar cada archivo individual del kit.
 ///
-/// Galería de desarrollo: ver `dev_gallery.dart` en este mismo directorio
-/// para una vista que muestra los 7 componentes en todos sus estados
-/// (normal/hover/selected/loading/disabled, dark+light).
+/// Galería de desarrollo: sin app de preview separada por decisión de
+/// ADR-SH-006 ("Sin app real de preview separada — anotaciones sobre
+/// funciones top-level parameter-less"). Cada componente expone sus propios
+/// `@Preview` co-ubicados en su archivo (ver `preview_wrapper.dart` para el
+/// wrapper compartido dark + `MaterialApp`).
 ///
 /// Componentes exportados:
 /// - [CoachHubDataTable] (`data_table/`)
