@@ -8,7 +8,7 @@ import 'package:treino/core/persistence/shared_prefs_provider.dart';
 import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach_hub/application/sidebar_collapsed_provider.dart';
-import 'package:treino/features/coach_hub/presentation/widgets/treino_interactive_state.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 
 import 'sidebar_item.dart';
@@ -96,7 +96,8 @@ class CoachHubSidebar extends ConsumerWidget {
                 children: [
                   for (var i = 0; i < groupEntries.length; i++) ...[
                     if (i > 0) Container(height: 1, color: palette.border),
-                    if (!collapsed) _GroupHeader(label: groupEntries[i].key.label),
+                    if (!collapsed)
+                      _GroupHeader(label: groupEntries[i].key.label),
                     for (final item in groupEntries[i].value)
                       _SidebarItemRow(
                         item: item,
@@ -115,7 +116,8 @@ class CoachHubSidebar extends ConsumerWidget {
           _SidebarFooter(
             collapsed: collapsed,
             canToggle: canToggle,
-            onToggle: () => ref.read(sidebarCollapsedProvider.notifier).toggle(),
+            onToggle: () =>
+                ref.read(sidebarCollapsedProvider.notifier).toggle(),
             ajustesItem: ajustesItem,
             ajustesActive:
                 ajustesItem != null && _isActive(location, ajustesItem.route),
@@ -234,7 +236,7 @@ class _SidebarItemRow extends StatelessWidget {
           curve: AppMotionTokens.enter,
           height: CoachHubLayoutTokens.sidebarItemHeight,
           margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          padding: EdgeInsets.symmetric(
+          padding: const EdgeInsets.symmetric(
             horizontal: CoachHubSidebarItemTokens.paddingH,
           ),
           decoration: BoxDecoration(
@@ -243,9 +245,8 @@ class _SidebarItemRow extends StatelessWidget {
                 BorderRadius.circular(CoachHubSidebarItemTokens.borderRadius),
           ),
           child: Row(
-            mainAxisAlignment: collapsed
-                ? MainAxisAlignment.center
-                : MainAxisAlignment.start,
+            mainAxisAlignment:
+                collapsed ? MainAxisAlignment.center : MainAxisAlignment.start,
             children: [
               if (active && !collapsed)
                 Container(
@@ -272,7 +273,8 @@ class _SidebarItemRow extends StatelessWidget {
                     ),
                   ),
                 ),
-                if (badgeCount != null && badgeCount! > 0) _Badge(count: badgeCount!),
+                if (badgeCount != null && badgeCount! > 0)
+                  _Badge(count: badgeCount!),
               ],
             ],
           ),
@@ -280,7 +282,8 @@ class _SidebarItemRow extends StatelessWidget {
       },
     );
 
-    return TreinoFadeSlideIn(delay: delay, distance: AppMotion.slideSm, child: row);
+    return TreinoFadeSlideIn(
+        delay: delay, distance: AppMotion.slideSm, child: row);
   }
 }
 
@@ -352,7 +355,8 @@ class _SidebarFooter extends StatelessWidget {
             badgeCount: null,
           ),
         Container(height: 1, color: palette.border),
-        _ToggleRow(collapsed: collapsed, canToggle: canToggle, onToggle: onToggle),
+        _ToggleRow(
+            collapsed: collapsed, canToggle: canToggle, onToggle: onToggle),
         Container(height: 1, color: palette.border),
         _ProfileRow(collapsed: collapsed),
       ],
@@ -376,7 +380,8 @@ class _ToggleRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    final tooltip = collapsed ? 'Expandir menú' : 'Contraer menú'; // i18n: Fase W1
+    final tooltip =
+        collapsed ? 'Expandir menú' : 'Contraer menú'; // i18n: Fase W1
 
     final button = Tooltip(
       message: tooltip,
@@ -392,10 +397,12 @@ class _ToggleRow extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
-      child: collapsed ? Center(child: button) : Padding(
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s14),
-        child: Align(alignment: Alignment.centerLeft, child: button),
-      ),
+      child: collapsed
+          ? Center(child: button)
+          : Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s14),
+              child: Align(alignment: Alignment.centerLeft, child: button),
+            ),
     );
   }
 }

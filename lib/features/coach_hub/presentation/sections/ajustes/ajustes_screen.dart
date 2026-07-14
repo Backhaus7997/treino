@@ -5,7 +5,7 @@ import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach_hub/presentation/sections/ajustes/tabs/cuenta_tab.dart';
 import 'package:treino/features/coach_hub/presentation/sections/ajustes/tabs/facturacion_tab.dart';
 import 'package:treino/features/coach_hub/presentation/sections/ajustes/tabs/notificaciones_tab.dart';
-import 'package:treino/features/coach_hub/presentation/widgets/section_header/section_header.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
 
 /// Tabs internos de la sección «Configuración» (Ajustes) del Coach Hub web.
 ///
