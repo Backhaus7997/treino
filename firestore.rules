@@ -58,8 +58,25 @@ service cloud.firestore {
       // explícito caen en este branch). Si la rutina es privada
       // (`visibility: 'private'`), solo `assignedBy` (PF) o `assignedTo`
       // (atleta) pueden leerla. REQ-COACH-FOUNDATIONS-006.
+      //
+      // ⚠️  `resource == null` NO es opcional — es el guard de existencia.
+      // En un `get` sobre un doc INEXISTENTE, `resource` es null, y cualquier
+      // desreferencia de `resource.data` (p. ej. `'visibility' in resource.data`)
+      // hace fallar la EVALUACIÓN de la regla → la lectura vuelve como
+      // PERMISSION_DENIED, no como un snapshot vacío. Sin este short-circuit,
+      // `getById()` de una rutina borrada TIRA EXCEPCIÓN en vez de devolver
+      // null, y el `if (!snap.exists)` del cliente es código muerto que nunca
+      // se ejecuta. Eso rompió los radares de distribución muscular: una sola
+      // sesión vieja apuntando a una rutina borrada dejaba el gráfico entero
+      // en blanco.
+      // El único dato que expone es "este id no existe" vs "existe pero es
+      // privado" — los auto-ids de Firestore son de 20 chars aleatorios, así
+      // que no habilita enumeración.
+      // Sólo aplica a `get`: en un `list` (query) `resource` es cada doc
+      // candidato y nunca es null, así que las queries no se ven afectadas.
       allow read: if request.auth != null
-                  && (!('visibility' in resource.data)
+                  && (resource == null
+                      || !('visibility' in resource.data)
                       || resource.data.visibility == 'public'
                       || resource.data.visibility == 'shared'
                       || request.auth.uid == resource.data.assignedTo
