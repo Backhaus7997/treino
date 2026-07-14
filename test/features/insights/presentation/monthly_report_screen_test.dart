@@ -31,7 +31,7 @@ void main() {
           // hit real Firebase resolving routines/exercises — individual
           // tests can still override these explicitly if needed.
           exercisesProvider.overrideWith((ref) async => []),
-          routineByIdProvider('r1').overrideWith((ref) async => null),
+          visibleRoutineByIdProvider('r1').overrideWith((ref) async => null),
           ...overrides,
         ],
         child: MaterialApp(

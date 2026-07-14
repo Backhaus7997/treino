@@ -65,10 +65,17 @@ final athleteMonthRadarInsightsProvider = FutureProvider.autoDispose
   // catalog — resolves EACH distinct routine referenced by the sessions in
   // scope (mirrors muscleDistributionInsightsProvider's per-session
   // resolution, since a full-month window can span multiple routines).
+  //
+  // [visibleRoutineByIdProvider], NOT [routineByIdProvider] — same reasoning as
+  // muscleDistributionInsightsProvider, and this provider is even MORE exposed:
+  // it resolves routines for the athlete's ENTIRE session history (no bounded
+  // scan), so it is likelier to reach one that is gone. Transient failures still
+  // propagate rather than silently producing a wrong radar.
   final distinctRoutineIds =
       sessions.map((s) => s.routineId).toSet().where((id) => id.isNotEmpty);
   final routines = await Future.wait(
-    distinctRoutineIds.map((id) => ref.watch(routineByIdProvider(id).future)),
+    distinctRoutineIds
+        .map((id) => ref.watch(visibleRoutineByIdProvider(id).future)),
   );
   final slotGroupById = <String, String>{};
   for (final routine in routines) {

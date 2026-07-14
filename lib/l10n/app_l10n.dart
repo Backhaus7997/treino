@@ -4581,6 +4581,12 @@ abstract class AppL10n {
   /// **'DISTRIBUCIÓN MUSCULAR'**
   String get muscleDistributionScreenTitle;
 
+  /// Error state for the MuscleDistributionScreen's provider load failure. Paired with coachRetryLabel for the retry CTA — same convention as monthlyReportLoadError.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cargar tu distribución muscular. Probá de nuevo.'**
+  String get muscleDistributionLoadError;
+
   /// [stats-hub] Tile title on InsightsScreen navigating to FrequentExercisesScreen (athlete's own uid).
   ///
   /// In es_AR, this message translates to:

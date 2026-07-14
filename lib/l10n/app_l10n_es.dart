@@ -2506,6 +2506,10 @@ class AppL10nEs extends AppL10n {
   String get muscleDistributionScreenTitle => 'DISTRIBUCIÓN MUSCULAR';
 
   @override
+  String get muscleDistributionLoadError =>
+      'No pudimos cargar tu distribución muscular. Inténtalo de nuevo.';
+
+  @override
   String get insightsTileFrequentExercisesTitle => 'Ejercicios frecuentes';
 
   @override
@@ -5027,6 +5031,10 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get muscleDistributionScreenTitle => 'DISTRIBUCIÓN MUSCULAR';
+
+  @override
+  String get muscleDistributionLoadError =>
+      'No pudimos cargar tu distribución muscular. Probá de nuevo.';
 
   @override
   String get insightsTileFrequentExercisesTitle => 'Ejercicios frecuentes';

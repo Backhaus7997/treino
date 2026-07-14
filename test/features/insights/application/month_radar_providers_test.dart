@@ -69,6 +69,77 @@ void main() {
   });
 
   test(
+      'a routine that is GONE does NOT fail the whole radar — catalog mapping '
+      'still resolves', () async {
+    // Regression: this provider resolves routines for the athlete's ENTIRE
+    // session history (no bounded scan), so it is the MOST exposed of the two.
+    // A single session pointing at a routine that is gone errored the whole
+    // provider and blanked the month radar. It must degrade, not detonate.
+    final juneSession =
+        _s('s1', DateTime(2026, 6, 15), routineId: 'deleted-routine');
+
+    when(() => repo.listSetLogs(uid: 'a1', sessionId: 's1'))
+        .thenAnswer((_) async => [_log('s1', 'chest')]);
+
+    final container = ProviderContainer(
+      overrides: [
+        sessionRepositoryProvider.overrideWithValue(repo),
+        sessionsByUidProvider('a1').overrideWith((ref) async => [juneSession]),
+        exercisesProvider.overrideWith((ref) async => [
+              const Exercise(
+                id: 'chest',
+                name: 'Press banca',
+                muscleGroup: 'chest',
+                category: 'compound',
+              ),
+            ]),
+        visibleRoutineByIdProvider('deleted-routine')
+            .overrideWith((ref) async => null),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final result = await container.read(
+      athleteMonthRadarInsightsProvider(
+        (uid: 'a1', month: DateTime(2026, 6, 1)),
+      ).future,
+    );
+
+    expect(result.isEmpty, isFalse);
+    expect(result.currentSetsByAxis[RadarAxis.chest], 1);
+    expect(result.currentWorkouts, 1);
+  });
+
+  test('a TRANSIENT routine failure propagates — never a silently wrong radar',
+      () async {
+    final juneSession = _s('s1', DateTime(2026, 6, 15));
+
+    when(() => repo.listSetLogs(uid: 'a1', sessionId: 's1'))
+        .thenAnswer((_) async => [_log('s1', 'chest')]);
+
+    final container = ProviderContainer(
+      overrides: [
+        sessionRepositoryProvider.overrideWithValue(repo),
+        sessionsByUidProvider('a1').overrideWith((ref) async => [juneSession]),
+        exercisesProvider.overrideWith((ref) async => []),
+        visibleRoutineByIdProvider('r').overrideWith(
+          (ref) async => throw StateError('network blip'),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await expectLater(
+      container.read(
+        athleteMonthRadarInsightsProvider(
+          (uid: 'a1', month: DateTime(2026, 6, 1)),
+        ).future,
+      ),
+      throwsA(isA<StateError>()),
+    );
+  });
+
+  test(
       'aggregates the SELECTED calendar month as current + the immediately '
       'preceding month as previous — NOT anchored to DateTime.now()', () async {
     // Selected month is June 2026; "now" (at test run time) could be any
@@ -105,7 +176,7 @@ void main() {
                 category: 'compound',
               ),
             ]),
-        routineByIdProvider('r').overrideWith((ref) async => null),
+        visibleRoutineByIdProvider('r').overrideWith((ref) async => null),
       ],
     );
     addTearDown(container.dispose);
@@ -142,7 +213,7 @@ void main() {
         sessionRepositoryProvider.overrideWithValue(repo),
         sessionsByUidProvider('a1').overrideWith((ref) async => sessions),
         exercisesProvider.overrideWith((ref) async => []),
-        routineByIdProvider('r').overrideWith((ref) async => null),
+        visibleRoutineByIdProvider('r').overrideWith((ref) async => null),
       ],
     );
     addTearDown(container.dispose);

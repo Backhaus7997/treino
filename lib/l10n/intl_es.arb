@@ -597,6 +597,7 @@
   "insightsTileMuscleDistributionTitle": "Distribución muscular",
   "insightsTileMuscleDistributionSubtitle": "Comparativa actual vs. período anterior",
   "muscleDistributionScreenTitle": "DISTRIBUCIÓN MUSCULAR",
+  "muscleDistributionLoadError": "No pudimos cargar tu distribución muscular. Inténtalo de nuevo.",
   "insightsTileFrequentExercisesTitle": "Ejercicios frecuentes",
   "insightsTileFrequentExercisesSubtitle": "Tus ejercicios más entrenados",
   "frequentExercisesScreenTitle": "EJERCICIOS FRECUENTES",

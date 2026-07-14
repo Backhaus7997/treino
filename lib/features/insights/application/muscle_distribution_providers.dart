@@ -74,10 +74,25 @@ final muscleDistributionInsightsProvider = FutureProvider.autoDispose
 
   // Per-session routine-slot fallback — resolves EACH distinct routine
   // referenced by the scanned sessions (not just the most-recent one).
+  //
+  // [visibleRoutineByIdProvider], NOT [routineByIdProvider]: the 60-session
+  // scan reaches far enough back to hit routines that are gone (deleted, or a
+  // trainer-template whose owner revoked athlete sharing), and those reads come
+  // back as errors. An unguarded `Future.wait` propagated the first one and
+  // failed the WHOLE radar — the entire chart vanishing because of one stale
+  // session. The slot fallback is best-effort (the public catalog already
+  // resolves every non-custom exercise), so a routine that is gone degrades to
+  // "no slot fallback for ITS exercises".
+  //
+  // It does NOT swallow transient failures: those still propagate and surface
+  // the screen's error state. Silently treating a network blip as "no routine"
+  // would drop custom-exercise sets from the radar axes while `currentSets`
+  // still counted them — a wrong chart is worse than a visible error.
   final distinctRoutineIds =
       scanned.map((s) => s.routineId).toSet().where((id) => id.isNotEmpty);
   final routines = await Future.wait(
-    distinctRoutineIds.map((id) => ref.watch(routineByIdProvider(id).future)),
+    distinctRoutineIds
+        .map((id) => ref.watch(visibleRoutineByIdProvider(id).future)),
   );
   final slotGroupById = <String, String>{};
   for (final routine in routines) {
