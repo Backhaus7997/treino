@@ -30,6 +30,21 @@ const Map<SubscriptionTier, int> kTierWeightLimits = {
   SubscriptionTier.plan2: 15,
 };
 
+/// Precios en ARS por tier pago y ciclo. Fuente de verdad para la UI del
+/// paywall (pricing page, cards de plan). DEBE mantenerse en sync con
+/// `TIER_PRICES_ARS` en `functions/src/subscriptions/tier-config.ts` — el
+/// servidor es la autoridad al crear la preapproval; este mapa es solo para
+/// mostrar los montos sin un round-trip.
+///
+/// Free no tiene precio (nunca se cobra). Anual = mensual × 10 (2 meses
+/// gratis, ~17% off). Definidos con estudio de mercado AR.
+///   Plan 1: $12.000/mes · $120.000/año
+///   Plan 2: $22.000/mes · $220.000/año
+const Map<SubscriptionTier, ({int monthly, int annual})> kTierPricesArs = {
+  SubscriptionTier.plan1: (monthly: 12000, annual: 120000),
+  SubscriptionTier.plan2: (monthly: 22000, annual: 220000),
+};
+
 /// Estado de la suscripción del PF.
 ///
 /// - `active`  — pago al día, con derecho al límite del tier.
