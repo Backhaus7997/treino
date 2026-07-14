@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../../../../app/theme/tokens/components/treino_focus_tokens.dart';
 import '../../../../../app/theme/tokens/components/treino_section_header_tokens.dart';
-import '../../../../../core/widgets/motion/treino_tappable.dart';
+import '../treino_interactive_state.dart';
 
 /// Datos de la acción opcional del [TreinoSectionHeader].
 @immutable
@@ -25,7 +26,9 @@ class TreinoSectionHeaderAction {
 ///
 /// Estados:
 /// - Normal: título UPPERCASE + count opcional.
-/// - Con acción: botón de texto a la derecha.
+/// - Con acción: botón de texto a la derecha — focusable, activable por
+///   teclado (Enter/Space) y con Semantics(button: true) vía
+///   TreinoInteractiveState (fuente única de verdad, ADR-SH-002).
 /// - Disabled: sin interacción, colores apagados.
 ///
 /// Tokens: TreinoSectionHeaderTokens.of(context) — nunca hex inline.
@@ -106,6 +109,11 @@ class TreinoSectionHeader extends StatelessWidget {
 }
 
 /// Botón de acción del [TreinoSectionHeader].
+///
+/// Con `onTap` — estado de interacción vía [TreinoInteractiveState] (fuente
+/// única de verdad, ADR-SH-002): focusable, activable por teclado
+/// (Enter/Space), expone Semantics(button: true) y subraya el label en
+/// hover. Sin `onTap` → texto estático deshabilitado, sin gesto.
 class _ActionButton extends StatelessWidget {
   const _ActionButton({
     required this.label,
@@ -119,8 +127,6 @@ class _ActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = onTap != null ? tokens.actionColor : tokens.disabledColor;
-
     if (onTap == null) {
       return Text(
         label,
@@ -128,22 +134,37 @@ class _ActionButton extends StatelessWidget {
           fontFamily: 'Barlow',
           fontWeight: FontWeight.w600,
           fontSize: TreinoSectionHeaderTokens.fontSize,
-          color: color,
+          color: tokens.disabledColor,
         ),
       );
     }
 
-    return TreinoTappable(
+    final focusTokens = TreinoFocusTokens.of(context);
+
+    return TreinoInteractiveState(
       onTap: onTap,
-      child: Text(
-        label,
-        style: TextStyle(
-          fontFamily: 'Barlow',
-          fontWeight: FontWeight.w600,
-          fontSize: TreinoSectionHeaderTokens.fontSize,
-          color: color,
-        ),
-      ),
+      builder: (ctx, states) {
+        return Container(
+          key: const Key('sh_action'),
+          padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
+          decoration: BoxDecoration(
+            border:
+                states.focused ? Border.all(color: focusTokens.ring) : null,
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontFamily: 'Barlow',
+              fontWeight: FontWeight.w600,
+              fontSize: TreinoSectionHeaderTokens.fontSize,
+              color: tokens.actionColor,
+              decoration: states.hovered
+                  ? TextDecoration.underline
+                  : TextDecoration.none,
+            ),
+          ),
+        );
+      },
     );
   }
 }
