@@ -17,15 +17,19 @@ import '../domain/chart_period.dart';
 /// coach-only [MostFrequentExercisesList] widget (PR4) with the athlete's
 /// OWN uid (obs #445), as an "ESTADÍSTICAS AVANZADAS" tile destination.
 ///
-/// NAVIGATION NOTE: on the coach side, tapping a row selects the exercise in
-/// a SIBLING inline progression section on the SAME screen (see
-/// `_ProgressionSection`/`_exerciseSelection` in
-/// `coach/presentation/athlete_detail_screen.dart`) — it is NOT a route
-/// push. No athlete-side per-exercise progression destination screen/route
-/// exists today (`ExerciseDetailScreen` at `/workout/exercise/:exerciseId`
-/// is a catalogue detail page, not a stats/progression view). Rows are
-/// therefore NON-NAVIGATING here for now — flagged for a future slice once
-/// an athlete-side exercise progression destination exists.
+/// NAVIGATION NOTE: en el shell del coach, tocar una fila selecciona el
+/// ejercicio en una sección de progresión HERMANA, inline, en la MISMA pantalla
+/// (`_ProgressionSection`/`_exerciseSelection` en
+/// `coach/presentation/athlete_detail_screen.dart`) — no es un push de ruta.
+///
+/// Del lado del alumno NO existía destino, así que las filas eran no-navegantes
+/// y esto quedó anotado como "flagged for a future slice". Ese slice ya está:
+/// las filas hacen push a [ExerciseProgressionScreen]
+/// (`/home/insights/exercise-progression?exerciseId=…`), que abre la progresión
+/// del ejercicio tocado ya preseleccionado.
+///
+/// (Ojo: `ExerciseDetailScreen` en `/workout/exercise/:exerciseId` NO es este
+/// destino — es la ficha del CATÁLOGO, no una vista de estadísticas.)
 ///
 /// [uid] is explicit — same reusability convention as the other promoted
 /// screens.
@@ -78,9 +82,13 @@ class _FrequentExercisesScreenState
                   data: (entries) => MostFrequentExercisesList(
                     entries: entries,
                     selectedPeriod: _selectedPeriod,
-                    // NON-NAVIGATING (see class doc) — no athlete-side
-                    // exercise progression destination exists yet.
-                    onSelectExercise: (_) {},
+                    // Ahora SÍ navegan: ExerciseProgressionScreen es el destino
+                    // que faltaba (ver el doc de la clase, que lo dejaba
+                    // anotado como "flagged for a future slice"). Toco una fila
+                    // → abro la progresión de ESE ejercicio, ya preseleccionado.
+                    onSelectExercise: (exerciseId) => context.push(
+                      '/home/insights/exercise-progression?exerciseId=$exerciseId',
+                    ),
                     onSelectPeriod: (p) => setState(() => _selectedPeriod = p),
                     labels: MostFrequentExercisesListLabels(
                       sectionTitle: l10n.mostFrequentExercisesSectionTitle,

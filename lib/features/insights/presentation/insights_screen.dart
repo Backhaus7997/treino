@@ -762,6 +762,13 @@ class _StatsHubTileList extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         _StatTile(
+          icon: TreinoIcon.trendUp,
+          title: l10n.insightsTileExerciseProgressionTitle,
+          subtitle: l10n.insightsTileExerciseProgressionSubtitle,
+          onTap: () => context.push('/home/insights/exercise-progression'),
+        ),
+        const SizedBox(height: 12),
+        _StatTile(
           icon: TreinoIcon.calendar,
           title: l10n.insightsMonthlyReportTile,
           subtitle: l10n.insightsTileMonthlyReportSubtitle,

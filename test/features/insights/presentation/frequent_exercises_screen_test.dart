@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/insights/presentation/frequent_exercises_screen.dart';
@@ -66,11 +67,36 @@ void main() {
   });
 
   testWidgets(
-      'SCENARIO-FREQ-SCREEN-02: tapping a row is a no-op (no navigation) — '
-      'no athlete-side exercise progression destination exists yet',
-      (tester) async {
-    await tester.pumpWidget(wrap(
-      const SizedBox.shrink(),
+      'SCENARIO-FREQ-SCREEN-02: tocar una fila navega a la progresión de ESE '
+      'ejercicio, ya preseleccionado', (tester) async {
+    // Este escenario afirmaba lo CONTRARIO ("tapping a row is a no-op — no
+    // athlete-side exercise progression destination exists yet"). Ese "yet"
+    // era una promesa: ExerciseProgressionScreen es ahora ese destino, y las
+    // filas navegan pasándole el exerciseId por query param.
+    final router = GoRouter(
+      initialLocation: '/home/insights/frequent-exercises',
+      routes: [
+        GoRoute(
+          path: '/home/insights/frequent-exercises',
+          builder: (_, __) => const Scaffold(
+            body: FrequentExercisesScreen(uid: 'me'),
+          ),
+        ),
+        GoRoute(
+          path: '/home/insights/exercise-progression',
+          builder: (_, state) => Scaffold(
+            // Se assertea el exerciseId, no sólo que "navegó a algún lado":
+            // llegar a la pantalla sin el ejercicio tocado sería un bug mudo.
+            body: Text(
+              'progression:${state.uri.queryParameters['exerciseId']}',
+            ),
+          ),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+
+    await tester.pumpWidget(ProviderScope(
       overrides: [
         exerciseFrequencyProvider((
           athleteUid: 'me',
@@ -83,16 +109,21 @@ void main() {
               ),
             ]),
       ],
+      child: MaterialApp.router(
+        theme: AppTheme.dark(),
+        routerConfig: router,
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+        locale: const Locale('es', 'AR'),
+      ),
     ));
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Press Banca'));
     await tester.pumpAndSettle();
 
-    // Still on the same screen — no exception, no navigation happened.
     expect(tester.takeException(), isNull);
-    expect(find.text('EJERCICIOS FRECUENTES'), findsOneWidget);
-    expect(find.text('Press Banca'), findsOneWidget);
+    expect(find.text('progression:e-press'), findsOneWidget);
   });
 
   testWidgets(
