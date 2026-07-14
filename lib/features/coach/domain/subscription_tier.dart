@@ -88,6 +88,15 @@ extension SubscriptionTierX on SubscriptionTier {
   /// Límite de peso ponderado de este tier.
   int get weightLimit => kTierWeightLimits[this]!;
 
+  /// El siguiente tier hacia arriba, para el upsell del paywall de bloqueo.
+  /// Free → Plan 1 → Plan 2 → null (Plan 2 es el tope de la Fase 1; más
+  /// alumnos van al plan a-medida, ver banner de la pricing page).
+  SubscriptionTier? get nextTier => switch (this) {
+        SubscriptionTier.free => SubscriptionTier.plan1,
+        SubscriptionTier.plan1 => SubscriptionTier.plan2,
+        SubscriptionTier.plan2 => null,
+      };
+
   static SubscriptionTier fromJson(String? value) => switch (value) {
         'free' => SubscriptionTier.free,
         'plan1' => SubscriptionTier.plan1,
