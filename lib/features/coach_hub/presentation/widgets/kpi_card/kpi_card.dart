@@ -4,14 +4,16 @@ import '../../../../../app/theme/app_motion.dart';
 import '../../../../../app/theme/app_palette.dart';
 import '../../../../../app/theme/tokens/components/treino_kpi_card_tokens.dart';
 import '../../../../../core/widgets/motion/treino_shimmer.dart';
-import '../../../../../core/widgets/motion/treino_tappable.dart';
+import '../treino_interactive_state.dart';
 
 /// KPI Card del kit Coach Hub Web — Fase 1.
 ///
 /// Muestra una métrica clave (value + label + delta opcional) con soporte de:
 /// - Estado loading: skeleton shimmer (TreinoShimmer).
-/// - Hover: cambio de borde/fondo sin sombra (elevation-free, ADR-SH-006).
-/// - onTap opcional: envuelto en TreinoTappable.
+/// - Hover/pressed/focus: vía TreinoInteractiveState (fuente única de verdad).
+/// - Cambio de borde/fondo sin sombra (elevation-free, ADR-SH-006).
+/// - onTap opcional: focusable, activable por teclado (Enter/Space) y expone
+///   Semantics(button: true) — accesible sin mouse.
 /// - Tokens: TreinoKpiCardTokens.of(context) — nunca hex inline.
 /// - Ambos temas dark y light.
 ///
@@ -25,7 +27,7 @@ import '../../../../../core/widgets/motion/treino_tappable.dart';
 ///   onTap: () => nav.push('/alumnos'),
 /// )
 /// ```
-class KpiCard extends StatefulWidget {
+class KpiCard extends StatelessWidget {
   const KpiCard({
     super.key,
     required this.value,
@@ -55,66 +57,50 @@ class KpiCard extends StatefulWidget {
   final VoidCallback? onTap;
 
   @override
-  State<KpiCard> createState() => _KpiCardState();
-}
-
-class _KpiCardState extends State<KpiCard> {
-  bool _hovered = false;
-
-  @override
   Widget build(BuildContext context) {
-    final tokens = TreinoKpiCardTokens.of(context);
-    final p = AppPalette.of(context);
+    return TreinoInteractiveState(
+      onTap: onTap,
+      builder: (ctx, states) {
+        final tokens = TreinoKpiCardTokens.of(ctx);
+        final p = AppPalette.of(ctx);
 
-    Widget content;
-    if (widget.loading) {
-      content = _SkeletonContent(tokens: tokens);
-    } else {
-      content = _CardContent(
-        value: widget.value,
-        label: widget.label,
-        delta: widget.delta,
-        deltaPositive: widget.deltaPositive,
-        tokens: tokens,
-        palette: p,
-      );
-    }
+        Widget content;
+        if (loading) {
+          content = _SkeletonContent(tokens: tokens);
+        } else {
+          content = _CardContent(
+            value: value,
+            label: label,
+            delta: delta,
+            deltaPositive: deltaPositive,
+            tokens: tokens,
+            palette: p,
+          );
+        }
 
-    final card = DecoratedBox(
-      decoration: BoxDecoration(
-        color: _hovered
-            ? tokens.border.withValues(alpha: 0.08)
-            : tokens.background,
-        border: Border.all(
-          color: _hovered ? p.borderHover : tokens.border,
-        ),
-        borderRadius: BorderRadius.circular(TreinoKpiCardTokens.borderRadius),
-        // Sin boxShadow — elevation-free por spec ADR-SH-006.
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(TreinoKpiCardTokens.padding),
-        child: content,
-      ),
-    );
+        final highlighted = states.hovered || states.pressed;
 
-    final interactive = widget.onTap != null
-        ? TreinoTappable(onTap: widget.onTap, child: card)
-        : card;
-
-    return MouseRegion(
-      cursor: widget.onTap != null
-          ? SystemMouseCursors.click
-          : SystemMouseCursors.basic,
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: AnimatedContainer(
-        duration: AppMotion.resolve(context, AppMotion.fast),
-        curve: AppMotion.standard,
-        child: KeyedSubtree(
+        return AnimatedContainer(
           key: const Key('kpi_card_root'),
-          child: interactive,
-        ),
-      ),
+          duration: AppMotion.resolve(ctx, AppMotion.fast),
+          curve: AppMotion.standard,
+          decoration: BoxDecoration(
+            color: highlighted
+                ? tokens.border.withValues(alpha: 0.08)
+                : tokens.background,
+            border: Border.all(
+              color: highlighted ? p.borderHover : tokens.border,
+            ),
+            borderRadius:
+                BorderRadius.circular(TreinoKpiCardTokens.borderRadius),
+            // Sin boxShadow — elevation-free por spec ADR-SH-006.
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(TreinoKpiCardTokens.padding),
+            child: content,
+          ),
+        );
+      },
     );
   }
 }

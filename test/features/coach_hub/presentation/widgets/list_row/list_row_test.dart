@@ -2,6 +2,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/app/theme/tokens/components/treino_list_row_tokens.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/list_row/list_row.dart';
 
 /// Envuelve en MaterialApp con el tema dado para que AppPalette resuelva.
@@ -96,6 +97,50 @@ void main() {
       await gesture.moveTo(tester.getCenter(find.byKey(const Key('row'))));
       await tester.pump();
       expect(find.byKey(const Key('row')), findsOneWidget);
+    });
+
+    // -------------------------------------------------------------------------
+    // Pressed: tap-down usa el mismo background que hover (rama states.pressed)
+    // -------------------------------------------------------------------------
+    testWidgets('pressed (tap-down) → usa hoverBackground [SCENARIO-CK-LR-12]',
+        (tester) async {
+      await tester.pumpWidget(_wrap(
+        TreinoListRow(
+          key: const Key('row'),
+          title: 'Ana García',
+          onTap: () {},
+        ),
+      ));
+      await tester.pump();
+
+      Color rowColor() {
+        final container = tester.widget<AnimatedContainer>(
+          find.descendant(
+            of: find.byKey(const Key('row')),
+            matching: find.byType(AnimatedContainer),
+          ),
+        );
+        return (container.decoration! as BoxDecoration).color!;
+      }
+
+      final normalColor = rowColor();
+
+      final gesture = await tester.startGesture(
+        tester.getCenter(find.byKey(const Key('row'))),
+      );
+      await tester.pump();
+
+      final pressedColor = rowColor();
+      final tokens = TreinoListRowTokens.of(
+        tester.element(find.byKey(const Key('row'))),
+      );
+      expect(pressedColor, equals(tokens.hoverBackground),
+          reason: 'pressed debe usar el mismo background que hover');
+      expect(pressedColor, isNot(equals(normalColor)),
+          reason: 'el background debe cambiar realmente al presionar');
+
+      await gesture.up();
+      await tester.pump();
     });
 
     // -------------------------------------------------------------------------
