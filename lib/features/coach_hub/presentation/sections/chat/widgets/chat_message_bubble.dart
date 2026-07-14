@@ -43,8 +43,13 @@ class ChatMessageBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    final bg = isOwn ? palette.accent.withValues(alpha: 0.2) : palette.bgCard;
-    final fg = palette.textPrimary;
+    // Mockup (chat.png): burbuja propia MINT SÓLIDO con texto oscuro; burbuja
+    // del alumno gris `bgCard` sólido SIN borde. Alto contraste, sin el look
+    // "lavado" translúcido anterior.
+    final bg = isOwn ? palette.accent : palette.bgCard;
+    final fg = isOwn ? palette.bg : palette.textPrimary;
+    final metaColor =
+        isOwn ? palette.bg.withValues(alpha: 0.7) : palette.textMuted;
     return Align(
       alignment: isOwn ? Alignment.centerRight : Alignment.centerLeft,
       child: ConstrainedBox(
@@ -59,11 +64,6 @@ class ChatMessageBubble extends StatelessWidget {
               topRight: const Radius.circular(14),
               bottomLeft: Radius.circular(isOwn ? 14 : 4),
               bottomRight: Radius.circular(isOwn ? 4 : 14),
-            ),
-            border: Border.all(
-              color: isOwn
-                  ? palette.accent.withValues(alpha: 0.3)
-                  : palette.border,
             ),
           ),
           child: Column(
@@ -151,16 +151,25 @@ class ChatMessageBubble extends StatelessWidget {
                   ),
                 ),
               const SizedBox(height: 4),
-              Align(
-                alignment: Alignment.centerRight,
-                child: Text(
-                  DateFormat('HH:mm').format(createdAt.toLocal()),
-                  style: GoogleFonts.barlow(
-                    fontWeight: FontWeight.w400,
-                    fontSize: 10,
-                    color: palette.textMuted,
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    DateFormat('HH:mm').format(createdAt.toLocal()),
+                    style: GoogleFonts.barlow(
+                      fontWeight: FontWeight.w400,
+                      fontSize: 10,
+                      color: metaColor,
+                    ),
                   ),
-                ),
+                  // Doble check en los mensajes propios (mockup). Visual —
+                  // no refleja estado de entrega real todavía.
+                  if (isOwn) ...[
+                    const SizedBox(width: 4),
+                    Icon(Icons.done_all, size: 13, color: metaColor),
+                  ],
+                ],
               ),
             ],
           ),
