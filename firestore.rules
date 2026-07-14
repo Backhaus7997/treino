@@ -932,13 +932,26 @@ service cloud.firestore {
          && request.resource.data.status == 'confirmed'
          && request.resource.data.athleteId == request.auth.uid)
         ||
-        // Path 3: trainer edits coaching notes on their own appointment.
+        // Path 3: trainer edits coaching notes OR links a Payment on their own
+        // appointment (Slice 2a, Agenda→cobro bridge, money-critical).
         // status / athleteId / trainerId / startsAt stay immutable.
+        // `paymentId` is SET-ONCE: null → a NON-EMPTY STRING (first bill), or
+        // re-assert the SAME value (a notes edit that leaves the charge alone).
+        // A client can never overwrite it with a different Payment id, clear it
+        // back to null, nor forge an empty / non-string value.
+        // NOTE: we deliberately do NOT exists()-check the Payment here —
+        // billAppointment creates the Payment and sets paymentId in the SAME
+        // Firestore transaction, and rules exists() reads pre-commit state, so
+        // an exists() check would reject the legitimate atomic flow.
         (request.auth.uid == resource.data.trainerId
          && request.resource.data.status == resource.data.status
          && request.resource.data.athleteId == resource.data.athleteId
          && request.resource.data.trainerId == resource.data.trainerId
-         && request.resource.data.startsAt == resource.data.startsAt)
+         && request.resource.data.startsAt == resource.data.startsAt
+         && ((resource.data.get('paymentId', null) == null
+              && request.resource.data.get('paymentId', null) is string
+              && request.resource.data.get('paymentId', null).size() > 0)
+             || request.resource.data.get('paymentId', null) == resource.data.get('paymentId', null)))
       );
       allow delete: if false;
     }

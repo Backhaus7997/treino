@@ -5,12 +5,21 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
+import '../../../../core/utils/argentina_time.dart'
+    show argentinaNow, argentinaUtcOffset;
+import '../../../../core/widgets/treino_icon.dart';
+import '../../../../l10n/app_l10n.dart';
+import '../../../coach_hub/presentation/sections/pagos/widgets/payment_format.dart'
+    show fmtArs;
+import '../../../payments/application/billing_providers.dart'
+    show athleteBillingProvider;
+import '../../../payments/domain/payment.dart';
 import '../../../profile/application/user_providers.dart'
     show firestoreProvider;
 import '../../application/agenda_providers.dart';
 import '../../domain/agenda_exceptions.dart';
 import '../../domain/appointment.dart';
-import '../../../../l10n/app_l10n.dart';
+import '../agenda_formatters.dart';
 
 /// Bottom-sheet content showing the full detail of a single [Appointment].
 ///
@@ -39,6 +48,18 @@ class _AppointmentDetailSheetState
   /// stale-cache scenarios and keeps the name in sync if the athlete renames.
   late final Stream<DocumentSnapshot<Map<String, Object?>>> _profileStream;
 
+  // ── Cobrar (Slice 2a — Agenda→cobro bridge) ───────────────────────────────
+  final _amountController = TextEditingController();
+  final _conceptController = TextEditingController();
+  bool _showCobrarForm = false;
+  bool _billing = false;
+  String? _billingError;
+
+  /// ART calendar day the charge is due (optional) — same idiom as
+  /// _AddSueltoSheet (Slice 1): only y/m/d are meaningful, [_confirmCobrar]
+  /// expands it to 23:59:59 ART.
+  DateTime? _dueDate;
+
   @override
   void initState() {
     super.initState();
@@ -50,9 +71,25 @@ class _AppointmentDetailSheetState
   }
 
   @override
+  void dispose() {
+    _amountController.dispose();
+    _conceptController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final appointment = widget.appointment;
+
+    // Pre-warm the athlete's reference-rate stream from the moment the sheet
+    // opens, so it's already resolved by the time the trainer taps COBRAR —
+    // _openCobrarForm reads it via ref.read() (synchronous), and a
+    // StreamProvider that had NEVER been watched before would still read as
+    // AsyncLoading right after its first subscription (the first event needs
+    // at least one microtask turn to arrive). Same fix as the web dialog
+    // counterpart (appointment_detail_dialog.dart).
+    ref.watch(athleteBillingProvider(appointment.athleteId));
 
     final canCancel = appointment.startsAt.difference(DateTime.now().toUtc()) >
         const Duration(hours: 24);
@@ -68,158 +105,222 @@ class _AppointmentDetailSheetState
           top: 20,
           bottom: MediaQuery.viewInsetsOf(context).bottom + 20,
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // ── Handle ────────────────────────────────────────────────────
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 16),
-                decoration: BoxDecoration(
-                  color: palette.border,
-                  borderRadius: BorderRadius.circular(2),
+        // SingleChildScrollView: the Cobrar form (Slice 2a) adds enough
+        // height that this sheet's Column can overflow on shorter phone
+        // viewports (and further still with the keyboard open) — this makes
+        // the content scrollable instead of clipping the confirm button.
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // ── Handle ────────────────────────────────────────────────────
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: palette.border,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
               ),
-            ),
-            // ── Title ─────────────────────────────────────────────────────
-            Text(
-              'Detalle del turno',
-              style: GoogleFonts.barlowCondensed(
-                fontWeight: FontWeight.w700,
-                fontSize: 18,
-                color: palette.textPrimary,
+              // ── Title ─────────────────────────────────────────────────────
+              Text(
+                'Detalle del turno',
+                style: GoogleFonts.barlowCondensed(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 18,
+                  color: palette.textPrimary,
+                ),
               ),
-            ),
-            const SizedBox(height: 18),
-            // ── Athlete header ────────────────────────────────────────────
-            StreamBuilder<DocumentSnapshot<Map<String, Object?>>>(
-              stream: _profileStream,
-              builder: (ctx, snap) {
-                final remoteName = snap.data?.data()?['displayName'] as String?;
-                final rawName = remoteName ?? appointment.athleteDisplayName;
-                final displayName = _looksLikeUid(rawName) ? 'Alumno' : rawName;
-                final initials = _initials(displayName);
+              const SizedBox(height: 18),
+              // ── Athlete header ────────────────────────────────────────────
+              StreamBuilder<DocumentSnapshot<Map<String, Object?>>>(
+                stream: _profileStream,
+                builder: (ctx, snap) {
+                  final remoteName =
+                      snap.data?.data()?['displayName'] as String?;
+                  final rawName = remoteName ?? appointment.athleteDisplayName;
+                  final displayName =
+                      _looksLikeUid(rawName) ? 'Alumno' : rawName;
+                  final initials = _initials(displayName);
 
-                return Row(
-                  children: [
-                    _AvatarInitialsLocal(initials: initials, palette: palette),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        displayName,
-                        style: GoogleFonts.barlow(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 16,
-                          color: palette.textPrimary,
+                  return Row(
+                    children: [
+                      _AvatarInitialsLocal(
+                          initials: initials, palette: palette),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          displayName,
+                          style: GoogleFonts.barlow(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 16,
+                            color: palette.textPrimary,
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  );
+                },
+              ),
+              const SizedBox(height: 18),
+              // ── Detail card ───────────────────────────────────────────────
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 14,
+                ),
+                decoration: BoxDecoration(
+                  color: palette.bgCard,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: palette.border),
+                ),
+                child: Column(
+                  children: [
+                    _DetailRow(
+                      label: 'Fecha',
+                      value: _formatDateFull(appointment.startsAt),
+                      palette: palette,
+                    ),
+                    _Divider(palette: palette),
+                    _DetailRow(
+                      label: 'Horario',
+                      value:
+                          '${_formatTime(appointment.startsAt)} – ${_formatTime(endTime)}',
+                      palette: palette,
+                    ),
+                    _Divider(palette: palette),
+                    _DetailRow(
+                      label: 'Duración',
+                      value: '${appointment.durationMin} min',
+                      palette: palette,
+                    ),
+                    _Divider(palette: palette),
+                    _StatusRow(palette: palette, status: appointment.status),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              // ── Actions ───────────────────────────────────────────────────
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    context.push('/coach/athlete/${appointment.athleteId}');
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: palette.accent,
+                    foregroundColor: palette.bg,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(9999),
+                    ),
+                  ),
+                  child: Text(
+                    'VER PERFIL DEL ALUMNO',
+                    style: GoogleFonts.barlowCondensed(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                      letterSpacing: 0.8,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              // ── Cobrar (Slice 2a — Agenda→cobro bridge) ────────────────────
+              if (appointment.status == AppointmentStatus.confirmed) ...[
+                if (appointment.paymentId != null)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    decoration: BoxDecoration(
+                      color: palette.accent.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(9999),
+                      border: Border.all(color: palette.accent),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(TreinoIcon.checkCircleFill,
+                            size: 18, color: palette.accent),
+                        const SizedBox(width: 8),
+                        Text(
+                          AppL10n.of(context).agendaCobradoLabel,
+                          style: GoogleFonts.barlowCondensed(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 14,
+                            color: palette.accent,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                else if (!_showCobrarForm)
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: OutlinedButton(
+                      onPressed: () => _openCobrarForm(ref),
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: palette.accent),
+                        foregroundColor: palette.accent,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(9999),
+                        ),
+                      ),
+                      child: Text(
+                        AppL10n.of(context).agendaCobrarCta,
+                        style: GoogleFonts.barlowCondensed(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                          letterSpacing: 0.8,
+                        ),
                       ),
                     ),
-                  ],
-                );
-              },
-            ),
-            const SizedBox(height: 18),
-            // ── Detail card ───────────────────────────────────────────────
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(
-                horizontal: 14,
-                vertical: 14,
-              ),
-              decoration: BoxDecoration(
-                color: palette.bgCard,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: palette.border),
-              ),
-              child: Column(
-                children: [
-                  _DetailRow(
-                    label: 'Fecha',
-                    value: _formatDateFull(appointment.startsAt),
-                    palette: palette,
+                  )
+                else
+                  _buildCobrarForm(context, ref, palette),
+                const SizedBox(height: 12),
+              ],
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: OutlinedButton(
+                  onPressed:
+                      canCancel ? () => _cancelAppointment(context, ref) : null,
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(
+                      color: canCancel ? palette.highlight : palette.border,
+                    ),
+                    foregroundColor:
+                        canCancel ? palette.highlight : palette.textMuted,
+                    disabledForegroundColor: palette.textMuted,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(9999),
+                    ),
                   ),
-                  _Divider(palette: palette),
-                  _DetailRow(
-                    label: 'Horario',
-                    value:
-                        '${_formatTime(appointment.startsAt)} – ${_formatTime(endTime)}',
-                    palette: palette,
-                  ),
-                  _Divider(palette: palette),
-                  _DetailRow(
-                    label: 'Duración',
-                    value: '${appointment.durationMin} min',
-                    palette: palette,
-                  ),
-                  _Divider(palette: palette),
-                  _StatusRow(palette: palette, status: appointment.status),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-            // ── Actions ───────────────────────────────────────────────────
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                  context.push('/coach/athlete/${appointment.athleteId}');
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: palette.accent,
-                  foregroundColor: palette.bg,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(9999),
-                  ),
-                ),
-                child: Text(
-                  'VER PERFIL DEL ALUMNO',
-                  style: GoogleFonts.barlowCondensed(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13,
-                    letterSpacing: 0.8,
+                  child: Text(
+                    canCancel
+                        ? 'CANCELAR TURNO'
+                        : 'CANCELAR TURNO (menos de 24h)',
+                    style: GoogleFonts.barlowCondensed(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                      letterSpacing: 0.8,
+                      color: canCancel ? palette.highlight : palette.textMuted,
+                    ),
                   ),
                 ),
               ),
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: OutlinedButton(
-                onPressed:
-                    canCancel ? () => _cancelAppointment(context, ref) : null,
-                style: OutlinedButton.styleFrom(
-                  side: BorderSide(
-                    color: canCancel ? palette.highlight : palette.border,
-                  ),
-                  foregroundColor:
-                      canCancel ? palette.highlight : palette.textMuted,
-                  disabledForegroundColor: palette.textMuted,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(9999),
-                  ),
-                ),
-                child: Text(
-                  canCancel
-                      ? 'CANCELAR TURNO'
-                      : 'CANCELAR TURNO (menos de 24h)',
-                  style: GoogleFonts.barlowCondensed(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13,
-                    letterSpacing: 0.8,
-                    color: canCancel ? palette.highlight : palette.textMuted,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-          ],
+              const SizedBox(height: 8),
+            ],
+          ),
         ),
       ),
     );
@@ -258,6 +359,299 @@ class _AppointmentDetailSheetState
         SnackBar(content: Text(l10n.agendaGenericError)),
       );
     }
+  }
+
+  // ── Cobrar (Slice 2a) ─────────────────────────────────────────────────────
+
+  void _openCobrarForm(WidgetRef ref) {
+    final appt = widget.appointment;
+    // Prefill from the athlete's reference rate AT THIS MOMENT — no reactive
+    // re-prefill afterwards, so it never clobbers a value the trainer is
+    // mid-typing. No config → field starts empty (designed fallback).
+    final billing =
+        ref.read(athleteBillingProvider(appt.athleteId)).valueOrNull;
+    _amountController.text =
+        billing != null ? billing.amountArs.toString() : '';
+    _conceptController.text = AppL10n.of(context).agendaCobrarConceptoDefault(
+      AgendaFormatters.formatDate(appt.startsAt),
+    );
+    setState(() {
+      _showCobrarForm = true;
+      _billingError = null;
+    });
+  }
+
+  void _closeCobrarForm() {
+    setState(() {
+      _showCobrarForm = false;
+      _billingError = null;
+      _dueDate = null;
+      _amountController.clear();
+      _conceptController.clear();
+    });
+  }
+
+  Future<void> _pickDueDate() async {
+    // "Today" as an ART calendar day — same rationale as _AddSueltoSheet.
+    final todayArt = argentinaNow();
+    final floor = DateTime(todayArt.year, todayArt.month, todayArt.day);
+    final initial = _dueDate ?? floor;
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial.isBefore(floor) ? floor : initial,
+      firstDate: floor,
+      lastDate: floor.add(const Duration(days: 365)),
+    );
+    if (picked != null && mounted) {
+      setState(() => _dueDate = picked);
+    }
+  }
+
+  Future<void> _confirmCobrar(BuildContext context, WidgetRef ref) async {
+    if (_billing) return;
+    final l10n = AppL10n.of(context);
+    final appt = widget.appointment;
+    final amount = int.tryParse(_amountController.text.trim());
+    final concept = _conceptController.text.trim();
+
+    if (amount == null || amount <= 0) {
+      setState(() => _billingError = l10n.agendaCobrarMontoInvalido);
+      return;
+    }
+    if (concept.isEmpty) {
+      setState(() => _billingError = l10n.agendaCobrarCompletaCampos);
+      return;
+    }
+
+    setState(() {
+      _billing = true;
+      _billingError = null;
+    });
+
+    // dueAt = end of the chosen ART calendar day, as a UTC instant — same
+    // normalization as _AddSueltoSheet (Slice 1).
+    final dueDate = _dueDate;
+    final dueAt = dueDate == null
+        ? null
+        : DateTime.utc(dueDate.year, dueDate.month, dueDate.day, 23, 59, 59)
+            .add(argentinaUtcOffset);
+
+    final payment = Payment(
+      id: '',
+      trainerId: widget.trainerId,
+      athleteId: appt.athleteId,
+      amountArs: amount,
+      concept: concept,
+      status: PaymentStatus.pending,
+      createdAt: DateTime.now().toUtc(),
+      dueAt: dueAt,
+    );
+
+    try {
+      await ref.read(appointmentRepositoryProvider).billAppointment(
+            appointment: appt,
+            payment: payment,
+          );
+      if (!context.mounted) return;
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.agendaCobrarSuccess)),
+      );
+    } catch (_) {
+      // Covers AppointmentAlreadyBilledException, AppointmentNotConfirmedException
+      // and any other failure — the repository transaction guarantees the
+      // Payment + paymentId link never diverge, so a single generic retry
+      // message is safe here (see appointment_detail_dialog.dart's web
+      // counterpart for more granular per-exception copy).
+      if (!mounted) return;
+      setState(() {
+        _billing = false;
+        _billingError = l10n.agendaCobrarError;
+      });
+    }
+  }
+
+  Widget _buildCobrarForm(
+    BuildContext context,
+    WidgetRef ref,
+    AppPalette palette,
+  ) {
+    final l10n = AppL10n.of(context);
+    final appt = widget.appointment;
+    final billing =
+        ref.watch(athleteBillingProvider(appt.athleteId)).valueOrNull;
+
+    InputDecoration deco(String hint) => InputDecoration(
+          hintText: hint,
+          hintStyle: TextStyle(color: palette.textMuted),
+          filled: true,
+          fillColor: palette.bgCard,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: palette.border),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: palette.border),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: palette.accent, width: 1.5),
+          ),
+        );
+
+    Widget label(String text) => Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Text(
+            text,
+            style: GoogleFonts.barlowCondensed(
+              fontWeight: FontWeight.w600,
+              fontSize: 12,
+              letterSpacing: 0.8,
+              color: palette.textMuted,
+            ),
+          ),
+        );
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: palette.bg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: palette.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          label(l10n.agendaCobrarMontoLabel),
+          TextField(
+            controller: _amountController,
+            keyboardType: TextInputType.number,
+            style: GoogleFonts.barlow(color: palette.textPrimary),
+            decoration: deco('5000'),
+          ),
+          if (billing != null) ...[
+            const SizedBox(height: 6),
+            Text(
+              l10n.agendaCobrarTarifaReferencia(fmtArs(billing.amountArs)),
+              style: GoogleFonts.barlow(fontSize: 12, color: palette.textMuted),
+            ),
+          ],
+          const SizedBox(height: 14),
+          label(l10n.agendaCobrarConceptoLabel),
+          TextField(
+            controller: _conceptController,
+            style: GoogleFonts.barlow(color: palette.textPrimary),
+            decoration: deco(l10n.agendaCobrarConceptoLabel),
+          ),
+          const SizedBox(height: 14),
+          label(l10n.agendaCobrarVenceElLabel),
+          InkWell(
+            onTap: _pickDueDate,
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+              decoration: BoxDecoration(
+                color: palette.bg,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: palette.border),
+              ),
+              child: Row(
+                children: [
+                  Icon(TreinoIcon.calendar, size: 16, color: palette.textMuted),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      _dueDate == null
+                          ? l10n.agendaCobrarVenceElHint
+                          : AgendaFormatters.formatDate(_dueDate!),
+                      style: GoogleFonts.barlow(
+                        fontSize: 14,
+                        color: _dueDate == null
+                            ? palette.textMuted
+                            : palette.textPrimary,
+                      ),
+                    ),
+                  ),
+                  if (_dueDate != null)
+                    Semantics(
+                      button: true,
+                      label: l10n.agendaCobrarVenceElQuitar,
+                      child: GestureDetector(
+                        onTap: () => setState(() => _dueDate = null),
+                        behavior: HitTestBehavior.opaque,
+                        child: Padding(
+                          padding: const EdgeInsets.all(2),
+                          child: Icon(TreinoIcon.close,
+                              size: 16, color: palette.textMuted),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          if (_billingError != null) ...[
+            const SizedBox(height: 10),
+            Text(
+              _billingError!,
+              style: TextStyle(color: palette.danger, fontSize: 12),
+            ),
+          ],
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: _billing ? null : _closeCobrarForm,
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: palette.border),
+                    foregroundColor: palette.textPrimary,
+                    minimumSize: const Size.fromHeight(44),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(9999),
+                    ),
+                  ),
+                  child: Text(l10n.agendaBookingCancel),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed:
+                      _billing ? null : () => _confirmCobrar(context, ref),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: palette.accent,
+                    foregroundColor: palette.bg,
+                    minimumSize: const Size.fromHeight(44),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(9999),
+                    ),
+                  ),
+                  child: _billing
+                      ? SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: palette.bg,
+                          ),
+                        )
+                      : Text(
+                          l10n.agendaCobrarConfirmCta,
+                          style: GoogleFonts.barlowCondensed(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                          ),
+                        ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 }
 

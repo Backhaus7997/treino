@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/features/coach/data/appointment_repository.dart';
 import 'package:treino/features/coach/domain/agenda_exceptions.dart';
 import 'package:treino/features/coach/domain/appointment.dart';
+import 'package:treino/features/payments/domain/payment.dart';
 
 void main() {
   late FakeFirebaseFirestore firestore;
@@ -465,5 +466,201 @@ void main() {
         expect(results.single.trainerId, equals(trainerId));
       },
     );
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Slice 2a — Agenda→cobro bridge: billAppointment() + markBilled()
+  // MONEY-CRITICAL: these pin the atomic create-Payment+link-appointment
+  // transaction and its race/guard behavior.
+  // ─────────────────────────────────────────────────────────────────────────
+
+  group('billAppointment()', () {
+    Appointment confirmedAppt(String id) => Appointment(
+          id: id,
+          trainerId: trainerId,
+          athleteId: athleteId,
+          athleteDisplayName: athleteDisplayName,
+          startsAt: startsAt,
+          durationMin: durationMin,
+          status: AppointmentStatus.confirmed,
+        );
+
+    Payment pendingPayment({DateTime? dueAt}) => Payment(
+          id: '',
+          trainerId: trainerId,
+          athleteId: athleteId,
+          amountArs: 5000,
+          concept: 'Sesión 01/07/2026',
+          status: PaymentStatus.pending,
+          createdAt: DateTime.utc(2026, 7, 1),
+          dueAt: dueAt,
+        );
+
+    test(
+      '(a) creates a Payment doc (athleteId from the appointment, status '
+      'pending, correct amount) AND atomically sets appointment.paymentId',
+      () async {
+        final appt = confirmedAppt('appt-bill-1');
+        await firestore
+            .collection('appointments')
+            .doc(appt.id)
+            .set(appt.toJson());
+
+        final paymentId = await repo.billAppointment(
+          appointment: appt,
+          payment: pendingPayment(),
+        );
+
+        expect(paymentId, isNotEmpty);
+
+        final paymentSnap =
+            await firestore.collection('payments').doc(paymentId).get();
+        expect(paymentSnap.exists, isTrue);
+        expect(paymentSnap.data()!['id'], equals(paymentId));
+        expect(paymentSnap.data()!['trainerId'], equals(trainerId));
+        expect(paymentSnap.data()!['athleteId'], equals(athleteId));
+        expect(paymentSnap.data()!['amountArs'], equals(5000));
+        expect(paymentSnap.data()!['status'], equals('pending'));
+
+        final apptSnap =
+            await firestore.collection('appointments').doc(appt.id).get();
+        expect(apptSnap.data()!['paymentId'], equals(paymentId));
+      },
+    );
+
+    test(
+      '(d) propagates an optional dueAt onto the created Payment',
+      () async {
+        final appt = confirmedAppt('appt-bill-2');
+        await firestore
+            .collection('appointments')
+            .doc(appt.id)
+            .set(appt.toJson());
+        final dueAt = DateTime.utc(2026, 7, 15, 23, 59, 59);
+
+        final paymentId = await repo.billAppointment(
+          appointment: appt,
+          payment: pendingPayment(dueAt: dueAt),
+        );
+
+        final paymentSnap =
+            await firestore.collection('payments').doc(paymentId).get();
+        expect(paymentSnap.data()!['dueAt'], isNotNull);
+      },
+    );
+
+    test(
+      '(d) dueAt stays null on the created Payment when not provided',
+      () async {
+        final appt = confirmedAppt('appt-bill-3');
+        await firestore
+            .collection('appointments')
+            .doc(appt.id)
+            .set(appt.toJson());
+
+        final paymentId = await repo.billAppointment(
+          appointment: appt,
+          payment: pendingPayment(),
+        );
+
+        final paymentSnap =
+            await firestore.collection('payments').doc(paymentId).get();
+        expect(paymentSnap.data()!['dueAt'], isNull);
+      },
+    );
+
+    test(
+      '(b) throws AppointmentAlreadyBilledException when paymentId is '
+      'already set — guards re-cobro: no second Payment doc is created and '
+      'the existing paymentId is left untouched',
+      () async {
+        final appt = confirmedAppt('appt-bill-4');
+        await firestore.collection('appointments').doc(appt.id).set({
+          ...appt.toJson(),
+          'paymentId': 'existing-payment-id',
+        });
+
+        await expectLater(
+          repo.billAppointment(
+            appointment: appt,
+            payment: pendingPayment(),
+          ),
+          throwsA(isA<AppointmentAlreadyBilledException>()),
+        );
+
+        final payments = await firestore.collection('payments').get();
+        expect(payments.docs, isEmpty);
+
+        final apptSnap =
+            await firestore.collection('appointments').doc(appt.id).get();
+        expect(apptSnap.data()!['paymentId'], equals('existing-payment-id'));
+      },
+    );
+
+    test(
+      'throws AppointmentNotConfirmedException when the live status is not '
+      'confirmed (e.g. cancelled concurrently after the dialog opened) — no '
+      'Payment doc is created',
+      () async {
+        final appt = confirmedAppt('appt-bill-5');
+        await firestore.collection('appointments').doc(appt.id).set({
+          ...appt.toJson(),
+          'status': 'cancelled',
+        });
+
+        await expectLater(
+          repo.billAppointment(
+            appointment: appt,
+            payment: pendingPayment(),
+          ),
+          throwsA(isA<AppointmentNotConfirmedException>()),
+        );
+
+        final payments = await firestore.collection('payments').get();
+        expect(payments.docs, isEmpty);
+      },
+    );
+
+    test(
+      'throws AppointmentNotFoundException when the appointment doc does '
+      'not exist — no Payment doc is created',
+      () async {
+        final appt = confirmedAppt('appt-bill-does-not-exist');
+        // Deliberately NOT seeded in Firestore.
+
+        await expectLater(
+          repo.billAppointment(
+            appointment: appt,
+            payment: pendingPayment(),
+          ),
+          throwsA(isA<AppointmentNotFoundException>()),
+        );
+
+        final payments = await firestore.collection('payments').get();
+        expect(payments.docs, isEmpty);
+      },
+    );
+  });
+
+  group('markBilled()', () {
+    test('(a) sets paymentId on the appointment doc', () async {
+      final appt = Appointment.create(
+        trainerId: trainerId,
+        athleteId: athleteId,
+        athleteDisplayName: athleteDisplayName,
+        startsAt: startsAt,
+        durationMin: durationMin,
+      );
+      await firestore
+          .collection('appointments')
+          .doc(appt.id)
+          .set(appt.toJson());
+
+      await repo.markBilled(appointmentId: appt.id, paymentId: 'payment-xyz');
+
+      final snap =
+          await firestore.collection('appointments').doc(appt.id).get();
+      expect(snap.data()!['paymentId'], equals('payment-xyz'));
+    });
   });
 }

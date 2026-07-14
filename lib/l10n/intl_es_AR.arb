@@ -145,6 +145,34 @@
       }
     }
   },
+  "agendaCobrarCta": "COBRAR",
+  "agendaCobradoLabel": "Cobrado",
+  "agendaCobrarMontoLabel": "MONTO (ARS)",
+  "agendaCobrarConceptoLabel": "CONCEPTO",
+  "agendaCobrarVenceElLabel": "VENCE EL (OPCIONAL)",
+  "agendaCobrarVenceElHint": "Sin fecha de vencimiento",
+  "agendaCobrarVenceElQuitar": "Quitar fecha de vencimiento",
+  "agendaCobrarConfirmCta": "CONFIRMAR COBRO",
+  "agendaCobrarCompletaCampos": "Completá todos los campos.",
+  "agendaCobrarMontoInvalido": "Ingresá un monto válido.",
+  "agendaCobrarSuccess": "Turno cobrado.",
+  "agendaCobrarError": "No pudimos registrar el cobro. Probá de nuevo.",
+  "agendaCobrarConceptoDefault": "Sesión {date}",
+  "@agendaCobrarConceptoDefault": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "agendaCobrarTarifaReferencia": "Tarifa de referencia: {amount}",
+  "@agendaCobrarTarifaReferencia": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
   "workoutSummaryHeaderCompleted": "BUEN ENTRENO",
   "workoutSummaryHeaderAbandoned": "SESIÓN INTERRUMPIDA",
   "workoutStatDuration": "DURACIÓN",
