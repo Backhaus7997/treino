@@ -4,6 +4,7 @@ import '../../../../../app/theme/app_motion.dart';
 import '../../../../../app/theme/app_palette.dart';
 import '../../../../../app/theme/tokens/components/treino_focus_tokens.dart';
 import '../../../../../app/theme/tokens/components/treino_table_tokens.dart';
+import '../../../../../app/theme/tokens/primitives.dart';
 import '../../../../../core/widgets/motion/treino_shimmer.dart';
 import '../../../../../core/widgets/treino_icon.dart';
 import '../empty_state/empty_state.dart';
@@ -480,7 +481,8 @@ class _ErrorState extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     return Padding(
-      padding: const EdgeInsets.all(32),
+      key: const Key('data_table_error_content'),
+      padding: const EdgeInsets.all(AppSpacing.s20),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [

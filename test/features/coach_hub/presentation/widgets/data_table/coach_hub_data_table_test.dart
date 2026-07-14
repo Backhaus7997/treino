@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/app/theme/tokens/primitives.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/data_table/coach_hub_data_table.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/empty_state/empty_state.dart';
@@ -207,6 +208,11 @@ void main() {
       // El ícono del estado error usa el ícono semántico TreinoIcon
       // (no Icons.error_outline crudo) — Finding C4.
       expect(find.byIcon(TreinoIcon.errorState), findsOneWidget);
+      // Spacing en escala 8/12/14/18/20 — Finding W4 (no padding 32 crudo).
+      final errorPadding = tester.widget<Padding>(
+        find.byKey(const Key('data_table_error_content')),
+      );
+      expect(errorPadding.padding, const EdgeInsets.all(AppSpacing.s20));
       await tester.tap(find.byKey(const Key('data_table_retry')));
       await tester.pump();
       expect(retryCalled, isTrue);
