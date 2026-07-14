@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:treino/app/theme/app_palette.dart';
+import 'package:treino/app/theme/tokens/components/coach_hub_layout_tokens.dart';
+import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
 
 import 'content_max_width.dart';
 import 'coach_hub_sidebar.dart';
@@ -40,13 +42,18 @@ class CoachHubScaffold extends ConsumerWidget {
         children: [
           CoachHubSidebar(collapsedOverride: forceCollapsed ? true : null),
           Expanded(
-            child: Column(
-              children: [
-                const CoachHubTopBar(),
-                Expanded(
-                  child: ContentMaxWidth(maxWidth: 1240, child: child),
-                ),
-              ],
+            child: TreinoFadeSlideIn(
+              child: Column(
+                children: [
+                  const CoachHubTopBar(),
+                  Expanded(
+                    child: ContentMaxWidth(
+                      maxWidth: CoachHubLayoutTokens.contentMaxWidth,
+                      child: child,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ],

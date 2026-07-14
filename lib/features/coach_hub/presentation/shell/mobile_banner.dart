@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:treino/app/theme/app_palette.dart';
+import 'package:treino/app/theme/tokens/primitives.dart';
 
 /// Pantalla completa que reemplaza el shell del Coach Hub en viewports móviles
 /// (`< 768 px`, ADR-CHW-004, REQ-CHW-RESPONSIVE-002).
@@ -16,7 +17,7 @@ class MobileBanner extends StatelessWidget {
       backgroundColor: palette.bg,
       body: Center(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [

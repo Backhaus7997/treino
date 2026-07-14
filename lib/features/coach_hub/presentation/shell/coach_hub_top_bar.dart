@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/theme_mode_provider.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
+import 'package:treino/core/persistence/shared_prefs_provider.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 
@@ -37,7 +38,15 @@ class CoachHubTopBar extends ConsumerWidget {
     final location = GoRouterState.of(context).uri.toString();
     final title = activeSidebarItem(location)?.label.toUpperCase() ?? '';
 
-    final themeMode = ref.watch(themeModeProvider);
+    // Igual que `sidebarCollapsedProvider` en el sidebar: `themeModeProvider`
+    // depende de `sharedPreferencesProvider` resuelto. En prod siempre está
+    // listo antes de `runApp` (ADR-LM-009), pero el guard evita un crash si
+    // algún harness de test monta el top bar antes de que el future
+    // complete su primer microtask.
+    final themeMode = ref.watch(sharedPreferencesProvider).maybeWhen(
+          data: (_) => ref.watch(themeModeProvider),
+          orElse: () => ThemeMode.system,
+        );
 
     return Container(
       height: CoachHubLayoutTokens.topBarHeight,
