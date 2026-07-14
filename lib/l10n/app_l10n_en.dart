@@ -2458,6 +2458,23 @@ class AppL10nEn extends AppL10n {
       'We couldn\'t load your muscle distribution. Try again.';
 
   @override
+  String get exerciseProgressionScreenTitle => 'EXERCISE PROGRESSION';
+
+  @override
+  String get insightsTileExerciseProgressionTitle => 'Exercise progression';
+
+  @override
+  String get insightsTileExerciseProgressionSubtitle =>
+      'Your progress per exercise + records';
+
+  @override
+  String get progressionSearchHint => 'Search exercise…';
+
+  @override
+  String get progressionSearchNoResults =>
+      'None of your exercises match the search.';
+
+  @override
   String get insightsTileAnthropometryTitle => 'Anthropometry';
 
   @override

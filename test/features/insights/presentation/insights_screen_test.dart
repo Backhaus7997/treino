@@ -728,6 +728,12 @@ void main() {
             body: Text('performance-route'),
           ),
         ),
+        GoRoute(
+          path: '/home/insights/exercise-progression',
+          builder: (_, __) => const Scaffold(
+            body: Text('exercise-progression-route'),
+          ),
+        ),
       ],
     );
     addTearDown(router.dispose);
@@ -817,6 +823,19 @@ void main() {
     await tester.tap(find.text('Rendimiento'));
     await tester.pumpAndSettle();
     expect(find.text('performance-route'), findsOneWidget);
+
+    // Evolución por ejercicio: el destino que no existía del lado del alumno.
+    router.go('/home/insights');
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Evolución por ejercicio'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Evolución por ejercicio'));
+    await tester.pumpAndSettle();
+    expect(find.text('exercise-progression-route'), findsOneWidget);
   });
 }
 

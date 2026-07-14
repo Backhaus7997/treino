@@ -1960,6 +1960,26 @@
     "description": "[stats-hub] Header title for the dedicated MuscleDistributionScreen."
   },
   "muscleDistributionLoadError": "No pudimos cargar tu distribución muscular. Probá de nuevo.",
+  "exerciseProgressionScreenTitle": "EVOLUCIÓN POR EJERCICIO",
+  "@exerciseProgressionScreenTitle": {
+    "description": "Header title for the athlete-side ExerciseProgressionScreen."
+  },
+  "insightsTileExerciseProgressionTitle": "Evolución por ejercicio",
+  "@insightsTileExerciseProgressionTitle": {
+    "description": "Tile title on InsightsScreen navigating to ExerciseProgressionScreen."
+  },
+  "insightsTileExerciseProgressionSubtitle": "Tu progreso en cada ejercicio + records",
+  "@insightsTileExerciseProgressionSubtitle": {
+    "description": "Tile subtitle for the Exercise Progression stats-hub entry."
+  },
+  "progressionSearchHint": "Buscar ejercicio…",
+  "@progressionSearchHint": {
+    "description": "Hint of the exercise-progression picker search field. The search runs over the exercises the ATHLETE HAS LOGGED, never the catalogue — see the exercise-progression ADR."
+  },
+  "progressionSearchNoResults": "Ningún ejercicio tuyo coincide con la búsqueda.",
+  "@progressionSearchNoResults": {
+    "description": "Shown when the picker search matches none of the athletes logged exercises. Wording says tuyo on purpose: an exercise that exists in the catalogue but was never trained has no progression and is intentionally absent."
+  },
   "@muscleDistributionLoadError": {
     "description": "Error state for the MuscleDistributionScreen's provider load failure. Paired with coachRetryLabel for the retry CTA — same convention as monthlyReportLoadError."
   },

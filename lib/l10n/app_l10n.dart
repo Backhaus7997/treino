@@ -4593,6 +4593,36 @@ abstract class AppL10n {
   /// **'No pudimos cargar tu distribución muscular. Probá de nuevo.'**
   String get muscleDistributionLoadError;
 
+  /// Header title for the athlete-side ExerciseProgressionScreen.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'EVOLUCIÓN POR EJERCICIO'**
+  String get exerciseProgressionScreenTitle;
+
+  /// Tile title on InsightsScreen navigating to ExerciseProgressionScreen.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Evolución por ejercicio'**
+  String get insightsTileExerciseProgressionTitle;
+
+  /// Tile subtitle for the Exercise Progression stats-hub entry.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tu progreso en cada ejercicio + records'**
+  String get insightsTileExerciseProgressionSubtitle;
+
+  /// Hint of the exercise-progression picker search field. The search runs over the exercises the ATHLETE HAS LOGGED, never the catalogue — see the exercise-progression ADR.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Buscar ejercicio…'**
+  String get progressionSearchHint;
+
+  /// Shown when the picker search matches none of the athletes logged exercises. Wording says tuyo on purpose: an exercise that exists in the catalogue but was never trained has no progression and is intentionally absent.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ningún ejercicio tuyo coincide con la búsqueda.'**
+  String get progressionSearchNoResults;
+
   /// Tile title on InsightsScreen navigating to AnthropometryScreen.
   ///
   /// In es_AR, this message translates to:

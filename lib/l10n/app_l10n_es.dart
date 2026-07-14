@@ -2513,6 +2513,23 @@ class AppL10nEs extends AppL10n {
       'No pudimos cargar tu distribución muscular. Inténtalo de nuevo.';
 
   @override
+  String get exerciseProgressionScreenTitle => 'EVOLUCIÓN POR EJERCICIO';
+
+  @override
+  String get insightsTileExerciseProgressionTitle => 'Evolución por ejercicio';
+
+  @override
+  String get insightsTileExerciseProgressionSubtitle =>
+      'Tu progreso en cada ejercicio + records';
+
+  @override
+  String get progressionSearchHint => 'Buscar ejercicio…';
+
+  @override
+  String get progressionSearchNoResults =>
+      'Ningún ejercicio tuyo coincide con la búsqueda.';
+
+  @override
   String get insightsTileAnthropometryTitle => 'Antropometría';
 
   @override
@@ -5077,6 +5094,23 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get muscleDistributionLoadError =>
       'No pudimos cargar tu distribución muscular. Probá de nuevo.';
+
+  @override
+  String get exerciseProgressionScreenTitle => 'EVOLUCIÓN POR EJERCICIO';
+
+  @override
+  String get insightsTileExerciseProgressionTitle => 'Evolución por ejercicio';
+
+  @override
+  String get insightsTileExerciseProgressionSubtitle =>
+      'Tu progreso en cada ejercicio + records';
+
+  @override
+  String get progressionSearchHint => 'Buscar ejercicio…';
+
+  @override
+  String get progressionSearchNoResults =>
+      'Ningún ejercicio tuyo coincide con la búsqueda.';
 
   @override
   String get insightsTileAnthropometryTitle => 'Antropometría';

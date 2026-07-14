@@ -41,6 +41,7 @@ import '../features/feed/presentation/public_profile_screen.dart';
 import '../features/feed/presentation/search_users_screen.dart';
 import '../features/home/home_screen.dart';
 import '../features/insights/presentation/anthropometry_screen.dart';
+import '../features/insights/presentation/exercise_progression_screen.dart';
 import '../features/insights/presentation/frequent_exercises_screen.dart';
 import '../features/insights/presentation/insights_screen.dart';
 import '../features/insights/presentation/monthly_report_screen.dart';
@@ -401,6 +402,20 @@ GoRouter buildRouter({
         pageBuilder: (_, state) =>
             _report(state.pageKey, _immersive(const _PerformanceRouteHost())),
       ),
+      GoRoute(
+        // `?exerciseId=` opcional: preselecciona un ejercicio. Lo usa
+        // "Ejercicios frecuentes" al tocar una fila — hasta ahora esas filas
+        // no navegaban a ningún lado porque este destino no existía.
+        path: '/home/insights/exercise-progression',
+        pageBuilder: (_, state) => _report(
+          state.pageKey,
+          _immersive(
+            _ExerciseProgressionRouteHost(
+              initialExerciseId: state.uri.queryParameters['exerciseId'],
+            ),
+          ),
+        ),
+      ),
 
       // ShellRoute with the existing 5 tabs.
       // Use `pageBuilder` (not `builder`) so the shell itself uses an
@@ -735,6 +750,23 @@ class _PerformanceRouteHost extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final uid = ref.watch(currentUidProvider) ?? '';
     return PerformanceScreen(uid: uid);
+  }
+}
+
+/// Resuelve el uid actual y monta [ExerciseProgressionScreen], propagando el
+/// `?exerciseId=` de la query si vino.
+class _ExerciseProgressionRouteHost extends ConsumerWidget {
+  const _ExerciseProgressionRouteHost({this.initialExerciseId});
+
+  final String? initialExerciseId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final uid = ref.watch(currentUidProvider) ?? '';
+    return ExerciseProgressionScreen(
+      uid: uid,
+      initialExerciseId: initialExerciseId,
+    );
   }
 }
 

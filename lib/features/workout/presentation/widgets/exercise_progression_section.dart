@@ -17,7 +17,9 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/treino_icon.dart';
 import '../../../insights/domain/chart_period.dart';
+import '../../application/exercise_filter.dart' show foldSearch;
 import '../../application/exercise_progression_providers.dart';
+import '../../domain/exercise_progression.dart' show ExerciseListEntry;
 import 'exercise_progression_chart.dart';
 import 'personal_records_list.dart';
 
@@ -71,10 +73,16 @@ class ExerciseProgressionSectionLabels {
     required this.periodLabels,
     required this.localeName,
     required this.personalRecordsLabels,
+    this.searchLabels,
   });
 
-  /// E.g. 'EVOLUCIÓN POR EJERCICIO'
-  final String sectionTitle;
+  /// E.g. 'EVOLUCIÓN POR EJERCICIO'.
+  ///
+  /// Null → no se renderiza encabezado de sección. Los shells del coach SÍ lo
+  /// pasan: ahí la sección convive con otras (Antropometría, Rendimiento…) y
+  /// necesita identificarse. En una pantalla DEDICADA el header de la pantalla
+  /// ya dice lo mismo, y repetirlo es ruido.
+  final String? sectionTitle;
 
   /// E.g. 'Cargando…' — shown while the exercise list loads.
   final String loadingText;
@@ -99,7 +107,41 @@ class ExerciseProgressionSectionLabels {
   /// [AD3] Labels for the per-exercise [PersonalRecordsList] shown below the
   /// progression chart.
   final PersonalRecordsListLabels personalRecordsLabels;
+
+  /// Cuando es null (default), NO se renderiza el buscador y la chip row lista
+  /// TODOS los ejercicios — o sea, el comportamiento actual, intacto. Los
+  /// shells del coach no pasan esto, así que no cambian en nada.
+  ///
+  /// Cuando se pasa, aparece un campo de búsqueda y la chip row se recorta a
+  /// [kPickerChipCap] (ver su doc). Es la variante que usa la pantalla del
+  /// alumno: con decenas de ejercicios logueados, un carrusel horizontal es
+  /// incómodo de recorrer.
+  final ExercisePickerSearchLabels? searchLabels;
 }
+
+/// Plain-string label bag del buscador del picker. NUNCA importa AppL10n
+/// (misma regla R3 que el resto de este archivo).
+class ExercisePickerSearchLabels {
+  const ExercisePickerSearchLabels({
+    required this.hintText,
+    required this.noResultsText,
+  });
+
+  /// E.g. 'Buscar ejercicio…'
+  final String hintText;
+
+  /// E.g. 'Ningún ejercicio tuyo coincide.' — la búsqueda corre SOBRE LOS
+  /// EJERCICIOS QUE EL ATLETA REGISTRÓ, no sobre el catálogo. Un ejercicio que
+  /// nunca entrenó no tiene progresión que mostrar, así que no debe aparecer.
+  final String noResultsText;
+}
+
+/// Cuántos chips se muestran cuando el buscador está activo y el campo está
+/// vacío. El resto se alcanza tipeando.
+///
+/// El pedido original era "5/10 principales"; 10 da suficiente alcance sin
+/// convertir la fila en el mismo carrusel infinito que se quería evitar.
+const int kPickerChipCap = 10;
 
 /// Per-exercise progression section — shared between the mobile coach shell
 /// and the web coach_hub shell (AD1).
@@ -113,7 +155,13 @@ class ExerciseProgressionSection extends ConsumerStatefulWidget {
     required this.athleteId,
     required this.labels,
     this.externalExerciseSelection,
+    this.initialExerciseId,
   });
+
+  /// Preselecciona un ejercicio al montar — p. ej. cuando se llega desde
+  /// "Ejercicios frecuentes" tocando una fila. Null → se mantiene el default
+  /// de siempre (el más recientemente logueado, SCENARIO-PROG-05B).
+  final String? initialExerciseId;
 
   final String athleteId;
   final ExerciseProgressionSectionLabels labels;
@@ -138,9 +186,14 @@ class _ExerciseProgressionSectionState
   /// [AD7] Defaults to [ChartPeriod.defaultPeriod] (last30d).
   ChartPeriod _selectedPeriod = ChartPeriod.defaultPeriod;
 
+  /// Texto tipeado en el buscador. Sólo se usa cuando `labels.searchLabels`
+  /// no es null.
+  String _query = '';
+
   @override
   void initState() {
     super.initState();
+    _selectedExerciseId = widget.initialExerciseId;
     widget.externalExerciseSelection?.addListener(_onExternalSelection);
   }
 
@@ -148,6 +201,29 @@ class _ExerciseProgressionSectionState
   void dispose() {
     widget.externalExerciseSelection?.removeListener(_onExternalSelection);
     super.dispose();
+  }
+
+  /// Los ejercicios que la chip row muestra AHORA.
+  ///
+  /// Sin buscador → todos (comportamiento histórico, intacto).
+  /// Con buscador y campo vacío → los primeros [kPickerChipCap].
+  /// Con buscador y texto → todos los que matchean, sin tope: si tipeaste algo
+  /// concreto, querés verlo aunque sea el ejercicio número 37.
+  ///
+  /// El filtro corre sobre `exerciseName`, que viene DENORMALIZADO en el
+  /// SetLog — sin lecturas extra a Firestore y sin tocar el catálogo (la razón
+  /// exacta por la que el ADR de `exercise-progression` prohíbe reusar
+  /// exercise_picker_sheet.dart acá: aquél busca sobre los 429 ejercicios del
+  /// catálogo, y un ejercicio que nunca entrenaste no tiene progresión).
+  List<ExerciseListEntry> _visibleExercises(List<ExerciseListEntry> all) {
+    if (widget.labels.searchLabels == null) return all;
+
+    final q = foldSearch(_query.trim());
+    if (q.isEmpty) return all.take(kPickerChipCap).toList();
+
+    return all
+        .where((e) => foldSearch(e.exerciseName).contains(q))
+        .toList(growable: false);
   }
 
   void _onExternalSelection() {
@@ -167,17 +243,19 @@ class _ExerciseProgressionSectionState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // ── Section header ──────────────────────────────────────────────
-        Text(
-          labels.sectionTitle,
-          style: GoogleFonts.barlowCondensed(
-            fontWeight: FontWeight.w700,
-            fontSize: 12,
-            letterSpacing: 1.2,
-            color: palette.textMuted,
+        // ── Section header (omitido en pantallas dedicadas) ─────────────
+        if (labels.sectionTitle != null) ...[
+          Text(
+            labels.sectionTitle!,
+            style: GoogleFonts.barlowCondensed(
+              fontWeight: FontWeight.w700,
+              fontSize: 12,
+              letterSpacing: 1.2,
+              color: palette.textMuted,
+            ),
           ),
-        ),
-        const SizedBox(height: 12),
+          const SizedBox(height: 12),
+        ],
 
         exerciseListAsync.when(
           loading: () => Text(
@@ -205,15 +283,39 @@ class _ExerciseProgressionSectionState
             final effectiveId =
                 _selectedExerciseId ?? exercises.first.exerciseId;
 
+            final searchLabels = widget.labels.searchLabels;
+            final visible = _visibleExercises(exercises);
+
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // ── Buscador (sólo si el caller lo pidió) ─────────────
+                if (searchLabels != null) ...[
+                  _ExerciseSearchField(
+                    hintText: searchLabels.hintText,
+                    onChanged: (v) => setState(() => _query = v),
+                  ),
+                  const SizedBox(height: 10),
+                ],
+
                 // ── Exercise picker chip row ──────────────────────────
-                ExercisePickerRow(
-                  exercises: exercises,
-                  selectedId: effectiveId,
-                  onSelect: (id) => setState(() => _selectedExerciseId = id),
-                ),
+                //
+                // `selectedId: effectiveId` a propósito, aunque el ejercicio
+                // seleccionado NO esté entre los visibles: la selección es
+                // independiente del filtro. Si no fuera así, tipear en el
+                // buscador borraría el gráfico que estabas mirando.
+                if (visible.isEmpty && searchLabels != null)
+                  Text(
+                    searchLabels.noResultsText,
+                    style: GoogleFonts.barlow(
+                        fontSize: 13, color: palette.textMuted),
+                  )
+                else
+                  ExercisePickerRow(
+                    exercises: visible,
+                    selectedId: effectiveId,
+                    onSelect: (id) => setState(() => _selectedExerciseId = id),
+                  ),
                 const SizedBox(height: 12),
 
                 // ── Period selector ────────────────────────────────────
@@ -362,6 +464,59 @@ class ChartPeriodSelector extends StatelessWidget {
             const SizedBox(width: 4),
             Icon(TreinoIcon.chevronDown, size: 14, color: palette.textMuted),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Search field ──────────────────────────────────────────────────────────────
+
+/// Campo de búsqueda del picker de progresión.
+///
+/// Filtra SÓLO los ejercicios que el atleta registró — nunca el catálogo. Por
+/// eso no reusa `exercise_picker_sheet.dart`: aquél busca sobre los 429
+/// ejercicios del catálogo público + los custom, porque su trabajo es "elegir
+/// un ejercicio para AGREGAR a una rutina". Acá el universo es otro: "elegir
+/// entre los ejercicios que YA entrenaste", y uno que nunca hiciste no tiene
+/// progresión que mostrar. Ver el ADR en
+/// `openspec/changes/exercise-progression/proposal.md` (scope b).
+class _ExerciseSearchField extends StatelessWidget {
+  const _ExerciseSearchField({
+    required this.hintText,
+    required this.onChanged,
+  });
+
+  final String hintText;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+
+    return TextField(
+      onChanged: onChanged,
+      style: GoogleFonts.barlow(fontSize: 14, color: palette.textPrimary),
+      decoration: InputDecoration(
+        isDense: true,
+        hintText: hintText,
+        hintStyle: GoogleFonts.barlow(fontSize: 14, color: palette.textMuted),
+        prefixIcon: Icon(TreinoIcon.search, size: 18, color: palette.textMuted),
+        filled: true,
+        fillColor: palette.bg,
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: palette.border),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: palette.border),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: palette.accent),
         ),
       ),
     );
