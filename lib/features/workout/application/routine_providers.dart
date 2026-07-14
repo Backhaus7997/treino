@@ -39,6 +39,22 @@ final routineByIdProvider = FutureProvider.family<Routine?, String>(
   },
 );
 
+/// Routine lookup for callers that treat the routine as OPTIONAL enrichment:
+/// resolves to `null` when it is not visible (deleted, or access revoked)
+/// instead of throwing. Transient backend failures still propagate — see
+/// [RoutineRepository.getByIdIfVisible] for the full contract and why the
+/// distinction matters.
+///
+/// The insights radars use this for their muscle-group slot fallback: they
+/// resolve the routine of every scanned session, so one stale session pointing
+/// at a routine that is gone must degrade that session's custom-exercise
+/// mapping, not fail the whole chart.
+final visibleRoutineByIdProvider = FutureProvider.family<Routine?, String>(
+  (ref, id) async {
+    return ref.watch(routineRepositoryProvider).getByIdIfVisible(id);
+  },
+);
+
 /// Currently selected level filter for the Plantillas section.
 /// `null` means "Todas" (no filter applied).
 final routinesLevelFilterProvider =

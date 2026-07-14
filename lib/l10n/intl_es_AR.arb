@@ -1955,6 +1955,10 @@
   "@muscleDistributionScreenTitle": {
     "description": "[stats-hub] Header title for the dedicated MuscleDistributionScreen."
   },
+  "muscleDistributionLoadError": "No pudimos cargar tu distribución muscular. Probá de nuevo.",
+  "@muscleDistributionLoadError": {
+    "description": "Error state for the MuscleDistributionScreen's provider load failure. Paired with coachRetryLabel for the retry CTA — same convention as monthlyReportLoadError."
+  },
   "insightsTileFrequentExercisesTitle": "Ejercicios frecuentes",
   "@insightsTileFrequentExercisesTitle": {
     "description": "[stats-hub] Tile title on InsightsScreen navigating to FrequentExercisesScreen (athlete's own uid)."

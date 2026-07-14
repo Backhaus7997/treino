@@ -1,5 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart'
-    show CollectionReference, DocumentSnapshot, FieldValue, FirebaseFirestore;
+    show
+        CollectionReference,
+        DocumentSnapshot,
+        FieldValue,
+        FirebaseException,
+        FirebaseFirestore;
 
 import '../../profile/domain/experience_level.dart';
 import '../domain/routine.dart';
@@ -72,9 +77,8 @@ class RoutineRepository {
     // opt-in at create time to share the routine on their public profile.
     // `shared` remains trainer-assigned only, and any other unexpected
     // value is coerced back to `private` (defensive).
-    final visibilityStr = draft.visibility == RoutineVisibility.public
-        ? 'public'
-        : 'private';
+    final visibilityStr =
+        draft.visibility == RoutineVisibility.public ? 'public' : 'private';
     final json = draft.toJson()
       ..remove('id')
       ..remove('assignedBy')
@@ -287,6 +291,34 @@ class RoutineRepository {
   Future<Routine?> getById(String id) async {
     final snap = await _collection.doc(id).get();
     return _fromDoc(snap);
+  }
+
+  /// Same as [getById], but resolves to `null` when the routine is not VISIBLE
+  /// to the caller instead of throwing.
+  ///
+  /// Two Firestore codes both mean "you cannot have this routine", and a caller
+  /// that treats the routine as OPTIONAL enrichment should see `null` for both:
+  /// - `not-found`: the doc was deleted.
+  /// - `permission-denied`: e.g. a `trainer-template` an athlete trained from
+  ///   while the trainer had `sharedTemplatesWithAthletes` on, after the trainer
+  ///   flipped it off. The old sessions keep referencing that routineId forever.
+  ///
+  /// Every OTHER [FirebaseException] (`unavailable`, `deadline-exceeded`, …)
+  /// RETHROWS, deliberately. A transient network failure must never be mistaken
+  /// for "no routine": the insights radars use this for the muscle-group slot
+  /// fallback, and silently resolving to `null` there would drop custom-exercise
+  /// sets from the radar axes while the header total still counts them — a
+  /// silently WRONG chart instead of an honest, retryable error.
+  ///
+  /// Callers that REQUIRE the routine (plan progress, routine detail) must keep
+  /// using [getById], so a genuine backend failure still surfaces to them.
+  Future<Routine?> getByIdIfVisible(String id) async {
+    try {
+      return await getById(id);
+    } on FirebaseException catch (e) {
+      if (e.code == 'not-found' || e.code == 'permission-denied') return null;
+      rethrow;
+    }
   }
 
   /// Returns all plans assigned to [athleteId] by a trainer,

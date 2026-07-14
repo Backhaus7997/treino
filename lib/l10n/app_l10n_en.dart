@@ -157,7 +157,7 @@ class AppL10nEn extends AppL10n {
   String get coachErrorLabel => '';
 
   @override
-  String get coachRetryLabel => '';
+  String get coachRetryLabel => 'Retry';
 
   @override
   String get coachEmptyLabel => '';
@@ -2449,6 +2449,10 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get muscleDistributionScreenTitle => 'MUSCLE DISTRIBUTION';
+
+  @override
+  String get muscleDistributionLoadError =>
+      'We couldn\'t load your muscle distribution. Try again.';
 
   @override
   String get insightsTileFrequentExercisesTitle => 'Frequent exercises';
