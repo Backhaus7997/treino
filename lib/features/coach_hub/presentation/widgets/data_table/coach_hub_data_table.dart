@@ -262,7 +262,7 @@ class _HeaderCell extends StatelessWidget {
           Text(
             column.label,
             style: TextStyle(
-              fontFamily: 'Barlow',
+              fontFamily: AppFonts.barlow,
               fontWeight: FontWeight.w600,
               fontSize: 12,
               color: tokens.headerTextColor,
@@ -395,7 +395,7 @@ class _DataRow extends StatelessWidget {
                     child: Text(
                       row.cells[col.key] ?? '',
                       style: TextStyle(
-                        fontFamily: 'Barlow',
+                        fontFamily: AppFonts.barlow,
                         fontWeight: FontWeight.w400,
                         fontSize: 14,
                         color: AppPalette.of(ctx).textPrimary,
@@ -491,7 +491,7 @@ class _ErrorState extends StatelessWidget {
           Text(
             message,
             style: TextStyle(
-              fontFamily: 'Barlow',
+              fontFamily: AppFonts.barlow,
               fontSize: 14,
               color: palette.textMuted,
             ),

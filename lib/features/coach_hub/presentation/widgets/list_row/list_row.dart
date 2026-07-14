@@ -3,6 +3,7 @@ import 'package:flutter/widget_previews.dart';
 
 import '../../../../../app/theme/app_motion.dart';
 import '../../../../../app/theme/tokens/components/treino_list_row_tokens.dart';
+import '../../../../../app/theme/tokens/primitives.dart';
 import '../../../../../core/widgets/motion/treino_shimmer.dart';
 import '../preview_wrapper.dart';
 import '../treino_interactive_state.dart';
@@ -115,7 +116,7 @@ class TreinoListRow extends StatelessWidget {
                       Text(
                         title,
                         style: TextStyle(
-                          fontFamily: 'Barlow',
+                          fontFamily: AppFonts.barlow,
                           fontWeight: FontWeight.w400,
                           fontSize: 14,
                           color: states.disabled
@@ -129,7 +130,7 @@ class TreinoListRow extends StatelessWidget {
                         Text(
                           subtitle!,
                           style: TextStyle(
-                            fontFamily: 'Barlow',
+                            fontFamily: AppFonts.barlow,
                             fontWeight: FontWeight.w400,
                             fontSize: 12,
                             color: states.disabled

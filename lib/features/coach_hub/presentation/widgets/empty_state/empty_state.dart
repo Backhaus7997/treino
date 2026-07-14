@@ -103,7 +103,7 @@ class TreinoEmptyState extends StatelessWidget {
                 title,
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontFamily: 'Barlow',
+                  fontFamily: AppFonts.barlow,
                   fontWeight: FontWeight.w600,
                   fontSize: 16,
                   color: tokens.titleColor,
@@ -115,7 +115,7 @@ class TreinoEmptyState extends StatelessWidget {
                   description!,
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontFamily: 'Barlow',
+                    fontFamily: AppFonts.barlow,
                     fontWeight: FontWeight.w400,
                     fontSize: 14,
                     color: tokens.descriptionColor,
@@ -129,7 +129,7 @@ class TreinoEmptyState extends StatelessWidget {
                   child: Text(
                     ctaLabel!,
                     style: TextStyle(
-                      fontFamily: 'Barlow',
+                      fontFamily: AppFonts.barlow,
                       fontWeight: FontWeight.w600,
                       fontSize: 14,
                       color: tokens.ctaColor,

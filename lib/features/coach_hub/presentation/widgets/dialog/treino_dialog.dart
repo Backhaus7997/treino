@@ -5,6 +5,7 @@ import '../../../../../app/theme/app_palette.dart';
 import '../../../../../app/theme/tokens/components/treino_dialog_tokens.dart';
 import '../../../../../app/theme/tokens/components/treino_focus_tokens.dart';
 import '../../../../../app/theme/tokens/motion_tokens.dart';
+import '../../../../../app/theme/tokens/primitives.dart';
 import '../../../../../core/widgets/treino_icon.dart';
 import '../treino_interactive_state.dart';
 
@@ -163,7 +164,7 @@ class TreinoDialog extends StatelessWidget {
                         Text(
                           errorMessage!,
                           style: TextStyle(
-                            fontFamily: 'Barlow',
+                            fontFamily: AppFonts.barlow,
                             fontSize: 13,
                             color: palette.danger,
                           ),
@@ -209,7 +210,7 @@ class _Header extends StatelessWidget {
           child: Text(
             title,
             style: TextStyle(
-              fontFamily: 'BarlowCondensed',
+              fontFamily: AppFonts.barlowCondensed,
               fontWeight: FontWeight.w700,
               fontSize: 20,
               color: tokens.titleColor,
@@ -331,7 +332,7 @@ class _DialogActionButton extends StatelessWidget {
               : Text(
                   label,
                   style: TextStyle(
-                    fontFamily: 'Barlow',
+                    fontFamily: AppFonts.barlow,
                     fontWeight: FontWeight.w600,
                     fontSize: 14,
                     color: color,

@@ -3,6 +3,7 @@ import 'package:flutter/widget_previews.dart';
 
 import '../../../../../app/theme/tokens/components/treino_focus_tokens.dart';
 import '../../../../../app/theme/tokens/components/treino_section_header_tokens.dart';
+import '../../../../../app/theme/tokens/primitives.dart';
 import '../preview_wrapper.dart';
 import '../treino_interactive_state.dart';
 
@@ -103,7 +104,7 @@ class TreinoSectionHeader extends StatelessWidget {
           Text(
             '$count',
             style: TextStyle(
-              fontFamily: 'Barlow',
+              fontFamily: AppFonts.barlow,
               fontWeight: FontWeight.w600,
               fontSize: TreinoSectionHeaderTokens.fontSize,
               color: tokens.disabledColor,
@@ -145,7 +146,7 @@ class _ActionButton extends StatelessWidget {
       return Text(
         label,
         style: TextStyle(
-          fontFamily: 'Barlow',
+          fontFamily: AppFonts.barlow,
           fontWeight: FontWeight.w600,
           fontSize: TreinoSectionHeaderTokens.fontSize,
           color: tokens.disabledColor,
@@ -167,7 +168,7 @@ class _ActionButton extends StatelessWidget {
           child: Text(
             label,
             style: TextStyle(
-              fontFamily: 'Barlow',
+              fontFamily: AppFonts.barlow,
               fontWeight: FontWeight.w600,
               fontSize: TreinoSectionHeaderTokens.fontSize,
               color: tokens.actionColor,

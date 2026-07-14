@@ -4,6 +4,7 @@ import 'package:flutter/widget_previews.dart';
 import '../../../../../app/theme/app_motion.dart';
 import '../../../../../app/theme/app_palette.dart';
 import '../../../../../app/theme/tokens/components/treino_kpi_card_tokens.dart';
+import '../../../../../app/theme/tokens/primitives.dart';
 import '../../../../../core/widgets/motion/treino_shimmer.dart';
 import '../preview_wrapper.dart';
 import '../treino_interactive_state.dart';
@@ -188,7 +189,7 @@ class _CardContent extends StatelessWidget {
         Text(
           value,
           style: TextStyle(
-            fontFamily: 'BarlowCondensed',
+            fontFamily: AppFonts.barlowCondensed,
             fontWeight: FontWeight.w700,
             fontSize: 28,
             color: tokens.valueColor,
@@ -198,7 +199,7 @@ class _CardContent extends StatelessWidget {
         Text(
           label,
           style: TextStyle(
-            fontFamily: 'Barlow',
+            fontFamily: AppFonts.barlow,
             fontWeight: FontWeight.w400,
             fontSize: 12,
             color: tokens.titleColor,
@@ -209,7 +210,7 @@ class _CardContent extends StatelessWidget {
           Text(
             delta!,
             style: TextStyle(
-              fontFamily: 'Barlow',
+              fontFamily: AppFonts.barlow,
               fontWeight: FontWeight.w600,
               fontSize: 12,
               color: deltaPositive == true

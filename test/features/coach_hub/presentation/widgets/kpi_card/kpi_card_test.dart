@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/app/theme/tokens/primitives.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/kpi_card/kpi_card.dart';
 
 /// Envuelve en MaterialApp con tema dado.
@@ -217,6 +218,26 @@ void main() {
               reason: 'KpiCard no debe tener sombra');
         }
       }
+    });
+
+    // -------------------------------------------------------------------------
+    // Tipografía real: el valor hero usa la familia condensada (token)
+    // -------------------------------------------------------------------------
+    testWidgets(
+        'value → fontFamily resuelve a AppFonts.barlowCondensed (token real) '
+        '[SCENARIO-CK-KPI-11]', (tester) async {
+      await tester.pumpWidget(_wrap(
+        const KpiCard(value: '1.234', label: 'Alumnos activos'),
+      ));
+      await tester.pump();
+
+      final text = tester.widget<Text>(find.text('1.234'));
+      expect(
+        text.style?.fontFamily,
+        AppFonts.barlowCondensed,
+        reason: 'el valor hero debe usar la familia condensada real '
+            '("Barlow Condensed", no "BarlowCondensed")',
+      );
     });
   });
 }

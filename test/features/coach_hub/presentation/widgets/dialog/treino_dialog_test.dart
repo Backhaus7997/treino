@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/app/theme/tokens/primitives.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/dialog/treino_dialog.dart';
 
 /// Envuelve en MaterialApp con el tema dado. El body es un botón que abre el
@@ -314,6 +315,27 @@ void main() {
         await tester.tap(find.byKey(const Key('dialog_close_button')));
         await tester.pumpAndSettle();
       }
+    });
+
+    // -------------------------------------------------------------------------
+    // Tipografía real: el título usa la familia condensada (token)
+    // -------------------------------------------------------------------------
+    testWidgets(
+        'título → fontFamily resuelve a AppFonts.barlowCondensed (token real) '
+        '[SCENARIO-CK-DL-13]', (tester) async {
+      await tester.pumpWidget(_wrap(
+        (ctx) => const TreinoDialog(title: 'Confirmar baja'),
+      ));
+      await tester.tap(find.byKey(const Key('open_dialog')));
+      await tester.pumpAndSettle();
+
+      final text = tester.widget<Text>(find.text('Confirmar baja'));
+      expect(
+        text.style?.fontFamily,
+        AppFonts.barlowCondensed,
+        reason: 'el título del dialog debe usar la familia condensada real '
+            '("Barlow Condensed", no "BarlowCondensed")',
+      );
     });
   });
 }

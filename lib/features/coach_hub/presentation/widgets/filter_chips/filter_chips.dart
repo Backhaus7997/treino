@@ -199,7 +199,7 @@ class _ChipItem extends StatelessWidget {
               Text(
                 label,
                 style: TextStyle(
-                  fontFamily: 'Barlow',
+                  fontFamily: AppFonts.barlow,
                   fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
                   fontSize: 14,
                   color: fg,
@@ -219,7 +219,7 @@ class _ChipItem extends StatelessWidget {
                   child: Text(
                     badgeCount!.toString(),
                     style: TextStyle(
-                      fontFamily: 'Barlow',
+                      fontFamily: AppFonts.barlow,
                       fontWeight: FontWeight.w700,
                       fontSize: 10,
                       color: badgeTokens.foreground,
