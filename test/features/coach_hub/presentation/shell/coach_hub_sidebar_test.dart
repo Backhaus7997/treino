@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:treino/app/theme/app_motion.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/app/theme/tokens/components/coach_hub_layout_tokens.dart';
 import 'package:treino/core/persistence/shared_prefs_provider.dart';
@@ -206,8 +205,7 @@ void main() {
       (tester) async {
     tester.platformDispatcher.accessibilityFeaturesTestValue =
         const FakeAccessibilityFeatures(disableAnimations: true);
-    addTearDown(
-        tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
+    addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
 
     await _pumpSidebar(tester);
 
@@ -264,8 +262,7 @@ void main() {
         overrides: [
           sharedPreferencesProvider.overrideWith((ref) => Future.value(sp)),
         ],
-        child:
-            MaterialApp.router(theme: AppTheme.dark(), routerConfig: router),
+        child: MaterialApp.router(theme: AppTheme.dark(), routerConfig: router),
       ),
     );
     await tester.pumpAndSettle();

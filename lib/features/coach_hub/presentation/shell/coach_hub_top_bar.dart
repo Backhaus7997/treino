@@ -133,7 +133,8 @@ class CoachHubTopBar extends ConsumerWidget {
                     ),
                   ),
                   const SizedBox(width: 4),
-                  Icon(TreinoIcon.chevronDown, size: 16, color: palette.textMuted),
+                  Icon(TreinoIcon.chevronDown,
+                      size: 16, color: palette.textMuted),
                 ],
               ),
             ),
@@ -169,7 +170,9 @@ class _ThemeMenuItem extends PopupMenuItem<String> {
           child: Row(
             children: [
               Icon(
-                selected ? TreinoIcon.checkCircleFill : TreinoIcon.checkCircleEmpty,
+                selected
+                    ? TreinoIcon.checkCircleFill
+                    : TreinoIcon.checkCircleEmpty,
                 size: 16,
                 color: selected ? palette.accent : palette.textMuted,
               ),
@@ -196,7 +199,8 @@ class _SearchField extends StatelessWidget {
         decoration: InputDecoration(
           hintText: 'Buscar alumnos, rutinas, plan...', // i18n: Fase W1
           hintStyle: TextStyle(color: palette.textMuted, fontSize: 14),
-          prefixIcon: Icon(TreinoIcon.search, size: 18, color: palette.textMuted),
+          prefixIcon:
+              Icon(TreinoIcon.search, size: 18, color: palette.textMuted),
           filled: true,
           fillColor: palette.bgCard,
           contentPadding: const EdgeInsets.symmetric(vertical: 12),

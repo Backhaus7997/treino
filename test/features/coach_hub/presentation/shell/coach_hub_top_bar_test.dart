@@ -120,7 +120,8 @@ void main() {
       expect(find.text('Salir'), findsOneWidget);
     });
 
-    testWidgets('título de sección Barlow Condensed 700 UPPERCASE en /dashboard',
+    testWidgets(
+        'título de sección Barlow Condensed 700 UPPERCASE en /dashboard',
         (tester) async {
       await _pumpTopBar(tester, initial: '/dashboard');
       expect(find.text('DASHBOARD'), findsOneWidget);
