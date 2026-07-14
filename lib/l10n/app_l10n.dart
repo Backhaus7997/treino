@@ -4328,6 +4328,12 @@ abstract class AppL10n {
   /// **'BUENAS, {name}'**
   String dashboardGreeting(String name);
 
+  /// Greeting prefix rendered before the trainer's name (styled separately) in the Coach Hub dashboard WelcomeCard. Trailing space is intentional.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'BUENAS, '**
+  String get dashboardGreetingPrefix;
+
   /// Dashboard WelcomeCard summary line combining sessions today, pending requests, and overdue payments.
   ///
   /// In es_AR, this message translates to:

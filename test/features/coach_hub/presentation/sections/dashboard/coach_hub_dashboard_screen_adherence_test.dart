@@ -133,7 +133,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // The KPI label should exist.
-      expect(find.textContaining('Adherencia promedio'), findsOneWidget);
+      expect(find.textContaining('ADHERENCIA PROMEDIO'), findsOneWidget);
       // The value tile should show 82%.
       expect(find.text('82%'), findsWidgets);
     });
@@ -149,7 +149,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Label present.
-      expect(find.textContaining('Adherencia promedio'), findsOneWidget);
+      expect(find.textContaining('ADHERENCIA PROMEDIO'), findsOneWidget);
       // Value is "--" (same placeholder key as before for null).
       expect(find.text('--'), findsWidgets);
     });

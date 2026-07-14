@@ -473,6 +473,10 @@
       "name": { "type": "String" }
     }
   },
+  "dashboardGreetingPrefix": "BUENAS, ",
+  "@dashboardGreetingPrefix": {
+    "description": "Greeting prefix rendered before the trainer's name (styled separately) in the Coach Hub dashboard WelcomeCard. Trailing space is intentional."
+  },
   "dashboardSummaryLine": "Tenés {sessions} sesiones hoy, {paraRevisar} para revisar, {pagos} pagos pendientes",
   "@dashboardSummaryLine": {
     "description": "Dashboard WelcomeCard summary line.",

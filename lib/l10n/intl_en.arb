@@ -861,6 +861,7 @@
   "appearanceDark": "Dark",
   "profileSectionAppearance": "Appearance",
   "dashboardGreeting": "",
+  "dashboardGreetingPrefix": "",
   "dashboardSummaryLine": "",
   "dashboardQuickActionNuevoAlumno": "",
   "dashboardQuickActionCrearRutina": "",

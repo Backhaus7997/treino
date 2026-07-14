@@ -2292,6 +2292,9 @@ class AppL10nEn extends AppL10n {
   }
 
   @override
+  String get dashboardGreetingPrefix => '';
+
+  @override
   String dashboardSummaryLine(int sessions, int paraRevisar, int pagos) {
     return '';
   }
