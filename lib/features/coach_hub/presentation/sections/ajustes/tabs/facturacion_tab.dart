@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
@@ -202,25 +203,25 @@ class _ChangePlanButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Semantics(
       button: true,
-      enabled: false,
-      label: 'Cambiar plan — próximamente', // i18n: Fase W3
-      child: Opacity(
-        opacity: 0.5,
+      label: 'Cambiar plan', // i18n: Fase W3
+      child: GestureDetector(
+        onTap: () => context.push('/facturacion/planes'),
+        behavior: HitTestBehavior.opaque,
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
-            border: Border.all(color: palette.border),
+            border: Border.all(color: palette.accent),
             borderRadius: BorderRadius.circular(9999),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(TreinoIcon.money, size: 14, color: palette.textMuted),
+              Icon(TreinoIcon.money, size: 14, color: palette.accent),
               const SizedBox(width: 6),
               Text(
                 'CAMBIAR PLAN', // i18n: Fase W3
                 style: GoogleFonts.barlowCondensed(
-                  color: palette.textMuted,
+                  color: palette.accent,
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
                   letterSpacing: 0.6,
