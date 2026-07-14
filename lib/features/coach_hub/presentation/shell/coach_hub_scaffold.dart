@@ -9,6 +9,7 @@ import 'coach_hub_sidebar.dart';
 import 'coach_hub_top_bar.dart';
 import 'mobile_banner.dart';
 import 'responsive.dart' as rsp;
+import 'sidebar_item.dart';
 
 /// Layout raíz del Coach Hub web (REQ-CHW-SHELL-001/002).
 ///
@@ -22,9 +23,14 @@ import 'responsive.dart' as rsp;
 ///   escribe, así el valor guardado se preserva al volver a desktop.
 /// - `>= 1280 px` (desktop) → el sidebar respeta `sidebarCollapsedProvider`.
 class CoachHubScaffold extends ConsumerWidget {
-  const CoachHubScaffold({super.key, required this.child});
+  const CoachHubScaffold({super.key, required this.child, this.itemsOverride});
 
   final Widget child;
+
+  /// Si es no-nulo, reemplaza `sidebarRegistry` en el `CoachHubSidebar` —
+  /// solo para tests/evidencia (eg. demostrar badges sin depender del
+  /// wiring real de W1+). Ver [CoachHubSidebar.itemsOverride].
+  final List<SidebarItem>? itemsOverride;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -40,7 +46,10 @@ class CoachHubScaffold extends ConsumerWidget {
       body: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          CoachHubSidebar(collapsedOverride: forceCollapsed ? true : null),
+          CoachHubSidebar(
+            collapsedOverride: forceCollapsed ? true : null,
+            itemsOverride: itemsOverride,
+          ),
           Expanded(
             child: TreinoFadeSlideIn(
               child: Column(

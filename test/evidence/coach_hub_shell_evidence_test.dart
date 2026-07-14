@@ -37,6 +37,7 @@ import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach_hub/presentation/shell/coach_hub_scaffold.dart';
+import 'package:treino/features/coach_hub/presentation/shell/sidebar_item.dart';
 import 'package:treino/features/coach_hub/presentation/shell/sidebar_registry.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
@@ -67,6 +68,36 @@ class _StubAuthNotifier extends AuthNotifier {
     return _fixedState.valueOrNull;
   }
 }
+
+// Badges falsos para la evidencia (Pagos=3, Chat=6, como el mockup
+// sidebar.png). W1 no wiring de datos reales todavía — no se inventa un
+// provider de negocio, solo se demuestra el diseño con un StateProvider fijo.
+final _pagosBadgeProvider = StateProvider<int?>((ref) => 3);
+final _chatBadgeProvider = StateProvider<int?>((ref) => 6);
+
+List<SidebarItem> get _evidenceSidebarItems => [
+      for (final item in sidebarRegistry)
+        if (item.id == 'pagos')
+          SidebarItem(
+            id: item.id,
+            label: item.label,
+            route: item.route,
+            iconBuilder: item.iconBuilder,
+            group: item.group,
+            badgeProvider: _pagosBadgeProvider,
+          )
+        else if (item.id == 'chat')
+          SidebarItem(
+            id: item.id,
+            label: item.label,
+            route: item.route,
+            iconBuilder: item.iconBuilder,
+            group: item.group,
+            badgeProvider: _chatBadgeProvider,
+          )
+        else
+          item,
+    ];
 
 UserProfile _trainerProfile() => UserProfile(
       uid: 'evidence-uid',
@@ -209,7 +240,10 @@ Future<void> _pumpShell(
     initialLocation: '/dashboard',
     routes: [
       ShellRoute(
-        builder: (ctx, state, child) => CoachHubScaffold(child: child),
+        builder: (ctx, state, child) => CoachHubScaffold(
+          itemsOverride: _evidenceSidebarItems,
+          child: child,
+        ),
         routes: [
           for (final p in paths)
             GoRoute(
