@@ -327,11 +327,11 @@ class _DayTimelineState extends ConsumerState<DayTimeline> {
       final athleteName =
           (isRawUid || rawName.trim().isEmpty) ? 'Alumno' : rawName;
 
-      // Progressive disclosure by block height: the start time always shows;
-      // the end time and the name appear only when there's vertical room,
-      // which keeps short blocks from overflowing.
-      final fitsEnd = blockHeight >= 44;
-      final fitsName = blockHeight >= 60;
+      // Progressive disclosure by block height: the start time always shows,
+      // then the name, then the end time last — each only when there's
+      // vertical room, which keeps short blocks from overflowing.
+      final fitsName = blockHeight >= 44;
+      final fitsEnd = blockHeight >= 60;
 
       return Positioned(
         top: top,
@@ -390,17 +390,6 @@ class _DayTimelineState extends ConsumerState<DayTimeline> {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        if (fitsEnd)
-                          Text(
-                            AgendaFormatters.formatTime(endsAt),
-                            style: GoogleFonts.barlowCondensed(
-                              fontWeight: FontWeight.w500,
-                              fontSize: 11,
-                              color: palette.highlight.withAlpha(180),
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
                         if (fitsName) ...[
                           const SizedBox(height: 2),
                           Text(
@@ -408,6 +397,19 @@ class _DayTimelineState extends ConsumerState<DayTimeline> {
                             style: GoogleFonts.barlow(
                               fontSize: 11,
                               color: palette.textPrimary,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                        if (fitsEnd) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            AgendaFormatters.formatTime(endsAt),
+                            style: GoogleFonts.barlowCondensed(
+                              fontWeight: FontWeight.w500,
+                              fontSize: 11,
+                              color: palette.highlight.withAlpha(180),
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
