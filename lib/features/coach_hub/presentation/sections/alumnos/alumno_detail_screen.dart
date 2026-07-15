@@ -6,6 +6,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
@@ -13,7 +14,6 @@ import 'package:treino/features/chat/application/chat_providers.dart';
 import 'package:treino/features/coach/application/athlete_file_providers.dart';
 import 'package:treino/features/coach/application/agenda_providers.dart';
 import 'package:treino/features/coach/application/athlete_note_providers.dart';
-import 'package:treino/features/coach/application/profile_share_providers.dart';
 import 'package:treino/features/coach/domain/appointment.dart';
 import 'package:treino/features/coach/application/follow_up_entry_providers.dart';
 import 'package:treino/features/coach/application/nutrition_plan_providers.dart';
@@ -26,6 +26,7 @@ import 'package:treino/features/coach/domain/nutrition_plan.dart';
 import 'package:treino/features/coach/domain/nutrition_plan_presets.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
+import 'package:treino/features/coach_hub/presentation/sections/chat/widgets/avatar_color.dart';
 import 'package:treino/features/coach_hub/presentation/sections/chat/widgets/chat_detail_pane.dart';
 import 'package:treino/features/coach_hub/presentation/sections/routine_editor/routine_web_editability.dart';
 import 'package:treino/features/gyms/application/gym_providers.dart';
@@ -43,8 +44,6 @@ import 'package:treino/features/performance/application/performance_test_provide
 import 'package:treino/features/performance/domain/performance_test.dart';
 import 'package:treino/features/performance/presentation/widgets/performance_progress_chart.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
-import 'package:treino/features/profile/domain/experience_level.dart';
-import 'package:treino/features/profile/domain/gender.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/features/workout/application/assigned_routine_providers.dart';
 import 'package:treino/features/workout/application/exercise_frequency_providers.dart';
@@ -150,6 +149,7 @@ class AlumnoDetailScreen extends ConsumerWidget {
                 _BackLink(palette: palette),
                 const SizedBox(height: 12),
                 _Header(
+                  athleteId: athleteId,
                   profile: profile,
                   link: link,
                   estado: estado,
@@ -228,6 +228,7 @@ class _BackLink extends StatelessWidget {
 
 class _Header extends StatelessWidget {
   const _Header({
+    required this.athleteId,
     required this.profile,
     required this.link,
     required this.estado,
@@ -237,6 +238,7 @@ class _Header extends StatelessWidget {
     required this.palette,
   });
 
+  final String athleteId;
   final UserPublicProfile? profile;
   final TrainerLink? link;
   final AlumnoEstado? estado;
@@ -258,6 +260,12 @@ class _Header extends StatelessWidget {
     // de pagosPorCobrarProvider y las escrituras usan UTC); evita un desfase de
     // 1 día en el borde del período en AR (UTC-3).
     final proxCobro = b == null ? null : nextDueDate(b, DateTime.now().toUtc());
+    // Mismo criterio determinístico que el chat (avatar_color.dart) y el
+    // roster (alumnos_screen.dart): sin foto de red, círculo de color estable
+    // seedeado por uid + inicial en blanco — evita que todos los alumnos sin
+    // avatar se vean iguales (mint plano) en el detalle.
+    final hasNetworkAvatar = avatarUrl != null && avatarUrl.isNotEmpty;
+    final avatarColor = avatarColorFor(link?.athleteId ?? athleteId);
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -270,20 +278,20 @@ class _Header extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               CircleAvatar(
                 radius: 26,
-                backgroundColor: palette.bg,
-                backgroundImage: (avatarUrl != null && avatarUrl.isNotEmpty)
-                    ? NetworkImage(avatarUrl)
-                    : null,
-                child: (avatarUrl == null || avatarUrl.isEmpty)
-                    ? Text(initial,
-                        style: TextStyle(
-                            color: palette.accent,
+                backgroundColor: hasNetworkAvatar ? palette.bg : avatarColor,
+                backgroundImage:
+                    hasNetworkAvatar ? NetworkImage(avatarUrl) : null,
+                child: hasNetworkAvatar
+                    ? null
+                    : Text(initial,
+                        style: const TextStyle(
+                            color: Colors.white,
                             fontSize: 20,
-                            fontWeight: FontWeight.w700))
-                    : null,
+                            fontWeight: FontWeight.w700)),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -292,13 +300,14 @@ class _Header extends StatelessWidget {
                   children: [
                     Text(
                       name,
-                      style: TextStyle(
+                      style: GoogleFonts.barlowCondensed(
                         color: palette.textPrimary,
-                        fontSize: 20,
+                        fontSize: 24,
                         fontWeight: FontWeight.w700,
+                        height: 1,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 6),
                     Wrap(
                       spacing: 12,
                       runSpacing: 4,
@@ -314,7 +323,8 @@ class _Header extends StatelessWidget {
                                 estado!.label(AppL10n.of(context)),
                                 style: TextStyle(
                                     color: estado!.color(palette),
-                                    fontSize: 13),
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600),
                               ),
                             ],
                           ),
@@ -702,94 +712,124 @@ class _ResumenTab extends ConsumerWidget {
     final peso = m.pesoActualKg;
     final pesoDelta = m.pesoDelta30dKg;
 
+    final kpiRow = IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _MetricCard(
+            palette: palette,
+            icon: TreinoIcon.checkCircleFill,
+            label: 'ADHERENCIA 30D', // i18n: Fase W2
+            value: adh == null ? '—' : '${adh.round()}%',
+            delta: adhDelta == null
+                ? null
+                : '${adhDelta >= 0 ? '↑' : '↓'} ${adhDelta.abs().round()} pts',
+            deltaColor: adhDelta == null
+                ? null
+                : (adhDelta >= 0 ? palette.accent : palette.danger),
+            caption: adh == null ? 'Sin plan' : 'vs 30 días previos',
+          ),
+          const SizedBox(width: 10),
+          _MetricCard(
+            palette: palette,
+            icon: TreinoIcon.calendar,
+            label: 'SESIONES / SEM', // i18n: Fase W2
+            value: m.sesionesPorSemana.toStringAsFixed(1),
+            caption:
+                m.weeklyTarget > 0 ? 'Plan: ${m.weeklyTarget}' : 'Sin plan',
+          ),
+          const SizedBox(width: 10),
+          _MetricCard(
+            palette: palette,
+            icon: TreinoIcon.dumbbell,
+            label: 'VOLUMEN', // i18n: Fase W2
+            value: _fmtVolKg(m.volumenSemanaActualKg),
+            delta: volDelta == null
+                ? null
+                : '${volDelta >= 0 ? '+' : ''}${volDelta.round()}%',
+            deltaColor: volDelta == null
+                ? null
+                : (volDelta >= 0 ? palette.accent : palette.danger),
+            caption: volDelta == null ? 'esta semana' : 'vs semana pasada',
+          ),
+          const SizedBox(width: 10),
+          _MetricCard(
+            palette: palette,
+            icon: TreinoIcon.scales,
+            label: 'PESO CORPORAL', // i18n: Fase W2
+            value: peso == null ? '—' : '${_trimNum(peso)} kg',
+            delta: pesoDelta == null
+                ? null
+                : '${pesoDelta >= 0 ? '+' : ''}${pesoDelta.toStringAsFixed(1)} kg',
+            deltaColor: pesoDelta == null
+                ? null
+                : (pesoDelta >= 0 ? palette.accent : palette.danger),
+            caption: pesoDelta == null ? null : '30 días',
+          ),
+        ],
+      ),
+    );
+
+    final heatmapBlock = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _sectionLabel(palette, 'ADHERENCIA · 12 SEMANAS'), // i18n: Fase W2
+        const SizedBox(height: 10),
+        _AdherenciaHeatmap(data: m.heatmap, palette: palette),
+      ],
+    );
+
+    final noteBlock = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _sectionLabel(palette, 'NOTA FIJADA'), // i18n: Fase W2
+        const SizedBox(height: 10),
+        if (trainerUid != null)
+          _NoteCard(
+            palette: palette,
+            trainerId: trainerUid,
+            athleteId: athleteId,
+          ),
+      ],
+    );
+
+    final proxSesionBlock = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _sectionLabel(palette, 'PRÓXIMA SESIÓN'), // i18n: Fase W2
+        const SizedBox(height: 10),
+        _ProxSesionCard(palette: palette, athleteId: athleteId),
+      ],
+    );
+
+    final ultimaSesionBlock = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _sectionLabel(
+            palette, 'ÚLTIMA SESIÓN · POR EJERCICIO'), // i18n: Fase W2
+        const SizedBox(height: 10),
+        _UltimaSessionCard(
+          palette: palette,
+          athleteId: athleteId,
+          sessionsAsync: sessionsAsync,
+        ),
+      ],
+    );
+
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _MetricCard(
-                  palette: palette,
-                  label: 'ADHERENCIA 30D', // i18n: Fase W2
-                  value: adh == null ? '—' : '${adh.round()}%',
-                  delta: adhDelta == null
-                      ? null
-                      : '${adhDelta >= 0 ? '↑' : '↓'} ${adhDelta.abs().round()} pts',
-                  deltaColor: adhDelta == null
-                      ? null
-                      : (adhDelta >= 0 ? palette.accent : palette.danger),
-                  caption: adh == null ? 'Sin plan' : 'vs 30 días previos',
-                ),
-                const SizedBox(width: 10),
-                _MetricCard(
-                  palette: palette,
-                  label: 'SESIONES / SEM', // i18n: Fase W2
-                  value: m.sesionesPorSemana.toStringAsFixed(1),
-                  caption: m.weeklyTarget > 0
-                      ? 'Plan: ${m.weeklyTarget}'
-                      : 'Sin plan',
-                ),
-                const SizedBox(width: 10),
-                _MetricCard(
-                  palette: palette,
-                  label: 'VOLUMEN', // i18n: Fase W2
-                  value: _fmtVolKg(m.volumenSemanaActualKg),
-                  delta: volDelta == null
-                      ? null
-                      : '${volDelta >= 0 ? '+' : ''}${volDelta.round()}%',
-                  deltaColor: volDelta == null
-                      ? null
-                      : (volDelta >= 0 ? palette.accent : palette.danger),
-                  caption:
-                      volDelta == null ? 'esta semana' : 'vs semana pasada',
-                ),
-                const SizedBox(width: 10),
-                _MetricCard(
-                  palette: palette,
-                  label: 'PESO CORPORAL', // i18n: Fase W2
-                  value: peso == null ? '—' : '${_trimNum(peso)} kg',
-                  delta: pesoDelta == null
-                      ? null
-                      : '${pesoDelta >= 0 ? '+' : ''}${pesoDelta.toStringAsFixed(1)} kg',
-                  deltaColor: palette.textMuted,
-                  caption: pesoDelta == null ? null : '30 días',
-                ),
-              ],
-            ),
-          ),
+          kpiRow,
           const SizedBox(height: 20),
-          _sectionLabel(palette, 'ADHERENCIA · 12 SEMANAS'), // i18n: Fase W2
-          const SizedBox(height: 10),
-          _AdherenciaHeatmap(data: m.heatmap, palette: palette),
+          heatmapBlock,
           const SizedBox(height: 20),
-          _sectionLabel(palette, 'NOTA FIJADA'), // i18n: Fase W2
-          const SizedBox(height: 10),
-          if (trainerUid != null)
-            _NoteCard(
-              palette: palette,
-              trainerId: trainerUid,
-              athleteId: athleteId,
-            ),
+          ultimaSesionBlock,
           const SizedBox(height: 20),
-          _sectionLabel(palette, 'PRÓXIMA SESIÓN'), // i18n: Fase W2
-          const SizedBox(height: 10),
-          _ProxSesionCard(palette: palette, athleteId: athleteId),
+          noteBlock,
           const SizedBox(height: 20),
-          _sectionLabel(
-              palette, 'ÚLTIMA SESIÓN · POR EJERCICIO'), // i18n: Fase W2
-          const SizedBox(height: 10),
-          _UltimaSessionCard(
-            palette: palette,
-            athleteId: athleteId,
-            sessionsAsync: sessionsAsync,
-          ),
-          const SizedBox(height: 20),
-          _sectionLabel(palette, 'DATOS PERSONALES'), // i18n
-          const SizedBox(height: 10),
-          _DatosPersonalesCard(palette: palette, athleteId: athleteId),
+          proxSesionBlock,
         ],
       ),
     );
@@ -799,6 +839,7 @@ class _ResumenTab extends ConsumerWidget {
 class _MetricCard extends StatelessWidget {
   const _MetricCard({
     required this.palette,
+    required this.icon,
     required this.label,
     required this.value,
     this.delta,
@@ -807,6 +848,7 @@ class _MetricCard extends StatelessWidget {
   });
 
   final AppPalette palette;
+  final IconData icon;
   final String label;
   final String value;
   final String? delta;
@@ -815,6 +857,10 @@ class _MetricCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Delta null/textMuted → neutral (sin dato o estado plano); accent →
+    // mejora; danger → retrocedió. El chip de ícono usa el mismo color para
+    // que la lectura "bien/mal/neutro" sea inmediata sin leer el texto.
+    final tone = deltaColor ?? palette.textMuted;
     return Expanded(
       child: Container(
         padding: const EdgeInsets.all(14),
@@ -826,37 +872,58 @@ class _MetricCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              label,
-              style: TextStyle(
-                color: palette.textMuted,
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.5,
-              ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      color: palette.textMuted,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: tone.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(icon, size: 14, color: tone),
+                ),
+              ],
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 10),
             Text(
               value,
               style: TextStyle(
                 color: palette.textPrimary,
-                fontSize: 22,
+                fontSize: 24,
                 fontWeight: FontWeight.w700,
               ),
             ),
             if (delta != null || caption != null) ...[
-              const SizedBox(height: 4),
+              const SizedBox(height: 6),
               Row(
                 children: [
                   if (delta != null)
-                    Padding(
-                      padding: const EdgeInsets.only(right: 6),
+                    Container(
+                      margin: const EdgeInsets.only(right: 6),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: tone.withValues(alpha: 0.14),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
                       child: Text(
                         delta!,
                         style: TextStyle(
-                          color: deltaColor ?? palette.textMuted,
+                          color: tone,
                           fontSize: 12,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                     ),
@@ -874,182 +941,6 @@ class _MetricCard extends StatelessWidget {
             ],
           ],
         ),
-      ),
-    );
-  }
-}
-
-// ── _DatosPersonalesCard ──────────────────────────────────────────────────────
-
-/// Tarjeta de datos personales del alumno en el tab Resumen.
-///
-/// Lee [profileShareProvider] (athlete-shared-profile, Slice 1).
-/// Mientras el alumno no opte in (doc ausente → null), muestra un estado vacío
-/// claro. Los campos nil dentro del doc se omiten silenciosamente.
-///
-/// Web read-only — no escribe `profile_shares` en esta slice.
-class _DatosPersonalesCard extends ConsumerWidget {
-  const _DatosPersonalesCard({
-    required this.palette,
-    required this.athleteId,
-  });
-
-  final AppPalette palette;
-  final String athleteId;
-
-  String _fmtBornAt(DateTime dt) {
-    final local = dt.toLocal();
-    final d = local.day.toString().padLeft(2, '0');
-    final m = local.month.toString().padLeft(2, '0');
-    final y = local.year.toString();
-    return '$d/$m/$y';
-  }
-
-  String _updatedAt(DateTime dt) {
-    final diff = DateTime.now().difference(dt.toLocal());
-    final days = diff.inDays;
-    if (days == 0) return 'actualizado hoy'; // i18n
-    if (days == 1) return 'actualizado hace 1 día'; // i18n
-    return 'actualizado hace $days días'; // i18n
-  }
-
-  String _genderLabel(Gender g) => switch (g) {
-        Gender.male => 'Masculino', // i18n
-        Gender.female => 'Femenino', // i18n
-        Gender.nonBinary => 'No binario', // i18n
-        Gender.undisclosed => 'Prefiero no decir', // i18n
-      };
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final async = ref.watch(profileShareProvider(athleteId));
-    return async.when(
-      loading: () => SizedBox(
-        height: 48,
-        child: Center(
-          child: SizedBox(
-            width: 18,
-            height: 18,
-            child: CircularProgressIndicator(
-                strokeWidth: 2, color: palette.accent),
-          ),
-        ),
-      ),
-      error: (_, __) => _muted(
-          palette, 'No se pudieron cargar los datos personales.'), // i18n
-      data: (share) {
-        return Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: palette.bgCard,
-            border: Border.all(color: palette.border),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: share == null
-              ? Text(
-                  'El alumno no compartió sus datos personales.', // i18n
-                  style: TextStyle(color: palette.textMuted, fontSize: 13),
-                )
-              : Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (share.phone != null) ...[
-                      _DatoRow(
-                        palette: palette,
-                        label: 'Teléfono', // i18n
-                        value: share.phone!,
-                      ),
-                    ],
-                    if (share.bornAt != null) ...[
-                      _DatoRow(
-                        palette: palette,
-                        label: 'Fecha de nacimiento', // i18n
-                        value: _fmtBornAt(share.bornAt!),
-                      ),
-                    ],
-                    if (share.heightCm != null) ...[
-                      _DatoRow(
-                        palette: palette,
-                        label: 'Altura', // i18n
-                        value: '${share.heightCm} cm',
-                      ),
-                    ],
-                    if (share.bodyWeightKg != null) ...[
-                      _DatoRow(
-                        palette: palette,
-                        label: 'Peso', // i18n
-                        value: '${_trimNum(share.bodyWeightKg!)} kg',
-                      ),
-                    ],
-                    if (share.gender != null) ...[
-                      _DatoRow(
-                        palette: palette,
-                        label: 'Género', // i18n
-                        value: _genderLabel(share.gender!),
-                      ),
-                    ],
-                    if (share.experienceLevel != null) ...[
-                      _DatoRow(
-                        palette: palette,
-                        label: 'Nivel', // i18n
-                        value: share.experienceLevel!.displayNameEs,
-                      ),
-                    ],
-                    if (share.updatedAt != null) ...[
-                      const SizedBox(height: 6),
-                      Text(
-                        _updatedAt(share.updatedAt!),
-                        style: TextStyle(
-                          color: palette.textMuted,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-        );
-      },
-    );
-  }
-}
-
-class _DatoRow extends StatelessWidget {
-  const _DatoRow({
-    required this.palette,
-    required this.label,
-    required this.value,
-  });
-
-  final AppPalette palette;
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 160,
-            child: Text(
-              label,
-              style: TextStyle(color: palette.textMuted, fontSize: 12),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: TextStyle(
-                color: palette.textPrimary,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -1455,9 +1346,13 @@ class _AdherenciaHeatmap extends StatelessWidget {
   static const _dayLabels = ['L', 'Ma', 'Mi', 'J', 'V', 'S', 'D'];
   static const _labelWidth = 22.0;
 
+  // Nivel 0 = celda vacía/muted (sin tinte accent, para que se lea claramente
+  // "sin actividad"). Niveles 1..4 = rampa accent que escala del tenue al
+  // saturado (mockup: verde claro → verde intenso), bien diferenciable a
+  // simple vista entre escalones.
   Color _cellColor(int level) => level <= 0
-      ? palette.border.withValues(alpha: 0.35)
-      : palette.accent.withValues(alpha: 0.25 + level * 0.1875);
+      ? palette.border.withValues(alpha: 0.4)
+      : palette.accent.withValues(alpha: 0.28 + level * 0.18);
 
   @override
   Widget build(BuildContext context) {
@@ -1472,52 +1367,7 @@ class _AdherenciaHeatmap extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Grilla + eje temporal comparten ancho intrínseco para que las
-          // etiquetas «hace 12 sem» / «esta semana» caigan bajo la primera y la
-          // última columna.
-          IntrinsicWidth(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                for (var day = 0; day < 7; day++)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 2),
-                    child: Row(
-                      children: [
-                        SizedBox(
-                          width: _labelWidth,
-                          child: Text(_dayLabels[day], style: axisStyle),
-                        ),
-                        for (var week = 0; week < data.length; week++)
-                          Padding(
-                            padding: const EdgeInsets.all(2),
-                            child: Container(
-                              width: 14,
-                              height: 14,
-                              decoration: BoxDecoration(
-                                color: _cellColor(data[week][day]),
-                                borderRadius: BorderRadius.circular(3),
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                const SizedBox(height: 4),
-                Padding(
-                  padding: const EdgeInsets.only(left: _labelWidth),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('hace 12 sem', style: axisStyle), // i18n: Fase W2
-                      Text('esta semana', style: axisStyle), // i18n: Fase W2
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 10),
+          // Leyenda arriba a la derecha (mockup): "Menos [swatches] Más".
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
@@ -1538,6 +1388,48 @@ class _AdherenciaHeatmap extends StatelessWidget {
               const SizedBox(width: 6),
               Text('Más', style: axisStyle), // i18n: Fase W2
             ],
+          ),
+          const SizedBox(height: 10),
+          // Celdas anchas tipo "barra" que llenan el ancho de la card (mockup):
+          // cada semana es un Expanded, así la grilla se estira full-width en
+          // vez de cuadraditos fijos con aire muerto a la derecha.
+          for (var day = 0; day < 7; day++)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 2),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: _labelWidth,
+                    child: Text(_dayLabels[day], style: axisStyle),
+                  ),
+                  for (var week = 0; week < data.length; week++)
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 1.5),
+                        child: Container(
+                          height: 14,
+                          decoration: BoxDecoration(
+                            color: _cellColor(data[week][day]),
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          const SizedBox(height: 6),
+          // Eje temporal alineado con la grilla (deja el ancho de la etiqueta de
+          // día a la izquierda para que caiga bajo la primera/última columna).
+          Padding(
+            padding: const EdgeInsets.only(left: _labelWidth),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('hace 12 sem', style: axisStyle), // i18n: Fase W2
+                Text('esta semana', style: axisStyle), // i18n: Fase W2
+              ],
+            ),
           ),
         ],
       ),
