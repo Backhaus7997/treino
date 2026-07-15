@@ -7,10 +7,14 @@ import 'package:treino/features/insights/presentation/measurements_screen.dart';
 import 'package:treino/features/measurements/application/measurement_providers.dart';
 import 'package:treino/features/measurements/domain/measurement.dart';
 import 'package:treino/features/measurements/presentation/widgets/measurement_progress_chart.dart';
+import 'package:treino/features/measurements/presentation/log_measurement_screen.dart';
 import 'package:treino/features/profile/application/user_providers.dart'
-    show userProfileProvider;
+    show firestoreProvider, userProfileProvider;
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
+import 'package:treino/features/workout/application/session_providers.dart'
+    show currentUidProvider;
+import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
 Measurement _m(DateTime at, double kg) => Measurement(
@@ -41,6 +45,9 @@ Widget _wrap({
     ProviderScope(
       overrides: [
         userProfileProvider.overrideWith((ref) => Stream.value(profile)),
+        // Para el form self-log que abre el botón "+".
+        currentUidProvider.overrideWithValue('u1'),
+        firestoreProvider.overrideWithValue(FakeFirebaseFirestore()),
         ...overrides,
       ],
       child: MaterialApp(
@@ -178,5 +185,22 @@ void main() {
     expect(find.text('TUS DATOS'), findsOneWidget);
     expect(find.text('170 cm'), findsOneWidget);
     expect(find.text('Peso'), findsNothing);
+  });
+
+  testWidgets('T6: el botón "+" abre el formulario de auto-carga (self-log)',
+      (tester) async {
+    await tester.pumpWidget(_wrap(
+      profile: _profile(bodyWeightKg: 80),
+      overrides: [
+        ownMeasurementsProvider('u1').overrideWith((ref) => Stream.value([])),
+      ],
+    ));
+    await tester.pumpAndSettle();
+
+    // El tooltip del "+" (measurementsAddSelfLog, es_AR).
+    await tester.tap(find.byTooltip('Cargar medición'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(LogMeasurementScreen), findsOneWidget);
   });
 }

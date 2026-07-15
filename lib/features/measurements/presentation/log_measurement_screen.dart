@@ -65,11 +65,32 @@ String _formatDateTimeEs(DateTime dt) {
 /// ));
 /// ```
 ///
-/// All fields are optional — the trainer saves whatever metrics they measured.
-class LogMeasurementScreen extends ConsumerStatefulWidget {
-  const LogMeasurementScreen({super.key, required this.athleteId});
+/// All fields are optional — whoever logs saves whatever metrics they measured.
+///
+/// Two authoring modes (design ADR-ASM-6):
+/// - default [LogMeasurementScreen] — a TRAINER logging FOR [athleteId]
+///   (`recordedBy = uid`, `athleteId = the passed athlete`).
+/// - [LogMeasurementScreen.selfLog] — an ATHLETE logging their OWN measurement.
+///   [athleteId] is null and the effective athleteId is derived from the
+///   authenticated uid at save time, so the caller cannot inject someone
+///   else's id → the write is always `recordedBy == athleteId == uid`, exactly
+///   what the create rule's athlete-self branch requires.
+enum _LogAuthorMode { trainerForAthlete, athleteSelf }
 
-  final String athleteId;
+class LogMeasurementScreen extends ConsumerStatefulWidget {
+  /// Trainer logging FOR an athlete (existing behavior).
+  const LogMeasurementScreen({super.key, required this.athleteId})
+      : _mode = _LogAuthorMode.trainerForAthlete;
+
+  /// Athlete logging their OWN measurement. `athleteId` resolves from the
+  /// authenticated uid at save time.
+  const LogMeasurementScreen.selfLog({super.key})
+      : athleteId = null,
+        _mode = _LogAuthorMode.athleteSelf;
+
+  /// The subject athlete in trainer mode; null in self mode (derived from uid).
+  final String? athleteId;
+  final _LogAuthorMode _mode;
 
   @override
   ConsumerState<LogMeasurementScreen> createState() =>
@@ -246,7 +267,8 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
 
   /// All circumference controllers (the collapsible section). Kept separate so
   /// the section can be force-expanded when one of them holds invalid input.
-  List<TextEditingController> get _circumferenceCtrls => <TextEditingController>[
+  List<TextEditingController> get _circumferenceCtrls =>
+      <TextEditingController>[
         _shouldersCtrl,
         _chestCtrl,
         _waistCtrl,
@@ -300,8 +322,8 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
   Future<void> _save() async {
     if (_saving) return;
     final l10n = AppL10n.of(context);
-    final trainerUid = ref.read(currentUidProvider);
-    if (trainerUid == null) {
+    final uid = ref.read(currentUidProvider);
+    if (uid == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
@@ -312,10 +334,20 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
       return;
     }
 
+    // Effective subject: self mode ALWAYS uses the authenticated uid (the
+    // caller cannot inject another athleteId), trainer mode uses the passed id.
+    // In self mode this guarantees `athleteId == recordedBy == uid`, the exact
+    // invariant the create rule's athlete-self branch enforces.
+    final effectiveAthleteId =
+        widget._mode == _LogAuthorMode.athleteSelf ? uid : widget.athleteId!;
+    assert(
+      widget._mode != _LogAuthorMode.athleteSelf || effectiveAthleteId == uid,
+      'self-log must attribute the measurement to the authenticated athlete',
+    );
+
     // If a collapsed circumference holds an invalid value, expand the section
     // first so its inline error is actually visible before we validate.
-    if (!_circumferencesExpanded &&
-        _circumferenceCtrls.any(_isMetricInvalid)) {
+    if (!_circumferencesExpanded && _circumferenceCtrls.any(_isMetricInvalid)) {
       setState(() => _circumferencesExpanded = true);
       // Let the section mount before its fields' validators run.
       await Future<void>.delayed(Duration.zero);
@@ -337,8 +369,8 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
 
     final measurement = Measurement(
       id: '',
-      athleteId: widget.athleteId,
-      recordedBy: trainerUid,
+      athleteId: effectiveAthleteId,
+      recordedBy: uid,
       recordedAt: DateTime.now().toUtc(),
       weightKg: _parseDouble(_weightCtrl),
       fatPercentage: _parseDouble(_fatCtrl),
@@ -389,10 +421,10 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
-    final trainerUid = ref.watch(currentUidProvider);
+    final uid = ref.watch(currentUidProvider);
     // GUARDAR stays disabled until there is at least one value to save, so an
     // accidental tap cannot persist an all-null record.
-    final canSave = trainerUid != null && !_saving && _hasValue;
+    final canSave = uid != null && !_saving && _hasValue;
     final now = DateTime.now();
 
     return Scaffold(
@@ -451,80 +483,82 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                    // Body composition
-                    _sectionLabel('COMPOSICIÓN CORPORAL', palette),
-                    const SizedBox(height: 12),
-                    _numericField(
-                      label: 'Peso (kg)',
-                      controller: _weightCtrl,
-                      palette: palette,
-                      validator: (v) => _validateMetric(v, l10n),
-                    ),
-                    const SizedBox(height: 12),
-                    _numericField(
-                      label: 'Grasa (%)',
-                      controller: _fatCtrl,
-                      palette: palette,
-                      validator: (v) => _validateMetric(v, l10n),
-                    ),
-                    const SizedBox(height: 12),
-                    _numericField(
-                      label: 'Masa muscular (kg)',
-                      controller: _muscleCtrl,
-                      palette: palette,
-                      validator: (v) => _validateMetric(v, l10n),
-                    ),
-                    const SizedBox(height: 20),
-
-                    // Circumferences — collapsible
-                    _CircumferencesSection(
-                      palette: palette,
-                      validateMetric: (v) => _validateMetric(v, l10n),
-                      expanded: _circumferencesExpanded,
-                      onToggle: () => setState(
-                        () => _circumferencesExpanded =
-                            !_circumferencesExpanded,
-                      ),
-                      shouldersCtrl: _shouldersCtrl,
-                      chestCtrl: _chestCtrl,
-                      waistCtrl: _waistCtrl,
-                      hipsCtrl: _hipsCtrl,
-                      glutesCtrl: _glutesCtrl,
-                      bicepsLCtrl: _bicepsLCtrl,
-                      bicepsRCtrl: _bicepsRCtrl,
-                      bicepsFlexLCtrl: _bicepsFlexLCtrl,
-                      bicepsFlexRCtrl: _bicepsFlexRCtrl,
-                      forearmLCtrl: _forearmLCtrl,
-                      forearmRCtrl: _forearmRCtrl,
-                      upperThighLCtrl: _upperThighLCtrl,
-                      upperThighRCtrl: _upperThighRCtrl,
-                      midThighLCtrl: _midThighLCtrl,
-                      midThighRCtrl: _midThighRCtrl,
-                      calfLCtrl: _calfLCtrl,
-                      calfRCtrl: _calfRCtrl,
-                    ),
-                    const SizedBox(height: 20),
-
-                    // Notes
-                    _sectionLabel('NOTAS', palette),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _notesCtrl,
-                      minLines: 3,
-                      maxLines: 6,
-                      keyboardType: TextInputType.multiline,
-                      style: GoogleFonts.barlow(
-                        color: palette.textPrimary,
-                        fontSize: 14,
-                      ),
-                      decoration: _inputDecoration(
+                      // Body composition
+                      _sectionLabel('COMPOSICIÓN CORPORAL', palette),
+                      const SizedBox(height: 12),
+                      _numericField(
+                        label: 'Peso (kg)',
+                        controller: _weightCtrl,
                         palette: palette,
-                        hint: 'Observaciones del entrenador…',
+                        validator: (v) => _validateMetric(v, l10n),
                       ),
-                    ),
+                      const SizedBox(height: 12),
+                      _numericField(
+                        label: 'Grasa (%)',
+                        controller: _fatCtrl,
+                        palette: palette,
+                        validator: (v) => _validateMetric(v, l10n),
+                      ),
+                      const SizedBox(height: 12),
+                      _numericField(
+                        label: 'Masa muscular (kg)',
+                        controller: _muscleCtrl,
+                        palette: palette,
+                        validator: (v) => _validateMetric(v, l10n),
+                      ),
+                      const SizedBox(height: 20),
 
-                    // Space so FAB doesn't cover last field
-                    const SizedBox(height: 80),
+                      // Circumferences — collapsible
+                      _CircumferencesSection(
+                        palette: palette,
+                        validateMetric: (v) => _validateMetric(v, l10n),
+                        expanded: _circumferencesExpanded,
+                        onToggle: () => setState(
+                          () => _circumferencesExpanded =
+                              !_circumferencesExpanded,
+                        ),
+                        shouldersCtrl: _shouldersCtrl,
+                        chestCtrl: _chestCtrl,
+                        waistCtrl: _waistCtrl,
+                        hipsCtrl: _hipsCtrl,
+                        glutesCtrl: _glutesCtrl,
+                        bicepsLCtrl: _bicepsLCtrl,
+                        bicepsRCtrl: _bicepsRCtrl,
+                        bicepsFlexLCtrl: _bicepsFlexLCtrl,
+                        bicepsFlexRCtrl: _bicepsFlexRCtrl,
+                        forearmLCtrl: _forearmLCtrl,
+                        forearmRCtrl: _forearmRCtrl,
+                        upperThighLCtrl: _upperThighLCtrl,
+                        upperThighRCtrl: _upperThighRCtrl,
+                        midThighLCtrl: _midThighLCtrl,
+                        midThighRCtrl: _midThighRCtrl,
+                        calfLCtrl: _calfLCtrl,
+                        calfRCtrl: _calfRCtrl,
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Notes
+                      _sectionLabel('NOTAS', palette),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _notesCtrl,
+                        minLines: 3,
+                        maxLines: 6,
+                        keyboardType: TextInputType.multiline,
+                        style: GoogleFonts.barlow(
+                          color: palette.textPrimary,
+                          fontSize: 14,
+                        ),
+                        decoration: _inputDecoration(
+                          palette: palette,
+                          hint: widget._mode == _LogAuthorMode.athleteSelf
+                              ? l10n.measurementsSelfLogNotesHint
+                              : 'Observaciones del entrenador…',
+                        ),
+                      ),
+
+                      // Space so FAB doesn't cover last field
+                      const SizedBox(height: 80),
                     ],
                   ),
                 ),

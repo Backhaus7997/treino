@@ -4659,6 +4659,18 @@ abstract class AppL10n {
   /// **'MEDIDAS'**
   String get measurementsScreenTitle;
 
+  /// Notes field hint in LogMeasurementScreen.selfLog mode — replaces the trainer-mode "Observaciones del entrenador…" copy.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Notas (opcional)…'**
+  String get measurementsSelfLogNotesHint;
+
+  /// Label/tooltip for the "+" affordance on MEDIDAS that opens the athlete self-log form.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cargar medición'**
+  String get measurementsAddSelfLog;
+
   /// Title of the card in MeasurementsScreen showing the athlete's own weight + height, read from UserProfile (captured at onboarding Step 4) so they don't re-enter them.
   ///
   /// In es_AR, this message translates to:

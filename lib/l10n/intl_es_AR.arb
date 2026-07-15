@@ -2009,6 +2009,14 @@
     "description": "Tile subtitle for the Anthropometry stats-hub entry."
   },
   "measurementsScreenTitle": "MEDIDAS",
+  "measurementsSelfLogNotesHint": "Notas (opcional)…",
+  "@measurementsSelfLogNotesHint": {
+    "description": "Notes field hint in LogMeasurementScreen.selfLog mode — replaces the trainer-mode \"Observaciones del entrenador…\" copy."
+  },
+  "measurementsAddSelfLog": "Cargar medición",
+  "@measurementsAddSelfLog": {
+    "description": "Label/tooltip for the \"+\" affordance on MEDIDAS that opens the athlete self-log form."
+  },
   "@measurementsScreenTitle": {
     "description": "Header title for the dedicated MeasurementsScreen."
   },

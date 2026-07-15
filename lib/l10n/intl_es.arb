@@ -620,6 +620,8 @@
   "insightsTileMeasurementsTitle": "Medidas",
   "insightsTileMeasurementsSubtitle": "Peso y medidas corporales en el tiempo",
   "measurementsScreenTitle": "MEDIDAS",
+  "measurementsSelfLogNotesHint": "Notas (opcional)…",
+  "measurementsAddSelfLog": "Registrar medición",
   "measurementsProfileCardTitle": "TUS DATOS",
   "measurementsProfileCardHint": "Los cargaste al registrarte. Edítalos desde tu perfil.",
   "measurementsWeightLabel": "Peso",

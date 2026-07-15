@@ -2551,6 +2551,12 @@ class AppL10nEs extends AppL10n {
   String get measurementsScreenTitle => 'MEDIDAS';
 
   @override
+  String get measurementsSelfLogNotesHint => 'Notas (opcional)…';
+
+  @override
+  String get measurementsAddSelfLog => 'Registrar medición';
+
+  @override
   String get measurementsProfileCardTitle => 'TUS DATOS';
 
   @override
@@ -5138,6 +5144,12 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get measurementsScreenTitle => 'MEDIDAS';
+
+  @override
+  String get measurementsSelfLogNotesHint => 'Notas (opcional)…';
+
+  @override
+  String get measurementsAddSelfLog => 'Cargar medición';
 
   @override
   String get measurementsProfileCardTitle => 'TUS DATOS';
