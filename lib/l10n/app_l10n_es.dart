@@ -2540,8 +2540,21 @@ class AppL10nEs extends AppL10n {
   String get measurementsScreenTitle => 'MEDIDAS';
 
   @override
+  String get measurementsProfileCardTitle => 'TUS DATOS';
+
+  @override
+  String get measurementsProfileCardHint =>
+      'Los cargaste al registrarte. Edítalos desde tu perfil.';
+
+  @override
+  String get measurementsWeightLabel => 'Peso';
+
+  @override
+  String get measurementsHeightLabel => 'Altura';
+
+  @override
   String get measurementsEmptyState =>
-      'Todavía no tienes mediciones cargadas. Las registra tu entrenador.';
+      'Tu entrenador todavía no registró mediciones. Cuando las tengas, tu evolución aparece aquí.';
 
   @override
   String get measurementsNeedsMoreData =>
@@ -5105,8 +5118,21 @@ class AppL10nEsAr extends AppL10nEs {
   String get measurementsScreenTitle => 'MEDIDAS';
 
   @override
+  String get measurementsProfileCardTitle => 'TUS DATOS';
+
+  @override
+  String get measurementsProfileCardHint =>
+      'Los cargaste al registrarte. Editalos desde tu perfil.';
+
+  @override
+  String get measurementsWeightLabel => 'Peso';
+
+  @override
+  String get measurementsHeightLabel => 'Altura';
+
+  @override
   String get measurementsEmptyState =>
-      'Todavía no tenés mediciones cargadas. Las registra tu entrenador.';
+      'Tu entrenador todavía no registró mediciones. Cuando las tengas, tu evolución aparece acá.';
 
   @override
   String get measurementsNeedsMoreData =>

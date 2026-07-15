@@ -1993,11 +1993,27 @@
   },
   "measurementsScreenTitle": "MEDIDAS",
   "@measurementsScreenTitle": {
-    "description": "Header title for the dedicated AnthropometryScreen."
+    "description": "Header title for the dedicated MeasurementsScreen."
   },
-  "measurementsEmptyState": "Todavía no tenés mediciones cargadas. Las registra tu entrenador.",
+  "measurementsProfileCardTitle": "TUS DATOS",
+  "@measurementsProfileCardTitle": {
+    "description": "Title of the card in MeasurementsScreen showing the athlete's own weight + height, read from UserProfile (captured at onboarding Step 4) so they don't re-enter them."
+  },
+  "measurementsProfileCardHint": "Los cargaste al registrarte. Editalos desde tu perfil.",
+  "@measurementsProfileCardHint": {
+    "description": "Small hint under the profile-data card explaining where the weight/height come from and where to edit them."
+  },
+  "measurementsWeightLabel": "Peso",
+  "@measurementsWeightLabel": {
+    "description": "Label for the body-weight value in the profile-data card."
+  },
+  "measurementsHeightLabel": "Altura",
+  "@measurementsHeightLabel": {
+    "description": "Label for the height value in the profile-data card."
+  },
+  "measurementsEmptyState": "Tu entrenador todavía no registró mediciones. Cuando las tengas, tu evolución aparece acá.",
   "@measurementsEmptyState": {
-    "description": "Shown when the athlete has ZERO measurements. Names WHO records them, because today only a trainer-role user can create them (firestore.rules AD-1) — an athlete without a trainer would otherwise have no idea why the screen is empty."
+    "description": "Shown below the profile-data card when the athlete has ZERO trainer-recorded measurements. Talks about EVOLUTION over time (the chart), not about having no data at all — the profile card above already shows the athlete's weight/height. Only a trainer-role user can create measurements today (firestore.rules AD-1)."
   },
   "measurementsNeedsMoreData": "Con una sola medición no hay progreso que mostrar. Falta al menos una más.",
   "@measurementsNeedsMoreData": {
