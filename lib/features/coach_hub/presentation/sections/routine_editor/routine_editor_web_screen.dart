@@ -31,13 +31,14 @@ import 'routine_web_editability.dart';
 /// Editor de rutinas web — crea o edita la rutina de UN alumno (mirrors
 /// mobile's `RoutineEditorScreen(TrainerAssigning)`). Soporta, por ejercicio:
 /// reps fijas o rango (mín–máx), duración (por tiempo), notas para el alumno,
-/// supersets y N semanas con la misma prescripción (paridad Fases 1-4a). Todavía
-/// NO: prescripción distinta por semana (Fase 4b) ni máscara de presencia por
-/// semana (Fase 4c) — esas rutinas se siguen editando en mobile.
+/// supersets y N semanas, cada una con SU PROPIA prescripción de sets
+/// (`weeklySets`, Fase 4b) mediante el selector "Sem 1..N". Todavía NO:
+/// máscara de presencia por semana (Fase 4c) — esas rutinas se siguen editando
+/// en mobile.
 ///
 /// **Modo edición** (`routineId != null`): carga la rutina y la abre en el
 /// form. Como `updateAssigned` pisa el array `days` entero, editar una rutina
-/// con prescripción por-semana desde acá la truncaría silenciosamente — por eso
+/// con máscara de presencia desde acá la truncaría silenciosamente — por eso
 /// [isRoutineWebEditable] actúa de compuerta: si la rutina usa un campo aún no
 /// soportado, el editor NO la carga y muestra un aviso para editarla en mobile.
 /// Las rutinas creadas en web están siempre dentro de scope, así que
@@ -73,7 +74,24 @@ class _EditorSet {
   int? repsMin; // used when repMode == range
   int? repsMax; // used when repMode == range
   int? durationSeconds; // used when exerciseMode == duration
+
+  /// Deep copy — used when padding a slot's `weeklySets` to a new week count
+  /// ([_RoutineEditorWebScreenState._normalizeSlotWeeks]).
+  _EditorSet copy() => _EditorSet()
+    ..weightKg = weightKg
+    ..reps = reps
+    ..repsMin = repsMin
+    ..repsMax = repsMax
+    ..durationSeconds = durationSeconds;
 }
+
+/// Maps a persisted [SetSpec] into its mutable editor row.
+_EditorSet _editorSetFromSpec(SetSpec spec) => _EditorSet()
+  ..reps = spec.reps
+  ..repsMin = spec.repsMin
+  ..repsMax = spec.repsMax
+  ..durationSeconds = spec.durationSeconds
+  ..weightKg = spec.weightKg;
 
 class _EditorSlot {
   Exercise? exercise;
@@ -84,7 +102,14 @@ class _EditorSlot {
   // True when this exercise is supersetted with the NEXT one in the day. A run
   // of linked slots becomes one superset group (id derived at build time).
   bool linkedToNext = false;
-  List<_EditorSet> sets = [_EditorSet()];
+
+  /// One inner list of sets per plan week — outer index is the 0-based week.
+  /// Invariant: every slot keeps exactly `_numWeeks` inner lists; week-count
+  /// changes normalize all slots together via `_normalizeSlotWeeks`.
+  /// Mirrors mobile's `_EditableSlot.weeklySets` (Fase 4b).
+  List<List<_EditorSet>> weeklySets = [
+    [_EditorSet()],
+  ];
 }
 
 class _EditorDay {
@@ -103,6 +128,11 @@ class _RoutineEditorWebScreenState
   final _splitCtrl = TextEditingController();
   ExperienceLevel _level = ExperienceLevel.beginner;
   int _numWeeks = 1;
+
+  /// 0-based week shown in the editor — drives which inner list of each
+  /// slot's `weeklySets` the day/slot cards render and edit (Fase 4b).
+  /// Display is 1-based ("Sem 1"). Always kept in `[0, _numWeeks - 1]`.
+  int _selectedWeek = 0;
   final List<_EditorDay> _days = [
     _EditorDay(dayNumber: 1, name: 'Día 1')
   ]; // i18n
@@ -195,21 +225,24 @@ class _RoutineEditorWebScreenState
   }
 
   _EditorSlot _editorSlotFrom(RoutineSlot slot) {
-    final effective = slot.effectiveSets;
-    // Derive the mode from the actual set data — robust against stale
-    // exerciseMode/repMode fields (mirrors mobile's _repModeFromHydratedSets).
-    final isDuration = effective.any((s) => (s.durationSeconds ?? 0) > 0);
-    final isRange = !isDuration &&
-        effective.any((s) => s.repsMin != null || s.repsMax != null);
-    final sets = effective
-        .map((s) => _EditorSet()
-          ..reps = s.reps
-          ..repsMin = s.repsMin
-          ..repsMax = s.repsMax
-          ..durationSeconds = s.durationSeconds
-          ..weightKg = s.weightKg)
-        .toList();
-    return _EditorSlot()
+    // Periodized docs hydrate every week from weeklySets; legacy/single-week
+    // docs hydrate week 0 from effectiveSets (mirrors mobile's hydration in
+    // _loadExistingRoutine, REQ-PERIOD-018/019).
+    final weeklySets = slot.weeklySets.isNotEmpty
+        ? slot.weeklySets
+            .map((wk) => wk.map(_editorSetFromSpec).toList())
+            .toList()
+        : [slot.effectiveSets.map(_editorSetFromSpec).toList()];
+
+    // Derive the mode from WEEK 0's set data — robust against stale
+    // exerciseMode/repMode fields (mirrors mobile's _repModeFromHydratedSets),
+    // applied to week 0 only since mode is per-slot, not per-week.
+    final week0 = weeklySets.first;
+    final isDuration = week0.any((s) => (s.durationSeconds ?? 0) > 0);
+    final isRange =
+        !isDuration && week0.any((s) => s.repsMin != null || s.repsMax != null);
+
+    final editorSlot = _EditorSlot()
       // Synthesize a minimal Exercise from the slot's denormalized fields —
       // _buildSlot only reads id/name/muscleGroup, so category is a filler.
       ..exercise = Exercise(
@@ -222,7 +255,12 @@ class _RoutineEditorWebScreenState
       ..exerciseMode = isDuration ? ExerciseMode.duration : ExerciseMode.reps
       ..repMode = isRange ? RepMode.range : RepMode.single
       ..notes = slot.notes ?? ''
-      ..sets = sets.isEmpty ? [_EditorSet()] : sets;
+      ..weeklySets = weeklySets;
+    // Pad/truncate to _numWeeks (already set by _populate before this runs)
+    // and guard against an authored-empty week 0 (deload) leaving a blank
+    // editor slot with 0 sets.
+    _normalizeSlotWeeks(editorSlot);
+    return editorSlot;
   }
 
   @override
@@ -236,13 +274,44 @@ class _RoutineEditorWebScreenState
   // already rebuild via their own setState or a TextField's onChanged.
   void _markDirty() => _isDirty = true;
 
-  // ── Week operations (periodización) ───────────────────────────────────────
+  // ── Week operations (periodización, Fase 4b) ────────────────────────────
+
+  /// Pads/truncates [slot]'s `weeklySets` to exactly `_numWeeks` inner lists.
+  /// Padding appends a DEEP COPY of the last week's sets (via
+  /// [_EditorSet.copy]) so a newly-added week starts from the trainer's most
+  /// recent prescription instead of a blank set. Never leaves a slot with 0
+  /// weeks or a week with 0 sets.
+  void _normalizeSlotWeeks(_EditorSlot slot) {
+    if (slot.weeklySets.isEmpty) {
+      slot.weeklySets.add([_EditorSet()]);
+    }
+    while (slot.weeklySets.length < _numWeeks) {
+      slot.weeklySets.add(slot.weeklySets.last.map((e) => e.copy()).toList());
+    }
+    if (slot.weeklySets.length > _numWeeks) {
+      slot.weeklySets.removeRange(_numWeeks, slot.weeklySets.length);
+    }
+    for (var w = 0; w < slot.weeklySets.length; w++) {
+      if (slot.weeklySets[w].isEmpty) {
+        slot.weeklySets[w] = [_EditorSet()];
+      }
+    }
+  }
 
   void _setNumWeeks(int value) {
     final clamped = value.clamp(1, _kMaxWeeks);
     if (clamped == _numWeeks) return;
     _markDirty();
-    setState(() => _numWeeks = clamped);
+    setState(() {
+      _numWeeks = clamped;
+      for (final day in _days) {
+        for (final slot in day.slots) {
+          _normalizeSlotWeeks(slot);
+        }
+      }
+      if (_selectedWeek > _numWeeks - 1) _selectedWeek = _numWeeks - 1;
+      if (_selectedWeek < 0) _selectedWeek = 0;
+    });
   }
 
   // ── Day operations ───────────────────────────────────────────────────────
@@ -288,7 +357,9 @@ class _RoutineEditorWebScreenState
     setState(() {
       for (final exercise in picked) {
         if (day.slots.any((s) => s.exercise?.id == exercise.id)) continue;
-        day.slots.add(_EditorSlot()..exercise = exercise);
+        day.slots.add(_EditorSlot()
+          ..exercise = exercise
+          ..weeklySets = List.generate(_numWeeks, (_) => [_EditorSet()]));
       }
     });
   }
@@ -330,7 +401,7 @@ class _RoutineEditorWebScreenState
   void _addSet(int dayIndex, int slotIndex) {
     _markDirty();
     setState(() {
-      final sets = _days[dayIndex].slots[slotIndex].sets;
+      final sets = _days[dayIndex].slots[slotIndex].weeklySets[_selectedWeek];
       // Duplicate the last row's values — same "+ Agregar set" UX as mobile.
       final last = sets.isEmpty ? null : sets.last;
       sets.add(_EditorSet()
@@ -343,30 +414,36 @@ class _RoutineEditorWebScreenState
   }
 
   void _removeSet(int dayIndex, int slotIndex, int setIndex) {
-    final sets = _days[dayIndex].slots[slotIndex].sets;
-    if (sets.length <= 1) return; // at least one set per exercise
+    final sets = _days[dayIndex].slots[slotIndex].weeklySets[_selectedWeek];
+    if (sets.length <= 1) return; // at least one set per exercise per week
     _markDirty();
     setState(() => sets.removeAt(setIndex));
   }
 
   void _onSetRepsChanged(int dayIndex, int slotIndex, int setIndex, String v) {
     _markDirty();
-    setState(() => _days[dayIndex].slots[slotIndex].sets[setIndex].reps =
-        int.tryParse(v.trim()));
+    setState(() => _days[dayIndex]
+        .slots[slotIndex]
+        .weeklySets[_selectedWeek][setIndex]
+        .reps = int.tryParse(v.trim()));
   }
 
   void _onSetRepsMinChanged(
       int dayIndex, int slotIndex, int setIndex, String v) {
     _markDirty();
-    setState(() => _days[dayIndex].slots[slotIndex].sets[setIndex].repsMin =
-        int.tryParse(v.trim()));
+    setState(() => _days[dayIndex]
+        .slots[slotIndex]
+        .weeklySets[_selectedWeek][setIndex]
+        .repsMin = int.tryParse(v.trim()));
   }
 
   void _onSetRepsMaxChanged(
       int dayIndex, int slotIndex, int setIndex, String v) {
     _markDirty();
-    setState(() => _days[dayIndex].slots[slotIndex].sets[setIndex].repsMax =
-        int.tryParse(v.trim()));
+    setState(() => _days[dayIndex]
+        .slots[slotIndex]
+        .weeklySets[_selectedWeek][setIndex]
+        .repsMax = int.tryParse(v.trim()));
   }
 
   void _onSetDurationChanged(
@@ -374,12 +451,17 @@ class _RoutineEditorWebScreenState
     _markDirty();
     setState(() => _days[dayIndex]
         .slots[slotIndex]
-        .sets[setIndex]
+        .weeklySets[_selectedWeek][setIndex]
         .durationSeconds = int.tryParse(v.trim()));
   }
 
   /// Switches an exercise between fixed reps, a min–max range, and duration.
-  /// Reps ↔ range values carry across so the trainer doesn't retype.
+  /// Reps ↔ range values carry across so the trainer doesn't retype. Mode is
+  /// per-slot (not per-week, REQ-PERIOD-017/ADR-PB-03), so the carry-across
+  /// runs over EVERY week's sets — not just `_selectedWeek` — otherwise a
+  /// week the trainer isn't currently viewing would keep stale/incompatible
+  /// values (e.g. `reps` set but no `repsMin`/`repsMax` after switching to
+  /// Rango) and fail validation invisibly.
   void _setSlotMode(
     int dayIndex,
     int slotIndex,
@@ -393,12 +475,14 @@ class _RoutineEditorWebScreenState
       slot.exerciseMode = exerciseMode;
       slot.repMode = repMode;
       if (exerciseMode == ExerciseMode.reps) {
-        for (final s in slot.sets) {
-          if (repMode == RepMode.range) {
-            s.repsMin ??= s.reps;
-            s.repsMax ??= s.reps;
-          } else {
-            s.reps ??= s.repsMin ?? s.repsMax;
+        for (final week in slot.weeklySets) {
+          for (final s in week) {
+            if (repMode == RepMode.range) {
+              s.repsMin ??= s.reps;
+              s.repsMax ??= s.reps;
+            } else {
+              s.reps ??= s.repsMin ?? s.repsMax;
+            }
           }
         }
       }
@@ -416,8 +500,10 @@ class _RoutineEditorWebScreenState
       int dayIndex, int slotIndex, int setIndex, String v) {
     _markDirty();
     setState(() {
-      _days[dayIndex].slots[slotIndex].sets[setIndex].weightKg =
-          double.tryParse(v.trim().replaceAll(',', '.'));
+      _days[dayIndex]
+          .slots[slotIndex]
+          .weeklySets[_selectedWeek][setIndex]
+          .weightKg = double.tryParse(v.trim().replaceAll(',', '.'));
     });
   }
 
@@ -438,19 +524,24 @@ class _RoutineEditorWebScreenState
         return 'El día "${day.name}" necesita al menos un ejercicio.'; // i18n
       }
       for (final slot in day.slots) {
-        for (final set in slot.sets) {
-          final name = slot.exercise?.name ?? 'Un ejercicio'; // i18n
-          if (slot.exerciseMode == ExerciseMode.duration) {
-            if (set.durationSeconds == null || set.durationSeconds! <= 0) {
-              return '$name tiene una serie sin duración.'; // i18n
+        // Every week's sets must be complete (not just the currently viewed
+        // one) — otherwise a trainer could save with an incomplete week
+        // hidden behind an unvisited "Sem N" tab (Fase 4b).
+        for (final week in slot.weeklySets) {
+          for (final set in week) {
+            final name = slot.exercise?.name ?? 'Un ejercicio'; // i18n
+            if (slot.exerciseMode == ExerciseMode.duration) {
+              if (set.durationSeconds == null || set.durationSeconds! <= 0) {
+                return '$name tiene una serie sin duración.'; // i18n
+              }
+            } else if (slot.repMode == RepMode.range) {
+              final min = set.repsMin, max = set.repsMax;
+              if (min == null || min <= 0 || max == null || max < min) {
+                return '$name tiene un rango de reps inválido (mín ≤ máx).'; // i18n
+              }
+            } else if (set.reps == null || set.reps! <= 0) {
+              return '$name tiene una serie sin reps.'; // i18n
             }
-          } else if (slot.repMode == RepMode.range) {
-            final min = set.repsMin, max = set.repsMax;
-            if (min == null || min <= 0 || max == null || max < min) {
-              return '$name tiene un rango de reps inválido (mín ≤ máx).'; // i18n
-            }
-          } else if (set.reps == null || set.reps! <= 0) {
-            return '$name tiene una serie sin reps.'; // i18n
           }
         }
       }
@@ -492,6 +583,11 @@ class _RoutineEditorWebScreenState
     final isDuration = slot.exerciseMode == ExerciseMode.duration;
     final isRange = !isDuration && slot.repMode == RepMode.range;
 
+    // Legacy fields + the `sets:` list stay derived from WEEK 0, mirroring
+    // mobile's buildRoutineSlot — every non-week-aware consumer keeps reading
+    // the first week's prescription (REQ-PERIOD-017, ADR-PB-03).
+    final week0 = slot.weeklySets.first;
+
     // Legacy field derivation mirrors mobile's buildRoutineSlot.
     final int targetRepsMin;
     final int targetRepsMax;
@@ -501,48 +597,59 @@ class _RoutineEditorWebScreenState
       targetRepsMin = 0;
       targetRepsMax = 0;
       targetReps = const [];
-      durationSeconds =
-          slot.sets.isEmpty ? null : slot.sets.first.durationSeconds;
+      durationSeconds = week0.isEmpty ? null : week0.first.durationSeconds;
     } else if (isRange) {
-      final mins = slot.sets.map((s) => s.repsMin ?? 0).toList();
-      final maxs = slot.sets.map((s) => s.repsMax ?? 0).toList();
+      final mins = week0.map((s) => s.repsMin ?? 0).toList();
+      final maxs = week0.map((s) => s.repsMax ?? 0).toList();
       targetRepsMin = mins.isEmpty ? 0 : mins.reduce((a, b) => a < b ? a : b);
       targetRepsMax = maxs.isEmpty ? 0 : maxs.reduce((a, b) => a > b ? a : b);
       targetReps = const [];
     } else {
-      final reps = slot.sets.map((s) => s.reps ?? 0).toList();
+      final reps = week0.map((s) => s.reps ?? 0).toList();
       targetRepsMin = reps.isEmpty ? 0 : reps.reduce((a, b) => a < b ? a : b);
       targetRepsMax = reps.isEmpty ? 0 : reps.reduce((a, b) => a > b ? a : b);
       targetReps = reps;
     }
 
-    final specs = slot.sets.map((s) {
+    // Mode is per-slot (not per-week), so the SAME conversion applies to
+    // every week's rows.
+    SetSpec toSpec(_EditorSet s) {
       if (isDuration) return SetSpec(durationSeconds: s.durationSeconds);
       if (isRange) {
         return SetSpec(
             repsMin: s.repsMin, repsMax: s.repsMax, weightKg: s.weightKg);
       }
       return SetSpec(reps: s.reps, weightKg: s.weightKg);
-    }).toList();
+    }
+
+    final week0Specs = week0.map(toSpec).toList();
     final notes = slot.notes.trim();
 
     return RoutineSlot(
       exerciseId: exercise.id,
       exerciseName: exercise.name,
       muscleGroup: exercise.muscleGroup,
-      targetSets: specs.length,
+      targetSets: week0Specs.length,
       targetRepsMin: targetRepsMin,
       targetRepsMax: targetRepsMax,
       restSeconds: slot.restSeconds,
       supersetGroup: supersetGroup,
-      targetWeightKg: isDuration || specs.isEmpty ? null : specs.first.weightKg,
+      targetWeightKg:
+          isDuration || week0Specs.isEmpty ? null : week0Specs.first.weightKg,
       targetReps: targetReps,
       durationSeconds: durationSeconds,
       exerciseMode: slot.exerciseMode,
       repMode: slot.repMode,
       notes: notes.isEmpty ? null : notes,
-      sets: specs,
-      // weeklySets/activeWeeks default to empty ([] = single-week / all weeks).
+      sets: week0Specs,
+      // Full per-week prescription — only written past the first week; a
+      // single-week plan keeps weeklySets EMPTY (compact wire shape, parity
+      // with Fase 4a). `sets:` above always carries week 0 as the legacy
+      // fallback for non-week-aware readers.
+      weeklySets: _numWeeks > 1
+          ? slot.weeklySets.map((wk) => wk.map(toSpec).toList()).toList()
+          : const [],
+      // activeWeeks stays empty (presence mask) — Fase 4c, still out of scope.
     );
   }
 
@@ -785,10 +892,24 @@ class _RoutineEditorWebScreenState
                                 const SizedBox(height: 24),
                                 _FieldLabel('DÍAS', palette), // i18n
                                 const SizedBox(height: 8),
+                                // Global week switcher (Fase 4b) — one row for
+                                // the whole plan since `_selectedWeek` isn't
+                                // per-day. Hidden for single-week plans.
+                                if (_numWeeks > 1) ...[
+                                  _WeekTabs(
+                                    numWeeks: _numWeeks,
+                                    selectedWeek: _selectedWeek,
+                                    palette: palette,
+                                    onSelected: (w) =>
+                                        setState(() => _selectedWeek = w),
+                                  ),
+                                  const SizedBox(height: 12),
+                                ],
                                 for (var i = 0; i < _days.length; i++) ...[
                                   _DayCard(
                                     day: _days[i],
                                     palette: palette,
+                                    selectedWeek: _selectedWeek,
                                     canRemove: _days.length > 1,
                                     onNameChanged: (v) =>
                                         _onDayNameChanged(i, v),
@@ -1149,6 +1270,7 @@ class _DayCard extends StatelessWidget {
   const _DayCard({
     required this.day,
     required this.palette,
+    required this.selectedWeek,
     required this.canRemove,
     required this.onNameChanged,
     required this.onRemove,
@@ -1170,6 +1292,10 @@ class _DayCard extends StatelessWidget {
 
   final _EditorDay day;
   final AppPalette palette;
+
+  /// 0-based week whose `weeklySets` entry each slot card should render
+  /// (Fase 4b) — threaded down to [_SlotCard].
+  final int selectedWeek;
   final bool canRemove;
   final ValueChanged<String> onNameChanged;
   final VoidCallback onRemove;
@@ -1237,6 +1363,7 @@ class _DayCard extends StatelessWidget {
             _SlotCard(
               slot: day.slots[i],
               palette: palette,
+              selectedWeek: selectedWeek,
               canMoveUp: i > 0,
               canMoveDown: i < day.slots.length - 1,
               canLink: i < day.slots.length - 1,
@@ -1286,6 +1413,7 @@ class _SlotCard extends StatelessWidget {
   const _SlotCard({
     required this.slot,
     required this.palette,
+    required this.selectedWeek,
     required this.canMoveUp,
     required this.canMoveDown,
     required this.canLink,
@@ -1309,6 +1437,9 @@ class _SlotCard extends StatelessWidget {
 
   final _EditorSlot slot;
   final AppPalette palette;
+
+  /// 0-based week whose `slot.weeklySets` entry this card renders (Fase 4b).
+  final int selectedWeek;
   final bool canMoveUp;
   final bool canMoveDown;
   final bool canLink; // false for the last slot of a day (nothing to link to)
@@ -1332,6 +1463,9 @@ class _SlotCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final exercise = slot.exercise;
+    // The sets for the currently-viewed week only — other weeks' rows aren't
+    // rendered while a different tab is selected (Fase 4b).
+    final weekSets = slot.weeklySets[selectedWeek];
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
@@ -1431,14 +1565,18 @@ class _SlotCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 4),
-          for (var i = 0; i < slot.sets.length; i++)
+          for (var i = 0; i < weekSets.length; i++)
             _SetRow(
+              // Key by week so switching weeks REBUILDS the fields fresh from
+              // the model. Without it the uncontrolled TextFormFields keep the
+              // previous week's controller text and show stale values.
+              key: ValueKey('w${selectedWeek}s$i'),
               index: i,
-              set: slot.sets[i],
+              set: weekSets[i],
               palette: palette,
               exerciseMode: slot.exerciseMode,
               repMode: slot.repMode,
-              canRemove: slot.sets.length > 1,
+              canRemove: weekSets.length > 1,
               onRemove: () => onRemoveSet(i),
               onRepsChanged: (v) => onSetRepsChanged(i, v),
               onRepsMinChanged: (v) => onSetRepsMinChanged(i, v),
@@ -1509,6 +1647,7 @@ class _SlotCard extends StatelessWidget {
 
 class _SetRow extends StatelessWidget {
   const _SetRow({
+    super.key,
     required this.index,
     required this.set,
     required this.palette,
@@ -1650,6 +1789,87 @@ class _ModeChip extends StatelessWidget {
         ),
         child: Text(
           label,
+          style: GoogleFonts.barlowCondensed(
+            color: selected ? palette.bg : palette.textMuted,
+            fontWeight: FontWeight.w700,
+            fontSize: 12,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Week tabs (prescripción por semana, Fase 4b) ─────────────────────────────
+
+/// Plan-level week switcher shown above the days list when the routine spans
+/// more than one week: one chip per week ("Sem 1".."Sem N"). Tapping a chip
+/// changes which week's sets the day/slot cards render and edit
+/// (`_selectedWeek`) — a single global row since the selection isn't per-day.
+class _WeekTabs extends StatelessWidget {
+  const _WeekTabs({
+    required this.numWeeks,
+    required this.selectedWeek,
+    required this.palette,
+    required this.onSelected,
+  });
+
+  final int numWeeks;
+  final int selectedWeek;
+  final AppPalette palette;
+  final ValueChanged<int> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          for (var w = 0; w < numWeeks; w++) ...[
+            _WeekChip(
+              index: w,
+              selected: w == selectedWeek,
+              palette: palette,
+              onTap: () => onSelected(w),
+            ),
+            if (w < numWeeks - 1) const SizedBox(width: 6),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// One selectable week pill — accent-filled when [selected]. Mirrors
+/// [_ModeChip]'s visual style.
+class _WeekChip extends StatelessWidget {
+  const _WeekChip({
+    required this.index,
+    required this.selected,
+    required this.palette,
+    required this.onTap,
+  });
+
+  /// 0-based week — rendered 1-based ("Sem 1").
+  final int index;
+  final bool selected;
+  final AppPalette palette;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      key: Key('week_tab_$index'),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+        decoration: BoxDecoration(
+          color: selected ? palette.accent : palette.bgCard,
+          borderRadius: BorderRadius.circular(9999),
+          border: Border.all(color: selected ? palette.accent : palette.border),
+        ),
+        child: Text(
+          'Sem ${index + 1}', // i18n
           style: GoogleFonts.barlowCondensed(
             color: selected ? palette.bg : palette.textMuted,
             fontWeight: FontWeight.w700,

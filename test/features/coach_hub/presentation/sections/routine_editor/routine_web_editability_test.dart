@@ -1,6 +1,6 @@
 // Unit tests for isRoutineWebEditable — the gate that keeps the simple web
-// editor from silently truncating periodized / superset routines authored in
-// the mobile app.
+// editor from silently truncating routines that use the per-week presence
+// mask (activeWeeks, Fase 4c) authored in the mobile app.
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/features/coach_hub/presentation/sections/routine_editor/routine_web_editability.dart';
@@ -82,13 +82,13 @@ void main() {
       );
     });
 
-    test('per-week periodization (weeklySets) → not editable', () {
+    test('per-week periodization (weeklySets) IS editable (Fase 4b)', () {
       expect(
         isRoutineWebEditable(_routine(
             slot: _slot(weeklySets: const [
           [SetSpec(reps: 8)]
         ]))),
-        isFalse,
+        isTrue,
       );
     });
 

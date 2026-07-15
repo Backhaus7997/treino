@@ -27,7 +27,8 @@ Routine _routine({
   int days = 1,
   int numWeeks = 1,
   RoutineStatus status = RoutineStatus.active,
-  bool perWeek = false, // true → weeklySets populated → NOT web-editable
+  bool presenceMasked =
+      false, // true → activeWeeks populated → NOT web-editable
 }) =>
     Routine(
       id: id,
@@ -54,12 +55,7 @@ Routine _routine({
                 targetRepsMax: 8,
                 restSeconds: 60,
                 sets: const [SetSpec(reps: 8)],
-                weeklySets: perWeek
-                    ? const [
-                        [SetSpec(reps: 10)],
-                        [SetSpec(reps: 8)],
-                      ]
-                    : const [],
+                activeWeeks: presenceMasked ? const [0] : const [],
               ),
             ],
           ),
@@ -163,10 +159,13 @@ void main() {
       expect(find.text('CREATE $_athleteId'), findsOneWidget);
     });
 
-    testWidgets('a periodized routine is view-only (tap does not open editor)',
+    testWidgets(
+        'a routine with a presence mask is view-only (tap does not open editor)',
         (tester) async {
-      await _pump(
-          tester, [_routine(id: 'r9', name: 'Periodizada', perWeek: true)]);
+      await _pump(tester, [
+        _routine(
+            id: 'r9', name: 'Periodizada', numWeeks: 2, presenceMasked: true)
+      ]);
 
       expect(find.text('Editá en la app'), findsOneWidget);
 
