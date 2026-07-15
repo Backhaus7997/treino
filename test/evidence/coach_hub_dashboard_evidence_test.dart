@@ -488,11 +488,32 @@ Future<void> _pumpDashboard(
         debugShowCheckedModeBanner: false,
         localizationsDelegates: AppL10n.localizationsDelegates,
         supportedLocales: AppL10n.supportedLocales,
+        // CRÍTICO (CRITICAL#1 sdd-verify fase-2): sin locale explícito, el
+        // entorno de test resuelve a 'en' — y varios keys nuevos del
+        // dashboard (dashboardGreeting, dashboardSummaryLine, quick
+        // actions, KPIs) están vacíos en intl_en.arb (l10n congelado en
+        // español, ADR-D2-03). Sin esto, el golden queda en blanco (saludo,
+        // labels de KPI y CTAs ausentes) — invalida la paridad visual con
+        // el mockup. Mismo patrón que dashboard_hero_test.dart /
+        // coach_hub_dashboard_screen_assembly_test.dart.
+        locale: const Locale('es', 'AR'),
         routerConfig: router,
       ),
     ),
   );
   await tester.pumpAndSettle();
+
+  // Guard de regresión: si el locale no resuelve a español, el saludo
+  // ("BUENAS, {NOMBRE}") queda vacío y el golden captura la welcome card en
+  // blanco sin que ningún test lo detecte (matchesGoldenFile solo compara
+  // píxeles contra el propio "before", igualmente roto). Falla temprano acá
+  // con un mensaje claro en vez de un mismatch de imagen silencioso.
+  expect(
+    find.textContaining('BUENAS,'),
+    findsOneWidget,
+    reason: 'saludo en español ausente — el locale del harness no está '
+        'resolviendo a es_AR (welcome card quedaría en blanco en el golden)',
+  );
 }
 
 // Cuerpo de sección stub para las rutas del sidebar que no son /dashboard.
