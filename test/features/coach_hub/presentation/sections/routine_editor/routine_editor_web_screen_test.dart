@@ -212,6 +212,48 @@ Routine _durationRoutine({String id = 'r3'}) => Routine(
       ],
     );
 
+/// A web-editable routine with a 2-exercise superset (shared supersetGroup).
+Routine _supersetRoutine({String id = 'r4'}) => Routine(
+      id: id,
+      name: 'PPL',
+      split: 'PPL',
+      level: ExperienceLevel.advanced,
+      source: RoutineSource.trainerAssigned,
+      assignedBy: _trainerId,
+      assignedTo: _athleteId,
+      visibility: RoutineVisibility.private,
+      days: const [
+        RoutineDay(
+          dayNumber: 1,
+          name: 'Día A',
+          slots: [
+            RoutineSlot(
+              exerciseId: 'bench-press',
+              exerciseName: 'Press de Banca',
+              muscleGroup: 'chest',
+              targetSets: 1,
+              targetRepsMin: 10,
+              targetRepsMax: 10,
+              restSeconds: 60,
+              supersetGroup: 1,
+              sets: [SetSpec(reps: 10, weightKg: 40)],
+            ),
+            RoutineSlot(
+              exerciseId: 'cable-fly',
+              exerciseName: 'Aperturas con Cable',
+              muscleGroup: 'chest',
+              targetSets: 1,
+              targetRepsMin: 12,
+              targetRepsMax: 12,
+              restSeconds: 60,
+              supersetGroup: 1,
+              sets: [SetSpec(reps: 12, weightKg: 15)],
+            ),
+          ],
+        ),
+      ],
+    );
+
 /// Fills name + split and adds one exercise (via the mocked exercise picker
 /// data) to the first day, then sets valid reps on its single default set.
 Future<void> _fillMinimalValidForm(WidgetTester tester) async {
@@ -728,6 +770,64 @@ void main() {
       final slot = draft.days.single.slots.single;
       expect(slot.exerciseMode, ExerciseMode.duration);
       expect(slot.sets.single.durationSeconds, 60);
+    });
+  });
+
+  group('RoutineEditorWebScreen — supersets (Fase 3)', () {
+    testWidgets('unlinking a superset saves both exercises as standalone',
+        (tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.getById(any()))
+          .thenAnswer((_) async => _supersetRoutine());
+      when(() => repo.updateAssigned(
+            uid: any(named: 'uid'),
+            draft: any(named: 'draft'),
+          )).thenAnswer((i) async => i.namedArguments[#draft] as Routine);
+      await _pumpEditor(tester, repo: repo, routineId: 'r4');
+
+      // Loaded as a linked superset → toggle it off.
+      await tester.tap(find.text('En superserie con el siguiente'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
+      await tester.pumpAndSettle();
+
+      final draft = verify(() => repo.updateAssigned(
+            uid: any(named: 'uid'),
+            draft: captureAny(named: 'draft'),
+          )).captured.single as Routine;
+      final slots = draft.days.single.slots;
+      // A lone (unlinked) slot normalizes to a standalone (null group).
+      expect(slots[0].supersetGroup, isNull);
+      expect(slots[1].supersetGroup, isNull);
+    });
+
+    testWidgets('edit mode loads a superset and re-saves it linked',
+        (tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.getById(any()))
+          .thenAnswer((_) async => _supersetRoutine());
+      when(() => repo.updateAssigned(
+            uid: any(named: 'uid'),
+            draft: any(named: 'draft'),
+          )).thenAnswer((i) async => i.namedArguments[#draft] as Routine);
+      await _pumpEditor(tester, repo: repo, routineId: 'r4');
+
+      expect(find.text('Press de Banca'), findsOneWidget);
+      expect(find.text('Aperturas con Cable'), findsOneWidget);
+      // The link is reconstructed and shown as active on the first slot.
+      expect(find.text('En superserie con el siguiente'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
+      await tester.pumpAndSettle();
+
+      final draft = verify(() => repo.updateAssigned(
+            uid: any(named: 'uid'),
+            draft: captureAny(named: 'draft'),
+          )).captured.single as Routine;
+      final slots = draft.days.single.slots;
+      expect(slots[0].supersetGroup, isNotNull);
+      expect(slots[0].supersetGroup, slots[1].supersetGroup);
     });
   });
 }
