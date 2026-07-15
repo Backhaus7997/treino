@@ -375,7 +375,8 @@ class _DayTimelineState extends ConsumerState<DayTimeline> {
                 // Content
                 Expanded(
                   child: Padding(
-                    padding: const EdgeInsets.all(6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
@@ -403,7 +404,7 @@ class _DayTimelineState extends ConsumerState<DayTimeline> {
                           ),
                         ],
                         if (fitsEnd) ...[
-                          const SizedBox(height: 2),
+                          const SizedBox(height: 1),
                           Text(
                             AgendaFormatters.formatTime(endsAt),
                             style: GoogleFonts.barlowCondensed(
