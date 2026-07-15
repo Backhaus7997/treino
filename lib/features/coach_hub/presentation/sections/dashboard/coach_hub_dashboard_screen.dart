@@ -15,14 +15,10 @@ import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach_hub/presentation/sections/dashboard/widgets/dashboard_hero.dart';
+import 'package:treino/features/coach_hub/presentation/sections/dashboard/widgets/dashboard_kpi_strip.dart';
 import 'package:treino/features/coach_hub/presentation/sections/pagos/widgets/pagos_buckets_provider.dart';
-import 'package:treino/features/coach_hub/presentation/sections/pagos/widgets/pagos_kpi_row.dart'
-    show KpiTile;
-import 'package:treino/features/coach_hub/presentation/sections/pagos/widgets/payment_format.dart'
-    show fmtArs;
 import 'package:treino/features/feed/presentation/widgets/post_avatar.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
-import 'package:treino/features/coach_hub/application/aggregate_adherence_provider.dart';
 import 'package:treino/features/coach_hub/application/inactivos_provider.dart';
 import 'package:treino/features/workout/application/session_providers.dart'
     show currentUidProvider;
@@ -97,7 +93,7 @@ class _DashboardContent extends ConsumerWidget {
         const SizedBox(height: AppSpacing.s18),
         const DashboardWelcomeCard(),
         const SizedBox(height: AppSpacing.s18),
-        const _KpiStrip(),
+        const DashboardKpiStrip(),
         const SizedBox(height: 20),
         if (wide) ...[
           const _TwoColumnLayout(
@@ -135,80 +131,6 @@ class _TwoColumnLayout extends StatelessWidget {
           Expanded(flex: 55, child: left),
           const SizedBox(width: 20),
           Expanded(flex: 45, child: right),
-        ],
-      ),
-    );
-  }
-}
-
-// ── KPI strip ─────────────────────────────────────────────────────────────────
-
-/// 4-tile KPI strip: Alumnos activos / Ingreso del mes / Adherencia / Por cobrar.
-/// REQ-HOY-05.
-class _KpiStrip extends ConsumerWidget {
-  const _KpiStrip();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final l10n = AppL10n.of(context);
-    final linksAsync = ref.watch(trainerLinksStreamProvider);
-    final bucketsAsync = ref.watch(pagosBucketsProvider);
-
-    // Alumnos activos.
-    final activeCount = linksAsync.valueOrNull
-            ?.where((l) => l.status == TrainerLinkStatus.active)
-            .length ??
-        0;
-
-    // Ingreso del mes + Por cobrar from pagosBuckets.
-    int ingresoMes = 0;
-    int porCobrarTotal = 0;
-    int vencidosCount = 0;
-    bucketsAsync.whenData((buckets) {
-      final now = DateTime.now().toUtc();
-      final monthStart = DateTime.utc(now.year, now.month, 1);
-      for (final p in buckets.pagados) {
-        final ref = (p.paidAt ?? p.createdAt).toUtc();
-        if (!ref.isBefore(monthStart)) {
-          ingresoMes += p.amountArs;
-        }
-      }
-      porCobrarTotal = buckets.vencidos.fold(0, (sum, p) => sum + p.amountArs);
-      vencidosCount = buckets.vencidos.length;
-    });
-
-    // Adherencia aggregate — valueOrNull degrades to null (no spinner hang).
-    final adherenceAsync = ref.watch(aggregateAdherenceProvider);
-    final adherenceValue = adherenceAsync.valueOrNull;
-    final adherenceLabel = adherenceValue == null
-        ? l10n.dashboardAdherenceRingPlaceholder // "--"
-        : l10n.dashboardAdherenceValue(adherenceValue.round());
-
-    final isLoading = linksAsync.isLoading || bucketsAsync.isLoading;
-
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: [
-          KpiTile(
-            label: l10n.dashboardKpiAlumnosActivos,
-            value: isLoading ? '…' : activeCount.toString(),
-          ),
-          const SizedBox(width: 12),
-          KpiTile(
-            label: l10n.dashboardKpiIngresoMes,
-            value: bucketsAsync.isLoading ? '…' : fmtArs(ingresoMes),
-          ),
-          const SizedBox(width: 12),
-          KpiTile(
-            label: l10n.dashboardKpiAdherencia,
-            value: adherenceLabel,
-          ),
-          const SizedBox(width: 12),
-          KpiTile(
-            label: l10n.dashboardKpiPorCobrar(vencidosCount),
-            value: bucketsAsync.isLoading ? '…' : fmtArs(porCobrarTotal),
-          ),
         ],
       ),
     );
