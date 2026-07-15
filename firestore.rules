@@ -978,22 +978,50 @@ service cloud.firestore {
     // profile via trainerMonthlyRate. A future subscribe flow may
     // reintroduce a plan catalog with its own rules block.
 
-    // Body measurements / anthropometry. Owned by the TRAINER who recorded them
-    // (recordedBy). The athlete gets read-only of their own. No one else.
+    // Body measurements / anthropometry. Written by the TRAINER who recorded
+    // them (recordedBy) OR self-logged by the athlete about themselves
+    // (athlete-self-measurements). The athlete always reads their own; a
+    // linked+consented trainer reads the athlete's self-logged ones.
     match /measurements/{measurementId} {
+      // READ branches, cheapest first so get()s only run for the trainer path:
+      //   1. author (trainer OR self-logging athlete) — pure field compare.
+      //   2. subject athlete — own vantage — pure field compare.
+      //   3. [athlete-self-measurements] a SELF-LOGGED doc
+      //      (recordedBy == athleteId) is readable by a trainer ONLY when BOTH
+      //      fixed-path share docs name them: session_shares (live link, kept
+      //      by the syncSessionShareOnTrainerLink CF → follows the CURRENT
+      //      trainer) AND profile_shares (the athlete's own consent toggle,
+      //      the same surface that shares weight/height). Both are keyed by
+      //      athleteId, so a trainer's athleteId-scoped list resolves them ONCE
+      //      (cached), not per-doc — the same idiom already live for setLogs
+      //      (~:852). This is NOT gated on the dead `sharedWithTrainer` bool
+      //      (design.md ADR-ASM-2). Ordering is load-bearing: branches 1/2
+      //      short-circuit before any get().
       allow read: if request.auth != null
                   && (request.auth.uid == resource.data.recordedBy
-                      || request.auth.uid == resource.data.athleteId);
-      // rules-hardening Slice C (AD-1 option b) — Coach-Collection Create
-      // Requires Trainer Role: closes the "any athlete-role user forges a
-      // measurement naming themselves recordedBy" vector. Role-check only,
-      // NOT a trainer_links relationship check — see design.md AD-1 /
-      // engram obs #413.
+                      || request.auth.uid == resource.data.athleteId
+                      || (resource.data.recordedBy == resource.data.athleteId
+                          && exists(/databases/$(database)/documents/session_shares/$(resource.data.athleteId))
+                          && get(/databases/$(database)/documents/session_shares/$(resource.data.athleteId)).data.trainerId == request.auth.uid
+                          && exists(/databases/$(database)/documents/profile_shares/$(resource.data.athleteId))
+                          && get(/databases/$(database)/documents/profile_shares/$(resource.data.athleteId)).data.trainerId == request.auth.uid));
+      // CREATE — dual OR-branch (mirrors the appointments athlete-self-book /
+      // trainer+role pattern). `recordedBy == uid` + athleteId shape checks are
+      // a SHARED precondition of both branches, so a self-logged doc is always
+      // recordedBy == athleteId == uid. The `||` short-circuits on the
+      // athlete-self branch, so a self-logging athlete never triggers the role
+      // get(); a forger naming ANOTHER athleteId always falls through to the
+      // role check and is denied (AD-1 forge vector stays closed).
       allow create: if request.auth != null
                     && request.resource.data.recordedBy == request.auth.uid
-                    && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'trainer'
                     && request.resource.data.athleteId is string
-                    && request.resource.data.athleteId.size() > 0;
+                    && request.resource.data.athleteId.size() > 0
+                    && (
+                         // Athlete-self branch: may log ONLY about themselves.
+                         request.resource.data.athleteId == request.auth.uid
+                         // Trainer branch (unchanged from rules-hardening Slice C).
+                         || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'trainer'
+                       );
       allow update: if request.auth != null
                     && resource.data.recordedBy == request.auth.uid
                     && request.resource.data.recordedBy == resource.data.recordedBy
