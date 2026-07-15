@@ -171,7 +171,7 @@ void main() {
       repo = TrainerLinkRepository(firestore: firestore);
     });
 
-    Future<List<Override>> _repoOverrides(String athleteId) async => [
+    Future<List<Override>> repoOverrides(String athleteId) async => [
           firestoreProvider.overrideWithValue(firestore),
           currentUidProvider.overrideWithValue('trainer-1'),
           analyticsServiceProvider.overrideWithValue(FakeAnalyticsService()),
@@ -189,7 +189,7 @@ void main() {
 
       await _pump(
         tester,
-        overrides: await _repoOverrides('a1'),
+        overrides: await repoOverrides('a1'),
       );
       await tester.pumpAndSettle();
 
@@ -210,7 +210,7 @@ void main() {
 
       await _pump(
         tester,
-        overrides: await _repoOverrides('a1'),
+        overrides: await repoOverrides('a1'),
       );
       await tester.pumpAndSettle();
 
