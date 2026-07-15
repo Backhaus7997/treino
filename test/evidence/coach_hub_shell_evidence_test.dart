@@ -19,6 +19,7 @@
 //
 // Matriz: dark 1440x900, dark 420x900, light 1440x900, light 420x900.
 
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:firebase_auth/firebase_auth.dart';
@@ -129,6 +130,8 @@ Future<void> _loadTestFonts() async {
     'test/fonts/BarlowCondensed-Regular.ttf',
     'test/fonts/BarlowCondensed-Bold.ttf',
   ]);
+
+  await _loadPhosphorFonts();
 }
 
 Future<ByteData?> _readTtf(String path) async {
@@ -144,6 +147,70 @@ Future<void> _loadFontFamily(String family, List<String> paths) async {
     if (bytes != null) loader.addFont(Future.value(bytes));
   }
   await loader.load();
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Carga de la fuente de phosphor_flutter (Finding H2).
+//
+// `TreinoIcon` (lib/core/widgets/treino_icon.dart) es la única puerta de
+// entrada a los íconos del kit y solo usa 3 estilos de Phosphor: Regular,
+// Fill y Bold (ver PhosphorIconsRegular/Fill/Bold en treino_icon.dart — Light,
+// Thin y Duotone no se usan en ningún lugar del código).
+//
+// `PhosphorFlatIconData` (phosphor_flutter/lib/src/phosphor_icon_data.dart)
+// construye cada `IconData` con `fontFamily: 'Phosphor$style'` y
+// `fontPackage: 'phosphor_flutter'`. Flutter resuelve el nombre de familia
+// EFECTIVO como `packages/<fontPackage>/<fontFamily>` (ver
+// `TextStyle._effectiveFontFamily` en el SDK) — por eso el `FontLoader` se
+// registra con el nombre YA prefijado (`packages/phosphor_flutter/PhosphorX`),
+// no con el nombre "pelado" (`PhosphorX`); de lo contrario el texto no
+// encuentra la fuente y sigue renderizando tofu aunque el TTF esté cargado.
+//
+// Los TTF de `phosphor_flutter` están declarados en su pubspec.yaml bajo
+// `flutter: fonts:` (no `assets:`), por lo que NO quedan expuestos vía
+// `rootBundle.load('packages/phosphor_flutter/...')` durante `flutter test`
+// (el bundle de test solo sirve assets declarados explícitamente — falla con
+// "Unable to load asset"). En su lugar resolvemos la ubicación real del
+// paquete leyendo `.dart_tool/package_config.json` (generado por `pub get`,
+// siempre apunta a la ubicación correcta en CADA máquina/CI — pub-cache,
+// path override, monorepo, etc.) y leemos el TTF directo del disco, el mismo
+// mecanismo que usa el propio SDK de Dart para resolver `package:`.
+// ──────────────────────────────────────────────────────────────────────────────
+Future<String> _resolvePackageRoot(String packageName) async {
+  final configFile = File('.dart_tool/package_config.json');
+  final config =
+      jsonDecode(await configFile.readAsString()) as Map<String, dynamic>;
+  final packages = config['packages'] as List<dynamic>;
+  final pkg = packages.cast<Map<String, dynamic>>().firstWhere(
+        (p) => p['name'] == packageName,
+        orElse: () => throw StateError(
+          'Package "$packageName" not found in .dart_tool/package_config.json',
+        ),
+      );
+  final rootUri = pkg['rootUri'] as String;
+  // rootUri puede ser absoluto (file:///...) o relativo a package_config.json
+  // — Uri.resolve maneja ambos casos correctamente.
+  final resolved = configFile.absolute.uri.resolve(rootUri);
+  return resolved.toFilePath();
+}
+
+Future<void> _loadPhosphorFonts() async {
+  const styleToAsset = {
+    'Regular': 'Phosphor.ttf',
+    'Fill': 'Phosphor-Fill.ttf',
+    'Bold': 'Phosphor-Bold.ttf',
+  };
+
+  final packageRoot = await _resolvePackageRoot('phosphor_flutter');
+
+  for (final entry in styleToAsset.entries) {
+    final loader = FontLoader('packages/phosphor_flutter/Phosphor${entry.key}');
+    final ttfPath =
+        '$packageRoot/lib/fonts/${entry.value}'.replaceAll('\\', '/');
+    final bytes = await _readTtf(ttfPath);
+    if (bytes != null) loader.addFont(Future.value(bytes));
+    await loader.load();
+  }
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
