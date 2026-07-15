@@ -309,6 +309,7 @@ class _DayTimelineState extends ConsumerState<DayTimeline> {
       final startMin = appt.startsAt.hour * 60 + appt.startsAt.minute;
       final top = (startMin - startHour * 60) * _kPxPerMin;
       final blockHeight = math.max(appt.durationMin * _kPxPerMin, _kMinBlockH);
+      final endsAt = appt.startsAt.add(Duration(minutes: appt.durationMin));
 
       final colW = availW / layout.columnCount;
       final left = _kGutter + layout.columnIndex * colW;
@@ -377,7 +378,8 @@ class _DayTimelineState extends ConsumerState<DayTimeline> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          AgendaFormatters.formatTime(appt.startsAt),
+                          '${AgendaFormatters.formatTime(appt.startsAt)} – '
+                          '${AgendaFormatters.formatTime(endsAt)}',
                           style: GoogleFonts.barlowCondensed(
                             fontWeight: FontWeight.w700,
                             fontSize: 12,
