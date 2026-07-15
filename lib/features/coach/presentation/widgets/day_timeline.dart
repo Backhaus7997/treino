@@ -327,8 +327,11 @@ class _DayTimelineState extends ConsumerState<DayTimeline> {
       final athleteName =
           (isRawUid || rawName.trim().isEmpty) ? 'Alumno' : rawName;
 
-      // How many text lines fit in the block?
-      final fitsName = blockHeight >= 44;
+      // Progressive disclosure by block height: the start time always shows;
+      // the end time and the name appear only when there's vertical room,
+      // which keeps short blocks from overflowing.
+      final fitsEnd = blockHeight >= 44;
+      final fitsName = blockHeight >= 60;
 
       return Positioned(
         top: top,
@@ -378,8 +381,7 @@ class _DayTimelineState extends ConsumerState<DayTimeline> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          '${AgendaFormatters.formatTime(appt.startsAt)} – '
-                          '${AgendaFormatters.formatTime(endsAt)}',
+                          AgendaFormatters.formatTime(appt.startsAt),
                           style: GoogleFonts.barlowCondensed(
                             fontWeight: FontWeight.w700,
                             fontSize: 12,
@@ -388,6 +390,17 @@ class _DayTimelineState extends ConsumerState<DayTimeline> {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
+                        if (fitsEnd)
+                          Text(
+                            AgendaFormatters.formatTime(endsAt),
+                            style: GoogleFonts.barlowCondensed(
+                              fontWeight: FontWeight.w500,
+                              fontSize: 11,
+                              color: palette.highlight.withAlpha(180),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         if (fitsName) ...[
                           const SizedBox(height: 2),
                           Text(
