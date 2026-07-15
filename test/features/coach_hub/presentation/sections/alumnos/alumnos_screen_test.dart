@@ -158,7 +158,7 @@ void main() {
         profiles: [_prof('a1', 'Sofía'), _prof('a2', 'Diego')],
       );
 
-      await tester.tap(find.text('Pausados 1'));
+      await tester.tap(find.text('PAUSADOS · 1'));
       await tester.pumpAndSettle();
 
       expect(find.text('Diego'), findsOneWidget);

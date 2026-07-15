@@ -1941,6 +1941,17 @@ class AppL10nEs extends AppL10n {
   String get coachHubAlumnosStatusInactive => 'Inactivo';
 
   @override
+  String get coachHubAlumnosViewTable => 'Tabla';
+
+  @override
+  String get coachHubAlumnosViewCards => 'Cards';
+
+  @override
+  String coachHubAlumnosDebtAmount(String amount) {
+    return 'Debe $amount';
+  }
+
+  @override
   String get coachHubAlumnoDetailNotasTitle => 'Notas privadas';
 
   @override
@@ -4520,6 +4531,17 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get coachHubAlumnosStatusInactive => 'Inactivo';
+
+  @override
+  String get coachHubAlumnosViewTable => 'Tabla';
+
+  @override
+  String get coachHubAlumnosViewCards => 'Cards';
+
+  @override
+  String coachHubAlumnosDebtAmount(String amount) {
+    return 'Debe $amount';
+  }
 
   @override
   String get coachHubAlumnoDetailNotasTitle => 'Notas privadas';

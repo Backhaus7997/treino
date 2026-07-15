@@ -1890,6 +1890,17 @@ class AppL10nEn extends AppL10n {
   String get coachHubAlumnosStatusInactive => 'Inactive';
 
   @override
+  String get coachHubAlumnosViewTable => 'Table';
+
+  @override
+  String get coachHubAlumnosViewCards => 'Cards';
+
+  @override
+  String coachHubAlumnosDebtAmount(String amount) {
+    return 'Owes $amount';
+  }
+
+  @override
   String get coachHubAlumnoDetailNotasTitle => 'Private notes';
 
   @override

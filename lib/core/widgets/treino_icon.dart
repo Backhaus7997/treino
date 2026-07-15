@@ -174,4 +174,8 @@ class TreinoIcon {
   // Alumno detail — Archivos tab (upload/download/trash/image ya existen arriba)
   static const IconData file = PhosphorIconsRegular.file;
   static const IconData filePdf = PhosphorIconsRegular.filePdf;
+
+  // Coach Hub — Alumnos roster view-mode toggle (Tabla / Cards).
+  static const IconData viewTable = PhosphorIconsRegular.rows;
+  static const IconData viewCards = PhosphorIconsRegular.squaresFour;
 }
