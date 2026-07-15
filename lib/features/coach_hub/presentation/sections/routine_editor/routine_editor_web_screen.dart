@@ -30,13 +30,13 @@ import 'routine_web_editability.dart';
 
 /// Editor de rutinas web — crea o edita la rutina de UN alumno (mirrors
 /// mobile's `RoutineEditorScreen(TrainerAssigning)`). Soporta, por ejercicio:
-/// reps fijas o rango (mín–máx), duración (por tiempo) y notas para el alumno
-/// (paridad Fases 1-2). Todavía NO: supersets (Fase 3) ni periodización
-/// multi-semana (Fase 4) — esas rutinas se siguen editando en mobile.
+/// reps fijas o rango (mín–máx), duración (por tiempo), notas para el alumno y
+/// supersets (paridad Fases 1-3). Todavía NO: periodización multi-semana
+/// (Fase 4) — esas rutinas se siguen editando en mobile.
 ///
 /// **Modo edición** (`routineId != null`): carga la rutina y la abre en el
 /// form. Como `updateAssigned` pisa el array `days` entero, editar una rutina
-/// con supersets/periodización desde acá la truncaría silenciosamente — por eso
+/// periodizada desde acá la truncaría silenciosamente — por eso
 /// [isRoutineWebEditable] actúa de compuerta: si la rutina usa un campo aún no
 /// soportado, el editor NO la carga y muestra un aviso para editarla en mobile.
 /// Las rutinas creadas en web están siempre dentro de scope, así que
@@ -80,6 +80,9 @@ class _EditorSlot {
   ExerciseMode exerciseMode = ExerciseMode.reps;
   RepMode repMode = RepMode.single;
   String notes = '';
+  // True when this exercise is supersetted with the NEXT one in the day. A run
+  // of linked slots becomes one superset group (id derived at build time).
+  bool linkedToNext = false;
   List<_EditorSet> sets = [_EditorSet()];
 }
 
@@ -175,8 +178,16 @@ class _RoutineEditorWebScreenState
   }
 
   _EditorDay _editorDayFrom(RoutineDay day) {
+    final editorSlots = day.slots.map(_editorSlotFrom).toList();
+    // Reconstruct linkedToNext: slot i is supersetted with i+1 when they share
+    // a non-null supersetGroup (supersets are consecutive runs by construction).
+    for (var i = 0; i < day.slots.length - 1; i++) {
+      final g = day.slots[i].supersetGroup;
+      editorSlots[i].linkedToNext =
+          g != null && g == day.slots[i + 1].supersetGroup;
+    }
     return _EditorDay(dayNumber: day.dayNumber, name: day.name)
-      ..slots = day.slots.map(_editorSlotFrom).toList();
+      ..slots = editorSlots;
   }
 
   _EditorSlot _editorSlotFrom(RoutineSlot slot) {
@@ -283,6 +294,15 @@ class _RoutineEditorWebScreenState
       final tmp = slots[slotIndex];
       slots[slotIndex] = slots[target];
       slots[target] = tmp;
+    });
+  }
+
+  // Links / unlinks this exercise with the next one into a superset.
+  void _toggleSlotLink(int dayIndex, int slotIndex) {
+    _markDirty();
+    setState(() {
+      final slot = _days[dayIndex].slots[slotIndex];
+      slot.linkedToNext = !slot.linkedToNext;
     });
   }
 
@@ -427,7 +447,34 @@ class _RoutineEditorWebScreenState
 
   // ── Submit ───────────────────────────────────────────────────────────────
 
-  RoutineSlot _buildSlot(_EditorSlot slot) {
+  /// Derives the `supersetGroup` id for each slot in a day from the
+  /// `linkedToNext` flags. Consecutive linked slots share an id; a group of a
+  /// single slot normalizes to `null` (standalone), mirroring mobile.
+  List<int?> _supersetGroups(List<_EditorSlot> slots) {
+    final n = slots.length;
+    // Assign a raw run id: a slot ends its run when it isn't linked to the next.
+    final raw = List<int>.filled(n, 0);
+    var run = 0;
+    for (var i = 0; i < n; i++) {
+      raw[i] = run;
+      if (!slots[i].linkedToNext) run++;
+    }
+    final counts = <int, int>{};
+    for (final r in raw) {
+      counts[r] = (counts[r] ?? 0) + 1;
+    }
+    // Map runs with >= 2 members to stable positive ids; singletons → null.
+    final ids = <int, int>{};
+    var next = 1;
+    return [
+      for (var i = 0; i < n; i++)
+        (counts[raw[i]] ?? 0) >= 2
+            ? ids.putIfAbsent(raw[i], () => next++)
+            : null,
+    ];
+  }
+
+  RoutineSlot _buildSlot(_EditorSlot slot, int? supersetGroup) {
     final exercise = slot.exercise!;
     final isDuration = slot.exerciseMode == ExerciseMode.duration;
     final isRange = !isDuration && slot.repMode == RepMode.range;
@@ -474,6 +521,7 @@ class _RoutineEditorWebScreenState
       targetRepsMin: targetRepsMin,
       targetRepsMax: targetRepsMax,
       restSeconds: slot.restSeconds,
+      supersetGroup: supersetGroup,
       targetWeightKg: isDuration || specs.isEmpty ? null : specs.first.weightKg,
       targetReps: targetReps,
       durationSeconds: durationSeconds,
@@ -500,16 +548,20 @@ class _RoutineEditorWebScreenState
       _errorMessage = null;
     });
 
-    final days = _days
-        .map((d) => RoutineDay(
-              dayNumber: d.dayNumber,
-              name: d.name,
-              slots: d.slots
-                  .where((s) => s.exercise != null)
-                  .map(_buildSlot)
-                  .toList(),
-            ))
-        .toList();
+    final days = _days.map((d) {
+      // supersetGroup ids are derived per day from the linkedToNext flags, over
+      // the exercise-bearing slots only (the ones that become RoutineDay.slots).
+      final withExercise = d.slots.where((s) => s.exercise != null).toList();
+      final groups = _supersetGroups(withExercise);
+      return RoutineDay(
+        dayNumber: d.dayNumber,
+        name: d.name,
+        slots: [
+          for (var i = 0; i < withExercise.length; i++)
+            _buildSlot(withExercise[i], groups[i]),
+        ],
+      );
+    }).toList();
 
     final repo = ref.read(routineRepositoryProvider);
     try {
@@ -742,6 +794,7 @@ class _RoutineEditorWebScreenState
                                         _setSlotMode(i, s, em, rm),
                                     onNotesChanged: (s, v) =>
                                         _onNotesChanged(i, s, v),
+                                    onToggleLink: (s) => _toggleSlotLink(i, s),
                                   ),
                                   const SizedBox(height: 12),
                                 ],
@@ -996,6 +1049,7 @@ class _DayCard extends StatelessWidget {
     required this.onSetWeightChanged,
     required this.onModeChanged,
     required this.onNotesChanged,
+    required this.onToggleLink,
   });
 
   final _EditorDay day;
@@ -1022,6 +1076,7 @@ class _DayCard extends StatelessWidget {
   final void Function(int slotIndex, ExerciseMode exerciseMode, RepMode repMode)
       onModeChanged;
   final void Function(int slotIndex, String value) onNotesChanged;
+  final void Function(int slotIndex) onToggleLink;
 
   @override
   Widget build(BuildContext context) {
@@ -1068,6 +1123,11 @@ class _DayCard extends StatelessWidget {
               palette: palette,
               canMoveUp: i > 0,
               canMoveDown: i < day.slots.length - 1,
+              canLink: i < day.slots.length - 1,
+              linkedToNext: day.slots[i].linkedToNext,
+              inSuperset:
+                  (i < day.slots.length - 1 && day.slots[i].linkedToNext) ||
+                      (i > 0 && day.slots[i - 1].linkedToNext),
               onRemove: () => onRemoveSlot(i),
               onMoveUp: () => onMoveSlot(i, -1),
               onMoveDown: () => onMoveSlot(i, 1),
@@ -1081,6 +1141,7 @@ class _DayCard extends StatelessWidget {
               onSetWeightChanged: (set, v) => onSetWeightChanged(i, set, v),
               onModeChanged: (em, rm) => onModeChanged(i, em, rm),
               onNotesChanged: (v) => onNotesChanged(i, v),
+              onToggleLink: () => onToggleLink(i),
             ),
           ],
           const SizedBox(height: 10),
@@ -1111,6 +1172,9 @@ class _SlotCard extends StatelessWidget {
     required this.palette,
     required this.canMoveUp,
     required this.canMoveDown,
+    required this.canLink,
+    required this.linkedToNext,
+    required this.inSuperset,
     required this.onRemove,
     required this.onMoveUp,
     required this.onMoveDown,
@@ -1124,12 +1188,16 @@ class _SlotCard extends StatelessWidget {
     required this.onSetWeightChanged,
     required this.onModeChanged,
     required this.onNotesChanged,
+    required this.onToggleLink,
   });
 
   final _EditorSlot slot;
   final AppPalette palette;
   final bool canMoveUp;
   final bool canMoveDown;
+  final bool canLink; // false for the last slot of a day (nothing to link to)
+  final bool linkedToNext;
+  final bool inSuperset; // part of a >=2 superset run → accent border
   final VoidCallback onRemove;
   final VoidCallback onMoveUp;
   final VoidCallback onMoveDown;
@@ -1143,6 +1211,7 @@ class _SlotCard extends StatelessWidget {
   final void Function(int setIndex, String value) onSetWeightChanged;
   final void Function(ExerciseMode exerciseMode, RepMode repMode) onModeChanged;
   final ValueChanged<String> onNotesChanged;
+  final VoidCallback onToggleLink;
 
   @override
   Widget build(BuildContext context) {
@@ -1152,6 +1221,11 @@ class _SlotCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: palette.bg,
         borderRadius: BorderRadius.circular(10),
+        // Slots in a superset run share an accent-tinted border to read as a
+        // group (the "link with next" toggle is what forms the run).
+        border: inSuperset
+            ? Border.all(color: palette.accent.withValues(alpha: 0.55))
+            : null,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1285,6 +1359,30 @@ class _SlotCard extends StatelessWidget {
               counterText: '',
             ),
           ),
+          // Superset link — only offered when there IS a next exercise to link
+          // to. A run of linked exercises becomes one superset block on save.
+          if (canLink)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: onToggleLink,
+                icon: Icon(
+                  linkedToNext ? TreinoIcon.check : TreinoIcon.plus,
+                  size: 14,
+                  color: linkedToNext ? palette.accent : palette.textMuted,
+                ),
+                label: Text(
+                  linkedToNext
+                      ? 'En superserie con el siguiente' // i18n
+                      : 'Superserie con el siguiente', // i18n
+                  style: GoogleFonts.barlowCondensed(
+                    color: linkedToNext ? palette.accent : palette.textMuted,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );

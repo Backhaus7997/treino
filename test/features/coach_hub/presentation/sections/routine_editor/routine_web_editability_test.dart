@@ -74,10 +74,10 @@ void main() {
       expect(isRoutineWebEditable(_routine(numWeeks: 2)), isFalse);
     });
 
-    test('a superset slot → not editable', () {
+    test('a superset slot IS editable (Fase 3)', () {
       expect(
         isRoutineWebEditable(_routine(slot: _slot(supersetGroup: 1))),
-        isFalse,
+        isTrue,
       );
     });
 
