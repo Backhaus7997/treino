@@ -1,8 +1,8 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
+import '../../../../app/theme/tokens/primitives.dart';
 
 class PostAvatar extends StatelessWidget {
   const PostAvatar({
@@ -70,7 +70,8 @@ class _InitialFallback extends StatelessWidget {
       alignment: Alignment.center,
       child: Text(
         initial,
-        style: GoogleFonts.barlowCondensed(
+        style: TextStyle(
+          fontFamily: AppFonts.barlowCondensed,
           fontWeight: FontWeight.w700,
           fontSize: size * 0.45,
           color: palette.bg,

@@ -28,6 +28,11 @@ class TreinoIcon {
   static const IconData mapPin = PhosphorIconsRegular.mapPin;
   static const IconData bell = PhosphorIconsRegular.bell;
 
+  /// Rayo de atención — caja de ícono mint del alert banner del dashboard
+  /// Coach Hub web (Fase 2, WU-02). Alias de [specialty] (mismo glyph
+  /// `lightning`, distinto significado semántico según contexto de uso).
+  static const IconData alertAttention = specialty;
+
   // Rankings (per-gym leaderboards — rachas/volumen/lifts).
   static const IconData ranking = PhosphorIconsRegular.trophy;
 

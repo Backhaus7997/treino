@@ -308,6 +308,14 @@ void _ignoreKnownGoogleFontsAsyncErrors() {
     if (isGoogleFontsNetworkError) return;
     previousOnError?.call(details);
   };
+  // CRÍTICO: restaurar el handler original al cerrar el test. Sin esto, el
+  // framework de test (`TestWidgetsFlutterBinding._runTest.handleUncaughtError`)
+  // invoca `FlutterError.onError` para registrar `_pendingExceptionDetails`
+  // en errores async no capturados (fuera de este handler); si sigue
+  // apuntando a este filtro, el swallow rompe ese bookkeeping interno y el
+  // test falla con la aserción "A test overrode FlutterError.onError but
+  // either failed to return it to its original state".
+  addTearDown(() => FlutterError.onError = previousOnError);
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
