@@ -27,6 +27,7 @@ Routine _routine({
   int days = 1,
   int numWeeks = 1,
   RoutineStatus status = RoutineStatus.active,
+  bool perWeek = false, // true → weeklySets populated → NOT web-editable
 }) =>
     Routine(
       id: id,
@@ -43,7 +44,7 @@ Routine _routine({
           RoutineDay(
             dayNumber: i + 1,
             name: 'Día ${i + 1}',
-            slots: const [
+            slots: [
               RoutineSlot(
                 exerciseId: 'e',
                 exerciseName: 'Ex',
@@ -52,7 +53,13 @@ Routine _routine({
                 targetRepsMin: 8,
                 targetRepsMax: 8,
                 restSeconds: 60,
-                sets: [SetSpec(reps: 8)],
+                sets: const [SetSpec(reps: 8)],
+                weeklySets: perWeek
+                    ? const [
+                        [SetSpec(reps: 10)],
+                        [SetSpec(reps: 8)],
+                      ]
+                    : const [],
               ),
             ],
           ),
@@ -159,7 +166,7 @@ void main() {
     testWidgets('a periodized routine is view-only (tap does not open editor)',
         (tester) async {
       await _pump(
-          tester, [_routine(id: 'r9', name: 'Periodizada', numWeeks: 4)]);
+          tester, [_routine(id: 'r9', name: 'Periodizada', perWeek: true)]);
 
       expect(find.text('Editá en la app'), findsOneWidget);
 

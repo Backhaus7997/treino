@@ -70,8 +70,9 @@ void main() {
       );
     });
 
-    test('numWeeks > 1 → not editable', () {
-      expect(isRoutineWebEditable(_routine(numWeeks: 2)), isFalse);
+    test('numWeeks > 1 with a shared prescription IS editable (Fase 4a)', () {
+      // Multi-week where every week uses the same sets (weeklySets empty).
+      expect(isRoutineWebEditable(_routine(numWeeks: 2)), isTrue);
     });
 
     test('a superset slot IS editable (Fase 3)', () {
