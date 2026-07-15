@@ -30,21 +30,22 @@ import 'routine_web_editability.dart';
 
 /// Editor de rutinas web — crea o edita la rutina de UN alumno (mirrors
 /// mobile's `RoutineEditorScreen(TrainerAssigning)`). Soporta, por ejercicio:
-/// reps fijas o rango (mín–máx), duración (por tiempo), notas para el alumno y
-/// supersets (paridad Fases 1-3). Todavía NO: periodización multi-semana
-/// (Fase 4) — esas rutinas se siguen editando en mobile.
+/// reps fijas o rango (mín–máx), duración (por tiempo), notas para el alumno,
+/// supersets y N semanas con la misma prescripción (paridad Fases 1-4a). Todavía
+/// NO: prescripción distinta por semana (Fase 4b) ni máscara de presencia por
+/// semana (Fase 4c) — esas rutinas se siguen editando en mobile.
 ///
 /// **Modo edición** (`routineId != null`): carga la rutina y la abre en el
 /// form. Como `updateAssigned` pisa el array `days` entero, editar una rutina
-/// periodizada desde acá la truncaría silenciosamente — por eso
+/// con prescripción por-semana desde acá la truncaría silenciosamente — por eso
 /// [isRoutineWebEditable] actúa de compuerta: si la rutina usa un campo aún no
 /// soportado, el editor NO la carga y muestra un aviso para editarla en mobile.
 /// Las rutinas creadas en web están siempre dentro de scope, así que
 /// round-tripean sin drama.
 ///
 /// La `Routine` que este editor escribe es 100% válida para el modelo de
-/// dominio completo (numWeeks: 1, weeklySets/activeWeeks vacíos = "todas las
-/// semanas") — mobile puede leerla y editarla sin problema.
+/// dominio completo (weeklySets/activeWeeks vacíos = "misma prescripción todas
+/// las semanas") — mobile puede leerla y editarla sin problema.
 class RoutineEditorWebScreen extends ConsumerStatefulWidget {
   const RoutineEditorWebScreen({
     super.key,
@@ -94,12 +95,14 @@ class _EditorDay {
 }
 
 const _kMaxDays = 7; // mirrors mobile's _kMaxDays
+const _kMaxWeeks = 16; // mirrors mobile's _kMaxWeeks
 
 class _RoutineEditorWebScreenState
     extends ConsumerState<RoutineEditorWebScreen> {
   final _nameCtrl = TextEditingController();
   final _splitCtrl = TextEditingController();
   ExperienceLevel _level = ExperienceLevel.beginner;
+  int _numWeeks = 1;
   final List<_EditorDay> _days = [
     _EditorDay(dayNumber: 1, name: 'Día 1')
   ]; // i18n
@@ -169,6 +172,7 @@ class _RoutineEditorWebScreenState
     _nameCtrl.text = routine.name;
     _splitCtrl.text = routine.split ?? '';
     _level = routine.level;
+    _numWeeks = routine.numWeeks.clamp(1, _kMaxWeeks);
     _days
       ..clear()
       ..addAll(routine.days.map(_editorDayFrom));
@@ -231,6 +235,15 @@ class _RoutineEditorWebScreenState
   // Deliberately no setState here (mirrors mobile's own _markDirty): callers
   // already rebuild via their own setState or a TextField's onChanged.
   void _markDirty() => _isDirty = true;
+
+  // ── Week operations (periodización) ───────────────────────────────────────
+
+  void _setNumWeeks(int value) {
+    final clamped = value.clamp(1, _kMaxWeeks);
+    if (clamped == _numWeeks) return;
+    _markDirty();
+    setState(() => _numWeeks = clamped);
+  }
 
   // ── Day operations ───────────────────────────────────────────────────────
 
@@ -575,7 +588,7 @@ class _RoutineEditorWebScreenState
           split: _splitCtrl.text.trim(),
           level: _level,
           days: days,
-          numWeeks: 1,
+          numWeeks: _numWeeks,
         );
         await repo.updateAssigned(uid: trainerUid, draft: draft);
       } else {
@@ -585,6 +598,7 @@ class _RoutineEditorWebScreenState
           split: _splitCtrl.text.trim(),
           level: _level,
           days: days,
+          numWeeks: _numWeeks,
           source: RoutineSource.trainerAssigned,
           assignedBy: trainerUid,
           assignedTo: widget.athleteId,
@@ -759,6 +773,14 @@ class _RoutineEditorWebScreenState
                                     _markDirty();
                                     setState(() => _level = l);
                                   },
+                                ),
+                                const SizedBox(height: 24),
+                                _FieldLabel('SEMANAS', palette), // i18n
+                                const SizedBox(height: 8),
+                                _WeeksStepper(
+                                  numWeeks: _numWeeks,
+                                  palette: palette,
+                                  onChanged: _setNumWeeks,
                                 ),
                                 const SizedBox(height: 24),
                                 _FieldLabel('DÍAS', palette), // i18n
@@ -977,6 +999,100 @@ class _FatalMessage extends StatelessWidget {
                       color: palette.textPrimary, fontWeight: FontWeight.w700)),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Weeks stepper (periodización) ────────────────────────────────────────────
+
+class _WeeksStepper extends StatelessWidget {
+  const _WeeksStepper({
+    required this.numWeeks,
+    required this.palette,
+    required this.onChanged,
+  });
+
+  final int numWeeks;
+  final AppPalette palette;
+  final ValueChanged<int> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        _StepButton(
+          label: '−',
+          enabled: numWeeks > 1,
+          palette: palette,
+          onTap: () => onChanged(numWeeks - 1),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Text(
+            numWeeks == 1 ? '1 semana' : '$numWeeks semanas', // i18n
+            style: GoogleFonts.barlowCondensed(
+                color: palette.textPrimary,
+                fontSize: 16,
+                fontWeight: FontWeight.w700),
+          ),
+        ),
+        _StepButton(
+          label: '+',
+          enabled: numWeeks < _kMaxWeeks,
+          palette: palette,
+          onTap: () => onChanged(numWeeks + 1),
+        ),
+        const SizedBox(width: 14),
+        if (numWeeks > 1)
+          Expanded(
+            child: Text(
+              'Misma rutina cada semana.', // i18n
+              style: GoogleFonts.barlow(color: palette.textMuted, fontSize: 12),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _StepButton extends StatelessWidget {
+  const _StepButton({
+    required this.label,
+    required this.enabled,
+    required this.palette,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool enabled;
+  final AppPalette palette;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: enabled ? onTap : null,
+      child: Container(
+        width: 36,
+        height: 36,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: palette.bgCard,
+          borderRadius: BorderRadius.circular(9999),
+          border: Border.all(
+              color: enabled
+                  ? palette.border
+                  : palette.border.withValues(alpha: 0.4)),
+        ),
+        child: Text(
+          label,
+          style: GoogleFonts.barlowCondensed(
+            color: enabled ? palette.accent : palette.textMuted,
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+          ),
         ),
       ),
     );

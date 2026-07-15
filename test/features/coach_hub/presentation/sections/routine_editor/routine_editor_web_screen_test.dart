@@ -254,6 +254,47 @@ Routine _supersetRoutine({String id = 'r4'}) => Routine(
       ],
     );
 
+/// A web-editable multi-week routine: N weeks sharing one prescription
+/// (weeklySets stays empty) — the Fase 4a shape.
+Routine _multiWeekRoutine({String id = 'r5'}) =>
+    _simpleRoutine(id: id).copyWith(numWeeks: 4);
+
+/// A per-week PERIODIZED routine (weeklySets populated) — still out of web
+/// scope (Fase 4b), so the editor must refuse it.
+Routine _perWeekRoutine({String id = 'r6'}) => Routine(
+      id: id,
+      name: 'Periodizada',
+      split: 'PPL',
+      level: ExperienceLevel.advanced,
+      source: RoutineSource.trainerAssigned,
+      assignedBy: _trainerId,
+      assignedTo: _athleteId,
+      visibility: RoutineVisibility.private,
+      numWeeks: 2,
+      days: const [
+        RoutineDay(
+          dayNumber: 1,
+          name: 'Día A',
+          slots: [
+            RoutineSlot(
+              exerciseId: 'bench-press',
+              exerciseName: 'Press de Banca',
+              muscleGroup: 'chest',
+              targetSets: 1,
+              targetRepsMin: 8,
+              targetRepsMax: 8,
+              restSeconds: 90,
+              sets: [SetSpec(reps: 8, weightKg: 60)],
+              weeklySets: [
+                [SetSpec(reps: 10, weightKg: 55)],
+                [SetSpec(reps: 8, weightKg: 60)],
+              ],
+            ),
+          ],
+        ),
+      ],
+    );
+
 /// Fills name + split and adds one exercise (via the mocked exercise picker
 /// data) to the first day, then sets valid reps on its single default set.
 Future<void> _fillMinimalValidForm(WidgetTester tester) async {
@@ -518,8 +559,8 @@ void main() {
         (tester) async {
       final repo = _MockRoutineRepository();
       when(() => repo.getById(any()))
-          .thenAnswer((_) async => _simpleRoutine().copyWith(numWeeks: 4));
-      await _pumpEditor(tester, repo: repo, routineId: 'r1');
+          .thenAnswer((_) async => _perWeekRoutine());
+      await _pumpEditor(tester, repo: repo, routineId: 'r6');
 
       expect(find.textContaining('periodización'), findsOneWidget);
       expect(find.text('Volver'), findsOneWidget);
@@ -785,7 +826,10 @@ void main() {
           )).thenAnswer((i) async => i.namedArguments[#draft] as Routine);
       await _pumpEditor(tester, repo: repo, routineId: 'r4');
 
-      // Loaded as a linked superset → toggle it off.
+      // Loaded as a linked superset → toggle it off. ensureVisible because the
+      // toggle sits low in a tall form (scrolls off the test viewport).
+      await tester.ensureVisible(find.text('En superserie con el siguiente'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('En superserie con el siguiente'));
       await tester.pumpAndSettle();
 
@@ -828,6 +872,66 @@ void main() {
       final slots = draft.days.single.slots;
       expect(slots[0].supersetGroup, isNotNull);
       expect(slots[0].supersetGroup, slots[1].supersetGroup);
+    });
+  });
+
+  group('RoutineEditorWebScreen — semanas (Fase 4a)', () {
+    testWidgets('the weeks stepper sets numWeeks on create (shared sets)',
+        (tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.createAssigned(any())).thenAnswer(
+        (i) async => i.positionalArguments.first as Routine,
+      );
+      await _pumpEditor(tester, repo: repo);
+
+      // Bump 1 → 3 weeks (stepper is near the top, before adding exercises).
+      await tester.tap(find.text('+'));
+      await tester.pump();
+      await tester.tap(find.text('+'));
+      await tester.pumpAndSettle();
+      expect(find.text('3 semanas'), findsOneWidget);
+
+      await _fillMinimalValidForm(tester);
+      await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
+      await tester.pumpAndSettle();
+
+      final routine = verify(() => repo.createAssigned(captureAny()))
+          .captured
+          .single as Routine;
+      expect(routine.numWeeks, 3);
+      // Same prescription every week → no per-week data written.
+      expect(routine.days.single.slots.single.weeklySets, isEmpty);
+    });
+
+    testWidgets('the "−" stepper does not go below 1 week', (tester) async {
+      await _pumpEditor(tester);
+
+      expect(find.text('1 semana'), findsOneWidget);
+      await tester.tap(find.text('−'));
+      await tester.pumpAndSettle();
+      expect(find.text('1 semana'), findsOneWidget); // clamped at 1
+    });
+
+    testWidgets('edit mode loads numWeeks and re-saves it', (tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.getById(any()))
+          .thenAnswer((_) async => _multiWeekRoutine());
+      when(() => repo.updateAssigned(
+            uid: any(named: 'uid'),
+            draft: any(named: 'draft'),
+          )).thenAnswer((i) async => i.namedArguments[#draft] as Routine);
+      await _pumpEditor(tester, repo: repo, routineId: 'r5');
+
+      expect(find.text('4 semanas'), findsOneWidget); // loaded
+
+      await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
+      await tester.pumpAndSettle();
+
+      final draft = verify(() => repo.updateAssigned(
+            uid: any(named: 'uid'),
+            draft: captureAny(named: 'draft'),
+          )).captured.single as Routine;
+      expect(draft.numWeeks, 4);
     });
   });
 }
