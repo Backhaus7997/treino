@@ -239,5 +239,76 @@ void main() {
             '("Barlow Condensed", no "BarlowCondensed")',
       );
     });
+
+    // -------------------------------------------------------------------------
+    // Orden mockup (ADR-D2-04, Fase 2): label arriba, value abajo.
+    // -------------------------------------------------------------------------
+    testWidgets(
+        'orden visual → label arriba del value (mockup) [SCENARIO-CK-KPI-12]',
+        (tester) async {
+      await tester.pumpWidget(_wrap(
+        const KpiCard(value: '28', label: 'Alumnos activos'),
+      ));
+      await tester.pump();
+
+      final labelY = tester.getTopLeft(find.text('Alumnos activos')).dy;
+      final valueY = tester.getTopLeft(find.text('28')).dy;
+      expect(labelY, lessThan(valueY),
+          reason: 'el label debe estar arriba del value (orden mockup '
+              'ADR-D2-04)');
+    });
+
+    // -------------------------------------------------------------------------
+    // sublabel opcional (ADR-D2-04): solo se pasa cuando hay dato real.
+    // -------------------------------------------------------------------------
+    testWidgets(
+        'sublabel provisto → se muestra bajo el value [SCENARIO-CK-KPI-13]',
+        (tester) async {
+      await tester.pumpWidget(_wrap(
+        const KpiCard(
+          value: '86.000',
+          label: 'Por cobrar',
+          sublabel: '3 vencidos',
+        ),
+      ));
+      await tester.pump();
+      expect(find.text('3 vencidos'), findsOneWidget);
+
+      final valueY = tester.getTopLeft(find.text('86.000')).dy;
+      final sublabelY = tester.getTopLeft(find.text('3 vencidos')).dy;
+      expect(sublabelY, greaterThan(valueY),
+          reason: 'el sublabel debe estar debajo del value');
+    });
+
+    testWidgets('sublabel null (default) → no renderiza nada extra '
+        '[SCENARIO-CK-KPI-14]', (tester) async {
+      await tester.pumpWidget(_wrap(
+        const KpiCard(value: '28', label: 'Alumnos activos'),
+      ));
+      await tester.pump();
+      // Sin sublabel: solo label + value en el árbol (sin texto extra).
+      expect(find.text('28'), findsOneWidget);
+      expect(find.text('Alumnos activos'), findsOneWidget);
+    });
+
+    // -------------------------------------------------------------------------
+    // loading=true sigue intacto tras el reorder (regresión).
+    // -------------------------------------------------------------------------
+    testWidgets(
+        'loading=true con sublabel provisto → sigue mostrando skeleton, '
+        'oculta value/sublabel [SCENARIO-CK-KPI-15]', (tester) async {
+      await tester.pumpWidget(_wrap(
+        const KpiCard(
+          value: '86.000',
+          label: 'Por cobrar',
+          sublabel: '3 vencidos',
+          loading: true,
+        ),
+      ));
+      await tester.pump();
+      expect(find.byKey(const Key('kpi_card_skeleton')), findsOneWidget);
+      expect(find.text('86.000'), findsNothing);
+      expect(find.text('3 vencidos'), findsNothing);
+    });
   });
 }

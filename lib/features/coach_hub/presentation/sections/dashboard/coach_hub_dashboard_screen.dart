@@ -16,12 +16,10 @@ import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach_hub/presentation/sections/dashboard/widgets/dashboard_hero.dart';
+import 'package:treino/features/coach_hub/presentation/sections/dashboard/widgets/dashboard_kpi_strip.dart';
 import 'package:treino/features/coach_hub/presentation/sections/pagos/widgets/pagos_buckets_provider.dart';
-import 'package:treino/features/coach_hub/presentation/sections/pagos/widgets/payment_format.dart'
-    show fmtArs;
 import 'package:treino/features/feed/presentation/widgets/post_avatar.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
-import 'package:treino/features/coach_hub/application/aggregate_adherence_provider.dart';
 import 'package:treino/features/coach_hub/application/inactivos_provider.dart';
 import 'package:treino/features/workout/application/session_providers.dart'
     show currentUidProvider;
@@ -102,7 +100,7 @@ class _DashboardContent extends ConsumerWidget {
         const SizedBox(height: AppSpacing.s18),
         const DashboardWelcomeCard(),
         const SizedBox(height: AppSpacing.s18),
-        const _KpiStrip(),
+        const DashboardKpiStrip(),
         const SizedBox(height: 20),
         if (wide) ...[
           const _TwoColumnLayout(
@@ -140,169 +138,6 @@ class _TwoColumnLayout extends StatelessWidget {
           Expanded(flex: 55, child: left),
           const SizedBox(width: 20),
           Expanded(flex: 45, child: right),
-        ],
-      ),
-    );
-  }
-}
-
-// ── KPI strip ─────────────────────────────────────────────────────────────────
-
-/// 4-tile KPI strip: Alumnos activos / Ingreso del mes / Adherencia / Por cobrar.
-/// REQ-HOY-05.
-class _KpiStrip extends ConsumerWidget {
-  const _KpiStrip();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final l10n = AppL10n.of(context);
-    final linksAsync = ref.watch(trainerLinksStreamProvider);
-    final bucketsAsync = ref.watch(pagosBucketsProvider);
-
-    // Alumnos activos.
-    final activeCount = linksAsync.valueOrNull
-            ?.where((l) => l.status == TrainerLinkStatus.active)
-            .length ??
-        0;
-
-    // Ingreso del mes + Por cobrar from pagosBuckets.
-    int ingresoMes = 0;
-    int porCobrarTotal = 0;
-    int vencidosCount = 0;
-    bucketsAsync.whenData((buckets) {
-      final now = DateTime.now().toUtc();
-      final monthStart = DateTime.utc(now.year, now.month, 1);
-      for (final p in buckets.pagados) {
-        final ref = (p.paidAt ?? p.createdAt).toUtc();
-        if (!ref.isBefore(monthStart)) {
-          ingresoMes += p.amountArs;
-        }
-      }
-      porCobrarTotal = buckets.vencidos.fold(0, (sum, p) => sum + p.amountArs);
-      vencidosCount = buckets.vencidos.length;
-    });
-
-    // Adherencia aggregate — valueOrNull degrades to null (no spinner hang).
-    final adherenceAsync = ref.watch(aggregateAdherenceProvider);
-    final adherenceValue = adherenceAsync.valueOrNull;
-    final adherenceLabel = adherenceValue == null
-        ? l10n.dashboardAdherenceRingPlaceholder // "--"
-        // Clamp to 100% — matches the adherence ring (raw value can exceed
-        // 100 when an athlete logs more sessions than planned).
-        : l10n.dashboardAdherenceValue(adherenceValue.round().clamp(0, 100));
-
-    final isLoading = linksAsync.isLoading || bucketsAsync.isLoading;
-
-    final palette = AppPalette.of(context);
-    return Row(
-      children: [
-        Expanded(
-          child: _DashboardKpiCard(
-            label: l10n.dashboardKpiAlumnosActivos,
-            value: isLoading ? '…' : activeCount.toString(),
-            icon: TreinoIcon.sidebarAlumnos,
-            palette: palette,
-          ),
-        ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: _DashboardKpiCard(
-            label: l10n.dashboardKpiIngresoMes,
-            value: bucketsAsync.isLoading ? '…' : fmtArs(ingresoMes),
-            icon: TreinoIcon.trendUp,
-            palette: palette,
-          ),
-        ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: _DashboardKpiCard(
-            label: l10n.dashboardKpiAdherencia,
-            value: adherenceLabel,
-            icon: TreinoIcon.equipCardio,
-            palette: palette,
-          ),
-        ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: _DashboardKpiCard(
-            label: l10n.dashboardKpiPorCobrar(vencidosCount),
-            value: bucketsAsync.isLoading ? '…' : fmtArs(porCobrarTotal),
-            icon: TreinoIcon.sidebarPagos,
-            palette: palette,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-/// KPI card del dashboard (mockup resto-cards.png): ícono de acento en un
-/// chip mint suave arriba, label chico, valor grande. Más presencia que el
-/// `KpiTile` plano compartido con Pagos.
-class _DashboardKpiCard extends StatelessWidget {
-  const _DashboardKpiCard({
-    required this.label,
-    required this.value,
-    required this.icon,
-    required this.palette,
-  });
-
-  final String label;
-  final String value;
-  final IconData icon;
-  final AppPalette palette;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: palette.bgCard,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: palette.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 30,
-                height: 30,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: palette.accent.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(icon, size: 16, color: palette.accent),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  label.toUpperCase(),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.barlowCondensed(
-                    color: palette.textMuted,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.6,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            value,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: GoogleFonts.barlowCondensed(
-              color: palette.textPrimary,
-              fontSize: 26,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
         ],
       ),
     );
