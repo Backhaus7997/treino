@@ -1983,45 +1983,25 @@
   "@muscleDistributionLoadError": {
     "description": "Error state for the MuscleDistributionScreen's provider load failure. Paired with coachRetryLabel for the retry CTA — same convention as monthlyReportLoadError."
   },
-  "insightsTileAnthropometryTitle": "Antropometría",
-  "@insightsTileAnthropometryTitle": {
+  "insightsTileMeasurementsTitle": "Medidas",
+  "@insightsTileMeasurementsTitle": {
     "description": "Tile title on InsightsScreen navigating to AnthropometryScreen."
   },
-  "insightsTileAnthropometrySubtitle": "Peso y medidas corporales en el tiempo",
-  "@insightsTileAnthropometrySubtitle": {
+  "insightsTileMeasurementsSubtitle": "Peso y medidas corporales en el tiempo",
+  "@insightsTileMeasurementsSubtitle": {
     "description": "Tile subtitle for the Anthropometry stats-hub entry."
   },
-  "anthropometryScreenTitle": "ANTROPOMETRÍA",
-  "@anthropometryScreenTitle": {
+  "measurementsScreenTitle": "MEDIDAS",
+  "@measurementsScreenTitle": {
     "description": "Header title for the dedicated AnthropometryScreen."
   },
-  "anthropometryEmptyState": "Todavía no tenés mediciones cargadas. Las registra tu entrenador.",
-  "@anthropometryEmptyState": {
+  "measurementsEmptyState": "Todavía no tenés mediciones cargadas. Las registra tu entrenador.",
+  "@measurementsEmptyState": {
     "description": "Shown when the athlete has ZERO measurements. Names WHO records them, because today only a trainer-role user can create them (firestore.rules AD-1) — an athlete without a trainer would otherwise have no idea why the screen is empty."
   },
-  "anthropometryNeedsMoreData": "Con una sola medición no hay progreso que mostrar. Falta al menos una más.",
-  "@anthropometryNeedsMoreData": {
+  "measurementsNeedsMoreData": "Con una sola medición no hay progreso que mostrar. Falta al menos una más.",
+  "@measurementsNeedsMoreData": {
     "description": "Shown when the athlete has exactly ONE measurement. MeasurementProgressChart requires >= 2 points — distinct from the zero case, which is why it is a separate string."
-  },
-  "insightsTilePerformanceTitle": "Rendimiento",
-  "@insightsTilePerformanceTitle": {
-    "description": "Tile title on InsightsScreen navigating to PerformanceScreen."
-  },
-  "insightsTilePerformanceSubtitle": "Saltos, velocidad, fuerza y resistencia",
-  "@insightsTilePerformanceSubtitle": {
-    "description": "Tile subtitle for the Performance stats-hub entry."
-  },
-  "performanceScreenTitle": "RENDIMIENTO",
-  "@performanceScreenTitle": {
-    "description": "Header title for the dedicated PerformanceScreen."
-  },
-  "performanceEmptyState": "Todavía no tenés evaluaciones cargadas. Las registra tu entrenador.",
-  "@performanceEmptyState": {
-    "description": "Shown when the athlete has ZERO performance tests. Same rationale as anthropometryEmptyState."
-  },
-  "performanceNeedsMoreData": "Con una sola evaluación no hay progreso que mostrar. Falta al menos una más.",
-  "@performanceNeedsMoreData": {
-    "description": "Shown when the athlete has exactly ONE performance test. PerformanceProgressChart requires >= 2 points."
   },
   "insightsTileFrequentExercisesTitle": "Ejercicios frecuentes",
   "@insightsTileFrequentExercisesTitle": {

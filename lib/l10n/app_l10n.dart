@@ -4626,62 +4626,32 @@ abstract class AppL10n {
   /// Tile title on InsightsScreen navigating to AnthropometryScreen.
   ///
   /// In es_AR, this message translates to:
-  /// **'Antropometría'**
-  String get insightsTileAnthropometryTitle;
+  /// **'Medidas'**
+  String get insightsTileMeasurementsTitle;
 
   /// Tile subtitle for the Anthropometry stats-hub entry.
   ///
   /// In es_AR, this message translates to:
   /// **'Peso y medidas corporales en el tiempo'**
-  String get insightsTileAnthropometrySubtitle;
+  String get insightsTileMeasurementsSubtitle;
 
   /// Header title for the dedicated AnthropometryScreen.
   ///
   /// In es_AR, this message translates to:
-  /// **'ANTROPOMETRÍA'**
-  String get anthropometryScreenTitle;
+  /// **'MEDIDAS'**
+  String get measurementsScreenTitle;
 
   /// Shown when the athlete has ZERO measurements. Names WHO records them, because today only a trainer-role user can create them (firestore.rules AD-1) — an athlete without a trainer would otherwise have no idea why the screen is empty.
   ///
   /// In es_AR, this message translates to:
   /// **'Todavía no tenés mediciones cargadas. Las registra tu entrenador.'**
-  String get anthropometryEmptyState;
+  String get measurementsEmptyState;
 
   /// Shown when the athlete has exactly ONE measurement. MeasurementProgressChart requires >= 2 points — distinct from the zero case, which is why it is a separate string.
   ///
   /// In es_AR, this message translates to:
   /// **'Con una sola medición no hay progreso que mostrar. Falta al menos una más.'**
-  String get anthropometryNeedsMoreData;
-
-  /// Tile title on InsightsScreen navigating to PerformanceScreen.
-  ///
-  /// In es_AR, this message translates to:
-  /// **'Rendimiento'**
-  String get insightsTilePerformanceTitle;
-
-  /// Tile subtitle for the Performance stats-hub entry.
-  ///
-  /// In es_AR, this message translates to:
-  /// **'Saltos, velocidad, fuerza y resistencia'**
-  String get insightsTilePerformanceSubtitle;
-
-  /// Header title for the dedicated PerformanceScreen.
-  ///
-  /// In es_AR, this message translates to:
-  /// **'RENDIMIENTO'**
-  String get performanceScreenTitle;
-
-  /// Shown when the athlete has ZERO performance tests. Same rationale as anthropometryEmptyState.
-  ///
-  /// In es_AR, this message translates to:
-  /// **'Todavía no tenés evaluaciones cargadas. Las registra tu entrenador.'**
-  String get performanceEmptyState;
-
-  /// Shown when the athlete has exactly ONE performance test. PerformanceProgressChart requires >= 2 points.
-  ///
-  /// In es_AR, this message translates to:
-  /// **'Con una sola evaluación no hay progreso que mostrar. Falta al menos una más.'**
-  String get performanceNeedsMoreData;
+  String get measurementsNeedsMoreData;
 
   /// [stats-hub] Tile title on InsightsScreen navigating to FrequentExercisesScreen (athlete's own uid).
   ///

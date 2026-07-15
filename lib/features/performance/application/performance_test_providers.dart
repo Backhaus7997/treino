@@ -33,25 +33,3 @@ final performanceTestsForAthleteProvider = StreamProvider.autoDispose
             all.toList()..sort((a, b) => a.recordedAt.compareTo(b.recordedAt)),
       );
 });
-
-/// Live stream de TODOS los tests de performance de [athleteId], desde la
-/// óptica del PROPIO atleta — sin importar quién los registró.
-///
-/// Contraparte de [performanceTestsForAthleteProvider] (óptica del ENTRENADOR,
-/// sólo ve los que él mismo cargó). Misma asimetría y mismas restricciones que
-/// [ownMeasurementsProvider] — ver su doc para el detalle de las reglas.
-///
-/// ⚠️ SÓLO válido cuando el caller ES el atleta. Ver
-/// [PerformanceTestRepository.watchForAthlete].
-final ownPerformanceTestsProvider = StreamProvider.autoDispose
-    .family<List<PerformanceTest>, String>((ref, athleteId) {
-  if (athleteId.isEmpty) return Stream.value(const []);
-
-  return ref
-      .watch(performanceTestRepositoryProvider)
-      .watchForAthlete(athleteId)
-      .map(
-        (all) =>
-            all.toList()..sort((a, b) => a.recordedAt.compareTo(b.recordedAt)),
-      );
-});

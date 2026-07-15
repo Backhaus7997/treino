@@ -40,13 +40,12 @@ import '../features/profile/application/account_deletion_notifier.dart';
 import '../features/feed/presentation/public_profile_screen.dart';
 import '../features/feed/presentation/search_users_screen.dart';
 import '../features/home/home_screen.dart';
-import '../features/insights/presentation/anthropometry_screen.dart';
 import '../features/insights/presentation/exercise_progression_screen.dart';
 import '../features/insights/presentation/frequent_exercises_screen.dart';
 import '../features/insights/presentation/insights_screen.dart';
+import '../features/insights/presentation/measurements_screen.dart';
 import '../features/insights/presentation/monthly_report_screen.dart';
 import '../features/insights/presentation/muscle_distribution_screen.dart';
-import '../features/insights/presentation/performance_screen.dart';
 import '../features/insights/presentation/volume_by_group_screen.dart';
 import '../features/profile/application/user_providers.dart';
 import '../features/profile/domain/user_profile_trainer_completeness.dart';
@@ -393,14 +392,9 @@ GoRouter buildRouter({
             _report(state.pageKey, _immersive(const _VolumeByGroupRouteHost())),
       ),
       GoRoute(
-        path: '/home/insights/anthropometry',
+        path: '/home/insights/measurements',
         pageBuilder: (_, state) =>
-            _report(state.pageKey, _immersive(const _AnthropometryRouteHost())),
-      ),
-      GoRoute(
-        path: '/home/insights/performance',
-        pageBuilder: (_, state) =>
-            _report(state.pageKey, _immersive(const _PerformanceRouteHost())),
+            _report(state.pageKey, _immersive(const _MeasurementsRouteHost())),
       ),
       GoRoute(
         // `?exerciseId=` opcional: preselecciona un ejercicio. Lo usa
@@ -730,26 +724,15 @@ class _MuscleDistributionRouteHost extends ConsumerWidget {
   }
 }
 
-/// Resuelve el uid actual y monta [AnthropometryScreen] — mismo patrón que los
+/// Resuelve el uid actual y monta [MeasurementsScreen] — mismo patrón que los
 /// demás hosts del hub.
-class _AnthropometryRouteHost extends ConsumerWidget {
-  const _AnthropometryRouteHost();
+class _MeasurementsRouteHost extends ConsumerWidget {
+  const _MeasurementsRouteHost();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final uid = ref.watch(currentUidProvider) ?? '';
-    return AnthropometryScreen(uid: uid);
-  }
-}
-
-/// Resuelve el uid actual y monta [PerformanceScreen].
-class _PerformanceRouteHost extends ConsumerWidget {
-  const _PerformanceRouteHost();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final uid = ref.watch(currentUidProvider) ?? '';
-    return PerformanceScreen(uid: uid);
+    return MeasurementsScreen(uid: uid);
   }
 }
 

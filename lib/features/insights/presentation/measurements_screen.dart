@@ -10,7 +10,7 @@ import '../../../l10n/app_l10n.dart';
 import '../../measurements/application/measurement_providers.dart';
 import '../../measurements/presentation/widgets/measurement_progress_chart.dart';
 
-/// Antropometría del PROPIO atleta — peso y medidas corporales en el tiempo.
+/// MEDIDAS del PROPIO atleta — peso corporal y circunferencias en el tiempo.
 ///
 /// Cierra una asimetría real: hasta ahora el entrenador cargaba las mediciones
 /// de su alumno y era el ÚNICO que las veía ([athlete_detail_screen.dart]). El
@@ -19,18 +19,19 @@ import '../../measurements/presentation/widgets/measurement_progress_chart.dart'
 /// Usa [ownMeasurementsProvider] (query `athleteId ==`), NO
 /// [measurementsForAthleteProvider] (query `recordedBy == trainerUid`, óptica
 /// del PF): el atleta debe ver TODAS sus mediciones, sin importar cuál de sus
-/// entrenadores —presente o pasado— las registró.
+/// entrenadores —presente o pasado— las registró. (Verificado en el reporte
+/// del usuario: tras desvincularse del PF, sigue viendo lo que aquél le cargó.)
 ///
-/// LIMITACIÓN CONOCIDA: hoy sólo un usuario con rol `trainer` puede CREAR
-/// mediciones (firestore.rules — decisión AD-1 de `rules-hardening`: éstas son
-/// colecciones del coach). Así que un atleta SIN entrenador ve el empty state
-/// para siempre. El auto-registro es una feature aparte, con su cambio de
-/// reglas.
+/// SOLO-LECTURA por ahora: hoy sólo un usuario con rol `trainer` puede CREAR
+/// mediciones (firestore.rules — decisión AD-1 de `rules-hardening`). El
+/// auto-registro por el propio alumno + visibilidad para su entrenador
+/// vinculado es la siguiente capa (cambio de reglas + esquema, va por SDD). El
+/// empty state ya anticipa ese futuro apuntando a quién las carga hoy.
 ///
 /// [uid] explícito — misma convención de reusabilidad que el resto de las
 /// pantallas del hub ([MuscleDistributionScreen], [VolumeByGroupScreen]).
-class AnthropometryScreen extends ConsumerWidget {
-  const AnthropometryScreen({super.key, required this.uid});
+class MeasurementsScreen extends ConsumerWidget {
+  const MeasurementsScreen({super.key, required this.uid});
 
   final String uid;
 
@@ -43,7 +44,7 @@ class AnthropometryScreen extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _Header(title: l10n.anthropometryScreenTitle),
+        _Header(title: l10n.measurementsScreenTitle),
         Expanded(
           child: TreinoStateSwitcher(
             childKey: ValueKey(
@@ -70,9 +71,9 @@ class AnthropometryScreen extends ConsumerWidget {
                   // distintas para el usuario, así que llevan mensajes
                   // distintos.
                   if (measurements.isEmpty)
-                    _Hint(text: l10n.anthropometryEmptyState)
+                    _Hint(text: l10n.measurementsEmptyState)
                   else if (measurements.length < 2)
-                    _Hint(text: l10n.anthropometryNeedsMoreData)
+                    _Hint(text: l10n.measurementsNeedsMoreData)
                   else
                     MeasurementProgressChart(measurements: measurements),
                 ],
