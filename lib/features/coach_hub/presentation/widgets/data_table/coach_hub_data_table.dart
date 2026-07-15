@@ -36,6 +36,30 @@ Widget coachHubDataTableEmptyPreview() => const CoachHubDataTable(
       emptyMessage: 'Sin alumnos todavía',
     );
 
+/// Ejemplo de celdas-widget (ADR-A3-02): la columna 'status' rinde un chip
+/// en lugar del string plano, mientras 'name' sigue usando [CoachHubRow.cells].
+@Preview(name: 'DataTable — celdas-widget', wrapper: coachHubPreviewWrapper)
+Widget coachHubDataTableCellWidgetsPreview() => CoachHubDataTable(
+      columns: const [
+        CoachHubColumn(key: 'name', label: 'Nombre', sortable: true),
+        CoachHubColumn(key: 'status', label: 'Estado'),
+      ],
+      rows: const [
+        CoachHubRow(
+          id: '1',
+          cells: {'name': 'Ana García', 'status': 'Activo'},
+          cellWidgets: {
+            'status': Chip(label: Text('Activo')),
+          },
+        ),
+        CoachHubRow(
+          id: '2',
+          cells: {'name': 'Carlos López', 'status': 'Inactivo'},
+        ),
+      ],
+      onRowTap: (_) {},
+    );
+
 /// Modelo de columna para [CoachHubDataTable].
 @immutable
 class CoachHubColumn {
@@ -65,6 +89,7 @@ class CoachHubRow {
   const CoachHubRow({
     required this.id,
     required this.cells,
+    this.cellWidgets = const {},
   });
 
   /// Identificador único de la fila (usado en [CoachHubDataTable.onRowTap]).
@@ -72,6 +97,15 @@ class CoachHubRow {
 
   /// Mapa de valores por clave de columna.
   final Map<String, String> cells;
+
+  /// Celdas-widget opcionales por clave de columna (ADR-A3-02).
+  ///
+  /// Si `cellWidgets[column.key]` existe, se renderiza ese widget en lugar
+  /// del string de [cells] para esa columna. Back-compat total: consumidores
+  /// que sólo usan [cells] (string-only) quedan idénticos — el default es
+  /// `const {}`, así que ninguna columna cae en la rama de widget salvo que
+  /// se declare explícitamente.
+  final Map<String, Widget> cellWidgets;
 }
 
 /// Tabla de datos del kit Coach Hub Web — Fase 1.
@@ -418,16 +452,17 @@ class _DataRow extends StatelessWidget {
                       horizontal: TreinoTableTokens.cellPaddingH,
                       vertical: TreinoTableTokens.cellPaddingV,
                     ),
-                    child: Text(
-                      row.cells[col.key] ?? '',
-                      style: TextStyle(
-                        fontFamily: AppFonts.barlow,
-                        fontWeight: FontWeight.w400,
-                        fontSize: 14,
-                        color: AppPalette.of(ctx).textPrimary,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                    child: row.cellWidgets[col.key] ??
+                        Text(
+                          row.cells[col.key] ?? '',
+                          style: TextStyle(
+                            fontFamily: AppFonts.barlow,
+                            fontWeight: FontWeight.w400,
+                            fontSize: 14,
+                            color: AppPalette.of(ctx).textPrimary,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
                   ),
                 ),
             ],

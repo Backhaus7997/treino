@@ -333,6 +333,92 @@ void main() {
     });
 
     // -------------------------------------------------------------------------
+    // cellWidgets: celda-widget reemplaza el string de esa columna
+    // -------------------------------------------------------------------------
+    testWidgets(
+        'cellWidgets con la key de la columna → renderiza el widget dado '
+        '[SCENARIO-CK-DT-14]', (tester) async {
+      await tester.pumpWidget(_wrap(
+        CoachHubDataTable(
+          columns: _columns,
+          rows: const [
+            CoachHubRow(
+              id: '1',
+              cells: {
+                'name': 'Ana García',
+                'status': 'Activo',
+                'sessions': '12',
+              },
+              cellWidgets: {
+                'status': Chip(
+                  key: Key('status_chip_1'),
+                  label: Text('Activo'),
+                ),
+              },
+            ),
+          ],
+        ),
+      ));
+      await tester.pump();
+
+      expect(find.byKey(const Key('status_chip_1')), findsOneWidget);
+    });
+
+    // -------------------------------------------------------------------------
+    // cellWidgets: sin celdas-widget la fila sigue mostrando el string (back-compat)
+    // -------------------------------------------------------------------------
+    testWidgets(
+        'sin cellWidgets → columna sigue mostrando el string de cells '
+        '[SCENARIO-CK-DT-15]', (tester) async {
+      await tester.pumpWidget(_wrap(
+        CoachHubDataTable(
+          columns: _columns,
+          rows: _rows,
+        ),
+      ));
+      await tester.pump();
+
+      expect(find.text('Activo'), findsOneWidget);
+      expect(find.byType(Chip), findsNothing);
+    });
+
+    // -------------------------------------------------------------------------
+    // cellWidgets: mezcla string+widget en la misma fila
+    // -------------------------------------------------------------------------
+    testWidgets(
+        'cellWidgets parcial → mezcla widget en una columna y string en '
+        'las demás de la misma fila [SCENARIO-CK-DT-16]', (tester) async {
+      await tester.pumpWidget(_wrap(
+        CoachHubDataTable(
+          columns: _columns,
+          rows: const [
+            CoachHubRow(
+              id: '1',
+              cells: {
+                'name': 'Ana García',
+                'status': 'Activo',
+                'sessions': '12',
+              },
+              cellWidgets: {
+                'status': Chip(
+                  key: Key('status_chip_1'),
+                  label: Text('Activo'),
+                ),
+              },
+            ),
+          ],
+        ),
+      ));
+      await tester.pump();
+
+      // Columna 'status' rinde el widget.
+      expect(find.byKey(const Key('status_chip_1')), findsOneWidget);
+      // Columnas 'name' y 'sessions' siguen renderizando el string de cells.
+      expect(find.text('Ana García'), findsOneWidget);
+      expect(find.text('12'), findsOneWidget);
+    });
+
+    // -------------------------------------------------------------------------
     // Smoke dark+light
     // -------------------------------------------------------------------------
     testWidgets('smoke dark+light sin crash [SCENARIO-CK-DT-10]',
