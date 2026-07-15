@@ -10,6 +10,7 @@
 // SCENARIO-HERO-03: el anillo de adherencia muestra "--" en loading/null y
 //   el porcentaje real con data.
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -264,6 +265,79 @@ void main() {
       );
 
       expect(find.text('84%'), findsOneWidget);
+    });
+  });
+
+  group('SCENARIO-HERO-04 — accesibilidad de teclado de los CTAs nuevos', () {
+    // Remediación CRITICAL#2 (sdd-verify fase-2): _AlertBannerCta y
+    // _PrimaryQuickAction envolvían un TreinoTappable crudo (sin Focus ni
+    // Semantics) en vez de TreinoInteractiveState, el resolver que expone
+    // el resto del kit (KpiCard, TreinoListRow) — inalcanzables por teclado
+    // y no anunciados como botón a lectores de pantalla.
+    testWidgets(
+        'alert banner CTA: focusable, Semantics(button) y Enter activa onTap',
+        (tester) async {
+      final handle = tester.ensureSemantics();
+
+      await _pumpWithRouter(
+        tester,
+        const DashboardAlertBanner(),
+        overrides: _bannerOverrides(payments: [_vencidoPayment('p1')]),
+      );
+
+      final semantics = tester.getSemantics(
+        find.byKey(const Key('alert_banner_cta')),
+      );
+      expect(semantics.flagsCollection.isButton, isTrue,
+          reason:
+              'el CTA del alert banner debe exponer Semantics(button: true)');
+
+      final focusNode = Focus.of(
+        tester.element(find.byKey(const Key('alert_banner_cta'))),
+      );
+      focusNode.requestFocus();
+      await tester.pump();
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pumpAndSettle();
+
+      expect(find.text('page:/pagos'), findsOneWidget,
+          reason: 'Enter (teclado) debe activar el CTA igual que el tap');
+
+      handle.dispose();
+    });
+
+    testWidgets(
+        '"+ Nuevo alumno": focusable, Semantics(button) y Enter activa onTap',
+        (tester) async {
+      final handle = tester.ensureSemantics();
+
+      await _pumpWithRouter(
+        tester,
+        const DashboardWelcomeCard(),
+        overrides: _welcomeOverrides(),
+      );
+
+      final semantics = tester.getSemantics(
+        find.byKey(const Key('quick_action_nuevo_alumno')),
+      );
+      expect(semantics.flagsCollection.isButton, isTrue,
+          reason:
+              '"+ Nuevo alumno" debe exponer Semantics(button: true)');
+
+      final focusNode = Focus.of(
+        tester.element(find.byKey(const Key('quick_action_nuevo_alumno'))),
+      );
+      focusNode.requestFocus();
+      await tester.pump();
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pumpAndSettle();
+
+      expect(find.text('page:/alumnos'), findsOneWidget,
+          reason: 'Enter (teclado) debe activar el CTA igual que el tap');
+
+      handle.dispose();
     });
   });
 }

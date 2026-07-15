@@ -29,7 +29,6 @@ import 'package:treino/app/theme/tokens/components/treino_badge_tokens.dart';
 import 'package:treino/app/theme/tokens/primitives.dart';
 import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
 import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
-import 'package:treino/core/widgets/motion/treino_tappable.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach/application/agenda_providers.dart';
 import 'package:treino/features/coach/domain/appointment.dart';
@@ -38,6 +37,7 @@ import 'package:treino/features/coach_hub/presentation/sections/pagos/widgets/pa
 import 'package:treino/features/coach_hub/presentation/widgets/empty_state/empty_state.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/list_row/list_row.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/section_header/section_header.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/treino_interactive_state.dart';
 import 'package:treino/features/feed/presentation/widgets/post_avatar.dart';
 import 'package:treino/features/payments/domain/payment.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
@@ -398,9 +398,12 @@ class _VencimientosContent extends StatelessWidget {
             ],
           ),
         const SizedBox(height: AppSpacing.s12),
-        TreinoTappable(
+        // TreinoInteractiveState (resolver de Focus/Semantics del kit) —
+        // REEMPLAZA al TreinoTappable crudo, que no exponía Focus ni
+        // Semantics(button) (CRITICAL#2 sdd-verify fase-2).
+        TreinoInteractiveState(
           onTap: () => context.go('/pagos'),
-          child: Text(
+          builder: (ctx, states) => Text(
             key: const Key('vencimientos_ver_todos'),
             l10n.dashboardVencimientosVerTodos,
             style: TextStyle(
