@@ -10,8 +10,11 @@
 // del kit vía TreinoListRow(loading: true), igual que dashboard_pending.dart.
 //
 // NO se agrega TreinoFadeSlideIn en las filas: son data-driven (streams que
-// re-emiten) — el motion de entrada seccional es responsabilidad del
-// ensamble (WU-06).
+// re-emiten) — pero cada una de las 3 cards de nivel superior (Próximas
+// sesiones / Vencimientos / Inactivos) SÍ se envuelve en TreinoFadeSlideIn
+// (entrada staggered del ensamble, WU-06 fase-2). [startIndex] permite que
+// el screen raíz continúe la secuencia de stagger tras sus propias
+// secciones (alert banner, welcome card, KPI strip, columna izquierda).
 //
 // Sigue el contrato de sección: sin Scaffold/SafeArea, AppPalette/AppL10n
 // (ADR-CHW-005).
@@ -20,9 +23,11 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:treino/app/theme/app_motion.dart';
 import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/tokens/components/treino_badge_tokens.dart';
 import 'package:treino/app/theme/tokens/primitives.dart';
+import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
 import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
 import 'package:treino/core/widgets/motion/treino_tappable.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
@@ -43,18 +48,32 @@ import 'package:treino/l10n/app_l10n.dart';
 /// Columna derecha: Próximas sesiones + Vencimientos 7 días + Alumnos
 /// inactivos. REQ-HOY-07, REQ-HOY-08, REQ-HOY-09.
 class DashboardRightColumn extends StatelessWidget {
-  const DashboardRightColumn({super.key});
+  const DashboardRightColumn({super.key, this.startIndex = 0});
+
+  /// Índice de stagger del primer card (`_ProximasSesiones`) — las otras dos
+  /// cards continúan en `startIndex + 1` y `startIndex + 2`. Permite que el
+  /// screen raíz encadene el stagger tras sus propias secciones (WU-06).
+  final int startIndex;
 
   @override
   Widget build(BuildContext context) {
-    return const Column(
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _ProximasSesiones(),
-        SizedBox(height: AppSpacing.s18),
-        _Vencimientos7d(),
-        SizedBox(height: AppSpacing.s18),
-        _InactivosSection(),
+        TreinoFadeSlideIn(
+          delay: AppMotion.stagger(startIndex),
+          child: const _ProximasSesiones(),
+        ),
+        const SizedBox(height: AppSpacing.s18),
+        TreinoFadeSlideIn(
+          delay: AppMotion.stagger(startIndex + 1),
+          child: const _Vencimientos7d(),
+        ),
+        const SizedBox(height: AppSpacing.s18),
+        TreinoFadeSlideIn(
+          delay: AppMotion.stagger(startIndex + 2),
+          child: const _InactivosSection(),
+        ),
       ],
     );
   }

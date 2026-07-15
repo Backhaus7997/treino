@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/app/theme/tokens/primitives.dart';
 import 'package:treino/features/feed/presentation/widgets/post_avatar.dart';
 
 Widget _wrap(Widget w) => MaterialApp(
@@ -129,6 +130,29 @@ void main() {
       expect(foundGradient, isTrue,
           reason:
               'Expected a Container with LinearGradient using accent and highlight colors');
+    });
+
+    // SCENARIO-185: la fuente del fallback de iniciales usa el token local
+    // AppFonts.barlowCondensed — NO GoogleFonts.barlowCondensed() (llamada
+    // cruda que dispara un fetch de red evitable y bloqueado en entornos
+    // sandboxed, además de violar la convención del design system de usar
+    // tokens en vez de fuentes crudas).
+    testWidgets(
+        'SCENARIO-185: initials fallback uses AppFonts.barlowCondensed token',
+        (tester) async {
+      await tester.pumpWidget(
+        _wrap(
+          const PostAvatar(
+            authorAvatarUrl: null,
+            authorDisplayName: 'Tincho',
+            size: 40,
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final text = tester.widget<Text>(find.text('T'));
+      expect(text.style?.fontFamily, AppFonts.barlowCondensed);
     });
   });
 }

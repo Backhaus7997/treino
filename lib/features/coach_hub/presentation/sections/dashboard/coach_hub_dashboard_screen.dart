@@ -2,7 +2,9 @@
 // NO los agregues acá (ADR-CHW-005).
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:treino/app/theme/app_motion.dart';
 import 'package:treino/app/theme/tokens/primitives.dart';
+import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
 import 'package:treino/features/coach_hub/presentation/sections/dashboard/widgets/dashboard_hero.dart';
 import 'package:treino/features/coach_hub/presentation/sections/dashboard/widgets/dashboard_kpi_strip.dart';
 import 'package:treino/features/coach_hub/presentation/sections/dashboard/widgets/dashboard_pending.dart';
@@ -46,13 +48,18 @@ class CoachHubDashboardScreen extends ConsumerWidget {
 
             if (wide) {
               return SingleChildScrollView(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.s20,
+                  vertical: AppSpacing.s20,
+                ),
                 child: content,
               );
             }
             return SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.s18,
+                vertical: AppSpacing.s18,
+              ),
               child: content,
             );
           },
@@ -68,31 +75,54 @@ class _DashboardContent extends ConsumerWidget {
   const _DashboardContent({required this.wide});
   final bool wide;
 
+  // Índices de stagger de las secciones de nivel superior (WU-06):
+  // 0 alert banner · 1 welcome card · 2 KPI strip · 3 columna izquierda ·
+  // 4-6 las 3 cards de la columna derecha (ver DashboardRightColumn).
+  static const _bannerIndex = 0;
+  static const _welcomeIndex = 1;
+  static const _kpiIndex = 2;
+  static const _leftColumnIndex = 3;
+  static const _rightColumnStartIndex = 4;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final leftColumn = TreinoFadeSlideIn(
+      delay: AppMotion.stagger(_leftColumnIndex),
+      child: const Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          DashboardPendingSection(),
+        ],
+      ),
+    );
+    const rightColumn = DashboardRightColumn(
+      startIndex: _rightColumnStartIndex,
+    );
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const DashboardAlertBanner(),
+        TreinoFadeSlideIn(
+          delay: AppMotion.stagger(_bannerIndex),
+          child: const DashboardAlertBanner(),
+        ),
         const SizedBox(height: AppSpacing.s18),
-        const DashboardWelcomeCard(),
+        TreinoFadeSlideIn(
+          delay: AppMotion.stagger(_welcomeIndex),
+          child: const DashboardWelcomeCard(),
+        ),
         const SizedBox(height: AppSpacing.s18),
-        const DashboardKpiStrip(),
-        const SizedBox(height: 20),
+        TreinoFadeSlideIn(
+          delay: AppMotion.stagger(_kpiIndex),
+          child: DashboardKpiStrip(wide: wide),
+        ),
+        const SizedBox(height: AppSpacing.s20),
         if (wide) ...[
-          const _TwoColumnLayout(
-            left: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                DashboardPendingSection(),
-              ],
-            ),
-            right: DashboardRightColumn(),
-          ),
+          _TwoColumnLayout(left: leftColumn, right: rightColumn),
         ] else ...[
-          const DashboardPendingSection(),
-          const SizedBox(height: 16),
-          const DashboardRightColumn(),
+          leftColumn,
+          const SizedBox(height: AppSpacing.s18),
+          rightColumn,
         ],
       ],
     );
@@ -113,7 +143,7 @@ class _TwoColumnLayout extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Expanded(flex: 55, child: left),
-          const SizedBox(width: 20),
+          const SizedBox(width: AppSpacing.s20),
           Expanded(flex: 45, child: right),
         ],
       ),

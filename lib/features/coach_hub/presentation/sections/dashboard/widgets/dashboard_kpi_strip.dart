@@ -9,6 +9,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:treino/app/theme/tokens/primitives.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach_hub/application/aggregate_adherence_provider.dart';
@@ -39,7 +40,12 @@ import 'package:treino/l10n/app_l10n.dart';
 ///   se mantiene el label combinado existente en vez de forzar el kit
 ///   `sublabel`).
 class DashboardKpiStrip extends ConsumerWidget {
-  const DashboardKpiStrip({super.key});
+  const DashboardKpiStrip({super.key, this.wide = true});
+
+  /// `true` (default) = tira horizontal scrolleable (desktop, sobra ancho).
+  /// `false` = [Wrap] sin scroll — evita el scroll horizontal en narrow
+  /// (WU-06 fase-2), donde las 4 cards no entran en una fila.
+  final bool wide;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -80,33 +86,47 @@ class DashboardKpiStrip extends ConsumerWidget {
     final linksLoading = linksAsync.isLoading;
     final bucketsLoading = bucketsAsync.isLoading;
 
+    final cards = [
+      KpiCard(
+        value: activeCount.toString(),
+        label: l10n.dashboardKpiAlumnosActivos,
+        loading: linksLoading,
+      ),
+      KpiCard(
+        value: fmtArs(ingresoMes),
+        label: l10n.dashboardKpiIngresoMes,
+        loading: bucketsLoading,
+      ),
+      // Adherencia: nunca skeleton — degrada a "--" (ADR-D2-07).
+      KpiCard(
+        value: adherenceLabel,
+        label: l10n.dashboardKpiAdherencia,
+      ),
+      KpiCard(
+        value: fmtArs(porCobrarTotal),
+        label: l10n.dashboardKpiPorCobrar(vencidosCount),
+        loading: bucketsLoading,
+      ),
+    ];
+
+    if (!wide) {
+      // Narrow: Wrap en vez de scroll horizontal — las 4 cards no entran en
+      // una fila, pero no hace falta el gesto de scroll extra (WU-06).
+      return Wrap(
+        spacing: AppSpacing.s12,
+        runSpacing: AppSpacing.s12,
+        children: cards,
+      );
+    }
+
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
         children: [
-          KpiCard(
-            value: activeCount.toString(),
-            label: l10n.dashboardKpiAlumnosActivos,
-            loading: linksLoading,
-          ),
-          const SizedBox(width: 12),
-          KpiCard(
-            value: fmtArs(ingresoMes),
-            label: l10n.dashboardKpiIngresoMes,
-            loading: bucketsLoading,
-          ),
-          const SizedBox(width: 12),
-          // Adherencia: nunca skeleton — degrada a "--" (ADR-D2-07).
-          KpiCard(
-            value: adherenceLabel,
-            label: l10n.dashboardKpiAdherencia,
-          ),
-          const SizedBox(width: 12),
-          KpiCard(
-            value: fmtArs(porCobrarTotal),
-            label: l10n.dashboardKpiPorCobrar(vencidosCount),
-            loading: bucketsLoading,
-          ),
+          for (var i = 0; i < cards.length; i++) ...[
+            if (i > 0) const SizedBox(width: AppSpacing.s12),
+            cards[i],
+          ],
         ],
       ),
     );
