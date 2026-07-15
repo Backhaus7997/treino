@@ -339,6 +339,16 @@
   "coachHubAlumnosStatusDebt": "Con deuda",
   "coachHubAlumnosStatusPaused": "Pausado",
   "coachHubAlumnosStatusInactive": "Inactivo",
+  "coachHubAlumnosViewTable": "Tabla",
+  "coachHubAlumnosViewCards": "Cards",
+  "coachHubAlumnosDebtAmount": "Debe {amount}",
+  "@coachHubAlumnosDebtAmount": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
   "coachHubAlumnoDetailNotasTitle": "Notas privadas",
   "coachHubAlumnoDetailNotasSubtitle": "Anota lo que necesites sobre este alumno. Solo tú lo ves.",
   "coachHubAlumnoDetailNotasHint": "Ej: Lesión de rodilla derecha, evitar sentadilla profunda…",

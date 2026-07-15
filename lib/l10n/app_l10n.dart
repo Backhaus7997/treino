@@ -3638,6 +3638,24 @@ abstract class AppL10n {
   /// **'Inactivo'**
   String get coachHubAlumnosStatusInactive;
 
+  /// Coach Hub web alumnos section — view-mode toggle, table layout.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tabla'**
+  String get coachHubAlumnosViewTable;
+
+  /// Coach Hub web alumnos section — view-mode toggle, cards layout.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cards'**
+  String get coachHubAlumnosViewCards;
+
+  /// Coach Hub web alumnos section — pending debt amount shown on a row/card.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Debe {amount}'**
+  String coachHubAlumnosDebtAmount(String amount);
+
   /// Coach Hub web alumno detail — title of the Notas privadas tab body.
   ///
   /// In es_AR, this message translates to:

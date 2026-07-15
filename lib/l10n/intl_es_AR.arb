@@ -1281,6 +1281,23 @@
   "@coachHubAlumnosStatusInactive": {
     "description": "Coach Hub web alumnos section — status badge for inactive athletes."
   },
+  "coachHubAlumnosViewTable": "Tabla",
+  "@coachHubAlumnosViewTable": {
+    "description": "Coach Hub web alumnos section — view-mode toggle, table layout."
+  },
+  "coachHubAlumnosViewCards": "Cards",
+  "@coachHubAlumnosViewCards": {
+    "description": "Coach Hub web alumnos section — view-mode toggle, cards layout."
+  },
+  "coachHubAlumnosDebtAmount": "Debe {amount}",
+  "@coachHubAlumnosDebtAmount": {
+    "description": "Coach Hub web alumnos section — pending debt amount shown on a row/card.",
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
   "coachHubAlumnoDetailNotasTitle": "Notas privadas",
   "@coachHubAlumnoDetailNotasTitle": {
     "description": "Coach Hub web alumno detail — title of the Notas privadas tab body."

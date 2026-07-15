@@ -1,17 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
+import 'package:treino/features/coach_hub/presentation/sections/chat/widgets/avatar_color.dart';
+import 'package:treino/features/coach_hub/presentation/sections/pagos/widgets/payment_format.dart';
 import 'package:treino/features/gyms/application/gym_providers.dart';
 import '../../../../../l10n/app_l10n.dart';
 import 'package:treino/features/payments/application/pagos_por_cobrar_provider.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
+
+/// Modo de visualización del roster (toggle Tabla / Cards, mockup
+/// view-general.png vs view-general-cards.png).
+enum AlumnosViewMode { tabla, cards }
+
+final _viewModeProvider =
+    StateProvider.autoDispose<AlumnosViewMode>((_) => AlumnosViewMode.tabla);
 
 /// Estado compuesto de un alumno en el roster (link + billing).
 ///
@@ -98,17 +108,24 @@ class AlumnosScreen extends ConsumerWidget {
         final ids = (roster.map((l) => l.athleteId).toSet().toList()..sort());
         final profilesAsync =
             ref.watch(userPublicProfilesBatchProvider(ids.join(',')));
+        final cobros =
+            ref.watch(pagosPorCobrarProvider).valueOrNull ?? const [];
         final conDeudaIds = <String>{
-          for (final c
-              in ref.watch(pagosPorCobrarProvider).valueOrNull ?? const [])
-            c.athleteId,
+          for (final c in cobros) c.athleteId,
+        };
+        final deudaByAthlete = <String, int>{
+          for (final c in cobros) c.athleteId: c.amountArs,
         };
         return profilesAsync.when(
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (e, _) =>
               _CenteredMuted(l10n.coachHubAlumnosProfilesLoadError),
           data: (profiles) => _RosterView(
-              roster: roster, profiles: profiles, conDeudaIds: conDeudaIds),
+            roster: roster,
+            profiles: profiles,
+            conDeudaIds: conDeudaIds,
+            deudaByAthlete: deudaByAthlete,
+          ),
         );
       },
     );
@@ -120,11 +137,13 @@ class _RosterView extends ConsumerWidget {
     required this.roster,
     required this.profiles,
     required this.conDeudaIds,
+    required this.deudaByAthlete,
   });
 
   final List<TrainerLink> roster;
   final Map<String, UserPublicProfile> profiles;
   final Set<String> conDeudaIds;
+  final Map<String, int> deudaByAthlete;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -132,6 +151,7 @@ class _RosterView extends ConsumerWidget {
     final l10n = AppL10n.of(context);
     final filtro = ref.watch(_filtroProvider);
     final query = ref.watch(_queryProvider).trim().toLowerCase();
+    final viewMode = ref.watch(_viewModeProvider);
 
     // Una sola lectura del catálogo de gimnasios (~20 docs) en vez de un
     // gymByIdProvider por fila (N+1) — mismo criterio que el batch de perfiles.
@@ -163,22 +183,21 @@ class _RosterView extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            l10n.coachHubAlumnosTitle,
-            style: TextStyle(
-              color: palette.textPrimary,
-              fontSize: 22,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.8,
-            ),
-          ),
+          const _AlumnosHeader(),
           const SizedBox(height: 4),
           Text(
             l10n.coachHubAlumnosSummary(roster.length, activos),
             style: TextStyle(color: palette.textMuted, fontSize: 13),
           ),
           const SizedBox(height: 18),
-          _FilterBar(filtro: filtro, countFor: countFor),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: _FilterBar(filtro: filtro, countFor: countFor)),
+              const SizedBox(width: 12),
+              const _ViewModeToggle(),
+            ],
+          ),
           const SizedBox(height: 12),
           _SearchField(),
           const SizedBox(height: 14),
@@ -191,7 +210,7 @@ class _RosterView extends ConsumerWidget {
                     : l10n.coachHubAlumnosEmptyFiltered,
               ),
             )
-          else ...[
+          else if (viewMode == AlumnosViewMode.tabla) ...[
             const _RosterHeaderRow(),
             for (final link in visibles)
               _RosterRow(
@@ -199,8 +218,94 @@ class _RosterView extends ConsumerWidget {
                 profile: profiles[link.athleteId],
                 estado: estadoForLink(link, conDeudaIds),
                 gymName: gymNameFor(link),
+                debtAmountArs: deudaByAthlete[link.athleteId],
               ),
-          ],
+          ] else
+            _RosterCardsGrid(
+              links: visibles,
+              profiles: profiles,
+              conDeudaIds: conDeudaIds,
+              deudaByAthlete: deudaByAthlete,
+              gymNameFor: gymNameFor,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Header con título del roster, mockup view-general-cards.png.
+class _AlumnosHeader extends StatelessWidget {
+  const _AlumnosHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+    return Text(
+      l10n.coachHubAlumnosTitle,
+      style: GoogleFonts.barlowCondensed(
+        color: palette.textPrimary,
+        fontSize: 28,
+        fontWeight: FontWeight.w700,
+        letterSpacing: 0.8,
+      ),
+    );
+  }
+}
+
+class _ViewModeToggle extends ConsumerWidget {
+  const _ViewModeToggle();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+    final mode = ref.watch(_viewModeProvider);
+    Widget option(AlumnosViewMode m, IconData icon, String label) {
+      final selected = m == mode;
+      return GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => ref.read(_viewModeProvider.notifier).state = m,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+          decoration: BoxDecoration(
+            color: selected ? palette.accent : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon,
+                  size: 15, color: selected ? palette.bg : palette.textMuted),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  color: selected ? palette.bg : palette.textMuted,
+                  fontSize: 13,
+                  fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        border: Border.all(color: palette.border),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          option(AlumnosViewMode.tabla, TreinoIcon.viewTable,
+              l10n.coachHubAlumnosViewTable),
+          option(AlumnosViewMode.cards, TreinoIcon.viewCards,
+              l10n.coachHubAlumnosViewCards),
         ],
       ),
     );
@@ -232,7 +337,9 @@ class _FilterBar extends ConsumerWidget {
       children: [
         for (final (f, label) in _chips(l10n))
           _Chip(
-            label: '$label ${countFor(f)}',
+            // "TODOS · 12" — label mayúscula + punto medio + contador, mockup
+            // view-general-cards.png.
+            label: '${label.toUpperCase()} · ${countFor(f)}',
             selected: f == filtro,
             onTap: () => ref.read(_filtroProvider.notifier).state = f,
             palette: palette,
@@ -263,16 +370,17 @@ class _Chip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
         decoration: BoxDecoration(
-          color: selected ? palette.bgCard : palette.bg,
+          color: selected ? palette.accent : Colors.transparent,
           border: Border.all(color: selected ? palette.accent : palette.border),
           borderRadius: BorderRadius.circular(20),
         ),
         child: Text(
           label,
           style: TextStyle(
-            color: selected ? palette.accent : palette.textMuted,
-            fontSize: 13,
-            fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+            color: selected ? palette.bg : palette.textMuted,
+            fontSize: 12,
+            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+            letterSpacing: 0.4,
           ),
         ),
       ),
@@ -369,12 +477,14 @@ class _RosterRow extends ConsumerWidget {
     required this.profile,
     required this.estado,
     required this.gymName,
+    required this.debtAmountArs,
   });
 
   final TrainerLink link;
   final UserPublicProfile? profile;
   final AlumnoEstado estado;
   final String? gymName;
+  final int? debtAmountArs;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -404,7 +514,11 @@ class _RosterRow extends ConsumerWidget {
               child: Row(
                 children: [
                   _Avatar(
-                      name: name, url: profile?.avatarUrl, palette: palette),
+                    name: name,
+                    url: profile?.avatarUrl,
+                    athleteId: link.athleteId,
+                    palette: palette,
+                  ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Column(
@@ -436,12 +550,26 @@ class _RosterRow extends ConsumerWidget {
                 flex: 2, child: _EstadoBadge(estado: estado, palette: palette)),
             Expanded(
               flex: 2,
-              child: Text(
-                trainedToday ? l10n.coachHubAlumnosLastWorkoutToday : '—',
-                style: TextStyle(
-                  color: trainedToday ? palette.accent : palette.textMuted,
-                  fontSize: 13,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    trainedToday ? l10n.coachHubAlumnosLastWorkoutToday : '—',
+                    style: TextStyle(
+                      color: trainedToday ? palette.accent : palette.textMuted,
+                      fontSize: 13,
+                    ),
+                  ),
+                  if (debtAmountArs != null)
+                    Text(
+                      l10n.coachHubAlumnosDebtAmount(fmtArs(debtAmountArs!)),
+                      style: TextStyle(
+                        color: palette.warning,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                ],
               ),
             ),
             Expanded(
@@ -456,30 +584,36 @@ class _RosterRow extends ConsumerWidget {
 }
 
 class _Avatar extends StatelessWidget {
-  const _Avatar({required this.name, required this.url, required this.palette});
+  const _Avatar({
+    required this.name,
+    required this.url,
+    required this.athleteId,
+    required this.palette,
+  });
 
   final String name;
   final String? url;
+  final String athleteId;
   final AppPalette palette;
 
   @override
   Widget build(BuildContext context) {
     final initial = name.trim().isEmpty ? '?' : name.trim()[0].toUpperCase();
+    final hasNetworkImage = url != null && url!.isNotEmpty;
     return CircleAvatar(
       radius: 18,
-      backgroundColor: palette.bg,
-      backgroundImage:
-          (url != null && url!.isNotEmpty) ? NetworkImage(url!) : null,
-      child: (url == null || url!.isEmpty)
-          ? Text(
+      backgroundColor: hasNetworkImage ? palette.bg : avatarColorFor(athleteId),
+      backgroundImage: hasNetworkImage ? NetworkImage(url!) : null,
+      child: hasNetworkImage
+          ? null
+          : Text(
               initial,
-              style: TextStyle(
-                color: palette.accent,
+              style: const TextStyle(
+                color: Colors.white,
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
               ),
-            )
-          : null,
+            ),
     );
   }
 }
@@ -496,23 +630,31 @@ class _EstadoBadge extends StatelessWidget {
     final color = estado.color(palette);
     return Align(
       alignment: Alignment.centerLeft,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 8,
-            height: 8,
-            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-          ),
-          const SizedBox(width: 6),
-          Flexible(
-            child: Text(
-              estado.label(l10n),
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: color, fontSize: 13),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 7,
+              height: 7,
+              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
             ),
-          ),
-        ],
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                estado.label(l10n),
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                    color: color, fontSize: 12, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -609,6 +751,181 @@ class _IconAction extends StatelessWidget {
       icon: Icon(icon, size: 18, color: color),
       onPressed: onPressed,
       visualDensity: VisualDensity.compact,
+    );
+  }
+}
+
+/// Grilla responsive de cards (modo Cards), mockup view-general-cards.png.
+/// Sin barra de adherencia (diferida — no hay data todavía); solo lo que
+/// tenemos: avatar, nombre, gimnasio como subtítulo, estado, último entreno
+/// y deuda si corresponde.
+class _RosterCardsGrid extends ConsumerWidget {
+  const _RosterCardsGrid({
+    required this.links,
+    required this.profiles,
+    required this.conDeudaIds,
+    required this.deudaByAthlete,
+    required this.gymNameFor,
+  });
+
+  final List<TrainerLink> links;
+  final Map<String, UserPublicProfile> profiles;
+  final Set<String> conDeudaIds;
+  final Map<String, int> deudaByAthlete;
+  final String? Function(TrainerLink) gymNameFor;
+
+  static const double _targetCardWidth = 300;
+  static const double _runSpacing = 12;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final availableWidth = constraints.maxWidth;
+        final rawColumns =
+            ((availableWidth + _runSpacing) / (_targetCardWidth + _runSpacing))
+                .floor();
+        final columns = rawColumns < 1 ? 1 : rawColumns;
+        final totalSpacing = _runSpacing * (columns - 1);
+        final cardWidth = (availableWidth - totalSpacing) / columns;
+        return Wrap(
+          spacing: _runSpacing,
+          runSpacing: _runSpacing,
+          children: [
+            for (final link in links)
+              SizedBox(
+                width: cardWidth,
+                child: _RosterCard(
+                  link: link,
+                  profile: profiles[link.athleteId],
+                  estado: estadoForLink(link, conDeudaIds),
+                  gymName: gymNameFor(link),
+                  debtAmountArs: deudaByAthlete[link.athleteId],
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _RosterCard extends ConsumerWidget {
+  const _RosterCard({
+    required this.link,
+    required this.profile,
+    required this.estado,
+    required this.gymName,
+    required this.debtAmountArs,
+  });
+
+  final TrainerLink link;
+  final UserPublicProfile? profile;
+  final AlumnoEstado estado;
+  final String? gymName;
+  final int? debtAmountArs;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+    final name = profile?.displayName ?? l10n.coachHubAlumnosNameFallback;
+    final trainedToday =
+        (ref.watch(finishedTodayByUidProvider(link.athleteId)).valueOrNull ??
+                const [])
+            .isNotEmpty;
+    final color = estado.color(palette);
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => context.go('/alumnos/${link.athleteId}'),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: palette.bgCard,
+          border: Border.all(color: palette.border),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _Avatar(
+                  name: name,
+                  url: profile?.avatarUrl,
+                  athleteId: link.athleteId,
+                  palette: palette,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: palette.textPrimary,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      if (gymName != null)
+                        Text(
+                          gymName!,
+                          overflow: TextOverflow.ellipsis,
+                          style:
+                              TextStyle(color: palette.textMuted, fontSize: 12),
+                        ),
+                    ],
+                  ),
+                ),
+                Container(
+                  width: 9,
+                  height: 9,
+                  margin: const EdgeInsets.only(top: 4),
+                  decoration:
+                      BoxDecoration(color: color, shape: BoxShape.circle),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  l10n.coachHubAlumnosColumnLastWorkout,
+                  style: TextStyle(color: palette.textMuted, fontSize: 11),
+                ),
+                Text(
+                  trainedToday ? l10n.coachHubAlumnosLastWorkoutToday : '—',
+                  style: TextStyle(
+                    color: trainedToday ? palette.accent : palette.textMuted,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+            if (debtAmountArs != null) ...[
+              const SizedBox(height: 6),
+              Align(
+                alignment: Alignment.centerRight,
+                child: Text(
+                  l10n.coachHubAlumnosDebtAmount(fmtArs(debtAmountArs!)),
+                  style: TextStyle(
+                    color: palette.warning,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 }
