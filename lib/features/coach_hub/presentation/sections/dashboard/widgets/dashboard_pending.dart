@@ -106,9 +106,15 @@ class _PendingContent extends ConsumerWidget {
     }
 
     if (list.isEmpty) {
-      return const TreinoEmptyState(
+      // ADR-D2-03 (l10n congelado): no existe key dedicada para "sin
+      // solicitudes pendientes" (esta sección no tenía empty state antes
+      // del rediseño — mostraba SizedBox.shrink()). Se reusa
+      // `dashboardAlertBannerAllClear` ("Todo al día"), ya usada en el
+      // alert banner con el mismo significado ("nada pendiente de
+      // revisar"), en vez de inventar un literal nuevo.
+      return TreinoEmptyState(
         icon: TreinoIcon.emptyState,
-        title: 'Sin pendientes',
+        title: l10n.dashboardAlertBannerAllClear,
       );
     }
 

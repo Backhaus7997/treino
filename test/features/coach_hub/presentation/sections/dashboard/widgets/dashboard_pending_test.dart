@@ -109,6 +109,34 @@ void main() {
 
       expect(find.byKey(const Key('empty_state_content')), findsOneWidget);
     });
+
+    testWidgets(
+        'título del empty state viene de AppL10n, no de un literal '
+        'hardcodeado (regresión WARNING adversarial ronda 2)', (tester) async {
+      await _pump(
+        tester,
+        overrides: [
+          trainerLinksStreamProvider.overrideWith(
+            (ref) => Stream.value(const <TrainerLink>[]),
+          ),
+        ],
+      );
+      await tester.pumpAndSettle();
+
+      final l10n = AppL10n.of(
+        tester.element(find.byKey(const Key('empty_state_content'))),
+      );
+
+      // ADR-D2-03 (l10n congelado): no hay key dedicada para "sin
+      // solicitudes pendientes" — se reusa `dashboardAlertBannerAllClear`
+      // ("Todo al día"), ya usada en el alert banner para el mismo
+      // significado ("nada pendiente de revisar"). Un literal español
+      // crudo inventado (p. ej. 'Sin pendientes') rompería este test.
+      expect(
+        find.text(l10n.dashboardAlertBannerAllClear),
+        findsOneWidget,
+      );
+    });
   });
 
   group('SCENARIO-PEND-03 — N pendientes preservan keys + count', () {
