@@ -9,8 +9,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/tokens/primitives.dart';
-import 'package:treino/core/utils/argentina_time.dart';
-import 'package:treino/core/widgets/motion/treino_tappable.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach/application/agenda_providers.dart';
 import 'package:treino/features/coach/application/dashboard_day_counts.dart';
@@ -21,6 +19,7 @@ import 'package:treino/features/chat/application/chat_providers.dart'
 import 'package:treino/features/coach_hub/application/aggregate_adherence_provider.dart';
 import 'package:treino/features/coach_hub/application/inactivos_provider.dart';
 import 'package:treino/features/coach_hub/presentation/sections/pagos/widgets/pagos_buckets_provider.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/treino_interactive_state.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/workout/application/session_providers.dart'
     show currentUidProvider;
@@ -126,7 +125,9 @@ class DashboardAlertBanner extends ConsumerWidget {
 }
 
 /// CTA "revisar todo" del alert banner — pill mint envuelta en
-/// [TreinoTappable] (REEMPLAZA al OutlinedButton, sin doble recognizer).
+/// [TreinoInteractiveState] (resolver único de hover/pressed/focus/Semantics
+/// del kit — REEMPLAZA al TreinoTappable crudo, que no exponía Focus ni
+/// Semantics(button), CRITICAL#2 sdd-verify fase-2).
 ///
 /// No existe key l10n dedicada para el copy del mockup ("Revisar todo") — el
 /// l10n está congelado (ADR-D2-03, cero keys nuevas). Se reusa
@@ -141,9 +142,9 @@ class _AlertBannerCta extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    return TreinoTappable(
+    return TreinoInteractiveState(
       onTap: () => context.go(route),
-      child: Container(
+      builder: (ctx, states) => Container(
         key: const Key('alert_banner_cta'),
         padding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.s12,
@@ -268,7 +269,6 @@ class DashboardWelcomeCard extends ConsumerWidget {
                   runSpacing: AppSpacing.s8,
                   children: [
                     _PrimaryQuickAction(
-                      key: const Key('quick_action_nuevo_alumno'),
                       label: l10n.dashboardQuickActionNuevoAlumno,
                       icon: TreinoIcon.plus,
                       onTap: () => context.go('/alumnos'),
@@ -353,16 +353,16 @@ class _Greeting extends StatelessWidget {
 }
 
 /// Acción primaria ("+ Nuevo alumno") — pill mint filled envuelta en
-/// [TreinoTappable] (press scale). El resto de las quick actions usan
-/// [_QuickAction] (OutlinedButton, que ya maneja su propio tap — NO se
-/// envuelve con TreinoTappable, evita doble recognizer).
+/// [TreinoInteractiveState] (resolver único de hover/pressed/focus/Semantics
+/// del kit — REEMPLAZA al TreinoTappable crudo, CRITICAL#2 sdd-verify
+/// fase-2). El resto de las quick actions usan [_QuickAction] (OutlinedButton,
+/// que ya maneja su propio foco/Semantics vía Material — NO se envuelve con
+/// TreinoInteractiveState, evita doble recognizer).
+///
+/// Única instancia en el árbol (welcome card) — la key del contenedor
+/// interno se hardcodea en vez de exponerse por constructor.
 class _PrimaryQuickAction extends StatelessWidget {
-  const _PrimaryQuickAction({
-    super.key,
-    required this.label,
-    required this.onTap,
-    required this.icon,
-  });
+  const _PrimaryQuickAction({required this.label, required this.onTap});
 
   final String label;
   final VoidCallback onTap;
@@ -374,9 +374,10 @@ class _PrimaryQuickAction extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    return TreinoTappable(
+    return TreinoInteractiveState(
       onTap: onTap,
-      child: Container(
+      builder: (ctx, states) => Container(
+        key: const Key('quick_action_nuevo_alumno'),
         padding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.s12,
           vertical: AppSpacing.s8,

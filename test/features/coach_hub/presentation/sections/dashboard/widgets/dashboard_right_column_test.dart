@@ -13,6 +13,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -307,6 +308,41 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.textContaining('Carla Díaz'), findsOneWidget);
+    });
+  });
+
+  group('SCENARIO-RCOL-11 — accesibilidad de teclado de "Ver todos"', () {
+    // Remediación CRITICAL#2 (sdd-verify fase-2): el link "Ver todos"
+    // envolvía un TreinoTappable crudo (sin Focus ni Semantics) en vez de
+    // TreinoInteractiveState, el resolver que expone el resto del kit.
+    testWidgets(
+        '"Ver todos": focusable, Semantics(button) y Enter navega a /pagos',
+        (tester) async {
+      final handle = tester.ensureSemantics();
+
+      final router = await _pump(tester, overrides: _baseOverrides());
+      await tester.pumpAndSettle();
+
+      final semantics = tester.getSemantics(
+        find.byKey(const Key('vencimientos_ver_todos')),
+      );
+      expect(semantics.flagsCollection.isButton, isTrue,
+          reason: '"Ver todos" debe exponer Semantics(button: true)');
+
+      final focusNode = Focus.of(
+        tester.element(find.byKey(const Key('vencimientos_ver_todos'))),
+      );
+      focusNode.requestFocus();
+      await tester.pump();
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pumpAndSettle();
+
+      expect(find.text('page:/pagos'), findsOneWidget,
+          reason: 'Enter (teclado) debe activar el link igual que el tap');
+      expect(router.routerDelegate.currentConfiguration.uri.path, '/pagos');
+
+      handle.dispose();
     });
   });
 }
