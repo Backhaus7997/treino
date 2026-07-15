@@ -126,6 +126,31 @@ Providers reales ya cableados: `trainerLinksStreamProvider`,
   del welcome card es un medidor determinado (`value: pct`), no un spinner de
   carga (degrada a "--" vía `valueOrNull`). Se conserva como gauge tokenizado; no
   cuenta como violación de "spinner seco".
+- **ADR-D2-08 · Excepción — busy state accept/decline en `_PendingRequestTile`**
+  (`dashboard_pending.dart:279-291`, hallazgo heredado de sdd-verify rondas 1-2):
+  el `CircularProgressIndicator` de 18×18 que reemplaza los botones
+  Aceptar/Rechazar mientras `_busy == true` **NO** se migra a
+  `TreinoStateSwitcher`/`TreinoShimmer`. Motivo: ambos widgets del kit están
+  diseñados para cross-fade de **contenido de sección** (listas, cards) con
+  `childKey` estable por estado — no para un micro-indicador inline dentro de
+  una `Row` de acciones de un solo tile, que ya está envuelto en
+  `Semantics(liveRegion: true)` para a11y. Es el mismo patrón que un spinner de
+  botón (`ElevatedButton` con `child: CircularProgressIndicator`), aceptado en
+  el resto del código base. *Rechazado*: envolver 2 botones + 1 spinner en
+  `TreinoStateSwitcher` solo para evitar un `CircularProgressIndicator` —
+  sobre-ingeniería para una interacción de <1s sin beneficio de motion
+  perceptible.
+- **ADR-D2-09 · `_InactivosSection` simplifica el mockup (data-honest)**
+  (`dashboard_right_column.dart:470-546`, hallazgo heredado de sdd-verify
+  rondas 1-2): el mockup muestra header rojo + cluster de avatares
+  superpuestos + pill "Revisar"; la implementación usa `TreinoSectionHeader` +
+  `TreinoListRow` por alumno inactivo (mismo patrón que Próximas
+  sesiones/Vencimientos). *Rechazado*: reproducir el cluster de avatares
+  superpuestos y el header rojo bespoke — no aporta información nueva
+  (`inactivosProvider` ya expone la lista completa vía `TreinoListRow`) y
+  duplicaría composición fuera del kit (viola ADR-D2-02). Se prioriza
+  consistencia visual entre las 3 subsecciones de la columna derecha por sobre
+  el pixel-match del mockup en este componente.
 
 ## 5. Mapa de motion
 
