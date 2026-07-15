@@ -9,6 +9,7 @@ import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../measurements/application/measurement_providers.dart';
 import '../../measurements/presentation/widgets/measurement_progress_chart.dart';
+import '../../profile/application/user_providers.dart' show userProfileProvider;
 
 /// MEDIDAS del PROPIO atleta — peso corporal y circunferencias en el tiempo.
 ///
@@ -41,6 +42,13 @@ class MeasurementsScreen extends ConsumerWidget {
     final l10n = AppL10n.of(context);
     final async = ref.watch(ownMeasurementsProvider(uid));
 
+    // Peso y altura ya cargados en el onboarding (Step 4 → UserProfile). El
+    // atleta no debería recargarlos: se consumen del perfil. `userProfileProvider`
+    // lee el perfil del usuario autenticado (owner-read), que en esta pantalla
+    // es el propio alumno. `.valueOrNull` porque la tarjeta es secundaria: si
+    // el perfil aún carga, simplemente no aparece todavía (no bloquea el chart).
+    final profile = ref.watch(userProfileProvider).valueOrNull;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -66,6 +74,25 @@ class MeasurementsScreen extends ConsumerWidget {
                     20, 12, 20, 20 + MediaQuery.paddingOf(context).bottom),
                 physics: const AlwaysScrollableScrollPhysics(),
                 children: [
+                  // ── TUS DATOS (peso + altura del perfil) ──────────────
+                  // Reutiliza lo del onboarding. La ALTURA sólo vive acá: no
+                  // está en el modelo Measurement (es un dato estable, no una
+                  // serie), así que nunca se recarga como medición.
+                  if (profile != null &&
+                      (profile.bodyWeightKg != null ||
+                          profile.heightCm != null)) ...[
+                    _ProfileDataCard(
+                      title: l10n.measurementsProfileCardTitle,
+                      hint: l10n.measurementsProfileCardHint,
+                      weightLabel: l10n.measurementsWeightLabel,
+                      heightLabel: l10n.measurementsHeightLabel,
+                      weightKg: profile.bodyWeightKg,
+                      heightCm: profile.heightCm,
+                    ),
+                    const SizedBox(height: 14),
+                  ],
+
+                  // ── EVOLUCIÓN (mediciones del entrenador en el tiempo) ─
                   // El chart exige >= 2 puntos (su propio contrato). Con 0 o 1
                   // no hay progreso que dibujar — y son dos situaciones
                   // distintas para el usuario, así que llevan mensajes
@@ -127,6 +154,125 @@ void _safePopOrInsights(BuildContext context) {
     context.go('/home/insights');
   }
 }
+
+// ── Profile data card (peso + altura del onboarding) ──────────────────────────
+
+/// Muestra el peso y la altura que el atleta ya cargó en el onboarding, para
+/// que no tenga que recargarlos. Se editan desde el Perfil, no acá — de ahí el
+/// [hint]. Cada valor sólo se muestra si existe (el onboarding los pide, pero
+/// un doc viejo podría no tenerlos).
+class _ProfileDataCard extends StatelessWidget {
+  const _ProfileDataCard({
+    required this.title,
+    required this.hint,
+    required this.weightLabel,
+    required this.heightLabel,
+    required this.weightKg,
+    required this.heightCm,
+  });
+
+  final String title;
+  final String hint;
+  final String weightLabel;
+  final String heightLabel;
+  final double? weightKg;
+  final int? heightCm;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: palette.bgCard,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: GoogleFonts.barlowCondensed(
+              fontWeight: FontWeight.w700,
+              fontSize: 12,
+              letterSpacing: 1.2,
+              color: palette.textMuted,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              if (weightKg != null)
+                Expanded(
+                  child: _Stat(
+                    label: weightLabel,
+                    value: '${_trimNum(weightKg!)} kg',
+                    palette: palette,
+                  ),
+                ),
+              if (weightKg != null && heightCm != null)
+                const SizedBox(width: 12),
+              if (heightCm != null)
+                Expanded(
+                  child: _Stat(
+                    label: heightLabel,
+                    value: '$heightCm cm',
+                    palette: palette,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            hint,
+            style: GoogleFonts.barlow(fontSize: 11, color: palette.textMuted),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Stat extends StatelessWidget {
+  const _Stat(
+      {required this.label, required this.value, required this.palette});
+
+  final String label;
+  final String value;
+  final AppPalette palette;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: GoogleFonts.barlowCondensed(
+            fontWeight: FontWeight.w700,
+            fontSize: 11,
+            letterSpacing: 0.6,
+            color: palette.textMuted,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: GoogleFonts.barlowCondensed(
+            fontWeight: FontWeight.w700,
+            fontSize: 22,
+            color: palette.textPrimary,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// `80.0` → `80`, `78.5` → `78.5`. Mismo criterio que las stat cards del radar.
+String _trimNum(double v) =>
+    v % 1 == 0 ? v.toStringAsFixed(0) : v.toStringAsFixed(1);
 
 // ── Hint (empty / not-enough-data) ────────────────────────────────────────────
 

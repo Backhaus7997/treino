@@ -2485,8 +2485,21 @@ class AppL10nEn extends AppL10n {
   String get measurementsScreenTitle => 'BODY MEASUREMENTS';
 
   @override
+  String get measurementsProfileCardTitle => 'YOUR DATA';
+
+  @override
+  String get measurementsProfileCardHint =>
+      'You entered these when you signed up. Edit them from your profile.';
+
+  @override
+  String get measurementsWeightLabel => 'Weight';
+
+  @override
+  String get measurementsHeightLabel => 'Height';
+
+  @override
   String get measurementsEmptyState =>
-      'You have no measurements yet. Your trainer records them.';
+      'Your trainer has not recorded any measurements yet. Once they do, your progress shows up here.';
 
   @override
   String get measurementsNeedsMoreData =>

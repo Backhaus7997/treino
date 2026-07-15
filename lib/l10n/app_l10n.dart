@@ -4635,16 +4635,40 @@ abstract class AppL10n {
   /// **'Peso y medidas corporales en el tiempo'**
   String get insightsTileMeasurementsSubtitle;
 
-  /// Header title for the dedicated AnthropometryScreen.
+  /// Header title for the dedicated MeasurementsScreen.
   ///
   /// In es_AR, this message translates to:
   /// **'MEDIDAS'**
   String get measurementsScreenTitle;
 
-  /// Shown when the athlete has ZERO measurements. Names WHO records them, because today only a trainer-role user can create them (firestore.rules AD-1) — an athlete without a trainer would otherwise have no idea why the screen is empty.
+  /// Title of the card in MeasurementsScreen showing the athlete's own weight + height, read from UserProfile (captured at onboarding Step 4) so they don't re-enter them.
   ///
   /// In es_AR, this message translates to:
-  /// **'Todavía no tenés mediciones cargadas. Las registra tu entrenador.'**
+  /// **'TUS DATOS'**
+  String get measurementsProfileCardTitle;
+
+  /// Small hint under the profile-data card explaining where the weight/height come from and where to edit them.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Los cargaste al registrarte. Editalos desde tu perfil.'**
+  String get measurementsProfileCardHint;
+
+  /// Label for the body-weight value in the profile-data card.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Peso'**
+  String get measurementsWeightLabel;
+
+  /// Label for the height value in the profile-data card.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Altura'**
+  String get measurementsHeightLabel;
+
+  /// Shown below the profile-data card when the athlete has ZERO trainer-recorded measurements. Talks about EVOLUTION over time (the chart), not about having no data at all — the profile card above already shows the athlete's weight/height. Only a trainer-role user can create measurements today (firestore.rules AD-1).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tu entrenador todavía no registró mediciones. Cuando las tengas, tu evolución aparece acá.'**
   String get measurementsEmptyState;
 
   /// Shown when the athlete has exactly ONE measurement. MeasurementProgressChart requires >= 2 points — distinct from the zero case, which is why it is a separate string.
