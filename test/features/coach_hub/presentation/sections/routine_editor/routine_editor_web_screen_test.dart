@@ -259,8 +259,9 @@ Routine _supersetRoutine({String id = 'r4'}) => Routine(
 Routine _multiWeekRoutine({String id = 'r5'}) =>
     _simpleRoutine(id: id).copyWith(numWeeks: 4);
 
-/// A per-week PERIODIZED routine (weeklySets populated) — still out of web
-/// scope (Fase 4b), so the editor must refuse it.
+/// A per-week PERIODIZED routine (weeklySets populated, 2 weeks with
+/// DIFFERENT prescriptions) — web-editable since Fase 4b. Used by the
+/// edit-round-trip test to confirm weeklySets survives a save unchanged.
 Routine _perWeekRoutine({String id = 'r6'}) => Routine(
       id: id,
       name: 'Periodizada',
@@ -289,6 +290,39 @@ Routine _perWeekRoutine({String id = 'r6'}) => Routine(
                 [SetSpec(reps: 10, weightKg: 55)],
                 [SetSpec(reps: 8, weightKg: 60)],
               ],
+            ),
+          ],
+        ),
+      ],
+    );
+
+/// A routine using the per-week PRESENCE mask (activeWeeks populated) — still
+/// out of web scope (Fase 4c), so the editor must refuse it.
+Routine _presenceRoutine({String id = 'r7'}) => Routine(
+      id: id,
+      name: 'Con máscara de presencia',
+      split: 'PPL',
+      level: ExperienceLevel.advanced,
+      source: RoutineSource.trainerAssigned,
+      assignedBy: _trainerId,
+      assignedTo: _athleteId,
+      visibility: RoutineVisibility.private,
+      numWeeks: 2,
+      days: const [
+        RoutineDay(
+          dayNumber: 1,
+          name: 'Día A',
+          slots: [
+            RoutineSlot(
+              exerciseId: 'bench-press',
+              exerciseName: 'Press de Banca',
+              muscleGroup: 'chest',
+              targetSets: 1,
+              targetRepsMin: 8,
+              targetRepsMax: 8,
+              restSeconds: 90,
+              sets: [SetSpec(reps: 8, weightKg: 60)],
+              activeWeeks: [0],
             ),
           ],
         ),
@@ -555,12 +589,12 @@ void main() {
     });
 
     testWidgets(
-        'refuses a periodized routine and does not save (no truncation)',
+        'refuses a routine with a presence mask and does not save (no truncation)',
         (tester) async {
       final repo = _MockRoutineRepository();
       when(() => repo.getById(any()))
-          .thenAnswer((_) async => _perWeekRoutine());
-      await _pumpEditor(tester, repo: repo, routineId: 'r6');
+          .thenAnswer((_) async => _presenceRoutine());
+      await _pumpEditor(tester, repo: repo, routineId: 'r7');
 
       expect(find.textContaining('periodización'), findsOneWidget);
       expect(find.text('Volver'), findsOneWidget);
@@ -884,14 +918,20 @@ void main() {
       );
       await _pumpEditor(tester, repo: repo);
 
-      // Bump 1 → 3 weeks (stepper is near the top, before adding exercises).
+      // Fill week 1 FIRST, then bump 1 → 3 weeks: each new week is seeded
+      // with a deep copy of the last week's sets (_normalizeSlotWeeks,
+      // Fase 4b), so all 3 weeks end up sharing the same reps without
+      // touching "Sem 2"/"Sem 3" — every week must carry a valid prescription
+      // to save (REQ-PERIOD-016 parity), so bumping weeks before filling any
+      // exercise would leave weeks 2-3 blank and block submit.
+      await _fillMinimalValidForm(tester);
+
       await tester.tap(find.text('+'));
       await tester.pump();
       await tester.tap(find.text('+'));
       await tester.pumpAndSettle();
       expect(find.text('3 semanas'), findsOneWidget);
 
-      await _fillMinimalValidForm(tester);
       await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
       await tester.pumpAndSettle();
 
@@ -899,8 +939,13 @@ void main() {
           .captured
           .single as Routine;
       expect(routine.numWeeks, 3);
-      // Same prescription every week → no per-week data written.
-      expect(routine.days.single.slots.single.weeklySets, isEmpty);
+      // Same prescription every week (copied by the padding above) — still
+      // written to weeklySets since numWeeks > 1 (Fase 4b, ADR-PB-03 parity).
+      final weeklySets = routine.days.single.slots.single.weeklySets;
+      expect(weeklySets, hasLength(3));
+      for (final week in weeklySets) {
+        expect(week.single.reps, 10);
+      }
     });
 
     testWidgets('the "−" stepper does not go below 1 week', (tester) async {
@@ -932,6 +977,83 @@ void main() {
             draft: captureAny(named: 'draft'),
           )).captured.single as Routine;
       expect(draft.numWeeks, 4);
+    });
+  });
+
+  group('RoutineEditorWebScreen — prescripción por semana (Fase 4b)', () {
+    testWidgets('different reps per week saves weeklySets with 2 entries',
+        (tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.createAssigned(any())).thenAnswer(
+        (i) async => i.positionalArguments.first as Routine,
+      );
+      await _pumpEditor(tester, repo: repo);
+
+      // Bump 1 → 2 weeks (stepper is near the top, before adding exercises).
+      await tester.tap(find.text('+'));
+      await tester.pumpAndSettle();
+      expect(find.text('2 semanas'), findsOneWidget);
+
+      // Fills the form and sets week 1's (Sem 1) reps to 10.
+      await _fillMinimalValidForm(tester);
+
+      // Switch to week 2 and give it a DIFFERENT rep count — only that
+      // week's (empty) field renders while "Sem 2" is selected, so the
+      // 'reps' hint match stays unique (mirrors _fillMinimalValidForm).
+      await tester.ensureVisible(find.text('Sem 2'));
+      await tester.tap(find.text('Sem 2'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.ancestor(
+            of: find.text('reps'), matching: find.byType(TextFormField)),
+        '6',
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
+      await tester.pumpAndSettle();
+
+      final routine = verify(() => repo.createAssigned(captureAny()))
+          .captured
+          .single as Routine;
+      expect(routine.numWeeks, 2);
+      final slot = routine.days.single.slots.single;
+      expect(slot.weeklySets, hasLength(2));
+      expect(slot.weeklySets[0].single.reps, 10);
+      expect(slot.weeklySets[1].single.reps, 6);
+      // Legacy fallback mirrors week 0, mirroring mobile's buildRoutineSlot.
+      expect(slot.sets.single.reps, 10);
+    });
+
+    testWidgets(
+        'edit mode loads a per-week routine and re-saves weeklySets preserved',
+        (tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.getById(any()))
+          .thenAnswer((_) async => _perWeekRoutine());
+      when(() => repo.updateAssigned(
+            uid: any(named: 'uid'),
+            draft: any(named: 'draft'),
+          )).thenAnswer((i) async => i.namedArguments[#draft] as Routine);
+      await _pumpEditor(tester, repo: repo, routineId: 'r6');
+
+      expect(find.text('2 semanas'), findsOneWidget); // loaded
+      expect(find.text('Sem 1'), findsOneWidget);
+      expect(find.text('Sem 2'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
+      await tester.pumpAndSettle();
+
+      final draft = verify(() => repo.updateAssigned(
+            uid: any(named: 'uid'),
+            draft: captureAny(named: 'draft'),
+          )).captured.single as Routine;
+      final slot = draft.days.single.slots.single;
+      expect(slot.weeklySets, hasLength(2));
+      expect(slot.weeklySets[0].single.reps, 10);
+      expect(slot.weeklySets[0].single.weightKg, 55);
+      expect(slot.weeklySets[1].single.reps, 8);
+      expect(slot.weeklySets[1].single.weightKg, 60);
     });
   });
 }
