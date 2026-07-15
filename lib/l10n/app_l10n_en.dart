@@ -2496,6 +2496,12 @@ class AppL10nEn extends AppL10n {
   String get measurementsScreenTitle => 'BODY MEASUREMENTS';
 
   @override
+  String get measurementsSelfLogNotesHint => 'Notes (optional)…';
+
+  @override
+  String get measurementsAddSelfLog => 'Log measurement';
+
+  @override
   String get measurementsProfileCardTitle => 'YOUR DATA';
 
   @override

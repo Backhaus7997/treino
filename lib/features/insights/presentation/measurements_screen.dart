@@ -8,6 +8,7 @@ import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../measurements/application/measurement_providers.dart';
+import '../../measurements/presentation/log_measurement_screen.dart';
 import '../../measurements/presentation/widgets/measurement_progress_chart.dart';
 import '../../profile/application/user_providers.dart' show userProfileProvider;
 
@@ -23,11 +24,11 @@ import '../../profile/application/user_providers.dart' show userProfileProvider;
 /// entrenadores —presente o pasado— las registró. (Verificado en el reporte
 /// del usuario: tras desvincularse del PF, sigue viendo lo que aquél le cargó.)
 ///
-/// SOLO-LECTURA por ahora: hoy sólo un usuario con rol `trainer` puede CREAR
-/// mediciones (firestore.rules — decisión AD-1 de `rules-hardening`). El
-/// auto-registro por el propio alumno + visibilidad para su entrenador
-/// vinculado es la siguiente capa (cambio de reglas + esquema, va por SDD). El
-/// empty state ya anticipa ese futuro apuntando a quién las carga hoy.
+/// [athlete-self-measurements] El alumno también CARGA sus propias medidas
+/// desde acá (botón "+" → [LogMeasurementScreen.selfLog]). Su entrenador
+/// vinculado las ve con vínculo activo + consentimiento (gate dual
+/// session_shares ∧ profile_shares en la regla de lectura). El empty state
+/// sigue hablando de la EVOLUCIÓN que registra el PF.
 ///
 /// [uid] explícito — misma convención de reusabilidad que el resto de las
 /// pantallas del hub ([MuscleDistributionScreen], [VolumeByGroupScreen]).
@@ -52,7 +53,10 @@ class MeasurementsScreen extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _Header(title: l10n.measurementsScreenTitle),
+        _Header(
+          title: l10n.measurementsScreenTitle,
+          addTooltip: l10n.measurementsAddSelfLog,
+        ),
         Expanded(
           child: TreinoStateSwitcher(
             childKey: ValueKey(
@@ -116,9 +120,12 @@ class MeasurementsScreen extends ConsumerWidget {
 // ── Header ────────────────────────────────────────────────────────────────────
 
 class _Header extends StatelessWidget {
-  const _Header({required this.title});
+  const _Header({required this.title, required this.addTooltip});
 
   final String title;
+
+  /// Tooltip del botón "+" que abre el formulario de auto-carga.
+  final String addTooltip;
 
   @override
   Widget build(BuildContext context) {
@@ -132,13 +139,26 @@ class _Header extends StatelessWidget {
             onPressed: () => _safePopOrInsights(context),
           ),
           const SizedBox(width: 8),
-          Text(
-            title,
-            style: GoogleFonts.barlowCondensed(
-              fontWeight: FontWeight.w700,
-              fontSize: 24,
-              letterSpacing: 1.2,
-              color: palette.textPrimary,
+          Expanded(
+            child: Text(
+              title,
+              style: GoogleFonts.barlowCondensed(
+                fontWeight: FontWeight.w700,
+                fontSize: 24,
+                letterSpacing: 1.2,
+                color: palette.textPrimary,
+              ),
+            ),
+          ),
+          // [athlete-self-measurements] El alumno carga su propia medición.
+          IconButton(
+            icon: Icon(TreinoIcon.plus, color: palette.accent),
+            tooltip: addTooltip,
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                fullscreenDialog: true,
+                builder: (_) => const LogMeasurementScreen.selfLog(),
+              ),
             ),
           ),
         ],

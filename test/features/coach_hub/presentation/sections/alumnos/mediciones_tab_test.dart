@@ -144,6 +144,10 @@ class _StubMeasurementRepo implements MeasurementRepository {
     String athleteId,
   ) =>
       const Stream.empty();
+
+  @override
+  Stream<List<Measurement>> watchSelfLoggedForAthlete(String athleteId) =>
+      const Stream.empty();
 }
 
 List<Override> _baseOverrides({
@@ -152,16 +156,14 @@ List<Override> _baseOverrides({
 }) =>
     [
       currentUidProvider.overrideWithValue(_trainerUid),
-      trainerLinksStreamProvider
-          .overrideWith((ref) => Stream.value([_link()])),
+      trainerLinksStreamProvider.overrideWith((ref) => Stream.value([_link()])),
       userPublicProfilesBatchProvider
           .overrideWith((ref, key) => {_athleteUid: _profile()}),
       userPublicProfileProvider
           .overrideWith((ref, id) => Stream.value(_profile())),
       pagosPorCobrarProvider
           .overrideWith((ref) => const AsyncData(<CobroPendiente>[])),
-      finishedTodayByUidProvider
-          .overrideWith((ref, uid) => const <Session>[]),
+      finishedTodayByUidProvider.overrideWith((ref, uid) => const <Session>[]),
       measurementsForAthleteProvider
           .overrideWith((ref, id) => Stream.value(measurements)),
       performanceTestsForAthleteProvider
@@ -169,8 +171,7 @@ List<Override> _baseOverrides({
       gymsProvider.overrideWith((ref) => const <Gym>[]),
       athleteBillingProvider.overrideWith((ref, id) => Stream.value(null)),
       sessionsByUidProvider.overrideWith((ref, id) => const <Session>[]),
-      assignedRoutinesProvider
-          .overrideWith((ref, id) => const <Routine>[]),
+      assignedRoutinesProvider.overrideWith((ref, id) => const <Routine>[]),
       athleteNoteProvider(
         (trainerId: _trainerUid, athleteId: _athleteUid),
       ).overrideWith((ref) => const Stream.empty()),
@@ -179,8 +180,7 @@ List<Override> _baseOverrides({
         (trainerId: _trainerUid, athleteId: _athleteUid),
       ).overrideWith((ref) => const Stream.empty()),
       athleteFileRepositoryProvider.overrideWithValue(_StubFileRepo()),
-      if (repo != null)
-        measurementRepositoryProvider.overrideWithValue(repo),
+      if (repo != null) measurementRepositoryProvider.overrideWithValue(repo),
     ];
 
 Widget _wrap(List<Override> overrides) => ProviderScope(
@@ -230,7 +230,8 @@ void main() {
     );
   });
 
-  testWidgets('populated list: una row por medición con summary', (tester) async {
+  testWidgets('populated list: una row por medición con summary',
+      (tester) async {
     final measurements = [
       _measurement(
         id: 'm1',
@@ -257,8 +258,7 @@ void main() {
     expect(find.textContaining('cintura 82.0 cm'), findsOneWidget);
   });
 
-  testWidgets(
-      'tap en row expande el detalle con todos los campos cargados',
+  testWidgets('tap en row expande el detalle con todos los campos cargados',
       (tester) async {
     final m = _measurement(
       id: 'm1',
@@ -284,8 +284,7 @@ void main() {
     expect(find.text('Cintura'), findsOneWidget);
   });
 
-  testWidgets(
-      'tap en trash → confirm dialog → repository.delete llamado',
+  testWidgets('tap en trash → confirm dialog → repository.delete llamado',
       (tester) async {
     final m = _measurement(
       id: 'm1',
@@ -314,8 +313,7 @@ void main() {
     expect(repo.deletedIds, ['m1']);
   });
 
-  testWidgets(
-      'cancelar el confirm dialog NO llama repository.delete',
+  testWidgets('cancelar el confirm dialog NO llama repository.delete',
       (tester) async {
     final m = _measurement(
       id: 'm1',
@@ -395,8 +393,7 @@ void main() {
     expect(find.text('15.0'), findsOneWidget);
   });
 
-  testWidgets(
-      'save en modo edición llama repository.update (no add)',
+  testWidgets('save en modo edición llama repository.update (no add)',
       (tester) async {
     final m = _measurement(
       id: 'm1',
@@ -423,8 +420,7 @@ void main() {
     expect(repo.added, isEmpty);
   });
 
-  testWidgets(
-      'subvista Rendimiento muestra pruebas con summary line',
+  testWidgets('subvista Rendimiento muestra pruebas con summary line',
       (tester) async {
     final tests = [
       PerformanceTest(

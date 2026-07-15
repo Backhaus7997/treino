@@ -916,6 +916,8 @@
   "insightsTileMeasurementsTitle": "Body measurements",
   "insightsTileMeasurementsSubtitle": "Body weight and measurements over time",
   "measurementsScreenTitle": "BODY MEASUREMENTS",
+  "measurementsSelfLogNotesHint": "Notes (optional)…",
+  "measurementsAddSelfLog": "Log measurement",
   "measurementsProfileCardTitle": "YOUR DATA",
   "measurementsProfileCardHint": "You entered these when you signed up. Edit them from your profile.",
   "measurementsWeightLabel": "Weight",
