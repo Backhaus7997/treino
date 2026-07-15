@@ -5,24 +5,22 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/app_palette.dart';
+import 'package:treino/app/theme/tokens/primitives.dart';
 import 'package:treino/core/analytics/analytics_service.dart';
 import 'package:treino/core/utils/argentina_time.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach/application/agenda_providers.dart';
-import 'package:treino/features/coach/application/dashboard_day_counts.dart';
 import 'package:treino/features/coach/domain/appointment.dart';
 import 'package:treino/features/payments/domain/payment.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
-import 'package:treino/features/chat/application/chat_providers.dart'
-    show totalUnreadCountProvider;
+import 'package:treino/features/coach_hub/presentation/sections/dashboard/widgets/dashboard_hero.dart';
 import 'package:treino/features/coach_hub/presentation/sections/pagos/widgets/pagos_buckets_provider.dart';
 import 'package:treino/features/coach_hub/presentation/sections/pagos/widgets/payment_format.dart'
     show fmtArs;
 import 'package:treino/features/feed/presentation/widgets/post_avatar.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
-import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/coach_hub/application/aggregate_adherence_provider.dart';
 import 'package:treino/features/coach_hub/application/inactivos_provider.dart';
 import 'package:treino/features/workout/application/session_providers.dart'
@@ -100,10 +98,10 @@ class _DashboardContent extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const _AlertBanner(),
-        const SizedBox(height: 16),
-        const _WelcomeCard(),
-        const SizedBox(height: 16),
+        const DashboardAlertBanner(),
+        const SizedBox(height: AppSpacing.s18),
+        const DashboardWelcomeCard(),
+        const SizedBox(height: AppSpacing.s18),
         const _KpiStrip(),
         const SizedBox(height: 20),
         if (wide) ...[
@@ -142,329 +140,6 @@ class _TwoColumnLayout extends StatelessWidget {
           Expanded(flex: 55, child: left),
           const SizedBox(width: 20),
           Expanded(flex: 45, child: right),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Alert banner (REAL — composes vencidos + solicitudes + inactivos) ────────
-
-/// Alert banner — REQ-HOY-03.
-///
-/// Watches three signals:
-/// - [pagosBucketsProvider].vencidos count
-/// - [trainerLinksStreamProvider] pending solicitudes
-/// - [inactivosProvider].inactiveCount
-///
-/// Shows "Todo al día" when all are 0; otherwise renders a composed line.
-class _AlertBanner extends ConsumerWidget {
-  const _AlertBanner();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final palette = AppPalette.of(context);
-    final l10n = AppL10n.of(context);
-
-    final bucketsAsync = ref.watch(pagosBucketsProvider);
-    final linksAsync = ref.watch(trainerLinksStreamProvider);
-    final inactivosAsync = ref.watch(inactivosProvider);
-
-    final vencidosCount = bucketsAsync.valueOrNull?.vencidos.length ?? 0;
-    final solicitudesCount = linksAsync.valueOrNull
-            ?.where((l) => l.status == TrainerLinkStatus.pending)
-            .length ??
-        0;
-    final inactivosCount = inactivosAsync.valueOrNull?.inactiveCount ?? 0;
-
-    final allClear =
-        vencidosCount == 0 && solicitudesCount == 0 && inactivosCount == 0;
-
-    final text = allClear
-        ? l10n.dashboardAlertBannerAllClear
-        : l10n.dashboardAlertBannerSummary(
-            vencidosCount,
-            solicitudesCount,
-            inactivosCount,
-          );
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-      decoration: BoxDecoration(
-        color: palette.bgCard,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: palette.border),
-      ),
-      child: Row(
-        children: [
-          Icon(TreinoIcon.bell, size: 16, color: palette.textMuted),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              text,
-              style: TextStyle(color: palette.textMuted, fontSize: 13),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Welcome card ──────────────────────────────────────────────────────────────
-
-/// Welcome card — greeting + summary + quick actions + adherencia ring.
-/// REQ-HOY-04.
-class _WelcomeCard extends ConsumerWidget {
-  const _WelcomeCard();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final palette = AppPalette.of(context);
-    final l10n = AppL10n.of(context);
-
-    // Name from userProfileProvider.
-    final profileAsync = ref.watch(userProfileProvider);
-    final displayName = profileAsync.valueOrNull?.displayName ?? '';
-    final firstName = displayName.trim().split(RegExp(r'\s+')).first;
-
-    // Unread message count.
-    final unread = ref.watch(totalUnreadCountProvider);
-
-    // Pending solicitudes count (para revisar).
-    final linksAsync = ref.watch(trainerLinksStreamProvider);
-    final pendingCount = linksAsync.valueOrNull
-            ?.where((l) => l.status == TrainerLinkStatus.pending)
-            .length ??
-        0;
-
-    // Sesiones hoy count via trainerAppointmentsStreamProvider + dashboardDayCounts.
-    final uid = ref.watch(currentUidProvider) ?? '';
-    // QA-HOME-001: appointments' startsAt is Argentina wall-clock, so bucket the
-    // "today" query range and the dashboard counts by ART wall-clock too.
-    final now = argentinaNow();
-    final todayStart = DateTime.utc(now.year, now.month, now.day);
-    final todayEnd = todayStart.add(const Duration(days: 1));
-    final appointmentsAsync = ref.watch(
-      trainerAppointmentsStreamProvider(
-        TrainerAppointmentsKey(
-          trainerId: uid,
-          fromDate: todayStart,
-          toDate: todayEnd,
-        ),
-      ),
-    );
-    final sessionCounts = dashboardDayCounts(
-      appointmentsAsync.valueOrNull ?? [],
-      now,
-    );
-
-    // Vencidos count from pagosBucketsProvider.
-    final bucketsAsync = ref.watch(pagosBucketsProvider);
-    final vencidosCount = bucketsAsync.valueOrNull?.vencidos.length ?? 0;
-
-    // Mockup (welcome-card.png): fondo con glow mint radial en la esquina
-    // izquierda, saludo con el NOMBRE en mint, botones con ícono (el primario
-    // relleno), ring de adherencia a la derecha.
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: palette.border),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            palette.accent.withValues(alpha: 0.12),
-            palette.bgCard,
-            palette.bgCard,
-          ],
-          stops: const [0.0, 0.45, 1.0],
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Saludo: "BUENAS, " blanco + el nombre en mint (mockup).
-          RichText(
-            text: TextSpan(
-              children: [
-                TextSpan(
-                  text: l10n.dashboardGreetingPrefix,
-                  style: GoogleFonts.barlowCondensed(
-                    color: palette.textPrimary,
-                    fontSize: 30,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 1.2,
-                  ),
-                ),
-                TextSpan(
-                  text: firstName.toUpperCase(),
-                  style: GoogleFonts.barlowCondensed(
-                    color: palette.accent,
-                    fontSize: 30,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 1.2,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            l10n.dashboardSummaryLine(
-              sessionCounts.pending,
-              pendingCount,
-              vencidosCount,
-            ),
-            style: TextStyle(color: palette.textMuted, fontSize: 13),
-          ),
-          const SizedBox(height: 18),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  children: [
-                    _QuickAction(
-                      label: l10n.dashboardQuickActionNuevoAlumno,
-                      icon: TreinoIcon.plus,
-                      primary: true,
-                      onTap: () => context.go('/alumnos'),
-                    ),
-                    _QuickAction(
-                      label: l10n.dashboardQuickActionCrearRutina,
-                      icon: TreinoIcon.sidebarRutinas,
-                      onTap: () => context.push('/template-editor'),
-                    ),
-                    _QuickAction(
-                      label: l10n.dashboardQuickActionMensajes(unread),
-                      icon: TreinoIcon.sidebarChat,
-                      onTap: () => context.go('/chat'),
-                    ),
-                    _QuickAction(
-                      label: l10n.dashboardQuickActionImportarPlan,
-                      icon: TreinoIcon.upload,
-                      onTap: () => context.push('/upload-plan'),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 16),
-              const _AdherenceRing(),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// A single quick action chip/button (mockup: con ícono; el primario relleno
-/// en mint, el resto outline).
-class _QuickAction extends StatelessWidget {
-  const _QuickAction({
-    required this.label,
-    required this.onTap,
-    required this.icon,
-    this.primary = false,
-  });
-  final String label;
-  final VoidCallback onTap;
-  final IconData icon;
-  final bool primary;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-    final fg = primary ? palette.bg : palette.textPrimary;
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        decoration: BoxDecoration(
-          color: primary ? palette.accent : Colors.transparent,
-          border: Border.all(
-            color: primary ? palette.accent : palette.border,
-          ),
-          borderRadius: BorderRadius.circular(9999),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 15, color: fg),
-            const SizedBox(width: 7),
-            Text(
-              label,
-              style: GoogleFonts.barlowCondensed(
-                color: fg,
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 1.0,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Adherencia ring — real aggregate from [aggregateAdherenceProvider]. REQ-HOY-04B.
-///
-/// Shows "{pct}%" when data is available; "--" when null (no athlete has a plan).
-/// Loading state degrades gracefully to "--" (not a perpetual spinner) so
-/// [pumpAndSettle] does not hang in CI.
-class _AdherenceRing extends ConsumerWidget {
-  const _AdherenceRing();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final palette = AppPalette.of(context);
-    final l10n = AppL10n.of(context);
-
-    // valueOrNull: resolves to null while loading → shows "--" (no spinner hang).
-    final adherence = ref.watch(aggregateAdherenceProvider).valueOrNull;
-
-    final String label;
-    final double ringValue;
-    if (adherence == null) {
-      label = l10n.dashboardAdherenceRingPlaceholder; // "--"
-      ringValue = 0;
-    } else {
-      // Clamp the displayed % to 100: an athlete can log more sessions than
-      // planned (raw value can exceed 100), but "105% de adherencia" reads
-      // as a bug. Same clamp is applied to the KPI card so both agree.
-      label = l10n.dashboardAdherenceValue(adherence.round().clamp(0, 100));
-      ringValue = (adherence / 100).clamp(0.0, 1.0);
-    }
-
-    return SizedBox(
-      width: 84,
-      height: 84,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          CircularProgressIndicator(
-            value: ringValue,
-            strokeWidth: 6,
-            backgroundColor: palette.border,
-            color: adherence == null
-                ? palette.accent.withValues(alpha: 0.3)
-                : palette.accent,
-          ),
-          Text(
-            label,
-            style: TextStyle(
-              color:
-                  adherence == null ? palette.textMuted : palette.textPrimary,
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
         ],
       ),
     );
