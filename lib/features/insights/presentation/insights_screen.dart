@@ -782,21 +782,16 @@ class _StatsHubTileList extends StatelessWidget {
           onTap: () => context.push('/home/insights/volume-by-group'),
         ),
         const SizedBox(height: 12),
-        // Antropometría y Rendimiento: hasta ahora el PF cargaba estos datos de
-        // su alumno y era el ÚNICO que los veía. El alumno no tenía dónde
-        // mirarlos. Mismas gráficas, ahora desde su propia óptica.
+        // MEDIDAS: el PF carga peso y circunferencias de su alumno y era el
+        // ÚNICO que las veía. El alumno no tenía dónde mirarlas. (Rendimiento
+        // NO se surfacea al alumno: son evaluaciones profesionales —CMJ,
+        // sprints, VO2máx— que toma el coach con equipo específico; siguen
+        // viviendo sólo en el detalle de alumno del PF.)
         _StatTile(
           icon: TreinoIcon.ruler,
-          title: l10n.insightsTileAnthropometryTitle,
-          subtitle: l10n.insightsTileAnthropometrySubtitle,
-          onTap: () => context.push('/home/insights/anthropometry'),
-        ),
-        const SizedBox(height: 12),
-        _StatTile(
-          icon: TreinoIcon.trendUp,
-          title: l10n.insightsTilePerformanceTitle,
-          subtitle: l10n.insightsTilePerformanceSubtitle,
-          onTap: () => context.push('/home/insights/performance'),
+          title: l10n.insightsTileMeasurementsTitle,
+          subtitle: l10n.insightsTileMeasurementsSubtitle,
+          onTap: () => context.push('/home/insights/measurements'),
         ),
       ],
     );

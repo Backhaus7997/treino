@@ -2475,40 +2475,22 @@ class AppL10nEn extends AppL10n {
       'None of your exercises match the search.';
 
   @override
-  String get insightsTileAnthropometryTitle => 'Anthropometry';
+  String get insightsTileMeasurementsTitle => 'Body measurements';
 
   @override
-  String get insightsTileAnthropometrySubtitle =>
+  String get insightsTileMeasurementsSubtitle =>
       'Body weight and measurements over time';
 
   @override
-  String get anthropometryScreenTitle => 'ANTHROPOMETRY';
+  String get measurementsScreenTitle => 'BODY MEASUREMENTS';
 
   @override
-  String get anthropometryEmptyState =>
+  String get measurementsEmptyState =>
       'You have no measurements yet. Your trainer records them.';
 
   @override
-  String get anthropometryNeedsMoreData =>
+  String get measurementsNeedsMoreData =>
       'A single measurement is not enough to show progress. At least one more is needed.';
-
-  @override
-  String get insightsTilePerformanceTitle => 'Performance';
-
-  @override
-  String get insightsTilePerformanceSubtitle =>
-      'Jumps, speed, strength and endurance';
-
-  @override
-  String get performanceScreenTitle => 'PERFORMANCE';
-
-  @override
-  String get performanceEmptyState =>
-      'You have no assessments yet. Your trainer records them.';
-
-  @override
-  String get performanceNeedsMoreData =>
-      'A single assessment is not enough to show progress. At least one more is needed.';
 
   @override
   String get insightsTileFrequentExercisesTitle => 'Frequent exercises';

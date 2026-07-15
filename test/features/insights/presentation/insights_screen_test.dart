@@ -717,15 +717,9 @@ void main() {
           ),
         ),
         GoRoute(
-          path: '/home/insights/anthropometry',
+          path: '/home/insights/measurements',
           builder: (_, __) => const Scaffold(
-            body: Text('anthropometry-route'),
-          ),
-        ),
-        GoRoute(
-          path: '/home/insights/performance',
-          builder: (_, __) => const Scaffold(
-            body: Text('performance-route'),
+            body: Text('measurements-route'),
           ),
         ),
         GoRoute(
@@ -798,31 +792,19 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('volume-by-group-route'), findsOneWidget);
 
-    // Antropometría y Rendimiento: los datos los carga el PF, pero hasta ahora
-    // el alumno no tenía NINGUNA pantalla para verlos.
+    // MEDIDAS: el PF carga peso y circunferencias del alumno; ahora el alumno
+    // las ve. (Rendimiento NO se surfacea — evaluaciones profesionales del PF.)
     router.go('/home/insights');
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(
-      find.text('Antropometría'),
+      find.text('Medidas'),
       200,
       scrollable: find.byType(Scrollable).first,
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Antropometría'));
+    await tester.tap(find.text('Medidas'));
     await tester.pumpAndSettle();
-    expect(find.text('anthropometry-route'), findsOneWidget);
-
-    router.go('/home/insights');
-    await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(
-      find.text('Rendimiento'),
-      200,
-      scrollable: find.byType(Scrollable).first,
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Rendimiento'));
-    await tester.pumpAndSettle();
-    expect(find.text('performance-route'), findsOneWidget);
+    expect(find.text('measurements-route'), findsOneWidget);
 
     // Evolución por ejercicio: el destino que no existía del lado del alumno.
     router.go('/home/insights');

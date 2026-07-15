@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:treino/app/theme/app_theme.dart';
-import 'package:treino/features/insights/presentation/anthropometry_screen.dart';
+import 'package:treino/features/insights/presentation/measurements_screen.dart';
 import 'package:treino/features/measurements/application/measurement_providers.dart';
 import 'package:treino/features/measurements/domain/measurement.dart';
 import 'package:treino/features/measurements/presentation/widgets/measurement_progress_chart.dart';
@@ -24,7 +24,7 @@ Widget _wrap({required List<Override> overrides}) => ProviderScope(
         localizationsDelegates: AppL10n.localizationsDelegates,
         supportedLocales: AppL10n.supportedLocales,
         locale: const Locale('es', 'AR'),
-        home: const Scaffold(body: AnthropometryScreen(uid: 'u1')),
+        home: const Scaffold(body: MeasurementsScreen(uid: 'u1')),
       ),
     );
 
@@ -40,7 +40,7 @@ void main() {
     ]));
     await tester.pumpAndSettle();
 
-    expect(find.text('ANTROPOMETRÍA'), findsOneWidget);
+    expect(find.text('MEDIDAS'), findsOneWidget);
     expect(find.byType(MeasurementProgressChart), findsOneWidget);
   });
 
