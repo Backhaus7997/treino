@@ -7,6 +7,7 @@ import '../../profile/application/user_providers.dart';
 import '../domain/post.dart';
 import '../domain/post_privacy.dart';
 import 'feed_screen_providers.dart';
+import 'post_actions_notifier.dart';
 import 'post_providers.dart';
 
 /// Maximum character count for a post (grapheme clusters).
@@ -23,12 +24,20 @@ class CreatePostState {
     this.privacy = PostPrivacy.friends,
     this.isSubmitting = false,
     this.errorMessage,
+    this.editingPost,
   });
 
   final String text;
   final PostPrivacy privacy;
   final bool isSubmitting;
   final String? errorMessage;
+
+  /// The post being edited, or `null` when composing a brand-new post.
+  /// Drives edit-mode UI (title/submit label) and routes [submit] to
+  /// `PostActionsNotifier.updatePost` instead of `PostRepository.create`.
+  final Post? editingPost;
+
+  bool get isEditing => editingPost != null;
 
   /// True when the post can be submitted: text is non-empty, within the char
   /// limit, and not already submitting.
@@ -43,12 +52,14 @@ class CreatePostState {
     bool? isSubmitting,
     String? errorMessage,
     bool clearError = false,
+    Post? editingPost,
   }) =>
       CreatePostState(
         text: text ?? this.text,
         privacy: privacy ?? this.privacy,
         isSubmitting: isSubmitting ?? this.isSubmitting,
         errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
+        editingPost: editingPost ?? this.editingPost,
       );
 }
 
@@ -56,9 +67,31 @@ class CreatePostState {
 // Notifier
 // ---------------------------------------------------------------------------
 
-class CreatePostNotifier extends AsyncNotifier<CreatePostState> {
+/// Family keyed on the optional post being edited. `null` (the default,
+/// via [createPostNotifierProvider]) is the compose-new-post flow; a non-null
+/// [Post] pre-fills the form and routes [submit] to an update instead of a
+/// create.
+class CreatePostNotifier
+    extends AutoDisposeFamilyAsyncNotifier<CreatePostState, Post?> {
   @override
-  Future<CreatePostState> build() async => const CreatePostState();
+  Future<CreatePostState> build(Post? existingPost) async {
+    if (existingPost == null) return const CreatePostState();
+    // Defense-in-depth: only the author may edit. If a post that isn't the
+    // current viewer's arrives here (e.g. a future call site that forgets to
+    // gate), fall back to compose-new mode instead of pre-filling someone
+    // else's post. The 3-dot menu already gates this, and Firestore rules
+    // reject the write — this guards the UI layer too.
+    final viewerUid =
+        (await ref.read(authStateChangesProvider.future))?.uid;
+    if (viewerUid == null || viewerUid != existingPost.authorUid) {
+      return const CreatePostState();
+    }
+    return CreatePostState(
+      text: existingPost.text,
+      privacy: existingPost.privacy,
+      editingPost: existingPost,
+    );
+  }
 
   void setText(String value) {
     final current = state.valueOrNull;
@@ -74,11 +107,14 @@ class CreatePostNotifier extends AsyncNotifier<CreatePostState> {
 
   /// Submits the post. Returns [true] on success, [false] on any failure.
   ///
+  /// When [CreatePostState.isEditing] is true, updates the existing post
+  /// (text/privacy/routineTag only) instead of creating a new one.
+  ///
   /// Failure cases:
   /// - `canSubmit == false` (text empty / over limit / already submitting)
   /// - viewer not authenticated
   /// - gym privacy selected but user has no gym
-  /// - `PostRepository.create()` throws
+  /// - `PostRepository.create()` / `PostActionsNotifier.updatePost()` throws
   Future<bool> submit() async {
     final current = state.valueOrNull;
     if (current == null || !current.canSubmit) return false;
@@ -112,6 +148,28 @@ class CreatePostNotifier extends AsyncNotifier<CreatePostState> {
         ),
       );
       return false;
+    }
+
+    final editingPost = current.editingPost;
+    if (editingPost != null) {
+      try {
+        await ref.read(postActionsProvider).updatePost(
+              editingPost.copyWith(
+                text: current.text.trim(),
+                privacy: current.privacy,
+              ),
+            );
+        state = AsyncData(current.copyWith(isSubmitting: false));
+        return true;
+      } catch (_) {
+        state = AsyncData(
+          current.copyWith(
+            isSubmitting: false,
+            errorMessage: 'No pudimos guardar los cambios. Intentá de nuevo.',
+          ),
+        );
+        return false;
+      }
     }
 
     try {
@@ -153,7 +211,7 @@ class CreatePostNotifier extends AsyncNotifier<CreatePostState> {
 // Provider
 // ---------------------------------------------------------------------------
 
-final createPostNotifierProvider =
-    AsyncNotifierProvider<CreatePostNotifier, CreatePostState>(
+final createPostNotifierProvider = AutoDisposeAsyncNotifierProviderFamily<
+    CreatePostNotifier, CreatePostState, Post?>(
   CreatePostNotifier.new,
 );

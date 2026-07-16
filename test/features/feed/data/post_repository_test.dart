@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/features/feed/data/post_repository.dart';
@@ -55,6 +56,91 @@ void main() {
       expect(data['authorUid'], equals('u1'));
       expect(data['text'], equals('Hello'));
       expect(data['privacy'], equals('public'));
+    });
+  });
+
+  group('PostRepository.delete', () {
+    test('delete removes the post doc from Firestore', () async {
+      await repo.create(_makePost(id: 'p1', authorUid: 'u1'));
+
+      await repo.delete('p1');
+
+      final snap = await firestore.collection('posts').doc('p1').get();
+      expect(snap.exists, isFalse);
+    });
+
+    test('delete is a no-op when the doc does not exist', () async {
+      // Should not throw for a missing doc.
+      await repo.delete('does-not-exist');
+    });
+  });
+
+  group('PostRepository.update', () {
+    test('update changes text, privacy, and routineTag', () async {
+      final original = _makePost(
+        id: 'p1',
+        authorUid: 'u1',
+        text: 'Original text',
+        privacy: PostPrivacy.friends,
+        routineTag: null,
+      );
+      await repo.create(original);
+
+      final edited = original.copyWith(
+        text: 'Edited text',
+        privacy: PostPrivacy.public,
+        routineTag:
+            const RoutineTag(routineId: 'r1', routineName: 'Push Día 1'),
+      );
+      final result = await repo.update(edited);
+
+      expect(result.text, equals('Edited text'));
+      expect(result.privacy, equals(PostPrivacy.public));
+      expect(result.routineTag?.routineId, equals('r1'));
+
+      final snap = await firestore.collection('posts').doc('p1').get();
+      final data = snap.data()!;
+      expect(data['text'], equals('Edited text'));
+      expect(data['privacy'], equals('public'));
+      expect(data['routineTag'], isNotNull);
+    });
+
+    test('update does not change author fields, createdAt, or id', () async {
+      final createdAt = DateTime.utc(2026, 1, 1);
+      final original = _makePost(
+        id: 'p1',
+        authorUid: 'u1',
+        authorDisplayName: 'Original Author',
+        authorAvatarUrl: 'https://example.com/avatar.png',
+        authorGymId: 'gym-1',
+        text: 'Original text',
+        createdAt: createdAt,
+      );
+      await repo.create(original);
+
+      // Attempt to change immutable fields via the input — update() must
+      // ignore them and only write text/privacy/routineTag.
+      final tampered = original.copyWith(
+        text: 'Edited text',
+        authorUid: 'someone-else',
+        authorDisplayName: 'Hacked Name',
+        authorGymId: 'gym-2',
+        createdAt: DateTime.utc(2030, 1, 1),
+      );
+      await repo.update(tampered);
+
+      final snap = await firestore.collection('posts').doc('p1').get();
+      final data = snap.data()!;
+      expect(data['text'], equals('Edited text'));
+      // Immutable fields must be untouched in Firestore.
+      expect(data['authorUid'], equals('u1'));
+      expect(data['authorDisplayName'], equals('Original Author'));
+      expect(data['authorGymId'], equals('gym-1'));
+      expect(
+        (data['createdAt'] as Timestamp).toDate().toUtc(),
+        equals(createdAt),
+      );
+      expect(snap.id, equals('p1'));
     });
   });
 

@@ -8,27 +8,33 @@ import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../profile/application/user_providers.dart';
 import '../application/create_post_notifier.dart';
+import '../domain/post.dart';
 import '../domain/post_privacy.dart';
 
 // ---------------------------------------------------------------------------
 // Screen
 // ---------------------------------------------------------------------------
 
-/// Full-screen form for composing a new post.
+/// Full-screen form for composing a new post, or editing an existing one
+/// when [existingPost] is passed (e.g. via `state.extra` from the router).
 ///
 /// Does NOT own a [Scaffold] — relies on [_ShellScaffold] via the router.
 class CreatePostScreen extends ConsumerWidget {
-  const CreatePostScreen({super.key});
+  const CreatePostScreen({super.key, this.existingPost});
+
+  /// The post to edit. `null` (default) composes a brand-new post.
+  final Post? existingPost;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final stateAsync = ref.watch(createPostNotifierProvider);
-    final notifier = ref.read(createPostNotifierProvider.notifier);
+    final provider = createPostNotifierProvider(existingPost);
+    final stateAsync = ref.watch(provider);
+    final notifier = ref.read(provider.notifier);
 
     return stateAsync.when(
       loading: () => const _CreatePostLoading(),
       error: (_, __) => _CreatePostError(
-        onRetry: () => ref.invalidate(createPostNotifierProvider),
+        onRetry: () => ref.invalidate(provider),
       ),
       data: (state) => _CreatePostBody(state: state, notifier: notifier),
     );
@@ -300,7 +306,7 @@ class _CreatePostHeader extends ConsumerWidget {
           Semantics(
             header: true,
             child: Text(
-              'NUEVO POST',
+              state.isEditing ? l10n.createPostEditTitle : 'NUEVO POST',
               style: GoogleFonts.barlowCondensed(
                 fontWeight: FontWeight.w700,
                 fontSize: 18,
@@ -310,15 +316,19 @@ class _CreatePostHeader extends ConsumerWidget {
             ),
           ),
           const Spacer(),
-          // PUBLICAR
+          // PUBLICAR / GUARDAR
           Opacity(
             opacity: state.canSubmit ? 1.0 : 0.4,
             child: Semantics(
               button: true,
               enabled: state.canSubmit,
               label: state.isSubmitting
-                  ? l10n.feedPublishingA11y
-                  : l10n.feedCreatePostA11y,
+                  ? (state.isEditing
+                      ? l10n.createPostSavingA11y
+                      : l10n.feedPublishingA11y)
+                  : (state.isEditing
+                      ? l10n.createPostSaveChangesA11y
+                      : l10n.feedCreatePostA11y),
               liveRegion: state.isSubmitting,
               child: GestureDetector(
                 onTap: state.canSubmit
@@ -328,7 +338,9 @@ class _CreatePostHeader extends ConsumerWidget {
                         // The app-level messenger survives the pop, so the success
                         // toast is still delivered on the feed.
                         final messenger = ScaffoldMessenger.of(context);
-                        final successMessage = l10n.feedPostPublishedSuccess;
+                        final successMessage = state.isEditing
+                            ? l10n.feedPostUpdatedSuccess
+                            : l10n.feedPostPublishedSuccess;
                         final ok = await notifier.submit();
                         if (ok && context.mounted) {
                           messenger
@@ -356,7 +368,9 @@ class _CreatePostHeader extends ConsumerWidget {
                               ),
                             )
                           : Text(
-                              'PUBLICAR',
+                              state.isEditing
+                                  ? l10n.createPostSaveChanges
+                                  : 'PUBLICAR',
                               style: GoogleFonts.barlowCondensed(
                                 fontWeight: FontWeight.w700,
                                 fontSize: 14,

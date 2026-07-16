@@ -34,6 +34,25 @@ class PostRepository {
     return post;
   }
 
+  /// Deletes the post doc at `posts/{postId}`. No-op if it doesn't exist —
+  /// Firestore `delete()` does not throw for a missing doc.
+  Future<void> delete(String postId) async {
+    await _posts.doc(postId).delete();
+  }
+
+  /// Updates the editable fields of an existing post: `text`, `privacy`, and
+  /// `routineTag`. Author fields, `authorGymId`, `createdAt`, and `id` are
+  /// immutable on edit — this writes an explicit partial map (not
+  /// `post.toJson()`) so those fields are never clobbered.
+  Future<Post> update(Post post) async {
+    await _posts.doc(post.id).update({
+      'text': post.text,
+      'privacy': post.privacy.toJson(),
+      'routineTag': post.routineTag?.toJson(),
+    });
+    return post;
+  }
+
   Future<List<Post>> byAuthor(String uid) async {
     final snap = await _posts.where('authorUid', isEqualTo: uid).get();
     return snap.docs.map(_fromDoc).whereType<Post>().toList();

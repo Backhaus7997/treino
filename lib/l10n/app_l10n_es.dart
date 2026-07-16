@@ -2147,6 +2147,43 @@ class AppL10nEs extends AppL10n {
   String get feedPostPublishedSuccess => 'Post publicado.';
 
   @override
+  String get postCardMenuA11y => 'Opciones del post';
+
+  @override
+  String get postCardMenuEdit => 'Editar';
+
+  @override
+  String get postCardMenuDelete => 'Eliminar';
+
+  @override
+  String get postCardDeleteConfirmTitle => '¿Eliminar este post?';
+
+  @override
+  String get postCardDeleteConfirmBody => 'Esta acción no se puede deshacer.';
+
+  @override
+  String get postCardDeleteSuccess => 'Post eliminado.';
+
+  @override
+  String get postCardDeleteError =>
+      'No pudimos eliminar el post. Inténtalo de nuevo.';
+
+  @override
+  String get createPostEditTitle => 'EDITAR POST';
+
+  @override
+  String get createPostSaveChanges => 'GUARDAR';
+
+  @override
+  String get createPostSaveChangesA11y => 'Guardar cambios';
+
+  @override
+  String get createPostSavingA11y => 'Guardando…';
+
+  @override
+  String get feedPostUpdatedSuccess => 'Cambios guardados.';
+
+  @override
   String get feedRequestSentSuccess => 'Solicitud enviada.';
 
   @override
@@ -4810,6 +4847,43 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get feedPostPublishedSuccess => 'Post publicado.';
+
+  @override
+  String get postCardMenuA11y => 'Opciones del post';
+
+  @override
+  String get postCardMenuEdit => 'Editar';
+
+  @override
+  String get postCardMenuDelete => 'Eliminar';
+
+  @override
+  String get postCardDeleteConfirmTitle => '¿Eliminar este post?';
+
+  @override
+  String get postCardDeleteConfirmBody => 'Esta acción no se puede deshacer.';
+
+  @override
+  String get postCardDeleteSuccess => 'Post eliminado.';
+
+  @override
+  String get postCardDeleteError =>
+      'No pudimos eliminar el post. Probá de nuevo.';
+
+  @override
+  String get createPostEditTitle => 'EDITAR POST';
+
+  @override
+  String get createPostSaveChanges => 'GUARDAR';
+
+  @override
+  String get createPostSaveChangesA11y => 'Guardar cambios';
+
+  @override
+  String get createPostSavingA11y => 'Guardando…';
+
+  @override
+  String get feedPostUpdatedSuccess => 'Cambios guardados.';
 
   @override
   String get feedRequestSentSuccess => 'Solicitud enviada.';

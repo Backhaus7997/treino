@@ -2097,6 +2097,43 @@ class AppL10nEn extends AppL10n {
   String get feedPostPublishedSuccess => 'Post published.';
 
   @override
+  String get postCardMenuA11y => 'Post options';
+
+  @override
+  String get postCardMenuEdit => 'Edit';
+
+  @override
+  String get postCardMenuDelete => 'Delete';
+
+  @override
+  String get postCardDeleteConfirmTitle => 'Delete this post?';
+
+  @override
+  String get postCardDeleteConfirmBody => 'This action can\'t be undone.';
+
+  @override
+  String get postCardDeleteSuccess => 'Post deleted.';
+
+  @override
+  String get postCardDeleteError =>
+      'We couldn\'t delete the post. Please try again.';
+
+  @override
+  String get createPostEditTitle => 'EDIT POST';
+
+  @override
+  String get createPostSaveChanges => 'SAVE';
+
+  @override
+  String get createPostSaveChangesA11y => 'Save changes';
+
+  @override
+  String get createPostSavingA11y => 'Saving…';
+
+  @override
+  String get feedPostUpdatedSuccess => 'Changes saved.';
+
+  @override
   String get feedRequestSentSuccess => 'Request sent.';
 
   @override
