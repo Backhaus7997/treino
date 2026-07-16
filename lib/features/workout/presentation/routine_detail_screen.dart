@@ -715,8 +715,15 @@ class _AssignedByChip extends ConsumerWidget {
     final profileAsync = ref.watch(userPublicProfileProvider(assignedBy));
 
     final label = profileAsync.when(
-      data: (profile) =>
-          '${l10n.coachAssignedByPrefix}${profile?.displayName ?? '?'}',
+      // A missing/blank profile is the same story as a failed read — we know a
+      // PF assigned the plan, we just can't name them. Fall back to the generic
+      // copy instead of rendering "Asignado por ?", which reads as a glitch.
+      data: (profile) {
+        final name = profile?.displayName;
+        return (name == null || name.trim().isEmpty)
+            ? l10n.coachAssignedByError
+            : '${l10n.coachAssignedByPrefix}$name';
+      },
       loading: () => l10n.coachAssignedByLoading,
       error: (_, __) => l10n.coachAssignedByError,
     );
