@@ -930,6 +930,10 @@ async function seedRoutines() {
         })),
       })),
       status: 'active',
+      // Required by the app's assigned/user routine queries, which
+      // `orderBy('createdAt')` — Firestore silently drops docs missing the
+      // field, so a routine without it is invisible to the athlete.
+      createdAt: r.createdAt || daysAgo(60),
     };
     await db.collection('routines').doc(r.id).set(data);
     console.log(`  ✓ routines/${r.id} — ${r.name} (${r.numWeeks}w, ${r.source})`);
