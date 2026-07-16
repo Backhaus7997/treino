@@ -7,6 +7,55 @@
   "@homeAthleteFirstRunCreateCta": {"description": "Home first-run primary CTA to create a routine (finding 6)."},
   "homeAthleteFirstRunFindTrainerCta": "Buscar entrenador",
   "@homeAthleteFirstRunFindTrainerCta": {"description": "Home first-run secondary CTA to browse trainers (finding 6)."},
+  "homeEstaSemanaTitle": "ESTA SEMANA",
+  "@homeEstaSemanaTitle": {"description": "Home 'Esta Semana' card section title (skeleton, error and loaded states)."},
+  "homeEstaSemanaLoadError": "No pudimos cargar tus insights.",
+  "@homeEstaSemanaLoadError": {"description": "Home 'Esta Semana' card error message shown when weekly insights fail to load."},
+  "homeEstaSemanaHeaderPill": "RACHA ACTUAL",
+  "@homeEstaSemanaHeaderPill": {"description": "Home 'Esta Semana' card header pill label when the athlete has an active streak."},
+  "homeEstaSemanaHeaderPillEmpty": "PRIMER PASO",
+  "@homeEstaSemanaHeaderPillEmpty": {"description": "Home 'Esta Semana' card header pill label in the empty state (no sessions yet)."},
+  "homeEstaSemanaWeekMonth": "SEM {week} · {month}",
+  "@homeEstaSemanaWeekMonth": {
+    "placeholders": {
+      "week": {
+        "type": "int"
+      },
+      "month": {
+        "type": "String"
+      }
+    }
+  },
+  "homeEstaSemanaStreakUnit": "{count, plural, =1{DÍA} other{DÍAS}}",
+  "@homeEstaSemanaStreakUnit": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "homeEstaSemanaStreakSubtextTrained": "No rompas la racha — entrenaste hoy.",
+  "@homeEstaSemanaStreakSubtextTrained": {"description": "Home 'Esta Semana' card streak subtext shown when the athlete already trained today."},
+  "homeEstaSemanaStreakSubtextPending": "No rompas la racha — entrená hoy.",
+  "@homeEstaSemanaStreakSubtextPending": {"description": "Home 'Esta Semana' card streak subtext shown when the athlete hasn't trained today yet."},
+  "homeEstaSemanaPeriodWeek": "SEMANA",
+  "@homeEstaSemanaPeriodWeek": {"description": "Home 'Esta Semana' card period card label for the current week count."},
+  "homeEstaSemanaPeriodMonth": "MES",
+  "@homeEstaSemanaPeriodMonth": {"description": "Home 'Esta Semana' card period card label for the current month count."},
+  "homeEstaSemanaPeriodUnit": "{count, plural, =1{entreno} other{entrenos}}",
+  "@homeEstaSemanaPeriodUnit": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "homeEstaSemanaEmptyTitle": "TU RACHA\nEMPIEZA ACÁ",
+  "@homeEstaSemanaEmptyTitle": {"description": "Home 'Esta Semana' card empty-state title for an athlete with zero sessions."},
+  "homeEstaSemanaEmptyBody": "Cada entrenamiento alimenta tu racha. Hacé el primero y empezá a construir tu progreso.",
+  "@homeEstaSemanaEmptyBody": {"description": "Home 'Esta Semana' card empty-state body copy encouraging the first workout."},
+  "homeEstaSemanaEmptyCta": "EXPLORAR RUTINAS  →",
+  "@homeEstaSemanaEmptyCta": {"description": "Home 'Esta Semana' card empty-state CTA button navigating to routines."},
   "@@locale": "es_AR",
   "authSplashTagline": "ENTRENÁ. COMPARTÍ. CRECÉ.",
   "authWelcomeEyebrow": "ENTRENAMIENTO · GYM · COACH",

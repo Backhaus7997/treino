@@ -5,6 +5,44 @@
   "homeAthleteFirstRunBody": "Creá tu primera rutina o buscá un entrenador para empezar.",
   "homeAthleteFirstRunCreateCta": "CREAR RUTINA",
   "homeAthleteFirstRunFindTrainerCta": "Buscar entrenador",
+  "homeEstaSemanaTitle": "ESTA SEMANA",
+  "homeEstaSemanaLoadError": "No pudimos cargar tus insights.",
+  "homeEstaSemanaHeaderPill": "RACHA ACTUAL",
+  "homeEstaSemanaHeaderPillEmpty": "PRIMER PASO",
+  "homeEstaSemanaWeekMonth": "SEM {week} · {month}",
+  "@homeEstaSemanaWeekMonth": {
+    "placeholders": {
+      "week": {
+        "type": "int"
+      },
+      "month": {
+        "type": "String"
+      }
+    }
+  },
+  "homeEstaSemanaStreakUnit": "{count, plural, =1{DÍA} other{DÍAS}}",
+  "@homeEstaSemanaStreakUnit": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "homeEstaSemanaStreakSubtextTrained": "No rompas la racha — entrenaste hoy.",
+  "homeEstaSemanaStreakSubtextPending": "No rompas la racha — entrena hoy.",
+  "homeEstaSemanaPeriodWeek": "SEMANA",
+  "homeEstaSemanaPeriodMonth": "MES",
+  "homeEstaSemanaPeriodUnit": "{count, plural, =1{entreno} other{entrenos}}",
+  "@homeEstaSemanaPeriodUnit": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "homeEstaSemanaEmptyTitle": "TU RACHA\nEMPIEZA AQUÍ",
+  "homeEstaSemanaEmptyBody": "Cada entrenamiento alimenta tu racha. Haz el primero y empieza a construir tu progreso.",
+  "homeEstaSemanaEmptyCta": "EXPLORAR RUTINAS  →",
   "@@locale": "es",
   "@@x-note": "Copia defensiva de intl_es_AR.arb (decisión Q3 del audit). El locale real lo fija locale_resolver.dart → es-AR; esto es seguro de muerte: si algún día se quita ese lock, plain-`es` muestra español válido en vez de strings vacíos.",
   "authSplashTagline": "ENTRENÁ. COMPARTÍ. CRECÉ.",

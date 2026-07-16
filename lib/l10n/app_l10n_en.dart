@@ -22,6 +22,69 @@ class AppL10nEn extends AppL10n {
   String get homeAthleteFirstRunFindTrainerCta => 'Find a trainer';
 
   @override
+  String get homeEstaSemanaTitle => 'THIS WEEK';
+
+  @override
+  String get homeEstaSemanaLoadError => 'We couldn\'t load your insights.';
+
+  @override
+  String get homeEstaSemanaHeaderPill => 'CURRENT STREAK';
+
+  @override
+  String get homeEstaSemanaHeaderPillEmpty => 'FIRST STEP';
+
+  @override
+  String homeEstaSemanaWeekMonth(int week, String month) {
+    return 'WK $week · $month';
+  }
+
+  @override
+  String homeEstaSemanaStreakUnit(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'DAYS',
+      one: 'DAY',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get homeEstaSemanaStreakSubtextTrained =>
+      'Don\'t break the streak — you trained today.';
+
+  @override
+  String get homeEstaSemanaStreakSubtextPending =>
+      'Don\'t break the streak — train today.';
+
+  @override
+  String get homeEstaSemanaPeriodWeek => 'WEEK';
+
+  @override
+  String get homeEstaSemanaPeriodMonth => 'MONTH';
+
+  @override
+  String homeEstaSemanaPeriodUnit(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'workouts',
+      one: 'workout',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get homeEstaSemanaEmptyTitle => 'YOUR STREAK\nSTARTS HERE';
+
+  @override
+  String get homeEstaSemanaEmptyBody =>
+      'Every workout feeds your streak. Do your first one and start building your progress.';
+
+  @override
+  String get homeEstaSemanaEmptyCta => 'EXPLORE ROUTINES  →';
+
+  @override
   String get authSplashTagline => '';
 
   @override

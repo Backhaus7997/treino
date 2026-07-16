@@ -7,6 +7,7 @@ import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/motion/treino_shimmer.dart';
 import '../../../core/widgets/motion/treino_tappable.dart';
 import '../../../core/widgets/treino_icon.dart';
+import '../../../l10n/app_l10n.dart';
 import '../../insights/application/insights_providers.dart';
 import '../../insights/domain/weekly_insights.dart';
 import '../../insights/presentation/widgets/body_silhouette_placeholder.dart';
@@ -84,6 +85,7 @@ class _Skeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     return TreinoShimmer(
       child: Padding(
         padding: const EdgeInsets.all(18),
@@ -91,7 +93,7 @@ class _Skeleton extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'ESTA SEMANA',
+              l10n.homeEstaSemanaTitle,
               style: GoogleFonts.barlowCondensed(
                 fontWeight: FontWeight.w700,
                 fontSize: 14,
@@ -116,13 +118,14 @@ class _ErrorFallback extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     return Padding(
       padding: const EdgeInsets.all(18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'ESTA SEMANA',
+            l10n.homeEstaSemanaTitle,
             style: GoogleFonts.barlowCondensed(
               fontWeight: FontWeight.w700,
               fontSize: 14,
@@ -132,7 +135,7 @@ class _ErrorFallback extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           Text(
-            'No pudimos cargar tus insights.',
+            l10n.homeEstaSemanaLoadError,
             style: GoogleFonts.barlow(fontSize: 13, color: palette.textMuted),
           ),
         ],
@@ -151,6 +154,7 @@ class _Loaded extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     final wi = insights;
 
     if (wi == null || wi.sessionsCount == 0) {
@@ -183,7 +187,7 @@ class _Loaded extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.only(bottom: 14),
                 child: Text(
-                  wi.streak == 1 ? 'DÍA' : 'DÍAS',
+                  l10n.homeEstaSemanaStreakUnit(wi.streak),
                   style: GoogleFonts.barlowCondensed(
                     fontWeight: FontWeight.w700,
                     fontSize: 20,
@@ -218,11 +222,17 @@ class _Loaded extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: _PeriodCard(label: 'SEMANA', count: wi.sessionsCount),
+                child: _PeriodCard(
+                  label: l10n.homeEstaSemanaPeriodWeek,
+                  count: wi.sessionsCount,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: _PeriodCard(label: 'MES', count: wi.monthSessionsCount),
+                child: _PeriodCard(
+                  label: l10n.homeEstaSemanaPeriodMonth,
+                  count: wi.monthSessionsCount,
+                ),
               ),
             ],
           ),
@@ -245,6 +255,7 @@ class _EmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     return Padding(
       padding: const EdgeInsets.all(18),
       child: Column(
@@ -254,7 +265,7 @@ class _EmptyState extends StatelessWidget {
           const SizedBox(height: 18),
           Center(
             child: Text(
-              'TU RACHA\nEMPIEZA ACÁ',
+              l10n.homeEstaSemanaEmptyTitle,
               textAlign: TextAlign.center,
               style: GoogleFonts.barlowCondensed(
                 fontWeight: FontWeight.w700,
@@ -272,7 +283,7 @@ class _EmptyState extends StatelessWidget {
           ),
           const SizedBox(height: 18),
           Text(
-            'Cada entrenamiento alimenta tu racha. Hacé el primero y empezá a construir tu progreso.',
+            l10n.homeEstaSemanaEmptyBody,
             textAlign: TextAlign.center,
             style: GoogleFonts.barlow(fontSize: 13, color: palette.textMuted),
           ),
@@ -290,7 +301,7 @@ class _EmptyState extends StatelessWidget {
                 ),
               ),
               child: Text(
-                'EXPLORAR RUTINAS  →',
+                l10n.homeEstaSemanaEmptyCta,
                 style: GoogleFonts.barlowCondensed(
                   fontWeight: FontWeight.w700,
                   fontSize: 13,
@@ -333,6 +344,7 @@ class _CardHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     final now = DateTime.now().toLocal();
     final week = isoWeekNumber(now);
     final month = _monthsEs[now.month - 1];
@@ -363,7 +375,9 @@ class _CardHeader extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Text(
-                emptyState ? 'PRIMER PASO' : 'RACHA ACTUAL',
+                emptyState
+                    ? l10n.homeEstaSemanaHeaderPillEmpty
+                    : l10n.homeEstaSemanaHeaderPill,
                 style: GoogleFonts.barlowCondensed(
                   fontWeight: FontWeight.w700,
                   fontSize: 12,
@@ -376,7 +390,7 @@ class _CardHeader extends StatelessWidget {
         ),
         // "SEM N · MMM"
         Text(
-          'SEM $week · $month',
+          l10n.homeEstaSemanaWeekMonth(week, month),
           style: GoogleFonts.barlowCondensed(
             fontWeight: FontWeight.w700,
             fontSize: 12,
@@ -398,14 +412,15 @@ class _StreakSubtext extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     final now = DateTime.now().toLocal();
     final todayIndex = now.weekday - DateTime.monday;
     final trainedToday =
         todayIndex >= 0 && todayIndex < 7 && insights.daysTrained[todayIndex];
 
     final text = trainedToday
-        ? 'No rompas la racha — entrenaste hoy.'
-        : 'No rompas la racha — entrená hoy.';
+        ? l10n.homeEstaSemanaStreakSubtextTrained
+        : l10n.homeEstaSemanaStreakSubtextPending;
 
     return Text(
       text,
@@ -520,6 +535,7 @@ class _PeriodCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
       decoration: BoxDecoration(
@@ -551,7 +567,7 @@ class _PeriodCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'entrenos',
+            l10n.homeEstaSemanaPeriodUnit(count),
             style: GoogleFonts.barlow(fontSize: 12, color: palette.textMuted),
           ),
         ],
