@@ -1158,7 +1158,13 @@ class AppL10nEs extends AppL10n {
 
   @override
   String profileCuentaRutinasSubtitle(int count) {
-    return '$count activas';
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count activas',
+      one: '1 activa',
+    );
+    return '$_temp0';
   }
 
   @override
@@ -2571,7 +2577,7 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get measurementsEmptyState =>
-      'Tu entrenador todavía no registró mediciones. Cuando las tengas, tu evolución aparece aquí.';
+      'Todavía no hay mediciones cargadas. Toca + para registrar la primera y seguir tu evolución.';
 
   @override
   String get measurementsNeedsMoreData =>
@@ -3755,7 +3761,13 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String profileCuentaRutinasSubtitle(int count) {
-    return '$count activas';
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count activas',
+      one: '1 activa',
+    );
+    return '$_temp0';
   }
 
   @override
@@ -5166,7 +5178,7 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get measurementsEmptyState =>
-      'Tu entrenador todavía no registró mediciones. Cuando las tengas, tu evolución aparece acá.';
+      'Todavía no hay mediciones cargadas. Tocá + para registrar la primera y seguir tu evolución.';
 
   @override
   String get measurementsNeedsMoreData =>

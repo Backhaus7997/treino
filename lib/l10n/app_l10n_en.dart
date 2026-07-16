@@ -1126,7 +1126,13 @@ class AppL10nEn extends AppL10n {
 
   @override
   String profileCuentaRutinasSubtitle(int count) {
-    return '$count activas';
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count activas',
+      one: '1 activa',
+    );
+    return '$_temp0';
   }
 
   @override
@@ -2516,7 +2522,7 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get measurementsEmptyState =>
-      'Your trainer has not recorded any measurements yet. Once they do, your progress shows up here.';
+      'No measurements logged yet. Tap + to record your first one and track your progress.';
 
   @override
   String get measurementsNeedsMoreData =>

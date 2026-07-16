@@ -922,7 +922,7 @@
   "measurementsProfileCardHint": "You entered these when you signed up. Edit them from your profile.",
   "measurementsWeightLabel": "Weight",
   "measurementsHeightLabel": "Height",
-  "measurementsEmptyState": "Your trainer has not recorded any measurements yet. Once they do, your progress shows up here.",
+  "measurementsEmptyState": "No measurements logged yet. Tap + to record your first one and track your progress.",
   "measurementsNeedsMoreData": "A single measurement is not enough to show progress. At least one more is needed.",
   "insightsTileFrequentExercisesTitle": "Frequent exercises",
   "insightsTileFrequentExercisesSubtitle": "Your most-trained exercises",

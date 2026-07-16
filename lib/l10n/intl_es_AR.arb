@@ -448,7 +448,7 @@
   "@profileCuentaNoGym": {},
   "profileCuentaMisRutinasTitle": "Mis rutinas",
   "@profileCuentaMisRutinasTitle": {},
-  "profileCuentaRutinasSubtitle": "{count} activas",
+  "profileCuentaRutinasSubtitle": "{count, plural, =1{1 activa} other{{count} activas}}",
   "@profileCuentaRutinasSubtitle": {
     "placeholders": {
       "count": {
@@ -2036,9 +2036,9 @@
   "@measurementsHeightLabel": {
     "description": "Label for the height value in the profile-data card."
   },
-  "measurementsEmptyState": "Tu entrenador todavía no registró mediciones. Cuando las tengas, tu evolución aparece acá.",
+  "measurementsEmptyState": "Todavía no hay mediciones cargadas. Tocá + para registrar la primera y seguir tu evolución.",
   "@measurementsEmptyState": {
-    "description": "Shown below the profile-data card when the athlete has ZERO trainer-recorded measurements. Talks about EVOLUTION over time (the chart), not about having no data at all — the profile card above already shows the athlete's weight/height. Only a trainer-role user can create measurements today (firestore.rules AD-1)."
+    "description": "Shown below the profile-data card when the athlete has ZERO measurements. Talks about EVOLUTION over time (the chart), not about having no data at all — the profile card above already shows the athlete's weight/height. Both the athlete (self-log, via the + action in this screen's header) and a linked trainer can create measurements — see `match /measurements` in firestore.rules, whose create rule allows `athleteId == uid` OR a trainer-role author."
   },
   "measurementsNeedsMoreData": "Con una sola medición no hay progreso que mostrar. Falta al menos una más.",
   "@measurementsNeedsMoreData": {

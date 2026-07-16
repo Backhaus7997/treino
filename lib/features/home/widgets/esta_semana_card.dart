@@ -183,7 +183,7 @@ class _Loaded extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.only(bottom: 14),
                 child: Text(
-                  'DÍAS',
+                  wi.streak == 1 ? 'DÍA' : 'DÍAS',
                   style: GoogleFonts.barlowCondensed(
                     fontWeight: FontWeight.w700,
                     fontSize: 20,

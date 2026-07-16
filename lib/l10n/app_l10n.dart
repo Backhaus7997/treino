@@ -2237,7 +2237,7 @@ abstract class AppL10n {
   /// No description provided for @profileCuentaRutinasSubtitle.
   ///
   /// In es_AR, this message translates to:
-  /// **'{count} activas'**
+  /// **'{count, plural, =1{1 activa} other{{count} activas}}'**
   String profileCuentaRutinasSubtitle(int count);
 
   /// No description provided for @chatListTitle.
@@ -4695,10 +4695,10 @@ abstract class AppL10n {
   /// **'Altura'**
   String get measurementsHeightLabel;
 
-  /// Shown below the profile-data card when the athlete has ZERO trainer-recorded measurements. Talks about EVOLUTION over time (the chart), not about having no data at all — the profile card above already shows the athlete's weight/height. Only a trainer-role user can create measurements today (firestore.rules AD-1).
+  /// Shown below the profile-data card when the athlete has ZERO measurements. Talks about EVOLUTION over time (the chart), not about having no data at all — the profile card above already shows the athlete's weight/height. Both the athlete (self-log, via the + action in this screen's header) and a linked trainer can create measurements — see `match /measurements` in firestore.rules, whose create rule allows `athleteId == uid` OR a trainer-role author.
   ///
   /// In es_AR, this message translates to:
-  /// **'Tu entrenador todavía no registró mediciones. Cuando las tengas, tu evolución aparece acá.'**
+  /// **'Todavía no hay mediciones cargadas. Tocá + para registrar la primera y seguir tu evolución.'**
   String get measurementsEmptyState;
 
   /// Shown when the athlete has exactly ONE measurement. MeasurementProgressChart requires >= 2 points — distinct from the zero case, which is why it is a separate string.
