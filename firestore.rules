@@ -8,12 +8,17 @@ service cloud.firestore {
       allow read: if request.auth != null
                   && request.auth.uid == uid;
 
-      // Create: only the authenticated user can create their own doc,
-      // role MUST be one of the two valid values, and uid MUST match doc id.
+      // Create: only the authenticated user can create their own doc, uid MUST
+      // match doc id, and self-registration is ALWAYS 'athlete'. The 'trainer'
+      // role is intrinsic (AGENTS.md rule 3) and provisioned exclusively via the
+      // Admin SDK, which bypasses these rules — so the client must never be able
+      // to mint a trainer. QA-SEC-001: allowing role in ['athlete','trainer']
+      // here let any client self-assign trainer (privilege escalation) and, since
+      // update pins role immutable, it was permanent.
       allow create: if request.auth != null
                     && request.auth.uid == uid
                     && request.resource.data.uid == uid
-                    && request.resource.data.role in ['athlete', 'trainer'];
+                    && request.resource.data.role == 'athlete';
 
       // Update: only the owner can update, and the four immutable fields
       // MUST equal their previous values. Trainers via Admin SDK only;
