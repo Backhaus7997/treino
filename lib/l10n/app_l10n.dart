@@ -122,6 +122,90 @@ abstract class AppL10n {
   /// **'Buscar entrenador'**
   String get homeAthleteFirstRunFindTrainerCta;
 
+  /// Home 'Esta Semana' card section title (skeleton, error and loaded states).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ESTA SEMANA'**
+  String get homeEstaSemanaTitle;
+
+  /// Home 'Esta Semana' card error message shown when weekly insights fail to load.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cargar tus insights.'**
+  String get homeEstaSemanaLoadError;
+
+  /// Home 'Esta Semana' card header pill label when the athlete has an active streak.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'RACHA ACTUAL'**
+  String get homeEstaSemanaHeaderPill;
+
+  /// Home 'Esta Semana' card header pill label in the empty state (no sessions yet).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'PRIMER PASO'**
+  String get homeEstaSemanaHeaderPillEmpty;
+
+  /// No description provided for @homeEstaSemanaWeekMonth.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'SEM {week} · {month}'**
+  String homeEstaSemanaWeekMonth(int week, String month);
+
+  /// No description provided for @homeEstaSemanaStreakUnit.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{count, plural, =1{DÍA} other{DÍAS}}'**
+  String homeEstaSemanaStreakUnit(int count);
+
+  /// Home 'Esta Semana' card streak subtext shown when the athlete already trained today.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No rompas la racha — entrenaste hoy.'**
+  String get homeEstaSemanaStreakSubtextTrained;
+
+  /// Home 'Esta Semana' card streak subtext shown when the athlete hasn't trained today yet.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No rompas la racha — entrená hoy.'**
+  String get homeEstaSemanaStreakSubtextPending;
+
+  /// Home 'Esta Semana' card period card label for the current week count.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'SEMANA'**
+  String get homeEstaSemanaPeriodWeek;
+
+  /// Home 'Esta Semana' card period card label for the current month count.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'MES'**
+  String get homeEstaSemanaPeriodMonth;
+
+  /// No description provided for @homeEstaSemanaPeriodUnit.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{count, plural, =1{entreno} other{entrenos}}'**
+  String homeEstaSemanaPeriodUnit(int count);
+
+  /// Home 'Esta Semana' card empty-state title for an athlete with zero sessions.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'TU RACHA\nEMPIEZA ACÁ'**
+  String get homeEstaSemanaEmptyTitle;
+
+  /// Home 'Esta Semana' card empty-state body copy encouraging the first workout.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cada entrenamiento alimenta tu racha. Hacé el primero y empezá a construir tu progreso.'**
+  String get homeEstaSemanaEmptyBody;
+
+  /// Home 'Esta Semana' card empty-state CTA button navigating to routines.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'EXPLORAR RUTINAS  →'**
+  String get homeEstaSemanaEmptyCta;
+
   /// No description provided for @authSplashTagline.
   ///
   /// In es_AR, this message translates to:

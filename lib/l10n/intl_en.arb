@@ -3,6 +3,44 @@
   "homeAthleteFirstRunBody": "Create your first routine or find a trainer to get started.",
   "homeAthleteFirstRunCreateCta": "CREATE ROUTINE",
   "homeAthleteFirstRunFindTrainerCta": "Find a trainer",
+  "homeEstaSemanaTitle": "THIS WEEK",
+  "homeEstaSemanaLoadError": "We couldn't load your insights.",
+  "homeEstaSemanaHeaderPill": "CURRENT STREAK",
+  "homeEstaSemanaHeaderPillEmpty": "FIRST STEP",
+  "homeEstaSemanaWeekMonth": "WK {week} · {month}",
+  "@homeEstaSemanaWeekMonth": {
+    "placeholders": {
+      "week": {
+        "type": "int"
+      },
+      "month": {
+        "type": "String"
+      }
+    }
+  },
+  "homeEstaSemanaStreakUnit": "{count, plural, =1{DAY} other{DAYS}}",
+  "@homeEstaSemanaStreakUnit": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "homeEstaSemanaStreakSubtextTrained": "Don't break the streak — you trained today.",
+  "homeEstaSemanaStreakSubtextPending": "Don't break the streak — train today.",
+  "homeEstaSemanaPeriodWeek": "WEEK",
+  "homeEstaSemanaPeriodMonth": "MONTH",
+  "homeEstaSemanaPeriodUnit": "{count, plural, =1{workout} other{workouts}}",
+  "@homeEstaSemanaPeriodUnit": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "homeEstaSemanaEmptyTitle": "YOUR STREAK\nSTARTS HERE",
+  "homeEstaSemanaEmptyBody": "Every workout feeds your streak. Do your first one and start building your progress.",
+  "homeEstaSemanaEmptyCta": "EXPLORE ROUTINES  →",
   "@@locale": "en",
   "@@x-translation-status": "TODO — EN launch deferred (audit Q4). Strings intentionally empty; locale_resolver.dart locks the app to es-AR so these are never shown. Populate before re-enabling English in the resolver.",
   "authSplashTagline": "",

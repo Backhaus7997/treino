@@ -22,6 +22,69 @@ class AppL10nEs extends AppL10n {
   String get homeAthleteFirstRunFindTrainerCta => 'Buscar entrenador';
 
   @override
+  String get homeEstaSemanaTitle => 'ESTA SEMANA';
+
+  @override
+  String get homeEstaSemanaLoadError => 'No pudimos cargar tus insights.';
+
+  @override
+  String get homeEstaSemanaHeaderPill => 'RACHA ACTUAL';
+
+  @override
+  String get homeEstaSemanaHeaderPillEmpty => 'PRIMER PASO';
+
+  @override
+  String homeEstaSemanaWeekMonth(int week, String month) {
+    return 'SEM $week · $month';
+  }
+
+  @override
+  String homeEstaSemanaStreakUnit(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'DÍAS',
+      one: 'DÍA',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get homeEstaSemanaStreakSubtextTrained =>
+      'No rompas la racha — entrenaste hoy.';
+
+  @override
+  String get homeEstaSemanaStreakSubtextPending =>
+      'No rompas la racha — entrena hoy.';
+
+  @override
+  String get homeEstaSemanaPeriodWeek => 'SEMANA';
+
+  @override
+  String get homeEstaSemanaPeriodMonth => 'MES';
+
+  @override
+  String homeEstaSemanaPeriodUnit(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'entrenos',
+      one: 'entreno',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get homeEstaSemanaEmptyTitle => 'TU RACHA\nEMPIEZA AQUÍ';
+
+  @override
+  String get homeEstaSemanaEmptyBody =>
+      'Cada entrenamiento alimenta tu racha. Haz el primero y empieza a construir tu progreso.';
+
+  @override
+  String get homeEstaSemanaEmptyCta => 'EXPLORAR RUTINAS  →';
+
+  @override
   String get authSplashTagline => 'ENTRENÁ. COMPARTÍ. CRECÉ.';
 
   @override
@@ -2623,6 +2686,69 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get homeAthleteFirstRunFindTrainerCta => 'Buscar entrenador';
+
+  @override
+  String get homeEstaSemanaTitle => 'ESTA SEMANA';
+
+  @override
+  String get homeEstaSemanaLoadError => 'No pudimos cargar tus insights.';
+
+  @override
+  String get homeEstaSemanaHeaderPill => 'RACHA ACTUAL';
+
+  @override
+  String get homeEstaSemanaHeaderPillEmpty => 'PRIMER PASO';
+
+  @override
+  String homeEstaSemanaWeekMonth(int week, String month) {
+    return 'SEM $week · $month';
+  }
+
+  @override
+  String homeEstaSemanaStreakUnit(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'DÍAS',
+      one: 'DÍA',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get homeEstaSemanaStreakSubtextTrained =>
+      'No rompas la racha — entrenaste hoy.';
+
+  @override
+  String get homeEstaSemanaStreakSubtextPending =>
+      'No rompas la racha — entrená hoy.';
+
+  @override
+  String get homeEstaSemanaPeriodWeek => 'SEMANA';
+
+  @override
+  String get homeEstaSemanaPeriodMonth => 'MES';
+
+  @override
+  String homeEstaSemanaPeriodUnit(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'entrenos',
+      one: 'entreno',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get homeEstaSemanaEmptyTitle => 'TU RACHA\nEMPIEZA ACÁ';
+
+  @override
+  String get homeEstaSemanaEmptyBody =>
+      'Cada entrenamiento alimenta tu racha. Hacé el primero y empezá a construir tu progreso.';
+
+  @override
+  String get homeEstaSemanaEmptyCta => 'EXPLORAR RUTINAS  →';
 
   @override
   String get authSplashTagline => 'ENTRENÁ. COMPARTÍ. CRECÉ.';

@@ -10,6 +10,7 @@ import 'package:treino/core/widgets/motion/treino_tappable.dart';
 import 'package:treino/features/home/widgets/esta_semana_card.dart';
 import 'package:treino/features/insights/application/insights_providers.dart';
 import 'package:treino/features/insights/domain/weekly_insights.dart';
+import 'package:treino/l10n/app_l10n.dart';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -61,7 +62,13 @@ Widget _wrapCard({required List<Override> overrides, GoRouter? router}) {
 
   return ProviderScope(
     overrides: overrides,
-    child: MaterialApp.router(theme: AppTheme.dark(), routerConfig: goRouter),
+    child: MaterialApp.router(
+      theme: AppTheme.dark(),
+      localizationsDelegates: AppL10n.localizationsDelegates,
+      supportedLocales: AppL10n.supportedLocales,
+      locale: const Locale('es', 'AR'),
+      routerConfig: goRouter,
+    ),
   );
 }
 
