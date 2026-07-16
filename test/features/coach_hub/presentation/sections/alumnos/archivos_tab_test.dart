@@ -101,6 +101,10 @@ class _StubNoteRepo implements AthleteNoteRepository {
 }
 
 class _StubFileRepo implements AthleteFileRepository {
+  // ignore: unused_element_parameter
+  _StubFileRepo({this.tooLargeOnUpload = false});
+
+  final bool tooLargeOnUpload;
   final List<AthleteFile> deleted = [];
   final List<Uint8List> uploadedBytes = [];
 
