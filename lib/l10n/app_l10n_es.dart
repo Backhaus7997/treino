@@ -806,7 +806,7 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get eliminarCuentaSheetBodySuffix =>
-      '. Vamos a eliminar tu cuenta, tu perfil, tu historial de entrenamientos y tu foto. Tus posts van a quedar como \"Usuario eliminado\".';
+      '. Vamos a eliminar tu cuenta, tu perfil, tu historial de entrenamientos, tus posts y tu foto.';
 
   @override
   String get eliminarCuentaSheetDeleteCta => 'ELIMINAR';
@@ -3472,7 +3472,7 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get eliminarCuentaSheetBodySuffix =>
-      '. Vamos a eliminar tu cuenta, tu perfil, tu historial de entrenamientos y tu foto. Tus posts van a quedar como \"Usuario eliminado\".';
+      '. Vamos a eliminar tu cuenta, tu perfil, tu historial de entrenamientos, tus posts y tu foto.';
 
   @override
   String get eliminarCuentaSheetDeleteCta => 'ELIMINAR';

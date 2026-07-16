@@ -3,7 +3,7 @@
  * Run against Firebase Local Emulator (Firestore).
  *
  * SCENARIOS covered:
- *   SCENARIO-540 — Post author is anonymized (REQ-ACCDEL-CF-006)
+ *   SCENARIO-540 — Post author's posts are deleted (REQ-ACCDEL-CF-006)
  *   SCENARIO-541 — No posts authored is a no-op (REQ-ACCDEL-CF-006)
  */
 
@@ -24,7 +24,7 @@ afterAll(async () => {
 });
 
 // Import the module under test — will fail until implementation exists
-import { anonymizePosts } from "../../cascade/posts";
+import { deletePosts } from "../../cascade/posts";
 
 const db = () => admin.firestore(testApp);
 
@@ -54,7 +54,7 @@ async function cleanupPosts(docIds: string[]): Promise<void> {
   await batch.commit().catch(() => undefined);
 }
 
-describe("SCENARIO-540: post author is anonymized", () => {
+describe("SCENARIO-540: posts authored by uid are deleted", () => {
   const uid = "posts-cascade-540";
   let docIds: string[] = [];
 
@@ -63,35 +63,22 @@ describe("SCENARIO-540: post author is anonymized", () => {
   });
   afterEach(() => cleanupPosts(docIds));
 
-  it("SCENARIO-540: authorDisplayName set to 'Usuario eliminado' on all user posts", async () => {
-    await anonymizePosts(testApp, uid);
+  it("SCENARIO-540: all posts authored by uid no longer exist", async () => {
+    await deletePosts(testApp, uid);
 
     for (const id of docIds) {
       const snap = await db().collection("posts").doc(id).get();
-      expect(snap.data()?.authorDisplayName).toBe("Usuario eliminado");
+      expect(snap.exists).toBe(false);
     }
   });
 
-  it("SCENARIO-540: authorAvatarUrl set to null on all user posts", async () => {
-    await anonymizePosts(testApp, uid);
-
-    for (const id of docIds) {
-      const snap = await db().collection("posts").doc(id).get();
-      expect(snap.data()?.authorAvatarUrl).toBeNull();
-    }
+  it("SCENARIO-540: returns the count of deleted documents", async () => {
+    const result = await deletePosts(testApp, uid);
+    expect(result.count).toBe(docIds.length);
   });
 
-  it("SCENARIO-540: authorUid remains unchanged (referential integrity per ADR-ACCDEL-004)", async () => {
-    await anonymizePosts(testApp, uid);
-
-    for (const id of docIds) {
-      const snap = await db().collection("posts").doc(id).get();
-      expect(snap.data()?.authorUid).toBe(uid);
-    }
-  });
-
-  it("SCENARIO-540: posts from other authors are not modified", async () => {
-    const otherUid = "other-author-not-anonymized";
+  it("SCENARIO-540: posts from other authors are not deleted", async () => {
+    const otherUid = "other-author-not-deleted";
     const otherId = "post-other-author";
     await db().collection("posts").doc(otherId).set({
       authorUid: otherUid,
@@ -99,11 +86,23 @@ describe("SCENARIO-540: post author is anonymized", () => {
       authorAvatarUrl: "https://example.com/other.jpg",
     });
 
-    await anonymizePosts(testApp, uid);
+    await deletePosts(testApp, uid);
 
     const snap = await db().collection("posts").doc(otherId).get();
+    expect(snap.exists).toBe(true);
     expect(snap.data()?.authorDisplayName).toBe("Other Author");
     await db().collection("posts").doc(otherId).delete();
+  });
+
+  it("SCENARIO-540: running twice is idempotent (second run deletes nothing)", async () => {
+    await deletePosts(testApp, uid);
+    const second = await deletePosts(testApp, uid);
+    expect(second.count).toBe(0);
+
+    for (const id of docIds) {
+      const snap = await db().collection("posts").doc(id).get();
+      expect(snap.exists).toBe(false);
+    }
   });
 });
 
@@ -111,6 +110,11 @@ describe("SCENARIO-541: no posts authored is a no-op", () => {
   const uid = "posts-cascade-541";
 
   it("SCENARIO-541: no error thrown when user has zero posts", async () => {
-    await expect(anonymizePosts(testApp, uid)).resolves.not.toThrow();
+    await expect(deletePosts(testApp, uid)).resolves.not.toThrow();
+  });
+
+  it("SCENARIO-541: returns count 0 when user has zero posts", async () => {
+    const result = await deletePosts(testApp, uid);
+    expect(result.count).toBe(0);
   });
 });
