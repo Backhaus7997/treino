@@ -9,7 +9,7 @@
  *   2. Trainer role guard
  *   3. Audit log: started
  *   4. Sweep friendships
- *   5. Anonymize posts
+ *   5. Delete posts
  *   6. Terminate trainer links
  *   7. Cancel future appointments
  *   8. Delete storage avatar
@@ -28,7 +28,7 @@ import * as functions from "firebase-functions/v2/https";
 import { HttpsError } from "firebase-functions/v2/https";
 import { writeStarted, writeFinal } from "./cascade/audit-log";
 import { sweepFriendships } from "./cascade/friendships";
-import { anonymizePosts } from "./cascade/posts";
+import { deletePosts } from "./cascade/posts";
 import { terminateTrainerLinks } from "./cascade/trainer-links";
 import { cancelFutureAppointments } from "./cascade/appointments";
 import { deleteAvatar } from "./cascade/storage";
@@ -94,9 +94,9 @@ export async function runDeleteAccount(
     errors.push(`friendships: ${(err as Error).message ?? String(err)}`);
   }
 
-  // ── Step 5: Anonymize posts ────────────────────────────────────────────
+  // ── Step 5: Delete posts ────────────────────────────────────────────────
   try {
-    await anonymizePosts(app, uid);
+    await deletePosts(app, uid);
     deletedCollections.push("posts");
   } catch (err: unknown) {
     errors.push(`posts: ${(err as Error).message ?? String(err)}`);

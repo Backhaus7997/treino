@@ -332,7 +332,7 @@
   "eliminarCuentaSheetTitle": "Eliminar cuenta",
   "eliminarCuentaSheetBodyPrefix": "Esta acción es ",
   "eliminarCuentaSheetBodyBold": "irreversible",
-  "eliminarCuentaSheetBodySuffix": ". Vamos a eliminar tu cuenta, tu perfil, tu historial de entrenamientos y tu foto. Tus posts van a quedar como \"Usuario eliminado\".",
+  "eliminarCuentaSheetBodySuffix": ". Vamos a eliminar tu cuenta, tu perfil, tu historial de entrenamientos, tus posts y tu foto.",
   "eliminarCuentaSheetDeleteCta": "ELIMINAR",
   "eliminarCuentaSheetCancelCta": "CANCELAR",
   "eliminarCuentaSheetLoadingLabel": "Eliminando tu cuenta...",

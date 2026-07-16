@@ -1541,7 +1541,7 @@ abstract class AppL10n {
   /// No description provided for @eliminarCuentaSheetBodySuffix.
   ///
   /// In es_AR, this message translates to:
-  /// **'. Vamos a eliminar tu cuenta, tu perfil, tu historial de entrenamientos y tu foto. Tus posts van a quedar como \"Usuario eliminado\".'**
+  /// **'. Vamos a eliminar tu cuenta, tu perfil, tu historial de entrenamientos, tus posts y tu foto.'**
   String get eliminarCuentaSheetBodySuffix;
 
   /// No description provided for @eliminarCuentaSheetDeleteCta.
