@@ -490,32 +490,37 @@ class _AlumnoCell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Fila del kit fija en TreinoTableTokens.rowHeight (48px, ADR-SH-003) →
+    // sólo 24px de alto disponibles tras el padding vertical de la celda.
+    // Nombre + gym en dos líneas (mockup original) no entra sin overflow;
+    // se combinan en una sola línea con separador para respetar el token
+    // de altura del kit (design system > mockup cuando chocan, CLAUDE.md).
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         _Avatar(name: name, url: url, palette: palette),
         const SizedBox(width: AppSpacing.s12),
         Flexible(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                name,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: palette.textPrimary,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
+          child: RichText(
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            text: TextSpan(
+              children: [
+                TextSpan(
+                  text: name,
+                  style: TextStyle(
+                    color: palette.textPrimary,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-              ),
-              if (gymName != null)
-                Text(
-                  gymName!,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: palette.textMuted, fontSize: 12),
-                ),
-            ],
+                if (gymName != null)
+                  TextSpan(
+                    text: '  ·  $gymName',
+                    style: TextStyle(color: palette.textMuted, fontSize: 12),
+                  ),
+              ],
+            ),
           ),
         ),
       ],
