@@ -329,12 +329,29 @@ service cloud.firestore {
       // equal-to-existing via get(...,null) (mismo idioma que `payments`,
       // firestore.rules ~1112-1134). Solo el downgrade CF y
       // acceptTrainerLink/reactivation CF (Admin SDK, bypasea rules) los
-      // escriben. El lock de promoción status pending→active queda para PR4
-      // junto con el CF que reemplaza el accept() client-side — agregarlo acá
-      // rompería el accept() actual antes de que su reemplazo exista.
+      // escriben. El lock CF-only de promoción status (reemplazar el accept()
+      // client-side por el acceptTrainerLink CF) queda para PR4 — hacerlo acá
+      // rompería el accept() actual antes de que su reemplazo exista. NOTA
+      // QA-SEC-002 (abajo): eso NO impide el gate más angosto que sí agregamos —
+      // impedir que el ATLETA promueva el link a active/paused — que preserva el
+      // accept() del trainer y no depende del CF.
       allow update: if request.auth != null
                     && (request.auth.uid == resource.data.trainerId
                         || request.auth.uid == resource.data.athleteId)
+                    // QA-SEC-002: only the trainer may promote a link INTO a
+                    // reviewable state (active/paused). The athlete creates the
+                    // pending request and may terminate it, but must never
+                    // self-promote — otherwise it forges an active/paused link
+                    // and fabricates reviews against any trainer (reviews create
+                    // gates on link.status in ['active','paused']). The trainer's
+                    // accept()/pause()/resume() still work; the acceptTrainerLink
+                    // CF (Admin SDK) bypasses rules. This is narrower than the
+                    // CF-only pending→active lock deferred to PR4: it preserves
+                    // the current client accept() (performed by the trainer), so
+                    // it does not break that flow ahead of the CF.
+                    && (request.resource.data.status == resource.data.status
+                        || !(request.resource.data.status in ['active', 'paused'])
+                        || request.auth.uid == resource.data.trainerId)
                     && request.resource.data.trainerId == resource.data.trainerId
                     && request.resource.data.athleteId == resource.data.athleteId
                     && request.resource.data.requestedAt == resource.data.requestedAt
