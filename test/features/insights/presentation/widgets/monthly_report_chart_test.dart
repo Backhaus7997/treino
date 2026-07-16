@@ -132,5 +132,24 @@ void main() {
       state.debugSelectMonth(state.widget.report.points.last.month);
       expect(tapped, state.widget.report.points.last.month);
     });
+
+    // El CLDR de es-AR devuelve 'sept' (4 chars) para septiembre — el resto de
+    // los meses da 3. En un eje de 12 barras ese label desentona, así que el
+    // chart va por `monthAbbrev`, que trunca. Si alguien vuelve a un
+    // `DateFormat('MMM')` pelado, este test lo frena.
+    testWidgets('el eje abrevia septiembre a 3 chars', (tester) async {
+      await tester.pumpWidget(_wrap(
+        MonthlyReportChart(
+          // _report12 arranca en junio 2025 → el índice 3 es septiembre.
+          report: _report12(workoutsCountAt: (i) => i + 1),
+          labels: _labels(),
+          localeName: 'es_AR',
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.text('sep'), findsOneWidget);
+      expect(find.text('sept'), findsNothing);
+    });
   });
 }

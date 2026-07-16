@@ -41,6 +41,7 @@ DailyHeatmapSectionLabels _labels() => const DailyHeatmapSectionLabels(
       dayStripLabels: DayStripLabels(
         todayLabel: 'HOY',
         emptyDayHint: 'No entrenaste este día.',
+        weekdayLetters: ['L', 'M', 'M', 'J', 'V', 'S', 'D'],
       ),
     );
 

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
+import '../../../core/utils/date_labels.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../chat/application/chat_providers.dart';
@@ -448,26 +449,10 @@ class _AthleteHeader extends StatelessWidget {
 
 // ── Antropometría section ─────────────────────────────────────────────────────
 
-const _kMonthsShort = <String>[
-  '',
-  'ene',
-  'feb',
-  'mar',
-  'abr',
-  'may',
-  'jun',
-  'jul',
-  'ago',
-  'sep',
-  'oct',
-  'nov',
-  'dic',
-];
-
-String _formatMeasurementDate(DateTime dt) {
+String _formatMeasurementDate(DateTime dt, String localeName) {
   // Dates are stored UTC; display as-is (no .toLocal()) — same UTC convention
   // used across the dashboard (see appointment_detail_sheet.dart).
-  return '${dt.day} ${_kMonthsShort[dt.month]} ${dt.year}';
+  return '${dt.day} ${monthAbbrev(dt, localeName)} ${dt.year}';
 }
 
 /// Formats a metric double for the summary cards. Mirrors the chart header
@@ -502,6 +487,7 @@ class _AntropometriaSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
+    final localeName = AppL10n.of(context).localeName;
     final measurementsAsync =
         ref.watch(measurementsForAthleteProvider(athleteId));
 
@@ -587,7 +573,7 @@ class _AntropometriaSection extends ConsumerWidget {
                     children: [
                       // Date
                       Text(
-                        _formatMeasurementDate(latest.recordedAt),
+                        _formatMeasurementDate(latest.recordedAt, localeName),
                         style: GoogleFonts.barlowCondensed(
                           fontWeight: FontWeight.w700,
                           fontSize: 13,
@@ -766,6 +752,7 @@ class _RendimientoSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
+    final localeName = AppL10n.of(context).localeName;
     final testsAsync = ref.watch(performanceTestsForAthleteProvider(athleteId));
 
     return Column(
@@ -850,7 +837,7 @@ class _RendimientoSection extends ConsumerWidget {
                     children: [
                       // Date
                       Text(
-                        _formatMeasurementDate(latest.recordedAt),
+                        _formatMeasurementDate(latest.recordedAt, localeName),
                         style: GoogleFonts.barlowCondensed(
                           fontWeight: FontWeight.w700,
                           fontSize: 13,
@@ -1677,6 +1664,7 @@ class _DailyHeatmapSection extends StatelessWidget {
         dayStripLabels: DayStripLabels(
           todayLabel: l10n.insightsDayStripTodayLabel,
           emptyDayHint: l10n.insightsDayEmptyHint,
+          weekdayLetters: weekdayInitials(l10n.localeName),
         ),
       ),
     );

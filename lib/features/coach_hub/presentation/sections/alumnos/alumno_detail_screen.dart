@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:treino/app/theme/app_palette.dart';
+import 'package:treino/core/utils/date_labels.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/chat/application/chat_providers.dart';
 import 'package:treino/features/coach/application/athlete_file_providers.dart';
@@ -775,7 +776,12 @@ class _ResumenTab extends ConsumerWidget {
       children: [
         _sectionLabel(palette, 'ADHERENCIA · 12 SEMANAS'), // i18n: Fase W2
         const SizedBox(height: 10),
-        _AdherenciaHeatmap(data: m.heatmap, palette: palette),
+        _AdherenciaHeatmap(
+          data: m.heatmap,
+          palette: palette,
+          // hardcoded for web Coach Hub (i18n: Fase W2)
+          dayLabels: weekdayDistinctAbbrevs('es_AR'),
+        ),
       ],
     );
 
@@ -1336,14 +1342,21 @@ class _UltimaEjercicioRow extends StatelessWidget {
 /// Heatmap estilo GitHub: 7 filas (días, lunes→domingo) × 12 columnas
 /// (semanas, vieja→actual). Cada celda colorea por nivel 0..4.
 class _AdherenciaHeatmap extends StatelessWidget {
-  const _AdherenciaHeatmap({required this.data, required this.palette});
+  const _AdherenciaHeatmap({
+    required this.data,
+    required this.palette,
+    required this.dayLabels,
+  });
 
   /// 12 semanas × 7 días (nivel 0..4), como lo devuelve [ResumenMetrics].
   final List<List<int>> data;
   final AppPalette palette;
 
-  // Abreviaturas es-AR sin colisión (martes/miércoles no quedan ambos como 'M').
-  static const _dayLabels = ['L', 'Ma', 'Mi', 'J', 'V', 'S', 'D'];
+  /// Abreviaturas de día sin colisión, lunes→domingo (martes/miércoles no
+  /// quedan ambos como 'M'). Calculadas por el caller vía
+  /// `weekdayDistinctAbbrevs` — este widget no importa `date_labels.dart`
+  /// para mantenerlo desacoplado del cálculo de locale.
+  final List<String> dayLabels;
   static const _labelWidth = 22.0;
 
   // Nivel 0 = celda vacía/muted (sin tinte accent, para que se lea claramente
@@ -1400,7 +1413,7 @@ class _AdherenciaHeatmap extends StatelessWidget {
                 children: [
                   SizedBox(
                     width: _labelWidth,
-                    child: Text(_dayLabels[day], style: axisStyle),
+                    child: Text(dayLabels[day], style: axisStyle),
                   ),
                   for (var week = 0; week < data.length; week++)
                     Expanded(
@@ -1706,11 +1719,13 @@ class _DailyHeatmapTabSection extends StatelessWidget {
   Widget build(BuildContext context) {
     return DailyHeatmapSection(
       athleteId: athleteId,
-      labels: const DailyHeatmapSectionLabels(
+      labels: DailyHeatmapSectionLabels(
         sectionTitle: 'MÚSCULOS DEL DÍA', // i18n: Fase W2
         dayStripLabels: DayStripLabels(
           todayLabel: 'HOY', // i18n: Fase W2
           emptyDayHint: 'No entrenó este día.', // i18n: Fase W2
+          // hardcoded for web Coach Hub (i18n: Fase W2)
+          weekdayLetters: weekdayInitials('es_AR'),
         ),
       ),
     );

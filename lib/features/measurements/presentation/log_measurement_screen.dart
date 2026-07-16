@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
+import '../../../core/utils/date_labels.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../workout/application/session_providers.dart'
@@ -25,28 +26,10 @@ final List<TextInputFormatter> _decimalInputFormatters = <TextInputFormatter>[
   FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
 ];
 
-// ── Month names (Spanish, no lib dependency) ──────────────────────────────────
-
-const _kMonths = <String>[
-  '',
-  'ene',
-  'feb',
-  'mar',
-  'abr',
-  'may',
-  'jun',
-  'jul',
-  'ago',
-  'sep',
-  'oct',
-  'nov',
-  'dic',
-];
-
-String _formatDateTimeEs(DateTime dt) {
+String _formatDateTimeEs(DateTime dt, String localeName) {
   final local = dt.toLocal();
   final d = local.day;
-  final m = _kMonths[local.month];
+  final m = monthAbbrev(local, localeName);
   final y = local.year;
   final hh = local.hour.toString().padLeft(2, '0');
   final mm = local.minute.toString().padLeft(2, '0');
@@ -462,7 +445,7 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
                         ),
                       ),
                       Text(
-                        _formatDateTimeEs(now),
+                        _formatDateTimeEs(now, l10n.localeName),
                         style: GoogleFonts.barlow(
                           fontSize: 12,
                           color: palette.textMuted,

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
+import '../../../core/utils/date_labels.dart';
 import '../../../core/widgets/motion/treino_shimmer.dart';
 import '../../../core/widgets/motion/treino_tappable.dart';
 import '../../../core/widgets/treino_icon.dart';
@@ -326,28 +327,13 @@ class _CardHeader extends StatelessWidget {
 
   final bool emptyState;
 
-  static const _monthsEs = [
-    'ENE',
-    'FEB',
-    'MAR',
-    'ABR',
-    'MAY',
-    'JUN',
-    'JUL',
-    'AGO',
-    'SEP',
-    'OCT',
-    'NOV',
-    'DIC',
-  ];
-
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
     final now = DateTime.now().toLocal();
     final week = isoWeekNumber(now);
-    final month = _monthsEs[now.month - 1];
+    final month = monthAbbrev(now, l10n.localeName, upperCase: true);
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -435,11 +421,11 @@ class _DayStrip extends StatelessWidget {
   const _DayStrip({required this.insights});
   final WeeklyInsights insights;
 
-  static const _dayLabels = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
-
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final localeName = AppL10n.of(context).localeName;
+    final dayLabels = weekdayInitials(localeName);
     final now = DateTime.now().toLocal();
     final todayIndex = now.weekday - DateTime.monday;
 
@@ -450,7 +436,7 @@ class _DayStrip extends StatelessWidget {
             child: Padding(
               padding: EdgeInsets.only(right: i < 6 ? 8 : 0),
               child: _DayBar(
-                label: _dayLabels[i],
+                label: dayLabels[i],
                 trained: insights.daysTrained[i],
                 isToday: i == todayIndex,
                 isPast: i < todayIndex,

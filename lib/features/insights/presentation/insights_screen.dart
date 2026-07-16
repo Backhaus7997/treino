@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
+import '../../../core/utils/date_labels.dart';
 import '../../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/motion/treino_tappable.dart';
@@ -333,11 +334,11 @@ class _WeekStripCard extends StatelessWidget {
   final VoidCallback onPreviousWeek;
   final VoidCallback onNextWeek;
 
-  static const _dayLabels = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
-
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final localeName = AppL10n.of(context).localeName;
+    final dayLabels = weekdayInitials(localeName);
     final today = DateTime.now().toLocal();
     final todayOnly = DateTime(today.year, today.month, today.day);
     final todayIndex = today.weekday - DateTime.monday;
@@ -366,7 +367,8 @@ class _WeekStripCard extends StatelessWidget {
               ),
               Expanded(
                 child: Text(
-                  _formatRange(insights.weekStart, insights.weekEnd),
+                  _formatRange(
+                      insights.weekStart, insights.weekEnd, localeName),
                   textAlign: TextAlign.center,
                   style: GoogleFonts.barlowCondensed(
                     fontWeight: FontWeight.w700,
@@ -402,7 +404,7 @@ class _WeekStripCard extends StatelessWidget {
           // Labels L M M J V S D
           Row(
             children: [
-              for (final label in _dayLabels)
+              for (final label in dayLabels)
                 Expanded(
                   child: Center(
                     child: Text(
@@ -897,13 +899,8 @@ class _VolverButton extends StatelessWidget {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const _monthsEs = [
-  'ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN', //
-  'JUL', 'AGO', 'SEP', 'OCT', 'NOV', 'DIC',
-];
-
-String _formatRange(DateTime start, DateTime end) {
-  final s = '${start.day} ${_monthsEs[start.month - 1]}';
-  final e = '${end.day} ${_monthsEs[end.month - 1]}';
+String _formatRange(DateTime start, DateTime end, String localeName) {
+  final s = '${start.day} ${monthAbbrev(start, localeName, upperCase: true)}';
+  final e = '${end.day} ${monthAbbrev(end, localeName, upperCase: true)}';
   return 'SEMANA · $s – $e';
 }

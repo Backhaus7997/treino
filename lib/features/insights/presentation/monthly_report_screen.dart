@@ -6,6 +6,7 @@ import 'package:intl/intl.dart' as intl;
 
 import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
+import '../../../core/utils/date_labels.dart';
 import '../../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/treino_icon.dart';
@@ -378,6 +379,7 @@ class _WorkoutDaysSection extends ConsumerWidget {
         data: data,
         labels: WorkoutDaysCalendarLabels(
           streakLabelBuilder: l10n.workoutDaysCalendarStreak,
+          weekdayLetters: weekdayInitials(l10n.localeName),
         ),
       ),
     );
@@ -506,11 +508,16 @@ class _MonthRadarSection extends ConsumerWidget {
 /// Short month-name legend label, e.g. "May 2026" / "Jun 2026" — Capitalized
 /// first letter (intl lower-cases month abbreviations by default), same
 /// capitalize-first-letter convention as [_monthTitle].
+///
+/// La abreviatura sale de `monthAbbrev` y no de `DateFormat('MMM yyyy')`
+/// porque el CLDR de es-AR devuelve 'sept' para septiembre: el label quedaba
+/// en 4 chars contra los 3 del resto, y desalineado con el eje del chart que
+/// esta misma pantalla muestra al lado.
 String _monthLegendLabel(DateTime month, String localeName) {
-  final formatted = intl.DateFormat('MMM yyyy', localeName).format(month);
-  return formatted.isEmpty
-      ? formatted
-      : formatted[0].toUpperCase() + formatted.substring(1);
+  final abbrev = monthAbbrev(month, localeName);
+  final capitalized =
+      abbrev.isEmpty ? abbrev : abbrev[0].toUpperCase() + abbrev.substring(1);
+  return '$capitalized ${month.year}';
 }
 
 // ── Error state ───────────────────────────────────────────────────────────────

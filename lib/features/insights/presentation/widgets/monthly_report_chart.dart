@@ -5,10 +5,10 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:intl/intl.dart' as intl;
 
 import '../../../../app/theme/app_motion.dart';
 import '../../../../app/theme/app_palette.dart';
+import '../../../../core/utils/date_labels.dart';
 import '../../domain/monthly_report.dart';
 
 // ── Label bag ─────────────────────────────────────────────────────────────────
@@ -283,8 +283,10 @@ class _Bars extends StatelessWidget {
     return value.toString();
   }
 
-  String _monthAbbrev(DateTime month) =>
-      intl.DateFormat('MMM', localeName).format(month);
+  // Vía el helper compartido y no `DateFormat` pelado: el CLDR de es-AR
+  // devuelve 'sept' (4 chars) para septiembre, que en un eje de 12 barras
+  // desentona contra los otros 11 labels de 3.
+  String _monthAbbrev(DateTime month) => monthAbbrev(month, localeName);
 
   @override
   Widget build(BuildContext context) {
