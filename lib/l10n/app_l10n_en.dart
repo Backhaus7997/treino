@@ -1551,13 +1551,10 @@ class AppL10nEn extends AppL10n {
   String get routineDetailCompleted => '';
 
   @override
-  String get routineDetailWeekLocked => '';
-
-  @override
-  String get routineDetailDayLocked => '';
-
-  @override
   String get routineDetailStart => '';
+
+  @override
+  String get routineDetailRepeat => 'REPEAT';
 
   @override
   String get routineEditorDeleteScopeTitle => '';

@@ -181,9 +181,8 @@
   "routineDetailWeekLabel": "SEM {week}",
   "routineDetailPlanComplete": "PLAN COMPLETADO",
   "routineDetailCompleted": "COMPLETADO",
-  "routineDetailWeekLocked": "SEMANA BLOQUEADA",
-  "routineDetailDayLocked": "DÍA BLOQUEADO",
   "routineDetailStart": "EMPEZAR",
+  "routineDetailRepeat": "REPETIR",
   "@routineEditorDuplicateWeekBody": {
     "placeholders": {
       "sourceWeek": {
