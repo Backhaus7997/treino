@@ -12,6 +12,9 @@
 //   - active sessions show startedAt fallback (not "—") in the date column
 //   - the tab shows ALL sessions (no take(20) or completed-only filter as
 //     the Entrenamientos tab has)
+//   - Fase 3 WU-07b: timeline grouped by calendar month (mockup
+//     historial.png) — one month header per distinct year-month + a real
+//     "Asistió N veces" aggregate per group (no invented event types).
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -255,5 +258,41 @@ void main() {
       reason:
           'active sessions must fall back to startedAt in the Historial tab',
     );
+  });
+
+  testWidgets(
+      'Fase 3 WU-07b: sessions across two months render two month headers '
+      '+ a real "Asistió N veces" aggregate per group', (tester) async {
+    final sessions = [
+      // Mayo 2026 — 2 sesiones.
+      _session(
+        id: 's1',
+        startedAt: DateTime(2026, 5, 20, 10),
+        finishedAt: DateTime(2026, 5, 20, 11),
+        routineName: 'PPL Push',
+      ),
+      _session(
+        id: 's2',
+        startedAt: DateTime(2026, 5, 5, 10),
+        finishedAt: DateTime(2026, 5, 5, 10, 20),
+        routineName: 'PPL Pull',
+      ),
+      // Abril 2026 — 1 sesión.
+      _session(
+        id: 's3',
+        startedAt: DateTime(2026, 4, 15, 10),
+        finishedAt: DateTime(2026, 4, 15, 11),
+        routineName: 'PPL Legs',
+      ),
+    ];
+
+    _useDesktopViewport(tester);
+    await tester.pumpWidget(_wrap(_baseOverrides(sessions: sessions)));
+    await _selectHistorialTab(tester);
+
+    expect(find.text('MAYO 2026'), findsOneWidget);
+    expect(find.text('ABRIL 2026'), findsOneWidget);
+    expect(find.text('Asistió 2 veces'), findsOneWidget);
+    expect(find.text('Asistió 1 vez'), findsOneWidget);
   });
 }

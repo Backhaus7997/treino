@@ -13,6 +13,9 @@
 //   - populated list → one row per file with size + date subtitle
 //   - delete flow → confirm dialog + repository call
 //   - too-large upload → repository throws → localized snackbar
+//   - Fase 3 WU-07b: rows render via the kit's TreinoListRow (mockup
+//     archivos.png — ícono + peso + fecha), delete confirm via
+//     showTreinoDialog.
 //
 // The upload happy path (file_picker + repo.upload) requires mocking the
 // file_picker plugin. We keep that for smoke, not for widget tests.
@@ -24,6 +27,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
 import 'package:treino/features/coach/application/athlete_file_providers.dart';
 import 'package:treino/features/coach/application/athlete_note_providers.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
@@ -308,5 +312,20 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(repo.deleted, isEmpty);
+  });
+
+  testWidgets('Fase 3 WU-07b: populated rows render via the kit TreinoListRow',
+      (tester) async {
+    final files = [
+      _file(id: 'f1', fileName: 'analisis.pdf'),
+      _file(id: 'f2', fileName: 'postura.jpg', kind: AthleteFileKind.image),
+    ];
+    _useDesktopViewport(tester);
+    await tester.pumpWidget(_wrap(_baseOverrides(
+      filesState: AsyncData(files),
+    )));
+    await _selectArchivosTab(tester);
+
+    expect(find.byType(TreinoListRow), findsNWidgets(2));
   });
 }
