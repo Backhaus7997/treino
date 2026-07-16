@@ -245,9 +245,15 @@ void main() {
     await _selectHistorialTab(tester);
 
     // The dash fallback used in Entrenamientos should NOT be present here —
-    // Historial falls back to startedAt for active rows.
-    expect(find.text('—'), findsNothing,
-        reason:
-            'active sessions must fall back to startedAt in the Historial tab');
+    // Historial falls back to startedAt for active rows. Acotado a
+    // TabBarView (Fase 3 WU-04: el KpiCard "Vencimiento" del chrome
+    // persistente puede mostrar '—' cuando no hay billing, fuera del
+    // TabBarView).
+    expect(
+      find.descendant(of: find.byType(TabBarView), matching: find.text('—')),
+      findsNothing,
+      reason:
+          'active sessions must fall back to startedAt in the Historial tab',
+    );
   });
 }
