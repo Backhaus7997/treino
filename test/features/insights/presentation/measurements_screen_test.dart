@@ -59,8 +59,11 @@ Widget _wrap({
       ),
     );
 
-const _emptyState =
-    'Tu entrenador todavía no registró mediciones. Cuando las tengas, tu evolución aparece acá.';
+/// El copy sale del ARB, no de literales: estos tests son de comportamiento y
+/// no deben romperse porque cambió una redacción. Pinear copy verbatim es tarea
+/// de los `*_strings_migration_test.dart`.
+AppL10n _l10n(WidgetTester tester) =>
+    AppL10n.of(tester.element(find.byType(MeasurementsScreen)));
 
 void main() {
   testWidgets('2+ mediciones → renderiza el chart de progreso', (tester) async {
@@ -74,7 +77,7 @@ void main() {
     ]));
     await tester.pumpAndSettle();
 
-    expect(find.text('MEDIDAS'), findsOneWidget);
+    expect(find.text(_l10n(tester).measurementsScreenTitle), findsOneWidget);
     expect(find.byType(MeasurementProgressChart), findsOneWidget);
   });
 
@@ -87,7 +90,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(MeasurementProgressChart), findsNothing);
-    expect(find.text(_emptyState), findsOneWidget);
+    expect(find.text(_l10n(tester).measurementsEmptyState), findsOneWidget);
   });
 
   testWidgets('UNA sola medición → mensaje distinto al de cero',
@@ -101,11 +104,10 @@ void main() {
 
     expect(find.byType(MeasurementProgressChart), findsNothing);
     expect(
-      find.text(
-          'Con una sola medición no hay progreso que mostrar. Falta al menos una más.'),
+      find.text(_l10n(tester).measurementsNeedsMoreData),
       findsOneWidget,
     );
-    expect(find.text(_emptyState), findsNothing);
+    expect(find.text(_l10n(tester).measurementsEmptyState), findsNothing);
   });
 
   testWidgets('fallo de carga → error VISIBLE con retry, nunca card vacía',
@@ -118,7 +120,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(MeasurementProgressChart), findsNothing);
-    expect(find.text('Reintentar'), findsOneWidget);
+    expect(find.text(_l10n(tester).coachRetryLabel), findsOneWidget);
   });
 
   // ── TUS DATOS: peso + altura del perfil (onboarding) ────────────────────────
@@ -136,12 +138,15 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    expect(find.text('TUS DATOS'), findsOneWidget);
+    expect(
+      find.text(_l10n(tester).measurementsProfileCardTitle),
+      findsOneWidget,
+    );
     expect(find.text('80 kg'), findsOneWidget);
     expect(find.text('178 cm'), findsOneWidget);
-    // La evolución (chart) sigue vacía porque no hay mediciones del PF.
+    // La evolución (chart) sigue vacía porque todavía no hay ninguna medición.
     expect(find.byType(MeasurementProgressChart), findsNothing);
-    expect(find.text(_emptyState), findsOneWidget);
+    expect(find.text(_l10n(tester).measurementsEmptyState), findsOneWidget);
   });
 
   testWidgets('el peso decimal se muestra sin ceros de más (80.5, no 80.50)',
@@ -169,7 +174,10 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    expect(find.text('TUS DATOS'), findsNothing);
+    expect(
+      find.text(_l10n(tester).measurementsProfileCardTitle),
+      findsNothing,
+    );
   });
 
   testWidgets('sólo altura (sin peso) → la tarjeta muestra sólo altura',
@@ -182,9 +190,12 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    expect(find.text('TUS DATOS'), findsOneWidget);
+    expect(
+      find.text(_l10n(tester).measurementsProfileCardTitle),
+      findsOneWidget,
+    );
     expect(find.text('170 cm'), findsOneWidget);
-    expect(find.text('Peso'), findsNothing);
+    expect(find.text(_l10n(tester).measurementsWeightLabel), findsNothing);
   });
 
   testWidgets('T6: el botón "+" abre el formulario de auto-carga (self-log)',
@@ -197,8 +208,7 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    // El tooltip del "+" (measurementsAddSelfLog, es_AR).
-    await tester.tap(find.byTooltip('Cargar medición'));
+    await tester.tap(find.byTooltip(_l10n(tester).measurementsAddSelfLog));
     await tester.pumpAndSettle();
 
     expect(find.byType(LogMeasurementScreen), findsOneWidget);
