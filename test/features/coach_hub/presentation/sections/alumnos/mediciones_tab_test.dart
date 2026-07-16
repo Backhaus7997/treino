@@ -36,8 +36,6 @@ import 'package:treino/features/gyms/domain/gym.dart';
 import 'package:treino/features/measurements/application/measurement_providers.dart';
 import 'package:treino/features/measurements/data/measurement_repository.dart';
 import 'package:treino/features/measurements/domain/measurement.dart';
-import 'package:treino/features/measurements/application/measurement_providers.dart'
-    show measurementsForAthleteProvider;
 import 'package:treino/features/payments/application/billing_providers.dart';
 import 'package:treino/features/payments/application/pagos_por_cobrar_provider.dart';
 import 'package:treino/features/performance/application/performance_test_providers.dart';

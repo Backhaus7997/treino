@@ -501,10 +501,8 @@ class _AlumnoCell extends StatelessWidget {
         _Avatar(name: name, url: url, palette: palette),
         const SizedBox(width: AppSpacing.s12),
         Flexible(
-          child: RichText(
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            text: TextSpan(
+          child: Text.rich(
+            TextSpan(
               children: [
                 TextSpan(
                   text: name,
@@ -521,6 +519,8 @@ class _AlumnoCell extends StatelessWidget {
                   ),
               ],
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ),
       ],

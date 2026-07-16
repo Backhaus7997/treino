@@ -23,7 +23,6 @@ import 'package:treino/features/coach/data/athlete_note_repository.dart';
 import 'package:treino/features/coach/data/nutrition_plan_repository.dart';
 import 'package:treino/features/coach/domain/athlete_file.dart';
 import 'package:treino/features/coach/domain/athlete_note.dart';
-import 'package:treino/features/coach/domain/follow_up_entry.dart';
 import 'package:treino/features/coach/domain/nutrition_plan.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
