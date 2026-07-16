@@ -1600,13 +1600,10 @@ class AppL10nEs extends AppL10n {
   String get routineDetailCompleted => 'COMPLETADO';
 
   @override
-  String get routineDetailWeekLocked => 'SEMANA BLOQUEADA';
-
-  @override
-  String get routineDetailDayLocked => 'DÍA BLOQUEADO';
-
-  @override
   String get routineDetailStart => 'EMPEZAR';
+
+  @override
+  String get routineDetailRepeat => 'REPETIR';
 
   @override
   String get routineEditorDeleteScopeTitle => '';
@@ -4303,13 +4300,10 @@ class AppL10nEsAr extends AppL10nEs {
   String get routineDetailCompleted => 'COMPLETADO';
 
   @override
-  String get routineDetailWeekLocked => 'SEMANA BLOQUEADA';
-
-  @override
-  String get routineDetailDayLocked => 'DÍA BLOQUEADO';
-
-  @override
   String get routineDetailStart => 'EMPEZAR';
+
+  @override
+  String get routineDetailRepeat => 'REPETIR';
 
   @override
   String get routineEditorDeleteScopeTitle =>

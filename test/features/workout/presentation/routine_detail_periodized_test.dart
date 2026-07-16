@@ -331,8 +331,9 @@ void main() {
     });
 
     testWidgets(
-        'SCENARIO-036: plan-complete banner shown when all weeks/days done',
-        (tester) async {
+        'SCENARIO-REPEAT-001: plan-complete banner shown when all weeks/days '
+        'done, AND REPETIR remains available (device repro, extends '
+        'SCENARIO-036)', (tester) async {
       final routine = _multiWeekRoutine(
         numWeeks: 2,
         days: [_day(1), _day(2)],
@@ -353,11 +354,35 @@ void main() {
 
       // Plan-complete banner is in the CTA area below the fold.
       expect(find.text('PLAN COMPLETADO', skipOffstage: false), findsOneWidget);
+      // AD-2: the banner is a signal, never a lock — REPETIR must still be
+      // there and enabled. This is the true device repro path: before this
+      // change, the widget early-returned the banner with no button at all.
+      expect(
+        find.text('REPETIR', skipOffstage: false),
+        findsOneWidget,
+        reason: 'A complete plan must still offer an action (AD-2) — the '
+            'device repro this change fixes.',
+      );
+      // AD-1: banner XOR chip. Exact match on 'COMPLETADO' does not collide
+      // with 'PLAN COMPLETADO' (find.text is an exact match, not substring).
+      expect(
+        find.text('COMPLETADO', skipOffstage: false),
+        findsNothing,
+        reason: 'Banner XOR chip (AD-1) — PLAN COMPLETADO already states '
+            'the day-level fact; stacking COMPLETADO would say it twice.',
+      );
+      final btn = tester.widget<ElevatedButton>(find
+          .ancestor(
+            of: find.text('REPETIR', skipOffstage: false),
+            matching: find.byType(ElevatedButton, skipOffstage: false),
+          )
+          .first);
+      expect(btn.onPressed, isNotNull);
     });
 
     testWidgets(
-        'SCENARIO-035: completed day shows COMPLETADO state (not EMPEZAR)',
-        (tester) async {
+        'SCENARIO-REPEAT-003: completed day shows COMPLETADO + REPETIR '
+        '(renegotiates SCENARIO-035, plan incomplete)', (tester) async {
       final routine = _multiWeekRoutine(
         numWeeks: 2,
         days: [_day(1), _day(2)],
@@ -373,9 +398,98 @@ void main() {
       ));
       await _settle(tester);
 
-      // Day 1 is done → COMPLETADO (not EMPEZAR). CTA is below the fold.
+      // Day 1 is done → COMPLETADO chip + REPETIR button, never EMPEZAR.
       expect(find.text('COMPLETADO', skipOffstage: false), findsOneWidget);
-      expect(find.text('EMPEZAR', skipOffstage: false), findsNothing);
+      expect(find.text('REPETIR', skipOffstage: false), findsOneWidget);
+      expect(
+        find.text('EMPEZAR', skipOffstage: false),
+        findsNothing,
+        reason: 'Completion relabels the action to REPETIR — it never '
+            'removes it (AD-2). This is NOT "there is no action".',
+      );
+      final btn = tester.widget<ElevatedButton>(find
+          .ancestor(
+            of: find.text('REPETIR', skipOffstage: false),
+            matching: find.byType(ElevatedButton, skipOffstage: false),
+          )
+          .first);
+      expect(btn.onPressed, isNotNull,
+          reason: 'Completion is a signal, never a hard lock (AD-2).');
+    });
+  });
+
+  // ── T-4 — AD-2 invariant: completion never removes the action ──────────
+  // Replaces the 14 plan_gating.dart tests deleted in Phase 2 (AD-3): those
+  // asserted a function returned a literal; these assert the action EXISTS
+  // and is enabled, which is strictly stronger.
+  group('AD-2 invariant — completion never removes the action', () {
+    testWidgets('fresh day (no completions): enabled action button renders',
+        (tester) async {
+      final routine = _multiWeekRoutine(numWeeks: 2, days: [_day(1), _day(2)]);
+      await tester.pumpWidget(_wrap(
+        RoutineDetailScreen(routineId: routine.id),
+        routine: routine,
+      ));
+      await _settle(tester);
+
+      final btn = tester.widget<ElevatedButton>(find
+          .ancestor(
+            of: find.text('EMPEZAR', skipOffstage: false),
+            matching: find.byType(ElevatedButton, skipOffstage: false),
+          )
+          .first);
+      expect(btn.onPressed, isNotNull);
+    });
+
+    testWidgets(
+        'day already done (plan incomplete): enabled action button renders',
+        (tester) async {
+      final routine = _multiWeekRoutine(numWeeks: 2, days: [_day(1), _day(2)]);
+      final sessions = [
+        _doneSession(routineId: routine.id, week: 0, day: 1),
+      ];
+      await tester.pumpWidget(_wrap(
+        RoutineDetailScreen(routineId: routine.id),
+        routine: routine,
+        sessions: sessions,
+      ));
+      await _settle(tester);
+
+      final btn = tester.widget<ElevatedButton>(find
+          .ancestor(
+            of: find.text('REPETIR', skipOffstage: false),
+            matching: find.byType(ElevatedButton, skipOffstage: false),
+          )
+          .first);
+      expect(btn.onPressed, isNotNull);
+    });
+
+    testWidgets(
+        'plan complete: enabled action button renders (not just the banner)',
+        (tester) async {
+      final routine = _multiWeekRoutine(numWeeks: 2, days: [_day(1), _day(2)]);
+      final sessions = [
+        _doneSession(routineId: routine.id, week: 0, day: 1),
+        _doneSession(routineId: routine.id, week: 0, day: 2),
+        _doneSession(routineId: routine.id, week: 1, day: 1),
+        _doneSession(routineId: routine.id, week: 1, day: 2),
+      ];
+      await tester.pumpWidget(_wrap(
+        RoutineDetailScreen(routineId: routine.id),
+        routine: routine,
+        sessions: sessions,
+      ));
+      await _settle(tester);
+
+      final btn = tester.widget<ElevatedButton>(find
+          .ancestor(
+            of: find.text('REPETIR', skipOffstage: false),
+            matching: find.byType(ElevatedButton, skipOffstage: false),
+          )
+          .first);
+      expect(btn.onPressed, isNotNull,
+          reason: 'AD-2: completion is a signal, never a hard lock — this '
+              'replaces the 14 plan_gating.dart tests deleted by AD-3.');
     });
   });
 
@@ -530,6 +644,63 @@ void main() {
           reason: 'Info message shown when no slots present in this week');
       expect(find.byType(ExerciseSlotRow), findsNothing,
           reason: 'No ExerciseSlotRow when day has zero present slots');
+    });
+
+    testWidgets(
+        'SCENARIO-REPEAT-002: plan complete + viewed day auto-satisfied '
+        '(zero present slots that week) → EMPEZAR, not REPETIR',
+        (tester) async {
+      final slotA = slotPresentAllWeeks(exerciseId: 'slotA');
+      final slotB = slotPresentOnlyWeek2(exerciseId: 'slotB');
+      final routine = Routine(
+        id: 'routine-3w-repeat-002',
+        name: 'Plan 3 semanas',
+        level: ExperienceLevel.intermediate,
+        days: [
+          RoutineDay(dayNumber: 1, name: 'Push', slots: [slotA]),
+          RoutineDay(dayNumber: 2, name: 'Pull', slots: [slotB]),
+        ],
+        numWeeks: 3,
+      );
+      // Every REQUIRED (week, day) pair done: day1 is present every week
+      // (0,1,2); day2 is present ONLY week index 2 (activeWeeks: [2]) → the
+      // (week 0, day 2) pair is auto-satisfied (REQ-WPRES-022) and never
+      // enters `completed`.
+      final sessions = [
+        _doneSession(routineId: routine.id, week: 0, day: 1),
+        _doneSession(routineId: routine.id, week: 1, day: 1),
+        _doneSession(routineId: routine.id, week: 2, day: 1),
+        _doneSession(routineId: routine.id, week: 2, day: 2),
+      ];
+      await tester.pumpWidget(_wrap(
+        RoutineDetailScreen(routineId: routine.id),
+        routine: routine,
+        sessions: sessions,
+      ));
+      await _settle(tester);
+
+      // View day 2 of week 0 — auto-satisfied, never completed, while the
+      // plan as a whole is complete.
+      await tester.tap(find.text('DÍA 2', skipOffstage: false));
+      await _settle(tester);
+
+      expect(find.text('PLAN COMPLETADO', skipOffstage: false), findsOneWidget,
+          reason: 'planComplete is true — every required pair is satisfied.');
+      expect(
+        find.text('EMPEZAR', skipOffstage: false),
+        findsOneWidget,
+        reason: 'This (week, day) was never in `completed` (zero present '
+            'slots this week, REQ-WPRES-022) — the label rule is keyed off '
+            'the DAY, not the plan (AD-5).',
+      );
+      expect(find.text('REPETIR', skipOffstage: false), findsNothing);
+      final btn = tester.widget<ElevatedButton>(find
+          .ancestor(
+            of: find.text('EMPEZAR', skipOffstage: false),
+            matching: find.byType(ElevatedButton, skipOffstage: false),
+          )
+          .first);
+      expect(btn.onPressed, isNotNull);
     });
   });
 }

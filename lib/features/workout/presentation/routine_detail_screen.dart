@@ -12,8 +12,6 @@ import '../../../l10n/app_l10n.dart';
 import '../../profile/application/user_providers.dart' show userProfileProvider;
 import '../../profile/application/user_public_profile_providers.dart';
 import '../../profile/domain/user_role.dart';
-import '../application/plan_gating.dart';
-import '../application/plan_progress.dart' show CompletedKey;
 import '../application/routine_providers.dart';
 import '../application/session_providers.dart'
     show currentUidProvider, lastWeightByExerciseProvider, planProgressProvider;
@@ -898,10 +896,10 @@ class _WeekSelector extends StatelessWidget {
 }
 
 /// Start CTA for periodized plans (numWeeks > 1). Reads [planProgressProvider]
-/// to determine the active (week, day) and to show gating affordances for the
-/// currently viewed (week, day) combination.
-///
-/// REQ-PERIOD-033/034/035/036/037/042.
+/// to render a completion SIGNAL (banner or chip, at most one) above an
+/// unconditional ACTION button. Completion only ever changes the signal and
+/// the action's label — it never removes, disables, or hides the action
+/// (periodized-plan-repeat, AD-1/AD-2).
 class _PeriodizedCTABar extends ConsumerWidget {
   const _PeriodizedCTABar({
     required this.routine,
@@ -924,11 +922,6 @@ class _PeriodizedCTABar extends ConsumerWidget {
     if (role == UserRole.trainer) return const SizedBox.shrink();
 
     final uid = ref.watch(currentUidProvider) ?? '';
-    // dayNumbers is kept locally for gating function calls below.
-    // planProgressProvider resolves dayNumbers/numWeeks internally via
-    // routineByIdProvider — key uses only String fields for structural equality.
-    final dayNumbers =
-        routine.days.map((d) => d.dayNumber).toList(growable: false);
     final progressAsync = ref.watch(
       planProgressProvider((uid: uid, routineId: routine.id)),
     );
@@ -937,179 +930,149 @@ class _PeriodizedCTABar extends ConsumerWidget {
       loading: () => const SizedBox(height: 56),
       error: (_, __) => const SizedBox.shrink(),
       data: (progress) {
-        final palette = AppPalette.of(context);
-        final l10n = AppL10n.of(context);
-
-        // Plan-complete banner (REQ-PERIOD-037, SCENARIO-036).
-        if (progress.planComplete) {
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 18),
-            child: Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: palette.accent.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: palette.accent),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(TreinoIcon.check, size: 20, color: palette.accent),
-                  const SizedBox(width: 10),
-                  Text(
-                    l10n.routineDetailPlanComplete,
-                    style: GoogleFonts.barlowCondensed(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 16,
-                      letterSpacing: 1.2,
-                      color: palette.accent,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        }
-
-        // REQ-WPRES-022: compute requiredPairs so gating functions know which
-        // (week, day) combos have zero present slots (auto-satisfied).
-        // Mirrors planProgressProvider's requiredPairs computation so gating
-        // here stays consistent with the progress derivation.
-        final requiredPairs = <CompletedKey>{};
-        for (var w = 0; w < routine.numWeeks; w++) {
-          for (final d in routine.days) {
-            final hasPresent = d.slots.any((s) => s.isPresentInWeek(w));
-            if (hasPresent) {
-              requiredPairs.add((week: w, day: d.dayNumber));
-            }
-          }
-        }
-
-        final viewedDay = day.dayNumber;
-        final weekLocked = !isWeekUnlocked(
-          viewedWeek,
-          progress.completed,
-          dayNumbers,
-          requiredPairs: requiredPairs,
-        );
-        final dayLocked = !isDayUnlocked(
-          viewedWeek,
-          viewedDay,
-          progress.completed,
-          dayNumbers,
-          requiredPairs: requiredPairs,
-        );
         final alreadyDone = progress.completed.contains((
           week: viewedWeek,
-          day: viewedDay,
+          day: day.dayNumber,
         ));
 
-        // Already completed this (week, day).
-        if (alreadyDone) {
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 18),
-            child: Container(
-              height: 56,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: palette.bgCard,
-                borderRadius: BorderRadius.circular(9999),
-                border: Border.all(color: palette.border),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(TreinoIcon.check, size: 16, color: palette.accent),
-                  const SizedBox(width: 8),
-                  Text(
-                    l10n.routineDetailCompleted,
-                    style: GoogleFonts.barlowCondensed(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 14,
-                      letterSpacing: 1.2,
-                      color: palette.accent,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        }
-
-        // Locked (week or day not yet unlocked).
-        if (weekLocked || dayLocked) {
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 18),
-            child: Container(
-              height: 56,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: palette.bgCard,
-                borderRadius: BorderRadius.circular(9999),
-                border: Border.all(color: palette.border),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(TreinoIcon.lock, size: 16, color: palette.textMuted),
-                  const SizedBox(width: 8),
-                  Text(
-                    weekLocked
-                        ? l10n.routineDetailWeekLocked
-                        : l10n.routineDetailDayLocked,
-                    style: GoogleFonts.barlowCondensed(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 14,
-                      letterSpacing: 1.2,
-                      color: palette.textMuted,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        }
-
-        // Startable — show active CTA with the correct week.
         return Padding(
           padding: const EdgeInsets.symmetric(vertical: 18),
-          child: Row(
+          child: Column(
             children: [
-              Expanded(
-                child: ElevatedButton(
-                  // By this point alreadyDone, weekLocked, and dayLocked have
-                  // all early-returned above, so this day is always startable.
-                  onPressed: () {
-                    ref.read(analyticsServiceProvider).logRoutineStarted(
-                          routineId: routine.id,
-                          routineName: routine.name,
-                        );
-                    context.push(
-                      '/workout/session/${routine.id}/${day.dayNumber}?week=$viewedWeek',
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: palette.accent,
-                    minimumSize: const Size.fromHeight(56),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(9999),
-                    ),
-                  ),
-                  child: Text(
-                    l10n.routineDetailStart,
-                    style: GoogleFonts.barlowCondensed(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 16,
-                      letterSpacing: 1.0,
-                      color: palette.bg,
-                    ),
-                  ),
-                ),
-              ),
+              // SIGNAL — never gates. Plan-scoped wins over day-scoped
+              // (banner XOR chip): "PLAN COMPLETADO" stacked above
+              // "COMPLETADO" would say the same fact twice.
+              if (progress.planComplete)
+                const _PlanCompleteBanner()
+              else if (alreadyDone)
+                const _CompletedDayChip(),
+              if (progress.planComplete || alreadyDone)
+                const SizedBox(height: 12),
+              // ACTION — unconditional. No completion state removes it
+              // (AD-2); only the label changes, keyed off the day.
+              _buildSessionCTA(context, ref, isRepeat: alreadyDone),
             ],
           ),
         );
       },
+    );
+  }
+
+  /// The single action call site for this CTA — startable or repeatable, the
+  /// route composed is identical (SCENARIO-REPEAT-004); only [isRepeat]
+  /// changes the label (AD-5). Kept inline (needs [context] + `ref`, exactly
+  /// one call site) rather than extracted as a separate widget.
+  Widget _buildSessionCTA(
+    BuildContext context,
+    WidgetRef ref, {
+    required bool isRepeat,
+  }) {
+    return Row(
+      children: [
+        Expanded(
+          child: ElevatedButton(
+            onPressed: () {
+              ref.read(analyticsServiceProvider).logRoutineStarted(
+                    routineId: routine.id,
+                    routineName: routine.name,
+                  );
+              context.push(
+                '/workout/session/${routine.id}/${day.dayNumber}?week=$viewedWeek',
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppPalette.of(context).accent,
+              minimumSize: const Size.fromHeight(56),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(9999),
+              ),
+            ),
+            child: Text(
+              isRepeat
+                  ? AppL10n.of(context).routineDetailRepeat
+                  : AppL10n.of(context).routineDetailStart,
+              style: GoogleFonts.barlowCondensed(
+                fontWeight: FontWeight.w700,
+                fontSize: 16,
+                letterSpacing: 1.0,
+                color: AppPalette.of(context).bg,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Informational banner shown when every required (week, day) in the plan is
+/// complete. Purely a SIGNAL — never withholds the action below it (AD-1/AD-2).
+class _PlanCompleteBanner extends StatelessWidget {
+  const _PlanCompleteBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: palette.accent.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: palette.accent),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(TreinoIcon.check, size: 20, color: palette.accent),
+          const SizedBox(width: 10),
+          Text(
+            AppL10n.of(context).routineDetailPlanComplete,
+            style: GoogleFonts.barlowCondensed(
+              fontWeight: FontWeight.w700,
+              fontSize: 16,
+              letterSpacing: 1.2,
+              color: palette.accent,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Chip shown when the viewed (week, day) is already completed but the plan
+/// as a whole is not. Purely a SIGNAL — never withholds the action below it
+/// (AD-1/AD-2).
+class _CompletedDayChip extends StatelessWidget {
+  const _CompletedDayChip();
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    return Container(
+      height: 56,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: palette.bgCard,
+        borderRadius: BorderRadius.circular(9999),
+        border: Border.all(color: palette.border),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(TreinoIcon.check, size: 16, color: palette.accent),
+          const SizedBox(width: 8),
+          Text(
+            AppL10n.of(context).routineDetailCompleted,
+            style: GoogleFonts.barlowCondensed(
+              fontWeight: FontWeight.w700,
+              fontSize: 14,
+              letterSpacing: 1.2,
+              color: palette.accent,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -2978,23 +2978,17 @@ abstract class AppL10n {
   /// **'COMPLETADO'**
   String get routineDetailCompleted;
 
-  /// No description provided for @routineDetailWeekLocked.
-  ///
-  /// In es_AR, this message translates to:
-  /// **'SEMANA BLOQUEADA'**
-  String get routineDetailWeekLocked;
-
-  /// No description provided for @routineDetailDayLocked.
-  ///
-  /// In es_AR, this message translates to:
-  /// **'DÍA BLOQUEADO'**
-  String get routineDetailDayLocked;
-
   /// No description provided for @routineDetailStart.
   ///
   /// In es_AR, this message translates to:
   /// **'EMPEZAR'**
   String get routineDetailStart;
+
+  /// No description provided for @routineDetailRepeat.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'REPETIR'**
+  String get routineDetailRepeat;
 
   /// No description provided for @routineEditorDeleteScopeTitle.
   ///
