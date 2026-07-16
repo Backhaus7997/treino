@@ -28,7 +28,6 @@ import 'package:treino/features/coach/domain/nutrition_plan.dart';
 import 'package:treino/features/coach/domain/nutrition_plan_presets.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach_hub/presentation/sections/chat/widgets/chat_detail_pane.dart';
-import 'package:treino/features/coach_hub/presentation/sections/routine_editor/routine_web_editability.dart';
 import 'package:treino/features/gyms/application/gym_providers.dart';
 import 'package:treino/features/insights/domain/chart_period.dart';
 import 'package:treino/features/insights/presentation/widgets/daily_heatmap_section.dart';
@@ -49,14 +48,11 @@ import 'package:treino/features/workout/application/session_providers.dart';
 import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/domain/routine_status.dart';
 import 'package:treino/features/workout/domain/session.dart';
-import 'package:treino/features/workout/domain/session_status.dart';
-import 'package:treino/features/workout/domain/set_log.dart';
 import 'package:treino/features/workout/presentation/widgets/exercise_progression_chart.dart'
     show ExerciseProgressionChartLabels;
 import 'package:treino/features/workout/presentation/widgets/exercise_progression_section.dart';
 import 'package:treino/features/workout/presentation/widgets/most_frequent_exercises_list.dart';
 import 'package:treino/features/workout/presentation/widgets/personal_records_list.dart';
-import 'package:treino/features/workout/presentation/widgets/session_exercise_block.dart';
 import 'package:treino/features/profile/application/user_providers.dart'
     show userProfileProvider;
 import 'package:treino/features/payments/domain/payment.dart';
@@ -77,6 +73,7 @@ import 'widgets/alumno_header.dart';
 import 'widgets/alumno_kpi_strip.dart';
 import 'widgets/alumno_tabs.dart';
 import 'widgets/datos_personales_card.dart';
+import 'widgets/historial_sesiones_table.dart';
 import 'widgets/medicion_dialog.dart';
 import 'widgets/medicion_list.dart';
 import 'widgets/mediciones_toggle.dart';
@@ -87,6 +84,7 @@ import 'widgets/prox_sesion_card.dart';
 import 'widgets/rendimiento_dialog.dart';
 import 'widgets/rendimiento_list.dart';
 import 'widgets/resumen_kpi_strip.dart';
+import 'widgets/rutina_activa_card.dart';
 import 'widgets/ultima_sesion_card.dart';
 
 /// Detalle del alumno (`/alumnos/:id`, Fase W2 PR2).
@@ -741,9 +739,18 @@ class _PagosTab extends ConsumerWidget {
   }
 }
 
-/// Tab Entrenamiento (W2 PR3): rutina activa + historial de sesiones + evolución
-/// por ejercicio. Reusa `assignedRoutinesProvider`, `sessionsByUidProvider`,
-/// `athleteExerciseListProvider` y `exerciseProgressionProvider`.
+/// Tab Entrenamiento (Fase 3 WU-07a, rediseño kit v2): rutina activa +
+/// historial de sesiones + evolución por ejercicio. Reusa
+/// `assignedRoutinesProvider`, `sessionsByUidProvider`,
+/// `athleteExerciseListProvider` y `exerciseProgressionProvider` — 100%
+/// lógica de negocio preservada (ADR-A3-04), sólo cambia presentación/motion.
+///
+/// Rutina activa e historial extraídos a `widgets/rutina_activa_card.dart` /
+/// `widgets/historial_sesiones_table.dart` (ADR-A3-02: la tabla ahora corre
+/// sobre `CoachHubDataTable`; ver ADR-A3-10 sobre el expand-en-panel de sets
+/// reales, antes inline por fila). El chart «EVOLUCIÓN POR EJERCICIO»
+/// ([_ProgressionTabSection]) YA es real (mismo criterio de honestidad que
+/// WU-06b) — no se fabrica ningún dato nuevo, sólo se envuelve en motion.
 class _EntrenamientoTab extends ConsumerWidget {
   const _EntrenamientoTab({required this.athleteId});
   final String athleteId;
@@ -755,81 +762,131 @@ class _EntrenamientoTab extends ConsumerWidget {
     final routinesAsync = ref.watch(assignedRoutinesProvider(athleteId));
     final sessionsAsync = ref.watch(sessionsByUidProvider(athleteId));
 
+    final routineStateKey = _asyncStateKeyOf(routinesAsync);
+    final routines = routinesAsync.valueOrNull ?? const <Routine>[];
+    final actives = routines.where((r) => r.status == RoutineStatus.active);
+    final activeRoutine =
+        actives.where((r) => r.assignedBy == trainerUid).firstOrNull ??
+            actives.firstOrNull;
+
+    final sessionsStateKey = _asyncStateKeyOf(sessionsAsync);
+    // isCompletedSession excluye sesiones abandonadas (status=finished pero
+    // wasFullyCompleted=false) para no divergir del historial del propio
+    // alumno ni de los contadores públicos.
+    final finished = (sessionsAsync.valueOrNull ?? const <Session>[])
+        .where(isCompletedSession)
+        .take(20)
+        .toList();
+    final sessionsError = sessionsAsync.error;
+    final sessionsErrorMessage = sessionsError is FirebaseException &&
+            sessionsError.code == 'permission-denied'
+        ? 'El alumno no compartió su historial.' // i18n: Fase W2
+        : 'No se pudo cargar el historial.'; // i18n: Fase W2
+
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.s20,
+        AppSpacing.hairline,
+        AppSpacing.s20,
+        AppSpacing.s20,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              Expanded(child: _sectionLabel(palette, 'RUTINA ACTIVA')), // i18n
-              TextButton.icon(
-                onPressed: () =>
-                    context.push('/routine-editor/$athleteId'), // i18n
-                icon: Icon(TreinoIcon.plus, size: 16, color: palette.accent),
-                label: Text(
-                  'Asignar rutina', // i18n: Fase W2
-                  style: TextStyle(
-                    color: palette.accent,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13,
+          TreinoFadeSlideIn(
+            delay: AppMotion.stagger(0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                        child: _sectionLabel(palette, 'RUTINA ACTIVA')), // i18n
+                    TextButton.icon(
+                      onPressed: () =>
+                          context.push('/routine-editor/$athleteId'), // i18n
+                      icon: Icon(TreinoIcon.plus,
+                          size: 16, color: palette.accent),
+                      label: Text(
+                        'Asignar rutina', // i18n: Fase W2
+                        style: TextStyle(
+                          color: palette.accent,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.s8 + 2),
+                TreinoStateSwitcher(
+                  childKey: ValueKey('rutina_activa_$routineStateKey'),
+                  child: switch (routineStateKey) {
+                    'loading' => RutinaActivaCardSkeleton(palette: palette),
+                    'error' => const TreinoEmptyState(
+                        icon: TreinoIcon.errorState,
+                        title: 'No se pudo cargar la rutina.', // i18n
+                      ),
+                    _ => activeRoutine == null
+                        ? const TreinoEmptyState(
+                            icon: TreinoIcon.emptyState,
+                            title: 'Sin rutina activa asignada.', // i18n
+                          )
+                        : RutinaActivaCard(
+                            routine: activeRoutine,
+                            palette: palette,
+                            athleteId: athleteId,
+                          ),
+                  },
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.s20),
+          TreinoFadeSlideIn(
+            delay: AppMotion.stagger(1),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _sectionLabel(palette, 'HISTORIAL DE SESIONES'), // i18n
+                const SizedBox(height: AppSpacing.s8 + 2),
+                TreinoStateSwitcher(
+                  childKey:
+                      ValueKey('entrenamiento_historial_$sessionsStateKey'),
+                  child: HistorialSesionesTable(
+                    sessions: finished,
+                    athleteId: athleteId,
+                    palette: palette,
+                    loading: sessionsStateKey == 'loading',
+                    errorMessage: sessionsStateKey == 'error'
+                        ? sessionsErrorMessage
+                        : null,
+                    onRetry: () =>
+                        ref.invalidate(sessionsByUidProvider(athleteId)),
+                    emptyMessage:
+                        'Sin sesiones registradas todavía.', // i18n: Fase W2
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-          const SizedBox(height: 10),
-          routinesAsync.when(
-            loading: () => _muted(palette, 'Cargando…'), // i18n: Fase W2
-            error: (e, _) => _muted(
-                palette, 'No se pudo cargar la rutina.'), // i18n: Fase W2
-            data: (routines) {
-              final actives =
-                  routines.where((r) => r.status == RoutineStatus.active);
-              final active = actives
-                      .where((r) => r.assignedBy == trainerUid)
-                      .firstOrNull ??
-                  actives.firstOrNull;
-              if (active == null) {
-                return _muted(
-                    palette, 'Sin rutina activa asignada.'); // i18n: Fase W2
-              }
-              return _RutinaCard(
-                  routine: active, palette: palette, athleteId: athleteId);
-            },
-          ),
-          const SizedBox(height: 20),
-          _sectionLabel(palette, 'HISTORIAL DE SESIONES'), // i18n: Fase W2
-          const SizedBox(height: 10),
-          sessionsAsync.when(
-            loading: () => _muted(palette, 'Cargando…'), // i18n: Fase W2
-            error: (e, _) => _muted(
-                palette,
-                e is FirebaseException && e.code == 'permission-denied'
-                    ? 'El alumno no compartió su historial.' // i18n: Fase W2
-                    : 'No se pudo cargar el historial.'), // i18n: Fase W2
-            data: (sessions) {
-              // isCompletedSession excluye sesiones abandonadas (status=finished
-              // pero wasFullyCompleted=false) para no divergir del historial del
-              // propio alumno ni de los contadores públicos. // i18n: Fase W2
-              final finished =
-                  sessions.where(isCompletedSession).take(20).toList();
-              if (finished.isEmpty) {
-                return _muted(palette,
-                    'Sin sesiones registradas todavía.'); // i18n: Fase W2
-              }
-              return _HistorialTable(
-                  sessions: finished, palette: palette, athleteId: athleteId);
-            },
-          ),
-          const SizedBox(height: 24),
+          const SizedBox(height: AppSpacing.s20 + 4),
           _DailyHeatmapTabSection(athleteId: athleteId),
-          const SizedBox(height: 24),
+          const SizedBox(height: AppSpacing.s20 + 4),
           _ProgressionTabSection(athleteId: athleteId, palette: palette),
         ],
       ),
     );
   }
+}
+
+/// `error` si la fuente falló; `loading` mientras no tenga valor todavía;
+/// `data` en cualquier otro caso. Generaliza el criterio de
+/// `_progresoStateKeyOf` para gates de una sola fuente async.
+String _asyncStateKeyOf(AsyncValue<Object?> value) {
+  if (value.hasError) return 'error';
+  if (value.isLoading && !value.hasValue) return 'loading';
+  return 'data';
 }
 
 // ── Músculos del día (PR2b) ───────────────────────────────────────────────────
@@ -1009,326 +1066,6 @@ class _MostFrequentExercisesTabSectionState
             monthLabel: 'Este mes', // i18n: Fase W2
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _RutinaCard extends StatelessWidget {
-  const _RutinaCard({
-    required this.routine,
-    required this.palette,
-    required this.athleteId,
-  });
-  final Routine routine;
-  final AppPalette palette;
-  final String athleteId;
-
-  @override
-  Widget build(BuildContext context) {
-    // Only web-authored (simple) routines can be edited here; periodized /
-    // superset plans from mobile would be truncated on save, so we route the
-    // trainer to the mobile app instead (see isRoutineWebEditable).
-    final editable = isRoutineWebEditable(routine);
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: palette.bgCard,
-        border: Border.all(color: palette.border),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  routine.name,
-                  style: TextStyle(
-                    color: palette.textPrimary,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-              if (editable)
-                TextButton.icon(
-                  onPressed: () =>
-                      context.push('/routine-editor/$athleteId/${routine.id}'),
-                  icon: Icon(TreinoIcon.edit, size: 15, color: palette.accent),
-                  label: Text('Editar', // i18n: Fase W2
-                      style: TextStyle(
-                          color: palette.accent,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 13)),
-                  style: TextButton.styleFrom(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                )
-              else
-                Text('Editá en la app', // i18n: Fase W2
-                    style: TextStyle(color: palette.textMuted, fontSize: 12)),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            '${routine.days.length} días · ${routine.numWeeks} ${routine.numWeeks == 1 ? 'semana' : 'semanas'}', // i18n: Fase W2
-            style: TextStyle(color: palette.textMuted, fontSize: 12),
-          ),
-          const SizedBox(height: 10),
-          for (final day in routine.days)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 6),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      day.name,
-                      style:
-                          TextStyle(color: palette.textPrimary, fontSize: 14),
-                    ),
-                  ),
-                  Text(
-                    '${day.slots.length} ${day.slots.length == 1 ? 'ejercicio' : 'ejercicios'}', // i18n: Fase W2
-                    style: TextStyle(color: palette.textMuted, fontSize: 12),
-                  ),
-                ],
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _HistorialTable extends StatelessWidget {
-  const _HistorialTable({
-    required this.sessions,
-    required this.palette,
-    required this.athleteId,
-    this.showStatusBadge = false,
-  });
-  final List<Session> sessions;
-  final AppPalette palette;
-  final String athleteId;
-
-  /// If true, the row prefixes the session name with a small status pill
-  /// (Completada / Incompleta / En curso). Used by the Historial tab where
-  /// non-completed sessions are shown; the Entrenamientos tab filters to
-  /// completed and doesn't need it.
-  final bool showStatusBadge;
-
-  @override
-  Widget build(BuildContext context) {
-    final h = TextStyle(
-        color: palette.textMuted,
-        fontSize: 11,
-        fontWeight: FontWeight.w600,
-        letterSpacing: 0.5);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      decoration: BoxDecoration(
-        color: palette.bgCard,
-        border: Border.all(color: palette.border),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Row(
-              children: [
-                // i18n: Fase W2 (encabezados)
-                Expanded(flex: 3, child: Text('FECHA', style: h)),
-                Expanded(flex: 4, child: Text('SESIÓN', style: h)),
-                Expanded(flex: 2, child: Text('DURACIÓN', style: h)),
-                Expanded(
-                  flex: 2,
-                  child: Text('VOLUMEN', style: h, textAlign: TextAlign.right),
-                ),
-                const SizedBox(width: 24),
-              ],
-            ),
-          ),
-          // Tap a session to expand its real per-exercise set detail
-          // (trainer-athlete-set-logs).
-          for (final s in sessions)
-            _ExpandableSessionRow(
-              session: s,
-              athleteId: athleteId,
-              palette: palette,
-              showStatusBadge: showStatusBadge,
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-/// A session row that expands on tap to show the athlete's REAL logged sets
-/// for that session (read-only; gated by `session_shares`).
-class _ExpandableSessionRow extends ConsumerStatefulWidget {
-  const _ExpandableSessionRow({
-    required this.session,
-    required this.athleteId,
-    required this.palette,
-    this.showStatusBadge = false,
-  });
-  final Session session;
-  final String athleteId;
-  final AppPalette palette;
-  final bool showStatusBadge;
-
-  @override
-  ConsumerState<_ExpandableSessionRow> createState() =>
-      _ExpandableSessionRowState();
-}
-
-class _ExpandableSessionRowState extends ConsumerState<_ExpandableSessionRow> {
-  bool _expanded = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = widget.palette;
-    final s = widget.session;
-    final c = TextStyle(color: palette.textPrimary, fontSize: 13);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        InkWell(
-          onTap: () => setState(() => _expanded = !_expanded),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Row(
-              children: [
-                Expanded(
-                  flex: 3,
-                  child: Text(
-                    // Historial tab shows active sessions too; fall back to
-                    // startedAt when finishedAt is null so the user still
-                    // sees WHEN the athlete started it.
-                    s.finishedAt != null
-                        ? fmtDate(s.finishedAt!)
-                        : widget.showStatusBadge
-                            ? fmtDate(s.startedAt)
-                            : '—',
-                    style: c,
-                  ),
-                ),
-                Expanded(
-                  flex: 4,
-                  child: widget.showStatusBadge
-                      ? Row(
-                          children: [
-                            _SessionStatusPill(session: s, palette: palette),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(s.routineName,
-                                  overflow: TextOverflow.ellipsis, style: c),
-                            ),
-                          ],
-                        )
-                      : Text(s.routineName,
-                          overflow: TextOverflow.ellipsis, style: c),
-                ),
-                Expanded(
-                  flex: 2,
-                  child:
-                      Text('${s.durationMin} min', style: c), // i18n: Fase W2
-                ),
-                Expanded(
-                  flex: 2,
-                  child: Text('${s.totalVolumeKg.round()} kg', // i18n: Fase W2
-                      style: c,
-                      textAlign: TextAlign.right),
-                ),
-                SizedBox(
-                  width: 24,
-                  child: Icon(
-                    _expanded ? TreinoIcon.chevronUp : TreinoIcon.chevronDown,
-                    size: 16,
-                    color: palette.textMuted,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        if (_expanded)
-          _SetLogsExpansion(
-            athleteId: widget.athleteId,
-            sessionId: s.id,
-            palette: palette,
-          ),
-      ],
-    );
-  }
-}
-
-/// Loads and renders one session's per-exercise set logs for the trainer.
-/// Maps `permission-denied` (athlete hasn't shared) to a friendly placeholder.
-class _SetLogsExpansion extends ConsumerWidget {
-  const _SetLogsExpansion({
-    required this.athleteId,
-    required this.sessionId,
-    required this.palette,
-  });
-  final String athleteId;
-  final String sessionId;
-  final AppPalette palette;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final async = ref.watch(coachSessionSetLogsProvider(
-        (athleteUid: athleteId, sessionId: sessionId)));
-    final muted = TextStyle(color: palette.textMuted, fontSize: 12);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(4, 0, 4, 12),
-      child: async.when(
-        loading: () => Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: SizedBox(
-            width: 18,
-            height: 18,
-            child: CircularProgressIndicator(
-                strokeWidth: 2, color: palette.accent),
-          ),
-        ),
-        error: (e, _) {
-          final noShare =
-              e is FirebaseException && e.code == 'permission-denied';
-          return Text(
-            noShare
-                ? 'El alumno no compartió su historial.' // i18n: Fase W2
-                : 'No se pudo cargar el detalle de la sesión.', // i18n: Fase W2
-            style: muted,
-          );
-        },
-        data: (logs) {
-          if (logs.isEmpty) {
-            return Text(
-                'Sin series registradas en esta sesión.', // i18n: Fase W2
-                style: muted);
-          }
-          final groups = <String, List<SetLog>>{};
-          for (final log in logs) {
-            groups.putIfAbsent(log.exerciseId, () => <SetLog>[]).add(log);
-          }
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              for (final entry in groups.entries)
-                SessionExerciseBlock(
-                  exerciseName: entry.value.first.exerciseName,
-                  sets: entry.value,
-                ),
-            ],
-          );
-        },
       ),
     );
   }
@@ -1623,8 +1360,9 @@ class _NotasPrivadasTabState extends ConsumerState<_NotasPrivadasTab> {
 /// - Historial: TODAS las sesiones (sin límite, sin filtro) con badge de
 ///   status para que el PF distinga completadas, incompletas y activas.
 ///
-/// Reusa el mismo `_HistorialTable` + `_ExpandableSessionRow` que
-/// Entrenamientos, activando el flag `showStatusBadge`.
+/// Reusa el mismo `HistorialSesionesTable` (Fase 3 WU-07a,
+/// `widgets/historial_sesiones_table.dart`) que Entrenamientos, activando el
+/// flag `showStatusBadge`.
 class _HistorialTab extends ConsumerWidget {
   const _HistorialTab({required this.athleteId});
 
@@ -1681,7 +1419,7 @@ class _HistorialTab extends ConsumerWidget {
                 style: TextStyle(color: palette.textMuted, fontSize: 13),
               ),
               const SizedBox(height: 16),
-              _HistorialTable(
+              HistorialSesionesTable(
                 sessions: sessions,
                 palette: palette,
                 athleteId: athleteId,
@@ -1692,54 +1430,6 @@ class _HistorialTab extends ConsumerWidget {
         );
       },
     );
-  }
-}
-
-// ── _SessionStatusPill ────────────────────────────────────────────────────────
-
-/// Small pill/badge rendering the session's completion status: verde
-/// «Completa», amarillo «Incompleta», naranja «En curso». Used inside the
-/// Historial tab's session rows to distinguish state at a glance.
-class _SessionStatusPill extends StatelessWidget {
-  const _SessionStatusPill({required this.session, required this.palette});
-
-  final Session session;
-  final AppPalette palette;
-
-  @override
-  Widget build(BuildContext context) {
-    final (label, color) = _statusFor(session, palette);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(9999),
-        border: Border.all(color: color.withValues(alpha: 0.5), width: 1),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: color,
-          fontSize: 10,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.5,
-        ),
-      ),
-    );
-  }
-
-  /// Returns (label, color) for the session's current state.
-  /// - `active` → «En curso» (rare in Historial but we show it if we see it).
-  /// - `finished + wasFullyCompleted` → «Completa».
-  /// - `finished + !wasFullyCompleted` → «Incompleta» (athlete abandoned).
-  static (String, Color) _statusFor(Session s, AppPalette palette) {
-    if (s.status == SessionStatus.active) {
-      return ('EN CURSO', palette.warning); // i18n: Fase W2
-    }
-    if (s.wasFullyCompleted) {
-      return ('COMPLETA', palette.accent); // i18n: Fase W2
-    }
-    return ('INCOMPLETA', palette.danger); // i18n: Fase W2
   }
 }
 
