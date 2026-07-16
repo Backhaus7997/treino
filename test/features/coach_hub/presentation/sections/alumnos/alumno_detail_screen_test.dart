@@ -29,6 +29,7 @@ import 'package:treino/features/coach_hub/presentation/sections/alumnos/widgets/
 import 'package:treino/features/coach_hub/presentation/sections/alumnos/widgets/alumno_header.dart';
 import 'package:treino/features/coach_hub/presentation/sections/alumnos/widgets/alumno_kpi_strip.dart';
 import 'package:treino/features/coach_hub/presentation/sections/alumnos/widgets/alumno_tabs.dart';
+import 'package:treino/features/coach_hub/presentation/sections/alumnos/widgets/progreso_kpi_strip.dart';
 import 'package:treino/features/coach_hub/presentation/sections/pagos/widgets/estado_cuenta_card.dart';
 import 'package:treino/features/coach_hub/presentation/sections/pagos/widgets/payment_format.dart'
     show fmtDayMonth, nextDueDate;
@@ -211,12 +212,18 @@ AthleteBilling _billing({
       updatedAt: DateTime.utc(2026, 1, 1),
     );
 
-PerformanceTest _perf({double cmjCm = 30, int day = 1}) => PerformanceTest(
+PerformanceTest _perf({
+  double cmjCm = 30,
+  int day = 1,
+  double? squat1rmKg,
+}) =>
+    PerformanceTest(
       id: 'pt$day',
       athleteId: 'a1',
       recordedBy: 't1',
       recordedAt: DateTime.utc(2026, 1, day),
       cmjCm: cmjCm,
+      squat1rmKg: squat1rmKg,
     );
 
 SetLog _setLog({
@@ -753,6 +760,74 @@ void main() {
       expect(find.text('No se pudo cargar el progreso.'), findsOneWidget);
       expect(
           find.text('ANTROPOMETRÍA'), findsNothing); // gateado, no se muestra
+    });
+
+    group('Progreso — rediseño kit v2 (Fase 3 WU-06b)', () {
+      testWidgets('strip de 4 KpiCard (peso/%grasa/cintura/1RM) con delta real',
+          (tester) async {
+        await _pump(
+          tester,
+          profile: _prof(),
+          link: _link(TrainerLinkStatus.active),
+          measurements: [
+            _meas(60, fat: 20, waist: 70, day: 1),
+            _meas(61, fat: 19, waist: 69, day: 20),
+          ],
+          performanceTests: [
+            _perf(day: 1, squat1rmKg: 100),
+            _perf(day: 20, squat1rmKg: 110),
+          ],
+        );
+
+        await tester.tap(find.text('Progreso'));
+        await tester.pumpAndSettle();
+
+        expect(find.byType(ProgresoKpiStrip), findsOneWidget);
+        expect(
+          find.descendant(
+            of: find.byType(ProgresoKpiStrip),
+            matching: find.byType(KpiCard),
+          ),
+          findsNWidgets(4),
+        );
+        expect(find.text('61 kg'), findsOneWidget); // último peso
+        expect(find.text('+1.0 kg'), findsOneWidget); // delta peso
+        expect(find.text('110 kg'), findsOneWidget); // último 1RM
+        expect(find.text('Sentadilla'), findsOneWidget); // sublabel honesto
+      });
+
+      testWidgets('sin datos de progreso usa TreinoEmptyState (kit v2)',
+          (tester) async {
+        await _pump(
+          tester,
+          profile: _prof(),
+          link: _link(TrainerLinkStatus.active),
+          measurements: const [],
+          performanceTests: const [],
+        );
+
+        await tester.tap(find.text('Progreso'));
+        await tester.pumpAndSettle();
+
+        expect(find.byType(TreinoEmptyState), findsOneWidget);
+        expect(find.byType(ProgresoKpiStrip), findsNothing);
+      });
+
+      testWidgets('error de una fuente usa TreinoEmptyState (kit v2)',
+          (tester) async {
+        await _pump(
+          tester,
+          profile: _prof(),
+          link: _link(TrainerLinkStatus.active),
+          measurements: [_meas(60.5)],
+          performanceError: 'boom',
+        );
+
+        await tester.tap(find.text('Progreso'));
+        await tester.pumpAndSettle();
+
+        expect(find.byType(TreinoEmptyState), findsOneWidget);
+      });
     });
 
     // Removed: "tab placeholder muestra 'Próximamente.'" — al implementar

@@ -68,6 +68,7 @@ import '../pagos/widgets/marcar_pagado_actions.dart';
 import '../pagos/widgets/pagos_table.dart';
 import '../pagos/widgets/payment_format.dart';
 import 'alumnos_screen.dart' show estadoForLink;
+import 'progreso_metrics.dart';
 import 'resumen_metrics.dart';
 import 'widgets/adherencia_heatmap.dart';
 import 'widgets/alumno_breadcrumb.dart';
@@ -81,6 +82,7 @@ import 'widgets/medicion_list.dart';
 import 'widgets/mediciones_toggle.dart';
 import 'widgets/nota_card.dart';
 import 'widgets/plan_nutricion_card.dart';
+import 'widgets/progreso_kpi_strip.dart';
 import 'widgets/prox_sesion_card.dart';
 import 'widgets/rendimiento_dialog.dart';
 import 'widgets/rendimiento_list.dart';
@@ -291,76 +293,124 @@ class _ChatTab extends ConsumerWidget {
   }
 }
 
+/// Tab «Progreso» del detalle de Alumno — Fase 3 WU-06b (rediseño kit v2).
+///
+/// Fuentes independientes (antropometría + rendimiento): gateadas juntas vía
+/// `TreinoStateSwitcher` (loading shimmer / error / data), mismo criterio que
+/// el original — spinner hasta que ambas tengan valor, error si alguna falla.
+///
+/// Honestidad de datos (ADR-A3-01 / patrón ADR-D2 fase 2): el mockup pide un
+/// único chart "EVOLUCIÓN DE CARGAS" con dropdown de ejercicio — NO se
+/// fabrica: se conservan los DOS charts reales ya cableados
+/// (`MeasurementProgressChart` para antropometría, `PerformanceProgressChart`
+/// para 1RM/rendimiento, éste con su propio selector + delta real por
+/// métrica). Se agrega arriba un strip de 4 `KpiCard` (peso/%grasa/cintura/
+/// 1RM con delta, [ProgresoKpiStrip]/[ProgresoKpis] — cálculo puro) que
+/// resume ambas fuentes sin inventar ninguna serie nueva.
 class _ProgresoTab extends ConsumerWidget {
   const _ProgresoTab({required this.athleteId});
   final String athleteId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final palette = AppPalette.of(context);
     final measAsync = ref.watch(measurementsForAthleteProvider(athleteId));
     final perfAsync = ref.watch(performanceTestsForAthleteProvider(athleteId));
+    final stateKey = _progresoStateKeyOf(measAsync, perfAsync);
 
-    // Antropometría y Rendimiento son fuentes independientes: gateamos juntas
-    // (spinner hasta que ambas tengan valor, error si alguna falla) y mostramos
-    // cada sección por separado según haya datos.
-    if (measAsync.isLoading || perfAsync.isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    if (measAsync.hasError || perfAsync.hasError) {
-      return _muted(palette, 'No se pudo cargar el progreso.'); // i18n: Fase W2
+    return TreinoStateSwitcher(
+      childKey: ValueKey('progreso_tab_$stateKey'),
+      child: switch (stateKey) {
+        'loading' => const _ProgresoTabSkeleton(),
+        'error' => const TreinoEmptyState(
+            icon: TreinoIcon.errorState,
+            title: 'No se pudo cargar el progreso.', // i18n: Fase W2
+          ),
+        _ => _ProgresoTabData(
+            measurements: measAsync.requireValue,
+            tests: perfAsync.requireValue,
+          ),
+      },
+    );
+  }
+}
+
+/// `error` si alguna fuente falló; `loading` mientras ninguna de las dos
+/// tenga valor todavía; `data` en cualquier otro caso.
+String _progresoStateKeyOf(
+  AsyncValue<Object?> meas,
+  AsyncValue<Object?> perf,
+) {
+  if (meas.hasError || perf.hasError) return 'error';
+  if ((meas.isLoading && !meas.hasValue) ||
+      (perf.isLoading && !perf.hasValue)) {
+    return 'loading';
+  }
+  return 'data';
+}
+
+class _ProgresoTabSkeleton extends StatelessWidget {
+  const _ProgresoTabSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Padding(
+      padding: EdgeInsets.fromLTRB(24, 4, 24, 24),
+      child: ProgresoKpiStrip(),
+    );
+  }
+}
+
+class _ProgresoTabData extends StatelessWidget {
+  const _ProgresoTabData({required this.measurements, required this.tests});
+
+  final List<Measurement> measurements;
+  final List<PerformanceTest> tests;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+
+    if (measurements.isEmpty && tests.isEmpty) {
+      return const TreinoEmptyState(
+        icon: TreinoIcon.emptyState,
+        title: 'Sin datos de progreso todavía.', // i18n: Fase W2
+      );
     }
 
-    final ms = measAsync.requireValue;
-    final tests = perfAsync.requireValue;
-    if (ms.isEmpty && tests.isEmpty) {
-      return _muted(palette, 'Sin datos de progreso todavía.'); // i18n: Fase W2
-    }
-
-    final latest = ms.isEmpty ? null : ms.last;
+    final latest = measurements.isEmpty ? null : measurements.last;
+    final kpis = ProgresoKpis.compute(measurements: measurements, tests: tests);
 
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          TreinoFadeSlideIn(
+            delay: AppMotion.stagger(0),
+            child: ProgresoKpiStrip(kpis: kpis),
+          ),
           if (latest != null) ...[
-            _sectionLabel(palette, 'ANTROPOMETRÍA'), // i18n: Fase W2
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                _MeasCard(
-                    label: 'Peso',
-                    value: latest.weightKg,
-                    unit: 'kg',
-                    palette: palette), // i18n: Fase W2
-                const SizedBox(width: 10),
-                _MeasCard(
-                    label: '% Graso',
-                    value: latest.fatPercentage,
-                    unit: '%',
-                    palette: palette), // i18n: Fase W2
-                const SizedBox(width: 10),
-                _MeasCard(
-                    label: 'Cintura',
-                    value: latest.waistCm,
-                    unit: 'cm',
-                    palette: palette), // i18n: Fase W2
-              ],
+            const SizedBox(height: 20),
+            TreinoFadeSlideIn(
+              delay: AppMotion.stagger(1),
+              child: _sectionLabel(palette, 'ANTROPOMETRÍA'), // i18n: Fase W2
             ),
-            if (ms.length >= 2) ...[
-              const SizedBox(height: 16),
+            const SizedBox(height: 10),
+            if (measurements.length >= 2)
               // El chart trae su propia card + heading; no lo re-envolvemos.
-              MeasurementProgressChart(measurements: ms),
-            ],
+              MeasurementProgressChart(measurements: measurements),
           ],
           // ── Rendimiento (W2 PR8) ──────────────────────────────────────────
           // Ambos casos lideran con la misma sección «RENDIMIENTO» (consistencia
           // con el módulo coach legacy). Con ≥2 tests el chart agrega ABAJO su
-          // propia card interna (heading l10n «PROGRESO»).
+          // propia card interna (heading l10n «PROGRESO») — es el chart real de
+          // "evolución de cargas" (1RM y demás métricas), con delta propio.
           if (tests.isNotEmpty) ...[
-            if (latest != null) const SizedBox(height: 20),
-            _sectionLabel(palette, 'RENDIMIENTO'), // i18n: Fase W2
+            const SizedBox(height: 20),
+            TreinoFadeSlideIn(
+              delay: AppMotion.stagger(2),
+              child: _sectionLabel(palette, 'RENDIMIENTO'), // i18n: Fase W2
+            ),
             const SizedBox(height: 10),
             if (tests.length >= 2)
               PerformanceProgressChart(tests: tests)
@@ -369,50 +419,6 @@ class _ProgresoTab extends ConsumerWidget {
                   'Cargá al menos 2 tests para ver la evolución.'), // i18n: Fase W2
           ],
         ],
-      ),
-    );
-  }
-}
-
-class _MeasCard extends StatelessWidget {
-  const _MeasCard({
-    required this.label,
-    required this.value,
-    required this.unit,
-    required this.palette,
-  });
-
-  final String label;
-  final double? value;
-  final String unit;
-  final AppPalette palette;
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: palette.bgCard,
-          border: Border.all(color: palette.border),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(label,
-                style: TextStyle(color: palette.textMuted, fontSize: 11)),
-            const SizedBox(height: 4),
-            Text(
-              value == null ? '—' : '${_trimNum(value!)} $unit',
-              style: TextStyle(
-                color: palette.textPrimary,
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -435,10 +441,6 @@ Widget _muted(AppPalette palette, String text) => Center(
             style: TextStyle(color: palette.textMuted, fontSize: 14)),
       ),
     );
-
-/// Entero si es redondo, un decimal si no (61 → "61", 60.5 → "60.5").
-String _trimNum(double v) =>
-    v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(1);
 
 /// Tab Resumen (Fase 3 WU-05): 4 `KpiCard` (vía [ResumenKpiStrip]) + última
 /// sesión + heatmap de adherencia de 12 semanas + columna derecha (datos
