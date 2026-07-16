@@ -38,8 +38,6 @@ class DayStripNavigator extends StatelessWidget {
   final ValueChanged<DateTime> onDaySelected;
   final DayStripLabels labels;
 
-  static const _weekdayLettersEs = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
-
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
@@ -58,8 +56,8 @@ class DayStripNavigator extends StatelessWidget {
               trained: !dayInsights.isEmpty,
               isToday: dayInsights.day == todayOnly,
               isSelected: dayInsights.day == _dateOnly(selectedDay),
-              weekdayLetter:
-                  _weekdayLettersEs[dayInsights.day.weekday - DateTime.monday],
+              weekdayLetter: labels
+                  .weekdayLetters[dayInsights.day.weekday - DateTime.monday],
               todayLabel: labels.todayLabel,
               palette: palette,
               onTap: () => onDaySelected(dayInsights.day),

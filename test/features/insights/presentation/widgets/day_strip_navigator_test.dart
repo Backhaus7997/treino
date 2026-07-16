@@ -15,6 +15,7 @@ Widget _wrap(Widget child) => MaterialApp(
 const _labels = DayStripLabels(
   todayLabel: 'HOY',
   emptyDayHint: 'Sin sesión este día.',
+  weekdayLetters: ['L', 'M', 'M', 'J', 'V', 'S', 'D'],
 );
 
 DateTime _todayOnly() {

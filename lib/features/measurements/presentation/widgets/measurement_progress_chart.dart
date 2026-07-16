@@ -3,28 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
+import '../../../../core/utils/date_labels.dart';
+import '../../../../l10n/app_l10n.dart';
 import '../../domain/measurement.dart';
 
-// ── Spanish month abbreviations (mirrors athlete_detail_screen.dart) ──────────
-
-const _kMonthsShort = <String>[
-  '',
-  'ene',
-  'feb',
-  'mar',
-  'abr',
-  'may',
-  'jun',
-  'jul',
-  'ago',
-  'sep',
-  'oct',
-  'nov',
-  'dic',
-];
-
 /// Short date label: '7 abr'
-String _shortDate(DateTime dt) => '${dt.day} ${_kMonthsShort[dt.month]}';
+String _shortDate(DateTime dt, String localeName) =>
+    '${dt.day} ${monthAbbrev(dt, localeName)}';
 
 // ── Bilateral average helper ──────────────────────────────────────────────────
 
@@ -219,6 +204,7 @@ class _MeasurementProgressChartState extends State<MeasurementProgressChart> {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final localeName = AppL10n.of(context).localeName;
     final points = _dataPoints();
 
     return Container(
@@ -265,6 +251,7 @@ class _MeasurementProgressChartState extends State<MeasurementProgressChart> {
               allMeasurements: widget.measurements,
               metric: _selected,
               palette: palette,
+              localeName: localeName,
             ),
         ],
       ),
@@ -423,12 +410,14 @@ class _ProgressLineChart extends StatelessWidget {
     required this.allMeasurements,
     required this.metric,
     required this.palette,
+    required this.localeName,
   });
 
   final List<({int idx, double value, Measurement m})> points;
   final List<Measurement> allMeasurements;
   final _ChartMetric metric;
   final AppPalette palette;
+  final String localeName;
 
   @override
   Widget build(BuildContext context) {
@@ -512,7 +501,7 @@ class _ProgressLineChart extends StatelessWidget {
                   return SideTitleWidget(
                     meta: meta,
                     child: Text(
-                      _shortDate(date),
+                      _shortDate(date, localeName),
                       style: GoogleFonts.barlowCondensed(
                         fontSize: 10,
                         color: palette.textMuted,
@@ -572,7 +561,8 @@ class _ProgressLineChart extends StatelessWidget {
                   final valStr = spot.y % 1 == 0
                       ? spot.y.toStringAsFixed(0)
                       : spot.y.toStringAsFixed(1);
-                  final dateStr = date != null ? '\n${_shortDate(date)}' : '';
+                  final dateStr =
+                      date != null ? '\n${_shortDate(date, localeName)}' : '';
                   return LineTooltipItem(
                     '$valStr ${metric.unit}$dateStr',
                     GoogleFonts.barlow(
