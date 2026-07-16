@@ -5,6 +5,8 @@
 // pumped with stubbed providers (no Firestore, no GoRouter needed since we
 // don't tap the back link).
 
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart' show FirebaseException;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -22,9 +24,16 @@ import 'package:treino/features/coach/domain/athlete_note.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach_hub/presentation/sections/alumnos/alumno_detail_screen.dart';
+import 'package:treino/features/coach_hub/presentation/sections/alumnos/widgets/alumno_breadcrumb.dart';
+import 'package:treino/features/coach_hub/presentation/sections/alumnos/widgets/alumno_chrome_skeleton.dart';
+import 'package:treino/features/coach_hub/presentation/sections/alumnos/widgets/alumno_header.dart';
+import 'package:treino/features/coach_hub/presentation/sections/alumnos/widgets/alumno_kpi_strip.dart';
+import 'package:treino/features/coach_hub/presentation/sections/alumnos/widgets/alumno_tabs.dart';
+import 'package:treino/features/coach_hub/presentation/sections/pagos/widgets/estado_cuenta_card.dart';
 import 'package:treino/features/coach_hub/presentation/sections/pagos/widgets/payment_format.dart'
     show fmtDayMonth, nextDueDate;
 import 'package:treino/features/coach_hub/presentation/sections/alumnos/alumnos_screen.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
 import 'package:treino/features/gyms/application/gym_providers.dart';
 import 'package:treino/features/gyms/domain/gym.dart';
 import 'package:treino/features/measurements/application/measurement_providers.dart';
@@ -268,6 +277,10 @@ Appointment _appointment({
 Future<void> _pump(
   WidgetTester tester, {
   UserPublicProfile? profile,
+  // Fase 3 WU-04: override directo del stream de perfil — permite dejarlo
+  // "colgado" (StreamController sin emitir) para exercitar el skeleton del
+  // chrome sin usar [profile].
+  Stream<UserPublicProfile?>? profileStream,
   TrainerLink? link,
   List<Measurement> measurements = const [],
   List<Routine> routines = const [],
@@ -293,6 +306,10 @@ Future<void> _pump(
   // athleteLast7DaysInsightsProvider. Defaults to an empty-history mock so
   // existing tests that don't care about this section keep passing.
   SessionRepository? sessionRepository,
+  // Fase 3 WU-04: cuando es false, hace un solo `pump()` en vez de
+  // `pumpAndSettle()` — necesario para capturar el skeleton del chrome (usa
+  // `TreinoShimmer`, que anima en loop y cuelga `pumpAndSettle`).
+  bool settle = true,
 }) async {
   tester.view.physicalSize = const Size(1200, 900);
   tester.view.devicePixelRatio = 1.0;
@@ -303,7 +320,7 @@ Future<void> _pump(
     ProviderScope(
       overrides: [
         userPublicProfileProvider
-            .overrideWith((ref, id) => Stream.value(profile)),
+            .overrideWith((ref, id) => profileStream ?? Stream.value(profile)),
         trainerLinksStreamProvider
             .overrideWith((ref) => Stream.value(link == null ? [] : [link])),
         pagosPorCobrarProvider.overrideWith((ref) => AsyncData(pendingCobros)),
@@ -369,7 +386,11 @@ Future<void> _pump(
       ),
     ),
   );
-  await tester.pumpAndSettle();
+  if (settle) {
+    await tester.pumpAndSettle();
+  } else {
+    await tester.pump();
+  }
 }
 
 void main() {
@@ -446,6 +467,99 @@ void main() {
       expect(find.text('· Mensual'), findsNothing);
       // El botón Pago está siempre (no depende de billing).
       expect(find.widgetWithText(OutlinedButton, 'Pago'), findsOneWidget);
+    });
+
+    group('Chrome del detalle — rediseño kit v2 (Fase 3 WU-04)', () {
+      testWidgets(
+          'usa AlumnoBreadcrumb + AlumnoHeader + AlumnoKpiStrip + AlumnoTabs (kit v2)',
+          (tester) async {
+        await _pump(tester,
+            profile: _prof(name: 'Sofía', wc: 38, racha: 14),
+            link: _link(TrainerLinkStatus.active));
+
+        expect(find.byType(AlumnoBreadcrumb), findsOneWidget);
+        expect(find.byType(AlumnoHeader), findsOneWidget);
+        expect(find.byType(AlumnoKpiStrip), findsOneWidget);
+        expect(find.byType(AlumnoTabs), findsOneWidget);
+        expect(
+          find.descendant(
+            of: find.byType(AlumnoKpiStrip),
+            matching: find.byType(KpiCard),
+          ),
+          findsNWidgets(4),
+        );
+      });
+
+      testWidgets('breadcrumb muestra "Alumnos / {nombre}" una vez resuelto',
+          (tester) async {
+        await _pump(tester,
+            profile: _prof(name: 'Sofía'),
+            link: _link(TrainerLinkStatus.active));
+
+        final breadcrumb =
+            tester.widget<AlumnoBreadcrumb>(find.byType(AlumnoBreadcrumb));
+        expect(breadcrumb.athleteName, 'Sofía');
+        expect(find.text('Sofía'), findsOneWidget); // sólo en el breadcrumb —
+        // AlumnoHeader muestra el nombre en CAPS ("SOFÍA"), no colisiona.
+      });
+
+      testWidgets(
+          'KPI strip: sesiones/racha reales + vencimiento/deuda derivados de billing',
+          (tester) async {
+        await _pump(
+          tester,
+          profile: _prof(name: 'Sofía', wc: 38, racha: 14),
+          link: _link(TrainerLinkStatus.active),
+          billing: _billing(amountArs: 24000, cadence: BillingCadence.mensual),
+          pendingCobros: [_cobro(amountArs: 24000, concept: 'Mensual')],
+        );
+
+        final strip =
+            tester.widget<AlumnoKpiStrip>(find.byType(AlumnoKpiStrip));
+        expect(strip.sesiones, 38);
+        expect(strip.racha, 14);
+        expect(strip.vencimiento, isNotNull);
+        expect(strip.deuda, '\$24.000');
+      });
+
+      testWidgets('sin cobros pendientes → KpiCard de deuda muestra "Al día"',
+          (tester) async {
+        await _pump(tester,
+            profile: _prof(), link: _link(TrainerLinkStatus.active));
+
+        final strip =
+            tester.widget<AlumnoKpiStrip>(find.byType(AlumnoKpiStrip));
+        expect(strip.deuda, isNull);
+        expect(
+          find.descendant(
+            of: find.byType(AlumnoKpiStrip),
+            matching: find.text('Al día'),
+          ),
+          findsOneWidget,
+        );
+      });
+
+      testWidgets(
+          'perfil cargando → AlumnoChromeSkeleton visible; header/kpi-strip aún no; tabs siguen visibles',
+          (tester) async {
+        final controller = StreamController<UserPublicProfile?>();
+        addTearDown(controller.close);
+
+        await _pump(
+          tester,
+          profileStream: controller.stream,
+          link: _link(TrainerLinkStatus.active),
+          settle: false,
+        );
+
+        expect(find.byType(AlumnoChromeSkeleton), findsOneWidget);
+        expect(find.byType(AlumnoBreadcrumb), findsNothing);
+        expect(find.byType(AlumnoHeader), findsNothing);
+        expect(find.byType(AlumnoKpiStrip), findsNothing);
+        // Los tabs NO dependen del perfil → siguen visibles durante la carga
+        // (ADR-A3-08, no forman parte del skeleton).
+        expect(find.byType(AlumnoTabs), findsOneWidget);
+      });
     });
 
     testWidgets('tab bar muestra exactamente las 11 secciones', (tester) async {
@@ -678,7 +792,16 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('ESTADO DE CUENTA'), findsOneWidget);
-      expect(find.text('Al día'), findsOneWidget);
+      // Fase 3 WU-04: "Al día" también puede aparecer en el KpiCard "Deuda"
+      // del header (chrome persistente, ADR-A3-02) cuando no hay cobros
+      // pendientes → se acota al EstadoCuentaCard del tab Pagos.
+      expect(
+        find.descendant(
+          of: find.byType(EstadoCuentaCard),
+          matching: find.text('Al día'),
+        ),
+        findsOneWidget,
+      );
       expect(find.text('HISTORIAL DE PAGOS'), findsOneWidget);
       expect(find.text('Sin pagos registrados todavía.'), findsOneWidget);
     });
@@ -716,8 +839,16 @@ void main() {
 
       // Estado de cuenta: el total (24px) + la línea del único cobro (mismo
       // monto) → el texto aparece 2 veces; más el botón Marcar pagado.
+      // Acotado a EstadoCuentaCard (Fase 3 WU-04: el KpiCard "Deuda" del
+      // header también puede repetir el mismo monto formateado).
       expect(find.text('Pendiente de cobro'), findsOneWidget);
-      expect(find.text('\$18.000'), findsNWidgets(2));
+      expect(
+        find.descendant(
+          of: find.byType(EstadoCuentaCard),
+          matching: find.text('\$18.000'),
+        ),
+        findsNWidgets(2),
+      );
       expect(find.text('Marcar pagado'), findsOneWidget);
 
       // Historial del alumno (no el pago "Ajeno" de otro).
@@ -751,7 +882,15 @@ void main() {
       await tester.tap(find.text('Pagos'));
       await tester.pumpAndSettle();
 
-      expect(find.text('\$30.000'), findsOneWidget); // total 18.000 + 12.000
+      // Acotado a EstadoCuentaCard (Fase 3 WU-04: el KpiCard "Deuda" del
+      // header también muestra el mismo total formateado).
+      expect(
+        find.descendant(
+          of: find.byType(EstadoCuentaCard),
+          matching: find.text('\$30.000'), // total 18.000 + 12.000
+        ),
+        findsOneWidget,
+      );
       expect(find.text('Mensual'), findsOneWidget); // un concepto por cobro
       expect(find.text('Extra'), findsOneWidget);
       expect(
@@ -1159,7 +1298,17 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Sin fecha'), findsOneWidget);
-      expect(find.text('—'), findsOneWidget);
+      // 2 = la fila del historial (sin finishedAt) + el KpiCard "Vencimiento"
+      // del header (Fase 3 WU-04: sin billing en este fixture, muestra '—').
+      // Acotado a TabBarView para aislar el de la fila (el KpiCard vive en el
+      // chrome persistente, fuera del TabBarView).
+      expect(
+        find.descendant(
+          of: find.byType(TabBarView),
+          matching: find.text('—'),
+        ),
+        findsOneWidget,
+      );
     });
 
     testWidgets('tab Entrenamientos: historial se topa en 20 filas (W2 PR3)',

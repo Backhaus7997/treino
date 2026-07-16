@@ -7,14 +7,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:treino/app/theme/app_motion.dart';
 import 'package:treino/app/theme/app_palette.dart';
+import 'package:treino/app/theme/tokens/primitives.dart';
+import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
+import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/chat/application/chat_providers.dart';
 import 'package:treino/features/coach/application/athlete_file_providers.dart';
-import 'package:treino/features/coach/application/agenda_providers.dart';
 import 'package:treino/features/coach/application/athlete_note_providers.dart';
-import 'package:treino/features/coach/application/profile_share_providers.dart';
-import 'package:treino/features/coach/domain/appointment.dart';
 import 'package:treino/features/coach/application/follow_up_entry_providers.dart';
 import 'package:treino/features/coach/application/nutrition_plan_providers.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
@@ -24,7 +25,6 @@ import 'package:treino/features/coach/domain/athlete_note.dart';
 import 'package:treino/features/coach/domain/follow_up_entry.dart';
 import 'package:treino/features/coach/domain/nutrition_plan.dart';
 import 'package:treino/features/coach/domain/nutrition_plan_presets.dart';
-import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach_hub/presentation/sections/chat/widgets/chat_detail_pane.dart';
 import 'package:treino/features/coach_hub/presentation/sections/routine_editor/routine_web_editability.dart';
@@ -38,14 +38,10 @@ import 'package:treino/features/measurements/presentation/widgets/measurement_pr
 import 'package:treino/features/payments/application/billing_providers.dart';
 import 'package:treino/features/payments/application/pagos_por_cobrar_provider.dart';
 import 'package:treino/features/payments/application/payment_providers.dart';
-import 'package:treino/features/payments/domain/athlete_billing.dart';
 import 'package:treino/features/performance/application/performance_test_providers.dart';
 import 'package:treino/features/performance/domain/performance_test.dart';
 import 'package:treino/features/performance/presentation/widgets/performance_progress_chart.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
-import 'package:treino/features/profile/domain/experience_level.dart';
-import 'package:treino/features/profile/domain/gender.dart';
-import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/features/workout/application/assigned_routine_providers.dart';
 import 'package:treino/features/workout/application/exercise_frequency_providers.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
@@ -70,8 +66,19 @@ import '../pagos/widgets/estado_cuenta_card.dart';
 import '../pagos/widgets/marcar_pagado_actions.dart';
 import '../pagos/widgets/pagos_table.dart';
 import '../pagos/widgets/payment_format.dart';
-import 'alumnos_screen.dart' show AlumnoEstado, AlumnoEstadoX, estadoForLink;
+import 'alumnos_screen.dart' show estadoForLink;
 import 'resumen_metrics.dart';
+import 'widgets/adherencia_heatmap.dart';
+import 'widgets/alumno_breadcrumb.dart';
+import 'widgets/alumno_chrome_skeleton.dart';
+import 'widgets/alumno_header.dart';
+import 'widgets/alumno_kpi_strip.dart';
+import 'widgets/alumno_tabs.dart';
+import 'widgets/datos_personales_card.dart';
+import 'widgets/nota_card.dart';
+import 'widgets/prox_sesion_card.dart';
+import 'widgets/resumen_kpi_strip.dart';
+import 'widgets/ultima_sesion_card.dart';
 
 /// Detalle del alumno (`/alumnos/:id`, Fase W2 PR2).
 ///
@@ -115,7 +122,8 @@ class AlumnoDetailScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
-    final profile = ref.watch(userPublicProfileProvider(athleteId)).valueOrNull;
+    final profileAsync = ref.watch(userPublicProfileProvider(athleteId));
+    final profile = profileAsync.valueOrNull;
     // Mismo criterio que el roster: el link más reciente NO-pending del alumno
     // (el stream viene requestedAt DESC). Sin el filtro de pending, un alumno
     // re-vinculado mostraría estados contradictorios entre roster y detalle.
@@ -125,16 +133,29 @@ class AlumnoDetailScreen extends ConsumerWidget {
         ?.where((l) =>
             l.athleteId == athleteId && l.status != TrainerLinkStatus.pending)
         .firstOrNull;
-    final conDeudaIds = <String>{
-      for (final c in ref.watch(pagosPorCobrarProvider).valueOrNull ?? const [])
-        c.athleteId,
-    };
+    final cobrosPendientes =
+        ref.watch(pagosPorCobrarProvider).valueOrNull ?? const [];
+    final conDeudaIds = <String>{for (final c in cobrosPendientes) c.athleteId};
     final estado = link == null ? null : estadoForLink(link, conDeudaIds);
     final gymId = profile?.gymId;
     final gymName = gymId == null
         ? null
         : ref.watch(gymByIdProvider(gymId)).valueOrNull?.name;
     final billing = ref.watch(athleteBillingProvider(athleteId)).valueOrNull;
+    final proxCobro =
+        billing == null ? null : nextDueDate(billing, DateTime.now().toUtc());
+    final athleteCobros =
+        cobrosPendientes.where((c) => c.athleteId == athleteId);
+    final deudaTotal = athleteCobros.isEmpty
+        ? null
+        : athleteCobros.fold<int>(0, (sum, c) => sum + c.amountArs);
+    // Chrome (breadcrumb+header+KPI strip) cross-fadea sólo en la carga
+    // INICIAL del perfil — link/gym/billing conservan su propio degrade
+    // silencioso vía valueOrNull (mismo criterio que antes de WU-04), así que
+    // no gatean el skeleton (evita 4 queries adicionales bloqueando el chrome
+    // completo por una que tarde más).
+    final chromeLoading = profileAsync.isLoading && !profileAsync.hasValue;
+    final chromeStateKey = chromeLoading ? 'loading' : 'data';
 
     return DefaultTabController(
       length: _tabs.length,
@@ -143,27 +164,57 @@ class AlumnoDetailScreen extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.s20,
+              AppSpacing.s18,
+              AppSpacing.s20,
+              0,
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _BackLink(palette: palette),
-                const SizedBox(height: 12),
-                _Header(
-                  profile: profile,
-                  link: link,
-                  estado: estado,
-                  gymName: gymName,
-                  billing: billing,
-                  onPago: () => registrarPago(context, ref, athleteId),
-                  palette: palette,
+                TreinoStateSwitcher(
+                  childKey: ValueKey('alumno_chrome_$chromeStateKey'),
+                  child: chromeLoading
+                      ? AlumnoChromeSkeleton(palette: palette)
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            AlumnoBreadcrumb(
+                              palette: palette,
+                              athleteName: profile?.displayName,
+                            ),
+                            const SizedBox(height: AppSpacing.s12),
+                            AlumnoHeader(
+                              profile: profile,
+                              link: link,
+                              estado: estado,
+                              gymName: gymName,
+                              billing: billing,
+                              onPago: () =>
+                                  registrarPago(context, ref, athleteId),
+                              palette: palette,
+                            ),
+                            const SizedBox(height: AppSpacing.s12),
+                            AlumnoKpiStrip(
+                              sesiones: profile?.workoutsCount ?? 0,
+                              racha: profile?.racha ?? 0,
+                              vencimiento: proxCobro == null
+                                  ? null
+                                  : fmtDayMonth(proxCobro),
+                              deuda: deudaTotal == null
+                                  ? null
+                                  : fmtArs(deudaTotal),
+                            ),
+                          ],
+                        ),
                 ),
-                const SizedBox(height: 14),
-                _Tabs(palette: palette, labels: _tabs),
+                const SizedBox(height: AppSpacing.s14),
+                AlumnoTabs(palette: palette, labels: _tabs),
               ],
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.s8),
           Expanded(
             child: TabBarView(
               physics: const NeverScrollableScrollPhysics(),
@@ -197,265 +248,6 @@ class AlumnoDetailScreen extends ConsumerWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _BackLink extends StatelessWidget {
-  const _BackLink({required this.palette});
-  final AppPalette palette;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: () => context.go('/alumnos'),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(TreinoIcon.chevronLeft, size: 16, color: palette.textMuted),
-          const SizedBox(width: 4),
-          Text(
-            'Alumnos', // i18n: Fase W2
-            style: TextStyle(color: palette.textMuted, fontSize: 13),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _Header extends StatelessWidget {
-  const _Header({
-    required this.profile,
-    required this.link,
-    required this.estado,
-    required this.gymName,
-    required this.billing,
-    required this.onPago,
-    required this.palette,
-  });
-
-  final UserPublicProfile? profile;
-  final TrainerLink? link;
-  final AlumnoEstado? estado;
-  final String? gymName;
-  final AthleteBilling? billing;
-  final VoidCallback onPago;
-  final AppPalette palette;
-
-  @override
-  Widget build(BuildContext context) {
-    final name = profile?.displayName ?? 'Atleta'; // i18n: Fase W2
-    final initial = name.trim().isEmpty ? '?' : name.trim()[0].toUpperCase();
-    final sesiones = profile?.workoutsCount ?? 0;
-    final racha = profile?.racha ?? 0;
-    final avatarUrl = profile?.avatarUrl;
-    final desde = link?.acceptedAt;
-    final b = billing;
-    // .toUtc() para compartir reloj con el pipeline de billing (monthKey/weekKey
-    // de pagosPorCobrarProvider y las escrituras usan UTC); evita un desfase de
-    // 1 día en el borde del período en AR (UTC-3).
-    final proxCobro = b == null ? null : nextDueDate(b, DateTime.now().toUtc());
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: palette.bgCard,
-        border: Border.all(color: palette.border),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              CircleAvatar(
-                radius: 26,
-                backgroundColor: palette.bg,
-                backgroundImage: (avatarUrl != null && avatarUrl.isNotEmpty)
-                    ? NetworkImage(avatarUrl)
-                    : null,
-                child: (avatarUrl == null || avatarUrl.isEmpty)
-                    ? Text(initial,
-                        style: TextStyle(
-                            color: palette.accent,
-                            fontSize: 20,
-                            fontWeight: FontWeight.w700))
-                    : null,
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      name,
-                      style: TextStyle(
-                        color: palette.textPrimary,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Wrap(
-                      spacing: 12,
-                      runSpacing: 4,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        if (estado != null)
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              _Dot(color: estado!.color(palette)),
-                              const SizedBox(width: 6),
-                              Text(
-                                estado!.label(AppL10n.of(context)),
-                                style: TextStyle(
-                                    color: estado!.color(palette),
-                                    fontSize: 13),
-                              ),
-                            ],
-                          ),
-                        if (gymName != null)
-                          Text(
-                            gymName!,
-                            style: TextStyle(
-                                color: palette.textMuted, fontSize: 13),
-                          ),
-                        if (desde != null)
-                          Text(
-                            'Desde ${fmtDate(desde)}', // i18n: Fase W2
-                            style: TextStyle(
-                                color: palette.textMuted, fontSize: 13),
-                          ),
-                        if (b != null && b.cadence != BillingCadence.suelto)
-                          Text(
-                            '${fmtArs(b.amountArs)} · ${_cadenciaLabel(b.cadence)}', // i18n: Fase W2
-                            style: TextStyle(
-                                color: palette.textMuted, fontSize: 13),
-                          ),
-                        if (proxCobro != null)
-                          Text(
-                            'Próx. cobro: ${fmtDayMonth(proxCobro)}', // i18n: Fase W2
-                            style: TextStyle(
-                                color: palette.textMuted, fontSize: 13),
-                          ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              OutlinedButton(
-                onPressed: onPago,
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: palette.accent,
-                  side: BorderSide(color: palette.border),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                child: const Text('Pago', // i18n: Fase W2
-                    style:
-                        TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              _MetricChip(
-                  label: 'Sesiones',
-                  value: '$sesiones',
-                  palette: palette), // i18n: Fase W2
-              const SizedBox(width: 10),
-              _MetricChip(
-                  label: 'Racha',
-                  value: '$racha d',
-                  palette: palette), // i18n: Fase W2
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _Dot extends StatelessWidget {
-  const _Dot({required this.color});
-  final Color color;
-  @override
-  Widget build(BuildContext context) => Container(
-        width: 8,
-        height: 8,
-        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-      );
-}
-
-class _MetricChip extends StatelessWidget {
-  const _MetricChip(
-      {required this.label, required this.value, required this.palette});
-  final String label;
-  final String value;
-  final AppPalette palette;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: palette.bg,
-        border: Border.all(color: palette.border),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: TextStyle(color: palette.textMuted, fontSize: 11)),
-          const SizedBox(height: 2),
-          Text(value,
-              style: TextStyle(
-                  color: palette.textPrimary,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700)),
-        ],
-      ),
-    );
-  }
-}
-
-class _Tabs extends StatelessWidget {
-  const _Tabs({required this.palette, required this.labels});
-  final AppPalette palette;
-  final List<String> labels;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: palette.bgCard,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: palette.border),
-      ),
-      child: TabBar(
-        isScrollable: true,
-        tabAlignment: TabAlignment.start,
-        dividerColor: Colors.transparent,
-        indicatorSize: TabBarIndicatorSize.tab,
-        indicator: BoxDecoration(
-          color: palette.accent,
-          borderRadius: BorderRadius.circular(20),
-        ),
-        splashBorderRadius: BorderRadius.circular(20),
-        labelColor: palette.bg,
-        unselectedLabelColor: palette.textMuted,
-        labelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
-        unselectedLabelStyle: const TextStyle(fontSize: 13),
-        tabs: [for (final l in labels) Tab(text: l, height: 38)],
       ),
     );
   }
@@ -641,15 +433,16 @@ Widget _muted(AppPalette palette, String text) => Center(
 String _trimNum(double v) =>
     v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(1);
 
-/// Volumen compacto: kg hasta 999, toneladas con un decimal de ahí en más.
-String _fmtVolKg(double kg) =>
-    kg >= 1000 ? '${(kg / 1000).toStringAsFixed(1)} t' : '${kg.round()} kg';
-
-/// Tab Resumen (W2 PR4): 4 métricas derivadas + heatmap de adherencia de 12
-/// semanas. Sólo usa data trainer-readable (sesiones, mediciones, plan
-/// activo) vía [ResumenMetrics]. La última-sesión por ejercicio, los datos
-/// personales privados, la nota fijada y la próxima sesión se difieren
-/// (dependen de `setLogs` owner-only, campos privados o backend nuevo).
+/// Tab Resumen (Fase 3 WU-05): 4 `KpiCard` (vía [ResumenKpiStrip]) + última
+/// sesión + heatmap de adherencia de 12 semanas + columna derecha (datos
+/// personales, nota fijada, próxima sesión). Extraído a
+/// `widgets/*.dart` (ADR-A3-04) — este composition root sólo orquesta el
+/// gate async del bloque de métricas ([ResumenMetrics]) y compone los
+/// cards, cada uno resolviendo su propio estado con `TreinoStateSwitcher`.
+///
+/// Layout responsive: 2 columnas en desktop (>=900px) — izquierda: KPI
+/// strip + última sesión + heatmap; derecha: datos personales + nota fijada
+/// + próxima sesión — 1 columna apilada en compact.
 class _ResumenTab extends ConsumerWidget {
   const _ResumenTab({required this.athleteId});
   final String athleteId;
@@ -662,895 +455,134 @@ class _ResumenTab extends ConsumerWidget {
     final measAsync = ref.watch(measurementsForAthleteProvider(athleteId));
     final routinesAsync = ref.watch(assignedRoutinesProvider(athleteId));
 
-    // El resumen combina tres fuentes async: spinner hasta que las tres tengan
-    // valor, y un único error si alguna falla. Si leyéramos routines/measurements
-    // con valueOrNull, un error o un load lento se disfrazaría de «sin plan /
-    // sin datos» — data trainer-facing engañosa.
+    // El bloque de métricas (KPI strip + heatmap) combina tres fuentes async:
+    // skeleton hasta que las tres tengan valor, y un único error si
+    // measurements/routines fallan. Si leyéramos routines/measurements con
+    // valueOrNull, un error o un load lento se disfrazaría de «sin plan / sin
+    // datos» — data trainer-facing engañosa. Las SESIONES, en cambio,
+    // dependen de `session_shares`, que el CF borra cuando el link no está
+    // `active` (p.ej. pausado) → un permission-denied ahí NO es un error del
+    // resumen: cada card dependiente de sesiones (última sesión) resuelve su
+    // propio estado vacío vía `sessionsAsync` (ver `UltimaSessionCard`).
+    final String metricsStateKey;
+    final Widget metricsBlock;
     if (sessionsAsync.isLoading ||
         measAsync.isLoading ||
         routinesAsync.isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    // measurements (trainer-owned) y routines SIEMPRE son legibles → si alguna
-    // falla es un error real del resumen. Las SESIONES, en cambio, dependen de
-    // `session_shares`, que el CF borra cuando el link no está `active` (p.ej.
-    // pausado) → un permission-denied ahí NO es un error del resumen: lo
-    // degradamos a "sin sesiones" y renderizamos igual todo lo que sí se puede
-    // (mediciones, plan, próxima sesión, nota, datos personales). Los widgets
-    // dependientes de sesiones (adherencia, última sesión) muestran su propio
-    // estado vacío.
-    if (measAsync.hasError || routinesAsync.hasError) {
-      return _muted(palette, 'No se pudo cargar el resumen.'); // i18n: Fase W2
-    }
-
-    final routines = routinesAsync.requireValue;
-    final actives = routines.where((r) => r.status == RoutineStatus.active);
-    final active =
-        actives.where((r) => r.assignedBy == trainerUid).firstOrNull ??
-            actives.firstOrNull;
-    final sessions = sessionsAsync.valueOrNull ?? const [];
-    final m = ResumenMetrics.compute(
-      sessions: sessions,
-      measurements: measAsync.requireValue,
-      weeklyTarget: active?.days.length ?? 0,
-      now: DateTime.now(),
-    );
-
-    final adh = m.adherencia30dPct;
-    final adhDelta = m.adherenciaDeltaPts;
-    final volDelta = m.volumenDeltaPct;
-    final peso = m.pesoActualKg;
-    final pesoDelta = m.pesoDelta30dKg;
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
-      child: Column(
+      metricsStateKey = 'loading';
+      metricsBlock = Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _MetricCard(
-                  palette: palette,
-                  label: 'ADHERENCIA 30D', // i18n: Fase W2
-                  value: adh == null ? '—' : '${adh.round()}%',
-                  delta: adhDelta == null
-                      ? null
-                      : '${adhDelta >= 0 ? '↑' : '↓'} ${adhDelta.abs().round()} pts',
-                  deltaColor: adhDelta == null
-                      ? null
-                      : (adhDelta >= 0 ? palette.accent : palette.danger),
-                  caption: adh == null ? 'Sin plan' : 'vs 30 días previos',
-                ),
-                const SizedBox(width: 10),
-                _MetricCard(
-                  palette: palette,
-                  label: 'SESIONES / SEM', // i18n: Fase W2
-                  value: m.sesionesPorSemana.toStringAsFixed(1),
-                  caption: m.weeklyTarget > 0
-                      ? 'Plan: ${m.weeklyTarget}'
-                      : 'Sin plan',
-                ),
-                const SizedBox(width: 10),
-                _MetricCard(
-                  palette: palette,
-                  label: 'VOLUMEN', // i18n: Fase W2
-                  value: _fmtVolKg(m.volumenSemanaActualKg),
-                  delta: volDelta == null
-                      ? null
-                      : '${volDelta >= 0 ? '+' : ''}${volDelta.round()}%',
-                  deltaColor: volDelta == null
-                      ? null
-                      : (volDelta >= 0 ? palette.accent : palette.danger),
-                  caption:
-                      volDelta == null ? 'esta semana' : 'vs semana pasada',
-                ),
-                const SizedBox(width: 10),
-                _MetricCard(
-                  palette: palette,
-                  label: 'PESO CORPORAL', // i18n: Fase W2
-                  value: peso == null ? '—' : '${_trimNum(peso)} kg',
-                  delta: pesoDelta == null
-                      ? null
-                      : '${pesoDelta >= 0 ? '+' : ''}${pesoDelta.toStringAsFixed(1)} kg',
-                  deltaColor: palette.textMuted,
-                  caption: pesoDelta == null ? null : '30 días',
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
+          const ResumenKpiStrip(),
+          const SizedBox(height: AppSpacing.s20),
           _sectionLabel(palette, 'ADHERENCIA · 12 SEMANAS'), // i18n: Fase W2
-          const SizedBox(height: 10),
-          _AdherenciaHeatmap(data: m.heatmap, palette: palette),
-          const SizedBox(height: 20),
-          _sectionLabel(palette, 'NOTA FIJADA'), // i18n: Fase W2
-          const SizedBox(height: 10),
-          if (trainerUid != null)
-            _NoteCard(
-              palette: palette,
-              trainerId: trainerUid,
-              athleteId: athleteId,
-            ),
-          const SizedBox(height: 20),
-          _sectionLabel(palette, 'PRÓXIMA SESIÓN'), // i18n: Fase W2
-          const SizedBox(height: 10),
-          _ProxSesionCard(palette: palette, athleteId: athleteId),
-          const SizedBox(height: 20),
-          _sectionLabel(
-              palette, 'ÚLTIMA SESIÓN · POR EJERCICIO'), // i18n: Fase W2
-          const SizedBox(height: 10),
-          _UltimaSessionCard(
+          const SizedBox(height: AppSpacing.s8 + 2),
+          AdherenciaHeatmapSkeleton(palette: palette),
+        ],
+      );
+    } else if (measAsync.hasError || routinesAsync.hasError) {
+      metricsStateKey = 'error';
+      metricsBlock =
+          _muted(palette, 'No se pudo cargar el resumen.'); // i18n: Fase W2
+    } else {
+      metricsStateKey = 'data';
+      final routines = routinesAsync.requireValue;
+      final actives = routines.where((r) => r.status == RoutineStatus.active);
+      final active =
+          actives.where((r) => r.assignedBy == trainerUid).firstOrNull ??
+              actives.firstOrNull;
+      final sessions = sessionsAsync.valueOrNull ?? const [];
+      final m = ResumenMetrics.compute(
+        sessions: sessions,
+        measurements: measAsync.requireValue,
+        weeklyTarget: active?.days.length ?? 0,
+        now: DateTime.now(),
+      );
+      metricsBlock = Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TreinoFadeSlideIn(
+            delay: AppMotion.stagger(0),
+            child: ResumenKpiStrip(metrics: m),
+          ),
+          const SizedBox(height: AppSpacing.s20),
+          _sectionLabel(palette, 'ADHERENCIA · 12 SEMANAS'), // i18n: Fase W2
+          const SizedBox(height: AppSpacing.s8 + 2),
+          AdherenciaHeatmap(data: m.heatmap, palette: palette),
+        ],
+      );
+    }
+
+    final left = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        TreinoStateSwitcher(
+          childKey: ValueKey('resumen_metrics_$metricsStateKey'),
+          child: metricsBlock,
+        ),
+        const SizedBox(height: AppSpacing.s20),
+        _sectionLabel(
+            palette, 'ÚLTIMA SESIÓN · POR EJERCICIO'), // i18n: Fase W2
+        const SizedBox(height: AppSpacing.s8 + 2),
+        UltimaSessionCard(
+          palette: palette,
+          athleteId: athleteId,
+          sessionsAsync: sessionsAsync,
+        ),
+      ],
+    );
+
+    final right = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _sectionLabel(palette, 'DATOS PERSONALES'), // i18n
+        const SizedBox(height: AppSpacing.s8 + 2),
+        DatosPersonalesCard(palette: palette, athleteId: athleteId),
+        const SizedBox(height: AppSpacing.s20),
+        _sectionLabel(palette, 'NOTA FIJADA'), // i18n: Fase W2
+        const SizedBox(height: AppSpacing.s8 + 2),
+        if (trainerUid != null)
+          NoteCard(
             palette: palette,
+            trainerId: trainerUid,
             athleteId: athleteId,
-            sessionsAsync: sessionsAsync,
           ),
-          const SizedBox(height: 20),
-          _sectionLabel(palette, 'DATOS PERSONALES'), // i18n
-          const SizedBox(height: 10),
-          _DatosPersonalesCard(palette: palette, athleteId: athleteId),
-        ],
-      ),
+        const SizedBox(height: AppSpacing.s20),
+        _sectionLabel(palette, 'PRÓXIMA SESIÓN'), // i18n: Fase W2
+        const SizedBox(height: AppSpacing.s8 + 2),
+        ProxSesionCard(palette: palette, athleteId: athleteId),
+      ],
     );
-  }
-}
 
-class _MetricCard extends StatelessWidget {
-  const _MetricCard({
-    required this.palette,
-    required this.label,
-    required this.value,
-    this.delta,
-    this.deltaColor,
-    this.caption,
-  });
-
-  final AppPalette palette;
-  final String label;
-  final String value;
-  final String? delta;
-  final Color? deltaColor;
-  final String? caption;
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: palette.bgCard,
-          border: Border.all(color: palette.border),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              label,
-              style: TextStyle(
-                color: palette.textMuted,
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.5,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              value,
-              style: TextStyle(
-                color: palette.textPrimary,
-                fontSize: 22,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            if (delta != null || caption != null) ...[
-              const SizedBox(height: 4),
-              Row(
-                children: [
-                  if (delta != null)
-                    Padding(
-                      padding: const EdgeInsets.only(right: 6),
-                      child: Text(
-                        delta!,
-                        style: TextStyle(
-                          color: deltaColor ?? palette.textMuted,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  if (caption != null)
-                    Flexible(
-                      child: Text(
-                        caption!,
-                        overflow: TextOverflow.ellipsis,
-                        style:
-                            TextStyle(color: palette.textMuted, fontSize: 12),
-                      ),
-                    ),
-                ],
-              ),
-            ],
-          ],
-        ),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.s20,
+        AppSpacing.hairline,
+        AppSpacing.s20,
+        AppSpacing.s20,
       ),
-    );
-  }
-}
-
-// ── _DatosPersonalesCard ──────────────────────────────────────────────────────
-
-/// Tarjeta de datos personales del alumno en el tab Resumen.
-///
-/// Lee [profileShareProvider] (athlete-shared-profile, Slice 1).
-/// Mientras el alumno no opte in (doc ausente → null), muestra un estado vacío
-/// claro. Los campos nil dentro del doc se omiten silenciosamente.
-///
-/// Web read-only — no escribe `profile_shares` en esta slice.
-class _DatosPersonalesCard extends ConsumerWidget {
-  const _DatosPersonalesCard({
-    required this.palette,
-    required this.athleteId,
-  });
-
-  final AppPalette palette;
-  final String athleteId;
-
-  String _fmtBornAt(DateTime dt) {
-    final local = dt.toLocal();
-    final d = local.day.toString().padLeft(2, '0');
-    final m = local.month.toString().padLeft(2, '0');
-    final y = local.year.toString();
-    return '$d/$m/$y';
-  }
-
-  String _updatedAt(DateTime dt) {
-    final diff = DateTime.now().difference(dt.toLocal());
-    final days = diff.inDays;
-    if (days == 0) return 'actualizado hoy'; // i18n
-    if (days == 1) return 'actualizado hace 1 día'; // i18n
-    return 'actualizado hace $days días'; // i18n
-  }
-
-  String _genderLabel(Gender g) => switch (g) {
-        Gender.male => 'Masculino', // i18n
-        Gender.female => 'Femenino', // i18n
-        Gender.nonBinary => 'No binario', // i18n
-        Gender.undisclosed => 'Prefiero no decir', // i18n
-      };
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final async = ref.watch(profileShareProvider(athleteId));
-    return async.when(
-      loading: () => SizedBox(
-        height: 48,
-        child: Center(
-          child: SizedBox(
-            width: 18,
-            height: 18,
-            child: CircularProgressIndicator(
-                strokeWidth: 2, color: palette.accent),
-          ),
-        ),
-      ),
-      error: (_, __) => _muted(
-          palette, 'No se pudieron cargar los datos personales.'), // i18n
-      data: (share) {
-        return Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: palette.bgCard,
-            border: Border.all(color: palette.border),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: share == null
-              ? Text(
-                  'El alumno no compartió sus datos personales.', // i18n
-                  style: TextStyle(color: palette.textMuted, fontSize: 13),
-                )
-              : Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (share.phone != null) ...[
-                      _DatoRow(
-                        palette: palette,
-                        label: 'Teléfono', // i18n
-                        value: share.phone!,
-                      ),
-                    ],
-                    if (share.bornAt != null) ...[
-                      _DatoRow(
-                        palette: palette,
-                        label: 'Fecha de nacimiento', // i18n
-                        value: _fmtBornAt(share.bornAt!),
-                      ),
-                    ],
-                    if (share.heightCm != null) ...[
-                      _DatoRow(
-                        palette: palette,
-                        label: 'Altura', // i18n
-                        value: '${share.heightCm} cm',
-                      ),
-                    ],
-                    if (share.bodyWeightKg != null) ...[
-                      _DatoRow(
-                        palette: palette,
-                        label: 'Peso', // i18n
-                        value: '${_trimNum(share.bodyWeightKg!)} kg',
-                      ),
-                    ],
-                    if (share.gender != null) ...[
-                      _DatoRow(
-                        palette: palette,
-                        label: 'Género', // i18n
-                        value: _genderLabel(share.gender!),
-                      ),
-                    ],
-                    if (share.experienceLevel != null) ...[
-                      _DatoRow(
-                        palette: palette,
-                        label: 'Nivel', // i18n
-                        value: share.experienceLevel!.displayNameEs,
-                      ),
-                    ],
-                    if (share.updatedAt != null) ...[
-                      const SizedBox(height: 6),
-                      Text(
-                        _updatedAt(share.updatedAt!),
-                        style: TextStyle(
-                          color: palette.textMuted,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-        );
-      },
-    );
-  }
-}
-
-class _DatoRow extends StatelessWidget {
-  const _DatoRow({
-    required this.palette,
-    required this.label,
-    required this.value,
-  });
-
-  final AppPalette palette;
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 160,
-            child: Text(
-              label,
-              style: TextStyle(color: palette.textMuted, fontSize: 12),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: TextStyle(
-                color: palette.textPrimary,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ── _NoteCard ─────────────────────────────────────────────────────────────────
-
-/// Tarjeta de la nota fijada del PF sobre el alumno en el tab Resumen (W2 PR9).
-///
-/// Reutiliza [athleteNoteProvider] — el mismo que usa [_NotasPrivadasTab].
-/// Trunca a 3 líneas + "hace X días" del updatedAt. Sin nota → estado vacío.
-class _NoteCard extends ConsumerWidget {
-  const _NoteCard({
-    required this.palette,
-    required this.trainerId,
-    required this.athleteId,
-  });
-
-  final AppPalette palette;
-  final String trainerId;
-  final String athleteId;
-
-  String _haceDias(DateTime updatedAt) {
-    final diff = DateTime.now().difference(updatedAt.toLocal());
-    final days = diff.inDays;
-    if (days == 0) return 'hoy';
-    if (days == 1) return 'hace 1 día';
-    return 'hace $days días';
-  }
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final async = ref.watch(
-      athleteNoteProvider((trainerId: trainerId, athleteId: athleteId)),
-    );
-    return async.when(
-      loading: () => SizedBox(
-        height: 48,
-        child: Center(
-          child: SizedBox(
-            width: 18,
-            height: 18,
-            child: CircularProgressIndicator(
-                strokeWidth: 2, color: palette.accent),
-          ),
-        ),
-      ),
-      error: (_, __) => _muted(palette, 'No se pudo cargar la nota.'),
-      data: (note) {
-        return Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: palette.bgCard,
-            border: Border.all(color: palette.border),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: note == null || note.note.trim().isEmpty
-              ? Text(
-                  'Sin nota fijada.', // i18n: Fase W2
-                  style: TextStyle(color: palette.textMuted, fontSize: 13),
-                )
-              : Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      note.note,
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: palette.textPrimary,
-                        fontSize: 13,
-                        height: 1.45,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      _haceDias(note.updatedAt), // i18n: Fase W2
-                      style: TextStyle(
-                        color: palette.textMuted,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-        );
-      },
-    );
-  }
-}
-
-// ── _ProxSesionCard ───────────────────────────────────────────────────────────
-
-/// Tarjeta de la próxima sesión confirmada del alumno (W2 PR9).
-///
-/// Reutiliza [appointmentsForAthleteStreamProvider] ya presente en
-/// agenda_providers.dart. Filtra: confirmed + startsAt futuro, ordena ASC,
-/// toma el primero. Sin sesiones → estado vacío.
-class _ProxSesionCard extends ConsumerWidget {
-  const _ProxSesionCard({required this.palette, required this.athleteId});
-
-  final AppPalette palette;
-  final String athleteId;
-
-  String _fmtDate(DateTime dt) {
-    final local = dt.toLocal();
-    final d = local.day.toString().padLeft(2, '0');
-    final m = local.month.toString().padLeft(2, '0');
-    final y = local.year.toString();
-    final hh = local.hour.toString().padLeft(2, '0');
-    final mm = local.minute.toString().padLeft(2, '0');
-    return '$d/$m/$y · $hh:$mm';
-  }
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    // La regla de `appointments` exige filtrar por trainerId — Firestore rechaza
-    // un query por athleteId (watchForAthlete es del lado del alumno, no del PF).
-    // Usamos el stream del trainer (mismo que el dashboard) con ventana
-    // day-truncada ESTABLE y filtramos el alumno en memoria: sin permission-denied
-    // y sin índice nuevo.
-    final trainerId = ref.watch(currentUidProvider) ?? '';
-    final now = DateTime.now().toUtc();
-    final todayStart = DateTime.utc(now.year, now.month, now.day);
-    final async = ref.watch(trainerAppointmentsStreamProvider(
-      TrainerAppointmentsKey(
-        trainerId: trainerId,
-        fromDate: todayStart,
-        toDate: todayStart.add(const Duration(days: 60)),
-      ),
-    ));
-    return async.when(
-      loading: () => SizedBox(
-        height: 48,
-        child: Center(
-          child: SizedBox(
-            width: 18,
-            height: 18,
-            child: CircularProgressIndicator(
-                strokeWidth: 2, color: palette.accent),
-          ),
-        ),
-      ),
-      error: (_, __) => _muted(palette, 'No se pudo cargar la agenda.'),
-      data: (appointments) {
-        final upcoming = appointments
-            .where((a) =>
-                a.athleteId == athleteId &&
-                a.status == AppointmentStatus.confirmed &&
-                a.startsAt.isAfter(now))
-            .toList()
-          ..sort((a, b) => a.startsAt.compareTo(b.startsAt));
-        final next = upcoming.firstOrNull;
-
-        return Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: palette.bgCard,
-            border: Border.all(color: palette.border),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: next == null
-              ? Text(
-                  'Sin sesiones próximas.', // i18n: Fase W2
-                  style: TextStyle(color: palette.textMuted, fontSize: 13),
-                )
-              : Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _fmtDate(next.startsAt), // i18n: Fase W2
-                      style: TextStyle(
-                        color: palette.textPrimary,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '${next.durationMin} min', // i18n: Fase W2
-                      style: TextStyle(
-                        color: palette.textMuted,
-                        fontSize: 12,
-                      ),
-                    ),
-                    if (next.noteBefore != null &&
-                        next.noteBefore!.trim().isNotEmpty) ...[
-                      const SizedBox(height: 6),
-                      Text(
-                        next.noteBefore!,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: palette.textMuted,
-                          fontSize: 12,
-                          fontStyle: FontStyle.italic,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-        );
-      },
-    );
-  }
-}
-
-// ── _UltimaSessionCard ────────────────────────────────────────────────────────
-
-/// Tarjeta con el desglose por ejercicio de la última sesión del alumno (W2 PR9).
-///
-/// Reutiliza [coachSessionSetLogsProvider] — el mismo que usa [_SetLogsExpansion].
-/// Incluye el mismo manejo de permission-denied (alumno no compartió historial).
-/// Opcionalmente muestra badge "+N kg" usando [lastWeightByExerciseProvider].
-class _UltimaSessionCard extends ConsumerWidget {
-  const _UltimaSessionCard({
-    required this.palette,
-    required this.athleteId,
-    required this.sessionsAsync,
-  });
-
-  final AppPalette palette;
-  final String athleteId;
-  final AsyncValue<List<Session>> sessionsAsync;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    // Caja bordeada reutilizable para los estados de texto (error / vacío).
-    Widget box(Widget child) => Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: palette.bgCard,
-            border: Border.all(color: palette.border),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: child,
-        );
-
-    // Las sesiones dependen de `session_shares`, que el CF borra cuando el link
-    // no está `active` (p.ej. pausado) → ahí la lista da permission-denied. Eso
-    // NO es un fallo real: significa que el alumno no está compartiendo su
-    // historial ahora. Lo decimos explícitamente en vez de un engañoso «sin
-    // sesiones registradas» (que implicaría que nunca entrenó).
-    if (sessionsAsync.hasError) {
-      final e = sessionsAsync.error;
-      final noShare = e is FirebaseException && e.code == 'permission-denied';
-      return box(Text(
-        noShare
-            ? 'El alumno no compartió su historial.' // i18n: Fase W2
-            : 'No se pudo cargar la última sesión.', // i18n: Fase W2
-        style: TextStyle(color: palette.textMuted, fontSize: 13),
-      ));
-    }
-
-    final sessions = sessionsAsync.valueOrNull ?? const <Session>[];
-    if (sessions.isEmpty) {
-      return box(Text(
-        'Sin sesiones registradas.', // i18n: Fase W2
-        style: TextStyle(color: palette.textMuted, fontSize: 13),
-      ));
-    }
-
-    final lastSession = sessions.first;
-    final logsAsync = ref.watch(coachSessionSetLogsProvider(
-        (athleteUid: athleteId, sessionId: lastSession.id)));
-    final lastWeightAsync = ref.watch(lastWeightByExerciseProvider(athleteId));
-    final muted = TextStyle(color: palette.textMuted, fontSize: 12);
-
-    return box(
-      Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            lastSession.routineName, // i18n: Fase W2
-            style: TextStyle(
-              color: palette.textPrimary,
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 8),
-          logsAsync.when(
-            loading: () => Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(
-                    strokeWidth: 2, color: palette.accent),
-              ),
-            ),
-            error: (e, _) {
-              final noShare =
-                  e is FirebaseException && e.code == 'permission-denied';
-              return Text(
-                noShare
-                    ? 'El alumno no compartió su historial.' // i18n: Fase W2
-                    : 'No se pudo cargar el detalle de la sesión.', // i18n: Fase W2
-                style: muted,
-              );
-            },
-            data: (logs) {
-              if (logs.isEmpty) {
-                return Text(
-                    'Sin series registradas en esta sesión.', // i18n: Fase W2
-                    style: muted);
-              }
-              final groups = <String, List<SetLog>>{};
-              for (final log in logs) {
-                groups.putIfAbsent(log.exerciseId, () => <SetLog>[]).add(log);
-              }
-              final lastWeight = lastWeightAsync.valueOrNull;
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  for (final entry in groups.entries)
-                    _UltimaEjercicioRow(
-                      palette: palette,
-                      logs: entry.value,
-                      progressionKg: lastWeight?[entry.key],
-                    ),
-                ],
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Fila de un ejercicio en [_UltimaSessionCard]: nombre + nro de sets +
-/// badge opcional "+N kg" de progresión.
-class _UltimaEjercicioRow extends StatelessWidget {
-  const _UltimaEjercicioRow({
-    required this.palette,
-    required this.logs,
-    this.progressionKg,
-  });
-
-  final AppPalette palette;
-  final List<SetLog> logs;
-  final double? progressionKg;
-
-  @override
-  Widget build(BuildContext context) {
-    final name = logs.first.exerciseName;
-    final sets = logs.length;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              name,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: palette.textPrimary,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            '$sets × sets', // i18n: Fase W2
-            style: TextStyle(color: palette.textMuted, fontSize: 12),
-          ),
-          if (progressionKg != null) ...[
-            const SizedBox(width: 6),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: palette.accent.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Text(
-                '${progressionKg! >= 0 ? '+' : ''}${progressionKg!.toStringAsFixed(1)} kg',
-                style: TextStyle(
-                  color: palette.accent,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-/// Heatmap estilo GitHub: 7 filas (días, lunes→domingo) × 12 columnas
-/// (semanas, vieja→actual). Cada celda colorea por nivel 0..4.
-class _AdherenciaHeatmap extends StatelessWidget {
-  const _AdherenciaHeatmap({required this.data, required this.palette});
-
-  /// 12 semanas × 7 días (nivel 0..4), como lo devuelve [ResumenMetrics].
-  final List<List<int>> data;
-  final AppPalette palette;
-
-  // Abreviaturas es-AR sin colisión (martes/miércoles no quedan ambos como 'M').
-  static const _dayLabels = ['L', 'Ma', 'Mi', 'J', 'V', 'S', 'D'];
-  static const _labelWidth = 22.0;
-
-  Color _cellColor(int level) => level <= 0
-      ? palette.border.withValues(alpha: 0.35)
-      : palette.accent.withValues(alpha: 0.25 + level * 0.1875);
-
-  @override
-  Widget build(BuildContext context) {
-    final axisStyle = TextStyle(color: palette.textMuted, fontSize: 9);
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: palette.bgCard,
-        border: Border.all(color: palette.border),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Grilla + eje temporal comparten ancho intrínseco para que las
-          // etiquetas «hace 12 sem» / «esta semana» caigan bajo la primera y la
-          // última columna.
-          IntrinsicWidth(
-            child: Column(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final wide = constraints.maxWidth >= 900;
+          if (!wide) {
+            return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                for (var day = 0; day < 7; day++)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 2),
-                    child: Row(
-                      children: [
-                        SizedBox(
-                          width: _labelWidth,
-                          child: Text(_dayLabels[day], style: axisStyle),
-                        ),
-                        for (var week = 0; week < data.length; week++)
-                          Padding(
-                            padding: const EdgeInsets.all(2),
-                            child: Container(
-                              width: 14,
-                              height: 14,
-                              decoration: BoxDecoration(
-                                color: _cellColor(data[week][day]),
-                                borderRadius: BorderRadius.circular(3),
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                const SizedBox(height: 4),
-                Padding(
-                  padding: const EdgeInsets.only(left: _labelWidth),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('hace 12 sem', style: axisStyle), // i18n: Fase W2
-                      Text('esta semana', style: axisStyle), // i18n: Fase W2
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 10),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
+              children: [left, const SizedBox(height: AppSpacing.s20), right],
+            );
+          }
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Menos', style: axisStyle), // i18n: Fase W2
-              const SizedBox(width: 6),
-              for (var level = 0; level <= 4; level++)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 1.5),
-                  child: Container(
-                    width: 12,
-                    height: 12,
-                    decoration: BoxDecoration(
-                      color: _cellColor(level),
-                      borderRadius: BorderRadius.circular(3),
-                    ),
-                  ),
-                ),
-              const SizedBox(width: 6),
-              Text('Más', style: axisStyle), // i18n: Fase W2
+              Expanded(flex: 7, child: left),
+              const SizedBox(width: AppSpacing.s20),
+              SizedBox(width: 320, child: right),
             ],
-          ),
-        ],
+          );
+        },
       ),
     );
   }
 }
-
-String _cadenciaLabel(BillingCadence c) => switch (c) {
-      BillingCadence.mensual => 'Mensual', // i18n: Fase W2
-      BillingCadence.semanal => 'Semanal',
-      BillingCadence.porSesion => 'Por sesión',
-      BillingCadence.suelto => 'Suelto',
-    };
 
 /// Tab Pagos (W2 PR5/PR6): estado de cuenta + historial de pagos + acciones.
 ///
