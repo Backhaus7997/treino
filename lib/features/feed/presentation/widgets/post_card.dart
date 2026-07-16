@@ -1,14 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/treino_icon.dart';
+import '../../../../l10n/app_l10n.dart';
+import '../../../auth/application/auth_providers.dart';
+import '../../application/post_actions_notifier.dart';
 import '../../domain/post.dart';
 import '../../domain/routine_tag.dart';
 import 'post_avatar.dart';
 
-class PostCard extends StatelessWidget {
+class PostCard extends ConsumerWidget {
   const PostCard({
     super.key,
     required this.post,
@@ -19,8 +23,10 @@ class PostCard extends StatelessWidget {
   final VoidCallback? onAuthorTap;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
+    final viewerUid = ref.watch(authStateChangesProvider).valueOrNull?.uid;
+    final isOwner = viewerUid != null && viewerUid == post.authorUid;
 
     return Container(
       decoration: BoxDecoration(
@@ -94,18 +100,24 @@ class PostCard extends StatelessWidget {
                   ),
                 ),
               ),
-              // Overflow icon stub — REQ-FEED-POSTCARD-006
-              IconButton(
-                icon: Icon(
-                  TreinoIcon.dotsThree,
-                  color: palette.textMuted,
-                  size: 20,
+              // Overflow menu — Editar/Eliminar, own posts only
+              // (REQ-FEED-POSTCARD-006).
+              if (isOwner)
+                Semantics(
+                  button: true,
+                  label: AppL10n.of(context).postCardMenuA11y,
+                  child: IconButton(
+                    icon: Icon(
+                      TreinoIcon.dotsThree,
+                      color: palette.textMuted,
+                      size: 20,
+                    ),
+                    onPressed: () => _showPostMenu(context, ref),
+                    tooltip: null,
+                    constraints: const BoxConstraints(),
+                    padding: EdgeInsets.zero,
+                  ),
                 ),
-                onPressed: null,
-                tooltip: null,
-                constraints: const BoxConstraints(),
-                padding: EdgeInsets.zero,
-              ),
             ],
           ),
 
@@ -163,6 +175,94 @@ class PostCard extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  // ── Overflow menu (owner only) ────────────────────────────────────────
+
+  void _showPostMenu(BuildContext context, WidgetRef ref) {
+    final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: palette.bgCard,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: Icon(TreinoIcon.edit, color: palette.textPrimary),
+              title: Text(
+                l10n.postCardMenuEdit,
+                style: GoogleFonts.barlow(
+                  fontWeight: FontWeight.w400,
+                  fontSize: 14,
+                  color: palette.textPrimary,
+                ),
+              ),
+              onTap: () {
+                Navigator.of(sheetContext).pop();
+                context.push('/feed/create', extra: post);
+              },
+            ),
+            ListTile(
+              leading: Icon(TreinoIcon.trash, color: palette.danger),
+              title: Text(
+                l10n.postCardMenuDelete,
+                style: GoogleFonts.barlow(
+                  fontWeight: FontWeight.w400,
+                  fontSize: 14,
+                  color: palette.danger,
+                ),
+              ),
+              onTap: () {
+                Navigator.of(sheetContext).pop();
+                _confirmDelete(context, ref);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _confirmDelete(BuildContext context, WidgetRef ref) async {
+    final l10n = AppL10n.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(l10n.postCardDeleteConfirmTitle),
+        content: Text(l10n.postCardDeleteConfirmBody),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(l10n.commonCancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(l10n.postCardMenuDelete),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      await ref.read(postActionsProvider).deletePost(post.id);
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(l10n.postCardDeleteSuccess)));
+    } catch (_) {
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(l10n.postCardDeleteError)));
+    }
   }
 }
 

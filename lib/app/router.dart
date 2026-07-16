@@ -33,6 +33,7 @@ import '../features/workout/presentation/session_detail_screen.dart';
 import '../features/workout/presentation/session_history_screen.dart';
 import '../features/workout/presentation/routine_detail_screen.dart';
 import '../features/workout/presentation/session_player_screen.dart';
+import '../features/feed/domain/post.dart';
 import '../features/feed/feed_screen.dart';
 import '../features/feed/presentation/create_post_screen.dart';
 import '../features/feed/presentation/friend_requests_inbox_screen.dart';
@@ -500,7 +501,9 @@ GoRouter buildRouter({
             routes: [
               GoRoute(
                 path: 'create',
-                builder: (_, __) => _withBg(const CreatePostScreen()),
+                builder: (_, state) => _withBg(
+                  CreatePostScreen(existingPost: state.extra as Post?),
+                ),
               ),
               GoRoute(
                 path: 'profile/:uid',

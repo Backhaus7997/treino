@@ -3950,6 +3950,78 @@ abstract class AppL10n {
   /// **'Post publicado.'**
   String get feedPostPublishedSuccess;
 
+  /// Semantics label for the post card overflow (3-dot) menu button, shown only on the viewer's own posts.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Opciones del post'**
+  String get postCardMenuA11y;
+
+  /// Edit action in the post card overflow menu.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Editar'**
+  String get postCardMenuEdit;
+
+  /// Delete action in the post card overflow menu.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Eliminar'**
+  String get postCardMenuDelete;
+
+  /// Title of the confirmation dialog shown before deleting a post.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Eliminar este post?'**
+  String get postCardDeleteConfirmTitle;
+
+  /// Body of the confirmation dialog shown before deleting a post.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Esta acción no se puede deshacer.'**
+  String get postCardDeleteConfirmBody;
+
+  /// Success snackbar after deleting a post.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Post eliminado.'**
+  String get postCardDeleteSuccess;
+
+  /// Error snackbar when deleting a post fails.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos eliminar el post. Probá de nuevo.'**
+  String get postCardDeleteError;
+
+  /// Header title of the compose screen when editing an existing post (vs. NUEVO POST when creating).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'EDITAR POST'**
+  String get createPostEditTitle;
+
+  /// Submit button label in the compose screen header when editing an existing post (vs. PUBLICAR when creating).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'GUARDAR'**
+  String get createPostSaveChanges;
+
+  /// Semantics label for the submit button when editing an existing post.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Guardar cambios'**
+  String get createPostSaveChangesA11y;
+
+  /// Semantics label for the submit button while an edit is being saved.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Guardando…'**
+  String get createPostSavingA11y;
+
+  /// Success snackbar shown after successfully editing an existing post.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cambios guardados.'**
+  String get feedPostUpdatedSuccess;
+
   /// Success feedback when a friend/follow request is sent from the public profile follow button (findings 25/26).
   ///
   /// In es_AR, this message translates to:

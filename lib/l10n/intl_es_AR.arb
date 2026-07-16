@@ -1504,6 +1504,54 @@
   "@feedPostPublishedSuccess": {
     "description": "Success snackbar after publishing a post (finding 25). Shown via the root ScaffoldMessenger since the compose screen pops on success."
   },
+  "postCardMenuA11y": "Opciones del post",
+  "@postCardMenuA11y": {
+    "description": "Semantics label for the post card overflow (3-dot) menu button, shown only on the viewer's own posts."
+  },
+  "postCardMenuEdit": "Editar",
+  "@postCardMenuEdit": {
+    "description": "Edit action in the post card overflow menu."
+  },
+  "postCardMenuDelete": "Eliminar",
+  "@postCardMenuDelete": {
+    "description": "Delete action in the post card overflow menu."
+  },
+  "postCardDeleteConfirmTitle": "¿Eliminar este post?",
+  "@postCardDeleteConfirmTitle": {
+    "description": "Title of the confirmation dialog shown before deleting a post."
+  },
+  "postCardDeleteConfirmBody": "Esta acción no se puede deshacer.",
+  "@postCardDeleteConfirmBody": {
+    "description": "Body of the confirmation dialog shown before deleting a post."
+  },
+  "postCardDeleteSuccess": "Post eliminado.",
+  "@postCardDeleteSuccess": {
+    "description": "Success snackbar after deleting a post."
+  },
+  "postCardDeleteError": "No pudimos eliminar el post. Probá de nuevo.",
+  "@postCardDeleteError": {
+    "description": "Error snackbar when deleting a post fails."
+  },
+  "createPostEditTitle": "EDITAR POST",
+  "@createPostEditTitle": {
+    "description": "Header title of the compose screen when editing an existing post (vs. NUEVO POST when creating)."
+  },
+  "createPostSaveChanges": "GUARDAR",
+  "@createPostSaveChanges": {
+    "description": "Submit button label in the compose screen header when editing an existing post (vs. PUBLICAR when creating)."
+  },
+  "createPostSaveChangesA11y": "Guardar cambios",
+  "@createPostSaveChangesA11y": {
+    "description": "Semantics label for the submit button when editing an existing post."
+  },
+  "createPostSavingA11y": "Guardando…",
+  "@createPostSavingA11y": {
+    "description": "Semantics label for the submit button while an edit is being saved."
+  },
+  "feedPostUpdatedSuccess": "Cambios guardados.",
+  "@feedPostUpdatedSuccess": {
+    "description": "Success snackbar shown after successfully editing an existing post."
+  },
   "feedRequestSentSuccess": "Solicitud enviada.",
   "@feedRequestSentSuccess": {
     "description": "Success feedback when a friend/follow request is sent from the public profile follow button (findings 25/26)."
