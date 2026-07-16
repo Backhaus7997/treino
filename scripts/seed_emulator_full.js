@@ -798,11 +798,36 @@ async function seedCoaches() {
       reviewCount: 0,
     };
 
+    // trainerPublicProfiles holds the DISCOVERY data (rate, bio, geohash), but
+    // the app resolves a person's IDENTITY — trainers included — through
+    // userPublicProfiles: routine detail ("Asignado por …"), mi plan, reviews
+    // and chat all read it by uid. Without this doc a trainer-assigned routine
+    // renders "Asignado por ?".
+    const userPublicDoc = {
+      uid: c.uid,
+      displayName: c.displayName,
+      displayNameLowercase: c.displayName.trim().toLowerCase(),
+      avatarUrl: null,
+      gymId: null,
+      workoutsCount: 0,
+      racha: 0,
+      followersCount: 0,
+      followingCount: 0,
+      sharedTemplatesWithAthletes: false,
+    };
+
     const batch = db.batch();
     batch.set(db.collection('users').doc(c.uid), userDoc, { merge: true });
     batch.set(db.collection('trainerPublicProfiles').doc(c.uid), publicDoc, { merge: true });
+    batch.set(
+      db.collection('userPublicProfiles').doc(c.uid),
+      userPublicDoc,
+      { merge: true },
+    );
     await batch.commit();
-    console.log(`  ✓ Firestore docs: users/${c.uid} + trainerPublicProfiles/${c.uid} (geohash=${geohash})`);
+    console.log(
+      `  ✓ Firestore docs: users/${c.uid} + trainerPublicProfiles/${c.uid} + userPublicProfiles/${c.uid} (geohash=${geohash})`,
+    );
   }
 }
 
@@ -1059,7 +1084,12 @@ async function clear() {
   // Firestore
   await deleteCollection('gyms', GYMS.map(g => g.id));
   await deleteCollection('users', allUids);
-  await deleteCollection('userPublicProfiles', ATHLETES.map(a => a.uid));
+  // Coaches get a userPublicProfiles doc too (identity lookups) — clearing only
+  // the athletes' would leave theirs orphaned.
+  await deleteCollection('userPublicProfiles', [
+    ...ATHLETES.map(a => a.uid),
+    ...COACHES.map(c => c.uid),
+  ]);
   await deleteCollection('trainerPublicProfiles', COACHES.map(c => c.uid));
   await deleteCollection('trainer_links', TRAINER_LINKS.map(l => l.id));
   await deleteCollection('friendships', FRIENDSHIPS.map(f => f.id));
