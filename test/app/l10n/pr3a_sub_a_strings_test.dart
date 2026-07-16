@@ -94,8 +94,7 @@ void main() {
       expect(
         l10n.eliminarCuentaSheetBodySuffix,
         '. Vamos a eliminar tu cuenta, tu perfil, tu historial '
-        'de entrenamientos y tu foto. Tus posts van a quedar '
-        'como "Usuario eliminado".',
+        'de entrenamientos, tus posts y tu foto.',
       );
     });
 
