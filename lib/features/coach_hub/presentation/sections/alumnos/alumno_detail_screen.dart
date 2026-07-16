@@ -74,6 +74,7 @@ import 'widgets/alumno_kpi_strip.dart';
 import 'widgets/alumno_tabs.dart';
 import 'widgets/datos_personales_card.dart';
 import 'widgets/historial_sesiones_table.dart';
+import 'widgets/historial_timeline.dart';
 import 'widgets/medicion_dialog.dart';
 import 'widgets/medicion_list.dart';
 import 'widgets/mediciones_toggle.dart';
@@ -1348,21 +1349,21 @@ class _NotasPrivadasTabState extends ConsumerState<_NotasPrivadasTab> {
 
 // ── _HistorialTab ─────────────────────────────────────────────────────────────
 
-/// Coach Hub web — Tab «Historial» del alumno detail.
+/// Coach Hub web — Tab «Historial» del alumno detail — Fase 3 WU-07b.
 ///
 /// Timeline cronológico de TODAS las sesiones del alumno (finished OK,
-/// finished incompleta/abandonada, y active). Ordenadas más nuevas arriba,
-/// vienen así del `sessionsByUidProvider`.
+/// finished incompleta/abandonada, y active), agrupadas por mes calendario
+/// — anatomía del mockup `historial.png` (header de mes CAPS + dots mint).
+/// Ordenadas más nuevas arriba, vienen así del `sessionsByUidProvider`.
+/// Extraído a [HistorialTimeline] (`widgets/historial_timeline.dart`,
+/// ADR-A3-04); este composition root sólo resuelve el gate async con
+/// `TreinoStateSwitcher` (REQ motion) y arma el header de conteo.
 ///
 /// Diferencia con el tab «Entrenamientos»:
 /// - Entrenamientos: últimas 20 sesiones COMPLETAS (isCompletedSession) +
-///   evolución por ejercicio.
-/// - Historial: TODAS las sesiones (sin límite, sin filtro) con badge de
-///   status para que el PF distinga completadas, incompletas y activas.
-///
-/// Reusa el mismo `HistorialSesionesTable` (Fase 3 WU-07a,
-/// `widgets/historial_sesiones_table.dart`) que Entrenamientos, activando el
-/// flag `showStatusBadge`.
+///   evolución por ejercicio, sobre `HistorialSesionesTable` (tabla).
+/// - Historial: TODAS las sesiones (sin límite, sin filtro), timeline por
+///   mes con badge de estado por sesión.
 class _HistorialTab extends ConsumerWidget {
   const _HistorialTab({required this.athleteId});
 
@@ -1372,63 +1373,71 @@ class _HistorialTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
     final sessionsAsync = ref.watch(sessionsByUidProvider(athleteId));
-    return sessionsAsync.when(
-      loading: () => Center(
-        child: CircularProgressIndicator(color: palette.accent),
-      ),
-      // Un link pausado borra session_shares → permission-denied. No es un
-      // fallo de carga: el alumno dejó de compartir. Lo decimos claro, igual
-      // que Entrenamientos y el card de última sesión del Resumen.
-      error: (e, _) => Center(
-        child: Text(
-          e is FirebaseException && e.code == 'permission-denied'
-              ? 'El alumno no compartió su historial.' // i18n: Fase W2
-              : 'No pudimos cargar el historial.', // i18n: Fase W2
-          style: TextStyle(color: palette.textMuted, fontSize: 14),
-        ),
-      ),
-      data: (sessions) {
-        if (sessions.isEmpty) {
-          return Center(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-              child: Text(
-                'Este alumno todavía no registró sesiones.', // i18n: Fase W2
-                textAlign: TextAlign.center,
-                style: TextStyle(color: palette.textMuted, fontSize: 14),
-              ),
-            ),
-          );
-        }
-        return SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                'Historial completo · ${sessions.length} sesiones', // i18n: Fase W2
-                style: TextStyle(
-                  color: palette.textPrimary,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
+    final stateKey = _asyncStateKeyOf(sessionsAsync);
+    final sessions = sessionsAsync.valueOrNull ?? const <Session>[];
+    // Un link pausado borra session_shares → permission-denied. No es un
+    // fallo de carga: el alumno dejó de compartir. Lo decimos claro, igual
+    // que Entrenamientos y el card de última sesión del Resumen.
+    final error = sessionsAsync.error;
+    final errorMessage =
+        error is FirebaseException && error.code == 'permission-denied'
+            ? 'El alumno no compartió su historial.' // i18n: Fase W2
+            : 'No pudimos cargar el historial.'; // i18n: Fase W2
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TreinoFadeSlideIn(
+            delay: AppMotion.stagger(0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Historial completo · ${sessions.length} sesiones', // i18n
+                  style: TextStyle(
+                    color: palette.textPrimary,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                'Todas las sesiones que registró — completas, incompletas y en curso.', // i18n: Fase W2
-                style: TextStyle(color: palette.textMuted, fontSize: 13),
-              ),
-              const SizedBox(height: 16),
-              HistorialSesionesTable(
-                sessions: sessions,
-                palette: palette,
-                athleteId: athleteId,
-                showStatusBadge: true,
-              ),
-            ],
+                const SizedBox(height: 6),
+                Text(
+                  'Todas las sesiones que registró — completas, incompletas y en curso.', // i18n: Fase W2
+                  style: TextStyle(color: palette.textMuted, fontSize: 13),
+                ),
+              ],
+            ),
           ),
-        );
-      },
+          const SizedBox(height: AppSpacing.s20),
+          TreinoStateSwitcher(
+            childKey: ValueKey('historial_$stateKey'),
+            child: switch (stateKey) {
+              'loading' => const Column(
+                  children: [
+                    TreinoListRow(title: '', loading: true),
+                    SizedBox(height: AppSpacing.s8),
+                    TreinoListRow(title: '', loading: true),
+                    SizedBox(height: AppSpacing.s8),
+                    TreinoListRow(title: '', loading: true),
+                  ],
+                ),
+              'error' => TreinoEmptyState(
+                  icon: TreinoIcon.errorState,
+                  title: errorMessage,
+                ),
+              _ => sessions.isEmpty
+                  ? const TreinoEmptyState(
+                      icon: TreinoIcon.emptyState,
+                      title:
+                          'Este alumno todavía no registró sesiones.', // i18n
+                    )
+                  : HistorialTimeline(sessions: sessions, palette: palette),
+            },
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1517,23 +1526,18 @@ class _ArchivosTabState extends ConsumerState<_ArchivosTab> {
   Future<void> _confirmAndDelete(AthleteFile file) async {
     final l10n = AppL10n.of(context);
     final messenger = ScaffoldMessenger.of(context);
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(l10n.coachHubAlumnoDetailArchivosDeleteTitle),
-        content: Text(
-          l10n.coachHubAlumnoDetailArchivosDeleteBody(file.fileName),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(l10n.coachHubActionCancel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(l10n.coachHubActionConfirm),
-          ),
-        ],
+    // showTreinoDialog reemplaza showDialog(AlertDialog) — mismo patrón que
+    // el confirm de baja del roster (WU-03) y de mediciones (WU-06a).
+    final confirmed = await showTreinoDialog<bool>(
+      context,
+      builder: (ctx) => TreinoDialog(
+        title: l10n.coachHubAlumnoDetailArchivosDeleteTitle,
+        body: Text(l10n.coachHubAlumnoDetailArchivosDeleteBody(file.fileName)),
+        primaryLabel: l10n.coachHubActionConfirm,
+        secondaryLabel: l10n.coachHubActionCancel,
+        destructive: true,
+        onPrimaryTap: () => Navigator.of(ctx).pop(true),
+        onSecondaryTap: () => Navigator.of(ctx).pop(false),
       ),
     );
     if (confirmed != true) return;
@@ -1560,6 +1564,16 @@ class _ArchivosTabState extends ConsumerState<_ArchivosTab> {
         (trainerId: trainerUid, athleteId: widget.athleteId),
       ),
     );
+    // Sticky-data pattern: si ya emitimos data alguna vez, la seguimos
+    // mostrando aunque el stream emita error después (ej. reconnect
+    // transient de Firestore). Solo mostramos el error state duro cuando NO
+    // hay data previa.
+    final stateKey = filesAsync.hasValue
+        ? 'data'
+        : filesAsync.hasError
+            ? 'error'
+            : 'loading';
+    final files = filesAsync.valueOrNull ?? const <AthleteFile>[];
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
@@ -1567,97 +1581,89 @@ class _ArchivosTabState extends ConsumerState<_ArchivosTab> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // ── Header ─────────────────────────────────────────────────────
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      l10n.coachHubAlumnoDetailArchivosTitle,
-                      style: TextStyle(
-                        color: palette.textPrimary,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      l10n.coachHubAlumnoDetailArchivosSubtitle,
-                      style: TextStyle(color: palette.textMuted, fontSize: 13),
-                    ),
-                  ],
-                ),
-              ),
-              ElevatedButton.icon(
-                onPressed: _uploading ? null : () => _pickAndUpload(trainerUid),
-                icon: _uploading
-                    ? SizedBox(
-                        width: 14,
-                        height: 14,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: palette.bg,
+          TreinoFadeSlideIn(
+            delay: AppMotion.stagger(0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        l10n.coachHubAlumnoDetailArchivosTitle,
+                        style: TextStyle(
+                          color: palette.textPrimary,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
                         ),
-                      )
-                    : Icon(TreinoIcon.upload, size: 16, color: palette.bg),
-                label: Text(l10n.coachHubAlumnoDetailArchivosUploadButton),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: palette.accent,
-                  foregroundColor: palette.bg,
-                  disabledBackgroundColor:
-                      palette.accent.withValues(alpha: 0.3),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-                  shape: const StadiumBorder(),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          Expanded(
-            // Sticky-data pattern: si ya emitimos data alguna vez, la
-            // seguimos mostrando aunque el stream emita error después
-            // (ej. reconnect transient de Firestore). Solo mostramos el
-            // error state duro cuando NO hay data previa.
-            child: Builder(
-              builder: (_) {
-                if (filesAsync.hasValue) {
-                  final files = filesAsync.requireValue;
-                  if (files.isEmpty) {
-                    return Center(
-                      child: Text(
-                        l10n.coachHubAlumnoDetailArchivosEmpty,
-                        textAlign: TextAlign.center,
-                        style:
-                            TextStyle(color: palette.textMuted, fontSize: 14),
                       ),
-                    );
-                  }
-                  return ListView.separated(
-                    itemCount: files.length,
-                    separatorBuilder: (_, __) => Divider(
-                      height: 1,
-                      color: palette.border,
-                    ),
-                    itemBuilder: (_, i) => _ArchivoRow(
-                      file: files[i],
-                      palette: palette,
-                      onDelete: () => _confirmAndDelete(files[i]),
-                    ),
-                  );
-                }
-                if (filesAsync.hasError) {
-                  return Center(
+                      const SizedBox(height: 4),
+                      Text(
+                        l10n.coachHubAlumnoDetailArchivosSubtitle,
+                        style:
+                            TextStyle(color: palette.textMuted, fontSize: 13),
+                      ),
+                    ],
+                  ),
+                ),
+                ElevatedButton.icon(
+                  onPressed:
+                      _uploading ? null : () => _pickAndUpload(trainerUid),
+                  icon: _uploading
+                      ? SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: palette.bg,
+                          ),
+                        )
+                      : Icon(TreinoIcon.upload, size: 16, color: palette.bg),
+                  label: Text(l10n.coachHubAlumnoDetailArchivosUploadButton),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: palette.accent,
+                    foregroundColor: palette.bg,
+                    disabledBackgroundColor:
+                        palette.accent.withValues(alpha: 0.3),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 18, vertical: 12),
+                    shape: const StadiumBorder(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.s20),
+          Expanded(
+            child: TreinoStateSwitcher(
+              childKey: ValueKey('archivos_$stateKey'),
+              child: switch (stateKey) {
+                'error' => Center(
                     child: Text(
                       l10n.coachHubAlumnoDetailArchivosLoadError,
                       style: TextStyle(color: palette.textMuted, fontSize: 14),
                     ),
-                  );
-                }
-                return Center(
-                  child: CircularProgressIndicator(color: palette.accent),
-                );
+                  ),
+                'loading' => Center(
+                    child: CircularProgressIndicator(color: palette.accent),
+                  ),
+                _ => files.isEmpty
+                    ? TreinoEmptyState(
+                        icon: TreinoIcon.emptyState,
+                        title: l10n.coachHubAlumnoDetailArchivosEmpty,
+                      )
+                    : ListView.separated(
+                        itemCount: files.length,
+                        separatorBuilder: (_, __) => Divider(
+                          height: 1,
+                          color: palette.border,
+                        ),
+                        itemBuilder: (_, i) => _ArchivoRow(
+                          file: files[i],
+                          palette: palette,
+                          onDelete: () => _confirmAndDelete(files[i]),
+                        ),
+                      ),
               },
             ),
           ),
@@ -1695,7 +1701,10 @@ class _ArchivosTabState extends ConsumerState<_ArchivosTab> {
   }
 }
 
-/// Row de un archivo dentro del tab Archivos.
+/// Row de un archivo dentro del tab Archivos — Fase 3 WU-07b: `TreinoListRow`
+/// del kit v2 (ícono en `leading`, peso+fecha en `subtitle`, acciones
+/// descargar/borrar en `trailing`) reemplaza el `InkWell`+`Row` bespoke,
+/// mismo patrón que `MedicionRow` (`widgets/medicion_list.dart`).
 class _ArchivoRow extends StatelessWidget {
   const _ArchivoRow({
     required this.file,
@@ -1721,51 +1730,26 @@ class _ArchivoRow extends StatelessWidget {
       AthleteFileKind.image => TreinoIcon.image,
       AthleteFileKind.other => TreinoIcon.file,
     };
-    final subtitle =
-        '${_formatSize(file.sizeBytes)} · ${fmtDate(file.uploadedAt)}';
-    return InkWell(
-      onTap: _open,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-        child: Row(
-          children: [
-            Icon(icon, size: 24, color: palette.textMuted),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    file.fileName,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: palette.textPrimary,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: TextStyle(color: palette.textMuted, fontSize: 12),
-                  ),
-                ],
-              ),
-            ),
-            IconButton(
-              tooltip: l10n.coachHubAlumnoDetailArchivosOpenTooltip,
-              onPressed: _open,
-              icon:
-                  Icon(TreinoIcon.download, size: 18, color: palette.textMuted),
-            ),
-            IconButton(
-              tooltip: l10n.coachHubAlumnoDetailArchivosDeleteTooltip,
-              onPressed: onDelete,
-              icon: Icon(TreinoIcon.trash, size: 18, color: palette.danger),
-            ),
-          ],
-        ),
+    return TreinoListRow(
+      leading: Icon(icon, size: 22, color: palette.textMuted),
+      title: file.fileName,
+      subtitle: '${_formatSize(file.sizeBytes)} · ${fmtDate(file.uploadedAt)}',
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            tooltip: l10n.coachHubAlumnoDetailArchivosOpenTooltip,
+            onPressed: _open,
+            icon: Icon(TreinoIcon.download, size: 18, color: palette.textMuted),
+          ),
+          IconButton(
+            tooltip: l10n.coachHubAlumnoDetailArchivosDeleteTooltip,
+            onPressed: onDelete,
+            icon: Icon(TreinoIcon.trash, size: 18, color: palette.danger),
+          ),
+        ],
       ),
+      onTap: _open,
     );
   }
 
