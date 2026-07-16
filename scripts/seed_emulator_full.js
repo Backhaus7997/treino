@@ -86,7 +86,11 @@ function geohash5(lat, lon) {
 // Data definitions
 // ────────────────────────────────────────────────────────────────────────────
 
-const NOW = new Date('2026-06-16T12:00:00Z'); // deterministic "now"
+// Base "now" for every relative date below. Defaults to the real clock so the
+// scenarios this seed promises (a session yesterday, appointments today and
+// tomorrow, a live streak) actually land on today when you run it. Pin it via
+// SEED_NOW=2026-06-16T12:00:00Z when you need byte-identical, reproducible data.
+const NOW = process.env.SEED_NOW ? new Date(process.env.SEED_NOW) : new Date();
 
 function daysAgo(n) {
   return new Date(NOW.getTime() - n * 86_400_000);
@@ -978,6 +982,22 @@ async function seedPosts() {
 
 async function seedAppointments() {
   console.log('\n── Appointments ─────────────────────────────────────────────────');
+
+  // An appointment's doc id embeds startsAt (`${trainerId}_${startsAtMs}`), so
+  // once NOW follows the real clock a re-run writes NEW ids instead of
+  // overwriting the previous ones — leaving last run's turnos behind. Drop this
+  // seed's own appointments first so re-running stays idempotent. Scoped to the
+  // seed trainers, so real data in the emulator is never touched.
+  const seedTrainerIds = [...new Set(APPOINTMENTS.map(a => a.trainerId))];
+  const stale = await db
+    .collection('appointments')
+    .where('trainerId', 'in', seedTrainerIds)
+    .get();
+  await Promise.all(stale.docs.map(d => d.ref.delete()));
+  if (stale.size > 0) {
+    console.log(`  ⌫ ${stale.size} turno(s) de corridas anteriores eliminados`);
+  }
+
   for (const a of APPOINTMENTS) {
     const docId = apptDocId(a.trainerId, a.startsAt);
     const data = {
