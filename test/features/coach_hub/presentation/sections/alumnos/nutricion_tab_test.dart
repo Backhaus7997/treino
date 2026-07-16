@@ -7,6 +7,8 @@
 //   - save flow: tap "GUARDAR PLAN" hits repository.save() with the draft
 //   - cross-alumno: swap athlete resets the draft
 
+import 'dart:async' show StreamController;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -105,29 +107,27 @@ List<Override> _baseOverrides({
   required String athleteUid,
   NutritionPlan? existing,
   NutritionPlanRepository? repo,
+  Stream<NutritionPlan?>? planStream,
 }) =>
     [
       currentUidProvider.overrideWithValue(_trainerUid),
       trainerLinksStreamProvider
           .overrideWith((ref) => Stream.value([_link(athleteUid)])),
-      userPublicProfilesBatchProvider.overrideWith(
-          (ref, key) => {athleteUid: _profile(athleteUid)}),
-      userPublicProfileProvider.overrideWith(
-          (ref, id) => Stream.value(_profile(id))),
+      userPublicProfilesBatchProvider
+          .overrideWith((ref, key) => {athleteUid: _profile(athleteUid)}),
+      userPublicProfileProvider
+          .overrideWith((ref, id) => Stream.value(_profile(id))),
       pagosPorCobrarProvider
           .overrideWith((ref) => const AsyncData(<CobroPendiente>[])),
-      finishedTodayByUidProvider
-          .overrideWith((ref, uid) => const <Session>[]),
+      finishedTodayByUidProvider.overrideWith((ref, uid) => const <Session>[]),
       measurementsForAthleteProvider
           .overrideWith((ref, id) => Stream.value(const <Measurement>[])),
       performanceTestsForAthleteProvider
-          .overrideWith(
-              (ref, id) => Stream.value(const <PerformanceTest>[])),
+          .overrideWith((ref, id) => Stream.value(const <PerformanceTest>[])),
       gymsProvider.overrideWith((ref) => const <Gym>[]),
       athleteBillingProvider.overrideWith((ref, id) => Stream.value(null)),
       sessionsByUidProvider.overrideWith((ref, id) => const <Session>[]),
-      assignedRoutinesProvider
-          .overrideWith((ref, id) => const <Routine>[]),
+      assignedRoutinesProvider.overrideWith((ref, id) => const <Routine>[]),
       athleteNoteProvider(
         (trainerId: _trainerUid, athleteId: athleteUid),
       ).overrideWith((ref) => const Stream.empty()),
@@ -141,9 +141,8 @@ List<Override> _baseOverrides({
       ).overrideWith((ref) => const Stream.empty()),
       nutritionPlanProvider(
         (trainerId: _trainerUid, athleteId: athleteUid),
-      ).overrideWith((ref) => Stream.value(existing)),
-      if (repo != null)
-        nutritionPlanRepositoryProvider.overrideWithValue(repo),
+      ).overrideWith((ref) => planStream ?? Stream.value(existing)),
+      if (repo != null) nutritionPlanRepositoryProvider.overrideWithValue(repo),
     ];
 
 Widget _wrap(List<Override> overrides, String athleteUid) => ProviderScope(
@@ -166,25 +165,41 @@ void _useDesktopViewport(WidgetTester tester) {
   addTearDown(tester.view.resetDevicePixelRatio);
 }
 
-Future<void> _selectNutricionTab(WidgetTester tester) async {
-  try {
-    await tester.pumpAndSettle(const Duration(milliseconds: 500));
-  } catch (_) {}
+// [settle]=false evita `pumpAndSettle`: el shimmer del plan de nutrición
+// (Fase 3 WU-08) corre en loop infinito mientras el plan carga, así que
+// `pumpAndSettle` nunca converge — mismo patrón que
+// `alumnos_screen_test.dart` (Fase 3 WU-03) para loading states con
+// `TreinoShimmer`.
+Future<void> _selectNutricionTab(WidgetTester tester,
+    {bool settle = true}) async {
+  if (settle) {
+    try {
+      await tester.pumpAndSettle(const Duration(milliseconds: 500));
+    } catch (_) {}
+  } else {
+    await tester.pump();
+  }
   final tabBarContext = tester.element(find.byType(TabBar));
   // "Nutrición" es tab 2. Salteamos por TabController por si está off-screen.
   DefaultTabController.of(tabBarContext).animateTo(2);
-  try {
-    await tester.pumpAndSettle(const Duration(milliseconds: 500));
-  } catch (_) {}
+  if (settle) {
+    try {
+      await tester.pumpAndSettle(const Duration(milliseconds: 500));
+    } catch (_) {}
+  } else {
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+  }
 }
 
 void main() {
-  testWidgets('empty state: se seedean los 6 presets default',
-      (tester) async {
+  testWidgets('empty state: se seedean los 6 presets default', (tester) async {
     _useDesktopViewport(tester);
-    await tester.pumpWidget(_wrap(_baseOverrides(athleteUid: _athleteUid), _athleteUid));
+    await tester.pumpWidget(
+        _wrap(_baseOverrides(athleteUid: _athleteUid), _athleteUid));
     await _selectNutricionTab(tester);
 
+    expect(find.text('PLAN ACTIVO'), findsOneWidget);
     expect(find.text('Plan de alimentación'), findsOneWidget);
     // Los 6 presets por nombre. Uso findsWidgets porque algunos names
     // ("Colación") coinciden entre un meal y un grupo dentro de otro meal.
@@ -194,6 +209,35 @@ void main() {
     expect(find.text('Merienda'), findsOneWidget);
     expect(find.text('Colación'), findsWidgets);
     expect(find.text('Cena'), findsOneWidget);
+  });
+
+  testWidgets(
+      'loading: shimmer skeleton visible mientras el plan aún no llega del stream (rediseño kit v2 Fase 3 WU-08)',
+      (tester) async {
+    // StreamController sin emitir ni cerrar — el plan queda en loading real.
+    final controller = StreamController<NutritionPlan?>();
+    addTearDown(controller.close);
+    _useDesktopViewport(tester);
+    await tester.pumpWidget(
+      _wrap(
+        _baseOverrides(
+          athleteUid: _athleteUid,
+          planStream: controller.stream,
+        ),
+        _athleteUid,
+      ),
+    );
+    await _selectNutricionTab(tester, settle: false);
+
+    // El header "PLAN ACTIVO" + CTA "GUARDAR PLAN" son estáticos — se
+    // muestran igual mientras el plan carga (TreinoFadeSlideIn, no gateado
+    // por el estado async).
+    expect(find.text('PLAN ACTIVO'), findsOneWidget);
+    expect(find.text('GUARDAR PLAN'), findsOneWidget);
+    // El plan en sí (título/comidas) todavía no llegó: shimmer skeleton en
+    // su lugar, nunca `CircularProgressIndicator` seco.
+    expect(find.byKey(const Key('plan_nutricion_skeleton')), findsOneWidget);
+    expect(find.text('Plan de alimentación'), findsNothing);
   });
 
   testWidgets('populated: plan existente renderiza título y comidas',
@@ -236,6 +280,7 @@ void main() {
     );
     await _selectNutricionTab(tester);
 
+    expect(find.text('PLAN ACTIVO'), findsOneWidget);
     expect(find.text('Progresión 4 - Semana 9'), findsOneWidget);
     expect(find.text('Desayuno post entrenamiento'), findsOneWidget);
     expect(find.text('5 discos de arroz'), findsOneWidget);
