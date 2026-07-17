@@ -48,6 +48,7 @@ Future<void> _pump(
   // `false` cuando el stream de links queda colgado en loading a propósito
   // (TreinoShimmer corre en loop infinito — pumpAndSettle no termina nunca).
   bool settle = true,
+  ThemeData? theme,
 }) async {
   tester.view.physicalSize = const Size(1200, 900);
   tester.view.devicePixelRatio = 1.0;
@@ -68,7 +69,7 @@ Future<void> _pump(
         if (repo != null) trainerLinkRepositoryProvider.overrideWithValue(repo),
       ],
       child: MaterialApp(
-        theme: AppTheme.dark(),
+        theme: theme ?? AppTheme.dark(),
         localizationsDelegates: AppL10n.localizationsDelegates,
         supportedLocales: AppL10n.supportedLocales,
         locale: const Locale('es', 'AR'),
@@ -199,6 +200,195 @@ void main() {
         ),
         findsOneWidget,
       );
+    });
+  });
+
+  group('InvitacionesScreen — tabs Aceptadas y Rechazadas (WU-05)', () {
+    testWidgets('Aceptadas: sin solicitudes aceptadas → estado vacío honesto',
+        (tester) async {
+      await _pump(
+        tester,
+        links: [_link('a1', TrainerLinkStatus.pending)],
+        profiles: [_prof('a1', 'Ana García')],
+      );
+
+      await tester.tap(find.byKey(const Key('filter_chip_Aceptadas')));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Todavía no aceptaste ninguna solicitud.'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('Rechazadas: sin solicitudes rechazadas → estado vacío honesto',
+        (tester) async {
+      await _pump(
+        tester,
+        links: [_link('a1', TrainerLinkStatus.pending)],
+        profiles: [_prof('a1', 'Ana García')],
+      );
+
+      await tester.tap(find.byKey(const Key('filter_chip_Rechazadas')));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('No rechazaste ninguna solicitud.'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('Rechazadas filtra solo terminated', (tester) async {
+      await _pump(
+        tester,
+        links: [
+          _link('a1', TrainerLinkStatus.pending, id: 'l_a1'),
+          _link('a2', TrainerLinkStatus.active, id: 'l_a2'),
+          _link('a3', TrainerLinkStatus.terminated, id: 'l_a3'),
+        ],
+        profiles: [
+          _prof('a1', 'Ana García'),
+          _prof('a2', 'Beto López'),
+          _prof('a3', 'Caro Díaz'),
+        ],
+      );
+
+      await tester.tap(find.byKey(const Key('filter_chip_Rechazadas')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('solicitud_card_l_a1')), findsNothing);
+      expect(find.byKey(const Key('solicitud_card_l_a2')), findsNothing);
+      expect(find.byKey(const Key('solicitud_card_l_a3')), findsOneWidget);
+    });
+
+    testWidgets(
+        'Aceptadas y Rechazadas son read-only: sin botones aceptar/rechazar',
+        (tester) async {
+      await _pump(
+        tester,
+        links: [
+          _link('a2', TrainerLinkStatus.active, id: 'l_a2'),
+          _link('a3', TrainerLinkStatus.terminated, id: 'l_a3'),
+        ],
+        profiles: [
+          _prof('a2', 'Beto López'),
+          _prof('a3', 'Caro Díaz'),
+        ],
+      );
+
+      await tester.tap(find.byKey(const Key('filter_chip_Aceptadas')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('accept_l_a2')), findsNothing);
+      expect(find.byKey(const Key('decline_l_a2')), findsNothing);
+      expect(find.text('ACEPTADA'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('filter_chip_Rechazadas')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('accept_l_a3')), findsNothing);
+      expect(find.byKey(const Key('decline_l_a3')), findsNothing);
+      expect(find.text('RECHAZADA'), findsOneWidget);
+    });
+
+    testWidgets('ordena las tarjetas por requestedAt DESC dentro del tab',
+        (tester) async {
+      final now = DateTime.now();
+      await _pump(
+        tester,
+        links: [
+          // Deliberadamente fuera de orden — el stream real (Firestore
+          // `.orderBy('requestedAt', descending: true)`) ya viene ordenado,
+          // pero la screen no debe depender de eso ciegamente.
+          _link(
+            'old',
+            TrainerLinkStatus.active,
+            id: 'l_old',
+            requestedAt: now.subtract(const Duration(days: 5)),
+          ),
+          _link(
+            'new',
+            TrainerLinkStatus.active,
+            id: 'l_new',
+            requestedAt: now.subtract(const Duration(hours: 1)),
+          ),
+          _link(
+            'mid',
+            TrainerLinkStatus.active,
+            id: 'l_mid',
+            requestedAt: now.subtract(const Duration(days: 1)),
+          ),
+        ],
+        profiles: [
+          _prof('old', 'Vieja Solicitud'),
+          _prof('new', 'Nueva Solicitud'),
+          _prof('mid', 'Media Solicitud'),
+        ],
+      );
+
+      await tester.tap(find.byKey(const Key('filter_chip_Aceptadas')));
+      await tester.pumpAndSettle();
+
+      final newY =
+          tester.getTopLeft(find.byKey(const Key('solicitud_card_l_new'))).dy;
+      final midY =
+          tester.getTopLeft(find.byKey(const Key('solicitud_card_l_mid'))).dy;
+      final oldY =
+          tester.getTopLeft(find.byKey(const Key('solicitud_card_l_old'))).dy;
+
+      expect(newY, lessThan(midY));
+      expect(midY, lessThan(oldY));
+    });
+
+    testWidgets(
+        'el childKey del StateSwitcher incluye el tab activo (cross-fade)',
+        (tester) async {
+      await _pump(
+        tester,
+        links: [_link('a1', TrainerLinkStatus.pending)],
+        profiles: [_prof('a1', 'Ana García')],
+      );
+
+      expect(
+        find.byKey(const ValueKey('invitaciones_data_pendientes')),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.byKey(const Key('filter_chip_Aceptadas')));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey('invitaciones_data_pendientes')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey('invitaciones_data_aceptadas')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('Aceptadas y Rechazadas: smoke dark+light sin crash',
+        (tester) async {
+      for (final theme in [AppTheme.dark(), AppTheme.light()]) {
+        await _pump(
+          tester,
+          theme: theme,
+          links: [
+            _link('a2', TrainerLinkStatus.active, id: 'l_a2'),
+            _link('a3', TrainerLinkStatus.terminated, id: 'l_a3'),
+          ],
+          profiles: [
+            _prof('a2', 'Beto López'),
+            _prof('a3', 'Caro Díaz'),
+          ],
+        );
+
+        await tester.tap(find.byKey(const Key('filter_chip_Aceptadas')));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('solicitud_card_l_a2')), findsOneWidget);
+
+        await tester.tap(find.byKey(const Key('filter_chip_Rechazadas')));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('solicitud_card_l_a3')), findsOneWidget);
+      }
     });
   });
 

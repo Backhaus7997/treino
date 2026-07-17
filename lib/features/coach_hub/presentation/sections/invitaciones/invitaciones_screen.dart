@@ -75,10 +75,15 @@ class InvitacionesScreen extends ConsumerWidget {
                 ref.invalidate(trainerLinksStreamProvider);
               }),
               data: (links) {
+                // El stream real ya viene `requestedAt DESC` (Firestore
+                // `.orderBy`, ver `trainer_link_repository.dart`), pero no
+                // dependemos ciegamente de eso: ordenamos explícito acá para
+                // que la garantía sea de la screen, no del stream stub que
+                // reciba (WU-05).
                 final filtered = [
                   for (final l in links)
                     if (matchesSolicitudTab(l, tab)) l,
-                ];
+                ]..sort((a, b) => b.requestedAt.compareTo(a.requestedAt));
                 if (filtered.isEmpty) return _EmptyForTab(tab: tab);
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
