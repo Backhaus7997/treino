@@ -148,6 +148,38 @@ Routine _simpleRoutine({String id = 'r1', String name = 'Fuerza base'}) =>
       ],
     );
 
+/// A trainer TEMPLATE (no athlete) — `RoutineSource.trainerTemplate`,
+/// `assignedTo` null. The shape edit-mode template loading must accept.
+Routine _templateRoutine({String id = 't1'}) => Routine(
+      id: id,
+      name: 'Plantilla PPL',
+      split: 'PPL',
+      level: ExperienceLevel.intermediate,
+      source: RoutineSource.trainerTemplate,
+      assignedBy: _trainerId,
+      visibility: RoutineVisibility.private,
+      days: const [
+        RoutineDay(
+          dayNumber: 1,
+          name: 'Día A',
+          slots: [
+            RoutineSlot(
+              exerciseId: 'bench-press',
+              exerciseName: 'Press de Banca',
+              muscleGroup: 'chest',
+              targetSets: 1,
+              targetRepsMin: 8,
+              targetRepsMax: 8,
+              targetReps: [8],
+              targetWeightKg: 60,
+              restSeconds: 90,
+              sets: [SetSpec(reps: 8, weightKg: 60)],
+            ),
+          ],
+        ),
+      ],
+    );
+
 /// A web-editable routine that uses a rep RANGE + a coaching note (Fase 1).
 Routine _rangeRoutine({String id = 'r2'}) => Routine(
       id: id,
@@ -1867,6 +1899,119 @@ void main() {
       final slot = (await save(tester, repo)).days.single.slots.single;
       expect(slot.sets.single.type, SetType.failure);
       expect(slot.sets.single.reps, isNull);
+    });
+  });
+
+  group('RoutineEditorWebScreen — modo plantilla', () {
+    // Pumps the editor in TEMPLATE mode (no athlete). With [templateId] the
+    // edit route is pushed; without it, the create route.
+    Future<void> pumpTemplate(
+      WidgetTester tester, {
+      RoutineRepository? repo,
+      String? templateId,
+    }) async {
+      tester.view.physicalSize = const Size(1400, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final router = GoRouter(
+        initialLocation: '/biblioteca',
+        routes: [
+          GoRoute(
+            path: '/biblioteca',
+            builder: (_, __) => const Scaffold(body: Text('Biblioteca')),
+          ),
+          GoRoute(
+            path: '/template-editor',
+            builder: (_, __) =>
+                const Scaffold(body: RoutineEditorWebScreen.template()),
+          ),
+          GoRoute(
+            path: '/template-editor/:templateId',
+            builder: (_, state) => Scaffold(
+              body: RoutineEditorWebScreen.template(
+                routineId: state.pathParameters['templateId'],
+              ),
+            ),
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: _overrides(repo: repo),
+          child:
+              MaterialApp.router(theme: AppTheme.dark(), routerConfig: router),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      router.push(
+        templateId == null
+            ? '/template-editor'
+            : '/template-editor/$templateId',
+      );
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('header reads "Nueva plantilla" and names no athlete',
+        (tester) async {
+      await pumpTemplate(tester);
+
+      expect(find.text('Nueva plantilla'), findsOneWidget);
+      expect(find.text('Plantilla reutilizable, sin alumno'), findsOneWidget);
+      expect(find.textContaining('Para '), findsNothing);
+    });
+
+    testWidgets('creating saves via createTemplate with the template shape',
+        (tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.createTemplate(any())).thenAnswer(
+        (i) async => i.positionalArguments.first as Routine,
+      );
+      await pumpTemplate(tester, repo: repo);
+
+      await _fillMinimalValidForm(tester);
+      await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
+      await tester.pumpAndSettle();
+
+      final t = verify(() => repo.createTemplate(captureAny())).captured.single
+          as Routine;
+      expect(t.source, RoutineSource.trainerTemplate);
+      expect(t.assignedTo, isNull);
+      expect(t.visibility, RoutineVisibility.private);
+      expect(t.assignedBy, _trainerId);
+      // Never the assigned path.
+      verifyNever(() => repo.createAssigned(any()));
+    });
+
+    testWidgets('editing saves via updateTemplate, never updateAssigned',
+        (tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.getById(any()))
+          .thenAnswer((_) async => _templateRoutine());
+      when(() => repo.updateTemplate(
+            uid: any(named: 'uid'),
+            draft: any(named: 'draft'),
+          )).thenAnswer((i) async => i.namedArguments[#draft] as Routine);
+      await pumpTemplate(tester, repo: repo, templateId: 't1');
+
+      expect(find.text('Editar plantilla'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
+      await tester.pumpAndSettle();
+
+      final draft = verify(() => repo.updateTemplate(
+            uid: any(named: 'uid'),
+            draft: captureAny(named: 'draft'),
+          )).captured.single as Routine;
+      expect(draft.id, 't1');
+      expect(draft.source, RoutineSource.trainerTemplate);
+      verifyNever(() => repo.updateAssigned(
+            uid: any(named: 'uid'),
+            draft: any(named: 'draft'),
+          ));
     });
   });
 }
