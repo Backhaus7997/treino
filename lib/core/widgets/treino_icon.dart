@@ -214,4 +214,6 @@ class TreinoIcon {
   // Coach Hub — Alumnos roster view-mode toggle (Tabla / Cards).
   static const IconData viewTable = PhosphorIconsRegular.rows;
   static const IconData viewCards = PhosphorIconsRegular.squaresFour;
+  // Coach Hub Web — acción archivar rutina (Fase 5, WU-04).
+  static const IconData archive = PhosphorIconsRegular.archive;
 }

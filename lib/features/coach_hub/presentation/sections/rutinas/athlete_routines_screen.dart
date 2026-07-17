@@ -15,6 +15,7 @@ import 'package:treino/core/widgets/motion/treino_tappable.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 // NO se importa routine_web_editability: a725b026 lo eliminó de main junto con
 // el guard — el editor web abre cualquier rutina sin perder datos.
+import 'package:treino/features/coach_hub/presentation/sections/rutinas/routine_actions_provider.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/features/workout/application/assigned_routine_providers.dart';
@@ -221,13 +222,14 @@ class _AthleteRoutinesBody extends ConsumerWidget {
 
 /// Fila de una rutina asignada.
 ///
-/// - Activas: tap abre el editor web, trailing ícono de edición. a725b026
-///   borró el guard de editabilidad — el editor hidrata y reescribe todo el
-///   modelo sin pérdida, así que YA NO hay rutinas view-only con hint "Editá
-///   en la app". Coincide con el dartdoc de [AthleteRoutinesScreen].
+/// - Activas: tap abre el editor, trailing ícono de edición + botón de
+///   archivar (WU-04, única mutación cableada desde esta pantalla). a725b026
+///   borró el guard de editabilidad, así que TODA activa es editable — ya no
+///   hay periodizadas view-only con hint "Editá en la app", y por lo tanto
+///   todas ofrecen archivar.
 /// - Archivadas (WU-03): SIEMPRE view-only (soft-delete, ADR-USR-04) — sin
 ///   tap y con trailing informativo propio.
-class _RoutineRow extends StatelessWidget {
+class _RoutineRow extends ConsumerStatefulWidget {
   const _RoutineRow({
     required this.routine,
     required this.athleteId,
@@ -239,29 +241,113 @@ class _RoutineRow extends StatelessWidget {
   final bool archived;
 
   @override
+  ConsumerState<_RoutineRow> createState() => _RoutineRowState();
+}
+
+class _RoutineRowState extends ConsumerState<_RoutineRow> {
+  /// Busy local a la fila mientras la mutación de archivar está en curso —
+  /// la fila desaparece de la lista apenas termina (invalidate del
+  /// provider), así que este flag sólo cubre la ventana de la llamada.
+  bool _archiving = false;
+
+  Future<void> _handleArchiveTap() async {
+    final confirmed = await showTreinoDialog<bool>(
+      context,
+      builder: (ctx) => TreinoDialog(
+        title: 'Archivar rutina', // i18n
+        body: Text(
+          '¿Archivar "${widget.routine.name}"? Va a dejar de estar activa y '
+          'vas a poder verla en Archivadas.', // i18n
+        ),
+        primaryLabel: 'Archivar', // i18n
+        secondaryLabel: 'Cancelar', // i18n
+        destructive: true,
+        onPrimaryTap: () => Navigator.of(ctx).pop(true),
+        onSecondaryTap: () => Navigator.of(ctx).pop(false),
+      ),
+    );
+    if (confirmed != true) return;
+    if (!mounted) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _archiving = true);
+
+    final ok = await ref.read(routineActionsProvider.notifier).archive(
+          routineId: widget.routine.id,
+          athleteId: widget.athleteId,
+        );
+
+    if (!mounted) return;
+    setState(() => _archiving = false);
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          ok
+              ? 'Rutina archivada.' // i18n
+              : 'No pudimos archivar la rutina.', // i18n
+        ),
+      ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final routine = widget.routine;
+    final archived = widget.archived;
+    // a725b026: sin guard por periodización. Sólo el archivado bloquea editar.
+    final editable = !archived;
     final weeks = routine.numWeeks == 1 ? 'semana' : 'semanas'; // i18n
+
+    Widget trailing;
+    if (archived) {
+      trailing = Text(
+        'Archivada', // i18n
+        style: TextStyle(
+          fontFamily: AppFonts.barlow,
+          fontSize: 12,
+          color: palette.textMuted,
+        ),
+      );
+      // Acá iba la rama `!editable` con el hint "Editá en la app" para
+      // rutinas periodizadas. a725b026 borró ese guard: `editable` es
+      // `!archived`, así que dentro de este else la rama era inalcanzable.
+    } else if (_archiving) {
+      trailing = SizedBox(
+        width: 18,
+        height: 18,
+        child: CircularProgressIndicator(
+          strokeWidth: 2,
+          color: palette.textMuted,
+        ),
+      );
+    } else {
+      trailing = Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(TreinoIcon.edit, size: 18, color: palette.textMuted),
+          const SizedBox(width: AppSpacing.s8),
+          IconButton(
+            key: ValueKey('routine_row_archive_button_${routine.id}'),
+            tooltip: 'Archivar', // i18n
+            icon: Icon(TreinoIcon.archive, size: 18, color: palette.textMuted),
+            onPressed: _handleArchiveTap,
+            visualDensity: VisualDensity.compact,
+            splashRadius: 16,
+          ),
+        ],
+      );
+    }
 
     return TreinoListRow(
       title: routine.name,
       subtitle:
           '${routine.days.length} días · ${routine.numWeeks} $weeks', // i18n
-      // Archivada = view-only (soft-delete). Activa = editable siempre:
-      // a725b026 borró el guard por periodización.
-      trailing: archived
-          ? Text(
-              'Archivada', // i18n
-              style: TextStyle(
-                fontFamily: AppFonts.barlow,
-                fontSize: 12,
-                color: palette.textMuted,
-              ),
-            )
-          : Icon(TreinoIcon.edit, size: 18, color: palette.textMuted),
-      onTap: archived
-          ? null
-          : () => context.push('/routine-editor/$athleteId/${routine.id}'),
+      trailing: trailing,
+      onTap: editable
+          ? () =>
+              context.push('/routine-editor/${widget.athleteId}/${routine.id}')
+          : null,
     );
   }
 }
