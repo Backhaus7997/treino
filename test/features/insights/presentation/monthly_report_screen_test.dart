@@ -5,6 +5,7 @@ import 'package:intl/intl.dart' as intl;
 import 'package:mocktail/mocktail.dart';
 
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/core/utils/argentina_time.dart';
 import 'package:treino/features/insights/presentation/monthly_report_screen.dart';
 import 'package:treino/features/insights/presentation/widgets/monthly_report_chart.dart';
 import 'package:treino/features/workout/application/exercise_providers.dart';
@@ -75,20 +76,24 @@ void main() {
       '(AD6/PR5c pinning test — not just presence of the label)',
       (tester) async {
     final repo = MockSessionRepository();
-    final now = DateTime.now();
-    final monthStart = DateTime(now.year, now.month, 1);
+    // [#379] Anchor in the Argentina frame (as the aggregator does via
+    // argentinaNow()) and store startedAt as real UTC instants at NOON on
+    // mid-month days: `toArgentina` shifts by -3h, so day-1 LOCAL midnight would
+    // spill into the PREVIOUS month and drop the session — noon mid-month keeps
+    // the Argentina calendar month unambiguous and TZ-independent.
+    final now = argentinaNow();
 
     when(() => repo.listByUid('u1')).thenAnswer((_) async => [
           makeSession(
             id: 's1',
-            startedAt: monthStart,
+            startedAt: DateTime.utc(now.year, now.month, 10, 12),
             status: SessionStatus.finished,
             wasFullyCompleted: true,
             durationMin: 40,
           ),
           makeSession(
             id: 's2',
-            startedAt: DateTime(monthStart.year, monthStart.month, 2),
+            startedAt: DateTime.utc(now.year, now.month, 11, 12),
             status: SessionStatus.finished,
             wasFullyCompleted: true,
             durationMin: 25,
@@ -96,7 +101,7 @@ void main() {
           // A non-finished session's duration must NOT be counted.
           makeSession(
             id: 's3',
-            startedAt: DateTime(monthStart.year, monthStart.month, 3),
+            startedAt: DateTime.utc(now.year, now.month, 12, 12),
             status: SessionStatus.active,
             durationMin: 999,
           ),

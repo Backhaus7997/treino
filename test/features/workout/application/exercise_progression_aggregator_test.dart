@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:treino/core/utils/argentina_time.dart';
 import 'package:treino/features/insights/domain/chart_period.dart';
 import 'package:treino/features/workout/application/exercise_progression_aggregator.dart';
 import 'package:treino/features/workout/domain/exercise_progression.dart';
@@ -333,9 +334,17 @@ void main() {
     test(
         'SCENARIO-PROG-03B: Frecuencia boundary — session at exactly 56 days is included',
         () {
-      final now = DateTime(2025, 3, 2, 0, 0, 0);
-      final edge = now.subtract(const Duration(days: 56));
-      final sEdge = _session('sEdge', edge);
+      // [#379] `now` is the Argentina-framed reference (as argentinaNow()
+      // provides in production): UTC-flagged wall-clock. Sessions are stored as
+      // real UTC instants. The 56-day cutoff lives in the ART frame, and the
+      // filter compares `toArgentina(startedAt)` against it — so a session whose
+      // ART instant is EXACTLY the cutoff must be INCLUDED (inclusive lower
+      // bound). Since ART = UTC - offset, the real UTC startedAt is
+      // `cutoff + offset`. All UTC-flagged → TZ-independent (local UTC-3 == CI
+      // UTC).
+      final now = DateTime.utc(2025, 3, 2, 12);
+      final cutoffArt = now.subtract(const Duration(days: 56));
+      final sEdge = _session('sEdge', cutoffArt.add(argentinaUtcOffset));
       final logs = {
         'sEdge': [
           _log(
@@ -500,8 +509,7 @@ void main() {
     // Sessions on Jan 5 / Jan 10 / Jan 15 (s3/Jan 15 has NO squat logs in the
     // shared fixture). A window covering ONLY Jan 8..20 must exclude Jan 5's
     // session (s1) from every series — only s2 (Jan 10) has squat data left.
-    test('sessions outside the period window are excluded from all series',
-        () {
+    test('sessions outside the period window are excluded from all series', () {
       final window = ChartPeriodWindow(
         currentStart: DateTime(2025, 1, 8),
         currentEnd: DateTime(2025, 1, 20),
@@ -521,43 +529,91 @@ void main() {
       expect(result.heaviestWeightSeries.single.date, _s2.startedAt);
     });
 
+    // [#379] Boundary tests are self-contained with UTC-flagged fixtures: the
+    // shared _sN fixtures use LOCAL midnight, whose Argentina calendar day under
+    // `toArgentina` is TZ-dependent (Jan 5 on UTC-3, Jan 4 on UTC) — fatal for a
+    // day-boundary assertion. Sessions here are real UTC instants at NOON so
+    // their ART day (09:00) is unambiguous, and windows are UTC-flagged exactly
+    // as ChartPeriod.windowFor emits.
     test('a window boundary day (currentStart) is INCLUSIVE', () {
+      final sA = _session('sA', DateTime.utc(2025, 1, 5, 12)); // ART day Jan 5
+      final sB =
+          _session('sB', DateTime.utc(2025, 1, 10, 12)); // ART day Jan 10
+      final logs = <String, List<SetLog>>{
+        'sA': [
+          _log(
+              sessionId: 'sA',
+              exerciseId: 'squat',
+              exerciseName: 'S',
+              reps: 5,
+              weightKg: 80)
+        ],
+        'sB': [
+          _log(
+              sessionId: 'sB',
+              exerciseId: 'squat',
+              exerciseName: 'S',
+              reps: 5,
+              weightKg: 85)
+        ],
+      };
       final window = ChartPeriodWindow(
-        currentStart: DateTime(2025, 1, 5), // exactly s1's day
-        currentEnd: DateTime(2025, 1, 20),
-        previousStart: DateTime(2024, 12, 1),
-        previousEnd: DateTime(2025, 1, 4),
+        currentStart: DateTime.utc(2025, 1, 5), // exactly sA's ART day
+        currentEnd: DateTime.utc(2025, 1, 20),
+        previousStart: DateTime.utc(2024, 12, 1),
+        previousEnd: DateTime.utc(2025, 1, 4),
       );
 
       final result = aggregateExerciseProgression(
         exerciseId: 'squat',
-        sessionsDesc: _sessionsDesc,
-        logsBySession: _logsBySession,
-        now: DateTime(2025, 1, 20),
+        sessionsDesc: [sB, sA],
+        logsBySession: logs,
+        now: DateTime.utc(2025, 1, 20, 12),
         periodWindow: window,
       );
 
-      // s1 (Jan 5, boundary day) + s2 (Jan 10) have squat logs; s3 has none.
+      // sA (boundary day) + sB are INCLUDED.
       expect(result.heaviestWeightSeries.length, 2);
     });
 
     test('a window boundary day (currentEnd) is INCLUSIVE', () {
+      final sA = _session('sA', DateTime.utc(2025, 1, 5, 12)); // ART day Jan 5
+      final sB =
+          _session('sB', DateTime.utc(2025, 1, 10, 12)); // ART day Jan 10
+      final logs = <String, List<SetLog>>{
+        'sA': [
+          _log(
+              sessionId: 'sA',
+              exerciseId: 'squat',
+              exerciseName: 'S',
+              reps: 5,
+              weightKg: 80)
+        ],
+        'sB': [
+          _log(
+              sessionId: 'sB',
+              exerciseId: 'squat',
+              exerciseName: 'S',
+              reps: 5,
+              weightKg: 85)
+        ],
+      };
       final window = ChartPeriodWindow(
-        currentStart: DateTime(2025, 1, 1),
-        currentEnd: DateTime(2025, 1, 10), // exactly s2's day
-        previousStart: DateTime(2024, 12, 1),
-        previousEnd: DateTime(2024, 12, 31),
+        currentStart: DateTime.utc(2025, 1, 1),
+        currentEnd: DateTime.utc(2025, 1, 10), // exactly sB's ART day
+        previousStart: DateTime.utc(2024, 12, 1),
+        previousEnd: DateTime.utc(2024, 12, 31),
       );
 
       final result = aggregateExerciseProgression(
         exerciseId: 'squat',
-        sessionsDesc: _sessionsDesc,
-        logsBySession: _logsBySession,
-        now: DateTime(2025, 1, 20),
+        sessionsDesc: [sB, sA],
+        logsBySession: logs,
+        now: DateTime.utc(2025, 1, 20, 12),
         periodWindow: window,
       );
 
-      // s1 (Jan 5) + s2 (Jan 10, boundary day) have squat logs.
+      // sA + sB (boundary day) are INCLUDED.
       expect(result.heaviestWeightSeries.length, 2);
     });
 
@@ -574,7 +630,8 @@ void main() {
       expect(result.heaviestWeightSeries.length, 2);
     });
 
-    test('frequencyLast8Weeks is unaffected by periodWindow (still uses the '
+    test(
+        'frequencyLast8Weeks is unaffected by periodWindow (still uses the '
         '56-day `now`-relative cutoff, not the period window)', () {
       final window = ChartPeriodWindow(
         currentStart: DateTime(2025, 1, 8),

@@ -373,7 +373,6 @@
   "dashboardAceptarLabel": "ACEPTAR",
   "dashboardPagosPorCobrarTitle": "PAGOS POR COBRAR",
   "dashboardCobroTrailingLabel": "+ Cobro",
-  "dashboardInvitarAlumnoLabel": "+ INVITAR ALUMNO",
   "dashboardAsignarRutinaLabel": "+ ASIGNAR RUTINA",
   "dashboardCobroSueltoTitle": "COBRO SUELTO",
   "dashboardAlumnoLabel": "ALUMNO",
@@ -412,7 +411,6 @@
   "dashboardSinCobros": "Sin cobros pendientes.",
   "dashboardErrorCobros": "No pudimos cargar los cobros.",
   "dashboardHolaSinNombre": "HOLA",
-  "dashboardInvitarProximamente": "Invitar alumno — próximamente.",
   "dashboardSolicitudesPendientesTitle": "SOLICITUDES PENDIENTES ({count})",
   "@dashboardSolicitudesPendientesTitle": {
     "placeholders": {

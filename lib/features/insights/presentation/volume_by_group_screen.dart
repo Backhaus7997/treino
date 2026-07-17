@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
+import '../../../core/utils/argentina_time.dart';
 import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
@@ -29,7 +30,7 @@ class VolumeByGroupScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
-    final weekStart = mondayOfWeek(DateTime.now().toLocal());
+    final weekStart = mondayOfWeek(argentinaNow());
     final async = ref.watch(
       athleteWeekInsightsProvider((uid: uid, weekStart: weekStart)),
     );

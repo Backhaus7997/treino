@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/utils/argentina_time.dart';
 import '../../../core/utils/streak_calculator.dart';
 import '../../workout/application/exercise_providers.dart';
 import '../../workout/application/routine_providers.dart';
@@ -31,14 +32,14 @@ final athleteWeekInsightsProvider = FutureProvider.autoDispose
   // el siguiente lunes (exclusivo). Aritmética de calendario (no Duration)
   // para que el borde caiga en medianoche local incluso atravesando un
   // cambio de horario (DST).
-  final weekStart = DateTime(
+  final weekStart = DateTime.utc(
     key.weekStart.year,
     key.weekStart.month,
     key.weekStart.day,
   );
   final weekEndExclusive =
-      DateTime(weekStart.year, weekStart.month, weekStart.day + 7);
-  final now = DateTime.now().toLocal();
+      DateTime.utc(weekStart.year, weekStart.month, weekStart.day + 7);
+  final now = argentinaNow();
 
   // Todas las sessions del usuario (listByUid ya viene ordenado DESC por
   // startedAt en SessionRepository).
@@ -47,7 +48,7 @@ final athleteWeekInsightsProvider = FutureProvider.autoDispose
 
   // Filtro a la semana pedida + finished.
   final weekSessions = allSessions.where((s) {
-    final started = s.startedAt.toLocal();
+    final started = toArgentina(s.startedAt);
     return !started.isBefore(weekStart) &&
         started.isBefore(weekEndExclusive) &&
         s.countsAsWorkout;
@@ -56,7 +57,7 @@ final athleteWeekInsightsProvider = FutureProvider.autoDispose
   // Días entrenados (0=lun..6=dom).
   final daysTrained = List<bool>.filled(7, false);
   for (final s in weekSessions) {
-    final dayIndex = s.startedAt.toLocal().weekday - DateTime.monday;
+    final dayIndex = toArgentina(s.startedAt).weekday - DateTime.monday;
     if (dayIndex >= 0 && dayIndex < 7) {
       daysTrained[dayIndex] = true;
     }
@@ -126,13 +127,20 @@ final athleteWeekInsightsProvider = FutureProvider.autoDispose
   // streak — días consecutivos entrenados (incluye hoy si entrenó, sino
   // cuenta desde ayer). ADR-WRS-08: lifted to lib/core/utils/streak_calculator.dart
   // in PR#2.
-  final streak = computeStreak(allSessions, now: now);
+  // NB: computeStreak is device-local (it calls `.toLocal()` internally on both
+  // its `now` arg and each session date), NOT ART — passing the ART-framed
+  // `now` above would double-shift and corrupt the day math. We deliberately
+  // let it default to `DateTime.now()`, keeping its behavior IDENTICAL to before
+  // this fix and consistent with every other computeStreak caller
+  // (workout_days_providers / profile_stats / session_repository).
+  final streak = computeStreak(allSessions);
 
   // monthSessionsCount — sesiones finished en el mes calendario actual.
-  // ADR-WRS-03: mes calendario, NOT ventana de 30 días.
+  // ADR-WRS-03: mes calendario ARGENTINA (mismo frame que el resto de Insights),
+  // NOT ventana de 30 días.
   final monthSessionsCount = allSessions.where((s) {
     if (!s.countsAsWorkout) return false;
-    final local = s.startedAt.toLocal();
+    final local = toArgentina(s.startedAt);
     return local.year == now.year && local.month == now.month;
   }).length;
 
@@ -167,7 +175,7 @@ final weeklyInsightsProvider =
   final uid = ref.watch(currentUidProvider);
   if (uid == null) return null;
 
-  final weekStart = mondayOfWeek(DateTime.now().toLocal());
+  final weekStart = mondayOfWeek(argentinaNow());
   return ref.watch(
     athleteWeekInsightsProvider((uid: uid, weekStart: weekStart)).future,
   );
@@ -182,6 +190,8 @@ final weeklyInsightsProvider =
 DateTime mondayOfWeek(DateTime now) {
   final daysFromMonday = now.weekday - DateTime.monday;
   // Resta de días vía constructor de calendario para normalizar el borde a
-  // medianoche local aun cuando la semana cruza un cambio de horario (DST).
-  return DateTime(now.year, now.month, now.day - daysFromMonday);
+  // medianoche. UTC-flagged para vivir en el frame ART (mismo que las
+  // comparaciones de sesión vía toArgentina); pasarle argentinaNow() da el
+  // lunes calendario de Argentina.
+  return DateTime.utc(now.year, now.month, now.day - daysFromMonday);
 }
