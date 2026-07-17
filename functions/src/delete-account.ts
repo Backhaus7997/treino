@@ -31,7 +31,8 @@ import { sweepFriendships } from "./cascade/friendships";
 import { deletePosts } from "./cascade/posts";
 import { terminateTrainerLinks } from "./cascade/trainer-links";
 import { cancelFutureAppointments } from "./cascade/appointments";
-import { deleteAvatar } from "./cascade/storage";
+import { deleteAvatar, deleteAthleteStorage } from "./cascade/storage";
+import { deleteAthleteOwnedData } from "./cascade/athlete-data";
 import { deleteUserDocs } from "./cascade/users";
 import {
   DeleteAccountRequest,
@@ -125,6 +126,25 @@ export async function runDeleteAccount(
     deletedCollections.push("storage");
   } catch (err: unknown) {
     errors.push(`storage: ${(err as Error).message ?? String(err)}`);
+  }
+
+  // ── Step 8b: Delete the athlete's other Storage objects (QA-CMP-002) ───
+  // chatMedia / customExerciseVideos / temp uploads / athleteFiles.
+  try {
+    await deleteAthleteStorage(app, uid);
+    deletedCollections.push("storage-athlete");
+  } catch (err: unknown) {
+    errors.push(`storage-athlete: ${(err as Error).message ?? String(err)}`);
+  }
+
+  // ── Step 8c: Delete athlete-owned Firestore data (QA-CMP-003) ──────────
+  // measurements, performance_tests, profile_shares, session_shares,
+  // athlete_billing, athlete_notes, follow_up_entries, nutrition_plans.
+  try {
+    await deleteAthleteOwnedData(app, uid);
+    deletedCollections.push("athlete-data");
+  } catch (err: unknown) {
+    errors.push(`athlete-data: ${(err as Error).message ?? String(err)}`);
   }
 
   // ── Step 9: Delete user docs ───────────────────────────────────────────
