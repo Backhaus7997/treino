@@ -13,6 +13,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/core/widgets/motion/treino_tappable.dart';
+import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach/application/athlete_file_providers.dart';
 import 'package:treino/features/coach/application/athlete_note_providers.dart';
 import 'package:treino/features/coach/application/follow_up_entry_providers.dart';
@@ -208,6 +210,47 @@ void main() {
     expect(find.text('Merienda'), findsOneWidget);
     expect(find.text('Colación'), findsWidgets);
     expect(find.text('Cena'), findsOneWidget);
+  });
+
+  testWidgets(
+      'token-purity: usa TreinoIcon (Phosphor), no Icons.* de Material '
+      '(remediación CRITICAL, verify Fase 3 ronda 1)', (tester) async {
+    _useDesktopViewport(tester);
+    await tester.pumpWidget(
+        _wrap(_baseOverrides(athleteUid: _athleteUid), _athleteUid));
+    await _selectNutricionTab(tester);
+
+    // AGREGAR COMIDA / AGREGAR GRUPO / AGREGAR OPCIÓN → TreinoIcon.plus.
+    expect(find.byIcon(TreinoIcon.plus), findsWidgets);
+    expect(find.byIcon(Icons.add), findsNothing);
+    // Prefix del campo "Hora" → TreinoIcon.clock.
+    expect(find.byIcon(TreinoIcon.clock), findsWidgets);
+    expect(find.byIcon(Icons.schedule), findsNothing);
+  });
+
+  testWidgets(
+      'a11y: el selector ELEGIR UNA/TODAS usa TreinoTappable, no '
+      'GestureDetector crudo (remediación WARNING, verify Fase 3 ronda 1)',
+      (tester) async {
+    _useDesktopViewport(tester);
+    await tester.pumpWidget(
+        _wrap(_baseOverrides(athleteUid: _athleteUid), _athleteUid));
+    await _selectNutricionTab(tester);
+
+    expect(
+      find.ancestor(
+        of: find.text('ELEGIR UNA').first,
+        matching: find.byType(TreinoTappable),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.ancestor(
+        of: find.text('TODAS').first,
+        matching: find.byType(TreinoTappable),
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets(

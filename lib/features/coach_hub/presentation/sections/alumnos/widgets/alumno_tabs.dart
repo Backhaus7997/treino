@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:treino/app/theme/app_palette.dart';
+import 'package:treino/app/theme/tokens/components/treino_transparent_tokens.dart';
 import 'package:treino/app/theme/tokens/primitives.dart';
 
 /// Tab bar del detalle de Alumno — Fase 3 WU-04.
@@ -29,7 +30,7 @@ class AlumnoTabs extends StatelessWidget {
       child: TabBar(
         isScrollable: true,
         tabAlignment: TabAlignment.start,
-        dividerColor: Colors.transparent,
+        dividerColor: TreinoTransparentTokens.value,
         indicatorSize: TabBarIndicatorSize.tab,
         indicator: BoxDecoration(
           color: palette.accent,
