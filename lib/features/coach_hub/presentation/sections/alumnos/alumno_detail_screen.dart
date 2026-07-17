@@ -29,7 +29,6 @@ import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach_hub/presentation/sections/chat/widgets/avatar_color.dart';
 import 'package:treino/features/coach_hub/presentation/sections/chat/widgets/chat_detail_pane.dart';
-import 'package:treino/features/coach_hub/presentation/sections/routine_editor/routine_web_editability.dart';
 import 'package:treino/features/gyms/application/gym_providers.dart';
 import 'package:treino/features/insights/domain/chart_period.dart';
 import 'package:treino/features/insights/presentation/widgets/daily_heatmap_section.dart';
@@ -1892,10 +1891,6 @@ class _RutinaCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Only web-authored (simple) routines can be edited here; periodized /
-    // superset plans from mobile would be truncated on save, so we route the
-    // trainer to the mobile app instead (see isRoutineWebEditable).
-    final editable = isRoutineWebEditable(routine);
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -1918,26 +1913,22 @@ class _RutinaCard extends StatelessWidget {
                   ),
                 ),
               ),
-              if (editable)
-                TextButton.icon(
-                  onPressed: () =>
-                      context.push('/routine-editor/$athleteId/${routine.id}'),
-                  icon: Icon(TreinoIcon.edit, size: 15, color: palette.accent),
-                  label: Text('Editar', // i18n: Fase W2
-                      style: TextStyle(
-                          color: palette.accent,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 13)),
-                  style: TextButton.styleFrom(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                )
-              else
-                Text('Editá en la app', // i18n: Fase W2
-                    style: TextStyle(color: palette.textMuted, fontSize: 12)),
+              TextButton.icon(
+                onPressed: () =>
+                    context.push('/routine-editor/$athleteId/${routine.id}'),
+                icon: Icon(TreinoIcon.edit, size: 15, color: palette.accent),
+                label: Text('Editar', // i18n: Fase W2
+                    style: TextStyle(
+                        color: palette.accent,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13)),
+                style: TextButton.styleFrom(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 4),

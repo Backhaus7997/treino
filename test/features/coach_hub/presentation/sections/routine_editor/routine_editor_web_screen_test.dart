@@ -296,8 +296,128 @@ Routine _perWeekRoutine({String id = 'r6'}) => Routine(
       ],
     );
 
-/// A routine using the per-week PRESENCE mask (activeWeeks populated) — still
-/// out of web scope (Fase 4c), so the editor must refuse it.
+/// A per-week PRESENCE-masked routine (activeWeeks populated: present only in
+/// week 0 of 2) — web-editable since Fase 4c. Used by the edit round-trip
+/// test to confirm activeWeeks survives a save unchanged.
+/// A mobile-authored plan exercising every axis at once: 2 weeks with distinct
+/// per-week loads, a superset pair, typed sets, a rep range, coaching notes and
+/// a presence mask. Its legacy fields are filled exactly as mobile's
+/// `buildRoutineSlot` derives them, so a faithful web round-trip is an
+/// identity — any diff is a field web silently drops or rewrites.
+Routine _kitchenSinkRoutine({String id = 'r9'}) => Routine(
+      id: id,
+      name: 'Periodizada completa',
+      split: 'PPL',
+      level: ExperienceLevel.advanced,
+      source: RoutineSource.trainerAssigned,
+      assignedBy: _trainerId,
+      assignedTo: _athleteId,
+      visibility: RoutineVisibility.private,
+      numWeeks: 2,
+      days: const [
+        RoutineDay(
+          dayNumber: 1,
+          name: 'Día A',
+          slots: [
+            // Superset member 1: reps/single, typed sets, present every week.
+            RoutineSlot(
+              exerciseId: 'bench-press',
+              exerciseName: 'Press de Banca',
+              muscleGroup: 'chest',
+              targetSets: 3,
+              targetRepsMin: 6,
+              targetRepsMax: 12,
+              targetReps: [12, 8, 6],
+              targetWeightKg: 20,
+              restSeconds: 90,
+              supersetGroup: 1,
+              notes: 'Controlá la bajada',
+              sets: [
+                SetSpec(type: SetType.warmup, reps: 12, weightKg: 20),
+                SetSpec(reps: 8, weightKg: 60),
+                SetSpec(type: SetType.failure, reps: 6, weightKg: 70),
+              ],
+              weeklySets: [
+                [
+                  SetSpec(type: SetType.warmup, reps: 12, weightKg: 20),
+                  SetSpec(reps: 8, weightKg: 60),
+                  SetSpec(type: SetType.failure, reps: 6, weightKg: 70),
+                ],
+                [
+                  SetSpec(type: SetType.warmup, reps: 12, weightKg: 25),
+                  SetSpec(reps: 8, weightKg: 65),
+                  SetSpec(type: SetType.failure, reps: 5, weightKg: 75),
+                ],
+              ],
+            ),
+            // Superset member 2: reps/RANGE, dropped from week 2.
+            RoutineSlot(
+              exerciseId: 'squat',
+              exerciseName: 'Sentadilla',
+              muscleGroup: 'legs',
+              targetSets: 2,
+              targetRepsMin: 8,
+              targetRepsMax: 12,
+              targetWeightKg: 80,
+              restSeconds: 120,
+              supersetGroup: 1,
+              repMode: RepMode.range,
+              sets: [
+                SetSpec(repsMin: 8, repsMax: 12, weightKg: 80),
+                SetSpec(repsMin: 8, repsMax: 10, weightKg: 85),
+              ],
+              weeklySets: [
+                [
+                  SetSpec(repsMin: 8, repsMax: 12, weightKg: 80),
+                  SetSpec(repsMin: 8, repsMax: 10, weightKg: 85),
+                ],
+                [
+                  SetSpec(repsMin: 8, repsMax: 12, weightKg: 80),
+                  SetSpec(repsMin: 8, repsMax: 10, weightKg: 85),
+                ],
+              ],
+              activeWeeks: [0],
+            ),
+          ],
+        ),
+      ],
+    );
+
+/// A mobile-authored routine whose sets carry non-default [SetType]s — the
+/// shape web must not damage when it opens and re-saves someone else's plan.
+Routine _typedSetsRoutine({String id = 'r8'}) => Routine(
+      id: id,
+      name: 'Con series tipadas',
+      split: 'Full Body',
+      level: ExperienceLevel.advanced,
+      source: RoutineSource.trainerAssigned,
+      assignedBy: _trainerId,
+      assignedTo: _athleteId,
+      visibility: RoutineVisibility.private,
+      days: const [
+        RoutineDay(
+          dayNumber: 1,
+          name: 'Día A',
+          slots: [
+            RoutineSlot(
+              exerciseId: 'bench-press',
+              exerciseName: 'Press de Banca',
+              muscleGroup: 'chest',
+              targetSets: 3,
+              targetRepsMin: 8,
+              targetRepsMax: 8,
+              restSeconds: 90,
+              sets: [
+                SetSpec(type: SetType.warmup, reps: 12, weightKg: 20),
+                SetSpec(reps: 8, weightKg: 60),
+                SetSpec(type: SetType.failure, reps: 6, weightKg: 70),
+              ],
+            ),
+          ],
+        ),
+      ],
+    );
+
 Routine _presenceRoutine({String id = 'r7'}) => Routine(
       id: id,
       name: 'Con máscara de presencia',
@@ -586,24 +706,6 @@ void main() {
       expect(draft.name, 'Fuerza v2');
       expect(draft.numWeeks, 1);
       verifyNever(() => repo.createAssigned(any()));
-    });
-
-    testWidgets(
-        'refuses a routine with a presence mask and does not save (no truncation)',
-        (tester) async {
-      final repo = _MockRoutineRepository();
-      when(() => repo.getById(any()))
-          .thenAnswer((_) async => _presenceRoutine());
-      await _pumpEditor(tester, repo: repo, routineId: 'r7');
-
-      expect(find.textContaining('periodización'), findsOneWidget);
-      expect(find.text('Volver'), findsOneWidget);
-      expect(find.text('Guardar cambios'), findsNothing); // form/footer hidden
-      expect(find.text('Fuerza base'), findsNothing); // not populated
-      verifyNever(() => repo.updateAssigned(
-            uid: any(named: 'uid'),
-            draft: any(named: 'draft'),
-          ));
     });
 
     testWidgets('shows a not-found message when the routine is missing',
@@ -1054,6 +1156,189 @@ void main() {
       expect(slot.weeklySets[0].single.weightKg, 55);
       expect(slot.weeklySets[1].single.reps, 8);
       expect(slot.weeklySets[1].single.weightKg, 60);
+    });
+  });
+
+  group('RoutineEditorWebScreen — presencia por semana (Fase 4c)', () {
+    testWidgets('excluding week 2 via its presence chip saves activeWeeks: [0]',
+        (tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.createAssigned(any())).thenAnswer(
+        (i) async => i.positionalArguments.first as Routine,
+      );
+      await _pumpEditor(tester, repo: repo);
+
+      // Fill week 1 FIRST, then bump to 2 weeks — the new week is seeded with
+      // a deep copy of week 1's (now-filled) sets (_normalizeSlotWeeks, Fase
+      // 4b), so both weeks start with a valid prescription; only the
+      // presence mask changes below (bumping first would leave week 2 blank
+      // and block submit, mirroring the Fase 4a stepper test).
+      await _fillMinimalValidForm(tester);
+
+      await tester.tap(find.text('+'));
+      await tester.pumpAndSettle();
+      expect(find.text('2 semanas'), findsOneWidget);
+
+      // Exclude week 2 (0-based index 1) via its presence chip.
+      await tester.ensureVisible(find.byKey(const Key('presence_chip_1')));
+      await tester.tap(find.byKey(const Key('presence_chip_1')));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
+      await tester.pumpAndSettle();
+
+      final routine = verify(() => repo.createAssigned(captureAny()))
+          .captured
+          .single as Routine;
+      expect(routine.days.single.slots.single.activeWeeks, [0]);
+    });
+
+    testWidgets(
+        'a blank week does NOT block submit when the exercise is absent from it',
+        (tester) async {
+      // Regression: the trainer bumps the week count FIRST and then adds the
+      // exercise, so weeks 2..N start blank. Excluding week 2 via its presence
+      // chip must let the plan save — those rows are never executed, so
+      // demanding reps for them blocked a perfectly valid routine.
+      final repo = _MockRoutineRepository();
+      when(() => repo.createAssigned(any())).thenAnswer(
+        (i) async => i.positionalArguments.first as Routine,
+      );
+      await _pumpEditor(tester, repo: repo);
+
+      // Bump FIRST → the exercise added below gets 2 BLANK weeks.
+      await tester.tap(find.text('+'));
+      await tester.pumpAndSettle();
+      expect(find.text('2 semanas'), findsOneWidget);
+
+      // Adds the exercise and fills ONLY week 1's reps — week 2 stays blank.
+      await _fillMinimalValidForm(tester);
+
+      // Exclude week 2 (0-based 1): its blank sets must not be validated.
+      await tester.ensureVisible(find.byKey(const Key('presence_chip_1')));
+      await tester.tap(find.byKey(const Key('presence_chip_1')));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
+      await tester.pumpAndSettle();
+
+      final routine = verify(() => repo.createAssigned(captureAny()))
+          .captured
+          .single as Routine;
+      expect(routine.days.single.slots.single.activeWeeks, [0]);
+    });
+
+    testWidgets(
+        'toggling a week off then back on canonicalizes the mask back to empty (all weeks)',
+        (tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.createAssigned(any())).thenAnswer(
+        (i) async => i.positionalArguments.first as Routine,
+      );
+      await _pumpEditor(tester, repo: repo);
+
+      await _fillMinimalValidForm(tester);
+      await tester.tap(find.text('+'));
+      await tester.pumpAndSettle();
+      expect(find.text('2 semanas'), findsOneWidget);
+
+      await tester.ensureVisible(find.byKey(const Key('presence_chip_1')));
+      await tester.tap(find.byKey(const Key('presence_chip_1'))); // exclude
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('presence_chip_1'))); // re-include
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
+      await tester.pumpAndSettle();
+
+      final routine = verify(() => repo.createAssigned(captureAny()))
+          .captured
+          .single as Routine;
+      // Covering every week again is canonically "no mask", not [0, 1].
+      expect(routine.days.single.slots.single.activeWeeks, isEmpty);
+    });
+
+    testWidgets(
+        'edit mode loads a presence-masked routine (gate is gone) and re-saves it unchanged',
+        (tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.getById(any()))
+          .thenAnswer((_) async => _presenceRoutine());
+      when(() => repo.updateAssigned(
+            uid: any(named: 'uid'),
+            draft: any(named: 'draft'),
+          )).thenAnswer((i) async => i.namedArguments[#draft] as Routine);
+      await _pumpEditor(tester, repo: repo, routineId: 'r7');
+
+      // Loads successfully now — the isRoutineWebEditable gate is gone.
+      expect(find.textContaining('periodización'), findsNothing);
+      expect(find.text('Editar rutina'), findsOneWidget);
+      expect(find.text('Con máscara de presencia'), findsOneWidget);
+      expect(find.text('Guardar cambios'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
+      await tester.pumpAndSettle();
+
+      final draft = verify(() => repo.updateAssigned(
+            uid: any(named: 'uid'),
+            draft: captureAny(named: 'draft'),
+          )).captured.single as Routine;
+      expect(draft.days.single.slots.single.activeWeeks, [0]);
+    });
+  });
+
+  group('RoutineEditorWebScreen — SetType round-trip', () {
+    testWidgets('re-saving a mobile-authored routine preserves each set type',
+        (tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.getById(any()))
+          .thenAnswer((_) async => _typedSetsRoutine());
+      when(() => repo.updateAssigned(
+            uid: any(named: 'uid'),
+            draft: any(named: 'draft'),
+          )).thenAnswer((i) async => i.namedArguments[#draft] as Routine);
+      await _pumpEditor(tester, repo: repo, routineId: 'r8');
+
+      // Touch nothing — just open the plan and hit save, the way a trainer
+      // would after glancing at it.
+      await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
+      await tester.pumpAndSettle();
+
+      final draft = verify(() => repo.updateAssigned(
+            uid: any(named: 'uid'),
+            draft: captureAny(named: 'draft'),
+          )).captured.single as Routine;
+
+      expect(
+        draft.days.single.slots.single.sets.map((s) => s.type).toList(),
+        const [SetType.warmup, SetType.normal, SetType.failure],
+        reason: 'Opening and re-saving a plan must not silently downgrade '
+            'warm-up/failure sets to normal working sets.',
+      );
+    });
+
+    testWidgets('re-saving a full mobile-authored plan changes nothing at all',
+        (tester) async {
+      // This is what justifies dropping the isRoutineWebEditable gate: web may
+      // open ANY routine only if a no-op edit is provably a no-op on the wire.
+      final original = _kitchenSinkRoutine();
+      final repo = _MockRoutineRepository();
+      when(() => repo.getById(any())).thenAnswer((_) async => original);
+      when(() => repo.updateAssigned(
+            uid: any(named: 'uid'),
+            draft: any(named: 'draft'),
+          )).thenAnswer((i) async => i.namedArguments[#draft] as Routine);
+      await _pumpEditor(tester, repo: repo, routineId: 'r9');
+
+      await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
+      await tester.pumpAndSettle();
+
+      final draft = verify(() => repo.updateAssigned(
+            uid: any(named: 'uid'),
+            draft: captureAny(named: 'draft'),
+          )).captured.single as Routine;
+
+      expect(draft.days, original.days);
     });
   });
 }
