@@ -52,6 +52,14 @@ admin.initializeApp({ projectId: 'treino-dev' });
 const auth = admin.auth();
 const db = admin.firestore();
 
+// Stock exercise catalogue — same data prod uses. Required AFTER
+// initializeApp: seed_workout_catalog.js guards its own init, so requiring it
+// here reuses this emulator-bound app instead of creating a prod one.
+const {
+  exercises: CATALOG_EXERCISES,
+  buildExerciseDoc,
+} = require('./seed_workout_catalog.js');
+
 // ────────────────────────────────────────────────────────────────────────────
 // Geohash5 — port of lib/core/utils/geohash.dart
 // ────────────────────────────────────────────────────────────────────────────
@@ -335,9 +343,9 @@ const ROUTINES = [
         name: 'Upper A – Empuje',
         estimatedMinutes: 55,
         slots: [
-          { exerciseId: 'press-banca', exerciseName: 'Press de Banca', muscleGroup: 'Pecho', targetSets: 4, targetRepsMin: 5, targetRepsMax: 6, restSeconds: 180, targetWeightKg: 80 },
-          { exerciseId: 'press-militar', exerciseName: 'Press Militar', muscleGroup: 'Hombros', targetSets: 3, targetRepsMin: 6, targetRepsMax: 8, restSeconds: 150, targetWeightKg: 50 },
-          { exerciseId: 'fondos', exerciseName: 'Fondos en paralelas', muscleGroup: 'Tríceps', targetSets: 3, targetRepsMin: 8, targetRepsMax: 12, restSeconds: 120, targetWeightKg: null },
+          { exerciseId: 'press-banca', exerciseName: 'Press de Banca', muscleGroup: 'chest', targetSets: 4, targetRepsMin: 5, targetRepsMax: 6, restSeconds: 180, targetWeightKg: 80 },
+          { exerciseId: 'press-militar', exerciseName: 'Press Militar', muscleGroup: 'shoulders', targetSets: 3, targetRepsMin: 6, targetRepsMax: 8, restSeconds: 150, targetWeightKg: 50 },
+          { exerciseId: 'fondos', exerciseName: 'Fondos en paralelas', muscleGroup: 'triceps', targetSets: 3, targetRepsMin: 8, targetRepsMax: 12, restSeconds: 120, targetWeightKg: null },
         ],
       },
       {
@@ -345,9 +353,9 @@ const ROUTINES = [
         name: 'Lower A – Cuádriceps',
         estimatedMinutes: 60,
         slots: [
-          { exerciseId: 'sentadilla', exerciseName: 'Sentadilla', muscleGroup: 'Cuádriceps', targetSets: 4, targetRepsMin: 5, targetRepsMax: 6, restSeconds: 180, targetWeightKg: 100 },
-          { exerciseId: 'prensa', exerciseName: 'Prensa de Piernas', muscleGroup: 'Cuádriceps', targetSets: 3, targetRepsMin: 8, targetRepsMax: 10, restSeconds: 150, targetWeightKg: 180 },
-          { exerciseId: 'extension-cuadriceps', exerciseName: 'Extensión de Cuádriceps', muscleGroup: 'Cuádriceps', targetSets: 3, targetRepsMin: 10, targetRepsMax: 15, restSeconds: 90, targetWeightKg: 40 },
+          { exerciseId: 'sentadilla', exerciseName: 'Sentadilla', muscleGroup: 'quads', targetSets: 4, targetRepsMin: 5, targetRepsMax: 6, restSeconds: 180, targetWeightKg: 100 },
+          { exerciseId: 'prensa', exerciseName: 'Prensa de Piernas', muscleGroup: 'quads', targetSets: 3, targetRepsMin: 8, targetRepsMax: 10, restSeconds: 150, targetWeightKg: 180 },
+          { exerciseId: 'extension-cuadriceps', exerciseName: 'Extensión de Cuádriceps', muscleGroup: 'quads', targetSets: 3, targetRepsMin: 10, targetRepsMax: 15, restSeconds: 90, targetWeightKg: 40 },
         ],
       },
       {
@@ -355,9 +363,9 @@ const ROUTINES = [
         name: 'Upper B – Tirón',
         estimatedMinutes: 55,
         slots: [
-          { exerciseId: 'peso-muerto', exerciseName: 'Peso Muerto Rumano', muscleGroup: 'Espalda', targetSets: 4, targetRepsMin: 4, targetRepsMax: 5, restSeconds: 210, targetWeightKg: 110 },
-          { exerciseId: 'remo-barra', exerciseName: 'Remo con Barra', muscleGroup: 'Espalda', targetSets: 3, targetRepsMin: 6, targetRepsMax: 8, restSeconds: 150, targetWeightKg: 70 },
-          { exerciseId: 'dominadas', exerciseName: 'Dominadas', muscleGroup: 'Espalda', targetSets: 3, targetRepsMin: 5, targetRepsMax: 8, restSeconds: 150, targetWeightKg: null },
+          { exerciseId: 'peso-muerto', exerciseName: 'Peso Muerto Rumano', muscleGroup: 'back', targetSets: 4, targetRepsMin: 4, targetRepsMax: 5, restSeconds: 210, targetWeightKg: 110 },
+          { exerciseId: 'remo-barra', exerciseName: 'Remo con Barra', muscleGroup: 'back', targetSets: 3, targetRepsMin: 6, targetRepsMax: 8, restSeconds: 150, targetWeightKg: 70 },
+          { exerciseId: 'dominadas', exerciseName: 'Dominadas', muscleGroup: 'back', targetSets: 3, targetRepsMin: 5, targetRepsMax: 8, restSeconds: 150, targetWeightKg: null },
         ],
       },
     ],
@@ -381,9 +389,9 @@ const ROUTINES = [
         name: 'WOD Lunes',
         estimatedMinutes: 45,
         slots: [
-          { exerciseId: 'thruster', exerciseName: 'Thruster', muscleGroup: 'Full Body', targetSets: 5, targetRepsMin: 10, targetRepsMax: 10, restSeconds: 90, targetWeightKg: 42.5 },
-          { exerciseId: 'pull-ups-kipping', exerciseName: 'Pull-ups Kipping', muscleGroup: 'Espalda', targetSets: 5, targetRepsMin: 10, targetRepsMax: 10, restSeconds: 90, targetWeightKg: null },
-          { exerciseId: 'box-jump', exerciseName: 'Box Jump', muscleGroup: 'Glúteos', targetSets: 5, targetRepsMin: 15, targetRepsMax: 15, restSeconds: 60, targetWeightKg: null },
+          { exerciseId: 'thruster', exerciseName: 'Thruster', muscleGroup: 'full_body', targetSets: 5, targetRepsMin: 10, targetRepsMax: 10, restSeconds: 90, targetWeightKg: 42.5 },
+          { exerciseId: 'pull-ups-kipping', exerciseName: 'Pull-ups Kipping', muscleGroup: 'back', targetSets: 5, targetRepsMin: 10, targetRepsMax: 10, restSeconds: 90, targetWeightKg: null },
+          { exerciseId: 'box-jump', exerciseName: 'Box Jump', muscleGroup: 'glutes', targetSets: 5, targetRepsMin: 15, targetRepsMax: 15, restSeconds: 60, targetWeightKg: null },
         ],
       },
       {
@@ -391,9 +399,9 @@ const ROUTINES = [
         name: 'WOD Miércoles',
         estimatedMinutes: 45,
         slots: [
-          { exerciseId: 'deadlift-cf', exerciseName: 'Deadlift', muscleGroup: 'Espalda', targetSets: 5, targetRepsMin: 5, targetRepsMax: 5, restSeconds: 120, targetWeightKg: 120 },
-          { exerciseId: 'hspu', exerciseName: 'Handstand Push-Up', muscleGroup: 'Hombros', targetSets: 5, targetRepsMin: 8, targetRepsMax: 10, restSeconds: 90, targetWeightKg: null },
-          { exerciseId: 'ring-dip', exerciseName: 'Ring Dip', muscleGroup: 'Pecho', targetSets: 4, targetRepsMin: 8, targetRepsMax: 10, restSeconds: 90, targetWeightKg: null },
+          { exerciseId: 'deadlift-cf', exerciseName: 'Deadlift', muscleGroup: 'back', targetSets: 5, targetRepsMin: 5, targetRepsMax: 5, restSeconds: 120, targetWeightKg: 120 },
+          { exerciseId: 'hspu', exerciseName: 'Handstand Push-Up', muscleGroup: 'shoulders', targetSets: 5, targetRepsMin: 8, targetRepsMax: 10, restSeconds: 90, targetWeightKg: null },
+          { exerciseId: 'ring-dip', exerciseName: 'Ring Dip', muscleGroup: 'chest', targetSets: 4, targetRepsMin: 8, targetRepsMax: 10, restSeconds: 90, targetWeightKg: null },
         ],
       },
     ],
@@ -417,10 +425,10 @@ const ROUTINES = [
         name: 'Día A',
         estimatedMinutes: 40,
         slots: [
-          { exerciseId: 'sentadilla-goblet', exerciseName: 'Sentadilla Goblet', muscleGroup: 'Cuádriceps', targetSets: 3, targetRepsMin: 10, targetRepsMax: 12, restSeconds: 90, targetWeightKg: 16 },
-          { exerciseId: 'press-mancuernas', exerciseName: 'Press con Mancuernas', muscleGroup: 'Pecho', targetSets: 3, targetRepsMin: 10, targetRepsMax: 12, restSeconds: 90, targetWeightKg: 14 },
-          { exerciseId: 'remo-mancuerna', exerciseName: 'Remo con Mancuerna', muscleGroup: 'Espalda', targetSets: 3, targetRepsMin: 10, targetRepsMax: 12, restSeconds: 90, targetWeightKg: 14 },
-          { exerciseId: 'plancha', exerciseName: 'Plancha Isométrica', muscleGroup: 'Core', targetSets: 3, targetRepsMin: 30, targetRepsMax: 60, restSeconds: 60, targetWeightKg: null, durationSeconds: 45 },
+          { exerciseId: 'sentadilla-goblet', exerciseName: 'Sentadilla Goblet', muscleGroup: 'quads', targetSets: 3, targetRepsMin: 10, targetRepsMax: 12, restSeconds: 90, targetWeightKg: 16 },
+          { exerciseId: 'press-mancuernas', exerciseName: 'Press con Mancuernas', muscleGroup: 'chest', targetSets: 3, targetRepsMin: 10, targetRepsMax: 12, restSeconds: 90, targetWeightKg: 14 },
+          { exerciseId: 'remo-mancuerna', exerciseName: 'Remo con Mancuerna', muscleGroup: 'back', targetSets: 3, targetRepsMin: 10, targetRepsMax: 12, restSeconds: 90, targetWeightKg: 14 },
+          { exerciseId: 'plancha', exerciseName: 'Plancha Isométrica', muscleGroup: 'core', targetSets: 3, targetRepsMin: 30, targetRepsMax: 60, restSeconds: 60, targetWeightKg: null, durationSeconds: 45 },
         ],
       },
     ],
@@ -432,7 +440,17 @@ const ROUTINES = [
 // Mateo:  8 sessions over last 20 days — all fully completed
 // Sofia:  4 sessions over last 15 days — mix
 
+// dayNumber/weekNumber cycle over the referenced routine's REAL day/week
+// count — the app only ever writes dayNumbers that exist in the plan, so the
+// seed must too (a dayNumber:3 session against a 2-day routine is data the
+// app can't produce). Derived from ROUTINES so a routine edit can't drift.
+// totalVolumeKg is stamped later from the generated setLogs (single source of
+// truth: Σ reps×weightKg, exactly how SessionState computes it live).
 function makeSessionsForAthlete({ uid, routineId, routineName, count, startDaysAgo, spacing, fullCompletedPattern }) {
+  const routine = ROUTINES.find((r) => r.id === routineId);
+  if (!routine) throw new Error(`makeSessionsForAthlete: unknown routine '${routineId}'`);
+  const numDays = routine.days.length;
+  const numWeeks = routine.numWeeks;
   const sessions = [];
   for (let i = 0; i < count; i++) {
     const daysBack = startDaysAgo - i * spacing;
@@ -447,11 +465,11 @@ function makeSessionsForAthlete({ uid, routineId, routineName, count, startDaysA
       routineName,
       startedAt,
       finishedAt: new Date(startedAt.getTime() + durationMin * 60_000),
-      totalVolumeKg: wasFullyCompleted ? (2500 + i * 200) : (1200 + i * 100),
+      totalVolumeKg: 0, // recomputed below from setLogs
       durationMin,
       status: 'finished',
-      dayNumber: (i % 3) + 1,
-      weekNumber: Math.floor(i / 3) % 3,
+      dayNumber: (i % numDays) + 1,
+      weekNumber: Math.floor(i / numDays) % numWeeks,
       wasFullyCompleted,
     });
   }
@@ -490,6 +508,103 @@ const SESSIONS = [
     fullCompletedPattern: [true, false, true, true],
   }),
 ];
+
+// ── Set logs ─────────────────────────────────────────────────────────────────
+// Every seed session gets a `setLogs` subcollection mirroring what the live
+// session player writes (issue #374): without them the whole muscle pipeline
+// of Insights (radar, "Músculos del día", Volumen por grupo, Sets counts,
+// frecuencia/progresión) sees empty sessions.
+
+const ROUTINE_BY_ID = Object.fromEntries(ROUTINES.map((r) => [r.id, r]));
+
+const plateRound = (kg) => Math.round(kg / 2.5) * 2.5;
+
+/**
+ * Deterministic per-set logs for one seed session.
+ *
+ * - Weight ramps +2.5 kg per prior occurrence of the same (routine, day),
+ *   starting 10 kg under the slot's targetWeightKg — so the 5th occurrence
+ *   lands exactly on target and Evolución por ejercicio gets a real
+ *   progression curve. Bodyweight slots (targetWeightKg null) log 0 kg,
+ *   matching how the player persists an empty weight field.
+ * - Partial sessions (wasFullyCompleted=false) stop mid-workout: all sets of
+ *   the first slot plus one set of the second.
+ * - completedAt advances ~3 min per set from startedAt, staying inside the
+ *   session's durationMin.
+ */
+function buildSetLogsForSession(session, occurrence) {
+  const routine = ROUTINE_BY_ID[session.routineId];
+  if (!routine) return [];
+  const day =
+    routine.days.find((d) => d.dayNumber === session.dayNumber) ??
+    routine.days[(session.dayNumber - 1) % routine.days.length];
+  const slots = session.wasFullyCompleted ? day.slots : day.slots.slice(0, 2);
+
+  // Set counts first, so completedAt can be paced evenly across the session's
+  // real durationMin instead of a fixed stride that could overrun finishedAt.
+  const setCounts = slots.map((slot, slotIdx) => {
+    // Partial = abandoned mid-workout: full sets of the first slot + one set
+    // of the second. A 1-slot day has no second slot to cut, so cut the first
+    // one in half instead — a partial must always log fewer sets than a full.
+    const isPartialTail = !session.wasFullyCompleted &&
+        (slotIdx === 1 || day.slots.length === 1);
+    return isPartialTail
+        ? Math.max(1, Math.floor(slot.targetSets / 2))
+        : slot.targetSets;
+  });
+  const totalSets = setCounts.reduce((a, b) => a + b, 0);
+  if (totalSets === 0) return [];
+  // First set ~2 min in, last set ~2 min before finishedAt, evenly spaced.
+  const usableMs = Math.max((session.durationMin - 4), 1) * 60_000;
+  const strideMs = totalSets > 1 ? Math.floor(usableMs / (totalSets - 1)) : 0;
+
+  const logs = [];
+  slots.forEach((slot, slotIdx) => {
+    // Ramp +2.5 kg per prior occurrence, floored at 60% of target and CAPPED
+    // at targetWeightKg — extending an athlete's session count must plateau
+    // at the plan's target, never overshoot it.
+    const weightKg = slot.targetWeightKg == null
+      ? 0
+      : plateRound(Math.min(
+          slot.targetWeightKg,
+          Math.max(
+            slot.targetWeightKg * 0.6,
+            slot.targetWeightKg - 10 + 2.5 * occurrence,
+          ),
+        ));
+    for (let n = 1; n <= setCounts[slotIdx]; n++) {
+      logs.push({
+        id: `${session.id}-set-${String(logs.length + 1).padStart(2, '0')}`,
+        exerciseId: slot.exerciseId,
+        exerciseName: slot.exerciseName,
+        setNumber: n,
+        reps: slot.targetRepsMax,
+        weightKg,
+        rpe: null,
+        completedAt: new Date(
+          session.startedAt.getTime() + 2 * 60_000 + logs.length * strideMs),
+      });
+    }
+  });
+  return logs;
+}
+
+// Stamp logs + recompute totalVolumeKg (Σ reps×weightKg — same formula the
+// live SessionState uses, so summary docs and subcollections always agree).
+// Sorted by startedAt so the occurrence counter tracks REAL calendar order —
+// the weight ramp must follow dates, not fixture declaration order.
+const SETLOGS_BY_SESSION = {};
+{
+  const occurrenceCounter = {};
+  for (const s of [...SESSIONS].sort((a, b) => a.startedAt - b.startedAt)) {
+    const key = `${s.uid}|${s.routineId}|${s.dayNumber}`;
+    const occ = occurrenceCounter[key] ?? 0;
+    occurrenceCounter[key] = occ + 1;
+    const logs = buildSetLogsForSession(s, occ);
+    SETLOGS_BY_SESSION[s.id] = logs;
+    s.totalVolumeKg = logs.reduce((sum, l) => sum + l.reps * l.weightKg, 0);
+  }
+}
 
 // ── Posts ─────────────────────────────────────────────────────────────────────
 // All three privacy levels seeded.
@@ -700,6 +815,16 @@ const AVAILABILITY_RULES = [
 
 function ts(date) {
   return admin.firestore.Timestamp.fromDate(date);
+}
+
+/** Deletes every doc in a (sub)collection ref. Overwriting or deleting a
+ * parent doc never touches its subcollections, so both seed and --clear need
+ * this for `setLogs`. */
+async function deleteAllDocs(collectionRef) {
+  const snap = await collectionRef.get().catch(() => null);
+  if (snap && !snap.empty) {
+    await Promise.all(snap.docs.map((d) => d.ref.delete()));
+  }
 }
 
 /** Deterministic appointment doc ID per ADR-7 */
@@ -980,17 +1105,53 @@ async function seedSessions() {
       startedAt: ts(data.startedAt),
       finishedAt: ts(data.finishedAt),
     };
-    await db
+    const sessionRef = db
       .collection('users')
       .doc(uid)
       .collection('sessions')
-      .doc(id)
-      .set(docData);
+      .doc(id);
+    await sessionRef.set(docData);
+
+    // setLogs: wipe leftovers first so a re-run with fewer sets can't leave
+    // stale docs behind.
+    const setLogsRef = sessionRef.collection('setLogs');
+    await deleteAllDocs(setLogsRef);
+    const logs = SETLOGS_BY_SESSION[id] ?? [];
+    if (logs.length > 0) {
+      const batch = db.batch();
+      for (const log of logs) {
+        batch.set(setLogsRef.doc(log.id), {
+          ...log,
+          completedAt: ts(log.completedAt),
+        });
+      }
+      await batch.commit();
+    }
     console.log(
       `  ✓ users/${uid}/sessions/${id} — ${data.routineName} ` +
-      `[w=${data.weekNumber} d=${data.dayNumber}] ${data.wasFullyCompleted ? '✅' : '⬡'}`,
+      `[w=${data.weekNumber} d=${data.dayNumber}] ` +
+      `${logs.length} sets, ${data.totalVolumeKg} kg ` +
+      `${data.wasFullyCompleted ? '✅' : '⬡'}`,
     );
   }
+}
+
+// NOTE (deliberate tradeoff): the catalogue's canonical ids (bench-press,
+// deadlift, …) do NOT match the exerciseIds the seed routines/sessions use
+// (press-banca, peso-muerto, …). The seeded routines behave like routines
+// built from custom exercises: Insights resolves their muscleGroup via the
+// routine-slot fallback (English keys), while the catalogue's job here is to
+// populate the exercise picker / CREAR RUTINA exactly like prod. Aligning the
+// ids would orphan the muscle mapping of any session logged live in the
+// emulator before a re-seed (their setLogs keep the old exerciseIds).
+async function seedExercisesCatalog() {
+  console.log('\n── Exercise catalogue ───────────────────────────────────────────');
+  const batch = db.batch();
+  for (const ex of CATALOG_EXERCISES) {
+    batch.set(db.collection('exercises').doc(ex.id), buildExerciseDoc(ex));
+  }
+  await batch.commit();
+  console.log(`  ✓ ${CATALOG_EXERCISES.length} ejercicios de catálogo (exercises/)`);
 }
 
 async function seedPosts() {
@@ -1098,9 +1259,15 @@ async function clear() {
   await deleteCollection('coach_availability_rules', AVAILABILITY_RULES.map(r => r.id));
   await deleteCollection('session_shares', TRAINER_LINKS.filter(l => l.sharedWithTrainer).map(l => l.athleteId));
 
-  // Sessions (subcollections)
+  // Exercise catalogue
+  await deleteCollection('exercises', CATALOG_EXERCISES.map(e => e.id));
+
+  // Sessions (subcollections) — setLogs first: deleting the parent doc leaves
+  // the subcollection orphaned otherwise.
   for (const s of SESSIONS) {
-    await db.collection('users').doc(s.uid).collection('sessions').doc(s.id).delete().catch(() => {});
+    const ref = db.collection('users').doc(s.uid).collection('sessions').doc(s.id);
+    await deleteAllDocs(ref.collection('setLogs'));
+    await ref.delete().catch(() => {});
   }
 
   // Appointments
@@ -1126,6 +1293,7 @@ async function seed() {
   await seedAthletes();
   await seedTrainerLinks();
   await seedFriendships();
+  await seedExercisesCatalog();
   await seedRoutines();
   await seedSessions();
   await seedPosts();
