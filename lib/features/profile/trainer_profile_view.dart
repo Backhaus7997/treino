@@ -9,6 +9,7 @@ import '../auth/application/auth_providers.dart';
 import '../coach/application/trainer_discovery_providers.dart';
 import '../coach/application/trainer_link_providers.dart';
 import '../coach/domain/trainer_link_status.dart';
+import 'presentation/widgets/eliminar_cuenta_sheet.dart';
 import '../coach/domain/trainer_public_profile.dart';
 import '../workout/application/session_providers.dart' show currentUidProvider;
 import 'application/user_providers.dart';
@@ -141,6 +142,26 @@ class TrainerProfileView extends ConsumerWidget {
           label: 'Cerrar sesión',
           color: palette.highlight,
           onTap: () => ref.read(authNotifierProvider.notifier).signOut(),
+          palette: palette,
+        ),
+        const SizedBox(height: 10),
+        // QA-PRO-001: account deletion must be reachable for trainers too —
+        // Apple Guideline 5.1.1(v). The deleteAccount CF is role-agnostic; only
+        // the entry point was missing (EliminarCuentaSheet was athlete-only).
+        _MenuRow(
+          icon: TreinoIcon.trash,
+          label: 'Eliminar cuenta',
+          color: palette.danger,
+          onTap: () => showModalBottomSheet<void>(
+            context: context,
+            useRootNavigator: true,
+            backgroundColor: palette.bgCard,
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+            ),
+            isScrollControlled: true,
+            builder: (_) => const EliminarCuentaSheet(),
+          ),
           palette: palette,
         ),
       ],
