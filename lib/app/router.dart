@@ -352,6 +352,19 @@ GoRouter buildRouter({
         },
       ),
       GoRoute(
+        // Read-only plan detail reached from the coach's athlete-detail screen.
+        // MUST stay top-level (out of the shell) like its origin
+        // `/coach/athlete/:id` — pushing the in-shell `/workout/routine/:id`
+        // from an out-of-shell route rebuilds the whole shell branch and lands
+        // blank (issue #399). RoutineDetailScreen already renders read-only for
+        // a non-owner trainer, so no screen change is needed — only the route.
+        path: '/coach/athlete/:athleteId/plan/:routineId',
+        builder: (context, state) {
+          final routineId = state.pathParameters['routineId']!;
+          return _immersive(RoutineDetailScreen(routineId: routineId));
+        },
+      ),
+      GoRoute(
         // 1-1 chat — full-screen, no nav bar. Reached from the athlete-detail
         // MENSAJE button AND the messages inbox; both push this same route so
         // it always opens full-screen with a proper background.
