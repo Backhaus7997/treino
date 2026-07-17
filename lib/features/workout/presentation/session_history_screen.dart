@@ -115,7 +115,8 @@ class _HistoryCard extends StatelessWidget {
     final palette = AppPalette.of(context);
     final theme = Theme.of(context);
     final l10n = AppL10n.of(context);
-    final formattedDate = formatSessionDate(session.startedAt);
+    // startedAt is a real UTC instant — localize before formatting (#380).
+    final formattedDate = formatSessionDate(session.startedAt.toLocal());
 
     return InkWell(
       onTap: () => context.push('/workout/historial/${session.id}'),

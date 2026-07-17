@@ -206,7 +206,8 @@ class _HistorialCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final theme = Theme.of(context);
-    final formattedDate = formatSessionDate(session.startedAt);
+    // startedAt is a real UTC instant — localize before formatting (#380).
+    final formattedDate = formatSessionDate(session.startedAt.toLocal());
 
     return GestureDetector(
       onTap: () => context.push('/workout/historial/${session.id}'),

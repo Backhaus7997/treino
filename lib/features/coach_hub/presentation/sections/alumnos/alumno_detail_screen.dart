@@ -2068,6 +2068,7 @@ class _ExpandableSessionRowState extends ConsumerState<_ExpandableSessionRow> {
                     // Historial tab shows active sessions too; fall back to
                     // startedAt when finishedAt is null so the user still
                     // sees WHEN the athlete started it.
+                    // Real UTC instants; fmtDate localizes them (#380).
                     s.finishedAt != null
                         ? fmtDate(s.finishedAt!)
                         : widget.showStatusBadge

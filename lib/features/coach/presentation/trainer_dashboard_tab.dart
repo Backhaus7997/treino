@@ -826,7 +826,12 @@ class _EntrenaronHoyRow extends ConsumerWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    '${session.routineName} · ${_formatTime(session.finishedAt!)}',
+                    // finishedAt is a real UTC instant — localize before
+                    // formatting (#380). NOTE: _formatTime is shared with
+                    // appointment.startsAt (ADR-7 wall-clock, line ~690) which
+                    // must stay raw — so convert HERE at the call site, never
+                    // inside _formatTime.
+                    '${session.routineName} · ${_formatTime(session.finishedAt!.toLocal())}',
                     style: GoogleFonts.barlow(
                       fontWeight: FontWeight.w400,
                       fontSize: 12,
