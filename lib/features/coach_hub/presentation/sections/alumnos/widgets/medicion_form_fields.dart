@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/tokens/primitives.dart';
+import 'package:treino/core/widgets/motion/treino_tappable.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 
 /// Sección colapsable de un form de mediciones/rendimiento — Fase 3 WU-06a.
@@ -61,7 +62,7 @@ class MedicionFormSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (onToggle != null)
-          InkWell(onTap: onToggle, child: header)
+          TreinoTappable(onTap: onToggle, child: header)
         else
           header,
         if (expanded)

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
 import 'package:treino/app/theme/app_palette.dart';
+import 'package:treino/app/theme/tokens/components/treino_transparent_tokens.dart';
 import 'package:treino/app/theme/tokens/primitives.dart';
 import 'package:treino/core/widgets/motion/treino_shimmer.dart';
+import 'package:treino/core/widgets/motion/treino_tappable.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach/domain/nutrition_plan.dart';
 
@@ -85,7 +87,7 @@ class PlanNutricionCard extends StatelessWidget {
         const SizedBox(height: AppSpacing.hairline),
         OutlinedButton.icon(
           onPressed: onAddMeal,
-          icon: const Icon(Icons.add, size: 16),
+          icon: const Icon(TreinoIcon.plus, size: 16),
           label: const Text('AGREGAR COMIDA'), // i18n: Fase W2
           style: OutlinedButton.styleFrom(
             foregroundColor: palette.accent,
@@ -199,9 +201,9 @@ class _MealEditor extends StatelessWidget {
       child: Theme(
         // Quitar los divisores default y el splash raro del ExpansionTile.
         data: Theme.of(context).copyWith(
-          dividerColor: Colors.transparent,
-          splashColor: Colors.transparent,
-          highlightColor: Colors.transparent,
+          dividerColor: TreinoTransparentTokens.value,
+          splashColor: TreinoTransparentTokens.value,
+          highlightColor: TreinoTransparentTokens.value,
         ),
         child: ExpansionTile(
           initiallyExpanded: true,
@@ -248,7 +250,7 @@ class _MealEditor extends StatelessWidget {
                       color: palette.textMuted.withValues(alpha: 0.6),
                       fontSize: 12,
                     ),
-                    prefixIcon: Icon(Icons.schedule,
+                    prefixIcon: Icon(TreinoIcon.clock,
                         size: 14, color: palette.textMuted),
                     prefixIconConstraints:
                         const BoxConstraints(minWidth: 22, minHeight: 22),
@@ -285,7 +287,7 @@ class _MealEditor extends StatelessWidget {
               alignment: Alignment.centerLeft,
               child: TextButton.icon(
                 onPressed: _addGroup,
-                icon: const Icon(Icons.add, size: 14),
+                icon: const Icon(TreinoIcon.plus, size: 14),
                 label: const Text('AGREGAR GRUPO'), // i18n: Fase W2
                 style: TextButton.styleFrom(
                   foregroundColor: palette.accent,
@@ -405,7 +407,7 @@ class _GroupEditor extends StatelessWidget {
             alignment: Alignment.centerLeft,
             child: TextButton.icon(
               onPressed: _addOption,
-              icon: const Icon(Icons.add, size: 12),
+              icon: const Icon(TreinoIcon.plus, size: 12),
               label: const Text('AGREGAR OPCIÓN'), // i18n: Fase W2
               style: TextButton.styleFrom(
                 foregroundColor: palette.accent,
@@ -437,9 +439,8 @@ class _SelectionModeSelector extends StatelessWidget {
   final ValueChanged<SelectionMode> onChanged;
 
   Widget _pill(String label, bool active, VoidCallback onTap) {
-    return GestureDetector(
+    return TreinoTappable(
       onTap: onTap,
-      behavior: HitTestBehavior.opaque,
       child: Container(
         padding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.s8,
@@ -448,7 +449,7 @@ class _SelectionModeSelector extends StatelessWidget {
         decoration: BoxDecoration(
           color: active
               ? palette.accent.withValues(alpha: 0.18)
-              : Colors.transparent,
+              : TreinoTransparentTokens.value,
           borderRadius: BorderRadius.circular(AppRadius.full),
           border: Border.all(
             color: active ? palette.accent : palette.border,
