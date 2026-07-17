@@ -132,6 +132,13 @@ ExerciseProgression aggregateExerciseProgression({
 
     if (exerciseLogs.isEmpty) continue;
 
+    // Points feed chart labels and PR dates — a real UTC instant must be
+    // localized for display (#380). Window/frecuencia filtering above uses the
+    // raw `session.startedAt` separately, so this only affects what's shown.
+    // Shifting every point by the same offset preserves ordering, so
+    // derivePersonalRecords (first-occurrence-of-max) is unaffected.
+    final localDate = session.startedAt.toLocal();
+
     // Extract exercise name from the first matching log (denormalized)
     resolvedName ??= exerciseLogs.first.exerciseName;
 
@@ -139,14 +146,14 @@ ExerciseProgression aggregateExerciseProgression({
     final maxWeight =
         exerciseLogs.map((l) => l.weightKg).reduce((a, b) => a > b ? a : b);
     heaviestWeightPoints
-        .add(ProgressionPoint(date: session.startedAt, value: maxWeight));
+        .add(ProgressionPoint(date: localDate, value: maxWeight));
 
     // Best Set Volume = max(reps × weightKg) of a single set this session
     final maxSetVolume = exerciseLogs
         .map((l) => l.reps * l.weightKg)
         .reduce((a, b) => a > b ? a : b);
     bestSetVolumePoints
-        .add(ProgressionPoint(date: session.startedAt, value: maxSetVolume));
+        .add(ProgressionPoint(date: localDate, value: maxSetVolume));
 
     // Best Session Volume = Σ(reps × weightKg) for this session
     final sessionVolume = exerciseLogs.fold<double>(
@@ -154,7 +161,7 @@ ExerciseProgression aggregateExerciseProgression({
       (sum, l) => sum + l.reps * l.weightKg,
     );
     bestSessionVolumePoints
-        .add(ProgressionPoint(date: session.startedAt, value: sessionVolume));
+        .add(ProgressionPoint(date: localDate, value: sessionVolume));
 
     // [AD2] 1RM = max Epley estimate across this session's valid sets
     // (reps<=0 sets are skipped by calculateOneRepMax). Session is omitted
@@ -170,7 +177,7 @@ ExerciseProgression aggregateExerciseProgression({
     }
     if (maxOneRepMax != null) {
       oneRepMaxPoints
-          .add(ProgressionPoint(date: session.startedAt, value: maxOneRepMax));
+          .add(ProgressionPoint(date: localDate, value: maxOneRepMax));
     }
   }
 

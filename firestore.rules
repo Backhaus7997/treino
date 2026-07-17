@@ -366,9 +366,36 @@ service cloud.firestore {
     }
 
     match /posts/{postId} {
-      // Any authenticated user can read posts (friends-privacy is soft / client-side).
-      // REQ-PFM-009
-      allow read: if request.auth != null;
+      // QA-FEED-001: post privacy is enforced SERVER-SIDE (was client-side only,
+      // REQ-PFM-009 — any authenticated user could read every post via the SDK).
+      // A post is readable when it is public, is the caller's own, is a
+      // 'friends' post authored by an ACCEPTED friend, or is a 'gym' post whose
+      // authorGymId matches the caller's gym. The client feed queries are
+      // already scoped to match (feedForFriends by friend uids, feedForGym by
+      // gym, profile by privacy tier), so these per-doc get()s only fire for
+      // rows the query already narrowed to.
+      function postFriendAccepted(authorUid) {
+        let fid = request.auth.uid < authorUid
+          ? request.auth.uid + '_' + authorUid
+          : authorUid + '_' + request.auth.uid;
+        return exists(/databases/$(database)/documents/friendships/$(fid))
+            && get(/databases/$(database)/documents/friendships/$(fid)).data.status == 'accepted';
+      }
+      function postSameGym(authorGymId) {
+        return authorGymId != null
+            && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.gymId == authorGymId;
+      }
+
+      allow read: if request.auth != null
+                  && (
+                    resource == null
+                    || resource.data.privacy == 'public'
+                    || request.auth.uid == resource.data.authorUid
+                    || (resource.data.privacy == 'friends'
+                        && postFriendAccepted(resource.data.authorUid))
+                    || (resource.data.privacy == 'gym'
+                        && postSameGym(resource.data.get('authorGymId', null)))
+                  );
 
       // Create: only the owner of the post — authorUid must equal caller uid.
       // SCENARIO-130: non-owner create is blocked.

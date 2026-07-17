@@ -9,6 +9,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/coach_hub/presentation/sections/biblioteca/widgets/templates_tab.dart';
 import 'package:treino/features/workout/application/routine_providers.dart';
@@ -252,7 +253,7 @@ void main() {
     });
 
     testWidgets(
-        'detail dialog is read-only — no edit controls — SCENARIO-BIBW-10a',
+        'detail dialog offers Editar but no INLINE editing (edits on a screen)',
         (tester) async {
       tester.view.physicalSize = const Size(1280, 900);
       tester.view.devicePixelRatio = 1.0;
@@ -267,7 +268,10 @@ void main() {
       await tester.tap(find.text('Fuerza Total'));
       await tester.pumpAndSettle();
 
-      // No TextField or editing widgets in dialog
+      // Editing happens on the full editor screen, not inline in the dialog:
+      // an Editar action is present, but no text fields.
+      expect(
+          find.byKey(const Key('template_detail_edit_button')), findsOneWidget);
       expect(find.byType(TextField), findsNothing);
       expect(find.byType(EditableText), findsNothing);
     });
@@ -293,6 +297,73 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(AlertDialog), findsNothing);
+    });
+  });
+
+  group('TemplatesTab — navegación al editor de plantillas', () {
+    Future<void> pumpRouter(
+      WidgetTester tester, {
+      List<Routine> templates = const [],
+    }) async {
+      tester.view.physicalSize = const Size(1280, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final router = GoRouter(
+        initialLocation: '/biblioteca',
+        routes: [
+          GoRoute(
+            path: '/biblioteca',
+            builder: (_, __) => const Scaffold(body: TemplatesTab()),
+          ),
+          // Editor stand-ins — assert navigation by the marker text.
+          GoRoute(
+            path: '/template-editor',
+            builder: (_, __) => const Scaffold(body: Text('CREATE TEMPLATE')),
+          ),
+          GoRoute(
+            path: '/template-editor/:id',
+            builder: (_, s) =>
+                Scaffold(body: Text('EDIT ${s.pathParameters['id']}')),
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            currentUidProvider.overrideWithValue(_kTrainerId),
+            trainerTemplatesStreamProvider(_kTrainerId)
+                .overrideWith((ref) => Stream.value(templates)),
+          ],
+          child:
+              MaterialApp.router(theme: AppTheme.dark(), routerConfig: router),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('"Nueva plantilla" abre el editor en modo plantilla',
+        (tester) async {
+      await pumpRouter(tester);
+
+      await tester.tap(find.byKey(const Key('nueva_plantilla_button')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('CREATE TEMPLATE'), findsOneWidget);
+    });
+
+    testWidgets('"Editar" en el detalle abre el editor de esa plantilla',
+        (tester) async {
+      await pumpRouter(tester, templates: [_templateA]);
+
+      await tester.tap(find.text('Fuerza Total'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('template_detail_edit_button')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('EDIT tpl-a'), findsOneWidget);
     });
   });
 }

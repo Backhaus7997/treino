@@ -293,6 +293,15 @@ class RoutineRepository {
     return _fromDoc(snap);
   }
 
+  /// Live stream of a single routine doc by id. Emits a new [Routine] on every
+  /// Firestore write, so screens watching it (routine detail) auto-refresh
+  /// after an edit — mirroring [listUserCreated]/[watchTemplatesBy]. Resolves
+  /// to `null` when the doc does not exist. Works for both public catalogue
+  /// plantillas and private trainer-assigned plans, same as [getById].
+  Stream<Routine?> watchById(String id) {
+    return _collection.doc(id).snapshots().map(_fromDoc);
+  }
+
   /// Same as [getById], but resolves to `null` when the routine is not VISIBLE
   /// to the caller instead of throwing.
   ///

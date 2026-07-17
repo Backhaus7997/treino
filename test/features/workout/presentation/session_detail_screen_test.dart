@@ -12,6 +12,7 @@ import 'package:treino/features/workout/application/session_providers.dart';
 import 'package:treino/features/workout/domain/session.dart';
 import 'package:treino/features/workout/domain/session_status.dart';
 import 'package:treino/features/workout/domain/set_log.dart';
+import 'package:treino/features/workout/presentation/utils/date_helpers.dart';
 import 'package:treino/features/workout/presentation/session_detail_screen.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
@@ -138,6 +139,8 @@ void main() {
       _makeSetLog(exerciseName: 'Bench Press', setNumber: 2, reps: 8),
       _makeSetLog(exerciseName: 'Squat', setNumber: 1, reps: 5, weightKg: 100),
     ];
+    // Real UTC instant, mid-day so no TZ boundary crossing muddies the assertion.
+    final startedAtUtc = DateTime.utc(2026, 5, 19, 10, 30);
 
     await tester.pumpWidget(_pumpDetailScreen(
       summaryOverride: () => (
@@ -145,17 +148,22 @@ void main() {
           routineName: 'Push',
           durationMin: 45,
           totalVolumeKg: 1800,
-          startedAt: DateTime.utc(2026, 5, 19, 10, 30),
+          startedAt: startedAtUtc,
         ),
         setLogs: setLogs,
       ),
     ));
     await tester.pumpAndSettle();
 
-    // Header: date formatted (Mié 27 nov format), time (HH:mm), routineName
-    // 2026-05-19 is a Tuesday (Mar)
-    expect(find.textContaining('Mar'), findsWidgets);
-    expect(find.textContaining('10:30'), findsOneWidget);
+    // Header shows the session's startedAt in the viewer's LOCAL time (#380):
+    // startedAt is a real UTC instant, so the expected strings are derived from
+    // .toLocal() — keeps the test correct in any TZ (Argentina dev box or UTC CI)
+    // and pins the localization itself, not a raw UTC literal.
+    final local = startedAtUtc.toLocal();
+    final expectedTime =
+        '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
+    expect(find.text(formatSessionDate(local)), findsWidgets);
+    expect(find.textContaining(expectedTime), findsOneWidget);
     expect(find.text('Push'), findsOneWidget);
 
     // 4 StatTiles — labels

@@ -148,6 +148,38 @@ Routine _simpleRoutine({String id = 'r1', String name = 'Fuerza base'}) =>
       ],
     );
 
+/// A trainer TEMPLATE (no athlete) — `RoutineSource.trainerTemplate`,
+/// `assignedTo` null. The shape edit-mode template loading must accept.
+Routine _templateRoutine({String id = 't1'}) => Routine(
+      id: id,
+      name: 'Plantilla PPL',
+      split: 'PPL',
+      level: ExperienceLevel.intermediate,
+      source: RoutineSource.trainerTemplate,
+      assignedBy: _trainerId,
+      visibility: RoutineVisibility.private,
+      days: const [
+        RoutineDay(
+          dayNumber: 1,
+          name: 'Día A',
+          slots: [
+            RoutineSlot(
+              exerciseId: 'bench-press',
+              exerciseName: 'Press de Banca',
+              muscleGroup: 'chest',
+              targetSets: 1,
+              targetRepsMin: 8,
+              targetRepsMax: 8,
+              targetReps: [8],
+              targetWeightKg: 60,
+              restSeconds: 90,
+              sets: [SetSpec(reps: 8, weightKg: 60)],
+            ),
+          ],
+        ),
+      ],
+    );
+
 /// A web-editable routine that uses a rep RANGE + a coaching note (Fase 1).
 Routine _rangeRoutine({String id = 'r2'}) => Routine(
       id: id,
@@ -299,6 +331,131 @@ Routine _perWeekRoutine({String id = 'r6'}) => Routine(
 /// A per-week PRESENCE-masked routine (activeWeeks populated: present only in
 /// week 0 of 2) — web-editable since Fase 4c. Used by the edit round-trip
 /// test to confirm activeWeeks survives a save unchanged.
+/// Two NORMAL sets (reps 8, 60kg), single week — for exercising set-type
+/// assignment and the running-number relabel.
+Routine _twoNormalSetsRoutine({String id = 'r13'}) => Routine(
+      id: id,
+      name: 'Dos series',
+      split: 'Full Body',
+      level: ExperienceLevel.intermediate,
+      source: RoutineSource.trainerAssigned,
+      assignedBy: _trainerId,
+      assignedTo: _athleteId,
+      visibility: RoutineVisibility.private,
+      days: const [
+        RoutineDay(
+          dayNumber: 1,
+          name: 'Día A',
+          slots: [
+            RoutineSlot(
+              exerciseId: 'bench-press',
+              exerciseName: 'Press de Banca',
+              muscleGroup: 'chest',
+              targetSets: 2,
+              targetRepsMin: 8,
+              targetRepsMax: 8,
+              targetReps: [8, 8],
+              targetWeightKg: 60,
+              restSeconds: 90,
+              sets: [
+                SetSpec(reps: 8, weightKg: 60),
+                SetSpec(reps: 8, weightKg: 60),
+              ],
+            ),
+          ],
+        ),
+      ],
+    );
+
+/// A single FAILURE set with NO reps — the mobile-authored shape web must
+/// accept on save (a failure set works to failure; reps are optional).
+Routine _failureSetRoutine({String id = 'r14'}) => Routine(
+      id: id,
+      name: 'Al fallo',
+      split: 'Full Body',
+      level: ExperienceLevel.advanced,
+      source: RoutineSource.trainerAssigned,
+      assignedBy: _trainerId,
+      assignedTo: _athleteId,
+      visibility: RoutineVisibility.private,
+      days: const [
+        RoutineDay(
+          dayNumber: 1,
+          name: 'Día A',
+          slots: [
+            RoutineSlot(
+              exerciseId: 'bench-press',
+              exerciseName: 'Press de Banca',
+              muscleGroup: 'chest',
+              targetSets: 1,
+              targetRepsMin: 0,
+              targetRepsMax: 0,
+              restSeconds: 90,
+              sets: [SetSpec(type: SetType.failure, weightKg: 70)],
+            ),
+          ],
+        ),
+      ],
+    );
+
+/// Single week: Press+Sentadilla are ONE superset, Dominadas stands alone —
+/// the shape a reorder must never silently re-group.
+Routine _supersetOrderRoutine({String id = 'r12'}) => Routine(
+      id: id,
+      name: 'Orden con superserie',
+      split: 'Full Body',
+      level: ExperienceLevel.advanced,
+      source: RoutineSource.trainerAssigned,
+      assignedBy: _trainerId,
+      assignedTo: _athleteId,
+      visibility: RoutineVisibility.private,
+      days: const [
+        RoutineDay(
+          dayNumber: 1,
+          name: 'Día A',
+          slots: [
+            RoutineSlot(
+              exerciseId: 'bench-press',
+              exerciseName: 'Press de Banca',
+              muscleGroup: 'chest',
+              targetSets: 1,
+              targetRepsMin: 8,
+              targetRepsMax: 8,
+              targetReps: [8],
+              targetWeightKg: 60,
+              restSeconds: 90,
+              supersetGroup: 1,
+              sets: [SetSpec(reps: 8, weightKg: 60)],
+            ),
+            RoutineSlot(
+              exerciseId: 'squat',
+              exerciseName: 'Sentadilla',
+              muscleGroup: 'legs',
+              targetSets: 1,
+              targetRepsMin: 10,
+              targetRepsMax: 10,
+              targetReps: [10],
+              targetWeightKg: 80,
+              restSeconds: 120,
+              supersetGroup: 1,
+              sets: [SetSpec(reps: 10, weightKg: 80)],
+            ),
+            RoutineSlot(
+              exerciseId: 'pull-up',
+              exerciseName: 'Dominadas',
+              muscleGroup: 'back',
+              targetSets: 1,
+              targetRepsMin: 6,
+              targetRepsMax: 6,
+              targetReps: [6],
+              restSeconds: 60,
+              sets: [SetSpec(reps: 6)],
+            ),
+          ],
+        ),
+      ],
+    );
+
 /// 2-week plan whose week 1 carries typed sets and whose week 2 is plain —
 /// duplicating week 1 onto week 2 must carry the types across.
 Routine _twoWeekTypedRoutine({String id = 'r10'}) => Routine(
@@ -1464,6 +1621,91 @@ void main() {
     });
   });
 
+  group('RoutineEditorWebScreen — reordenar sin romper superseries', () {
+    Future<_MockRoutineRepository> pumpOrderRoutine(WidgetTester tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.getById(any()))
+          .thenAnswer((_) async => _supersetOrderRoutine());
+      when(() => repo.updateAssigned(
+            uid: any(named: 'uid'),
+            draft: any(named: 'draft'),
+          )).thenAnswer((i) async => i.namedArguments[#draft] as Routine);
+      await _pumpEditor(tester, repo: repo, routineId: 'r12');
+      return repo;
+    }
+
+    Future<Routine> save(
+        WidgetTester tester, _MockRoutineRepository repo) async {
+      await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
+      await tester.pumpAndSettle();
+      return verify(() => repo.updateAssigned(
+            uid: any(named: 'uid'),
+            draft: captureAny(named: 'draft'),
+          )).captured.single as Routine;
+    }
+
+    testWidgets('moving the last superset member down moves the WHOLE superset',
+        (tester) async {
+      // Press+Sentadilla are supersetted; Dominadas is alone. A naive
+      // position swap would leave Press linked to Dominadas — dragging an
+      // unrelated exercise into the superset and evicting Sentadilla.
+      final repo = await pumpOrderRoutine(tester);
+
+      final btn = find.byTooltip('Bajar').at(1); // Sentadilla
+      await tester.ensureVisible(btn); // 900px-tall viewport: a
+      // missed tap only WARNS, it does not fail — the test would
+      // silently assert on an untouched routine.
+      await tester.tap(btn);
+      await tester.pumpAndSettle();
+
+      final slots = (await save(tester, repo)).days.single.slots;
+
+      expect(slots.map((s) => s.exerciseName).toList(),
+          const ['Dominadas', 'Press de Banca', 'Sentadilla']);
+      expect(slots.map((s) => s.supersetGroup).toList(), const [null, 1, 1],
+          reason: 'Dominadas must stay standalone and the superset intact.');
+    });
+
+    testWidgets(
+        'moving a standalone exercise up does not absorb it into the '
+        'superset above', (tester) async {
+      final repo = await pumpOrderRoutine(tester);
+
+      final btn = find.byTooltip('Subir').at(2); // Dominadas
+      await tester.ensureVisible(btn); // 900px-tall viewport: a
+      // missed tap only WARNS, it does not fail — the test would
+      // silently assert on an untouched routine.
+      await tester.tap(btn);
+      await tester.pumpAndSettle();
+
+      final slots = (await save(tester, repo)).days.single.slots;
+
+      expect(slots.map((s) => s.exerciseName).toList(),
+          const ['Dominadas', 'Press de Banca', 'Sentadilla']);
+      expect(slots.map((s) => s.supersetGroup).toList(), const [null, 1, 1],
+          reason: 'Dominadas jumped the whole superset, not into it.');
+    });
+
+    testWidgets('moving a member INSIDE a superset just reorders it',
+        (tester) async {
+      final repo = await pumpOrderRoutine(tester);
+
+      final btn = find.byTooltip('Bajar').at(0); // Press, inside {1}
+      await tester.ensureVisible(btn); // 900px-tall viewport: a
+      // missed tap only WARNS, it does not fail — the test would
+      // silently assert on an untouched routine.
+      await tester.tap(btn);
+      await tester.pumpAndSettle();
+
+      final slots = (await save(tester, repo)).days.single.slots;
+
+      expect(slots.map((s) => s.exerciseName).toList(),
+          const ['Sentadilla', 'Press de Banca', 'Dominadas']);
+      expect(slots.map((s) => s.supersetGroup).toList(), const [1, 1, null],
+          reason: 'Swapping two members keeps the group; nothing joins it.');
+    });
+  });
+
   group('RoutineEditorWebScreen — copiar semana anterior (Fase 5)', () {
     /// Opens [routine] in edit mode, jumps to week 2, and returns the mock so
     /// the caller can capture the saved draft.
@@ -1584,6 +1826,192 @@ void main() {
 
       expect(draft.days.single.slots.map((s) => s.supersetGroup).toList(),
           const [null, null]);
+    });
+  });
+
+  group('RoutineEditorWebScreen — series tipadas (warm-up/drop/al-fallo)', () {
+    Future<_MockRoutineRepository> pump(
+        WidgetTester tester, Routine routine) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.getById(any())).thenAnswer((_) async => routine);
+      when(() => repo.updateAssigned(
+            uid: any(named: 'uid'),
+            draft: any(named: 'draft'),
+          )).thenAnswer((i) async => i.namedArguments[#draft] as Routine);
+      await _pumpEditor(tester, repo: repo, routineId: routine.id);
+      return repo;
+    }
+
+    Future<Routine> save(
+        WidgetTester tester, _MockRoutineRepository repo) async {
+      await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
+      await tester.pumpAndSettle();
+      return verify(() => repo.updateAssigned(
+            uid: any(named: 'uid'),
+            draft: captureAny(named: 'draft'),
+          )).captured.single as Routine;
+    }
+
+    testWidgets('tapping the chip and picking "Entrada en calor" saves warmup',
+        (tester) async {
+      final repo = await pump(tester, _simpleRoutine());
+
+      await tester.tap(find.byType(PopupMenuButton<SetType>).first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Entrada en calor (W)'));
+      await tester.pumpAndSettle();
+
+      final slot = (await save(tester, repo)).days.single.slots.single;
+      expect(slot.sets.single.type, SetType.warmup);
+    });
+
+    testWidgets('a warm-up does not consume a set number (running relabel)',
+        (tester) async {
+      // Two normal sets show "1" and "2". Marking the first as warm-up must
+      // renumber the second to "1" — the glyph replaces the count, it doesn't
+      // shift it.
+      final repo = await pump(tester, _twoNormalSetsRoutine());
+      expect(find.text('1'), findsOneWidget);
+      expect(find.text('2'), findsOneWidget);
+
+      await tester.tap(find.byType(PopupMenuButton<SetType>).first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Al fallo (F)'));
+      await tester.pumpAndSettle();
+
+      // First chip now shows 'F'; the second normal set is renumbered to '1'.
+      expect(find.text('F'), findsOneWidget);
+      expect(find.text('1'), findsOneWidget);
+      expect(find.text('2'), findsNothing);
+
+      // And it round-trips.
+      final sets = (await save(tester, repo)).days.single.slots.single.sets;
+      expect(sets.map((s) => s.type).toList(),
+          const [SetType.failure, SetType.normal]);
+    });
+
+    testWidgets('a failure set with no reps still saves (reps are optional)',
+        (tester) async {
+      // The whole point of "al fallo": the athlete works to failure, so the
+      // reps-completeness validation must skip it instead of blocking submit.
+      final repo = await pump(tester, _failureSetRoutine());
+
+      final slot = (await save(tester, repo)).days.single.slots.single;
+      expect(slot.sets.single.type, SetType.failure);
+      expect(slot.sets.single.reps, isNull);
+    });
+  });
+
+  group('RoutineEditorWebScreen — modo plantilla', () {
+    // Pumps the editor in TEMPLATE mode (no athlete). With [templateId] the
+    // edit route is pushed; without it, the create route.
+    Future<void> pumpTemplate(
+      WidgetTester tester, {
+      RoutineRepository? repo,
+      String? templateId,
+    }) async {
+      tester.view.physicalSize = const Size(1400, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final router = GoRouter(
+        initialLocation: '/biblioteca',
+        routes: [
+          GoRoute(
+            path: '/biblioteca',
+            builder: (_, __) => const Scaffold(body: Text('Biblioteca')),
+          ),
+          GoRoute(
+            path: '/template-editor',
+            builder: (_, __) =>
+                const Scaffold(body: RoutineEditorWebScreen.template()),
+          ),
+          GoRoute(
+            path: '/template-editor/:templateId',
+            builder: (_, state) => Scaffold(
+              body: RoutineEditorWebScreen.template(
+                routineId: state.pathParameters['templateId'],
+              ),
+            ),
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: _overrides(repo: repo),
+          child:
+              MaterialApp.router(theme: AppTheme.dark(), routerConfig: router),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      router.push(
+        templateId == null
+            ? '/template-editor'
+            : '/template-editor/$templateId',
+      );
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('header reads "Nueva plantilla" and names no athlete',
+        (tester) async {
+      await pumpTemplate(tester);
+
+      expect(find.text('Nueva plantilla'), findsOneWidget);
+      expect(find.text('Plantilla reutilizable, sin alumno'), findsOneWidget);
+      expect(find.textContaining('Para '), findsNothing);
+    });
+
+    testWidgets('creating saves via createTemplate with the template shape',
+        (tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.createTemplate(any())).thenAnswer(
+        (i) async => i.positionalArguments.first as Routine,
+      );
+      await pumpTemplate(tester, repo: repo);
+
+      await _fillMinimalValidForm(tester);
+      await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
+      await tester.pumpAndSettle();
+
+      final t = verify(() => repo.createTemplate(captureAny())).captured.single
+          as Routine;
+      expect(t.source, RoutineSource.trainerTemplate);
+      expect(t.assignedTo, isNull);
+      expect(t.visibility, RoutineVisibility.private);
+      expect(t.assignedBy, _trainerId);
+      // Never the assigned path.
+      verifyNever(() => repo.createAssigned(any()));
+    });
+
+    testWidgets('editing saves via updateTemplate, never updateAssigned',
+        (tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.getById(any()))
+          .thenAnswer((_) async => _templateRoutine());
+      when(() => repo.updateTemplate(
+            uid: any(named: 'uid'),
+            draft: any(named: 'draft'),
+          )).thenAnswer((i) async => i.namedArguments[#draft] as Routine);
+      await pumpTemplate(tester, repo: repo, templateId: 't1');
+
+      expect(find.text('Editar plantilla'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
+      await tester.pumpAndSettle();
+
+      final draft = verify(() => repo.updateTemplate(
+            uid: any(named: 'uid'),
+            draft: captureAny(named: 'draft'),
+          )).captured.single as Routine;
+      expect(draft.id, 't1');
+      expect(draft.source, RoutineSource.trainerTemplate);
+      verifyNever(() => repo.updateAssigned(
+            uid: any(named: 'uid'),
+            draft: any(named: 'draft'),
+          ));
     });
   });
 }

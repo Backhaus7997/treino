@@ -23,7 +23,7 @@ import '../domain/routine_source.dart';
 import 'widgets/exercise_slot_row.dart';
 import 'widgets/stat_tile.dart';
 
-/// RoutineDetailScreen — ConsumerStatefulWidget that observes routineByIdProvider.
+/// RoutineDetailScreen — ConsumerStatefulWidget that observes routineByIdStreamProvider.
 /// selectedDayIndex is local state (ADR-RD-3).
 /// No Scaffold, AppBackground, or SafeArea — provided by _ShellScaffold (REQ-RDT-011).
 class RoutineDetailScreen extends ConsumerStatefulWidget {
@@ -70,7 +70,7 @@ class _RoutineDetailScreenState extends ConsumerState<RoutineDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final routineAsync = ref.watch(routineByIdProvider(widget.routineId));
+    final routineAsync = ref.watch(routineByIdStreamProvider(widget.routineId));
 
     // Stack so the hero image can extend edge-to-edge from the top of the
     // safe area while the back button floats over it. Non-data states still
@@ -142,7 +142,7 @@ class _RoutineDetailScreenState extends ConsumerState<RoutineDetailScreen> {
               error: (_, __) => _ErrorState(
                 message: AppL10n.of(context).routineDetailLoadError,
                 onRetry: () =>
-                    ref.invalidate(routineByIdProvider(widget.routineId)),
+                    ref.invalidate(routineByIdStreamProvider(widget.routineId)),
               ),
             ),
           ),

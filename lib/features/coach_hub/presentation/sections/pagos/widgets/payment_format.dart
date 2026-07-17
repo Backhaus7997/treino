@@ -49,8 +49,16 @@ String fmtArs(int amount) =>
 String fmtDayMonth(DateTime d) => '${d.day} ${kMesesLargos[d.month]}';
 
 /// dd/MM/yyyy — usado en historial de pagos y en otros tabs.
-String fmtDate(DateTime d) =>
-    '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+///
+/// Todos sus callers le pasan instantes reales (UTC vía TimestampConverter:
+/// `createdAt`, `recordedAt`, `finishedAt`, `startedAt`, `uploadedAt`,
+/// `acceptedAt`) — NUNCA un wall-clock ADR-7 de appointment (esos usan el
+/// `_fmtDate` local de cada pantalla). Por eso localizamos acá: sin `.toLocal()`
+/// la fecha se muestra en UTC (+3h en Argentina, corrida un día de noche) — #392.
+String fmtDate(DateTime d) {
+  final local = d.toLocal();
+  return '${local.day.toString().padLeft(2, '0')}/${local.month.toString().padLeft(2, '0')}/${local.year}';
+}
 
 // ── Lógica de vencimiento ─────────────────────────────────────────────────────
 

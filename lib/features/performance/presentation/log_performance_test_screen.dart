@@ -15,16 +15,15 @@ import '../domain/performance_test.dart';
 
 /// Formats [dt] for the screen header using the active [localeName].
 ///
-/// Uses the same UTC convention as every reader of
-/// [PerformanceTest.recordedAt] (chart `_shortDate`, athlete detail
-/// `_formatMeasurementDate`): the stored UTC instant is shown as-is, with no
-/// `.toLocal()`. [intl.DateFormat.format] reads the [DateTime]'s own calendar
-/// fields (day/month/year/hour/minute) directly, so passing a UTC value (e.g.
-/// `DateTime.now().toUtc()`) keeps the header aligned with the date that gets
-/// persisted and rendered after saving, while localizing the month name.
+/// [PerformanceTest.recordedAt] is a real instant (persisted as
+/// `DateTime.now().toUtc()`), so it must be shown in the viewer's local time —
+/// same convention as `log_measurement_screen`. [intl.DateFormat.format] reads
+/// the [DateTime]'s own calendar fields directly, so callers pass an already
+/// `.toLocal()`-ed value; a raw UTC instant would read +3h in Argentina (#392).
 String _formatDateTime(DateTime dt, String localeName) {
-  final date = intl.DateFormat('d MMM y', localeName).format(dt);
-  final time = intl.DateFormat('HH:mm', localeName).format(dt);
+  final local = dt.toLocal();
+  final date = intl.DateFormat('d MMM y', localeName).format(local);
+  final time = intl.DateFormat('HH:mm', localeName).format(local);
   return '$date · $time';
 }
 
@@ -273,10 +272,9 @@ class _LogPerformanceTestScreenState
     final l10n = AppL10n.of(context);
     final trainerUid = ref.watch(currentUidProvider);
     final canSave = trainerUid != null && !_saving && _hasAnyMetric;
-    // Use UTC to match the persisted recordedAt (see _save) and the UTC display
-    // convention of every reader, so the header date never disagrees with the
-    // saved record near midnight.
-    final now = DateTime.now().toUtc();
+    // Real instant; _formatDateTime localizes it for display (#392). The record
+    // is still persisted as UTC in _save — same instant, shown in local time.
+    final now = DateTime.now();
 
     return Scaffold(
       backgroundColor: palette.bg,

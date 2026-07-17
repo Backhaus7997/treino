@@ -32,26 +32,47 @@ import '../../widgets/exercise_picker_dialog.dart';
 /// reps fijas o rango (mín–máx), duración (por tiempo), peso, descanso, notas
 /// para el alumno, supersets, N semanas con prescripción propia por semana
 /// (`weeklySets`, Fase 4b, selector "Sem 1..N") y máscara de presencia por
-/// semana (`activeWeeks`, Fase 4c, chips "Semanas:"). Paridad completa con el
-/// modelo de dominio y con el editor mobile — ya no hay ningún campo de
-/// [RoutineSlot] que este editor no pueda representar.
+/// semana (`activeWeeks`, Fase 4c, chips "Semanas:").
+///
+/// **Fidelidad total del modelo, NO paridad total de features**: el form
+/// modela el 100% del esquema de [RoutineSlot], así que hidrata y reescribe
+/// cualquier rutina sin perder un solo campo. Pero todavía NO sabe CREAR
+/// algunas cosas que mobile sí: series tipadas (warm-up/drop/al-fallo — las
+/// respeta y las round-trippea, pero no hay UI para asignarlas), plantillas
+/// reusables y ejercicios custom nuevos. Fidelidad ≠ paridad.
 ///
 /// **Modo edición** (`routineId != null`): carga la rutina y la abre en el
 /// form. `updateAssigned` pisa el array `days` entero en cada guardado, pero
 /// como el form modela el 100% del esquema, ninguna rutina asignada —sea cual
 /// sea su origen (mobile o web)— pierde información al re-guardarse.
 class RoutineEditorWebScreen extends ConsumerStatefulWidget {
+  /// Trainer-assigned mode: builds or edits ONE athlete's routine
+  /// (`RoutineSource.trainerAssigned`), saved via createAssigned/updateAssigned.
   const RoutineEditorWebScreen({
     super.key,
-    required this.athleteId,
+    required String this.athleteId,
     this.routineId,
-  });
+  }) : isTemplate = false;
 
-  final String athleteId;
+  /// Template mode: builds or edits a REUSABLE routine with no athlete
+  /// (`RoutineSource.trainerTemplate`), saved via createTemplate/updateTemplate.
+  /// Reached from the Biblioteca "Templates Rutinas" tab. Same rich form — a
+  /// template is just a routine without an `assignedTo`.
+  const RoutineEditorWebScreen.template({
+    super.key,
+    this.routineId,
+  })  : athleteId = null,
+        isTemplate = true;
 
-  /// When non-null, the editor loads this existing routine and saves via
-  /// `updateAssigned` instead of `createAssigned`.
+  /// Non-null only in trainer-assigned mode. Null ⟺ [isTemplate].
+  final String? athleteId;
+
+  /// When non-null, loads this existing doc (assigned routine OR template) and
+  /// saves via the update path instead of the create path.
   final String? routineId;
+
+  /// True → template mode: no athlete, `trainer-template` source.
+  final bool isTemplate;
 
   @override
   ConsumerState<RoutineEditorWebScreen> createState() =>
@@ -93,6 +114,20 @@ _EditorSet _editorSetFromSpec(SetSpec spec) => _EditorSet()
   ..repsMax = spec.repsMax
   ..durationSeconds = spec.durationSeconds
   ..weightKg = spec.weightKg;
+
+/// Leading chip label for a set row: the running count of NORMAL sets up to
+/// and including [index] — so a warm-up/drop/failure doesn't consume a number
+/// — or the type glyph (W/D/F) for a typed set. Mirrors mobile's
+/// `setChipLabel`, and reuses [kSetTypeLabel] as the single source of glyphs.
+String _setChipLabel(List<_EditorSet> sets, int index) {
+  final type = sets[index].type;
+  if (type != SetType.normal) return kSetTypeLabel[type]!;
+  var n = 0;
+  for (var i = 0; i <= index; i++) {
+    if (sets[i].type == SetType.normal) n++;
+  }
+  return '$n';
+}
 
 class _EditorSlot {
   Exercise? exercise;
@@ -153,6 +188,17 @@ class _RoutineEditorWebScreenState
   // ── Edit mode ─────────────────────────────────────────────────────────────
   bool get _isEditing => widget.routineId != null;
 
+  /// "Nueva/Editar" × "rutina/plantilla".
+  String get _headerTitle {
+    if (widget.isTemplate) {
+      return _isEditing ? 'Editar plantilla' : 'Nueva plantilla'; // i18n
+    }
+    return _isEditing ? 'Editar rutina' : 'Nueva rutina'; // i18n
+  }
+
+  /// Noun for user-facing messages ("No pudimos guardar la …").
+  String get _noun => widget.isTemplate ? 'plantilla' : 'rutina'; // i18n
+
   /// The routine being edited (its identity fields are preserved on save).
   Routine? _loadedRoutine;
 
@@ -180,7 +226,7 @@ class _RoutineEditorWebScreenState
       if (routine == null) {
         setState(() {
           _loading = false;
-          _fatalMessage = 'No encontramos la rutina.'; // i18n
+          _fatalMessage = 'No encontramos la $_noun.'; // i18n
         });
         return;
       }
@@ -193,7 +239,7 @@ class _RoutineEditorWebScreenState
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _fatalMessage = 'No pudimos cargar la rutina. Probá de nuevo.'; // i18n
+        _fatalMessage = 'No pudimos cargar la $_noun. Probá de nuevo.'; // i18n
       });
     }
   }
@@ -484,16 +530,75 @@ class _RoutineEditorWebScreenState
     setState(() => _days[dayIndex].slots.removeAt(slotIndex));
   }
 
+  /// Groups [slots] into blocks: a superset run, or a lone standalone slot.
+  /// `linkedToNext` links by POSITION, so a block is a maximal run of slots
+  /// joined by it.
+  List<List<_EditorSlot>> _blocksOf(List<_EditorSlot> slots) {
+    final blocks = <List<_EditorSlot>>[];
+    var current = <_EditorSlot>[];
+    for (var i = 0; i < slots.length; i++) {
+      current.add(slots[i]);
+      if (!slots[i].linkedToNext || i == slots.length - 1) {
+        blocks.add(current);
+        current = <_EditorSlot>[];
+      }
+    }
+    return blocks;
+  }
+
+  /// Flattens [blocks] back into [slots] and re-derives `linkedToNext` from
+  /// the block structure: every member links to the next except the last.
+  ///
+  /// The flags are POSITIONAL, so they must be rewritten after a reorder
+  /// rather than travel with the slots — carrying them is what let a plain
+  /// swap re-wire which exercises were grouped.
+  void _writeBlocks(List<_EditorSlot> slots, List<List<_EditorSlot>> blocks) {
+    for (final block in blocks) {
+      for (var i = 0; i < block.length; i++) {
+        block[i].linkedToNext = i < block.length - 1;
+      }
+    }
+    slots
+      ..clear()
+      ..addAll([for (final block in blocks) ...block]);
+  }
+
+  /// Moves the slot at [slotIndex] one step in [dir] (-1 up / +1 down),
+  /// keeping superset grouping intact — mirrors mobile, which splits this
+  /// across `_moveSlotWithinGroup` and `_moveBlock`:
+  ///
+  /// - Neighbour in the SAME superset → swap the two members; the group is
+  ///   untouched.
+  /// - At the block's edge → move the WHOLE block past the neighbouring one,
+  ///   so a reorder can never split a superset or drag an outsider into it.
+  ///
+  /// The old code swapped raw positions, which silently re-grouped: moving a
+  /// member out of a superset left the previous slot linked to whatever
+  /// landed next to it.
   void _moveSlot(int dayIndex, int slotIndex, int dir) {
     final slots = _days[dayIndex].slots;
-    final target = slotIndex + dir;
-    if (target < 0 || target >= slots.length) return;
+    if (slotIndex < 0 || slotIndex >= slots.length) return;
+    final slot = slots[slotIndex];
+    final blocks = _blocksOf(slots);
+
+    final blockIndex = blocks.indexWhere((b) => b.contains(slot));
+    final block = blocks[blockIndex];
+    final from = block.indexOf(slot);
+    final within = from + dir;
+
+    if (within >= 0 && within < block.length) {
+      // Reorder inside the superset.
+      block[from] = block[within];
+      block[within] = slot;
+    } else {
+      // Edge of the block → the whole block hops its neighbour.
+      final target = blockIndex + dir;
+      if (target < 0 || target >= blocks.length) return;
+      blocks.insert(target, blocks.removeAt(blockIndex));
+    }
+
     _markDirty();
-    setState(() {
-      final tmp = slots[slotIndex];
-      slots[slotIndex] = slots[target];
-      slots[target] = tmp;
-    });
+    setState(() => _writeBlocks(slots, blocks));
   }
 
   // Links / unlinks this exercise with the next one into a superset.
@@ -654,6 +759,15 @@ class _RoutineEditorWebScreenState
     });
   }
 
+  void _onSetTypeChanged(
+      int dayIndex, int slotIndex, int setIndex, SetType type) {
+    _markDirty();
+    setState(() => _days[dayIndex]
+        .slots[slotIndex]
+        .weeklySets[_selectedWeek][setIndex]
+        .type = type);
+  }
+
   // ── Validation ───────────────────────────────────────────────────────────
 
   /// First unmet requirement, in fill order — mirrors mobile's
@@ -693,6 +807,10 @@ class _RoutineEditorWebScreenState
           // meaningful once there's more than one week.
           final wk = _numWeeks > 1 ? ' en la Semana ${w + 1}' : ''; // i18n
           for (final set in slot.weeklySets[w]) {
+            // A failure set has no countable target by definition — the
+            // athlete works to failure. Reps/duration are an optional
+            // reference, never a requirement (mirrors mobile's isSetValid).
+            if (set.type == SetType.failure) continue;
             if (slot.exerciseMode == ExerciseMode.duration) {
               if (set.durationSeconds == null || set.durationSeconds! <= 0) {
                 return '$name tiene una serie sin duración$wk.'; // i18n
@@ -860,6 +978,9 @@ class _RoutineEditorWebScreenState
         // createdAt, …). updateAssigned only writes name/split/level/days/
         // numWeeks — `days` is rebuilt from a form that models 100% of
         // RoutineSlot's schema, so nothing is lost on re-save (Fase 4c).
+        // updateTemplate/updateAssigned each write only name/split/level/days/
+        // numWeeks — `days` is rebuilt from a form that models 100% of
+        // RoutineSlot's schema, so nothing is lost on re-save.
         final draft = _loadedRoutine!.copyWith(
           name: _nameCtrl.text.trim(),
           split: _splitCtrl.text.trim(),
@@ -867,7 +988,27 @@ class _RoutineEditorWebScreenState
           days: days,
           numWeeks: _numWeeks,
         );
-        await repo.updateAssigned(uid: trainerUid, draft: draft);
+        if (widget.isTemplate) {
+          await repo.updateTemplate(uid: trainerUid, draft: draft);
+        } else {
+          await repo.updateAssigned(uid: trainerUid, draft: draft);
+        }
+      } else if (widget.isTemplate) {
+        // A template has no athlete. createTemplate forces
+        // source=trainer-template / assignedTo=null / visibility=private to
+        // satisfy firestore.rules (templates accept ONLY 'private').
+        final template = Routine(
+          id: '',
+          name: _nameCtrl.text.trim(),
+          split: _splitCtrl.text.trim(),
+          level: _level,
+          days: days,
+          numWeeks: _numWeeks,
+          source: RoutineSource.trainerTemplate,
+          assignedBy: trainerUid,
+          visibility: RoutineVisibility.private,
+        );
+        await repo.createTemplate(template);
       } else {
         final routine = Routine(
           id: '',
@@ -887,17 +1028,19 @@ class _RoutineEditorWebScreenState
         );
         await repo.createAssigned(routine);
       }
-      // assignedRoutinesProvider is a one-shot FutureProvider (not a stream) —
-      // invalidate so the athlete detail's "Rutina activa" card picks up the
-      // change on return.
-      ref.invalidate(assignedRoutinesProvider(widget.athleteId));
+      // trainerTemplatesStreamProvider is a live stream — no invalidation
+      // needed. The assigned list is a one-shot FutureProvider, so invalidate
+      // it so the athlete detail's "Rutina activa" card refreshes on return.
+      if (!widget.isTemplate) {
+        ref.invalidate(assignedRoutinesProvider(widget.athleteId!));
+      }
       if (mounted) context.pop();
     } catch (_) {
       if (mounted) {
         setState(() {
           _submitting = false;
           _errorMessage =
-              'No pudimos guardar la rutina. Probá de nuevo.'; // i18n
+              'No pudimos guardar la $_noun. Probá de nuevo.'; // i18n
         });
       }
     }
@@ -945,9 +1088,15 @@ class _RoutineEditorWebScreenState
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    final profileAsync = ref.watch(userPublicProfileProvider(widget.athleteId));
-    final athleteName =
-        profileAsync.valueOrNull?.displayName ?? 'el alumno'; // i18n
+    // Only resolve the athlete in assigned mode — the profile family is keyed
+    // by a non-null id, and a template has no athlete.
+    final athleteName = widget.isTemplate
+        ? null
+        : ref
+                .watch(userPublicProfileProvider(widget.athleteId!))
+                .valueOrNull
+                ?.displayName ??
+            'el alumno'; // i18n
 
     return PopScope(
       canPop: !_isDirty,
@@ -972,7 +1121,7 @@ class _RoutineEditorWebScreenState
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        _isEditing ? 'Editar rutina' : 'Nueva rutina', // i18n
+                        _headerTitle, // i18n
                         style: GoogleFonts.barlowCondensed(
                           fontWeight: FontWeight.w700,
                           fontSize: 20,
@@ -981,7 +1130,9 @@ class _RoutineEditorWebScreenState
                         ),
                       ),
                       Text(
-                        'Para $athleteName', // i18n
+                        widget.isTemplate
+                            ? 'Plantilla reutilizable, sin alumno' // i18n
+                            : 'Para $athleteName', // i18n
                         style: GoogleFonts.barlow(
                             color: palette.textMuted, fontSize: 13),
                       ),
@@ -1119,6 +1270,8 @@ class _RoutineEditorWebScreenState
                                         _onSetDurationChanged(i, s, set, v),
                                     onSetWeightChanged: (s, set, v) =>
                                         _onSetWeightChanged(i, s, set, v),
+                                    onSetTypeChanged: (s, set, t) =>
+                                        _onSetTypeChanged(i, s, set, t),
                                     onModeChanged: (s, em, rm) =>
                                         _setSlotMode(i, s, em, rm),
                                     onNotesChanged: (s, v) =>
@@ -1468,6 +1621,7 @@ class _DayCard extends StatelessWidget {
     required this.onAddExercises,
     required this.onRemoveSlot,
     required this.onMoveSlot,
+    required this.onSetTypeChanged,
     required this.onRestChanged,
     required this.onAddSet,
     required this.onRemoveSet,
@@ -1511,6 +1665,8 @@ class _DayCard extends StatelessWidget {
       onSetDurationChanged;
   final void Function(int slotIndex, int setIndex, String value)
       onSetWeightChanged;
+  final void Function(int slotIndex, int setIndex, SetType type)
+      onSetTypeChanged;
   final void Function(int slotIndex, ExerciseMode exerciseMode, RepMode repMode)
       onModeChanged;
   final void Function(int slotIndex, String value) onNotesChanged;
@@ -1580,6 +1736,7 @@ class _DayCard extends StatelessWidget {
               onSetRepsMaxChanged: (set, v) => onSetRepsMaxChanged(i, set, v),
               onSetDurationChanged: (set, v) => onSetDurationChanged(i, set, v),
               onSetWeightChanged: (set, v) => onSetWeightChanged(i, set, v),
+              onSetTypeChanged: (set, t) => onSetTypeChanged(i, set, t),
               onModeChanged: (em, rm) => onModeChanged(i, em, rm),
               onNotesChanged: (v) => onNotesChanged(i, v),
               onToggleLink: () => onToggleLink(i),
@@ -1622,6 +1779,7 @@ class _SlotCard extends StatelessWidget {
     required this.onRemove,
     required this.onMoveUp,
     required this.onMoveDown,
+    required this.onSetTypeChanged,
     required this.onRestChanged,
     required this.onAddSet,
     required this.onRemoveSet,
@@ -1662,6 +1820,7 @@ class _SlotCard extends StatelessWidget {
   final void Function(int setIndex, String value) onSetRepsMaxChanged;
   final void Function(int setIndex, String value) onSetDurationChanged;
   final void Function(int setIndex, String value) onSetWeightChanged;
+  final void Function(int setIndex, SetType type) onSetTypeChanged;
   final void Function(ExerciseMode exerciseMode, RepMode repMode) onModeChanged;
   final ValueChanged<String> onNotesChanged;
   final VoidCallback onToggleLink;
@@ -1818,6 +1977,8 @@ class _SlotCard extends StatelessWidget {
               onRepsMaxChanged: (v) => onSetRepsMaxChanged(i, v),
               onDurationChanged: (v) => onSetDurationChanged(i, v),
               onWeightChanged: (v) => onSetWeightChanged(i, v),
+              chipLabel: _setChipLabel(weekSets, i),
+              onTypeChanged: (t) => onSetTypeChanged(i, t),
             ),
           Align(
             alignment: Alignment.centerLeft,
@@ -1888,6 +2049,70 @@ class _SlotCard extends StatelessWidget {
 
 // ── Set row ────────────────────────────────────────────────────────────────
 
+/// Tappable leading chip on a set row. Shows a running number for normal sets
+/// and the W/D/F glyph for typed ones; tapping opens a menu to change the
+/// [SetType]. This is the web editor's only way to author warm-up / drop /
+/// failure sets (before this, every set was forced to normal).
+class _SetTypeChip extends StatelessWidget {
+  const _SetTypeChip({
+    required this.label,
+    required this.type,
+    required this.palette,
+    required this.onChanged,
+  });
+
+  final String label;
+  final SetType type;
+  final AppPalette palette;
+  final ValueChanged<SetType> onChanged;
+
+  static const _options = <(SetType, String)>[
+    (SetType.normal, 'Normal'), // i18n
+    (SetType.warmup, 'Entrada en calor (W)'), // i18n
+    (SetType.drop, 'Drop (D)'), // i18n
+    (SetType.failure, 'Al fallo (F)'), // i18n
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final typed = type != SetType.normal;
+    return PopupMenuButton<SetType>(
+      tooltip: 'Tipo de serie', // i18n
+      color: palette.bgCard,
+      padding: EdgeInsets.zero,
+      initialValue: type,
+      onSelected: onChanged,
+      itemBuilder: (_) => [
+        for (final (value, text) in _options)
+          PopupMenuItem<SetType>(
+            value: value,
+            child: Text(text,
+                style: GoogleFonts.barlow(color: palette.textPrimary)),
+          ),
+      ],
+      child: Container(
+        width: 26,
+        height: 26,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: typed ? palette.accent.withValues(alpha: 0.16) : null,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(
+              color: typed ? palette.accent : palette.border, width: 1),
+        ),
+        child: Text(
+          label,
+          style: GoogleFonts.barlowCondensed(
+            color: typed ? palette.accent : palette.textMuted,
+            fontWeight: FontWeight.w700,
+            fontSize: 13,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _SetRow extends StatelessWidget {
   const _SetRow({
     super.key,
@@ -1903,6 +2128,8 @@ class _SetRow extends StatelessWidget {
     required this.onRepsMaxChanged,
     required this.onDurationChanged,
     required this.onWeightChanged,
+    required this.chipLabel,
+    required this.onTypeChanged,
   });
 
   final int index;
@@ -1918,6 +2145,12 @@ class _SetRow extends StatelessWidget {
   final ValueChanged<String> onDurationChanged;
   final ValueChanged<String> onWeightChanged;
 
+  /// Precomputed leading label: the running set number, or W/D/F for a typed
+  /// set (see [_setChipLabel]). Computed in the parent, which holds the week's
+  /// full set list.
+  final String chipLabel;
+  final ValueChanged<SetType> onTypeChanged;
+
   @override
   Widget build(BuildContext context) {
     final isDuration = exerciseMode == ExerciseMode.duration;
@@ -1926,11 +2159,11 @@ class _SetRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 3),
       child: Row(
         children: [
-          SizedBox(
-            width: 20,
-            child: Text('${index + 1}',
-                style: GoogleFonts.barlowCondensed(
-                    color: palette.textMuted, fontWeight: FontWeight.w700)),
+          _SetTypeChip(
+            label: chipLabel,
+            type: set.type,
+            palette: palette,
+            onChanged: onTypeChanged,
           ),
           if (isDuration)
             // Duration exercises (planks, cardio) have no weight — just seconds.
