@@ -164,7 +164,7 @@ async function seedFullAthleteData(uid: string): Promise<void> {
   batch.set(db.collection("appointments").doc(`appt-future-${uid}`), {
     athleteId: uid,
     trainerId: "trainer-xyz",
-    scheduledAt: admin.firestore.Timestamp.fromDate(
+    startsAt: admin.firestore.Timestamp.fromDate(
       new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
     ),
     status: "confirmed",
@@ -173,7 +173,7 @@ async function seedFullAthleteData(uid: string): Promise<void> {
   batch.set(db.collection("appointments").doc(`appt-past-${uid}`), {
     athleteId: uid,
     trainerId: "trainer-xyz",
-    scheduledAt: admin.firestore.Timestamp.fromDate(
+    startsAt: admin.firestore.Timestamp.fromDate(
       new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
     ),
     status: "confirmed",

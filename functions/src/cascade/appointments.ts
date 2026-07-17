@@ -3,7 +3,7 @@
  *
  * Queries `appointments` where:
  *   - `athleteId == uid`
- *   - `scheduledAt > now()`
+ *   - `startsAt > now()`
  *   - `status != 'cancelled'`   (already-cancelled are left as-is)
  *
  * Updates each matching doc:
@@ -29,11 +29,15 @@ export async function cancelFutureAppointments(
   const db = admin.firestore(app);
   const now = admin.firestore.Timestamp.now();
 
-  // Query future appointments for this athlete that are not already cancelled
+  // Query future appointments for this athlete that are not already cancelled.
+  // QA-API-001: the field is `startsAt` (what appointment_repository writes and
+  // the freezed Appointment model declares) — NOT `scheduledAt`, which no client
+  // code ever writes. Querying the non-existent field returned an empty snapshot,
+  // so the athlete's future appointments were never cancelled and kept their PII.
   const snapshot = await db
     .collection("appointments")
     .where("athleteId", "==", uid)
-    .where("scheduledAt", ">", now)
+    .where("startsAt", ">", now)
     .get();
 
   if (snapshot.empty) {
