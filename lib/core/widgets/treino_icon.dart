@@ -191,4 +191,7 @@ class TreinoIcon {
   static const IconData sortable = PhosphorIconsRegular.caretUpDown;
   // Ícono del estado de error (tabla, dialogs, etc.).
   static const IconData errorState = PhosphorIconsRegular.warningCircle;
+
+  // Coach Hub Web — acción archivar rutina (Fase 5, WU-04).
+  static const IconData archive = PhosphorIconsRegular.archive;
 }

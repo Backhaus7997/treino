@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
 import 'package:treino/features/coach_hub/presentation/sections/rutinas/athlete_routines_screen.dart';
@@ -15,6 +16,8 @@ import 'package:treino/features/profile/application/user_public_profile_provider
 import 'package:treino/features/profile/domain/experience_level.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/features/workout/application/assigned_routine_providers.dart';
+import 'package:treino/features/workout/application/routine_providers.dart';
+import 'package:treino/features/workout/data/routine_repository.dart';
 import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/domain/routine_day.dart';
 import 'package:treino/features/workout/domain/routine_slot.dart';
@@ -22,6 +25,8 @@ import 'package:treino/features/workout/domain/routine_source.dart';
 import 'package:treino/features/workout/domain/routine_status.dart';
 import 'package:treino/features/workout/domain/routine_visibility.dart';
 import 'package:treino/features/workout/domain/set_spec.dart';
+
+class _MockRoutineRepository extends Mock implements RoutineRepository {}
 
 const _athleteId = 'athlete-1';
 
@@ -143,6 +148,41 @@ Future<void> _pumpWithFuture(
       ),
     ),
   );
+}
+
+/// Pumps the screen with `routineRepositoryProvider` mockeado y
+/// `assignedRoutinesProvider` recalculado a partir de [routinesOf] en cada
+/// fetch — permite simular que la lista cambia después de archivar (WU-04).
+Future<void> _pumpWithRepo(
+  WidgetTester tester, {
+  required List<Routine> Function() routinesOf,
+  required RoutineRepository mockRepo,
+}) async {
+  tester.view.physicalSize = const Size(1400, 900);
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [
+        routineRepositoryProvider.overrideWithValue(mockRepo),
+        assignedRoutinesProvider(_athleteId)
+            .overrideWith((ref) async => routinesOf()),
+        userPublicProfileProvider(_athleteId).overrideWith(
+          (ref) => Stream.value(
+            const UserPublicProfile(uid: _athleteId, displayName: 'Vicente'),
+          ),
+        ),
+      ],
+      child: MaterialApp(
+        theme: AppTheme.dark(),
+        home:
+            const Scaffold(body: AthleteRoutinesScreen(athleteId: _athleteId)),
+      ),
+    ),
+  );
+  await tester.pumpAndSettle();
 }
 
 void main() {
@@ -314,6 +354,149 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('No hay rutinas archivadas.'), findsOneWidget);
+    });
+  });
+
+  group('AthleteRoutinesScreen — archivar rutina (WU-04)', () {
+    late _MockRoutineRepository mockRepo;
+
+    setUp(() {
+      mockRepo = _MockRoutineRepository();
+    });
+
+    testWidgets('el botón de archivar sólo aparece en activas web-editables',
+        (tester) async {
+      final routines = [
+        _routine(id: 'r1', name: 'Activa editable'),
+        _routine(id: 'r2', name: 'Periodizada', numWeeks: 4),
+      ];
+      await _pumpWithRepo(
+        tester,
+        routinesOf: () => routines,
+        mockRepo: mockRepo,
+      );
+
+      expect(
+        find.byKey(const ValueKey('routine_row_archive_button_r1')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('routine_row_archive_button_r2')),
+        findsNothing,
+      );
+    });
+
+    testWidgets('tocar archivar abre una confirmación con TreinoDialog',
+        (tester) async {
+      await _pumpWithRepo(
+        tester,
+        routinesOf: () => [_routine(id: 'r1', name: 'Activa editable')],
+        mockRepo: mockRepo,
+      );
+
+      await tester
+          .tap(find.byKey(const ValueKey('routine_row_archive_button_r1')));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(TreinoDialog), findsOneWidget);
+      expect(find.text('Archivar'), findsWidgets);
+      expect(find.text('Cancelar'), findsOneWidget);
+    });
+
+    testWidgets('cancelar la confirmación NO llama a repo.archive',
+        (tester) async {
+      await _pumpWithRepo(
+        tester,
+        routinesOf: () => [_routine(id: 'r1', name: 'Activa editable')],
+        mockRepo: mockRepo,
+      );
+
+      await tester
+          .tap(find.byKey(const ValueKey('routine_row_archive_button_r1')));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Cancelar'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(TreinoDialog), findsNothing);
+      expect(find.text('Activa editable'), findsOneWidget);
+      verifyNever(() => mockRepo.archive(any()));
+    });
+
+    testWidgets(
+        'confirmar archiva: llama a repo.archive, refresca la lista y '
+        'muestra un snackbar de éxito', (tester) async {
+      var routines = [_routine(id: 'r1', name: 'Activa editable')];
+      when(() => mockRepo.archive('r1')).thenAnswer((_) async {
+        routines = const [];
+      });
+
+      await _pumpWithRepo(
+        tester,
+        routinesOf: () => routines,
+        mockRepo: mockRepo,
+      );
+
+      await tester
+          .tap(find.byKey(const ValueKey('routine_row_archive_button_r1')));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Archivar').last);
+      await tester.pumpAndSettle();
+
+      verify(() => mockRepo.archive('r1')).called(1);
+      expect(find.text('Activa editable'), findsNothing);
+      expect(find.text('Rutina archivada.'), findsOneWidget);
+    });
+
+    testWidgets('muestra estado busy mientras la operación está en curso',
+        (tester) async {
+      final completer = Completer<void>();
+      when(() => mockRepo.archive('r1')).thenAnswer((_) => completer.future);
+
+      await _pumpWithRepo(
+        tester,
+        routinesOf: () => [_routine(id: 'r1', name: 'Activa editable')],
+        mockRepo: mockRepo,
+      );
+
+      await tester
+          .tap(find.byKey(const ValueKey('routine_row_archive_button_r1')));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Archivar').last);
+      await tester.pump();
+
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('routine_row_archive_button_r1')),
+        findsNothing,
+      );
+
+      completer.complete();
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets(
+        'si repo.archive falla, muestra un snackbar de error y la fila '
+        'sigue visible', (tester) async {
+      when(() => mockRepo.archive('r1')).thenThrow(Exception('boom'));
+
+      await _pumpWithRepo(
+        tester,
+        routinesOf: () => [_routine(id: 'r1', name: 'Activa editable')],
+        mockRepo: mockRepo,
+      );
+
+      await tester
+          .tap(find.byKey(const ValueKey('routine_row_archive_button_r1')));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Archivar').last);
+      await tester.pumpAndSettle();
+
+      expect(find.text('No pudimos archivar la rutina.'), findsOneWidget);
+      expect(find.text('Activa editable'), findsOneWidget);
     });
   });
 }
