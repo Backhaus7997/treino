@@ -55,6 +55,39 @@ final currentAthleteLinkProvider =
   return links.first; // listForAthlete viene ordenado por requestedAt DESC
 });
 
+/// Vínculo NO terminado del atleta actual: `pending`, `active` o `paused`, o
+/// null si no tiene ninguno.
+///
+/// A diferencia de [currentAthleteLinkProvider] (solo `active`), este incluye
+/// `pending` y `paused`. Lo consume la vista de coach del atleta para decidir
+/// si mostrar la card de estado (SOLICITUD ENVIADA / VÍNCULO PAUSADO) o la
+/// discovery, y el guard anti-duplicados de "PEDIR VÍNCULO". QA-COA-001: con el
+/// provider active-only, una solicitud `pending` (o un vínculo `paused`) hacía
+/// que la vista devolviera null → caía a discovery, la card quedaba muerta, y
+/// el guard no veía la solicitud en curso → solicitudes duplicadas ilimitadas.
+///
+/// NO lo usan los consumidores que requieren específicamente el vínculo activo
+/// (chat, reviews, mi_cuota, agenda, workout) — esos siguen en
+/// [currentAthleteLinkProvider].
+///
+/// Si hubiera varios no-terminados (no debería — un atleta se vincula con UN PF
+/// a la vez), devuelve el más reciente (requestedAt DESC).
+final currentAthleteLinkAnyStatusProvider =
+    FutureProvider.autoDispose<TrainerLink?>((ref) async {
+  final uid = ref.watch(currentUidProvider);
+  if (uid == null) return null;
+  final links = await ref.read(trainerLinkRepositoryProvider).listForAthlete(
+    uid,
+    statuses: {
+      TrainerLinkStatus.pending,
+      TrainerLinkStatus.active,
+      TrainerLinkStatus.paused,
+    },
+  );
+  if (links.isEmpty) return null;
+  return links.first;
+});
+
 /// Stream real-time de los vínculos del PF actual. Lo consume el dashboard
 /// del PF (Etapa 3).
 final trainerLinksStreamProvider =
