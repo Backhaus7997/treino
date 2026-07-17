@@ -304,6 +304,115 @@ class _RoutineEditorWebScreenState
     slot.activeWeeks.removeWhere((w) => w < 0 || w >= _numWeeks);
   }
 
+  /// Replaces the selected week's prescription with a deep copy of the
+  /// PREVIOUS week's, slot by slot — mirrors mobile's `_duplicateWeek`
+  /// (REQ-PERIOD-014). `_EditorSet.copy()` keeps set types, so warm-ups and
+  /// failure sets survive the duplication.
+  ///
+  /// Presence travels with it (ADR-WPRES-06): a slot present in the source
+  /// week becomes present in the target too, and one absent from the source
+  /// is dropped from the target.
+  ///
+  /// DELIBERATE DEVIATION from mobile, in exactly one case: when the target is
+  /// a slot's ONLY week, mobile removes it from the mask and leaves the mask
+  /// EMPTY — which in this model reads as "present in EVERY week", so an
+  /// exercise scheduled once silently spreads across the whole plan (verified
+  /// against mobile's own `duplicateWeekPresence` test bridge). Since the
+  /// source week doesn't have that exercise, after the copy NO week does, and
+  /// a slot scheduled nowhere is a ghost — so it's dropped instead.
+  Future<void> _duplicateWeek() async {
+    if (_selectedWeek == 0) return;
+    final sourceWeek = _selectedWeek - 1;
+    final targetWeek = _selectedWeek;
+
+    final confirmed = await _confirmDuplicateWeek(sourceWeek, targetWeek);
+    if (confirmed != true || !mounted) return;
+
+    _markDirty();
+    setState(() {
+      for (final day in _days) {
+        for (final slot in day.slots) {
+          slot.weeklySets[targetWeek] =
+              slot.weeklySets[sourceWeek].map((e) => e.copy()).toList();
+        }
+        // Back-to-front: dropping a slot keeps the lower indices valid.
+        for (var i = day.slots.length - 1; i >= 0; i--) {
+          if (!_copyPresenceToTarget(day.slots[i], sourceWeek, targetWeek)) {
+            _dropSlotKeepingGroups(day.slots, i);
+          }
+        }
+      }
+    });
+  }
+
+  /// Confirms the overwrite. This replaces everything already loaded in the
+  /// target week, so it asks first — and names both weeks, since "duplicar"
+  /// alone doesn't say which direction it goes.
+  Future<bool?> _confirmDuplicateWeek(int sourceWeek, int targetWeek) {
+    final palette = AppPalette.of(context);
+    return showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: palette.bgCard,
+        title: Text(
+          '¿Copiar la Semana ${sourceWeek + 1} acá?', // i18n
+          style: GoogleFonts.barlow(
+              color: palette.textPrimary, fontWeight: FontWeight.w600),
+        ),
+        content: Text(
+          'Se reemplaza todo lo que tengas cargado en la Semana '
+          '${targetWeek + 1}.', // i18n
+          style: GoogleFonts.barlow(color: palette.textMuted, fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            // Keyed: the form footer has its own "Cancelar" too.
+            key: const Key('duplicate_week_cancel_button'),
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text('Cancelar', // i18n
+                style: GoogleFonts.barlow(color: palette.textMuted)),
+          ),
+          TextButton(
+            key: const Key('duplicate_week_confirm_button'),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text('Copiar', // i18n
+                style: GoogleFonts.barlow(
+                    color: palette.accent, fontWeight: FontWeight.w600)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Copies [slot]'s presence from [sourceWeek] onto [targetWeek]. Returns
+  /// false when the slot ends up scheduled in NO week and must be dropped.
+  bool _copyPresenceToTarget(_EditorSlot slot, int sourceWeek, int targetWeek) {
+    // An empty mask already means "every week" — the target inherits it.
+    if (slot.activeWeeks.isEmpty) return true;
+    if (slot.isPresentInWeek(sourceWeek)) {
+      final mask = Set<int>.from(slot.activeWeeks)..add(targetWeek);
+      // Canonicalize a now-full mask back to empty, like
+      // [_toggleSlotWeekPresence] does — one wire shape for "all weeks".
+      slot.activeWeeks = mask.length == _numWeeks ? <int>{} : mask;
+      return true;
+    }
+    final mask = Set<int>.from(slot.activeWeeks)..remove(targetWeek);
+    if (mask.isEmpty) return false; // scheduled nowhere → see _duplicateWeek
+    slot.activeWeeks = mask;
+    return true;
+  }
+
+  /// Removes `slots[index]`, keeping superset grouping intact: the previous
+  /// slot inherits the dropped one's [_EditorSlot.linkedToNext]. Without this,
+  /// a group that ENDED at the dropped slot would silently swallow whatever
+  /// came after it, since `linkedToNext` links by POSITION, not by partner id.
+  void _dropSlotKeepingGroups(List<_EditorSlot> slots, int index) {
+    if (index > 0) {
+      slots[index - 1].linkedToNext = slots[index].linkedToNext;
+    }
+    slots.removeAt(index);
+  }
+
   void _setNumWeeks(int value) {
     final clamped = value.clamp(1, _kMaxWeeks);
     if (clamped == _numWeeks) return;
@@ -957,12 +1066,27 @@ class _RoutineEditorWebScreenState
                                 // the whole plan since `_selectedWeek` isn't
                                 // per-day. Hidden for single-week plans.
                                 if (_numWeeks > 1) ...[
-                                  _WeekTabs(
-                                    numWeeks: _numWeeks,
-                                    selectedWeek: _selectedWeek,
-                                    palette: palette,
-                                    onSelected: (w) =>
-                                        setState(() => _selectedWeek = w),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: _WeekTabs(
+                                          numWeeks: _numWeeks,
+                                          selectedWeek: _selectedWeek,
+                                          palette: palette,
+                                          onSelected: (w) =>
+                                              setState(() => _selectedWeek = w),
+                                        ),
+                                      ),
+                                      // Nothing to copy from on week 1.
+                                      if (_selectedWeek > 0) ...[
+                                        const SizedBox(width: 8),
+                                        _DuplicateWeekButton(
+                                          sourceWeek: _selectedWeek - 1,
+                                          palette: palette,
+                                          onPressed: _duplicateWeek,
+                                        ),
+                                      ],
+                                    ],
                                   ),
                                   const SizedBox(height: 12),
                                 ],
@@ -1925,6 +2049,43 @@ class _ModeChip extends StatelessWidget {
 /// more than one week: one chip per week ("Sem 1".."Sem N"). Tapping a chip
 /// changes which week's sets the day/slot cards render and edit
 /// (`_selectedWeek`) — a single global row since the selection isn't per-day.
+/// "Copiar Sem N acá" — pulls the previous week's prescription into the one
+/// being viewed. Labelled with the SOURCE week (not just "duplicar") because
+/// the direction is the whole point: a 4-week progression is built by copying
+/// forward and tweaking a number, not by re-typing every row.
+class _DuplicateWeekButton extends StatelessWidget {
+  const _DuplicateWeekButton({
+    required this.sourceWeek,
+    required this.palette,
+    required this.onPressed,
+  });
+
+  /// 0-based index of the week being copied FROM.
+  final int sourceWeek;
+  final AppPalette palette;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextButton.icon(
+      key: const Key('duplicate_week_button'),
+      onPressed: onPressed,
+      icon: Icon(TreinoIcon.copy, size: 16, color: palette.textMuted),
+      label: Text(
+        'Copiar Sem ${sourceWeek + 1} acá', // i18n
+        style: GoogleFonts.barlow(color: palette.textMuted, fontSize: 13),
+      ),
+      style: TextButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+          side: BorderSide(color: palette.border),
+        ),
+      ),
+    );
+  }
+}
+
 class _WeekTabs extends StatelessWidget {
   const _WeekTabs({
     required this.numWeeks,
