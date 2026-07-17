@@ -25,6 +25,12 @@ Widget _wrap(Widget child, {List<Override> overrides = const []}) =>
         miCuotaProvider.overrideWith(
           (ref) => const AsyncValue<MiCuotaState?>.data(null),
         ),
+        // QA-COA-001: the view/harness now read currentAthleteLinkAnyStatusProvider
+        // for the card-vs-discovery decision. Bridge it to whatever each test
+        // overrides currentAthleteLinkProvider with, so the existing per-test
+        // overrides keep driving the view unchanged.
+        currentAthleteLinkAnyStatusProvider
+            .overrideWith((ref) => ref.watch(currentAthleteLinkProvider.future)),
         ...overrides,
       ],
       child: MaterialApp(

@@ -37,7 +37,13 @@ UserPublicProfile _makePub() => const UserPublicProfile(
     );
 
 Widget _wrap(List<Override> overrides) => ProviderScope(
-      overrides: overrides,
+      overrides: [
+        // QA-COA-001: the harness reads currentAthleteLinkAnyStatusProvider;
+        // bridge it to the currentAthleteLinkProvider override each test provides.
+        currentAthleteLinkAnyStatusProvider
+            .overrideWith((ref) => ref.watch(currentAthleteLinkProvider.future)),
+        ...overrides,
+      ],
       child: MaterialApp(
         theme: AppTheme.dark(),
         localizationsDelegates: AppL10n.localizationsDelegates,

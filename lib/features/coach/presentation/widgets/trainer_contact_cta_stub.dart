@@ -51,6 +51,7 @@ class _TrainerContactCtaStubState extends ConsumerState<TrainerContactCtaStub> {
             athleteId: athleteId,
           );
       ref.invalidate(currentAthleteLinkProvider);
+      ref.invalidate(currentAthleteLinkAnyStatusProvider);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -74,7 +75,11 @@ class _TrainerContactCtaStubState extends ConsumerState<TrainerContactCtaStub> {
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
-    final linkAsync = ref.watch(currentAthleteLinkProvider);
+    // QA-COA-001: read the any-status link so a `pending` request actually
+    // disables this button. With the active-only provider, `existingLink` was
+    // never pending, so the pending branch of the guard was dead and the
+    // athlete could fire unlimited duplicate requests.
+    final linkAsync = ref.watch(currentAthleteLinkAnyStatusProvider);
 
     // Disabled si: ya hay vínculo en pending/active, está submitting, o
     // el provider todavía no resolvió.

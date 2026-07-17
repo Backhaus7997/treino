@@ -123,7 +123,10 @@ class _AthleteCoachViewState extends ConsumerState<AthleteCoachView> {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    final linkAsync = ref.watch(currentAthleteLinkProvider);
+    // QA-COA-001: card-vs-discovery decision must see pending/paused links too,
+    // not just active — otherwise a sent request (pending) or a paused link
+    // falls through to discovery and the status card is never shown.
+    final linkAsync = ref.watch(currentAthleteLinkAnyStatusProvider);
 
     // Trigger #2: fire 30-day prompt after the link provider resolves.
     // Using ref.listen so we react each time the async value transitions to
@@ -385,6 +388,7 @@ class _ActionRow extends ConsumerWidget {
     if (!confirmed) return;
     await ref.read(trainerLinkRepositoryProvider).cancel(link.id);
     ref.invalidate(currentAthleteLinkProvider);
+    ref.invalidate(currentAthleteLinkAnyStatusProvider);
   }
 
   Future<void> _onTerminate(BuildContext context, WidgetRef ref) async {
@@ -426,6 +430,7 @@ class _ActionRow extends ConsumerWidget {
         .terminate(linkId, reason: 'athlete-terminated');
 
     container.invalidate(currentAthleteLinkProvider);
+    container.invalidate(currentAthleteLinkAnyStatusProvider);
 
     // Show review sheet — context is still valid here because we checked
     // mounted already and the sheet uses the container, not this widget's ref.
@@ -868,7 +873,7 @@ class AthleteCoachViewTestHarness extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final linkAsync = ref.watch(currentAthleteLinkProvider);
+    final linkAsync = ref.watch(currentAthleteLinkAnyStatusProvider);
     return linkAsync.when(
       loading: () => const CircularProgressIndicator(),
       error: (_, __) => const SizedBox.shrink(),
