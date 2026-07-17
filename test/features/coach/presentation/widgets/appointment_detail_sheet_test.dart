@@ -157,8 +157,9 @@ void main() {
 
         await _tap(tester, find.text('COBRAR'));
 
-        // El campo Monto arranca prellenado con la tarifa de referencia.
-        expect(find.text('8000'), findsOneWidget);
+        // El campo Monto arranca prellenado con la tarifa de referencia,
+        // agrupada de a miles por el ThousandsSeparatorInputFormatter.
+        expect(find.text('8.000'), findsOneWidget);
         expect(find.textContaining('Tarifa de referencia'), findsOneWidget);
 
         await _tap(tester, find.text('CONFIRMAR COBRO'));

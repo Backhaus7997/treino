@@ -13,6 +13,9 @@ import '../../measurements/presentation/log_measurement_screen.dart';
 import '../../measurements/presentation/widgets/measurement_progress_chart.dart';
 import '../application/athlete_note_providers.dart';
 import '../domain/athlete_note.dart';
+import '../../coach_hub/presentation/sections/pagos/widgets/payment_format.dart'
+    show groupThousands;
+import '../../coach_hub/presentation/sections/pagos/widgets/thousands_input_formatter.dart';
 import '../../payments/application/billing_providers.dart';
 import '../../payments/domain/athlete_billing.dart';
 import '../../insights/presentation/widgets/daily_heatmap_section.dart';
@@ -1077,8 +1080,9 @@ class _CobroConfigSheetState extends ConsumerState<_CobroConfigSheet> {
     final trainerRate =
         widget.ref.read(userProfileProvider).valueOrNull?.trainerMonthlyRate;
     final initialAmount = widget.existing?.amountArs ?? trainerRate ?? 0;
-    _priceController =
-        TextEditingController(text: initialAmount > 0 ? '$initialAmount' : '');
+    _priceController = TextEditingController(
+      text: initialAmount > 0 ? groupThousands('$initialAmount') : '',
+    );
     _cadence = widget.existing?.cadence ?? BillingCadence.mensual;
   }
 
@@ -1090,7 +1094,7 @@ class _CobroConfigSheetState extends ConsumerState<_CobroConfigSheet> {
 
   Future<void> _save() async {
     if (_saving) return;
-    final amount = int.tryParse(_priceController.text.trim());
+    final amount = parseGroupedInt(_priceController.text);
     if (amount == null || amount <= 0) return;
 
     final trainerId = ref.read(currentUidProvider);
@@ -1178,6 +1182,7 @@ class _CobroConfigSheetState extends ConsumerState<_CobroConfigSheet> {
           TextField(
             controller: _priceController,
             keyboardType: TextInputType.number,
+            inputFormatters: [ThousandsSeparatorInputFormatter()],
             style: TextStyle(color: palette.textPrimary),
             decoration: InputDecoration(
               hintText: 'Ej: 7000',

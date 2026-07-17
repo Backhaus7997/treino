@@ -7,6 +7,7 @@ import '../../../app/theme/app_palette.dart';
 import '../../../core/analytics/analytics_service.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../../core/widgets/treino_icon.dart';
+import '../../coach_hub/presentation/sections/pagos/widgets/thousands_input_formatter.dart';
 import '../../payments/application/pagos_por_cobrar_provider.dart';
 import '../../payments/application/payment_providers.dart';
 import '../../payments/domain/athlete_billing.dart';
@@ -1369,6 +1370,7 @@ class _AddSueltoSheetState extends ConsumerState<_AddSueltoSheet> {
           TextField(
             controller: _amountController,
             keyboardType: TextInputType.number,
+            inputFormatters: [ThousandsSeparatorInputFormatter()],
             style: GoogleFonts.barlow(
               fontSize: 14,
               color: palette.textPrimary,
@@ -1566,7 +1568,7 @@ class _AddSueltoSheetState extends ConsumerState<_AddSueltoSheet> {
       return;
     }
 
-    final amount = int.tryParse(amountText);
+    final amount = parseGroupedInt(amountText);
     if (amount == null || amount <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(l10n.dashboardMontoInvalido)),
