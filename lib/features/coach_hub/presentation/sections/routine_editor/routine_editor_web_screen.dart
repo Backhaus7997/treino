@@ -32,9 +32,14 @@ import '../../widgets/exercise_picker_dialog.dart';
 /// reps fijas o rango (mín–máx), duración (por tiempo), peso, descanso, notas
 /// para el alumno, supersets, N semanas con prescripción propia por semana
 /// (`weeklySets`, Fase 4b, selector "Sem 1..N") y máscara de presencia por
-/// semana (`activeWeeks`, Fase 4c, chips "Semanas:"). Paridad completa con el
-/// modelo de dominio y con el editor mobile — ya no hay ningún campo de
-/// [RoutineSlot] que este editor no pueda representar.
+/// semana (`activeWeeks`, Fase 4c, chips "Semanas:").
+///
+/// **Fidelidad total del modelo, NO paridad total de features**: el form
+/// modela el 100% del esquema de [RoutineSlot], así que hidrata y reescribe
+/// cualquier rutina sin perder un solo campo. Pero todavía NO sabe CREAR
+/// algunas cosas que mobile sí: series tipadas (warm-up/drop/al-fallo — las
+/// respeta y las round-trippea, pero no hay UI para asignarlas), plantillas
+/// reusables y ejercicios custom nuevos. Fidelidad ≠ paridad.
 ///
 /// **Modo edición** (`routineId != null`): carga la rutina y la abre en el
 /// form. `updateAssigned` pisa el array `days` entero en cada guardado, pero
@@ -484,16 +489,75 @@ class _RoutineEditorWebScreenState
     setState(() => _days[dayIndex].slots.removeAt(slotIndex));
   }
 
+  /// Groups [slots] into blocks: a superset run, or a lone standalone slot.
+  /// `linkedToNext` links by POSITION, so a block is a maximal run of slots
+  /// joined by it.
+  List<List<_EditorSlot>> _blocksOf(List<_EditorSlot> slots) {
+    final blocks = <List<_EditorSlot>>[];
+    var current = <_EditorSlot>[];
+    for (var i = 0; i < slots.length; i++) {
+      current.add(slots[i]);
+      if (!slots[i].linkedToNext || i == slots.length - 1) {
+        blocks.add(current);
+        current = <_EditorSlot>[];
+      }
+    }
+    return blocks;
+  }
+
+  /// Flattens [blocks] back into [slots] and re-derives `linkedToNext` from
+  /// the block structure: every member links to the next except the last.
+  ///
+  /// The flags are POSITIONAL, so they must be rewritten after a reorder
+  /// rather than travel with the slots — carrying them is what let a plain
+  /// swap re-wire which exercises were grouped.
+  void _writeBlocks(List<_EditorSlot> slots, List<List<_EditorSlot>> blocks) {
+    for (final block in blocks) {
+      for (var i = 0; i < block.length; i++) {
+        block[i].linkedToNext = i < block.length - 1;
+      }
+    }
+    slots
+      ..clear()
+      ..addAll([for (final block in blocks) ...block]);
+  }
+
+  /// Moves the slot at [slotIndex] one step in [dir] (-1 up / +1 down),
+  /// keeping superset grouping intact — mirrors mobile, which splits this
+  /// across `_moveSlotWithinGroup` and `_moveBlock`:
+  ///
+  /// - Neighbour in the SAME superset → swap the two members; the group is
+  ///   untouched.
+  /// - At the block's edge → move the WHOLE block past the neighbouring one,
+  ///   so a reorder can never split a superset or drag an outsider into it.
+  ///
+  /// The old code swapped raw positions, which silently re-grouped: moving a
+  /// member out of a superset left the previous slot linked to whatever
+  /// landed next to it.
   void _moveSlot(int dayIndex, int slotIndex, int dir) {
     final slots = _days[dayIndex].slots;
-    final target = slotIndex + dir;
-    if (target < 0 || target >= slots.length) return;
+    if (slotIndex < 0 || slotIndex >= slots.length) return;
+    final slot = slots[slotIndex];
+    final blocks = _blocksOf(slots);
+
+    final blockIndex = blocks.indexWhere((b) => b.contains(slot));
+    final block = blocks[blockIndex];
+    final from = block.indexOf(slot);
+    final within = from + dir;
+
+    if (within >= 0 && within < block.length) {
+      // Reorder inside the superset.
+      block[from] = block[within];
+      block[within] = slot;
+    } else {
+      // Edge of the block → the whole block hops its neighbour.
+      final target = blockIndex + dir;
+      if (target < 0 || target >= blocks.length) return;
+      blocks.insert(target, blocks.removeAt(blockIndex));
+    }
+
     _markDirty();
-    setState(() {
-      final tmp = slots[slotIndex];
-      slots[slotIndex] = slots[target];
-      slots[target] = tmp;
-    });
+    setState(() => _writeBlocks(slots, blocks));
   }
 
   // Links / unlinks this exercise with the next one into a superset.

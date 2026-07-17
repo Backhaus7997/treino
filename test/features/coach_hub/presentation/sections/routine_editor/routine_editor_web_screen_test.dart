@@ -299,6 +299,64 @@ Routine _perWeekRoutine({String id = 'r6'}) => Routine(
 /// A per-week PRESENCE-masked routine (activeWeeks populated: present only in
 /// week 0 of 2) — web-editable since Fase 4c. Used by the edit round-trip
 /// test to confirm activeWeeks survives a save unchanged.
+/// Single week: Press+Sentadilla are ONE superset, Dominadas stands alone —
+/// the shape a reorder must never silently re-group.
+Routine _supersetOrderRoutine({String id = 'r12'}) => Routine(
+      id: id,
+      name: 'Orden con superserie',
+      split: 'Full Body',
+      level: ExperienceLevel.advanced,
+      source: RoutineSource.trainerAssigned,
+      assignedBy: _trainerId,
+      assignedTo: _athleteId,
+      visibility: RoutineVisibility.private,
+      days: const [
+        RoutineDay(
+          dayNumber: 1,
+          name: 'Día A',
+          slots: [
+            RoutineSlot(
+              exerciseId: 'bench-press',
+              exerciseName: 'Press de Banca',
+              muscleGroup: 'chest',
+              targetSets: 1,
+              targetRepsMin: 8,
+              targetRepsMax: 8,
+              targetReps: [8],
+              targetWeightKg: 60,
+              restSeconds: 90,
+              supersetGroup: 1,
+              sets: [SetSpec(reps: 8, weightKg: 60)],
+            ),
+            RoutineSlot(
+              exerciseId: 'squat',
+              exerciseName: 'Sentadilla',
+              muscleGroup: 'legs',
+              targetSets: 1,
+              targetRepsMin: 10,
+              targetRepsMax: 10,
+              targetReps: [10],
+              targetWeightKg: 80,
+              restSeconds: 120,
+              supersetGroup: 1,
+              sets: [SetSpec(reps: 10, weightKg: 80)],
+            ),
+            RoutineSlot(
+              exerciseId: 'pull-up',
+              exerciseName: 'Dominadas',
+              muscleGroup: 'back',
+              targetSets: 1,
+              targetRepsMin: 6,
+              targetRepsMax: 6,
+              targetReps: [6],
+              restSeconds: 60,
+              sets: [SetSpec(reps: 6)],
+            ),
+          ],
+        ),
+      ],
+    );
+
 /// 2-week plan whose week 1 carries typed sets and whose week 2 is plain —
 /// duplicating week 1 onto week 2 must carry the types across.
 Routine _twoWeekTypedRoutine({String id = 'r10'}) => Routine(
@@ -1461,6 +1519,91 @@ void main() {
           )).captured.single as Routine;
 
       expect(draft.days, original.days);
+    });
+  });
+
+  group('RoutineEditorWebScreen — reordenar sin romper superseries', () {
+    Future<_MockRoutineRepository> pumpOrderRoutine(WidgetTester tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.getById(any()))
+          .thenAnswer((_) async => _supersetOrderRoutine());
+      when(() => repo.updateAssigned(
+            uid: any(named: 'uid'),
+            draft: any(named: 'draft'),
+          )).thenAnswer((i) async => i.namedArguments[#draft] as Routine);
+      await _pumpEditor(tester, repo: repo, routineId: 'r12');
+      return repo;
+    }
+
+    Future<Routine> save(
+        WidgetTester tester, _MockRoutineRepository repo) async {
+      await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
+      await tester.pumpAndSettle();
+      return verify(() => repo.updateAssigned(
+            uid: any(named: 'uid'),
+            draft: captureAny(named: 'draft'),
+          )).captured.single as Routine;
+    }
+
+    testWidgets('moving the last superset member down moves the WHOLE superset',
+        (tester) async {
+      // Press+Sentadilla are supersetted; Dominadas is alone. A naive
+      // position swap would leave Press linked to Dominadas — dragging an
+      // unrelated exercise into the superset and evicting Sentadilla.
+      final repo = await pumpOrderRoutine(tester);
+
+      final btn = find.byTooltip('Bajar').at(1); // Sentadilla
+      await tester.ensureVisible(btn); // 900px-tall viewport: a
+      // missed tap only WARNS, it does not fail — the test would
+      // silently assert on an untouched routine.
+      await tester.tap(btn);
+      await tester.pumpAndSettle();
+
+      final slots = (await save(tester, repo)).days.single.slots;
+
+      expect(slots.map((s) => s.exerciseName).toList(),
+          const ['Dominadas', 'Press de Banca', 'Sentadilla']);
+      expect(slots.map((s) => s.supersetGroup).toList(), const [null, 1, 1],
+          reason: 'Dominadas must stay standalone and the superset intact.');
+    });
+
+    testWidgets(
+        'moving a standalone exercise up does not absorb it into the '
+        'superset above', (tester) async {
+      final repo = await pumpOrderRoutine(tester);
+
+      final btn = find.byTooltip('Subir').at(2); // Dominadas
+      await tester.ensureVisible(btn); // 900px-tall viewport: a
+      // missed tap only WARNS, it does not fail — the test would
+      // silently assert on an untouched routine.
+      await tester.tap(btn);
+      await tester.pumpAndSettle();
+
+      final slots = (await save(tester, repo)).days.single.slots;
+
+      expect(slots.map((s) => s.exerciseName).toList(),
+          const ['Dominadas', 'Press de Banca', 'Sentadilla']);
+      expect(slots.map((s) => s.supersetGroup).toList(), const [null, 1, 1],
+          reason: 'Dominadas jumped the whole superset, not into it.');
+    });
+
+    testWidgets('moving a member INSIDE a superset just reorders it',
+        (tester) async {
+      final repo = await pumpOrderRoutine(tester);
+
+      final btn = find.byTooltip('Bajar').at(0); // Press, inside {1}
+      await tester.ensureVisible(btn); // 900px-tall viewport: a
+      // missed tap only WARNS, it does not fail — the test would
+      // silently assert on an untouched routine.
+      await tester.tap(btn);
+      await tester.pumpAndSettle();
+
+      final slots = (await save(tester, repo)).days.single.slots;
+
+      expect(slots.map((s) => s.exerciseName).toList(),
+          const ['Sentadilla', 'Press de Banca', 'Dominadas']);
+      expect(slots.map((s) => s.supersetGroup).toList(), const [1, 1, null],
+          reason: 'Swapping two members keeps the group; nothing joins it.');
     });
   });
 
