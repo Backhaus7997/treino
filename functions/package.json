@@ -6,7 +6,7 @@
     "build": "tsc",
     "serve": "npm run build && firebase emulators:start --only functions",
     "test": "jest --forceExit",
-    "test:rules": "jest --forceExit \"(user-public-profiles-rules|trainer-links-paywall-rules|users-subscription-rules|users-role-create-rules|trainer-links-forge-rules)\"",
+    "test:rules": "jest --forceExit \"(user-public-profiles-rules|trainer-links-paywall-rules|users-subscription-rules|users-role-create-rules|trainer-links-forge-rules|post-privacy-rules)\"",
     "test:rules:emulator": "firebase emulators:exec --only firestore,auth --project treino-rules-test \"npm run test:rules\"",
     "lint": "eslint --ext .ts src/",
     "lint:fix": "eslint --ext .ts src/ --fix"

@@ -58,6 +58,39 @@ class PostRepository {
     return snap.docs.map(_fromDoc).whereType<Post>().toList();
   }
 
+  /// Posts by [uid] of a single [privacy] tier. QA-FEED-001: a viewer who is
+  /// not the author can only read the tiers firestore.rules allows, so the
+  /// profile provider must query per tier (not fetch-all-then-filter, which the
+  /// enforced read rule now rejects). Two equality filters need no composite
+  /// index (zigzag merge); results are sorted by the caller.
+  ///
+  /// Only for the `public` and `friends` tiers — the `gym` tier must be
+  /// constrained by [byAuthorGymTier] so the query never pulls a row the read
+  /// rule would reject.
+  Future<List<Post>> byAuthorAndPrivacy(String uid, PostPrivacy privacy) async {
+    final snap = await _posts
+        .where('authorUid', isEqualTo: uid)
+        .where('privacy', isEqualTo: privacy.toJson())
+        .get();
+    return snap.docs.map(_fromDoc).whereType<Post>().toList();
+  }
+
+  /// Gym-tier posts by [uid] whose `authorGymId == gymId`. QA-FEED-001: the
+  /// read rule only lets a viewer read a gym post when their own gym matches the
+  /// post's `authorGymId`. The profile query must therefore be constrained to
+  /// the viewer's gym — querying every gym post and filtering client-side would
+  /// pull rows authored for other gyms, which the rule rejects, failing the
+  /// whole query. Three equality filters need no composite index (zigzag
+  /// merge); results are sorted by the caller.
+  Future<List<Post>> byAuthorGymTier(String uid, String gymId) async {
+    final snap = await _posts
+        .where('authorUid', isEqualTo: uid)
+        .where('privacy', isEqualTo: PostPrivacy.gym.toJson())
+        .where('authorGymId', isEqualTo: gymId)
+        .get();
+    return snap.docs.map(_fromDoc).whereType<Post>().toList();
+  }
+
   Future<List<Post>> feedPublic() async {
     final snap = await _posts
         .where('privacy', isEqualTo: PostPrivacy.public.toJson())
