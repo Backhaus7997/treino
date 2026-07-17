@@ -111,6 +111,12 @@ Routine _singleWeekRoutine({List<RoutineDay>? days}) => Routine(
 /// Wraps under ProviderScope with required overrides.
 /// Uses sessionsByUidProvider (String key, structural equality) so
 /// planProgressProvider can compute without key-equality problems.
+///
+/// Both routine providers are overridden: the screen's own build() watches
+/// [routineByIdStreamProvider] (issue #401 fix — auto-refresh after edit),
+/// while [planProgressProvider] (read internally by the periodized CTA bar
+/// for week/day completion) still chains through the original one-shot
+/// [routineByIdProvider].
 Widget _wrap(
   Widget w, {
   required Routine routine,
@@ -118,6 +124,8 @@ Widget _wrap(
 }) {
   return ProviderScope(
     overrides: [
+      routineByIdStreamProvider(routine.id)
+          .overrideWith((ref) => Stream.value(routine)),
       routineByIdProvider(routine.id).overrideWith((ref) async => routine),
       currentUidProvider.overrideWithValue(_uid),
       userProfileProvider
@@ -135,13 +143,14 @@ Widget _wrap(
 }
 
 /// Pumps until async providers settle.
-/// planProgressProvider chains routineByIdProvider → sessionsByUidProvider
-/// → derivePlanProgress, so we need enough pumps for all three futures to
-/// resolve plus the stream to emit the user profile.
+/// planProgressProvider chains routineByIdProvider (via routine.id passed in
+/// separately for progress calc) → sessionsByUidProvider → derivePlanProgress;
+/// the detail screen itself watches routineByIdStreamProvider. Enough pumps
+/// for all of those plus the userProfileProvider stream to emit.
 Future<void> _settle(WidgetTester tester) async {
   // Round 1 – drain the initial microtask queue.
   await tester.pump();
-  // Round 2 – routineByIdProvider future resolves.
+  // Round 2 – routineByIdStreamProvider's first stream event resolves.
   await tester.pump(const Duration(milliseconds: 50));
   // Round 3 – sessionsByUidProvider resolves inside planProgressProvider.
   await tester.pump(const Duration(milliseconds: 50));

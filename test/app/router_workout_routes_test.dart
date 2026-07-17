@@ -116,8 +116,8 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
-            routineByIdProvider('test-id')
-                .overrideWith((ref) async => _kRoutine),
+            routineByIdStreamProvider('test-id')
+                .overrideWith((ref) => Stream.value(_kRoutine)),
           ],
           child: MaterialApp.router(
             theme: AppTheme.dark(),
