@@ -5,9 +5,9 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/app_motion.dart';
 import 'package:treino/app/theme/app_palette.dart';
+import 'package:treino/app/theme/tokens/primitives.dart';
 import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
 import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
 import 'package:treino/core/widgets/motion/treino_tappable.dart';
@@ -56,9 +56,16 @@ class RutinasScreen extends ConsumerWidget {
         children: [
           const TreinoSectionHeader(title: 'Rutinas'), // i18n
           const SizedBox(height: 6),
-          Text(
-            'Elegí un alumno para armarle una rutina.', // i18n
-            style: GoogleFonts.barlow(color: palette.textMuted, fontSize: 14),
+          TreinoFadeSlideIn(
+            delay: AppMotion.stagger(1),
+            child: Text(
+              'Elegí un alumno para armarle una rutina.', // i18n
+              style: TextStyle(
+                fontFamily: AppFonts.barlow,
+                color: palette.textMuted,
+                fontSize: 14,
+              ),
+            ),
           ),
           const SizedBox(height: 20),
           TreinoStateSwitcher(
@@ -105,7 +112,7 @@ class RutinasScreen extends ConsumerWidget {
 Widget _muted(AppPalette palette, String text) => Padding(
       padding: const EdgeInsets.symmetric(vertical: 24),
       child: Text(text,
-          style: GoogleFonts.barlow(color: palette.textMuted, fontSize: 14)),
+          style: TextStyle(fontFamily: AppFonts.barlow, color: palette.textMuted, fontSize: 14)),
     );
 
 /// Estado simplificado del vínculo para esta lista — a diferencia de
@@ -538,7 +545,7 @@ class _AthleteRowState extends State<_AthleteRow> {
                     Text(
                       widget.name,
                       overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.barlow(
+                      style: TextStyle(fontFamily: AppFonts.barlow, 
                           color: palette.textPrimary,
                           fontSize: 15,
                           fontWeight: FontWeight.w600),
@@ -547,7 +554,7 @@ class _AthleteRowState extends State<_AthleteRow> {
                       Text(
                         gymName,
                         overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.barlow(
+                        style: TextStyle(fontFamily: AppFonts.barlow, 
                             color: palette.textMuted, fontSize: 12),
                       ),
                   ],
@@ -668,7 +675,7 @@ class _RutinasCard extends StatelessWidget {
               child: Text(
                 name,
                 overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.barlow(
+                style: TextStyle(fontFamily: AppFonts.barlow, 
                   color: palette.textPrimary,
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
