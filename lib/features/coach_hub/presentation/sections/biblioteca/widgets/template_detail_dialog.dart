@@ -11,26 +11,32 @@ import 'package:treino/features/coach_hub/presentation/sections/biblioteca/widge
 import 'package:treino/features/profile/domain/experience_level.dart';
 import 'package:treino/features/workout/domain/routine.dart';
 
-/// Opens a read-only [AlertDialog] with the details of a trainer template.
+/// Opens an [AlertDialog] with the details of a trainer template.
 ///
 /// Entry point: [showTemplateDetailDialog].
 ///
 /// Shows: name, level, días/sem · semanas, and a per-day slot-count summary.
-/// NO edit controls — creation/editing is out of scope (W5.2/W5.4).
-/// NO new provider or navigation (ADR-CHW-005 compliant).
+/// When [onEdit] is provided, an "Editar" action closes the dialog and runs it
+/// (the caller navigates to the template editor). Navigation lives in the
+/// caller so this widget stays context-safe after the dialog pops.
 ///
 /// REQ-BIBW-10, SCENARIO-BIBW-10a.
-void showTemplateDetailDialog(BuildContext context, Routine routine) {
+void showTemplateDetailDialog(
+  BuildContext context,
+  Routine routine, {
+  VoidCallback? onEdit,
+}) {
   showDialog<void>(
     context: context,
-    builder: (_) => _TemplateDetailDialog(routine: routine),
+    builder: (_) => _TemplateDetailDialog(routine: routine, onEdit: onEdit),
   );
 }
 
 class _TemplateDetailDialog extends StatelessWidget {
-  const _TemplateDetailDialog({required this.routine});
+  const _TemplateDetailDialog({required this.routine, this.onEdit});
 
   final Routine routine;
+  final VoidCallback? onEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -137,10 +143,27 @@ class _TemplateDetailDialog extends StatelessWidget {
             'Cerrar', // i18n
             style: GoogleFonts.barlow(
               fontWeight: FontWeight.w600,
-              color: palette.accent,
+              color: palette.textMuted,
             ),
           ),
         ),
+        if (onEdit != null)
+          TextButton(
+            key: const Key('template_detail_edit_button'),
+            // Pop first, then hand off — the caller's context does the
+            // navigation, so nothing runs on this dialog's dead context.
+            onPressed: () {
+              Navigator.of(context).pop();
+              onEdit!();
+            },
+            child: Text(
+              'Editar', // i18n
+              style: GoogleFonts.barlow(
+                fontWeight: FontWeight.w600,
+                color: palette.accent,
+              ),
+            ),
+          ),
       ],
     );
   }

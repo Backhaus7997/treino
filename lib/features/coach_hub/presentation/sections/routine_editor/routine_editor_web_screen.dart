@@ -46,17 +46,33 @@ import '../../widgets/exercise_picker_dialog.dart';
 /// como el form modela el 100% del esquema, ninguna rutina asignada —sea cual
 /// sea su origen (mobile o web)— pierde información al re-guardarse.
 class RoutineEditorWebScreen extends ConsumerStatefulWidget {
+  /// Trainer-assigned mode: builds or edits ONE athlete's routine
+  /// (`RoutineSource.trainerAssigned`), saved via createAssigned/updateAssigned.
   const RoutineEditorWebScreen({
     super.key,
-    required this.athleteId,
+    required String this.athleteId,
     this.routineId,
-  });
+  }) : isTemplate = false;
 
-  final String athleteId;
+  /// Template mode: builds or edits a REUSABLE routine with no athlete
+  /// (`RoutineSource.trainerTemplate`), saved via createTemplate/updateTemplate.
+  /// Reached from the Biblioteca "Templates Rutinas" tab. Same rich form — a
+  /// template is just a routine without an `assignedTo`.
+  const RoutineEditorWebScreen.template({
+    super.key,
+    this.routineId,
+  })  : athleteId = null,
+        isTemplate = true;
 
-  /// When non-null, the editor loads this existing routine and saves via
-  /// `updateAssigned` instead of `createAssigned`.
+  /// Non-null only in trainer-assigned mode. Null ⟺ [isTemplate].
+  final String? athleteId;
+
+  /// When non-null, loads this existing doc (assigned routine OR template) and
+  /// saves via the update path instead of the create path.
   final String? routineId;
+
+  /// True → template mode: no athlete, `trainer-template` source.
+  final bool isTemplate;
 
   @override
   ConsumerState<RoutineEditorWebScreen> createState() =>
@@ -172,6 +188,17 @@ class _RoutineEditorWebScreenState
   // ── Edit mode ─────────────────────────────────────────────────────────────
   bool get _isEditing => widget.routineId != null;
 
+  /// "Nueva/Editar" × "rutina/plantilla".
+  String get _headerTitle {
+    if (widget.isTemplate) {
+      return _isEditing ? 'Editar plantilla' : 'Nueva plantilla'; // i18n
+    }
+    return _isEditing ? 'Editar rutina' : 'Nueva rutina'; // i18n
+  }
+
+  /// Noun for user-facing messages ("No pudimos guardar la …").
+  String get _noun => widget.isTemplate ? 'plantilla' : 'rutina'; // i18n
+
   /// The routine being edited (its identity fields are preserved on save).
   Routine? _loadedRoutine;
 
@@ -199,7 +226,7 @@ class _RoutineEditorWebScreenState
       if (routine == null) {
         setState(() {
           _loading = false;
-          _fatalMessage = 'No encontramos la rutina.'; // i18n
+          _fatalMessage = 'No encontramos la $_noun.'; // i18n
         });
         return;
       }
@@ -212,7 +239,7 @@ class _RoutineEditorWebScreenState
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _fatalMessage = 'No pudimos cargar la rutina. Probá de nuevo.'; // i18n
+        _fatalMessage = 'No pudimos cargar la $_noun. Probá de nuevo.'; // i18n
       });
     }
   }
@@ -951,6 +978,9 @@ class _RoutineEditorWebScreenState
         // createdAt, …). updateAssigned only writes name/split/level/days/
         // numWeeks — `days` is rebuilt from a form that models 100% of
         // RoutineSlot's schema, so nothing is lost on re-save (Fase 4c).
+        // updateTemplate/updateAssigned each write only name/split/level/days/
+        // numWeeks — `days` is rebuilt from a form that models 100% of
+        // RoutineSlot's schema, so nothing is lost on re-save.
         final draft = _loadedRoutine!.copyWith(
           name: _nameCtrl.text.trim(),
           split: _splitCtrl.text.trim(),
@@ -958,7 +988,27 @@ class _RoutineEditorWebScreenState
           days: days,
           numWeeks: _numWeeks,
         );
-        await repo.updateAssigned(uid: trainerUid, draft: draft);
+        if (widget.isTemplate) {
+          await repo.updateTemplate(uid: trainerUid, draft: draft);
+        } else {
+          await repo.updateAssigned(uid: trainerUid, draft: draft);
+        }
+      } else if (widget.isTemplate) {
+        // A template has no athlete. createTemplate forces
+        // source=trainer-template / assignedTo=null / visibility=private to
+        // satisfy firestore.rules (templates accept ONLY 'private').
+        final template = Routine(
+          id: '',
+          name: _nameCtrl.text.trim(),
+          split: _splitCtrl.text.trim(),
+          level: _level,
+          days: days,
+          numWeeks: _numWeeks,
+          source: RoutineSource.trainerTemplate,
+          assignedBy: trainerUid,
+          visibility: RoutineVisibility.private,
+        );
+        await repo.createTemplate(template);
       } else {
         final routine = Routine(
           id: '',
@@ -978,17 +1028,19 @@ class _RoutineEditorWebScreenState
         );
         await repo.createAssigned(routine);
       }
-      // assignedRoutinesProvider is a one-shot FutureProvider (not a stream) —
-      // invalidate so the athlete detail's "Rutina activa" card picks up the
-      // change on return.
-      ref.invalidate(assignedRoutinesProvider(widget.athleteId));
+      // trainerTemplatesStreamProvider is a live stream — no invalidation
+      // needed. The assigned list is a one-shot FutureProvider, so invalidate
+      // it so the athlete detail's "Rutina activa" card refreshes on return.
+      if (!widget.isTemplate) {
+        ref.invalidate(assignedRoutinesProvider(widget.athleteId!));
+      }
       if (mounted) context.pop();
     } catch (_) {
       if (mounted) {
         setState(() {
           _submitting = false;
           _errorMessage =
-              'No pudimos guardar la rutina. Probá de nuevo.'; // i18n
+              'No pudimos guardar la $_noun. Probá de nuevo.'; // i18n
         });
       }
     }
@@ -1036,9 +1088,15 @@ class _RoutineEditorWebScreenState
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    final profileAsync = ref.watch(userPublicProfileProvider(widget.athleteId));
-    final athleteName =
-        profileAsync.valueOrNull?.displayName ?? 'el alumno'; // i18n
+    // Only resolve the athlete in assigned mode — the profile family is keyed
+    // by a non-null id, and a template has no athlete.
+    final athleteName = widget.isTemplate
+        ? null
+        : ref
+                .watch(userPublicProfileProvider(widget.athleteId!))
+                .valueOrNull
+                ?.displayName ??
+            'el alumno'; // i18n
 
     return PopScope(
       canPop: !_isDirty,
@@ -1063,7 +1121,7 @@ class _RoutineEditorWebScreenState
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        _isEditing ? 'Editar rutina' : 'Nueva rutina', // i18n
+                        _headerTitle, // i18n
                         style: GoogleFonts.barlowCondensed(
                           fontWeight: FontWeight.w700,
                           fontSize: 20,
@@ -1072,7 +1130,9 @@ class _RoutineEditorWebScreenState
                         ),
                       ),
                       Text(
-                        'Para $athleteName', // i18n
+                        widget.isTemplate
+                            ? 'Plantilla reutilizable, sin alumno' // i18n
+                            : 'Para $athleteName', // i18n
                         style: GoogleFonts.barlow(
                             color: palette.textMuted, fontSize: 13),
                       ),

@@ -5,9 +5,11 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:treino/app/theme/app_palette.dart';
+import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/workout/application/routine_providers.dart';
 import 'package:treino/features/workout/application/session_providers.dart'
     show currentUidProvider;
@@ -36,50 +38,99 @@ class TemplatesTab extends ConsumerWidget {
         ? const AsyncValue<List<Routine>>.data([])
         : ref.watch(trainerTemplatesStreamProvider(uid));
 
-    return templatesAsync.when(
-      loading: () => Center(
-        child: CircularProgressIndicator(color: palette.accent),
-      ),
-      error: (e, _) => Center(
-        child: Text(
-          'Error al cargar plantillas.', // i18n
-          style: GoogleFonts.barlow(
-            color: palette.textMuted,
-            fontSize: 14,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: _NuevaPlantillaButton(palette: palette),
           ),
         ),
-      ),
-      data: (templates) {
-        if (templates.isEmpty) {
-          return Center(
-            child: Text(
-              'Todavía no creaste plantillas.', // i18n
-              style: GoogleFonts.barlow(
-                color: palette.textMuted,
-                fontSize: 14,
+        Expanded(
+          child: templatesAsync.when(
+            loading: () => Center(
+              child: CircularProgressIndicator(color: palette.accent),
+            ),
+            error: (e, _) => Center(
+              child: Text(
+                'Error al cargar plantillas.', // i18n
+                style: GoogleFonts.barlow(
+                  color: palette.textMuted,
+                  fontSize: 14,
+                ),
               ),
             ),
-          );
-        }
+            data: (templates) {
+              if (templates.isEmpty) {
+                return Center(
+                  child: Text(
+                    'Todavía no creaste plantillas.\n'
+                    'Tocá "Nueva plantilla" para armar una.', // i18n
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.barlow(
+                      color: palette.textMuted,
+                      fontSize: 14,
+                    ),
+                  ),
+                );
+              }
 
-        return GridView.builder(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-          gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-            maxCrossAxisExtent: 360,
-            childAspectRatio: 1.6,
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
+              return GridView.builder(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                  maxCrossAxisExtent: 360,
+                  childAspectRatio: 1.6,
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 12,
+                ),
+                itemCount: templates.length,
+                itemBuilder: (context, index) {
+                  final routine = templates[index];
+                  return TemplateGridCard(
+                    routine: routine,
+                    onTap: () => showTemplateDetailDialog(
+                      context,
+                      routine,
+                      onEdit: () =>
+                          context.push('/template-editor/${routine.id}'),
+                    ),
+                  );
+                },
+              );
+            },
           ),
-          itemCount: templates.length,
-          itemBuilder: (context, index) {
-            final routine = templates[index];
-            return TemplateGridCard(
-              routine: routine,
-              onTap: () => showTemplateDetailDialog(context, routine),
-            );
-          },
-        );
-      },
+        ),
+      ],
+    );
+  }
+}
+
+/// "Nueva plantilla" → opens the routine editor in template mode (no athlete).
+class _NuevaPlantillaButton extends StatelessWidget {
+  const _NuevaPlantillaButton({required this.palette});
+
+  final AppPalette palette;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextButton.icon(
+      key: const Key('nueva_plantilla_button'),
+      onPressed: () => context.push('/template-editor'),
+      icon: Icon(TreinoIcon.plus, size: 16, color: palette.accent),
+      label: Text(
+        'Nueva plantilla', // i18n
+        style: GoogleFonts.barlow(
+            color: palette.accent, fontWeight: FontWeight.w600),
+      ),
+      style: TextButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+          side: BorderSide(color: palette.accent.withValues(alpha: 0.5)),
+        ),
+      ),
     );
   }
 }
