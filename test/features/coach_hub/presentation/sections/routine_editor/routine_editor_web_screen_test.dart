@@ -299,6 +299,128 @@ Routine _perWeekRoutine({String id = 'r6'}) => Routine(
 /// A per-week PRESENCE-masked routine (activeWeeks populated: present only in
 /// week 0 of 2) — web-editable since Fase 4c. Used by the edit round-trip
 /// test to confirm activeWeeks survives a save unchanged.
+/// 2-week plan whose week 1 carries typed sets and whose week 2 is plain —
+/// duplicating week 1 onto week 2 must carry the types across.
+Routine _twoWeekTypedRoutine({String id = 'r10'}) => Routine(
+      id: id,
+      name: 'Tipada 2 semanas',
+      split: 'Full Body',
+      level: ExperienceLevel.advanced,
+      source: RoutineSource.trainerAssigned,
+      assignedBy: _trainerId,
+      assignedTo: _athleteId,
+      visibility: RoutineVisibility.private,
+      numWeeks: 2,
+      days: const [
+        RoutineDay(
+          dayNumber: 1,
+          name: 'Día A',
+          slots: [
+            RoutineSlot(
+              exerciseId: 'bench-press',
+              exerciseName: 'Press de Banca',
+              muscleGroup: 'chest',
+              targetSets: 2,
+              targetRepsMin: 8,
+              targetRepsMax: 12,
+              targetReps: [12, 8],
+              targetWeightKg: 20,
+              restSeconds: 90,
+              sets: [
+                SetSpec(type: SetType.warmup, reps: 12, weightKg: 20),
+                SetSpec(reps: 8, weightKg: 60),
+              ],
+              weeklySets: [
+                [
+                  SetSpec(type: SetType.warmup, reps: 12, weightKg: 20),
+                  SetSpec(reps: 8, weightKg: 60),
+                ],
+                [
+                  SetSpec(reps: 10, weightKg: 50),
+                  SetSpec(reps: 10, weightKg: 50),
+                ],
+              ],
+            ),
+          ],
+        ),
+      ],
+    );
+
+/// 2-week plan with a superset (Press+Sentadilla) followed by a standalone
+/// Dominadas, where the SECOND superset member lives only in week 2. Copying
+/// week 1 over week 2 evicts it — and must not leave Press linked to
+/// Dominadas.
+Routine _presenceDropRoutine({String id = 'r11'}) => Routine(
+      id: id,
+      name: 'Drop de presencia',
+      split: 'Full Body',
+      level: ExperienceLevel.advanced,
+      source: RoutineSource.trainerAssigned,
+      assignedBy: _trainerId,
+      assignedTo: _athleteId,
+      visibility: RoutineVisibility.private,
+      numWeeks: 2,
+      days: const [
+        RoutineDay(
+          dayNumber: 1,
+          name: 'Día A',
+          slots: [
+            RoutineSlot(
+              exerciseId: 'bench-press',
+              exerciseName: 'Press de Banca',
+              muscleGroup: 'chest',
+              targetSets: 1,
+              targetRepsMin: 8,
+              targetRepsMax: 8,
+              targetReps: [8],
+              targetWeightKg: 60,
+              restSeconds: 90,
+              supersetGroup: 1,
+              sets: [SetSpec(reps: 8, weightKg: 60)],
+              weeklySets: [
+                [SetSpec(reps: 8, weightKg: 60)],
+                [SetSpec(reps: 8, weightKg: 60)],
+              ],
+            ),
+            // Superset partner — scheduled ONLY in week 2.
+            RoutineSlot(
+              exerciseId: 'squat',
+              exerciseName: 'Sentadilla',
+              muscleGroup: 'legs',
+              targetSets: 1,
+              targetRepsMin: 10,
+              targetRepsMax: 10,
+              targetReps: [10],
+              targetWeightKg: 80,
+              restSeconds: 120,
+              supersetGroup: 1,
+              sets: [SetSpec(reps: 10, weightKg: 80)],
+              weeklySets: [
+                [SetSpec(reps: 10, weightKg: 80)],
+                [SetSpec(reps: 10, weightKg: 80)],
+              ],
+              activeWeeks: [1],
+            ),
+            RoutineSlot(
+              exerciseId: 'pull-up',
+              exerciseName: 'Dominadas',
+              muscleGroup: 'back',
+              targetSets: 1,
+              targetRepsMin: 6,
+              targetRepsMax: 6,
+              targetReps: [6],
+              restSeconds: 60,
+              sets: [SetSpec(reps: 6)],
+              weeklySets: [
+                [SetSpec(reps: 6)],
+                [SetSpec(reps: 6)],
+              ],
+            ),
+          ],
+        ),
+      ],
+    );
+
 /// A mobile-authored plan exercising every axis at once: 2 weeks with distinct
 /// per-week loads, a superset pair, typed sets, a rep range, coaching notes and
 /// a presence mask. Its legacy fields are filled exactly as mobile's
@@ -1339,6 +1461,129 @@ void main() {
           )).captured.single as Routine;
 
       expect(draft.days, original.days);
+    });
+  });
+
+  group('RoutineEditorWebScreen — copiar semana anterior (Fase 5)', () {
+    /// Opens [routine] in edit mode, jumps to week 2, and returns the mock so
+    /// the caller can capture the saved draft.
+    Future<_MockRoutineRepository> pumpOnWeek2(
+      WidgetTester tester,
+      Routine routine,
+    ) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.getById(any())).thenAnswer((_) async => routine);
+      when(() => repo.updateAssigned(
+            uid: any(named: 'uid'),
+            draft: any(named: 'draft'),
+          )).thenAnswer((i) async => i.namedArguments[#draft] as Routine);
+      await _pumpEditor(tester, repo: repo, routineId: routine.id);
+      await tester.tap(find.byKey(const Key('week_tab_1')));
+      await tester.pumpAndSettle();
+      return repo;
+    }
+
+    Future<Routine> saveAndCapture(
+        WidgetTester tester, _MockRoutineRepository repo) async {
+      await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
+      await tester.pumpAndSettle();
+      return verify(() => repo.updateAssigned(
+            uid: any(named: 'uid'),
+            draft: captureAny(named: 'draft'),
+          )).captured.single as Routine;
+    }
+
+    testWidgets('the button is hidden on week 1 and labelled with the source',
+        (tester) async {
+      await _pumpEditor(tester, repo: (() {
+        final r = _MockRoutineRepository();
+        when(() => r.getById(any()))
+            .thenAnswer((_) async => _twoWeekTypedRoutine());
+        return r;
+      })(), routineId: 'r10');
+
+      // Week 1 is selected by default — nothing to copy from.
+      expect(find.byKey(const Key('duplicate_week_button')), findsNothing);
+
+      await tester.tap(find.byKey(const Key('week_tab_1')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('duplicate_week_button')), findsOneWidget);
+      expect(find.text('Copiar Sem 1 acá'), findsOneWidget);
+    });
+
+    testWidgets('copying carries the set TYPES, not just the numbers',
+        (tester) async {
+      final repo = await pumpOnWeek2(tester, _twoWeekTypedRoutine());
+
+      await tester.tap(find.byKey(const Key('duplicate_week_button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('duplicate_week_confirm_button')));
+      await tester.pumpAndSettle();
+
+      final draft = await saveAndCapture(tester, repo);
+      final week2 = draft.days.single.slots.single.weeklySets[1];
+
+      expect(week2.map((s) => s.type).toList(),
+          const [SetType.warmup, SetType.normal]);
+      expect(week2.map((s) => s.reps).toList(), const [12, 8]);
+      expect(week2.map((s) => s.weightKg).toList(), const [20.0, 60.0]);
+    });
+
+    testWidgets('cancelling changes nothing', (tester) async {
+      final original = _twoWeekTypedRoutine();
+      final repo = await pumpOnWeek2(tester, original);
+
+      await tester.tap(find.byKey(const Key('duplicate_week_button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('duplicate_week_cancel_button')));
+      await tester.pumpAndSettle();
+
+      final draft = await saveAndCapture(tester, repo);
+      expect(draft.days, original.days);
+    });
+
+    testWidgets(
+        'an exercise scheduled ONLY in the target week is dropped, not spread '
+        'to every week', (tester) async {
+      // The deviation from mobile. Mobile empties the mask here, and an empty
+      // mask reads as "present in EVERY week" — so a once-scheduled exercise
+      // silently lands in the whole plan. Week 1 has no Sentadilla, so after
+      // copying week 1 over week 2 nothing does: drop it.
+      final repo = await pumpOnWeek2(tester, _presenceDropRoutine());
+
+      await tester.tap(find.byKey(const Key('duplicate_week_button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('duplicate_week_confirm_button')));
+      await tester.pumpAndSettle();
+
+      final draft = await saveAndCapture(tester, repo);
+      final slots = draft.days.single.slots;
+
+      expect(slots.map((s) => s.exerciseName).toList(),
+          const ['Press de Banca', 'Dominadas'],
+          reason: 'Sentadilla lived only in week 2; copying week 1 over it '
+              'leaves it scheduled nowhere.');
+      expect(slots.every((s) => s.activeWeeks.isEmpty), isTrue,
+          reason: 'No survivor should have inherited a stale mask.');
+    });
+
+    testWidgets('dropping a superset member does not re-link the survivors',
+        (tester) async {
+      // Press+Sentadilla were the superset; Dominadas stood alone. Evicting
+      // Sentadilla must leave Press alone too — NOT supersetted with
+      // Dominadas, which `linkedToNext` would do since it links by position.
+      final repo = await pumpOnWeek2(tester, _presenceDropRoutine());
+
+      await tester.tap(find.byKey(const Key('duplicate_week_button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('duplicate_week_confirm_button')));
+      await tester.pumpAndSettle();
+
+      final draft = await saveAndCapture(tester, repo);
+
+      expect(draft.days.single.slots.map((s) => s.supersetGroup).toList(),
+          const [null, null]);
     });
   });
 }
