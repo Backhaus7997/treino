@@ -99,6 +99,20 @@ _EditorSet _editorSetFromSpec(SetSpec spec) => _EditorSet()
   ..durationSeconds = spec.durationSeconds
   ..weightKg = spec.weightKg;
 
+/// Leading chip label for a set row: the running count of NORMAL sets up to
+/// and including [index] — so a warm-up/drop/failure doesn't consume a number
+/// — or the type glyph (W/D/F) for a typed set. Mirrors mobile's
+/// `setChipLabel`, and reuses [kSetTypeLabel] as the single source of glyphs.
+String _setChipLabel(List<_EditorSet> sets, int index) {
+  final type = sets[index].type;
+  if (type != SetType.normal) return kSetTypeLabel[type]!;
+  var n = 0;
+  for (var i = 0; i <= index; i++) {
+    if (sets[i].type == SetType.normal) n++;
+  }
+  return '$n';
+}
+
 class _EditorSlot {
   Exercise? exercise;
   int restSeconds = 0;
@@ -718,6 +732,15 @@ class _RoutineEditorWebScreenState
     });
   }
 
+  void _onSetTypeChanged(
+      int dayIndex, int slotIndex, int setIndex, SetType type) {
+    _markDirty();
+    setState(() => _days[dayIndex]
+        .slots[slotIndex]
+        .weeklySets[_selectedWeek][setIndex]
+        .type = type);
+  }
+
   // ── Validation ───────────────────────────────────────────────────────────
 
   /// First unmet requirement, in fill order — mirrors mobile's
@@ -757,6 +780,10 @@ class _RoutineEditorWebScreenState
           // meaningful once there's more than one week.
           final wk = _numWeeks > 1 ? ' en la Semana ${w + 1}' : ''; // i18n
           for (final set in slot.weeklySets[w]) {
+            // A failure set has no countable target by definition — the
+            // athlete works to failure. Reps/duration are an optional
+            // reference, never a requirement (mirrors mobile's isSetValid).
+            if (set.type == SetType.failure) continue;
             if (slot.exerciseMode == ExerciseMode.duration) {
               if (set.durationSeconds == null || set.durationSeconds! <= 0) {
                 return '$name tiene una serie sin duración$wk.'; // i18n
@@ -1183,6 +1210,8 @@ class _RoutineEditorWebScreenState
                                         _onSetDurationChanged(i, s, set, v),
                                     onSetWeightChanged: (s, set, v) =>
                                         _onSetWeightChanged(i, s, set, v),
+                                    onSetTypeChanged: (s, set, t) =>
+                                        _onSetTypeChanged(i, s, set, t),
                                     onModeChanged: (s, em, rm) =>
                                         _setSlotMode(i, s, em, rm),
                                     onNotesChanged: (s, v) =>
@@ -1532,6 +1561,7 @@ class _DayCard extends StatelessWidget {
     required this.onAddExercises,
     required this.onRemoveSlot,
     required this.onMoveSlot,
+    required this.onSetTypeChanged,
     required this.onRestChanged,
     required this.onAddSet,
     required this.onRemoveSet,
@@ -1575,6 +1605,8 @@ class _DayCard extends StatelessWidget {
       onSetDurationChanged;
   final void Function(int slotIndex, int setIndex, String value)
       onSetWeightChanged;
+  final void Function(int slotIndex, int setIndex, SetType type)
+      onSetTypeChanged;
   final void Function(int slotIndex, ExerciseMode exerciseMode, RepMode repMode)
       onModeChanged;
   final void Function(int slotIndex, String value) onNotesChanged;
@@ -1644,6 +1676,7 @@ class _DayCard extends StatelessWidget {
               onSetRepsMaxChanged: (set, v) => onSetRepsMaxChanged(i, set, v),
               onSetDurationChanged: (set, v) => onSetDurationChanged(i, set, v),
               onSetWeightChanged: (set, v) => onSetWeightChanged(i, set, v),
+              onSetTypeChanged: (set, t) => onSetTypeChanged(i, set, t),
               onModeChanged: (em, rm) => onModeChanged(i, em, rm),
               onNotesChanged: (v) => onNotesChanged(i, v),
               onToggleLink: () => onToggleLink(i),
@@ -1686,6 +1719,7 @@ class _SlotCard extends StatelessWidget {
     required this.onRemove,
     required this.onMoveUp,
     required this.onMoveDown,
+    required this.onSetTypeChanged,
     required this.onRestChanged,
     required this.onAddSet,
     required this.onRemoveSet,
@@ -1726,6 +1760,7 @@ class _SlotCard extends StatelessWidget {
   final void Function(int setIndex, String value) onSetRepsMaxChanged;
   final void Function(int setIndex, String value) onSetDurationChanged;
   final void Function(int setIndex, String value) onSetWeightChanged;
+  final void Function(int setIndex, SetType type) onSetTypeChanged;
   final void Function(ExerciseMode exerciseMode, RepMode repMode) onModeChanged;
   final ValueChanged<String> onNotesChanged;
   final VoidCallback onToggleLink;
@@ -1882,6 +1917,8 @@ class _SlotCard extends StatelessWidget {
               onRepsMaxChanged: (v) => onSetRepsMaxChanged(i, v),
               onDurationChanged: (v) => onSetDurationChanged(i, v),
               onWeightChanged: (v) => onSetWeightChanged(i, v),
+              chipLabel: _setChipLabel(weekSets, i),
+              onTypeChanged: (t) => onSetTypeChanged(i, t),
             ),
           Align(
             alignment: Alignment.centerLeft,
@@ -1952,6 +1989,70 @@ class _SlotCard extends StatelessWidget {
 
 // ── Set row ────────────────────────────────────────────────────────────────
 
+/// Tappable leading chip on a set row. Shows a running number for normal sets
+/// and the W/D/F glyph for typed ones; tapping opens a menu to change the
+/// [SetType]. This is the web editor's only way to author warm-up / drop /
+/// failure sets (before this, every set was forced to normal).
+class _SetTypeChip extends StatelessWidget {
+  const _SetTypeChip({
+    required this.label,
+    required this.type,
+    required this.palette,
+    required this.onChanged,
+  });
+
+  final String label;
+  final SetType type;
+  final AppPalette palette;
+  final ValueChanged<SetType> onChanged;
+
+  static const _options = <(SetType, String)>[
+    (SetType.normal, 'Normal'), // i18n
+    (SetType.warmup, 'Entrada en calor (W)'), // i18n
+    (SetType.drop, 'Drop (D)'), // i18n
+    (SetType.failure, 'Al fallo (F)'), // i18n
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final typed = type != SetType.normal;
+    return PopupMenuButton<SetType>(
+      tooltip: 'Tipo de serie', // i18n
+      color: palette.bgCard,
+      padding: EdgeInsets.zero,
+      initialValue: type,
+      onSelected: onChanged,
+      itemBuilder: (_) => [
+        for (final (value, text) in _options)
+          PopupMenuItem<SetType>(
+            value: value,
+            child: Text(text,
+                style: GoogleFonts.barlow(color: palette.textPrimary)),
+          ),
+      ],
+      child: Container(
+        width: 26,
+        height: 26,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: typed ? palette.accent.withValues(alpha: 0.16) : null,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(
+              color: typed ? palette.accent : palette.border, width: 1),
+        ),
+        child: Text(
+          label,
+          style: GoogleFonts.barlowCondensed(
+            color: typed ? palette.accent : palette.textMuted,
+            fontWeight: FontWeight.w700,
+            fontSize: 13,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _SetRow extends StatelessWidget {
   const _SetRow({
     super.key,
@@ -1967,6 +2068,8 @@ class _SetRow extends StatelessWidget {
     required this.onRepsMaxChanged,
     required this.onDurationChanged,
     required this.onWeightChanged,
+    required this.chipLabel,
+    required this.onTypeChanged,
   });
 
   final int index;
@@ -1982,6 +2085,12 @@ class _SetRow extends StatelessWidget {
   final ValueChanged<String> onDurationChanged;
   final ValueChanged<String> onWeightChanged;
 
+  /// Precomputed leading label: the running set number, or W/D/F for a typed
+  /// set (see [_setChipLabel]). Computed in the parent, which holds the week's
+  /// full set list.
+  final String chipLabel;
+  final ValueChanged<SetType> onTypeChanged;
+
   @override
   Widget build(BuildContext context) {
     final isDuration = exerciseMode == ExerciseMode.duration;
@@ -1990,11 +2099,11 @@ class _SetRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 3),
       child: Row(
         children: [
-          SizedBox(
-            width: 20,
-            child: Text('${index + 1}',
-                style: GoogleFonts.barlowCondensed(
-                    color: palette.textMuted, fontWeight: FontWeight.w700)),
+          _SetTypeChip(
+            label: chipLabel,
+            type: set.type,
+            palette: palette,
+            onChanged: onTypeChanged,
           ),
           if (isDuration)
             // Duration exercises (planks, cardio) have no weight — just seconds.
