@@ -786,6 +786,26 @@ service cloud.firestore {
     //   - update: caller en members. members/createdAt inmutables.
     //   - delete: denied.
     match /chats/{chatId} {
+      // QA-CHAT-004: a chat may only be opened between two users who have a real
+      // relationship — an ACCEPTED friendship (its doc id equals the chatId), or
+      // an active trainer_link named by a client-provided `linkId` whose
+      // trainerId+athleteId are exactly the two chat members. The link is
+      // verified here (not trusted): SEC-002 guarantees an active link is
+      // trainer-accepted, so neither party can forge one. Without this gate any
+      // authenticated user could open a chat with — and message — anyone.
+      function chatRelationshipOk(chatId, members, data) {
+        return (
+          exists(/databases/$(database)/documents/friendships/$(chatId))
+          && get(/databases/$(database)/documents/friendships/$(chatId)).data.status == 'accepted'
+        ) || (
+          'linkId' in data
+          && exists(/databases/$(database)/documents/trainer_links/$(data.linkId))
+          && get(/databases/$(database)/documents/trainer_links/$(data.linkId)).data.status == 'active'
+          && get(/databases/$(database)/documents/trainer_links/$(data.linkId)).data.trainerId in members
+          && get(/databases/$(database)/documents/trainer_links/$(data.linkId)).data.athleteId in members
+        );
+      }
+
       allow read: if request.auth != null
                   && (resource == null
                       || request.auth.uid in resource.data.members);
@@ -794,7 +814,9 @@ service cloud.firestore {
                     && request.resource.data.members.size() == 2
                     && request.auth.uid in request.resource.data.members
                     && request.resource.data.members[0] < request.resource.data.members[1]
-                    && chatId == request.resource.data.members[0] + '_' + request.resource.data.members[1];
+                    && chatId == request.resource.data.members[0] + '_' + request.resource.data.members[1]
+                    && chatRelationshipOk(
+                        chatId, request.resource.data.members, request.resource.data);
 
       // REQ-CHATUNREAD-008: members may update the chat (preview fields on
       // send) but a member may only touch THEIR OWN key inside lastRead — a
