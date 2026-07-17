@@ -5,10 +5,14 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'package:treino/app/theme/app_motion.dart';
 import 'package:treino/app/theme/app_palette.dart';
+import 'package:treino/app/theme/tokens/primitives.dart';
+import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
+import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach_hub/presentation/sections/routine_editor/routine_web_editability.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/features/workout/application/assigned_routine_providers.dart';
 import 'package:treino/features/workout/domain/routine.dart';
@@ -33,6 +37,9 @@ class AthleteRoutinesScreen extends ConsumerWidget {
     final rawName = profileAsync.valueOrNull?.displayName ?? '';
     final name = rawName.isEmpty ? 'el alumno' : rawName; // i18n
     final routinesAsync = ref.watch(assignedRoutinesProvider(athleteId));
+    final active = (routinesAsync.valueOrNull ?? const <Routine>[])
+        .where((r) => r.status == RoutineStatus.active)
+        .toList();
 
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
@@ -40,65 +47,36 @@ class AthleteRoutinesScreen extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // ── Header: back + título + "Nueva rutina" ──────────────────────
-          Row(
-            children: [
-              IconButton(
-                icon: Icon(TreinoIcon.arrowLeft, color: palette.textMuted),
-                onPressed: () => context.pop(),
-              ),
-              const SizedBox(width: 4),
-              Expanded(
-                child: Text(
-                  'Rutinas de $name', // i18n
-                  style: GoogleFonts.barlowCondensed(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 20,
-                    letterSpacing: 0.8,
-                    color: palette.textPrimary,
+          TreinoFadeSlideIn(
+            delay: AppMotion.stagger(0),
+            child: Row(
+              children: [
+                IconButton(
+                  icon: Icon(TreinoIcon.arrowLeft, color: palette.textMuted),
+                  onPressed: () => context.pop(),
+                ),
+                const SizedBox(width: AppSpacing.hairline),
+                Expanded(
+                  child: TreinoSectionHeader(
+                    title: 'Rutinas de $name', // i18n
+                    count: routinesAsync.hasValue ? active.length : null,
+                    action: TreinoSectionHeaderAction(
+                      label: 'Nueva rutina', // i18n
+                      onTap: () => context.push('/routine-editor/$athleteId'),
+                    ),
                   ),
                 ),
-              ),
-              ElevatedButton.icon(
-                onPressed: () => context.push('/routine-editor/$athleteId'),
-                icon: Icon(TreinoIcon.plus, size: 18, color: palette.bg),
-                label: Text('Nueva rutina', // i18n
-                    style: GoogleFonts.barlowCondensed(
-                        fontWeight: FontWeight.w700)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: palette.accent,
-                  foregroundColor: palette.bg,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(9999)),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          routinesAsync.when(
-            loading: () => const Padding(
-              padding: EdgeInsets.symmetric(vertical: 40),
-              child: Center(child: CircularProgressIndicator()),
+              ],
             ),
-            error: (_, __) =>
-                _muted(palette, 'No pudimos cargar las rutinas.'), // i18n
-            data: (routines) {
-              final active = routines
-                  .where((r) => r.status == RoutineStatus.active)
-                  .toList();
-              if (active.isEmpty) {
-                return _muted(
-                    palette, 'Todavía no le cargaste ninguna rutina.'); // i18n
-              }
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  for (final routine in active)
-                    _RoutineRow(routine: routine, athleteId: athleteId),
-                ],
-              );
-            },
+          ),
+          const SizedBox(height: AppSpacing.s20),
+          TreinoStateSwitcher(
+            childKey: ValueKey(_stateKeyOf(routinesAsync, active)),
+            child: _AthleteRoutinesBody(
+              routinesAsync: routinesAsync,
+              active: active,
+              athleteId: athleteId,
+            ),
           ),
         ],
       ),
@@ -106,88 +84,106 @@ class AthleteRoutinesScreen extends ConsumerWidget {
   }
 }
 
-Widget _muted(AppPalette palette, String text) => Padding(
-      padding: const EdgeInsets.symmetric(vertical: 24),
-      child: Text(text,
-          style: GoogleFonts.barlow(color: palette.textMuted, fontSize: 14)),
-    );
+/// Key del [TreinoStateSwitcher]: `loading` sólo en la primera carga (sin
+/// data previa), luego `error`/`empty`/`data` según corresponda.
+String _stateKeyOf(
+  AsyncValue<List<Routine>> routinesAsync,
+  List<Routine> active,
+) {
+  if (routinesAsync.isLoading && !routinesAsync.hasValue) return 'loading';
+  if (routinesAsync.hasError) return 'error';
+  if (active.isEmpty) return 'empty';
+  return 'data';
+}
 
-/// A single assigned routine — tap to edit (web-editable ones), or a muted
-/// "editá en la app" hint for periodized / superset plans authored on mobile.
-class _RoutineRow extends StatefulWidget {
+/// Contenido bajo el header — resuelve loading/error/empty/data.
+class _AthleteRoutinesBody extends ConsumerWidget {
+  const _AthleteRoutinesBody({
+    required this.routinesAsync,
+    required this.active,
+    required this.athleteId,
+  });
+
+  final AsyncValue<List<Routine>> routinesAsync;
+  final List<Routine> active;
+  final String athleteId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (routinesAsync.isLoading && !routinesAsync.hasValue) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (var i = 0; i < 4; i++) ...[
+            if (i != 0) const SizedBox(height: AppSpacing.s8),
+            const TreinoListRow(title: '', loading: true),
+          ],
+        ],
+      );
+    }
+
+    if (routinesAsync.hasError) {
+      return TreinoEmptyState(
+        icon: TreinoIcon.errorState,
+        title: 'No pudimos cargar las rutinas.', // i18n
+        ctaLabel: 'Reintentar', // i18n
+        onCtaTap: () => ref.invalidate(assignedRoutinesProvider(athleteId)),
+      );
+    }
+
+    if (active.isEmpty) {
+      return const TreinoEmptyState(
+        icon: TreinoIcon.emptyState,
+        title: 'Todavía no le cargaste ninguna rutina.', // i18n
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (var i = 0; i < active.length; i++) ...[
+          if (i != 0) const SizedBox(height: AppSpacing.s8),
+          TreinoFadeSlideIn(
+            delay: AppMotion.stagger(i),
+            child: _RoutineRow(routine: active[i], athleteId: athleteId),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+/// Fila de una rutina asignada — tap abre el editor (web-editables), las
+/// periodizadas quedan view-only con un hint "Editá en la app".
+class _RoutineRow extends StatelessWidget {
   const _RoutineRow({required this.routine, required this.athleteId});
 
   final Routine routine;
   final String athleteId;
 
   @override
-  State<_RoutineRow> createState() => _RoutineRowState();
-}
-
-class _RoutineRowState extends State<_RoutineRow> {
-  bool _hovered = false;
-
-  @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    final routine = widget.routine;
     final editable = isRoutineWebEditable(routine);
     final weeks = routine.numWeeks == 1 ? 'semana' : 'semanas'; // i18n
 
-    final card = Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: palette.bgCard,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-            color: _hovered && editable ? palette.borderHover : palette.border),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  routine.name,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.barlow(
-                      color: palette.textPrimary,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  '${routine.days.length} días · ${routine.numWeeks} $weeks', // i18n
-                  style: GoogleFonts.barlow(
-                      color: palette.textMuted, fontSize: 12),
-                ),
-              ],
+    return TreinoListRow(
+      title: routine.name,
+      subtitle:
+          '${routine.days.length} días · ${routine.numWeeks} $weeks', // i18n
+      trailing: editable
+          ? Icon(TreinoIcon.edit, size: 18, color: palette.textMuted)
+          : Text(
+              'Editá en la app', // i18n
+              style: TextStyle(
+                fontFamily: AppFonts.barlow,
+                fontSize: 12,
+                color: palette.textMuted,
+              ),
             ),
-          ),
-          if (editable)
-            Icon(TreinoIcon.edit, size: 18, color: palette.textMuted)
-          else
-            Text('Editá en la app', // i18n
-                style:
-                    GoogleFonts.barlow(color: palette.textMuted, fontSize: 12)),
-        ],
-      ),
-    );
-
-    // Periodized routines are view-only on web (no tap → no truncation risk).
-    if (!editable) return card;
-
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () =>
-            context.push('/routine-editor/${widget.athleteId}/${routine.id}'),
-        child: card,
-      ),
+      onTap: editable
+          ? () => context.push('/routine-editor/$athleteId/${routine.id}')
+          : null,
     );
   }
 }

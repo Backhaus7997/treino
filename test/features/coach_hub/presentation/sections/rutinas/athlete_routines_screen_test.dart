@@ -1,12 +1,16 @@
 // Tests for AthleteRoutinesScreen — the per-athlete routines list reached from
 // the Rutinas sidebar (elegí alumno → ver/crear/editar sus rutinas).
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
 import 'package:treino/features/coach_hub/presentation/sections/rutinas/athlete_routines_screen.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/features/profile/domain/experience_level.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
@@ -106,15 +110,79 @@ Future<void> _pump(WidgetTester tester, List<Routine> routines) async {
   await tester.pumpAndSettle();
 }
 
+/// Pumps the screen with `assignedRoutinesProvider` bound to whatever
+/// [futureFactory] returns — no `pumpAndSettle`, así el frame queda
+/// congelado mientras el future no resolvió (loading indefinido) o lo
+/// dejamos resolver como error. `futureFactory` corre recién dentro del
+/// override del provider, para que Riverpod (no la zone de test) sea quien
+/// capture el rechazo.
+Future<void> _pumpWithFuture(
+  WidgetTester tester,
+  Future<List<Routine>> Function() futureFactory,
+) async {
+  tester.view.physicalSize = const Size(1400, 900);
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [
+        assignedRoutinesProvider(_athleteId)
+            .overrideWith((ref) => futureFactory()),
+        userPublicProfileProvider(_athleteId).overrideWith(
+          (ref) => Stream.value(
+            const UserPublicProfile(uid: _athleteId, displayName: 'Vicente'),
+          ),
+        ),
+      ],
+      child: MaterialApp(
+        theme: AppTheme.dark(),
+        home:
+            const Scaffold(body: AthleteRoutinesScreen(athleteId: _athleteId)),
+      ),
+    ),
+  );
+}
+
 void main() {
   group('AthleteRoutinesScreen', () {
     testWidgets('lists active routines with the athlete name and a summary',
         (tester) async {
       await _pump(tester, [_routine(id: 'r1', name: 'Fuerza base', days: 3)]);
 
-      expect(find.text('Rutinas de Vicente'), findsOneWidget);
+      // TreinoSectionHeader uppercasea el título (kit Fase 1, REQ-CK-002).
+      expect(find.text('RUTINAS DE VICENTE'), findsOneWidget);
       expect(find.text('Fuerza base'), findsOneWidget);
       expect(find.text('3 días · 1 semana'), findsOneWidget);
+    });
+
+    testWidgets(
+        'shows shimmer TreinoListRow skeletons keyed "loading" while the '
+        'routines have not loaded yet', (tester) async {
+      final completer = Completer<List<Routine>>();
+      addTearDown(() {
+        if (!completer.isCompleted) completer.complete(const []);
+      });
+
+      await _pumpWithFuture(tester, () => completer.future);
+
+      expect(find.byKey(const ValueKey('loading')), findsOneWidget);
+      expect(find.byType(TreinoStateSwitcher), findsOneWidget);
+      expect(find.byType(TreinoListRow), findsWidgets);
+    });
+
+    testWidgets('shows a retry empty state when routines fail to load',
+        (tester) async {
+      await _pumpWithFuture(
+        tester,
+        () async => throw Exception('boom'),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('error')), findsOneWidget);
+      expect(find.text('No pudimos cargar las rutinas.'), findsOneWidget);
+      expect(find.text('Reintentar'), findsOneWidget);
     });
 
     testWidgets('hides archived routines', (tester) async {
