@@ -18,6 +18,15 @@ import 'package:treino/features/workout/application/assigned_routine_providers.d
 import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/domain/routine_status.dart';
 
+/// Filtro de estado seleccionado en [AthleteRoutinesScreen] (WU-03).
+/// `autoDispose` porque el filtro no debe sobrevivir a la navegación fuera
+/// de esta pantalla — mismo patrón que `_filtroProvider` en AlumnosScreen.
+final _statusFilterProvider =
+    StateProvider.autoDispose<RoutineStatus>((_) => RoutineStatus.active);
+
+const _kActivasLabel = 'Activas'; // i18n
+const _kArchivadasLabel = 'Archivadas'; // i18n
+
 /// Rutinas ya asignadas a UN alumno (Coach Hub web).
 ///
 /// Punto intermedio del flujo del sidebar «Rutinas»: elegís un alumno y acá ves
@@ -37,9 +46,13 @@ class AthleteRoutinesScreen extends ConsumerWidget {
     final rawName = profileAsync.valueOrNull?.displayName ?? '';
     final name = rawName.isEmpty ? 'el alumno' : rawName; // i18n
     final routinesAsync = ref.watch(assignedRoutinesProvider(athleteId));
-    final active = (routinesAsync.valueOrNull ?? const <Routine>[])
-        .where((r) => r.status == RoutineStatus.active)
-        .toList();
+    final statusFilter = ref.watch(_statusFilterProvider);
+    final allRoutines = routinesAsync.valueOrNull ?? const <Routine>[];
+    final active =
+        allRoutines.where((r) => r.status == RoutineStatus.active).toList();
+    final archived =
+        allRoutines.where((r) => r.status == RoutineStatus.archived).toList();
+    final visible = statusFilter == RoutineStatus.active ? active : archived;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
@@ -59,7 +72,7 @@ class AthleteRoutinesScreen extends ConsumerWidget {
                 Expanded(
                   child: TreinoSectionHeader(
                     title: 'Rutinas de $name', // i18n
-                    count: routinesAsync.hasValue ? active.length : null,
+                    count: routinesAsync.hasValue ? visible.length : null,
                     action: TreinoSectionHeaderAction(
                       label: 'Nueva rutina', // i18n
                       onTap: () => context.push('/routine-editor/$athleteId'),
@@ -69,12 +82,41 @@ class AthleteRoutinesScreen extends ConsumerWidget {
               ],
             ),
           ),
+          const SizedBox(height: AppSpacing.s18),
+          TreinoFadeSlideIn(
+            delay: AppMotion.stagger(1),
+            child: TreinoFilterChips(
+              options: const [_kActivasLabel, _kArchivadasLabel],
+              selected: {
+                statusFilter == RoutineStatus.active
+                    ? _kActivasLabel
+                    : _kArchivadasLabel,
+              },
+              badgeCounts: {
+                _kActivasLabel: active.length,
+                _kArchivadasLabel: archived.length,
+              },
+              onChanged: (newSelected) {
+                // Single-select: TreinoFilterChips permite deseleccionar el
+                // chip activo (queda `{}`) — siempre necesitamos un filtro
+                // activo, así que un tap que vacía la selección es un no-op
+                // (mismo criterio que AlumnosScreen._FiltroChips).
+                if (newSelected.isEmpty) return;
+                final f = newSelected.first == _kActivasLabel
+                    ? RoutineStatus.active
+                    : RoutineStatus.archived;
+                ref.read(_statusFilterProvider.notifier).state = f;
+              },
+            ),
+          ),
           const SizedBox(height: AppSpacing.s20),
           TreinoStateSwitcher(
-            childKey: ValueKey(_stateKeyOf(routinesAsync, active)),
+            childKey:
+                ValueKey(_stateKeyOf(routinesAsync, visible, statusFilter)),
             child: _AthleteRoutinesBody(
               routinesAsync: routinesAsync,
-              active: active,
+              visible: visible,
+              statusFilter: statusFilter,
               athleteId: athleteId,
             ),
           ),
@@ -85,27 +127,33 @@ class AthleteRoutinesScreen extends ConsumerWidget {
 }
 
 /// Key del [TreinoStateSwitcher]: `loading` sólo en la primera carga (sin
-/// data previa), luego `error`/`empty`/`data` según corresponda.
+/// data previa), luego `error`/`empty-{filtro}`/`data-{filtro}` según
+/// corresponda — el sufijo de filtro fuerza el cross-fade al cambiar entre
+/// Activas/Archivadas (WU-03).
 String _stateKeyOf(
   AsyncValue<List<Routine>> routinesAsync,
-  List<Routine> active,
+  List<Routine> visible,
+  RoutineStatus statusFilter,
 ) {
   if (routinesAsync.isLoading && !routinesAsync.hasValue) return 'loading';
   if (routinesAsync.hasError) return 'error';
-  if (active.isEmpty) return 'empty';
-  return 'data';
+  final suffix =
+      statusFilter == RoutineStatus.active ? 'activas' : 'archivadas';
+  return visible.isEmpty ? 'empty-$suffix' : 'data-$suffix';
 }
 
 /// Contenido bajo el header — resuelve loading/error/empty/data.
 class _AthleteRoutinesBody extends ConsumerWidget {
   const _AthleteRoutinesBody({
     required this.routinesAsync,
-    required this.active,
+    required this.visible,
+    required this.statusFilter,
     required this.athleteId,
   });
 
   final AsyncValue<List<Routine>> routinesAsync;
-  final List<Routine> active;
+  final List<Routine> visible;
+  final RoutineStatus statusFilter;
   final String athleteId;
 
   @override
@@ -131,21 +179,27 @@ class _AthleteRoutinesBody extends ConsumerWidget {
       );
     }
 
-    if (active.isEmpty) {
-      return const TreinoEmptyState(
+    if (visible.isEmpty) {
+      return TreinoEmptyState(
         icon: TreinoIcon.emptyState,
-        title: 'Todavía no le cargaste ninguna rutina.', // i18n
+        title: statusFilter == RoutineStatus.active
+            ? 'Todavía no le cargaste ninguna rutina.' // i18n
+            : 'No hay rutinas archivadas.', // i18n
       );
     }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        for (var i = 0; i < active.length; i++) ...[
+        for (var i = 0; i < visible.length; i++) ...[
           if (i != 0) const SizedBox(height: AppSpacing.s8),
           TreinoFadeSlideIn(
             delay: AppMotion.stagger(i),
-            child: _RoutineRow(routine: active[i], athleteId: athleteId),
+            child: _RoutineRow(
+              routine: visible[i],
+              athleteId: athleteId,
+              archived: statusFilter == RoutineStatus.archived,
+            ),
           ),
         ],
       ],
@@ -153,34 +207,55 @@ class _AthleteRoutinesBody extends ConsumerWidget {
   }
 }
 
-/// Fila de una rutina asignada — tap abre el editor (web-editables), las
-/// periodizadas quedan view-only con un hint "Editá en la app".
+/// Fila de una rutina asignada.
+///
+/// - Activas web-editables: tap abre el editor, trailing ícono de edición.
+/// - Activas periodizadas: view-only con hint "Editá en la app" (se editan
+///   en mobile).
+/// - Archivadas (WU-03): SIEMPRE view-only (soft-delete, ADR-USR-04) — sin
+///   tap y con trailing informativo propio (no reutiliza el hint de
+///   periodizadas, que es semánticamente distinto: "existe pero se edita en
+///   otro lado" vs. "ya no está activa").
 class _RoutineRow extends StatelessWidget {
-  const _RoutineRow({required this.routine, required this.athleteId});
+  const _RoutineRow({
+    required this.routine,
+    required this.athleteId,
+    this.archived = false,
+  });
 
   final Routine routine;
   final String athleteId;
+  final bool archived;
 
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    final editable = isRoutineWebEditable(routine);
+    final editable = !archived && isRoutineWebEditable(routine);
     final weeks = routine.numWeeks == 1 ? 'semana' : 'semanas'; // i18n
 
     return TreinoListRow(
       title: routine.name,
       subtitle:
           '${routine.days.length} días · ${routine.numWeeks} $weeks', // i18n
-      trailing: editable
-          ? Icon(TreinoIcon.edit, size: 18, color: palette.textMuted)
-          : Text(
-              'Editá en la app', // i18n
+      trailing: archived
+          ? Text(
+              'Archivada', // i18n
               style: TextStyle(
                 fontFamily: AppFonts.barlow,
                 fontSize: 12,
                 color: palette.textMuted,
               ),
-            ),
+            )
+          : editable
+              ? Icon(TreinoIcon.edit, size: 18, color: palette.textMuted)
+              : Text(
+                  'Editá en la app', // i18n
+                  style: TextStyle(
+                    fontFamily: AppFonts.barlow,
+                    fontSize: 12,
+                    color: palette.textMuted,
+                  ),
+                ),
       onTap: editable
           ? () => context.push('/routine-editor/$athleteId/${routine.id}')
           : null,

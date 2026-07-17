@@ -238,4 +238,82 @@ void main() {
       expect(find.text('Periodizada'), findsOneWidget);
     });
   });
+
+  group('AthleteRoutinesScreen — filtro Activas/Archivadas (WU-03)', () {
+    testWidgets(
+        'por defecto muestra sólo Activas y expone el filtro con conteos '
+        'reales', (tester) async {
+      await _pump(tester, [
+        _routine(id: 'r1', name: 'A1'),
+        _routine(id: 'r2', name: 'A2'),
+        _routine(id: 'r3', name: 'Vieja', status: RoutineStatus.archived),
+      ]);
+
+      expect(find.text('A1'), findsOneWidget);
+      expect(find.text('A2'), findsOneWidget);
+      expect(find.text('Vieja'), findsNothing);
+
+      final chips =
+          tester.widget<TreinoFilterChips>(find.byType(TreinoFilterChips));
+      expect(chips.selected, {'Activas'});
+      expect(chips.badgeCounts['Activas'], 2);
+      expect(chips.badgeCounts['Archivadas'], 1);
+    });
+
+    testWidgets(
+        'seleccionar "Archivadas" muestra las archivadas en modo view-only '
+        '(sin tap al editor, sin trailing edit)', (tester) async {
+      await _pump(tester, [
+        _routine(id: 'r1', name: 'Activa'),
+        _routine(id: 'r2', name: 'Vieja', status: RoutineStatus.archived),
+      ]);
+
+      await tester.tap(find.text('Archivadas'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Vieja'), findsOneWidget);
+      expect(find.text('Activa'), findsNothing);
+
+      // View-only: tap no navega al editor.
+      await tester.tap(find.text('Vieja'));
+      await tester.pumpAndSettle();
+      expect(find.text('EDIT r2'), findsNothing);
+      expect(find.text('Vieja'), findsOneWidget); // seguimos en la lista
+
+      // Trailing informativo (no el hint de "Editá en la app" de periodizadas
+      // ni el ícono de edición de las activas web-editables).
+      expect(find.text('Editá en la app'), findsNothing);
+      expect(find.text('Archivada'), findsOneWidget);
+    });
+
+    testWidgets(
+        'el childKey del TreinoStateSwitcher cambia con el filtro para '
+        'cross-fadear', (tester) async {
+      await _pump(tester, [
+        _routine(id: 'r1', name: 'Activa'),
+        _routine(id: 'r2', name: 'Vieja', status: RoutineStatus.archived),
+      ]);
+
+      var switcher =
+          tester.widget<TreinoStateSwitcher>(find.byType(TreinoStateSwitcher));
+      expect(switcher.childKey, const ValueKey('data-activas'));
+
+      await tester.tap(find.text('Archivadas'));
+      await tester.pumpAndSettle();
+
+      switcher =
+          tester.widget<TreinoStateSwitcher>(find.byType(TreinoStateSwitcher));
+      expect(switcher.childKey, const ValueKey('data-archivadas'));
+    });
+
+    testWidgets('el empty state de "Archivadas" es honesto (mensaje propio)',
+        (tester) async {
+      await _pump(tester, [_routine(id: 'r1', name: 'Activa')]);
+
+      await tester.tap(find.text('Archivadas'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('No hay rutinas archivadas.'), findsOneWidget);
+    });
+  });
 }
