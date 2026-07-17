@@ -14,6 +14,8 @@ import 'package:treino/features/profile/application/user_public_profile_provider
 import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/features/workout/application/assigned_routine_providers.dart';
 import 'package:treino/features/workout/application/exercise_providers.dart';
+import 'package:treino/features/workout/application/routine_providers.dart'
+    show routineByIdStreamProvider;
 import 'package:treino/features/workout/application/session_providers.dart'
     show
         currentUidProvider,
@@ -22,12 +24,14 @@ import 'package:treino/features/workout/application/session_providers.dart'
         sessionRepositoryProvider;
 import 'package:treino/features/workout/data/session_repository.dart';
 import 'package:treino/features/workout/domain/routine.dart';
+import 'package:treino/features/workout/domain/routine_day.dart';
 import 'package:treino/features/workout/domain/routine_source.dart';
 import 'package:treino/features/workout/domain/routine_visibility.dart';
 import 'package:treino/features/profile/domain/experience_level.dart';
 import 'package:treino/features/workout/domain/session.dart';
 import 'package:treino/features/workout/domain/session_status.dart';
 import 'package:treino/features/workout/domain/set_log.dart';
+import 'package:treino/features/workout/presentation/routine_detail_screen.dart';
 
 class _MockSessionRepository extends Mock implements SessionRepository {}
 
@@ -87,6 +91,35 @@ Routine _makePlan({
       split: 'PPL',
       level: ExperienceLevel.beginner,
       days: const [],
+      source: RoutineSource.trainerAssigned,
+      assignedBy: assignedBy,
+      assignedTo: assignedTo,
+      visibility: RoutineVisibility.private,
+    );
+
+/// Same plan as [_makePlan] but with a non-empty `days` list, so that when
+/// `routineByIdStreamProvider` resolves with this value, RoutineDetailScreen
+/// renders `_RoutineDetailContent` (the day title + stat row) instead of
+/// `_EmptyState` — proof the detail screen shows real content, not blank.
+/// `slots: const []` on the single day keeps `_SlotRowWithLastWeight` out of
+/// the tree (spec SCENARIO-046 allows empty slots), which sidesteps needing
+/// to override `currentUidProvider`/`lastWeightByExerciseProvider` — mirrors
+/// the override footprint router_workout_routes_test.dart uses for
+/// SCENARIO-110 (only `routineByIdStreamProvider` overridden).
+Routine _makeDetailedPlan({
+  required String id,
+  required String name,
+  required String assignedBy,
+  required String assignedTo,
+}) =>
+    Routine(
+      id: id,
+      name: name,
+      split: 'PPL',
+      level: ExperienceLevel.beginner,
+      days: const [
+        RoutineDay(dayNumber: 1, name: 'Día de Empuje', slots: []),
+      ],
       source: RoutineSource.trainerAssigned,
       assignedBy: assignedBy,
       assignedTo: assignedTo,
@@ -252,6 +285,163 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('MENSAJE'), findsOneWidget);
+    });
+  });
+
+  // ── Issue #399 — plan-card tap must land on the top-level plan route ──────
+  //
+  // The bug: AthleteDetailScreen lives OUTSIDE the ShellRoute (top-level,
+  // wrapped in `_immersive`), but the plan card's onTap used to push
+  // '/workout/routine/{id}' — a route INSIDE the ShellRoute. Crossing from a
+  // top-level route into a shell route that way rebuilds the shell branch and
+  // renders blank. The fix registers a new top-level route
+  // '/coach/athlete/:athleteId/plan/:routineId' (see router.dart, right after
+  // '/coach/athlete/:athleteId') and the card now pushes that instead.
+  //
+  // `_pumpScreen` above nests '/coach/athlete/:athleteId' INSIDE a ShellRoute,
+  // which does NOT reproduce production's placement — that's why the bug
+  // shipped without a failing test. This group builds a router with BOTH
+  // routes top-level (siblings, no ShellRoute wrapper), matching router.dart.
+  group('AthleteDetailScreen — issue #399 (plan card cross-shell navigation)',
+      () {
+    // Mirrors router.dart's private `_immersive(child)` helper: both
+    // '/coach/athlete/:athleteId' and the new plan route wrap their screen
+    // in a Scaffold this way in production (screens are bare Columns with no
+    // Scaffold of their own). Reproducing it here matters functionally, not
+    // just cosmetically — AthleteDetailScreen's plan-card InkWell needs a
+    // Material ancestor, which only the Scaffold provides.
+    Widget immersive(Widget child) => Scaffold(
+          backgroundColor: Colors.transparent,
+          body: SafeArea(child: child),
+        );
+
+    Future<GoRouter> pumpWithTopLevelPlanRoute(
+      WidgetTester tester, {
+      required String athleteId,
+      required List<Override> overrides,
+    }) async {
+      final router = GoRouter(
+        initialLocation: '/coach/athlete/$athleteId',
+        routes: [
+          // Top-level — mirrors router.dart's '/coach/athlete/:athleteId'
+          // (outside any ShellRoute, wrapped in `_immersive` in production).
+          GoRoute(
+            path: '/coach/athlete/:athleteId',
+            builder: (context, state) => immersive(
+              AthleteDetailScreen(
+                athleteId: state.pathParameters['athleteId']!,
+              ),
+            ),
+          ),
+          // Top-level — mirrors router.dart's new
+          // '/coach/athlete/:athleteId/plan/:routineId' sibling route, added
+          // by the #399 fix. MUST NOT be nested in a ShellRoute: that would
+          // silently "fix" the test without reproducing the bug's condition.
+          GoRoute(
+            path: '/coach/athlete/:athleteId/plan/:routineId',
+            builder: (context, state) => immersive(
+              RoutineDetailScreen(
+                routineId: state.pathParameters['routineId']!,
+              ),
+            ),
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: overrides,
+          child: MaterialApp.router(
+            theme: AppTheme.dark(),
+            localizationsDelegates: AppL10n.localizationsDelegates,
+            supportedLocales: AppL10n.supportedLocales,
+            locale: const Locale('es', 'AR'),
+            routerConfig: router,
+          ),
+        ),
+      );
+      return router;
+    }
+
+    testWidgets(
+        'REGRESSION-399: tapping a plan card navigates to the top-level '
+        'plan route and renders RoutineDetailScreen content (not blank)',
+        (tester) async {
+      final myPlan = _makePlan(
+        id: 'plan-1',
+        name: 'Plan Hipertrofia',
+        assignedBy: 'trainer-1',
+        assignedTo: 'athlete-1',
+      );
+      // Separate fixture with non-empty `days` so RoutineDetailScreen renders
+      // real content once routineByIdStreamProvider resolves — same `id` as
+      // myPlan so it's what the pushed route looks up.
+      final detailedPlan = _makeDetailedPlan(
+        id: 'plan-1',
+        name: 'Plan Hipertrofia',
+        assignedBy: 'trainer-1',
+        assignedTo: 'athlete-1',
+      );
+
+      final router = await pumpWithTopLevelPlanRoute(
+        tester,
+        athleteId: 'athlete-1',
+        overrides: [
+          currentUidProvider.overrideWithValue('trainer-1'),
+          userPublicProfileProvider('athlete-1').overrideWith(
+            (ref) => Stream.value(_makeProfile('athlete-1', 'Martín García')),
+          ),
+          assignedRoutinesProvider('athlete-1').overrideWith(
+            (ref) async => [myPlan],
+          ),
+          // RoutineDetailScreen watches this for widget.routineId — override
+          // so it resolves to a routine with content instead of hanging in
+          // loading (StreamProvider.autoDispose.family<Routine?, String>).
+          routineByIdStreamProvider('plan-1').overrideWith(
+            (ref) => Stream.value(detailedPlan),
+          ),
+        ],
+      );
+
+      await tester.pumpAndSettle();
+
+      // Sanity check: the plan card rendered before we tap it.
+      expect(find.text('Plan Hipertrofia'), findsOneWidget);
+
+      // Sanity check: the tap target InkWell (whole card) exists — asserted
+      // separately from the tap itself, which targets the plan-name Text.
+      // Tapping the InkWell's own bounding-box center would land on one of
+      // the trailing 44x44 edit/delete IconButtons instead (their own
+      // InkResponse claims the hit first), so tap the Text directly — it
+      // sits unambiguously inside the card's InkWell and outside both
+      // IconButtons' hit areas.
+      expect(
+        find.ancestor(
+          of: find.text('Plan Hipertrofia'),
+          matching: find.byType(InkWell),
+        ),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.text('Plan Hipertrofia'));
+      await tester.pumpAndSettle();
+
+      // Real assertion #1: the router's match stack actually landed on the
+      // new top-level plan route, not the old in-shell '/workout/routine/:id'.
+      // NOTE: `currentConfiguration.uri` deliberately does NOT reflect
+      // ImperativeRouteMatch entries (go_router's own doc comment on
+      // RouteMatchList.uri) — context.push() always produces one, so the
+      // pushed leaf must be read from `matches.last.matchedLocation` instead.
+      expect(
+        router.routerDelegate.currentConfiguration.matches.last.matchedLocation,
+        equals('/coach/athlete/athlete-1/plan/plan-1'),
+      );
+
+      // Real assertion #2: RoutineDetailScreen actually rendered content for
+      // that routine (the day title), proving the screen is NOT blank —
+      // this is the exact failure mode issue #399 produced.
+      expect(find.byType(RoutineDetailScreen), findsOneWidget);
+      expect(find.text('DÍA DE EMPUJE'), findsOneWidget);
     });
   });
 

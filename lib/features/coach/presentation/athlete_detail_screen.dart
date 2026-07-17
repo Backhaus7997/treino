@@ -209,7 +209,9 @@ class _AthleteDetailBody extends ConsumerWidget {
                 for (final plan in myPlans) ...[
                   _PlanCard(
                     plan: plan,
-                    onTap: () => context.push('/workout/routine/${plan.id}'),
+                    onTap: () => context.push(
+                      '/coach/athlete/$athleteId/plan/${plan.id}',
+                    ),
                     onEdit: () => context.push(
                       '/workout/routine-editor/$athleteId',
                       extra: plan.id,
