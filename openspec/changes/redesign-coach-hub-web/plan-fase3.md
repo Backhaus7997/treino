@@ -152,6 +152,18 @@ VENCIMIENTO · ACCIONES (íconos). Hover de fila, header CAPS muted.
   `notas_privadas_tab_test`, `seguimiento_tab_test` conservan TODAS sus aserciones.
   Algunos arrastran warnings del **baseline 42** — **no** arreglarlos ni
   empeorarlos; los nuevos widgets extraídos van con **cero issues nuevos**.
+- **ADR-A3-10 · Expand-en-línea → panel debajo de la tabla (Historial de
+  sesiones)**: `CoachHubDataTable` fija cada fila a `TreinoTableTokens.rowHeight`
+  (48px, ADR-SH-003) — no hay slot para contenido variable DENTRO de una fila.
+  El expand-on-tap original (sets reales por fila, `_ExpandableSessionRow` en
+  `alumno_detail_screen.dart` pre-WU-07a) se preserva funcionalmente pero se
+  renderiza en `HistorialSesionesTable`
+  (`widgets/historial_sesiones_table.dart`) como un panel único DEBAJO de la
+  tabla (una sesión expandida a la vez, toggle con la misma fila o con el
+  botón cerrar). Cero dato inventado — mismo provider
+  (`coachSessionSetLogsProvider`), mismo contenido (`SessionExerciseBlock` por
+  ejercicio). *Rechazado*: extender `CoachHubDataTable` con una segunda
+  variante de fila (sobre-ingeniería del kit para un único consumidor).
 
 ## 5. Mapa de motion
 
