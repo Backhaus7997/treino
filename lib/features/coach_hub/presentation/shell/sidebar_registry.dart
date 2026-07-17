@@ -4,6 +4,7 @@ import 'package:treino/features/coach_hub/presentation/sections/alumnos/routes.d
 import 'package:treino/features/coach_hub/presentation/sections/biblioteca/routes.dart';
 import 'package:treino/features/coach_hub/presentation/sections/chat/routes.dart';
 import 'package:treino/features/coach_hub/presentation/sections/dashboard/routes.dart';
+import 'package:treino/features/coach_hub/presentation/sections/invitaciones/routes.dart';
 import 'package:treino/features/coach_hub/presentation/sections/pagos/routes.dart';
 import 'package:treino/features/coach_hub/presentation/sections/rutinas/routes.dart';
 
@@ -31,10 +32,21 @@ import 'sidebar_item.dart';
 /// punto de entrada del editor de rutinas web (elegí alumno → editor), llevando
 /// el total a 8. Mismo flujo que mobile ("Asignar rutina"), expuesto también
 /// desde el menú lateral.
-const List<SidebarItem> sidebarRegistry = [
+///
+/// **Solicitudes re-agregado (Fase 4 WU-06, ADR-F4-04)**: Invitaciones
+/// (copia de usuario "Solicitudes") vuelve al grupo GESTIÓN, inmediatamente
+/// después de Alumnos, con badge real de pendientes
+/// (`invitacionesPendingCountProvider`) — llevando el total a 9.
+/// Re-exposición parcial de la reducción W2, justificada porque Fase 4
+/// entrega la bandeja real (antes era `ProximamenteScreen`). Nota: el
+/// registro deja de ser `const` (pasa a `final`) porque
+/// `invitacionesSidebarItems` tampoco lo es — su `badgeProvider` referencia
+/// un provider real, no evaluable en tiempo de compilación.
+final List<SidebarItem> sidebarRegistry = [
   // GESTIÓN — surfaces multi-alumno del día a día del PF
   ...dashboardSidebarItems,
   ...alumnosSidebarItems,
+  ...invitacionesSidebarItems,
   ...agendaSidebarItems,
   ...chatSidebarItems,
 
