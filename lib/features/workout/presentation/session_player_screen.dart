@@ -346,12 +346,18 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
 
   /// Loguea un set directamente sin pasar por la sheet.
   ///
-  /// Defensive: si `reps == 0` no creamos log. El TextField del row puede
-  /// quedar vacío/en 0 como estado intermedio de tipeo, y el athlete puede
+  /// Defensive: en sets por REPS, `reps == 0` no crea log. El TextField del row
+  /// puede quedar vacío/en 0 como estado intermedio de tipeo, y el athlete puede
   /// apretar el check antes de completar — preferimos no-op silencioso a
   /// loggear un set falso que después habría que borrar.
+  ///
+  /// QA-WKT-001: los sets por DURACIÓN se completan legítimamente con `reps == 0`
+  /// (su métrica es el tiempo; el `_DurationSetRow` loguea vía
+  /// `onSetCheck(setNumber, 0, 0.0)` cuando el countdown llega a 0). Ahí el guard
+  /// NO aplica — si no, el set nunca se marca hecho y un día con cualquier
+  /// ejercicio por tiempo jamás puede terminarse.
   void _logSet(RoutineSlot slot, int setNumber, int reps, double weightKg) {
-    if (reps <= 0) return;
+    if (slot.effectiveExerciseMode != ExerciseMode.duration && reps <= 0) return;
     ref.read(sessionNotifierProvider(widget.init).notifier).logSet(
           SetLog(
             id: '',
