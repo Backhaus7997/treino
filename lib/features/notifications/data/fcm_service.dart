@@ -69,8 +69,12 @@ class FcmService {
 
   /// Cleans up FCM for [uid] on sign-out:
   /// 1. Cancels the [onTokenRefresh] subscription.
-  /// 2. Best-effort: gets the current token and removes it.
-  ///    Errors are swallowed — user may already be signed out from Firestore.
+  /// 2. Best-effort: gets the current token and removes it from Firestore.
+  ///    Errors are swallowed — on a forced sign-out the user is already
+  ///    unauthenticated and the rule denies the write.
+  /// 3. QA-NOT-001: deletes the registration token on the DEVICE. This is
+  ///    auth-independent, so it still runs when step 2 was denied — after it the
+  ///    device stops receiving pushes addressed to the signed-out account.
   ///
   /// REQ-PN-CLIENT-003, SCENARIO-648, 649, 679.
   Future<void> dispose(String uid) async {
@@ -84,6 +88,18 @@ class FcmService {
       }
     } catch (e) {
       debugPrint('[fcm] dispose: error removing token for $uid — $e');
+    }
+
+    // QA-NOT-001: invalidate the token device-side regardless of the Firestore
+    // outcome. On forced sign-outs (token revocation, password change on another
+    // device, Admin-SDK disable) auth is already null so removeToken above is
+    // denied and the stale token would keep delivering the closed account's
+    // pushes (including chat content). deleteToken() needs no auth; the next
+    // login mints a fresh token via getToken().
+    try {
+      await _messaging.deleteToken();
+    } catch (e) {
+      debugPrint('[fcm] dispose: error deleting device token — $e');
     }
   }
 
