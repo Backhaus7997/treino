@@ -26,11 +26,13 @@
 //
 // Matriz: (dark, light) × (1440x900, 420x900) = 4 goldens.
 //
-// Guard laxo (WU-01): al momento de este harness `/invitaciones` todavía
-// renderiza `ProximamenteScreen` (label "Invitaciones", ADR-CHW-009) — la
-// pantalla real llega en WU-04. El guard acepta tanto el placeholder
-// ("INVITACIONES"/"Próximamente.") como el título real futuro ("SOLICITUDES")
-// para no requerir edición cuando WU-04 reemplace la screen.
+// Guard endurecido (WU-07): la screen real (`InvitacionesScreen`, WU-04)
+// reemplazó el placeholder — el guard laxo de WU-01 (que aceptaba
+// "INVITACIONES"/"Próximamente." O "SOLICITUDES") ya cumplió su propósito y
+// quedó obsoleto. Ahora se exige el título real exacto ("SOLICITUDES") Y el
+// nombre de una solicitud pending fake ("Ana López") para confirmar que la
+// data poblada del harness realmente se renderiza, no solo un texto
+// estático.
 
 import 'dart:convert';
 import 'dart:io';
@@ -455,18 +457,21 @@ Future<void> _pumpSolicitudes(
     return;
   }
 
-  // Guard laxo (WU-01): acepta el placeholder actual (`ProximamenteScreen`,
-  // título "INVITACIONES" + texto "Próximamente.") o el título real futuro
-  // ("SOLICITUDES", WU-04) — así el harness no requiere edición cuando la
-  // screen real reemplace al placeholder.
+  // Guard endurecido (WU-07): título real exacto + nombre de una solicitud
+  // pending fake — confirma que la screen real está montada Y que la data
+  // poblada (links + perfiles) llegó hasta el render, no solo el título.
   expect(
-    find.textContaining('INVITACIONES').evaluate().isNotEmpty ||
-        find.textContaining('Próximamente').evaluate().isNotEmpty ||
-        find.textContaining('SOLICITUDES').evaluate().isNotEmpty,
+    find.text('SOLICITUDES').evaluate().isNotEmpty,
     isTrue,
-    reason: 'l10n español ausente o pantalla no renderizada — el locale del '
-        'harness no está resolviendo a es_AR o los overrides no matchearon '
-        'la pantalla montada',
+    reason: 'Título "SOLICITUDES" ausente — la screen real de Solicitudes no '
+        'se montó (regresión al placeholder o l10n español ausente).',
+  );
+  expect(
+    find.textContaining('Ana López').evaluate().isNotEmpty,
+    isTrue,
+    reason: 'Nombre de la solicitud pending fake ("Ana López") ausente — '
+        'trainerLinksStreamProvider o userPublicProfileProvider no están '
+        'resolviendo la data poblada del harness.',
   );
 }
 
