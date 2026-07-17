@@ -20,7 +20,8 @@ import '../../../../coach/presentation/agenda_formatters.dart';
 import '../../../../payments/application/billing_providers.dart'
     show athleteBillingProvider;
 import '../../../../payments/domain/payment.dart';
-import '../pagos/widgets/payment_format.dart' show fmtArs;
+import '../pagos/widgets/payment_format.dart' show fmtArs, groupThousands;
+import '../pagos/widgets/thousands_input_formatter.dart';
 
 /// Dialog de cobro por LOTE (Slice 2b).
 ///
@@ -85,7 +86,9 @@ class _BatchCobrarDialogState extends ConsumerState<BatchCobrarDialog> {
     // microtask).
     final billing = ref.read(athleteBillingProvider(_athleteId)).valueOrNull;
     _amountController = TextEditingController(
-      text: billing != null ? (billing.amountArs * _count).toString() : '',
+      text: billing != null
+          ? groupThousands((billing.amountArs * _count).toString())
+          : '',
     );
     _conceptController =
         TextEditingController(text: '$_count $_sesionesLabel'); // i18n
@@ -118,7 +121,7 @@ class _BatchCobrarDialogState extends ConsumerState<BatchCobrarDialog> {
 
   Future<void> _confirm() async {
     if (_billing) return; // guard de doble-tap (mismo idiom que Slice 2a).
-    final amount = int.tryParse(_amountController.text.trim());
+    final amount = parseGroupedInt(_amountController.text);
     final concept = _conceptController.text.trim();
 
     if (amount == null || amount <= 0) {
@@ -267,6 +270,7 @@ class _BatchCobrarDialogState extends ConsumerState<BatchCobrarDialog> {
               TextField(
                 controller: _amountController,
                 keyboardType: TextInputType.number,
+                inputFormatters: [ThousandsSeparatorInputFormatter()],
                 style: GoogleFonts.barlow(
                     fontSize: 14, color: palette.textPrimary),
                 decoration: deco('Ej: 15000'), // i18n
