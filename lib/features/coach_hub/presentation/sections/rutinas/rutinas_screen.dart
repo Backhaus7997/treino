@@ -5,7 +5,6 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/app_motion.dart';
 import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/tokens/primitives.dart';
@@ -56,7 +55,11 @@ class RutinasScreen extends ConsumerWidget {
             delay: AppMotion.stagger(1),
             child: Text(
               'Elegí un alumno para armarle una rutina.', // i18n
-              style: GoogleFonts.barlow(color: palette.textMuted, fontSize: 14),
+              style: TextStyle(
+                fontFamily: AppFonts.barlow,
+                color: palette.textMuted,
+                fontSize: 14,
+              ),
             ),
           ),
           const SizedBox(height: 20),

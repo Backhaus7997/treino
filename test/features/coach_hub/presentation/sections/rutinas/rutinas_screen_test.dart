@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/app/theme/tokens/primitives.dart';
 import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
@@ -138,6 +139,24 @@ void main() {
       );
       // count = alumnos no-pending deduplicados.
       expect(find.text('1'), findsOneWidget);
+    });
+
+    testWidgets(
+        'the subtitle uses AppFonts.barlow directly instead of '
+        'GoogleFonts.barlow() — the latter loads the variant asynchronously '
+        '(fontFamily "Barlow_400", not "Barlow") and renders as tofu in the '
+        'evidence goldens before the async load resolves',
+        (tester) async {
+      await _pumpRutinas(tester, links: [
+        _link(id: '1', status: TrainerLinkStatus.active),
+      ], names: {
+        'a1': 'Ana Activa',
+      });
+
+      final subtitle = tester.widget<Text>(
+        find.text('Elegí un alumno para armarle una rutina.'),
+      );
+      expect(subtitle.style?.fontFamily, AppFonts.barlow);
     });
 
     testWidgets(

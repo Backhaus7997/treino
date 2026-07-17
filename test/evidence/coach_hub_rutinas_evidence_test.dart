@@ -47,17 +47,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
-// ignore: implementation_imports
-// Necesario para desactivar el fetch de red de `GoogleFonts.barlow(...)` /
-// `GoogleFonts.barlowCondensed(...)` (llamados directamente por
-// `rutinas_screen.dart` / `athlete_routines_screen.dart`, a diferencia del
-// resto del kit que usa la fuente del theme). Sin esto, `loadFontIfNecessary`
-// intenta un fetch HTTP real (bloqueado en este entorno), el `Future`
-// fire-and-forget queda sin manejar y el test crashea con
-// "A test overrode FlutterError.onError but..." — ver `_pumpRutinas` donde
-// se puebla `gfb.assetManifest` con los TTF reales de `test/fonts/` para que
-// la resolución de fuente tome el camino de asset (sin red, sin excepción).
-import 'package:google_fonts/src/google_fonts_base.dart' as gfb;
 import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:treino/app/theme/app_palette.dart';
@@ -284,44 +273,6 @@ Future<void> _loadFontFamily(String family, List<String> paths) async {
   await loader.load();
 }
 
-// ──────────────────────────────────────────────────────────────────────────────
-// `AssetManifest` fake que le hace creer a `package:google_fonts` que
-// Barlow/BarlowCondensed ya están bundleadas como asset — así resuelve por
-// `rootBundle.load(...)` (sin red, sin validación de hash) en vez de intentar
-// el fetch HTTP real. Las claves son justamente los TTF reales en
-// `test/fonts/` (mismos que carga `_loadTestFonts`), y el mock del canal
-// `flutter/assets` en `_installFakeGoogleFontsAssets` les devuelve los bytes.
-// ──────────────────────────────────────────────────────────────────────────────
-const _fakeGoogleFontsAssetPaths = [
-  'test/fonts/Barlow-Regular.ttf',
-  'test/fonts/Barlow-Medium.ttf',
-  'test/fonts/Barlow-SemiBold.ttf',
-  'test/fonts/Barlow-Bold.ttf',
-  'test/fonts/BarlowCondensed-Regular.ttf',
-  'test/fonts/BarlowCondensed-Bold.ttf',
-];
-
-class _FakeGoogleFontsAssetManifest implements AssetManifest {
-  @override
-  List<String> listAssets() => _fakeGoogleFontsAssetPaths;
-
-  @override
-  List<AssetMetadata>? getAssetVariants(String key) => null;
-}
-
-/// Instala el `AssetManifest` fake + un handler del canal `flutter/assets`
-/// que devuelve los TTF reales para esas claves. Ver comentario del import de
-/// `google_fonts_base.dart` para el porqué.
-void _installFakeGoogleFontsAssets() {
-  gfb.assetManifest = _FakeGoogleFontsAssetManifest();
-  TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-      .setMockMessageHandler('flutter/assets', (ByteData? message) async {
-    if (message == null) return null;
-    final key = utf8.decode(message.buffer.asUint8List());
-    return _readTtf(key);
-  });
-}
-
 Future<String> _resolvePackageRoot(String packageName) async {
   final configFile = File('.dart_tool/package_config.json');
   final config =
@@ -404,27 +355,6 @@ ThemeData _evidenceTheme({required AppPalette palette, required bool dark}) {
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
-// Silencia el ruido async conocido de `GoogleFonts.barlowCondensed(...)`
-// cuando intenta resolver la fuente por red y la red está bloqueada en el
-// entorno de test. Ver coach_hub_alumnos_evidence_test.dart para el
-// razonamiento completo.
-// ──────────────────────────────────────────────────────────────────────────────
-void _ignoreKnownGoogleFontsAsyncErrors() {
-  final previousOnError = FlutterError.onError;
-  FlutterError.onError = (FlutterErrorDetails details) {
-    final message = details.exceptionAsString();
-    final isGoogleFontsNetworkError = message.contains('google_fonts') ||
-        message.contains('Failed to load font') ||
-        message.contains('allowRuntimeFetching');
-    if (isGoogleFontsNetworkError) return;
-    previousOnError?.call(details);
-  };
-  // CRÍTICO: restaurar el handler original al cerrar el test (ver
-  // coach_hub_alumnos_evidence_test.dart — mismo razonamiento).
-  addTearDown(() => FlutterError.onError = previousOnError);
-}
-
-// ──────────────────────────────────────────────────────────────────────────────
 // Helper: monta el shell real (CoachHubScaffold) con el selector o el
 // detalle REAL en [initialLocation], GoRouter + proveedores falsos
 // POBLADOS.
@@ -435,7 +365,6 @@ Future<void> _pumpRutinas(
   required Size physicalSize,
   required String initialLocation,
 }) async {
-  _ignoreKnownGoogleFontsAsyncErrors();
   tester.view.physicalSize = physicalSize;
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.resetPhysicalSize);
@@ -622,7 +551,6 @@ void main() {
 
   setUpAll(() async {
     await _loadTestFonts();
-    _installFakeGoogleFontsAssets();
     goldenFileComparator = _EvidenceComparator(Platform.script.toFilePath());
   });
 
